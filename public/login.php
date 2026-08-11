@@ -17,17 +17,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $user = trim(sanitize_text_field($_POST['username'] ?? ''));
   $clientIp = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
   $rateLimiter = new \SCM\Support\FileRateLimiter(SCM_STORAGE_PATH . '/data/rate-limits');
+  $ipKey = 'login-v2-ip|' . $clientIp;
+  $userKey = 'login-v2-user|' . $clientIp . '|' . strtolower($user);
 
-  $withinIpLimit = $rateLimiter->consume('login-ip|' . $clientIp, 30, 900);
-  $withinUserLimit = $withinIpLimit && $rateLimiter->consume(
-    'login-user|' . $clientIp . '|' . strtolower($user),
-    10,
-    900
-  );
-  $withinAttemptLimit = $withinIpLimit && $withinUserLimit;
+  $ipRetryAfter = $rateLimiter->retryAfter($ipKey, 30, 900);
+  $userRetryAfter = $rateLimiter->retryAfter($userKey, 10, 900);
+  $retryAfter = max($ipRetryAfter, $userRetryAfter);
+  $withinAttemptLimit = $retryAfter === 0;
   if (!$withinAttemptLimit) {
     http_response_code(429);
-    $error = 'Demasiados intentos. Espera unos minutos antes de volver a intentar.';
+    header('Retry-After: ' . $retryAfter);
+    $minutes = max(1, (int) ceil($retryAfter / 60));
+    $error = sprintf(
+      'Demasiados intentos fallidos. Intenta nuevamente en %d %s.',
+      $minutes,
+      $minutes === 1 ? 'minuto' : 'minutos'
+    );
   }
 
   $token  = $_POST['_csrf_token'] ?? '';
@@ -39,9 +44,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pass = $_POST['password'] ?? '';
 
     if ($scmAuth->attempt($user, $pass)) {
+      $rateLimiter->clear($ipKey);
+      $rateLimiter->clear($userKey);
       header('Location: ' . SCM_BASE_URL . '/index.php');
       exit;
     }
+
+    $rateLimiter->consume($ipKey, 30, 900);
+    $rateLimiter->consume($userKey, 10, 900);
     $error = 'Usuario o contraseña incorrectos.';
   }
 }

@@ -50,11 +50,6 @@ final class Auth
 
     if (!$isHashed && $this->allowLegacyPasswords && hash_equals($storedPass, $pass)) {
       $passwordOk = true;
-      $this->db->update($table, [
-        'pass_others_apss' => password_hash($pass, PASSWORD_DEFAULT),
-      ], [
-        '_ID' => (int) $row['_ID'],
-      ]);
     }
 
     if (!$passwordOk) {

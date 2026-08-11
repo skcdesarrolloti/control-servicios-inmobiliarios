@@ -78,7 +78,7 @@ Las clases fachada grandes se conservaron para mantener compatibilidad con la ba
 ## Seguridad y operación
 
 - No se guardan credenciales, secretos, datos, logs ni adjuntos en Git.
-- Las contraseñas nuevas deben usar hashes de PHP. El acceso con contraseñas antiguas en texto plano está desactivado; `AUTH_ALLOW_LEGACY_PASSWORDS=true` lo habilita temporalmente y actualiza el hash al iniciar sesión.
+- Las contraseñas con hash de PHP se validan con `password_verify()`. `AUTH_ALLOW_LEGACY_PASSWORDS=true` permite validar las contraseñas antiguas en texto plano sin modificar el valor almacenado, para conservar la compatibilidad con las demás aplicaciones que comparten la tabla de funcionarios.
 - Los adjuntos nuevos se validan por MIME/tamaño, se guardan fuera de `public/` y se sirven con firma HMAC.
 - La ruta `/uploads/*` existe solo para compatibilidad con enlaces históricos. Los adjuntos nuevos no deben usarla.
 - El login tiene límite de intentos y las operaciones autenticadas usan CSRF.

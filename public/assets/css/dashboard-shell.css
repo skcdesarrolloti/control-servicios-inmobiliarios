@@ -10,13 +10,13 @@
           font-family: 'Poppins', sans-serif;
           background:
             radial-gradient(circle at 8% 0%, rgba(255, 122, 0, .10), transparent 26%),
-            radial-gradient(circle at 95% 0%, rgba(47, 111, 167, .10), transparent 32%),
-            #f3f7fc;
-          color: #1c3048;
+            radial-gradient(circle at 95% 0%, rgba(52, 65, 73, .08), transparent 32%),
+            #f5f6f7;
+          color: #263238;
         }
 
         .top-bar {
-          background: linear-gradient(135deg, #1f4c78, #2d6ea7);
+          background: linear-gradient(135deg, #1f292e, #3b474d);
           color: #fff;
           padding: .85rem 1.5rem;
           display: flex;
@@ -24,8 +24,8 @@
           justify-content: space-between;
           gap: 1rem;
           flex-wrap: wrap;
-          border-bottom: 1px solid rgba(255, 255, 255, .2);
-          box-shadow: 0 8px 24px rgba(16, 41, 68, .25);
+          border-bottom: 2px solid rgba(241, 144, 1, .78);
+          box-shadow: 0 8px 24px rgba(20, 28, 32, .25);
         }
 
         .top-bar .brand {
@@ -42,12 +42,13 @@
           width: 142px;
           min-height: 40px;
           border-radius: 8px;
-          background: #fff;
+          background: linear-gradient(145deg, #344149, #1f292e);
+          border: 1px solid rgba(241, 144, 1, .5);
           display: flex;
           align-items: center;
           justify-content: center;
           padding: .35rem .55rem;
-          box-shadow: 0 8px 18px rgba(13, 30, 47, .18);
+          box-shadow: 0 8px 18px rgba(9, 15, 18, .28);
           flex: 0 0 auto;
         }
 

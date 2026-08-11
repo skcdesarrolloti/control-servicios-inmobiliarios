@@ -22,7 +22,8 @@ body {
           width: 154px;
           min-height: 48px;
           border-radius: 8px;
-          background: #fff;
+          background: linear-gradient(145deg, #344149, #1f292e);
+          border: 1px solid rgba(241, 144, 1, .5);
           display: inline-flex;
           align-items: center;
           justify-content: center;

@@ -113,14 +113,14 @@
     .logo-plate {
       width: min(230px, 100%);
       min-height: 72px;
-      background: #fff;
-      border: 1px solid #eef2f7;
+      background: linear-gradient(145deg, #344149, #1f292e);
+      border: 1px solid rgba(241, 144, 1, .5);
       border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: .7rem 1rem;
-      box-shadow: 0 8px 18px rgba(15, 23, 42, .08);
+      box-shadow: 0 8px 18px rgba(15, 23, 42, .18);
       flex: 0 0 auto;
     }
 

@@ -7,10 +7,34 @@ define('SCM_PUBLIC_PATH', SCM_ROOT . '/public');
 define('SCM_STORAGE_PATH', SCM_ROOT . '/storage');
 define('SCM_RESOURCES_PATH', SCM_ROOT . '/resources');
 define('SCM_BASE_PATH', SCM_PUBLIC_PATH);
-define('SCM_VERSION', '3.0.0');
+define('SCM_VERSION', '3.0.1');
 
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');
+ini_set('log_errors', '1');
+error_reporting(E_ALL);
+
+$logsDir = SCM_STORAGE_PATH . '/logs';
+if ((is_dir($logsDir) || @mkdir($logsDir, 0750, true)) && is_writable($logsDir)) {
+  ini_set('error_log', $logsDir . '/php-error.log');
+}
+
+set_exception_handler(static function (\Throwable $exception): never {
+  error_log(sprintf(
+    '[uncaught] %s in %s:%d',
+    $exception->getMessage(),
+    $exception->getFile(),
+    $exception->getLine()
+  ));
+
+  if (!headers_sent()) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=UTF-8');
+  }
+
+  echo 'No fue posible iniciar la aplicación.';
+  exit(1);
+});
 
 $composerAutoload = SCM_ROOT . '/vendor/autoload.php';
 if (is_readable($composerAutoload)) {
@@ -44,7 +68,6 @@ if (strlen((string) $scmConfig['app_secret']) < 32) {
 define('SCM_APP_SECRET', (string) $scmConfig['app_secret']);
 define('SCM_UPLOAD_MAX_BYTES', max(1024, (int) ($scmConfig['upload_max_bytes'] ?? 10485760)));
 
-$logsDir = SCM_STORAGE_PATH . '/logs';
 if (!is_dir($logsDir) && !mkdir($logsDir, 0750, true) && !is_dir($logsDir)) {
   throw new \RuntimeException('No se pudo crear el directorio de logs.');
 }
@@ -52,9 +75,7 @@ if (!is_dir($logsDir) && !mkdir($logsDir, 0750, true) && !is_dir($logsDir)) {
 $debug = (bool) ($scmConfig['debug'] ?? false);
 ini_set('display_errors', $debug ? '1' : '0');
 ini_set('display_startup_errors', $debug ? '1' : '0');
-ini_set('log_errors', '1');
 ini_set('error_log', $logsDir . '/php-error.log');
-error_reporting(E_ALL);
 
 date_default_timezone_set((string) ($scmConfig['timezone'] ?? 'America/Bogota'));
 
