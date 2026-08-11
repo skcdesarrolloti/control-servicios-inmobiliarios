@@ -387,10 +387,6 @@ trait PublicPortalQueriesConcern
       return ['ok' => false, 'message' => 'Encontramos el codigo, pero el inmueble no esta disponible actualmente.', 'property' => null];
     }
 
-    if (!array_key_exists('lookup_value', $options)) {
-      $options['lookup_value'] = $lookupValue;
-    }
-
     return [
       'ok' => true,
       'message' => '',
