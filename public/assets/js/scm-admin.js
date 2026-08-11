@@ -1160,9 +1160,12 @@
     var title = sub.querySelector(".scm-case-submodal-title");
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = caseBtn.dataset.ticketPk || "";
+    var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
 
     if (title) {
-      title.textContent = "Agregar nota al ticket";
+      title.textContent = isPublicPqr
+        ? "Agregar nota a la solicitud"
+        : "Agregar nota al ticket";
     }
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
@@ -1171,7 +1174,11 @@
         '<input type="hidden" name="ticket_pk" value="' +
         escHtml(ticketPk) +
         '">' +
-        '<label class="scm-seg-field"><span>Nota</span><textarea name="observacion" rows="6" required placeholder="Escribe una nota interna para el ticket..."></textarea></label>' +
+        '<label class="scm-seg-field"><span>Nota</span><textarea name="observacion" rows="6" required placeholder="' +
+        (isPublicPqr
+          ? "Escribe una nota interna para la solicitud..."
+          : "Escribe una nota interna para el ticket...") +
+        '"></textarea></label>' +
         '<div class="scm-seg-actions">' +
         '<button type="submit" class="scm-btn-primary">Guardar nota</button>' +
         '<span class="scm-seg-msg" aria-live="polite"></span>' +
@@ -1191,9 +1198,10 @@
     var title = sub.querySelector(".scm-case-submodal-title");
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = caseBtn.dataset.ticketPk || "";
+    var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
 
     if (title) {
-      title.textContent = "Postergar ticket";
+      title.textContent = isPublicPqr ? "Postergar solicitud" : "Postergar ticket";
     }
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
@@ -1202,11 +1210,17 @@
         '<input type="hidden" name="ticket_pk" value="' +
         escHtml(ticketPk) +
         '">' +
-        '<p class="scm-muted">Esta acci&oacute;n mantendr&aacute; el ticket abierto y marcar&aacute; el estado administrativo como Postergado.</p>' +
-        '<label class="scm-seg-field"><span>Motivo de postergaci&oacute;n</span><textarea name="observacion" rows="6" required placeholder="Describe por qu&eacute; se posterga el ticket..."></textarea></label>' +
+        '<p class="scm-muted">Esta acci&oacute;n mantendr&aacute; ' +
+        (isPublicPqr ? "la solicitud" : "el ticket") +
+        ' abierta y marcar&aacute; el estado administrativo como Postergado.</p>' +
+        '<label class="scm-seg-field"><span>Motivo de postergaci&oacute;n</span><textarea name="observacion" rows="6" required placeholder="' +
+        (isPublicPqr
+          ? "Describe por qu&eacute; se posterga la solicitud..."
+          : "Describe por qu&eacute; se posterga el ticket...") +
+        '"></textarea></label>' +
         '<label class="scm-seg-field"><span>Imagenes / Evidencias (opcional)</span><input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
         renderTicketDocumentFields() +
-        renderNotifyTargets() +
+        renderNotifyTargets(isPublicPqr ? ["arrendatario", "propietario"] : []) +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Guardar postergaci&oacute;n</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
@@ -1241,7 +1255,8 @@
     var title = sub.querySelector(".scm-case-submodal-title");
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = caseBtn.dataset.ticketPk || "";
-    if (title) title.textContent = "Responder ticket";
+    var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
+    if (title) title.textContent = isPublicPqr ? "Responder solicitud" : "Responder ticket";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
       body.innerHTML =
@@ -1255,7 +1270,7 @@
         '<label class="scm-seg-field"><span>Respuesta</span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
         '<label class="scm-seg-field"><span>Imagenes (opcional)</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
         renderTicketDocumentFields() +
-        renderNotifyTargets() +
+        renderNotifyTargets(isPublicPqr ? ["arrendatario", "propietario"] : []) +
         '<div class="scm-seg-actions"><label class="scm-seg-check"><input type="checkbox" name="cerrar_ticket" value="1"> Cerrar al responder</label><button type="submit" class="scm-btn-primary">Publicar y enviar correo</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
@@ -1860,7 +1875,8 @@
     var title = sub.querySelector(".scm-case-submodal-title");
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = caseBtn.dataset.ticketPk || "";
-    if (title) title.textContent = "Cerrar ticket";
+    var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
+    if (title) title.textContent = isPublicPqr ? "Cerrar solicitud" : "Cerrar ticket";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
       body.innerHTML =
@@ -1868,7 +1884,9 @@
         '<input type="hidden" name="ticket_pk" value="' +
         escHtml(ticketPk) +
         '">' +
-        '<p class="scm-muted">Esta acci&oacute;n cerrar&aacute; el ticket y marcar&aacute; el estado administrativo como Finalizado.</p>' +
+        '<p class="scm-muted">Esta acci&oacute;n cerrar&aacute; ' +
+        (isPublicPqr ? "la solicitud" : "el ticket") +
+        ' y marcar&aacute; el estado administrativo como Finalizado.</p>' +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Confirmar cierre</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
@@ -1964,6 +1982,7 @@
           (isPublicPqr ? "Solicitud creada desde un portal web" : "Ticket de servicios inmobiliarios");
       }
       modal.dataset.ticketPk = btn.dataset.ticketPk || "";
+      modal.dataset.caseKind = isPublicPqr ? "public-pqr" : "";
       modal.dataset.idInmuebleWeb = btn.dataset.idInmuebleWeb || "";
       modal.dataset.idInmuebleData = btn.dataset.idInmuebleData || "";
       modal.dataset.ubicacionGoogleMaps = btn.dataset.ubicacionGoogleMaps || "";
@@ -2054,6 +2073,22 @@
             '<button type="button" class="scm-case-work-btn" data-scm-open-pqr-transfer-from-case data-ticket-pk="' +
             escHtml(btn.dataset.ticketPk || "") +
             '">Trasladar solicitud</button>';
+        }
+        if (isPublicPqr) {
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>';
+          if (statusBucket !== "cerrados") {
+            caseActionsHtml +=
+              '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar solicitud</button>';
+            caseActionsHtml +=
+              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder solicitud / enviar correo</button>';
+            caseActionsHtml +=
+              '<button type="button" class="scm-case-work-btn" data-scm-close-ticket>Cerrar solicitud</button>';
+          }
+          if (statusBucket === "postergados" || statusBucket === "cerrados") {
+            caseActionsHtml +=
+              '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket>Activar solicitud</button>';
+          }
         }
         if (!isPublicPqr && seguimientoWrap) {
           caseActionsHtml +=

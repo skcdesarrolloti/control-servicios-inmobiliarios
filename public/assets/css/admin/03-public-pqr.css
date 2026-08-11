@@ -877,6 +877,84 @@
   padding: 10px;
 }
 
+/* Solicitudes Web needs a little more air inside the shared case popup. */
+#scm-app .scm-case-modal.open .scm-case-dialog {
+  max-height: calc(100vh - 28px);
+}
+
+#scm-app .scm-case-modal.open .scm-case-head {
+  padding: 18px 62px 18px 22px !important;
+}
+
+#scm-app .scm-case-modal.open .scm-case-body {
+  padding: 24px !important;
+}
+
+#scm-app .scm-case-modal.open .scm-case-layout {
+  grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) !important;
+  gap: 18px !important;
+}
+
+#scm-app .scm-public-pqr-case-detail {
+  display: grid;
+  gap: 14px;
+}
+
+#scm-app .scm-public-pqr-case-detail h4 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+#scm-app .scm-public-pqr-description,
+#scm-app .scm-public-pqr-detail-grid > div,
+#scm-app .scm-case-work-actions {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 8px;
+}
+
+#scm-app .scm-public-pqr-description {
+  padding: 14px 16px;
+}
+
+#scm-app .scm-public-pqr-description span,
+#scm-app .scm-public-pqr-detail-grid span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-public-pqr-description p {
+  margin: 8px 0 0;
+  color: #1e293b;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+#scm-app .scm-public-pqr-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+#scm-app .scm-public-pqr-detail-grid > div {
+  padding: 12px 14px;
+}
+
+#scm-app .scm-public-pqr-detail-grid strong {
+  display: block;
+  margin-top: 5px;
+  color: #1e293b;
+  font-size: 13px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
 /* ============================================================
    Maintenance header readability + metrics tab
    ============================================================ */

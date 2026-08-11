@@ -465,6 +465,16 @@
 
     function refreshCaseAfterSave(ticketPk, fromNode) {
       closeCaseSubmodalForNode(fromNode);
+      var openModal = root.querySelector("#scm-case-modal.open");
+      if (
+        openModal &&
+        openModal.dataset &&
+        openModal.dataset.caseKind === "public-pqr"
+      ) {
+        closeCaseModal(openModal);
+        refreshActiveTab();
+        return;
+      }
       var refreshed = refreshActiveTab();
       if (!refreshed || typeof refreshed.then !== "function") {
         reopenCaseFromUpdatedCard(ticketPk);
@@ -475,13 +485,14 @@
       });
     }
 
-    function finishActivateTicket(ticketPk, triggerNode) {
+    function finishActivateTicket(ticketPk, triggerNode, caseBtn) {
+      var isPublicPqr = (caseBtn && caseBtn.dataset && caseBtn.dataset.caseKind === "public-pqr");
       var openModal = root.querySelector("#scm-case-modal.open");
       if (openModal) {
         closeCaseModal(openModal);
       }
       return refreshActiveTab().then(function () {
-        showToast("success", "Ticket activado.");
+        showToast("success", isPublicPqr ? "Solicitud activada." : "Ticket activado.");
         if (triggerNode && triggerNode.focus) {
           triggerNode.focus();
         }
@@ -523,7 +534,7 @@
                 "No se pudo activar el ticket.",
             );
           }
-          return finishActivateTicket(ticketPk, triggerNode);
+          return finishActivateTicket(ticketPk, triggerNode, caseBtn);
         })
         .catch(function (err) {
           showToast("error", err.message || "No se pudo activar el ticket.");
@@ -540,12 +551,15 @@
         showToast("error", "No se encontro el ticket.");
         return;
       }
+      var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
       if (window.Swal && typeof window.Swal.fire === "function") {
         window.Swal.fire({
-          title: "Activar ticket",
+          title: isPublicPqr ? "Activar solicitud" : "Activar ticket",
           input: "textarea",
           inputLabel: "Motivo",
-          inputPlaceholder: "Escribe el motivo de activacion",
+          inputPlaceholder: isPublicPqr
+            ? "Escribe el motivo de activacion de la solicitud"
+            : "Escribe el motivo de activacion",
           inputAttributes: { "aria-label": "Motivo de activacion" },
           showCancelButton: true,
           confirmButtonText: "Activar",
@@ -619,6 +633,15 @@
         if (statusKey && tabFetchers[statusKey]) {
           return tabFetchers[statusKey].fetchTab(
             new FormData(tabFetchers[statusKey].form),
+          );
+        }
+      } else if (activeKey === "pqr-publico" && activePanel) {
+        var publicPqrForm = activePanel.querySelector(
+          "form.scm-public-pqr-filter-form",
+        );
+        if (publicPqrForm) {
+          publicPqrForm.dispatchEvent(
+            new Event("submit", { bubbles: true, cancelable: true }),
           );
         }
       }

@@ -13,6 +13,19 @@
   gap: 10px !important;
 }
 
+#scm-app .scm-case-modal.open .scm-case-head {
+  padding: 18px 62px 18px 22px !important;
+}
+
+#scm-app .scm-case-modal.open .scm-case-body {
+  padding: 24px !important;
+}
+
+#scm-app .scm-case-modal.open .scm-case-layout {
+  grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) !important;
+  gap: 18px !important;
+}
+
 /* Popup timeline fix: full width without horizontal scroll in Ver caso. */
 #scm-app .scm-case-main .scm-modal-timeline-only .scm-timeline {
   display: flex !important;
