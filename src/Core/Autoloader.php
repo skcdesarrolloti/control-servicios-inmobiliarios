@@ -22,7 +22,7 @@ final class Autoloader
             }
 
             $relative = substr($class, strlen($prefix));
-            if ($relative === false || $relative === '') {
+            if ($relative === '') {
                 return;
             }
 

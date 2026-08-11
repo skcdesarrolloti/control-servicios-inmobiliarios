@@ -1,0 +1,10 @@
+parameters:
+  level: 5
+  paths:
+    - src/Core
+    - src/Http/Response
+    - src/Modules/PublicTickets/SignedAccessTokenService.php
+    - src/Support/FileRateLimiter.php
+    - src/Support/StoredFileService.php
+  bootstrapFiles:
+    - tests/phpstan-bootstrap.php

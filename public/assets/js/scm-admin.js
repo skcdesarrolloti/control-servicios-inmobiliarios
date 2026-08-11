@@ -1,0 +1,2359 @@
+(function () {
+  "use strict";
+
+  function parseRuntime(root) {
+    var raw = root.getAttribute("data-scm-runtime") || "";
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error("SCM runtime parse error:", err);
+      return null;
+    }
+  }
+
+  function escHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function scmNotify(type, message, title) {
+    var icon = type === "error" ? "error" : "success";
+    if (window.Swal && typeof window.Swal.fire === "function") {
+      window.Swal.fire({
+        icon: icon,
+        title: title || (type === "error" ? "No se pudo guardar" : "Guardado"),
+        text: message || "",
+        timer: type === "error" ? undefined : 2200,
+        timerProgressBar: type !== "error",
+        confirmButtonColor: "#1f4f99",
+      });
+      return;
+    }
+    if (type === "error") {
+      alert(message || "No se pudo guardar.");
+    }
+  }
+
+  function bindTabs(root, runtime) {
+    var tabs = root.querySelectorAll(".scm-tab[data-tab]");
+    if (!tabs.length) {
+      return;
+    }
+
+    function activateOpenTopic(target) {
+      if (!target) {
+        return false;
+      }
+      var openWrap = root.querySelector("#scm-panel-abiertos .scm-open-bucket");
+      if (!openWrap) {
+        return false;
+      }
+      var targetPanel = openWrap.querySelector(
+        '.scm-open-topic-panel[data-open-topic="' + target + '"]',
+      );
+      if (!targetPanel) {
+        return false;
+      }
+      openWrap.querySelectorAll(".scm-open-topic-tab").forEach(function (tab) {
+        tab.classList.toggle(
+          "active",
+          tab.getAttribute("data-open-target") === target,
+        );
+      });
+      openWrap
+        .querySelectorAll(".scm-open-topic-panel")
+        .forEach(function (panel) {
+          panel.classList.toggle(
+            "active",
+            panel.getAttribute("data-open-topic") === target,
+          );
+        });
+      return true;
+    }
+
+    function activateTab(target) {
+      if (!target) {
+        return false;
+      }
+
+      var panelTarget = root.querySelector("#" + target);
+      if (!panelTarget) {
+        return false;
+      }
+
+      tabs.forEach(function (item) {
+        item.classList.toggle("active", item.dataset.tab === target);
+      });
+
+      root.querySelectorAll(".scm-tab-panel").forEach(function (panel) {
+        panel.classList.toggle("active", panel.id === target);
+      });
+
+      return true;
+    }
+
+    root.querySelectorAll(".scm-open-topic-tab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        activateOpenTopic(tab.getAttribute("data-open-target") || "");
+      });
+    });
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        activateTab(tab.dataset.tab || "");
+      });
+    });
+
+    var initialTab = "";
+    if (runtime && typeof runtime.initialTab === "string") {
+      initialTab = runtime.initialTab.trim();
+    }
+
+    if (!initialTab) {
+      try {
+        var params = new URL(window.location.href).searchParams;
+        initialTab = (
+          params.get("scm_tab") ||
+          params.get("tab") ||
+          ""
+        ).trim();
+      } catch (_e) {}
+    }
+
+    if (initialTab && activateTab(initialTab)) {
+      if (runtime && typeof runtime.initialOpenTopic === "string") {
+        activateOpenTopic(runtime.initialOpenTopic.trim());
+      }
+      var iframeMode = !!(runtime && runtime.iframeMode);
+      if (iframeMode) {
+        var tabsBar = root.querySelector(".scm-tabs");
+        if (tabsBar) {
+          tabsBar.style.display = "none";
+        }
+        var guideBar = root.querySelector(".scm-guide-bar");
+        if (guideBar) {
+          guideBar.style.display = "none";
+        }
+      }
+    }
+  }
+
+  window.scmToggleTL = function (btn) {
+    if (!btn) {
+      return;
+    }
+    var tr = btn.closest("tr");
+    if (!tr) {
+      return;
+    }
+    var next = tr.nextElementSibling;
+    if (!next || !next.classList.contains("scm-tl-row")) {
+      return;
+    }
+
+    var hidden = next.style.display === "none" || next.style.display === "";
+    next.style.display = hidden ? "table-row" : "none";
+    btn.innerHTML = hidden ? "&#9650; Timeline" : "&#9660; Timeline";
+  };
+
+  function findRootFromNode(node) {
+    if (!node || !node.closest) {
+      return null;
+    }
+    return node.closest("#scm-app.scm-wrap[data-scm-runtime]");
+  }
+
+  function getCaseModal(root) {
+    if (!root) {
+      return null;
+    }
+    return root.querySelector("#scm-case-modal");
+  }
+
+  function openIframeModal(url, title) {
+    if (!url) {
+      return;
+    }
+    var overlay = document.createElement("div");
+    overlay.className = "scm-iframe-overlay";
+    overlay.innerHTML =
+      '<div class="scm-iframe-box">' +
+      '<div class="scm-iframe-toolbar">' +
+      '<span class="scm-iframe-toolbar-title">' +
+      escHtml(title) +
+      "</span>" +
+      '<button type="button" class="scm-iframe-close" aria-label="Cerrar">&times;</button>' +
+      "</div>" +
+      '<div class="scm-iframe-loader"><div class="scm-iframe-spinner"></div></div>' +
+      '<iframe class="scm-iframe-frame" src="" allowfullscreen></iframe>' +
+      "</div>";
+    document.body.appendChild(overlay);
+    var iframeEl = overlay.querySelector(".scm-iframe-frame");
+    var loaderEl = overlay.querySelector(".scm-iframe-loader");
+    iframeEl.addEventListener("load", function () {
+      if (loaderEl) {
+        loaderEl.style.display = "none";
+      }
+    });
+    iframeEl.src = url;
+    function destroyOverlay() {
+      overlay.removeEventListener("click", onOverlayClick);
+      document.removeEventListener("keydown", onKeyDown);
+      if (overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      }
+    }
+    function onOverlayClick(e) {
+      if (e.target === overlay) {
+        destroyOverlay();
+      }
+    }
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        destroyOverlay();
+      }
+    }
+    overlay.addEventListener("click", onOverlayClick);
+    overlay
+      .querySelector(".scm-iframe-close")
+      .addEventListener("click", destroyOverlay);
+    document.addEventListener("keydown", onKeyDown);
+  }
+
+  function closeCaseModal(modal) {
+    if (!modal) {
+      return;
+    }
+
+    var sub = modal.querySelector(".scm-case-submodal");
+    if (sub) {
+      sub.classList.remove("open");
+    }
+
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("scm-modal-open");
+
+    var body = modal.querySelector("#scm-case-body");
+    if (body) {
+      body.innerHTML = "";
+    }
+    var headActions = modal.querySelector("#scm-case-head-actions");
+    if (headActions) {
+      headActions.innerHTML = "";
+    }
+  }
+
+  function ensureCaseSubmodal(modal) {
+    if (!modal) {
+      return null;
+    }
+    var existing = modal.querySelector(".scm-case-submodal");
+    if (existing) {
+      return existing;
+    }
+
+    var wrap = document.createElement("div");
+    wrap.className = "scm-case-submodal";
+    wrap.setAttribute("aria-hidden", "true");
+    wrap.innerHTML =
+      '<div class="scm-case-submodal-dialog" role="dialog" aria-modal="true">' +
+      '<button type="button" class="scm-case-submodal-close" aria-label="Cerrar detalle">&times;</button>' +
+      '<div class="scm-case-submodal-head"><h4 class="scm-case-submodal-title">Detalle</h4><p class="scm-case-submodal-meta"></p></div>' +
+      '<div class="scm-case-submodal-body"></div>' +
+      "</div>";
+
+    modal.querySelector(".scm-case-dialog").appendChild(wrap);
+
+    function closeSub() {
+      wrap.classList.remove("open");
+      wrap.setAttribute("aria-hidden", "true");
+    }
+
+    wrap.addEventListener("click", function (e) {
+      if (e.target === wrap) {
+        closeSub();
+      }
+    });
+    var closeBtn = wrap.querySelector(".scm-case-submodal-close");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", closeSub);
+    }
+
+    return wrap;
+  }
+
+  function getCasePropertyCode(caseBtn, fallbackNode) {
+    var value = "";
+    if (caseBtn && caseBtn.dataset) {
+      value = String(caseBtn.dataset.idInmuebleWeb || "").trim();
+    }
+    if (!value && fallbackNode && fallbackNode.dataset) {
+      value = String(fallbackNode.dataset.idInmuebleWeb || "").trim();
+    }
+    if (!value || value === "-") {
+      return "";
+    }
+    return value;
+  }
+
+  function setCaseSubmodalMeta(sub, caseBtn) {
+    if (!sub) {
+      return;
+    }
+    var meta = sub.querySelector(".scm-case-submodal-meta");
+    if (!meta) {
+      return;
+    }
+    var propertyCode = getCasePropertyCode(caseBtn, sub.closest(".scm-case-modal"));
+    if (!propertyCode) {
+      meta.textContent = "";
+      meta.style.display = "none";
+      return;
+    }
+    meta.textContent = "Codigo inmueble web: " + propertyCode;
+    meta.style.display = "block";
+  }
+
+  function cleanCaseValue(value) {
+    value = String(value || "").trim();
+    return value === "-" ? "" : value;
+  }
+
+  function readCaseValue(caseBtn, fallbackNode, key) {
+    if (caseBtn && caseBtn.dataset && caseBtn.dataset[key]) {
+      return cleanCaseValue(caseBtn.dataset[key]);
+    }
+    if (fallbackNode && fallbackNode.dataset && fallbackNode.dataset[key]) {
+      return cleanCaseValue(fallbackNode.dataset[key]);
+    }
+    return "";
+  }
+
+  function getCaseLocationPayload(caseBtn, fallbackNode) {
+    return {
+      propertyCode: readCaseValue(caseBtn, fallbackNode, "idInmuebleWeb"),
+      propertyRowId: readCaseValue(caseBtn, fallbackNode, "idInmuebleData"),
+      googleMapsUrl: readCaseValue(
+        caseBtn,
+        fallbackNode,
+        "ubicacionGoogleMaps",
+      ),
+      direccion: readCaseValue(caseBtn, fallbackNode, "direccion"),
+    };
+  }
+
+  function parseCoord(value) {
+    var num = parseFloat(String(value || "").replace(",", "."));
+    return isFinite(num) ? num : null;
+  }
+
+  function parseLatLngPair(text) {
+    var match = String(text || "").match(
+      /(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/,
+    );
+    if (!match) {
+      return null;
+    }
+    var lat = parseCoord(match[1]);
+    var lng = parseCoord(match[2]);
+    if (lat === null || lng === null) {
+      return null;
+    }
+    return { lat: lat, lng: lng };
+  }
+
+  function parseCoordsFromUrl(url) {
+    url = String(url || "");
+    if (!url) {
+      return null;
+    }
+    var decoded = url;
+    try {
+      decoded = decodeURIComponent(url);
+    } catch (e) {}
+
+    var patterns = [
+      /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+      /[?&](?:q|ll|query|destination|marker)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+      /[?&]mlat=(-?\d+(?:\.\d+)?).*?[?&]mlon=(-?\d+(?:\.\d+)?)/,
+      /#map=\d+\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)/,
+    ];
+    for (var i = 0; i < patterns.length; i++) {
+      var match = decoded.match(patterns[i]);
+      if (match) {
+        var lat = parseCoord(match[1]);
+        var lng = parseCoord(match[2]);
+        if (lat !== null && lng !== null) {
+          return { lat: lat, lng: lng };
+        }
+      }
+    }
+    return parseLatLngPair(decoded);
+  }
+
+  function buildOpenStreetMapEmbedUrl(lat, lng) {
+    var delta = 0.0035;
+    var left = (lng - delta).toFixed(6);
+    var right = (lng + delta).toFixed(6);
+    var top = (lat + delta).toFixed(6);
+    var bottom = (lat - delta).toFixed(6);
+    return (
+      "https://www.openstreetmap.org/export/embed.html?bbox=" +
+      left +
+      "%2C" +
+      bottom +
+      "%2C" +
+      right +
+      "%2C" +
+      top +
+      "&layer=mapnik&marker=" +
+      lat.toFixed(6) +
+      "%2C" +
+      lng.toFixed(6)
+    );
+  }
+
+  function buildCaseLocationInfo(caseBtn, fallbackNode) {
+    var payload = getCaseLocationPayload(caseBtn, fallbackNode);
+    var googleUrl = payload.googleMapsUrl;
+    var googleIsUrl = /^https?:\/\//i.test(googleUrl);
+    var osmUrl = "";
+    var coords = null;
+    if (!coords && googleUrl) {
+      coords = parseCoordsFromUrl(googleUrl);
+    }
+
+    if (googleIsUrl && /openstreetmap\.org/i.test(googleUrl)) {
+      osmUrl = googleUrl;
+      googleUrl = "";
+    }
+
+    if (coords) {
+      if (!googleUrl) {
+        googleUrl =
+          "https://www.google.com/maps?q=" + coords.lat + "," + coords.lng;
+      }
+      if (!osmUrl) {
+        osmUrl =
+          "https://www.openstreetmap.org/?mlat=" +
+          coords.lat +
+          "&mlon=" +
+          coords.lng +
+          "#map=18/" +
+          coords.lat +
+          "/" +
+          coords.lng;
+      }
+    }
+
+    var searchText = payload.direccion;
+    if (!googleUrl && searchText) {
+      googleUrl =
+        "https://www.google.com/maps/search/?api=1&query=" +
+        encodeURIComponent(searchText);
+    }
+    if (!osmUrl && searchText) {
+      osmUrl =
+        "https://www.openstreetmap.org/search?query=" +
+        encodeURIComponent(searchText);
+    }
+
+    return {
+      payload: payload,
+      hasLocation: !!(googleUrl || osmUrl || coords),
+      googleUrl: googleUrl,
+      osmUrl: osmUrl,
+      embedUrl: coords ? buildOpenStreetMapEmbedUrl(coords.lat, coords.lng) : "",
+      coordsLabel: coords
+        ? coords.lat.toFixed(6) + ", " + coords.lng.toFixed(6)
+        : "",
+    };
+  }
+
+  function renderCaseLocationPanel(caseBtn, fallbackNode, compact) {
+    var info = buildCaseLocationInfo(caseBtn, fallbackNode);
+    var payload = info.payload;
+    var editLabel = info.hasLocation
+      ? "Actualizar ubicacion"
+      : "Agregar ubicacion";
+    var html =
+      '<section class="scm-case-location-panel' +
+      (compact ? " is-compact" : "") +
+      '">' +
+      '<div class="scm-case-location-head"><div><h4>Ubicacion del inmueble</h4>' +
+      (payload.propertyCode
+        ? '<p>Codigo web: <strong>' + escHtml(payload.propertyCode) + "</strong></p>"
+        : "<p>Sin codigo de inmueble.</p>") +
+      "</div>" +
+      '<button type="button" class="btn btn-outline btn-sm" data-scm-open-location-editor>' +
+      editLabel +
+      "</button></div>";
+
+    if (payload.googleMapsUrl) {
+      html +=
+        '<p class="scm-case-location-source"><strong>Ubicacion guardada:</strong> ' +
+        escHtml(payload.googleMapsUrl) +
+        "</p>";
+    }
+    if (info.coordsLabel) {
+      html +=
+        '<p class="scm-case-location-source"><strong>Coordenadas:</strong> ' +
+        escHtml(info.coordsLabel) +
+        "</p>";
+    }
+    if (!payload.manualLocation && !info.coordsLabel && payload.direccion) {
+      html +=
+        '<p class="scm-case-location-source"><strong>Direccion base:</strong> ' +
+        escHtml(payload.direccion) +
+        "</p>";
+    }
+
+    html += '<div class="scm-case-location-links">';
+    if (info.osmUrl) {
+      html +=
+        '<a class="scm-case-location-link" href="' +
+        escHtml(info.osmUrl) +
+        '" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>';
+    }
+    if (info.googleUrl) {
+      html +=
+        '<a class="scm-case-location-link" href="' +
+        escHtml(info.googleUrl) +
+        '" target="_blank" rel="noopener noreferrer">Google Maps</a>';
+    }
+    if (!info.osmUrl && !info.googleUrl) {
+      html +=
+        '<span class="scm-case-location-empty">No hay ubicacion registrada todavia.</span>';
+    }
+    html += "</div>";
+
+    if (info.embedUrl) {
+      html +=
+        '<div class="scm-case-location-map"><iframe loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="' +
+        escHtml(info.embedUrl) +
+        '" title="Mapa del inmueble"></iframe></div>';
+    }
+
+    html += "</section>";
+    return html;
+  }
+
+  function prependCaseLocationPanel(container, caseBtn, fallbackNode) {
+    if (!container) {
+      return;
+    }
+    var existing = container.querySelector(".scm-case-location-panel");
+    if (existing) {
+      existing.remove();
+    }
+    container.insertAdjacentHTML(
+      "afterbegin",
+      renderCaseLocationPanel(caseBtn, fallbackNode, true),
+    );
+  }
+
+  function renderPropertyLocationEditorHtml(caseBtn, fallbackNode) {
+    var locationInfo = buildCaseLocationInfo(caseBtn, fallbackNode);
+    var payload = locationInfo.payload;
+    return (
+      renderCaseLocationPanel(caseBtn, fallbackNode, false) +
+      '<form class="scm-property-location-form" method="post" autocomplete="off">' +
+      '<input type="hidden" name="ticket_pk" value="' +
+      escHtml(
+        readCaseValue(caseBtn, fallbackNode, "ticketPk") ||
+          readCaseValue(caseBtn, fallbackNode, "ticket"),
+      ) +
+      '">' +
+      '<input type="hidden" name="property_row_id" value="' +
+      escHtml(payload.propertyRowId || "") +
+      '">' +
+      '<input type="hidden" name="property_code" value="' +
+      escHtml(payload.propertyCode || "") +
+      '">' +
+      '<label class="scm-seg-field"><span>Ubicacion del inmueble</span><textarea name="manual_location" rows="4" placeholder="Pega un link de Google Maps, OpenStreetMap, coordenadas lat,lng o una direccion">' +
+      escHtml(payload.googleMapsUrl || "") +
+      "</textarea></label>" +
+      '<p class="scm-muted">Tambien tomamos como apoyo la direccion y las coordenadas actuales del inmueble cuando existen.</p>' +
+      '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">' +
+      (locationInfo.hasLocation
+        ? "Guardar ubicacion manual"
+        : "Agregar ubicacion manual") +
+      '</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+      "</form>"
+    );
+  }
+
+  function openPropertyLocationEditor(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+
+    if (title) {
+      title.textContent = "Ubicacion del inmueble";
+    }
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML = renderPropertyLocationEditorHtml(caseBtn, modal);
+    }
+
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function openPropertyLocationStandaloneEditor(root, caseBtn) {
+    if (!root || !caseBtn) {
+      return;
+    }
+    openStandaloneDetail(root, {
+      title: "Ubicacion del inmueble",
+      html: renderPropertyLocationEditorHtml(caseBtn, null),
+      caseBtn: caseBtn,
+    });
+  }
+
+  function openCaseSubmodal(modal, triggerBtn, targetId) {
+    if (!modal || !targetId) {
+      return;
+    }
+    var source = modal.querySelector("#" + targetId);
+    if (!source) {
+      return;
+    }
+
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub) {
+      return;
+    }
+
+    var clone = source.cloneNode(true);
+    clone.removeAttribute("id");
+    clone.style.display = "";
+    clone.querySelectorAll("[id]").forEach(function (el) {
+      el.removeAttribute("id");
+    });
+
+    var title = "Detalle";
+    var titleNode = source.querySelector("h4");
+    if (titleNode && titleNode.textContent) {
+      title = titleNode.textContent.trim();
+    } else if (triggerBtn && triggerBtn.textContent) {
+      title = triggerBtn.textContent.trim();
+    }
+
+    var subTitle = sub.querySelector(".scm-case-submodal-title");
+    var subBody = sub.querySelector(".scm-case-submodal-body");
+    if (subTitle) {
+      subTitle.textContent = title || "Detalle";
+    }
+    var caseBtn = modal.querySelector(".scm-btn-case");
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (subBody) {
+      subBody.innerHTML = "";
+      subBody.appendChild(clone);
+      prependCaseLocationPanel(subBody, caseBtn, modal);
+    }
+
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function renderCaseDamageItems(items) {
+    if (!Array.isArray(items) || !items.length) {
+      return '<p class="scm-muted">Sin da&ntilde;os detallados para esta revision.</p>';
+    }
+
+    return (
+      '<ul class="scm-damage-items">' +
+      items
+        .map(function (item) {
+          var fields = item.fields || {};
+          var photos = Array.isArray(item.photos) ? item.photos : [];
+          var areas =
+            Array.isArray(item.areas) && item.areas.length
+              ? item.areas.join(", ")
+              : [
+                  fields.area_afectada_1,
+                  fields.area_afectada_2,
+                  fields.area_afectada_3,
+                  fields.area_afectada_4,
+                ]
+                  .filter(Boolean)
+                  .join(", ");
+          var photoHtml = photos.length
+            ? '<div class="scm-damage-photo-grid">' +
+              photos
+                .map(function (photo) {
+                  return (
+                    '<a href="' +
+                    escHtml(photo.url) +
+                    '" target="_blank" rel="noopener noreferrer">' +
+                    '<img src="' +
+                    escHtml(photo.url) +
+                    '" alt="Registro fotografico ' +
+                    escHtml(photo.id || "") +
+                    '" loading="lazy">' +
+                    "</a>"
+                  );
+                })
+                .join("") +
+              "</div>"
+            : "";
+
+          return (
+            '<li class="scm-damage-item-rich">' +
+            "<p><b>Indice:</b> " +
+            escHtml(fields.indice || item.label || "Dano registrado") +
+            "</p>" +
+            (areas
+              ? "<p><b>Area afectada:</b> " + escHtml(areas) + "</p>"
+              : "") +
+            (fields.a_quien_corresponde
+              ? "<p><b>A quien corresponde este dano:</b> " +
+                escHtml(fields.a_quien_corresponde) +
+                "</p>"
+              : "") +
+            (photoHtml
+              ? "<p><b>Registro fotografico:</b></p>" + photoHtml
+              : "") +
+            (fields.registro_foto_dano && !photos.length
+              ? "<p><b>Registro fotografico:</b> " +
+                escHtml(fields.registro_foto_dano) +
+                "</p>"
+              : "") +
+            (fields.descripcion_dano
+              ? "<p><b>Descripcion de dano:</b><br>" +
+                escHtml(fields.descripcion_dano) +
+                "</p>"
+              : "") +
+            (fields.consecuencia
+              ? "<p><b>Consecuencia:</b><br>" +
+                escHtml(fields.consecuencia) +
+                "</p>"
+              : "") +
+            (fields.nivel_dano || fields.tiempo_atencion
+              ? '<div class="scm-damage-item-duo">' +
+                (fields.nivel_dano
+                  ? "<p><b>Nivel del dano:</b> " +
+                    escHtml(fields.nivel_dano) +
+                    "</p>"
+                  : "") +
+                (fields.tiempo_atencion
+                  ? "<p><b>Tiempo de atencion:</b> " +
+                    escHtml(fields.tiempo_atencion) +
+                    "</p>"
+                  : "") +
+                "</div>"
+              : "") +
+            "</li>"
+          );
+        })
+        .join("") +
+      "</ul>"
+    );
+  }
+
+  function renderCaseDamage(ticket) {
+    var m = (ticket && ticket.magnitud) || {};
+    var matrix = Array.isArray(ticket && ticket.matriz) ? ticket.matriz : [];
+    var matrixHtml = matrix
+      .map(function (row) {
+        return (
+          '<div class="scm-ticket-matrix-row"><span>' +
+          escHtml(row.factor) +
+          "</span><strong>" +
+          escHtml(row.nivel) +
+          "</strong><small>" +
+          escHtml(row.criterio) +
+          "</small></div>"
+        );
+      })
+      .join("");
+
+    return (
+      '<section class="scm-case-damage-detail">' +
+      '<div class="scm-damage-modal-head"><div><span class="scm-ticket-id">#' +
+      escHtml(ticket.id_ticket || ticket.ticket_row_id || "") +
+      '</span><h3>Magnitud del da&ntilde;o</h3></div><span class="scm-badge scm-badge-' +
+      escHtml(m.key || "medio") +
+      '">' +
+      escHtml(m.label || "") +
+      "</span></div>" +
+      '<div class="scm-score-explain">' +
+      "<div><span>Score</span><strong>" +
+      escHtml(m.score || 0) +
+      "</strong></div>" +
+      "<div><span>Hallazgos</span><strong>" +
+      escHtml(m.items || 0) +
+      "</strong></div>" +
+      "<div><span>Indicadores criticos</span><strong>" +
+      escHtml(m.critical_hits || 0) +
+      "</strong></div>" +
+      "<div><span>Indicadores altos</span><strong>" +
+      escHtml(m.high_hits || 0) +
+      "</strong></div>" +
+      "</div>" +
+      '<div class="scm-score-guide scm-score-guide-compact">' +
+      "<div><h4>Formula</h4><p>(Criticos x 6) + (Altos x 4) + (Medios x 2) + (Bajos x 1). Si la prioridad es urgente suma +3.</p></div>" +
+      "<div><h4>Ajustes</h4><ul><li>3 o mas hallazgos suman +1.</li><li>6 o mas hallazgos suman +3.</li><li>Los niveles escritos en la revision pesan mas que una palabra suelta.</li></ul></div>" +
+      "<div><h4>Lectura</h4><ul><li>Critico: indicador critico o score 18+.</li><li>Alto: indicador alto o score 11+.</li><li>Medio: indicador medio o score 5+.</li></ul></div>" +
+      "</div>" +
+      "<h4>Matriz de interpretacion</h4>" +
+      '<div class="scm-ticket-matrix">' +
+      matrixHtml +
+      "</div>" +
+      "<h4>Danos detectados</h4>" +
+      renderCaseDamageItems(ticket.danos_detectados || []) +
+      "<h4>Recomendacion</h4><p>" +
+      escHtml(m.recommendation || "") +
+      "</p>" +
+      "</section>"
+    );
+  }
+
+  function normalizeMagnitudeKey(value) {
+    var key = String(value || "")
+      .trim()
+      .toLowerCase();
+    if (key === "crítico") {
+      key = "critico";
+    }
+    return ["critico", "alto", "medio", "bajo"].indexOf(key) >= 0 ? key : "";
+  }
+
+  function magnitudeLabel(key) {
+    var labels = {
+      critico: "Critico",
+      alto: "Alto",
+      medio: "Medio",
+      bajo: "Bajo",
+    };
+    return labels[key] || "Sin clasificar";
+  }
+
+  function renderMagnitudeBadge(value) {
+    var key = normalizeMagnitudeKey(value);
+    if (!key) {
+      return '<span class="scm-magnitude-badge scm-magnitude-empty">Sin clasificar</span>';
+    }
+    return (
+      '<span class="scm-magnitude-badge scm-magnitude-' +
+      escHtml(key) +
+      '">' +
+      escHtml(magnitudeLabel(key)) +
+      "</span>"
+    );
+  }
+
+  function saveManualCaseMagnitude(root, ticketPk, magnitud, onDone) {
+    var runtime = parseRuntime(root) || {};
+    var fd = new FormData();
+    fd.set(
+      "action",
+      (runtime.actions && runtime.actions.save_case_magnitude) ||
+        "scm_guardar_magnitud_caso",
+    );
+    fd.set("nonce", runtime.nonce || "");
+    fd.set("ticket_pk", ticketPk || "");
+    fd.set("magnitud", magnitud || "");
+
+    return fetch(runtime.ajaxUrl || "api.php", {
+      method: "POST",
+      body: fd,
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (json) {
+        if (!json || !json.success) {
+          throw new Error(
+            (json && json.data && json.data.message) ||
+              "No se pudo guardar la magnitud.",
+          );
+        }
+        if (typeof onDone === "function") {
+          onDone(json.data || {});
+        }
+        return json.data || {};
+      });
+  }
+
+  function openCaseDamageSubmodal(
+    modal,
+    triggerBtn,
+    root,
+    caseBtn,
+    revisionType,
+  ) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    if (title) {
+      title.textContent =
+        revisionType === "preventiva"
+          ? "Magnitud daños preventiva"
+          : "Magnitud daños correctiva";
+    }
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML =
+        '<p class="scm-muted">Consultando magnitud del da&ntilde;o...</p>';
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+
+    var runtime = parseRuntime(root) || {};
+    var fd = new FormData();
+    fd.set(
+      "action",
+      (runtime.actions && runtime.actions.damage_magnitude) ||
+        "damage_magnitude_tickets",
+    );
+    fd.set("nonce", runtime.nonce || "");
+    fd.set("ticket", caseBtn.dataset.ticket || caseBtn.dataset.ticketPk || "");
+    fd.set("revision_type", revisionType);
+    fd.set("limit", "50");
+    fd.set("offset", "0");
+
+    fetch(runtime.ajaxUrl || "api.php", {
+      method: "POST",
+      body: fd,
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (json) {
+        if (!json || !(json.success || json.ok)) {
+          throw new Error(
+            (json && json.data && json.data.message) ||
+              json.message ||
+              "No se pudo consultar la magnitud.",
+          );
+        }
+        var tickets = (json.data && json.data.tickets) || [];
+        if (!tickets.length) {
+          body.innerHTML =
+            '<p class="scm-muted">Este ticket no tiene magnitud calculable para esa revision.</p>';
+          prependCaseLocationPanel(body, caseBtn, modal);
+          return;
+        }
+        body.innerHTML = renderCaseDamage(tickets[0]);
+        prependCaseLocationPanel(body, caseBtn, modal);
+      })
+      .catch(function (err) {
+        body.innerHTML =
+          '<p class="scm-error">No se pudo cargar la magnitud: ' +
+          escHtml(err.message || "error") +
+          "</p>";
+        prependCaseLocationPanel(body, caseBtn, modal);
+      });
+  }
+
+  function openCaseMagnitudeEditor(modal, root, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = caseBtn.dataset.ticketPk || "";
+    var current = normalizeMagnitudeKey(caseBtn.dataset.magnitudCaso || "");
+    var options = ["critico", "alto", "medio", "bajo"];
+
+    if (title) {
+      title.textContent = "Editar magnitud del caso";
+    }
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML =
+        '<div class="scm-case-magnitude-popup" data-ticket-pk="' +
+        escHtml(ticketPk) +
+        '">' +
+        '<p class="scm-muted">Esta magnitud es manual y queda guardada en el ticket.</p>' +
+        '<div class="scm-case-magnitude-options">' +
+        options
+          .map(function (key) {
+            return (
+              '<button type="button" class="scm-magnitude-choice ' +
+              (current === key ? "is-active" : "") +
+              '" data-magnitude="' +
+              escHtml(key) +
+              '">' +
+              renderMagnitudeBadge(key) +
+              "</button>"
+            );
+          })
+          .join("") +
+        "</div>" +
+        '<small class="scm-case-magnitude-msg"></small>' +
+        "</div>";
+      prependCaseLocationPanel(body, caseBtn, modal);
+    }
+
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+
+    sub.querySelectorAll(".scm-magnitude-choice").forEach(function (choice) {
+      choice.addEventListener("click", function () {
+        var value = choice.getAttribute("data-magnitude") || "";
+        var msg = sub.querySelector(".scm-case-magnitude-msg");
+        if (!ticketPk || !value) return;
+        sub.querySelectorAll(".scm-magnitude-choice").forEach(function (btn) {
+          btn.disabled = true;
+        });
+        if (msg) {
+          msg.textContent = "Guardando...";
+        }
+        saveManualCaseMagnitude(root, ticketPk, value, function (data) {
+          caseBtn.dataset.magnitudCaso = data.label || magnitudeLabel(value);
+          sub.querySelectorAll(".scm-magnitude-choice").forEach(function (btn) {
+            btn.classList.toggle(
+              "is-active",
+              btn.getAttribute("data-magnitude") === value,
+            );
+            btn.disabled = false;
+          });
+          var summaryBadge = modal.querySelector(
+            "[data-scm-case-magnitude-badge]",
+          );
+          if (summaryBadge) {
+            summaryBadge.innerHTML = renderMagnitudeBadge(value);
+          }
+          if (msg) {
+            msg.textContent = "Guardado";
+          }
+        })
+          .then(function (data) {
+            scmNotify(
+              "success",
+              data && data.message
+                ? data.message
+                : "Magnitud del caso guardada.",
+              "Magnitud actualizada",
+            );
+            if (root && typeof window.CustomEvent === "function") {
+              root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+            }
+            setTimeout(function () {
+              sub.classList.remove("open");
+              sub.setAttribute("aria-hidden", "true");
+            }, 350);
+          })
+          .catch(function (err) {
+            sub
+              .querySelectorAll(".scm-magnitude-choice")
+              .forEach(function (btn) {
+                btn.disabled = false;
+              });
+            if (msg) {
+              msg.textContent =
+                err && err.message ? err.message : "No se pudo guardar.";
+            }
+            scmNotify(
+              "error",
+              err && err.message
+                ? err.message
+                : "No se pudo guardar la magnitud.",
+            );
+          });
+      });
+    });
+  }
+
+  function openTrasladarCasoEditor(modal, caseBtn, runtime) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = caseBtn.dataset.ticketPk || "";
+    var currentEmpId = String(
+      caseBtn.dataset.empleadoId || caseBtn.dataset.empleado || "",
+    ).trim();
+    var funcionarios =
+      runtime && Array.isArray(runtime.funcionarios)
+        ? runtime.funcionarios
+        : [];
+
+    if (title) title.textContent = "Trasladar caso a otro funcionario";
+    setCaseSubmodalMeta(sub, caseBtn);
+
+    var empOptions = '<option value="">Seleccionar funcionario…</option>';
+    funcionarios.forEach(function (func) {
+      var id = String((func && func.id) || "").trim();
+      var label = String((func && func.label) || id).trim();
+      if (!id) return;
+      var sel = id === currentEmpId ? " selected" : "";
+      empOptions +=
+        '<option value="' +
+        escHtml(id) +
+        '"' +
+        sel +
+        ">" +
+        escHtml(label) +
+        "</option>";
+    });
+
+    if (body) {
+      body.innerHTML =
+        '<form class="scm-trasladar-form" method="post" autocomplete="off">' +
+        '<input type="hidden" name="ticket_pk" value="' +
+        escHtml(ticketPk) +
+        '">' +
+        '<label class="scm-seg-field"><span>Nuevo funcionario</span><select name="new_empleado_id" required>' +
+        empOptions +
+        "</select></label>" +
+        '<fieldset class="scm-notify-targets scm-notify-traslado"><legend>Notificar por correo (empleados)</legend>' +
+        '<label class="scm-seg-check"><input type="checkbox" name="notify_anterior" value="1" checked> Notificar al funcionario anterior</label>' +
+        '<label class="scm-seg-check"><input type="checkbox" name="notify_nuevo" value="1" checked> Notificar al funcionario nuevo</label>' +
+        "</fieldset>" +
+        renderNotifyTargets(["empleado"]) +
+        '<div class="scm-seg-actions">' +
+        '<button type="submit" class="scm-btn-primary">Trasladar caso</button>' +
+        '<span class="scm-seg-msg" aria-live="polite"></span>' +
+        "</div>" +
+        "</form>";
+      prependCaseLocationPanel(body, caseBtn, modal);
+    }
+
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function openCaseNoteEditor(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = caseBtn.dataset.ticketPk || "";
+
+    if (title) {
+      title.textContent = "Agregar nota al ticket";
+    }
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML =
+        '<form class="scm-note-form" method="post" autocomplete="off">' +
+        '<input type="hidden" name="ticket_pk" value="' +
+        escHtml(ticketPk) +
+        '">' +
+        '<label class="scm-seg-field"><span>Nota</span><textarea name="observacion" rows="6" required placeholder="Escribe una nota interna para el ticket..."></textarea></label>' +
+        '<div class="scm-seg-actions">' +
+        '<button type="submit" class="scm-btn-primary">Guardar nota</button>' +
+        '<span class="scm-seg-msg" aria-live="polite"></span>' +
+        "</div>" +
+        "</form>";
+      prependCaseLocationPanel(body, caseBtn, modal);
+    }
+
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function openPostponeTicketEditor(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = caseBtn.dataset.ticketPk || "";
+
+    if (title) {
+      title.textContent = "Postergar ticket";
+    }
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML =
+        '<form class="scm-postpone-ticket-form" method="post" enctype="multipart/form-data" autocomplete="off">' +
+        '<input type="hidden" name="ticket_pk" value="' +
+        escHtml(ticketPk) +
+        '">' +
+        '<p class="scm-muted">Esta acci&oacute;n mantendr&aacute; el ticket abierto y marcar&aacute; el estado administrativo como Postergado.</p>' +
+        '<label class="scm-seg-field"><span>Motivo de postergaci&oacute;n</span><textarea name="observacion" rows="6" required placeholder="Describe por qu&eacute; se posterga el ticket..."></textarea></label>' +
+        '<label class="scm-seg-field"><span>Imagenes / Evidencias (opcional)</span><input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
+        renderTicketDocumentFields() +
+        renderNotifyTargets() +
+        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Guardar postergaci&oacute;n</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        "</form>";
+      prependCaseLocationPanel(body, caseBtn, modal);
+    }
+
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function renderTicketDocumentRow() {
+    return (
+      '<div class="scm-ticket-document-row">' +
+      '<label class="scm-seg-field"><span>Titulo del documento</span><input type="text" name="documento_nombre[]" placeholder="Ej: Cotizacion, soporte, factura..."></label>' +
+      '<label class="scm-seg-field"><span>Documento</span><input type="file" name="documento[]" accept="image/jpeg,image/png,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-rar-compressed,text/html,text/plain,text/csv"></label>' +
+      '<button type="button" class="btn btn-outline btn-sm scm-remove-ticket-document" data-remove-ticket-document>Quitar</button>' +
+      "</div>"
+    );
+  }
+
+  function renderTicketDocumentFields() {
+    return (
+      '<div class="scm-ticket-documents" data-ticket-documents>' +
+      renderTicketDocumentRow() +
+      "</div>" +
+      '<button type="button" class="btn btn-outline btn-sm scm-add-ticket-document" data-add-ticket-document>Agregar otro documento</button>'
+    );
+  }
+
+  function openTicketResponseEditor(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = caseBtn.dataset.ticketPk || "";
+    if (title) title.textContent = "Responder ticket";
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML =
+        '<form class="scm-ticket-response-form" method="post" enctype="multipart/form-data" autocomplete="off">' +
+        '<input type="hidden" name="ticket_pk" value="' +
+        escHtml(ticketPk) +
+        '">' +
+        '<label class="scm-seg-field"><span>Estado administrativo</span><select name="estado_administrativo">' +
+        '<option value="__keep__">Sin cambio</option><option value="Nuevo">Nuevo</option><option value="Por inspecccionar">Por inspecccionar</option><option value="Inspeccionado">Inspeccionado</option><option value="Cotizado">Cotizado</option><option value="En ejecucion">En ejecucion</option><option value="Finalizado">Finalizado</option><option value="Trasladado">Trasladado</option><option value="Entregado">Entregado</option><option value="Recibido">Recibido</option><option value="Desistido">Desistido</option>' +
+        "</select></label>" +
+        '<label class="scm-seg-field"><span>Respuesta</span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
+        '<label class="scm-seg-field"><span>Imagenes (opcional)</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
+        renderTicketDocumentFields() +
+        renderNotifyTargets() +
+        '<div class="scm-seg-actions"><label class="scm-seg-check"><input type="checkbox" name="cerrar_ticket" value="1"> Cerrar al responder</label><button type="submit" class="scm-btn-primary">Publicar y enviar correo</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        "</form>";
+      prependCaseLocationPanel(body, caseBtn, modal);
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function openCotizacionResponseEditor(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = caseBtn.dataset.ticketPk || "";
+    if (title) title.textContent = "Responder cotizacion";
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML =
+        '<form class="scm-cotizacion-response-form" method="post" autocomplete="off">' +
+        '<input type="hidden" name="ticket_pk" value="' +
+        escHtml(ticketPk) +
+        '">' +
+        '<label class="scm-seg-field"><span>Respuesta</span><select name="estado" required><option value="">Elige una respuesta</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
+        '<label class="scm-seg-field scm-cotizacion-motivo" style="display:none;"><span>Motivo</span><select name="motivo"><option value="">Elige un motivo</option><option value="Por costo">Por costo</option><option value="Ejecucción por cuenta propia">Ejecucción por cuenta propia</option></select></label>' +
+        '<label class="scm-seg-field scm-cotizacion-financiacion" style="display:none;"><span>Financiacion</span><select name="financiacion"><option value="">No aplica / sin respuesta</option><option value="Si">Si</option><option value="No">No</option></select></label>' +
+        '<label class="scm-seg-field"><span>Observaciones</span><textarea name="observacion" rows="6" placeholder="Ninguna">Ninguna</textarea></label>' +
+        renderNotifyTargets() +
+        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Guardar y enviar correo</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        "</form>";
+      prependCaseLocationPanel(body, caseBtn, modal);
+      var estado = body.querySelector('select[name="estado"]');
+      var motivoWrap = body.querySelector(".scm-cotizacion-motivo");
+      var motivoInput = body.querySelector('select[name="motivo"]');
+      var financiacionWrap = body.querySelector(".scm-cotizacion-financiacion");
+      var financiacionInput = body.querySelector('select[name="financiacion"]');
+      if (
+        estado &&
+        motivoWrap &&
+        motivoInput &&
+        financiacionWrap &&
+        financiacionInput
+      ) {
+        estado.addEventListener("change", function () {
+          var showMotivo = estado.value === "Desaprobada";
+          var showFinanciacion = estado.value === "Aprobada";
+          motivoWrap.style.display = showMotivo ? "" : "none";
+          motivoInput.required = showMotivo;
+          if (!showMotivo) motivoInput.value = "";
+          financiacionWrap.style.display = showFinanciacion ? "" : "none";
+          if (!showFinanciacion) financiacionInput.value = "";
+        });
+      }
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function renderNotifyTargets(exclude) {
+    exclude = Array.isArray(exclude) ? exclude : [];
+    var all = [
+      { value: "solicitante", label: "Solicitante" },
+      { value: "arrendatario", label: "Arrendatario" },
+      { value: "propietario", label: "Propietario" },
+      { value: "empleado", label: "Empleado" },
+      { value: "admin", label: "Administrativos" },
+    ];
+    var html =
+      '<input type="hidden" name="notify_recipients_present" value="1">' +
+      '<fieldset class="scm-notify-targets"><legend>Notificar por correo</legend>';
+    all.forEach(function (opt) {
+      if (exclude.indexOf(opt.value) !== -1) return;
+      html +=
+        '<label class="scm-seg-check"><input type="checkbox" name="notify_recipients[]" value="' +
+        opt.value +
+        '" checked> ' +
+        opt.label +
+        "</label>";
+    });
+    html +=
+      '<label class="scm-seg-check scm-seg-check--none"><input type="checkbox" name="notify_recipients[]" value="none"> Ninguno</label>';
+    html += "</fieldset>";
+    return html;
+  }
+
+  function normalizeIndicativo(value) {
+    value = String(value || "").replace(/[^0-9+]/g, "");
+    if (!value) return "";
+    return value.charAt(0) === "+" ? value : "+" + value.replace(/^\++/, "");
+  }
+
+  function indicativoFieldHtml(name, value, options) {
+    value = normalizeIndicativo(value || "+57");
+    options = Array.isArray(options) ? options : [];
+    if (!options.length) {
+      return (
+        '<label class="scm-seg-field"><span>Indicativo</span><input class="input input-bordered input-sm scm-input" name="' +
+        escHtml(name) +
+        '" type="text" value="' +
+        escHtml(value) +
+        '" placeholder="+57"></label>'
+      );
+    }
+
+    var found = false;
+    var html =
+      '<label class="scm-seg-field"><span>Indicativo</span><select class="select select-bordered select-sm scm-select" name="' +
+      escHtml(name) +
+      '">';
+    options.forEach(function (opt) {
+      var code = normalizeIndicativo(opt && opt.codigo);
+      if (!code) return;
+      var label = String((opt && opt.label) || code);
+      if (code === value) found = true;
+      html +=
+        '<option value="' +
+        escHtml(code) +
+        '"' +
+        (code === value ? " selected" : "") +
+        ">" +
+        escHtml(label) +
+        "</option>";
+    });
+    if (value && !found) {
+      html +=
+        '<option value="' +
+        escHtml(value) +
+        '" selected>' +
+        escHtml(value) +
+        "</option>";
+    }
+    return html + "</select></label>";
+  }
+
+  function openContactEditor(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var root = findRootFromNode(caseBtn);
+    var runtime = root ? parseRuntime(root) || {} : {};
+    var indicativos = runtime.indicativos || [];
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = caseBtn.dataset.ticketPk || "";
+    if (title) title.textContent = "Editar propietario y arrendatario";
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML =
+        '<form class="scm-contact-update-form" method="post" autocomplete="off">' +
+        '<input type="hidden" name="ticket_pk" value="' +
+        escHtml(ticketPk) +
+        '">' +
+        '<div class="scm-contact-edit-grid">' +
+        '<fieldset class="scm-contact-edit-group"><legend>Propietario</legend>' +
+        '<label class="scm-seg-field"><span>Nombre</span><input class="input input-bordered input-sm scm-input" name="propietario" type="text" value="' +
+        escHtml(caseBtn.dataset.propietario || "") +
+        '"></label>' +
+        '<label class="scm-seg-field"><span>Correo</span><input class="input input-bordered input-sm scm-input" name="correo_propietario" type="email" value="' +
+        escHtml(caseBtn.dataset.correoPropietario || "") +
+        '"></label>' +
+        indicativoFieldHtml(
+          "indicativo_propietario",
+          caseBtn.dataset.indicativoPropietario || "",
+          indicativos,
+        ) +
+        '<label class="scm-seg-field"><span>Celular</span><input class="input input-bordered input-sm scm-input" name="celular_propietario" type="text" value="' +
+        escHtml(caseBtn.dataset.celularPropietario || "") +
+        '"></label>' +
+        "</fieldset>" +
+        '<fieldset class="scm-contact-edit-group"><legend>Arrendatario</legend>' +
+        '<label class="scm-seg-field"><span>Nombre</span><input class="input input-bordered input-sm scm-input" name="arrendatario" type="text" value="' +
+        escHtml(caseBtn.dataset.arrendatario || "") +
+        '"></label>' +
+        '<label class="scm-seg-field"><span>Correo</span><input class="input input-bordered input-sm scm-input" name="correo_arrendatario" type="email" value="' +
+        escHtml(caseBtn.dataset.correoArrendatario || "") +
+        '"></label>' +
+        indicativoFieldHtml(
+          "indicativo_arrendatario",
+          caseBtn.dataset.indicativoArrendatario || "",
+          indicativos,
+        ) +
+        '<label class="scm-seg-field"><span>Celular</span><input class="input input-bordered input-sm scm-input" name="celular_arrendatario" type="text" value="' +
+        escHtml(caseBtn.dataset.celularArrendatario || "") +
+        '"></label>' +
+        "</fieldset>" +
+        "</div>" +
+        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Guardar cambios</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        "</form>";
+      prependCaseLocationPanel(body, caseBtn, modal);
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function hasPerturbacionValue(rawValue) {
+    var value = String(rawValue || "")
+      .trim()
+      .toLowerCase();
+    if (
+      !value ||
+      value === "0" ||
+      value === "no" ||
+      value === "false" ||
+      value === "null"
+    ) {
+      return false;
+    }
+    var num = Number(value);
+    if (!isNaN(num)) {
+      return num > 0;
+    }
+    return true;
+  }
+
+  function openLlavesDetail(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var detail = getLlavesDetailPayload(caseBtn);
+
+    if (title) title.textContent = detail.title;
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML = detail.html;
+      prependCaseLocationPanel(body, caseBtn, modal);
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function openConsultorEntregaDetail(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var detail = getConsultorEntregaDetailPayload(caseBtn);
+
+    if (title) title.textContent = detail.title;
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML = detail.html;
+      prependCaseLocationPanel(body, caseBtn, modal);
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function getLlavesDetailPayload(caseBtn) {
+    var ubicacion = String(caseBtn.dataset.ubicacionLlaves || "").trim();
+    var persona = String(caseBtn.dataset.personaLlaves || "").trim();
+    var contacto = String(caseBtn.dataset.contactoLlaves || "").trim();
+    var html = "";
+
+    if (!ubicacion && !persona && !contacto) {
+      html =
+        '<p class="scm-muted">No hay informaci\u00f3n de llaves registrada.</p>';
+    } else {
+      html = '<dl class="scm-detail-list">';
+      if (ubicacion)
+        html +=
+          "<dt>Ubicaci\u00f3n</dt><dd><strong>" +
+          escHtml(ubicacion) +
+          "</strong></dd>";
+      if (persona)
+        html +=
+          "<dt>Persona</dt><dd><strong>" + escHtml(persona) + "</strong></dd>";
+      if (contacto)
+        html +=
+          "<dt>Contacto</dt><dd><strong>" +
+          escHtml(contacto) +
+          "</strong></dd>";
+      html += "</dl>";
+    }
+
+    return {
+      title: "Ubicaci\u00f3n de llaves",
+      html: html,
+    };
+  }
+
+  function getConsultorEntregaDetailPayload(caseBtn) {
+    var nombre = String(caseBtn.dataset.consultorEntrega || "").trim();
+    var celular = String(caseBtn.dataset.consultorEntregaCelular || "").trim();
+    var correo = String(caseBtn.dataset.consultorEntregaCorreo || "").trim();
+    var html = "";
+
+    if (!nombre && !celular && !correo) {
+      html =
+        '<p class="scm-muted">No hay informaci\u00f3n del consultor/a de entrega registrada.</p>';
+    } else {
+      html = '<dl class="scm-detail-list">';
+      if (nombre)
+        html +=
+          "<dt>Nombre</dt><dd><strong>" + escHtml(nombre) + "</strong></dd>";
+      if (celular)
+        html +=
+          "<dt>Celular</dt><dd><strong>" +
+          escHtml(celular) +
+          "</strong></dd>";
+      if (correo)
+        html +=
+          "<dt>Correo</dt><dd><strong>" + escHtml(correo) + "</strong></dd>";
+      html += "</dl>";
+    }
+
+    return {
+      title: "Consultor/a de entrega",
+      html: html,
+    };
+  }
+
+  function ensureStandaloneDetailModal(root) {
+    if (!root) {
+      return null;
+    }
+    var existing = root.querySelector(".scm-standalone-detail-modal");
+    if (existing) {
+      return existing;
+    }
+
+    var wrap = document.createElement("div");
+    wrap.className = "scm-standalone-detail-modal";
+    wrap.setAttribute("aria-hidden", "true");
+    wrap.innerHTML =
+      '<div class="scm-standalone-detail-dialog" role="dialog" aria-modal="true">' +
+      '<button type="button" class="scm-standalone-detail-close" aria-label="Cerrar detalle">&times;</button>' +
+      '<div class="scm-standalone-detail-head"><h4 class="scm-standalone-detail-title">Detalle</h4><p class="scm-standalone-detail-meta"></p></div>' +
+      '<div class="scm-standalone-detail-body"></div>' +
+      "</div>";
+    root.appendChild(wrap);
+
+    function closeStandaloneDetail() {
+      wrap.classList.remove("open");
+      wrap.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("scm-modal-open");
+    }
+
+    wrap.addEventListener("click", function (e) {
+      if (e.target === wrap) {
+        closeStandaloneDetail();
+      }
+    });
+    var closeBtn = wrap.querySelector(".scm-standalone-detail-close");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", closeStandaloneDetail);
+    }
+
+    return wrap;
+  }
+
+  function openStandaloneDetail(root, detail) {
+    var modal = ensureStandaloneDetailModal(root);
+    if (!modal || !detail) {
+      return;
+    }
+    var title = modal.querySelector(".scm-standalone-detail-title");
+    var meta = modal.querySelector(".scm-standalone-detail-meta");
+    var body = modal.querySelector(".scm-standalone-detail-body");
+    if (title) {
+      title.textContent = detail.title || "Detalle";
+    }
+    if (meta) {
+      var propertyCode = getCasePropertyCode(detail.caseBtn, modal);
+      if (propertyCode) {
+        meta.textContent = "Codigo inmueble web: " + propertyCode;
+        meta.style.display = "block";
+      } else {
+        meta.textContent = "";
+        meta.style.display = "none";
+      }
+    }
+    if (body) {
+      body.innerHTML = detail.html || "";
+      prependCaseLocationPanel(body, detail.caseBtn || null, modal);
+    }
+    if (detail.caseBtn && detail.caseBtn.dataset) {
+      modal.dataset.ticketPk = detail.caseBtn.dataset.ticketPk || "";
+      modal.dataset.idInmuebleWeb = detail.caseBtn.dataset.idInmuebleWeb || "";
+      modal.dataset.idInmuebleData = detail.caseBtn.dataset.idInmuebleData || "";
+      modal.dataset.ubicacionGoogleMaps =
+        detail.caseBtn.dataset.ubicacionGoogleMaps || "";
+      modal.dataset.direccion = detail.caseBtn.dataset.direccion || "";
+    }
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("scm-modal-open");
+  }
+
+  function openPerturbacionDetail(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var perturbacion = String(caseBtn.dataset.perturbacion || "").trim();
+    var justificacion = String(
+      caseBtn.dataset.justificacionPerturbacion || "",
+    ).trim();
+    var resumenRaw = String(
+      caseBtn.dataset.resumenCalculoPerturbacion || "",
+    ).trim();
+
+    if (title) title.textContent = "Resumen t\u00e9cnico de perturbaci\u00f3n";
+
+    if (
+      !hasPerturbacionValue(perturbacion) &&
+      resumenRaw === "" &&
+      justificacion === ""
+    ) {
+      if (body)
+        body.innerHTML =
+          '<p class="scm-muted">Este caso no tiene perturbaci\u00f3n registrada.</p>';
+      setCaseSubmodalMeta(sub, caseBtn);
+      prependCaseLocationPanel(body, caseBtn, modal);
+      sub.classList.add("open");
+      sub.setAttribute("aria-hidden", "false");
+      return;
+    }
+
+    var data = null;
+    if (resumenRaw !== "") {
+      try {
+        data = JSON.parse(resumenRaw);
+      } catch (e) {
+        data = null;
+      }
+    }
+
+    function moneyFmt(val) {
+      var num = parseFloat(String(val).replace(/[^0-9.-]/g, ""));
+      if (isNaN(num) || num === 0) return "$0";
+      return "$" + Math.round(num).toLocaleString("es-CO");
+    }
+
+    var tipo = data && data.tipo_valoracion ? data.tipo_valoracion : "";
+    var actividad =
+      data && data.actividad_comercial ? data.actividad_comercial : "";
+    var criterios = data && Array.isArray(data.criterios) ? data.criterios : [];
+    var porcentaje =
+      data && data.perturbacion
+        ? data.perturbacion.porcentaje != null
+          ? data.perturbacion.porcentaje
+          : perturbacion
+        : perturbacion;
+    var nivel = data && data.perturbacion ? data.perturbacion.nivel || "" : "";
+    var descripcion =
+      data && data.perturbacion ? data.perturbacion.descripcion || "" : "";
+    var bonificacion =
+      data && data.bonificacion_sugerida != null
+        ? data.bonificacion_sugerida
+        : caseBtn.dataset.valorBonificacion || 0;
+    var codigo = data && data.inmueble ? data.inmueble.codigo || "" : "";
+    var areaTotal =
+      data && data.inmueble ? data.inmueble.area_construida || 0 : 0;
+    var areaAfect =
+      data && data.inmueble
+        ? data.inmueble.area_afectada || 0
+        : caseBtn.dataset.areaAfectada || 0;
+    var canonTotal = data && data.inmueble ? data.inmueble.canon_total || 0 : 0;
+    var idTicket = data && data.ticket ? data.ticket.id_ticket || "" : "";
+    var fechaTicket = data && data.ticket ? data.ticket.fecha_ticket || "" : "";
+    var fechaCot =
+      data && data.ticket ? data.ticket.fecha_cotizacion || "" : "";
+    var diasTicket =
+      data && data.ticket ? data.ticket.dias_desde_ticket || 0 : 0;
+    var duracion = data && data.ticket ? data.ticket.duracion_trabajo || 0 : 0;
+    var diasCalc =
+      data && data.ticket ? data.ticket.dias_afectacion_calculados || 0 : 0;
+
+    var styles =
+      '<style id="skc-rp-styles">' +
+      ".skc-rp{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:20px;font-family:inherit;box-shadow:0 8px 24px rgba(15,23,42,.08);}" +
+      ".skc-rp-hdr{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px;}" +
+      ".skc-rp-title{font-size:17px;font-weight:900;color:#111827;margin:0 0 3px;}" +
+      ".skc-rp-subtitle{font-size:12px;color:#6b7280;}" +
+      ".skc-rp-badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:800;background:#eff6ff;color:#1d4ed8;margin:2px;}" +
+      ".skc-rp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0;}" +
+      ".skc-rp-card{border:1px solid #e5e7eb;background:#f9fafb;border-radius:12px;padding:12px;}" +
+      ".skc-rp-card.rp-primary{background:linear-gradient(135deg,#404041,#63605B);color:#fff;border-color:transparent;}" +
+      ".skc-rp-card.rp-success{background:#f0fdf4;border-color:#bbf7d0;}" +
+      ".skc-rp-lbl{font-size:11px;color:#6b7280;font-weight:700;margin-bottom:4px;}" +
+      ".skc-rp-card.rp-primary .skc-rp-lbl{color:rgba(255,255,255,.75);}" +
+      ".skc-rp-val{font-size:19px;font-weight:900;color:#111827;line-height:1.1;}" +
+      ".skc-rp-card.rp-primary .skc-rp-val{color:#fff;}" +
+      ".skc-rp-money{color:#15803d;}" +
+      ".skc-rp-sec{font-size:13px;font-weight:900;color:#111827;margin:14px 0 6px;}" +
+      ".skc-rp-txt{font-size:12px;color:#374151;line-height:1.55;}" +
+      ".skc-rp-formula{background:#fff7ed;color:#7c2d12;border:1px solid #fed7aa;border-radius:12px;padding:10px;font-size:12px;line-height:1.7;}" +
+      ".skc-rp-crits{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px;}" +
+      ".skc-rp-crit{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:8px;font-size:11px;color:#374151;}" +
+      "@media(max-width:560px){.skc-rp-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.skc-rp-crits{grid-template-columns:1fr;}}" +
+      "</style>";
+
+    var headerBadges = "";
+    if (tipo)
+      headerBadges += '<span class="skc-rp-badge">' + escHtml(tipo) + "</span>";
+    if (tipo.toLowerCase() === "comercial" && actividad)
+      headerBadges +=
+        '<span class="skc-rp-badge">' + escHtml(actividad) + "</span>";
+
+    var grid1 =
+      '<div class="skc-rp-grid">' +
+      '<div class="skc-rp-card rp-primary"><div class="skc-rp-lbl">Perturbaci\u00f3n sugerida</div><div class="skc-rp-val">' +
+      escHtml(String(porcentaje)) +
+      "%</div></div>" +
+      '<div class="skc-rp-card"><div class="skc-rp-lbl">Nivel</div><div class="skc-rp-val">' +
+      escHtml(nivel) +
+      "</div></div>" +
+      '<div class="skc-rp-card rp-success"><div class="skc-rp-lbl">Bonificaci\u00f3n sugerida</div><div class="skc-rp-val skc-rp-money">' +
+      escHtml(moneyFmt(bonificacion)) +
+      "</div></div>" +
+      '<div class="skc-rp-card"><div class="skc-rp-lbl">D\u00edas calculados</div><div class="skc-rp-val">' +
+      escHtml(String(diasCalc)) +
+      "</div></div>" +
+      "</div>";
+
+    var grid2 =
+      '<div class="skc-rp-grid">' +
+      '<div class="skc-rp-card"><div class="skc-rp-lbl">Canon total</div><div class="skc-rp-val">' +
+      escHtml(moneyFmt(canonTotal)) +
+      "</div></div>" +
+      '<div class="skc-rp-card"><div class="skc-rp-lbl">\u00c1rea total</div><div class="skc-rp-val">' +
+      escHtml(String(areaTotal)) +
+      " m2</div></div>" +
+      '<div class="skc-rp-card"><div class="skc-rp-lbl">\u00c1rea afectada</div><div class="skc-rp-val">' +
+      escHtml(String(areaAfect)) +
+      " m2</div></div>" +
+      '<div class="skc-rp-card"><div class="skc-rp-lbl">Ticket / Inmueble</div><div class="skc-rp-val">#' +
+      escHtml(String(idTicket)) +
+      "</div>" +
+      (codigo
+        ? '<div class="skc-rp-txt">C\u00f3d: ' + escHtml(codigo) + "</div>"
+        : "") +
+      "</div>" +
+      "</div>";
+
+    var descHtml = descripcion
+      ? '<div class="skc-rp-sec">Descripci\u00f3n t\u00e9cnica</div><div class="skc-rp-txt">' +
+        escHtml(descripcion) +
+        "</div>"
+      : "";
+
+    var diasHtml =
+      '<div class="skc-rp-sec">C\u00e1lculo de d\u00edas</div>' +
+      '<div class="skc-rp-formula">' +
+      "<strong>Fecha ticket:</strong> " +
+      escHtml(String(fechaTicket)) +
+      "<br>" +
+      "<strong>Fecha cotizaci\u00f3n:</strong> " +
+      escHtml(String(fechaCot)) +
+      "<br>" +
+      "<strong>D\u00edas desde ticket:</strong> " +
+      escHtml(String(diasTicket)) +
+      "<br>" +
+      "<strong>Duraci\u00f3n del trabajo:</strong> " +
+      escHtml(String(duracion)) +
+      "</div>";
+
+    var critsHtml = "";
+    if (criterios.length > 0) {
+      critsHtml =
+        '<div class="skc-rp-sec">Criterios seleccionados</div><div class="skc-rp-crits">';
+      criterios.forEach(function (c) {
+        critsHtml +=
+          '<div class="skc-rp-crit">' + escHtml(String(c)) + "</div>";
+      });
+      critsHtml += "</div>";
+    }
+
+    var justHtml =
+      '<div class="skc-rp-sec">Justificaci\u00f3n</div>' +
+      '<div class="skc-rp-txt">' +
+      (justificacion
+        ? escHtml(justificacion)
+        : '<em style="color:#9ca3af;">A\u00fan no est\u00e1 definida.</em>') +
+      "</div>";
+
+    if (body) {
+      body.innerHTML =
+        styles +
+        '<div class="skc-rp">' +
+        '<div class="skc-rp-hdr">' +
+        '<div><div class="skc-rp-title">Resumen t\u00e9cnico de perturbaci\u00f3n</div>' +
+        '<div class="skc-rp-subtitle">Informaci\u00f3n calculada autom\u00e1ticamente para apoyar la revisi\u00f3n de la cotizaci\u00f3n.</div></div>' +
+        (headerBadges ? "<div>" + headerBadges + "</div>" : "") +
+        "</div>" +
+        grid1 +
+        grid2 +
+        descHtml +
+        diasHtml +
+        critsHtml +
+        justHtml +
+        "</div>";
+      prependCaseLocationPanel(body, caseBtn, modal);
+    }
+    setCaseSubmodalMeta(sub, caseBtn);
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function openCloseTicketEditor(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = caseBtn.dataset.ticketPk || "";
+    if (title) title.textContent = "Cerrar ticket";
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML =
+        '<form class="scm-close-ticket-form" method="post" autocomplete="off">' +
+        '<input type="hidden" name="ticket_pk" value="' +
+        escHtml(ticketPk) +
+        '">' +
+        '<p class="scm-muted">Esta acci&oacute;n cerrar&aacute; el ticket y marcar&aacute; el estado administrativo como Finalizado.</p>' +
+        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Confirmar cierre</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        "</form>";
+      prependCaseLocationPanel(body, caseBtn, modal);
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  window.scmCloseCase = function (trigger) {
+    var modal = null;
+    if (trigger && trigger.closest) {
+      modal = trigger.closest(".scm-case-modal");
+    }
+    if (!modal) {
+      modal = document.querySelector("#scm-app #scm-case-modal.open");
+    }
+    closeCaseModal(modal);
+  };
+
+  window.scmOpenCase = function (btn) {
+    if (!btn) {
+      return;
+    }
+    var root = findRootFromNode(btn);
+    if (!root) {
+      return;
+    }
+
+    var modal = getCaseModal(root);
+    if (!modal) {
+      return;
+    }
+
+    try {
+      var sourceHtml = "";
+      var card = btn.closest(".scm-ticket-card");
+      if (card) {
+        var cardSource = card.querySelector(".scm-case-source");
+        if (cardSource) {
+          sourceHtml = cardSource.innerHTML || "";
+        }
+      }
+
+      if (!sourceHtml) {
+        var tr = btn.closest("tr");
+        if (tr) {
+          var sourceRow = tr.nextElementSibling;
+          if (sourceRow && sourceRow.classList.contains("scm-tl-row")) {
+            var sourceCell = sourceRow.querySelector("td");
+            if (sourceCell) {
+              sourceHtml = sourceCell.innerHTML || "";
+            }
+          }
+        }
+      }
+
+      if (!sourceHtml) {
+        return;
+      }
+
+      var title = modal.querySelector("#scm-case-title");
+      var subtitle = modal.querySelector("#scm-case-subtitle");
+      var meta = modal.querySelector("#scm-case-meta");
+      var headActions = modal.querySelector("#scm-case-head-actions");
+      var body = modal.querySelector("#scm-case-body");
+      var summaryItems = [];
+
+      function escHtml(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function collectSummary(label, value) {
+        if (!value) {
+          return;
+        }
+        summaryItems.push({ label: label, value: value });
+      }
+
+      if (title) {
+        title.textContent =
+          "Caso #" + (btn.dataset.ticketPk || btn.dataset.ticket || "-");
+      }
+      if (subtitle) {
+        subtitle.textContent =
+          btn.dataset.asunto || "Ticket de servicios inmobiliarios";
+      }
+      modal.dataset.ticketPk = btn.dataset.ticketPk || "";
+      modal.dataset.idInmuebleWeb = btn.dataset.idInmuebleWeb || "";
+      modal.dataset.idInmuebleData = btn.dataset.idInmuebleData || "";
+      modal.dataset.ubicacionGoogleMaps = btn.dataset.ubicacionGoogleMaps || "";
+      modal.dataset.direccion = btn.dataset.direccion || "";
+      if (meta) {
+        meta.innerHTML = "";
+        collectSummary("Estado", btn.dataset.estado || "");
+        collectSummary("Estado administrativo", btn.dataset.admin || "");
+        collectSummary("Contrato", btn.dataset.contrato || "");
+        collectSummary("Inmueble", btn.dataset.inmueble || "");
+        collectSummary(
+          "Codigo inmueble web",
+          btn.dataset.idInmuebleWeb || "",
+        );
+        collectSummary("Barrio", btn.dataset.barrio || "");
+        collectSummary("Dirección", btn.dataset.direccion || "");
+        collectSummary("Creado", btn.dataset.creado || "");
+        collectSummary("Asignado a", btn.dataset.empleado || "");
+        collectSummary("Propietario", btn.dataset.propietario || "");
+        collectSummary("Arrendatario", btn.dataset.arrendatario || "");
+        collectSummary("Tiempo total", btn.dataset.total || "");
+        collectSummary("Etapa actual", btn.dataset.etapa || "");
+        collectSummary("Tiempo en etapa", btn.dataset.etapaTiempo || "");
+        collectSummary("En ejecución", btn.dataset.ejecucion || "");
+        collectSummary("Sin actualizar", btn.dataset.sinActualizar || "");
+      }
+      if (body) {
+        var runtime = parseRuntime(root) || {};
+        var runtimeConfig = runtime.config || {};
+        var srcWrap = document.createElement("div");
+        srcWrap.innerHTML = sourceHtml;
+        var floatingActionWrap = srcWrap.querySelector(
+          ".scm-case-action-buttons",
+        );
+        var seguimientoWrap = srcWrap.querySelector(".scm-seg-wrap");
+        var topActionButtons = [];
+        if (floatingActionWrap) {
+          topActionButtons = Array.prototype.slice.call(
+            floatingActionWrap.querySelectorAll("[data-scm-open-section]"),
+          );
+          floatingActionWrap.remove();
+        }
+        var ticketUrl = (btn.dataset.ticketUrl || "").trim();
+        if (!ticketUrl) {
+          var baseTicketUrl = String(runtimeConfig.ticket_url || "").trim();
+          var ticketRef = String(
+            btn.dataset.ticket || btn.dataset.ticketPk || "",
+          ).trim();
+          if (baseTicketUrl && ticketRef) {
+            ticketUrl = baseTicketUrl + encodeURIComponent(ticketRef);
+          }
+        }
+        var cotizacionUrl = (btn.dataset.cotizacionUrl || "").trim();
+        var cotEstado = (btn.dataset.cotEstado || "").trim().toLowerCase();
+        var cotizacionSinResponder =
+          cotEstado === "" || cotEstado === "esperando respuesta";
+        var statusBucket = (btn.dataset.statusBucket || "").trim();
+        if (seguimientoWrap) {
+          seguimientoWrap.setAttribute("id", "scm-sec-seguimiento");
+          seguimientoWrap.style.display = "none";
+        }
+        var caseActionsHtml =
+          '<section class="scm-case-work-actions"><h4>Acciones del caso</h4><div class="scm-case-work-action-list">';
+        if (seguimientoWrap) {
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-open-section="scm-sec-seguimiento">Agregar seguimiento</button>';
+        }
+        caseActionsHtml +=
+          '<button type="button" class="scm-case-work-btn" data-scm-open-contacts>Editar contactos</button>';
+        caseActionsHtml +=
+          '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>';
+        caseActionsHtml +=
+          '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar ticket</button>';
+        if (statusBucket === "postergados" || statusBucket === "cerrados") {
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket>Activar ticket</button>';
+        }
+        caseActionsHtml +=
+          '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder ticket / enviar correo</button>';
+        caseActionsHtml +=
+          '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>';
+        if (cotizacionUrl && cotizacionSinResponder) {
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-open-cotizacion-response>Responder cotizaci&oacute;n / enviar correo</button>';
+        }
+        if (ticketUrl) {
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' +
+            escHtml(ticketUrl) +
+            '" data-iframe-title="Ticket">Abrir ticket</button>';
+        }
+        if (cotizacionUrl) {
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' +
+            escHtml(cotizacionUrl) +
+            '" data-iframe-title="Cotizaci&oacute;n">Abrir cotizaci&oacute;n</button>';
+        }
+        caseActionsHtml += "</div></section>";
+
+        var firstHistory = srcWrap.querySelector(".scm-case-history");
+        if (firstHistory) {
+          firstHistory.insertAdjacentHTML("beforebegin", caseActionsHtml);
+        } else {
+          srcWrap.insertAdjacentHTML("beforeend", caseActionsHtml);
+        }
+        sourceHtml = srcWrap.innerHTML;
+
+        var sidebarHtml = '<aside class="scm-case-sidebar">';
+        sidebarHtml += "<h4>Resumen del caso</h4>";
+        sidebarHtml += '<div class="scm-case-sidebar-list">';
+        summaryItems.forEach(function (item) {
+          sidebarHtml +=
+            '<div class="scm-case-side-item"><span class="scm-case-side-label">' +
+            escHtml(item.label) +
+            '</span><span class="scm-case-side-value">' +
+            escHtml(item.value) +
+            "</span></div>";
+        });
+        var sideMagnitude = normalizeMagnitudeKey(
+          btn.dataset.magnitudCaso || "",
+        );
+        sidebarHtml +=
+          '<div class="scm-case-side-item"><span class="scm-case-side-label">Magnitud del caso</span><span data-scm-case-magnitude-badge>' +
+          renderMagnitudeBadge(sideMagnitude) +
+          "</span></div>";
+        sidebarHtml +=
+          '<div class="scm-case-side-item scm-case-magnitude-editor">' +
+          '<span class="scm-case-side-label">Editar caso</span>' +
+          '<button type="button" class="btn btn-outline btn-sm scm-edit-case-magnitude" data-scm-edit-case-magnitude data-ticket-pk="' +
+          escHtml(btn.dataset.ticketPk || "") +
+          '">Editar magnitud caso</button>' +
+          "</div>";
+        sidebarHtml += renderCaseLocationPanel(btn, modal, false);
+        var tabKeySide = (btn.dataset.tabKey || "").trim();
+        var consultorEntrega = (btn.dataset.consultorEntrega || "").trim();
+        var consultorCelular = (
+          btn.dataset.consultorEntregaCelular || ""
+        ).trim();
+        var consultorCorreo = (btn.dataset.consultorEntregaCorreo || "").trim();
+        if (
+          tabKeySide === "entrega" &&
+          (consultorEntrega || consultorCelular || consultorCorreo)
+        ) {
+          sidebarHtml +=
+            '<div class="scm-case-side-item"><span class="scm-case-side-label scm-label-section">Consultor/a de entrega</span></div>';
+          if (consultorEntrega) {
+            sidebarHtml +=
+              '<div class="scm-case-side-item"><span class="scm-case-side-label">Nombre</span><span class="scm-case-side-value">' +
+              escHtml(consultorEntrega) +
+              "</span></div>";
+          }
+          if (consultorCelular) {
+            sidebarHtml +=
+              '<div class="scm-case-side-item"><span class="scm-case-side-label">Celular</span><span class="scm-case-side-value">' +
+              escHtml(consultorCelular) +
+              "</span></div>";
+          }
+          if (consultorCorreo) {
+            sidebarHtml +=
+              '<div class="scm-case-side-item"><span class="scm-case-side-label">Correo</span><span class="scm-case-side-value">' +
+              escHtml(consultorCorreo) +
+              "</span></div>";
+          }
+        }
+        var ubicLlaves = (btn.dataset.ubicacionLlaves || "").trim();
+        var personaLlaves = (btn.dataset.personaLlaves || "").trim();
+        var contactoLlaves = (btn.dataset.contactoLlaves || "").trim();
+        if (
+          tabKeySide === "entrega" &&
+          (ubicLlaves || personaLlaves || contactoLlaves)
+        ) {
+          sidebarHtml +=
+            '<div class="scm-case-side-item">' +
+            '<span class="scm-case-side-label">Llaves</span>' +
+            '<button type="button" class="btn btn-outline btn-sm" data-scm-open-llaves>Ver llaves</button>' +
+            "</div>";
+        }
+        sidebarHtml += "</div></aside>";
+        if (headActions) {
+          headActions.innerHTML = "";
+          if (hasPerturbacionValue((btn.dataset.perturbacion || "").trim())) {
+            headActions.innerHTML +=
+              '<button type="button" class="scm-case-side-link" data-scm-open-perturbacion>Ver perturbaci&oacute;n</button>';
+          }
+          if ((btn.dataset.idRevisionCorrectiva || "").trim()) {
+            headActions.innerHTML +=
+              '<button type="button" class="scm-case-side-link" data-scm-open-damage="correctiva">Magnitud da&ntilde;os correctiva</button>';
+          }
+          if ((btn.dataset.idRevisionPreventiva || "").trim()) {
+            headActions.innerHTML +=
+              '<button type="button" class="scm-case-side-link" data-scm-open-damage="preventiva">Magnitud da&ntilde;os preventiva</button>';
+          }
+          topActionButtons.forEach(function (rawBtn) {
+            var sectionId = rawBtn.getAttribute("data-scm-open-section") || "";
+            var label = (rawBtn.textContent || "").trim() || "Ver detalle";
+            if (!sectionId) {
+              return;
+            }
+            headActions.innerHTML +=
+              '<button type="button" class="scm-case-side-link" data-scm-open-section="' +
+              escHtml(sectionId) +
+              '">' +
+              escHtml(label) +
+              "</button>";
+          });
+          var tabKeyHead = (btn.dataset.tabKey || "").trim();
+          var idEstudioHead = (btn.dataset.idEstudioAseguradora || "").trim();
+          var anexosHead = (btn.dataset.anexosEntrega || "").trim();
+          var ubicLlavesHead = (btn.dataset.ubicacionLlaves || "").trim();
+          var personaLlavesHead = (btn.dataset.personaLlaves || "").trim();
+          var contactoLlavesHead = (btn.dataset.contactoLlaves || "").trim();
+          if (tabKeyHead === "entrega" && idEstudioHead) {
+            headActions.innerHTML +=
+              '<a href="https://sucasainmobiliaria.com.co/estudio-aseguradora/?id_estudio=' +
+              encodeURIComponent(idEstudioHead) +
+              '" class="scm-case-side-link" target="_blank" rel="noopener">Ver asegurable</a>';
+          }
+          if (tabKeyHead === "entrega" && anexosHead) {
+            headActions.innerHTML +=
+              '<a href="' +
+              escHtml(anexosHead) +
+              '" class="scm-case-side-link" target="_blank" rel="noopener">Ver documentos</a>';
+          }
+          if (
+            tabKeyHead === "entrega" &&
+            (ubicLlavesHead || personaLlavesHead || contactoLlavesHead)
+          ) {
+            headActions.innerHTML +=
+              '<button type="button" class="scm-case-side-link" data-scm-open-llaves>Ver llaves</button>';
+          }
+        }
+
+        body.innerHTML =
+          '<div class="scm-case-layout">' +
+          sidebarHtml +
+          '<section class="scm-case-main">' +
+          sourceHtml +
+          "</section></div>";
+      }
+
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+      document.body.classList.add("scm-modal-open");
+
+      var closeBtn = modal.querySelector(".scm-case-close");
+      if (closeBtn) {
+        closeBtn.focus();
+      }
+
+      modal
+        .querySelectorAll("[data-scm-open-section]")
+        .forEach(function (scrollBtn) {
+          scrollBtn.addEventListener("click", function () {
+            var targetId =
+              scrollBtn.getAttribute("data-scm-open-section") || "";
+            if (!targetId) {
+              return;
+            }
+            openCaseSubmodal(modal, scrollBtn, targetId);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-damage]")
+        .forEach(function (damageBtn) {
+          damageBtn.addEventListener("click", function () {
+            openCaseDamageSubmodal(
+              modal,
+              damageBtn,
+              root,
+              btn,
+              damageBtn.getAttribute("data-scm-open-damage") || "correctiva",
+            );
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-scroll-target]")
+        .forEach(function (scrollBtn) {
+          scrollBtn.addEventListener("click", function () {
+            var targetId =
+              scrollBtn.getAttribute("data-scm-scroll-target") || "";
+            if (!targetId) {
+              return;
+            }
+            var target = modal.querySelector("#" + targetId);
+            if (!target || !target.scrollIntoView) {
+              return;
+            }
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-edit-case-magnitude]")
+        .forEach(function (editBtn) {
+          editBtn.addEventListener("click", function () {
+            openCaseMagnitudeEditor(modal, root, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-note]")
+        .forEach(function (noteBtn) {
+          noteBtn.addEventListener("click", function () {
+            openCaseNoteEditor(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-postpone-ticket]")
+        .forEach(function (postponeBtn) {
+          postponeBtn.addEventListener("click", function () {
+            openPostponeTicketEditor(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-activate-ticket]")
+        .forEach(function (activateBtn) {
+          activateBtn.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            openActivateTicketPrompt(btn, activateBtn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-trasladar]")
+        .forEach(function (trasladarBtn) {
+          trasladarBtn.addEventListener("click", function () {
+            var root = findRootFromNode(trasladarBtn);
+            var rt = root ? parseRuntime(root) || {} : {};
+            openTrasladarCasoEditor(modal, btn, rt);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-contacts]")
+        .forEach(function (contactsBtn) {
+          contactsBtn.addEventListener("click", function () {
+            openContactEditor(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-ticket-response]")
+        .forEach(function (responseBtn) {
+          responseBtn.addEventListener("click", function () {
+            openTicketResponseEditor(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-cotizacion-response]")
+        .forEach(function (responseBtn) {
+          responseBtn.addEventListener("click", function () {
+            openCotizacionResponseEditor(modal, btn);
+          });
+        });
+      modal
+        .querySelectorAll("[data-scm-open-perturbacion]")
+        .forEach(function (pb) {
+          pb.addEventListener("click", function () {
+            openPerturbacionDetail(modal, btn);
+          });
+        });
+
+      modal.querySelectorAll("[data-scm-open-llaves]").forEach(function (lb) {
+        lb.addEventListener("click", function () {
+          openLlavesDetail(modal, btn);
+        });
+      });
+
+      modal
+        .querySelectorAll("[data-scm-close-ticket]")
+        .forEach(function (closeBtn) {
+          closeBtn.addEventListener("click", function () {
+            openCloseTicketEditor(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-iframe]")
+        .forEach(function (iframeBtn) {
+          iframeBtn.addEventListener("click", function () {
+            openIframeModal(
+              iframeBtn.dataset.iframeUrl || "",
+              iframeBtn.dataset.iframeTitle || "",
+            );
+          });
+        });
+    } catch (err) {
+      console.error("SCM open case error:", err);
+      closeCaseModal(modal);
+    }
+  };
+
+  window.SCMAdminCore = {
+    parseRuntime: parseRuntime,
+    escHtml: escHtml,
+    scmNotify: scmNotify,
+    bindTabs: bindTabs,
+    findRootFromNode: findRootFromNode,
+    getCaseModal: getCaseModal,
+    openIframeModal: openIframeModal,
+    closeCaseModal: closeCaseModal,
+    openPropertyLocationEditor: openPropertyLocationEditor,
+    openPropertyLocationStandaloneEditor: openPropertyLocationStandaloneEditor,
+    renderTicketDocumentRow: renderTicketDocumentRow,
+    renderTicketDocumentFields: renderTicketDocumentFields,
+    renderNotifyTargets: renderNotifyTargets,
+    getLlavesDetailPayload: getLlavesDetailPayload,
+    getConsultorEntregaDetailPayload: getConsultorEntregaDetailPayload,
+    openStandaloneDetail: openStandaloneDetail
+  };
+})();

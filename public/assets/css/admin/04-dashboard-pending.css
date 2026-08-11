@@ -1,0 +1,641 @@
+/* Unified tabs: remove tab headers, keep same style in all tabs. */
+#scm-app .scm-tab-panel > .scm-header {
+  display: none !important;
+}
+
+/* Popup refinement requested: sidebar closer + more inner padding. */
+#scm-app .scm-case-body {
+  padding: 22px !important;
+}
+
+#scm-app .scm-case-layout {
+  grid-template-columns: minmax(230px, 280px) minmax(0, 1fr) !important;
+  gap: 10px !important;
+}
+
+/* Popup timeline fix: full width without horizontal scroll in Ver caso. */
+#scm-app .scm-case-main .scm-modal-timeline-only .scm-timeline {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  gap: 10px !important;
+}
+
+#scm-app .scm-case-main .scm-modal-timeline-only .scm-tl-item {
+  flex: 1 1 190px !important;
+  min-width: 190px !important;
+  max-width: none !important;
+}
+
+#scm-app .scm-case-main .scm-modal-timeline-only .scm-tl-line {
+  display: block !important;
+  flex: 0 0 30px !important;
+  min-width: 30px !important;
+  height: 2px !important;
+  margin-top: 42px !important;
+  position: relative !important;
+  background: #b8c7da !important;
+  border-radius: 2px !important;
+}
+
+#scm-app .scm-case-main .scm-modal-timeline-only .scm-tl-line::after {
+  content: "" !important;
+  position: absolute !important;
+  right: -1px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  border-top: 5px solid transparent !important;
+  border-bottom: 5px solid transparent !important;
+  border-left: 7px solid #b8c7da !important;
+}
+
+/* Generic tabs timeline fix in popup:
+   .scm-tl-wrap was a 2-column grid (info + timeline) and shrank Preventiva. */
+#scm-app .scm-case-main .scm-modal-timeline-only .scm-tl-wrap {
+  display: block !important;
+  grid-template-columns: 1fr !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+/* Keep the same timeline density in every tab popup (generic + mantenimiento). */
+#scm-app .scm-case-main .scm-modal-timeline-only > .scm-timeline,
+#scm-app .scm-case-main .scm-modal-timeline-only .scm-tl-wrap > .scm-timeline {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+#scm-app .scm-case-sidebar {
+  padding: 12px !important;
+}
+
+#scm-app .scm-case-submodal {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.34);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9;
+  padding: 16px;
+}
+
+#scm-app .scm-case-submodal.open {
+  display: flex;
+}
+
+#scm-app .scm-case-submodal-dialog {
+  width: min(820px, calc(100% - 8px));
+  max-height: calc(100% - 8px);
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #d9dee7;
+  background: #ffffff;
+  box-shadow: 0 26px 70px rgba(15, 23, 42, 0.24);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  position: relative;
+}
+
+#scm-app .scm-case-submodal-close {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #111827;
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#scm-app .scm-case-submodal-head {
+  padding: 12px 42px 10px 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+#scm-app .scm-case-submodal-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+#scm-app .scm-case-submodal-meta,
+#scm-app .scm-standalone-detail-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #475569;
+}
+
+#scm-app .scm-case-location-panel {
+  border: 1px solid #dbe6f1;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 0 0 14px;
+}
+
+#scm-app .scm-case-location-panel.is-compact {
+  padding: 10px;
+}
+
+#scm-app .scm-case-location-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+#scm-app .scm-case-location-head h4 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+#scm-app .scm-case-location-head p,
+#scm-app .scm-case-location-source {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #475569;
+}
+
+#scm-app .scm-case-location-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+
+#scm-app .scm-case-location-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#scm-app .scm-case-location-empty {
+  font-size: 12px;
+  color: #64748b;
+}
+
+#scm-app .scm-case-location-map {
+  margin-top: 10px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #dbe6f1;
+  background: #e2e8f0;
+}
+
+#scm-app .scm-case-location-map iframe {
+  display: block;
+  width: 100%;
+  height: 220px;
+  border: 0;
+}
+
+#scm-app .scm-case-submodal-body {
+  padding: 12px 14px 14px;
+  overflow: auto;
+}
+
+#scm-app .scm-standalone-detail-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.34);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+#scm-app .scm-standalone-detail-modal.open {
+  display: flex;
+}
+
+#scm-app .scm-standalone-detail-dialog {
+  width: min(820px, calc(100% - 8px));
+  max-height: calc(100% - 8px);
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #d9dee7;
+  background: #ffffff;
+  box-shadow: 0 26px 70px rgba(15, 23, 42, 0.24);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  position: relative;
+}
+
+#scm-app .scm-standalone-detail-close {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #111827;
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#scm-app .scm-standalone-detail-head {
+  padding: 12px 42px 10px 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+#scm-app .scm-standalone-detail-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+#scm-app .scm-standalone-detail-body {
+  padding: 12px 14px 14px;
+  overflow: auto;
+}
+
+/* Unified spacing scale (8/12/16/24) */
+#scm-app {
+  --sp-1: 8px;
+  --sp-2: 12px;
+  --sp-3: 16px;
+  --sp-4: 24px;
+}
+
+#scm-app .scm-tabs {
+  gap: var(--sp-1) !important;
+  margin-bottom: var(--sp-3) !important;
+  padding: var(--sp-1) !important;
+}
+
+#scm-app .scm-tab {
+  padding: var(--sp-2) var(--sp-3) !important;
+}
+
+#scm-app .scm-header,
+#scm-app .scm-header-prev,
+#scm-app .scm-header-corr,
+#scm-app [class*="scm-header-"]:not(.scm-header) {
+  padding: var(--sp-4) !important;
+  margin-bottom: var(--sp-3) !important;
+  gap: var(--sp-3) !important;
+}
+
+#scm-app .scm-kpis,
+#scm-app .scm-kpis-daisy,
+#scm-app .scm-grid,
+#scm-app .scm-grid-3,
+#scm-app .scm-ticket-cards {
+  gap: var(--sp-2) !important;
+}
+
+#scm-app .scm-filter-card,
+#scm-app .scm-cards-wrap,
+#scm-app .scm-pagination-card,
+#scm-app .scm-case-sidebar,
+#scm-app .scm-seg-wrap,
+#scm-app .scm-case-history {
+  padding: var(--sp-3) !important;
+}
+
+#scm-app .scm-actions,
+#scm-app .scm-case-actions,
+#scm-app .scm-case-head-actions {
+  gap: var(--sp-2) !important;
+}
+
+#scm-app .scm-actions,
+#scm-app .scm-case-actions {
+  margin-top: var(--sp-2) !important;
+}
+
+#scm-app .scm-case-body {
+  padding: var(--sp-3) !important;
+}
+
+#scm-app .scm-main-tabs {
+  margin-bottom: var(--sp-4) !important;
+}
+
+#scm-app .scm-open-bucket,
+#scm-app .scm-status-bucket[data-status-bucket] {
+  padding: var(--sp-3) var(--sp-2) 0 !important;
+}
+
+#scm-app .scm-status-subtabs {
+  gap: var(--sp-1) !important;
+  margin-bottom: var(--sp-3) !important;
+  padding: 0 0 var(--sp-1) !important;
+}
+
+#scm-app .scm-status-topic-tab {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--sp-3) !important;
+}
+
+#scm-app .scm-open-topic-panel {
+  display: none;
+}
+
+#scm-app .scm-open-topic-panel.active {
+  display: block;
+}
+
+#scm-app .scm-status-topic-head {
+  border-bottom: 1px solid var(--scm-border);
+  margin: 0 0 var(--sp-3) !important;
+  padding: 0 0 var(--sp-2) !important;
+}
+
+#scm-app .scm-status-topic-head h3 {
+  font-size: 22px;
+  margin: 0;
+}
+
+#scm-app .scm-status-count {
+  min-height: 40px;
+  padding: 9px 12px !important;
+}
+
+.swal2-container {
+  z-index: 1000000 !important;
+}
+
+/* ── Iframe popup modal ─────────────────────────────────────── */
+.scm-iframe-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.scm-iframe-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(1200px, 96vw);
+  height: min(860px, 92vh);
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.scm-iframe-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #1f2937;
+  flex-shrink: 0;
+}
+
+.scm-iframe-toolbar-title {
+  color: #f9fafb;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scm-iframe-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #f9fafb;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.scm-iframe-close:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.scm-iframe-frame {
+  flex: 1;
+  width: 100%;
+  border: none;
+}
+
+.scm-iframe-loader {
+  position: absolute;
+  inset: 44px 0 0 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+}
+
+.scm-iframe-spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #1f2937;
+  border-radius: 50%;
+  animation: scm-iframe-spin 0.75s linear infinite;
+}
+
+@keyframes scm-iframe-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Pending panels (Preventivas / Servicios Públicos) ─────────────────────── */
+#scm-app .scm-pending-wrap {
+  padding-bottom: 16px;
+}
+
+#scm-app .scm-pending-header {
+  background: var(--scm-surface);
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-lg);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--scm-shadow-md);
+}
+
+#scm-app .scm-pending-header::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--scm-teal-700), var(--scm-teal-500));
+}
+
+#scm-app .scm-pending-header--teal::before {
+  background: linear-gradient(90deg, var(--scm-teal-700), var(--scm-teal-500));
+}
+
+#scm-app .scm-pending-header--green::before {
+  background: linear-gradient(90deg, var(--scm-blue-700), var(--scm-blue-400));
+}
+
+#scm-app .scm-pending-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--scm-text-main);
+  letter-spacing: -0.3px;
+}
+
+#scm-app .scm-pending-header p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--scm-text-soft);
+}
+
+#scm-app .scm-pending-count {
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--scm-text-main);
+  line-height: 1;
+}
+
+#scm-app .scm-pending-count-label {
+  font-size: 11px;
+  color: var(--scm-text-muted);
+  margin-top: 2px;
+  text-align: right;
+}
+
+/* Date cells in pending tables */
+#scm-app .scm-date-cell {
+  font-variant-numeric: tabular-nums;
+  color: var(--scm-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#scm-app .scm-date-warn {
+  color: var(--scm-danger) !important;
+  font-weight: 700;
+}
+
+/* Action button in pending table rows */
+#scm-app .scm-pending-action-btn {
+  background: linear-gradient(135deg, var(--scm-teal-700), var(--scm-teal-500));
+  color: #fff;
+  border: none;
+  border-radius: var(--scm-r-sm);
+  padding: 6px 13px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+#scm-app .scm-pending-action-btn:hover {
+  opacity: 0.85;
+  color: #fff;
+  text-decoration: none;
+}
+
+#scm-app .scm-pending-action-btn--blue {
+  background: linear-gradient(135deg, var(--scm-blue-700), var(--scm-blue-600));
+}
+
+/* Pending panels: restore dark table header (overrides the flat-pass rule) */
+#scm-app .scm-pending-wrap .scm-table-prev thead tr {
+  background: linear-gradient(130deg, var(--scm-teal-700), #0d4a46) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+#scm-app .scm-pending-wrap .scm-table-prev thead th {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Ticket status badges in pending table action cells */
+#scm-app .scm-pending-action-cell {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+#scm-app .scm-tkt-est {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+}
+#scm-app .scm-tkt-est--open {
+  background: #fef9c3;
+  color: #854d0e;
+  border-color: #fde68a;
+}
+#scm-app .scm-tkt-est--closed {
+  background: #dcfce7;
+  color: #14532d;
+  border-color: #bbf7d0;
+}
+/* Ticket info block (replaces Crear-ticket button when ticket already exists) */
+#scm-app .scm-tkt-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+#scm-app .scm-tkt-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--scm-text-muted, #94a3b8);
+  letter-spacing: 0.03em;
+}

@@ -9,6 +9,7 @@ final class SharedNotificationsBridge
   private const PROJECT_CODE = 'control-servicios-inmobiliarios';
 
   private Database $db;
+  private string $packageRoot;
 
   /** @var array<string,mixed>|null */
   private ?array $config = null;
@@ -19,9 +20,13 @@ final class SharedNotificationsBridge
   private ?string $lastError = null;
   private bool $booted = false;
 
-  public function __construct(Database $db)
+  public function __construct(Database $db, string $packageRoot = '')
   {
     $this->db = $db;
+    $configuredRoot = $packageRoot !== '' ? $packageRoot : (string) (getenv('SHARED_NOTIFICATIONS_PATH') ?: '');
+    $this->packageRoot = $configuredRoot !== ''
+      ? rtrim($configuredRoot, '/\\')
+      : dirname(__DIR__, 3) . '/shared-notifications';
   }
 
   public function isAvailable(): bool
@@ -99,9 +104,8 @@ final class SharedNotificationsBridge
 
     $this->booted = true;
 
-    $packageRoot = dirname(__DIR__, 3) . '/shared-notifications';
-    $autoloadFile = $packageRoot . '/autoload.php';
-    $configFile = $packageRoot . '/config.php';
+    $autoloadFile = $this->packageRoot . '/autoload.php';
+    $configFile = $this->packageRoot . '/config.php';
     if (!is_readable($autoloadFile)) {
       $this->lastError = 'No se encontro shared-notifications/autoload.php.';
       return false;

@@ -1,0 +1,319 @@
+body {
+          margin: 0;
+          font-family: 'Poppins', sans-serif;
+          background:
+            radial-gradient(circle at 8% 0%, rgba(255, 122, 0, .10), transparent 26%),
+            radial-gradient(circle at 95% 0%, rgba(47, 111, 167, .10), transparent 32%),
+            #f3f7fc;
+          color: #1c3048;
+        }
+
+        .scm-public-shell {
+          max-width: 1360px;
+          margin: 0 auto;
+          padding: 28px 20px 56px;
+        }
+
+        .scm-public-header {
+          margin-bottom: 22px;
+          padding: 28px 30px;
+          border: 1px solid rgba(199, 213, 229, .9);
+          border-radius: 24px;
+          background: linear-gradient(145deg, rgba(255, 255, 255, .97), rgba(242, 247, 253, .95));
+          box-shadow: 0 22px 50px rgba(22, 48, 77, .08);
+        }
+
+        .scm-public-brand-logo {
+          width: 154px;
+          min-height: 48px;
+          border-radius: 8px;
+          background: #fff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 7px 10px;
+          margin-bottom: 12px;
+          box-shadow: 0 12px 26px rgba(22, 48, 77, .12);
+        }
+
+        .scm-public-brand-logo img {
+          display: block;
+          width: auto;
+          max-width: 100%;
+          max-height: 34px;
+          object-fit: contain;
+        }
+
+        .scm-public-kicker {
+          display: inline-block;
+          margin-bottom: 8px;
+          padding: 7px 12px;
+          border-radius: 999px;
+          background: rgba(31, 76, 120, .10);
+          color: #1f4c78;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: .02em;
+        }
+
+        .scm-public-header h1 {
+          margin: 0 0 8px;
+          font-size: 40px;
+          line-height: 1.05;
+          color: #17304d;
+        }
+
+        .scm-public-header p {
+          margin: 0;
+          max-width: 720px;
+          color: #4c6077;
+          font-size: 18px;
+          line-height: 1.55;
+        }
+
+        .scm-public-alert {
+          margin: 0 0 16px;
+          padding: 14px 16px;
+          border-radius: 14px;
+          font-size: 14px;
+          font-weight: 600;
+          box-shadow: 0 10px 24px rgba(22, 48, 77, .06);
+        }
+
+        .scm-public-alert-success {
+          background: #ecfdf3;
+          border: 1px solid #86efac;
+          color: #166534;
+        }
+
+        .scm-public-alert-error {
+          background: #fef2f2;
+          border: 1px solid #fca5a5;
+          color: #991b1b;
+        }
+
+        .scm-public-pqr-public-form {
+          display: block;
+          margin-top: 10px;
+        }
+
+        .scm-public-pqr-public-form .scm-select {
+          width: 100%;
+          min-height: 42px;
+          border: 1px solid #cad8e8;
+          border-radius: 12px;
+          background: #fff;
+          box-shadow: inset 0 1px 2px rgba(15, 23, 42, .04);
+        }
+
+        .scm-filter-card.card {
+          border: 1px solid rgba(199, 213, 229, .95);
+          border-radius: 22px;
+          background: rgba(255, 255, 255, .97);
+          box-shadow: 0 18px 40px rgba(22, 48, 77, .08);
+          padding: 22px 22px 24px;
+        }
+
+        .scm-filter-card.card h3 {
+          margin: 0 0 6px;
+          font-size: 18px;
+          color: #17304d;
+        }
+
+        .result-wrap {
+          margin-top: 18px;
+          overflow: auto;
+          border: 1px solid #d6e2ef;
+          border-radius: 18px;
+          background: #fff;
+        }
+
+        .scm-go-table {
+          width: 100%;
+          border-collapse: collapse;
+          min-width: 1120px;
+        }
+
+        .scm-go-table thead th {
+          padding: 16px 14px;
+          background: linear-gradient(135deg, #17304d, #223d5b);
+          color: #fff;
+          font-size: 12px;
+          letter-spacing: .03em;
+          text-transform: uppercase;
+          text-align: left;
+          border: 0;
+        }
+
+        .scm-go-table tbody td {
+          padding: 16px 14px;
+          vertical-align: top;
+          border-bottom: 1px solid #e8eef5;
+          color: #26425f;
+          font-size: 14px;
+          line-height: 1.45;
+          background: #fff;
+        }
+
+        .scm-go-table tbody tr:hover td {
+          background: #f7fbff;
+        }
+
+        .scm-go-table tbody tr:last-child td {
+          border-bottom: 0;
+        }
+
+        .scm-public-pqr-current-topic,
+        .scm-public-pqr-current-department,
+        .scm-public-pqr-current-employee {
+          display: inline-block;
+          padding: 6px 10px;
+          border-radius: 999px;
+          background: #edf4fb;
+          color: #204567;
+          font-weight: 600;
+          font-size: 12px;
+        }
+
+        .scm-public-pqr-actions {
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 10px;
+        }
+
+        .scm-public-pqr-view-btn,
+        .scm-public-pqr-transfer-btn,
+        .scm-public-pqr-public-form button[type="submit"] {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 42px;
+          padding: 10px 14px;
+          border: 0;
+          border-radius: 12px;
+          text-decoration: none;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+        }
+
+        .scm-public-pqr-view-btn {
+          background: linear-gradient(135deg, #17304d, #28507b);
+          color: #fff;
+          box-shadow: 0 10px 22px rgba(23, 48, 77, .18);
+        }
+
+        .scm-public-pqr-transfer-btn {
+          background: linear-gradient(135deg, #f59120, #db7d11);
+          color: #fff;
+          box-shadow: 0 10px 22px rgba(245, 145, 32, .24);
+        }
+
+        .scm-public-pqr-public-form button[type="submit"] {
+          background: linear-gradient(135deg, #f59120, #db7d11);
+          color: #fff;
+          box-shadow: 0 10px 22px rgba(245, 145, 32, .24);
+        }
+
+        .scm-public-pqr-view-btn:hover,
+        .scm-public-pqr-public-form button[type="submit"]:hover {
+          transform: translateY(-1px);
+        }
+
+        .scm-public-pqr-public-form>div {
+          justify-content: flex-start;
+        }
+
+        .scm-pqr-transfer-overlay,
+        .scm-public-iframe-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 99999;
+          display: none;
+        }
+
+        .scm-pqr-transfer-overlay.open,
+        .scm-public-iframe-overlay.open {
+          display: block;
+        }
+
+        .scm-pqr-transfer-backdrop,
+        .scm-public-iframe-backdrop {
+          position: absolute;
+          inset: 0;
+          background: rgba(11, 22, 35, .62);
+        }
+
+        .scm-pqr-transfer-dialog,
+        .scm-public-iframe-dialog {
+          position: relative;
+          margin: 4vh auto 0;
+          width: min(760px, 96vw);
+          max-height: 92vh;
+          overflow: auto;
+          border-radius: 16px;
+          border: 1px solid #d8e5f2;
+          background: #fff;
+          box-shadow: 0 18px 44px rgba(13, 30, 47, .34);
+          padding: 16px 16px 14px;
+        }
+
+        .scm-public-iframe-dialog {
+          width: min(1240px, 98vw);
+          height: 92vh;
+          padding: 14px;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .scm-pqr-transfer-close,
+        .scm-public-iframe-close {
+          position: absolute;
+          top: 8px;
+          right: 10px;
+          width: 34px;
+          height: 34px;
+          border: 0;
+          border-radius: 10px;
+          background: #f2f7fd;
+          color: #17304d;
+          font-size: 24px;
+          cursor: pointer;
+        }
+
+        .scm-pqr-transfer-title,
+        .scm-public-iframe-title {
+          margin: 0 40px 12px 0;
+          font-size: 18px;
+          color: #17304d;
+        }
+
+        .scm-public-iframe-frame {
+          width: 100%;
+          height: calc(100% - 40px);
+          border: 1px solid #d6e2ef;
+          border-radius: 12px;
+          background: #fff;
+        }
+
+        @media (max-width: 860px) {
+          .scm-public-shell {
+            padding: 18px 12px 36px;
+          }
+
+          .scm-public-header {
+            padding: 22px 18px;
+            border-radius: 18px;
+          }
+
+          .scm-public-header h1 {
+            font-size: 32px;
+          }
+
+          .scm-public-header p {
+            font-size: 16px;
+          }
+        }

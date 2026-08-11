@@ -38,8 +38,8 @@ final class EmailTemplate
   /** @param array<string,string> $vars */
   public static function renderNamed(string $name, array $vars): string
   {
-    $root = defined('SCM_ROOT') ? SCM_ROOT : dirname(__DIR__, 2);
-    $path = $root . '/src/Support/plantillas-html/' . preg_replace('/[^a-zA-Z0-9_-]/', '', $name) . '.php';
+    $resources = defined('SCM_RESOURCES_PATH') ? SCM_RESOURCES_PATH : dirname(__DIR__, 2) . '/resources';
+    $path = $resources . '/emails/' . preg_replace('/[^a-zA-Z0-9_-]/', '', $name) . '.php';
     if (!is_readable($path)) {
       return self::render((string)($vars['titulo'] ?? 'SUCASA INMOBILIARIA'), (string)($vars['contenido'] ?? ''), $vars);
     }

@@ -42,7 +42,7 @@ final class PendingRepository
         continue;
       }
       $activo = trim((string)($row['activo'] ?? ''));
-      if ($activo !== '' && !in_array($activo, ['si', 's�', '1', 'true', 'activo'], true)) {
+      if ($activo !== '' && !in_array($activo, ['si', 'sí', '1', 'true', 'activo'], true)) {
         continue;
       }
       $nombre = trim((string)($row['nombre'] ?? ''));

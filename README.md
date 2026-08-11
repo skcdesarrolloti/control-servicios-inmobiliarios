@@ -1,0 +1,97 @@
+# Control de Servicios Inmobiliarios
+
+Aplicación PHP para administrar tickets, mantenimientos, PQR, revisiones preventivas y notificaciones de servicios inmobiliarios.
+
+## Requisitos
+
+- PHP 8.2 o superior.
+- Extensiones `pdo_mysql`, `json`, `fileinfo` y `mbstring`.
+- Apache con `mod_rewrite` y `mod_headers`, o reglas equivalentes en el servidor web.
+- MySQL/MariaDB y acceso al esquema existente de la aplicación.
+- Composer para instalar herramientas de desarrollo.
+
+## Instalación
+
+1. Instala las dependencias:
+
+   ```bash
+   composer install --no-dev --optimize-autoloader
+   ```
+
+2. Copia `.env.example` como `.env` y completa las variables. `APP_SECRET` debe ser aleatorio y tener al menos 32 caracteres.
+
+3. Configura el *document root* del sitio apuntando a la carpeta `public/`, nunca a la raíz del repositorio.
+
+4. Concede al usuario de PHP permisos de escritura únicamente sobre:
+
+   ```text
+   storage/data
+   storage/logs
+   storage/uploads
+   ```
+
+5. Si reemplazas una instalación anterior, migra los archivos sin sobrescribir los que ya existan:
+
+   ```bash
+   php bin/migrate-legacy-storage.php /ruta/al/proyecto/anterior
+   ```
+
+6. Programa el worker de notificaciones desde CLI, por ejemplo cada minuto:
+
+   ```bash
+   php bin/queue-worker.php 40
+   ```
+
+La integración de notificaciones compartidas se localiza mediante `SHARED_NOTIFICATIONS_PATH`. Si está vacía, se intenta usar el proyecto hermano histórico.
+
+## Estructura
+
+```text
+bin/                    comandos CLI y migración
+bootstrap/              arranque de la aplicación
+config/                 configuración basada en entorno
+public/                 única raíz pública y assets del navegador
+resources/emails/       plantillas de correo
+src/
+  App/                  fachada y orquestación del panel
+  Core/                 autenticación, sesión, base de datos y configuración
+  Http/                 controladores, router y respuestas HTTP
+  Modules/              casos de uso por dominio
+  Repositories/         consultas y enriquecimiento de datos
+  Support/              archivos, colas y utilidades
+  Views/                 renderizado de interfaces
+storage/                datos variables; no se versionan
+tests/                  pruebas automatizadas
+tools/                  verificaciones de desarrollo
+```
+
+Las clases fachada grandes se conservaron para mantener compatibilidad con la base y los flujos existentes, pero su comportamiento está separado en `Concerns` cohesivos. Esto reduce el riesgo de una reescritura total y deja límites claros para migrar gradualmente a servicios independientes.
+
+## Seguridad y operación
+
+- No se guardan credenciales, secretos, datos, logs ni adjuntos en Git.
+- Las contraseñas nuevas deben usar hashes de PHP. El acceso con contraseñas antiguas en texto plano está desactivado; `AUTH_ALLOW_LEGACY_PASSWORDS=true` lo habilita temporalmente y actualiza el hash al iniciar sesión.
+- Los adjuntos nuevos se validan por MIME/tamaño, se guardan fuera de `public/` y se sirven con firma HMAC.
+- La ruta `/uploads/*` existe solo para compatibilidad con enlaces históricos. Los adjuntos nuevos no deben usarla.
+- El login tiene límite de intentos y las operaciones autenticadas usan CSRF.
+- Rota las credenciales y secretos utilizados por cualquier despliegue anterior antes de publicar esta versión.
+
+## Verificación
+
+```bash
+composer check
+```
+
+El comando ejecuta:
+
+- sintaxis de todos los archivos PHP del proyecto;
+- PHPStan nivel 5 sobre el núcleo y la infraestructura nueva tipada;
+- PHPUnit para tokens firmados, rate limiting, entorno y persistencia de configuración.
+
+Los assets JavaScript también pueden validarse con `node --check public/assets/js/<archivo>.js`.
+
+## Despliegue
+
+No copies `.env` desde otro entorno sin revisar sus valores. Conserva `storage/` entre versiones y despliega el código de forma atómica. Después del despliegue ejecuta `composer install --no-dev --optimize-autoloader` y verifica que el worker CLI pueda iniciar.
+
+El inventario completo de cambios y deuda restante está en [docs/REFACTORIZACION.md](docs/REFACTORIZACION.md).

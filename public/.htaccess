@@ -1,0 +1,30 @@
+Options -Indexes
+DirectoryIndex index.php
+
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  RewriteCond %{THE_REQUEST} \s/+[^\s?]*ticket-(propietario|arrendatario|copropiedad|cliente)\.php(?:[\s?]|$) [NC]
+  RewriteRule ^ticket-(propietario|arrendatario|copropiedad|cliente)\.php$ ticket-$1 [R=301,L,NE]
+  RewriteRule ^ticket-(propietario|arrendatario|copropiedad|cliente)/?$ ticket-$1.php [L,NC,QSA]
+
+  RewriteCond %{THE_REQUEST} \s/+[^\s?]*ticket\.php(?:[\s?]|$) [NC]
+  RewriteRule ^ticket\.php$ ticket [R=301,L,NE]
+  RewriteRule ^ticket/?$ ticket.php [L,NC,QSA]
+
+  # Compatibilidad temporal para URLs /uploads/* existentes en la base de datos.
+  RewriteRule ^uploads/([A-Za-z0-9._-]+)$ legacy-file.php?n=$1 [L,NC,QSA]
+
+  RewriteRule ^settings(?:\.php)?$ index.php [R=301,L]
+</IfModule>

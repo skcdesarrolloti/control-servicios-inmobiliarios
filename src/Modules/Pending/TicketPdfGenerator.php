@@ -3,6 +3,7 @@
 namespace SCM\Modules\Pending;
 
 use SCM\Support\SimplePdf;
+use SCM\Support\StoredFileService;
 
 final class TicketPdfGenerator
 {
@@ -125,16 +126,16 @@ final class TicketPdfGenerator
    */
   private function save(SimplePdf $pdf, string $slug, string $title, string $key): array
   {
-    $basename = preg_replace('/[^a-zA-Z0-9_-]+/', '_', $slug) . '_' . bin2hex(random_bytes(5)) . '.pdf';
-    $uploadDir = defined('SCM_BASE_PATH') ? SCM_BASE_PATH . '/uploads' : dirname(__DIR__, 3) . '/uploads';
-    $uploadUrl = defined('SCM_BASE_URL') ? rtrim(SCM_BASE_URL, '/') . '/uploads' : '';
+    $basename = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
+    $uploadDir = (string) SCM_UPLOAD_PATH;
     $path = $uploadDir . '/' . $basename;
     $pdf->save($path);
+    $files = StoredFileService::fromRuntime();
 
     return [
       'key' => $key,
       'title' => $title,
-      'url' => $uploadUrl !== '' ? ($uploadUrl . '/' . $basename) : $basename,
+      'url' => $files->urlFor($basename),
       'path' => $path,
     ];
   }

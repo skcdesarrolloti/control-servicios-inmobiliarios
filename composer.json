@@ -1,0 +1,42 @@
+{
+  "name": "skcdesarrolloti/control-servicios-inmobiliarios",
+  "description": "Panel y portales de control de servicios inmobiliarios.",
+  "type": "project",
+  "require": {
+    "php": "^8.2",
+    "ext-fileinfo": "*",
+    "ext-json": "*",
+    "ext-mbstring": "*",
+    "ext-pdo": "*"
+  },
+  "require-dev": {
+    "phpstan/phpstan": "^2.1",
+    "phpunit/phpunit": "^11.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "SCM\\": "src/"
+    },
+    "files": [
+      "src/Core/Helpers.php"
+    ]
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "check": [
+      "@lint",
+      "@analyse",
+      "@test"
+    ],
+    "lint": "php tools/lint.php",
+    "analyse": "phpstan analyse --memory-limit=512M",
+    "test": "phpunit"
+  },
+  "config": {
+    "sort-packages": true
+  }
+}

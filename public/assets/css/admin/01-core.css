@@ -1,0 +1,1954 @@
+/* ============================================================
+   SCM Admin — Design System v3 Dark
+   Panel de Control de Servicios Inmobiliarios SuCasa
+   ============================================================ */
+
+/* â”€â”€ Variables globales â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app {
+  /* --- Dark backgrounds --- */
+  --scm-bg: #0e1117;
+  --scm-surface: #161b27;
+  --scm-surface-2: #1e2538;
+  --scm-surface-3: #252d42;
+  --scm-border: #2a3348;
+  --scm-border-soft: #1e2538;
+
+  /* --- Text --- */
+  --scm-text: #e8ecf3;
+  --scm-text-main: #ffffff;
+  --scm-text-soft: #8896ad;
+  --scm-text-muted: #4d5a72;
+
+  /* --- Brand accent: Red/Coral (like the dashboard) --- */
+  --scm-accent: #e63946;
+  --scm-accent-2: #ff6b6b;
+  --scm-accent-glow: rgba(230, 57, 70, 0.22);
+
+  /* --- Yellow accent --- */
+  --scm-yellow: #f4c542;
+  --scm-yellow-dark: #d4a017;
+  --scm-yellow-bg: rgba(244, 197, 66, 0.12);
+
+  /* --- Blue --- */
+  --scm-blue-900: #0d1f3c;
+  --scm-blue-800: #112952;
+  --scm-blue-700: #1a5998;
+  --scm-blue-600: #2472c0;
+  --scm-blue-400: #5b9fd9;
+  --scm-blue-100: rgba(91, 159, 217, 0.15);
+  --scm-blue-50: rgba(91, 159, 217, 0.08);
+
+  /* --- Teal --- */
+  --scm-teal-700: #0a5c58;
+  --scm-teal-500: #0d9488;
+  --scm-teal-100: rgba(13, 148, 136, 0.15);
+  --scm-teal-50: rgba(13, 148, 136, 0.08);
+
+  /* --- Naranja --- */
+  --scm-orange-700: #9a3412;
+  --scm-orange-500: #f97316;
+  --scm-orange-100: rgba(249, 115, 22, 0.15);
+  --scm-orange-50: rgba(249, 115, 22, 0.08);
+
+  /* --- Semánticos --- */
+  --scm-success: #22c55e;
+  --scm-success-bg: rgba(34, 197, 94, 0.12);
+  --scm-success-bd: rgba(34, 197, 94, 0.3);
+  --scm-warning: #f4c542;
+  --scm-warning-bg: rgba(244, 197, 66, 0.12);
+  --scm-warning-bd: rgba(244, 197, 66, 0.3);
+  --scm-danger: #e63946;
+  --scm-danger-bg: rgba(230, 57, 70, 0.12);
+  --scm-danger-bd: rgba(230, 57, 70, 0.3);
+  --scm-neutral: #8896ad;
+  --scm-neutral-bg: rgba(136, 150, 173, 0.1);
+  --scm-neutral-bd: rgba(136, 150, 173, 0.2);
+
+  /* --- Sombras --- */
+  --scm-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.25);
+  --scm-shadow-md: 0 4px 20px rgba(0, 0, 0, 0.35);
+  --scm-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --scm-shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+  /* --- Radios --- */
+  --scm-r-sm: 8px;
+  --scm-r-md: 12px;
+  --scm-r-lg: 16px;
+  --scm-r-xl: 20px;
+
+  box-sizing: border-box;
+  color: var(--scm-text);
+  background: var(--scm-bg);
+  font-family:
+    "Inter", "Plus Jakarta Sans", "Manrope", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#scm-app * {
+  box-sizing: border-box;
+}
+#scm-app a {
+  color: var(--scm-blue-400);
+  text-decoration: none;
+  font-weight: 600;
+}
+#scm-app a:hover {
+  color: var(--scm-accent-2);
+  text-decoration: underline;
+}
+
+/* â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--scm-border);
+  padding-bottom: 0;
+  overflow-x: auto;
+}
+
+#scm-app .scm-tab {
+  position: relative;
+  padding: 10px 18px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--scm-text-soft);
+  background: transparent;
+  border: none;
+  border-radius: var(--scm-r-sm) var(--scm-r-sm) 0 0;
+  cursor: pointer;
+  transition:
+    color 0.18s,
+    background 0.18s;
+  outline: none;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+#scm-app .scm-tab::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: transparent;
+  transition: background 0.2s;
+}
+
+#scm-app .scm-tab:hover {
+  color: var(--scm-text);
+  background: var(--scm-surface-2);
+}
+#scm-app .scm-tab.active {
+  color: var(--scm-accent);
+  background: var(--scm-surface-2);
+}
+#scm-app .scm-tab.active::after {
+  background: var(--scm-accent);
+}
+
+#scm-app .scm-guide-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+#scm-app .scm-guide-btn {
+  padding: 10px 24px;
+  background: linear-gradient(135deg, var(--scm-accent), #c1121f);
+  color: #fff;
+  border: none;
+  border-radius: var(--scm-r-sm);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  letter-spacing: 0.03em;
+  box-shadow: 0 3px 10px var(--scm-accent-glow);
+  transition:
+    box-shadow 0.18s,
+    filter 0.18s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#scm-app .scm-guide-btn:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 18px var(--scm-accent-glow);
+}
+
+#scm-app .scm-tab-panel {
+  display: none;
+}
+#scm-app .scm-tab-panel.active {
+  display: block;
+}
+
+#scm-app .scm-status-bucket {
+  display: grid;
+  gap: 16px;
+}
+
+#scm-app .scm-status-subtabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+#scm-app .scm-status-topic-tab {
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-sm);
+  background: var(--scm-surface);
+  color: var(--scm-text-soft);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+#scm-app .scm-status-topic-tab.active {
+  background: var(--scm-accent);
+  border-color: var(--scm-accent);
+  color: #fff;
+}
+
+#scm-app .scm-status-topic-panel {
+  display: none;
+}
+
+#scm-app .scm-status-topic-panel.active {
+  display: block;
+}
+
+#scm-app .scm-status-topic-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+#scm-app .scm-status-topic-head h3 {
+  color: var(--scm-text);
+  font-size: 20px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+#scm-app .scm-status-topic-head p {
+  color: var(--scm-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  margin: 4px 0 0;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-status-count {
+  background: var(--scm-surface-2);
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-sm);
+  color: var(--scm-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+/* Headers de sección */
+#scm-app .scm-header,
+#scm-app .scm-header-prev,
+#scm-app .scm-header-corr {
+  border-radius: var(--scm-r-xl);
+  padding: 24px 28px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  box-shadow: var(--scm-shadow-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+#scm-app .scm-header::after,
+#scm-app .scm-header-prev::after,
+#scm-app .scm-header-corr::after {
+  content: "";
+  position: absolute;
+  right: -60px;
+  top: -60px;
+  width: 220px;
+  height: 220px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+#scm-app .scm-header {
+  background: linear-gradient(
+    135deg,
+    var(--scm-blue-800) 0%,
+    var(--scm-blue-600) 100%
+  );
+}
+#scm-app .scm-header-prev {
+  background: linear-gradient(
+    135deg,
+    var(--scm-teal-700) 0%,
+    var(--scm-teal-500) 100%
+  );
+}
+#scm-app .scm-header-corr {
+  background: linear-gradient(
+    135deg,
+    var(--scm-orange-700) 0%,
+    var(--scm-orange-500) 100%
+  );
+}
+
+#scm-app .scm-header h2,
+#scm-app .scm-header-prev h2,
+#scm-app .scm-header-corr h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+#scm-app .scm-header p,
+#scm-app .scm-header-prev p,
+#scm-app .scm-header-corr p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* â”€â”€ Card base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .card,
+#scm-app.scm-daisy .card {
+  background: var(--scm-surface);
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-lg);
+  box-shadow: var(--scm-shadow-md);
+}
+
+/* â”€â”€ KPI Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-kpis,
+#scm-app .scm-kpis-daisy {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  margin-bottom: 20px;
+}
+
+#scm-app .scm-kpi {
+  background: var(--scm-surface);
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-md);
+  padding: 16px 18px 14px;
+  box-shadow: var(--scm-shadow-sm);
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+#scm-app .scm-kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--scm-shadow-md);
+}
+
+#scm-app .scm-kpi::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--scm-accent), var(--scm-yellow));
+}
+
+#scm-app .scm-kpi.danger::before {
+  background: linear-gradient(90deg, #991b1b, var(--scm-accent));
+}
+#scm-app .scm-kpi.success::before {
+  background: linear-gradient(90deg, #14532d, var(--scm-success));
+}
+
+#scm-app .scm-kpi-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--scm-text-muted);
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+
+#scm-app .scm-kpi-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--scm-text-main);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+#scm-app .scm-kpi.danger .scm-kpi-value {
+  color: var(--scm-danger);
+}
+#scm-app .scm-kpi.success .scm-kpi-value {
+  color: var(--scm-success);
+}
+
+/* â”€â”€ Filter Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-filter-card {
+  background: var(--scm-surface);
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-xl);
+  padding: 22px 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--scm-shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+
+#scm-app .scm-filter-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--scm-blue-700), var(--scm-blue-400));
+}
+
+#scm-app .scm-filter-card h3 {
+  margin: 0 0 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--scm-text-muted);
+}
+
+/* â”€â”€ Grids de filtros â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+#scm-app .scm-grid-3 {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* â”€â”€ Fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-field label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 5px;
+  color: var(--scm-text-soft);
+}
+
+#scm-app .scm-field input,
+#scm-app .scm-field select,
+#scm-app.scm-daisy .scm-daisy-form .select,
+#scm-app.scm-daisy .scm-daisy-form .input {
+  width: 100%;
+  border: 1.5px solid var(--scm-border);
+  border-radius: var(--scm-r-sm);
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--scm-text);
+  background: var(--scm-surface-2);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    background 0.15s;
+  outline: none;
+  font-family: inherit;
+}
+
+#scm-app .scm-field input:hover,
+#scm-app .scm-field select:hover {
+  border-color: var(--scm-surface-3);
+}
+
+#scm-app .scm-field input:focus,
+#scm-app .scm-field select:focus,
+#scm-app.scm-daisy .scm-daisy-form .select:focus,
+#scm-app.scm-daisy .scm-daisy-form .input:focus {
+  border-color: var(--scm-accent);
+  background: var(--scm-surface);
+  box-shadow: 0 0 0 3px var(--scm-accent-glow);
+}
+
+/* â”€â”€ Actions bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* â”€â”€ Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-btn-primary,
+#scm-app .scm-btn-primary-cyan {
+  border: none;
+  color: #fff;
+  border-radius: var(--scm-r-sm);
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.14s,
+    box-shadow 0.14s,
+    opacity 0.14s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+}
+
+#scm-app .scm-btn-primary {
+  background: linear-gradient(135deg, var(--scm-accent), #c1121f);
+  box-shadow: 0 4px 14px var(--scm-accent-glow);
+}
+
+#scm-app .scm-btn-primary-cyan {
+  background: linear-gradient(135deg, var(--scm-teal-700), var(--scm-teal-500));
+  box-shadow: 0 4px 14px rgba(10, 92, 88, 0.28);
+}
+
+#scm-app .scm-btn-primary:hover,
+#scm-app .scm-btn-primary-cyan:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
+
+#scm-app .scm-btn-secondary {
+  border: 1.5px solid var(--scm-border);
+  background: var(--scm-surface-2);
+  color: var(--scm-text-soft);
+  border-radius: var(--scm-r-sm);
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: inherit;
+}
+
+#scm-app .scm-btn-secondary:hover {
+  background: var(--scm-surface-3);
+  border-color: var(--scm-accent);
+  color: var(--scm-text);
+}
+
+/* DaisyUI btn base */
+#scm-app.scm-daisy .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--scm-r-sm);
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition:
+    transform 0.14s,
+    box-shadow 0.14s,
+    opacity 0.14s;
+  font-family: inherit;
+}
+#scm-app.scm-daisy .btn-sm {
+  padding: 7px 12px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+#scm-app.scm-daisy .btn:hover {
+  transform: translateY(-1px);
+}
+
+#scm-app.scm-daisy .btn-primary {
+  background: linear-gradient(135deg, var(--scm-accent), #c1121f);
+  color: #fff;
+  box-shadow: 0 4px 12px var(--scm-accent-glow);
+}
+#scm-app.scm-daisy .btn-primary:hover {
+  box-shadow: 0 7px 18px var(--scm-accent-glow);
+  opacity: 0.96;
+}
+
+#scm-app.scm-daisy .btn-outline {
+  background: var(--scm-surface-2);
+  color: var(--scm-text-soft);
+  border-color: var(--scm-border);
+}
+#scm-app.scm-daisy .btn-outline:hover {
+  background: var(--scm-surface-3);
+  border-color: var(--scm-accent);
+  color: var(--scm-text);
+}
+
+/* â”€â”€ Spinner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-spinner {
+  display: none;
+  margin-left: 6px;
+  align-items: center;
+  gap: 5px;
+}
+#scm-app .scm-spinner.active {
+  display: inline-flex;
+}
+
+#scm-app .scm-spinner-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--scm-blue-600);
+  animation: scm-bounce 0.7s infinite alternate;
+}
+#scm-app .scm-spinner-dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+#scm-app .scm-spinner-dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes scm-bounce {
+  from {
+    opacity: 0.25;
+    transform: scale(0.65);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+#scm-app .scm-loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* â”€â”€ Cards wrap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-cards-wrap {
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-xl);
+  background: var(--scm-surface);
+  box-shadow: var(--scm-shadow-md);
+  padding: 16px;
+}
+
+#scm-app .scm-case-magnitude-editor {
+  gap: 8px;
+}
+
+#scm-app .scm-case-magnitude-select {
+  width: 100%;
+  min-height: 36px;
+}
+
+#scm-app .scm-case-magnitude-msg {
+  display: block;
+  min-height: 16px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+#scm-app .scm-case-magnitude-popup {
+  display: grid;
+  gap: 14px;
+}
+
+#scm-app .scm-case-magnitude-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+#scm-app .scm-magnitude-choice {
+  border: 1px solid #dbe4f0;
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+#scm-app .scm-magnitude-choice:hover,
+#scm-app .scm-magnitude-choice.is-active {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.18);
+}
+
+#scm-app .scm-magnitude-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+#scm-app .scm-magnitude-critico {
+  background: #dc2626;
+}
+#scm-app .scm-magnitude-alto {
+  background: #ea580c;
+}
+#scm-app .scm-magnitude-medio {
+  background: #ca8a04;
+}
+#scm-app .scm-magnitude-bajo {
+  background: #16a34a;
+}
+#scm-app .scm-magnitude-empty {
+  background: #64748b;
+}
+
+#scm-app .scm-ticket-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 14px;
+}
+
+/* â”€â”€ Ticket Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-ticket-card {
+  background: var(--scm-surface);
+  border: 1.5px solid #dce8f5;
+  border-radius: var(--scm-r-lg);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--scm-shadow-sm);
+  min-height: 260px;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+#scm-app .scm-ticket-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--scm-accent), var(--scm-yellow));
+}
+
+#scm-app .scm-ticket-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--scm-shadow-lg);
+  border-color: var(--scm-surface-3);
+}
+
+#scm-app .scm-ticket-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 16px 10px;
+  border-bottom: 1px solid var(--scm-border-soft);
+}
+
+#scm-app .scm-ticket-card-head h3 {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--scm-text-main);
+  font-weight: 800;
+  flex: 1;
+}
+
+#scm-app .scm-ticket-card-contract,
+#scm-app .scm-ticket-card-property,
+#scm-app .scm-ticket-card-barrio,
+#scm-app .scm-ticket-card-address,
+#scm-app .scm-ticket-card-owner,
+#scm-app .scm-ticket-card-request,
+#scm-app .scm-ticket-card-employee,
+#scm-app .scm-ticket-card-execution,
+#scm-app .scm-ticket-card-stale {
+  margin: 0;
+  padding: 5px 16px;
+  font-size: 12px;
+  color: var(--scm-text-soft);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px dashed var(--scm-border-soft);
+}
+
+#scm-app .scm-ticket-card-stale {
+  border-bottom: none;
+}
+
+#scm-app .scm-ticket-card-contract strong,
+#scm-app .scm-ticket-card-property strong,
+#scm-app .scm-ticket-card-barrio strong,
+#scm-app .scm-ticket-card-address strong,
+#scm-app .scm-ticket-card-owner strong,
+#scm-app .scm-ticket-card-request strong,
+#scm-app .scm-ticket-card-employee strong,
+#scm-app .scm-ticket-card-execution strong,
+#scm-app .scm-ticket-card-stale strong {
+  color: var(--scm-text);
+  font-weight: 700;
+  text-align: right;
+  max-width: 60%;
+  white-space: normal;
+  word-break: break-word;
+}
+
+#scm-app .scm-ticket-card-states {
+  display: grid;
+  gap: 6px;
+  padding: 10px 16px;
+  flex: 1;
+}
+
+#scm-app .scm-ticket-card-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1.5px solid var(--scm-border-soft);
+  border-radius: var(--scm-r-sm);
+  background: var(--scm-surface-2);
+}
+
+#scm-app .scm-ticket-card-state-label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--scm-text-muted);
+  font-weight: 700;
+}
+
+#scm-app .scm-ticket-card-footer {
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--scm-border-soft);
+  margin-top: auto;
+  display: grid;
+  gap: 8px;
+}
+
+#scm-app .scm-ticket-card-footer .scm-btn-case,
+#scm-app .scm-ticket-card-footer .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+#scm-app .scm-case-source {
+  display: none;
+}
+
+/* â”€â”€ Table (fallback) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--scm-r-lg);
+  border: 1px solid var(--scm-border);
+  box-shadow: var(--scm-shadow-md);
+  background: var(--scm-surface);
+}
+
+#scm-app .scm-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1200px;
+}
+
+#scm-app .scm-table thead tr {
+  background: linear-gradient(130deg, #1a1d2e, #252d42);
+}
+#scm-app .scm-table-prev thead tr {
+  background: linear-gradient(130deg, var(--scm-teal-700), #0d4a46);
+}
+#scm-app .scm-table-corr thead tr {
+  background: linear-gradient(130deg, var(--scm-orange-700), #7c2a0c);
+}
+
+#scm-app .scm-table thead th {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 13px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+#scm-app .scm-table tbody tr {
+  transition: background 0.1s;
+}
+#scm-app .scm-table tbody tr:hover {
+  background: var(--scm-surface-2);
+}
+
+#scm-app .scm-table tbody td {
+  border-top: 1px solid var(--scm-border);
+  padding: 11px 12px;
+  font-size: 13px;
+  color: var(--scm-text-soft);
+  vertical-align: middle;
+}
+
+#scm-app .scm-table tbody td a,
+#scm-app .scm-tl-info a {
+  color: var(--scm-blue-400) !important;
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+/* â”€â”€ Badges & Chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-ticket-badge {
+  background: var(--scm-blue-100);
+  color: var(--scm-blue-400);
+  border: 1px solid var(--scm-blue-100);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+#scm-app .scm-inmueble-badge {
+  background: var(--scm-success-bg);
+  color: var(--scm-success);
+  border: 1px solid var(--scm-success-bd);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+#scm-app .scm-date {
+  font-variant-numeric: tabular-nums;
+  color: var(--scm-text-muted);
+  font-size: 12px;
+}
+
+/* â”€â”€ Stage / time pills â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-stage-pill,
+#scm-app .scm-time-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+#scm-app .scm-stage-done,
+#scm-app .scm-time-done {
+  background: var(--scm-success-bg);
+  color: var(--scm-success);
+  border-color: var(--scm-success-bd);
+}
+#scm-app .scm-stage-pending {
+  background: var(--scm-blue-100);
+  color: var(--scm-blue-400);
+  border-color: var(--scm-blue-100);
+}
+#scm-app .scm-stage-risk,
+#scm-app .scm-time-risk {
+  background: var(--scm-warning-bg);
+  color: var(--scm-warning);
+  border-color: var(--scm-warning-bd);
+}
+#scm-app .scm-stage-critical,
+#scm-app .scm-time-critical {
+  background: var(--scm-danger-bg);
+  color: var(--scm-danger);
+  border-color: var(--scm-danger-bd);
+}
+#scm-app .scm-stage-none,
+#scm-app .scm-time-muted {
+  background: var(--scm-neutral-bg);
+  color: var(--scm-neutral);
+  border-color: var(--scm-neutral-bd);
+}
+#scm-app .scm-time-normal {
+  background: var(--scm-blue-100);
+  color: var(--scm-blue-400);
+  border-color: var(--scm-blue-100);
+}
+
+/* â”€â”€ Empty / Error â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-empty {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--scm-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+#scm-app .scm-empty-cards {
+  grid-column: 1 / -1;
+  border: 2px dashed var(--scm-border);
+  border-radius: var(--scm-r-md);
+  background: var(--scm-surface-2);
+}
+
+#scm-app .scm-error {
+  color: var(--scm-danger);
+  padding: 16px;
+  background: var(--scm-danger-bg);
+  border: 1px solid var(--scm-danger-bd);
+  border-radius: var(--scm-r-sm);
+}
+
+/* â”€â”€ Timeline button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-btn-tl {
+  background: var(--scm-surface-2);
+  color: var(--scm-text-soft);
+  border: 1px solid var(--scm-border);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.14s,
+    border-color 0.14s;
+  font-family: inherit;
+}
+#scm-app .scm-btn-tl:hover {
+  background: var(--scm-surface-3);
+  border-color: var(--scm-accent);
+}
+
+/* â”€â”€ Case button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-btn-case {
+  background: linear-gradient(135deg, var(--scm-accent) 0%, #c1121f 100%);
+  color: #fff;
+  border: none;
+  border-radius: var(--scm-r-sm);
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px var(--scm-accent-glow);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+  font-family: inherit;
+}
+#scm-app .scm-btn-case:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px var(--scm-accent-glow);
+}
+
+/* â”€â”€ Modal overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-case-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 99999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  padding: 28px;
+  overflow-y: auto;
+}
+
+#scm-app .scm-case-modal.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#scm-app .scm-case-dialog {
+  position: relative;
+  width: min(1320px, 100%);
+  margin: 0 auto;
+  background: var(--scm-surface);
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-xl);
+  overflow: hidden;
+  box-shadow: var(--scm-shadow-xl);
+  display: flex;
+  flex-direction: column;
+}
+
+#scm-app .scm-case-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.14s;
+}
+#scm-app .scm-case-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+body.scm-modal-open {
+  overflow: hidden;
+}
+
+/* Modal header */
+#scm-app .scm-case-head {
+  position: relative;
+  background: linear-gradient(135deg, #1a1d2e 0%, #252d42 100%);
+  color: #eef6ff;
+  padding: 20px 64px 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--scm-border);
+}
+
+#scm-app .scm-case-head h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+#scm-app .scm-case-head p {
+  margin: 4px 0 0;
+  color: rgba(238, 246, 255, 0.82);
+  font-size: 13px;
+}
+
+#scm-app .scm-case-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-width: 700px;
+}
+
+#scm-app .scm-case-mini-chip {
+  background: rgba(255, 255, 255, 0.15);
+  color: #f0f9ff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Modal body */
+#scm-app .scm-case-body {
+  padding: 20px;
+  overflow: visible;
+}
+
+#scm-app .scm-case-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+#scm-app .scm-case-chip {
+  display: inline-flex;
+  align-items: center;
+  background: var(--scm-surface-2);
+  color: var(--scm-text-soft);
+  border: 1.5px solid var(--scm-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* â”€â”€ Timeline en modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-case-description {
+  background: var(--scm-surface-2);
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-md);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+#scm-app .scm-case-description > strong {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--scm-text-muted, #6b7280);
+  margin-bottom: 6px;
+}
+#scm-app .scm-case-description-content p {
+  margin: 0 0 6px;
+}
+#scm-app .scm-case-description-content p:last-child {
+  margin-bottom: 0;
+}
+
+#scm-app .scm-modal-timeline-only {
+  background: var(--scm-surface-2);
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-md);
+  padding: 16px;
+}
+
+#scm-app .scm-case-body .scm-tl-wrap {
+  background: var(--scm-surface-2);
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-md);
+  padding: 16px;
+  display: grid;
+  grid-template-columns: minmax(260px, 380px) 1fr;
+  gap: 16px;
+}
+
+#scm-app .scm-case-body .scm-tl-info {
+  background: var(--scm-surface);
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-sm);
+  padding: 12px 14px;
+  gap: 6px;
+}
+
+#scm-app .scm-case-body .scm-tl-info div {
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--scm-border-soft);
+  font-size: 12px;
+}
+#scm-app .scm-case-body .scm-tl-info div:last-child {
+  border-bottom: none;
+}
+
+#scm-app .scm-case-body .scm-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+#scm-app .scm-case-body .scm-tl-item {
+  flex-direction: row;
+  align-items: flex-start;
+  text-align: left;
+  min-width: 0;
+  width: 100%;
+  gap: 10px;
+}
+
+#scm-app .scm-case-body .scm-tl-label {
+  text-align: left;
+}
+
+#scm-app .scm-case-body .scm-tl-line {
+  width: 2px;
+  height: 16px;
+  margin: 0 0 0 16px;
+}
+
+/* â”€â”€ Timeline cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-case-timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+#scm-app .scm-case-step {
+  background: var(--scm-surface);
+  border: 1.5px solid var(--scm-border);
+  border-radius: var(--scm-r-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 118px;
+  transition: box-shadow 0.15s;
+}
+#scm-app .scm-case-step:hover {
+  box-shadow: var(--scm-shadow-md);
+}
+
+#scm-app .scm-case-step-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+#scm-app .scm-case-step-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+#scm-app .scm-case-step-titles h4 {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--scm-blue-900);
+  font-weight: 800;
+}
+
+#scm-app .scm-case-step-meta {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+#scm-app .scm-case-step-state,
+#scm-app .scm-case-step-date {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+}
+
+#scm-app .scm-case-step-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--scm-text-soft);
+  line-height: 1.35;
+}
+
+/* done / pending / none step states */
+#scm-app .scm-case-step-done .scm-case-step-icon {
+  background: var(--scm-success-bg);
+  border: 1px solid var(--scm-success-bd);
+  color: var(--scm-success);
+}
+#scm-app .scm-case-step-done .scm-case-step-state {
+  background: var(--scm-success-bg);
+  border: 1px solid var(--scm-success-bd);
+  color: var(--scm-success);
+}
+#scm-app .scm-case-step-done .scm-case-step-date {
+  background: var(--scm-surface-3);
+  border: 1px solid #dbe3ee;
+  color: var(--scm-text);
+}
+#scm-app .scm-case-step-pending .scm-case-step-icon {
+  background: var(--scm-warning-bg);
+  border: 1px solid var(--scm-warning-bd);
+  color: var(--scm-warning);
+}
+#scm-app .scm-case-step-pending .scm-case-step-state {
+  background: var(--scm-warning-bg);
+  border: 1px solid var(--scm-warning-bd);
+  color: var(--scm-warning);
+}
+#scm-app .scm-case-step-pending .scm-case-step-date {
+  background: var(--scm-blue-100);
+  border: 1px solid var(--scm-blue-100);
+  color: var(--scm-blue-400);
+}
+#scm-app .scm-case-step-none .scm-case-step-icon {
+  background: var(--scm-danger-bg);
+  border: 1px solid var(--scm-danger-bd);
+  color: var(--scm-danger);
+}
+#scm-app .scm-case-step-none .scm-case-step-state {
+  background: var(--scm-danger-bg);
+  border: 1px solid var(--scm-danger-bd);
+  color: var(--scm-danger);
+}
+#scm-app .scm-case-step-none .scm-case-step-date {
+  background: var(--scm-neutral-bg);
+  border: 1px solid var(--scm-neutral-bd);
+  color: var(--scm-neutral);
+}
+
+/* â”€â”€ Timeline horizontal (tabla) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-tl-wrap {
+  background: var(--scm-surface-2);
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-md);
+  padding: 16px;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+#scm-app .scm-tl-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--scm-text-soft);
+  min-width: 240px;
+  max-width: 360px;
+  flex: 1;
+}
+#scm-app .scm-tl-info strong {
+  color: var(--scm-blue-400);
+}
+
+#scm-app .scm-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 0;
+  flex: 2;
+  min-width: 0;
+}
+
+#scm-app .scm-tl-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 86px;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+#scm-app .scm-tl-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+#scm-app .scm-tl-done .scm-tl-icon {
+  background: var(--scm-success-bg);
+  border: 2px solid var(--scm-success);
+  color: var(--scm-success);
+}
+#scm-app .scm-tl-pending .scm-tl-icon {
+  background: var(--scm-warning-bg);
+  border: 2px solid var(--scm-warning);
+  color: var(--scm-warning);
+}
+#scm-app .scm-tl-none .scm-tl-icon {
+  background: var(--scm-danger-bg);
+  border: 2px solid var(--scm-danger);
+  color: var(--scm-danger);
+}
+
+#scm-app .scm-tl-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--scm-text-soft);
+  line-height: 1.25;
+  display: block;
+}
+#scm-app .scm-tl-none .scm-tl-label {
+  color: var(--scm-danger);
+}
+#scm-app .scm-tl-label small {
+  display: block;
+  color: var(--scm-text-muted);
+  font-size: 9.5px;
+}
+
+#scm-app .scm-tl-sub {
+  color: var(--scm-blue-400) !important;
+  font-weight: 700 !important;
+}
+#scm-app .scm-tl-nohecho {
+  color: var(--scm-danger) !important;
+  font-weight: 600 !important;
+}
+#scm-app .scm-tl-pend {
+  color: var(--scm-warning) !important;
+}
+
+#scm-app .scm-tl-line {
+  flex: 1 0 20px;
+  min-width: 16px;
+  max-width: 56px;
+  height: 2px;
+  background: var(--scm-border);
+  margin-top: 16px;
+  align-self: flex-start;
+  border-radius: 1px;
+}
+#scm-app .scm-tl-line.scm-tl-line-done {
+  background: var(--scm-success);
+}
+#scm-app .scm-timeline > .scm-tl-line:last-child {
+  display: none;
+}
+#scm-app .scm-tl-date {
+  display: block;
+  font-size: 9px;
+  color: var(--scm-success);
+  font-weight: 600;
+  margin-top: 1px;
+}
+#scm-app .scm-tl-date.scm-tl-empty {
+  color: var(--scm-danger);
+}
+
+/* â”€â”€ Seguimiento form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-seg-wrap {
+  margin-top: 12px;
+  background: var(--scm-surface);
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-md);
+  padding: 14px 16px;
+}
+
+#scm-app .scm-seg-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 2fr 1fr 1fr;
+}
+
+#scm-app .scm-seg-field span {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--scm-text-muted);
+  margin-bottom: 4px;
+}
+
+#scm-app .scm-seg-field textarea,
+#scm-app .scm-seg-field select,
+#scm-app .scm-seg-field input {
+  width: 100%;
+  border: 1.5px solid var(--scm-border);
+  border-radius: var(--scm-r-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--scm-text);
+  background: var(--scm-surface);
+  font-family: inherit;
+}
+
+#scm-app .scm-seg-field textarea:focus,
+#scm-app .scm-seg-field select:focus,
+#scm-app .scm-seg-field input:focus {
+  outline: none;
+  border-color: var(--scm-accent);
+  box-shadow: 0 0 0 3px var(--scm-accent-glow);
+}
+
+#scm-app .scm-ticket-documents {
+  display: grid;
+  gap: 10px;
+}
+
+#scm-app .scm-ticket-document-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+#scm-app .scm-add-ticket-document,
+#scm-app .scm-remove-ticket-document {
+  width: fit-content;
+}
+
+#scm-app .scm-seg-actions {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#scm-app .scm-seg-check {
+  font-size: 12px;
+  color: var(--scm-text-soft);
+  font-weight: 600;
+}
+#scm-app .scm-seg-msg {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--scm-teal-500);
+}
+#scm-app .scm-seg-msg.error {
+  color: var(--scm-danger);
+}
+
+#scm-app .scm-seg-readonly {
+  font-size: 12px;
+  color: var(--scm-text-soft);
+  background: var(--scm-surface-2);
+  border: 1.5px dashed var(--scm-border);
+  border-radius: var(--scm-r-sm);
+  padding: 10px 12px;
+}
+
+/* â”€â”€ Pagination â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-pagination {
+  margin-top: 14px;
+}
+
+#scm-app .scm-pagination-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-md);
+  background: var(--scm-surface);
+  box-shadow: var(--scm-shadow-sm);
+}
+
+#scm-app .scm-pagination-summary {
+  font-size: 12px;
+  color: var(--scm-text-soft);
+  font-weight: 700;
+}
+#scm-app .scm-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+#scm-app .scm-page-btn {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1.5px solid var(--scm-border);
+  border-radius: 9px;
+  background: var(--scm-surface);
+  color: var(--scm-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.14s,
+    border-color 0.14s,
+    color 0.14s;
+  font-family: inherit;
+}
+#scm-app .scm-page-btn:hover {
+  background: var(--scm-surface-3);
+  border-color: var(--scm-accent);
+  color: var(--scm-text);
+}
+#scm-app .scm-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+#scm-app .scm-page-btn.is-active {
+  background: var(--scm-accent);
+  border-color: var(--scm-accent);
+  color: #fff;
+  box-shadow: 0 4px 10px var(--scm-accent-glow);
+  pointer-events: none;
+}
+
+#scm-app .scm-page-dots {
+  color: var(--scm-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 2px;
+}
+
+/* â”€â”€ DaisyUI scoped badges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app.scm-daisy .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--scm-border);
+  background: var(--scm-surface);
+  color: var(--scm-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 9px;
+}
+#scm-app.scm-daisy .badge-sm {
+  font-size: 10px;
+  padding: 3px 8px;
+}
+
+#scm-app.scm-daisy .badge-primary {
+  background: var(--scm-blue-100);
+  border-color: var(--scm-blue-100);
+  color: var(--scm-blue-400);
+}
+#scm-app.scm-daisy .badge-info {
+  background: var(--scm-blue-100);
+  border-color: var(--scm-blue-100);
+  color: var(--scm-blue-400);
+}
+#scm-app.scm-daisy .badge-success {
+  background: var(--scm-success-bg);
+  border-color: var(--scm-success-bd);
+  color: var(--scm-success);
+}
+#scm-app.scm-daisy .badge-warning {
+  background: var(--scm-warning-bg);
+  border-color: var(--scm-warning-bd);
+  color: var(--scm-warning);
+}
+#scm-app.scm-daisy .badge-error {
+  background: var(--scm-danger-bg);
+  border-color: var(--scm-danger-bd);
+  color: var(--scm-danger);
+}
+#scm-app.scm-daisy .badge-accent {
+  background: var(--scm-blue-100);
+  border-color: var(--scm-blue-100);
+  color: var(--scm-blue-400);
+}
+#scm-app.scm-daisy .badge-neutral {
+  background: var(--scm-surface-3);
+  border-color: var(--scm-border);
+  color: var(--scm-text-soft);
+}
+#scm-app.scm-daisy .badge-ghost {
+  background: var(--scm-neutral-bg);
+  border-color: var(--scm-neutral-bd);
+  color: var(--scm-neutral);
+}
+
+/* â”€â”€ Responsive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+@media (max-width: 1280px) {
+  #scm-app .scm-kpis,
+  #scm-app .scm-kpis-daisy {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+}
+
+@media (max-width: 960px) {
+  #scm-app .scm-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  #scm-app .scm-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  #scm-app .scm-seg-grid {
+    grid-template-columns: 1fr;
+  }
+  #scm-app .scm-ticket-document-row {
+    grid-template-columns: 1fr;
+  }
+  #scm-app .scm-case-modal {
+    padding: 12px;
+  }
+  #scm-app .scm-case-body .scm-tl-wrap {
+    grid-template-columns: 1fr;
+  }
+  #scm-app .scm-tl-wrap {
+    flex-direction: column;
+  }
+  #scm-app .scm-timeline {
+    width: 100%;
+  }
+  #scm-app .scm-pagination-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  #scm-app .scm-grid,
+  #scm-app .scm-grid-3 {
+    grid-template-columns: 1fr;
+  }
+  #scm-app .scm-kpis,
+  #scm-app .scm-kpis-daisy {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  #scm-app .scm-header,
+  #scm-app .scm-header-prev,
+  #scm-app .scm-header-corr {
+    padding: 18px;
+  }
+  #scm-app .scm-header h2,
+  #scm-app .scm-header-prev h2,
+  #scm-app .scm-header-corr h2 {
+    font-size: 18px;
+  }
+  #scm-app [class*="scm-header-"] h2 {
+    font-size: 18px;
+  }
+  #scm-app .scm-case-head {
+    padding: 16px 52px 16px 14px;
+  }
+  #scm-app .scm-case-head h3 {
+    font-size: 17px;
+  }
+  #scm-app .scm-case-body {
+    padding: 12px;
+  }
+  #scm-app .scm-ticket-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* â”€â”€ Generic tab headers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app [class*="scm-header-"]:not(.scm-header) {
+  background: linear-gradient(
+    135deg,
+    var(--scm-blue-700) 0%,
+    var(--scm-blue-900) 100%
+  );
+  border-radius: var(--scm-r-xl);
+  padding: 28px 32px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  color: #fff;
+  box-shadow: var(--scm-shadow-md);
+}
+#scm-app .scm-header-entrega {
+  background: linear-gradient(135deg, #0891b2 0%, #164e63 100%);
+}
+#scm-app .scm-header-recibo {
+  background: linear-gradient(135deg, #059669 0%, #064e3b 100%);
+}
+#scm-app .scm-header-contable {
+  background: linear-gradient(135deg, #d97706 0%, #78350f 100%);
+}
+#scm-app .scm-header-certificaciones {
+  background: linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%);
+}
+#scm-app .scm-header-contractual {
+  background: linear-gradient(135deg, #7c3aed 0%, #3b0764 100%);
+}
+#scm-app [class*="scm-header-"]:not(.scm-header) h2 {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
+#scm-app [class*="scm-header-"]:not(.scm-header) p {
+  font-size: 13px;
+  opacity: 0.85;
+  margin: 0;
+}
+
+/* â”€â”€ Empty state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-empty {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--scm-text-soft);
+  font-size: 15px;
+  grid-column: 1 / -1;
+}
+#scm-app .scm-empty p {
+  margin: 0;
+  opacity: 0.7;
+}
+
+/* â”€â”€ Contractual groups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-contractual-group {
+  margin-bottom: 28px;
+}
+#scm-app .scm-group-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--scm-text-main);
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--scm-border);
+}
+#scm-app .scm-ticket-cards-group {
+  margin-top: 0;
+}
+
+/* â”€â”€ Ticket card asunto â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#scm-app .scm-ticket-card-asunto {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--scm-text-soft);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px dashed var(--scm-border-soft);
+}
+
+#scm-app .scm-ticket-card-asunto span {
+  flex: 0 0 auto;
+}
+
+#scm-app .scm-ticket-card-asunto strong {
+  color: var(--scm-text);
+  font-weight: 700;
+  text-align: right;
+  max-width: 68%;
+  white-space: normal;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

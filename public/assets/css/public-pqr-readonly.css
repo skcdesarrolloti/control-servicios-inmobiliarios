@@ -1,0 +1,62 @@
+body {
+          margin: 0;
+          font-family: 'Poppins', sans-serif;
+          background:
+            radial-gradient(circle at 8% 0%, rgba(255, 122, 0, .10), transparent 26%),
+            radial-gradient(circle at 95% 0%, rgba(47, 111, 167, .10), transparent 32%),
+            #f3f7fc;
+          color: #1c3048;
+        }
+
+        .scm-public-shell {
+          max-width: 1240px;
+          margin: 0 auto;
+          padding: 24px 16px 40px;
+        }
+
+        .scm-public-header {
+          margin-bottom: 18px;
+        }
+
+        .scm-public-brand-logo {
+          width: 154px;
+          min-height: 48px;
+          border-radius: 8px;
+          background: #fff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 7px 10px;
+          margin-bottom: 12px;
+          box-shadow: 0 12px 26px rgba(22, 48, 77, .12);
+        }
+
+        .scm-public-brand-logo img {
+          display: block;
+          width: auto;
+          max-width: 100%;
+          max-height: 34px;
+          object-fit: contain;
+        }
+
+        .scm-public-kicker {
+          display: inline-block;
+          margin-bottom: 8px;
+          padding: 6px 10px;
+          border-radius: 999px;
+          background: rgba(31, 76, 120, .10);
+          color: #1f4c78;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .scm-public-header h1 {
+          margin: 0 0 6px;
+          font-size: 28px;
+          color: #17304d;
+        }
+
+        .scm-public-header p {
+          margin: 0;
+          color: #4c6077;
+        }

@@ -1,0 +1,91 @@
+*,
+        *::before,
+        *::after {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+
+        body {
+          font-family: 'Poppins', sans-serif;
+          background:
+            radial-gradient(circle at 8% 0%, rgba(255, 122, 0, .10), transparent 26%),
+            radial-gradient(circle at 95% 0%, rgba(47, 111, 167, .10), transparent 32%),
+            #f3f7fc;
+          color: #1c3048;
+        }
+
+        .top-bar {
+          background: linear-gradient(135deg, #1f4c78, #2d6ea7);
+          color: #fff;
+          padding: .85rem 1.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          flex-wrap: wrap;
+          border-bottom: 1px solid rgba(255, 255, 255, .2);
+          box-shadow: 0 8px 24px rgba(16, 41, 68, .25);
+        }
+
+        .top-bar .brand {
+          display: inline-flex;
+          align-items: center;
+          gap: .7rem;
+          font-weight: 700;
+          font-size: 1rem;
+          color: #ffd2ab;
+          text-decoration: none;
+        }
+
+        .top-bar .brand-logo {
+          width: 142px;
+          min-height: 40px;
+          border-radius: 8px;
+          background: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: .35rem .55rem;
+          box-shadow: 0 8px 18px rgba(13, 30, 47, .18);
+          flex: 0 0 auto;
+        }
+
+        .top-bar .brand-logo img {
+          display: block;
+          width: auto;
+          max-width: 100%;
+          max-height: 30px;
+          object-fit: contain;
+        }
+
+        .top-bar .nav-links form {
+          margin: 0;
+        }
+
+        .top-bar .nav-links button {
+          color: #dbe8f7;
+          font-size: .82rem;
+          margin-left: 1.2rem;
+          transition: color .2s;
+          border: 0;
+          background: transparent;
+          cursor: pointer;
+          font-family: inherit;
+          padding: 0;
+        }
+
+        .top-bar .nav-links button:hover {
+          color: #fff;
+          text-decoration: underline;
+          text-decoration-thickness: 1.5px;
+        }
+
+        .top-bar .user-info {
+          font-size: .82rem;
+          color: #e8f1fb;
+        }
+
+        .page-body {
+          padding: 1.25rem;
+        }

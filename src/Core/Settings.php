@@ -54,13 +54,27 @@ final class Settings
   private function save(): void
   {
     $dir = dirname($this->file);
-    if (!is_dir($dir)) {
-      mkdir($dir, 0755, true);
+    if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
+      throw new \RuntimeException('No se pudo crear el directorio de configuración persistente.');
     }
 
-    file_put_contents(
-      $this->file,
-      json_encode($this->data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-    );
+    $encoded = json_encode($this->data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    $temporary = tempnam($dir, 'settings_');
+    if ($temporary === false) {
+      throw new \RuntimeException('No se pudo crear el archivo temporal de configuración.');
+    }
+
+    try {
+      if (file_put_contents($temporary, $encoded, LOCK_EX) === false) {
+        throw new \RuntimeException('No se pudo escribir la configuración persistente.');
+      }
+      if (!rename($temporary, $this->file)) {
+        throw new \RuntimeException('No se pudo reemplazar la configuración persistente.');
+      }
+    } finally {
+      if (is_file($temporary)) {
+        @unlink($temporary);
+      }
+    }
   }
 }

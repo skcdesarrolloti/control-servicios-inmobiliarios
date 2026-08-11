@@ -9,10 +9,12 @@ namespace SCM\Core;
 final class Auth
 {
   private Database $db;
+  private bool $allowLegacyPasswords;
 
-  public function __construct(Database $db)
+  public function __construct(Database $db, bool $allowLegacyPasswords = false)
   {
     $this->db = $db;
+    $this->allowLegacyPasswords = $allowLegacyPasswords;
   }
 
   /**
@@ -42,10 +44,18 @@ final class Auth
 
     $storedPass = (string) ($row['pass_others_apss'] ?? '');
 
-    // Soporta hash bcrypt (password_hash) y texto plano
-    $passwordOk = strncmp($storedPass, '$2', 2) === 0
-      ? password_verify($pass, $storedPass)
-      : hash_equals($storedPass, $pass);
+    $passwordInfo = password_get_info($storedPass);
+    $isHashed = ($passwordInfo['algoName'] ?? 'unknown') !== 'unknown';
+    $passwordOk = $isHashed && password_verify($pass, $storedPass);
+
+    if (!$isHashed && $this->allowLegacyPasswords && hash_equals($storedPass, $pass)) {
+      $passwordOk = true;
+      $this->db->update($table, [
+        'pass_others_apss' => password_hash($pass, PASSWORD_DEFAULT),
+      ], [
+        '_ID' => (int) $row['_ID'],
+      ]);
+    }
 
     if (!$passwordOk) {
       return false;
@@ -65,6 +75,17 @@ final class Auth
   public function logout(): void
   {
     $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+      $params = session_get_cookie_params();
+      setcookie(session_name(), '', [
+        'expires' => time() - 42000,
+        'path' => $params['path'],
+        'domain' => $params['domain'],
+        'secure' => $params['secure'],
+        'httponly' => $params['httponly'],
+        'samesite' => $params['samesite'],
+      ]);
+    }
     session_destroy();
   }
 

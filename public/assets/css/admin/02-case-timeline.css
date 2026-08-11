@@ -1,0 +1,1000 @@
+/* ============================================================
+   SCM Light Refresh (Notion-inspired)
+   Overrides dark palette + improves case timeline readability.
+   ============================================================ */
+#scm-app {
+  --scm-bg: #f7f7f5;
+  --scm-surface: #ffffff;
+  --scm-surface-2: #fbfbfa;
+  --scm-surface-3: #f3f3f1;
+  --scm-border: #e7e6e4;
+  --scm-border-soft: #efeeec;
+  --scm-text: #2f3437;
+  --scm-text-main: #1f2328;
+  --scm-text-soft: #4f5660;
+  --scm-text-muted: #6b7280;
+  --scm-accent: #2f6fed;
+  --scm-accent-2: #2b63d5;
+  --scm-accent-glow: rgba(47, 111, 237, 0.15);
+  --scm-blue-900: #213547;
+  --scm-blue-800: #2b4b68;
+  --scm-blue-700: #3d6488;
+  --scm-blue-600: #4b79a6;
+  --scm-blue-400: #245eab;
+  --scm-blue-100: rgba(36, 94, 171, 0.12);
+  --scm-blue-50: rgba(36, 94, 171, 0.06);
+  --scm-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --scm-shadow-md: 0 6px 20px rgba(16, 24, 40, 0.08);
+  --scm-shadow-lg: 0 14px 36px rgba(16, 24, 40, 0.1);
+  --scm-shadow-xl: 0 20px 50px rgba(16, 24, 40, 0.14);
+  background: var(--scm-bg);
+  color: var(--scm-text);
+  font-family:
+    "IBM Plex Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+#scm-app .card,
+#scm-app.scm-daisy .card,
+#scm-app .scm-ticket-card,
+#scm-app .scm-filter-card,
+#scm-app .scm-pagination-card,
+#scm-app .scm-seg-wrap,
+#scm-app .scm-modal-timeline-only,
+#scm-app .scm-tl-wrap {
+  background: var(--scm-surface);
+  border-color: var(--scm-border);
+  box-shadow: var(--scm-shadow-sm);
+}
+
+#scm-app .scm-tab {
+  text-transform: none;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+#scm-app .scm-tab.active {
+  color: var(--scm-blue-400);
+  background: #f0f4fa;
+}
+
+#scm-app .scm-ticket-card::before,
+#scm-app .scm-filter-card::before,
+#scm-app .scm-kpi::before {
+  opacity: 0.9;
+}
+
+#scm-app .scm-btn-case,
+#scm-app .scm-btn-primary,
+#scm-app .btn-primary {
+  background: var(--scm-blue-600);
+  box-shadow: 0 2px 8px rgba(36, 94, 171, 0.2);
+}
+
+#scm-app .scm-btn-case:hover,
+#scm-app .scm-btn-primary:hover,
+#scm-app .btn-primary:hover {
+  background: var(--scm-blue-700);
+}
+
+#scm-app .scm-case-modal {
+  background: rgba(17, 24, 39, 0.28);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#scm-app .scm-case-dialog {
+  max-height: calc(100vh - 48px);
+  margin: 0;
+}
+
+#scm-app .scm-case-head {
+  background: #f6f8fb;
+  color: var(--scm-text-main);
+  border-bottom-color: var(--scm-border);
+}
+
+#scm-app .scm-case-head p {
+  color: var(--scm-text-soft);
+}
+
+#scm-app .scm-case-mini-chip {
+  background: #eef3fb;
+  color: var(--scm-blue-700);
+  border: 1px solid #d9e6f7;
+}
+
+#scm-app .scm-case-close {
+  border: 1px solid var(--scm-border);
+  background: #ffffff;
+  color: var(--scm-text-soft);
+}
+
+#scm-app .scm-case-close:hover {
+  background: #f3f4f6;
+}
+
+#scm-app .scm-case-body {
+  overflow: auto;
+}
+
+/* Timeline in "Ver caso": force horizontal rail to avoid excessive height. */
+#scm-app .scm-modal-timeline-only .scm-timeline,
+#scm-app .scm-case-body .scm-timeline {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  padding: 2px 2px 10px;
+  scrollbar-width: thin;
+  justify-content: space-between;
+}
+
+#scm-app .scm-modal-timeline-only .scm-tl-item,
+#scm-app .scm-case-body .scm-tl-item {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-width: 110px;
+  max-width: none;
+  flex: 1 1 0;
+  gap: 4px;
+  width: auto;
+}
+
+#scm-app .scm-modal-timeline-only .scm-tl-label,
+#scm-app .scm-case-body .scm-tl-label {
+  text-align: center;
+}
+
+#scm-app .scm-modal-timeline-only .scm-tl-line,
+#scm-app .scm-case-body .scm-tl-line {
+  width: auto;
+  min-width: 24px;
+  max-width: none;
+  flex: 1 1 auto;
+  height: 2px;
+  margin: 16px 6px 0;
+}
+
+@media (max-width: 960px) {
+  #scm-app .scm-case-modal {
+    align-items: flex-start;
+  }
+  #scm-app .scm-case-dialog {
+    max-height: calc(100vh - 24px);
+  }
+  #scm-app .scm-modal-timeline-only .scm-tl-item,
+  #scm-app .scm-case-body .scm-tl-item {
+    min-width: 110px;
+  }
+}
+
+/* Safety: timeline should appear only inside popup source content. */
+#scm-app .scm-ticket-card > .scm-tl-wrap,
+#scm-app .scm-ticket-card > .scm-timeline {
+  display: none !important;
+}
+
+/* Flat + squared pass: remove gradients and excessive rounded corners. */
+#scm-app {
+  --scm-r-sm: 4px;
+  --scm-r-md: 6px;
+  --scm-r-lg: 8px;
+  --scm-r-xl: 10px;
+}
+
+#scm-app .scm-btn-case,
+#scm-app .scm-btn-primary,
+#scm-app .scm-btn-primary-cyan,
+#scm-app .scm-btn-secondary,
+#scm-app .btn,
+#scm-app .btn-primary,
+#scm-app .btn-outline {
+  background-image: none !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+
+#scm-app .scm-btn-case,
+#scm-app .scm-btn-primary,
+#scm-app .scm-btn-primary-cyan,
+#scm-app .btn-primary {
+  background: var(--scm-blue-600) !important;
+  border: 1px solid var(--scm-blue-700) !important;
+  color: #fff !important;
+}
+
+#scm-app .scm-btn-case:hover,
+#scm-app .scm-btn-primary:hover,
+#scm-app .scm-btn-primary-cyan:hover,
+#scm-app .btn-primary:hover {
+  background: var(--scm-blue-700) !important;
+}
+
+#scm-app .scm-btn-secondary,
+#scm-app .btn-outline {
+  background: #fff !important;
+  border: 1px solid var(--scm-border) !important;
+  color: var(--scm-text-soft) !important;
+}
+
+#scm-app .scm-tab,
+#scm-app .scm-ticket-badge,
+#scm-app .scm-inmueble-badge,
+#scm-app .badge,
+#scm-app .scm-case-mini-chip,
+#scm-app .scm-case-chip,
+#scm-app .scm-case-close,
+#scm-app .scm-tl-icon {
+  border-radius: 4px !important;
+}
+
+#scm-app .scm-header,
+#scm-app .scm-header-prev,
+#scm-app .scm-header-corr,
+#scm-app [class*="scm-header-"]:not(.scm-header),
+#scm-app .scm-table thead tr,
+#scm-app .scm-table-prev thead tr,
+#scm-app .scm-table-corr thead tr {
+  background-image: none !important;
+  background: #eef2f7 !important;
+  color: var(--scm-text-main) !important;
+}
+
+#scm-app .scm-header h2,
+#scm-app .scm-header-prev h2,
+#scm-app .scm-header-corr h2,
+#scm-app [class*="scm-header-"]:not(.scm-header) h2 {
+  color: var(--scm-text-main) !important;
+}
+
+#scm-app .scm-header p,
+#scm-app .scm-header-prev p,
+#scm-app .scm-header-corr p,
+#scm-app [class*="scm-header-"]:not(.scm-header) p {
+  color: var(--scm-text-soft) !important;
+  opacity: 1 !important;
+}
+
+/* ============================================================
+   Case Modal Refresh v2
+   Left sidebar summary + modern timeline treatment
+   ============================================================ */
+#scm-app .scm-case-modal,
+#scm-app .scm-case-dialog,
+#scm-app .scm-case-head,
+#scm-app .scm-case-body,
+#scm-app .scm-case-layout,
+#scm-app .scm-case-sidebar,
+#scm-app .scm-case-main,
+#scm-app .scm-case-main .scm-modal-timeline-only,
+#scm-app .scm-case-main .scm-tl-wrap,
+#scm-app .scm-case-main .scm-timeline,
+#scm-app .scm-case-main .scm-tl-item,
+#scm-app .scm-case-main .scm-tl-label,
+#scm-app .scm-case-main .scm-tl-sub,
+#scm-app .scm-case-main .scm-seg-wrap {
+  font-family:
+    "Poppins", "Segoe UI", "Helvetica Neue", Arial, sans-serif !important;
+}
+
+#scm-app .scm-case-head-meta {
+  display: none !important;
+}
+
+#scm-app .scm-case-dialog {
+  width: min(1280px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
+}
+
+#scm-app .scm-case-head {
+  padding: 18px 22px;
+}
+
+#scm-app .scm-case-head h3 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+
+#scm-app .scm-case-head p {
+  margin: 8px 0 0;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+#scm-app .scm-case-body {
+  padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#scm-app .scm-case-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+}
+
+#scm-app .scm-case-sidebar {
+  background: #fff;
+  border: 1px solid var(--scm-border);
+  border-radius: 8px;
+  padding: 14px;
+  position: sticky;
+  top: 0;
+}
+
+#scm-app .scm-case-sidebar h4 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--scm-text-muted);
+}
+
+#scm-app .scm-case-sidebar-list {
+  display: grid;
+  gap: 8px;
+}
+
+#scm-app .scm-case-side-item {
+  display: grid;
+  gap: 3px;
+  background: #fafaf9;
+  border: 1px solid #ecebea;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+#scm-app .scm-case-side-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--scm-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+#scm-app .scm-case-side-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--scm-text-main);
+  line-height: 1.25;
+}
+
+#scm-app .scm-case-main {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  overflow: hidden;
+}
+
+#scm-app .scm-case-main .scm-modal-timeline-only {
+  border: 1px solid var(--scm-border);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+#scm-app .scm-case-main .scm-timeline {
+  width: 100%;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 2px 2px;
+  scrollbar-width: thin;
+}
+
+#scm-app .scm-case-main .scm-tl-item {
+  flex: 1 1 160px;
+  min-width: 160px;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #ebe9e6;
+  border-radius: 8px;
+  padding: 10px 8px;
+}
+
+#scm-app .scm-case-main .scm-tl-line {
+  flex: 0 0 42px;
+  min-width: 42px;
+  height: 2px;
+  margin-top: 32px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #d8dde5 0%, #cbd3de 100%);
+}
+
+#scm-app .scm-case-main .scm-tl-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+#scm-app .scm-case-main .scm-tl-icon-link {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+#scm-app .scm-case-main .scm-tl-icon-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+}
+
+#scm-app .scm-case-main .scm-tl-label {
+  display: grid;
+  gap: 3px;
+  text-align: center;
+  color: var(--scm-text-main);
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+#scm-app .scm-case-main .scm-tl-label small,
+#scm-app .scm-case-main .scm-tl-sub {
+  font-size: 11px;
+  color: #5f6976;
+  line-height: 1.25;
+}
+
+#scm-app .scm-case-main .scm-seg-wrap {
+  border-radius: 8px;
+  border: 1px solid var(--scm-border);
+}
+
+#scm-app .scm-case-side-actions {
+  margin-top: 10px;
+}
+
+#scm-app .scm-case-side-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 8px 12px;
+  border: 1px solid #d6d3d1;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2937;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Ajuste acciones en cabecera del popup de caso */
+#scm-app .scm-case-head {
+  padding-right: 72px;
+}
+
+#scm-app .scm-case-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+  margin-left: 8px;
+  margin-right: 14px;
+}
+
+#scm-app .scm-case-head-actions .scm-case-side-link {
+  padding: 8px 14px;
+  min-height: 34px;
+  line-height: 1.2;
+}
+
+#scm-app .scm-case-side-link:hover {
+  background: #f5f5f4;
+}
+
+#scm-app .scm-case-work-actions {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+#scm-app .scm-case-work-actions h4 {
+  margin: 0 0 10px;
+  color: #7188a2;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+
+#scm-app .scm-case-work-action-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#scm-app .scm-case-work-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid #d6d3d1;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2937;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1.2;
+}
+
+#scm-app .scm-case-work-btn:hover {
+  background: #f5f5f4;
+  border-color: #b8c0cc;
+}
+
+#scm-app .scm-contact-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+#scm-app .scm-contact-edit-group {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin: 0;
+  padding: 12px;
+}
+
+#scm-app .scm-contact-edit-group legend {
+  color: #111827;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 0 6px;
+}
+
+#scm-app .scm-notify-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+}
+
+#scm-app .scm-notify-targets legend {
+  color: #111827;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 6px;
+}
+
+/* "Ninguno" separado visualmente del resto de destinatarios */
+#scm-app .scm-seg-check--none {
+  margin-left: auto;
+  border-left: 1px solid #e5e7eb;
+  padding-left: 12px;
+  color: #6b7280;
+}
+
+/* Fieldset de empleados en traslado */
+#scm-app .scm-notify-traslado {
+  border-color: #d1fae5;
+  background: #f0fdf4;
+}
+#scm-app .scm-notify-traslado legend {
+  color: #166534;
+}
+
+@media (max-width: 760px) {
+  #scm-app .scm-contact-edit-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+#scm-app .scm-case-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+#scm-app .scm-case-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid #102f61;
+  border-radius: 6px;
+  background: #123b78;
+  color: #fff !important;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#scm-app .scm-case-action-btn:hover {
+  background: #0f3469;
+}
+
+@media (max-width: 1200px) {
+  #scm-app .scm-case-layout {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 960px) {
+  #scm-app .scm-case-dialog {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+  }
+
+  #scm-app .scm-case-head h3 {
+    font-size: 24px;
+  }
+
+  #scm-app .scm-case-head p {
+    font-size: 17px;
+  }
+
+  #scm-app .scm-case-layout {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-case-sidebar {
+    position: static;
+  }
+}
+
+/* Case content tune-up: avoid clipping + history section */
+#scm-app .scm-case-main .scm-seg-grid {
+  grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr) minmax(220px, 1fr);
+}
+
+#scm-app .scm-case-main .scm-seg-field,
+#scm-app .scm-case-main .scm-seg-field textarea,
+#scm-app .scm-case-main .scm-seg-field select {
+  min-width: 0;
+}
+
+#scm-app .scm-case-history {
+  background: #fff;
+  border: 1px solid var(--scm-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+#scm-app .scm-case-history h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--scm-text-muted);
+}
+
+#scm-app .scm-case-history-empty {
+  margin: 0;
+  color: var(--scm-text-soft);
+  font-size: 13px;
+}
+
+#scm-app .scm-case-history-list {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+#scm-app .scm-case-history-item.scm-history-item-extra {
+  display: none;
+}
+
+#scm-app
+  .scm-case-history-list.is-expanded
+  .scm-case-history-item.scm-history-item-extra {
+  display: block;
+}
+
+#scm-app .scm-case-history-item {
+  border: 1px solid #ebe9e6;
+  border-radius: 6px;
+  background: #fafaf9;
+  padding: 8px 10px;
+}
+
+#scm-app .scm-case-record-card {
+  background: #fafaf9;
+  border: 1px solid #ebe9e6;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+#scm-app .scm-case-record-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+#scm-app .scm-case-record-title {
+  align-items: center;
+  color: var(--scm-text-main);
+  display: inline-flex;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+#scm-app .scm-case-record-user-icon,
+#scm-app .scm-case-record-date-icon {
+  border: 1.5px solid #1f4f99;
+  border-radius: 2px;
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 13px;
+  position: relative;
+  width: 15px;
+}
+
+#scm-app .scm-case-record-user-icon::before {
+  background: #1f4f99;
+  border-radius: 50%;
+  content: "";
+  height: 3px;
+  left: 3px;
+  position: absolute;
+  top: 3px;
+  width: 3px;
+}
+
+#scm-app .scm-case-record-user-icon::after {
+  background: #1f4f99;
+  box-shadow: 5px 0 0 #1f4f99;
+  content: "";
+  height: 2px;
+  left: 3px;
+  position: absolute;
+  top: 8px;
+  width: 8px;
+}
+
+#scm-app .scm-case-record-detail {
+  color: var(--scm-text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
+#scm-app .scm-case-record-date {
+  align-items: center;
+  color: var(--scm-text-muted);
+  display: inline-flex;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-top: 6px;
+}
+
+#scm-app .scm-case-record-date-icon {
+  border-color: #60708a;
+  height: 12px;
+  width: 12px;
+}
+
+#scm-app .scm-case-record-date-icon::before {
+  background: #60708a;
+  content: "";
+  height: 1px;
+  left: 1px;
+  position: absolute;
+  right: 1px;
+  top: 4px;
+}
+
+#scm-app .scm-case-record-date-icon::after {
+  background: #60708a;
+  box-shadow:
+    4px 0 0 #60708a,
+    0 4px 0 #60708a,
+    4px 4px 0 #60708a;
+  content: "";
+  height: 1px;
+  left: 3px;
+  position: absolute;
+  top: 7px;
+  width: 1px;
+}
+
+#scm-app .scm-case-record-card .scm-case-actions {
+  gap: 6px;
+  margin: 0;
+}
+
+#scm-app .scm-case-record-card .scm-case-action-btn {
+  border-radius: 5px;
+  font-size: 11px;
+  min-height: 28px;
+  padding: 6px 9px;
+}
+
+#scm-app .scm-case-history-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+#scm-app .scm-case-history-meta strong {
+  font-size: 12px;
+  color: var(--scm-text-main);
+}
+
+#scm-app .scm-case-history-meta span {
+  font-size: 11px;
+  color: var(--scm-text-muted);
+}
+
+#scm-app .scm-case-history-item p,
+#scm-app .scm-case-history-detail p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--scm-text);
+  white-space: pre-wrap;
+}
+
+#scm-app .scm-case-history-detail {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--scm-text);
+}
+
+#scm-app .scm-case-history-detail p {
+  margin: 0 0 6px;
+}
+
+#scm-app .scm-case-history-detail p:last-child {
+  margin-bottom: 0;
+}
+
+#scm-app .scm-case-record-card .scm-case-record-detail,
+#scm-app .scm-case-record-card .scm-case-record-detail p {
+  color: var(--scm-text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+#scm-app .scm-history-pagination {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#scm-app .scm-history-page-btn {
+  border: 1px solid var(--scm-border);
+  background: #fff;
+  color: var(--scm-text-soft);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+#scm-app .scm-history-page-btn:hover {
+  background: #f6f6f5;
+  color: var(--scm-text-main);
+}
+
+#scm-app .scm-history-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#scm-app .scm-history-page-status {
+  font-size: 12px;
+  color: var(--scm-text-muted);
+}
+
+@media (max-width: 1280px) {
+  #scm-app .scm-case-main .scm-seg-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Timeline wrap in modal: continue on next line instead of clipping */
+#scm-app .scm-case-main {
+  overflow: visible;
+}
+
+#scm-app .scm-case-main .scm-modal-timeline-only {
+  overflow: visible;
+}
+
+#scm-app .scm-case-main .scm-timeline {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  overflow: visible;
+  row-gap: 12px;
+}
+
+#scm-app .scm-case-main .scm-tl-item {
+  flex: 1 1 170px;
+  min-width: 170px;
+  max-width: 230px;
+}
+
+@media (max-width: 1280px) {
+  #scm-app .scm-case-main .scm-tl-line {
+    display: none;
+  }
+}
+
+/* Final override: timeline always horizontal in cards and popup (all tabs). */
+#scm-app .scm-tl-wrap .scm-timeline,
+#scm-app .scm-modal-timeline-only .scm-timeline,
+#scm-app .scm-case-body .scm-timeline,
+#scm-app .scm-case-main .scm-timeline {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: flex-start !important;
+  width: 100%;
+  gap: 0;
+}
+
+#scm-app .scm-tl-wrap .scm-tl-item,
+#scm-app .scm-modal-timeline-only .scm-tl-item,
+#scm-app .scm-case-body .scm-tl-item,
+#scm-app .scm-case-main .scm-tl-item {
+  display: flex;
+  flex-direction: column !important;
+  align-items: center !important;
+  text-align: center !important;
+  min-width: 132px;
+  flex: 1 1 132px;
+}
+
+#scm-app .scm-tl-wrap .scm-tl-line,
+#scm-app .scm-modal-timeline-only .scm-tl-line,
+#scm-app .scm-case-body .scm-tl-line,
+#scm-app .scm-case-main .scm-tl-line {
+  display: block !important;
+  width: 44px;
+  height: 2px;
+  margin: 16px 10px 0;
+  align-self: flex-start;
+}
