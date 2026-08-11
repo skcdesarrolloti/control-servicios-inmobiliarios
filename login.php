@@ -1,0 +1,222 @@
+<?php
+
+/**
+ * Login — Control de Servicios Inmobiliarios
+ */
+require_once __DIR__ . '/bootstrap.php';
+
+// Ya autenticado → panel
+if (\SCM\Core\Auth::isLoggedIn()) {
+  header('Location: ' . SCM_BASE_URL . '/index.php');
+  exit;
+}
+
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $token  = $_POST['_csrf_token'] ?? '';
+  $action = $_POST['_csrf_action'] ?? 'login';
+
+  if (!$scmCsrf->verify($action, $token, true)) {
+    $error = 'Token de seguridad inválido. Recarga la página.';
+  } else {
+    $user = trim(sanitize_text_field($_POST['username'] ?? ''));
+    $pass = $_POST['password'] ?? '';
+
+    if ($scmAuth->attempt($user, $pass)) {
+      header('Location: ' . SCM_BASE_URL . '/index.php');
+      exit;
+    }
+    $error = 'Usuario o contraseña incorrectos.';
+  }
+}
+?>
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acceso — Control Servicios Inmobiliarios</title>
+  <link rel="icon" href="<?php echo esc_url(system_image('portal_favicon_url', SCM_DEFAULT_PORTAL_FAVICON_URL)); ?>" sizes="32x32">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --primary: #f19001;
+      --dark: #1e293b;
+      --light: #f8fafc;
+      --radius: 10px;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: var(--light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .login-card {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, .10);
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .login-card h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: .25rem;
+    }
+
+    .login-card p {
+      font-size: .85rem;
+      color: #64748b;
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--dark);
+      margin-bottom: .35rem;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: .65rem .85rem;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 7px;
+      font-size: .9rem;
+      font-family: inherit;
+      transition: border-color .2s;
+      outline: none;
+    }
+
+    .form-group input:focus {
+      border-color: var(--primary);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: .75rem;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: .95rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      margin-top: .5rem;
+      transition: background .2s;
+    }
+
+    .btn-primary:hover {
+      background: #d97f00;
+    }
+
+    .alert-error {
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+      border-radius: 7px;
+      padding: .65rem .9rem;
+      font-size: .85rem;
+      margin-bottom: 1rem;
+    }
+
+    .logo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .65rem;
+      margin-bottom: 1.65rem;
+      text-align: center;
+    }
+
+    .logo-plate {
+      width: min(230px, 100%);
+      min-height: 72px;
+      background: #fff;
+      border: 1px solid #eef2f7;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: .7rem 1rem;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, .08);
+      flex: 0 0 auto;
+    }
+
+    .logo-plate img {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      max-height: 50px;
+      object-fit: contain;
+    }
+
+    .logo-text {
+      font-weight: 700;
+      color: var(--dark);
+      font-size: 1rem;
+      line-height: 1.2;
+    }
+
+    .logo-text span {
+      color: var(--primary);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="login-card">
+    <div class="logo">
+      <div class="logo-plate">
+        <img src="<?php echo esc_url(system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL)); ?>" alt="Su Casa Inmobiliaria">
+      </div>
+      <span class="logo-text">Control Servicios<br><span>Inmobiliarios</span></span>
+    </div>
+    <h1>Iniciar sesión</h1>
+    <p>Ingresa tus credenciales de acceso</p>
+
+    <?php if ($error !== ''): ?>
+      <div class="alert-error"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
+    <?php endif; ?>
+
+    <form method="post" action="">
+      <?php echo $scmCsrf->field('login'); ?>
+      <div class="form-group">
+        <label for="username">Usuario</label>
+        <input type="text" id="username" name="username" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn-primary">Entrar</button>
+    </form>
+  </div>
+</body>
+
+</html>

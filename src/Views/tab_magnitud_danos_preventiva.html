@@ -1,0 +1,82 @@
+<!-- TAB: Magnitud de da&ntilde;os preventivos -->
+<section id="scm-tab-danos-preventiva" class="scm-damage-tab" data-api-url="api.php?action=damage_magnitude_tickets" data-revision-type="preventiva" data-revision-label="preventiva">
+  <div class="scm-damage-header">
+    <div>
+      <p class="scm-eyebrow">Revisi&oacute;n preventiva</p>
+      <h2>Magnitud da&ntilde;os preventiva</h2>
+      <p class="scm-muted">Matriz y cards para identificar r&aacute;pido qu&eacute; tickets requieren atenci&oacute;n prioritaria.</p>
+    </div>
+    <button type="button" class="scm-btn-primary" id="scmDamageRefresh">Actualizar</button>
+  </div>
+
+  <div class="scm-damage-filters">
+    <input type="search" id="scmDamageSearch" placeholder="Buscar por ticket, inmueble, asunto, direcci&oacute;n o solicitante...">
+    <input type="search" id="scmDamageTicket" placeholder="Ticket">
+    <input type="search" id="scmDamageContrato" placeholder="Contrato">
+    <input type="search" id="scmDamageInmueble" placeholder="Inmueble">
+    <select id="scmDamageCotizacion">
+      <option value="">Todas las cotizaciones</option>
+      <option value="has">Con cotizaci&oacute;n</option>
+      <option value="none">Sin cotizaci&oacute;n</option>
+    </select>
+    <select id="scmDamageMagnitude">
+      <option value="">Todas las magnitudes</option>
+      <option value="critico">Cr&iacute;tico</option>
+      <option value="alto">Alto</option>
+      <option value="medio">Medio</option>
+      <option value="bajo">Bajo</option>
+    </select>
+    <select id="scmDamageLimit">
+      <option value="50">50 tickets</option>
+      <option value="150" selected>150 tickets</option>
+      <option value="300">300 tickets</option>
+      <option value="500">500 tickets</option>
+    </select>
+  </div>
+
+  <div class="scm-damage-summary" id="scmDamageSummary">
+    <div class="scm-skeleton"></div>
+    <div class="scm-skeleton"></div>
+    <div class="scm-skeleton"></div>
+    <div class="scm-skeleton"></div>
+  </div>
+
+  <div class="scm-damage-matrix-card">
+    <div class="scm-section-title">
+      <h3>Matriz de interpretaci&oacute;n</h3>
+      <p>La magnitud se calcula leyendo el serializado de <strong>evaluacion_de_danos</strong>, detectando niveles expl&iacute;citos, palabras de riesgo y cantidad de hallazgos.</p>
+    </div>
+    <div class="scm-static-matrix">
+      <div><strong>Cr&iacute;tico</strong><span>Riesgo el&eacute;ctrico/gas/estructural, inhabitabilidad, emergencia o score &ge; 18.</span></div>
+      <div><strong>Alto</strong><span>Da&ntilde;o grave, servicio esencial afectado, fuga importante o score &ge; 11.</span></div>
+      <div><strong>Medio</strong><span>Da&ntilde;o moderado, humedad, filtraci&oacute;n, reparaci&oacute;n necesaria o score &ge; 5.</span></div>
+      <div><strong>Bajo</strong><span>Da&ntilde;o menor, ajuste, desgaste normal o detalle sin riesgo.</span></div>
+    </div>
+  </div>
+
+    <div class="scm-score-guide">
+      <div>
+        <h4>Formula del score</h4>
+        <p>(Criticos x 6) + (Altos x 4) + (Medios x 2) + (Bajos x 1), con ajustes por prioridad urgente y cantidad de hallazgos.</p>
+      </div>
+      <div>
+        <h4>Que suma puntos</h4>
+        <ul>
+          <li>Palabras de riesgo: gas, electrico, estructural, inundacion, fuga, humedad, grieta, roto.</li>
+          <li>Nivel explicito del dano: critico, alto, moderado, leve.</li>
+          <li>Muchos hallazgos: +1 si hay 3 o mas, +3 si hay 6 o mas.</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Umbrales</h4>
+        <ul>
+          <li>Critico: indicador critico o score 18+.</li>
+          <li>Alto: indicador alto o score 11+.</li>
+          <li>Medio: indicador medio o score 5+.</li>
+          <li>Bajo: dano menor sin senales de riesgo.</li>
+        </ul>
+      </div>
+    </div>
+  <div class="scm-damage-state" id="scmDamageState">Cargando tickets...</div>
+  <div class="scm-damage-grid" id="scmDamageGrid"></div>
+</section>

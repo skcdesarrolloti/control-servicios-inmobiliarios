@@ -1,0 +1,163 @@
+<?php
+
+namespace SCM\Modules\Pending;
+
+use SCM\Support\SimplePdf;
+
+final class TicketPdfGenerator
+{
+  /**
+   * @param array<string,mixed> $ticket
+   * @return array<string,array{key:string,title:string,url:string,path:string}>
+   */
+  public function generate(string $mode, string $tema, int $ticketId, array $ticket): array
+  {
+    $temaNorm = strtolower(trim($tema));
+    $out = [];
+
+    if ($mode === 'preventiva') {
+      $out['acta_revision_preventiva_arrendatario'] = $this->save(
+        $this->buildPreventiva($ticket, 'arrendatario'),
+        'ofrecimiento_revision_preventiva_arrendatario_' . $ticketId,
+        'Ofrecimiento revision preventiva arrendatario',
+        'acta_revision_preventiva_arrendatario'
+      );
+      $out['acta_revision_preventiva_propietario'] = $this->save(
+        $this->buildPreventiva($ticket, 'propietario'),
+        'ofrecimiento_revision_preventiva_propietario_' . $ticketId,
+        'Ofrecimiento revision preventiva propietario',
+        'acta_revision_preventiva_propietario'
+      );
+    }
+
+    if ($temaNorm === 'recibo de inmuebles') {
+      $out['acta_desocupacion'] = $this->save(
+        $this->buildActaDesocupacion($ticket),
+        'acta_desocupacion_' . $ticketId,
+        'Acta de desocupacion',
+        'acta_desocupacion'
+      );
+    }
+
+    return $out;
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function buildPreventiva(array $ticket, string $destinatario): SimplePdf
+  {
+    $pdf = new SimplePdf();
+    $isOwner = $destinatario === 'propietario';
+    $nombreDest = $isOwner
+      ? $this->value($ticket, 'propietario', 'propietario')
+      : $this->value($ticket, 'arrendatario', 'arrendatario');
+
+    $pdf->title('Ofrecimiento de la Revision gratuita preventiva dirigida al ' . $destinatario);
+    $pdf->logo();
+    $pdf->heading('Encabezado');
+    $pdf->heading('Encabezado');
+    $pdf->line($this->value($ticket, 'ciudad', 'Cartagena de Indias') . ', ' . date('d-m-Y'));
+    $pdf->line('Apreciado(a) ' . $nombreDest);
+    $pdf->spacer(8);
+    $pdf->heading('Encabezado');
+    $pdf->heading('Encabezado');
+    $pdf->paragraph('Conscientes de la importancia de mantener el INMUEBLE en optimas condiciones para el disfrute, goce y satisfaccion del mismo, se hace necesario practicar una REVISION ANUAL PREVENTIVA GRATUITA.');
+
+    if ($isOwner) {
+      $pdf->paragraph('Esta REVISION GRATUITA permite realizar una evaluacion del estado del inmueble, detectar danos, y hacer el diagnostico de las Reparaciones Necesarias, Utiles y/o Voluntarias que ordinariamente se producen por el normal uso, evidenciando despues de haber transcurrido un ano de vigencia de estar ocupado el inmueble.');
+    } else {
+      $pdf->paragraph('Esta REVISION GRATUITA permite realizar una evaluacion del estado del inmueble, detectar danos, y hacer el diagnostico de las Reparaciones Locativas que ordinariamente se producen por el normal uso, evidenciando despues de haber transcurrido un ano de vigencia de estar ocupado el inmueble.');
+    }
+
+    $pdf->line('BENEFICIOS DE LA REVISION PREVENTIVA GRATUITA:', 8, 'F2');
+    $pdf->bullets([
+      'Permitir cumplir con el Articulo 1985 del Codigo Civil Colombiano.',
+      'Detectar problemas de deterioros a tiempo y que su costo actual sea de facil alcance, evitando reparaciones futuras costosas.',
+      'Revision de la funcionalidad de los servicios publicos instalados con el fin de mantenerlos controlados con relacion a su costo-beneficio.',
+      'Autorizar o no las reparaciones con nuestro personal altamente calificado y al menor costo del Mercado.',
+      'Evidencia del resultado de la visita haciendo entrega del informe correspondiente.',
+    ]);
+
+    $pdf->paragraph('Cumpliendo nuestra mision con el fin de satisfacer todas sus expectativas y necesidades, sorprendiendolo de forma unica e inesperada, buscando que su permanencia en la empresa sea Positiva y Memorable.');
+    $pdf->heading('Encabezado');
+    $pdf->heading('Encabezado');
+    $pdf->line('Coordinador Contractual, Mantenimiento y Servicios Publicos:', 8, 'F2');
+    $pdf->line($this->contactLine($ticket, 'contractual'));
+    $pdf->spacer(8);
+    $pdf->line('Verificador de inmuebles:', 8, 'F2');
+    $pdf->line($this->contactLine($ticket, 'empleado'));
+
+    return $pdf;
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function buildActaDesocupacion(array $ticket): SimplePdf
+  {
+    $pdf = new SimplePdf();
+    $pdf->title('Acta de desocupacion');
+    $pdf->logo();
+    $pdf->heading('Encabezado');
+    $pdf->heading('Encabezado');
+    $pdf->line($this->value($ticket, 'ciudad', 'Cartagena de Indias') . ', ' . date('d-m-Y'));
+    $pdf->line('Apreciado(a) ' . $this->value($ticket, 'arrendatario', 'arrendatario'));
+    $pdf->spacer(8);
+    $pdf->heading('Encabezado');
+    $pdf->heading('Encabezado');
+    $pdf->paragraph('Por medio de la presente le notificamos que su contrato #' . $this->value($ticket, 'contrato', '-') . ' de arrendamiento esta proximo a culminar, es por ello por lo que, con anticipacion, le invitamos a realizar las reparaciones que se encuentren pendientes en el inmueble; lo anterior, toda vez que tal como lo estipula el contrato de arrendamiento en su CLAUSULA DECIMA NOVENA, la cual establece:');
+    $pdf->paragraph('"DECIMA NOVENA: RECIBO Y ESTADO. El arrendatario declara que ha recibido el inmueble objeto de este contrato en buen estado, conforme al inventario que hace parte de este, y que en el mismo estado lo restituira al arrendador a la terminacion del arrendamiento, o cuando este haya de cesar por alguna de las causales previstas, salvo el deterioro proveniente del tiempo y del uso legitimo."');
+    $pdf->paragraph('Asi mismo, destacamos que para recibir el bien inmueble, usted debera estar a paz y salvo de canon de arrendamiento, administracion (si aplica), y servicios publicos con su respectivo deposito.');
+    $pdf->paragraph('Nota: En caso de que el inmueble tenga reparaciones pendientes, o presente deudas de canon de arrendamiento, administracion y/o servicios publicos, los valores adeudados seguiran contando hasta el dia en que se reciba formalmente el inmueble y el mismo se encuentre totalmente a paz y salvo.');
+    $pdf->line('Anexos:', 8, 'F2');
+    $registro = $this->value($ticket, 'registro_fotografico', '');
+    if ($registro !== '') {
+      $pdf->linkText('Registro fotografico', $registro);
+    }
+    $pdf->heading('Encabezado');
+    $pdf->line('Coordinador Contractual, Mantenimiento y Servicios Publicos:', 8, 'F2');
+    $pdf->line($this->contactLine($ticket, 'contractual'));
+    $pdf->spacer(8);
+    $pdf->line('Verificador de inmuebles:', 8, 'F2');
+    $pdf->line($this->contactLine($ticket, 'empleado'));
+    return $pdf;
+  }
+
+  /**
+   * @return array{key:string,title:string,url:string,path:string}
+   */
+  private function save(SimplePdf $pdf, string $slug, string $title, string $key): array
+  {
+    $basename = preg_replace('/[^a-zA-Z0-9_-]+/', '_', $slug) . '_' . bin2hex(random_bytes(5)) . '.pdf';
+    $uploadDir = defined('SCM_BASE_PATH') ? SCM_BASE_PATH . '/uploads' : dirname(__DIR__, 3) . '/uploads';
+    $uploadUrl = defined('SCM_BASE_URL') ? rtrim(SCM_BASE_URL, '/') . '/uploads' : '';
+    $path = $uploadDir . '/' . $basename;
+    $pdf->save($path);
+
+    return [
+      'key' => $key,
+      'title' => $title,
+      'url' => $uploadUrl !== '' ? ($uploadUrl . '/' . $basename) : $basename,
+      'path' => $path,
+    ];
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function contactLine(array $ticket, string $prefix): string
+  {
+    if ($prefix === 'contractual') {
+      $name = $this->value($ticket, 'nombre_contractual', '');
+      $phone = $this->value($ticket, 'celular_contractual', '');
+      $email = $this->value($ticket, 'correo_contractual', '');
+    } else {
+      $name = $this->value($ticket, 'nombre_empleado', '');
+      $phone = $this->value($ticket, 'celular_empleado', '');
+      $email = $this->value($ticket, 'correo_empleado', '');
+    }
+    return trim($name . ' | ' . $phone . ' - ' . $email, ' |-');
+  }
+
+  /** @param array<string,mixed> $row */
+  private function value(array $row, string $key, string $default): string
+  {
+    $value = trim((string) ($row[$key] ?? ''));
+    return $value !== '' ? $value : $default;
+  }
+}

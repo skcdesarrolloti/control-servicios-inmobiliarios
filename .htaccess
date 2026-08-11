@@ -1,0 +1,26 @@
+# Control de Servicios Inmobiliarios — Apache config
+
+Options -Indexes
+
+# Bloquear acceso directo a archivos sensibles
+
+<Files "config.php">
+Require all denied
+</Files>
+
+<Files "bootstrap.php">
+Require all denied
+</Files>
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+# URLs limpias para portales PQR
+RewriteCond %{THE_REQUEST} \s/+[^\s?]*?(ticket-(propietario|arrendatario|copropiedad|cliente))\.php(?:[\s?]|$) [NC]
+RewriteRule ^ticket-(propietario|arrendatario|copropiedad|cliente)\.php$ ticket-$1 [R=301,L,NE]
+
+RewriteRule ^ticket-(propietario|arrendatario|copropiedad|cliente)/?$ ticket-$1.php [L,NC,QSA]
+RewriteCond %{THE_REQUEST} \s/+[^\s?]*?ticket\.php(?:[\s?]|$) [NC]
+RewriteRule ^ticket\.php$ ticket [R=301,L,NE]
+RewriteRule ^ticket/?$ ticket.php [L,NC,QSA]
+</IfModule>
