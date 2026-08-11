@@ -30,13 +30,21 @@ Aplicación PHP para administrar tickets, mantenimientos, PQR, revisiones preven
    storage/uploads
    ```
 
-5. Si reemplazas una instalación anterior, migra los archivos sin sobrescribir los que ya existan:
+5. Antes de habilitar el panel nuevo, importa el JSON anterior en la tabla central de configuración:
+
+   ```bash
+   php bin/migrate-settings-to-database.php /ruta/al/proyecto/anterior/data/settings.json
+   ```
+
+   El comando es idempotente, conserva el JSON de origen y guarda un documento versionado en la fila `control_servicios_config` de `wp_jet_cct_confi_sistema`.
+
+6. Si reemplazas una instalación anterior, migra los archivos sin sobrescribir los que ya existan:
 
    ```bash
    php bin/migrate-legacy-storage.php /ruta/al/proyecto/anterior
    ```
 
-6. Programa el worker de notificaciones desde CLI, por ejemplo cada minuto:
+7. Programa el worker de notificaciones desde CLI, por ejemplo cada minuto:
 
    ```bash
    php bin/queue-worker.php 40
@@ -74,6 +82,7 @@ Las clases fachada grandes se conservaron para mantener compatibilidad con la ba
 - Los adjuntos nuevos se validan por MIME/tamaño, se guardan fuera de `public/` y se sirven con firma HMAC.
 - La ruta `/uploads/*` existe solo para compatibilidad con enlaces históricos. Los adjuntos nuevos no deben usarla.
 - El login tiene límite de intentos y las operaciones autenticadas usan CSRF.
+- La configuración funcional vive como JSON en `wp_jet_cct_confi_sistema`; solo las acciones autenticadas del panel escriben en ella. El bot es consumidor de solo lectura.
 - Rota las credenciales y secretos utilizados por cualquier despliegue anterior antes de publicar esta versión.
 
 ## Verificación
@@ -86,12 +95,12 @@ El comando ejecuta:
 
 - sintaxis de todos los archivos PHP del proyecto;
 - PHPStan nivel 5 sobre el núcleo y la infraestructura nueva tipada;
-- PHPUnit para tokens firmados, rate limiting, entorno y persistencia de configuración.
+- PHPUnit para tokens firmados, rate limiting, entorno y persistencia SQL de configuración.
 
 Los assets JavaScript también pueden validarse con `node --check public/assets/js/<archivo>.js`.
 
 ## Despliegue
 
-No copies `.env` desde otro entorno sin revisar sus valores. Conserva `storage/` entre versiones y despliega el código de forma atómica. Después del despliegue ejecuta `composer install --no-dev --optimize-autoloader` y verifica que el worker CLI pueda iniciar.
+No copies `.env` desde otro entorno sin revisar sus valores. Conserva `storage/` entre versiones y despliega el código de forma atómica. La migración de configuración debe ejecutarse antes de dirigir tráfico al panel nuevo. Después del despliegue ejecuta `composer install --no-dev --optimize-autoloader` y verifica que el worker CLI pueda iniciar.
 
 El inventario completo de cambios y deuda restante está en [docs/REFACTORIZACION.md](docs/REFACTORIZACION.md).

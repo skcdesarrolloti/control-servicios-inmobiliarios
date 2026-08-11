@@ -28,6 +28,7 @@ Los principales riesgos eran:
 - El CSS administrativo se dividió por contexto conservando el orden de cascada.
 - El JavaScript administrativo se dividió en núcleo de casos, runtime del panel y guía.
 - El CSS/JS embebido en vistas se extrajo a assets versionables.
+- La configuración administrable se migró de `settings.json` a la fila JSON `control_servicios_config` de `wp_jet_cct_confi_sistema`; el panel es el único escritor y registra el funcionario que realiza cada actualización.
 
 ## Archivos retirados
 
@@ -45,9 +46,11 @@ Se eliminaron los siguientes elementos por ser duplicados, huérfanos, inseguros
 
 ## Compatibilidad
 
-La estructura de tablas y las reglas de negocio existentes no se reescribieron. Las fachadas conservan los nombres públicos usados por controladores y vistas. Para los adjuntos históricos se mantiene una ruta de solo lectura `/uploads/*`; los archivos deben copiarse a `storage/uploads` con el comando de migración.
+Las tablas y reglas de negocio existentes no se reescribieron ni se agregó una tabla paralela de configuración. Se reutilizó `wp_jet_cct_confi_sistema` para eliminar la duplicación entre panel y bot. Las fachadas conservan los nombres públicos usados por controladores y vistas. Para los adjuntos históricos se mantiene una ruta de solo lectura `/uploads/*`; los archivos deben copiarse a `storage/uploads` con el comando de migración.
 
-Antes de cambiar el despliegue se debe probar con una copia de la base de datos real. La revisión automatizada no puede confirmar nombres de columnas, permisos SQL, disponibilidad del proyecto externo `shared-notifications` ni entrega real de correo/WhatsApp.
+La migración `bin/migrate-settings-to-database.php` importa todas las claves del JSON anterior dentro de una transacción, es idempotente y verifica el resultado. El JSON no se elimina automáticamente para permitir una reversión controlada, pero deja de ser leído por el código nuevo.
+
+Antes de cambiar el despliegue se debe probar con una copia de la base de datos real. La revisión automatizada no puede confirmar la entrega externa real de correo/WhatsApp.
 
 ## Deuda técnica restante
 

@@ -16,7 +16,6 @@ if ($sourceRoot === false || !is_dir($sourceRoot)) {
 
 $targets = [
   $sourceRoot . '/uploads' => $projectRoot . '/storage/uploads',
-  $sourceRoot . '/data' => $projectRoot . '/storage/data',
 ];
 $copied = 0;
 $skipped = 0;

@@ -265,7 +265,10 @@ if (!function_exists('get_option')) {
 if (!function_exists('update_option')) {
   function update_option(string $key, $value): bool
   {
-    \SCM\Core\App::settings()->set($key, $value);
+    if (!\SCM\Core\Auth::isLoggedIn()) {
+      return false;
+    }
+    \SCM\Core\App::settings()->set($key, $value, \SCM\Core\Auth::userId());
     return true;
   }
 }

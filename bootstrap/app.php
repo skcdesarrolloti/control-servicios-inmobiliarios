@@ -94,7 +94,7 @@ try {
 $scmDb = new \SCM\Core\Database($pdo, (string) ($scmConfig['db_prefix'] ?? 'wp_'));
 $scmAuth = new \SCM\Core\Auth($scmDb, (bool) ($scmConfig['allow_legacy_passwords'] ?? false));
 $scmCsrf = new \SCM\Core\Csrf((string) $scmConfig['app_secret']);
-$scmSettings = new \SCM\Core\Settings(SCM_STORAGE_PATH . '/data');
+$scmSettings = new \SCM\Core\Settings($scmDb);
 
 \SCM\Core\App::init($scmDb, $scmAuth, $scmCsrf, $scmSettings);
 

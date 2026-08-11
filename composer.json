@@ -1,6 +1,7 @@
 {
   "name": "skcdesarrolloti/control-servicios-inmobiliarios",
   "description": "Panel y portales de control de servicios inmobiliarios.",
+  "license": "proprietary",
   "type": "project",
   "require": {
     "php": "^8.2",
