@@ -317,15 +317,20 @@
 
             pqrPanel.addEventListener('click', function(e) {
               var statusTab = e.target && e.target.closest ? e.target.closest('[data-public-pqr-bucket]') : null;
+              var topicTab = e.target && e.target.closest ? e.target.closest('[data-public-pqr-topic]') : null;
               var pageLink = e.target && e.target.closest ? e.target.closest('[data-public-pqr-page]') : null;
-              if (statusTab || pageLink) {
+              if (statusTab || topicTab || pageLink) {
                 var navigationForm = pqrPanel.querySelector('form.scm-public-pqr-filter-form');
                 if (navigationForm) {
                   e.preventDefault();
                   var bucketInput = navigationForm.querySelector('input[name="public_pqr_bucket"]');
+                  var topicInput = navigationForm.querySelector('input[name="public_pqr_topic"]');
                   var pageInput = navigationForm.querySelector('input[name="public_pqr_page"]');
                   if (statusTab && bucketInput) {
                     bucketInput.value = statusTab.getAttribute('data-public-pqr-bucket') || 'abiertos';
+                  }
+                  if (topicTab && topicInput) {
+                    topicInput.value = topicTab.getAttribute('data-public-pqr-topic') || 'mantenimiento';
                   }
                   if (pageInput) {
                     pageInput.value = pageLink ? (pageLink.getAttribute('data-public-pqr-page') || '1') : '1';
@@ -347,7 +352,7 @@
                 var pageInputForFilter = filterFormForPage ? filterFormForPage.querySelector('input[name="public_pqr_page"]') : null;
                 if (pageInputForFilter) pageInputForFilter.value = '1';
               }
-              var clearFilterBtn = e.target && e.target.closest ? e.target.closest('.scm-public-pqr-filter-actions a.btn') : null;
+              var clearFilterBtn = e.target && e.target.closest ? e.target.closest('.scm-public-pqr-filter-form .scm-actions a.btn') : null;
               if (clearFilterBtn) {
                 var filterFormForClear = pqrPanel.querySelector('form.scm-public-pqr-filter-form');
                 if (filterFormForClear) {
@@ -361,8 +366,12 @@
                   var searchInput = filterFormForClear.querySelector('input[name="public_pqr_busqueda"]');
                   if (searchInput) searchInput.value = '';
                   var clearBucket = filterFormForClear.querySelector('input[name="public_pqr_bucket"]');
+                  var clearBucketSelect = filterFormForClear.querySelector('select[name="public_pqr_bucket"]');
+                  var clearTopic = filterFormForClear.querySelector('input[name="public_pqr_topic"]');
                   var clearPage = filterFormForClear.querySelector('input[name="public_pqr_page"]');
                   if (clearBucket) clearBucket.value = 'abiertos';
+                  if (clearBucketSelect) clearBucketSelect.value = 'abiertos';
+                  if (clearTopic) clearTopic.value = 'mantenimiento';
                   if (clearPage) clearPage.value = '1';
                   filterFormForClear.dispatchEvent(new Event('submit', {
                     bubbles: true,
@@ -375,6 +384,21 @@
               if (!transferBtn) return;
               e.preventDefault();
               openTransferModal(transferBtn);
+            });
+
+            document.addEventListener('click', function(e) {
+              var transferFromCase = e.target && e.target.closest ? e.target.closest('[data-scm-open-pqr-transfer-from-case]') : null;
+              if (!transferFromCase) return;
+              e.preventDefault();
+              var ticketPk = transferFromCase.getAttribute('data-ticket-pk') || '';
+              var sourceTransferBtn = ticketPk ? pqrPanel.querySelector('[data-scm-open-pqr-transfer][data-ticket-pk="' + ticketPk.replace(/"/g, '\\"') + '"]') : null;
+              if (!sourceTransferBtn) return;
+              var caseModal = document.getElementById('scm-case-modal');
+              if (caseModal) {
+                caseModal.classList.remove('open');
+                caseModal.setAttribute('aria-hidden', 'true');
+              }
+              openTransferModal(sourceTransferBtn);
             });
 
             pqrPanel.addEventListener('submit', function(e) {
@@ -398,7 +422,9 @@
                 var filterNonce = filterRuntime.nonce || '';
                 var filterAction = (filterRuntime.actions && filterRuntime.actions.filtrar_pqr_publico) ? filterRuntime.actions.filtrar_pqr_publico : 'scm_filtrar_pqr_publico';
                 var filterBtn = form.querySelector('button[type="submit"]');
+                var filterSpinner = form.querySelector('.scm-spinner');
                 if (filterBtn) filterBtn.disabled = true;
+                if (filterSpinner) filterSpinner.classList.add('active');
                 pqrPanel.classList.add('is-loading');
 
                 var filterFd = new FormData(form);
@@ -437,6 +463,7 @@
                   .finally(function() {
                     pqrPanel.classList.remove('is-loading');
                     if (filterBtn) filterBtn.disabled = false;
+                    if (filterSpinner) filterSpinner.classList.remove('active');
                   });
                 return;
               }

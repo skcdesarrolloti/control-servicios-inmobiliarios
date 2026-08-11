@@ -377,6 +377,31 @@
   display: none !important;
 }
 
+#scm-app .scm-public-pqr-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#scm-app .scm-public-pqr-topic-tab {
+  text-decoration: none;
+}
+
+#scm-app .scm-public-pqr-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+}
+
+#scm-app .scm-page-btn[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 #scm-app .scm-public-pqr-kpis {
   margin-bottom: 16px;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -466,10 +491,6 @@
   background: #fff;
 }
 
-#scm-app .scm-public-pqr-card-grid {
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-}
-
 #scm-app .scm-public-pqr-card {
   min-width: 0;
 }
@@ -478,35 +499,10 @@
   overflow-wrap: anywhere;
 }
 
-#scm-app .scm-public-pqr-card .scm-ticket-card-states {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-#scm-app .scm-public-pqr-card .scm-ticket-card-state:last-child {
-  grid-column: 1 / -1;
-}
-
 #scm-app .scm-public-pqr-card .scm-ticket-card-state strong {
   color: #1f344d;
   font-size: 12px;
   overflow-wrap: anywhere;
-}
-
-#scm-app .scm-public-pqr-card-footer {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: center;
-  gap: 8px;
-}
-
-#scm-app .scm-public-pqr-card-footer .btn {
-  width: 100%;
-  min-height: 44px;
-  justify-content: center;
-}
-
-#scm-app .scm-public-pqr-card-footer .scm-public-pqr-row-msg {
-  grid-column: 1 / -1;
 }
 
 #scm-app .scm-public-pqr-case-detail h4 {

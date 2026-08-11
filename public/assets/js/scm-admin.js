@@ -2045,6 +2045,16 @@
           '<section class="scm-case-work-actions"><h4>' +
           (isPublicPqr ? "Acciones de la solicitud" : "Acciones del caso") +
           '</h4><div class="scm-case-work-action-list">';
+        if (
+          isPublicPqr &&
+          card &&
+          card.querySelector("[data-scm-open-pqr-transfer]")
+        ) {
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-open-pqr-transfer-from-case data-ticket-pk="' +
+            escHtml(btn.dataset.ticketPk || "") +
+            '">Trasladar solicitud</button>';
+        }
         if (!isPublicPqr && seguimientoWrap) {
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-section="scm-sec-seguimiento">Agregar seguimiento</button>';

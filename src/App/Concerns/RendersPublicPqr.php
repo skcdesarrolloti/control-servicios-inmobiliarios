@@ -19,6 +19,50 @@ trait RendersPublicPqr
     return \SCM\Modules\PublicTickets\PublicTicketsService::getDepartmentForTheme($theme);
   }
 
+  /** @return array<string,array{label:string,themes:array<int,string>}> */
+  private function get_public_pqr_topic_definitions(): array
+  {
+    $generic = $this->get_generic_tab_definitions();
+    $maintenanceThemes = array_map(
+      static fn(string $theme): string => mb_strtolower(trim($theme), 'UTF-8'),
+      \SCM\Repositories\TicketsRepository::MAINTENANCE_TOPICS
+    );
+    $knownThemes = [];
+
+    $definitions = [
+      'mantenimiento' => ['label' => 'Mantenimiento', 'themes' => $maintenanceThemes],
+      'preventiva' => ['label' => 'Preventiva', 'themes' => (array) ($generic['preventiva']['temas'] ?? [])],
+      'entrega' => ['label' => 'Entrega', 'themes' => (array) ($generic['entrega']['temas'] ?? [])],
+      'recibo' => ['label' => 'Recibo', 'themes' => (array) ($generic['recibo']['temas'] ?? [])],
+      'contractual' => ['label' => 'Contractual', 'themes' => (array) ($generic['contractual']['temas'] ?? [])],
+      'contable' => ['label' => 'Contable', 'themes' => (array) ($generic['contable']['temas'] ?? [])],
+      'certificaciones' => ['label' => 'Certificaciones', 'themes' => (array) ($generic['certificaciones']['temas'] ?? [])],
+    ];
+
+    foreach ($definitions as $key => $definition) {
+      $normalized = [];
+      foreach ((array) ($definition['themes'] ?? []) as $theme) {
+        $theme = mb_strtolower(trim((string) $theme), 'UTF-8');
+        if ($theme !== '' && !in_array($theme, $normalized, true)) {
+          $normalized[] = $theme;
+          $knownThemes[$theme] = true;
+        }
+      }
+      $definitions[$key]['themes'] = $normalized;
+    }
+
+    $otherThemes = [];
+    foreach ($this->get_public_pqr_themes() as $theme) {
+      $theme = mb_strtolower(trim((string) $theme), 'UTF-8');
+      if ($theme !== '' && !isset($knownThemes[$theme])) {
+        $otherThemes[] = $theme;
+      }
+    }
+    $definitions['otros'] = ['label' => 'Otros', 'themes' => array_values(array_unique($otherThemes))];
+
+    return $definitions;
+  }
+
   /** @return array<int,string> */
   private function get_public_pqr_department_options(): array
   {
@@ -122,7 +166,7 @@ trait RendersPublicPqr
     return $out;
   }
 
-  /** @param array<string,mixed> $input @return array{estado:string,empleado:string,categoria:string,busqueda:string,bucket:string,page:int} */
+  /** @param array<string,mixed> $input @return array{estado:string,empleado:string,categoria:string,busqueda:string,bucket:string,topic:string,page:int} */
   private function get_public_pqr_filters_from_input(array $input): array
   {
     $estado = trim((string) ($input['public_pqr_estado'] ?? ''));
@@ -130,6 +174,7 @@ trait RendersPublicPqr
     $categoria = trim((string) ($input['public_pqr_categoria'] ?? ''));
     $busqueda = trim((string) ($input['public_pqr_busqueda'] ?? ''));
     $bucket = mb_strtolower(trim((string) ($input['public_pqr_bucket'] ?? 'abiertos')), 'UTF-8');
+    $topic = mb_strtolower(trim((string) ($input['public_pqr_topic'] ?? 'mantenimiento')), 'UTF-8');
     $page = (int) ($input['public_pqr_page'] ?? 1);
 
     $estado = sanitize_text_field($estado);
@@ -142,6 +187,9 @@ trait RendersPublicPqr
     if (!in_array($bucket, ['abiertos', 'postergados', 'cerrados'], true)) {
       $bucket = 'abiertos';
     }
+    if (!isset($this->get_public_pqr_topic_definitions()[$topic])) {
+      $topic = 'mantenimiento';
+    }
 
     return [
       'estado' => $estado,
@@ -149,11 +197,12 @@ trait RendersPublicPqr
       'categoria' => $categoria,
       'busqueda' => $busqueda,
       'bucket' => $bucket,
+      'topic' => $topic,
       'page' => max(1, $page),
     ];
   }
 
-  /** @return array{estado:string,empleado:string,categoria:string,busqueda:string,bucket:string,page:int} */
+  /** @return array{estado:string,empleado:string,categoria:string,busqueda:string,bucket:string,topic:string,page:int} */
   private function get_public_pqr_filters_from_request(): array
   {
     return $this->get_public_pqr_filters_from_input($_GET);
@@ -163,6 +212,7 @@ trait RendersPublicPqr
    * @return array{
    *   rows:array<int,array<string,mixed>>,
    *   counts:array{abiertos:int,postergados:int,cerrados:int},
+   *   topic_counts:array<string,int>,
    *   pagination:array{page:int,per_page:int,total:int,total_pages:int},
    *   employees:array<int,array{id:string,label:string}>
    * }
@@ -172,6 +222,7 @@ trait RendersPublicPqr
     $emptyResult = [
       'rows' => [],
       'counts' => ['abiertos' => 0, 'postergados' => 0, 'cerrados' => 0],
+      'topic_counts' => [],
       'pagination' => ['page' => 1, 'per_page' => 10, 'total' => 0, 'total_pages' => 1],
       'employees' => [],
     ];
@@ -280,6 +331,53 @@ trait RendersPublicPqr
       $args[] = $estadoFilter;
     }
 
+    $topicDefinitions = $this->get_public_pqr_topic_definitions();
+    $topicCounts = array_fill_keys(array_keys($topicDefinitions), 0);
+    $themeToTopic = [];
+    foreach ($topicDefinitions as $topicKey => $topicDefinition) {
+      foreach ((array) ($topicDefinition['themes'] ?? []) as $theme) {
+        $themeToTopic[mb_strtolower(trim((string) $theme), 'UTF-8')] = $topicKey;
+      }
+    }
+    $topicCountRows = $this->db->getResults(
+      "SELECT LOWER({$tipoPqrsExpr}) AS tema_normalizado, COUNT(*) AS total
+       FROM `{$ticketsTable}`
+       WHERE {$whereSql}
+       GROUP BY LOWER({$tipoPqrsExpr})",
+      $args
+    );
+    foreach ($topicCountRows as $topicCountRow) {
+      $theme = mb_strtolower(trim((string) ($topicCountRow['tema_normalizado'] ?? '')), 'UTF-8');
+      $topicKey = $themeToTopic[$theme] ?? 'otros';
+      if (isset($topicCounts[$topicKey])) {
+        $topicCounts[$topicKey] += (int) ($topicCountRow['total'] ?? 0);
+      }
+    }
+
+    $topic = (string) ($filters['topic'] ?? 'mantenimiento');
+    if (!isset($topicDefinitions[$topic])) {
+      $topic = 'mantenimiento';
+    }
+    $topicThemes = (array) ($topicDefinitions[$topic]['themes'] ?? []);
+    if ($topic === 'otros') {
+      $nonOtherThemes = [];
+      foreach ($topicDefinitions as $definitionKey => $topicDefinition) {
+        if ($definitionKey !== 'otros') {
+          $nonOtherThemes = array_merge($nonOtherThemes, (array) ($topicDefinition['themes'] ?? []));
+        }
+      }
+      $nonOtherThemes = array_values(array_unique($nonOtherThemes));
+      if ($nonOtherThemes !== []) {
+        $knownPlaceholders = implode(',', array_fill(0, count($nonOtherThemes), '?'));
+        $whereSql .= " AND LOWER({$tipoPqrsExpr}) NOT IN ({$knownPlaceholders})";
+        $args = array_merge($args, $nonOtherThemes);
+      }
+    } elseif ($topicThemes !== []) {
+      $topicPlaceholders = implode(',', array_fill(0, count($topicThemes), '?'));
+      $whereSql .= " AND LOWER({$tipoPqrsExpr}) IN ({$topicPlaceholders})";
+      $args = array_merge($args, $topicThemes);
+    }
+
     $total = (int) $this->db->getVar("SELECT COUNT(*) FROM `{$ticketsTable}` WHERE {$whereSql}", $args);
     $totalPages = max(1, (int) ceil($total / $perPage));
     $page = min(max(1, (int) ($filters['page'] ?? 1)), $totalPages);
@@ -317,6 +415,7 @@ trait RendersPublicPqr
     return [
       'rows' => $this->db->getResults($sql, $args),
       'counts' => $counts,
+      'topic_counts' => $topicCounts,
       'pagination' => [
         'page' => $page,
         'per_page' => $perPage,
@@ -461,39 +560,42 @@ trait RendersPublicPqr
       $settingsModalHtml .= '</div></div>';
     }
 
-    $html = '<div class="scm-filter-card card">';
-    // Header row with title + settings button
-    $html .= '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px;">';
-    $html .= '<h3 style="margin:0;">Solicitudes Web</h3>';
-    if ($isAdmin) {
-      $html .= '<button type="button" onclick="document.getElementById(\'scm-pqr-settings-modal\').style.display=\'flex\'" class="btn btn-sm" style="display:inline-flex;align-items:center;gap:5px;"><svg xmlns=\'http://www.w3.org/2000/svg\' width=\'14\' height=\'14\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><circle cx=\'12\' cy=\'12\' r=\'3\'></circle><path d=\'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z\'></path></svg> Configuracion</button>';
-    }
-    $html .= '</div>';
-    $html .= '<p style="margin:0 0 10px;color:#4c6077;">' . ($readOnly ? 'Consulta publica de solicitudes creadas desde los portales publicos.' : ($isGlobalSignedAccess ? 'Este acceso corporativo puede revisar y trasladar todas las solicitudes web.' : ($isSignedPublicAccess ? 'Este acceso corporativo puede revisar y trasladar las solicitudes asignadas a tu ID.' : 'Gestiona las solicitudes creadas por Propietario, Arrendatario, Copropiedad y Cliente.'))) . '</p>';
     $currentBucket = (string) ($filters['bucket'] ?? 'abiertos');
     $statusLabels = [
       'abiertos' => 'Abiertos',
       'postergados' => 'Postergados',
       'cerrados' => 'Cerrados',
     ];
-    $statusBaseUrl = remove_query_arg(['public_pqr_bucket', 'public_pqr_page', 'public_pqr_estado', 'scm_tab', 'tab']);
-    $html .= '<nav class="scm-public-pqr-status-tabs" aria-label="Estado de las solicitudes web">';
-    foreach ($statusLabels as $bucketKey => $bucketLabel) {
-      $statusUrl = add_query_arg([
-        'scm_tab' => 'scm-panel-pqr-publico',
-        'public_pqr_bucket' => $bucketKey,
-        'public_pqr_page' => 1,
-      ], $statusBaseUrl);
-      $active = $currentBucket === $bucketKey;
-      $html .= '<a href="' . self::h($statusUrl) . '" class="scm-public-pqr-status-tab' . ($active ? ' is-active' : '') . '" data-public-pqr-bucket="' . self::h($bucketKey) . '"' . ($active ? ' aria-current="page"' : '') . '>';
-      $html .= '<span class="scm-public-pqr-status-label">' . self::h($bucketLabel) . '</span>';
-      $html .= '<strong class="scm-public-pqr-status-count">' . self::h((string) ($counts[$bucketKey] ?? 0)) . '</strong>';
-      $html .= '</a>';
+    $topicDefinitions = $this->get_public_pqr_topic_definitions();
+    $topicCounts = is_array($result['topic_counts'] ?? null) ? $result['topic_counts'] : [];
+    $currentTopic = (string) ($filters['topic'] ?? 'mantenimiento');
+    if (!isset($topicDefinitions[$currentTopic])) {
+      $currentTopic = 'mantenimiento';
     }
-    $html .= '</nav>';
+    $currentTopicLabel = (string) ($topicDefinitions[$currentTopic]['label'] ?? 'Mantenimiento');
+    $html = '<div class="scm-status-bucket scm-public-pqr-bucket" data-public-pqr-listing>';
+    $html .= '<div class="scm-status-subtabs scm-public-pqr-topic-tabs" role="tablist" aria-label="Categorías de solicitudes web">';
+    $topicBaseUrl = remove_query_arg(['public_pqr_categoria', 'public_pqr_topic', 'public_pqr_page', 'scm_tab', 'tab']);
+    foreach ($topicDefinitions as $topicKey => $topicDefinition) {
+      $active = $topicKey === $currentTopic;
+      $topicUrl = add_query_arg([
+        'scm_tab' => 'scm-panel-pqr-publico',
+        'public_pqr_bucket' => $currentBucket,
+        'public_pqr_topic' => $topicKey,
+        'public_pqr_page' => 1,
+      ], $topicBaseUrl);
+      $html .= '<a href="' . self::h($topicUrl) . '" class="scm-status-topic-tab scm-public-pqr-topic-tab' . ($active ? ' active' : '') . '" data-public-pqr-topic="' . self::h($topicKey) . '" aria-selected="' . ($active ? 'true' : 'false') . '">' . self::h((string) ($topicDefinition['label'] ?? $topicKey)) . '</a>';
+    }
+    $html .= '</div>';
+    $html .= '<div class="scm-status-topic-panel scm-public-pqr-topic-panel active" data-public-pqr-active-topic="' . self::h($currentTopic) . '">';
+    $html .= '<div class="scm-status-topic-head"><div><h3>' . self::h($currentTopicLabel) . '</h3><p>Solicitudes Web · ' . self::h((string) ($statusLabels[$currentBucket] ?? 'Abiertos')) . '</p></div>';
+    $html .= '<div class="scm-public-pqr-heading-actions"><span class="scm-status-count"><strong>' . self::h((string) ($topicCounts[$currentTopic] ?? ($pagination['total'] ?? 0))) . '</strong> tickets</span>';
+    if ($isAdmin) {
+      $html .= '<button type="button" onclick="document.getElementById(\'scm-pqr-settings-modal\').style.display=\'flex\'" class="btn btn-sm scm-public-pqr-settings-btn" aria-label="Configurar solicitudes web">Configuración</button>';
+    }
+    $html .= '</div></div>';
     $currentEstado = trim((string) ($filters['estado'] ?? ''));
     $currentEmpleado = trim((string) ($filters['empleado'] ?? ''));
-    $currentCategoria = trim((string) ($filters['categoria'] ?? ''));
     $currentBusqueda = trim((string) ($filters['busqueda'] ?? ''));
     $showEmployeeFilter = !$readOnly || $isGlobalSignedAccess;
     if ($employeeIdFilter !== '' && ($readOnly || $isSignedPublicAccess)) {
@@ -510,9 +612,10 @@ trait RendersPublicPqr
     } elseif ($employeeIdFilter !== '') {
       $clearQuery['id_empleado'] = $employeeIdFilter;
     }
-    $clearUrl = remove_query_arg(['public_pqr_estado', 'public_pqr_empleado', 'public_pqr_categoria', 'public_pqr_busqueda', 'public_pqr_bucket', 'public_pqr_page', 'scm_tab', 'tab', 'k', 'scope', 'exp', 'sig', 'id_empleado']);
+    $clearUrl = remove_query_arg(['public_pqr_estado', 'public_pqr_empleado', 'public_pqr_categoria', 'public_pqr_busqueda', 'public_pqr_bucket', 'public_pqr_topic', 'public_pqr_page', 'scm_tab', 'tab', 'k', 'scope', 'exp', 'sig', 'id_empleado']);
     $clearUrl = add_query_arg($clearQuery, $clearUrl);
-    $html .= '<form method="get" autocomplete="off" class="scm-public-pqr-filters scm-public-pqr-filter-form">';
+    $html .= '<div class="scm-filter-card card"><h3>Filtros</h3>';
+    $html .= '<form method="get" autocomplete="off" class="scm-public-pqr-filter-form">';
     if ($isSignedPublicAccess && $publicToken !== '') {
       $html .= '<input type="hidden" name="k" value="' . self::h($publicToken) . '">';
     } elseif ($isSignedPublicAccess) {
@@ -524,17 +627,16 @@ trait RendersPublicPqr
       $html .= '<input type="hidden" name="id_empleado" value="' . self::h($employeeIdFilter) . '">';
     }
     $html .= '<input type="hidden" name="scm_tab" value="scm-panel-pqr-publico">';
-    $html .= '<input type="hidden" name="public_pqr_bucket" value="' . self::h($currentBucket) . '">';
+    $html .= '<input type="hidden" name="public_pqr_topic" value="' . self::h($currentTopic) . '">';
     $html .= '<input type="hidden" name="public_pqr_page" value="' . self::h((string) ($pagination['page'] ?? 1)) . '">';
-    $html .= '<div class="scm-public-pqr-filter-field scm-public-pqr-filter-field-wide"><label>Categoría</label>';
-    $html .= '<select name="public_pqr_categoria" class="select select-bordered select-sm scm-select">';
-    $html .= '<option value="">Todas las categorías</option>';
-    foreach ($themes as $themeOption) {
-      $selected = mb_strtolower($currentCategoria, 'UTF-8') === mb_strtolower((string) $themeOption, 'UTF-8') ? ' selected' : '';
-      $html .= '<option value="' . self::h((string) $themeOption) . '"' . $selected . '>' . self::h((string) $themeOption) . '</option>';
+    $html .= '<div class="scm-grid">';
+    $html .= '<div class="scm-field"><label>Vista</label><select name="public_pqr_bucket" class="select select-bordered select-sm scm-select">';
+    foreach ($statusLabels as $bucketKey => $bucketLabel) {
+      $selected = $currentBucket === $bucketKey ? ' selected' : '';
+      $html .= '<option value="' . self::h($bucketKey) . '"' . $selected . '>' . self::h($bucketLabel) . ' (' . self::h((string) ($counts[$bucketKey] ?? 0)) . ')</option>';
     }
     $html .= '</select></div>';
-    $html .= '<div class="scm-public-pqr-filter-field"><label>Estado</label>';
+    $html .= '<div class="scm-field"><label>Estado</label>';
     $html .= '<select name="public_pqr_estado" class="select select-bordered select-sm scm-select">';
     $html .= '<option value="">Todos</option>';
     $estadoOptions = $currentBucket === 'cerrados' ? ['Cerrado', 'Resuelto', 'Finalizado'] : ['Nuevo', 'En proceso'];
@@ -544,7 +646,7 @@ trait RendersPublicPqr
     }
     $html .= '</select></div>';
     if ($showEmployeeFilter) {
-      $html .= '<div class="scm-public-pqr-filter-field scm-public-pqr-filter-field-wide"><label>Funcionario</label>';
+      $html .= '<div class="scm-field"><label>Funcionario</label>';
       $html .= '<select name="public_pqr_empleado" class="select select-bordered select-sm scm-select">';
       $html .= '<option value="">Todos</option>';
       foreach ($filterFuncionarios as $func) {
@@ -557,21 +659,23 @@ trait RendersPublicPqr
       }
       $html .= '</select></div>';
     }
-    $html .= '<div class="scm-public-pqr-filter-field scm-public-pqr-filter-field-search"><label>Búsqueda</label>';
+    $html .= '<div class="scm-field"><label>Búsqueda</label>';
     $html .= '<input type="search" name="public_pqr_busqueda" class="input input-bordered input-sm scm-input" value="' . self::h($currentBusqueda) . '" placeholder="ID, asunto, solicitante o descripción">';
     $html .= '</div>';
-    $html .= '<div class="scm-public-pqr-filter-actions">';
-    $html .= '<button type="submit" class="scm-btn-primary btn btn-primary btn-sm scm-public-pqr-filter-submit">Filtrar</button>';
-    $html .= '<a href="' . self::h($clearUrl) . '" class="btn btn-sm">Limpiar</a>';
+    $html .= '</div><div class="scm-actions">';
+    $html .= '<button type="submit" class="scm-btn-primary btn btn-primary scm-public-pqr-filter-submit">Filtrar</button>';
+    $html .= '<a href="' . self::h($clearUrl) . '" class="scm-btn-secondary btn btn-outline">Limpiar</a>';
+    $html .= '<span class="scm-spinner"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>';
     $html .= '</div>';
     $html .= '</form>';
+    $html .= '</div>';
     if (empty($rows)) {
-      $html .= '<p style="margin:0;color:#4c6077;">' . ($readOnly ? 'No hay solicitudes web disponibles para este acceso.' : 'No hay solicitudes creadas desde portales publicos para gestionar.') . '</p>';
-      $html .= '</div>';
+      $html .= '<div class="scm-empty"><p>' . ($readOnly ? 'No hay solicitudes web disponibles para este acceso.' : 'No hay solicitudes web en esta categoría y vista.') . '</p></div>';
+      $html .= '</div></div>';
       return $html . $settingsModalHtml;
     }
 
-    $html .= '<div class="scm-cards-wrap scm-public-pqr-cards-wrap"><div class="scm-ticket-cards scm-public-pqr-card-grid">';
+    $html .= '<div class="scm-cards-wrap scm-public-pqr-cards-wrap"><div class="scm-ticket-cards">';
 
     foreach ($rows as $row) {
       $ticketPk = (int) ($row['_ID'] ?? 0);
@@ -682,7 +786,7 @@ trait RendersPublicPqr
       $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Estado administrativo</span>' . $this->estado_badge($estadoAdminActual !== '' ? $estadoAdminActual : '-') . '</div>';
       $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Departamento</span><strong class="scm-public-pqr-current-department">' . self::h($deptoActual !== '' ? $deptoActual : '-') . '</strong></div>';
       $html .= '</div>';
-      $html .= '<div class="scm-ticket-card-footer scm-public-pqr-card-footer">';
+      $html .= '<div class="scm-ticket-card-footer">';
       if ($readOnly) {
         if ($ticketDetailUrl !== '') {
           $html .= '<a href="' . self::h($ticketDetailUrl) . '" target="_blank" rel="noopener noreferrer" class="scm-btn-case btn btn-primary btn-sm scm-public-pqr-view-btn">Ver solicitud</a>';
@@ -694,11 +798,15 @@ trait RendersPublicPqr
       } else {
         $html .= '<button class="scm-btn-case btn btn-primary btn-sm scm-public-pqr-view-btn" type="button" onclick="scmOpenCase(this)" data-case-kind="public-pqr" data-ticket="' . self::h($logicalId) . '" data-ticket-pk="' . self::h((string) $ticketPk) . '" data-asunto="' . self::h($asuntoActual !== '' ? $asuntoActual : '-') . '" data-estado="' . self::h($estadoActual !== '' ? $estadoActual : '-') . '" data-admin="' . self::h($estadoAdminActual !== '' ? $estadoAdminActual : '-') . '" data-creado="' . self::h($fechaTxt) . '" data-empleado="' . self::h($empActual !== '' ? $empActual : '-') . '" data-categoria="' . self::h($tipoActual !== '' ? $tipoActual : '-') . '" data-departamento="' . self::h($deptoActual !== '' ? $deptoActual : '-') . '" data-creado-por="' . self::h($creadoPor !== '' ? $creadoPor : '-') . '" data-medio="' . self::h($medioActual) . '" data-solicitante="' . self::h($solicitanteActual !== '' ? $solicitanteActual : '-') . '" data-correo-solicitante="' . self::h($correoSolicitante) . '" data-celular-solicitante="' . self::h($celularSolicitante) . '" data-contrato="' . self::h($contratoActual !== '' ? '#' . $contratoActual : '-') . '" data-inmueble="' . self::h($inmuebleActual !== '' ? $inmuebleActual : '-') . '" data-barrio="' . self::h($barrioActual) . '" data-direccion="' . self::h($direccionActual) . '" data-ticket-url="' . self::h($ticketDetailUrl) . '">Ver caso</button>';
       }
-      if (!$readOnly) {
+      if (!$readOnly && $isSignedPublicAccess) {
         $html .= '<button type="button" class="scm-btn-primary btn btn-primary btn-sm scm-public-pqr-transfer-btn" data-scm-open-pqr-transfer data-ticket-pk="' . self::h((string) $ticketPk) . '" data-ticket-logical="' . self::h($logicalId) . '">Trasladar</button>';
         $html .= '<small class="scm-public-pqr-row-msg" aria-live="polite"></small>';
       }
       $html .= '</div>';
+      if (!$readOnly && !$isSignedPublicAccess) {
+        $html .= '<button type="button" class="scm-public-pqr-transfer-btn" data-scm-open-pqr-transfer data-ticket-pk="' . self::h((string) $ticketPk) . '" data-ticket-logical="' . self::h($logicalId) . '" hidden tabindex="-1">Trasladar</button>';
+        $html .= '<small class="scm-public-pqr-row-msg" aria-live="polite"></small>';
+      }
       if (!$readOnly) {
         $formClass = $isSignedPublicAccess ? 'scm-public-pqr-public-form' : 'scm-public-pqr-form scm-public-pqr-form-inline';
         $html .= '<form class="' . self::h($formClass) . '" method="post" autocomplete="off" data-ticket-pk="' . self::h((string) $ticketPk) . '" style="display:none;">';
@@ -735,33 +843,39 @@ trait RendersPublicPqr
     $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
     $currentPage = min($totalPages, max(1, (int) ($pagination['page'] ?? 1)));
     $totalRows = max(0, (int) ($pagination['total'] ?? count($rows)));
-    if ($totalPages > 1) {
-      $pageBaseUrl = remove_query_arg(['public_pqr_page', 'scm_tab', 'tab']);
-      $html .= '<nav class="scm-public-pqr-pagination" aria-label="Paginación de solicitudes web">';
-      $html .= '<span class="scm-public-pqr-page-summary">Página ' . self::h((string) $currentPage) . ' de ' . self::h((string) $totalPages) . ' · ' . self::h((string) $totalRows) . ' solicitudes</span>';
-      $pageNumbers = array_values(array_unique(array_filter([1, $currentPage - 1, $currentPage, $currentPage + 1, $totalPages], static fn(int $pageNumber): bool => $pageNumber >= 1 && $pageNumber <= $totalPages)));
-      sort($pageNumbers);
-      $html .= '<div class="scm-public-pqr-page-links">';
-      if ($currentPage > 1) {
-        $previousUrl = add_query_arg(['scm_tab' => 'scm-panel-pqr-publico', 'public_pqr_page' => $currentPage - 1], $pageBaseUrl);
-        $html .= '<a href="' . self::h($previousUrl) . '" class="scm-public-pqr-page-btn" data-public-pqr-page="' . self::h((string) ($currentPage - 1)) . '" aria-label="Página anterior">Anterior</a>';
-      }
-      $lastRenderedPage = 0;
-      foreach ($pageNumbers as $pageNumber) {
-        if ($lastRenderedPage > 0 && $pageNumber > $lastRenderedPage + 1) {
-          $html .= '<span class="scm-public-pqr-page-gap" aria-hidden="true">…</span>';
+    if ($totalRows > 0) {
+      $pageBaseUrl = remove_query_arg(['public_pqr_categoria', 'public_pqr_page', 'scm_tab', 'tab']);
+      $pageQuery = [
+        'scm_tab' => 'scm-panel-pqr-publico',
+        'public_pqr_bucket' => $currentBucket,
+        'public_pqr_topic' => $currentTopic,
+      ];
+      if ($currentEstado !== '') $pageQuery['public_pqr_estado'] = $currentEstado;
+      if ($currentEmpleado !== '') $pageQuery['public_pqr_empleado'] = $currentEmpleado;
+      if ($currentBusqueda !== '') $pageQuery['public_pqr_busqueda'] = $currentBusqueda;
+      $renderPageButton = static function (int $pageNumber, string $label, bool $disabled = false, bool $active = false) use ($pageBaseUrl, $pageQuery): string {
+        $classes = 'scm-page-btn btn btn-sm scm-page-btn-public-pqr ' . ($active ? 'btn-primary is-active' : 'btn-outline');
+        if ($disabled) {
+          return '<span class="' . self::h($classes) . '" aria-disabled="true">' . $label . '</span>';
         }
-        $pageUrl = add_query_arg(['scm_tab' => 'scm-panel-pqr-publico', 'public_pqr_page' => $pageNumber], $pageBaseUrl);
-        $html .= '<a href="' . self::h($pageUrl) . '" class="scm-public-pqr-page-btn' . ($pageNumber === $currentPage ? ' is-active' : '') . '" data-public-pqr-page="' . self::h((string) $pageNumber) . '"' . ($pageNumber === $currentPage ? ' aria-current="page"' : '') . '>' . self::h((string) $pageNumber) . '</a>';
-        $lastRenderedPage = $pageNumber;
+        $pageUrl = add_query_arg($pageQuery + ['public_pqr_page' => max(1, $pageNumber)], $pageBaseUrl);
+        return '<a href="' . self::h($pageUrl) . '" class="' . self::h($classes) . '" data-public-pqr-page="' . self::h((string) max(1, $pageNumber)) . '"' . ($active ? ' aria-current="page"' : '') . '>' . $label . '</a>';
+      };
+      $html .= '<div class="scm-pagination"><div class="scm-pagination-card card">';
+      $html .= '<div class="scm-pagination-summary">Pagina ' . self::h((string) $currentPage) . ' de ' . self::h((string) $totalPages) . ' | Total: ' . self::h((string) $totalRows) . '</div>';
+      $html .= '<div class="scm-pagination-controls">';
+      $html .= $renderPageButton(1, '&laquo;', $currentPage <= 1);
+      $html .= $renderPageButton($currentPage - 1, '&lsaquo;', $currentPage <= 1);
+      $startPage = max(1, $currentPage - 2);
+      $endPage = min($totalPages, $currentPage + 2);
+      for ($pageNumber = $startPage; $pageNumber <= $endPage; $pageNumber++) {
+        $html .= $renderPageButton($pageNumber, self::h((string) $pageNumber), false, $pageNumber === $currentPage);
       }
-      if ($currentPage < $totalPages) {
-        $nextUrl = add_query_arg(['scm_tab' => 'scm-panel-pqr-publico', 'public_pqr_page' => $currentPage + 1], $pageBaseUrl);
-        $html .= '<a href="' . self::h($nextUrl) . '" class="scm-public-pqr-page-btn" data-public-pqr-page="' . self::h((string) ($currentPage + 1)) . '" aria-label="Página siguiente">Siguiente</a>';
-      }
-      $html .= '</div></nav>';
+      $html .= $renderPageButton($currentPage + 1, '&rsaquo;', $currentPage >= $totalPages);
+      $html .= $renderPageButton($totalPages, '&raquo;', $currentPage >= $totalPages);
+      $html .= '</div></div></div>';
     }
-    $html .= '</div>';
+    $html .= '</div></div>';
     return $html . $settingsModalHtml;
   }
 
@@ -821,7 +935,9 @@ trait RendersPublicPqr
           <h1>Solicitudes Web</h1>
           <p>Consulta de solo lectura para revisar solicitudes creadas desde los portales publicos.</p>
         </header>
-        <?php echo $contentHtml; ?>
+        <div id="scm-app" class="scm-wrap scm-daisy" data-theme="scm-daisy">
+          <?php echo $contentHtml; ?>
+        </div>
       </main>
     </body>
 
@@ -900,7 +1016,9 @@ trait RendersPublicPqr
         <?php if ($flashMessage !== ''): ?>
           <div class="scm-public-alert scm-public-alert-<?php echo self::h($flashType); ?>"><?php echo self::h($flashMessage); ?></div>
         <?php endif; ?>
-        <?php echo $contentHtml; ?>
+        <div id="scm-app" class="scm-wrap scm-daisy" data-theme="scm-daisy">
+          <?php echo $contentHtml; ?>
+        </div>
       </main>
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/public-pqr-signed.js?v=' . SCM_VERSION); ?>" defer></script>
     </body>

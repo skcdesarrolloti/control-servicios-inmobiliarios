@@ -1391,6 +1391,26 @@
         });
       }
 
+    if (pagination && form) {
+      pagination.addEventListener("click", function (e) {
+        var pageBtn =
+          e.target && e.target.closest
+            ? e.target.closest(".scm-page-btn:not(.scm-page-btn-generic)")
+            : null;
+        if (
+          !pageBtn ||
+          pageBtn.disabled ||
+          pageBtn.getAttribute("aria-disabled") === "true"
+        ) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        setMantPage(pageBtn.getAttribute("data-page") || "1");
+        doFetch(new FormData(form));
+      });
+    }
+
     root.querySelectorAll(".scm-classify-magnitude").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var type = btn.getAttribute("data-revision-type") || "correctiva";

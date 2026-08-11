@@ -1,5 +1,5 @@
 (function() {
-          var panel = document.getElementById('scm-panel-pqr-publico') || document.querySelector('.scm-filter-card.card');
+          var panel = document.getElementById('scm-panel-pqr-publico') || document.querySelector('[data-public-pqr-listing]');
           if (!panel) return;
 
           function ensureTransferModal() {
@@ -34,7 +34,7 @@
 
           function openTransferModal(triggerBtn) {
             if (!triggerBtn) return;
-            var row = triggerBtn.closest('tr[data-pqr-row]');
+            var row = triggerBtn.closest('[data-pqr-row]');
             if (!row) return;
             var sourceForm = row.querySelector('form.scm-public-pqr-form-inline, form.scm-public-pqr-public-form');
             if (!sourceForm) return;
