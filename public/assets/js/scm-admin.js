@@ -178,14 +178,16 @@
     return root.querySelector("#scm-case-modal");
   }
 
-  function openIframeModal(url, title) {
+  function openIframeModal(url, title, compact) {
     if (!url) {
       return;
     }
     var overlay = document.createElement("div");
-    overlay.className = "scm-iframe-overlay";
+    var compactMode = compact === true || compact === "1";
+    var previouslyFocused = document.activeElement;
+    overlay.className = "scm-iframe-overlay" + (compactMode ? " scm-iframe-overlay-compact" : "");
     overlay.innerHTML =
-      '<div class="scm-iframe-box">' +
+      '<div class="scm-iframe-box" role="dialog" aria-modal="true" aria-label="' + escHtml(title || "Detalle") + '">' +
       '<div class="scm-iframe-toolbar">' +
       '<span class="scm-iframe-toolbar-title">' +
       escHtml(title) +
@@ -199,6 +201,22 @@
     var iframeEl = overlay.querySelector(".scm-iframe-frame");
     var loaderEl = overlay.querySelector(".scm-iframe-loader");
     iframeEl.addEventListener("load", function () {
+      if (compactMode) {
+        try {
+          var frameDocument = iframeEl.contentDocument;
+          if (frameDocument && frameDocument.head) {
+            var compactStyle = frameDocument.createElement("style");
+            compactStyle.setAttribute("data-scm-compact-ticket", "1");
+            compactStyle.textContent =
+              "#wpadminbar,header,footer,.site-header,.site-footer,.elementor-location-header,.elementor-location-footer,.jet-mobile-menu-cover,.jet-mobile-menu__container{display:none!important}" +
+              "html{margin-top:0!important}body{padding-top:0!important;background:#f6f8fb!important}" +
+              "main,.site-main,#content,.site-content{margin-top:0!important;padding-top:12px!important}";
+            frameDocument.head.appendChild(compactStyle);
+          }
+        } catch (error) {
+          // Cross-origin tickets still work; they simply keep their original chrome.
+        }
+      }
       if (loaderEl) {
         loaderEl.style.display = "none";
       }
@@ -209,6 +227,9 @@
       document.removeEventListener("keydown", onKeyDown);
       if (overlay.parentNode) {
         overlay.parentNode.removeChild(overlay);
+      }
+      if (previouslyFocused && typeof previouslyFocused.focus === "function") {
+        previouslyFocused.focus();
       }
     }
     function onOverlayClick(e) {
@@ -222,10 +243,10 @@
       }
     }
     overlay.addEventListener("click", onOverlayClick);
-    overlay
-      .querySelector(".scm-iframe-close")
-      .addEventListener("click", destroyOverlay);
+    var closeButton = overlay.querySelector(".scm-iframe-close");
+    closeButton.addEventListener("click", destroyOverlay);
     document.addEventListener("keydown", onKeyDown);
+    closeButton.focus();
   }
 
   function closeCaseModal(modal) {
@@ -2329,6 +2350,7 @@
             openIframeModal(
               iframeBtn.dataset.iframeUrl || "",
               iframeBtn.dataset.iframeTitle || "",
+              iframeBtn.hasAttribute("data-scm-compact-iframe"),
             );
           });
         });

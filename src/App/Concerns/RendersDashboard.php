@@ -111,15 +111,15 @@ trait RendersDashboard
     if ($initialTab === '' && $initialOpenTopic !== '') {
       $initialTab = 'scm-panel-abiertos';
     }
-    if ($initialTab === '' && ($publicPqrEmployeeFilter !== '' || $publicPqrFilters['estado'] !== '' || $publicPqrFilters['empleado'] !== '')) {
+    if ($initialTab === '' && ($publicPqrEmployeeFilter !== '' || $publicPqrFilters['estado'] !== '' || $publicPqrFilters['empleado'] !== '' || isset($_GET['public_pqr_bucket']) || isset($_GET['public_pqr_page']))) {
       $initialTab = 'scm-panel-pqr-publico';
     }
     $iframeModeRaw = mb_strtolower(trim((string) ($_GET['scm_iframe'] ?? ($_GET['iframe'] ?? ''))), 'UTF-8');
     $iframeMode = in_array($iframeModeRaw, ['1', 'true', 'yes', 'si'], true);
 
-    $publicPqrRows = $this->fetch_public_pqr_rows(180, $publicPqrEmployeeFilter, $publicPqrFilters);
+    $publicPqrResult = $this->fetch_public_pqr_result(10, $publicPqrEmployeeFilter, $publicPqrFilters);
     $publicPqrHtml = $this->render_public_pqr_tab(
-      $publicPqrRows,
+      $publicPqrResult,
       (array) ($filterOptions['funcionarios'] ?? []),
       (string) ($config['ticket_url'] ?? self::DEFAULT_TICKET_URL),
       $publicPqrEmployeeFilter,
@@ -297,11 +297,11 @@ trait RendersDashboard
         <button class="scm-tab active" data-tab="scm-panel-abiertos" type="button">Abiertos</button>
         <button class="scm-tab" data-tab="scm-panel-postergados" type="button">Postergados</button>
         <button class="scm-tab" data-tab="scm-panel-cerrados" type="button">Cerrados</button>
+        <button class="scm-tab" data-tab="scm-panel-pqr-publico" type="button">Solicitudes Web</button>
         <button class="scm-tab" data-tab="scm-panel-preventivas-pendientes" type="button">Preventivas Pendientes</button>
         <button class="scm-tab" data-tab="scm-panel-contratos-arrendamiento" type="button">Contratos de arrendamiento</button>
         <button class="scm-tab" data-tab="scm-panel-servicios-publicos-pendientes" type="button">Servicios P&uacute;blicos Pendientes</button>
         <button class="scm-tab" data-tab="scm-panel-reportes-administrativos-pendientes" type="button">Reportes Administrativos</button>
-        <button class="scm-tab" data-tab="scm-panel-pqr-publico" type="button">Solicitudes Web</button>
         <button class="scm-tab" data-tab="scm-panel-metricas" type="button">Metricas</button>
       </div>
 
@@ -572,16 +572,16 @@ trait RendersDashboard
         <?php echo $reportesAdministrativosPendientesHtml; ?>
       </div>
 
-      <div class="scm-tab-panel" id="scm-panel-pqr-publico">
-        <?php echo $publicPqrHtml; ?>
-      </div>
-
       <div class="scm-tab-panel" id="scm-panel-postergados">
         <?php echo $this->render_status_bucket_panel('postergados', $statusBucketDefs['postergados'], $statusTopicDefs, $statusResults['postergados'] ?? []); ?>
       </div>
 
       <div class="scm-tab-panel" id="scm-panel-cerrados">
         <?php echo $this->render_status_bucket_panel('cerrados', $statusBucketDefs['cerrados'], $statusTopicDefs, $statusResults['cerrados'] ?? []); ?>
+      </div>
+
+      <div class="scm-tab-panel" id="scm-panel-pqr-publico">
+        <?php echo $publicPqrHtml; ?>
       </div>
 
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-dashboard-inline.js?v=' . SCM_VERSION); ?>" defer></script>

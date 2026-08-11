@@ -1490,6 +1490,7 @@
         openIframeModal(
           iframeBtn.dataset.iframeUrl || "",
           iframeBtn.dataset.iframeTitle || "",
+          iframeBtn.hasAttribute("data-scm-compact-iframe"),
         );
         return;
       }

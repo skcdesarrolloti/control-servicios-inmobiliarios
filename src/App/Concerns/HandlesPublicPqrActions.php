@@ -350,7 +350,7 @@ trait HandlesPublicPqrActions
       $employeeIdFilter = '';
     }
     $filters = $this->get_public_pqr_filters_from_input($_POST);
-    $rows = $this->fetch_public_pqr_rows(180, $employeeIdFilter, $filters);
+    $result = $this->fetch_public_pqr_result(10, $employeeIdFilter, $filters);
     $funcionarios = [];
     try {
       $funcionarios = (array) ($this->get_servicios_inmobiliarios_module()->getFilterOptions()['funcionarios'] ?? []);
@@ -359,7 +359,7 @@ trait HandlesPublicPqrActions
     }
 
     $html = $this->render_public_pqr_tab(
-      $rows,
+      $result,
       $funcionarios,
       self::DEFAULT_TICKET_URL,
       $employeeIdFilter,
@@ -370,7 +370,7 @@ trait HandlesPublicPqrActions
 
     $this->jsonOk([
       'tab_html' => $html,
-      'count' => (string) count($rows),
+      'count' => (string) ((int) ($result['pagination']['total'] ?? 0)),
     ]);
   }
 

@@ -128,7 +128,7 @@
               var iframeBtn = e.target.closest('[data-scm-open-iframe]');
               if (iframeBtn) {
                 if (typeof window.openIframeModal === 'function') {
-                  window.openIframeModal(iframeBtn.dataset.iframeUrl || '', iframeBtn.dataset.iframeTitle || '');
+                  window.openIframeModal(iframeBtn.dataset.iframeUrl || '', iframeBtn.dataset.iframeTitle || '', iframeBtn.hasAttribute('data-scm-compact-iframe'));
                 }
                 return;
               }
@@ -316,6 +316,37 @@
             setupSettingsObserver();
 
             pqrPanel.addEventListener('click', function(e) {
+              var statusTab = e.target && e.target.closest ? e.target.closest('[data-public-pqr-bucket]') : null;
+              var pageLink = e.target && e.target.closest ? e.target.closest('[data-public-pqr-page]') : null;
+              if (statusTab || pageLink) {
+                var navigationForm = pqrPanel.querySelector('form.scm-public-pqr-filter-form');
+                if (navigationForm) {
+                  e.preventDefault();
+                  var bucketInput = navigationForm.querySelector('input[name="public_pqr_bucket"]');
+                  var pageInput = navigationForm.querySelector('input[name="public_pqr_page"]');
+                  if (statusTab && bucketInput) {
+                    bucketInput.value = statusTab.getAttribute('data-public-pqr-bucket') || 'abiertos';
+                  }
+                  if (pageInput) {
+                    pageInput.value = pageLink ? (pageLink.getAttribute('data-public-pqr-page') || '1') : '1';
+                  }
+                  var stateSelect = navigationForm.querySelector('select[name="public_pqr_estado"]');
+                  if (statusTab && stateSelect) {
+                    stateSelect.value = '';
+                  }
+                  navigationForm.dispatchEvent(new Event('submit', {
+                    bubbles: true,
+                    cancelable: true
+                  }));
+                  return;
+                }
+              }
+              var filterSubmitBtn = e.target && e.target.closest ? e.target.closest('.scm-public-pqr-filter-submit') : null;
+              if (filterSubmitBtn) {
+                var filterFormForPage = filterSubmitBtn.closest('form.scm-public-pqr-filter-form');
+                var pageInputForFilter = filterFormForPage ? filterFormForPage.querySelector('input[name="public_pqr_page"]') : null;
+                if (pageInputForFilter) pageInputForFilter.value = '1';
+              }
               var clearFilterBtn = e.target && e.target.closest ? e.target.closest('.scm-public-pqr-filter-actions a.btn') : null;
               if (clearFilterBtn) {
                 var filterFormForClear = pqrPanel.querySelector('form.scm-public-pqr-filter-form');
@@ -327,6 +358,10 @@
                       window.jQuery(selectEl).val('').trigger('change.select2');
                     }
                   });
+                  var clearBucket = filterFormForClear.querySelector('input[name="public_pqr_bucket"]');
+                  var clearPage = filterFormForClear.querySelector('input[name="public_pqr_page"]');
+                  if (clearBucket) clearBucket.value = 'abiertos';
+                  if (clearPage) clearPage.value = '1';
                   filterFormForClear.dispatchEvent(new Event('submit', {
                     bubbles: true,
                     cancelable: true

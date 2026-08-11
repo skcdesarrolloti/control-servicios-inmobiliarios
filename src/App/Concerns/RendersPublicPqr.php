@@ -122,39 +122,59 @@ trait RendersPublicPqr
     return $out;
   }
 
-  /** @param array<string,mixed> $input @return array{estado:string,empleado:string} */
+  /** @param array<string,mixed> $input @return array{estado:string,empleado:string,bucket:string,page:int} */
   private function get_public_pqr_filters_from_input(array $input): array
   {
     $estado = trim((string) ($input['public_pqr_estado'] ?? ''));
     $empleado = trim((string) ($input['public_pqr_empleado'] ?? ''));
+    $bucket = mb_strtolower(trim((string) ($input['public_pqr_bucket'] ?? 'abiertos')), 'UTF-8');
+    $page = (int) ($input['public_pqr_page'] ?? 1);
 
     $estado = sanitize_text_field($estado);
     $empleado = preg_replace('/[^A-Za-z0-9_-]/', '', sanitize_text_field($empleado));
     if (!is_string($empleado)) {
       $empleado = '';
     }
+    if (!in_array($bucket, ['abiertos', 'postergados', 'cerrados'], true)) {
+      $bucket = 'abiertos';
+    }
 
     return [
       'estado' => $estado,
       'empleado' => $empleado,
+      'bucket' => $bucket,
+      'page' => max(1, $page),
     ];
   }
 
-  /** @return array{estado:string,empleado:string} */
+  /** @return array{estado:string,empleado:string,bucket:string,page:int} */
   private function get_public_pqr_filters_from_request(): array
   {
     return $this->get_public_pqr_filters_from_input($_GET);
   }
 
-  /** @return array<int,array<string,mixed>> */
-  private function fetch_public_pqr_rows(int $limit = 160, string $employeeIdFilter = '', array $filters = []): array
+  /**
+   * @return array{
+   *   rows:array<int,array<string,mixed>>,
+   *   counts:array{abiertos:int,postergados:int,cerrados:int},
+   *   pagination:array{page:int,per_page:int,total:int,total_pages:int},
+   *   employees:array<int,array{id:string,label:string}>
+   * }
+   */
+  private function fetch_public_pqr_result(int $perPage = 10, string $employeeIdFilter = '', array $filters = []): array
   {
+    $emptyResult = [
+      'rows' => [],
+      'counts' => ['abiertos' => 0, 'postergados' => 0, 'cerrados' => 0],
+      'pagination' => ['page' => 1, 'per_page' => 10, 'total' => 0, 'total_pages' => 1],
+      'employees' => [],
+    ];
     $ticketsTable = $this->db->table('jet_cct_tickets');
     if (!$this->table_exists($ticketsTable)) {
-      return [];
+      return $emptyResult;
     }
 
-    $limit = max(20, min(500, $limit));
+    $perPage = max(5, min(50, $perPage));
     $creatorLabels = ['propietario', 'arrendatario', 'copropiedad', 'cliente'];
     $medioLabels = ['portal propietario', 'portal arrendatario', 'portal copropiedad', 'whatsapp cliente'];
 
@@ -194,24 +214,74 @@ trait RendersPublicPqr
     if ($this->column_exists($ticketsTable, 'creador_por')) {
       $whereSql .= " AND LOWER(TRIM(COALESCE(`creador_por`, ''))) <> 'funcionario'";
     }
-    if ($this->column_exists($ticketsTable, 'estado')) {
-      $whereSql .= " AND LOWER(TRIM(COALESCE(`estado`, ''))) <> 'cerrado'";
-    }
     $employeeIdFilter = trim($employeeIdFilter);
     if ($employeeIdFilter !== '') {
       $whereSql .= " AND TRIM(COALESCE(`id_empleado`, '')) = ?";
       $args[] = $employeeIdFilter;
     }
-    $estadoFilter = strtolower(trim((string) ($filters['estado'] ?? '')));
-    if ($estadoFilter !== '' && $this->column_exists($ticketsTable, 'estado')) {
-      $whereSql .= " AND LOWER(TRIM(COALESCE(`estado`, ''))) = ?";
-      $args[] = $estadoFilter;
+
+    $employeeOptionsRows = $this->db->getResults(
+      "SELECT DISTINCT TRIM(COALESCE(`id_empleado`, '')) AS id, TRIM(COALESCE(`empleado`, '')) AS empleado
+       FROM `{$ticketsTable}` WHERE {$whereSql} AND TRIM(COALESCE(`id_empleado`, '')) <> '' ORDER BY empleado ASC",
+      $args
+    );
+    $employees = [];
+    foreach ($employeeOptionsRows as $employeeRow) {
+      $id = trim((string) ($employeeRow['id'] ?? ''));
+      if ($id === '') {
+        continue;
+      }
+      $name = trim((string) ($employeeRow['empleado'] ?? ''));
+      $employees[] = ['id' => $id, 'label' => ($name !== '' ? $name : 'ID ' . $id) . ' (' . $id . ')'];
     }
+
     $empleadoFilter = trim((string) ($filters['empleado'] ?? ''));
     if ($empleadoFilter !== '' && $employeeIdFilter === '') {
       $whereSql .= " AND TRIM(COALESCE(`id_empleado`, '')) = ?";
       $args[] = $empleadoFilter;
     }
+
+    $closedExprParts = ["LOWER(TRIM(COALESCE(`estado`, ''))) IN ('cerrado', 'resuelto', 'finalizado')"];
+    if ($this->column_exists($ticketsTable, 'estado_administrativo')) {
+      $closedExprParts[] = "LOWER(TRIM(COALESCE(`estado_administrativo`, ''))) IN ('cerrado', 'resuelto', 'finalizado')";
+    }
+    $closedExpr = '(' . implode(' OR ', $closedExprParts) . ')';
+    $postponedExpr = $this->column_exists($ticketsTable, 'estado_administrativo')
+      ? "(LOWER(TRIM(COALESCE(`estado_administrativo`, ''))) = 'postergado' AND NOT {$closedExpr})"
+      : '0 = 1';
+    $openExpr = "(NOT {$closedExpr} AND NOT {$postponedExpr})";
+
+    $countRow = $this->db->getRow(
+      "SELECT
+         COALESCE(SUM(CASE WHEN {$openExpr} THEN 1 ELSE 0 END), 0) AS abiertos,
+         COALESCE(SUM(CASE WHEN {$postponedExpr} THEN 1 ELSE 0 END), 0) AS postergados,
+         COALESCE(SUM(CASE WHEN {$closedExpr} THEN 1 ELSE 0 END), 0) AS cerrados
+       FROM `{$ticketsTable}` WHERE {$whereSql}",
+      $args
+    ) ?? [];
+    $counts = [
+      'abiertos' => (int) ($countRow['abiertos'] ?? 0),
+      'postergados' => (int) ($countRow['postergados'] ?? 0),
+      'cerrados' => (int) ($countRow['cerrados'] ?? 0),
+    ];
+
+    $bucket = (string) ($filters['bucket'] ?? 'abiertos');
+    $bucketExpr = $bucket === 'cerrados' ? $closedExpr : ($bucket === 'postergados' ? $postponedExpr : $openExpr);
+    $whereSql .= " AND {$bucketExpr}";
+
+    $estadoFilter = strtolower(trim((string) ($filters['estado'] ?? '')));
+    if ($estadoFilter !== '' && $this->column_exists($ticketsTable, 'estado')) {
+      $whereSql .= " AND LOWER(TRIM(COALESCE(`estado`, ''))) = ?";
+      $args[] = $estadoFilter;
+    }
+
+    $total = (int) $this->db->getVar("SELECT COUNT(*) FROM `{$ticketsTable}` WHERE {$whereSql}", $args);
+    $totalPages = max(1, (int) ceil($total / $perPage));
+    $page = min(max(1, (int) ($filters['page'] ?? 1)), $totalPages);
+    $offset = ($page - 1) * $perPage;
+    $selectEstadoAdministrativo = $this->column_exists($ticketsTable, 'estado_administrativo')
+      ? "TRIM(COALESCE(`estado_administrativo`, '')) AS estado_administrativo"
+      : "'' AS estado_administrativo";
     $sql = "SELECT
               `_ID`,
               TRIM(COALESCE(`id_ticket`, '')) AS id_ticket,
@@ -224,6 +294,7 @@ trait RendersPublicPqr
               TRIM(COALESCE(`id_empleado`, '')) AS id_empleado,
               TRIM(COALESCE(`empleado`, '')) AS empleado,
               TRIM(COALESCE(`estado`, '')) AS estado,
+              {$selectEstadoAdministrativo},
               TRIM(COALESCE(`medio`, '')) AS medio,
               COALESCE(`fecha_actualizacion`, `fecha`, 0) AS fecha_ref,
               {$selectCreadoPor},
@@ -231,14 +302,28 @@ trait RendersPublicPqr
             FROM `{$ticketsTable}`
             WHERE {$whereSql}
             ORDER BY `_ID` DESC
-            LIMIT {$limit}";
+            LIMIT {$perPage} OFFSET {$offset}";
 
-    return $this->db->getResults($sql, $args);
+    return [
+      'rows' => $this->db->getResults($sql, $args),
+      'counts' => $counts,
+      'pagination' => [
+        'page' => $page,
+        'per_page' => $perPage,
+        'total' => $total,
+        'total_pages' => $totalPages,
+      ],
+      'employees' => $employees,
+    ];
   }
 
-  /** @param array<int,array<string,mixed>> $rows @param array<int,mixed> $funcionarios */
-  private function render_public_pqr_tab(array $rows, array $funcionarios, string $ticketUrl = '', string $employeeIdFilter = '', bool $readOnly = false, array $publicAccess = [], array $filters = []): string
+  /** @param array<string,mixed> $result @param array<int,mixed> $funcionarios */
+  private function render_public_pqr_tab(array $result, array $funcionarios, string $ticketUrl = '', string $employeeIdFilter = '', bool $readOnly = false, array $publicAccess = [], array $filters = []): string
   {
+    $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
+    $counts = is_array($result['counts'] ?? null) ? $result['counts'] : ['abiertos' => 0, 'postergados' => 0, 'cerrados' => 0];
+    $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : ['page' => 1, 'per_page' => 10, 'total' => count($rows), 'total_pages' => 1];
+    $filterFuncionarios = is_array($result['employees'] ?? null) ? $result['employees'] : [];
     $themes = $readOnly ? [] : $this->get_public_pqr_themes();
     $corresponsables = $readOnly ? [] : $this->get_public_pqr_corresponsables();
     $corresponsableCandidates = $readOnly ? [] : $this->get_public_pqr_corresponsable_candidates();
@@ -372,39 +457,27 @@ trait RendersPublicPqr
     }
     $html .= '</div>';
     $html .= '<p style="margin:0 0 10px;color:#4c6077;">' . ($readOnly ? 'Consulta publica de solicitudes creadas desde los portales publicos.' : ($isGlobalSignedAccess ? 'Este acceso corporativo puede revisar y trasladar todas las solicitudes web.' : ($isSignedPublicAccess ? 'Este acceso corporativo puede revisar y trasladar las solicitudes asignadas a tu ID.' : 'Gestiona las solicitudes creadas por Propietario, Arrendatario, Copropiedad y Cliente.'))) . '</p>';
-    $kpiTotal = count($rows);
-    $kpiNuevo = 0;
-    $kpiEnProceso = 0;
-    $filterFuncionarios = [];
-    foreach ($rows as $kpiRow) {
-      $estadoKpi = mb_strtolower(trim((string) ($kpiRow['estado'] ?? '')), 'UTF-8');
-      if ($estadoKpi === 'nuevo') {
-        $kpiNuevo++;
-      } elseif ($estadoKpi === 'en proceso') {
-        $kpiEnProceso++;
-      }
-      $filterEmpleadoId = trim((string) ($kpiRow['id_empleado'] ?? ''));
-      if ($filterEmpleadoId !== '') {
-        $filterEmpleadoLabel = trim((string) ($kpiRow['empleado'] ?? ''));
-        if ($filterEmpleadoLabel === '') {
-          $filterEmpleadoLabel = 'ID ' . $filterEmpleadoId;
-        }
-        $filterFuncionarios[$filterEmpleadoId] = [
-          'id' => $filterEmpleadoId,
-          'label' => $filterEmpleadoLabel . ' (' . $filterEmpleadoId . ')',
-        ];
-      }
+    $currentBucket = (string) ($filters['bucket'] ?? 'abiertos');
+    $statusLabels = [
+      'abiertos' => 'Abiertos',
+      'postergados' => 'Postergados',
+      'cerrados' => 'Cerrados',
+    ];
+    $statusBaseUrl = remove_query_arg(['public_pqr_bucket', 'public_pqr_page', 'public_pqr_estado', 'scm_tab', 'tab']);
+    $html .= '<nav class="scm-public-pqr-status-tabs" aria-label="Estado de las solicitudes web">';
+    foreach ($statusLabels as $bucketKey => $bucketLabel) {
+      $statusUrl = add_query_arg([
+        'scm_tab' => 'scm-panel-pqr-publico',
+        'public_pqr_bucket' => $bucketKey,
+        'public_pqr_page' => 1,
+      ], $statusBaseUrl);
+      $active = $currentBucket === $bucketKey;
+      $html .= '<a href="' . self::h($statusUrl) . '" class="scm-public-pqr-status-tab' . ($active ? ' is-active' : '') . '" data-public-pqr-bucket="' . self::h($bucketKey) . '"' . ($active ? ' aria-current="page"' : '') . '>';
+      $html .= '<span class="scm-public-pqr-status-label">' . self::h($bucketLabel) . '</span>';
+      $html .= '<strong class="scm-public-pqr-status-count">' . self::h((string) ($counts[$bucketKey] ?? 0)) . '</strong>';
+      $html .= '</a>';
     }
-    if (!empty($filterFuncionarios)) {
-      uasort($filterFuncionarios, static function (array $a, array $b): int {
-        return strcasecmp((string) ($a['label'] ?? ''), (string) ($b['label'] ?? ''));
-      });
-    }
-    $html .= '<div class="scm-kpis scm-kpis-daisy scm-public-pqr-kpis">';
-    $html .= '<div class="scm-kpi"><div class="scm-kpi-label">Total</div><div class="scm-kpi-value">' . self::h((string) $kpiTotal) . '</div></div>';
-    $html .= '<div class="scm-kpi"><div class="scm-kpi-label">Nuevo</div><div class="scm-kpi-value">' . self::h((string) $kpiNuevo) . '</div></div>';
-    $html .= '<div class="scm-kpi"><div class="scm-kpi-label">En proceso</div><div class="scm-kpi-value">' . self::h((string) $kpiEnProceso) . '</div></div>';
-    $html .= '</div>';
+    $html .= '</nav>';
     $currentEstado = trim((string) ($filters['estado'] ?? ''));
     $currentEmpleado = trim((string) ($filters['empleado'] ?? ''));
     $showEmployeeFilter = !$readOnly || $isGlobalSignedAccess;
@@ -422,7 +495,7 @@ trait RendersPublicPqr
     } elseif ($employeeIdFilter !== '') {
       $clearQuery['id_empleado'] = $employeeIdFilter;
     }
-    $clearUrl = remove_query_arg(['public_pqr_estado', 'public_pqr_empleado', 'scm_tab', 'tab', 'k', 'scope', 'exp', 'sig', 'id_empleado']);
+    $clearUrl = remove_query_arg(['public_pqr_estado', 'public_pqr_empleado', 'public_pqr_bucket', 'public_pqr_page', 'scm_tab', 'tab', 'k', 'scope', 'exp', 'sig', 'id_empleado']);
     $clearUrl = add_query_arg($clearQuery, $clearUrl);
     $html .= '<form method="get" autocomplete="off" class="scm-public-pqr-filters scm-public-pqr-filter-form">';
     if ($isSignedPublicAccess && $publicToken !== '') {
@@ -436,10 +509,13 @@ trait RendersPublicPqr
       $html .= '<input type="hidden" name="id_empleado" value="' . self::h($employeeIdFilter) . '">';
     }
     $html .= '<input type="hidden" name="scm_tab" value="scm-panel-pqr-publico">';
+    $html .= '<input type="hidden" name="public_pqr_bucket" value="' . self::h($currentBucket) . '">';
+    $html .= '<input type="hidden" name="public_pqr_page" value="' . self::h((string) ($pagination['page'] ?? 1)) . '">';
     $html .= '<div class="scm-public-pqr-filter-field"><label>Estado</label>';
     $html .= '<select name="public_pqr_estado" class="select select-bordered select-sm scm-select">';
     $html .= '<option value="">Todos</option>';
-    foreach (['Nuevo', 'En proceso'] as $estadoOption) {
+    $estadoOptions = $currentBucket === 'cerrados' ? ['Cerrado', 'Resuelto', 'Finalizado'] : ['Nuevo', 'En proceso'];
+    foreach ($estadoOptions as $estadoOption) {
       $selected = strtolower($currentEstado) === strtolower($estadoOption) ? ' selected' : '';
       $html .= '<option value="' . self::h($estadoOption) . '"' . $selected . '>' . self::h($estadoOption) . '</option>';
     }
@@ -459,7 +535,7 @@ trait RendersPublicPqr
       $html .= '</select></div>';
     }
     $html .= '<div class="scm-public-pqr-filter-actions">';
-    $html .= '<button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Filtrar</button>';
+    $html .= '<button type="submit" class="scm-btn-primary btn btn-primary btn-sm scm-public-pqr-filter-submit">Filtrar</button>';
     $html .= '<a href="' . self::h($clearUrl) . '" class="btn btn-sm">Limpiar</a>';
     $html .= '</div>';
     $html .= '</form>';
@@ -556,7 +632,7 @@ trait RendersPublicPqr
         if ($readOnly) {
           $html .= '<a href="' . self::h($ticketUrl . rawurlencode($logicalId)) . '" target="_blank" rel="noopener noreferrer" class="btn btn-sm scm-public-pqr-view-btn">Ver solicitud</a>';
         } else {
-          $html .= '<button type="button" data-scm-open-iframe data-no-emp-check data-iframe-url="' . self::h($ticketUrl . rawurlencode($logicalId)) . '" data-iframe-title="Solicitud #' . self::h($logicalId) . '" class="btn btn-sm scm-public-pqr-view-btn">Ver solicitud</button>';
+          $html .= '<button type="button" data-scm-open-iframe data-scm-compact-iframe data-no-emp-check data-iframe-url="' . self::h($ticketUrl . rawurlencode($logicalId)) . '" data-iframe-title="Solicitud #' . self::h($logicalId) . '" class="btn btn-sm scm-public-pqr-view-btn">Ver solicitud</button>';
         }
       }
       if (!$readOnly) {
@@ -595,7 +671,37 @@ trait RendersPublicPqr
       $html .= '</td></tr>';
     }
 
-    $html .= '</tbody></table></div></div>';
+    $html .= '</tbody></table></div>';
+    $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
+    $currentPage = min($totalPages, max(1, (int) ($pagination['page'] ?? 1)));
+    $totalRows = max(0, (int) ($pagination['total'] ?? count($rows)));
+    if ($totalPages > 1) {
+      $pageBaseUrl = remove_query_arg(['public_pqr_page', 'scm_tab', 'tab']);
+      $html .= '<nav class="scm-public-pqr-pagination" aria-label="Paginación de solicitudes web">';
+      $html .= '<span class="scm-public-pqr-page-summary">Página ' . self::h((string) $currentPage) . ' de ' . self::h((string) $totalPages) . ' · ' . self::h((string) $totalRows) . ' solicitudes</span>';
+      $pageNumbers = array_values(array_unique(array_filter([1, $currentPage - 1, $currentPage, $currentPage + 1, $totalPages], static fn(int $pageNumber): bool => $pageNumber >= 1 && $pageNumber <= $totalPages)));
+      sort($pageNumbers);
+      $html .= '<div class="scm-public-pqr-page-links">';
+      if ($currentPage > 1) {
+        $previousUrl = add_query_arg(['scm_tab' => 'scm-panel-pqr-publico', 'public_pqr_page' => $currentPage - 1], $pageBaseUrl);
+        $html .= '<a href="' . self::h($previousUrl) . '" class="scm-public-pqr-page-btn" data-public-pqr-page="' . self::h((string) ($currentPage - 1)) . '" aria-label="Página anterior">Anterior</a>';
+      }
+      $lastRenderedPage = 0;
+      foreach ($pageNumbers as $pageNumber) {
+        if ($lastRenderedPage > 0 && $pageNumber > $lastRenderedPage + 1) {
+          $html .= '<span class="scm-public-pqr-page-gap" aria-hidden="true">…</span>';
+        }
+        $pageUrl = add_query_arg(['scm_tab' => 'scm-panel-pqr-publico', 'public_pqr_page' => $pageNumber], $pageBaseUrl);
+        $html .= '<a href="' . self::h($pageUrl) . '" class="scm-public-pqr-page-btn' . ($pageNumber === $currentPage ? ' is-active' : '') . '" data-public-pqr-page="' . self::h((string) $pageNumber) . '"' . ($pageNumber === $currentPage ? ' aria-current="page"' : '') . '>' . self::h((string) $pageNumber) . '</a>';
+        $lastRenderedPage = $pageNumber;
+      }
+      if ($currentPage < $totalPages) {
+        $nextUrl = add_query_arg(['scm_tab' => 'scm-panel-pqr-publico', 'public_pqr_page' => $currentPage + 1], $pageBaseUrl);
+        $html .= '<a href="' . self::h($nextUrl) . '" class="scm-public-pqr-page-btn" data-public-pqr-page="' . self::h((string) ($currentPage + 1)) . '" aria-label="Página siguiente">Siguiente</a>';
+      }
+      $html .= '</div></nav>';
+    }
+    $html .= '</div>';
     return $html . $settingsModalHtml;
   }
 
@@ -611,9 +717,9 @@ trait RendersPublicPqr
     }
 
     $filters = $this->get_public_pqr_filters_from_request();
-    $rows = $this->fetch_public_pqr_rows(180, $employeeIdFilter, $filters);
+    $result = $this->fetch_public_pqr_result(10, $employeeIdFilter, $filters);
     $contentHtml = $this->render_public_pqr_tab(
-      $rows,
+      $result,
       [],
       (string) ($config['ticket_url'] ?? self::DEFAULT_TICKET_URL),
       $employeeIdFilter,
@@ -680,9 +786,9 @@ trait RendersPublicPqr
     }
 
     $filters = $this->get_public_pqr_filters_from_request();
-    $rows = $this->fetch_public_pqr_rows(180, $accessScope === 'all' ? '' : $employeeIdFilter, $filters);
+    $result = $this->fetch_public_pqr_result(10, $accessScope === 'all' ? '' : $employeeIdFilter, $filters);
     $contentHtml = $this->render_public_pqr_tab(
-      $rows,
+      $result,
       $this->get_public_pqr_corresponsable_candidates(),
       (string) ($config['ticket_url'] ?? self::DEFAULT_TICKET_URL),
       $accessScope === 'all' ? '' : $employeeIdFilter,
