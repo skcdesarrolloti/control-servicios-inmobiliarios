@@ -12,6 +12,11 @@ use SCM\Support\SmsQueue;
 
 trait PublicTicketNotificationsConcern
 {
+  private function normalizePublicPqrAccessScope(string $scope): string
+  {
+    return mb_strtolower(trim($scope), 'UTF-8') === 'all' ? 'all' : 'assigned';
+  }
+
   private function notifyResponsible(
     int $ticketPk,
     string $logicalTicket,
