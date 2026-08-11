@@ -111,7 +111,7 @@ trait RendersDashboard
     if ($initialTab === '' && $initialOpenTopic !== '') {
       $initialTab = 'scm-panel-abiertos';
     }
-    if ($initialTab === '' && ($publicPqrEmployeeFilter !== '' || $publicPqrFilters['estado'] !== '' || $publicPqrFilters['empleado'] !== '' || isset($_GET['public_pqr_bucket']) || isset($_GET['public_pqr_page']))) {
+    if ($initialTab === '' && ($publicPqrEmployeeFilter !== '' || $publicPqrFilters['estado'] !== '' || $publicPqrFilters['empleado'] !== '' || $publicPqrFilters['categoria'] !== '' || $publicPqrFilters['busqueda'] !== '' || isset($_GET['public_pqr_bucket']) || isset($_GET['public_pqr_page']))) {
       $initialTab = 'scm-panel-pqr-publico';
     }
     $iframeModeRaw = mb_strtolower(trim((string) ($_GET['scm_iframe'] ?? ($_GET['iframe'] ?? ''))), 'UTF-8');

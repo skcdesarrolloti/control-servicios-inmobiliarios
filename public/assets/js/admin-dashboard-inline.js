@@ -233,7 +233,7 @@
             function findPqrRowByTicketPk(ticketPk) {
               ticketPk = (ticketPk || '').trim();
               if (ticketPk === '') return null;
-              return pqrPanel.querySelector('tr[data-pqr-row="' + ticketPk.replace(/"/g, '\\"') + '"]');
+              return pqrPanel.querySelector('[data-pqr-row="' + ticketPk.replace(/"/g, '\\"') + '"]');
             }
 
             function ensureTransferModal() {
@@ -280,7 +280,7 @@
 
             function openTransferModal(triggerBtn) {
               if (!triggerBtn) return;
-              var row = triggerBtn.closest('tr[data-pqr-row]');
+              var row = triggerBtn.closest('[data-pqr-row]');
               if (!row) return;
               var sourceForm = row.querySelector('form.scm-public-pqr-form-inline, form.scm-public-pqr-public-form');
               if (!sourceForm) return;
@@ -352,12 +352,14 @@
                 var filterFormForClear = pqrPanel.querySelector('form.scm-public-pqr-filter-form');
                 if (filterFormForClear) {
                   e.preventDefault();
-                  filterFormForClear.querySelectorAll('select[name="public_pqr_estado"], select[name="public_pqr_empleado"]').forEach(function(selectEl) {
+                  filterFormForClear.querySelectorAll('select[name="public_pqr_estado"], select[name="public_pqr_empleado"], select[name="public_pqr_categoria"]').forEach(function(selectEl) {
                     selectEl.value = '';
                     if (window.jQuery && window.jQuery.fn && window.jQuery(selectEl).data('select2')) {
                       window.jQuery(selectEl).val('').trigger('change.select2');
                     }
                   });
+                  var searchInput = filterFormForClear.querySelector('input[name="public_pqr_busqueda"]');
+                  if (searchInput) searchInput.value = '';
                   var clearBucket = filterFormForClear.querySelector('input[name="public_pqr_bucket"]');
                   var clearPage = filterFormForClear.querySelector('input[name="public_pqr_page"]');
                   if (clearBucket) clearBucket.value = 'abiertos';
@@ -443,7 +445,7 @@
               var msg = form.querySelector(msgClass);
               var rowMsg = null;
               if (isAssignForm) {
-                var rowForMsg = form.closest('tr[data-pqr-row]');
+                var rowForMsg = form.closest('[data-pqr-row]');
                 if (!rowForMsg) {
                   var ticketInputForMsg = form.querySelector('input[name="ticket_pk"]');
                   if (ticketInputForMsg) {
@@ -502,7 +504,7 @@
                   if (rowMsg) rowMsg.textContent = data.message || 'Actualizado';
 
                   if (isAssignForm) {
-                    var row = form.closest('tr[data-pqr-row]');
+                    var row = form.closest('[data-pqr-row]');
                     if (!row) {
                       var ticketInput = form.querySelector('input[name="ticket_pk"]');
                       if (ticketInput) {
@@ -525,6 +527,16 @@
                           emp.textContent = empName;
                         } else if (empId !== '') {
                           emp.textContent = 'ID ' + empId;
+                        }
+                      }
+                      var caseBtn = row.querySelector('[data-case-kind="public-pqr"]');
+                      if (caseBtn) {
+                        if (tipo) caseBtn.dataset.categoria = tipo;
+                        if (typeof data.departamento === 'string') caseBtn.dataset.departamento = data.departamento || '-';
+                        if (typeof data.empleado === 'string' && data.empleado.trim() !== '') {
+                          caseBtn.dataset.empleado = data.empleado.trim();
+                        } else if (typeof data.id_empleado === 'string' && data.id_empleado.trim() !== '') {
+                          caseBtn.dataset.empleado = 'ID ' + data.id_empleado.trim();
                         }
                       }
                     }

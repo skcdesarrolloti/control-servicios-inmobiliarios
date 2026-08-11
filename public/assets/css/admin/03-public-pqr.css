@@ -449,7 +449,7 @@
 
 #scm-app .scm-public-pqr-filters {
   display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(240px, 1fr) auto;
+  grid-template-columns: repeat(4, minmax(170px, 1fr));
   gap: 12px;
   align-items: end;
   margin: 0 0 16px;
@@ -457,6 +457,111 @@
   border: 1px solid #dbe6f1;
   border-radius: 12px;
   background: linear-gradient(180deg, #f8fbff 0%, #f4f8fd 100%);
+}
+
+#scm-app .scm-public-pqr-filter-field-search .scm-input {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 10px;
+  background: #fff;
+}
+
+#scm-app .scm-public-pqr-card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+#scm-app .scm-public-pqr-card {
+  min-width: 0;
+}
+
+#scm-app .scm-public-pqr-card .scm-ticket-card-head h3 {
+  overflow-wrap: anywhere;
+}
+
+#scm-app .scm-public-pqr-card .scm-ticket-card-states {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#scm-app .scm-public-pqr-card .scm-ticket-card-state:last-child {
+  grid-column: 1 / -1;
+}
+
+#scm-app .scm-public-pqr-card .scm-ticket-card-state strong {
+  color: #1f344d;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+#scm-app .scm-public-pqr-card-footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+}
+
+#scm-app .scm-public-pqr-card-footer .btn {
+  width: 100%;
+  min-height: 44px;
+  justify-content: center;
+}
+
+#scm-app .scm-public-pqr-card-footer .scm-public-pqr-row-msg {
+  grid-column: 1 / -1;
+}
+
+#scm-app .scm-public-pqr-case-detail h4 {
+  margin: 0 0 14px;
+  color: #173654;
+  font-size: 16px;
+}
+
+#scm-app .scm-public-pqr-description {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid #dbe6f1;
+  border-radius: 12px;
+  background: #f7faff;
+}
+
+#scm-app .scm-public-pqr-description > span,
+#scm-app .scm-public-pqr-detail-grid span {
+  display: block;
+  margin-bottom: 5px;
+  color: #5d728a;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-public-pqr-description p {
+  margin: 0;
+  color: #1f344d;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+#scm-app .scm-public-pqr-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#scm-app .scm-public-pqr-detail-grid > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e1e9f2;
+  border-radius: 10px;
+  background: #fff;
+}
+
+#scm-app .scm-public-pqr-detail-grid strong {
+  display: block;
+  color: #1f344d;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 #scm-app .scm-public-pqr-filter-field {
@@ -688,6 +793,15 @@
 
   #scm-app .scm-public-pqr-filter-actions {
     flex-wrap: wrap;
+  }
+
+  #scm-app .scm-public-pqr-card-grid,
+  #scm-app .scm-public-pqr-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-public-pqr-card-footer {
+    grid-template-columns: 1fr;
   }
 
   #scm-app .scm-public-pqr-pagination {

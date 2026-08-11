@@ -122,15 +122,19 @@ trait RendersPublicPqr
     return $out;
   }
 
-  /** @param array<string,mixed> $input @return array{estado:string,empleado:string,bucket:string,page:int} */
+  /** @param array<string,mixed> $input @return array{estado:string,empleado:string,categoria:string,busqueda:string,bucket:string,page:int} */
   private function get_public_pqr_filters_from_input(array $input): array
   {
     $estado = trim((string) ($input['public_pqr_estado'] ?? ''));
     $empleado = trim((string) ($input['public_pqr_empleado'] ?? ''));
+    $categoria = trim((string) ($input['public_pqr_categoria'] ?? ''));
+    $busqueda = trim((string) ($input['public_pqr_busqueda'] ?? ''));
     $bucket = mb_strtolower(trim((string) ($input['public_pqr_bucket'] ?? 'abiertos')), 'UTF-8');
     $page = (int) ($input['public_pqr_page'] ?? 1);
 
     $estado = sanitize_text_field($estado);
+    $categoria = sanitize_text_field($categoria);
+    $busqueda = sanitize_text_field($busqueda);
     $empleado = preg_replace('/[^A-Za-z0-9_-]/', '', sanitize_text_field($empleado));
     if (!is_string($empleado)) {
       $empleado = '';
@@ -142,12 +146,14 @@ trait RendersPublicPqr
     return [
       'estado' => $estado,
       'empleado' => $empleado,
+      'categoria' => $categoria,
+      'busqueda' => $busqueda,
       'bucket' => $bucket,
       'page' => max(1, $page),
     ];
   }
 
-  /** @return array{estado:string,empleado:string,bucket:string,page:int} */
+  /** @return array{estado:string,empleado:string,categoria:string,busqueda:string,bucket:string,page:int} */
   private function get_public_pqr_filters_from_request(): array
   {
     return $this->get_public_pqr_filters_from_input($_GET);
@@ -187,12 +193,13 @@ trait RendersPublicPqr
     $hasTemaAyuda = $this->column_exists($ticketsTable, 'tema_ayuda');
     $hasTipoPqrs = $this->column_exists($ticketsTable, 'tipo_pqrs');
     if ($hasTemaAyuda && $hasTipoPqrs) {
-      $selectTipoPqrs = "TRIM(COALESCE(`tema_ayuda`, `tipo_pqrs`, '')) AS tipo_pqrs";
+      $tipoPqrsExpr = "TRIM(COALESCE(`tema_ayuda`, `tipo_pqrs`, ''))";
     } elseif ($hasTemaAyuda) {
-      $selectTipoPqrs = "TRIM(COALESCE(`tema_ayuda`, '')) AS tipo_pqrs";
+      $tipoPqrsExpr = "TRIM(COALESCE(`tema_ayuda`, ''))";
     } else {
-      $selectTipoPqrs = "TRIM(COALESCE(`tipo_pqrs`, '')) AS tipo_pqrs";
+      $tipoPqrsExpr = "TRIM(COALESCE(`tipo_pqrs`, ''))";
     }
+    $selectTipoPqrs = $tipoPqrsExpr . ' AS tipo_pqrs';
 
     $wherePublic = [];
     $args = [];
@@ -220,25 +227,23 @@ trait RendersPublicPqr
       $args[] = $employeeIdFilter;
     }
 
-    $employeeOptionsRows = $this->db->getResults(
-      "SELECT DISTINCT TRIM(COALESCE(`id_empleado`, '')) AS id, TRIM(COALESCE(`empleado`, '')) AS empleado
-       FROM `{$ticketsTable}` WHERE {$whereSql} AND TRIM(COALESCE(`id_empleado`, '')) <> '' ORDER BY empleado ASC",
-      $args
-    );
-    $employees = [];
-    foreach ($employeeOptionsRows as $employeeRow) {
-      $id = trim((string) ($employeeRow['id'] ?? ''));
-      if ($id === '') {
-        continue;
-      }
-      $name = trim((string) ($employeeRow['empleado'] ?? ''));
-      $employees[] = ['id' => $id, 'label' => ($name !== '' ? $name : 'ID ' . $id) . ' (' . $id . ')'];
-    }
-
     $empleadoFilter = trim((string) ($filters['empleado'] ?? ''));
     if ($empleadoFilter !== '' && $employeeIdFilter === '') {
       $whereSql .= " AND TRIM(COALESCE(`id_empleado`, '')) = ?";
       $args[] = $empleadoFilter;
+    }
+
+    $categoriaFilter = mb_strtolower(trim((string) ($filters['categoria'] ?? '')), 'UTF-8');
+    if ($categoriaFilter !== '') {
+      $whereSql .= " AND LOWER({$tipoPqrsExpr}) = ?";
+      $args[] = $categoriaFilter;
+    }
+
+    $busquedaFilter = trim((string) ($filters['busqueda'] ?? ''));
+    if ($busquedaFilter !== '') {
+      $searchLike = '%' . $this->db->escapeLike($busquedaFilter) . '%';
+      $whereSql .= " AND (TRIM(COALESCE(`id_ticket`, '')) LIKE ? OR TRIM(COALESCE(`asunto`, '')) LIKE ? OR TRIM(COALESCE(`solicitante`, '')) LIKE ? OR TRIM(COALESCE(`descripcion`, '')) LIKE ?)";
+      $args = array_merge($args, [$searchLike, $searchLike, $searchLike, $searchLike]);
     }
 
     $closedExprParts = ["LOWER(TRIM(COALESCE(`estado`, ''))) IN ('cerrado', 'resuelto', 'finalizado')"];
@@ -286,6 +291,7 @@ trait RendersPublicPqr
               `_ID`,
               TRIM(COALESCE(`id_ticket`, '')) AS id_ticket,
               TRIM(COALESCE(`asunto`, '')) AS asunto,
+              TRIM(COALESCE(`descripcion`, '')) AS descripcion,
               TRIM(COALESCE(`solicitante`, '')) AS solicitante,
               TRIM(COALESCE(`correo_solicitante`, '')) AS correo_solicitante,
               TRIM(COALESCE(`celular_solicitante`, '')) AS celular_solicitante,
@@ -296,6 +302,10 @@ trait RendersPublicPqr
               TRIM(COALESCE(`estado`, '')) AS estado,
               {$selectEstadoAdministrativo},
               TRIM(COALESCE(`medio`, '')) AS medio,
+              TRIM(COALESCE(`contrato`, '')) AS contrato,
+              TRIM(COALESCE(`inmueble`, '')) AS inmueble,
+              TRIM(COALESCE(`barrio`, '')) AS barrio,
+              TRIM(COALESCE(`direccion`, '')) AS direccion,
               COALESCE(`fecha_actualizacion`, `fecha`, 0) AS fecha_ref,
               {$selectCreadoPor},
               {$selectCreadorPor}
@@ -313,7 +323,7 @@ trait RendersPublicPqr
         'total' => $total,
         'total_pages' => $totalPages,
       ],
-      'employees' => $employees,
+      'employees' => [],
     ];
   }
 
@@ -324,7 +334,10 @@ trait RendersPublicPqr
     $counts = is_array($result['counts'] ?? null) ? $result['counts'] : ['abiertos' => 0, 'postergados' => 0, 'cerrados' => 0];
     $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : ['page' => 1, 'per_page' => 10, 'total' => count($rows), 'total_pages' => 1];
     $filterFuncionarios = is_array($result['employees'] ?? null) ? $result['employees'] : [];
-    $themes = $readOnly ? [] : $this->get_public_pqr_themes();
+    if (empty($filterFuncionarios)) {
+      $filterFuncionarios = $funcionarios;
+    }
+    $themes = $this->get_public_pqr_themes();
     $corresponsables = $readOnly ? [] : $this->get_public_pqr_corresponsables();
     $corresponsableCandidates = $readOnly ? [] : $this->get_public_pqr_corresponsable_candidates();
     $publicToken = trim((string) ($publicAccess['token'] ?? ''));
@@ -480,6 +493,8 @@ trait RendersPublicPqr
     $html .= '</nav>';
     $currentEstado = trim((string) ($filters['estado'] ?? ''));
     $currentEmpleado = trim((string) ($filters['empleado'] ?? ''));
+    $currentCategoria = trim((string) ($filters['categoria'] ?? ''));
+    $currentBusqueda = trim((string) ($filters['busqueda'] ?? ''));
     $showEmployeeFilter = !$readOnly || $isGlobalSignedAccess;
     if ($employeeIdFilter !== '' && ($readOnly || $isSignedPublicAccess)) {
       $showEmployeeFilter = false;
@@ -495,7 +510,7 @@ trait RendersPublicPqr
     } elseif ($employeeIdFilter !== '') {
       $clearQuery['id_empleado'] = $employeeIdFilter;
     }
-    $clearUrl = remove_query_arg(['public_pqr_estado', 'public_pqr_empleado', 'public_pqr_bucket', 'public_pqr_page', 'scm_tab', 'tab', 'k', 'scope', 'exp', 'sig', 'id_empleado']);
+    $clearUrl = remove_query_arg(['public_pqr_estado', 'public_pqr_empleado', 'public_pqr_categoria', 'public_pqr_busqueda', 'public_pqr_bucket', 'public_pqr_page', 'scm_tab', 'tab', 'k', 'scope', 'exp', 'sig', 'id_empleado']);
     $clearUrl = add_query_arg($clearQuery, $clearUrl);
     $html .= '<form method="get" autocomplete="off" class="scm-public-pqr-filters scm-public-pqr-filter-form">';
     if ($isSignedPublicAccess && $publicToken !== '') {
@@ -511,6 +526,14 @@ trait RendersPublicPqr
     $html .= '<input type="hidden" name="scm_tab" value="scm-panel-pqr-publico">';
     $html .= '<input type="hidden" name="public_pqr_bucket" value="' . self::h($currentBucket) . '">';
     $html .= '<input type="hidden" name="public_pqr_page" value="' . self::h((string) ($pagination['page'] ?? 1)) . '">';
+    $html .= '<div class="scm-public-pqr-filter-field scm-public-pqr-filter-field-wide"><label>Categoría</label>';
+    $html .= '<select name="public_pqr_categoria" class="select select-bordered select-sm scm-select">';
+    $html .= '<option value="">Todas las categorías</option>';
+    foreach ($themes as $themeOption) {
+      $selected = mb_strtolower($currentCategoria, 'UTF-8') === mb_strtolower((string) $themeOption, 'UTF-8') ? ' selected' : '';
+      $html .= '<option value="' . self::h((string) $themeOption) . '"' . $selected . '>' . self::h((string) $themeOption) . '</option>';
+    }
+    $html .= '</select></div>';
     $html .= '<div class="scm-public-pqr-filter-field"><label>Estado</label>';
     $html .= '<select name="public_pqr_estado" class="select select-bordered select-sm scm-select">';
     $html .= '<option value="">Todos</option>';
@@ -534,6 +557,9 @@ trait RendersPublicPqr
       }
       $html .= '</select></div>';
     }
+    $html .= '<div class="scm-public-pqr-filter-field scm-public-pqr-filter-field-search"><label>Búsqueda</label>';
+    $html .= '<input type="search" name="public_pqr_busqueda" class="input input-bordered input-sm scm-input" value="' . self::h($currentBusqueda) . '" placeholder="ID, asunto, solicitante o descripción">';
+    $html .= '</div>';
     $html .= '<div class="scm-public-pqr-filter-actions">';
     $html .= '<button type="submit" class="scm-btn-primary btn btn-primary btn-sm scm-public-pqr-filter-submit">Filtrar</button>';
     $html .= '<a href="' . self::h($clearUrl) . '" class="btn btn-sm">Limpiar</a>';
@@ -545,9 +571,7 @@ trait RendersPublicPqr
       return $html . $settingsModalHtml;
     }
 
-    $html .= '<div class="result-wrap"><table class="scm-go-table"><thead><tr>';
-    $html .= '<th>ID</th><th>Fecha</th><th>Creado por</th><th>Solicitante</th><th>Asunto</th><th>Tipo Solicitud/Peticion</th><th>Estado</th><th>Departamento</th><th>Funcionario</th><th>' . ($readOnly ? 'Detalle' : 'Accion') . '</th>';
-    $html .= '</tr></thead><tbody>';
+    $html .= '<div class="scm-cards-wrap scm-public-pqr-cards-wrap"><div class="scm-ticket-cards scm-public-pqr-card-grid">';
 
     foreach ($rows as $row) {
       $ticketPk = (int) ($row['_ID'] ?? 0);
@@ -589,6 +613,18 @@ trait RendersPublicPqr
         $fechaTxt = '-';
       }
       $estadoActual = trim((string) ($row['estado'] ?? ''));
+      $estadoAdminActual = trim((string) ($row['estado_administrativo'] ?? ''));
+      $solicitanteActual = trim((string) ($row['solicitante'] ?? ''));
+      $correoSolicitante = trim((string) ($row['correo_solicitante'] ?? ''));
+      $celularSolicitante = trim((string) ($row['celular_solicitante'] ?? ''));
+      $asuntoActual = trim((string) ($row['asunto'] ?? ''));
+      $descripcionActual = trim((string) ($row['descripcion'] ?? ''));
+      $medioActual = trim((string) ($row['medio'] ?? ''));
+      $contratoActual = trim((string) ($row['contrato'] ?? ''));
+      $inmuebleActual = trim((string) ($row['inmueble'] ?? ''));
+      $barrioActual = trim((string) ($row['barrio'] ?? ''));
+      $direccionActual = trim((string) ($row['direccion'] ?? ''));
+      $ticketDetailUrl = ($ticketUrl !== '' && $logicalId !== '') ? $ticketUrl . rawurlencode($logicalId) : '';
 
       $tipoOptsRow = '';
       $deptoOptsRow = '';
@@ -616,24 +652,47 @@ trait RendersPublicPqr
         }
       }
 
-      $html .= '<tr data-pqr-row="' . self::h((string) $ticketPk) . '">';
-      $html .= '<td>#' . self::h($logicalId) . '</td>';
-      $html .= '<td>' . self::h($fechaTxt) . '</td>';
-      $html .= '<td>' . self::h($creadoPor !== '' ? $creadoPor : '-') . '</td>';
-      $html .= '<td>' . self::h(trim((string) ($row['solicitante'] ?? ''))) . '<br><small>' . self::h(trim((string) ($row['celular_solicitante'] ?? ''))) . '</small></td>';
-      $html .= '<td>' . self::h(trim((string) ($row['asunto'] ?? ''))) . '</td>';
-      $html .= '<td><span class="scm-public-pqr-current-topic">' . self::h($tipoActual !== '' ? $tipoActual : '-') . '</span></td>';
-      $html .= '<td><span class="scm-public-pqr-current-state">' . $this->estado_badge($estadoActual !== '' ? $estadoActual : '-') . '</span></td>';
-      $html .= '<td><span class="scm-public-pqr-current-department">' . self::h($deptoActual !== '' ? $deptoActual : '-') . '</span></td>';
-      $html .= '<td><span class="scm-public-pqr-current-employee">' . self::h($empActual !== '' ? $empActual : '-') . '</span></td>';
-      $html .= '<td class="scm-public-pqr-action-cell">';
-      $html .= '<div class="scm-public-pqr-actions">';
-      if ($ticketUrl !== '' && $logicalId !== '') {
-        if ($readOnly) {
-          $html .= '<a href="' . self::h($ticketUrl . rawurlencode($logicalId)) . '" target="_blank" rel="noopener noreferrer" class="btn btn-sm scm-public-pqr-view-btn">Ver solicitud</a>';
-        } else {
-          $html .= '<button type="button" data-scm-open-iframe data-scm-compact-iframe data-no-emp-check data-iframe-url="' . self::h($ticketUrl . rawurlencode($logicalId)) . '" data-iframe-title="Solicitud #' . self::h($logicalId) . '" class="btn btn-sm scm-public-pqr-view-btn">Ver solicitud</button>';
+      $caseSource = '<section class="scm-public-pqr-case-detail">';
+      $caseSource .= '<h4>Detalle de la solicitud</h4>';
+      $caseSource .= '<div class="scm-public-pqr-description"><span>Descripción</span><p>' . ($descripcionActual !== '' ? nl2br(self::h($descripcionActual)) : 'Sin descripción registrada.') . '</p></div>';
+      $caseSource .= '<div class="scm-public-pqr-detail-grid">';
+      $caseSource .= '<div><span>Solicitante</span><strong>' . self::h($solicitanteActual !== '' ? $solicitanteActual : '-') . '</strong></div>';
+      $caseSource .= '<div><span>Celular</span><strong>' . self::h($celularSolicitante !== '' ? $celularSolicitante : '-') . '</strong></div>';
+      $caseSource .= '<div><span>Correo</span><strong>' . self::h($correoSolicitante !== '' ? $correoSolicitante : '-') . '</strong></div>';
+      $caseSource .= '<div><span>Origen</span><strong>' . self::h($medioActual !== '' ? $medioActual : ($creadoPor !== '' ? $creadoPor : '-')) . '</strong></div>';
+      if ($contratoActual !== '' || $inmuebleActual !== '') {
+        $caseSource .= '<div><span>Contrato</span><strong>' . self::h($contratoActual !== '' ? '#' . $contratoActual : '-') . '</strong></div>';
+        $caseSource .= '<div><span>Inmueble</span><strong>' . self::h($inmuebleActual !== '' ? $inmuebleActual : '-') . '</strong></div>';
+      }
+      if ($direccionActual !== '' || $barrioActual !== '') {
+        $caseSource .= '<div><span>Barrio</span><strong>' . self::h($barrioActual !== '' ? $barrioActual : '-') . '</strong></div>';
+        $caseSource .= '<div><span>Dirección</span><strong>' . self::h($direccionActual !== '' ? $direccionActual : '-') . '</strong></div>';
+      }
+      $caseSource .= '</div></section>';
+
+      $html .= '<article class="scm-ticket-card card scm-public-pqr-card" data-pqr-row="' . self::h((string) $ticketPk) . '" data-pk="' . self::h((string) $ticketPk) . '">';
+      $html .= '<header class="scm-ticket-card-head"><span class="scm-ticket-badge badge badge-primary">#' . self::h($logicalId) . '</span><h3><span class="scm-public-pqr-current-topic">' . self::h($tipoActual !== '' ? $tipoActual : 'Solicitud web') . '</span></h3></header>';
+      $html .= '<p class="scm-ticket-card-asunto"><span>Asunto</span><strong>' . self::h($asuntoActual !== '' ? $asuntoActual : '-') . '</strong></p>';
+      $html .= '<p class="scm-ticket-card-request">Solicitante <strong>' . self::h($solicitanteActual !== '' ? $solicitanteActual : '-') . '</strong></p>';
+      $html .= '<p class="scm-ticket-card-request">Creado por <strong>' . self::h($creadoPor !== '' ? $creadoPor : '-') . '</strong></p>';
+      $html .= '<p class="scm-ticket-card-request">Fecha <strong>' . self::h($fechaTxt) . '</strong></p>';
+      $html .= '<p class="scm-ticket-card-employee">Asignado a <strong class="scm-public-pqr-current-employee">' . self::h($empActual !== '' ? $empActual : '-') . '</strong></p>';
+      $html .= '<div class="scm-ticket-card-states">';
+      $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Estado</span><span class="scm-public-pqr-current-state">' . $this->estado_badge($estadoActual !== '' ? $estadoActual : '-') . '</span></div>';
+      $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Estado administrativo</span>' . $this->estado_badge($estadoAdminActual !== '' ? $estadoAdminActual : '-') . '</div>';
+      $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Departamento</span><strong class="scm-public-pqr-current-department">' . self::h($deptoActual !== '' ? $deptoActual : '-') . '</strong></div>';
+      $html .= '</div>';
+      $html .= '<div class="scm-ticket-card-footer scm-public-pqr-card-footer">';
+      if ($readOnly) {
+        if ($ticketDetailUrl !== '') {
+          $html .= '<a href="' . self::h($ticketDetailUrl) . '" target="_blank" rel="noopener noreferrer" class="scm-btn-case btn btn-primary btn-sm scm-public-pqr-view-btn">Ver solicitud</a>';
         }
+      } elseif ($isSignedPublicAccess) {
+        if ($ticketDetailUrl !== '') {
+          $html .= '<button type="button" data-scm-open-iframe data-scm-compact-iframe data-no-emp-check data-iframe-url="' . self::h($ticketDetailUrl) . '" data-iframe-title="Solicitud #' . self::h($logicalId) . '" class="scm-btn-case btn btn-primary btn-sm scm-public-pqr-view-btn">Ver solicitud</button>';
+        }
+      } else {
+        $html .= '<button class="scm-btn-case btn btn-primary btn-sm scm-public-pqr-view-btn" type="button" onclick="scmOpenCase(this)" data-case-kind="public-pqr" data-ticket="' . self::h($logicalId) . '" data-ticket-pk="' . self::h((string) $ticketPk) . '" data-asunto="' . self::h($asuntoActual !== '' ? $asuntoActual : '-') . '" data-estado="' . self::h($estadoActual !== '' ? $estadoActual : '-') . '" data-admin="' . self::h($estadoAdminActual !== '' ? $estadoAdminActual : '-') . '" data-creado="' . self::h($fechaTxt) . '" data-empleado="' . self::h($empActual !== '' ? $empActual : '-') . '" data-categoria="' . self::h($tipoActual !== '' ? $tipoActual : '-') . '" data-departamento="' . self::h($deptoActual !== '' ? $deptoActual : '-') . '" data-creado-por="' . self::h($creadoPor !== '' ? $creadoPor : '-') . '" data-medio="' . self::h($medioActual) . '" data-solicitante="' . self::h($solicitanteActual !== '' ? $solicitanteActual : '-') . '" data-correo-solicitante="' . self::h($correoSolicitante) . '" data-celular-solicitante="' . self::h($celularSolicitante) . '" data-contrato="' . self::h($contratoActual !== '' ? '#' . $contratoActual : '-') . '" data-inmueble="' . self::h($inmuebleActual !== '' ? $inmuebleActual : '-') . '" data-barrio="' . self::h($barrioActual) . '" data-direccion="' . self::h($direccionActual) . '" data-ticket-url="' . self::h($ticketDetailUrl) . '">Ver caso</button>';
       }
       if (!$readOnly) {
         $html .= '<button type="button" class="scm-btn-primary btn btn-primary btn-sm scm-public-pqr-transfer-btn" data-scm-open-pqr-transfer data-ticket-pk="' . self::h((string) $ticketPk) . '" data-ticket-logical="' . self::h($logicalId) . '">Trasladar</button>';
@@ -668,10 +727,11 @@ trait RendersPublicPqr
         $html .= '</div>';
         $html .= '</form>';
       }
-      $html .= '</td></tr>';
+      $html .= '<div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div>';
+      $html .= '</article>';
     }
 
-    $html .= '</tbody></table></div>';
+    $html .= '</div></div>';
     $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
     $currentPage = min($totalPages, max(1, (int) ($pagination['page'] ?? 1)));
     $totalRows = max(0, (int) ($pagination['total'] ?? count($rows)));

@@ -1905,6 +1905,7 @@
     try {
       var sourceHtml = "";
       var card = btn.closest(".scm-ticket-card");
+      var isPublicPqr = (btn.dataset.caseKind || "") === "public-pqr";
       if (card) {
         var cardSource = card.querySelector(".scm-case-source");
         if (cardSource) {
@@ -1954,11 +1955,13 @@
 
       if (title) {
         title.textContent =
-          "Caso #" + (btn.dataset.ticketPk || btn.dataset.ticket || "-");
+          (isPublicPqr ? "Solicitud #" : "Caso #") +
+          (btn.dataset.ticket || btn.dataset.ticketPk || "-");
       }
       if (subtitle) {
         subtitle.textContent =
-          btn.dataset.asunto || "Ticket de servicios inmobiliarios";
+          btn.dataset.asunto ||
+          (isPublicPqr ? "Solicitud creada desde un portal web" : "Ticket de servicios inmobiliarios");
       }
       modal.dataset.ticketPk = btn.dataset.ticketPk || "";
       modal.dataset.idInmuebleWeb = btn.dataset.idInmuebleWeb || "";
@@ -1969,23 +1972,39 @@
         meta.innerHTML = "";
         collectSummary("Estado", btn.dataset.estado || "");
         collectSummary("Estado administrativo", btn.dataset.admin || "");
-        collectSummary("Contrato", btn.dataset.contrato || "");
-        collectSummary("Inmueble", btn.dataset.inmueble || "");
-        collectSummary(
-          "Codigo inmueble web",
-          btn.dataset.idInmuebleWeb || "",
-        );
-        collectSummary("Barrio", btn.dataset.barrio || "");
-        collectSummary("Dirección", btn.dataset.direccion || "");
-        collectSummary("Creado", btn.dataset.creado || "");
-        collectSummary("Asignado a", btn.dataset.empleado || "");
-        collectSummary("Propietario", btn.dataset.propietario || "");
-        collectSummary("Arrendatario", btn.dataset.arrendatario || "");
-        collectSummary("Tiempo total", btn.dataset.total || "");
-        collectSummary("Etapa actual", btn.dataset.etapa || "");
-        collectSummary("Tiempo en etapa", btn.dataset.etapaTiempo || "");
-        collectSummary("En ejecución", btn.dataset.ejecucion || "");
-        collectSummary("Sin actualizar", btn.dataset.sinActualizar || "");
+        if (isPublicPqr) {
+          collectSummary("Categoría", btn.dataset.categoria || "");
+          collectSummary("Departamento", btn.dataset.departamento || "");
+          collectSummary("Creado por", btn.dataset.creadoPor || "");
+          collectSummary("Canal", btn.dataset.medio || "");
+          collectSummary("Solicitante", btn.dataset.solicitante || "");
+          collectSummary("Celular", btn.dataset.celularSolicitante || "");
+          collectSummary("Correo", btn.dataset.correoSolicitante || "");
+          collectSummary("Fecha", btn.dataset.creado || "");
+          collectSummary("Asignado a", btn.dataset.empleado || "");
+          collectSummary("Contrato", btn.dataset.contrato || "");
+          collectSummary("Inmueble", btn.dataset.inmueble || "");
+          collectSummary("Barrio", btn.dataset.barrio || "");
+          collectSummary("Dirección", btn.dataset.direccion || "");
+        } else {
+          collectSummary("Contrato", btn.dataset.contrato || "");
+          collectSummary("Inmueble", btn.dataset.inmueble || "");
+          collectSummary(
+            "Codigo inmueble web",
+            btn.dataset.idInmuebleWeb || "",
+          );
+          collectSummary("Barrio", btn.dataset.barrio || "");
+          collectSummary("Dirección", btn.dataset.direccion || "");
+          collectSummary("Creado", btn.dataset.creado || "");
+          collectSummary("Asignado a", btn.dataset.empleado || "");
+          collectSummary("Propietario", btn.dataset.propietario || "");
+          collectSummary("Arrendatario", btn.dataset.arrendatario || "");
+          collectSummary("Tiempo total", btn.dataset.total || "");
+          collectSummary("Etapa actual", btn.dataset.etapa || "");
+          collectSummary("Tiempo en etapa", btn.dataset.etapaTiempo || "");
+          collectSummary("En ejecución", btn.dataset.ejecucion || "");
+          collectSummary("Sin actualizar", btn.dataset.sinActualizar || "");
+        }
       }
       if (body) {
         var runtime = parseRuntime(root) || {};
@@ -2023,36 +2042,48 @@
           seguimientoWrap.style.display = "none";
         }
         var caseActionsHtml =
-          '<section class="scm-case-work-actions"><h4>Acciones del caso</h4><div class="scm-case-work-action-list">';
-        if (seguimientoWrap) {
+          '<section class="scm-case-work-actions"><h4>' +
+          (isPublicPqr ? "Acciones de la solicitud" : "Acciones del caso") +
+          '</h4><div class="scm-case-work-action-list">';
+        if (!isPublicPqr && seguimientoWrap) {
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-section="scm-sec-seguimiento">Agregar seguimiento</button>';
         }
-        caseActionsHtml +=
-          '<button type="button" class="scm-case-work-btn" data-scm-open-contacts>Editar contactos</button>';
-        caseActionsHtml +=
-          '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>';
-        caseActionsHtml +=
-          '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar ticket</button>';
-        if (statusBucket === "postergados" || statusBucket === "cerrados") {
+        if (!isPublicPqr) {
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-open-contacts>Editar contactos</button>';
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>';
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar ticket</button>';
+        }
+        if (!isPublicPqr && (statusBucket === "postergados" || statusBucket === "cerrados")) {
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket>Activar ticket</button>';
         }
-        caseActionsHtml +=
-          '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder ticket / enviar correo</button>';
-        caseActionsHtml +=
-          '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>';
-        if (cotizacionUrl && cotizacionSinResponder) {
+        if (!isPublicPqr) {
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder ticket / enviar correo</button>';
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>';
+        }
+        if (!isPublicPqr && cotizacionUrl && cotizacionSinResponder) {
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-cotizacion-response>Responder cotizaci&oacute;n / enviar correo</button>';
         }
         if (ticketUrl) {
           caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' +
+            '<button type="button" class="scm-case-work-btn" data-scm-open-iframe' +
+            (isPublicPqr ? ' data-scm-compact-iframe' : '') +
+            ' data-iframe-url="' +
             escHtml(ticketUrl) +
-            '" data-iframe-title="Ticket">Abrir ticket</button>';
+            '" data-iframe-title="' +
+            (isPublicPqr ? "Solicitud" : "Ticket") +
+            '">' +
+            (isPublicPqr ? "Abrir solicitud original" : "Abrir ticket") +
+            "</button>";
         }
-        if (cotizacionUrl) {
+        if (!isPublicPqr && cotizacionUrl) {
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' +
             escHtml(cotizacionUrl) +
@@ -2069,7 +2100,7 @@
         sourceHtml = srcWrap.innerHTML;
 
         var sidebarHtml = '<aside class="scm-case-sidebar">';
-        sidebarHtml += "<h4>Resumen del caso</h4>";
+        sidebarHtml += isPublicPqr ? "<h4>Resumen de la solicitud</h4>" : "<h4>Resumen del caso</h4>";
         sidebarHtml += '<div class="scm-case-sidebar-list">';
         summaryItems.forEach(function (item) {
           sidebarHtml +=
@@ -2079,21 +2110,23 @@
             escHtml(item.value) +
             "</span></div>";
         });
-        var sideMagnitude = normalizeMagnitudeKey(
-          btn.dataset.magnitudCaso || "",
-        );
-        sidebarHtml +=
-          '<div class="scm-case-side-item"><span class="scm-case-side-label">Magnitud del caso</span><span data-scm-case-magnitude-badge>' +
-          renderMagnitudeBadge(sideMagnitude) +
-          "</span></div>";
-        sidebarHtml +=
-          '<div class="scm-case-side-item scm-case-magnitude-editor">' +
-          '<span class="scm-case-side-label">Editar caso</span>' +
-          '<button type="button" class="btn btn-outline btn-sm scm-edit-case-magnitude" data-scm-edit-case-magnitude data-ticket-pk="' +
-          escHtml(btn.dataset.ticketPk || "") +
-          '">Editar magnitud caso</button>' +
-          "</div>";
-        sidebarHtml += renderCaseLocationPanel(btn, modal, false);
+        if (!isPublicPqr) {
+          var sideMagnitude = normalizeMagnitudeKey(
+            btn.dataset.magnitudCaso || "",
+          );
+          sidebarHtml +=
+            '<div class="scm-case-side-item"><span class="scm-case-side-label">Magnitud del caso</span><span data-scm-case-magnitude-badge>' +
+            renderMagnitudeBadge(sideMagnitude) +
+            "</span></div>";
+          sidebarHtml +=
+            '<div class="scm-case-side-item scm-case-magnitude-editor">' +
+            '<span class="scm-case-side-label">Editar caso</span>' +
+            '<button type="button" class="btn btn-outline btn-sm scm-edit-case-magnitude" data-scm-edit-case-magnitude data-ticket-pk="' +
+            escHtml(btn.dataset.ticketPk || "") +
+            '">Editar magnitud caso</button>' +
+            "</div>";
+          sidebarHtml += renderCaseLocationPanel(btn, modal, false);
+        }
         var tabKeySide = (btn.dataset.tabKey || "").trim();
         var consultorEntrega = (btn.dataset.consultorEntrega || "").trim();
         var consultorCelular = (
