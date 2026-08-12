@@ -292,9 +292,9 @@ trait RendersDashboard
       </div>
       <div class="scm-tabs scm-main-tabs">
         <button class="scm-tab active" data-tab="scm-panel-abiertos" type="button">Abiertos</button>
-        <button class="scm-tab" data-tab="scm-panel-mis-tickets" type="button">Mis tickets</button>
         <button class="scm-tab" data-tab="scm-panel-postergados" type="button">Postergados</button>
         <button class="scm-tab" data-tab="scm-panel-cerrados" type="button">Cerrados</button>
+        <button class="scm-tab" data-tab="scm-panel-mis-tickets" type="button">Mis tickets</button>
         <button class="scm-tab" data-tab="scm-panel-cotizaciones-mantenimiento" type="button">Cotizaciones de Mantenimiento</button>
         <button class="scm-tab" data-tab="scm-panel-preventivas-pendientes" type="button">Preventivas Pendientes</button>
         <button class="scm-tab" data-tab="scm-panel-contratos-arrendamiento" type="button">Contratos de arrendamiento</button>

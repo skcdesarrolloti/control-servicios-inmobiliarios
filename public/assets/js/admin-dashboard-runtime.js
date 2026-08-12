@@ -1549,6 +1549,7 @@
       }
       if (cotizacionSelect) {
         cotizacionSelect.addEventListener("change", function () {
+          setMantPage(1);
           applyCotizacionDependentFilters(form, cotizacionSelect);
           applyBinaryFilterKpiVisibility(
             "scm-",
@@ -1556,9 +1557,20 @@
             "con-cotz",
             "sin-cotz",
           );
+          doFetch(new FormData(form));
         });
         applyCotizacionDependentFilters(form, cotizacionSelect);
       }
+      form
+        .querySelectorAll(
+          ".scm-cotizacion-dependent select, .scm-cotizacion-dependent input",
+        )
+        .forEach(function (field) {
+          field.addEventListener("change", function () {
+            setMantPage(1);
+            doFetch(new FormData(form));
+          });
+        });
     }
 
     if (clearBtn && form) {
@@ -2164,6 +2176,9 @@
       var tabCotizacionSelect = tabForm.querySelector("[name$='cotizacion']");
       if (tabCotizacionSelect) {
         tabCotizacionSelect.addEventListener("change", function () {
+          if (pageInput) {
+            pageInput.value = "1";
+          }
           applyCotizacionDependentFilters(tabForm, tabCotizacionSelect);
           applyBinaryFilterKpiVisibility(
             "scm-" + tabKey + "-",
@@ -2171,8 +2186,21 @@
             "con-cotz",
             "sin-cotz",
           );
+          fetchTab(new FormData(tabForm));
         });
       }
+      tabForm
+        .querySelectorAll(
+          ".scm-cotizacion-dependent select, .scm-cotizacion-dependent input",
+        )
+        .forEach(function (field) {
+          field.addEventListener("change", function () {
+            if (pageInput) {
+              pageInput.value = "1";
+            }
+            fetchTab(new FormData(tabForm));
+          });
+        });
 
       if (tabClear) {
         tabClear.addEventListener("click", function () {
@@ -2261,6 +2289,9 @@
         : null;
       var pageInput = tabForm
         ? tabForm.querySelector("input[name$='page']")
+        : null;
+      var tabCotizacionSelect = tabForm
+        ? tabForm.querySelector("[name$='cotizacion']")
         : null;
 
       if (
@@ -2358,10 +2389,26 @@
 
       if (tabCotizacionSelect) {
         tabCotizacionSelect.addEventListener("change", function () {
+          if (pageInput) {
+            pageInput.value = "1";
+          }
           applyCotizacionDependentFilters(tabForm, tabCotizacionSelect);
+          fetchTab(new FormData(tabForm));
         });
         applyCotizacionDependentFilters(tabForm, tabCotizacionSelect);
       }
+      tabForm
+        .querySelectorAll(
+          ".scm-cotizacion-dependent select, .scm-cotizacion-dependent input",
+        )
+        .forEach(function (field) {
+          field.addEventListener("change", function () {
+            if (pageInput) {
+              pageInput.value = "1";
+            }
+            fetchTab(new FormData(tabForm));
+          });
+        });
 
       if (tabPagination) {
         tabPagination.addEventListener("click", function (e) {

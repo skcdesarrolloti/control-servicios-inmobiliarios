@@ -148,10 +148,11 @@ trait MaintenanceQueriesConcern
 
     if ($filters['fCotizacion'] !== '') {
       $cotFilter = trim((string) $filters['fCotizacion']);
+      $cotExistsExpr = $this->maintenanceCotizacionExistsExpression('t');
       if ($cotFilter === 'has') {
-        $where[] = "TRIM(COALESCE(t.id_cotizacion_mantenimiento, '')) <> ''";
+        $where[] = $cotExistsExpr;
       } elseif ($cotFilter === 'none') {
-        $where[] = "TRIM(COALESCE(t.id_cotizacion_mantenimiento, '')) = ''";
+        $where[] = "NOT ({$cotExistsExpr})";
       } elseif (strpos($cotFilter, 'state:') === 0) {
         $state = strtolower(trim(substr($cotFilter, 6)));
         if ($state !== '') {
@@ -187,9 +188,9 @@ trait MaintenanceQueriesConcern
           $joinParts[] = "FIND_IN_SET(CAST(cot_dyn._ID AS CHAR), REPLACE(COALESCE(t.id_cotizacion_mantenimiento, ''), ' ', '')) > 0";
         }
         if ($this->schema->columnExists($cotTable, 'id_ticket')) {
-          $joinParts[] = "TRIM(COALESCE(cot_dyn.id_ticket, '')) = CAST(t._ID AS CHAR)";
+          $joinParts[] = "(TRIM(COALESCE(cot_dyn.id_ticket, '')) <> '' AND TRIM(COALESCE(cot_dyn.id_ticket, '')) = CAST(t._ID AS CHAR))";
           if ($this->schema->columnExists($table, 'id_ticket')) {
-            $joinParts[] = "TRIM(COALESCE(cot_dyn.id_ticket, '')) = TRIM(COALESCE(t.id_ticket, ''))";
+            $joinParts[] = "(TRIM(COALESCE(t.id_ticket, '')) <> '' AND TRIM(COALESCE(cot_dyn.id_ticket, '')) <> '' AND TRIM(COALESCE(cot_dyn.id_ticket, '')) = TRIM(COALESCE(t.id_ticket, '')))";
           }
         }
         if (!empty($joinParts)) {
@@ -480,6 +481,42 @@ trait MaintenanceQueriesConcern
     return $rows;
   }
 
+  private function maintenanceCotizacionExistsExpression(string $alias = 't'): string
+  {
+    $ticketTable = $this->ticketsTable();
+    $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    $parts = [];
+
+    if ($this->schema->columnExists($ticketTable, 'id_cotizacion_mantenimiento')) {
+      $parts[] = "TRIM(COALESCE({$alias}.`id_cotizacion_mantenimiento`, '')) <> ''";
+    }
+
+    if ($this->schema->tableExists($cotTable)) {
+      $joinParts = [];
+      if (
+        $this->schema->columnExists($ticketTable, 'id_cotizacion_mantenimiento')
+        && $this->schema->columnExists($cotTable, '_ID')
+      ) {
+        $joinParts[] = "FIND_IN_SET(CAST(cot_exists.`_ID` AS CHAR), REPLACE(COALESCE({$alias}.`id_cotizacion_mantenimiento`, ''), ' ', '')) > 0";
+      }
+      if ($this->schema->columnExists($cotTable, 'id_ticket')) {
+        $joinParts[] = "(TRIM(COALESCE(cot_exists.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_exists.`id_ticket`, '')) = CAST({$alias}.`_ID` AS CHAR))";
+        if ($this->schema->columnExists($ticketTable, 'id_ticket')) {
+          $joinParts[] = "(TRIM(COALESCE({$alias}.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_exists.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_exists.`id_ticket`, '')) = TRIM(COALESCE({$alias}.`id_ticket`, '')))";
+        }
+      }
+      if (!empty($joinParts)) {
+        $parts[] = "EXISTS (SELECT 1 FROM `{$cotTable}` cot_exists WHERE " . implode(' OR ', $joinParts) . ")";
+      }
+    }
+
+    if (empty($parts)) {
+      return '0';
+    }
+
+    return '(' . implode(' OR ', $parts) . ')';
+  }
+
   private function maintenanceWebOriginExpression(string $alias = 't'): string
   {
     $table = $this->ticketsTable();
@@ -530,9 +567,7 @@ trait MaintenanceQueriesConcern
       ? "COALESCE(NULLIF(t.`fecha_seguimiento`, 0), {$updatedExpr}, {$fechaExpr})"
       : "COALESCE({$updatedExpr}, {$fechaExpr})";
     $closedExpr = $this->maintenanceClosedExpr('t');
-    $cotExpr = $this->schema->columnExists($table, 'id_cotizacion_mantenimiento')
-      ? "TRIM(COALESCE(t.`id_cotizacion_mantenimiento`, '')) <> ''"
-      : '0';
+    $cotExpr = $this->maintenanceCotizacionExistsExpression('t');
     $prevExpr = $this->schema->columnExists($table, 'id_revision_preventiva')
       ? "TRIM(COALESCE(t.`id_revision_preventiva`, '')) <> ''"
       : '0';
