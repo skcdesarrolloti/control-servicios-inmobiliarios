@@ -24,6 +24,7 @@ final class ServiciosInmobiliariosFilters
       'fTema' => $this->value($input, $prefix . 'tema'),
       'fEstado' => $this->value($input, $prefix . 'estado'),
       'fEstadoAdmin' => $this->value($input, $prefix . 'estado_admin'),
+      'fOrigen' => $this->value($input, $prefix . 'origen'),
       'fPrioridad' => $this->value($input, $prefix . 'prioridad'),
       'fCotizacion' => $this->value($input, $prefix . 'cotizacion'),
       'fPerturbacion' => $this->value($input, $prefix . 'perturbacion'),

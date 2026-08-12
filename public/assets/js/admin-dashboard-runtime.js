@@ -783,6 +783,17 @@
           input.por_categoria
             ? input.por_categoria
             : {},
+        web:
+          input && typeof input.web === "object" && input.web
+            ? input.web
+            : {
+                total: 0,
+                abiertos: 0,
+                en_proceso: 0,
+                cerrados: 0,
+                por_estado_comercial: {},
+                por_estado_administrativo: {},
+              },
         seg_por_funcionario:
           input &&
           typeof input.seg_por_funcionario === "object" &&
@@ -1049,6 +1060,60 @@
       renderBars(
         root.querySelector("#scm-chart-categorias"),
         categoriasRows,
+        "",
+      );
+
+      var webMetrics = metrics.web || {};
+      renderBars(
+        root.querySelector("#scm-chart-web"),
+        [
+          {
+            label: "Total web",
+            value: Math.max(0, Math.round(toNumber(webMetrics.total))),
+            cls: "accent",
+          },
+          {
+            label: "Abiertos",
+            value: Math.max(0, Math.round(toNumber(webMetrics.abiertos))),
+            cls: "success",
+          },
+          {
+            label: "En proceso",
+            value: Math.max(0, Math.round(toNumber(webMetrics.en_proceso))),
+            cls: "warning",
+          },
+          {
+            label: "Cerrados",
+            value: Math.max(0, Math.round(toNumber(webMetrics.cerrados))),
+            cls: "danger",
+          },
+        ],
+        "",
+      );
+
+      var webComercial = webMetrics.por_estado_comercial || {};
+      renderBars(
+        root.querySelector("#scm-chart-web-comercial"),
+        Object.keys(webComercial).map(function (label) {
+          return {
+            label: label,
+            value: Math.max(0, Math.round(toNumber(webComercial[label]))),
+            cls: "accent",
+          };
+        }),
+        "",
+      );
+
+      var webAdmin = webMetrics.por_estado_administrativo || {};
+      renderBars(
+        root.querySelector("#scm-chart-web-admin"),
+        Object.keys(webAdmin).map(function (label) {
+          return {
+            label: label,
+            value: Math.max(0, Math.round(toNumber(webAdmin[label]))),
+            cls: "warning",
+          };
+        }),
         "",
       );
 

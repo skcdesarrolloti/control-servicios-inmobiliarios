@@ -82,22 +82,10 @@ trait RendersDashboard
     $serviciosPublicosPendientesHtml = $pendingController->renderServiciosPublicosTab($_GET);
     $reportesAdministrativosPendientesHtml = $pendingController->renderReportesAdministrativosTab();
     $contratosArrendamientoHtml = $pendingController->renderContratosArrendamientoTab();
-    $publicPqrEmployeeFilter = trim((string) ($_GET['id_empleado'] ?? ''));
-    $publicPqrEmployeeFilter = preg_replace('/[^A-Za-z0-9_-]/', '', $publicPqrEmployeeFilter);
-    if (!is_string($publicPqrEmployeeFilter)) {
-      $publicPqrEmployeeFilter = '';
-    }
-    $publicPqrFilters = $this->get_public_pqr_filters_from_request();
-
     $tabMap = [
       'abiertos' => 'scm-panel-abiertos',
       'abierto' => 'scm-panel-abiertos',
       'scm-panel-abiertos' => 'scm-panel-abiertos',
-      'pqr_publico' => 'scm-panel-pqr-publico',
-      'pqr-publico' => 'scm-panel-pqr-publico',
-      'solicitudes_web' => 'scm-panel-pqr-publico',
-      'solicitudes-web' => 'scm-panel-pqr-publico',
-      'scm-panel-pqr-publico' => 'scm-panel-pqr-publico',
       'postergados' => 'scm-panel-postergados',
       'scm-panel-postergados' => 'scm-panel-postergados',
       'cerrados' => 'scm-panel-cerrados',
@@ -111,22 +99,8 @@ trait RendersDashboard
     if ($initialTab === '' && $initialOpenTopic !== '') {
       $initialTab = 'scm-panel-abiertos';
     }
-    if ($initialTab === '' && ($publicPqrEmployeeFilter !== '' || $publicPqrFilters['estado'] !== '' || $publicPqrFilters['empleado'] !== '' || $publicPqrFilters['categoria'] !== '' || $publicPqrFilters['busqueda'] !== '' || isset($_GET['public_pqr_bucket']) || isset($_GET['public_pqr_topic']) || isset($_GET['public_pqr_page']))) {
-      $initialTab = 'scm-panel-pqr-publico';
-    }
     $iframeModeRaw = mb_strtolower(trim((string) ($_GET['scm_iframe'] ?? ($_GET['iframe'] ?? ''))), 'UTF-8');
     $iframeMode = in_array($iframeModeRaw, ['1', 'true', 'yes', 'si'], true);
-
-    $publicPqrResult = $this->fetch_public_pqr_result(24, $publicPqrEmployeeFilter, $publicPqrFilters);
-    $publicPqrHtml = $this->render_public_pqr_tab(
-      $publicPqrResult,
-      (array) ($filterOptions['funcionarios'] ?? []),
-      (string) ($config['ticket_url'] ?? self::DEFAULT_TICKET_URL),
-      $publicPqrEmployeeFilter,
-      false,
-      [],
-      $publicPqrFilters
-    );
 
     $categoryMetrics = [
       'Mantenimiento' => (int)($stats['total'] ?? 0),
@@ -137,6 +111,7 @@ trait RendersDashboard
       'Certificaciones' => (int)($genericResults['certificaciones']['result']['stats']['total'] ?? 0),
       'Contractual' => (int)($genericResults['contractual']['result']['stats']['total'] ?? 0),
     ];
+    $webTicketStats = $this->get_web_ticket_statistics();
 
     $nonce = \SCM\Core\App::csrf()->token(self::NONCE_KEY);
     $apiUrl = defined('SCM_BASE_URL') ? (SCM_BASE_URL . '/api.php') : '/api.php';
@@ -149,7 +124,6 @@ trait RendersDashboard
       'initialTab' => $initialTab,
       'initialOpenTopic' => $initialOpenTopic,
       'iframeMode' => $iframeMode,
-      'publicPqrEmployeeFilter' => $publicPqrEmployeeFilter,
       'guide'   => [
         'enabled' => true,
         'title'   => 'Guia de uso',
@@ -218,6 +192,7 @@ trait RendersDashboard
       'mes_actualizados' => (int)($stats['mes_actualizados'] ?? 0),
       'mes_cerrados' => (int)($stats['mes_cerrados'] ?? 0),
       'mes_seguimientos' => (int)($stats['mes_seguimientos'] ?? 0),
+      'web' => $webTicketStats,
       'por_categoria' => $categoryMetrics,
       'detalle_por_categoria' => [
         'mantenimiento' => [
@@ -297,7 +272,6 @@ trait RendersDashboard
         <button class="scm-tab active" data-tab="scm-panel-abiertos" type="button">Abiertos</button>
         <button class="scm-tab" data-tab="scm-panel-postergados" type="button">Postergados</button>
         <button class="scm-tab" data-tab="scm-panel-cerrados" type="button">Cerrados</button>
-        <button class="scm-tab" data-tab="scm-panel-pqr-publico" type="button">Solicitudes Web</button>
         <button class="scm-tab" data-tab="scm-panel-preventivas-pendientes" type="button">Preventivas Pendientes</button>
         <button class="scm-tab" data-tab="scm-panel-contratos-arrendamiento" type="button">Contratos de arrendamiento</button>
         <button class="scm-tab" data-tab="scm-panel-servicios-publicos-pendientes" type="button">Servicios P&uacute;blicos Pendientes</button>
@@ -365,6 +339,11 @@ trait RendersDashboard
                 </select></div>
               <div class="scm-field"><label for="scm_estado_admin">Estado administrativo</label><select id="scm_estado_admin" name="scm_estado_admin" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["estado_admin"] ?? []) as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected(($params["fEstadoAdmin"] ?? ""), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?>
+                </select></div>
+              <div class="scm-field"><label for="scm_origen">Origen</label><select id="scm_origen" name="scm_origen" class="select select-bordered select-sm scm-select">
+                  <option value="">Todos</option>
+                  <option value="web" <?php selected(($params['fOrigen'] ?? ''), 'web'); ?>>Web</option>
+                  <option value="interno" <?php selected(($params['fOrigen'] ?? ''), 'interno'); ?>>No web</option>
                 </select></div>
               <div class="scm-field"><label for="scm_id_empleado">Funcionario</label><select id="scm_id_empleado" name="scm_id_empleado" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["funcionarios"] ?? []) as $func): $fId = trim((string)($func["id"] ?? ""));
@@ -580,10 +559,6 @@ trait RendersDashboard
         <?php echo $this->render_status_bucket_panel('cerrados', $statusBucketDefs['cerrados'], $statusTopicDefs, $statusResults['cerrados'] ?? []); ?>
       </div>
 
-      <div class="scm-tab-panel" id="scm-panel-pqr-publico">
-        <?php echo $publicPqrHtml; ?>
-      </div>
-
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-dashboard-inline.js?v=' . SCM_VERSION); ?>" defer></script>
 
       <div class="scm-tab-panel" id="scm-panel-metricas" data-scm-metrics="<?php echo self::h((string)$metricsJson); ?>">
@@ -639,6 +614,18 @@ trait RendersDashboard
             <div class="scm-bars" id="scm-chart-categorias"></div>
           </section>
           <section class="scm-metrics-card">
+            <h3>Tickets Web</h3>
+            <div class="scm-bars" id="scm-chart-web"></div>
+          </section>
+          <section class="scm-metrics-card">
+            <h3>Web por estado comercial</h3>
+            <div class="scm-bars" id="scm-chart-web-comercial"></div>
+          </section>
+          <section class="scm-metrics-card">
+            <h3>Web por estado administrativo</h3>
+            <div class="scm-bars" id="scm-chart-web-admin"></div>
+          </section>
+          <section class="scm-metrics-card">
             <h3>Seguimientos del mes por Funcionario</h3>
             <div class="scm-bars" id="scm-chart-seg-funcionario"></div>
           </section>
@@ -676,5 +663,85 @@ trait RendersDashboard
     <script src="<?php echo $damageJsUrl; ?>" defer></script>
 <?php
     return (string)ob_get_clean();
+  }
+
+  /** @return array<string,mixed> */
+  private function get_web_ticket_statistics(): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->table_exists($table)) {
+      return [
+        'total' => 0,
+        'abiertos' => 0,
+        'en_proceso' => 0,
+        'cerrados' => 0,
+        'por_estado_comercial' => [],
+        'por_estado_administrativo' => [],
+      ];
+    }
+
+    $webParts = [];
+    foreach (['creado_por', 'creador_por'] as $column) {
+      if ($this->column_exists($table, $column)) {
+        $webParts[] = "LOWER(TRIM(COALESCE(`{$column}`, ''))) IN ('propietario', 'arrendatario', 'copropiedad', 'cliente')";
+      }
+    }
+    if ($this->column_exists($table, 'medio')) {
+      $webParts[] = "LOWER(TRIM(COALESCE(`medio`, ''))) IN ('portal propietario', 'portal arrendatario', 'portal copropiedad', 'whatsapp cliente')";
+    }
+    $webWhere = empty($webParts) ? '0 = 1' : '(' . implode(' OR ', $webParts) . ')';
+
+    $estadoExpr = $this->column_exists($table, 'estado') ? "LOWER(TRIM(COALESCE(`estado`, '')))" : "''";
+    $estadoAdminExpr = $this->column_exists($table, 'estado_administrativo') ? "LOWER(TRIM(COALESCE(`estado_administrativo`, '')))" : "''";
+    $closedExpr = "({$estadoExpr} IN ('cerrado', 'resuelto', 'finalizado') OR {$estadoAdminExpr} IN ('cerrado', 'resuelto', 'finalizado'))";
+
+    $row = $this->db->getRow(
+      "SELECT
+        COUNT(1) AS total,
+        SUM(CASE WHEN {$estadoExpr} = 'nuevo' AND NOT {$closedExpr} THEN 1 ELSE 0 END) AS abiertos,
+        SUM(CASE WHEN {$estadoExpr} = 'en proceso' AND NOT {$closedExpr} THEN 1 ELSE 0 END) AS en_proceso,
+        SUM(CASE WHEN {$closedExpr} THEN 1 ELSE 0 END) AS cerrados
+       FROM `{$table}`
+       WHERE {$webWhere}"
+    ) ?: [];
+
+    $byCommercial = [];
+    if ($this->column_exists($table, 'estado_comercial')) {
+      $rows = $this->db->getResults(
+        "SELECT TRIM(COALESCE(`estado_comercial`, 'Sin estado')) AS label, COUNT(1) AS total
+         FROM `{$table}`
+         WHERE {$webWhere}
+         GROUP BY TRIM(COALESCE(`estado_comercial`, 'Sin estado'))
+         ORDER BY total DESC, label ASC"
+      );
+      foreach ($rows as $item) {
+        $label = trim((string) ($item['label'] ?? ''));
+        $byCommercial[$label !== '' ? $label : 'Sin estado'] = (int) ($item['total'] ?? 0);
+      }
+    }
+
+    $byAdmin = [];
+    if ($this->column_exists($table, 'estado_administrativo')) {
+      $rows = $this->db->getResults(
+        "SELECT TRIM(COALESCE(`estado_administrativo`, 'Sin estado')) AS label, COUNT(1) AS total
+         FROM `{$table}`
+         WHERE {$webWhere}
+         GROUP BY TRIM(COALESCE(`estado_administrativo`, 'Sin estado'))
+         ORDER BY total DESC, label ASC"
+      );
+      foreach ($rows as $item) {
+        $label = trim((string) ($item['label'] ?? ''));
+        $byAdmin[$label !== '' ? $label : 'Sin estado'] = (int) ($item['total'] ?? 0);
+      }
+    }
+
+    return [
+      'total' => (int) ($row['total'] ?? 0),
+      'abiertos' => (int) ($row['abiertos'] ?? 0),
+      'en_proceso' => (int) ($row['en_proceso'] ?? 0),
+      'cerrados' => (int) ($row['cerrados'] ?? 0),
+      'por_estado_comercial' => $byCommercial,
+      'por_estado_administrativo' => $byAdmin,
+    ];
   }
 }

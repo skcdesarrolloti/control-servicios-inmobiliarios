@@ -81,6 +81,12 @@ trait MaintenanceStatisticsConcern
       $args[] = strtolower(trim($estadoAdmin));
     }
 
+    $origenFilter = strtolower(trim((string) ($filters['fOrigen'] ?? '')));
+    if (in_array($origenFilter, ['web', 'interno'], true)) {
+      $webExpr = $this->maintenanceWebOriginExpression('t');
+      $where[] = $origenFilter === 'web' ? $webExpr : "NOT ({$webExpr})";
+    }
+
     $prioridad = (string) ($filters['fPrioridad'] ?? '');
     if ($prioridad !== '') {
       $where[] = "LOWER(TRIM(COALESCE(t.prioridad, ''))) = %s";

@@ -128,6 +128,12 @@ trait MaintenanceQueriesConcern
       $args[] = strtolower(trim((string) $filters['fEstadoAdmin']));
     }
 
+    $origenFilter = strtolower(trim((string) ($filters['fOrigen'] ?? '')));
+    if (in_array($origenFilter, ['web', 'interno'], true)) {
+      $webExpr = $this->maintenanceWebOriginExpression('t');
+      $where[] = $origenFilter === 'web' ? $webExpr : "NOT ({$webExpr})";
+    }
+
     if ($filters['fPrioridad'] !== '') {
       $where[] = "LOWER(TRIM(COALESCE(t.prioridad, ''))) = %s";
       $args[] = strtolower(trim((string) $filters['fPrioridad']));
@@ -422,6 +428,24 @@ trait MaintenanceQueriesConcern
     });
 
     return $rows;
+  }
+
+  private function maintenanceWebOriginExpression(string $alias = 't'): string
+  {
+    $table = $this->ticketsTable();
+    $parts = [];
+    foreach (['creado_por', 'creador_por'] as $column) {
+      if ($this->schema->columnExists($table, $column)) {
+        $parts[] = "LOWER(TRIM(COALESCE({$alias}.`{$column}`, ''))) IN ('propietario', 'arrendatario', 'copropiedad', 'cliente')";
+      }
+    }
+    if ($this->schema->columnExists($table, 'medio')) {
+      $parts[] = "LOWER(TRIM(COALESCE({$alias}.`medio`, ''))) IN ('portal propietario', 'portal arrendatario', 'portal copropiedad', 'whatsapp cliente')";
+    }
+    if (empty($parts)) {
+      return '0 = 1';
+    }
+    return '(' . implode(' OR ', $parts) . ')';
   }
 
   /**

@@ -409,6 +409,11 @@ final class GenericTicketsUiView
                 <option value="">Todos</option><?php foreach (($filterOptions['estado_admin'] ?? []) as $opt): ?><option value="<?php echo esc_attr((string) $opt); ?>" <?php selected((string) ($p['fEstadoAdmin'] ?? ''), (string) $opt); ?>><?php echo esc_html((string) $opt); ?></option><?php endforeach; ?>
               </select></div>
           <?php endif; ?>
+          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>origen">Origen</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>origen" name="<?php echo esc_attr($prefix); ?>origen">
+              <option value="">Todos</option>
+              <option value="web" <?php selected((string) ($p['fOrigen'] ?? ''), 'web'); ?>>Web</option>
+              <option value="interno" <?php selected((string) ($p['fOrigen'] ?? ''), 'interno'); ?>>No web</option>
+            </select></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>empleado">Funcionario</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>empleado" name="<?php echo esc_attr($prefix); ?>empleado">
               <option value="">Todos</option><?php foreach (($filterOptions['funcionarios'] ?? []) as $func): $fId = trim((string) ($func['id'] ?? ''));
                                                 if ($fId === '') continue; ?><option value="<?php echo esc_attr($fId); ?>" <?php selected((string) ($p['fEmpleado'] ?? ''), $fId); ?>><?php echo esc_html((string) ($func['label'] ?? $fId)); ?></option><?php endforeach; ?>

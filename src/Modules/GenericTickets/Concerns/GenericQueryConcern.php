@@ -24,6 +24,7 @@ trait GenericQueryConcern
     return [
       'fEstado' => $clean($input[$prefix . 'estado'] ?? ''),
       'fEstadoAdmin' => $clean($input[$prefix . 'estado_admin'] ?? ''),
+      'fOrigen' => $clean($input[$prefix . 'origen'] ?? ''),
       'fBusqueda' => $clean($input[$prefix . 'busqueda'] ?? ''),
       'fInmueble' => $clean($input[$prefix . 'inmueble'] ?? ''),
       'fContrato' => $clean($input[$prefix . 'contrato'] ?? ''),
@@ -122,6 +123,12 @@ trait GenericQueryConcern
           $args[] = $p['fEstadoAdmin'];
         }
       }
+    }
+
+    $origenFilter = strtolower(trim((string) ($p['fOrigen'] ?? '')));
+    if (in_array($origenFilter, ['web', 'interno'], true)) {
+      $webExpr = $this->generic_web_origin_expression($tabla);
+      $where[] = $origenFilter === 'web' ? $webExpr : "NOT ({$webExpr})";
     }
 
     if (!empty($p['fInmueble'])) {
@@ -521,6 +528,20 @@ trait GenericQueryConcern
       ],
       'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
     ];
+  }
+
+  private function generic_web_origin_expression(string $tabla): string
+  {
+    $parts = [];
+    foreach (['creado_por', 'creador_por'] as $column) {
+      if ($this->column_exists($tabla, $column)) {
+        $parts[] = "LOWER(TRIM(COALESCE(`{$column}`, ''))) IN ('propietario', 'arrendatario', 'copropiedad', 'cliente')";
+      }
+    }
+    if ($this->column_exists($tabla, 'medio')) {
+      $parts[] = "LOWER(TRIM(COALESCE(`medio`, ''))) IN ('portal propietario', 'portal arrendatario', 'portal copropiedad', 'whatsapp cliente')";
+    }
+    return empty($parts) ? '0 = 1' : '(' . implode(' OR ', $parts) . ')';
   }
 
   /**
