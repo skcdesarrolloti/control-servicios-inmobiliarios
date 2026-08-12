@@ -1,4 +1,25 @@
 (function() {
+          function setInlineListLoading(scope, isLoading, label) {
+            if (!scope) return;
+            var wrap = scope.querySelector('.scm-public-pqr-cards-wrap, .scm-cards-wrap, .scm-table-wrap, .table-responsive');
+            if (!wrap) return;
+            var loader = wrap.querySelector('.scm-list-loader');
+            if (!loader) {
+              loader = document.createElement('div');
+              loader.className = 'scm-list-loader';
+              loader.setAttribute('role', 'status');
+              loader.setAttribute('aria-live', 'polite');
+              loader.innerHTML = '<div class="scm-list-loader-card"><span class="scm-list-loader-dots" aria-hidden="true"><i></i><i></i><i></i></span><strong></strong><small>Espera un momento mientras actualizamos la vista.</small></div>';
+              wrap.appendChild(loader);
+            }
+            var title = loader.querySelector('strong');
+            if (title) title.textContent = label || 'Cargando datos...';
+            wrap.classList.toggle('scm-list-is-loading', !!isLoading);
+            loader.classList.toggle('active', !!isLoading);
+            var busyTarget = wrap.querySelector('.scm-ticket-cards, table, tbody') || wrap;
+            busyTarget.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+          }
+
           function setup(prefix, action, tableId, kpisId) {
             var form = document.getElementById(prefix + 'form');
             if (!form) return;
@@ -16,6 +37,7 @@
               fd.append('action', action);
               fd.append('nonce', nonce);
               if (spinner) spinner.classList.add('active');
+              setInlineListLoading(form.closest('.scm-tab-panel') || document, true, 'Cargando datos...');
               fetch(ajaxUrl, {
                   method: 'POST',
                   body: fd,
@@ -42,6 +64,7 @@
                 })
                 .finally(function() {
                   if (spinner) spinner.classList.remove('active');
+                  setInlineListLoading(form.closest('.scm-tab-panel') || document, false);
                 });
             }
 
@@ -83,6 +106,7 @@
               fd.append('action', actionsSra.reportes_administrativos_pendientes || 'scm_reportes_administrativos_pendientes');
               fd.append('nonce', nonceSra);
               if (sraSpinner) sraSpinner.classList.add('active');
+              setInlineListLoading(sraPanel, true, 'Cargando reportes...');
               fetch(ajaxUrlSra, {
                   method: 'POST',
                   body: fd,
@@ -101,6 +125,7 @@
                 })
                 .finally(function() {
                   if (sraSpinner) sraSpinner.classList.remove('active');
+                  setInlineListLoading(sraPanel, false);
                 });
             }
 
@@ -420,6 +445,7 @@
                 var filterSpinner = form.querySelector('.scm-spinner');
                 if (filterBtn) filterBtn.disabled = true;
                 if (filterSpinner) filterSpinner.classList.add('active');
+                setInlineListLoading(pqrPanel, true, 'Cargando Solicitudes Web...');
                 pqrPanel.classList.add('is-loading');
 
                 var filterFd = new FormData(form);
@@ -457,6 +483,7 @@
                   })
                   .finally(function() {
                     pqrPanel.classList.remove('is-loading');
+                    setInlineListLoading(pqrPanel, false);
                     if (filterBtn) filterBtn.disabled = false;
                     if (filterSpinner) filterSpinner.classList.remove('active');
                   });

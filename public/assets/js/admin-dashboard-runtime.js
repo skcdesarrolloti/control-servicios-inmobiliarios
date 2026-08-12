@@ -127,6 +127,37 @@
     var actionCrearTicketAdministrativo =
       actions.crear_ticket_administrativo || "";
 
+    function setListLoading(cardsEl, isLoading, label) {
+      if (!cardsEl) {
+        return;
+      }
+      var wrap = cardsEl.closest ? cardsEl.closest(".scm-cards-wrap") : null;
+      if (!wrap) {
+        return;
+      }
+      var loader = wrap.querySelector(".scm-list-loader");
+      if (!loader) {
+        loader = document.createElement("div");
+        loader.className = "scm-list-loader";
+        loader.setAttribute("role", "status");
+        loader.setAttribute("aria-live", "polite");
+        loader.innerHTML =
+          '<div class="scm-list-loader-card">' +
+          '<span class="scm-list-loader-dots" aria-hidden="true"><i></i><i></i><i></i></span>' +
+          '<strong></strong>' +
+          "<small>Espera un momento mientras actualizamos la vista.</small>" +
+          "</div>";
+        wrap.appendChild(loader);
+      }
+      var title = loader.querySelector("strong");
+      if (title) {
+        title.textContent = label || "Cargando tickets...";
+      }
+      wrap.classList.toggle("scm-list-is-loading", !!isLoading);
+      loader.classList.toggle("active", !!isLoading);
+      cardsEl.setAttribute("aria-busy", isLoading ? "true" : "false");
+    }
+
     function showToast(type, message) {
       scmNotify(type, message);
     }
@@ -1310,6 +1341,7 @@
       if (spinner) {
         spinner.classList.add("active");
       }
+      setListLoading(tbody, true, "Cargando tickets...");
       form.classList.add("scm-loading");
 
       return fetch(ajaxUrl, {
@@ -1368,6 +1400,7 @@
           if (spinner) {
             spinner.classList.remove("active");
           }
+          setListLoading(tbody, false);
           form.classList.remove("scm-loading");
         });
     }
@@ -1844,6 +1877,7 @@
         if (tabSpinner) {
           tabSpinner.classList.add("active");
         }
+        setListLoading(tabCards, true, "Cargando tickets...");
         tabForm.classList.add("scm-loading");
 
         return fetch(ajaxUrl, {
@@ -1961,6 +1995,7 @@
             if (tabSpinner) {
               tabSpinner.classList.remove("active");
             }
+            setListLoading(tabCards, false);
             tabForm.classList.remove("scm-loading");
           });
       }
@@ -2088,6 +2123,7 @@
         if (tabSpinner) {
           tabSpinner.classList.add("active");
         }
+        setListLoading(tabCards, true, "Cargando vista...");
         tabForm.classList.add("scm-loading");
 
         return fetch(ajaxUrl, {
@@ -2125,6 +2161,7 @@
             if (tabSpinner) {
               tabSpinner.classList.remove("active");
             }
+            setListLoading(tabCards, false);
             tabForm.classList.remove("scm-loading");
           });
       }

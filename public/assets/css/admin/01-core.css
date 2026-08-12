@@ -666,6 +666,85 @@
   background: var(--scm-surface);
   box-shadow: var(--scm-shadow-md);
   padding: 16px;
+  position: relative;
+  min-height: 180px;
+  overflow: hidden;
+}
+
+#scm-app .scm-list-is-loading .scm-ticket-cards {
+  opacity: 0.36;
+  filter: saturate(0.75);
+}
+
+#scm-app .scm-list-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(248, 250, 252, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+#scm-app .scm-list-loader.active {
+  display: flex;
+}
+
+#scm-app .scm-list-loader-card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 280px;
+  padding: 16px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
+  color: var(--scm-text);
+  text-align: center;
+}
+
+#scm-app .scm-list-loader-card strong {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+#scm-app .scm-list-loader-card small {
+  color: var(--scm-text-soft);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+#scm-app .scm-list-loader-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#scm-app .scm-list-loader-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--scm-orange);
+  animation: scm-bounce 0.72s infinite alternate;
+}
+
+#scm-app .scm-list-loader-dots i:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+#scm-app .scm-list-loader-dots i:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #scm-app .scm-list-loader-dots i {
+    animation: none;
+  }
 }
 
 #scm-app .scm-case-magnitude-editor {
@@ -885,6 +964,7 @@
 
 /* â”€â”€ Table (fallback) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 #scm-app .scm-table-wrap {
+  position: relative;
   overflow-x: auto;
   border-radius: var(--scm-r-lg);
   border: 1px solid var(--scm-border);
