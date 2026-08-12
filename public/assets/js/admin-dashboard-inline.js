@@ -393,11 +393,6 @@
               var ticketPk = transferFromCase.getAttribute('data-ticket-pk') || '';
               var sourceTransferBtn = ticketPk ? pqrPanel.querySelector('[data-scm-open-pqr-transfer][data-ticket-pk="' + ticketPk.replace(/"/g, '\\"') + '"]') : null;
               if (!sourceTransferBtn) return;
-              var caseModal = document.getElementById('scm-case-modal');
-              if (caseModal) {
-                caseModal.classList.remove('open');
-                caseModal.setAttribute('aria-hidden', 'true');
-              }
               openTransferModal(sourceTransferBtn);
             });
 

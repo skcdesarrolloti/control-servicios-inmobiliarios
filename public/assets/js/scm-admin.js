@@ -2361,8 +2361,6 @@
         .forEach(function (activateBtn) {
           activateBtn.addEventListener("click", function (event) {
             event.preventDefault();
-            event.stopPropagation();
-            openActivateTicketPrompt(btn, activateBtn);
           });
         });
 
