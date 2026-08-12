@@ -676,10 +676,34 @@ trait RendersPublicPqr
     }
 
     $html .= '<div class="scm-cards-wrap scm-public-pqr-cards-wrap"><div class="scm-ticket-cards">';
+    $fullCaseCardsByPk = [];
+    if (!$readOnly && !$isSignedPublicAccess) {
+      $ticketIds = [];
+      foreach ($rows as $candidateRow) {
+        $candidatePk = (int) ($candidateRow['_ID'] ?? 0);
+        if ($candidatePk > 0) {
+          $ticketIds[] = $candidatePk;
+        }
+      }
+      if (!empty($ticketIds)) {
+        $caseCardConfig = [
+          'ticket_url' => $ticketUrl !== '' ? $ticketUrl : self::DEFAULT_TICKET_URL,
+          'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
+          'correctiva_url' => self::DEFAULT_CORRECTIVA_URL,
+          'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
+          'acta_url' => self::DEFAULT_ACTA_URL,
+        ];
+        $fullCaseCardsByPk = $this->get_servicios_inmobiliarios_module()->renderCardsByTicketIds($ticketIds, $caseCardConfig, $currentBucket);
+      }
+    }
 
     foreach ($rows as $row) {
       $ticketPk = (int) ($row['_ID'] ?? 0);
       if ($ticketPk <= 0) {
+        continue;
+      }
+      if (isset($fullCaseCardsByPk[(string) $ticketPk]) && trim((string) $fullCaseCardsByPk[(string) $ticketPk]) !== '') {
+        $html .= (string) $fullCaseCardsByPk[(string) $ticketPk];
         continue;
       }
       $logicalId = trim((string) ($row['id_ticket'] ?? ''));

@@ -383,6 +383,48 @@ trait MaintenanceQueriesConcern
   }
 
   /**
+   * Devuelve tickets puntuales hidratados con las mismas tablas relacionadas que el listing normal.
+   *
+   * @param array<int,int|string> $ticketIds
+   * @return array<int,array<string,mixed>>
+   */
+  public function queryMaintenanceByPrimaryKeys(array $ticketIds): array
+  {
+    $table = $this->ticketsTable();
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+
+    $ids = [];
+    foreach ($ticketIds as $ticketId) {
+      $id = (int) $ticketId;
+      if ($id > 0) {
+        $ids[$id] = $id;
+      }
+    }
+    $ids = array_values($ids);
+    if (empty($ids)) {
+      return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $rows = $this->db->getResults("SELECT t.* FROM `{$table}` t WHERE t.`_ID` IN ({$placeholders})", $ids);
+    if (empty($rows)) {
+      return [];
+    }
+
+    $rows = $this->enrichRowsWithRelatedTables($rows);
+    $order = array_flip(array_map('strval', $ids));
+    usort($rows, static function (array $a, array $b) use ($order): int {
+      $aKey = (string) ($a['_ID'] ?? '');
+      $bKey = (string) ($b['_ID'] ?? '');
+      return ($order[$aKey] ?? PHP_INT_MAX) <=> ($order[$bKey] ?? PHP_INT_MAX);
+    });
+
+    return $rows;
+  }
+
+  /**
    * Calcula KPIs del universo filtrado sin hidratar cards, historial ni datos relacionados.
    *
    * @param array<string,string> $filters

@@ -91,4 +91,31 @@ final class ServiciosInmobiliariosModule
       'pagination_html' => $this->presenter->renderPagination($pagination, count($rows)),
     ];
   }
+
+  /**
+   * Renderiza tarjetas completas para tickets concretos usando el mismo presentador del listado normal.
+   *
+   * @param array<int,int|string> $ticketIds
+   * @param array<string,string> $config
+   * @return array<string,string>
+   */
+  public function renderCardsByTicketIds(array $ticketIds, array $config, string $statusBucket = ''): array
+  {
+    $statusBucket = in_array($statusBucket, ['postergados', 'cerrados'], true) ? $statusBucket : '';
+    $rows = $this->ticketsRepository->queryMaintenanceByPrimaryKeys($ticketIds);
+    if (empty($rows)) {
+      return [];
+    }
+
+    $rows = $this->metrics->enrichRows($rows);
+    $cards = [];
+    foreach ($rows as $row) {
+      $ticketPk = trim((string) ($row['_ID'] ?? ''));
+      if ($ticketPk === '') {
+        continue;
+      }
+      $cards[$ticketPk] = $this->presenter->renderTbody([$row], $config, Auth::isLoggedIn(), $statusBucket);
+    }
+    return $cards;
+  }
 }
