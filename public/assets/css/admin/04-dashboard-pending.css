@@ -361,6 +361,11 @@
   padding: var(--sp-3) var(--sp-2) 0 !important;
 }
 
+#scm-app #scm-panel-mis-tickets,
+#scm-app #scm-panel-cotizaciones-mantenimiento {
+  padding: var(--sp-4) var(--sp-3) var(--sp-3) !important;
+}
+
 #scm-app .scm-status-subtabs {
   gap: var(--sp-1) !important;
   margin-bottom: var(--sp-3) !important;

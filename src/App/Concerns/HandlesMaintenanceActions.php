@@ -100,6 +100,7 @@ trait HandlesMaintenanceActions
     $params = $module->parseParams($_POST, 'scm_my_');
     $employeeId = $this->current_employee_id();
     $params['fEmpleado'] = $employeeId !== '' ? $employeeId : '__sin_funcionario__';
+    $params['_scmEmpleadoExact'] = '1';
     $result = $module->run($params, $config);
     $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];
 

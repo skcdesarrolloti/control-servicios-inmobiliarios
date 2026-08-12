@@ -70,6 +70,7 @@ trait RendersDashboard
     $currentEmployeeId = $this->current_employee_id();
     $myTicketsParams = $module->parseParams($_GET, 'scm_my_');
     $myTicketsParams['fEmpleado'] = $currentEmployeeId !== '' ? $currentEmployeeId : '__sin_funcionario__';
+    $myTicketsParams['_scmEmpleadoExact'] = '1';
     $myTicketsResult = ['tbody' => $this->render_lazy_tickets_placeholder('Abre esta pestaña para cargar tus tickets.'), 'pagination_html' => ''];
     $myTicketsStats = ['total' => 0];
     $cotizacionesParams = $this->parse_cotizaciones_mantenimiento_params($_GET, 'scmqt_');

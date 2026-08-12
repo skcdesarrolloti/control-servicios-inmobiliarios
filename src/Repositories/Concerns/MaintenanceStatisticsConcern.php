@@ -218,7 +218,14 @@ trait MaintenanceStatisticsConcern
       $args[] = $term;
     }
     $this->buildLikeCondition($where, $args, "COALESCE(t.contrato, '')", (string) ($filters['fContrato'] ?? ''));
-    $this->buildLikeCondition($where, $args, "COALESCE(t.id_empleado, '')", (string) ($filters['fEmpleado'] ?? ''));
+    if (($filters['fEmpleado'] ?? '') !== '') {
+      if (!empty($filters['_scmEmpleadoExact'])) {
+        $where[] = "TRIM(COALESCE(t.id_empleado, '')) = ?";
+        $args[] = trim((string) $filters['fEmpleado']);
+      } else {
+        $this->buildLikeCondition($where, $args, "COALESCE(t.id_empleado, '')", (string) ($filters['fEmpleado'] ?? ''));
+      }
+    }
     $this->buildLikeCondition($where, $args, "COALESCE(t.arrendatario, '')", (string) ($filters['fArrendatario'] ?? ''));
     $this->buildLikeCondition($where, $args, "COALESCE(t.propietario, '')", (string) ($filters['fPropietario'] ?? ''));
     $this->buildLikeCondition($where, $args, "COALESCE(t.asunto, '')", (string) ($filters['fAsunto'] ?? ''));
