@@ -504,11 +504,17 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function closeTicket(int $ticketPk): array
+  public function closeTicket(int $ticketPk, string $motivo = ''): array
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
+    $seguimientoTable = $this->db->table('jet_cct_seguimiento_ticket');
+    $histTable = $this->db->table('jet_cct_historial_del_ticket');
     if ($ticketPk <= 0 || !$this->schema->tableExists($ticketsTable)) {
       return ['ok' => '0', 'message' => 'No se pudo cerrar el ticket.'];
+    }
+    $motivo = trim($motivo);
+    if ($motivo === '') {
+      return ['ok' => '0', 'message' => 'El mensaje de cierre es obligatorio.'];
     }
 
     $ticket = $this->db->getRow("SELECT * FROM `{$ticketsTable}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
@@ -518,19 +524,66 @@ trait WorkflowCommandsConcern
 
     $nowTs = time();
     $nowMysql = date('Y-m-d H:i:s', $nowTs);
+    $userId = \SCM\Core\Auth::userId();
+    $userName = \SCM\Core\Auth::user() ?: ($userId > 0 ? ('Usuario #' . $userId) : 'Sistema');
+    $userInfo = $this->findFuncionario($userId);
+    $employeeId = $this->employeeLogicalId($userId, $userInfo);
+    $histObservacion = 'Ticket cerrado: ' . $motivo;
     $ticketUpdate = [
       'estado' => 'Cerrado',
       'estado_administrativo' => 'Finalizado',
+      'tuvo_seguimiento' => 'Si',
+      'fecha_seguimiento' => $nowTs,
       'fecha_actualizacion' => $nowTs,
       'cct_modified' => $nowMysql,
+      'id_encargado_seguimiento' => $employeeId,
     ];
+    if (isset($ticket['seguimientos'])) {
+      $ticketUpdate['seguimientos'] = (string) ((int) $ticket['seguimientos'] + 1);
+    }
     $ticketUpdate = $this->schema->filterTableData($ticketsTable, $ticketUpdate);
     if (empty($ticketUpdate)) {
       return ['ok' => '0', 'message' => 'No hay columnas disponibles para cerrar el ticket.'];
     }
 
+    $histSaved = false;
+    if ($this->schema->tableExists($histTable)) {
+      $histSaved = $this->insertHistorial(
+        $histTable,
+        $ticketPk,
+        $histObservacion,
+        $userId,
+        $employeeId,
+        $userName,
+        $nowTs,
+        $nowMysql,
+        'Cerrado',
+        '__keep__',
+        'Finalizado'
+      );
+    }
+    if (!$histSaved) {
+      return ['ok' => '0', 'message' => 'No se pudo guardar el historial de cierre.'];
+    }
+
     $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);
-    return ['ok' => '1', 'message' => 'Ticket cerrado y estado administrativo finalizado.'];
+    $segSaved = $this->insertSeguimientoTicket(
+      $seguimientoTable,
+      $ticket,
+      $ticketPk,
+      $histObservacion,
+      $userId,
+      $employeeId,
+      $userName,
+      $nowTs,
+      $nowMysql
+    );
+    return [
+      'ok' => '1',
+      'message' => 'Ticket cerrado y mensaje guardado.',
+      'seg_saved' => $segSaved ? '1' : '0',
+      'hist_saved' => '1',
+    ];
   }
 
   /**

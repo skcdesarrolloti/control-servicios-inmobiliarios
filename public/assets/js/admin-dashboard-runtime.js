@@ -556,11 +556,11 @@
         window.Swal.fire({
           title: isPublicPqr ? "Activar solicitud" : "Activar ticket",
           input: "textarea",
-          inputLabel: "Motivo",
+          inputLabel: "Mensaje de activacion",
           inputPlaceholder: isPublicPqr
-            ? "Escribe el motivo de activacion de la solicitud"
-            : "Escribe el motivo de activacion",
-          inputAttributes: { "aria-label": "Motivo de activacion" },
+            ? "Escribe el mensaje o motivo para activar la solicitud"
+            : "Escribe el mensaje o motivo para activar el ticket",
+          inputAttributes: { "aria-label": "Mensaje de activacion" },
           showCancelButton: true,
           confirmButtonText: "Activar",
           cancelButtonText: "Cancelar",
@@ -568,7 +568,7 @@
           inputValidator: function (value) {
             return String(value || "").trim()
               ? undefined
-              : "El motivo es obligatorio.";
+              : "El mensaje es obligatorio.";
           },
         }).then(function (result) {
           if (!result || !result.isConfirmed) {
@@ -583,13 +583,13 @@
         return;
       }
 
-      var motivo = window.prompt("Motivo para activar el ticket:");
+      var motivo = window.prompt("Mensaje para activar el ticket:");
       if (motivo === null) {
         return;
       }
       motivo = String(motivo || "").trim();
       if (!motivo) {
-        showToast("error", "El motivo es obligatorio.");
+        showToast("error", "El mensaje es obligatorio.");
         return;
       }
       submitActivateTicket(caseBtn, motivo, triggerNode);

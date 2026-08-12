@@ -471,12 +471,16 @@ trait HandlesTicketWorkflowActions
     $this->verifyCsrf();
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
+    $observacion = trim(wp_kses_post(stripslashes((string) ($_POST['observacion'] ?? ($_POST['motivo'] ?? '')))));
     if ($ticketPk <= 0) {
       $this->jsonFail('Ticket invalido.');
     }
+    if ($observacion === '') {
+      $this->jsonFail('El mensaje de cierre es obligatorio.');
+    }
 
     $service = $this->get_seguimiento_service();
-    $result = $service->closeTicket($ticketPk);
+    $result = $service->closeTicket($ticketPk, $observacion);
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo cerrar el ticket.'));
     }

@@ -1887,6 +1887,11 @@
         '<p class="scm-muted">Esta acci&oacute;n cerrar&aacute; ' +
         (isPublicPqr ? "la solicitud" : "el ticket") +
         ' y marcar&aacute; el estado administrativo como Finalizado.</p>' +
+        '<label class="scm-seg-field"><span>Mensaje de cierre</span><textarea name="observacion" rows="6" required placeholder="' +
+        (isPublicPqr
+          ? "Escribe el mensaje o motivo para cerrar la solicitud..."
+          : "Escribe el mensaje o motivo para cerrar el ticket...") +
+        '"></textarea></label>' +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Confirmar cierre</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
