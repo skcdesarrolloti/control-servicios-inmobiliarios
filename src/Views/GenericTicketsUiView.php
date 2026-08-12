@@ -197,7 +197,7 @@ final class GenericTicketsUiView
     $html = '<div class="scm-case-history-docs">';
     foreach ($docs as $doc) {
       $label = trim((string) ($doc['nombre_archivo'] ?? ''));
-      $url = trim((string) ($doc['archivo'] ?? ''));
+      $url = $this->normalizeHistoryAttachmentUrl(trim((string) ($doc['archivo'] ?? '')));
       if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
         continue;
       }
@@ -232,10 +232,40 @@ final class GenericTicketsUiView
     foreach ($items as $item) {
       $url = is_array($item) ? trim((string) ($item['url'] ?? $item['archivo'] ?? '')) : trim((string) $item);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
-        $out[] = $url;
+        $out[] = $this->normalizeHistoryAttachmentUrl($url);
       }
     }
     return array_values(array_unique($out));
+  }
+
+  private function normalizeHistoryAttachmentUrl(string $url): string
+  {
+    $url = trim($url);
+    if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+      return $url;
+    }
+
+    $path = (string) parse_url($url, PHP_URL_PATH);
+    if ($path === '' || stripos($path, '/uploads/') === false) {
+      return $url;
+    }
+
+    $fileName = basename($path);
+    if (!$this->isSafeLegacyAttachmentName($fileName)) {
+      return $url;
+    }
+
+    return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
+  }
+
+  private function isSafeLegacyAttachmentName(string $fileName): bool
+  {
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,190}$/', $fileName)) {
+      return false;
+    }
+
+    $extension = strtolower((string) pathinfo($fileName, PATHINFO_EXTENSION));
+    return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx'], true);
   }
 
   /** @return array<int,array{nombre_archivo:string,archivo:string}> */
@@ -247,7 +277,8 @@ final class GenericTicketsUiView
     }
     $decoded = preg_match('/^[aObis]:/', $value) ? @unserialize($value, ['allowed_classes' => false]) : null;
     if (!is_array($decoded)) {
-      return filter_var($value, FILTER_VALIDATE_URL) ? [['nombre_archivo' => '', 'archivo' => $value]] : [];
+      $url = $this->normalizeHistoryAttachmentUrl($value);
+      return filter_var($url, FILTER_VALIDATE_URL) ? [['nombre_archivo' => '', 'archivo' => $url]] : [];
     }
 
     $out = [];
@@ -255,7 +286,7 @@ final class GenericTicketsUiView
       if (!is_array($doc)) {
         continue;
       }
-      $url = trim((string) ($doc['archivo'] ?? ''));
+      $url = $this->normalizeHistoryAttachmentUrl(trim((string) ($doc['archivo'] ?? '')));
       if ($url === '') {
         continue;
       }
@@ -290,10 +321,11 @@ final class GenericTicketsUiView
         }
       }
       if ($field === 'evidencia' || $field === 'imagen') {
-        if (filter_var($text, FILTER_VALIDATE_URL)) {
+        $url = $this->normalizeHistoryAttachmentUrl($text);
+        if (filter_var($url, FILTER_VALIDATE_URL)) {
           $lines .= '<p><strong>' . esc_html((string) $label) . ':</strong></p>'
-            . '<p><a href="' . esc_url($text) . '" target="_blank" rel="noopener noreferrer">'
-            . '<img src="' . esc_url($text) . '" alt="' . esc_attr((string) $label) . '" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:4px;margin-top:4px;">'
+            . '<p><a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">'
+            . '<img src="' . esc_url($url) . '" alt="' . esc_attr((string) $label) . '" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:4px;margin-top:4px;">'
             . '</a></p>';
           continue;
         }
