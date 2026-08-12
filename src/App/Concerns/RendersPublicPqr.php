@@ -756,23 +756,63 @@ trait RendersPublicPqr
         }
       }
 
-      $caseSource = '<section class="scm-public-pqr-case-detail">';
+      $caseSource = '<div class="scm-case-action-buttons">';
+      $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-public-solicitud">Ver solicitud</button>';
+      $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-public-solicitante">Ver solicitante</button>';
+      $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-public-inmueble">Ver inmueble</button>';
+      $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-public-descripcion">Ver descripcion</button>';
+      $caseSource .= '</div>';
+      $caseSource .= '<section class="scm-public-pqr-case-detail">';
       $caseSource .= '<h4>Detalle de la solicitud</h4>';
       $caseSource .= '<div class="scm-public-pqr-description"><span>Descripción</span><p>' . ($descripcionActual !== '' ? nl2br(self::h($descripcionActual)) : 'Sin descripción registrada.') . '</p></div>';
       $caseSource .= '<div class="scm-public-pqr-detail-grid">';
+      $caseSource .= '<div><span>Ticket</span><strong>#' . self::h($logicalId !== '' ? $logicalId : (string) $ticketPk) . '</strong></div>';
+      $caseSource .= '<div><span>Tipo</span><strong>' . self::h($tipoActual !== '' ? $tipoActual : 'Solicitud web') . '</strong></div>';
+      $caseSource .= '<div><span>Estado</span><strong>' . self::h($estadoActual !== '' ? $estadoActual : '-') . '</strong></div>';
+      $caseSource .= '<div><span>Estado administrativo</span><strong>' . self::h($estadoAdminActual !== '' ? $estadoAdminActual : '-') . '</strong></div>';
       $caseSource .= '<div><span>Solicitante</span><strong>' . self::h($solicitanteActual !== '' ? $solicitanteActual : '-') . '</strong></div>';
       $caseSource .= '<div><span>Celular</span><strong>' . self::h($celularSolicitante !== '' ? $celularSolicitante : '-') . '</strong></div>';
       $caseSource .= '<div><span>Correo</span><strong>' . self::h($correoSolicitante !== '' ? $correoSolicitante : '-') . '</strong></div>';
       $caseSource .= '<div><span>Origen</span><strong>' . self::h($medioActual !== '' ? $medioActual : ($creadoPor !== '' ? $creadoPor : '-')) . '</strong></div>';
-      if ($contratoActual !== '' || $inmuebleActual !== '') {
-        $caseSource .= '<div><span>Contrato</span><strong>' . self::h($contratoActual !== '' ? '#' . $contratoActual : '-') . '</strong></div>';
-        $caseSource .= '<div><span>Inmueble</span><strong>' . self::h($inmuebleActual !== '' ? $inmuebleActual : '-') . '</strong></div>';
-      }
-      if ($direccionActual !== '' || $barrioActual !== '') {
-        $caseSource .= '<div><span>Barrio</span><strong>' . self::h($barrioActual !== '' ? $barrioActual : '-') . '</strong></div>';
-        $caseSource .= '<div><span>Dirección</span><strong>' . self::h($direccionActual !== '' ? $direccionActual : '-') . '</strong></div>';
-      }
+      $caseSource .= '<div><span>Contrato</span><strong>' . self::h($contratoActual !== '' ? '#' . $contratoActual : '-') . '</strong></div>';
+      $caseSource .= '<div><span>Inmueble</span><strong>' . self::h($inmuebleActual !== '' ? $inmuebleActual : '-') . '</strong></div>';
+      $caseSource .= '<div><span>Barrio</span><strong>' . self::h($barrioActual !== '' ? $barrioActual : '-') . '</strong></div>';
+      $caseSource .= '<div><span>Dirección</span><strong>' . self::h($direccionActual !== '' ? $direccionActual : '-') . '</strong></div>';
       $caseSource .= '</div></section>';
+      $caseSource .= $this->render_public_pqr_case_section('Gestion de la solicitud', [
+        'Acciones disponibles' => $currentBucket === 'cerrados' ? 'Agregar nota, activar solicitud y abrir solicitud original.' : 'Trasladar, agregar nota, postergar, responder, cerrar y abrir solicitud original.',
+        'Estado actual' => $estadoActual,
+        'Estado administrativo' => $estadoAdminActual,
+        'Responsable actual' => $empActual,
+      ]);
+      $caseSource .= '<div class="scm-case-hidden-sections" style="display:none;">';
+      $caseSource .= $this->render_public_pqr_case_section('Solicitud web', [
+        'Ticket' => '#' . ($logicalId !== '' ? $logicalId : (string) $ticketPk),
+        'Asunto' => $asuntoActual,
+        'Tipo de solicitud' => $tipoActual,
+        'Departamento' => $deptoActual,
+        'Estado' => $estadoActual,
+        'Estado administrativo' => $estadoAdminActual,
+        'Fecha' => $fechaTxt,
+        'Canal' => $medioActual,
+        'Creado por' => $creadoPor,
+        'Responsable' => $empActual,
+      ], 'scm-sec-public-solicitud');
+      $caseSource .= $this->render_public_pqr_case_section('Solicitante y contacto', [
+        'Solicitante' => $solicitanteActual,
+        'Correo' => $correoSolicitante,
+        'Celular' => $celularSolicitante,
+        'Actor' => $creadoPor,
+        'Medio' => $medioActual,
+      ], 'scm-sec-public-solicitante');
+      $caseSource .= $this->render_public_pqr_case_section('Inmueble y contrato', [
+        'Contrato' => $contratoActual !== '' ? '#' . $contratoActual : '',
+        'Inmueble' => $inmuebleActual,
+        'Barrio' => $barrioActual,
+        'Direccion' => $direccionActual,
+      ], 'scm-sec-public-inmueble');
+      $caseSource .= '<section class="scm-case-history" id="scm-sec-public-descripcion"><h4>Descripcion</h4><article class="scm-case-history-item"><div class="scm-case-history-detail"><p>' . ($descripcionActual !== '' ? nl2br(self::h($descripcionActual)) : 'Sin descripcion registrada.') . '</p></div></article></section>';
+      $caseSource .= '</div>';
 
       $html .= '<article class="scm-ticket-card card scm-public-pqr-card" data-pqr-row="' . self::h((string) $ticketPk) . '" data-pk="' . self::h((string) $ticketPk) . '">';
       $html .= '<header class="scm-ticket-card-head"><span class="scm-ticket-badge badge badge-primary">#' . self::h($logicalId) . '</span><h3><span class="scm-public-pqr-current-topic">' . self::h($tipoActual !== '' ? $tipoActual : 'Solicitud web') . '</span></h3></header>';
@@ -796,7 +836,7 @@ trait RendersPublicPqr
           $html .= '<button type="button" data-scm-open-iframe data-scm-compact-iframe data-no-emp-check data-iframe-url="' . self::h($ticketDetailUrl) . '" data-iframe-title="Solicitud #' . self::h($logicalId) . '" class="scm-btn-case btn btn-primary btn-sm scm-public-pqr-view-btn">Ver solicitud</button>';
         }
       } else {
-        $html .= '<button class="scm-btn-case btn btn-primary btn-sm scm-public-pqr-view-btn" type="button" onclick="scmOpenCase(this)" data-case-kind="public-pqr" data-status-bucket="' . self::h($currentBucket) . '" data-ticket="' . self::h($logicalId) . '" data-ticket-pk="' . self::h((string) $ticketPk) . '" data-asunto="' . self::h($asuntoActual !== '' ? $asuntoActual : '-') . '" data-estado="' . self::h($estadoActual !== '' ? $estadoActual : '-') . '" data-admin="' . self::h($estadoAdminActual !== '' ? $estadoAdminActual : '-') . '" data-creado="' . self::h($fechaTxt) . '" data-empleado="' . self::h($empActual !== '' ? $empActual : '-') . '" data-categoria="' . self::h($tipoActual !== '' ? $tipoActual : '-') . '" data-departamento="' . self::h($deptoActual !== '' ? $deptoActual : '-') . '" data-creado-por="' . self::h($creadoPor !== '' ? $creadoPor : '-') . '" data-medio="' . self::h($medioActual) . '" data-solicitante="' . self::h($solicitanteActual !== '' ? $solicitanteActual : '-') . '" data-correo-solicitante="' . self::h($correoSolicitante) . '" data-celular-solicitante="' . self::h($celularSolicitante) . '" data-contrato="' . self::h($contratoActual !== '' ? '#' . $contratoActual : '-') . '" data-inmueble="' . self::h($inmuebleActual !== '' ? $inmuebleActual : '-') . '" data-barrio="' . self::h($barrioActual) . '" data-direccion="' . self::h($direccionActual) . '" data-ticket-url="' . self::h($ticketDetailUrl) . '">Ver caso</button>';
+        $html .= '<button class="scm-btn-case btn btn-primary btn-sm scm-public-pqr-view-btn" type="button" onclick="scmOpenCase(this)" data-case-kind="public-pqr" data-status-bucket="' . self::h($currentBucket) . '" data-ticket="' . self::h($logicalId) . '" data-ticket-pk="' . self::h((string) $ticketPk) . '" data-asunto="' . self::h($asuntoActual !== '' ? $asuntoActual : '-') . '" data-estado="' . self::h($estadoActual !== '' ? $estadoActual : '-') . '" data-admin="' . self::h($estadoAdminActual !== '' ? $estadoAdminActual : '-') . '" data-creado="' . self::h($fechaTxt) . '" data-empleado="' . self::h($empActual !== '' ? $empActual : '-') . '" data-empleado-id="' . self::h($empIdActual) . '" data-categoria="' . self::h($tipoActual !== '' ? $tipoActual : '-') . '" data-departamento="' . self::h($deptoActual !== '' ? $deptoActual : '-') . '" data-creado-por="' . self::h($creadoPor !== '' ? $creadoPor : '-') . '" data-medio="' . self::h($medioActual !== '' ? $medioActual : '-') . '" data-solicitante="' . self::h($solicitanteActual !== '' ? $solicitanteActual : '-') . '" data-correo-solicitante="' . self::h($correoSolicitante) . '" data-celular-solicitante="' . self::h($celularSolicitante) . '" data-descripcion="' . self::h($descripcionActual) . '" data-contrato="' . self::h($contratoActual !== '' ? '#' . $contratoActual : '-') . '" data-inmueble="' . self::h($inmuebleActual !== '' ? $inmuebleActual : '-') . '" data-id-inmueble-web="' . self::h($inmuebleActual) . '" data-id-inmueble-data="" data-ubicacion-google-maps="" data-barrio="' . self::h($barrioActual !== '' ? $barrioActual : '-') . '" data-direccion="' . self::h($direccionActual !== '' ? $direccionActual : '') . '" data-ticket-url="' . self::h($ticketDetailUrl) . '">Ver caso</button>';
       }
       if (!$readOnly && $isSignedPublicAccess) {
         $html .= '<button type="button" class="scm-btn-primary btn btn-primary btn-sm scm-public-pqr-transfer-btn" data-scm-open-pqr-transfer data-ticket-pk="' . self::h((string) $ticketPk) . '" data-ticket-logical="' . self::h($logicalId) . '">Trasladar</button>';
@@ -1026,6 +1066,22 @@ trait RendersPublicPqr
     </html>
   <?php
     return (string) ob_get_clean();
+  }
+
+  /**
+   * @param array<string,string> $fields
+   */
+  private function render_public_pqr_case_section(string $title, array $fields, string $sectionId = ''): string
+  {
+    $sectionAttr = $sectionId !== '' ? ' id="' . self::h($sectionId) . '"' : '';
+    $html = '<section class="scm-case-history"' . $sectionAttr . '><h4>' . self::h($title) . '</h4>';
+    $html .= '<article class="scm-case-history-item"><div class="scm-case-history-detail">';
+    foreach ($fields as $label => $value) {
+      $text = trim((string) $value);
+      $html .= '<p><strong>' . self::h((string) $label) . ':</strong> ' . self::h($text !== '' ? $text : '-') . '</p>';
+    }
+    $html .= '</div></article></section>';
+    return $html;
   }
 
   /** Panel principal - antes de render_shortcode(). Llamar desde index.php. */
