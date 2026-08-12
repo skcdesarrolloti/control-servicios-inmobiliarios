@@ -20,6 +20,9 @@ trait GenericQueryConcern
     $clean = static function ($v): string {
       return sanitize_text_field((string) ($v ?? ''));
     };
+    $singleDate = $clean($input[$prefix . 'fecha'] ?? '');
+    $dateFrom = $singleDate !== '' ? $singleDate : $clean($input[$prefix . 'fecha_desde'] ?? '');
+    $dateTo = $singleDate !== '' ? $singleDate : $clean($input[$prefix . 'fecha_hasta'] ?? '');
 
     return [
       'fEstado' => $clean($input[$prefix . 'estado'] ?? ''),
@@ -35,8 +38,9 @@ trait GenericQueryConcern
       'fBarrio' => $clean($input[$prefix . 'barrio'] ?? ''),
       'fAseguradora' => $clean($input[$prefix . 'aseguradora'] ?? ''),
       'fConsultorEntrega' => $clean($input[$prefix . 'consultor_entrega'] ?? ''),
-      'fFechaDesde' => $clean($input[$prefix . 'fecha_desde'] ?? ''),
-      'fFechaHasta' => $clean($input[$prefix . 'fecha_hasta'] ?? ''),
+      'fFecha' => $singleDate,
+      'fFechaDesde' => $dateFrom,
+      'fFechaHasta' => $dateTo,
       'fCotizacion' => $clean($input[$prefix . 'cotizacion'] ?? ''),
       'fRevision' => $clean($input[$prefix . 'revision'] ?? ''),
       'fDanos' => $clean($input[$prefix . 'danos'] ?? ''),

@@ -20,6 +20,10 @@ final class ServiciosInmobiliariosFilters
       $perPage = 100;
     }
 
+    $singleDate = $this->value($input, $prefix . 'fecha');
+    $dateFrom = $singleDate !== '' ? $singleDate : $this->value($input, $prefix . 'fecha_desde');
+    $dateTo = $singleDate !== '' ? $singleDate : $this->value($input, $prefix . 'fecha_hasta');
+
     return [
       'fTema' => $this->value($input, $prefix . 'tema'),
       'fEstado' => $this->value($input, $prefix . 'estado'),
@@ -43,8 +47,9 @@ final class ServiciosInmobiliariosFilters
       'fAtraso' => $this->value($input, $prefix . 'atraso'),
       'fSinActualizar' => $this->value($input, $prefix . 'sin_actualizar'),
       'fTuvoSeguimiento' => $this->value($input, $prefix . 'tuvo_seguimiento'),
-      'fFechaDesde' => $this->value($input, $prefix . 'fecha_desde'),
-      'fFechaHasta' => $this->value($input, $prefix . 'fecha_hasta'),
+      'fFecha' => $singleDate,
+      'fFechaDesde' => $dateFrom,
+      'fFechaHasta' => $dateTo,
       'fPage' => (string) $page,
       'fPerPage' => (string) $perPage,
     ];

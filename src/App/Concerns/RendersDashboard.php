@@ -127,7 +127,7 @@ trait RendersDashboard
       'guide'   => [
         'enabled' => true,
         'title'   => 'Guia de uso',
-        'html'    => '<ul><li>Usa filtros para acotar resultados.</li><li>Atraso ticket = tiempo desde creacion.</li><li>Sin actualizar = tiempo desde ultima actualizacion.</li></ul>',
+        'html'    => '<ul><li>Usa filtros para acotar resultados.</li><li>Atraso desde creacion = dias transcurridos desde que se creo el ticket.</li><li>Sin actualizar desde gestion = dias desde la ultima actualizacion o seguimiento.</li></ul>',
       ],
       'actions' => [
         'mant'            => self::AJAX_ACTION,
@@ -351,8 +351,7 @@ trait RendersDashboard
                     <option value="<?php echo esc_attr($fId); ?>" <?php selected(($params["fEmpleado"] ?? ""), $fId); ?>><?php echo esc_html((string)($func["label"] ?? $fId)); ?></option>
                   <?php endforeach; ?>
                 </select></div>
-              <div class="scm-field"><label for="scm_busqueda">B&uacute;squeda</label><input id="scm_busqueda" name="scm_busqueda" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params['fBusqueda'] ?? '')); ?>"></div>
-              <div class="scm-field"><label for="scm_inmueble">Inmueble</label><input id="scm_inmueble" name="scm_inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params['fInmueble'] ?? '')); ?>"></div>
+              <div class="scm-field"><label for="scm_inmueble">Inmueble SIMI</label><input id="scm_inmueble" name="scm_inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params['fInmueble'] ?? '')); ?>"></div>
               <div class="scm-field"><label for="scm_contrato">Contrato</label><input id="scm_contrato" name="scm_contrato" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fContrato"] ?? "")); ?>"></div>
               <div class="scm-field"><label for="scm_asunto">Asunto</label><input id="scm_asunto" name="scm_asunto" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fAsunto"] ?? "")); ?>"></div>
               <div class="scm-field"><label for="scm_arrendatario">Arrendatario</label><input id="scm_arrendatario" name="scm_arrendatario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fArrendatario"] ?? "")); ?>"></div>
@@ -360,8 +359,7 @@ trait RendersDashboard
               <div class="scm-field"><label for="scm_barrio">Barrio</label><select id="scm_barrio" name="scm_barrio" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["barrios"] ?? []) as $barrioOpt): ?><option value="<?php echo esc_attr((string)$barrioOpt); ?>" <?php selected((string)($params["fBarrio"] ?? ""), (string)$barrioOpt); ?>><?php echo esc_html((string)$barrioOpt); ?></option><?php endforeach; ?>
                 </select></div>
-              <div class="scm-field"><label for="scm_fecha_desde">Fecha desde</label><input id="scm_fecha_desde" name="scm_fecha_desde" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string)($params["fFechaDesde"] ?? "")); ?>"></div>
-              <div class="scm-field"><label for="scm_fecha_hasta">Fecha hasta</label><input id="scm_fecha_hasta" name="scm_fecha_hasta" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string)($params["fFechaHasta"] ?? "")); ?>"></div>
+              <div class="scm-field"><label for="scm_fecha">Fecha</label><input id="scm_fecha" name="scm_fecha" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string)($params["fFecha"] ?? (($params["fFechaDesde"] ?? "") === ($params["fFechaHasta"] ?? "") ? ($params["fFechaDesde"] ?? "") : ($params["fFechaDesde"] ?? "")))); ?>"></div>
 
               <div class="scm-field"><label for="scm_cotizacion">Cotizaci&oacute;n</label><select id="scm_cotizacion" name="scm_cotizacion" class="select select-bordered select-sm scm-select">
                   <option value="">Todas</option>
@@ -378,13 +376,13 @@ trait RendersDashboard
                   <option value="has" <?php selected(($params['fRevision'] ?? ''), 'has'); ?>>Con revisi&oacute;n</option>
                   <option value="none" <?php selected(($params['fRevision'] ?? ''), 'none'); ?>>Sin revisi&oacute;n</option>
                 </select></div>
-              <div class="scm-field"><label for="scm_atraso">Atraso ticket</label><select id="scm_atraso" name="scm_atraso" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_atraso">Atraso desde creaci&oacute;n</label><select id="scm_atraso" name="scm_atraso" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option>
                   <option value="3" <?php selected(($params['fAtraso'] ?? ''), '3'); ?>>+3 d&iacute;as</option>
                   <option value="5" <?php selected(($params['fAtraso'] ?? ''), '5'); ?>>+5 d&iacute;as</option>
                   <option value="10" <?php selected(($params['fAtraso'] ?? ''), '10'); ?>>+10 d&iacute;as</option>
                 </select></div>
-              <div class="scm-field"><label for="scm_sin_actualizar">Sin actualizar</label><select id="scm_sin_actualizar" name="scm_sin_actualizar" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_sin_actualizar">Sin actualizar desde gesti&oacute;n</label><select id="scm_sin_actualizar" name="scm_sin_actualizar" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option>
                   <option value="1" <?php selected(($params['fSinActualizar'] ?? ''), '1'); ?>>+1 d&iacute;a</option>
                   <option value="3" <?php selected(($params['fSinActualizar'] ?? ''), '3'); ?>>+3 d&iacute;as</option>
@@ -577,8 +575,10 @@ trait RendersDashboard
           <button class="scm-tab" type="button" data-scm-metric-cat="contable">Contable</button>
           <button class="scm-tab" type="button" data-scm-metric-cat="certificaciones">Certificaciones</button>
           <button class="scm-tab" type="button" data-scm-metric-cat="contractual">Contractual</button>
+          <button class="scm-tab" type="button" data-scm-metric-panel="guardian">Solicitudes Guardian</button>
         </div>
 
+        <div class="scm-metrics-pane active" data-scm-metrics-pane="operativas">
         <div class="scm-metrics-grid">
           <section class="scm-metrics-card">
             <h3>Estado general</h3>
@@ -614,18 +614,6 @@ trait RendersDashboard
             <div class="scm-bars" id="scm-chart-categorias"></div>
           </section>
           <section class="scm-metrics-card">
-            <h3>Tickets Guardian</h3>
-            <div class="scm-bars" id="scm-chart-web"></div>
-          </section>
-          <section class="scm-metrics-card">
-            <h3>Guardian por estado comercial</h3>
-            <div class="scm-bars" id="scm-chart-web-comercial"></div>
-          </section>
-          <section class="scm-metrics-card">
-            <h3>Guardian por estado administrativo</h3>
-            <div class="scm-bars" id="scm-chart-web-admin"></div>
-          </section>
-          <section class="scm-metrics-card">
             <h3>Seguimientos del mes por Funcionario</h3>
             <div class="scm-bars" id="scm-chart-seg-funcionario"></div>
           </section>
@@ -637,6 +625,23 @@ trait RendersDashboard
             <h3>Tickets abiertos por Funcionario</h3>
             <div class="scm-bars" id="scm-chart-abiertos-funcionario"></div>
           </section>
+        </div>
+        </div>
+        <div class="scm-metrics-pane" data-scm-metrics-pane="guardian">
+          <div class="scm-metrics-grid">
+            <section class="scm-metrics-card">
+              <h3>Solicitudes Guardian</h3>
+              <div class="scm-bars" id="scm-chart-web"></div>
+            </section>
+            <section class="scm-metrics-card">
+              <h3>Guardian por estado comercial</h3>
+              <div class="scm-bars" id="scm-chart-web-comercial"></div>
+            </section>
+            <section class="scm-metrics-card">
+              <h3>Guardian por estado administrativo</h3>
+              <div class="scm-bars" id="scm-chart-web-admin"></div>
+            </section>
+          </div>
         </div>
       </div>
 

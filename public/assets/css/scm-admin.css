@@ -3,3 +3,103 @@
 @import url("./admin/03-public-pqr.css?v=3.1.9");
 @import url("./admin/04-dashboard-pending.css?v=3.1.9");
 @import url("./admin/05-guide-contracts.css?v=3.1.9");
+
+#scm-app .scm-origin-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.05;
+  text-align: center;
+}
+
+#scm-app .scm-origin-badge--guardian {
+  background: #2563eb;
+}
+
+#scm-app .scm-origin-badge--internal {
+  background: #64748b;
+}
+
+#scm-app .scm-metrics-pane {
+  display: none;
+}
+
+#scm-app .scm-metrics-pane.active {
+  display: block;
+}
+
+#scm-app .scm-paste-evidence {
+  border: 1px dashed #93c5fd;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 12px 14px;
+  color: #1e3a5f;
+  cursor: pointer;
+  outline: none;
+}
+
+#scm-app .scm-paste-evidence:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+#scm-app .scm-paste-evidence strong {
+  display: block;
+  font-size: 12px;
+}
+
+#scm-app .scm-paste-evidence span {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+#scm-app .scm-paste-evidence ul {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  color: #0f172a;
+  font-size: 12px;
+}
+
+#scm-app .scm-paste-evidence.has-files {
+  border-color: #22c55e;
+  background: #f0fdf4;
+}
+
+#scm-app .scm-paste-evidence.is-error {
+  border-color: #ef4444;
+  background: #fff7f7;
+}
+
+#scm-app .scm-contact-view-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+#scm-app .scm-contact-view-card {
+  border: 1px solid #dbe6f1;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+#scm-app .scm-contact-view-card h5 {
+  margin: 0 0 10px;
+  color: #1e3a5f;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+@media (max-width: 720px) {
+  #scm-app .scm-contact-view-grid {
+    grid-template-columns: 1fr;
+  }
+}

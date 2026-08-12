@@ -17,6 +17,7 @@
   var openPropertyLocationStandaloneEditor = core.openPropertyLocationStandaloneEditor;
   var renderTicketDocumentRow = core.renderTicketDocumentRow;
   var renderTicketDocumentFields = core.renderTicketDocumentFields;
+  var renderPasteEvidenceBox = core.renderPasteEvidenceBox || function () { return ""; };
   var renderNotifyTargets = core.renderNotifyTargets;
   var getLlavesDetailPayload = core.getLlavesDetailPayload;
   var getConsultorEntregaDetailPayload = core.getConsultorEntregaDetailPayload;
@@ -432,6 +433,7 @@
         escHtml(defaultDescripcion) +
         "</textarea></label>" +
         '<label class="scm-seg-field"><span>Imagenes / evidencias</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
+        renderPasteEvidenceBox("imagen[]") +
         renderTicketDocumentFields() +
         renderNotifyTargets() +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear ticket</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
@@ -1063,60 +1065,6 @@
         "",
       );
 
-      var webMetrics = metrics.web || {};
-      renderBars(
-        root.querySelector("#scm-chart-web"),
-        [
-          {
-            label: "Total Guardian",
-            value: Math.max(0, Math.round(toNumber(webMetrics.total))),
-            cls: "accent",
-          },
-          {
-            label: "Abiertos",
-            value: Math.max(0, Math.round(toNumber(webMetrics.abiertos))),
-            cls: "success",
-          },
-          {
-            label: "En proceso",
-            value: Math.max(0, Math.round(toNumber(webMetrics.en_proceso))),
-            cls: "warning",
-          },
-          {
-            label: "Cerrados",
-            value: Math.max(0, Math.round(toNumber(webMetrics.cerrados))),
-            cls: "danger",
-          },
-        ],
-        "",
-      );
-
-      var webComercial = webMetrics.por_estado_comercial || {};
-      renderBars(
-        root.querySelector("#scm-chart-web-comercial"),
-        Object.keys(webComercial).map(function (label) {
-          return {
-            label: label,
-            value: Math.max(0, Math.round(toNumber(webComercial[label]))),
-            cls: "accent",
-          };
-        }),
-        "",
-      );
-
-      var webAdmin = webMetrics.por_estado_administrativo || {};
-      renderBars(
-        root.querySelector("#scm-chart-web-admin"),
-        Object.keys(webAdmin).map(function (label) {
-          return {
-            label: label,
-            value: Math.max(0, Math.round(toNumber(webAdmin[label]))),
-            cls: "warning",
-          };
-        }),
-        "",
-      );
-
       renderBars(
         root.querySelector("#scm-chart-seg-funcionario"),
         Object.keys(metrics.seg_por_funcionario || {}).map(function (name) {
@@ -1167,6 +1115,62 @@
             };
           },
         ),
+        "",
+      );
+    }
+
+    function renderGuardianMetrics(webMetrics) {
+      webMetrics = webMetrics || {};
+      renderBars(
+        root.querySelector("#scm-chart-web"),
+        [
+          {
+            label: "Total Guardian",
+            value: Math.max(0, Math.round(toNumber(webMetrics.total))),
+            cls: "accent",
+          },
+          {
+            label: "Abiertos",
+            value: Math.max(0, Math.round(toNumber(webMetrics.abiertos))),
+            cls: "success",
+          },
+          {
+            label: "En proceso",
+            value: Math.max(0, Math.round(toNumber(webMetrics.en_proceso))),
+            cls: "warning",
+          },
+          {
+            label: "Cerrados",
+            value: Math.max(0, Math.round(toNumber(webMetrics.cerrados))),
+            cls: "danger",
+          },
+        ],
+        "",
+      );
+
+      var webComercial = webMetrics.por_estado_comercial || {};
+      renderBars(
+        root.querySelector("#scm-chart-web-comercial"),
+        Object.keys(webComercial).map(function (label) {
+          return {
+            label: label,
+            value: Math.max(0, Math.round(toNumber(webComercial[label]))),
+            cls: "accent",
+          };
+        }),
+        "",
+      );
+
+      var webAdmin = webMetrics.por_estado_administrativo || {};
+      renderBars(
+        root.querySelector("#scm-chart-web-admin"),
+        Object.keys(webAdmin).map(function (label) {
+          return {
+            label: label,
+            value: Math.max(0, Math.round(toNumber(webAdmin[label]))),
+            cls: "warning",
+          };
+        }),
         "",
       );
     }
@@ -1317,6 +1321,7 @@
         activeMetricCategory,
       );
       renderMetricsCharts(initialCategoryMetrics, activeMetricCategory);
+      renderGuardianMetrics(initialMetrics.web || {});
       applyRevisionKpiVisibility(
         "scm-",
         initialCategoryMetrics.con_revision,
@@ -1324,14 +1329,24 @@
       );
       var metricTabsWrap = root.querySelector("#scm-metric-tabs");
       if (metricTabsWrap) {
+        function showMetricsPane(name) {
+          name = name === "guardian" ? "guardian" : "operativas";
+          root.querySelectorAll("[data-scm-metrics-pane]").forEach(function (pane) {
+            pane.classList.toggle(
+              "active",
+              pane.getAttribute("data-scm-metrics-pane") === name,
+            );
+          });
+        }
         metricTabsWrap
           .querySelectorAll("[data-scm-metric-cat]")
           .forEach(function (btn) {
             btn.addEventListener("click", function () {
+              showMetricsPane("operativas");
               activeMetricCategory =
                 btn.getAttribute("data-scm-metric-cat") || "mantenimiento";
               metricTabsWrap
-                .querySelectorAll("[data-scm-metric-cat]")
+                .querySelectorAll("[data-scm-metric-cat], [data-scm-metric-panel]")
                 .forEach(function (b) {
                   b.classList.remove("active");
                 });
@@ -1346,6 +1361,20 @@
                 activeCategoryMetrics.con_revision,
                 activeCategoryMetrics.sin_revision,
               );
+            });
+          });
+        metricTabsWrap
+          .querySelectorAll("[data-scm-metric-panel]")
+          .forEach(function (btn) {
+            btn.addEventListener("click", function () {
+              metricTabsWrap
+                .querySelectorAll("[data-scm-metric-cat], [data-scm-metric-panel]")
+                .forEach(function (b) {
+                  b.classList.remove("active");
+                });
+              btn.classList.add("active");
+              showMetricsPane(btn.getAttribute("data-scm-metric-panel") || "guardian");
+              renderGuardianMetrics(initialMetrics.web || {});
             });
           });
       }

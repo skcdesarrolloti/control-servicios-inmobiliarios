@@ -19,6 +19,7 @@ final class SeguimientoFormView
     $html .= '<div class="scm-seg-grid">';
     $html .= '<label class="scm-seg-field"><span>Observaci&oacute;n</span><textarea name="observacion" rows="3" required placeholder="Escribe el seguimiento..."></textarea></label>';
     $html .= '<label class="scm-seg-field"><span>Imagenes / Evidencias <em style="font-weight:normal;font-size:0.85em;">(opcional, jpg, png, gif, webp, bmp, heic, tiff)</em></span><input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>';
+    $html .= '<div class="scm-paste-evidence" tabindex="0" role="button" data-scm-paste-evidence data-file-input-name="evidencia[]"><strong>Pegar captura</strong><span>Haz clic aqui y presiona Ctrl+V para adjuntar una imagen copiada.</span><ul data-scm-paste-list></ul></div>';
     $html .= '<input type="hidden" name="estado_ticket" value="__keep__">';
     $html .= '<label class="scm-seg-field"><span>Estado administrativo</span><select name="estado_administrativo">'
       . '<option value="__keep__">Sin cambio</option>'

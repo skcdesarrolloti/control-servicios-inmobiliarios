@@ -1219,6 +1219,7 @@
           : "Describe por qu&eacute; se posterga el ticket...") +
         '"></textarea></label>' +
         '<label class="scm-seg-field"><span>Imagenes / Evidencias (opcional)</span><input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
+        renderPasteEvidenceBox("evidencia[]") +
         renderTicketDocumentFields() +
         renderNotifyTargets(isPublicPqr ? ["arrendatario", "propietario"] : []) +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Guardar postergaci&oacute;n</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
@@ -1236,6 +1237,18 @@
       '<label class="scm-seg-field"><span>Titulo del documento</span><input type="text" name="documento_nombre[]" placeholder="Ej: Cotizacion, soporte, factura..."></label>' +
       '<label class="scm-seg-field"><span>Documento</span><input type="file" name="documento[]" accept="image/jpeg,image/png,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-rar-compressed,text/html,text/plain,text/csv"></label>' +
       '<button type="button" class="btn btn-outline btn-sm scm-remove-ticket-document" data-remove-ticket-document>Quitar</button>' +
+      "</div>"
+    );
+  }
+
+  function renderPasteEvidenceBox(inputName) {
+    return (
+      '<div class="scm-paste-evidence" tabindex="0" role="button" data-scm-paste-evidence data-file-input-name="' +
+      escHtml(inputName || "evidencia[]") +
+      '">' +
+      "<strong>Pegar captura</strong>" +
+      "<span>Haz clic aqui y presiona Ctrl+V para adjuntar una imagen copiada.</span>" +
+      '<ul data-scm-paste-list></ul>' +
       "</div>"
     );
   }
@@ -1269,6 +1282,7 @@
         "</select></label>" +
         '<label class="scm-seg-field"><span>Respuesta</span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
         '<label class="scm-seg-field"><span>Imagenes (opcional)</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
+        renderPasteEvidenceBox("imagen[]") +
         renderTicketDocumentFields() +
         renderNotifyTargets(isPublicPqr ? ["arrendatario", "propietario"] : []) +
         '<div class="scm-seg-actions"><label class="scm-seg-check"><input type="checkbox" name="cerrar_ticket" value="1"> Cerrar al responder</label><button type="submit" class="scm-btn-primary">Publicar y enviar correo</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
@@ -1458,6 +1472,84 @@
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Guardar cambios</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function renderContactViewerHtml(caseBtn) {
+    function line(label, value) {
+      value = String(value || "").trim();
+      return value
+        ? "<dt>" + escHtml(label) + "</dt><dd><strong>" + escHtml(value) + "</strong></dd>"
+        : "";
+    }
+
+    var propietario =
+      line("Nombre", caseBtn.dataset.propietario || "") +
+      line("Correo", caseBtn.dataset.correoPropietario || "") +
+      line(
+        "Celular",
+        [
+          caseBtn.dataset.indicativoPropietario || "",
+          caseBtn.dataset.celularPropietario || "",
+        ]
+          .join(" ")
+          .trim(),
+      );
+    var arrendatario =
+      line("Nombre", caseBtn.dataset.arrendatario || "") +
+      line("Correo", caseBtn.dataset.correoArrendatario || "") +
+      line(
+        "Celular",
+        [
+          caseBtn.dataset.indicativoArrendatario || "",
+          caseBtn.dataset.celularArrendatario || "",
+        ]
+          .join(" ")
+          .trim(),
+      );
+
+    return (
+      '<div class="scm-contact-view-grid">' +
+      '<section class="scm-contact-view-card"><h5>Propietario</h5>' +
+      (propietario
+        ? '<dl class="scm-detail-list">' + propietario + "</dl>"
+        : '<p class="scm-muted">Sin datos de propietario.</p>') +
+      "</section>" +
+      '<section class="scm-contact-view-card"><h5>Arrendatario</h5>' +
+      (arrendatario
+        ? '<dl class="scm-detail-list">' + arrendatario + "</dl>"
+        : '<p class="scm-muted">Sin datos de arrendatario.</p>') +
+      "</section>" +
+      "</div>"
+    );
+  }
+
+  function openContactViewer(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    if (title) title.textContent = "Contactos del caso";
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML = renderContactViewerHtml(caseBtn);
+      prependCaseLocationPanel(body, caseBtn, modal);
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function openPropertyMapViewer(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    if (title) title.textContent = "Mapa del inmueble";
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML = renderCaseLocationPanel(caseBtn, modal, false);
     }
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
@@ -2103,6 +2195,10 @@
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-contacts>Editar contactos</button>';
           caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-view-contacts>Ver contactos</button>';
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-view-property-map>Ver mapa del inmueble</button>';
+          caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>';
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar ticket</button>';
@@ -2388,6 +2484,22 @@
         });
 
       modal
+        .querySelectorAll("[data-scm-view-contacts]")
+        .forEach(function (contactsBtn) {
+          contactsBtn.addEventListener("click", function () {
+            openContactViewer(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-view-property-map]")
+        .forEach(function (mapBtn) {
+          mapBtn.addEventListener("click", function () {
+            openPropertyMapViewer(modal, btn);
+          });
+        });
+
+      modal
         .querySelectorAll("[data-scm-open-ticket-response]")
         .forEach(function (responseBtn) {
           responseBtn.addEventListener("click", function () {
@@ -2441,6 +2553,71 @@
     }
   };
 
+  document.addEventListener("paste", function (event) {
+    var zone =
+      event.target && event.target.closest
+        ? event.target.closest("[data-scm-paste-evidence]")
+        : null;
+    if (!zone) {
+      return;
+    }
+    var clipboard = event.clipboardData || window.clipboardData;
+    var items = clipboard && clipboard.items ? clipboard.items : [];
+    var files = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i] && /^image\//i.test(items[i].type || "")) {
+        var file = items[i].getAsFile();
+        if (file) {
+          var ext = (file.type || "image/png").split("/").pop() || "png";
+          files.push(
+            new File([file], "captura-pegada-" + Date.now() + "-" + i + "." + ext, {
+              type: file.type || "image/png",
+            }),
+          );
+        }
+      }
+    }
+    if (!files.length) {
+      zone.classList.add("is-error");
+      var noImageList = zone.querySelector("[data-scm-paste-list]");
+      if (noImageList) {
+        noImageList.innerHTML = "<li>No se encontro una imagen en el portapapeles.</li>";
+      }
+      return;
+    }
+    var form = zone.closest("form");
+    var inputName = zone.getAttribute("data-file-input-name") || "evidencia[]";
+    var input = form ? form.querySelector('input[type="file"][name="' + inputName + '"]') : null;
+    if (!input || typeof DataTransfer === "undefined") {
+      zone.classList.add("is-error");
+      var unsupportedList = zone.querySelector("[data-scm-paste-list]");
+      if (unsupportedList) {
+        unsupportedList.innerHTML = "<li>Tu navegador no permitio adjuntar la captura pegada.</li>";
+      }
+      return;
+    }
+    var transfer = new DataTransfer();
+    Array.prototype.forEach.call(input.files || [], function (file) {
+      transfer.items.add(file);
+    });
+    files.forEach(function (file) {
+      transfer.items.add(file);
+    });
+    input.files = transfer.files;
+    zone.classList.remove("is-error");
+    zone.classList.add("has-files");
+    var list = zone.querySelector("[data-scm-paste-list]");
+    if (list) {
+      list.innerHTML = "";
+      Array.prototype.forEach.call(input.files || [], function (file) {
+        var item = document.createElement("li");
+        item.textContent = file.name;
+        list.appendChild(item);
+      });
+    }
+    event.preventDefault();
+  });
+
   window.SCMAdminCore = {
     parseRuntime: parseRuntime,
     escHtml: escHtml,
@@ -2454,6 +2631,7 @@
     openPropertyLocationStandaloneEditor: openPropertyLocationStandaloneEditor,
     renderTicketDocumentRow: renderTicketDocumentRow,
     renderTicketDocumentFields: renderTicketDocumentFields,
+    renderPasteEvidenceBox: renderPasteEvidenceBox,
     renderNotifyTargets: renderNotifyTargets,
     getLlavesDetailPayload: getLlavesDetailPayload,
     getConsultorEntregaDetailPayload: getConsultorEntregaDetailPayload,

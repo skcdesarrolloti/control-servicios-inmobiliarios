@@ -277,6 +277,10 @@ final class GenericTicketsCardView
     $correoArrendatarioRaw = trim((string) ($row['correo_arrendatario'] ?? ''));
     $celularArrendatarioRaw = trim((string) ($row['celular_arrendatario'] ?? ''));
     $indicativoArrendatarioRaw = trim((string) ($row['indicativo_arrendatario'] ?? $row['indicativo'] ?? ''));
+    $origenLabel = $this->ticketOriginIsGuardian($row) ? 'Guardian' : 'No Guardian';
+    $origenBadge = $origenLabel === 'Guardian'
+      ? '<span class="scm-origin-badge scm-origin-badge--guardian">Guardian</span>'
+      : '<span class="scm-origin-badge scm-origin-badge--internal">No Guardian</span>';
     $idPrev = trim((string) ($row['id_revision_preventiva'] ?? ''));
     $idCorr = trim((string) ($row['id_revision_correctiva'] ?? ''));
     $idCotz = trim((string) ($row['id_cotizacion_mantenimiento'] ?? ''));
@@ -385,6 +389,7 @@ final class GenericTicketsCardView
     $dataAttrs .= ' data-id-revision-preventiva="' . esc_attr($prevFirstId) . '"';
     $dataAttrs .= ' data-ejecucion="' . esc_attr($tiempoEjecucion) . '"';
     $dataAttrs .= ' data-sin-actualizar="' . esc_attr($tiempoSinActualizar) . '"';
+    $dataAttrs .= ' data-origen="' . esc_attr($origenLabel) . '"';
     $dataAttrs .= ' data-tab-key="' . esc_attr($tabKey) . '"';
     if ($statusBucket !== '') {
       $dataAttrs .= ' data-status-bucket="' . esc_attr($statusBucket) . '"';
@@ -426,6 +431,7 @@ final class GenericTicketsCardView
       $c .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Magnitud caso</span>' . $magnitudCasoBadge . '</div>';
       $c .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Perturbaci&oacute;n</span>' . $perturbacionBadge . '</div>';
     }
+    $c .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Origen</span>' . $origenBadge . '</div>';
     $c .= '</div>';
     if ($tabKey === 'preventiva') {
       $c .= '<p class="scm-ticket-card-barrio">Area afectada <strong>' . esc_html($areaAfectadaLabel) . '</strong></p>';
@@ -460,6 +466,14 @@ final class GenericTicketsCardView
       return '<span class="scm-magnitude-badge scm-magnitude-empty">Sin clasificar</span>';
     }
     return '<span class="scm-magnitude-badge scm-magnitude-' . esc_attr($key) . '">' . $labels[$key] . '</span>';
+  }
+
+  private function ticketOriginIsGuardian(array $row): bool
+  {
+    $createdBy = strtolower(trim((string) ($row['creado_por'] ?? $row['creador_por'] ?? '')));
+    $medio = strtolower(trim((string) ($row['medio'] ?? '')));
+    return in_array($createdBy, ['propietario', 'arrendatario', 'copropiedad', 'cliente'], true)
+      || in_array($medio, ['portal propietario', 'portal arrendatario', 'portal copropiedad', 'whatsapp cliente'], true);
   }
 
   public function renderGenericCards(array $rows, array $config, string $tabKey, string $statusBucket = ''): string

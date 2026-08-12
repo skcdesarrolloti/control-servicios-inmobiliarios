@@ -667,8 +667,7 @@ final class SuCasaControlServiciosInmobiliarios
                 <option value="<?php echo esc_attr($fId); ?>" <?php selected(($p["fEmpleado"] ?? ""), $fId); ?>><?php echo esc_html((string)($func["label"] ?? $fId)); ?></option>
               <?php endforeach; ?>
             </select></div>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>busqueda">B&uacute;squeda</label><input id="<?php echo esc_attr($prefix); ?>busqueda" name="<?php echo esc_attr($prefix); ?>busqueda" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($p['fBusqueda'] ?? '')); ?>"></div>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>inmueble">Inmueble</label><input id="<?php echo esc_attr($prefix); ?>inmueble" name="<?php echo esc_attr($prefix); ?>inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($p['fInmueble'] ?? '')); ?>"></div>
+          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>inmueble">Inmueble SIMI</label><input id="<?php echo esc_attr($prefix); ?>inmueble" name="<?php echo esc_attr($prefix); ?>inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($p['fInmueble'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>contrato">Contrato</label><input id="<?php echo esc_attr($prefix); ?>contrato" name="<?php echo esc_attr($prefix); ?>contrato" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($p["fContrato"] ?? "")); ?>"></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>asunto">Asunto</label><input id="<?php echo esc_attr($prefix); ?>asunto" name="<?php echo esc_attr($prefix); ?>asunto" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($p["fAsunto"] ?? "")); ?>"></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>arrendatario">Arrendatario</label><input id="<?php echo esc_attr($prefix); ?>arrendatario" name="<?php echo esc_attr($prefix); ?>arrendatario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($p["fArrendatario"] ?? "")); ?>"></div>
@@ -676,8 +675,7 @@ final class SuCasaControlServiciosInmobiliarios
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>barrio">Barrio</label><select id="<?php echo esc_attr($prefix); ?>barrio" name="<?php echo esc_attr($prefix); ?>barrio" class="select select-bordered select-sm scm-select">
               <option value="">Todos</option><?php foreach (($filterOptions["barrios"] ?? []) as $barrioOpt): ?><option value="<?php echo esc_attr((string)$barrioOpt); ?>" <?php selected((string)($p["fBarrio"] ?? ""), (string)$barrioOpt); ?>><?php echo esc_html((string)$barrioOpt); ?></option><?php endforeach; ?>
             </select></div>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>fecha_desde">Fecha desde</label><input id="<?php echo esc_attr($prefix); ?>fecha_desde" name="<?php echo esc_attr($prefix); ?>fecha_desde" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string)($p["fFechaDesde"] ?? "")); ?>"></div>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>fecha_hasta">Fecha hasta</label><input id="<?php echo esc_attr($prefix); ?>fecha_hasta" name="<?php echo esc_attr($prefix); ?>fecha_hasta" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string)($p["fFechaHasta"] ?? "")); ?>"></div>
+          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>fecha">Fecha</label><input id="<?php echo esc_attr($prefix); ?>fecha" name="<?php echo esc_attr($prefix); ?>fecha" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string)($p["fFecha"] ?? (($p["fFechaDesde"] ?? "") === ($p["fFechaHasta"] ?? "") ? ($p["fFechaDesde"] ?? "") : ($p["fFechaDesde"] ?? "")))); ?>"></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>cotizacion">Cotizaci&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>cotizacion" name="<?php echo esc_attr($prefix); ?>cotizacion" class="select select-bordered select-sm scm-select">
               <option value="">Todas</option>
               <option value="has" <?php selected(($p['fCotizacion'] ?? ''), 'has'); ?>>Con cotizaci&oacute;n</option>
@@ -693,13 +691,13 @@ final class SuCasaControlServiciosInmobiliarios
               <option value="has" <?php selected(($p['fRevision'] ?? ''), 'has'); ?>>Con revisi&oacute;n</option>
               <option value="none" <?php selected(($p['fRevision'] ?? ''), 'none'); ?>>Sin revisi&oacute;n</option>
             </select></div>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>atraso">Atraso ticket</label><select id="<?php echo esc_attr($prefix); ?>atraso" name="<?php echo esc_attr($prefix); ?>atraso" class="select select-bordered select-sm scm-select">
+          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>atraso">Atraso desde creaci&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>atraso" name="<?php echo esc_attr($prefix); ?>atraso" class="select select-bordered select-sm scm-select">
               <option value="">Todos</option>
               <option value="3" <?php selected(($p['fAtraso'] ?? ''), '3'); ?>>+3 d&iacute;as</option>
               <option value="5" <?php selected(($p['fAtraso'] ?? ''), '5'); ?>>+5 d&iacute;as</option>
               <option value="10" <?php selected(($p['fAtraso'] ?? ''), '10'); ?>>+10 d&iacute;as</option>
             </select></div>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>sin_actualizar">Sin actualizar</label><select id="<?php echo esc_attr($prefix); ?>sin_actualizar" name="<?php echo esc_attr($prefix); ?>sin_actualizar" class="select select-bordered select-sm scm-select">
+          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>sin_actualizar">Sin actualizar desde gesti&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>sin_actualizar" name="<?php echo esc_attr($prefix); ?>sin_actualizar" class="select select-bordered select-sm scm-select">
               <option value="">Todos</option>
               <option value="1" <?php selected(($p['fSinActualizar'] ?? ''), '1'); ?>>+1 d&iacute;a</option>
               <option value="3" <?php selected(($p['fSinActualizar'] ?? ''), '3'); ?>>+3 d&iacute;as</option>

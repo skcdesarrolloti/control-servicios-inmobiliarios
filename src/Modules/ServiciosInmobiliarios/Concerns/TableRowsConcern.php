@@ -60,6 +60,10 @@ trait TableRowsConcern
       $correoArrendatario = trim((string) ($row['correo_arrendatario'] ?? ''));
       $celularArrendatario = trim((string) ($row['celular_arrendatario'] ?? ''));
       $indicativoArrendatario = trim((string) ($row['indicativo_arrendatario'] ?? $row['indicativo'] ?? ''));
+      $origenLabel = $this->ticketOriginIsGuardian($row) ? 'Guardian' : 'No Guardian';
+      $origenBadge = $origenLabel === 'Guardian'
+        ? '<span class="scm-origin-badge scm-origin-badge--guardian">Guardian</span>'
+        : '<span class="scm-origin-badge scm-origin-badge--internal">No Guardian</span>';
 
       $rawCreated = ($row['cct_created'] ?? '') !== '' ? $row['cct_created'] : ($row['fecha'] ?? null);
       $createdTs = $this->parser->parse($rawCreated);
@@ -202,6 +206,7 @@ trait TableRowsConcern
       $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Estado administrativo</span>' . $estadoAdminBadge . '</div>';
       $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Magnitud caso</span>' . $magnitudCasoBadge . '</div>';
       $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Perturbaci&oacute;n</span>' . $perturbacionBadge . '</div>';
+      $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Origen</span>' . $origenBadge . '</div>';
       $html .= '</div>';
       $html .= '<p class="scm-ticket-card-barrio">Area afectada <strong>' . esc_html($areaAfectadaLabel) . '</strong></p>';
       $html .= '<div class="scm-ticket-card-footer">';
@@ -223,6 +228,7 @@ trait TableRowsConcern
         . ' data-resumen-calculo-perturbacion="' . esc_attr($resumenCalculoPerturbacionRaw) . '"'
         . ' data-ejecucion="' . esc_attr($tiempoEjecucion) . '"'
         . ' data-sin-actualizar="' . esc_attr($tiempoSinActualizar) . '"'
+        . ' data-origen="' . esc_attr($origenLabel) . '"'
         . ' data-contrato="' . esc_attr($contractLabel) . '"'
         . ' data-inmueble="' . esc_attr($inmuebleLabel) . '"'
         . ' data-id-inmueble-web="' . esc_attr($idInmuebleWeb !== '' ? $idInmuebleWeb : '-') . '"'
@@ -253,6 +259,14 @@ trait TableRowsConcern
     }
 
     return $html;
+  }
+
+  private function ticketOriginIsGuardian(array $row): bool
+  {
+    $createdBy = strtolower(trim((string) ($row['creado_por'] ?? $row['creador_por'] ?? '')));
+    $medio = strtolower(trim((string) ($row['medio'] ?? '')));
+    return in_array($createdBy, ['propietario', 'arrendatario', 'copropiedad', 'cliente'], true)
+      || in_array($medio, ['portal propietario', 'portal arrendatario', 'portal copropiedad', 'whatsapp cliente'], true);
   }
 
   private function renderMagnitudeBadge(string $magnitud): string
