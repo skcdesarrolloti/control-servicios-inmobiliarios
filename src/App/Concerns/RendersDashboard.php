@@ -342,8 +342,8 @@ trait RendersDashboard
                 </select></div>
               <div class="scm-field"><label for="scm_origen">Origen</label><select id="scm_origen" name="scm_origen" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option>
-                  <option value="web" <?php selected(($params['fOrigen'] ?? ''), 'web'); ?>>Web</option>
-                  <option value="interno" <?php selected(($params['fOrigen'] ?? ''), 'interno'); ?>>No web</option>
+                  <option value="web" <?php selected(($params['fOrigen'] ?? ''), 'web'); ?>>Guardian</option>
+                  <option value="interno" <?php selected(($params['fOrigen'] ?? ''), 'interno'); ?>>No Guardian</option>
                 </select></div>
               <div class="scm-field"><label for="scm_id_empleado">Funcionario</label><select id="scm_id_empleado" name="scm_id_empleado" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["funcionarios"] ?? []) as $func): $fId = trim((string)($func["id"] ?? ""));
@@ -614,15 +614,15 @@ trait RendersDashboard
             <div class="scm-bars" id="scm-chart-categorias"></div>
           </section>
           <section class="scm-metrics-card">
-            <h3>Tickets Web</h3>
+            <h3>Tickets Guardian</h3>
             <div class="scm-bars" id="scm-chart-web"></div>
           </section>
           <section class="scm-metrics-card">
-            <h3>Web por estado comercial</h3>
+            <h3>Guardian por estado comercial</h3>
             <div class="scm-bars" id="scm-chart-web-comercial"></div>
           </section>
           <section class="scm-metrics-card">
-            <h3>Web por estado administrativo</h3>
+            <h3>Guardian por estado administrativo</h3>
             <div class="scm-bars" id="scm-chart-web-admin"></div>
           </section>
           <section class="scm-metrics-card">

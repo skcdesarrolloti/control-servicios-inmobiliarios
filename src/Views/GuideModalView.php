@@ -78,12 +78,6 @@ final class GuideModalView
             <?php echo self::renderCrudPane(
               'grt',
               [
-                [
-                  'id' => 'scm-grt-cat',
-                  'type' => 'select',
-                  'placeholder' => '— Categoría —',
-                  'options' => ['Comercial', 'Administrativo', 'Servicio al cliente', 'Cartera']
-                ],
                 ['id' => 'scm-grt-est', 'type' => 'text', 'placeholder' => 'Filtrar por estado...'],
                 ['id' => 'scm-grt-sit', 'type' => 'text', 'placeholder' => 'Filtrar por situación...'],
                 ['id' => 'scm-grt-res', 'type' => 'text', 'placeholder' => 'Buscar en respuesta...'],
@@ -124,7 +118,6 @@ final class GuideModalView
 
   private static function renderEstados(): string
   {
-    $comerciales     = self::getComerciales();
     $administrativos = self::getAdministrativos();
 
     ob_start();
@@ -134,37 +127,12 @@ final class GuideModalView
     </div>
 
     <div class="scm-go-subtabs">
-      <button type="button" class="scm-go-subtab active" id="scm-go-subtab-com" onclick="scmGoSubTab('com')">
-        <i class="fas fa-briefcase"></i> Comerciales
-      </button>
-      <button type="button" class="scm-go-subtab" id="scm-go-subtab-adm" onclick="scmGoSubTab('adm')">
+      <button type="button" class="scm-go-subtab active" id="scm-go-subtab-adm" onclick="scmGoSubTab('adm')">
         <i class="fas fa-tools"></i> Administrativos
       </button>
     </div>
 
-    <div id="scm-go-grid-com" class="scm-go-cards-grid">
-      <?php foreach ($comerciales as $item): ?>
-        <div class="scm-go-card" data-search="<?php echo esc_attr(mb_strtolower($item['titulo'])); ?>">
-          <div class="scm-go-card-head">
-            <span class="scm-go-card-icon <?php echo esc_attr($item['color']); ?>">
-              <i class="fas <?php echo esc_attr($item['icono']); ?>"></i>
-            </span>
-            <h4><?php echo esc_html($item['titulo']); ?></h4>
-          </div>
-          <p><?php echo wp_kses_post($item['desc']); ?></p>
-          <?php if (!empty($item['extra'])): ?>
-            <div class="scm-go-card-extra"><?php echo wp_kses_post($item['extra']); ?></div>
-          <?php endif; ?>
-          <?php if (!empty($item['nota'])): ?>
-            <div class="scm-go-card-nota">
-              <i class="fas fa-exclamation-circle"></i> <?php echo esc_html($item['nota']); ?>
-            </div>
-          <?php endif; ?>
-        </div>
-      <?php endforeach; ?>
-    </div>
-
-    <div id="scm-go-grid-adm" class="scm-go-cards-grid" style="display:none">
+    <div id="scm-go-grid-adm" class="scm-go-cards-grid">
       <?php foreach ($administrativos as $item): ?>
         <div class="scm-go-card" data-search="<?php echo esc_attr(mb_strtolower($item['titulo'])); ?>">
           <div class="scm-go-card-head">
@@ -291,7 +259,7 @@ final class GuideModalView
 
   private static function renderGrtEditModal(): string
   {
-    $categorias = ['Comercial', 'Administrativo', 'Servicio al cliente', 'Cartera'];
+    $categorias = ['Administrativo'];
 
     ob_start();
   ?>

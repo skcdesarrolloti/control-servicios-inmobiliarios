@@ -92,7 +92,7 @@
   // ── Sub-tabs (Estados) ────────────────────────────────────────────
 
   window.scmGoSubTab = function (sub) {
-    ["com", "adm"].forEach(function (s) {
+    ["adm"].forEach(function (s) {
       var btn = document.getElementById("scm-go-subtab-" + s);
       var grid = document.getElementById("scm-go-grid-" + s);
       if (btn) btn.classList.toggle("active", s === sub);
@@ -107,7 +107,7 @@
     var q = (document.getElementById("scm-go-search") || {}).value || "";
     q = q.toLowerCase().trim();
     var visible = 0;
-    ["com", "adm"].forEach(function (s) {
+    ["adm"].forEach(function (s) {
       var grid = document.getElementById("scm-go-grid-" + s);
       if (!grid || grid.style.display === "none") return;
       grid.querySelectorAll(".scm-go-card").forEach(function (card) {
@@ -173,8 +173,7 @@
       filters.busqueda =
         (document.getElementById("scm-gcd-bus") || {}).value || "";
     } else if (prefix === "grt") {
-      filters.categoria =
-        (document.getElementById("scm-grt-cat") || {}).value || "";
+      filters.categoria = "Administrativo";
       filters.estado =
         (document.getElementById("scm-grt-est") || {}).value || "";
       filters.situacion =
@@ -215,7 +214,6 @@
       "scm-gcd-clas",
       "scm-gcd-resp",
       "scm-gcd-bus",
-      "scm-grt-cat",
       "scm-grt-est",
       "scm-grt-sit",
       "scm-grt-res",
@@ -254,7 +252,7 @@
         document.getElementById("scm-gcd-obs").value = "";
       } else if (prefix === "grt") {
         document.getElementById("scm-grt-id").value = "";
-        document.getElementById("scm-grt-cat-m").selectedIndex = 0;
+        setSelectVal("scm-grt-cat-m", "Administrativo");
         document.getElementById("scm-grt-est").value = "";
         document.getElementById("scm-grt-sit").value = "";
         document.getElementById("scm-grt-res").value = "";
@@ -346,7 +344,7 @@
       }
     } else if (prefix === "grt") {
       data.id = document.getElementById("scm-grt-id").value;
-      data.categoria = document.getElementById("scm-grt-cat-m").value;
+      data.categoria = "Administrativo";
       data.estado = document.getElementById("scm-grt-est").value;
       data.situacion = document.getElementById("scm-grt-sit").value;
       data.respuesta = document.getElementById("scm-grt-res").value.trim();

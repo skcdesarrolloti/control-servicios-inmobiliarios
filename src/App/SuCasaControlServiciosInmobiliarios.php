@@ -658,8 +658,8 @@ final class SuCasaControlServiciosInmobiliarios
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>estado_bloqueado">Vista</label><input id="<?php echo esc_attr($prefix); ?>estado_bloqueado" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr($lockedStatusLabel); ?>" readonly></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>origen">Origen</label><select id="<?php echo esc_attr($prefix); ?>origen" name="<?php echo esc_attr($prefix); ?>origen" class="select select-bordered select-sm scm-select">
               <option value="">Todos</option>
-              <option value="web" <?php selected(($p['fOrigen'] ?? ''), 'web'); ?>>Web</option>
-              <option value="interno" <?php selected(($p['fOrigen'] ?? ''), 'interno'); ?>>No web</option>
+              <option value="web" <?php selected(($p['fOrigen'] ?? ''), 'web'); ?>>Guardian</option>
+              <option value="interno" <?php selected(($p['fOrigen'] ?? ''), 'interno'); ?>>No Guardian</option>
             </select></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>id_empleado">Funcionario</label><select id="<?php echo esc_attr($prefix); ?>id_empleado" name="<?php echo esc_attr($prefix); ?>id_empleado" class="select select-bordered select-sm scm-select">
               <option value="">Todos</option><?php foreach (($filterOptions["funcionarios"] ?? []) as $func): $fId = trim((string)($func["id"] ?? ""));

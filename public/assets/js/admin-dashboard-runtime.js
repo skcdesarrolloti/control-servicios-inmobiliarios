@@ -1068,7 +1068,7 @@
         root.querySelector("#scm-chart-web"),
         [
           {
-            label: "Total web",
+            label: "Total Guardian",
             value: Math.max(0, Math.round(toNumber(webMetrics.total))),
             cls: "accent",
           },
