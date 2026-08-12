@@ -350,7 +350,7 @@ trait HandlesPublicPqrActions
       $employeeIdFilter = '';
     }
     $filters = $this->get_public_pqr_filters_from_input($_POST);
-    $result = $this->fetch_public_pqr_result(10, $employeeIdFilter, $filters);
+    $result = $this->fetch_public_pqr_result(20, $employeeIdFilter, $filters);
     $funcionarios = [];
     try {
       $funcionarios = (array) ($this->get_servicios_inmobiliarios_module()->getFilterOptions()['funcionarios'] ?? []);

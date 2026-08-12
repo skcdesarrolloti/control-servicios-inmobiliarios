@@ -325,7 +325,7 @@
 }
 
 #scm-app .scm-ticket-cards {
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)) !important;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)) !important;
 }
 
 #scm-app .scm-filter-card,

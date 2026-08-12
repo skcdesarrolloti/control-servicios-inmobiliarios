@@ -13,8 +13,8 @@ final class ServiciosInmobiliariosFilters
   {
     $page = $this->intValue($input, $prefix . 'page', 1);
     $perPage = $this->intValue($input, $prefix . 'per_page', 20);
-    if ($perPage < 5) {
-      $perPage = 5;
+    if ($perPage < 20) {
+      $perPage = 20;
     }
     if ($perPage > 100) {
       $perPage = 100;

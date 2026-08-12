@@ -117,7 +117,7 @@ trait RendersDashboard
     $iframeModeRaw = mb_strtolower(trim((string) ($_GET['scm_iframe'] ?? ($_GET['iframe'] ?? ''))), 'UTF-8');
     $iframeMode = in_array($iframeModeRaw, ['1', 'true', 'yes', 'si'], true);
 
-    $publicPqrResult = $this->fetch_public_pqr_result(10, $publicPqrEmployeeFilter, $publicPqrFilters);
+    $publicPqrResult = $this->fetch_public_pqr_result(20, $publicPqrEmployeeFilter, $publicPqrFilters);
     $publicPqrHtml = $this->render_public_pqr_tab(
       $publicPqrResult,
       (array) ($filterOptions['funcionarios'] ?? []),

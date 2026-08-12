@@ -512,8 +512,8 @@ trait MaintenanceQueriesConcern
       $perPage = 20;
     }
 
-    if ($perPage < 5) {
-      $perPage = 5;
+    if ($perPage < 20) {
+      $perPage = 20;
     }
     if ($perPage > 100) {
       $perPage = 100;

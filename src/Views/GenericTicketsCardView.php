@@ -406,8 +406,14 @@ final class GenericTicketsCardView
     $c .= '<p class="scm-ticket-card-property">Inmueble <strong>' . esc_html($inmuebleRaw !== '' ? $inmuebleRaw : '-') . '</strong></p>';
     $c .= '<p class="scm-ticket-card-barrio">Barrio <strong>' . esc_html($barrioRaw !== '' ? $barrioRaw : '-') . '</strong></p>';
     $c .= '<p class="scm-ticket-card-address">Direccion <strong>' . esc_html($direccionRaw !== '' ? $direccionRaw : '-') . '</strong></p>';
+    $ownerLabel = $propietarioRaw !== '' ? $propietarioRaw : (($tabKey === 'entrega' && $solicitanteRaw !== '') ? $solicitanteRaw : '');
+    if ($ownerLabel !== '') {
+      $c .= '<p class="scm-ticket-card-owner">Propietario <strong>' . esc_html($ownerLabel) . '</strong></p>';
+    }
+    if ($arrendatarioRaw !== '') {
+      $c .= '<p class="scm-ticket-card-tenant">Arrendatario <strong>' . esc_html($arrendatarioRaw) . '</strong></p>';
+    }
     if ($tabKey === 'entrega') {
-      $c .= '<p class="scm-ticket-card-owner">Propietario <strong>' . esc_html($solicitanteRaw !== '' ? $solicitanteRaw : '-') . '</strong></p>';
       $c .= '<p class="scm-ticket-card-request">Numero solicitud <strong>' . esc_html($numeroSolicitudRaw !== '' ? $numeroSolicitudRaw : '-') . '</strong></p>';
     }
     $c .= '<p class="scm-ticket-card-employee">Asignado a <strong>' . esc_html($empleadoRaw !== '' ? $empleadoRaw : '-') . '</strong></p>';

@@ -186,6 +186,12 @@ trait TableRowsConcern
       $html .= '<p class="scm-ticket-card-property">Inmueble <strong>' . esc_html($inmuebleLabel) . '</strong></p>';
       $html .= '<p class="scm-ticket-card-barrio">Barrio <strong>' . esc_html($barrioLabel) . '</strong></p>';
       $html .= '<p class="scm-ticket-card-address">Dirección <strong>' . esc_html($direccion !== '' ? $direccion : '-') . '</strong></p>';
+      if ($propietario !== '') {
+        $html .= '<p class="scm-ticket-card-owner">Propietario <strong>' . esc_html($propietario) . '</strong></p>';
+      }
+      if ($arrendatario !== '') {
+        $html .= '<p class="scm-ticket-card-tenant">Arrendatario <strong>' . esc_html($arrendatario) . '</strong></p>';
+      }
       $html .= '<p class="scm-ticket-card-employee">Asignado a <strong>' . esc_html($employee !== '' ? $employee : '-') . '</strong></p>';
       if ($statusBucket !== 'cerrados') {
         $html .= '<p class="scm-ticket-card-execution">En ejecución <strong>' . esc_html($tiempoEjecucion) . '</strong></p>';

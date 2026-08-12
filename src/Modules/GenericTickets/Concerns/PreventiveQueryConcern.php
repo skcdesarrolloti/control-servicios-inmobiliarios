@@ -110,7 +110,7 @@ trait PreventiveQueryConcern
       . " AND LOWER(TRIM(COALESCE(`se_envio`,''))) IN ({$enviadaPhs})";
     $conEnviada = (int) $this->db->getVar($conEnviadaSql, array_merge($args, $enviadaVals));
 
-    $perPage    = max(5, min(100, (int) ($p['fPerPage'] ?? 20)));
+    $perPage    = max(20, min(100, (int) ($p['fPerPage'] ?? 20)));
     $page       = max(1, (int) ($p['fPage'] ?? 1));
     $totalPages = max(1, (int) ceil($total / $perPage));
     if ($page > $totalPages) {
