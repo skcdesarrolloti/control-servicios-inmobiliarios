@@ -217,13 +217,13 @@ trait RendersPublicPqr
    *   employees:array<int,array{id:string,label:string}>
    * }
    */
-  private function fetch_public_pqr_result(int $perPage = 20, string $employeeIdFilter = '', array $filters = []): array
+  private function fetch_public_pqr_result(int $perPage = 24, string $employeeIdFilter = '', array $filters = []): array
   {
     $emptyResult = [
       'rows' => [],
       'counts' => ['abiertos' => 0, 'postergados' => 0, 'cerrados' => 0],
       'topic_counts' => [],
-      'pagination' => ['page' => 1, 'per_page' => 20, 'total' => 0, 'total_pages' => 1],
+      'pagination' => ['page' => 1, 'per_page' => 24, 'total' => 0, 'total_pages' => 1],
       'employees' => [],
     ];
     $ticketsTable = $this->db->table('jet_cct_tickets');
@@ -231,7 +231,7 @@ trait RendersPublicPqr
       return $emptyResult;
     }
 
-    $perPage = max(20, min(50, $perPage));
+    $perPage = max(24, min(50, $perPage));
     $creatorLabels = ['propietario', 'arrendatario', 'copropiedad', 'cliente'];
     $medioLabels = ['portal propietario', 'portal arrendatario', 'portal copropiedad', 'whatsapp cliente'];
 
@@ -431,7 +431,7 @@ trait RendersPublicPqr
   {
     $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
     $counts = is_array($result['counts'] ?? null) ? $result['counts'] : ['abiertos' => 0, 'postergados' => 0, 'cerrados' => 0];
-    $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : ['page' => 1, 'per_page' => 20, 'total' => count($rows), 'total_pages' => 1];
+    $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : ['page' => 1, 'per_page' => 24, 'total' => count($rows), 'total_pages' => 1];
     $filterFuncionarios = is_array($result['employees'] ?? null) ? $result['employees'] : [];
     if (empty($filterFuncionarios)) {
       $filterFuncionarios = $funcionarios;
@@ -891,7 +891,7 @@ trait RendersPublicPqr
     }
 
     $filters = $this->get_public_pqr_filters_from_request();
-    $result = $this->fetch_public_pqr_result(20, $employeeIdFilter, $filters);
+    $result = $this->fetch_public_pqr_result(24, $employeeIdFilter, $filters);
     $contentHtml = $this->render_public_pqr_tab(
       $result,
       [],
@@ -962,7 +962,7 @@ trait RendersPublicPqr
     }
 
     $filters = $this->get_public_pqr_filters_from_request();
-    $result = $this->fetch_public_pqr_result(20, $accessScope === 'all' ? '' : $employeeIdFilter, $filters);
+    $result = $this->fetch_public_pqr_result(24, $accessScope === 'all' ? '' : $employeeIdFilter, $filters);
     $contentHtml = $this->render_public_pqr_tab(
       $result,
       $this->get_public_pqr_corresponsable_candidates(),

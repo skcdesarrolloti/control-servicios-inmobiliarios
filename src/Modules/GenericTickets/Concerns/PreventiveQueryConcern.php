@@ -23,7 +23,7 @@ trait PreventiveQueryConcern
     $empty = [
       'rows' => [],
       'stats' => ['total' => 0, 'abiertos' => 0, 'cerrados' => 0, 'con_cotizacion' => 0, 'sin_cotizacion' => 0, 'con_revision' => 0, 'sin_revision' => 0],
-      'pagination' => ['page' => 1, 'per_page' => 20, 'total' => 0, 'total_pages' => 1],
+      'pagination' => ['page' => 1, 'per_page' => 24, 'total' => 0, 'total_pages' => 1],
     ];
 
     if (!$this->table_exists($tabla)) {
@@ -110,7 +110,7 @@ trait PreventiveQueryConcern
       . " AND LOWER(TRIM(COALESCE(`se_envio`,''))) IN ({$enviadaPhs})";
     $conEnviada = (int) $this->db->getVar($conEnviadaSql, array_merge($args, $enviadaVals));
 
-    $perPage    = max(20, min(100, (int) ($p['fPerPage'] ?? 20)));
+    $perPage    = max(24, min(100, (int) ($p['fPerPage'] ?? 24)));
     $page       = max(1, (int) ($p['fPage'] ?? 1));
     $totalPages = max(1, (int) ceil($total / $perPage));
     if ($page > $totalPages) {

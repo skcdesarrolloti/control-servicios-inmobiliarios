@@ -507,13 +507,13 @@ trait MaintenanceQueriesConcern
       $page = 1;
     }
 
-    $perPage = isset($filters['fPerPage']) ? (int) $filters['fPerPage'] : 20;
+    $perPage = isset($filters['fPerPage']) ? (int) $filters['fPerPage'] : 24;
     if ($perPage <= 0) {
-      $perPage = 20;
+      $perPage = 24;
     }
 
-    if ($perPage < 20) {
-      $perPage = 20;
+    if ($perPage < 24) {
+      $perPage = 24;
     }
     if ($perPage > 100) {
       $perPage = 100;
