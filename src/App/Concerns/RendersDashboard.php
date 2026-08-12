@@ -67,6 +67,17 @@ trait RendersDashboard
     $statusBucketDefs = $this->get_status_bucket_definitions();
     $statusTopicDefs = $this->get_status_topic_definitions();
     $statusResults = $this->build_status_bucket_results($statusBucketDefs, $statusTopicDefs, $config, $filterOptions, false);
+    $currentEmployeeId = $this->current_employee_id();
+    $myTicketsParams = $module->parseParams($_GET, 'scm_my_');
+    $myTicketsParams['fEmpleado'] = $currentEmployeeId !== '' ? $currentEmployeeId : '__sin_funcionario__';
+    $myTicketsResult = ['tbody' => $this->render_lazy_tickets_placeholder('Abre esta pestaña para cargar tus tickets.'), 'pagination_html' => ''];
+    $myTicketsStats = ['total' => 0];
+    $cotizacionesParams = $this->parse_cotizaciones_mantenimiento_params($_GET, 'scmqt_');
+    $cotizacionesResult = [
+      'rows' => [],
+      'stats' => ['total' => 0, 'enviadas' => 0, 'no_enviadas' => 0, 'aprobadas' => 0, 'desaprobadas' => 0],
+      'pagination' => ['page' => 1, 'per_page' => 20, 'total' => 0, 'total_pages' => 1],
+    ];
     $openTopicDefs = [
       'mant' => ['label' => 'Mantenimiento'],
       'preventiva' => ['label' => 'Preventiva'],
@@ -90,6 +101,14 @@ trait RendersDashboard
       'scm-panel-postergados' => 'scm-panel-postergados',
       'cerrados' => 'scm-panel-cerrados',
       'scm-panel-cerrados' => 'scm-panel-cerrados',
+      'mis_tickets' => 'scm-panel-mis-tickets',
+      'mis-tickets' => 'scm-panel-mis-tickets',
+      'mis tickets' => 'scm-panel-mis-tickets',
+      'scm-panel-mis-tickets' => 'scm-panel-mis-tickets',
+      'cotizaciones_mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
+      'cotizaciones-mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
+      'cotizaciones' => 'scm-panel-cotizaciones-mantenimiento',
+      'scm-panel-cotizaciones-mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
       'contratos_arrendamiento' => 'scm-panel-contratos-arrendamiento',
       'contratos-arrendamiento' => 'scm-panel-contratos-arrendamiento',
       'contratos' => 'scm-panel-contratos-arrendamiento',
@@ -136,6 +155,9 @@ trait RendersDashboard
         'ticket_response' => self::AJAX_TICKET_RESPONSE,
         'postpone_ticket' => self::AJAX_POSTPONE_TICKET,
         'status_tickets'  => self::AJAX_STATUS_TICKETS,
+        'my_tickets'      => self::AJAX_MY_TICKETS,
+        'cotizaciones_mantenimiento' => self::AJAX_COTIZACIONES_MANTENIMIENTO,
+        'delete_cotizacion' => self::AJAX_DELETE_COTIZACION,
         'activate_ticket' => self::AJAX_ACTIVATE_TICKET,
         'cotizacion_response' => self::AJAX_COTIZACION_RESPONSE,
         'close_ticket'    => self::AJAX_CLOSE_TICKET,
@@ -270,8 +292,10 @@ trait RendersDashboard
       </div>
       <div class="scm-tabs scm-main-tabs">
         <button class="scm-tab active" data-tab="scm-panel-abiertos" type="button">Abiertos</button>
+        <button class="scm-tab" data-tab="scm-panel-mis-tickets" type="button">Mis tickets</button>
         <button class="scm-tab" data-tab="scm-panel-postergados" type="button">Postergados</button>
         <button class="scm-tab" data-tab="scm-panel-cerrados" type="button">Cerrados</button>
+        <button class="scm-tab" data-tab="scm-panel-cotizaciones-mantenimiento" type="button">Cotizaciones de Mantenimiento</button>
         <button class="scm-tab" data-tab="scm-panel-preventivas-pendientes" type="button">Preventivas Pendientes</button>
         <button class="scm-tab" data-tab="scm-panel-contratos-arrendamiento" type="button">Contratos de arrendamiento</button>
         <button class="scm-tab" data-tab="scm-panel-servicios-publicos-pendientes" type="button">Servicios P&uacute;blicos Pendientes</button>
@@ -365,6 +389,14 @@ trait RendersDashboard
                   <option value="">Todas</option>
                   <option value="has" <?php selected(($params['fCotizacion'] ?? ''), 'has'); ?>>Con cotizaci&oacute;n</option>
                   <option value="none" <?php selected(($params['fCotizacion'] ?? ''), 'none'); ?>>Sin cotizaci&oacute;n</option>
+                </select></div>
+              <div class="scm-field scm-cotizacion-dependent" data-cotizacion-dependent-for="scm_cotizacion"><label for="scm_cotizacion_estado">Estado cotizaci&oacute;n</label><select id="scm_cotizacion_estado" name="scm_cotizacion_estado" class="select select-bordered select-sm scm-select">
+                  <option value="">Todos</option><?php foreach (($filterOptions["cotizacion_estado"] ?? []) as $cotEstadoOpt): ?><option value="<?php echo esc_attr((string)$cotEstadoOpt); ?>" <?php selected((string)($params["fCotizacionEstado"] ?? ""), (string)$cotEstadoOpt); ?>><?php echo esc_html((string)$cotEstadoOpt); ?></option><?php endforeach; ?>
+                </select></div>
+              <div class="scm-field scm-cotizacion-dependent" data-cotizacion-dependent-for="scm_cotizacion"><label for="scm_cotizacion_enviada">Fue enviada</label><select id="scm_cotizacion_enviada" name="scm_cotizacion_enviada" class="select select-bordered select-sm scm-select">
+                  <option value="">Todas</option>
+                  <option value="si" <?php selected(($params['fCotizacionEnviada'] ?? ''), 'si'); ?>>S&iacute;</option>
+                  <option value="no" <?php selected(($params['fCotizacionEnviada'] ?? ''), 'no'); ?>>No</option>
                 </select></div>
               <div class="scm-field"><label for="scm_perturbacion">Perturbaci&oacute;n</label><select id="scm_perturbacion" name="scm_perturbacion" class="select select-bordered select-sm scm-select">
                   <option value="">Todas</option>
@@ -533,6 +565,10 @@ trait RendersDashboard
         </div>
       </div>
 
+      <div class="scm-tab-panel" id="scm-panel-mis-tickets">
+        <?php echo $this->render_my_tickets_panel($myTicketsResult, $myTicketsStats, $myTicketsParams, $filterOptions); ?>
+      </div>
+
       <div class="scm-tab-panel" id="scm-panel-preventivas-pendientes">
         <?php echo $preventivasPendientesHtml; ?>
       </div>
@@ -555,6 +591,10 @@ trait RendersDashboard
 
       <div class="scm-tab-panel" id="scm-panel-cerrados">
         <?php echo $this->render_status_bucket_panel('cerrados', $statusBucketDefs['cerrados'], $statusTopicDefs, $statusResults['cerrados'] ?? []); ?>
+      </div>
+
+      <div class="scm-tab-panel" id="scm-panel-cotizaciones-mantenimiento">
+        <?php echo $this->render_cotizaciones_mantenimiento_panel($cotizacionesResult, $cotizacionesParams); ?>
       </div>
 
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-dashboard-inline.js?v=' . SCM_VERSION); ?>" defer></script>
@@ -668,6 +708,374 @@ trait RendersDashboard
     <script src="<?php echo $damageJsUrl; ?>" defer></script>
 <?php
     return (string)ob_get_clean();
+  }
+
+  private function current_employee_id(): string
+  {
+    $userId = Auth::userId();
+    if ($userId <= 0) {
+      return '';
+    }
+
+    $table = $this->db->table('jet_cct_funcionarios');
+    if (!$this->table_exists($table)) {
+      return '';
+    }
+
+    $row = $this->db->getRow(
+      "SELECT TRIM(COALESCE(`id_empleado`, '')) AS id_empleado FROM `{$table}` WHERE `_ID` = ? LIMIT 1",
+      [$userId]
+    );
+
+    return is_array($row) ? trim((string) ($row['id_empleado'] ?? '')) : '';
+  }
+
+  /** @return array<string,string> */
+  private function parse_cotizaciones_mantenimiento_params(array $input, string $prefix = 'scmqt_'): array
+  {
+    $clean = static function ($value): string {
+      return trim(sanitize_text_field(wp_unslash((string) ($value ?? ''))));
+    };
+    $page = max(1, (int) $clean($input[$prefix . 'page'] ?? '1'));
+    $perPage = max(10, min(60, (int) $clean($input[$prefix . 'per_page'] ?? '20')));
+
+    return [
+      'fPage' => (string) $page,
+      'fPerPage' => (string) $perPage,
+      'fCotizacion' => $clean($input[$prefix . 'cotizacion'] ?? ''),
+      'fTicket' => $clean($input[$prefix . 'ticket'] ?? ''),
+      'fFecha' => $clean($input[$prefix . 'fecha'] ?? ''),
+      'fDestinatario' => $clean($input[$prefix . 'destinatario'] ?? ''),
+      'fFuncionario' => $clean($input[$prefix . 'funcionario'] ?? ''),
+      'fInmueble' => $clean($input[$prefix . 'inmueble'] ?? ''),
+      'fContrato' => $clean($input[$prefix . 'contrato'] ?? ''),
+      'fEnviada' => $clean($input[$prefix . 'enviada'] ?? ''),
+      'fEstado' => $clean($input[$prefix . 'estado'] ?? ''),
+      'fTipoMantenimiento' => $clean($input[$prefix . 'tipo_mantenimiento'] ?? ''),
+      'fCategoria' => $clean($input[$prefix . 'categoria'] ?? ''),
+    ];
+  }
+
+  /** @return array<string,mixed> */
+  private function query_cotizaciones_mantenimiento(array $p): array
+  {
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    $ordersTable = $this->db->table('jet_cct_ordenes');
+    if (!$this->table_exists($table)) {
+      return ['rows' => [], 'stats' => ['total' => 0], 'pagination' => ['page' => 1, 'per_page' => 20, 'total' => 0, 'total_pages' => 1]];
+    }
+
+    $where = ['1=1'];
+    $args = [];
+    $like = function (string $column, string $value) use (&$where, &$args): void {
+      if ($value === '') {
+        return;
+      }
+      $where[] = "COALESCE(c.`{$column}`, '') LIKE ?";
+      $args[] = '%' . $this->db->escapeLike($value) . '%';
+    };
+
+    $like('_ID', (string) ($p['fCotizacion'] ?? ''));
+    $like('id_ticket', (string) ($p['fTicket'] ?? ''));
+    $like('destinatario', (string) ($p['fDestinatario'] ?? ''));
+    $like('id_empleado', (string) ($p['fFuncionario'] ?? ''));
+    if (($p['fInmueble'] ?? '') !== '') {
+      $term = '%' . $this->db->escapeLike((string) $p['fInmueble']) . '%';
+      $where[] = "(COALESCE(c.`inmueble`, '') LIKE ? OR COALESCE(c.`id_inmueble`, '') LIKE ?)";
+      $args[] = $term;
+      $args[] = $term;
+    }
+    if (($p['fContrato'] ?? '') !== '') {
+      $term = '%' . $this->db->escapeLike((string) $p['fContrato']) . '%';
+      $where[] = "(COALESCE(c.`contrato`, '') LIKE ? OR COALESCE(c.`id_contrato`, '') LIKE ?)";
+      $args[] = $term;
+      $args[] = $term;
+    }
+
+    if (($p['fFecha'] ?? '') !== '') {
+      $tsStart = strtotime((string) $p['fFecha'] . ' 00:00:00');
+      $tsEnd = strtotime((string) $p['fFecha'] . ' 23:59:59');
+      if ($tsStart !== false && $tsEnd !== false) {
+        $where[] = 'COALESCE(NULLIF(c.`fecha`, 0), UNIX_TIMESTAMP(c.`cct_created`)) BETWEEN ? AND ?';
+        $args[] = (int) $tsStart;
+        $args[] = (int) $tsEnd;
+      }
+    }
+
+    if (($p['fEstado'] ?? '') !== '') {
+      $where[] = "LOWER(TRIM(COALESCE(c.`estado`, ''))) = ?";
+      $args[] = strtolower(trim((string) $p['fEstado']));
+    }
+    if (($p['fTipoMantenimiento'] ?? '') !== '') {
+      $where[] = "LOWER(TRIM(COALESCE(c.`tipo_mantenimiento`, ''))) = ?";
+      $args[] = strtolower(trim((string) $p['fTipoMantenimiento']));
+    }
+    if (($p['fCategoria'] ?? '') !== '') {
+      $where[] = "LOWER(TRIM(COALESCE(c.`categoria_cotizacion`, ''))) = ?";
+      $args[] = strtolower(trim((string) $p['fCategoria']));
+    }
+    if (($p['fEnviada'] ?? '') !== '') {
+      $sent = strtolower(trim((string) $p['fEnviada']));
+      if (in_array($sent, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true)) {
+        $where[] = "LOWER(TRIM(COALESCE(c.`se_envio`, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado')";
+      } elseif (in_array($sent, ['no', '0', 'false', 'none', 'sin'], true)) {
+        $where[] = "(TRIM(COALESCE(c.`se_envio`, '')) = '' OR LOWER(TRIM(COALESCE(c.`se_envio`, ''))) IN ('no', '0', 'false'))";
+      }
+    }
+
+    $whereSql = implode(' AND ', $where);
+    $total = (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` c WHERE {$whereSql}", $args);
+    $page = max(1, (int) ($p['fPage'] ?? 1));
+    $perPage = max(10, min(60, (int) ($p['fPerPage'] ?? 20)));
+    $totalPages = max(1, (int) ceil($total / $perPage));
+    if ($page > $totalPages) {
+      $page = $totalPages;
+    }
+    $offset = ($page - 1) * $perPage;
+
+    $ordersSelect = $this->table_exists($ordersTable)
+      ? "(SELECT COUNT(1) FROM `{$ordersTable}` o WHERE TRIM(COALESCE(o.`id_cotizacion`, '')) = CAST(c.`_ID` AS CHAR)) AS ordenes_total"
+      : '0 AS ordenes_total';
+    $rows = $this->db->getResults(
+      "SELECT c.*, {$ordersSelect}
+       FROM `{$table}` c
+       WHERE {$whereSql}
+       ORDER BY COALESCE(NULLIF(c.`fecha`, 0), UNIX_TIMESTAMP(c.`cct_created`)) DESC, c.`_ID` DESC
+       LIMIT ? OFFSET ?",
+      array_merge($args, [$perPage, $offset])
+    );
+
+    return [
+      'rows' => $this->attach_cotizacion_orders(is_array($rows) ? $rows : []),
+      'stats' => $this->aggregate_cotizaciones_mantenimiento($whereSql, $args),
+      'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
+    ];
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @return array<int,array<string,mixed>> */
+  private function attach_cotizacion_orders(array $rows): array
+  {
+    $ordersTable = $this->db->table('jet_cct_ordenes');
+    if (empty($rows) || !$this->table_exists($ordersTable)) {
+      return $rows;
+    }
+
+    $ids = [];
+    foreach ($rows as $row) {
+      $id = trim((string) ($row['_ID'] ?? ''));
+      if ($id !== '') {
+        $ids[$id] = true;
+      }
+    }
+    if (empty($ids)) {
+      return $rows;
+    }
+
+    $idList = array_keys($ids);
+    $ph = implode(',', array_fill(0, count($idList), '?'));
+    $orderRows = $this->db->getResults(
+      "SELECT `_ID`, `id_cotizacion`, `id_ticket`, `estado`, `proveedor`, `valor`, `actividad`, `fecha`
+       FROM `{$ordersTable}`
+       WHERE TRIM(COALESCE(`id_cotizacion`, '')) IN ({$ph})
+       ORDER BY `_ID` DESC",
+      $idList
+    );
+    $map = [];
+    foreach ($orderRows as $order) {
+      $idCot = trim((string) ($order['id_cotizacion'] ?? ''));
+      if ($idCot !== '') {
+        $map[$idCot][] = $order;
+      }
+    }
+    foreach ($rows as &$row) {
+      $id = trim((string) ($row['_ID'] ?? ''));
+      $row['_scm_ordenes'] = $id !== '' && isset($map[$id]) ? $map[$id] : [];
+    }
+    unset($row);
+
+    return $rows;
+  }
+
+  /** @return array<string,int> */
+  private function aggregate_cotizaciones_mantenimiento(string $whereSql, array $args): array
+  {
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    $row = $this->db->getRow(
+      "SELECT
+        COUNT(1) AS total,
+        SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`se_envio`, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado') THEN 1 ELSE 0 END) AS enviadas,
+        SUM(CASE WHEN TRIM(COALESCE(c.`se_envio`, '')) = '' OR LOWER(TRIM(COALESCE(c.`se_envio`, ''))) IN ('no', '0', 'false') THEN 1 ELSE 0 END) AS no_enviadas,
+        SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'aprobada' THEN 1 ELSE 0 END) AS aprobadas,
+        SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'desaprobada' THEN 1 ELSE 0 END) AS desaprobadas
+       FROM `{$table}` c
+       WHERE {$whereSql}",
+      $args
+    ) ?: [];
+
+    return [
+      'total' => (int) ($row['total'] ?? 0),
+      'enviadas' => (int) ($row['enviadas'] ?? 0),
+      'no_enviadas' => (int) ($row['no_enviadas'] ?? 0),
+      'aprobadas' => (int) ($row['aprobadas'] ?? 0),
+      'desaprobadas' => (int) ($row['desaprobadas'] ?? 0),
+    ];
+  }
+
+  private function render_my_tickets_panel(array $result, array $stats, array $params, array $filterOptions): string
+  {
+    $cards = (string) ($result['tbody'] ?? '');
+    $pagination = (string) ($result['pagination_html'] ?? '');
+    $form = $this->render_status_maintenance_filter_form('mis_tickets', 'scm_my_', $params, $filterOptions, 'Mis tickets');
+    return '<span id="scm-mis_tickets-count" style="display:none;">' . esc_html((string) ($stats['total'] ?? 0)) . '</span>'
+      . '<div class="scm-status-topic-head"><div><h3>Mis tickets</h3><p>Tickets abiertos asignados a tu funcionario.</p></div><span class="scm-status-count"><strong>' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> tickets</span></div>'
+      . $form
+      . '<div class="scm-cards-wrap"><div class="scm-ticket-cards" id="scm-cards-mis_tickets">' . $cards . '</div></div>'
+      . '<div class="scm-pagination" id="scm-pagination-mis_tickets">' . $pagination . '</div>';
+  }
+
+  private function render_cotizaciones_mantenimiento_panel(array $result, array $params): string
+  {
+    $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];
+    $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : ['page' => 1, 'total_pages' => 1, 'total' => 0];
+    $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
+    return '<span id="scm-cotizaciones_mantenimiento-count" style="display:none;">' . esc_html((string) ($stats['total'] ?? 0)) . '</span>'
+      . '<div class="scm-status-topic-head"><div><h3>Cotizaciones de Mantenimiento</h3><p>Control de envio, respuesta, ordenes y acciones de cotizacion.</p></div><span class="scm-status-count"><strong id="scm-cotizaciones_mantenimiento-kpi-total">' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> cotizaciones</span></div>'
+      . '<div class="scm-kpis scm-kpis-daisy scm-cotizaciones-kpis"><div class="scm-kpi"><div class="scm-kpi-label">Enviadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-enviadas">' . esc_html((string) ($stats['enviadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">No enviadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-no-enviadas">' . esc_html((string) ($stats['no_enviadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Aprobadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-aprobadas">' . esc_html((string) ($stats['aprobadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Desaprobadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-desaprobadas">' . esc_html((string) ($stats['desaprobadas'] ?? 0)) . '</div></div></div>'
+      . $this->render_cotizaciones_mantenimiento_filter_form($params)
+      . '<div class="scm-cotizaciones-list" id="scm-cards-cotizaciones_mantenimiento">' . $this->render_cotizaciones_mantenimiento_cards($rows) . '</div>'
+      . '<div class="scm-pagination" id="scm-pagination-cotizaciones_mantenimiento">' . $this->render_cotizaciones_mantenimiento_pagination($pagination) . '</div>';
+  }
+
+  private function render_cotizaciones_mantenimiento_filter_form(array $p): string
+  {
+    ob_start();
+?>
+    <div class="scm-filter-card card">
+      <h3>Filtros</h3>
+      <form id="scm-form-cotizaciones_mantenimiento" autocomplete="off">
+        <input type="hidden" id="scmqt_page" name="scmqt_page" value="<?php echo esc_attr((string) ($p['fPage'] ?? '1')); ?>">
+        <div class="scm-grid">
+          <div class="scm-field"><label for="scmqt_cotizacion">Cotizaci&oacute;n</label><input id="scmqt_cotizacion" name="scmqt_cotizacion" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fCotizacion'] ?? '')); ?>" placeholder="Ej: 528"></div>
+          <div class="scm-field"><label for="scmqt_ticket">Ticket</label><input id="scmqt_ticket" name="scmqt_ticket" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fTicket'] ?? '')); ?>" placeholder="Ej: 10055"></div>
+          <div class="scm-field"><label for="scmqt_fecha">Fecha</label><input id="scmqt_fecha" name="scmqt_fecha" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string) ($p['fFecha'] ?? '')); ?>"></div>
+          <div class="scm-field"><label for="scmqt_destinatario">Destinatario</label><input id="scmqt_destinatario" name="scmqt_destinatario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fDestinatario'] ?? '')); ?>"></div>
+          <div class="scm-field"><label for="scmqt_funcionario">Funcionario</label><input id="scmqt_funcionario" name="scmqt_funcionario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fFuncionario'] ?? '')); ?>" placeholder="ID empleado"></div>
+          <div class="scm-field"><label for="scmqt_inmueble">Inmueble SIMI</label><input id="scmqt_inmueble" name="scmqt_inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fInmueble'] ?? '')); ?>"></div>
+          <div class="scm-field"><label for="scmqt_contrato">Contrato</label><input id="scmqt_contrato" name="scmqt_contrato" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fContrato'] ?? '')); ?>"></div>
+          <div class="scm-field"><label for="scmqt_enviada">Fue enviada</label><select id="scmqt_enviada" name="scmqt_enviada" class="select select-bordered select-sm scm-select"><option value="">Todas</option><option value="si" <?php selected((string) ($p['fEnviada'] ?? ''), 'si'); ?>>S&iacute;</option><option value="no" <?php selected((string) ($p['fEnviada'] ?? ''), 'no'); ?>>No</option></select></div>
+          <div class="scm-field"><label for="scmqt_estado">Estado</label><select id="scmqt_estado" name="scmqt_estado" class="select select-bordered select-sm scm-select"><option value="">Todos</option><?php foreach ($this->cotizaciones_distinct_options('estado') as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected((string) ($p['fEstado'] ?? ''), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?></select></div>
+          <div class="scm-field"><label for="scmqt_tipo_mantenimiento">Tipo mantenimiento</label><select id="scmqt_tipo_mantenimiento" name="scmqt_tipo_mantenimiento" class="select select-bordered select-sm scm-select"><option value="">Todos</option><?php foreach ($this->cotizaciones_distinct_options('tipo_mantenimiento') as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected((string) ($p['fTipoMantenimiento'] ?? ''), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?></select></div>
+          <div class="scm-field"><label for="scmqt_categoria">Categoria</label><select id="scmqt_categoria" name="scmqt_categoria" class="select select-bordered select-sm scm-select"><option value="">Todas</option><?php foreach ($this->cotizaciones_distinct_options('categoria_cotizacion') as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected((string) ($p['fCategoria'] ?? ''), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?></select></div>
+        </div>
+        <div class="scm-actions"><button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button><button class="scm-btn-secondary btn btn-outline" type="button" id="scm-clear-cotizaciones_mantenimiento">Limpiar</button><span class="scm-spinner" id="scm-spinner-cotizaciones_mantenimiento"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span></div>
+      </form>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @return array<int,string> */
+  private function cotizaciones_distinct_options(string $column): array
+  {
+    $allowed = ['estado', 'tipo_mantenimiento', 'categoria_cotizacion'];
+    if (!in_array($column, $allowed, true)) {
+      return [];
+    }
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($table) || !$this->column_exists($table, $column)) {
+      return [];
+    }
+    $rows = $this->db->getCol("SELECT DISTINCT TRIM(COALESCE(`{$column}`, '')) AS val FROM `{$table}` WHERE TRIM(COALESCE(`{$column}`, '')) <> '' ORDER BY val ASC LIMIT 120");
+    $out = [];
+    foreach ($rows as $row) {
+      $value = trim((string) $row);
+      if ($value !== '') {
+        $out[$value] = $value;
+      }
+    }
+    return array_values($out);
+  }
+
+  /** @param array<int,array<string,mixed>> $rows */
+  private function render_cotizaciones_mantenimiento_cards(array $rows): string
+  {
+    if (empty($rows)) {
+      return '<div class="scm-empty scm-empty-cards">No hay cotizaciones con los filtros actuales.</div>';
+    }
+    $html = '';
+    foreach ($rows as $row) {
+      $html .= $this->render_cotizacion_mantenimiento_card($row);
+    }
+    return $html;
+  }
+
+  /** @param array<string,mixed> $row */
+  private function render_cotizacion_mantenimiento_card(array $row): string
+  {
+    $id = trim((string) ($row['_ID'] ?? ''));
+    $ticket = trim((string) ($row['id_ticket'] ?? ''));
+    $inmueble = trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? ''));
+    $idInmueble = trim((string) ($row['id_inmueble'] ?? $inmueble));
+    $contrato = trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? ''));
+    $idContrato = trim((string) ($row['id_contrato'] ?? $contrato));
+    $sucursal = trim((string) ($row['sucursal'] ?? '1'));
+    $estado = trim((string) ($row['estado'] ?? 'Inicial'));
+    $seEnvio = strtolower(trim((string) ($row['se_envio'] ?? '')));
+    $enviada = in_array($seEnvio, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true);
+    $fechaTs = (int) ($row['fecha'] ?? 0);
+    if ($fechaTs <= 0) {
+      $fechaTs = strtotime((string) ($row['cct_created'] ?? '')) ?: 0;
+    }
+    $fecha = $fechaTs > 0 ? date('d/m/Y', $fechaTs) : '-';
+    $destinatario = trim((string) ($row['destinatario'] ?? '-'));
+    $contacto = trim((string) ($row['celular_destinatario'] ?? '-'));
+    $empleado = trim((string) ($row['coordinador'] ?? $row['creador'] ?? $row['id_empleado'] ?? '-'));
+    $direccion = trim((string) ($row['direccion'] ?? '-'));
+    $ticketUrl = $ticket !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticket) : '';
+    $cotUrl = $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '';
+    $noteUrl = 'https://sucasainmobiliaria.com.co/mi-cuenta/anadir-nota-a-cotizacion-de-mantenimiento/?id_cotizacion=' . rawurlencode($id) . '&id_inmueble=' . rawurlencode($idInmueble) . '&id_sucursal=' . rawurlencode($sucursal) . '&id_contrato=' . rawurlencode($idContrato);
+    $orderUrl = 'https://sucasainmobiliaria.com.co/mi-cuenta/anadir-orden-de-mantenimiento/?id_cotizacion=' . rawurlencode($id) . '&id_inmueble=' . rawurlencode($idInmueble);
+    $actaUrl = 'https://sucasainmobiliaria.com.co/mi-cuenta/anadir-acta-de-satisfaccion/?id_cotizacion=' . rawurlencode($id) . '&id_rev_correctiva=' . rawurlencode(trim((string) ($row['id_revision'] ?? ''))) . '&id_propietario=' . rawurlencode(trim((string) ($row['id_propietario'] ?? ''))) . '&id_arrendatario=' . rawurlencode(trim((string) ($row['id_arrendatario'] ?? ''))) . '&id_inmueble=' . rawurlencode($idInmueble) . '&id_sucursal=' . rawurlencode($sucursal);
+    $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
+    $ordersHtml = empty($orders) ? '<p class="scm-case-history-empty">Sin ordenes registradas para esta cotizacion.</p>' : '';
+    foreach ($orders as $order) {
+      $ordersHtml .= '<article class="scm-case-history-item"><div class="scm-case-history-meta"><strong>Orden #' . esc_html((string) ($order['_ID'] ?? '')) . '</strong><span>' . esc_html((string) ($order['estado'] ?? '-')) . '</span></div><div class="scm-case-history-detail"><p><strong>Proveedor:</strong> ' . esc_html((string) ($order['proveedor'] ?? '-')) . '</p><p><strong>Actividad:</strong> ' . esc_html((string) ($order['actividad'] ?? '-')) . '</p><p><strong>Valor:</strong> ' . esc_html((string) ($order['valor'] ?? '-')) . '</p></div></article>';
+    }
+
+    return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '">'
+      . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Ticket <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'No fue enviada') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : '-') . '</span></div></div>'
+      . '<div class="scm-cotizacion-meta"><div><span>Fecha</span><strong>' . esc_html($fecha) . '</strong></div><div><span>Destinatario</span><strong>' . esc_html($destinatario !== '' ? $destinatario : '-') . '</strong></div><div><span>Contacto</span><strong>' . esc_html($contacto !== '' ? $contacto : '-') . '</strong></div><div><span>Empleado</span><strong>' . esc_html($empleado !== '' ? $empleado : '-') . '</strong></div><div><span>Mano de obra</span><strong>' . esc_html((string) ($row['saldo_obra'] ?? $row['total_mano_obra'] ?? '-')) . '</strong></div><div><span>Materiales</span><strong>' . esc_html((string) ($row['saldo_materiales'] ?? $row['total_materiales'] ?? '-')) . '</strong></div><div><span>Otros costos</span><strong>' . esc_html((string) ($row['saldo_otros_costo'] ?? $row['total_otros_costos'] ?? '-')) . '</strong></div><div><span>Ordenes</span><strong>' . esc_html((string) ($row['ordenes_total'] ?? count($orders))) . '</strong></div></div>'
+      . '<div class="scm-cotizacion-actions">'
+      . ($cotUrl !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($cotUrl) . '" data-iframe-title="Cotizacion #' . esc_attr($id) . '">Ver cotizacion</button>' : '')
+      . ($ticketUrl !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($ticketUrl) . '" data-iframe-title="Ticket #' . esc_attr($ticket) . '">Ver ticket</button>' : '')
+      . '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-orders>Ver ordenes</button>'
+      . '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizacion</button>'
+      . '<button type="button" class="scm-case-work-btn scm-danger-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizacion</button>'
+      . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($noteUrl) . '" data-iframe-title="Anadir nota a cotizacion">Anadir nota</button>'
+      . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($orderUrl) . '" data-iframe-title="Anadir orden de mantenimiento">Anadir orden</button>'
+      . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($actaUrl) . '" data-iframe-title="Anadir acta de satisfaccion">Anadir acta</button>'
+      . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div></article>';
+  }
+
+  private function render_cotizaciones_mantenimiento_pagination(array $pagination): string
+  {
+    $page = max(1, (int) ($pagination['page'] ?? 1));
+    $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
+    $total = max(0, (int) ($pagination['total'] ?? 0));
+    if ($total <= 0) {
+      return '';
+    }
+    $html = '<div class="scm-pagination-card card"><div class="scm-pagination-summary">Pagina ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' | Total: ' . esc_html((string) $total) . '</div><div class="scm-pagination-controls">';
+    foreach ([1 => '&laquo;', max(1, $page - 1) => '&lsaquo;'] as $p => $label) {
+      $html .= '<button type="button" class="scm-page-btn btn btn-sm btn-outline scm-page-btn-generic" data-tab="cotizaciones_mantenimiento" data-page="' . esc_attr((string) $p) . '"' . ($page <= 1 ? ' disabled' : '') . '>' . $label . '</button>';
+    }
+    for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++) {
+      $html .= '<button type="button" class="scm-page-btn btn btn-sm scm-page-btn-generic ' . ($i === $page ? 'btn-primary is-active' : 'btn-outline') . '" data-tab="cotizaciones_mantenimiento" data-page="' . esc_attr((string) $i) . '">' . esc_html((string) $i) . '</button>';
+    }
+    foreach ([min($totalPages, $page + 1) => '&rsaquo;', $totalPages => '&raquo;'] as $p => $label) {
+      $html .= '<button type="button" class="scm-page-btn btn btn-sm btn-outline scm-page-btn-generic" data-tab="cotizaciones_mantenimiento" data-page="' . esc_attr((string) $p) . '"' . ($page >= $totalPages ? ' disabled' : '') . '>' . $label . '</button>';
+    }
+    return $html . '</div></div>';
   }
 
   /** @return array<string,mixed> */

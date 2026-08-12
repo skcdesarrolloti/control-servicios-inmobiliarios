@@ -466,6 +466,14 @@ final class GenericTicketsUiView
                 <option value="has" <?php selected((string) ($p['fCotizacion'] ?? ''), 'has'); ?>>Con cotizacion</option>
                 <option value="none" <?php selected((string) ($p['fCotizacion'] ?? ''), 'none'); ?>>Sin cotizacion</option>
               </select></div>
+            <div class="scm-field scm-cotizacion-dependent" data-cotizacion-dependent-for="<?php echo esc_attr($prefix); ?>cotizacion"><label for="<?php echo esc_attr($prefix); ?>cotizacion_estado">Estado cotizacion</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>cotizacion_estado" name="<?php echo esc_attr($prefix); ?>cotizacion_estado">
+                <option value="">Todos</option><?php foreach (($filterOptions['cotizacion_estado'] ?? []) as $cotEstadoOpt): ?><option value="<?php echo esc_attr((string) $cotEstadoOpt); ?>" <?php selected((string) ($p['fCotizacionEstado'] ?? ''), (string) $cotEstadoOpt); ?>><?php echo esc_html((string) $cotEstadoOpt); ?></option><?php endforeach; ?>
+              </select></div>
+            <div class="scm-field scm-cotizacion-dependent" data-cotizacion-dependent-for="<?php echo esc_attr($prefix); ?>cotizacion"><label for="<?php echo esc_attr($prefix); ?>cotizacion_enviada">Fue enviada</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>cotizacion_enviada" name="<?php echo esc_attr($prefix); ?>cotizacion_enviada">
+                <option value="">Todas</option>
+                <option value="si" <?php selected((string) ($p['fCotizacionEnviada'] ?? ''), 'si'); ?>>Si</option>
+                <option value="no" <?php selected((string) ($p['fCotizacionEnviada'] ?? ''), 'no'); ?>>No</option>
+              </select></div>
             <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>perturbacion">Perturbacion</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>perturbacion" name="<?php echo esc_attr($prefix); ?>perturbacion">
                 <option value="">Todas</option>
                 <option value="has" <?php selected(strtolower((string) ($p['fPerturbacion'] ?? '')), 'has'); ?>>Con perturbacion</option>

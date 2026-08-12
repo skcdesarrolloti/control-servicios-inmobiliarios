@@ -19,7 +19,7 @@ trait GenericFiltersAndHistoryConcern
   {
     $tabla = $this->db->table('jet_cct_tickets');
     if (!$this->table_exists($tabla) || empty($temas)) {
-      return ['estado_admin' => [], 'funcionarios' => [], 'barrios' => $this->get_barrios_filter_options()];
+      return ['estado_admin' => [], 'cotizacion_estado' => $this->get_cotizacion_estado_options(), 'funcionarios' => [], 'barrios' => $this->get_barrios_filter_options()];
     }
 
     $cacheKey = md5(json_encode(array_values($temas), JSON_UNESCAPED_UNICODE) ?: implode('|', $temas));
@@ -86,9 +86,23 @@ trait GenericFiltersAndHistoryConcern
       }
     }
 
-    $out = ['estado_admin' => $estadoAdmin, 'funcionarios' => $funcionarios, 'barrios' => $this->get_barrios_filter_options()];
+    $out = ['estado_admin' => $estadoAdmin, 'cotizacion_estado' => $this->get_cotizacion_estado_options(), 'funcionarios' => $funcionarios, 'barrios' => $this->get_barrios_filter_options()];
     $this->genericFilterOptionsCache[$cacheKey] = $out;
     return $out;
+  }
+
+  /** @return array<int,string> */
+  private function get_cotizacion_estado_options(): array
+  {
+    $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($cotTable) || !$this->column_exists($cotTable, 'estado')) {
+      return [];
+    }
+
+    $rows = $this->db->getCol(
+      "SELECT DISTINCT TRIM(COALESCE(`estado`, '')) AS estado FROM `{$cotTable}` WHERE TRIM(COALESCE(`estado`, '')) <> '' ORDER BY estado ASC LIMIT 100"
+    );
+    return $this->unique_non_empty_values($rows);
   }
 
   /** @return array<int,string> */

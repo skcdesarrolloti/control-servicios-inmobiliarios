@@ -37,7 +37,7 @@ trait MaintenanceQueriesConcern
       'estado' => ['Nuevo', 'En proceso'],
       'estado_admin' => $this->getDistinctValuesFromCandidates($table, ['estado_administrativo']),
       'prioridad' => $this->getDistinctValuesFromCandidates($table, ['prioridad']),
-      'cotizacion_estado' => $this->getDistinctValuesFromCandidates($table, ['estado_cotizacion_mantenimiento', 'estado_respuesta_cotizacion_mantenimiento']),
+      'cotizacion_estado' => $this->getMaintenanceCotizacionEstadoOptions($table),
       'revision_estado' => $this->getDistinctValuesFromCandidates($table, ['estado_rev_preventiva', 'estado_rev_correctiva']),
       'funcionarios' => $this->getFuncionariosFilterOptions(),
       'barrios' => $this->getBarriosFilterOptions(),
@@ -158,6 +158,42 @@ trait MaintenanceQueriesConcern
           $where[] = "(LOWER(TRIM(COALESCE(t.estado_cotizacion_mantenimiento, ''))) = %s OR LOWER(TRIM(COALESCE(t.estado_respuesta_cotizacion_mantenimiento, ''))) = %s)";
           $args[] = $state;
           $args[] = $state;
+        }
+      }
+    }
+
+    $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (
+      (($filters['fCotizacionEstado'] ?? '') !== '' || ($filters['fCotizacionEnviada'] ?? '') !== '')
+      && $this->schema->tableExists($cotTable)
+      && $this->schema->columnExists($cotTable, '_ID')
+    ) {
+      $cotExtra = [];
+      if (($filters['fCotizacionEstado'] ?? '') !== '' && $this->schema->columnExists($cotTable, 'estado')) {
+        $cotExtra[] = "LOWER(TRIM(COALESCE(cot_dyn.estado, ''))) = %s";
+        $args[] = strtolower(trim((string) $filters['fCotizacionEstado']));
+      }
+      if (($filters['fCotizacionEnviada'] ?? '') !== '' && $this->schema->columnExists($cotTable, 'se_envio')) {
+        $sent = strtolower(trim((string) $filters['fCotizacionEnviada']));
+        if (in_array($sent, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true)) {
+          $cotExtra[] = "LOWER(TRIM(COALESCE(cot_dyn.se_envio, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado')";
+        } elseif (in_array($sent, ['no', '0', 'false', 'none', 'sin'], true)) {
+          $cotExtra[] = "(TRIM(COALESCE(cot_dyn.se_envio, '')) = '' OR LOWER(TRIM(COALESCE(cot_dyn.se_envio, ''))) IN ('no', '0', 'false'))";
+        }
+      }
+      if (!empty($cotExtra)) {
+        $joinParts = [];
+        if ($this->schema->columnExists($table, 'id_cotizacion_mantenimiento')) {
+          $joinParts[] = "FIND_IN_SET(CAST(cot_dyn._ID AS CHAR), REPLACE(COALESCE(t.id_cotizacion_mantenimiento, ''), ' ', '')) > 0";
+        }
+        if ($this->schema->columnExists($cotTable, 'id_ticket')) {
+          $joinParts[] = "TRIM(COALESCE(cot_dyn.id_ticket, '')) = CAST(t._ID AS CHAR)";
+          if ($this->schema->columnExists($table, 'id_ticket')) {
+            $joinParts[] = "TRIM(COALESCE(cot_dyn.id_ticket, '')) = TRIM(COALESCE(t.id_ticket, ''))";
+          }
+        }
+        if (!empty($joinParts)) {
+          $where[] = "EXISTS (SELECT 1 FROM `{$cotTable}` cot_dyn WHERE (" . implode(' OR ', $joinParts) . ') AND ' . implode(' AND ', $cotExtra) . ')';
         }
       }
     }
@@ -386,6 +422,20 @@ trait MaintenanceQueriesConcern
 
     /** @var array<int,array<string,mixed>> $rows */
     return $this->enrichRowsWithRelatedTables($rows);
+  }
+
+  /** @return array<int,string> */
+  private function getMaintenanceCotizacionEstadoOptions(string $ticketTable): array
+  {
+    $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if ($this->schema->tableExists($cotTable) && $this->schema->columnExists($cotTable, 'estado')) {
+      $rows = $this->db->getCol(
+        "SELECT DISTINCT TRIM(COALESCE(`estado`, '')) AS estado FROM `{$cotTable}` WHERE TRIM(COALESCE(`estado`, '')) <> '' ORDER BY estado ASC LIMIT 100"
+      );
+      return $this->uniqueNonEmptyValues($rows);
+    }
+
+    return $this->getDistinctValuesFromCandidates($ticketTable, ['estado_cotizacion_mantenimiento', 'estado_respuesta_cotizacion_mantenimiento']);
   }
 
   /**

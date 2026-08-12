@@ -19,6 +19,9 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_TICKET_RESPONSE = 'scm_responder_ticket';
   const AJAX_POSTPONE_TICKET = 'scm_postergar_ticket';
   const AJAX_STATUS_TICKETS = 'scm_filtrar_tickets_estado';
+  const AJAX_MY_TICKETS = 'scm_mis_tickets';
+  const AJAX_COTIZACIONES_MANTENIMIENTO = 'scm_cotizaciones_mantenimiento';
+  const AJAX_DELETE_COTIZACION = 'scm_eliminar_cotizacion_mantenimiento';
   const AJAX_ACTIVATE_TICKET = 'scm_activar_ticket';
   const AJAX_COTIZACION_RESPONSE = 'scm_responder_cotizacion';
   const AJAX_CLOSE_TICKET = 'scm_cerrar_ticket';
@@ -680,6 +683,14 @@ final class SuCasaControlServiciosInmobiliarios
               <option value="">Todas</option>
               <option value="has" <?php selected(($p['fCotizacion'] ?? ''), 'has'); ?>>Con cotizaci&oacute;n</option>
               <option value="none" <?php selected(($p['fCotizacion'] ?? ''), 'none'); ?>>Sin cotizaci&oacute;n</option>
+            </select></div>
+          <div class="scm-field scm-cotizacion-dependent" data-cotizacion-dependent-for="<?php echo esc_attr($prefix); ?>cotizacion"><label for="<?php echo esc_attr($prefix); ?>cotizacion_estado">Estado cotizaci&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>cotizacion_estado" name="<?php echo esc_attr($prefix); ?>cotizacion_estado" class="select select-bordered select-sm scm-select">
+              <option value="">Todos</option><?php foreach (($filterOptions["cotizacion_estado"] ?? []) as $cotEstadoOpt): ?><option value="<?php echo esc_attr((string)$cotEstadoOpt); ?>" <?php selected((string)($p["fCotizacionEstado"] ?? ""), (string)$cotEstadoOpt); ?>><?php echo esc_html((string)$cotEstadoOpt); ?></option><?php endforeach; ?>
+            </select></div>
+          <div class="scm-field scm-cotizacion-dependent" data-cotizacion-dependent-for="<?php echo esc_attr($prefix); ?>cotizacion"><label for="<?php echo esc_attr($prefix); ?>cotizacion_enviada">Fue enviada</label><select id="<?php echo esc_attr($prefix); ?>cotizacion_enviada" name="<?php echo esc_attr($prefix); ?>cotizacion_enviada" class="select select-bordered select-sm scm-select">
+              <option value="">Todas</option>
+              <option value="si" <?php selected(($p['fCotizacionEnviada'] ?? ''), 'si'); ?>>S&iacute;</option>
+              <option value="no" <?php selected(($p['fCotizacionEnviada'] ?? ''), 'no'); ?>>No</option>
             </select></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>perturbacion">Perturbaci&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>perturbacion" name="<?php echo esc_attr($prefix); ?>perturbacion" class="select select-bordered select-sm scm-select">
               <option value="">Todas</option>

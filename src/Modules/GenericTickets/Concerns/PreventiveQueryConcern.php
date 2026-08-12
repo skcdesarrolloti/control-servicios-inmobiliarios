@@ -91,6 +91,41 @@ trait PreventiveQueryConcern
       $where[] = '`cct_created` <= ?';
       $args[]  = $p['fFechaHasta'] . ' 23:59:59';
     }
+    if (!empty($p['fCotizacion']) && $this->table_exists($cotTabla) && $this->column_exists($cotTabla, 'id_ticket') && $this->column_exists($tabla, 'id_ticket')) {
+      $cotExists = "EXISTS (
+        SELECT 1
+        FROM `{$cotTabla}` cot_has
+        WHERE TRIM(COALESCE(cot_has.id_ticket, '')) = TRIM(COALESCE(`{$tabla}`.`id_ticket`, ''))
+      )";
+      if ($p['fCotizacion'] === 'has') {
+        $where[] = $cotExists;
+      } elseif ($p['fCotizacion'] === 'none') {
+        $where[] = 'NOT ' . $cotExists;
+      }
+    }
+    if ((!empty($p['fCotizacionEstado']) || !empty($p['fCotizacionEnviada'])) && $this->table_exists($cotTabla) && $this->column_exists($cotTabla, 'id_ticket')) {
+      $cotConds = [];
+      if (!empty($p['fCotizacionEstado']) && $this->column_exists($cotTabla, 'estado')) {
+        $cotConds[] = "LOWER(TRIM(COALESCE(cot_dyn.estado, ''))) = ?";
+        $args[] = strtolower(trim((string) $p['fCotizacionEstado']));
+      }
+      if (!empty($p['fCotizacionEnviada']) && $this->column_exists($cotTabla, 'se_envio')) {
+        $sent = strtolower(trim((string) $p['fCotizacionEnviada']));
+        if (in_array($sent, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true)) {
+          $cotConds[] = "LOWER(TRIM(COALESCE(cot_dyn.se_envio, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado')";
+        } elseif (in_array($sent, ['no', '0', 'false', 'none', 'sin'], true)) {
+          $cotConds[] = "(TRIM(COALESCE(cot_dyn.se_envio, '')) = '' OR LOWER(TRIM(COALESCE(cot_dyn.se_envio, ''))) IN ('no', '0', 'false'))";
+        }
+      }
+      if (!empty($cotConds) && $this->column_exists($tabla, 'id_ticket')) {
+        $where[] = "EXISTS (
+          SELECT 1
+          FROM `{$cotTabla}` cot_dyn
+          WHERE TRIM(COALESCE(cot_dyn.id_ticket, '')) = TRIM(COALESCE(`{$tabla}`.`id_ticket`, ''))
+            AND " . implode(' AND ', $cotConds) . '
+        )';
+      }
+    }
 
     $whereStr = empty($where) ? '1=1' : implode(' AND ', $where);
 

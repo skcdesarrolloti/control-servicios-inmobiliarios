@@ -117,6 +117,10 @@
     var actionCotizacionResponse = actions.cotizacion_response || "";
     var actionPostponeTicket = actions.postpone_ticket || "";
     var actionStatusTickets = actions.status_tickets || "";
+    var actionMyTickets = actions.my_tickets || "";
+    var actionCotizacionesMantenimiento =
+      actions.cotizaciones_mantenimiento || "";
+    var actionDeleteCotizacion = actions.delete_cotizacion || "";
     var actionActivateTicket = actions.activate_ticket || "";
     var actionCloseTicket = actions.close_ticket || "";
     var actionContactsUpdate = actions.contacts_update || "";
@@ -632,6 +636,11 @@
       var activePanel = root.querySelector(".scm-tab-panel.active");
       var panelId = activePanel ? activePanel.id : "";
       var activeKey = panelId.replace("scm-panel-", "");
+      if (activeKey === "mis-tickets") {
+        activeKey = "mis_tickets";
+      } else if (activeKey === "cotizaciones-mantenimiento") {
+        activeKey = "cotizaciones_mantenimiento";
+      }
       if (activeKey === "mant" && form) {
         return doFetch(new FormData(form));
       } else if (tabFetchers[activeKey]) {
@@ -1216,6 +1225,31 @@
       toggleKpiVisibility(prefix + "kpi-" + sinSuffix, showSin);
     }
 
+    function applyCotizacionDependentFilters(scope, cotizacionSelect) {
+      if (!scope || !cotizacionSelect) {
+        return;
+      }
+      var show = String(cotizacionSelect.value || "").trim().toLowerCase() === "has";
+      var cotizacionId = cotizacionSelect.id || "";
+      scope
+        .querySelectorAll(".scm-cotizacion-dependent")
+        .forEach(function (field) {
+          var target = field.getAttribute("data-cotizacion-dependent-for") || "";
+          if (target && cotizacionId && target !== cotizacionId) {
+            return;
+          }
+          field.style.display = show ? "" : "none";
+          if (!show) {
+            field.querySelectorAll("select, input").forEach(function (input) {
+              input.value = "";
+              if (input.dispatchEvent) {
+                input.dispatchEvent(new Event("change", { bubbles: true }));
+              }
+            });
+          }
+        });
+    }
+
     function getCategoryMetricSet(baseMetrics, key) {
       var details =
         baseMetrics &&
@@ -1515,6 +1549,7 @@
       }
       if (cotizacionSelect) {
         cotizacionSelect.addEventListener("change", function () {
+          applyCotizacionDependentFilters(form, cotizacionSelect);
           applyBinaryFilterKpiVisibility(
             "scm-",
             cotizacionSelect.value,
@@ -1522,6 +1557,7 @@
             "sin-cotz",
           );
         });
+        applyCotizacionDependentFilters(form, cotizacionSelect);
       }
     }
 
@@ -1537,6 +1573,9 @@
           });
           setMantPage(1);
           applyBinaryFilterKpiVisibility("scm-", "", "con-cotz", "sin-cotz");
+          if (cotizacionSelect) {
+            applyCotizacionDependentFilters(form, cotizacionSelect);
+          }
           doFetch(new FormData(form));
         });
       }
@@ -1957,7 +1996,13 @@
       var pageInput = tabForm
         ? tabForm.querySelector("input[name$='page']")
         : null;
-      var tabPanel = tabCards ? tabCards.closest(".scm-open-topic-panel") : null;
+      var tabCotizacionSelect = tabForm
+        ? tabForm.querySelector("[name$='cotizacion']")
+        : null;
+      var tabPanel = tabCards
+        ? tabCards.closest(".scm-open-topic-panel") ||
+          tabCards.closest(".scm-tab-panel")
+        : null;
 
       if (!tabForm || !tabCards || !ajaxUrl || !action) {
         return null;
@@ -1998,6 +2043,20 @@
               tabPanel.setAttribute("data-scm-loaded", "1");
             }
             updateGenericKPI(tabKey, "total", d.kpi_total || "0");
+            if (tabKey === "cotizaciones_mantenimiento") {
+              updateGenericKPI(tabKey, "enviadas", d.kpi_enviadas || "0");
+              updateGenericKPI(
+                tabKey,
+                "no-enviadas",
+                d.kpi_no_enviadas || "0",
+              );
+              updateGenericKPI(tabKey, "aprobadas", d.kpi_aprobadas || "0");
+              updateGenericKPI(
+                tabKey,
+                "desaprobadas",
+                d.kpi_desaprobadas || "0",
+              );
+            }
             updateGenericKPI(tabKey, "con-cotz", d.kpi_con_cotz || "0");
             updateGenericKPI(tabKey, "sin-cotz", d.kpi_sin_cotz || "0");
             updateGenericKPI(tabKey, "con-prev", d.kpi_con_prev || "0");
@@ -2105,6 +2164,7 @@
       var tabCotizacionSelect = tabForm.querySelector("[name$='cotizacion']");
       if (tabCotizacionSelect) {
         tabCotizacionSelect.addEventListener("change", function () {
+          applyCotizacionDependentFilters(tabForm, tabCotizacionSelect);
           applyBinaryFilterKpiVisibility(
             "scm-" + tabKey + "-",
             tabCotizacionSelect.value,
@@ -2133,6 +2193,9 @@
             "con-cotz",
             "sin-cotz",
           );
+          if (tabCotizacionSelect) {
+            applyCotizacionDependentFilters(tabForm, tabCotizacionSelect);
+          }
           fetchTab(new FormData(tabForm));
         });
       }
@@ -2143,6 +2206,9 @@
         "con-cotz",
         "sin-cotz",
       );
+      if (tabCotizacionSelect) {
+        applyCotizacionDependentFilters(tabForm, tabCotizacionSelect);
+      }
 
       if (tabPagination) {
         tabPagination.addEventListener("click", function (e) {
@@ -2283,8 +2349,18 @@
           if (pageInput) {
             pageInput.value = "1";
           }
+          if (tabCotizacionSelect) {
+            applyCotizacionDependentFilters(tabForm, tabCotizacionSelect);
+          }
           fetchTab(new FormData(tabForm));
         });
+      }
+
+      if (tabCotizacionSelect) {
+        tabCotizacionSelect.addEventListener("change", function () {
+          applyCotizacionDependentFilters(tabForm, tabCotizacionSelect);
+        });
+        applyCotizacionDependentFilters(tabForm, tabCotizacionSelect);
       }
 
       if (tabPagination) {
@@ -2554,6 +2630,179 @@
 
     initContractsPanel();
 
+    function submitCotizacionAction(formData, action, errorMessage) {
+      if (!ajaxUrl || !action) {
+        showToast("error", "Accion no disponible.");
+        return Promise.resolve();
+      }
+      formData.append("action", action);
+      formData.append("nonce", nonce);
+      return fetch(ajaxUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin",
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error(
+              (json && json.data && json.data.message) || errorMessage,
+            );
+          }
+          var message =
+            (json.data && json.data.message) || "Accion realizada.";
+          showToast("success", message);
+          return refreshActiveTab();
+        })
+        .catch(function (err) {
+          showToast("error", err.message || errorMessage);
+        });
+    }
+
+    root.addEventListener("click", function (e) {
+      var ordersBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-view-cotizacion-orders]")
+          : null;
+      if (ordersBtn) {
+        e.preventDefault();
+        var card = ordersBtn.closest(".scm-cotizacion-card");
+        var source = card ? card.querySelector(".scm-cotizacion-orders-source") : null;
+        if (window.Swal) {
+          window.Swal.fire({
+            title: "Ordenes de la cotizacion",
+            html: source ? source.innerHTML : "Sin ordenes registradas.",
+            width: 780,
+            confirmButtonText: "Cerrar",
+          });
+        } else {
+          showToast("info", source ? source.textContent : "Sin ordenes registradas.");
+        }
+        return;
+      }
+
+      var responseBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-cotizacion-response-standalone]")
+          : null;
+      if (responseBtn) {
+        e.preventDefault();
+        var ticketPk = responseBtn.getAttribute("data-ticket-pk") || "";
+        if (!ticketPk) {
+          showToast("error", "No se encontro el ticket de la cotizacion.");
+          return;
+        }
+        if (!window.Swal) {
+          showToast("error", "No se pudo abrir el popup de respuesta.");
+          return;
+        }
+        window.Swal.fire({
+          title: "Responder cotizacion",
+          html:
+            '<label class="scm-seg-field"><span>Respuesta</span><select id="swal-cot-estado" class="select select-bordered select-sm scm-select"><option value="">Elige una respuesta</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
+            '<label class="scm-seg-field" id="swal-cot-motivo-wrap" style="display:none;"><span>Motivo</span><select id="swal-cot-motivo" class="select select-bordered select-sm scm-select"><option value="">Elige un motivo</option><option value="Por costo">Por costo</option><option value="Ejecucción por cuenta propia">Ejecucción por cuenta propia</option></select></label>' +
+            '<label class="scm-seg-field" id="swal-cot-fin-wrap" style="display:none;"><span>Financiacion</span><select id="swal-cot-fin" class="select select-bordered select-sm scm-select"><option value="">No aplica / sin respuesta</option><option value="Si">Si</option><option value="No">No</option></select></label>' +
+            '<label class="scm-seg-field"><span>Observaciones</span><textarea id="swal-cot-observacion" class="textarea textarea-bordered" rows="5">Ninguna</textarea></label>',
+          width: 620,
+          showCancelButton: true,
+          confirmButtonText: "Guardar y enviar",
+          cancelButtonText: "Cancelar",
+          didOpen: function () {
+            var estado = document.getElementById("swal-cot-estado");
+            var motivoWrap = document.getElementById("swal-cot-motivo-wrap");
+            var finWrap = document.getElementById("swal-cot-fin-wrap");
+            if (estado) {
+              estado.addEventListener("change", function () {
+                var isNo = estado.value === "Desaprobada";
+                var isYes = estado.value === "Aprobada";
+                if (motivoWrap) motivoWrap.style.display = isNo ? "" : "none";
+                if (finWrap) finWrap.style.display = isYes ? "" : "none";
+              });
+            }
+          },
+          preConfirm: function () {
+            var estado = document.getElementById("swal-cot-estado");
+            var motivo = document.getElementById("swal-cot-motivo");
+            if (!estado || !estado.value) {
+              window.Swal.showValidationMessage("Elige una respuesta.");
+              return false;
+            }
+            if (estado.value === "Desaprobada" && (!motivo || !motivo.value)) {
+              window.Swal.showValidationMessage("Elige el motivo.");
+              return false;
+            }
+            return true;
+          },
+        }).then(function (res) {
+          if (!res.isConfirmed) return;
+          var fd = new FormData();
+          fd.append("ticket_pk", ticketPk);
+          fd.append("estado", document.getElementById("swal-cot-estado").value || "");
+          fd.append("motivo", document.getElementById("swal-cot-motivo").value || "");
+          fd.append("financiacion", document.getElementById("swal-cot-fin").value || "");
+          fd.append(
+            "observacion",
+            document.getElementById("swal-cot-observacion").value || "Ninguna",
+          );
+          fd.append("notify_recipients_present", "1");
+          fd.append("notify_recipients[]", "none");
+          submitCotizacionAction(
+            fd,
+            actionCotizacionResponse,
+            "Error enviando respuesta de cotizacion.",
+          );
+        });
+        return;
+      }
+
+      var deleteBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-delete-cotizacion]")
+          : null;
+      if (deleteBtn) {
+        e.preventDefault();
+        var cotizacionId = deleteBtn.getAttribute("data-cotizacion-id") || "";
+        if (!cotizacionId || !window.Swal) {
+          showToast("error", "No se pudo abrir el formulario.");
+          return;
+        }
+        window.Swal.fire({
+          title: "Eliminar cotizacion",
+          html:
+            '<label class="scm-seg-field"><span>Motivo</span><select id="swal-del-motivo" class="select select-bordered select-sm scm-select"><option value="">Elige una opcion</option><option value="Por costo">Por costo</option><option value="Ejecucción por cuenta propia">Ejecucción por cuenta propia</option><option value="Duplicada">Duplicada</option><option value="Error de registro">Error de registro</option></select></label>' +
+            '<label class="scm-seg-field"><span>Observaciones a la cotizacion</span><textarea id="swal-del-observacion" class="textarea textarea-bordered" rows="5" placeholder="Por si tiene una observacion con respecto a la cotizacion presentada."></textarea></label>',
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Eliminar cotizacion",
+          cancelButtonText: "Cancelar",
+          preConfirm: function () {
+            var motivo = document.getElementById("swal-del-motivo");
+            if (!motivo || !motivo.value) {
+              window.Swal.showValidationMessage("Selecciona el motivo.");
+              return false;
+            }
+            return true;
+          },
+        }).then(function (res) {
+          if (!res.isConfirmed) return;
+          var fd = new FormData();
+          fd.append("id_cotizacion", cotizacionId);
+          fd.append("motivo", document.getElementById("swal-del-motivo").value || "");
+          fd.append(
+            "observacion",
+            document.getElementById("swal-del-observacion").value || "",
+          );
+          submitCotizacionAction(
+            fd,
+            actionDeleteCotizacion,
+            "Error eliminando cotizacion.",
+          );
+        });
+      }
+    });
+
     var genericTabKeys = [
       { key: "entrega", action: actions.entrega || "" },
       { key: "preventiva", action: actions.preventiva || "" },
@@ -2561,6 +2810,11 @@
       { key: "contable", action: actions.contable || "" },
       { key: "certificaciones", action: actions.certificaciones || "" },
       { key: "contractual", action: actions.contractual || "" },
+      { key: "mis_tickets", action: actionMyTickets || "" },
+      {
+        key: "cotizaciones_mantenimiento",
+        action: actionCotizacionesMantenimiento || "",
+      },
     ];
 
     genericTabKeys.forEach(function (t) {
@@ -2630,6 +2884,12 @@
         return loadStatusPanelIfNeeded(
           activePanel.querySelector(".scm-status-topic-panel.active"),
         );
+      }
+      if (activePanel.id === "scm-panel-mis-tickets") {
+        return loadPanelOnce(activePanel, "mis_tickets");
+      }
+      if (activePanel.id === "scm-panel-cotizaciones-mantenimiento") {
+        return loadPanelOnce(activePanel, "cotizaciones_mantenimiento");
       }
       return Promise.resolve();
     }

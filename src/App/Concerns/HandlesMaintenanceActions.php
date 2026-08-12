@@ -82,6 +82,101 @@ trait HandlesMaintenanceActions
     ]);
   }
 
+  public function ajax_handler_my_tickets(): void
+  {
+    $this->verifyCsrf();
+
+    $rawConfig = json_decode(stripslashes((string)($_POST['config'] ?? '{}')), true);
+    $rawConfig = is_array($rawConfig) ? $rawConfig : [];
+    $config = [
+      'ticket_url'     => self::sanitizeUrl($rawConfig['ticket_url']     ?? self::DEFAULT_TICKET_URL),
+      'preventiva_url' => self::sanitizeUrl($rawConfig['preventiva_url'] ?? self::DEFAULT_PREVENTIVA_URL),
+      'correctiva_url' => self::sanitizeUrl($rawConfig['correctiva_url'] ?? self::DEFAULT_CORRECTIVA_URL),
+      'cotizacion_url' => self::sanitizeUrl($rawConfig['cotizacion_url'] ?? self::DEFAULT_COTIZACION_URL),
+      'acta_url'       => self::sanitizeUrl($rawConfig['acta_url']       ?? self::DEFAULT_ACTA_URL),
+    ];
+
+    $module = $this->get_servicios_inmobiliarios_module();
+    $params = $module->parseParams($_POST, 'scm_my_');
+    $employeeId = $this->current_employee_id();
+    $params['fEmpleado'] = $employeeId !== '' ? $employeeId : '__sin_funcionario__';
+    $result = $module->run($params, $config);
+    $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];
+
+    $this->jsonOk([
+      'cards' => (string) ($result['tbody'] ?? ''),
+      'pagination' => (string) ($result['pagination_html'] ?? ''),
+      'count' => (string) ($stats['total'] ?? 0),
+      'kpi_total' => (string) ($stats['total'] ?? 0),
+    ]);
+  }
+
+  public function ajax_handler_cotizaciones_mantenimiento(): void
+  {
+    $this->verifyCsrf();
+
+    $params = $this->parse_cotizaciones_mantenimiento_params($_POST, 'scmqt_');
+    $result = $this->query_cotizaciones_mantenimiento($params);
+    $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
+    $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];
+    $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : [];
+
+    $this->jsonOk([
+      'cards' => $this->render_cotizaciones_mantenimiento_cards($rows),
+      'pagination' => $this->render_cotizaciones_mantenimiento_pagination($pagination),
+      'count' => (string) ($stats['total'] ?? 0),
+      'kpi_total' => (string) ($stats['total'] ?? 0),
+      'kpi_enviadas' => (string) ($stats['enviadas'] ?? 0),
+      'kpi_no_enviadas' => (string) ($stats['no_enviadas'] ?? 0),
+      'kpi_aprobadas' => (string) ($stats['aprobadas'] ?? 0),
+      'kpi_desaprobadas' => (string) ($stats['desaprobadas'] ?? 0),
+    ]);
+  }
+
+  public function ajax_handler_delete_cotizacion_mantenimiento(): void
+  {
+    $this->verifyCsrf();
+
+    $cotizacionId = (int) ($_POST['id_cotizacion'] ?? 0);
+    $motivo = trim(sanitize_text_field(wp_unslash((string) ($_POST['motivo'] ?? ''))));
+    $observacion = trim(wp_kses_post(wp_unslash((string) ($_POST['observacion'] ?? ''))));
+    if ($cotizacionId <= 0) {
+      $this->jsonFail('Cotizacion invalida.');
+    }
+    if ($motivo === '') {
+      $this->jsonFail('Selecciona el motivo.');
+    }
+
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($table)) {
+      $this->jsonFail('La tabla de cotizaciones no esta disponible.');
+    }
+
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
+    if (!is_array($row)) {
+      $this->jsonFail('Cotizacion no encontrada.');
+    }
+
+    $now = time();
+    $update = [
+      'estado' => 'Desaprobada',
+      'se_envio' => 'Si',
+      'motivo' => $motivo,
+      'observacion_respuesta' => $observacion !== '' ? $observacion : 'Cotizacion eliminada desde el panel.',
+      'fecha_respuesta' => $now,
+      'fecha_envio' => $now,
+    ];
+    if ($this->column_exists($table, 'cct_modified')) {
+      $update['cct_modified'] = date('Y-m-d H:i:s', $now);
+    }
+    $this->db->update($table, $update, ['_ID' => $cotizacionId]);
+
+    $this->jsonOk([
+      'message' => 'Cotizacion eliminada/desaprobada correctamente.',
+      'id_cotizacion' => (string) $cotizacionId,
+    ]);
+  }
+
 
   public function ajax_handler_damage_magnitude(): void
   {

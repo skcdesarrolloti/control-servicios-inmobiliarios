@@ -31,6 +31,8 @@ final class ServiciosInmobiliariosFilters
       'fOrigen' => $this->value($input, $prefix . 'origen'),
       'fPrioridad' => $this->value($input, $prefix . 'prioridad'),
       'fCotizacion' => $this->value($input, $prefix . 'cotizacion'),
+      'fCotizacionEstado' => $this->value($input, $prefix . 'cotizacion_estado'),
+      'fCotizacionEnviada' => $this->value($input, $prefix . 'cotizacion_enviada'),
       'fPerturbacion' => $this->value($input, $prefix . 'perturbacion'),
       'fRevision' => $this->value($input, $prefix . 'revision'),
       'fMagnitud' => $this->value($input, $prefix . 'magnitud'),
