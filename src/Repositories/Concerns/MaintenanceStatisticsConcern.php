@@ -124,16 +124,42 @@ trait MaintenanceStatisticsConcern
       && $this->schema->columnExists($cotTable, '_ID')
     ) {
       $cotExtra = [];
-      if (($filters['fCotizacionEstado'] ?? '') !== '' && $this->schema->columnExists($cotTable, 'estado')) {
-        $cotExtra[] = "LOWER(TRIM(COALESCE(cot_dyn.estado, ''))) = %s";
-        $args[] = strtolower(trim((string) $filters['fCotizacionEstado']));
+      if (($filters['fCotizacionEstado'] ?? '') !== '') {
+        $stateParts = [];
+        foreach (['estado', 'estado_cotizacion_mantenimiento', 'estado_respuesta_cotizacion_mantenimiento', 'estado_respuesta'] as $cotStateCol) {
+          if ($this->schema->columnExists($cotTable, $cotStateCol)) {
+            $stateParts[] = "LOWER(TRIM(COALESCE(cot_dyn.`{$cotStateCol}`, ''))) = %s";
+            $args[] = strtolower(trim((string) $filters['fCotizacionEstado']));
+          }
+        }
+        if (!empty($stateParts)) {
+          $cotExtra[] = '(' . implode(' OR ', $stateParts) . ')';
+        }
       }
-      if (($filters['fCotizacionEnviada'] ?? '') !== '' && $this->schema->columnExists($cotTable, 'se_envio')) {
+      if (($filters['fCotizacionEnviada'] ?? '') !== '') {
         $sent = strtolower(trim((string) $filters['fCotizacionEnviada']));
+        $sentColumns = [];
+        foreach (['se_envio', 'fue_enviada_cotizacion_mantenimiento', 'fue_enviada'] as $sentCol) {
+          if ($this->schema->columnExists($cotTable, $sentCol)) {
+            $sentColumns[] = $sentCol;
+          }
+        }
         if (in_array($sent, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true)) {
-          $cotExtra[] = "LOWER(TRIM(COALESCE(cot_dyn.se_envio, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado')";
+          $sentParts = [];
+          foreach ($sentColumns as $sentCol) {
+            $sentParts[] = "LOWER(TRIM(COALESCE(cot_dyn.`{$sentCol}`, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado')";
+          }
+          if (!empty($sentParts)) {
+            $cotExtra[] = '(' . implode(' OR ', $sentParts) . ')';
+          }
         } elseif (in_array($sent, ['no', '0', 'false', 'none', 'sin'], true)) {
-          $cotExtra[] = "(TRIM(COALESCE(cot_dyn.se_envio, '')) = '' OR LOWER(TRIM(COALESCE(cot_dyn.se_envio, ''))) IN ('no', '0', 'false'))";
+          $sentParts = [];
+          foreach ($sentColumns as $sentCol) {
+            $sentParts[] = "(TRIM(COALESCE(cot_dyn.`{$sentCol}`, '')) = '' OR LOWER(TRIM(COALESCE(cot_dyn.`{$sentCol}`, ''))) IN ('no', '0', 'false'))";
+          }
+          if (!empty($sentParts)) {
+            $cotExtra[] = '(' . implode(' AND ', $sentParts) . ')';
+          }
         }
       }
       if (!empty($cotExtra)) {

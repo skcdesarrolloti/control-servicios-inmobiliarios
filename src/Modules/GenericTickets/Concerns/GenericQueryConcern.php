@@ -231,29 +231,53 @@ trait GenericQueryConcern
       }
     }
     if (!empty($p['fCotizacion'])) {
-      $cotCol = $this->detect_first_existing_column($tabla, ['id_cotizacion_mantenimiento', 'id_cotizacion']);
-      if ($cotCol !== '') {
-        if ($p['fCotizacion'] === 'has') {
-          $where[] = "TRIM(COALESCE(`{$cotCol}`, '')) <> ''";
-        } elseif ($p['fCotizacion'] === 'none') {
-          $where[] = "TRIM(COALESCE(`{$cotCol}`, '')) = ''";
-        }
+      $cotExistsExpr = $this->generic_cotizacion_exists_expression($tabla);
+      if ($p['fCotizacion'] === 'has') {
+        $where[] = $cotExistsExpr;
+      } elseif ($p['fCotizacion'] === 'none') {
+        $where[] = "NOT ({$cotExistsExpr})";
       }
     }
     if (!empty($p['fCotizacionEstado']) || !empty($p['fCotizacionEnviada'])) {
       $cotTabla = $this->db->table('jet_cct_cotizacion_mantenimiento');
       if ($this->table_exists($cotTabla) && $this->column_exists($cotTabla, '_ID')) {
         $cotConds = [];
-        if (!empty($p['fCotizacionEstado']) && $this->column_exists($cotTabla, 'estado')) {
-          $cotConds[] = "LOWER(TRIM(COALESCE(cot_dyn.estado, ''))) = ?";
-          $args[] = strtolower(trim((string) $p['fCotizacionEstado']));
+        if (!empty($p['fCotizacionEstado'])) {
+          $stateParts = [];
+          foreach (['estado', 'estado_cotizacion_mantenimiento', 'estado_respuesta_cotizacion_mantenimiento', 'estado_respuesta'] as $cotStateCol) {
+            if ($this->column_exists($cotTabla, $cotStateCol)) {
+              $stateParts[] = "LOWER(TRIM(COALESCE(cot_dyn.`{$cotStateCol}`, ''))) = ?";
+              $args[] = strtolower(trim((string) $p['fCotizacionEstado']));
+            }
+          }
+          if (!empty($stateParts)) {
+            $cotConds[] = '(' . implode(' OR ', $stateParts) . ')';
+          }
         }
-        if (!empty($p['fCotizacionEnviada']) && $this->column_exists($cotTabla, 'se_envio')) {
+        if (!empty($p['fCotizacionEnviada'])) {
           $sent = strtolower(trim((string) $p['fCotizacionEnviada']));
+          $sentColumns = [];
+          foreach (['se_envio', 'fue_enviada_cotizacion_mantenimiento', 'fue_enviada'] as $sentCol) {
+            if ($this->column_exists($cotTabla, $sentCol)) {
+              $sentColumns[] = $sentCol;
+            }
+          }
           if (in_array($sent, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true)) {
-            $cotConds[] = "LOWER(TRIM(COALESCE(cot_dyn.se_envio, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado')";
+            $sentParts = [];
+            foreach ($sentColumns as $sentCol) {
+              $sentParts[] = "LOWER(TRIM(COALESCE(cot_dyn.`{$sentCol}`, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado')";
+            }
+            if (!empty($sentParts)) {
+              $cotConds[] = '(' . implode(' OR ', $sentParts) . ')';
+            }
           } elseif (in_array($sent, ['no', '0', 'false', 'none', 'sin'], true)) {
-            $cotConds[] = "(TRIM(COALESCE(cot_dyn.se_envio, '')) = '' OR LOWER(TRIM(COALESCE(cot_dyn.se_envio, ''))) IN ('no', '0', 'false'))";
+            $sentParts = [];
+            foreach ($sentColumns as $sentCol) {
+              $sentParts[] = "(TRIM(COALESCE(cot_dyn.`{$sentCol}`, '')) = '' OR LOWER(TRIM(COALESCE(cot_dyn.`{$sentCol}`, ''))) IN ('no', '0', 'false'))";
+            }
+            if (!empty($sentParts)) {
+              $cotConds[] = '(' . implode(' AND ', $sentParts) . ')';
+            }
           }
         }
         if (!empty($cotConds)) {
@@ -262,11 +286,15 @@ trait GenericQueryConcern
           if ($cotCol !== '') {
             $joinParts[] = "FIND_IN_SET(CAST(cot_dyn._ID AS CHAR), REPLACE(COALESCE(`{$tabla}`.`{$cotCol}`, ''), ' ', '')) > 0";
           }
-          if ($this->column_exists($cotTabla, 'id_ticket') && $this->column_exists($tabla, 'id_ticket')) {
-            $joinParts[] = "TRIM(COALESCE(cot_dyn.id_ticket, '')) = TRIM(COALESCE(`{$tabla}`.`id_ticket`, ''))";
+          if ($this->column_exists($cotTabla, 'id_ticket')) {
+            $joinParts[] = "(TRIM(COALESCE(cot_dyn.id_ticket, '')) <> '' AND TRIM(COALESCE(cot_dyn.id_ticket, '')) = CAST(`{$tabla}`.`_ID` AS CHAR))";
+            if ($this->column_exists($tabla, 'id_ticket')) {
+              $joinParts[] = "(TRIM(COALESCE(`{$tabla}`.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_dyn.id_ticket, '')) <> '' AND TRIM(COALESCE(cot_dyn.id_ticket, '')) = TRIM(COALESCE(`{$tabla}`.`id_ticket`, '')))";
+            }
           }
-          $joinParts[] = "TRIM(COALESCE(cot_dyn.id_ticket, '')) = CAST(`{$tabla}`.`_ID` AS CHAR)";
-          $where[] = "EXISTS (SELECT 1 FROM `{$cotTabla}` cot_dyn WHERE (" . implode(' OR ', $joinParts) . ') AND ' . implode(' AND ', $cotConds) . ')';
+          if (!empty($joinParts)) {
+            $where[] = "EXISTS (SELECT 1 FROM `{$cotTabla}` cot_dyn WHERE (" . implode(' OR ', $joinParts) . ') AND ' . implode(' AND ', $cotConds) . ')';
+          }
         }
       }
     }
@@ -423,7 +451,6 @@ trait GenericQueryConcern
     $countSql = "SELECT COUNT(*) FROM `{$tabla}` WHERE {$whereStr}";
     $total = (int) $this->db->getVar($countSql, $args);
 
-    $cotCol = $this->detect_first_existing_column($tabla, ['id_cotizacion_mantenimiento', 'id_cotizacion']);
     $revCols = [];
     foreach (['id_revision_preventiva', 'id_revision_correctiva', 'id_revision_entrega', 'id_revision_recibo'] as $rc) {
       if ($this->column_exists($tabla, $rc)) {
@@ -438,7 +465,7 @@ trait GenericQueryConcern
       }
       $revExpr = '(' . implode(' OR ', $parts) . ')';
     }
-    $cotExpr = $cotCol !== '' ? "TRIM(COALESCE(`{$cotCol}`, '')) <> ''" : '0';
+    $cotExpr = $this->generic_cotizacion_exists_expression($tabla);
     $staleExpr = "AVG((UNIX_TIMESTAMP() - COALESCE(NULLIF(`fecha_actualizacion`, 0), `fecha`, UNIX_TIMESTAMP())) / 3600)";
     $firstExpr = "AVG((COALESCE(NULLIF(`fecha_actualizacion`, 0), `fecha`) - COALESCE(`fecha`, 0)) / 3600)";
     $magnitudDanoExpr = $this->column_exists($tabla, 'magnitud_caso')
@@ -573,6 +600,32 @@ trait GenericQueryConcern
     }
     $creadorExpr = "LOWER(TRIM(COALESCE(`creador_por`, '')))";
     return "({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario')";
+  }
+
+  private function generic_cotizacion_exists_expression(string $tabla): string
+  {
+    $cotTabla = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($cotTabla)) {
+      return '0 = 1';
+    }
+
+    $joinParts = [];
+    $cotCol = $this->detect_first_existing_column($tabla, ['id_cotizacion_mantenimiento', 'id_cotizacion']);
+    if ($cotCol !== '' && $this->column_exists($cotTabla, '_ID')) {
+      $joinParts[] = "FIND_IN_SET(CAST(cot_exists.`_ID` AS CHAR), REPLACE(COALESCE(`{$tabla}`.`{$cotCol}`, ''), ' ', '')) > 0";
+    }
+    if ($this->column_exists($cotTabla, 'id_ticket')) {
+      $joinParts[] = "(TRIM(COALESCE(cot_exists.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_exists.`id_ticket`, '')) = CAST(`{$tabla}`.`_ID` AS CHAR))";
+      if ($this->column_exists($tabla, 'id_ticket')) {
+        $joinParts[] = "(TRIM(COALESCE(`{$tabla}`.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_exists.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_exists.`id_ticket`, '')) = TRIM(COALESCE(`{$tabla}`.`id_ticket`, '')))";
+      }
+    }
+
+    if (empty($joinParts)) {
+      return '0 = 1';
+    }
+
+    return "EXISTS (SELECT 1 FROM `{$cotTabla}` cot_exists WHERE " . implode(' OR ', $joinParts) . ')';
   }
 
   /**

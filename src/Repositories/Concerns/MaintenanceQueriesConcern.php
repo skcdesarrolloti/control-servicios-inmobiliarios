@@ -170,16 +170,42 @@ trait MaintenanceQueriesConcern
       && $this->schema->columnExists($cotTable, '_ID')
     ) {
       $cotExtra = [];
-      if (($filters['fCotizacionEstado'] ?? '') !== '' && $this->schema->columnExists($cotTable, 'estado')) {
-        $cotExtra[] = "LOWER(TRIM(COALESCE(cot_dyn.estado, ''))) = %s";
-        $args[] = strtolower(trim((string) $filters['fCotizacionEstado']));
+      if (($filters['fCotizacionEstado'] ?? '') !== '') {
+        $stateParts = [];
+        foreach (['estado', 'estado_cotizacion_mantenimiento', 'estado_respuesta_cotizacion_mantenimiento', 'estado_respuesta'] as $cotStateCol) {
+          if ($this->schema->columnExists($cotTable, $cotStateCol)) {
+            $stateParts[] = "LOWER(TRIM(COALESCE(cot_dyn.`{$cotStateCol}`, ''))) = %s";
+            $args[] = strtolower(trim((string) $filters['fCotizacionEstado']));
+          }
+        }
+        if (!empty($stateParts)) {
+          $cotExtra[] = '(' . implode(' OR ', $stateParts) . ')';
+        }
       }
-      if (($filters['fCotizacionEnviada'] ?? '') !== '' && $this->schema->columnExists($cotTable, 'se_envio')) {
+      if (($filters['fCotizacionEnviada'] ?? '') !== '') {
         $sent = strtolower(trim((string) $filters['fCotizacionEnviada']));
+        $sentColumns = [];
+        foreach (['se_envio', 'fue_enviada_cotizacion_mantenimiento', 'fue_enviada'] as $sentCol) {
+          if ($this->schema->columnExists($cotTable, $sentCol)) {
+            $sentColumns[] = $sentCol;
+          }
+        }
         if (in_array($sent, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true)) {
-          $cotExtra[] = "LOWER(TRIM(COALESCE(cot_dyn.se_envio, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado')";
+          $sentParts = [];
+          foreach ($sentColumns as $sentCol) {
+            $sentParts[] = "LOWER(TRIM(COALESCE(cot_dyn.`{$sentCol}`, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado')";
+          }
+          if (!empty($sentParts)) {
+            $cotExtra[] = '(' . implode(' OR ', $sentParts) . ')';
+          }
         } elseif (in_array($sent, ['no', '0', 'false', 'none', 'sin'], true)) {
-          $cotExtra[] = "(TRIM(COALESCE(cot_dyn.se_envio, '')) = '' OR LOWER(TRIM(COALESCE(cot_dyn.se_envio, ''))) IN ('no', '0', 'false'))";
+          $sentParts = [];
+          foreach ($sentColumns as $sentCol) {
+            $sentParts[] = "(TRIM(COALESCE(cot_dyn.`{$sentCol}`, '')) = '' OR LOWER(TRIM(COALESCE(cot_dyn.`{$sentCol}`, ''))) IN ('no', '0', 'false'))";
+          }
+          if (!empty($sentParts)) {
+            $cotExtra[] = '(' . implode(' AND ', $sentParts) . ')';
+          }
         }
       }
       if (!empty($cotExtra)) {
@@ -437,11 +463,14 @@ trait MaintenanceQueriesConcern
   private function getMaintenanceCotizacionEstadoOptions(string $ticketTable): array
   {
     $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
-    if ($this->schema->tableExists($cotTable) && $this->schema->columnExists($cotTable, 'estado')) {
-      $rows = $this->db->getCol(
-        "SELECT DISTINCT TRIM(COALESCE(`estado`, '')) AS estado FROM `{$cotTable}` WHERE TRIM(COALESCE(`estado`, '')) <> '' ORDER BY estado ASC LIMIT 100"
-      );
-      return $this->uniqueNonEmptyValues($rows);
+    $cotOptions = $this->getDistinctValuesFromCandidates($cotTable, [
+      'estado',
+      'estado_cotizacion_mantenimiento',
+      'estado_respuesta_cotizacion_mantenimiento',
+      'estado_respuesta',
+    ], 160);
+    if (!empty($cotOptions)) {
+      return $cotOptions;
     }
 
     return $this->getDistinctValuesFromCandidates($ticketTable, ['estado_cotizacion_mantenimiento', 'estado_respuesta_cotizacion_mantenimiento']);
@@ -493,36 +522,30 @@ trait MaintenanceQueriesConcern
   {
     $ticketTable = $this->ticketsTable();
     $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
-    $parts = [];
 
-    if ($this->schema->columnExists($ticketTable, 'id_cotizacion_mantenimiento')) {
-      $parts[] = "TRIM(COALESCE({$alias}.`id_cotizacion_mantenimiento`, '')) <> ''";
+    if (!$this->schema->tableExists($cotTable)) {
+      return '0 = 1';
     }
 
-    if ($this->schema->tableExists($cotTable)) {
-      $joinParts = [];
-      if (
-        $this->schema->columnExists($ticketTable, 'id_cotizacion_mantenimiento')
-        && $this->schema->columnExists($cotTable, '_ID')
-      ) {
-        $joinParts[] = "FIND_IN_SET(CAST(cot_exists.`_ID` AS CHAR), REPLACE(COALESCE({$alias}.`id_cotizacion_mantenimiento`, ''), ' ', '')) > 0";
-      }
-      if ($this->schema->columnExists($cotTable, 'id_ticket')) {
-        $joinParts[] = "(TRIM(COALESCE(cot_exists.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_exists.`id_ticket`, '')) = CAST({$alias}.`_ID` AS CHAR))";
-        if ($this->schema->columnExists($ticketTable, 'id_ticket')) {
-          $joinParts[] = "(TRIM(COALESCE({$alias}.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_exists.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_exists.`id_ticket`, '')) = TRIM(COALESCE({$alias}.`id_ticket`, '')))";
-        }
-      }
-      if (!empty($joinParts)) {
-        $parts[] = "EXISTS (SELECT 1 FROM `{$cotTable}` cot_exists WHERE " . implode(' OR ', $joinParts) . ")";
+    $joinParts = [];
+    if (
+      $this->schema->columnExists($ticketTable, 'id_cotizacion_mantenimiento')
+      && $this->schema->columnExists($cotTable, '_ID')
+    ) {
+      $joinParts[] = "FIND_IN_SET(CAST(cot_exists.`_ID` AS CHAR), REPLACE(COALESCE({$alias}.`id_cotizacion_mantenimiento`, ''), ' ', '')) > 0";
+    }
+    if ($this->schema->columnExists($cotTable, 'id_ticket')) {
+      $joinParts[] = "(TRIM(COALESCE(cot_exists.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_exists.`id_ticket`, '')) = CAST({$alias}.`_ID` AS CHAR))";
+      if ($this->schema->columnExists($ticketTable, 'id_ticket')) {
+        $joinParts[] = "(TRIM(COALESCE({$alias}.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_exists.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_exists.`id_ticket`, '')) = TRIM(COALESCE({$alias}.`id_ticket`, '')))";
       }
     }
 
-    if (empty($parts)) {
-      return '0';
+    if (empty($joinParts)) {
+      return '0 = 1';
     }
 
-    return '(' . implode(' OR ', $parts) . ')';
+    return "EXISTS (SELECT 1 FROM `{$cotTable}` cot_exists WHERE " . implode(' OR ', $joinParts) . ')';
   }
 
   private function maintenanceWebOriginExpression(string $alias = 't'): string

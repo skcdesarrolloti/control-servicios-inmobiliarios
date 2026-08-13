@@ -95,12 +95,21 @@ trait GenericFiltersAndHistoryConcern
   private function get_cotizacion_estado_options(): array
   {
     $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
-    if (!$this->table_exists($cotTable) || !$this->column_exists($cotTable, 'estado')) {
+    if (!$this->table_exists($cotTable)) {
       return [];
     }
 
+    $parts = [];
+    foreach (['estado', 'estado_cotizacion_mantenimiento', 'estado_respuesta_cotizacion_mantenimiento', 'estado_respuesta'] as $column) {
+      if ($this->column_exists($cotTable, $column)) {
+        $parts[] = "SELECT TRIM(COALESCE(`{$column}`, '')) AS estado FROM `{$cotTable}`";
+      }
+    }
+    if (empty($parts)) {
+      return [];
+    }
     $rows = $this->db->getCol(
-      "SELECT DISTINCT TRIM(COALESCE(`estado`, '')) AS estado FROM `{$cotTable}` WHERE TRIM(COALESCE(`estado`, '')) <> '' ORDER BY estado ASC LIMIT 100"
+      'SELECT DISTINCT estado FROM (' . implode(' UNION ALL ', $parts) . ") AS scm_cot_estados WHERE estado <> '' ORDER BY estado ASC LIMIT 160"
     );
     return $this->unique_non_empty_values($rows);
   }
