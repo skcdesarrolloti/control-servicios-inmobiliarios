@@ -233,7 +233,7 @@ trait RendersPublicPqr
 
     $perPage = max(24, min(50, $perPage));
     $creatorLabels = ['propietario', 'arrendatario', 'copropiedad', 'cliente'];
-    $medioLabels = ['portal propietario', 'portal arrendatario', 'portal copropiedad', 'whatsapp cliente'];
+    $medioLabels = ['portal propietario', 'portal arrendatario', 'portal copropiedad', 'portal autoservicio', 'portal guardian', 'guardian', 'whatsapp cliente'];
 
     $selectCreadoPor = $this->column_exists($ticketsTable, 'creado_por')
       ? "TRIM(COALESCE(`creado_por`, '')) AS creado_por"

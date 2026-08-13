@@ -475,7 +475,7 @@ final class GenericTicketsCardView
     $createdBy = strtolower(trim((string) ($row['creado_por'] ?? $row['creador_por'] ?? '')));
     $medio = strtolower(trim((string) ($row['medio'] ?? '')));
     return in_array($createdBy, ['propietario', 'arrendatario', 'copropiedad', 'cliente'], true)
-      || in_array($medio, ['portal propietario', 'portal arrendatario', 'portal copropiedad', 'whatsapp cliente'], true);
+      || in_array($medio, ['portal propietario', 'portal arrendatario', 'portal copropiedad', 'portal autoservicio', 'portal guardian', 'guardian', 'whatsapp cliente'], true);
   }
 
   public function renderGenericCards(array $rows, array $config, string $tabKey, string $statusBucket = ''): string

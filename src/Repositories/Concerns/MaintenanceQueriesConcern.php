@@ -534,7 +534,7 @@ trait MaintenanceQueriesConcern
       }
     }
     if ($this->schema->columnExists($table, 'medio')) {
-      $parts[] = "LOWER(TRIM(COALESCE({$alias}.`medio`, ''))) IN ('portal propietario', 'portal arrendatario', 'portal copropiedad', 'whatsapp cliente')";
+      $parts[] = "LOWER(TRIM(COALESCE({$alias}.`medio`, ''))) IN ('portal propietario', 'portal arrendatario', 'portal copropiedad', 'portal autoservicio', 'portal guardian', 'guardian', 'whatsapp cliente')";
     }
     if (empty($parts)) {
       return '0 = 1';

@@ -575,7 +575,7 @@ trait GenericQueryConcern
       }
     }
     if ($this->column_exists($tabla, 'medio')) {
-      $parts[] = "LOWER(TRIM(COALESCE(`medio`, ''))) IN ('portal propietario', 'portal arrendatario', 'portal copropiedad', 'whatsapp cliente')";
+      $parts[] = "LOWER(TRIM(COALESCE(`medio`, ''))) IN ('portal propietario', 'portal arrendatario', 'portal copropiedad', 'portal autoservicio', 'portal guardian', 'guardian', 'whatsapp cliente')";
     }
     return empty($parts) ? '0 = 1' : '(' . implode(' OR ', $parts) . ')';
   }

@@ -1101,7 +1101,7 @@ trait RendersDashboard
       }
     }
     if ($this->column_exists($table, 'medio')) {
-      $webParts[] = "LOWER(TRIM(COALESCE(`medio`, ''))) IN ('portal propietario', 'portal arrendatario', 'portal copropiedad', 'whatsapp cliente')";
+      $webParts[] = "LOWER(TRIM(COALESCE(`medio`, ''))) IN ('portal propietario', 'portal arrendatario', 'portal copropiedad', 'portal autoservicio', 'portal guardian', 'guardian', 'whatsapp cliente')";
     }
     $webWhere = empty($webParts) ? '0 = 1' : '(' . implode(' OR ', $webParts) . ')';
 
