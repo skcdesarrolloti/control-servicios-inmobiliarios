@@ -1226,8 +1226,7 @@
 
   function renderTicketDocumentFields() {
     return (
-      '<div class="scm-ticket-documents-zone">' +
-      '<div class="scm-ticket-documents-zone-head"><strong>Documentos opcionales</strong><span>Agrega soportes, cotizaciones o facturas solo si aplica.</span></div>' +
+      '<div class="scm-ticket-documents-zone" data-ticket-documents-zone>' +
       '<div class="scm-ticket-documents" data-ticket-documents></div>' +
       '<button type="button" class="btn btn-outline btn-sm scm-add-ticket-document" data-add-ticket-document>Agregar documento</button>' +
       "</div>"
@@ -1483,6 +1482,7 @@
       );
 
     return (
+      '<div class="scm-contact-view-actions"><button type="button" class="btn btn-outline btn-sm" data-scm-edit-contacts-from-view>Editar contactos</button></div>' +
       '<div class="scm-contact-view-grid">' +
       '<section class="scm-contact-view-card"><h5>Propietario</h5>' +
       (propietario
@@ -1507,6 +1507,12 @@
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
       body.innerHTML = renderContactViewerHtml(caseBtn);
+      var editBtn = body.querySelector("[data-scm-edit-contacts-from-view]");
+      if (editBtn) {
+        editBtn.addEventListener("click", function () {
+          openContactEditor(modal, caseBtn);
+        });
+      }
       prependCaseLocationPanel(body, caseBtn, modal);
     }
     sub.classList.add("open");
@@ -2159,8 +2165,6 @@
             '<button type="button" class="scm-case-work-btn" data-scm-open-section="scm-sec-seguimiento">Agregar seguimiento</button>';
         }
         if (!isPublicPqr) {
-          caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-contacts>Editar contactos</button>';
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-view-contacts>Ver contactos</button>';
           caseActionsHtml +=

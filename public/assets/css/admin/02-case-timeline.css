@@ -575,6 +575,12 @@
   padding: 0 6px;
 }
 
+#scm-app .scm-contact-view-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
 #scm-app .scm-notify-targets {
   display: flex;
   flex-wrap: wrap;
