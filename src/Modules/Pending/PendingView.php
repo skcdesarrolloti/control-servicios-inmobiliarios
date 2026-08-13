@@ -530,6 +530,9 @@ final class PendingView
     foreach ($items as $item) {
       $row  = (array) ($item['row']  ?? []);
       $link = (string) ($item['link'] ?? '#');
+      $estado = strtolower(trim((string) ($row['estado'] ?? '')));
+      $contractPk = trim((string) ($row['_ID'] ?? ''));
+      $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
       $html .= '<tr>';
       $html .= '<td><span class="scm-ticket-badge">'   . esc_html((string) ($row['contrato']  ?? $row['_ID'] ?? '-')) . '</span></td>';
       $html .= '<td><span class="scm-inmueble-badge">' . esc_html((string) ($row['inmueble']  ?? '-')) . '</span></td>';
@@ -541,7 +544,15 @@ final class PendingView
       $html .= '<td class="scm-date-cell">'            . esc_html($this->fmt($this->ts($row['fecha_entrega']   ?? null))) . '</td>';
       $html .= '<td class="scm-date-cell">'            . esc_html($this->fmt((int) ($item['ultima'] ?? 0))) . '</td>';
       $html .= '<td class="scm-date-cell scm-date-warn">' . esc_html($this->fmt((int) ($item['due'] ?? 0))) . '</td>';
-      $html .= '<td><button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;"'
+      $html .= '<td class="scm-pending-action-cell">';
+      if ($contractPk !== '' && $estado !== 'recibido') {
+        $html .= '<button type="button" class="scm-pending-action-btn scm-contract-received-btn"'
+          . ' data-scm-mark-contract-received data-contract-context="servicios-publicos"'
+          . ' data-contract-id="' . esc_attr($contractPk) . '"'
+          . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
+          . 'Contrato recibido</button>';
+      }
+      $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;"'
         . ' data-scm-open-iframe data-iframe-url="' . esc_attr($link) . '" data-iframe-title="Agregar revision">'
         . 'Agregar revision</button></td>';
       $html .= '</tr>';

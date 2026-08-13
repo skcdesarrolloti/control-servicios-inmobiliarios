@@ -889,6 +889,8 @@
         activeKey = "cotizaciones_mantenimiento";
       } else if (activeKey === "preventivas-pendientes") {
         activeKey = "preventiva";
+      } else if (activeKey === "servicios-publicos-pendientes") {
+        activeKey = "servicios_publicos_pendientes";
       }
       if (activeKey === "mant" && form) {
         return doFetch(new FormData(form));
@@ -979,6 +981,18 @@
         var sppForm = root.querySelector("#scm-form-preventiva") || root.querySelector("#spp_form");
         if (sppForm) {
           sppForm.dispatchEvent(
+            new Event("submit", { bubbles: true, cancelable: true }),
+          );
+          return Promise.resolve();
+        }
+      }
+      var utilitiesPanel = button.closest
+        ? button.closest("#scm-panel-servicios-publicos-pendientes")
+        : null;
+      if (utilitiesPanel) {
+        var rspForm = root.querySelector("#rsp_form");
+        if (rspForm) {
+          rspForm.dispatchEvent(
             new Event("submit", { bubbles: true, cancelable: true }),
           );
           return Promise.resolve();

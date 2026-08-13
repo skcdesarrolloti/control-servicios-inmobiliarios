@@ -447,6 +447,7 @@ trait HandlesTicketWorkflowActions
     if (
       !$this->canAccessDashboardTab('contratos_arrendamiento')
       && !$this->canAccessDashboardTab('preventivas_pendientes')
+      && !$this->canAccessDashboardTab('servicios_publicos_pendientes')
     ) {
       $this->jsonFail('No tienes permiso para modificar contratos de arrendamiento.');
     }
