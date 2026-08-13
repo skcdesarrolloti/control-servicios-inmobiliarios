@@ -178,6 +178,47 @@
     return root.querySelector("#scm-case-modal");
   }
 
+  function injectIframePrintStyles(frameDocument) {
+    if (!frameDocument || !frameDocument.head || frameDocument.getElementById("scm-iframe-print-style")) {
+      return;
+    }
+    var printStyle = frameDocument.createElement("style");
+    printStyle.id = "scm-iframe-print-style";
+    printStyle.textContent =
+      "@media print{" +
+      "@page{size:A4;margin:12mm}" +
+      "html,body{background:#fff!important;color:#111827!important;overflow:visible!important;width:auto!important;min-height:0!important}" +
+      "body{margin:0!important;padding:0!important;font-size:12px!important;line-height:1.35!important}" +
+      "#wpadminbar,header,footer,nav,.site-header,.site-footer,.elementor-location-header,.elementor-location-footer,.jet-mobile-menu-cover,.jet-mobile-menu__container,.no-print,.noprint,.print-hide,.hide-print,button,input[type='button'],input[type='submit'],.button,.btn,.elementor-button{display:none!important}" +
+      "main,.site-main,#main,#content,.site-content,.entry-content,article,.elementor,.elementor-section,.elementor-container,.elementor-widget-wrap{display:block!important;width:auto!important;max-width:none!important;margin:0!important;padding:0!important;box-shadow:none!important;background:#fff!important}" +
+      "table{width:100%!important;border-collapse:collapse!important;page-break-inside:auto!important}" +
+      "tr,img,.elementor-widget-container{page-break-inside:avoid!important;break-inside:avoid!important}" +
+      "img{max-width:100%!important;height:auto!important}" +
+      "a[href]::after{content:''!important}" +
+      "*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}" +
+      "}";
+    frameDocument.head.appendChild(printStyle);
+  }
+
+  function printIframeDocument(iframeEl, url) {
+    try {
+      var frameWindow = iframeEl ? iframeEl.contentWindow : null;
+      var frameDocument = iframeEl ? iframeEl.contentDocument || (frameWindow ? frameWindow.document : null) : null;
+      if (!frameWindow || !frameDocument) {
+        throw new Error("Iframe no disponible");
+      }
+      injectIframePrintStyles(frameDocument);
+      frameWindow.focus();
+      setTimeout(function () {
+        frameWindow.print();
+      }, 80);
+      return true;
+    } catch (error) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return false;
+    }
+  }
+
   function openIframeModal(url, title, compact) {
     if (!url) {
       return;
@@ -193,7 +234,8 @@
       escHtml(title) +
       "</span>" +
       '<div class="scm-iframe-toolbar-actions">' +
-      '<a class="scm-iframe-open-tab" href="#" target="_blank" rel="noopener noreferrer">Abrir en nueva pesta&ntilde;a</a>' +
+      '<a class="scm-iframe-open-tab" href="#" target="_blank" rel="noopener noreferrer">Ver en grande</a>' +
+      '<button type="button" class="scm-iframe-print">Imprimir / PDF</button>' +
       '<button type="button" class="scm-iframe-close" aria-label="Cerrar">&times;</button>' +
       "</div>" +
       "</div>" +
@@ -204,10 +246,16 @@
     var iframeEl = overlay.querySelector(".scm-iframe-frame");
     var loaderEl = overlay.querySelector(".scm-iframe-loader");
     var openTabLink = overlay.querySelector(".scm-iframe-open-tab");
+    var printButton = overlay.querySelector(".scm-iframe-print");
     if (openTabLink) {
       openTabLink.setAttribute("href", url);
     }
     iframeEl.addEventListener("load", function () {
+      try {
+        injectIframePrintStyles(iframeEl.contentDocument);
+      } catch (error) {
+        // Si el navegador bloquea el acceso por origen, queda disponible "Ver en grande".
+      }
       if (compactMode) {
         try {
           var frameDocument = iframeEl.contentDocument;
@@ -238,6 +286,11 @@
       }
     }
     var closeButton = overlay.querySelector(".scm-iframe-close");
+    if (printButton) {
+      printButton.addEventListener("click", function () {
+        printIframeDocument(iframeEl, url);
+      });
+    }
     closeButton.addEventListener("click", destroyOverlay);
     closeButton.focus();
   }

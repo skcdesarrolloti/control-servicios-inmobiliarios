@@ -303,7 +303,15 @@ body {
           margin: 0 44px 12px 0;
         }
 
-        .scm-public-iframe-open-tab {
+        .scm-public-iframe-actions {
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .scm-public-iframe-open-tab,
+        .scm-public-iframe-print {
           min-height: 38px;
           display: inline-flex;
           align-items: center;
@@ -313,14 +321,18 @@ body {
           border-radius: 10px;
           background: #f2f7fd;
           color: #17304d;
+          font-family: inherit;
           font-size: 13px;
           font-weight: 800;
           text-decoration: none;
           white-space: nowrap;
+          cursor: pointer;
         }
 
         .scm-public-iframe-open-tab:hover,
-        .scm-public-iframe-open-tab:focus-visible {
+        .scm-public-iframe-open-tab:focus-visible,
+        .scm-public-iframe-print:hover,
+        .scm-public-iframe-print:focus-visible {
           background: #e7f0fb;
           border-color: #9fb7d2;
           color: #0f2742;
@@ -354,7 +366,13 @@ body {
             margin-right: 44px;
           }
 
-          .scm-public-iframe-open-tab {
+          .scm-public-iframe-actions {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .scm-public-iframe-open-tab,
+          .scm-public-iframe-print {
             width: 100%;
           }
 

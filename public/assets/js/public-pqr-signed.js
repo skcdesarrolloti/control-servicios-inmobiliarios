@@ -59,6 +59,43 @@
             modal.classList.add('open');
           }
 
+          function injectIframePrintStyles(frameDocument) {
+            if (!frameDocument || !frameDocument.head || frameDocument.getElementById('scm-public-iframe-print-style')) return;
+            var printStyle = frameDocument.createElement('style');
+            printStyle.id = 'scm-public-iframe-print-style';
+            printStyle.textContent =
+              "@media print{" +
+              "@page{size:A4;margin:12mm}" +
+              "html,body{background:#fff!important;color:#111827!important;overflow:visible!important;width:auto!important;min-height:0!important}" +
+              "body{margin:0!important;padding:0!important;font-size:12px!important;line-height:1.35!important}" +
+              "#wpadminbar,header,footer,nav,.site-header,.site-footer,.elementor-location-header,.elementor-location-footer,.jet-mobile-menu-cover,.jet-mobile-menu__container,.no-print,.noprint,.print-hide,.hide-print,button,input[type='button'],input[type='submit'],.button,.btn,.elementor-button{display:none!important}" +
+              "main,.site-main,#main,#content,.site-content,.entry-content,article,.elementor,.elementor-section,.elementor-container,.elementor-widget-wrap{display:block!important;width:auto!important;max-width:none!important;margin:0!important;padding:0!important;box-shadow:none!important;background:#fff!important}" +
+              "table{width:100%!important;border-collapse:collapse!important;page-break-inside:auto!important}" +
+              "tr,img,.elementor-widget-container{page-break-inside:avoid!important;break-inside:avoid!important}" +
+              "img{max-width:100%!important;height:auto!important}" +
+              "a[href]::after{content:''!important}" +
+              "*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}" +
+              "}";
+            frameDocument.head.appendChild(printStyle);
+          }
+
+          function printIframeDocument(iframe, url) {
+            try {
+              var frameWindow = iframe ? iframe.contentWindow : null;
+              var frameDocument = iframe ? iframe.contentDocument || (frameWindow ? frameWindow.document : null) : null;
+              if (!frameWindow || !frameDocument) throw new Error('Iframe no disponible');
+              injectIframePrintStyles(frameDocument);
+              frameWindow.focus();
+              setTimeout(function() {
+                frameWindow.print();
+              }, 80);
+              return true;
+            } catch (error) {
+              window.open(url, '_blank', 'noopener,noreferrer');
+              return false;
+            }
+          }
+
           function ensureIframeModal() {
             var modal = document.getElementById('scm-public-iframe-modal');
             if (modal) return modal;
@@ -71,7 +108,10 @@
               '<button type="button" class="scm-public-iframe-close" data-close-public-iframe="1" aria-label="Cerrar">&times;</button>' +
               '<div class="scm-public-iframe-header">' +
               '<h4 id="scm-public-iframe-title" class="scm-public-iframe-title">Solicitud</h4>' +
-              '<a class="scm-public-iframe-open-tab" href="#" target="_blank" rel="noopener noreferrer">Abrir en nueva pesta&ntilde;a</a>' +
+              '<div class="scm-public-iframe-actions">' +
+              '<a class="scm-public-iframe-open-tab" href="#" target="_blank" rel="noopener noreferrer">Ver en grande</a>' +
+              '<button type="button" class="scm-public-iframe-print">Imprimir / PDF</button>' +
+              '</div>' +
               '</div>' +
               '<iframe class="scm-public-iframe-frame" src="about:blank" loading="lazy"></iframe>' +
               '</div>';
@@ -101,9 +141,24 @@
             var title = modal.querySelector('.scm-public-iframe-title');
             var iframe = modal.querySelector('iframe.scm-public-iframe-frame');
             var openTabLink = modal.querySelector('.scm-public-iframe-open-tab');
+            var printButton = modal.querySelector('.scm-public-iframe-print');
             if (title) title.textContent = titleText;
             if (openTabLink) openTabLink.setAttribute('href', url);
-            if (iframe) iframe.src = url;
+            if (printButton) {
+              printButton.onclick = function() {
+                printIframeDocument(iframe, url);
+              };
+            }
+            if (iframe) {
+              iframe.onload = function() {
+                try {
+                  injectIframePrintStyles(iframe.contentDocument);
+                } catch (error) {
+                  // Si el navegador bloquea el iframe, queda disponible "Ver en grande".
+                }
+              };
+              iframe.src = url;
+            }
             modal.classList.add('open');
           }
 
