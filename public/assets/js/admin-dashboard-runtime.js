@@ -115,6 +115,7 @@
     var actionSavePropertyLocation = actions.save_property_location || "";
     var actionTrasladarCaso = actions.trasladar_caso || "";
     var actionContratosArrendamiento = actions.contratos_arrendamiento || "";
+    var actionContratoRecibido = actions.contrato_recibido || "";
     var actionContratosArrendamientoFallback =
       actions.preventivas_pendientes || "";
     var actionCrearTicketAdministrativo =
@@ -886,6 +887,8 @@
         activeKey = "mis_tickets";
       } else if (activeKey === "cotizaciones-mantenimiento") {
         activeKey = "cotizaciones_mantenimiento";
+      } else if (activeKey === "preventivas-pendientes") {
+        activeKey = "preventiva";
       }
       if (activeKey === "mant" && form) {
         return doFetch(new FormData(form));
@@ -939,6 +942,144 @@
     root.addEventListener("scm:refresh-active-tab", function () {
       refreshActiveTab();
     });
+
+    function bogotaTodayDate() {
+      try {
+        var formatter = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "America/Bogota",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        });
+        var parts = {};
+        formatter.formatToParts(new Date()).forEach(function (part) {
+          if (part.type !== "literal") {
+            parts[part.type] = part.value;
+          }
+        });
+        if (parts.year && parts.month && parts.day) {
+          return parts.year + "-" + parts.month + "-" + parts.day;
+        }
+      } catch (err) {}
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function refreshAfterContractReceived(button) {
+      var contractPanel = button.closest
+        ? button.closest("[data-scm-contracts]")
+        : null;
+      if (contractPanel) {
+        root.dispatchEvent(new CustomEvent("scm:contracts-refresh"));
+        return Promise.resolve();
+      }
+      var preventivePanel = button.closest
+        ? button.closest("#scm-panel-preventivas-pendientes")
+        : null;
+      if (preventivePanel) {
+        var sppForm = root.querySelector("#scm-form-preventiva") || root.querySelector("#spp_form");
+        if (sppForm) {
+          sppForm.dispatchEvent(
+            new Event("submit", { bubbles: true, cancelable: true }),
+          );
+          return Promise.resolve();
+        }
+      }
+      return refreshActiveTab();
+    }
+
+    function submitContractReceived(button, fechaRecibo) {
+      if (!ajaxUrl || !actionContratoRecibido) {
+        showToast("error", "Accion no disponible.");
+        return Promise.resolve();
+      }
+      var contractId = button.getAttribute("data-contract-id") || "";
+      if (!contractId) {
+        showToast("error", "No se encontro el contrato.");
+        return Promise.resolve();
+      }
+      var originalText = button.textContent;
+      button.disabled = true;
+      button.textContent = "Guardando...";
+      var fd = new FormData();
+      fd.append("action", actionContratoRecibido);
+      fd.append("nonce", nonce);
+      fd.append("contract_id", contractId);
+      fd.append("fecha_recibo", fechaRecibo);
+      return fetch(ajaxUrl, {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error(
+              (json && json.data && json.data.message) ||
+                "No se pudo marcar el contrato como recibido.",
+            );
+          }
+          showToast(
+            "success",
+            (json.data && json.data.message) ||
+              "Contrato marcado como recibido.",
+          );
+          return refreshAfterContractReceived(button);
+        })
+        .catch(function (err) {
+          showToast(
+            "error",
+            err && err.message
+              ? err.message
+              : "No se pudo marcar el contrato como recibido.",
+          );
+        })
+        .finally(function () {
+          button.disabled = false;
+          button.textContent = originalText;
+        });
+    }
+
+    function openContractReceivedPrompt(button) {
+      var code = button.getAttribute("data-contract-code") || "";
+      if (window.Swal && typeof window.Swal.fire === "function") {
+        window.Swal.fire({
+          title: "Contrato recibido",
+          text: code ? "Contrato " + code : "Selecciona la fecha de recibo.",
+          input: "date",
+          inputLabel: "Fecha de recibo",
+          inputValue: bogotaTodayDate(),
+          showCancelButton: true,
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          confirmButtonText: "Marcar recibido",
+          cancelButtonText: "Cancelar",
+          confirmButtonColor: "#10b981",
+          inputValidator: function (value) {
+            return String(value || "").trim()
+              ? undefined
+              : "La fecha de recibo es obligatoria.";
+          },
+        }).then(function (result) {
+          if (!result || !result.isConfirmed) {
+            return;
+          }
+          submitContractReceived(button, String(result.value || "").trim());
+        });
+        return;
+      }
+      var fecha = window.prompt("Fecha de recibo (AAAA-MM-DD):", bogotaTodayDate());
+      if (fecha === null) {
+        return;
+      }
+      fecha = String(fecha || "").trim();
+      if (!fecha) {
+        showToast("error", "La fecha de recibo es obligatoria.");
+        return;
+      }
+      submitContractReceived(button, fecha);
+    }
 
     function updateKPI(id, val) {
       var el = root.querySelector("#" + id);
@@ -1977,6 +2118,16 @@
       if (adminTicketBtn) {
         e.preventDefault();
         openAdminTicketModal(adminTicketBtn);
+        return;
+      }
+
+      var contractReceivedBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-mark-contract-received]")
+          : null;
+      if (contractReceivedBtn) {
+        e.preventDefault();
+        openContractReceivedPrompt(contractReceivedBtn);
         return;
       }
 

@@ -104,6 +104,33 @@ final class PendingRepository
     );
   }
 
+  /** @param array<string,mixed> $data */
+  public function updateContratoArrendamiento(int $id, array $data): int
+  {
+    if ($id <= 0 || empty($data)) {
+      return 0;
+    }
+
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    if (!$this->schema()->tableExists($table)) {
+      return 0;
+    }
+
+    $payload = [];
+    foreach ($data as $column => $value) {
+      $column = trim((string) $column);
+      if ($column !== '' && $this->schema()->columnExists($table, $column)) {
+        $payload[$column] = $value;
+      }
+    }
+
+    if (empty($payload)) {
+      return 0;
+    }
+
+    return (int) $this->db->update($table, $payload, ['_ID' => $id]);
+  }
+
   /** @return array<string,mixed>|null */
   public function getSucursalById(string $sucursalId): ?array
   {

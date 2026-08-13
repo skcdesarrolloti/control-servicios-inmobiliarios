@@ -188,4 +188,10 @@ final class PendingController
   {
     return $this->service->rejectReporteAdministrativo($preId);
   }
+
+  /** @return array<string,mixed> */
+  public function markContratoRecibido(int $contractId, string $fechaRecibo): array
+  {
+    return $this->service->markContratoRecibido($contractId, $fechaRecibo);
+  }
 }

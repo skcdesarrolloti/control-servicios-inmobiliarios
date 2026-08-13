@@ -417,7 +417,17 @@ final class PendingView
       // Actions cell: Ver ticket (link) if active ticket this year, else Crear ticket
       $ticket   = $item['ticket'] ?? null;
       $ticketId = $ticket !== null ? trim((string) ($ticket['ticket_id'] ?? '')) : '';
+      $contractPk = trim((string) ($row['_ID'] ?? ''));
+      $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
+      $estado = strtolower(trim((string) ($row['estado'] ?? '')));
       $html .= '<td class="scm-pending-action-cell">';
+      if ($contractPk !== '' && $estado !== 'recibido') {
+        $html .= '<button type="button" class="scm-pending-action-btn scm-contract-received-btn"'
+          . ' data-scm-mark-contract-received data-contract-context="preventiva"'
+          . ' data-contract-id="' . esc_attr($contractPk) . '"'
+          . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
+          . 'Contrato recibido</button>';
+      }
       if ($ticketId !== '') {
         $viewUrl = esc_attr('https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($ticketId));
         $html .= '<button type="button" class="scm-pending-action-btn"'
@@ -454,6 +464,9 @@ final class PendingView
     foreach ($items as $row) {
       $row = (array) $row;
       $estado = trim((string) ($row['estado'] ?? '-'));
+      $estadoNorm = strtolower(trim($estado));
+      $contractPk = trim((string) ($row['_ID'] ?? ''));
+      $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
       $html .= '<tr>';
       $html .= '<td><span class="scm-ticket-badge">' . esc_html((string) ($row['contrato'] ?? $row['_ID'] ?? '-')) . '</span></td>';
       $html .= '<td>' . esc_html($estado !== '' ? $estado : '-') . '</td>';
@@ -464,6 +477,13 @@ final class PendingView
       $html .= '<td class="scm-date-cell">' . esc_html($this->fmt($this->ts($row['inicio_contrato'] ?? null))) . '</td>';
       $html .= '<td class="scm-date-cell">' . esc_html($this->fmt($this->ts($row['fin_contrato'] ?? null))) . '</td>';
       $html .= '<td class="scm-pending-action-cell">';
+      if ($contractPk !== '' && $estadoNorm !== 'recibido') {
+        $html .= '<button type="button" class="scm-pending-action-btn scm-contract-received-btn"'
+          . ' data-scm-mark-contract-received data-contract-context="contratos"'
+          . ' data-contract-id="' . esc_attr($contractPk) . '"'
+          . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
+          . 'Contrato recibido</button>';
+      }
       $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;"'
         . ' data-scm-open-admin-ticket data-ticket-mode="administrativo" data-ticket-title="Crear ticket administrativo"'
         . $this->contractTicketAttrs($row)

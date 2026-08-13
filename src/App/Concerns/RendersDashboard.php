@@ -205,6 +205,7 @@ trait RendersDashboard
         'servicios_publicos_pendientes' => self::AJAX_SERVICIOS_PUBLICOS_PENDIENTES,
         'reportes_administrativos_pendientes' => self::AJAX_REPORTES_ADMINISTRATIVOS_PENDIENTES,
         'contratos_arrendamiento' => self::AJAX_CONTRATOS_ARRENDAMIENTO,
+        'contrato_recibido' => self::AJAX_CONTRATO_RECIBIDO,
         'crear_ticket_administrativo' => self::AJAX_CREAR_TICKET_ADMINISTRATIVO,
         'aprobar_reporte_administrativo' => self::AJAX_APROBAR_REPORTE_ADMINISTRATIVO,
         'desaprobar_reporte_administrativo' => self::AJAX_DESAPROBAR_REPORTE_ADMINISTRATIVO,

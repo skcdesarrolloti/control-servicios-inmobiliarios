@@ -441,6 +441,39 @@ trait HandlesTicketWorkflowActions
     ]);
   }
 
+  public function ajax_handler_contrato_recibido(): void
+  {
+    $this->verifyCsrf();
+    if (
+      !$this->canAccessDashboardTab('contratos_arrendamiento')
+      && !$this->canAccessDashboardTab('preventivas_pendientes')
+    ) {
+      $this->jsonFail('No tienes permiso para modificar contratos de arrendamiento.');
+    }
+
+    $contractId = (int) ($_POST['contract_id'] ?? $_POST['_ID'] ?? $_POST['id'] ?? 0);
+    $fechaRecibo = trim(sanitize_text_field(wp_unslash((string) ($_POST['fecha_recibo'] ?? ''))));
+    if ($contractId <= 0) {
+      $this->jsonFail('ID de contrato invalido.');
+    }
+    if ($fechaRecibo === '') {
+      $this->jsonFail('La fecha de recibo es obligatoria.');
+    }
+
+    $result = $this->get_pending_controller()->markContratoRecibido($contractId, $fechaRecibo);
+    if (empty($result['ok'])) {
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo marcar el contrato como recibido.'));
+    }
+
+    $this->jsonOk([
+      'message' => (string) ($result['message'] ?? 'Contrato marcado como recibido.'),
+      'estado' => (string) ($result['estado'] ?? 'Recibido'),
+      'tipo' => (string) ($result['tipo'] ?? 'Ex'),
+      'fecha_recibo' => (string) ($result['fecha_recibo'] ?? ''),
+      'fecha_recibo_date' => (string) ($result['fecha_recibo_date'] ?? ''),
+    ]);
+  }
+
   public function ajax_handler_crear_ticket_administrativo(): void
   {
     $this->verifyCsrf();

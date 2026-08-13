@@ -726,6 +726,15 @@
   background: linear-gradient(135deg, var(--scm-blue-700), var(--scm-blue-600));
 }
 
+#scm-app .scm-contract-received-btn {
+  background: linear-gradient(135deg, #047857, #10b981);
+}
+
+#scm-app .scm-contract-received-btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 /* Pending panels: restore dark table header (overrides the flat-pass rule) */
 #scm-app .scm-pending-wrap .scm-table-prev thead tr {
   background: linear-gradient(130deg, var(--scm-teal-700), #0d4a46) !important;
@@ -737,6 +746,9 @@
 
 /* Ticket status badges in pending table action cells */
 #scm-app .scm-pending-action-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   white-space: nowrap;
   vertical-align: middle;
 }
