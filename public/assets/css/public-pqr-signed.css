@@ -295,12 +295,14 @@ body {
         }
 
         .scm-public-iframe-header {
-          min-height: 42px;
+          min-height: 46px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          margin: 0 44px 12px 0;
+          margin: 0 48px 14px 0;
+          padding: 2px 0 12px;
+          border-bottom: 1px solid #d9e4f1;
         }
 
         .scm-public-iframe-actions {
@@ -312,14 +314,14 @@ body {
 
         .scm-public-iframe-open-tab,
         .scm-public-iframe-print {
-          min-height: 38px;
+          min-height: 40px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          padding: 0 14px;
+          padding: 0 16px;
           border: 1px solid #c9d8e8;
-          border-radius: 10px;
-          background: #f2f7fd;
+          border-radius: 12px;
+          background: #f7fafc;
           color: #17304d;
           font-family: inherit;
           font-size: 13px;
@@ -327,20 +329,30 @@ body {
           text-decoration: none;
           white-space: nowrap;
           cursor: pointer;
+          box-shadow: 0 1px 2px rgba(13, 30, 47, 0.06);
+        }
+
+        .scm-public-iframe-open-tab {
+          border-color: rgba(249, 146, 0, 0.45);
+          background: #fff7ed;
+          color: #b45309;
         }
 
         .scm-public-iframe-open-tab:hover,
         .scm-public-iframe-open-tab:focus-visible,
         .scm-public-iframe-print:hover,
         .scm-public-iframe-print:focus-visible {
-          background: #e7f0fb;
-          border-color: #9fb7d2;
-          color: #0f2742;
+          background: #fff;
+          border-color: #f99200;
+          color: #9a4300;
+          box-shadow: 0 4px 12px rgba(13, 30, 47, 0.12);
         }
 
         .scm-public-iframe-frame {
+          flex: 1;
+          min-height: 0;
           width: 100%;
-          height: calc(100% - 54px);
+          height: auto;
           border: 1px solid #d6e2ef;
           border-radius: 12px;
           background: #fff;

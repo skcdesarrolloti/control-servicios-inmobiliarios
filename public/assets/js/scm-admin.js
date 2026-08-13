@@ -186,16 +186,15 @@
     printStyle.id = "scm-iframe-print-style";
     printStyle.textContent =
       "@media print{" +
-      "@page{size:A4;margin:12mm}" +
-      "html,body{background:#fff!important;color:#111827!important;overflow:visible!important;width:auto!important;min-height:0!important}" +
-      "body{margin:0!important;padding:0!important;font-size:12px!important;line-height:1.35!important}" +
-      "#wpadminbar,header,footer,nav,.site-header,.site-footer,.elementor-location-header,.elementor-location-footer,.jet-mobile-menu-cover,.jet-mobile-menu__container,.no-print,.noprint,.print-hide,.hide-print,button,input[type='button'],input[type='submit'],.button,.btn,.elementor-button{display:none!important}" +
-      "main,.site-main,#main,#content,.site-content,.entry-content,article,.elementor,.elementor-section,.elementor-container,.elementor-widget-wrap{display:block!important;width:auto!important;max-width:none!important;margin:0!important;padding:0!important;box-shadow:none!important;background:#fff!important}" +
-      "table{width:100%!important;border-collapse:collapse!important;page-break-inside:auto!important}" +
-      "tr,img,.elementor-widget-container{page-break-inside:avoid!important;break-inside:avoid!important}" +
+      "@page{size:A4;margin:10mm}" +
+      "html,body{background:#fff!important;color:#111827!important;overflow:visible!important}" +
+      "body{margin:0!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}" +
+      "#wpadminbar,header,footer,nav,.site-header,.site-footer,.elementor-location-header,.elementor-location-footer,.jet-mobile-menu-cover,.jet-mobile-menu__container,.no-print,.noprint,.print-hide,.hide-print,button,input[type='button'],input[type='submit']{display:none!important}" +
+      "main,.site-main,#main,#content,.site-content,.entry-content,article{background:#fff!important;box-shadow:none!important}" +
+      "table{max-width:100%!important;border-collapse:collapse!important;page-break-inside:auto!important}" +
+      "tr,img{page-break-inside:avoid!important;break-inside:avoid!important}" +
       "img{max-width:100%!important;height:auto!important}" +
       "a[href]::after{content:''!important}" +
-      "*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}" +
       "}";
     frameDocument.head.appendChild(printStyle);
   }
