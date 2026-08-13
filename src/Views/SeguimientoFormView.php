@@ -41,14 +41,12 @@ final class SeguimientoFormView
     $html .= '<input type="hidden" name="estado_cotizacion" value="__keep__">';
 
     $html .= '</div>';
+    $html .= '<div class="scm-ticket-documents-zone" data-ticket-documents-zone>';
+    $html .= '<div class="scm-ticket-documents-label">Documentos opcionales</div>';
     $html .= '<div class="scm-ticket-documents" data-ticket-documents>';
-    $html .= '<div class="scm-ticket-document-row">';
-    $html .= '<label class="scm-seg-field"><span>Titulo del documento</span><input type="text" name="documento_nombre[]" placeholder="Ej: Cotizacion, soporte, factura..."></label>';
-    $html .= '<label class="scm-seg-field"><span>Documento</span><input type="file" name="documento[]" accept="image/jpeg,image/png,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-rar-compressed,text/html,text/plain,text/csv"></label>';
-    $html .= '<button type="button" class="btn btn-outline btn-sm scm-remove-ticket-document" data-remove-ticket-document>Quitar</button>';
     $html .= '</div>';
+    $html .= '<button type="button" class="btn btn-outline scm-add-ticket-document" data-add-ticket-document>+ Agregar documento</button>';
     $html .= '</div>';
-    $html .= '<button type="button" class="btn btn-outline btn-sm scm-add-ticket-document" data-add-ticket-document>Agregar otro documento</button>';
     $html .= '<input type="hidden" name="notify_recipients_present" value="1">';
     $html .= '<fieldset class="scm-notify-targets"><legend>Notificar por correo</legend>';
     foreach ($this->notifyOptions() as $value => $label) {
