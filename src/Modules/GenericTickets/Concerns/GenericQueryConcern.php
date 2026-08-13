@@ -569,13 +569,13 @@ trait GenericQueryConcern
   private function generic_web_origin_expression(string $tabla): string
   {
     $parts = [];
-    foreach (['creado_por', 'creador_por'] as $column) {
-      if ($this->column_exists($tabla, $column)) {
-        $parts[] = "LOWER(TRIM(COALESCE(`{$column}`, ''))) IN ('propietario', 'arrendatario', 'copropiedad', 'cliente')";
-      }
+    if ($this->column_exists($tabla, 'creador_por')) {
+      $parts[] = "(LOWER(TRIM(COALESCE(`creador_por`, ''))) <> '' AND LOWER(TRIM(COALESCE(`creador_por`, ''))) <> 'funcionario')";
+    } elseif ($this->column_exists($tabla, 'creado_por')) {
+      $parts[] = "LOWER(TRIM(COALESCE(`creado_por`, ''))) IN ('propietario', 'arrendatario', 'copropiedad', 'cliente')";
     }
     if ($this->column_exists($tabla, 'medio')) {
-      $parts[] = "LOWER(TRIM(COALESCE(`medio`, ''))) IN ('portal propietario', 'portal arrendatario', 'portal copropiedad', 'portal autoservicio', 'portal guardian', 'guardian', 'whatsapp cliente')";
+      $parts[] = "(LOWER(TRIM(COALESCE(`medio`, ''))) LIKE '%portal%' OR LOWER(TRIM(COALESCE(`medio`, ''))) LIKE '%guardian%' OR LOWER(TRIM(COALESCE(`medio`, ''))) = 'whatsapp cliente')";
     }
     return empty($parts) ? '0 = 1' : '(' . implode(' OR ', $parts) . ')';
   }

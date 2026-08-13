@@ -528,13 +528,13 @@ trait MaintenanceQueriesConcern
   {
     $table = $this->ticketsTable();
     $parts = [];
-    foreach (['creado_por', 'creador_por'] as $column) {
-      if ($this->schema->columnExists($table, $column)) {
-        $parts[] = "LOWER(TRIM(COALESCE({$alias}.`{$column}`, ''))) IN ('propietario', 'arrendatario', 'copropiedad', 'cliente')";
-      }
+    if ($this->schema->columnExists($table, 'creador_por')) {
+      $parts[] = "(LOWER(TRIM(COALESCE({$alias}.`creador_por`, ''))) <> '' AND LOWER(TRIM(COALESCE({$alias}.`creador_por`, ''))) <> 'funcionario')";
+    } elseif ($this->schema->columnExists($table, 'creado_por')) {
+      $parts[] = "LOWER(TRIM(COALESCE({$alias}.`creado_por`, ''))) IN ('propietario', 'arrendatario', 'copropiedad', 'cliente')";
     }
     if ($this->schema->columnExists($table, 'medio')) {
-      $parts[] = "LOWER(TRIM(COALESCE({$alias}.`medio`, ''))) IN ('portal propietario', 'portal arrendatario', 'portal copropiedad', 'portal autoservicio', 'portal guardian', 'guardian', 'whatsapp cliente')";
+      $parts[] = "(LOWER(TRIM(COALESCE({$alias}.`medio`, ''))) LIKE '%portal%' OR LOWER(TRIM(COALESCE({$alias}.`medio`, ''))) LIKE '%guardian%' OR LOWER(TRIM(COALESCE({$alias}.`medio`, ''))) = 'whatsapp cliente')";
     }
     if (empty($parts)) {
       return '0 = 1';

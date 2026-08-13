@@ -233,7 +233,6 @@ trait RendersPublicPqr
 
     $perPage = max(24, min(50, $perPage));
     $creatorLabels = ['propietario', 'arrendatario', 'copropiedad', 'cliente'];
-    $medioLabels = ['portal propietario', 'portal arrendatario', 'portal copropiedad', 'portal autoservicio', 'portal guardian', 'guardian', 'whatsapp cliente'];
 
     $selectCreadoPor = $this->column_exists($ticketsTable, 'creado_por')
       ? "TRIM(COALESCE(`creado_por`, '')) AS creado_por"
@@ -254,24 +253,16 @@ trait RendersPublicPqr
 
     $wherePublic = [];
     $args = [];
-    $creatorPh = implode(',', array_fill(0, count($creatorLabels), '?'));
-    if ($this->column_exists($ticketsTable, 'creado_por')) {
+    if ($this->column_exists($ticketsTable, 'creador_por')) {
+      $wherePublic[] = "(LOWER(TRIM(COALESCE(`creador_por`, ''))) <> '' AND LOWER(TRIM(COALESCE(`creador_por`, ''))) <> 'funcionario')";
+    } elseif ($this->column_exists($ticketsTable, 'creado_por')) {
+      $creatorPh = implode(',', array_fill(0, count($creatorLabels), '?'));
       $wherePublic[] = "LOWER(TRIM(COALESCE(`creado_por`, ''))) IN ({$creatorPh})";
       $args = array_merge($args, $creatorLabels);
     }
-    if ($this->column_exists($ticketsTable, 'creador_por')) {
-      $wherePublic[] = "LOWER(TRIM(COALESCE(`creador_por`, ''))) IN ({$creatorPh})";
-      $args = array_merge($args, $creatorLabels);
-    }
-    $medioPh = implode(',', array_fill(0, count($medioLabels), '?'));
-    $wherePublic[] = "LOWER(TRIM(COALESCE(`medio`, ''))) IN ({$medioPh})";
-    $args = array_merge($args, $medioLabels);
-    $wherePublic[] = "LOWER(TRIM(COALESCE(`departamento`, ''))) = 'servicio al cliente'";
+    $wherePublic[] = "(LOWER(TRIM(COALESCE(`medio`, ''))) LIKE '%portal%' OR LOWER(TRIM(COALESCE(`medio`, ''))) LIKE '%guardian%' OR LOWER(TRIM(COALESCE(`medio`, ''))) = 'whatsapp cliente')";
 
     $whereSql = '(' . implode(' OR ', $wherePublic) . ')';
-    if ($this->column_exists($ticketsTable, 'creador_por')) {
-      $whereSql .= " AND LOWER(TRIM(COALESCE(`creador_por`, ''))) <> 'funcionario'";
-    }
     $employeeIdFilter = trim($employeeIdFilter);
     if ($employeeIdFilter !== '') {
       $whereSql .= " AND TRIM(COALESCE(`id_empleado`, '')) = ?";

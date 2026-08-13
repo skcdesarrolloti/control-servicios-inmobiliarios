@@ -1095,13 +1095,13 @@ trait RendersDashboard
     }
 
     $webParts = [];
-    foreach (['creado_por', 'creador_por'] as $column) {
-      if ($this->column_exists($table, $column)) {
-        $webParts[] = "LOWER(TRIM(COALESCE(`{$column}`, ''))) IN ('propietario', 'arrendatario', 'copropiedad', 'cliente')";
-      }
+    if ($this->column_exists($table, 'creador_por')) {
+      $webParts[] = "(LOWER(TRIM(COALESCE(`creador_por`, ''))) <> '' AND LOWER(TRIM(COALESCE(`creador_por`, ''))) <> 'funcionario')";
+    } elseif ($this->column_exists($table, 'creado_por')) {
+      $webParts[] = "LOWER(TRIM(COALESCE(`creado_por`, ''))) IN ('propietario', 'arrendatario', 'copropiedad', 'cliente')";
     }
     if ($this->column_exists($table, 'medio')) {
-      $webParts[] = "LOWER(TRIM(COALESCE(`medio`, ''))) IN ('portal propietario', 'portal arrendatario', 'portal copropiedad', 'portal autoservicio', 'portal guardian', 'guardian', 'whatsapp cliente')";
+      $webParts[] = "(LOWER(TRIM(COALESCE(`medio`, ''))) LIKE '%portal%' OR LOWER(TRIM(COALESCE(`medio`, ''))) LIKE '%guardian%' OR LOWER(TRIM(COALESCE(`medio`, ''))) = 'whatsapp cliente')";
     }
     $webWhere = empty($webParts) ? '0 = 1' : '(' . implode(' OR ', $webParts) . ')';
 
