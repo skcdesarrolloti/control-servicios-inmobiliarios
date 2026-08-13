@@ -1234,6 +1234,72 @@
     );
   }
 
+  function caseHasCotizacion(caseBtn) {
+    return !!(
+      caseBtn &&
+      ((caseBtn.dataset.cotizacionUrl || "").trim() ||
+        (caseBtn.dataset.cotizacionId || "").trim())
+    );
+  }
+
+  function renderCotizacionInlineFields(hasCotizacion) {
+    if (!hasCotizacion) {
+      return '<input type="hidden" name="estado_cotizacion" value="__keep__">';
+    }
+    return (
+      '<section class="scm-cotizacion-response-inline" data-scm-cotizacion-response-fields>' +
+      '<div class="scm-cotizacion-response-head"><strong>Respuesta de cotizaci&oacute;n</strong><span>Opcional: si respondes aqu&iacute;, tambi&eacute;n se actualiza la cotizaci&oacute;n asociada.</span></div>' +
+      '<div class="scm-seg-grid">' +
+      '<label class="scm-seg-field"><span>Estado cotizaci&oacute;n</span><select name="estado_cotizacion"><option value="__keep__">Sin cambio</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
+      '<label class="scm-seg-field scm-cotizacion-motivo" style="display:none;"><span>Motivo</span><select name="motivo_cotizacion"><option value="">Elige un motivo</option><option value="Por costo">Por costo</option><option value="Ejecucción por cuenta propia">Ejecucción por cuenta propia</option></select></label>' +
+      '<label class="scm-seg-field scm-cotizacion-financiacion" style="display:none;"><span>Financiaci&oacute;n</span><select name="financiacion_cotizacion"><option value="">No aplica / sin respuesta</option><option value="Si">Si</option><option value="No">No</option></select></label>' +
+      "</div>" +
+      '<label class="scm-seg-field"><span>Observaci&oacute;n cotizaci&oacute;n</span><textarea name="observacion_cotizacion" rows="4" placeholder="Escribe la respuesta u observaci&oacute;n de la cotizaci&oacute;n..."></textarea></label>' +
+      "</section>"
+    );
+  }
+
+  function initCotizacionResponseFields(scope) {
+    if (!scope || !scope.querySelectorAll) return;
+    scope
+      .querySelectorAll("[data-scm-cotizacion-response-fields]")
+      .forEach(function (box) {
+        var estado = box.querySelector(
+          'select[name="estado_cotizacion"], select[name="estado"]',
+        );
+        var motivoWrap = box.querySelector(".scm-cotizacion-motivo");
+        var motivoInput = box.querySelector(
+          'select[name="motivo_cotizacion"], select[name="motivo"]',
+        );
+        var financiacionWrap = box.querySelector(
+          ".scm-cotizacion-financiacion",
+        );
+        var financiacionInput = box.querySelector(
+          'select[name="financiacion_cotizacion"], select[name="financiacion"]',
+        );
+        if (
+          !estado ||
+          !motivoWrap ||
+          !motivoInput ||
+          !financiacionWrap ||
+          !financiacionInput
+        ) {
+          return;
+        }
+        function syncCotizacionFields() {
+          var showMotivo = estado.value === "Desaprobada";
+          var showFinanciacion = estado.value === "Aprobada";
+          motivoWrap.style.display = showMotivo ? "" : "none";
+          motivoInput.required = showMotivo;
+          if (!showMotivo) motivoInput.value = "";
+          financiacionWrap.style.display = showFinanciacion ? "" : "none";
+          if (!showFinanciacion) financiacionInput.value = "";
+        }
+        estado.addEventListener("change", syncCotizacionFields);
+        syncCotizacionFields();
+      });
+  }
+
   function openTicketResponseEditor(modal, caseBtn) {
     var sub = ensureCaseSubmodal(modal);
     if (!sub || !caseBtn) return;
@@ -1253,6 +1319,7 @@
         '<option value="__keep__">Sin cambio</option><option value="Nuevo">Nuevo</option><option value="Por inspecccionar">Por inspecccionar</option><option value="Inspeccionado">Inspeccionado</option><option value="Cotizado">Cotizado</option><option value="En ejecucion por inmobiliaria">En ejecucion por inmobiliaria</option><option value="En ejecucion por propietario">En ejecucion por propietario</option><option value="En ejecucion por arrendatario">En ejecucion por arrendatario</option><option value="En ejecucion por copropiedad">En ejecucion por copropiedad</option><option value="Finalizado">Finalizado</option><option value="Trasladado">Trasladado</option><option value="Entregado">Entregado</option><option value="Recibido">Recibido</option><option value="Desistido">Desistido</option>' +
         "</select></label>" +
         '<label class="scm-seg-field"><span>Respuesta</span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
+        renderCotizacionInlineFields(!isPublicPqr && caseHasCotizacion(caseBtn)) +
         '<label class="scm-seg-field"><span>Imagenes (opcional)</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
         renderPasteEvidenceBox("imagen[]") +
         renderTicketDocumentFields() +
@@ -1260,6 +1327,7 @@
         '<div class="scm-seg-actions"><label class="scm-seg-check"><input type="checkbox" name="cerrar_ticket" value="1"> Cerrar al responder</label><button type="submit" class="scm-btn-primary">Publicar y enviar correo</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
+      initCotizacionResponseFields(body);
     }
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
@@ -1279,36 +1347,17 @@
         '<input type="hidden" name="ticket_pk" value="' +
         escHtml(ticketPk) +
         '">' +
+        '<section class="scm-cotizacion-response-inline" data-scm-cotizacion-response-fields>' +
         '<label class="scm-seg-field"><span>Respuesta</span><select name="estado" required><option value="">Elige una respuesta</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
         '<label class="scm-seg-field scm-cotizacion-motivo" style="display:none;"><span>Motivo</span><select name="motivo"><option value="">Elige un motivo</option><option value="Por costo">Por costo</option><option value="Ejecucción por cuenta propia">Ejecucción por cuenta propia</option></select></label>' +
         '<label class="scm-seg-field scm-cotizacion-financiacion" style="display:none;"><span>Financiacion</span><select name="financiacion"><option value="">No aplica / sin respuesta</option><option value="Si">Si</option><option value="No">No</option></select></label>' +
         '<label class="scm-seg-field"><span>Observaciones</span><textarea name="observacion" rows="6" placeholder="Ninguna">Ninguna</textarea></label>' +
+        "</section>" +
         renderNotifyTargets() +
-        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Guardar y enviar correo</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Guardar respuesta</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
-      var estado = body.querySelector('select[name="estado"]');
-      var motivoWrap = body.querySelector(".scm-cotizacion-motivo");
-      var motivoInput = body.querySelector('select[name="motivo"]');
-      var financiacionWrap = body.querySelector(".scm-cotizacion-financiacion");
-      var financiacionInput = body.querySelector('select[name="financiacion"]');
-      if (
-        estado &&
-        motivoWrap &&
-        motivoInput &&
-        financiacionWrap &&
-        financiacionInput
-      ) {
-        estado.addEventListener("change", function () {
-          var showMotivo = estado.value === "Desaprobada";
-          var showFinanciacion = estado.value === "Aprobada";
-          motivoWrap.style.display = showMotivo ? "" : "none";
-          motivoInput.required = showMotivo;
-          if (!showMotivo) motivoInput.value = "";
-          financiacionWrap.style.display = showFinanciacion ? "" : "none";
-          if (!showFinanciacion) financiacionInput.value = "";
-        });
-      }
+      initCotizacionResponseFields(body);
     }
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
@@ -2123,6 +2172,7 @@
           }
         }
         var cotizacionUrl = (btn.dataset.cotizacionUrl || "").trim();
+        var cotizacionId = (btn.dataset.cotizacionId || "").trim();
         var cotEstado = (btn.dataset.cotEstado || "").trim().toLowerCase();
         var cotizacionSinResponder =
           cotEstado === "" || cotEstado === "esperando respuesta";
@@ -2185,9 +2235,9 @@
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>';
         }
-        if (!isPublicPqr && cotizacionUrl && cotizacionSinResponder) {
+        if (!isPublicPqr && (cotizacionUrl || cotizacionId) && cotizacionSinResponder) {
           caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-cotizacion-response>Responder cotizaci&oacute;n / enviar correo</button>';
+            '<button type="button" class="scm-case-work-btn" data-scm-open-cotizacion-response>Responder cotizaci&oacute;n</button>';
         }
         if (ticketUrl) {
           caseActionsHtml +=
@@ -2349,6 +2399,7 @@
           '<section class="scm-case-main">' +
           sourceHtml +
           "</section></div>";
+        initCotizacionResponseFields(body);
       }
 
       modal.classList.add("open");

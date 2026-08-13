@@ -11,12 +11,11 @@ use SCM\Support\SchemaInspector;
 
 trait WorkflowCommandsConcern
 {
-  public function save(int $ticketPk, string $observacion, string $estadoTicket, string $estadoCotizacion, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $evidencias = '', array $documentos = []): array
+  public function save(int $ticketPk, string $observacion, string $estadoTicket, string $estadoCotizacion, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $evidencias = '', array $documentos = [], string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = ''): array
   {
     $ticketsTable      = $this->db->table('jet_cct_tickets');
     $seguimientoTable  = $this->db->table('jet_cct_seguimiento_ticket');
     $histFallbackTable = $this->db->table('jet_cct_historial_del_ticket');
-    $estadoCotizacion = '__keep__';
 
     if ($ticketPk <= 0) {
       return ['ok' => '0', 'message' => 'Ticket invalido.'];
@@ -107,13 +106,29 @@ trait WorkflowCommandsConcern
     if ($emailsSent > 0) {
       $msg .= ' Correos programados en cola: ' . $emailsSent . '.';
     }
+    $cotRows = '0';
+    if ($this->shouldSaveCotizacionResponse($estadoCotizacion)) {
+      $cotResult = $this->saveCotizacionResponse(
+        $ticketPk,
+        $estadoCotizacion,
+        $observacionCotizacion !== '' ? $observacionCotizacion : 'Ninguna',
+        $motivoCotizacion,
+        $financiacionCotizacion,
+        $notifyTargets
+      );
+      if (($cotResult['ok'] ?? '0') !== '1') {
+        return $cotResult;
+      }
+      $cotRows = (string)($cotResult['cot_rows'] ?? '0');
+      $msg .= ' Respuesta de cotizacion actualizada.';
+    }
 
     return [
       'ok' => '1',
       'message' => $msg,
       'seg_saved' => $segSaved ? '1' : '0',
       'hist_saved' => $histSaved ? '1' : '0',
-      'cot_rows' => '0',
+      'cot_rows' => $cotRows,
       'emails_sent' => (string)$emailsSent,
     ];
   }
@@ -121,7 +136,7 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = []): array
+  public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = [], string $estadoCotizacion = '__keep__', string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = ''): array
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $histTable    = $this->db->table('jet_cct_historial_del_ticket');
@@ -193,10 +208,28 @@ trait WorkflowCommandsConcern
     }
 
     $sent = $this->notifyTicketResponse($ticket, $logicalTicket, $respuesta, $userName, $newEstado, $notifyTargets);
+    $cotRows = '0';
+    $extraMessage = '';
+    if ($this->shouldSaveCotizacionResponse($estadoCotizacion)) {
+      $cotResult = $this->saveCotizacionResponse(
+        $ticketPk,
+        $estadoCotizacion,
+        $observacionCotizacion !== '' ? $observacionCotizacion : 'Ninguna',
+        $motivoCotizacion,
+        $financiacionCotizacion,
+        $notifyTargets
+      );
+      if (($cotResult['ok'] ?? '0') !== '1') {
+        return $cotResult;
+      }
+      $cotRows = (string)($cotResult['cot_rows'] ?? '0');
+      $extraMessage = ' Respuesta de cotizacion actualizada.';
+    }
     return [
       'ok' => '1',
-      'message' => 'Respuesta guardada.' . ($sent > 0 ? ' Correos programados en cola: ' . $sent . '.' : ' Sin correos programados.'),
+      'message' => 'Respuesta guardada.' . $extraMessage . ($sent > 0 ? ' Correos programados en cola: ' . $sent . '.' : ' Sin correos programados.'),
       'emails_sent' => (string)$sent,
+      'cot_rows' => $cotRows,
     ];
   }
 
@@ -433,6 +466,11 @@ trait WorkflowCommandsConcern
     }
 
     return $this->db->insert($seguimientoTable, $payload);
+  }
+
+  private function shouldSaveCotizacionResponse(string $estadoCotizacion): bool
+  {
+    return in_array(trim($estadoCotizacion), ['Aprobada', 'Desaprobada'], true);
   }
 
   /**

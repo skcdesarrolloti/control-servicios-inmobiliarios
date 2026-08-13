@@ -247,6 +247,7 @@ trait TableRowsConcern
         . ' data-celular-arrendatario="' . esc_attr($celularArrendatario) . '"'
         . ' data-indicativo-arrendatario="' . esc_attr($indicativoArrendatario) . '"'
         . ' data-ticket-url="' . esc_attr($ticketUrl) . '"'
+        . ' data-cotizacion-id="' . esc_attr($idCotzUrl) . '"'
         . ' data-cotizacion-url="' . esc_attr($cotzUrl) . '"'
         . ' data-cot-estado="' . esc_attr($cotEstadoRaw) . '"'
         . ' data-id-revision-correctiva="' . esc_attr($idCorrUrl) . '"'

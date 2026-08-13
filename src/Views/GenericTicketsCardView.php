@@ -383,6 +383,7 @@ final class GenericTicketsCardView
     $dataAttrs .= ' data-celular-arrendatario="' . esc_attr($celularArrendatarioRaw) . '"';
     $dataAttrs .= ' data-indicativo-arrendatario="' . esc_attr($indicativoArrendatarioRaw) . '"';
     $dataAttrs .= ' data-ticket-url="' . esc_attr($ticketUrl) . '"';
+    $dataAttrs .= ' data-cotizacion-id="' . esc_attr($cotzFirstId) . '"';
     $dataAttrs .= ' data-cotizacion-url="' . esc_attr($cotzUrl) . '"';
     $dataAttrs .= ' data-cot-estado="' . esc_attr($cotEstadoRaw) . '"';
     $dataAttrs .= ' data-id-revision-correctiva="' . esc_attr($corrFirstId) . '"';

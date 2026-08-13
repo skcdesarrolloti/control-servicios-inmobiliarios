@@ -1697,6 +1697,36 @@ body.scm-modal-open {
   gap: 10px;
 }
 
+#scm-app .scm-cotizacion-response-inline {
+  background: #fffaf0;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+  margin: 6px 0 10px;
+  padding: 14px 16px;
+}
+
+#scm-app .scm-cotizacion-response-head {
+  display: grid;
+  gap: 3px;
+}
+
+#scm-app .scm-cotizacion-response-head strong {
+  color: #7c3f00;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-cotizacion-response-head span {
+  color: #7b5b36;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 #scm-app .scm-ticket-document-row {
   display: grid;
   gap: 10px;

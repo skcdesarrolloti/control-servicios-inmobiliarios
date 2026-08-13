@@ -38,7 +38,17 @@ final class SeguimientoFormView
       . '<option value="Desistido">Desistido</option>'
       . '</select></label>';
 
-    $html .= '<input type="hidden" name="estado_cotizacion" value="__keep__">';
+    if ($hasCotizacion) {
+      $html .= '<section class="scm-cotizacion-response-inline" data-scm-cotizacion-response-fields>';
+      $html .= '<div class="scm-cotizacion-response-head"><strong>Respuesta de cotizaci&oacute;n</strong><span>Opcional: si respondes aqu&iacute;, tambi&eacute;n se actualiza la cotizaci&oacute;n asociada.</span></div>';
+      $html .= '<label class="scm-seg-field"><span>Estado cotizaci&oacute;n</span><select name="estado_cotizacion"><option value="__keep__">Sin cambio</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>';
+      $html .= '<label class="scm-seg-field scm-cotizacion-motivo" style="display:none;"><span>Motivo</span><select name="motivo_cotizacion"><option value="">Elige un motivo</option><option value="Por costo">Por costo</option><option value="Ejecucción por cuenta propia">Ejecucción por cuenta propia</option></select></label>';
+      $html .= '<label class="scm-seg-field scm-cotizacion-financiacion" style="display:none;"><span>Financiaci&oacute;n</span><select name="financiacion_cotizacion"><option value="">No aplica / sin respuesta</option><option value="Si">Si</option><option value="No">No</option></select></label>';
+      $html .= '<label class="scm-seg-field"><span>Observaci&oacute;n cotizaci&oacute;n</span><textarea name="observacion_cotizacion" rows="4" placeholder="Escribe la respuesta u observaci&oacute;n de la cotizaci&oacute;n..."></textarea></label>';
+      $html .= '</section>';
+    } else {
+      $html .= '<input type="hidden" name="estado_cotizacion" value="__keep__">';
+    }
 
     $html .= '</div>';
     $html .= '<div class="scm-ticket-documents-zone" data-ticket-documents-zone>';
