@@ -473,15 +473,10 @@ final class GenericTicketsCardView
   private function ticketOriginIsGuardian(array $row): bool
   {
     $creatorBy = strtolower(trim((string) ($row['creador_por'] ?? '')));
-    if ($creatorBy !== '' && $creatorBy !== 'funcionario') {
-      return true;
+    if ($creatorBy === '') {
+      $creatorBy = strtolower(trim((string) ($row['creado_por'] ?? '')));
     }
-    $createdBy = strtolower(trim((string) ($row['creado_por'] ?? '')));
-    $medio = strtolower(trim((string) ($row['medio'] ?? '')));
-    return in_array($createdBy, ['propietario', 'arrendatario', 'copropiedad', 'cliente'], true)
-      || strpos($medio, 'portal') !== false
-      || strpos($medio, 'guardian') !== false
-      || $medio === 'whatsapp cliente';
+    return $creatorBy !== '' && $creatorBy !== 'funcionario';
   }
 
   public function renderGenericCards(array $rows, array $config, string $tabKey, string $statusBucket = ''): string

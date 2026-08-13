@@ -527,19 +527,21 @@ trait MaintenanceQueriesConcern
   private function maintenanceWebOriginExpression(string $alias = 't'): string
   {
     $table = $this->ticketsTable();
-    $parts = [];
-    if ($this->schema->columnExists($table, 'creador_por')) {
-      $parts[] = "(LOWER(TRIM(COALESCE({$alias}.`creador_por`, ''))) <> '' AND LOWER(TRIM(COALESCE({$alias}.`creador_por`, ''))) <> 'funcionario')";
-    } elseif ($this->schema->columnExists($table, 'creado_por')) {
-      $parts[] = "LOWER(TRIM(COALESCE({$alias}.`creado_por`, ''))) IN ('propietario', 'arrendatario', 'copropiedad', 'cliente')";
+    $hasCreadorPor = $this->schema->columnExists($table, 'creador_por');
+    $hasCreadoPor = $this->schema->columnExists($table, 'creado_por');
+    $creadorExpr = $hasCreadorPor ? "LOWER(TRIM(COALESCE({$alias}.`creador_por`, '')))" : "''";
+    $creadoExpr = $hasCreadoPor ? "LOWER(TRIM(COALESCE({$alias}.`creado_por`, '')))" : "''";
+
+    if ($hasCreadorPor && $hasCreadoPor) {
+      return "(({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario') OR ({$creadorExpr} = '' AND {$creadoExpr} <> '' AND {$creadoExpr} <> 'funcionario'))";
     }
-    if ($this->schema->columnExists($table, 'medio')) {
-      $parts[] = "(LOWER(TRIM(COALESCE({$alias}.`medio`, ''))) LIKE '%portal%' OR LOWER(TRIM(COALESCE({$alias}.`medio`, ''))) LIKE '%guardian%' OR LOWER(TRIM(COALESCE({$alias}.`medio`, ''))) = 'whatsapp cliente')";
+    if ($hasCreadorPor) {
+      return "({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario')";
     }
-    if (empty($parts)) {
-      return '0 = 1';
+    if ($hasCreadoPor) {
+      return "({$creadoExpr} <> '' AND {$creadoExpr} <> 'funcionario')";
     }
-    return '(' . implode(' OR ', $parts) . ')';
+    return '0 = 1';
   }
 
   /**

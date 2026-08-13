@@ -1094,16 +1094,19 @@ trait RendersDashboard
       ];
     }
 
-    $webParts = [];
-    if ($this->column_exists($table, 'creador_por')) {
-      $webParts[] = "(LOWER(TRIM(COALESCE(`creador_por`, ''))) <> '' AND LOWER(TRIM(COALESCE(`creador_por`, ''))) <> 'funcionario')";
-    } elseif ($this->column_exists($table, 'creado_por')) {
-      $webParts[] = "LOWER(TRIM(COALESCE(`creado_por`, ''))) IN ('propietario', 'arrendatario', 'copropiedad', 'cliente')";
+    $hasCreadorPor = $this->column_exists($table, 'creador_por');
+    $hasCreadoPor = $this->column_exists($table, 'creado_por');
+    $creadorExpr = $hasCreadorPor ? "LOWER(TRIM(COALESCE(`creador_por`, '')))" : "''";
+    $creadoExpr = $hasCreadoPor ? "LOWER(TRIM(COALESCE(`creado_por`, '')))" : "''";
+    if ($hasCreadorPor && $hasCreadoPor) {
+      $webWhere = "(({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario') OR ({$creadorExpr} = '' AND {$creadoExpr} <> '' AND {$creadoExpr} <> 'funcionario'))";
+    } elseif ($hasCreadorPor) {
+      $webWhere = "({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario')";
+    } elseif ($hasCreadoPor) {
+      $webWhere = "({$creadoExpr} <> '' AND {$creadoExpr} <> 'funcionario')";
+    } else {
+      $webWhere = '0 = 1';
     }
-    if ($this->column_exists($table, 'medio')) {
-      $webParts[] = "(LOWER(TRIM(COALESCE(`medio`, ''))) LIKE '%portal%' OR LOWER(TRIM(COALESCE(`medio`, ''))) LIKE '%guardian%' OR LOWER(TRIM(COALESCE(`medio`, ''))) = 'whatsapp cliente')";
-    }
-    $webWhere = empty($webParts) ? '0 = 1' : '(' . implode(' OR ', $webParts) . ')';
 
     $estadoExpr = $this->column_exists($table, 'estado') ? "LOWER(TRIM(COALESCE(`estado`, '')))" : "''";
     $estadoAdminExpr = $this->column_exists($table, 'estado_administrativo') ? "LOWER(TRIM(COALESCE(`estado_administrativo`, '')))" : "''";
