@@ -1227,6 +1227,7 @@
   function renderTicketDocumentFields() {
     return (
       '<div class="scm-ticket-documents-zone" data-ticket-documents-zone>' +
+      '<div class="scm-ticket-documents-label">Documentos opcionales</div>' +
       '<div class="scm-ticket-documents" data-ticket-documents></div>' +
       '<button type="button" class="btn btn-outline scm-add-ticket-document" data-add-ticket-document>+ Agregar documento</button>' +
       "</div>"

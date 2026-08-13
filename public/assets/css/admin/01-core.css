@@ -1678,6 +1678,15 @@ body.scm-modal-open {
   gap: 8px;
 }
 
+#scm-app .scm-ticket-documents-label {
+  color: #526780;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
 #scm-app .scm-ticket-documents {
   display: grid;
   gap: 10px;
