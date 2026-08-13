@@ -155,6 +155,9 @@
 
 #scm-app .scm-guide-bar {
   display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   justify-content: flex-end;
   margin-bottom: 10px;
 }
@@ -182,6 +185,253 @@
 #scm-app .scm-guide-btn:hover {
   filter: brightness(1.1);
   box-shadow: 0 6px 18px var(--scm-accent-glow);
+}
+
+#scm-app .scm-permissions-btn,
+#scm-app .scm-pqr-settings-shortcut {
+  background: linear-gradient(135deg, #1f4f99, #12315f);
+  box-shadow: 0 3px 10px rgba(31, 79, 153, 0.24);
+}
+
+#scm-app .scm-pqr-settings-shortcut {
+  background: linear-gradient(135deg, #0f766e, #134e4a);
+  box-shadow: 0 3px 10px rgba(15, 118, 110, 0.22);
+}
+
+#scm-app .scm-permissions-modal,
+#scm-app .scm-pqr-settings-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  padding: 24px 14px;
+  background: rgba(15, 23, 42, 0.55);
+  overflow-y: auto;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+#scm-app .scm-permissions-modal.open,
+#scm-app .scm-pqr-settings-modal.open {
+  display: flex;
+}
+
+#scm-app .scm-permissions-dialog,
+#scm-app .scm-pqr-settings-dialog {
+  position: relative;
+  width: min(1120px, 96vw);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border: 1px solid #d8e3ef;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
+}
+
+#scm-app .scm-permissions-head,
+#scm-app .scm-pqr-settings-head {
+  padding: 22px 26px 18px;
+  color: #fff;
+  background: linear-gradient(135deg, #1f2d42, #263a56);
+}
+
+#scm-app .scm-permissions-head h3,
+#scm-app .scm-pqr-settings-head h3 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+#scm-app .scm-permissions-head p,
+#scm-app .scm-pqr-settings-head p {
+  max-width: 780px;
+  margin: 8px 0 0;
+  color: #dbe7f5;
+  font-size: 13px;
+}
+
+#scm-app .scm-permissions-close,
+#scm-app .scm-pqr-settings-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #d7e1ed;
+  border-radius: 8px;
+  background: #fff;
+  color: #20344c;
+  cursor: pointer;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+#scm-app .scm-permissions-form,
+#scm-app .scm-pqr-settings-section {
+  padding: 20px 26px 24px;
+}
+
+#scm-app .scm-permissions-table-wrap {
+  overflow: auto;
+  border: 1px solid #dbe6f1;
+  border-radius: 14px;
+}
+
+#scm-app .scm-permissions-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  color: #1a2d42;
+}
+
+#scm-app .scm-permissions-table th,
+#scm-app .scm-permissions-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e6eef7;
+  text-align: left;
+  vertical-align: top;
+}
+
+#scm-app .scm-permissions-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f1f6fb;
+  color: #405a78;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#scm-app .scm-permissions-table tbody th {
+  width: 190px;
+  background: #fbfdff;
+}
+
+#scm-app .scm-permissions-table tbody th span,
+#scm-app .scm-permissions-table tbody th small {
+  display: block;
+}
+
+#scm-app .scm-permissions-table tbody th small {
+  margin-top: 3px;
+  color: #71849b;
+  font-size: 11px;
+}
+
+#scm-app .scm-permissions-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 145px;
+  color: #243a52;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#scm-app .scm-permissions-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+#scm-app .scm-permissions-msg {
+  flex: 1 1 auto;
+  margin: 0;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#scm-app .scm-permissions-msg.error,
+#scm-app .scm-dashboard-pqr-config-form small.error {
+  color: #b91c1c;
+}
+
+#scm-app .scm-pqr-settings-section {
+  border-top: 1px solid #e5edf7;
+}
+
+#scm-app .scm-pqr-settings-section h4 {
+  margin: 0 0 6px;
+  color: #1a2d42;
+  font-size: 15px;
+}
+
+#scm-app .scm-pqr-settings-section p {
+  margin: 0 0 12px;
+  color: #5d728a;
+  font-size: 12px;
+}
+
+#scm-app .scm-pqr-settings-section > form {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+#scm-app .scm-pqr-settings-select-wrap {
+  flex: 1 1 360px;
+  min-width: 260px;
+}
+
+#scm-app .scm-pqr-settings-select-wrap small,
+#scm-app .scm-dashboard-pqr-config-form small {
+  display: block;
+  margin-top: 5px;
+  color: #627892;
+  font-size: 11px;
+}
+
+#scm-app .scm-pqr-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  max-height: 58vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+#scm-app .scm-dashboard-pqr-config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid #dbe6f1;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-dashboard-pqr-config-form label {
+  color: #415975;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#scm-app .scm-dashboard-pqr-config-form .scm-pqr-config-theme {
+  color: #1f3550;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+#scm-app .scm-pqr-config-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#scm-app .scm-pqr-config-empty {
+  margin: 0;
+  color: #a95b26;
+  font-size: 12px;
 }
 
 #scm-app .scm-tab-panel {

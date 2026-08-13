@@ -48,6 +48,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_GUARDAR_CORRESPONSABLE_PQR_PUBLICO = 'scm_guardar_corresponsable_pqr_publico';
   const AJAX_GUARDAR_NOTIF_RESPONSABLE_PQR = 'scm_guardar_notif_responsable_pqr';
   const AJAX_FILTER_PQR_PUBLICO = 'scm_filtrar_pqr_publico';
+  const AJAX_DASHBOARD_PERMISSIONS_READ = 'scm_dashboard_permissions_read';
+  const AJAX_DASHBOARD_PERMISSIONS_SAVE = 'scm_dashboard_permissions_save';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';
@@ -90,6 +92,116 @@ final class SuCasaControlServiciosInmobiliarios
   private static function h(string $s): string
   {
     return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+  }
+
+  /** @return array<int,string> */
+  private function dashboardPermissionAdminCargos(): array
+  {
+    return ['11', '12', '13', '14'];
+  }
+
+  /** @return array<string,string> */
+  private function dashboardPermissionTabs(): array
+  {
+    return [
+      'abiertos' => 'Abiertos',
+      'postergados' => 'Postergados',
+      'cerrados' => 'Cerrados',
+      'mis_tickets' => 'Mis tickets',
+      'cotizaciones_mantenimiento' => 'Cotizaciones de Mantenimiento',
+      'preventivas_pendientes' => 'Preventivas Pendientes',
+      'contratos_arrendamiento' => 'Contratos de arrendamiento',
+      'servicios_publicos_pendientes' => 'Servicios Publicos Pendientes',
+      'reportes_administrativos_pendientes' => 'Reportes Administrativos',
+      'metricas' => 'Metricas',
+    ];
+  }
+
+  private function canManageDashboardPermissions(): bool
+  {
+    return in_array(Auth::userCargo(), $this->dashboardPermissionAdminCargos(), true);
+  }
+
+  private function canManagePublicPqrSettings(): bool
+  {
+    return in_array(Auth::userCargo(), $this->dashboardPermissionAdminCargos(), true);
+  }
+
+  /** @return array<string,array<int,string>> */
+  private function dashboardPermissionsConfig(): array
+  {
+    $raw = \SCM\Core\App::settings()->get('dashboard_tab_permissions', []);
+    return $this->sanitizeDashboardPermissions(is_array($raw) ? $raw : []);
+  }
+
+  /** @param array<mixed> $raw @return array<string,array<int,string>> */
+  private function sanitizeDashboardPermissions(array $raw): array
+  {
+    $validTabs = array_keys($this->dashboardPermissionTabs());
+    $out = [];
+    foreach ($raw as $cargo => $tabs) {
+      $cargoKey = trim((string) $cargo);
+      if ($cargoKey === '') {
+        continue;
+      }
+      $selected = [];
+      foreach ((array) $tabs as $tab) {
+        $tabKey = preg_replace('/[^a-z0-9_]/', '', strtolower((string) $tab)) ?: '';
+        if ($tabKey !== '' && in_array($tabKey, $validTabs, true)) {
+          $selected[$tabKey] = $tabKey;
+        }
+      }
+      $out[$cargoKey] = array_values($selected);
+    }
+    ksort($out);
+    return $out;
+  }
+
+  /** @return array<int,string> */
+  private function currentDashboardAllowedTabs(): array
+  {
+    $cargo = Auth::userCargo();
+    $permissions = $this->dashboardPermissionsConfig();
+    $allTabs = array_keys($this->dashboardPermissionTabs());
+    if ($cargo === '' || !array_key_exists($cargo, $permissions)) {
+      return $allTabs;
+    }
+    return !empty($permissions[$cargo]) ? $permissions[$cargo] : ['mis_tickets'];
+  }
+
+  private function canAccessDashboardTab(string $tab): bool
+  {
+    $tab = preg_replace('/[^a-z0-9_]/', '', strtolower($tab)) ?: '';
+    return $tab !== '' && in_array($tab, $this->currentDashboardAllowedTabs(), true);
+  }
+
+  /** @return array<int,array<string,string>> */
+  private function getDashboardCargoOptions(): array
+  {
+    $cargos = [];
+    foreach ($this->dashboardPermissionAdminCargos() as $cargo) {
+      $cargos[$cargo] = ['id' => $cargo, 'label' => 'Cargo ' . $cargo];
+    }
+    $table = $this->db->table('jet_cct_funcionarios');
+    if ($this->table_exists($table) && $this->column_exists($table, 'id_cargo')) {
+      $rows = $this->db->getResults(
+        "SELECT TRIM(COALESCE(`id_cargo`, '')) AS id_cargo, COUNT(*) AS total
+           FROM `{$table}`
+          WHERE TRIM(COALESCE(`id_cargo`, '')) <> ''
+          GROUP BY TRIM(COALESCE(`id_cargo`, ''))
+          ORDER BY CAST(TRIM(COALESCE(`id_cargo`, '')) AS UNSIGNED), TRIM(COALESCE(`id_cargo`, ''))"
+      );
+      foreach ($rows as $row) {
+        $cargo = trim((string) ($row['id_cargo'] ?? ''));
+        if ($cargo === '') {
+          continue;
+        }
+        $total = (int) ($row['total'] ?? 0);
+        $cargos[$cargo] = ['id' => $cargo, 'label' => 'Cargo ' . $cargo . ($total > 0 ? ' (' . $total . ')' : '')];
+      }
+    }
+    ksort($cargos, SORT_NATURAL);
+    return array_values($cargos);
   }
 
   private static function sanitizeUrl(string $url): string

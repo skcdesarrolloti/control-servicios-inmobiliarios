@@ -293,6 +293,9 @@ trait HandlesPublicPqrActions
   public function ajax_handler_guardar_notif_responsable_pqr(): void
   {
     $this->verifyCsrf();
+    if (!$this->canManagePublicPqrSettings()) {
+      $this->jsonFail('No tienes permisos para configurar las notificaciones de Guardian.');
+    }
 
     $idsRaw = $_POST['notif_responsable_ids'] ?? ($_POST['notif_responsable_id'] ?? []);
     if (!is_array($idsRaw)) {
@@ -377,6 +380,9 @@ trait HandlesPublicPqrActions
   public function ajax_handler_guardar_corresponsable_pqr_publico(): void
   {
     $this->verifyCsrf();
+    if (!$this->canManagePublicPqrSettings()) {
+      $this->jsonFail('No tienes permisos para configurar los corresponsables de Guardian.');
+    }
 
     $tipoRaw = trim(sanitize_text_field(wp_unslash((string) ($_POST['tema_ayuda'] ?? $_POST['tipo_pqrs'] ?? ''))));
     $corresponsableIdsRaw = $_POST['corresponsable_ids'] ?? [];

@@ -119,6 +119,10 @@
       actions.preventivas_pendientes || "";
     var actionCrearTicketAdministrativo =
       actions.crear_ticket_administrativo || "";
+    var actionDashboardPermissionsRead =
+      actions.dashboard_permissions_read || "";
+    var actionDashboardPermissionsSave =
+      actions.dashboard_permissions_save || "";
 
     function setListLoading(cardsEl, isLoading, label) {
       if (!cardsEl) {
@@ -154,6 +158,200 @@
     function showToast(type, message) {
       scmNotify(type, message);
     }
+
+    function bindDashboardPermissions() {
+      var permConfig = runtime.dashboardPermissions || {};
+      if (!permConfig.canManage) {
+        return;
+      }
+      var openBtn = root.querySelector("#scm-open-permissions");
+      var modal = root.querySelector("#scm-permissions-modal");
+      var closeBtn = root.querySelector("#scm-close-permissions");
+      var form = root.querySelector("#scm-permissions-form");
+      var msg = root.querySelector("#scm-permissions-msg");
+      if (!openBtn || !modal || !form) {
+        return;
+      }
+
+      function openModal() {
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+      }
+      function closeModal() {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+      }
+      function collectPermissions() {
+        var permissions = {};
+        form
+          .querySelectorAll('input[type="checkbox"][name^="permissions["]')
+          .forEach(function (input) {
+            var match = input.name.match(/^permissions\[([^\]]+)\]/);
+            var cargo = match ? match[1] : "";
+            if (!cargo) return;
+            if (!permissions[cargo]) permissions[cargo] = [];
+            if (input.checked) permissions[cargo].push(input.value);
+          });
+        return permissions;
+      }
+      function setMessage(text, isError) {
+        if (!msg) return;
+        msg.textContent = text || "";
+        msg.classList.toggle("error", !!isError);
+      }
+
+      openBtn.addEventListener("click", openModal);
+      if (closeBtn) closeBtn.addEventListener("click", closeModal);
+      modal.addEventListener("click", function (event) {
+        if (event.target === modal) closeModal();
+      });
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (!ajaxUrl || !actionDashboardPermissionsSave) {
+          setMessage("No esta disponible la accion de guardado.", true);
+          return;
+        }
+        var submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+        setMessage("Guardando permisos...", false);
+        var fd = new FormData();
+        fd.append("action", actionDashboardPermissionsSave);
+        fd.append("nonce", nonce);
+        fd.append("permissions", JSON.stringify(collectPermissions()));
+        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error(
+                (json && json.data && json.data.message) ||
+                  "No se pudieron guardar los permisos.",
+              );
+            }
+            setMessage(
+              (json.data && json.data.message) || "Permisos guardados.",
+              false,
+            );
+            showToast("success", "Permisos de pestañas guardados.");
+          })
+          .catch(function (err) {
+            setMessage(err && err.message ? err.message : "Error al guardar.", true);
+            showToast("error", err && err.message ? err.message : "Error al guardar.");
+          })
+          .finally(function () {
+            if (submitBtn) submitBtn.disabled = false;
+        });
+      });
+    }
+
+    bindDashboardPermissions();
+
+    function bindPublicPqrSettingsShortcut() {
+      var openBtn = root.querySelector("#scm-open-pqr-settings");
+      var modal = root.querySelector("#scm-pqr-settings-modal");
+      if (!openBtn || !modal) {
+        return;
+      }
+      var closeBtn = modal.querySelector("#scm-close-pqr-settings");
+
+      function initSelects() {
+        if (!(window.jQuery && window.jQuery.fn && window.jQuery.fn.select2)) {
+          return;
+        }
+        var $ = window.jQuery;
+        modal.querySelectorAll("select.scm-select").forEach(function (selectEl) {
+          var $select = $(selectEl);
+          if ($select.data("select2")) {
+            return;
+          }
+          $select.select2({
+            width: "100%",
+            closeOnSelect: !selectEl.multiple,
+            dropdownParent: $(modal),
+            placeholder: selectEl.multiple ? "Buscar y seleccionar..." : "Seleccionar...",
+            allowClear: !selectEl.multiple,
+          });
+        });
+      }
+
+      function openModal() {
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+        initSelects();
+      }
+
+      function closeModal() {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+      }
+
+      function setMessage(form, text, isError) {
+        var msg = form.querySelector(
+          ".scm-public-pqr-corresponsable-msg, .scm-notif-responsable-msg"
+        );
+        if (!msg) {
+          return;
+        }
+        msg.textContent = text || "";
+        msg.classList.toggle("error", !!isError);
+      }
+
+      openBtn.addEventListener("click", openModal);
+      if (closeBtn) {
+        closeBtn.addEventListener("click", closeModal);
+      }
+      modal.addEventListener("click", function (event) {
+        if (event.target === modal) {
+          closeModal();
+        }
+      });
+
+      modal.addEventListener("submit", function (event) {
+        var form = event.target;
+        if (!form || !form.classList || !form.classList.contains("scm-dashboard-pqr-config-form")) {
+          return;
+        }
+        event.preventDefault();
+        var isCorresponsable = form.classList.contains("scm-public-pqr-corresponsable-form");
+        var action = isCorresponsable
+          ? actions.guardar_corresponsable_pqr_publico || "scm_guardar_corresponsable_pqr_publico"
+          : actions.notif_responsable_pqr || "scm_guardar_notif_responsable_pqr";
+        var btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+        setMessage(form, "Guardando...", false);
+
+        var fd = new FormData(form);
+        fd.append("action", action);
+        fd.append("nonce", nonce);
+
+        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error(
+                (json && json.data && json.data.message) ||
+                  (isCorresponsable
+                    ? "No se pudo guardar el corresponsable."
+                    : "No se pudo guardar la notificacion.")
+              );
+            }
+            setMessage(form, (json.data && json.data.message) || "Configuracion guardada.", false);
+            showToast("success", "Configuracion guardada.");
+          })
+          .catch(function (err) {
+            setMessage(form, err && err.message ? err.message : "No se pudo guardar.", true);
+            showToast("error", err && err.message ? err.message : "No se pudo guardar.");
+          })
+          .finally(function () {
+            if (btn) btn.disabled = false;
+          });
+      });
+    }
+
+    bindPublicPqrSettingsShortcut();
 
     function ticketAdminDatalist(id, values) {
       return (

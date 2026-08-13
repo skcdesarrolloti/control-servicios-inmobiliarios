@@ -52,6 +52,8 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_FILTER_PQR_PUBLICO => 'ajax_handler_filtrar_pqr_publico',
       SuCasaControlServiciosInmobiliarios::AJAX_GUARDAR_CORRESPONSABLE_PQR_PUBLICO => 'ajax_handler_guardar_corresponsable_pqr_publico',
       SuCasaControlServiciosInmobiliarios::AJAX_GUARDAR_NOTIF_RESPONSABLE_PQR => 'ajax_handler_guardar_notif_responsable_pqr',
+      SuCasaControlServiciosInmobiliarios::AJAX_DASHBOARD_PERMISSIONS_READ => 'ajax_handler_dashboard_permissions_read',
+      SuCasaControlServiciosInmobiliarios::AJAX_DASHBOARD_PERMISSIONS_SAVE => 'ajax_handler_dashboard_permissions_save',
     ];
 
     $this->guideRoutes = [

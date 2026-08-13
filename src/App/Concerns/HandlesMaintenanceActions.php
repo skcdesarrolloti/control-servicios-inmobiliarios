@@ -11,6 +11,9 @@ trait HandlesMaintenanceActions
   public function ajax_handler_generic(): void
   {
     $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('abiertos')) {
+      $this->jsonFail('No tienes permiso para ver esta pestaña.');
+    }
 
     $action = preg_replace('/[^a-z0-9_-]/', '', strtolower((string)($_POST['action'] ?? '')));
 
@@ -85,6 +88,9 @@ trait HandlesMaintenanceActions
   public function ajax_handler_my_tickets(): void
   {
     $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('mis_tickets')) {
+      $this->jsonFail('No tienes permiso para ver esta pestaña.');
+    }
 
     $rawConfig = json_decode(stripslashes((string)($_POST['config'] ?? '{}')), true);
     $rawConfig = is_array($rawConfig) ? $rawConfig : [];
@@ -115,6 +121,9 @@ trait HandlesMaintenanceActions
   public function ajax_handler_cotizaciones_mantenimiento(): void
   {
     $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento')) {
+      $this->jsonFail('No tienes permiso para ver esta pestaña.');
+    }
 
     $params = $this->parse_cotizaciones_mantenimiento_params($_POST, 'scmqt_');
     $result = $this->query_cotizaciones_mantenimiento($params);

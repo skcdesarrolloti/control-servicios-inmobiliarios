@@ -132,6 +132,38 @@ trait RendersDashboard
       'Contractual' => (int)($genericResults['contractual']['result']['stats']['total'] ?? 0),
     ];
     $webTicketStats = $this->get_web_ticket_statistics();
+    $dashboardAllowedTabs = $this->currentDashboardAllowedTabs();
+    $dashboardPermissionTabs = $this->dashboardPermissionTabs();
+    $dashboardPermissionConfig = $this->dashboardPermissionsConfig();
+    $canManageDashboardPermissions = $this->canManageDashboardPermissions();
+    $canManagePublicPqrSettings = $this->canManagePublicPqrSettings();
+
+    $dashboardPanelToTab = [
+      'scm-panel-abiertos' => 'abiertos',
+      'scm-panel-postergados' => 'postergados',
+      'scm-panel-cerrados' => 'cerrados',
+      'scm-panel-mis-tickets' => 'mis_tickets',
+      'scm-panel-cotizaciones-mantenimiento' => 'cotizaciones_mantenimiento',
+      'scm-panel-preventivas-pendientes' => 'preventivas_pendientes',
+      'scm-panel-contratos-arrendamiento' => 'contratos_arrendamiento',
+      'scm-panel-servicios-publicos-pendientes' => 'servicios_publicos_pendientes',
+      'scm-panel-reportes-administrativos-pendientes' => 'reportes_administrativos_pendientes',
+      'scm-panel-metricas' => 'metricas',
+    ];
+    if ($initialTab !== '') {
+      $initialTabPermissionKey = $dashboardPanelToTab[$initialTab] ?? '';
+      if ($initialTabPermissionKey !== '' && !in_array($initialTabPermissionKey, $dashboardAllowedTabs, true)) {
+        $initialTab = '';
+      }
+    }
+    if ($initialTab === '') {
+      foreach ($dashboardPanelToTab as $panelId => $permissionKey) {
+        if (in_array($permissionKey, $dashboardAllowedTabs, true)) {
+          $initialTab = $panelId;
+          break;
+        }
+      }
+    }
 
     $nonce = \SCM\Core\App::csrf()->token(self::NONCE_KEY);
     $apiUrl = defined('SCM_BASE_URL') ? (SCM_BASE_URL . '/api.php') : '/api.php';
@@ -185,6 +217,8 @@ trait RendersDashboard
         'filtrar_pqr_publico' => self::AJAX_FILTER_PQR_PUBLICO,
         'guardar_corresponsable_pqr_publico' => self::AJAX_GUARDAR_CORRESPONSABLE_PQR_PUBLICO,
         'notif_responsable_pqr' => self::AJAX_GUARDAR_NOTIF_RESPONSABLE_PQR,
+        'dashboard_permissions_read' => self::AJAX_DASHBOARD_PERMISSIONS_READ,
+        'dashboard_permissions_save' => self::AJAX_DASHBOARD_PERMISSIONS_SAVE,
         // Guía
         'guide_gcd_read' => self::AJAX_GUIDE_GCD_READ,
         'guide_gcd_save' => self::AJAX_GUIDE_GCD_SAVE,
@@ -196,6 +230,14 @@ trait RendersDashboard
         'guide_gac_save' => self::AJAX_GUIDE_GAC_SAVE,
         'guide_gac_del'  => self::AJAX_GUIDE_GAC_DEL,
         'guide_gac_cats' => self::AJAX_GUIDE_GAC_CATS,
+      ],
+      'dashboardPermissions' => [
+        'canManage' => $canManageDashboardPermissions,
+        'cargo' => Auth::userCargo(),
+        'allowedTabs' => $dashboardAllowedTabs,
+        'tabs' => $dashboardPermissionTabs,
+        'cargos' => $this->getDashboardCargoOptions(),
+        'permissions' => $dashboardPermissionConfig,
       ],
     ];
 
@@ -289,23 +331,23 @@ trait RendersDashboard
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
     <div id="scm-app" class="scm-wrap scm-daisy" data-theme="scm-daisy" data-scm-runtime="<?php echo self::h((string)$runtimeJson); ?>">
       <div class="scm-guide-bar">
+        <?php if ($canManageDashboardPermissions): ?>
+          <button class="scm-guide-btn scm-permissions-btn" type="button" id="scm-open-permissions">Configurar permisos</button>
+        <?php endif; ?>
+        <?php if ($canManagePublicPqrSettings): ?>
+          <button class="scm-guide-btn scm-pqr-settings-shortcut" type="button" id="scm-open-pqr-settings">Configurar notificaciones</button>
+        <?php endif; ?>
         <button class="scm-guide-btn" type="button" id="scm-open-guide"><i class="fas fa-book-open"></i> Ver gu&iacute;as</button>
       </div>
       <div class="scm-tabs scm-main-tabs">
-        <button class="scm-tab active" data-tab="scm-panel-abiertos" type="button">Abiertos</button>
-        <button class="scm-tab" data-tab="scm-panel-postergados" type="button">Postergados</button>
-        <button class="scm-tab" data-tab="scm-panel-cerrados" type="button">Cerrados</button>
-        <button class="scm-tab" data-tab="scm-panel-mis-tickets" type="button">Mis tickets</button>
-        <button class="scm-tab" data-tab="scm-panel-cotizaciones-mantenimiento" type="button">Cotizaciones de Mantenimiento</button>
-        <button class="scm-tab" data-tab="scm-panel-preventivas-pendientes" type="button">Preventivas Pendientes</button>
-        <button class="scm-tab" data-tab="scm-panel-contratos-arrendamiento" type="button">Contratos de arrendamiento</button>
-        <button class="scm-tab" data-tab="scm-panel-servicios-publicos-pendientes" type="button">Servicios P&uacute;blicos Pendientes</button>
-        <button class="scm-tab" data-tab="scm-panel-reportes-administrativos-pendientes" type="button">Reportes Administrativos</button>
-        <button class="scm-tab" data-tab="scm-panel-metricas" type="button">Metricas</button>
+        <?php foreach ($dashboardPanelToTab as $panelId => $permissionKey): ?>
+          <?php if (!in_array($permissionKey, $dashboardAllowedTabs, true)) continue; ?>
+          <button class="scm-tab<?php echo $initialTab === $panelId ? ' active' : ''; ?>" data-tab="<?php echo esc_attr($panelId); ?>" data-permission-tab="<?php echo esc_attr($permissionKey); ?>" type="button"><?php echo esc_html((string)($dashboardPermissionTabs[$permissionKey] ?? $permissionKey)); ?></button>
+        <?php endforeach; ?>
       </div>
 
       <?php $activeOpenTopic = isset($openTopicDefs[$initialOpenTopic]) ? $initialOpenTopic : 'mant'; ?>
-      <div class="scm-tab-panel active" id="scm-panel-abiertos">
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-abiertos' ? ' active' : ''; ?>" id="scm-panel-abiertos" data-permission-tab="abiertos">
         <div class="scm-status-bucket scm-open-bucket" data-open-bucket="abiertos">
           <div class="scm-status-subtabs scm-open-subtabs" role="tablist" aria-label="Tickets abiertos">
             <?php foreach ($openTopicDefs as $openTopicKey => $openTopicDef): ?>
@@ -566,41 +608,41 @@ trait RendersDashboard
         </div>
       </div>
 
-      <div class="scm-tab-panel" id="scm-panel-mis-tickets">
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-mis-tickets' ? ' active' : ''; ?>" id="scm-panel-mis-tickets" data-permission-tab="mis_tickets">
         <?php echo $this->render_my_tickets_panel($myTicketsResult, $myTicketsStats, $myTicketsParams, $filterOptions); ?>
       </div>
 
-      <div class="scm-tab-panel" id="scm-panel-preventivas-pendientes">
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-preventivas-pendientes' ? ' active' : ''; ?>" id="scm-panel-preventivas-pendientes" data-permission-tab="preventivas_pendientes">
         <?php echo $preventivasPendientesHtml; ?>
       </div>
 
-      <div class="scm-tab-panel" id="scm-panel-contratos-arrendamiento">
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-contratos-arrendamiento' ? ' active' : ''; ?>" id="scm-panel-contratos-arrendamiento" data-permission-tab="contratos_arrendamiento">
         <?php echo $contratosArrendamientoHtml; ?>
       </div>
 
-      <div class="scm-tab-panel" id="scm-panel-servicios-publicos-pendientes">
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-servicios-publicos-pendientes' ? ' active' : ''; ?>" id="scm-panel-servicios-publicos-pendientes" data-permission-tab="servicios_publicos_pendientes">
         <?php echo $serviciosPublicosPendientesHtml; ?>
       </div>
 
-      <div class="scm-tab-panel" id="scm-panel-reportes-administrativos-pendientes">
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-reportes-administrativos-pendientes' ? ' active' : ''; ?>" id="scm-panel-reportes-administrativos-pendientes" data-permission-tab="reportes_administrativos_pendientes">
         <?php echo $reportesAdministrativosPendientesHtml; ?>
       </div>
 
-      <div class="scm-tab-panel" id="scm-panel-postergados">
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-postergados' ? ' active' : ''; ?>" id="scm-panel-postergados" data-permission-tab="postergados">
         <?php echo $this->render_status_bucket_panel('postergados', $statusBucketDefs['postergados'], $statusTopicDefs, $statusResults['postergados'] ?? []); ?>
       </div>
 
-      <div class="scm-tab-panel" id="scm-panel-cerrados">
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-cerrados' ? ' active' : ''; ?>" id="scm-panel-cerrados" data-permission-tab="cerrados">
         <?php echo $this->render_status_bucket_panel('cerrados', $statusBucketDefs['cerrados'], $statusTopicDefs, $statusResults['cerrados'] ?? []); ?>
       </div>
 
-      <div class="scm-tab-panel" id="scm-panel-cotizaciones-mantenimiento">
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-cotizaciones-mantenimiento' ? ' active' : ''; ?>" id="scm-panel-cotizaciones-mantenimiento" data-permission-tab="cotizaciones_mantenimiento">
         <?php echo $this->render_cotizaciones_mantenimiento_panel($cotizacionesResult, $cotizacionesParams); ?>
       </div>
 
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-dashboard-inline.js?v=' . SCM_VERSION); ?>" defer></script>
 
-      <div class="scm-tab-panel" id="scm-panel-metricas" data-scm-metrics="<?php echo self::h((string)$metricsJson); ?>">
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas' ? ' active' : ''; ?>" id="scm-panel-metricas" data-permission-tab="metricas" data-scm-metrics="<?php echo self::h((string)$metricsJson); ?>">
         <div class="scm-header scm-header-metricas">
           <div>
             <h2>Metricas Operativas</h2>
@@ -687,6 +729,12 @@ trait RendersDashboard
       </div>
 
       <?php echo \SCM\Views\GuideModalView::render(); ?>
+      <?php if ($canManageDashboardPermissions): ?>
+        <?php echo $this->renderDashboardPermissionsModal($dashboardPermissionTabs, $this->getDashboardCargoOptions(), $dashboardPermissionConfig); ?>
+      <?php endif; ?>
+      <?php if ($canManagePublicPqrSettings): ?>
+        <?php echo $this->renderDashboardPublicPqrSettingsModal(); ?>
+      <?php endif; ?>
 
       <div class="scm-case-modal" id="scm-case-modal" aria-hidden="true">
         <div class="scm-case-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-case-title">
@@ -709,6 +757,175 @@ trait RendersDashboard
     <script src="<?php echo $damageJsUrl; ?>" defer></script>
 <?php
     return (string)ob_get_clean();
+  }
+
+  private function renderDashboardPublicPqrSettingsModal(): string
+  {
+    $currentNotifIds = \SCM\Modules\PublicTickets\PublicTicketsService::getNotifResponsables();
+    $selectedNotifMap = [];
+    foreach ($currentNotifIds as $notifId) {
+      $notifId = trim((string) $notifId);
+      if ($notifId !== '') {
+        $selectedNotifMap[$notifId] = true;
+      }
+    }
+
+    $themes = $this->get_public_pqr_themes();
+    $corresponsables = $this->get_public_pqr_corresponsables();
+    $corresponsableCandidates = $this->get_public_pqr_corresponsable_candidates();
+
+    $notifOptions = '';
+    foreach ($corresponsableCandidates as $func) {
+      $id = trim((string) ($func['id'] ?? ''));
+      if ($id === '') {
+        continue;
+      }
+      $label = trim((string) ($func['label'] ?? $id));
+      $sel = isset($selectedNotifMap[$id]) ? ' selected' : '';
+      $notifOptions .= '<option value="' . self::h($id) . '"' . $sel . '>' . self::h($label) . '</option>';
+    }
+
+    $buildCorrespOptions = function (array $selectedIds) use ($corresponsableCandidates): string {
+      $selectedCorresponsables = [];
+      foreach ($selectedIds as $idSaved) {
+        $idSaved = trim((string) $idSaved);
+        if ($idSaved !== '') {
+          $selectedCorresponsables[$idSaved] = true;
+        }
+      }
+
+      $options = '';
+      foreach ($corresponsableCandidates as $func) {
+        $id = trim((string) ($func['id'] ?? ''));
+        if ($id === '') {
+          continue;
+        }
+        $label = trim((string) ($func['label'] ?? $id));
+        $selected = isset($selectedCorresponsables[$id]) ? ' selected' : '';
+        $options .= '<option value="' . self::h($id) . '"' . $selected . '>' . self::h($label) . '</option>';
+      }
+
+      return $options;
+    };
+
+    $correspGridHtml = '';
+    foreach ($themes as $theme) {
+      $assignmentValue = is_array($corresponsables[$theme] ?? null) ? $corresponsables[$theme] : [];
+      $generalOptions = $buildCorrespOptions($this->public_pqr_corresponsable_scope_ids($assignmentValue, 'default'));
+      $ownerOptions = $buildCorrespOptions($this->public_pqr_corresponsable_scope_ids($assignmentValue, 'propietario'));
+      $tenantOptions = $buildCorrespOptions($this->public_pqr_corresponsable_scope_ids($assignmentValue, 'arrendatario'));
+      $coproOptions = $buildCorrespOptions($this->public_pqr_corresponsable_scope_ids($assignmentValue, 'copropiedad'));
+      $clientOptions = $buildCorrespOptions($this->public_pqr_corresponsable_scope_ids($assignmentValue, 'cliente'));
+
+      $correspGridHtml .= '<form class="scm-public-pqr-corresponsable-form scm-pqr-config-form scm-dashboard-pqr-config-form" method="post" autocomplete="off">';
+      $correspGridHtml .= '<input type="hidden" name="tema_ayuda" value="' . self::h((string) $theme) . '">';
+      $correspGridHtml .= '<label class="scm-pqr-config-theme">' . self::h((string) $theme) . '</label>';
+      $correspGridHtml .= '<small>General aplica cuando no hay responsable especifico por actor.</small>';
+      $correspGridHtml .= '<label>General</label>';
+      $correspGridHtml .= '<select name="corresponsable_ids[]" class="select select-bordered select-sm scm-select" multiple size="4">' . $generalOptions . '</select>';
+      $correspGridHtml .= '<label>Propietario</label>';
+      $correspGridHtml .= '<select name="corresponsable_actor[propietario][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $ownerOptions . '</select>';
+      $correspGridHtml .= '<label>Arrendatario</label>';
+      $correspGridHtml .= '<select name="corresponsable_actor[arrendatario][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $tenantOptions . '</select>';
+      $correspGridHtml .= '<label>Copropiedad</label>';
+      $correspGridHtml .= '<select name="corresponsable_actor[copropiedad][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $coproOptions . '</select>';
+      $correspGridHtml .= '<label>Cliente</label>';
+      $correspGridHtml .= '<select name="corresponsable_actor[cliente][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $clientOptions . '</select>';
+      $correspGridHtml .= '<small>Ctrl/Command + click para seleccionar varios o quitar seleccion.</small>';
+      $correspGridHtml .= '<div class="scm-pqr-config-actions"><button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Guardar</button><small class="scm-public-pqr-corresponsable-msg" aria-live="polite"></small></div>';
+      $correspGridHtml .= '</form>';
+    }
+
+    if (empty($corresponsableCandidates)) {
+      $correspGridHtml = '<p class="scm-pqr-config-empty">No hay funcionarios disponibles para configurar.</p>';
+    }
+
+    ob_start();
+?>
+    <div id="scm-pqr-settings-modal" class="scm-pqr-settings-modal" data-scm-dashboard-pqr-settings="1" aria-hidden="true">
+      <div class="scm-pqr-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-pqr-settings-title">
+        <button type="button" class="scm-pqr-settings-close" id="scm-close-pqr-settings" aria-label="Cerrar">&times;</button>
+        <div class="scm-pqr-settings-head">
+          <h3 id="scm-pqr-settings-title">Configuraci&oacute;n de Guardian</h3>
+          <p>Define qui&eacute;n recibe notificaciones nuevas y qui&eacute;nes quedan como corresponsables por tipo de solicitud.</p>
+        </div>
+        <section class="scm-pqr-settings-section">
+          <h4>Funcionarios que reciben notificaciones</h4>
+          <p>Recibir&aacute;n WhatsApp y correo cada vez que se cree una solicitud desde Guardian. Puedes seleccionar varios funcionarios.</p>
+          <form class="scm-notif-responsable-form scm-pqr-config-form scm-dashboard-pqr-config-form" method="post" autocomplete="off">
+            <div class="scm-pqr-settings-select-wrap">
+              <select name="notif_responsable_ids[]" class="select select-bordered select-sm scm-select" multiple size="6"><?php echo $notifOptions; ?></select>
+              <small>Ctrl/Command + click para seleccionar o quitar varios funcionarios.</small>
+            </div>
+            <button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Guardar</button>
+            <small class="scm-notif-responsable-msg" aria-live="polite"></small>
+          </form>
+        </section>
+        <section class="scm-pqr-settings-section">
+          <h4>Corresponsables por tipo de solicitud</h4>
+          <p>Puedes seleccionar responsables generales o espec&iacute;ficos por propietario, arrendatario, copropiedad y cliente.</p>
+          <div class="scm-pqr-settings-grid"><?php echo $correspGridHtml; ?></div>
+        </section>
+      </div>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<string,string> $tabs @param array<int,array<string,string>> $cargos @param array<string,array<int,string>> $permissions */
+  private function renderDashboardPermissionsModal(array $tabs, array $cargos, array $permissions): string
+  {
+    ob_start();
+?>
+    <div class="scm-permissions-modal" id="scm-permissions-modal" aria-hidden="true">
+      <div class="scm-permissions-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-permissions-title">
+        <button type="button" class="scm-permissions-close" id="scm-close-permissions" aria-label="Cerrar">&times;</button>
+        <div class="scm-permissions-head">
+          <div>
+            <h3 id="scm-permissions-title">Permisos por cargo</h3>
+            <p>Selecciona qué pestañas puede ver cada cargo. Si un cargo no aparece configurado, seguirá viendo todas las pestañas.</p>
+          </div>
+        </div>
+        <form class="scm-permissions-form" id="scm-permissions-form">
+          <div class="scm-permissions-table-wrap">
+            <table class="scm-permissions-table">
+              <thead>
+                <tr>
+                  <th>Cargo</th>
+                  <?php foreach ($tabs as $tabKey => $tabLabel): ?>
+                    <th><?php echo esc_html($tabLabel); ?></th>
+                  <?php endforeach; ?>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowed = $permissions[$cargoId] ?? array_keys($tabs); ?>
+                  <tr>
+                    <th scope="row">
+                      <span><?php echo esc_html((string)($cargo['label'] ?? ('Cargo ' . $cargoId))); ?></span>
+                      <small>ID cargo: <?php echo esc_html($cargoId); ?></small>
+                    </th>
+                    <?php foreach ($tabs as $tabKey => $tabLabel): ?>
+                      <td>
+                        <label class="scm-permissions-check">
+                          <input type="checkbox" name="permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr($tabKey); ?>" <?php checked(in_array($tabKey, $allowed, true)); ?>>
+                          <span><?php echo esc_html($tabLabel); ?></span>
+                        </label>
+                      </td>
+                    <?php endforeach; ?>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+          <div class="scm-permissions-actions">
+            <p class="scm-permissions-msg" id="scm-permissions-msg" aria-live="polite"></p>
+            <button type="submit" class="scm-btn-primary btn btn-primary">Guardar permisos</button>
+          </div>
+        </form>
+      </div>
+    </div>
+<?php
+    return (string) ob_get_clean();
   }
 
   private function current_employee_id(): string

@@ -8,9 +8,50 @@ use SCM\Core\Auth;
 
 trait HandlesTicketWorkflowActions
 {
+  public function ajax_handler_dashboard_permissions_read(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canManageDashboardPermissions()) {
+      $this->jsonFail('No tienes permiso para configurar pestañas.');
+    }
+
+    $this->jsonOk([
+      'tabs' => $this->dashboardPermissionTabs(),
+      'cargos' => $this->getDashboardCargoOptions(),
+      'permissions' => $this->dashboardPermissionsConfig(),
+    ]);
+  }
+
+  public function ajax_handler_dashboard_permissions_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canManageDashboardPermissions()) {
+      $this->jsonFail('No tienes permiso para configurar pestañas.');
+    }
+
+    $raw = stripslashes((string) ($_POST['permissions'] ?? '{}'));
+    try {
+      $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+    } catch (\JsonException $exception) {
+      $this->jsonFail('La configuracion enviada no es valida.');
+      return;
+    }
+    $permissions = $this->sanitizeDashboardPermissions(is_array($decoded) ? $decoded : []);
+    \SCM\Core\App::settings()->set('dashboard_tab_permissions', $permissions, Auth::userId());
+    \SCM\Core\App::settings()->refresh();
+
+    $this->jsonOk([
+      'message' => 'Permisos de pestañas guardados.',
+      'permissions' => $permissions,
+    ]);
+  }
+
   public function ajax_handler()
   {
     $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('abiertos')) {
+      $this->jsonFail('No tienes permiso para ver esta pestaña.');
+    }
 
     $rawConfig = [];
     if (!empty($_POST['config'])) {
@@ -183,6 +224,9 @@ trait HandlesTicketWorkflowActions
     if ($bucketKey === '' || $topicKey === '') {
       $this->jsonFail('Vista de tickets no reconocida.');
     }
+    if (!$this->canAccessDashboardTab($bucketKey)) {
+      $this->jsonFail('No tienes permiso para ver esta pestaña.');
+    }
 
     $rawConfig = json_decode(stripslashes((string)($_POST['config'] ?? '{}')), true);
     $rawConfig = is_array($rawConfig) ? $rawConfig : [];
@@ -317,7 +361,13 @@ trait HandlesTicketWorkflowActions
     $this->verifyCsrf();
     $scope = sanitize_key($_POST['pending_scope'] ?? $_POST['scope'] ?? '');
     if ($scope === 'contratos_arrendamiento') {
+      if (!$this->canAccessDashboardTab('contratos_arrendamiento')) {
+        $this->jsonFail('No tienes permiso para ver esta pestaña.');
+      }
       $this->respond_contratos_arrendamiento();
+    }
+    if (!$this->canAccessDashboardTab('preventivas_pendientes')) {
+      $this->jsonFail('No tienes permiso para ver esta pestaña.');
     }
 
     $controller = $this->get_pending_controller();
@@ -335,6 +385,9 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_servicios_publicos_pendientes()
   {
     $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('servicios_publicos_pendientes')) {
+      $this->jsonFail('No tienes permiso para ver esta pestaña.');
+    }
     $controller = $this->get_pending_controller();
     $payload = $controller->buildServiciosPublicosPayload($_POST);
     $view = new \SCM\Modules\Pending\PendingView();
@@ -350,6 +403,9 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_reportes_administrativos_pendientes()
   {
     $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('reportes_administrativos_pendientes')) {
+      $this->jsonFail('No tienes permiso para ver esta pestaña.');
+    }
     $controller = $this->get_pending_controller();
     $payload = $controller->buildReportesAdministrativosPayload($_POST);
     $view = new \SCM\Modules\Pending\PendingView();
@@ -363,6 +419,9 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_contratos_arrendamiento(): void
   {
     $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('contratos_arrendamiento')) {
+      $this->jsonFail('No tienes permiso para ver esta pestaña.');
+    }
     $this->respond_contratos_arrendamiento();
   }
 
