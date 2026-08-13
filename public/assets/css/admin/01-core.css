@@ -1674,8 +1674,13 @@ body.scm-modal-open {
 }
 
 #scm-app .scm-ticket-documents-zone {
+  background: #fbfdff;
+  border: 1px dashed #d8e4f2;
+  border-radius: 12px;
   display: grid;
-  gap: 8px;
+  gap: 12px;
+  margin: 14px 0 18px;
+  padding: 14px 16px 16px;
 }
 
 #scm-app .scm-ticket-documents-label {
@@ -1704,14 +1709,14 @@ body.scm-modal-open {
   align-self: flex-start;
   background: #f8fbff;
   border: 1px dashed #b8c7dc;
-  border-radius: 10px;
+  border-radius: 12px;
   color: #284469;
   display: inline-flex;
   font-size: 14px;
   font-weight: 800;
   justify-content: center;
-  min-height: 44px;
-  padding: 0 18px;
+  min-height: 48px;
+  padding: 0 22px;
   width: fit-content;
 }
 
