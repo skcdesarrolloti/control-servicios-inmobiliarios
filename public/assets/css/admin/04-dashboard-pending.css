@@ -361,35 +361,73 @@
   padding: var(--sp-3) var(--sp-2) 0 !important;
 }
 
-#scm-app #scm-panel-mis-tickets,
-#scm-app #scm-panel-actividades-administrativas,
-#scm-app #scm-panel-cotizaciones-mantenimiento {
+#scm-app #scm-panel-mis-tickets {
   padding: var(--sp-4) var(--sp-3) var(--sp-3) !important;
+}
+
+#scm-app #scm-panel-actividades-administrativas {
+  padding: var(--sp-2) var(--sp-2) var(--sp-3) !important;
 }
 
 #scm-app .scm-admin-activities {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
-}
-
-#scm-app .scm-header-admin-activities {
-  margin-bottom: 0 !important;
+  gap: var(--sp-2);
 }
 
 #scm-app .scm-admin-activity-subtabs {
-  background: #eef4fb;
-  border: 1px solid var(--scm-border);
-  border-radius: var(--scm-r-lg);
-  padding: var(--sp-1) !important;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--scm-border);
+  border-radius: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) !important;
+  margin: 0 0 var(--sp-2) !important;
+  padding: 0 0 var(--sp-2) !important;
+}
+
+#scm-app .scm-admin-activity-tab {
+  background: #fff;
+  border: 1px solid #d8e3ef;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  color: #58708b;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  min-height: 42px;
+  padding: 0 18px !important;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, color 0.16s ease;
+}
+
+#scm-app .scm-admin-activity-tab:hover {
+  background: var(--scm-orange-50);
+  border-color: var(--scm-orange-500);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.12);
+  color: var(--scm-orange-700);
+}
+
+#scm-app .scm-admin-activity-tab.active {
+  background: var(--scm-orange-500);
+  border-color: var(--scm-orange-500);
+  box-shadow: none;
+  color: #fff;
 }
 
 #scm-app .scm-admin-activity-panel {
   display: none;
+  padding: 0 !important;
 }
 
 #scm-app .scm-admin-activity-panel.active {
   display: block;
+}
+
+#scm-app .scm-admin-activity-panel > .scm-pending-wrap,
+#scm-app .scm-admin-activity-panel > .scm-cotizaciones-wrap {
+  margin-top: 0 !important;
 }
 
 #scm-app .scm-status-subtabs {

@@ -696,12 +696,6 @@ trait RendersDashboard
 
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-actividades-administrativas' ? ' active' : ''; ?>" id="scm-panel-actividades-administrativas" data-permission-tab="actividades_administrativas">
         <div class="scm-admin-activities">
-          <div class="scm-header scm-header-admin-activities">
-            <div>
-              <h2>Actividades administrativas</h2>
-              <p>Gestiona pendientes administrativos y cotizaciones desde un solo lugar.</p>
-            </div>
-          </div>
           <div class="scm-status-subtabs scm-admin-activity-subtabs" role="tablist" aria-label="Actividades administrativas">
             <?php foreach ($administrativeActivityTabs as $activityTabKey => $activityDef): ?>
               <?php if (!in_array($activityTabKey, $allowedAdministrativeActivityTabs, true)) continue; ?>
