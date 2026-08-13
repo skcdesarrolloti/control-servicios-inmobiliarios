@@ -223,8 +223,6 @@
     });
     iframeEl.src = url;
     function destroyOverlay() {
-      overlay.removeEventListener("click", onOverlayClick);
-      document.removeEventListener("keydown", onKeyDown);
       if (overlay.parentNode) {
         overlay.parentNode.removeChild(overlay);
       }
@@ -232,20 +230,8 @@
         previouslyFocused.focus();
       }
     }
-    function onOverlayClick(e) {
-      if (e.target === overlay) {
-        destroyOverlay();
-      }
-    }
-    function onKeyDown(e) {
-      if (e.key === "Escape") {
-        destroyOverlay();
-      }
-    }
-    overlay.addEventListener("click", onOverlayClick);
     var closeButton = overlay.querySelector(".scm-iframe-close");
     closeButton.addEventListener("click", destroyOverlay);
-    document.addEventListener("keydown", onKeyDown);
     closeButton.focus();
   }
 
@@ -299,11 +285,6 @@
       wrap.setAttribute("aria-hidden", "true");
     }
 
-    wrap.addEventListener("click", function (e) {
-      if (e.target === wrap) {
-        closeSub();
-      }
-    });
     var closeBtn = wrap.querySelector(".scm-case-submodal-close");
     if (closeBtn) {
       closeBtn.addEventListener("click", closeSub);
@@ -1245,10 +1226,11 @@
 
   function renderTicketDocumentFields() {
     return (
-      '<div class="scm-ticket-documents" data-ticket-documents>' +
-      renderTicketDocumentRow() +
-      "</div>" +
-      '<button type="button" class="btn btn-outline btn-sm scm-add-ticket-document" data-add-ticket-document>Agregar otro documento</button>'
+      '<div class="scm-ticket-documents-zone">' +
+      '<div class="scm-ticket-documents-zone-head"><strong>Documentos opcionales</strong><span>Agrega soportes, cotizaciones o facturas solo si aplica.</span></div>' +
+      '<div class="scm-ticket-documents" data-ticket-documents></div>' +
+      '<button type="button" class="btn btn-outline btn-sm scm-add-ticket-document" data-add-ticket-document>Agregar documento</button>' +
+      "</div>"
     );
   }
 
@@ -1689,11 +1671,6 @@
       document.body.classList.remove("scm-modal-open");
     }
 
-    wrap.addEventListener("click", function (e) {
-      if (e.target === wrap) {
-        closeStandaloneDetail();
-      }
-    });
     var closeBtn = wrap.querySelector(".scm-standalone-detail-close");
     if (closeBtn) {
       closeBtn.addEventListener("click", closeStandaloneDetail);

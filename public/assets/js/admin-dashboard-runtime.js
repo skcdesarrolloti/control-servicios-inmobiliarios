@@ -78,7 +78,7 @@
     if (caseModal) {
       caseModal.addEventListener("click", function (e) {
         if (e.target === caseModal) {
-          closeCaseModal(caseModal);
+          e.preventDefault();
         }
       });
     }
@@ -87,22 +87,10 @@
       if (e.key !== "Escape") {
         return;
       }
-      var adminTicketModal = root.querySelector("#scm-admin-ticket-modal.open");
-      if (adminTicketModal) {
-        closeAdminTicketModal();
-        return;
-      }
       var openModal = root.querySelector("#scm-case-modal.open");
-      if (!openModal) {
-        return;
+      if (openModal || root.querySelector("#scm-admin-ticket-modal.open")) {
+        e.preventDefault();
       }
-      var sub = openModal.querySelector(".scm-case-submodal.open");
-      if (sub) {
-        sub.classList.remove("open");
-        sub.setAttribute("aria-hidden", "true");
-        return;
-      }
-      closeCaseModal(openModal);
     });
 
     var ajaxUrl = runtime.ajaxUrl || "";
@@ -240,8 +228,10 @@
         "</div>";
       root.appendChild(modal);
       modal.addEventListener("click", function (e) {
-        if (e.target === modal || e.target.closest("[data-admin-ticket-close]")) {
+        if (e.target.closest("[data-admin-ticket-close]")) {
           closeAdminTicketModal();
+        } else if (e.target === modal) {
+          e.preventDefault();
         }
       });
       return modal;
@@ -599,6 +589,8 @@
             : "Escribe el mensaje o motivo para activar el ticket",
           inputAttributes: { "aria-label": "Mensaje de activacion" },
           showCancelButton: true,
+          allowOutsideClick: false,
+          allowEscapeKey: false,
           confirmButtonText: "Activar",
           cancelButtonText: "Cancelar",
           confirmButtonColor: "#1f4f99",
@@ -2754,6 +2746,8 @@
             '<label class="scm-seg-field"><span>Observaciones</span><textarea id="swal-cot-observacion" class="textarea textarea-bordered" rows="5">Ninguna</textarea></label>',
           width: 620,
           showCancelButton: true,
+          allowOutsideClick: false,
+          allowEscapeKey: false,
           confirmButtonText: "Guardar y enviar",
           cancelButtonText: "Cancelar",
           didOpen: function () {
@@ -2822,6 +2816,8 @@
             '<label class="scm-seg-field"><span>Observaciones a la cotizacion</span><textarea id="swal-del-observacion" class="textarea textarea-bordered" rows="5" placeholder="Por si tiene una observacion con respecto a la cotizacion presentada."></textarea></label>',
           icon: "warning",
           showCancelButton: true,
+          allowOutsideClick: false,
+          allowEscapeKey: false,
           confirmButtonText: "Eliminar cotizacion",
           cancelButtonText: "Cancelar",
           preConfirm: function () {

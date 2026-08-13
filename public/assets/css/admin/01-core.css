@@ -1673,6 +1673,33 @@ body.scm-modal-open {
   box-shadow: 0 0 0 3px var(--scm-accent-glow);
 }
 
+#scm-app .scm-ticket-documents-zone {
+  border: 1px dashed var(--scm-border);
+  border-radius: var(--scm-r-sm);
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+#scm-app .scm-ticket-documents-zone-head {
+  display: grid;
+  gap: 2px;
+}
+
+#scm-app .scm-ticket-documents-zone-head strong {
+  color: var(--scm-text);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-ticket-documents-zone-head span {
+  color: var(--scm-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 #scm-app .scm-ticket-documents {
   display: grid;
   gap: 10px;
