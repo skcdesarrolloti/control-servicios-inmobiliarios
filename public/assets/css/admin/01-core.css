@@ -1690,7 +1690,28 @@ body.scm-modal-open {
   align-items: end;
 }
 
-#scm-app .scm-add-ticket-document,
+#scm-app .scm-add-ticket-document {
+  align-items: center;
+  align-self: flex-start;
+  background: #f8fbff;
+  border: 1px dashed #b8c7dc;
+  border-radius: 10px;
+  color: #284469;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  width: fit-content;
+}
+
+#scm-app .scm-add-ticket-document:hover {
+  background: #eef5ff;
+  border-color: #7c96ba;
+  color: #17365d;
+}
+
 #scm-app .scm-remove-ticket-document {
   width: fit-content;
 }

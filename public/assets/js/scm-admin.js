@@ -1228,7 +1228,7 @@
     return (
       '<div class="scm-ticket-documents-zone" data-ticket-documents-zone>' +
       '<div class="scm-ticket-documents" data-ticket-documents></div>' +
-      '<button type="button" class="btn btn-outline btn-sm scm-add-ticket-document" data-add-ticket-document>Agregar documento</button>' +
+      '<button type="button" class="btn btn-outline scm-add-ticket-document" data-add-ticket-document>+ Agregar documento</button>' +
       "</div>"
     );
   }
