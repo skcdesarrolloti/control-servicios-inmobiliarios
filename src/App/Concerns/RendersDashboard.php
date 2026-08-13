@@ -883,39 +883,34 @@ trait RendersDashboard
         <div class="scm-permissions-head">
           <div>
             <h3 id="scm-permissions-title">Permisos por cargo</h3>
-            <p>Selecciona qué pestañas puede ver cada cargo. Si un cargo no aparece configurado, seguirá viendo todas las pestañas.</p>
+            <p>Activa o desactiva las pesta&ntilde;as que puede ver cada cargo. Si un cargo no aparece configurado, seguir&aacute; viendo todas las pesta&ntilde;as.</p>
           </div>
         </div>
         <form class="scm-permissions-form" id="scm-permissions-form">
-          <div class="scm-permissions-table-wrap">
-            <table class="scm-permissions-table">
-              <thead>
-                <tr>
-                  <th>Cargo</th>
-                  <?php foreach ($tabs as $tabKey => $tabLabel): ?>
-                    <th><?php echo esc_html($tabLabel); ?></th>
+          <div class="scm-permissions-toolbar">
+            <span>Selecciona permisos por cargo</span>
+            <small>Los cambios se aplican al guardar.</small>
+          </div>
+          <div class="scm-permissions-cards">
+            <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowed = $permissions[$cargoId] ?? array_keys($tabs); $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); ?>
+              <section class="scm-permission-card" data-permission-cargo="<?php echo esc_attr($cargoId); ?>">
+                <div class="scm-permission-card-head">
+                  <div>
+                    <h4><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?></h4>
+                    <p>ID cargo <strong><?php echo esc_html($cargoId); ?></strong><?php if ($cargoTotal !== ''): ?> · <?php echo esc_html($cargoTotal); ?> funcionario<?php echo $cargoTotal === '1' ? '' : 's'; ?><?php endif; ?></p>
+                  </div>
+                  <button type="button" class="scm-permission-select-all" data-scm-perm-all="<?php echo esc_attr($cargoId); ?>">Todo</button>
+                </div>
+                <div class="scm-permission-options">
+                  <?php foreach ($tabs as $tabKey => $tabLabel): $isChecked = in_array($tabKey, $allowed, true); ?>
+                    <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>">
+                      <input type="checkbox" name="permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr($tabKey); ?>" <?php checked($isChecked); ?>>
+                      <span><?php echo esc_html($tabLabel); ?></span>
+                    </label>
                   <?php endforeach; ?>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowed = $permissions[$cargoId] ?? array_keys($tabs); ?>
-                  <tr>
-                    <th scope="row">
-                      <span><?php echo esc_html((string)($cargo['label'] ?? ('Cargo ' . $cargoId))); ?></span>
-                      <small>ID cargo: <?php echo esc_html($cargoId); ?></small>
-                    </th>
-                    <?php foreach ($tabs as $tabKey => $tabLabel): ?>
-                      <td>
-                        <label class="scm-permissions-check">
-                          <input type="checkbox" name="permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr($tabKey); ?>" <?php checked(in_array($tabKey, $allowed, true)); ?>>
-                          <span><?php echo esc_html($tabLabel); ?></span>
-                        </label>
-                      </td>
-                    <?php endforeach; ?>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
+                </div>
+              </section>
+            <?php endforeach; ?>
           </div>
           <div class="scm-permissions-actions">
             <p class="scm-permissions-msg" id="scm-permissions-msg" aria-live="polite"></p>

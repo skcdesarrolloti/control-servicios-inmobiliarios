@@ -273,62 +273,165 @@
   padding: 20px 26px 24px;
 }
 
-#scm-app .scm-permissions-table-wrap {
-  overflow: auto;
+#scm-app .scm-permissions-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
   border: 1px solid #dbe6f1;
   border-radius: 14px;
+  background: linear-gradient(135deg, #f8fbff, #eef5fd);
 }
 
-#scm-app .scm-permissions-table {
-  width: 100%;
-  min-width: 920px;
-  border-collapse: collapse;
-  color: #1a2d42;
+#scm-app .scm-permissions-toolbar span {
+  color: #1f3550;
+  font-size: 13px;
+  font-weight: 800;
 }
 
-#scm-app .scm-permissions-table th,
-#scm-app .scm-permissions-table td {
-  padding: 12px;
+#scm-app .scm-permissions-toolbar small {
+  color: #667f9b;
+  font-size: 12px;
+}
+
+#scm-app .scm-permissions-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+#scm-app .scm-permission-card {
+  overflow: hidden;
+  border: 1px solid #dbe6f1;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(28, 55, 86, 0.06);
+}
+
+#scm-app .scm-permission-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 16px;
   border-bottom: 1px solid #e6eef7;
-  text-align: left;
-  vertical-align: top;
+  background: #f8fbff;
 }
 
-#scm-app .scm-permissions-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: #f1f6fb;
-  color: #405a78;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+#scm-app .scm-permission-card-head h4 {
+  margin: 0;
+  color: #10233b;
+  font-size: 15px;
+  line-height: 1.25;
 }
 
-#scm-app .scm-permissions-table tbody th {
-  width: 190px;
-  background: #fbfdff;
+#scm-app .scm-permission-card-head p {
+  margin: 6px 0 0;
+  color: #667f9b;
+  font-size: 12px;
+  font-weight: 600;
 }
 
-#scm-app .scm-permissions-table tbody th span,
-#scm-app .scm-permissions-table tbody th small {
-  display: block;
+#scm-app .scm-permission-card-head p strong {
+  color: #1f4f99;
 }
 
-#scm-app .scm-permissions-table tbody th small {
-  margin-top: 3px;
-  color: #71849b;
-  font-size: 11px;
+#scm-app .scm-permission-select-all {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid #cbd9ea;
+  border-radius: 999px;
+  background: #fff;
+  color: #1f4f99;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#scm-app .scm-permission-select-all:hover {
+  border-color: #1f4f99;
+  background: #eff6ff;
+}
+
+#scm-app .scm-permission-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 14px 16px 16px;
 }
 
 #scm-app .scm-permissions-check {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-width: 145px;
-  color: #243a52;
+  gap: 8px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid #d7e2ee;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #2e455f;
+  cursor: pointer;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 800;
+  line-height: 1.15;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#scm-app .scm-permissions-check:hover {
+  border-color: #9bb7d6;
+  background: #f0f6fc;
+}
+
+#scm-app .scm-permissions-check.is-checked {
+  border-color: rgba(31, 79, 153, 0.38);
+  background: #eaf3ff;
+  color: #123b72;
+  box-shadow: 0 4px 12px rgba(31, 79, 153, 0.08);
+}
+
+#scm-app .scm-permissions-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: #1f4f99;
+}
+
+#scm-app .scm-permissions-check span {
+  max-width: 190px;
+}
+
+@media (max-width: 720px) {
+  #scm-app .scm-permissions-dialog,
+  #scm-app .scm-pqr-settings-dialog {
+    width: 98vw;
+    border-radius: 14px;
+  }
+
+  #scm-app .scm-permissions-head,
+  #scm-app .scm-pqr-settings-head,
+  #scm-app .scm-permissions-form,
+  #scm-app .scm-pqr-settings-section {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  #scm-app .scm-permissions-cards {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-permissions-toolbar,
+  #scm-app .scm-permission-card-head,
+  #scm-app .scm-permissions-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #scm-app .scm-permission-select-all {
+    width: 100%;
+  }
 }
 
 #scm-app .scm-permissions-actions {

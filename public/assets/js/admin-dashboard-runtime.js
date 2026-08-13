@@ -176,6 +176,7 @@
       function openModal() {
         modal.classList.add("open");
         modal.setAttribute("aria-hidden", "false");
+        refreshCardState(form);
       }
       function closeModal() {
         modal.classList.remove("open");
@@ -199,11 +200,66 @@
         msg.textContent = text || "";
         msg.classList.toggle("error", !!isError);
       }
+      function refreshCardState(scope) {
+        var target = scope || form;
+        target.querySelectorAll(".scm-permissions-check").forEach(function (label) {
+          var input = label.querySelector('input[type="checkbox"]');
+          label.classList.toggle("is-checked", !!(input && input.checked));
+        });
+        var cards = [];
+        if (target.classList && target.classList.contains("scm-permission-card")) {
+          cards.push(target);
+        }
+        target.querySelectorAll(".scm-permission-card").forEach(function (card) {
+          cards.push(card);
+        });
+        cards.forEach(function (card) {
+          var checks = Array.prototype.slice.call(
+            card.querySelectorAll('.scm-permissions-check input[type="checkbox"]')
+          );
+          var allChecked = checks.length > 0 && checks.every(function (input) {
+            return input.checked;
+          });
+          var btn = card.querySelector("[data-scm-perm-all]");
+          if (btn) {
+            btn.textContent = allChecked ? "Quitar todo" : "Todo";
+          }
+        });
+      }
 
       openBtn.addEventListener("click", openModal);
       if (closeBtn) closeBtn.addEventListener("click", closeModal);
       modal.addEventListener("click", function (event) {
         if (event.target === modal) closeModal();
+      });
+      form.addEventListener("change", function (event) {
+        var input = event.target;
+        if (input && input.matches && input.matches('.scm-permissions-check input[type="checkbox"]')) {
+          refreshCardState(input.closest(".scm-permission-card") || form);
+        }
+      });
+      form.addEventListener("click", function (event) {
+        var btn = event.target && event.target.closest
+          ? event.target.closest("[data-scm-perm-all]")
+          : null;
+        if (!btn) {
+          return;
+        }
+        var card = btn.closest(".scm-permission-card");
+        if (!card) {
+          return;
+        }
+        var checks = Array.prototype.slice.call(
+          card.querySelectorAll('.scm-permissions-check input[type="checkbox"]')
+        );
+        var shouldCheck = checks.some(function (input) {
+          return !input.checked;
+        });
+        checks.forEach(function (input) {
+          input.checked = shouldCheck;
+        });
+        btn.textContent = shouldCheck ? "Quitar todo" : "Todo";
+        refreshCardState(card);
       });
       form.addEventListener("submit", function (event) {
         event.preventDefault();

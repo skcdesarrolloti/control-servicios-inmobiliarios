@@ -180,16 +180,27 @@ final class SuCasaControlServiciosInmobiliarios
   {
     $cargos = [];
     foreach ($this->dashboardPermissionAdminCargos() as $cargo) {
-      $cargos[$cargo] = ['id' => $cargo, 'label' => 'Cargo ' . $cargo];
+      $cargos[$cargo] = ['id' => $cargo, 'label' => 'Cargo ' . $cargo, 'name' => 'Cargo ' . $cargo, 'total' => ''];
     }
     $table = $this->db->table('jet_cct_funcionarios');
     if ($this->table_exists($table) && $this->column_exists($table, 'id_cargo')) {
+      $cargoTable = $this->db->table('jet_cct_cargos');
+      $hasCargoNames = $this->table_exists($cargoTable)
+        && $this->column_exists($cargoTable, '_ID')
+        && $this->column_exists($cargoTable, 'nombre_cargo');
+      $nameSelect = $hasCargoNames ? "TRIM(COALESCE(c.`nombre_cargo`, ''))" : "''";
+      $joinSql = $hasCargoNames
+        ? " LEFT JOIN `{$cargoTable}` c ON TRIM(COALESCE(f.`id_cargo`, '')) = CAST(c.`_ID` AS CHAR)"
+        : '';
       $rows = $this->db->getResults(
-        "SELECT TRIM(COALESCE(`id_cargo`, '')) AS id_cargo, COUNT(*) AS total
-           FROM `{$table}`
-          WHERE TRIM(COALESCE(`id_cargo`, '')) <> ''
-          GROUP BY TRIM(COALESCE(`id_cargo`, ''))
-          ORDER BY CAST(TRIM(COALESCE(`id_cargo`, '')) AS UNSIGNED), TRIM(COALESCE(`id_cargo`, ''))"
+        "SELECT TRIM(COALESCE(f.`id_cargo`, '')) AS id_cargo,
+                {$nameSelect} AS nombre_cargo,
+                COUNT(*) AS total
+           FROM `{$table}` f
+           {$joinSql}
+          WHERE TRIM(COALESCE(f.`id_cargo`, '')) <> ''
+          GROUP BY TRIM(COALESCE(f.`id_cargo`, '')), {$nameSelect}
+          ORDER BY CAST(TRIM(COALESCE(f.`id_cargo`, '')) AS UNSIGNED), TRIM(COALESCE(f.`id_cargo`, ''))"
       );
       foreach ($rows as $row) {
         $cargo = trim((string) ($row['id_cargo'] ?? ''));
@@ -197,7 +208,14 @@ final class SuCasaControlServiciosInmobiliarios
           continue;
         }
         $total = (int) ($row['total'] ?? 0);
-        $cargos[$cargo] = ['id' => $cargo, 'label' => 'Cargo ' . $cargo . ($total > 0 ? ' (' . $total . ')' : '')];
+        $name = trim((string) ($row['nombre_cargo'] ?? ''));
+        $displayName = $name !== '' ? $name : 'Cargo ' . $cargo;
+        $cargos[$cargo] = [
+          'id' => $cargo,
+          'name' => $displayName,
+          'label' => $displayName . ($total > 0 ? ' (' . $total . ')' : ''),
+          'total' => (string) $total,
+        ];
       }
     }
     ksort($cargos, SORT_NATURAL);
