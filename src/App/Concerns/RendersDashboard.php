@@ -1094,16 +1094,9 @@ trait RendersDashboard
       ];
     }
 
-    $hasCreadorPor = $this->column_exists($table, 'creador_por');
-    $hasCreadoPor = $this->column_exists($table, 'creado_por');
-    $creadorExpr = $hasCreadorPor ? "LOWER(TRIM(COALESCE(`creador_por`, '')))" : "''";
-    $creadoExpr = $hasCreadoPor ? "LOWER(TRIM(COALESCE(`creado_por`, '')))" : "''";
-    if ($hasCreadorPor && $hasCreadoPor) {
-      $webWhere = "(({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario') OR ({$creadorExpr} = '' AND {$creadoExpr} <> '' AND {$creadoExpr} <> 'funcionario'))";
-    } elseif ($hasCreadorPor) {
+    if ($this->column_exists($table, 'creador_por')) {
+      $creadorExpr = "LOWER(TRIM(COALESCE(`creador_por`, '')))";
       $webWhere = "({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario')";
-    } elseif ($hasCreadoPor) {
-      $webWhere = "({$creadoExpr} <> '' AND {$creadoExpr} <> 'funcionario')";
     } else {
       $webWhere = '0 = 1';
     }

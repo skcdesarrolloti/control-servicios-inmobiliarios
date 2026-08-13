@@ -447,6 +447,7 @@ trait GenericEnrichmentConcern
           $row['estado_cotizacion_mantenimiento'] = $cotEstado;
         }
         $cotRespEstado = $this->first_existing_value($cotRow, ['estado_respuesta_cotizacion_mantenimiento', 'estado_respuesta', 'respuesta']);
+        $row['_scm_cot_respuesta_estado'] = $cotRespEstado;
         if ($cotRespEstado !== '' && trim((string) ($row['estado_respuesta_cotizacion_mantenimiento'] ?? '')) === '') {
           $row['estado_respuesta_cotizacion_mantenimiento'] = $cotRespEstado;
         }

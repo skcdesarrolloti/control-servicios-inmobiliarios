@@ -250,16 +250,9 @@ trait RendersPublicPqr
     $selectTipoPqrs = $tipoPqrsExpr . ' AS tipo_pqrs';
 
     $args = [];
-    $hasCreadorPor = $this->column_exists($ticketsTable, 'creador_por');
-    $hasCreadoPor = $this->column_exists($ticketsTable, 'creado_por');
-    $creadorExpr = $hasCreadorPor ? "LOWER(TRIM(COALESCE(`creador_por`, '')))" : "''";
-    $creadoExpr = $hasCreadoPor ? "LOWER(TRIM(COALESCE(`creado_por`, '')))" : "''";
-    if ($hasCreadorPor && $hasCreadoPor) {
-      $whereSql = "(({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario') OR ({$creadorExpr} = '' AND {$creadoExpr} <> '' AND {$creadoExpr} <> 'funcionario'))";
-    } elseif ($hasCreadorPor) {
+    if ($this->column_exists($ticketsTable, 'creador_por')) {
+      $creadorExpr = "LOWER(TRIM(COALESCE(`creador_por`, '')))";
       $whereSql = "({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario')";
-    } elseif ($hasCreadoPor) {
-      $whereSql = "({$creadoExpr} <> '' AND {$creadoExpr} <> 'funcionario')";
     } else {
       $whereSql = '0 = 1';
     }
@@ -709,22 +702,7 @@ trait RendersPublicPqr
         $empActual = 'ID ' . $empIdActual;
       }
 
-      $creadoPor = trim((string) ($row['creado_por'] ?? ''));
-      if ($creadoPor === '') {
-        $creadoPor = trim((string) ($row['creador_por'] ?? ''));
-      }
-      if ($creadoPor === '') {
-        $medio = mb_strtolower(trim((string) ($row['medio'] ?? '')), 'UTF-8');
-        if (strpos($medio, 'propietario') !== false) {
-          $creadoPor = 'Propietario';
-        } elseif (strpos($medio, 'arrendatario') !== false) {
-          $creadoPor = 'Arrendatario';
-        } elseif (strpos($medio, 'copropiedad') !== false) {
-          $creadoPor = 'Copropiedad';
-        } elseif (strpos($medio, 'cliente') !== false) {
-          $creadoPor = 'Cliente';
-        }
-      }
+      $creadoPor = trim((string) ($row['creador_por'] ?? ''));
 
       $fechaRef = $this->parse_unix_ts($row['fecha_ref'] ?? 0);
       $fechaTxt = $this->format_date_time($fechaRef);

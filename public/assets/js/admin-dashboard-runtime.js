@@ -1242,6 +1242,25 @@
         });
     }
 
+    function updateInlineCotizacionResponseFields(scope) {
+      if (!scope) {
+        return;
+      }
+      var select = scope.querySelector("select[name='estado_cotizacion']");
+      if (!select) {
+        return;
+      }
+      var value = String(select.value || "").trim().toLowerCase();
+      var motivoWrap = scope.querySelector(".scm-cotizacion-motivo");
+      var financiacionWrap = scope.querySelector(".scm-cotizacion-financiacion");
+      if (motivoWrap) {
+        motivoWrap.style.display = value === "desaprobada" ? "" : "none";
+      }
+      if (financiacionWrap) {
+        financiacionWrap.style.display = value === "aprobada" ? "" : "none";
+      }
+    }
+
     function getCategoryMetricSet(baseMetrics, key) {
       var details =
         baseMetrics &&
@@ -1563,6 +1582,19 @@
             doFetch(new FormData(form));
           });
         });
+      form.querySelectorAll("select.scm-select").forEach(function (select) {
+        if (
+          select === cotizacionSelect ||
+          select === perPageSelect ||
+          (select.closest && select.closest(".scm-cotizacion-dependent"))
+        ) {
+          return;
+        }
+        select.addEventListener("change", function () {
+          setMantPage(1);
+          doFetch(new FormData(form));
+        });
+      });
     }
 
     if (clearBtn && form) {
@@ -2193,6 +2225,20 @@
             fetchTab(new FormData(tabForm));
           });
         });
+      tabForm.querySelectorAll("select.scm-select").forEach(function (select) {
+        if (
+          select === tabCotizacionSelect ||
+          (select.closest && select.closest(".scm-cotizacion-dependent"))
+        ) {
+          return;
+        }
+        select.addEventListener("change", function () {
+          if (pageInput) {
+            pageInput.value = "1";
+          }
+          fetchTab(new FormData(tabForm));
+        });
+      });
 
       if (tabClear) {
         tabClear.addEventListener("click", function () {
@@ -2401,6 +2447,20 @@
             fetchTab(new FormData(tabForm));
           });
         });
+      tabForm.querySelectorAll("select.scm-select").forEach(function (select) {
+        if (
+          select === tabCotizacionSelect ||
+          (select.closest && select.closest(".scm-cotizacion-dependent"))
+        ) {
+          return;
+        }
+        select.addEventListener("change", function () {
+          if (pageInput) {
+            pageInput.value = "1";
+          }
+          fetchTab(new FormData(tabForm));
+        });
+      });
 
       if (tabPagination) {
         tabPagination.addEventListener("click", function (e) {
@@ -2964,6 +3024,22 @@
 
       var btn = segForm.querySelector("button[type='submit']");
       var msg = segForm.querySelector(".scm-seg-msg");
+      var estadoCotizacion = segForm.querySelector("select[name='estado_cotizacion']");
+      var motivoCotizacion = segForm.querySelector("select[name='motivo_cotizacion']");
+      if (
+        estadoCotizacion &&
+        estadoCotizacion.value === "Desaprobada" &&
+        motivoCotizacion &&
+        !motivoCotizacion.value
+      ) {
+        if (msg) {
+          msg.textContent = "Elige el motivo de la desaprobacion.";
+          msg.classList.add("error");
+        }
+        showToast("error", "Elige el motivo de la desaprobacion.");
+        motivoCotizacion.focus();
+        return;
+      }
       if (btn) {
         btn.disabled = true;
       }
@@ -2996,6 +3072,7 @@
             msg.classList.remove("error");
           }
           segForm.reset();
+          updateInlineCotizacionResponseFields(segForm);
           showToast(
             "success",
             json.data && json.data.message
@@ -3020,6 +3097,20 @@
             btn.disabled = false;
           }
         });
+    });
+
+    root.addEventListener("change", function (e) {
+      var target = e.target;
+      if (
+        target &&
+        target.matches &&
+        target.matches("select[name='estado_cotizacion']")
+      ) {
+        updateInlineCotizacionResponseFields(
+          target.closest("[data-scm-cotizacion-response-fields]") ||
+            target.closest(".scm-seg-form"),
+        );
+      }
     });
 
     root.addEventListener("submit", function (e) {

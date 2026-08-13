@@ -285,6 +285,7 @@ final class GenericTicketsCardView
     $idCorr = trim((string) ($row['id_revision_correctiva'] ?? ''));
     $idCotz = trim((string) ($row['id_cotizacion_mantenimiento'] ?? ''));
     $cotEstadoRaw = trim((string) ($row['_scm_cot_estado'] ?? $row['estado_cotizacion_mantenimiento'] ?? ''));
+    $cotRespuestaEstadoRaw = trim((string) ($row['_scm_cot_respuesta_estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? $row['estado_respuesta'] ?? ''));
     $idEstudioAseguradoraRaw    = trim((string) ($row['id_estudio_aseguradora'] ?? ''));
     $anexosEntregaRaw           = trim((string) ($row['anexos_entrega'] ?? ''));
     $consultorEntregaRaw        = trim((string) ($row['consultor_entrega'] ?? ''));
@@ -324,7 +325,8 @@ final class GenericTicketsCardView
     $prevUrl = ($preventivaBaseUrl !== '' && $prevFirstId !== '') ? esc_url($preventivaBaseUrl . rawurlencode($prevFirstId)) : '';
     $corrUrl = ($correctivaBaseUrl !== '' && $corrFirstId !== '') ? esc_url($correctivaBaseUrl . rawurlencode($corrFirstId)) : '';
     $cotzUrl = ($cotizacionBaseUrl !== '' && $cotzFirstId !== '') ? esc_url($cotizacionBaseUrl . rawurlencode($cotzFirstId)) : '';
-    $cotizacionPendienteRespuesta = $idCotz !== '' && in_array(strtolower($cotEstadoRaw), ['', 'esperando respuesta'], true);
+    $cotEstadoParaRespuesta = $cotRespuestaEstadoRaw !== '' ? $cotRespuestaEstadoRaw : $cotEstadoRaw;
+    $cotizacionPendienteRespuesta = $idCotz !== '' && in_array(strtolower($cotEstadoParaRespuesta), ['', 'esperando respuesta'], true);
 
     $historialItems = is_array($row['_scm_historial_items'] ?? null) ? $row['_scm_historial_items'] : [];
     $seguimientosItems = is_array($row['_scm_seguimientos_ticket'] ?? null) ? $row['_scm_seguimientos_ticket'] : [];
@@ -473,9 +475,6 @@ final class GenericTicketsCardView
   private function ticketOriginIsGuardian(array $row): bool
   {
     $creatorBy = strtolower(trim((string) ($row['creador_por'] ?? '')));
-    if ($creatorBy === '') {
-      $creatorBy = strtolower(trim((string) ($row['creado_por'] ?? '')));
-    }
     return $creatorBy !== '' && $creatorBy !== 'funcionario';
   }
 

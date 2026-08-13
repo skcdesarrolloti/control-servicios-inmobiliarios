@@ -44,6 +44,7 @@ trait TableRowsConcern
       $areaAfectadaRaw = trim((string) ($row['area_afectada'] ?? $row['_scm_cot_area_afectada'] ?? ''));
       $resumenCalculoPerturbacionRaw = trim((string) ($row['resumen_calculo_perturbacion'] ?? $row['_scm_cot_resumen_calculo_perturbacion'] ?? ''));
       $cotEstadoRaw = trim((string) ($row['_scm_cot_estado'] ?? $row['estado_cotizacion_mantenimiento'] ?? ''));
+      $cotRespuestaEstadoRaw = trim((string) ($row['_scm_cot_respuesta_estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? $row['estado_respuesta'] ?? ''));
       $areaAfectadaLabel = $areaAfectadaRaw !== '' ? $areaAfectadaRaw : '-';
       if ($areaAfectadaRaw !== '' && !preg_match('/\bm2\b/i', $areaAfectadaRaw)) {
         $areaAfectadaLabel = $areaAfectadaRaw . ' m2';
@@ -71,7 +72,8 @@ trait TableRowsConcern
 
       $idCotz = trim((string) ($row['id_cotizacion_mantenimiento'] ?? ''));
       $tieneCotz = $idCotz !== '';
-      $cotizacionPendienteRespuesta = $tieneCotz && in_array(strtolower($cotEstadoRaw), ['', 'esperando respuesta'], true);
+      $cotEstadoParaRespuesta = $cotRespuestaEstadoRaw !== '' ? $cotRespuestaEstadoRaw : $cotEstadoRaw;
+      $cotizacionPendienteRespuesta = $tieneCotz && in_array(strtolower($cotEstadoParaRespuesta), ['', 'esperando respuesta'], true);
 
       $idPrev = trim((string) ($row['id_revision_preventiva'] ?? ''));
       $tienePrev = $idPrev !== '';
@@ -266,9 +268,6 @@ trait TableRowsConcern
   private function ticketOriginIsGuardian(array $row): bool
   {
     $creatorBy = strtolower(trim((string) ($row['creador_por'] ?? '')));
-    if ($creatorBy === '') {
-      $creatorBy = strtolower(trim((string) ($row['creado_por'] ?? '')));
-    }
     return $creatorBy !== '' && $creatorBy !== 'funcionario';
   }
 

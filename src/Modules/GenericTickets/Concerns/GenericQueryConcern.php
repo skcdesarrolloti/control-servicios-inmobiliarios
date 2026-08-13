@@ -568,21 +568,11 @@ trait GenericQueryConcern
 
   private function generic_web_origin_expression(string $tabla): string
   {
-    $hasCreadorPor = $this->column_exists($tabla, 'creador_por');
-    $hasCreadoPor = $this->column_exists($tabla, 'creado_por');
-    $creadorExpr = $hasCreadorPor ? "LOWER(TRIM(COALESCE(`creador_por`, '')))" : "''";
-    $creadoExpr = $hasCreadoPor ? "LOWER(TRIM(COALESCE(`creado_por`, '')))" : "''";
-
-    if ($hasCreadorPor && $hasCreadoPor) {
-      return "(({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario') OR ({$creadorExpr} = '' AND {$creadoExpr} <> '' AND {$creadoExpr} <> 'funcionario'))";
+    if (!$this->column_exists($tabla, 'creador_por')) {
+      return '0 = 1';
     }
-    if ($hasCreadorPor) {
-      return "({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario')";
-    }
-    if ($hasCreadoPor) {
-      return "({$creadoExpr} <> '' AND {$creadoExpr} <> 'funcionario')";
-    }
-    return '0 = 1';
+    $creadorExpr = "LOWER(TRIM(COALESCE(`creador_por`, '')))";
+    return "({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario')";
   }
 
   /**

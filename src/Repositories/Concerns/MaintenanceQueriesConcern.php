@@ -527,21 +527,11 @@ trait MaintenanceQueriesConcern
   private function maintenanceWebOriginExpression(string $alias = 't'): string
   {
     $table = $this->ticketsTable();
-    $hasCreadorPor = $this->schema->columnExists($table, 'creador_por');
-    $hasCreadoPor = $this->schema->columnExists($table, 'creado_por');
-    $creadorExpr = $hasCreadorPor ? "LOWER(TRIM(COALESCE({$alias}.`creador_por`, '')))" : "''";
-    $creadoExpr = $hasCreadoPor ? "LOWER(TRIM(COALESCE({$alias}.`creado_por`, '')))" : "''";
-
-    if ($hasCreadorPor && $hasCreadoPor) {
-      return "(({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario') OR ({$creadorExpr} = '' AND {$creadoExpr} <> '' AND {$creadoExpr} <> 'funcionario'))";
+    if (!$this->schema->columnExists($table, 'creador_por')) {
+      return '0 = 1';
     }
-    if ($hasCreadorPor) {
-      return "({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario')";
-    }
-    if ($hasCreadoPor) {
-      return "({$creadoExpr} <> '' AND {$creadoExpr} <> 'funcionario')";
-    }
-    return '0 = 1';
+    $creadorExpr = "LOWER(TRIM(COALESCE({$alias}.`creador_por`, '')))";
+    return "({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario')";
   }
 
   /**

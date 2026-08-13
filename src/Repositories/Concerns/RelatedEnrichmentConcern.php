@@ -123,6 +123,7 @@ trait RelatedEnrichmentConcern
       $row['_scm_cot_area_afectada'] = '';
       $row['_scm_cot_resumen_calculo_perturbacion'] = '';
       $row['_scm_cot_estado'] = '';
+      $row['_scm_cot_respuesta_estado'] = '';
       $row['_scm_cita_cal_fecha'] = 0;
       $row['_scm_acta_fecha'] = 0;
 
@@ -142,6 +143,7 @@ trait RelatedEnrichmentConcern
         }
 
         $cotResp = $this->firstExistingValue($cotRow, ['estado_respuesta_cotizacion_mantenimiento', 'estado_respuesta', 'respuesta']);
+        $row['_scm_cot_respuesta_estado'] = $cotResp;
         if ($cotResp !== '' && trim((string) ($row['estado_respuesta_cotizacion_mantenimiento'] ?? '')) === '') {
           $row['estado_respuesta_cotizacion_mantenimiento'] = $cotResp;
         }
