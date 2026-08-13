@@ -891,6 +891,13 @@
         activeKey = "preventiva";
       } else if (activeKey === "servicios-publicos-pendientes") {
         activeKey = "servicios_publicos_pendientes";
+      } else if (activeKey === "actividades-administrativas" && activePanel) {
+        var activeAdministrativePanel = activePanel.querySelector(
+          ".scm-admin-activity-panel.active",
+        );
+        activeKey = administrativeActivityKeyFromPanelId(
+          activeAdministrativePanel ? activeAdministrativePanel.id : "",
+        );
       }
       if (activeKey === "mant" && form) {
         return doFetch(new FormData(form));
@@ -944,6 +951,22 @@
     root.addEventListener("scm:refresh-active-tab", function () {
       refreshActiveTab();
     });
+
+    function administrativeActivityKeyFromPanelId(panelId) {
+      if (panelId === "scm-panel-cotizaciones-mantenimiento") {
+        return "cotizaciones_mantenimiento";
+      }
+      if (panelId === "scm-panel-preventivas-pendientes") {
+        return "preventivas_pendientes";
+      }
+      if (panelId === "scm-panel-servicios-publicos-pendientes") {
+        return "servicios_publicos_pendientes";
+      }
+      if (panelId === "scm-panel-reportes-administrativos-pendientes") {
+        return "reportes_administrativos_pendientes";
+      }
+      return "";
+    }
 
     function bogotaTodayDate() {
       try {
@@ -2456,6 +2479,7 @@
         : null;
       var tabPanel = tabCards
         ? tabCards.closest(".scm-open-topic-panel") ||
+          tabCards.closest(".scm-admin-activity-panel") ||
           tabCards.closest(".scm-tab-panel")
         : null;
 
@@ -3413,8 +3437,43 @@
       if (activePanel.id === "scm-panel-cotizaciones-mantenimiento") {
         return loadPanelOnce(activePanel, "cotizaciones_mantenimiento");
       }
+      if (activePanel.id === "scm-panel-actividades-administrativas") {
+        var activeAdministrativePanel = activePanel.querySelector(
+          ".scm-admin-activity-panel.active",
+        );
+        var administrativeKey = administrativeActivityKeyFromPanelId(
+          activeAdministrativePanel ? activeAdministrativePanel.id : "",
+        );
+        if (
+          activeAdministrativePanel &&
+          administrativeKey === "cotizaciones_mantenimiento"
+        ) {
+          return loadPanelOnce(activeAdministrativePanel, administrativeKey);
+        }
+      }
       return Promise.resolve();
     }
+
+    root.querySelectorAll(".scm-admin-activity-tab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        var target = tab.getAttribute("data-admin-activity-target") || "";
+        var parentPanel = tab.closest("#scm-panel-actividades-administrativas");
+        if (!target || !parentPanel) {
+          return;
+        }
+        parentPanel
+          .querySelectorAll(".scm-admin-activity-tab")
+          .forEach(function (item) {
+            item.classList.toggle("active", item === tab);
+          });
+        parentPanel
+          .querySelectorAll(".scm-admin-activity-panel")
+          .forEach(function (panel) {
+            panel.classList.toggle("active", panel.id === target);
+          });
+        window.setTimeout(loadActiveLazyPanel, 0);
+      });
+    });
 
     root.querySelectorAll(".scm-open-topic-tab").forEach(function (tab) {
       tab.addEventListener("click", function () {
@@ -3728,7 +3787,14 @@
           closeAdminTicketModal();
 
           var active = root.querySelector(".scm-tab-panel.active");
-          if (active && active.id === "scm-panel-preventivas-pendientes") {
+          var activeAdministrativePanel = active
+            ? active.querySelector(".scm-admin-activity-panel.active")
+            : null;
+          var activePanelId =
+            (activeAdministrativePanel && activeAdministrativePanel.id) ||
+            (active && active.id) ||
+            "";
+          if (activePanelId === "scm-panel-preventivas-pendientes") {
             var sppForm = root.querySelector("#spp_form");
             if (sppForm) {
               sppForm.dispatchEvent(
@@ -3736,7 +3802,7 @@
               );
             }
           }
-          if (active && active.id === "scm-panel-contratos-arrendamiento") {
+          if (activePanelId === "scm-panel-contratos-arrendamiento") {
             root.dispatchEvent(new CustomEvent("scm:contracts-refresh"));
           }
         })

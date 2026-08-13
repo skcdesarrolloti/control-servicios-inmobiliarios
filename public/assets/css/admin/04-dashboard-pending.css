@@ -362,8 +362,34 @@
 }
 
 #scm-app #scm-panel-mis-tickets,
+#scm-app #scm-panel-actividades-administrativas,
 #scm-app #scm-panel-cotizaciones-mantenimiento {
   padding: var(--sp-4) var(--sp-3) var(--sp-3) !important;
+}
+
+#scm-app .scm-admin-activities {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+#scm-app .scm-header-admin-activities {
+  margin-bottom: 0 !important;
+}
+
+#scm-app .scm-admin-activity-subtabs {
+  background: #eef4fb;
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-lg);
+  padding: var(--sp-1) !important;
+}
+
+#scm-app .scm-admin-activity-panel {
+  display: none;
+}
+
+#scm-app .scm-admin-activity-panel.active {
+  display: block;
 }
 
 #scm-app .scm-status-subtabs {

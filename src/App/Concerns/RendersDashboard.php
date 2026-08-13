@@ -94,6 +94,7 @@ trait RendersDashboard
     $serviciosPublicosPendientesHtml = $pendingController->renderServiciosPublicosTab($_GET);
     $reportesAdministrativosPendientesHtml = $pendingController->renderReportesAdministrativosTab();
     $contratosArrendamientoHtml = $pendingController->renderContratosArrendamientoTab();
+    $dashboardPermissionTabs = $this->dashboardPermissionTabs();
     $tabMap = [
       'abiertos' => 'scm-panel-abiertos',
       'abierto' => 'scm-panel-abiertos',
@@ -110,12 +111,52 @@ trait RendersDashboard
       'cotizaciones-mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
       'cotizaciones' => 'scm-panel-cotizaciones-mantenimiento',
       'scm-panel-cotizaciones-mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
+      'actividades_administrativas' => 'scm-panel-actividades-administrativas',
+      'actividades-administrativas' => 'scm-panel-actividades-administrativas',
+      'actividades administrativas' => 'scm-panel-actividades-administrativas',
+      'scm-panel-actividades-administrativas' => 'scm-panel-actividades-administrativas',
       'contratos_arrendamiento' => 'scm-panel-contratos-arrendamiento',
       'contratos-arrendamiento' => 'scm-panel-contratos-arrendamiento',
       'contratos' => 'scm-panel-contratos-arrendamiento',
       'scm-panel-contratos-arrendamiento' => 'scm-panel-contratos-arrendamiento',
+      'preventivas_pendientes' => 'scm-panel-preventivas-pendientes',
+      'preventivas-pendientes' => 'scm-panel-preventivas-pendientes',
+      'revision preventiva pendientes' => 'scm-panel-preventivas-pendientes',
+      'scm-panel-preventivas-pendientes' => 'scm-panel-preventivas-pendientes',
+      'servicios_publicos_pendientes' => 'scm-panel-servicios-publicos-pendientes',
+      'servicios-publicos-pendientes' => 'scm-panel-servicios-publicos-pendientes',
+      'scm-panel-servicios-publicos-pendientes' => 'scm-panel-servicios-publicos-pendientes',
+      'reportes_administrativos_pendientes' => 'scm-panel-reportes-administrativos-pendientes',
+      'reportes-administrativos-pendientes' => 'scm-panel-reportes-administrativos-pendientes',
+      'scm-panel-reportes-administrativos-pendientes' => 'scm-panel-reportes-administrativos-pendientes',
     ];
     $initialTab = $tabMap[$tabKey] ?? '';
+    $administrativeActivityTabs = [
+      'cotizaciones_mantenimiento' => [
+        'panel' => 'scm-panel-cotizaciones-mantenimiento',
+        'label' => $dashboardPermissionTabs['cotizaciones_mantenimiento'] ?? 'Cotizaciones de Mantenimiento',
+      ],
+      'preventivas_pendientes' => [
+        'panel' => 'scm-panel-preventivas-pendientes',
+        'label' => $dashboardPermissionTabs['preventivas_pendientes'] ?? 'Preventivas Pendientes',
+      ],
+      'servicios_publicos_pendientes' => [
+        'panel' => 'scm-panel-servicios-publicos-pendientes',
+        'label' => $dashboardPermissionTabs['servicios_publicos_pendientes'] ?? 'Servicios Publicos Pendientes',
+      ],
+      'reportes_administrativos_pendientes' => [
+        'panel' => 'scm-panel-reportes-administrativos-pendientes',
+        'label' => $dashboardPermissionTabs['reportes_administrativos_pendientes'] ?? 'Reportes Administrativos',
+      ],
+    ];
+    $administrativePanelToTab = [];
+    foreach ($administrativeActivityTabs as $activityTabKey => $activityDef) {
+      $administrativePanelToTab[(string) ($activityDef['panel'] ?? '')] = $activityTabKey;
+    }
+    $initialAdministrativeActivityKey = $administrativePanelToTab[$initialTab] ?? '';
+    if ($initialAdministrativeActivityKey !== '') {
+      $initialTab = 'scm-panel-actividades-administrativas';
+    }
     if ($initialTab === '' && $initialOpenTopic !== '') {
       $initialTab = 'scm-panel-abiertos';
     }
@@ -133,36 +174,56 @@ trait RendersDashboard
     ];
     $webTicketStats = $this->get_web_ticket_statistics();
     $dashboardAllowedTabs = $this->currentDashboardAllowedTabs();
-    $dashboardPermissionTabs = $this->dashboardPermissionTabs();
     $dashboardPermissionConfig = $this->dashboardPermissionsConfig();
     $canManageDashboardPermissions = $this->canManageDashboardPermissions();
     $canManagePublicPqrSettings = $this->canManagePublicPqrSettings();
+    $allowedAdministrativeActivityTabs = [];
+    foreach (array_keys($administrativeActivityTabs) as $activityTabKey) {
+      if (in_array($activityTabKey, $dashboardAllowedTabs, true)) {
+        $allowedAdministrativeActivityTabs[] = $activityTabKey;
+      }
+    }
+    $canAccessAdministrativeActivities = !empty($allowedAdministrativeActivityTabs);
 
     $dashboardPanelToTab = [
       'scm-panel-abiertos' => 'abiertos',
       'scm-panel-postergados' => 'postergados',
       'scm-panel-cerrados' => 'cerrados',
       'scm-panel-mis-tickets' => 'mis_tickets',
-      'scm-panel-cotizaciones-mantenimiento' => 'cotizaciones_mantenimiento',
-      'scm-panel-preventivas-pendientes' => 'preventivas_pendientes',
+      'scm-panel-actividades-administrativas' => 'actividades_administrativas',
       'scm-panel-contratos-arrendamiento' => 'contratos_arrendamiento',
-      'scm-panel-servicios-publicos-pendientes' => 'servicios_publicos_pendientes',
-      'scm-panel-reportes-administrativos-pendientes' => 'reportes_administrativos_pendientes',
       'scm-panel-metricas' => 'metricas',
     ];
     if ($initialTab !== '') {
       $initialTabPermissionKey = $dashboardPanelToTab[$initialTab] ?? '';
-      if ($initialTabPermissionKey !== '' && !in_array($initialTabPermissionKey, $dashboardAllowedTabs, true)) {
+      if ($initialTabPermissionKey === 'actividades_administrativas') {
+        if ($initialAdministrativeActivityKey !== '' && !in_array($initialAdministrativeActivityKey, $allowedAdministrativeActivityTabs, true)) {
+          $initialAdministrativeActivityKey = '';
+        }
+        if (!$canAccessAdministrativeActivities) {
+          $initialTab = '';
+        }
+      } elseif ($initialTabPermissionKey !== '' && !in_array($initialTabPermissionKey, $dashboardAllowedTabs, true)) {
         $initialTab = '';
       }
     }
     if ($initialTab === '') {
       foreach ($dashboardPanelToTab as $panelId => $permissionKey) {
+        if ($permissionKey === 'actividades_administrativas') {
+          if ($canAccessAdministrativeActivities) {
+            $initialTab = $panelId;
+            break;
+          }
+          continue;
+        }
         if (in_array($permissionKey, $dashboardAllowedTabs, true)) {
           $initialTab = $panelId;
           break;
         }
       }
+    }
+    if ($initialAdministrativeActivityKey === '' || !in_array($initialAdministrativeActivityKey, $allowedAdministrativeActivityTabs, true)) {
+      $initialAdministrativeActivityKey = (string) ($allowedAdministrativeActivityTabs[0] ?? '');
     }
 
     $nonce = \SCM\Core\App::csrf()->token(self::NONCE_KEY);
@@ -342,8 +403,16 @@ trait RendersDashboard
       </div>
       <div class="scm-tabs scm-main-tabs">
         <?php foreach ($dashboardPanelToTab as $panelId => $permissionKey): ?>
-          <?php if (!in_array($permissionKey, $dashboardAllowedTabs, true)) continue; ?>
-          <button class="scm-tab<?php echo $initialTab === $panelId ? ' active' : ''; ?>" data-tab="<?php echo esc_attr($panelId); ?>" data-permission-tab="<?php echo esc_attr($permissionKey); ?>" type="button"><?php echo esc_html((string)($dashboardPermissionTabs[$permissionKey] ?? $permissionKey)); ?></button>
+          <?php
+          if ($permissionKey === 'actividades_administrativas') {
+            if (!$canAccessAdministrativeActivities) continue;
+            $tabLabel = 'Actividades administrativas';
+          } else {
+            if (!in_array($permissionKey, $dashboardAllowedTabs, true)) continue;
+            $tabLabel = (string)($dashboardPermissionTabs[$permissionKey] ?? $permissionKey);
+          }
+          ?>
+          <button class="scm-tab<?php echo $initialTab === $panelId ? ' active' : ''; ?>" data-tab="<?php echo esc_attr($panelId); ?>" data-permission-tab="<?php echo esc_attr($permissionKey); ?>" type="button"><?php echo esc_html($tabLabel); ?></button>
         <?php endforeach; ?>
       </div>
 
@@ -613,20 +682,8 @@ trait RendersDashboard
         <?php echo $this->render_my_tickets_panel($myTicketsResult, $myTicketsStats, $myTicketsParams, $filterOptions); ?>
       </div>
 
-      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-preventivas-pendientes' ? ' active' : ''; ?>" id="scm-panel-preventivas-pendientes" data-permission-tab="preventivas_pendientes">
-        <?php echo $preventivasPendientesHtml; ?>
-      </div>
-
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-contratos-arrendamiento' ? ' active' : ''; ?>" id="scm-panel-contratos-arrendamiento" data-permission-tab="contratos_arrendamiento">
         <?php echo $contratosArrendamientoHtml; ?>
-      </div>
-
-      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-servicios-publicos-pendientes' ? ' active' : ''; ?>" id="scm-panel-servicios-publicos-pendientes" data-permission-tab="servicios_publicos_pendientes">
-        <?php echo $serviciosPublicosPendientesHtml; ?>
-      </div>
-
-      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-reportes-administrativos-pendientes' ? ' active' : ''; ?>" id="scm-panel-reportes-administrativos-pendientes" data-permission-tab="reportes_administrativos_pendientes">
-        <?php echo $reportesAdministrativosPendientesHtml; ?>
       </div>
 
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-postergados' ? ' active' : ''; ?>" id="scm-panel-postergados" data-permission-tab="postergados">
@@ -637,8 +694,46 @@ trait RendersDashboard
         <?php echo $this->render_status_bucket_panel('cerrados', $statusBucketDefs['cerrados'], $statusTopicDefs, $statusResults['cerrados'] ?? []); ?>
       </div>
 
-      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-cotizaciones-mantenimiento' ? ' active' : ''; ?>" id="scm-panel-cotizaciones-mantenimiento" data-permission-tab="cotizaciones_mantenimiento">
-        <?php echo $this->render_cotizaciones_mantenimiento_panel($cotizacionesResult, $cotizacionesParams); ?>
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-actividades-administrativas' ? ' active' : ''; ?>" id="scm-panel-actividades-administrativas" data-permission-tab="actividades_administrativas">
+        <div class="scm-admin-activities">
+          <div class="scm-header scm-header-admin-activities">
+            <div>
+              <h2>Actividades administrativas</h2>
+              <p>Gestiona pendientes administrativos y cotizaciones desde un solo lugar.</p>
+            </div>
+          </div>
+          <div class="scm-status-subtabs scm-admin-activity-subtabs" role="tablist" aria-label="Actividades administrativas">
+            <?php foreach ($administrativeActivityTabs as $activityTabKey => $activityDef): ?>
+              <?php if (!in_array($activityTabKey, $allowedAdministrativeActivityTabs, true)) continue; ?>
+              <?php $activityPanelId = (string)($activityDef['panel'] ?? ''); ?>
+              <button class="scm-status-topic-tab scm-admin-activity-tab<?php echo $initialAdministrativeActivityKey === $activityTabKey ? ' active' : ''; ?>" type="button" data-admin-activity-key="<?php echo esc_attr($activityTabKey); ?>" data-admin-activity-target="<?php echo esc_attr($activityPanelId); ?>"><?php echo esc_html((string)($activityDef['label'] ?? $activityTabKey)); ?></button>
+            <?php endforeach; ?>
+          </div>
+
+          <?php if (in_array('cotizaciones_mantenimiento', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'cotizaciones_mantenimiento' ? ' active' : ''; ?>" id="scm-panel-cotizaciones-mantenimiento" data-permission-tab="cotizaciones_mantenimiento" data-admin-activity-panel="cotizaciones_mantenimiento">
+              <?php echo $this->render_cotizaciones_mantenimiento_panel($cotizacionesResult, $cotizacionesParams); ?>
+            </div>
+          <?php endif; ?>
+
+          <?php if (in_array('preventivas_pendientes', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'preventivas_pendientes' ? ' active' : ''; ?>" id="scm-panel-preventivas-pendientes" data-permission-tab="preventivas_pendientes" data-admin-activity-panel="preventivas_pendientes">
+              <?php echo $preventivasPendientesHtml; ?>
+            </div>
+          <?php endif; ?>
+
+          <?php if (in_array('servicios_publicos_pendientes', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'servicios_publicos_pendientes' ? ' active' : ''; ?>" id="scm-panel-servicios-publicos-pendientes" data-permission-tab="servicios_publicos_pendientes" data-admin-activity-panel="servicios_publicos_pendientes">
+              <?php echo $serviciosPublicosPendientesHtml; ?>
+            </div>
+          <?php endif; ?>
+
+          <?php if (in_array('reportes_administrativos_pendientes', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'reportes_administrativos_pendientes' ? ' active' : ''; ?>" id="scm-panel-reportes-administrativos-pendientes" data-permission-tab="reportes_administrativos_pendientes" data-admin-activity-panel="reportes_administrativos_pendientes">
+              <?php echo $reportesAdministrativosPendientesHtml; ?>
+            </div>
+          <?php endif; ?>
+        </div>
       </div>
 
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-dashboard-inline.js?v=' . SCM_VERSION); ?>" defer></script>
@@ -876,6 +971,14 @@ trait RendersDashboard
   /** @param array<string,string> $tabs @param array<int,array<string,string>> $cargos @param array<string,array<int,string>> $permissions */
   private function renderDashboardPermissionsModal(array $tabs, array $cargos, array $permissions): string
   {
+    $activityPermissionKeys = [
+      'cotizaciones_mantenimiento',
+      'preventivas_pendientes',
+      'servicios_publicos_pendientes',
+      'reportes_administrativos_pendientes',
+    ];
+    $mainPermissionTabs = array_diff_key($tabs, array_flip($activityPermissionKeys));
+    $activityPermissionTabs = array_intersect_key($tabs, array_flip($activityPermissionKeys));
     ob_start();
 ?>
     <div class="scm-permissions-modal" id="scm-permissions-modal" aria-hidden="true">
@@ -903,12 +1006,25 @@ trait RendersDashboard
                   <button type="button" class="scm-permission-select-all" data-scm-perm-all="<?php echo esc_attr($cargoId); ?>">Todo</button>
                 </div>
                 <div class="scm-permission-options">
-                  <?php foreach ($tabs as $tabKey => $tabLabel): $isChecked = in_array($tabKey, $allowed, true); ?>
+                  <?php foreach ($mainPermissionTabs as $tabKey => $tabLabel): $isChecked = in_array($tabKey, $allowed, true); ?>
                     <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>">
                       <input type="checkbox" name="permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr($tabKey); ?>" <?php checked($isChecked); ?>>
                       <span><?php echo esc_html($tabLabel); ?></span>
                     </label>
                   <?php endforeach; ?>
+                  <?php if (!empty($activityPermissionTabs)): ?>
+                    <div class="scm-permissions-option-group">
+                      <div class="scm-permissions-option-group-title">Actividades administrativas</div>
+                      <div class="scm-permissions-option-group-grid">
+                        <?php foreach ($activityPermissionTabs as $tabKey => $tabLabel): $isChecked = in_array($tabKey, $allowed, true); ?>
+                          <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>">
+                            <input type="checkbox" name="permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr($tabKey); ?>" <?php checked($isChecked); ?>>
+                            <span><?php echo esc_html($tabLabel); ?></span>
+                          </label>
+                        <?php endforeach; ?>
+                      </div>
+                    </div>
+                  <?php endif; ?>
                 </div>
               </section>
             <?php endforeach; ?>
