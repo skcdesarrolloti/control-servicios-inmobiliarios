@@ -324,6 +324,7 @@ final class GenericTicketsCardView
     $prevUrl = ($preventivaBaseUrl !== '' && $prevFirstId !== '') ? esc_url($preventivaBaseUrl . rawurlencode($prevFirstId)) : '';
     $corrUrl = ($correctivaBaseUrl !== '' && $corrFirstId !== '') ? esc_url($correctivaBaseUrl . rawurlencode($corrFirstId)) : '';
     $cotzUrl = ($cotizacionBaseUrl !== '' && $cotzFirstId !== '') ? esc_url($cotizacionBaseUrl . rawurlencode($cotzFirstId)) : '';
+    $cotizacionPendienteRespuesta = $idCotz !== '' && in_array(strtolower($cotEstadoRaw), ['', 'esperando respuesta'], true);
 
     $historialItems = is_array($row['_scm_historial_items'] ?? null) ? $row['_scm_historial_items'] : [];
     $seguimientosItems = is_array($row['_scm_seguimientos_ticket'] ?? null) ? $row['_scm_seguimientos_ticket'] : [];
@@ -342,7 +343,7 @@ final class GenericTicketsCardView
       $caseSource .= '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">' . $descripcionRaw . '</div></div>';
     }
     $caseSource .= '<div class="scm-modal-timeline-only">' . $timelineHtml . '</div>';
-    $caseSource .= '<div class="scm-seg-wrap">' . (string) call_user_func($this->renderSeguimientoForm, $ticketPk, Auth::isLoggedIn(), $idCotz !== '') . '</div>';
+    $caseSource .= '<div class="scm-seg-wrap">' . (string) call_user_func($this->renderSeguimientoForm, $ticketPk, Auth::isLoggedIn(), $cotizacionPendienteRespuesta) . '</div>';
     $caseSource .= (string) call_user_func($this->renderHistorialBlock, $historialItems);
     $caseSource .= (string) call_user_func($this->renderRecordSection, 'Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);
     $caseSource .= (string) call_user_func($this->renderRecordSection, 'Notas del ticket', $notasItems);

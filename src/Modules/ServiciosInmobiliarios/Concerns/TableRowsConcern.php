@@ -71,6 +71,7 @@ trait TableRowsConcern
 
       $idCotz = trim((string) ($row['id_cotizacion_mantenimiento'] ?? ''));
       $tieneCotz = $idCotz !== '';
+      $cotizacionPendienteRespuesta = $tieneCotz && in_array(strtolower($cotEstadoRaw), ['', 'esperando respuesta'], true);
 
       $idPrev = trim((string) ($row['id_revision_preventiva'] ?? ''));
       $tienePrev = $idPrev !== '';
@@ -164,7 +165,7 @@ trait TableRowsConcern
       $caseSource .= $timeline;
       $caseSource .= '</div>';
       $caseSource .= '<div class="scm-seg-wrap">';
-      $caseSource .= (string) call_user_func($this->seguimientoFormRenderer, $ticketPk, $canSeguimiento, $tieneCotz);
+      $caseSource .= (string) call_user_func($this->seguimientoFormRenderer, $ticketPk, $canSeguimiento, $cotizacionPendienteRespuesta);
       $caseSource .= '</div>';
       $caseSource .= $this->renderHistorialBlock($historialItems);
       $caseSource .= $this->renderRecordSection('Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);

@@ -653,6 +653,7 @@
       subBody.innerHTML = "";
       subBody.appendChild(clone);
       prependCaseLocationPanel(subBody, caseBtn, modal);
+      initCotizacionResponseFields(subBody);
     }
 
     sub.classList.add("open");
@@ -1242,6 +1243,14 @@
     );
   }
 
+  function caseCotizacionCanRespond(caseBtn) {
+    if (!caseHasCotizacion(caseBtn)) {
+      return false;
+    }
+    var cotEstado = (caseBtn.dataset.cotEstado || "").trim().toLowerCase();
+    return cotEstado === "" || cotEstado === "esperando respuesta";
+  }
+
   function renderCotizacionInlineFields(hasCotizacion) {
     if (!hasCotizacion) {
       return '<input type="hidden" name="estado_cotizacion" value="__keep__">';
@@ -1259,6 +1268,37 @@
     );
   }
 
+  function syncCotizacionResponseBox(box) {
+    if (!box) return;
+    var estado = box.querySelector(
+      'select[name="estado_cotizacion"], select[name="estado"]',
+    );
+    var motivoWrap = box.querySelector(".scm-cotizacion-motivo");
+    var motivoInput = box.querySelector(
+      'select[name="motivo_cotizacion"], select[name="motivo"]',
+    );
+    var financiacionWrap = box.querySelector(".scm-cotizacion-financiacion");
+    var financiacionInput = box.querySelector(
+      'select[name="financiacion_cotizacion"], select[name="financiacion"]',
+    );
+    if (
+      !estado ||
+      !motivoWrap ||
+      !motivoInput ||
+      !financiacionWrap ||
+      !financiacionInput
+    ) {
+      return;
+    }
+    var showMotivo = estado.value === "Desaprobada";
+    var showFinanciacion = estado.value === "Aprobada";
+    motivoWrap.style.display = showMotivo ? "" : "none";
+    motivoInput.required = showMotivo;
+    if (!showMotivo) motivoInput.value = "";
+    financiacionWrap.style.display = showFinanciacion ? "" : "none";
+    if (!showFinanciacion) financiacionInput.value = "";
+  }
+
   function initCotizacionResponseFields(scope) {
     if (!scope || !scope.querySelectorAll) return;
     scope
@@ -1267,36 +1307,13 @@
         var estado = box.querySelector(
           'select[name="estado_cotizacion"], select[name="estado"]',
         );
-        var motivoWrap = box.querySelector(".scm-cotizacion-motivo");
-        var motivoInput = box.querySelector(
-          'select[name="motivo_cotizacion"], select[name="motivo"]',
-        );
-        var financiacionWrap = box.querySelector(
-          ".scm-cotizacion-financiacion",
-        );
-        var financiacionInput = box.querySelector(
-          'select[name="financiacion_cotizacion"], select[name="financiacion"]',
-        );
-        if (
-          !estado ||
-          !motivoWrap ||
-          !motivoInput ||
-          !financiacionWrap ||
-          !financiacionInput
-        ) {
-          return;
+        if (estado && !estado.dataset.scmCotizacionBind) {
+          estado.dataset.scmCotizacionBind = "1";
+          estado.addEventListener("change", function () {
+            syncCotizacionResponseBox(box);
+          });
         }
-        function syncCotizacionFields() {
-          var showMotivo = estado.value === "Desaprobada";
-          var showFinanciacion = estado.value === "Aprobada";
-          motivoWrap.style.display = showMotivo ? "" : "none";
-          motivoInput.required = showMotivo;
-          if (!showMotivo) motivoInput.value = "";
-          financiacionWrap.style.display = showFinanciacion ? "" : "none";
-          if (!showFinanciacion) financiacionInput.value = "";
-        }
-        estado.addEventListener("change", syncCotizacionFields);
-        syncCotizacionFields();
+        syncCotizacionResponseBox(box);
       });
   }
 
@@ -1319,7 +1336,7 @@
         '<option value="__keep__">Sin cambio</option><option value="Nuevo">Nuevo</option><option value="Por inspecccionar">Por inspecccionar</option><option value="Inspeccionado">Inspeccionado</option><option value="Cotizado">Cotizado</option><option value="En ejecucion por inmobiliaria">En ejecucion por inmobiliaria</option><option value="En ejecucion por propietario">En ejecucion por propietario</option><option value="En ejecucion por arrendatario">En ejecucion por arrendatario</option><option value="En ejecucion por copropiedad">En ejecucion por copropiedad</option><option value="Finalizado">Finalizado</option><option value="Trasladado">Trasladado</option><option value="Entregado">Entregado</option><option value="Recibido">Recibido</option><option value="Desistido">Desistido</option>' +
         "</select></label>" +
         '<label class="scm-seg-field"><span>Respuesta</span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
-        renderCotizacionInlineFields(!isPublicPqr && caseHasCotizacion(caseBtn)) +
+        renderCotizacionInlineFields(!isPublicPqr && caseCotizacionCanRespond(caseBtn)) +
         '<label class="scm-seg-field"><span>Imagenes (opcional)</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
         renderPasteEvidenceBox("imagen[]") +
         renderTicketDocumentFields() +
@@ -2638,6 +2655,21 @@
       });
     }
     event.preventDefault();
+  });
+
+  document.addEventListener("change", function (event) {
+    var target = event.target;
+    if (
+      !target ||
+      !target.matches ||
+      !target.matches('select[name="estado_cotizacion"], select[name="estado"]')
+    ) {
+      return;
+    }
+    var box = target.closest("[data-scm-cotizacion-response-fields]");
+    if (box) {
+      syncCotizacionResponseBox(box);
+    }
   });
 
   window.SCMAdminCore = {
