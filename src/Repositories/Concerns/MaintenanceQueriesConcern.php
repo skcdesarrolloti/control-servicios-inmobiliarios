@@ -349,6 +349,7 @@ trait MaintenanceQueriesConcern
       'respuesta',
       'observacion',
       'estado',
+      'creador_por',
       'tema_ayuda',
       'prioridad',
       'fecha',
