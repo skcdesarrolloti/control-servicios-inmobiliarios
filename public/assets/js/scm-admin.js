@@ -2219,7 +2219,7 @@
             caseActionsHtml +=
               '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar solicitud</button>';
             caseActionsHtml +=
-              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder solicitud / enviar correo</button>';
+              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder solicitud</button>';
             caseActionsHtml +=
               '<button type="button" class="scm-case-work-btn" data-scm-close-ticket>Cerrar solicitud</button>';
           }
@@ -2248,7 +2248,7 @@
         }
         if (!isPublicPqr) {
           caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder ticket / enviar correo</button>';
+            '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder ticket</button>';
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>';
         }
