@@ -569,17 +569,7 @@
   }
 
   function prependCaseLocationPanel(container, caseBtn, fallbackNode) {
-    if (!container) {
-      return;
-    }
-    var existing = container.querySelector(".scm-case-location-panel");
-    if (existing) {
-      existing.remove();
-    }
-    container.insertAdjacentHTML(
-      "afterbegin",
-      renderCaseLocationPanel(caseBtn, fallbackNode, true),
-    );
+    return;
   }
 
   function renderPropertyLocationEditorHtml(caseBtn, fallbackNode) {
@@ -2197,7 +2187,7 @@
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-view-contacts>Ver contactos</button>';
           caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-view-property-map>Ver mapa del inmueble</button>';
+            '<button type="button" class="scm-case-work-btn" data-scm-view-property-map>Ubicaci&oacute;n del inmueble</button>';
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>';
           caseActionsHtml +=
@@ -2271,7 +2261,6 @@
             escHtml(btn.dataset.ticketPk || "") +
             '">Editar magnitud caso</button>' +
             "</div>";
-          sidebarHtml += renderCaseLocationPanel(btn, modal, false);
         }
         var tabKeySide = (btn.dataset.tabKey || "").trim();
         var consultorEntrega = (btn.dataset.consultorEntrega || "").trim();
