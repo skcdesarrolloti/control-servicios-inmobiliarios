@@ -287,14 +287,48 @@ body {
 
         .scm-pqr-transfer-title,
         .scm-public-iframe-title {
-          margin: 0 40px 12px 0;
+          flex: 1;
+          min-width: 0;
+          margin: 0;
           font-size: 18px;
           color: #17304d;
         }
 
+        .scm-public-iframe-header {
+          min-height: 42px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin: 0 44px 12px 0;
+        }
+
+        .scm-public-iframe-open-tab {
+          min-height: 38px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 14px;
+          border: 1px solid #c9d8e8;
+          border-radius: 10px;
+          background: #f2f7fd;
+          color: #17304d;
+          font-size: 13px;
+          font-weight: 800;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+
+        .scm-public-iframe-open-tab:hover,
+        .scm-public-iframe-open-tab:focus-visible {
+          background: #e7f0fb;
+          border-color: #9fb7d2;
+          color: #0f2742;
+        }
+
         .scm-public-iframe-frame {
           width: 100%;
-          height: calc(100% - 40px);
+          height: calc(100% - 54px);
           border: 1px solid #d6e2ef;
           border-radius: 12px;
           background: #fff;
@@ -312,6 +346,16 @@ body {
 
           .scm-public-header h1 {
             font-size: 32px;
+          }
+
+          .scm-public-iframe-header {
+            align-items: stretch;
+            flex-direction: column;
+            margin-right: 44px;
+          }
+
+          .scm-public-iframe-open-tab {
+            width: 100%;
           }
 
           .scm-public-header p {

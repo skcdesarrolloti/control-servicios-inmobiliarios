@@ -69,7 +69,10 @@
               '<div class="scm-public-iframe-backdrop" data-close-public-iframe="1"></div>' +
               '<div class="scm-public-iframe-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-public-iframe-title">' +
               '<button type="button" class="scm-public-iframe-close" data-close-public-iframe="1" aria-label="Cerrar">&times;</button>' +
+              '<div class="scm-public-iframe-header">' +
               '<h4 id="scm-public-iframe-title" class="scm-public-iframe-title">Solicitud</h4>' +
+              '<a class="scm-public-iframe-open-tab" href="#" target="_blank" rel="noopener noreferrer">Abrir en nueva pesta&ntilde;a</a>' +
+              '</div>' +
               '<iframe class="scm-public-iframe-frame" src="about:blank" loading="lazy"></iframe>' +
               '</div>';
             document.body.appendChild(modal);
@@ -97,7 +100,9 @@
             var modal = ensureIframeModal();
             var title = modal.querySelector('.scm-public-iframe-title');
             var iframe = modal.querySelector('iframe.scm-public-iframe-frame');
+            var openTabLink = modal.querySelector('.scm-public-iframe-open-tab');
             if (title) title.textContent = titleText;
+            if (openTabLink) openTabLink.setAttribute('href', url);
             if (iframe) iframe.src = url;
             modal.classList.add('open');
           }

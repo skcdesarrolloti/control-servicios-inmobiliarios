@@ -192,7 +192,10 @@
       '<span class="scm-iframe-toolbar-title">' +
       escHtml(title) +
       "</span>" +
+      '<div class="scm-iframe-toolbar-actions">' +
+      '<a class="scm-iframe-open-tab" href="#" target="_blank" rel="noopener noreferrer">Abrir en nueva pesta&ntilde;a</a>' +
       '<button type="button" class="scm-iframe-close" aria-label="Cerrar">&times;</button>' +
+      "</div>" +
       "</div>" +
       '<div class="scm-iframe-loader"><div class="scm-iframe-spinner"></div></div>' +
       '<iframe class="scm-iframe-frame" src="" allowfullscreen></iframe>' +
@@ -200,6 +203,10 @@
     document.body.appendChild(overlay);
     var iframeEl = overlay.querySelector(".scm-iframe-frame");
     var loaderEl = overlay.querySelector(".scm-iframe-loader");
+    var openTabLink = overlay.querySelector(".scm-iframe-open-tab");
+    if (openTabLink) {
+      openTabLink.setAttribute("href", url);
+    }
     iframeEl.addEventListener("load", function () {
       if (compactMode) {
         try {
