@@ -477,10 +477,28 @@ final class GuideModalView
         'contenido' => '<strong>Definición:</strong> Valoración económica (mano de obra, materiales, etc.).<br><br><strong>Política:</strong> Discriminar actividades detalladamente y anexar cotizaciones de proveedores.',
       ],
       [
-        'titulo'    => 'En ejecución',
+        'titulo'    => 'En ejecución por inmobiliaria',
         'icono'     => 'fa-tools',
         'color'     => 'scm-gc-orange',
-        'contenido' => '<strong>Definición:</strong> Asignación del trabajo de reparación.<br><br><strong>Política:</strong> 1. Seguimiento con fotos. 2. Si el propietario realiza la reparación, estar pendiente para acta de satisfacción.',
+        'contenido' => '<strong>Definición:</strong> La inmobiliaria gestiona directamente la reparación o actividad pendiente.<br><br><strong>Política:</strong> Registrar seguimientos con fotos, avances, proveedor asignado y fecha estimada de cierre.',
+      ],
+      [
+        'titulo'    => 'En ejecución por propietario',
+        'icono'     => 'fa-user-tie',
+        'color'     => 'scm-gc-blue',
+        'contenido' => '<strong>Definición:</strong> El propietario asumió la ejecución de la reparación o actividad pendiente.<br><br><strong>Política:</strong> Hacer seguimiento al propietario, solicitar soportes/fotos y validar terminación antes del acta de satisfacción.',
+      ],
+      [
+        'titulo'    => 'En ejecución por arrendatario',
+        'icono'     => 'fa-user-check',
+        'color'     => 'scm-gc-indigo',
+        'contenido' => '<strong>Definición:</strong> El arrendatario asumió la ejecución de la reparación o actividad pendiente.<br><br><strong>Política:</strong> Dejar evidencia de autorización, responsable, soportes y validación final para evitar reprocesos.',
+      ],
+      [
+        'titulo'    => 'En ejecución por copropiedad',
+        'icono'     => 'fa-building',
+        'color'     => 'scm-gc-teal',
+        'contenido' => '<strong>Definición:</strong> La solución depende de la copropiedad, administración del edificio o zona común.<br><br><strong>Política:</strong> Registrar radicados, contactos, respuestas de administración y fechas de seguimiento hasta cierre.',
       ],
       [
         'titulo'    => 'Finalizado',
