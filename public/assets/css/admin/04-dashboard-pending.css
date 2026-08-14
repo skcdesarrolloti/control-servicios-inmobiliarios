@@ -1034,6 +1034,31 @@
   text-align: left;
 }
 
+.swal2-popup .scm-calendar-reschedule-form {
+  grid-template-columns: 1fr;
+}
+
+.swal2-popup .scm-calendar-reschedule-summary {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+}
+
+.swal2-popup .scm-calendar-reschedule-summary strong {
+  color: #0f2742;
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.swal2-popup .scm-calendar-reschedule-summary span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .swal2-popup .scm-calendar-popup-grid {
   align-content: start;
   background: #fff;

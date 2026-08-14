@@ -273,10 +273,67 @@
         if (current) select.value = current;
       }
 
+      function calendarCategoryLabel(row) {
+        return String((row && (row.nombre || row.categoria || row.name || row.id || row._ID || row.id_categoria)) || "").trim();
+      }
+
+      function isAdministrativeCalendarCategory(row) {
+        var name = normalizeText(calendarCategoryLabel(row));
+        if (!name) return false;
+        var commercialTerms = [
+          "comercial",
+          "captacion",
+          "captado",
+          "recaptado",
+          "prospect",
+          "mostrando",
+          "contactado",
+          "entregado",
+          "por publicar",
+          "publicar",
+          "en cierre",
+          "en busqueda",
+          "venta",
+          "banco",
+          "aseguradora",
+        ];
+        if (commercialTerms.some(function (term) { return name.indexOf(term) !== -1; })) return false;
+        var adminTerms = [
+          "administr",
+          "preventiva",
+          "correctiva",
+          "revision",
+          "mantenimiento",
+          "servicio",
+          "cita",
+          "inspeccion",
+          "contrato",
+          "inmueble",
+          "pendiente",
+          "visita",
+          "recibo",
+        ];
+        return adminTerms.some(function (term) { return name.indexOf(term) !== -1; });
+      }
+
+      function calendarAdminCategories() {
+        var rows = categories.filter(isAdministrativeCalendarCategory);
+        return rows.length ? rows : categories;
+      }
+
       function formatDateTime(value) {
         var raw = String(value || "").replace("T", " ");
         if (!raw) return "-";
         return raw.replace(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2}).*$/, "$3/$2/$1 $4");
+      }
+
+      function datePartFromDateTime(value) {
+        return String(value || "").replace("T", " ").slice(0, 10);
+      }
+
+      function timePartFromDateTime(value) {
+        var match = String(value || "").replace("T", " ").match(/\s(\d{2}:\d{2})/);
+        return match ? match[1] : "";
       }
 
       function toDateKey(date) {
@@ -420,6 +477,25 @@
           ". En caso de no ser posible contar con su atención en la fecha indicada, le agradecemos nos lo comunique por este mismo medio con al menos 3 horas de antelación.";
       }
 
+      function buildRescheduleDescription(title, dateValue, startValue, endValue, observation) {
+        if (!title || !dateValue || !startValue || !endValue) return "";
+        return "Por medio de la presente, se informa que la cita " +
+          title +
+          " fue reprogramada para el día " +
+          formatDateForMessage(dateValue) +
+          ", de " +
+          formatTimeForMessage(startValue) +
+          " a " +
+          formatTimeForMessage(endValue) +
+          "." +
+          (observation ? "\n\nMotivo: " + observation : "");
+      }
+
+      function isCalendarAppointmentCategoryName(categoryName) {
+        var name = normalizeText(categoryName);
+        return name.indexOf("preventiva") !== -1 || name.indexOf("correctiva") !== -1;
+      }
+
       function extractRows(payload) {
         if (Array.isArray(payload)) return payload;
         if (!payload) return [];
@@ -448,7 +524,7 @@
           if (id) used[id] = true;
         });
         var hasUsed = Object.keys(used).length > 0;
-        var available = categories.filter(function (row) {
+        var available = calendarAdminCategories().filter(function (row) {
           var id = String(row.id || row._ID || row.id_categoria || "").trim();
           return !hasUsed || !!used[id] || id === current;
         });
@@ -492,6 +568,7 @@
           '<div class="scm-calendar-event-actions">' +
           (eventoUrl ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' + escHtml(eventoUrl) + '" data-iframe-title="Evento #' + escHtml(id) + '">Ver evento</button>' : "") +
           (ticketUrl ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' + escHtml(ticketUrl) + '" data-iframe-title="Ticket #' + escHtml(ticket) + '">Ver ticket</button>' : "") +
+          (id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar evento</button>' : "") +
           "</div></div></article>";
       }
 
@@ -894,9 +971,9 @@
 
       function reportCategoryOptionsHtml(current) {
         current = String(current || "");
-        return '<option value="">Todas las categor&iacute;as</option>' + categories.map(function (row) {
+        return '<option value="">Todas las categor&iacute;as</option>' + calendarAdminCategories().map(function (row) {
           var id = String(row.id || row._ID || row.id_categoria || "").trim();
-          var name = String(row.nombre || row.categoria || id).trim();
+          var name = calendarCategoryLabel(row) || id;
           return id ? '<option value="' + escHtml(id) + '"' + (id === current ? " selected" : "") + '>' + escHtml(name) + "</option>" : "";
         }).join("");
       }
@@ -1052,13 +1129,135 @@
         });
       }
 
+      function calendarEventById(id) {
+        id = String(id || "").trim();
+        if (!id) return null;
+        return calendarEvents.find(function (row) {
+          return String(row.id || row._ID || row.event_id || "").trim() === id;
+        }) || null;
+      }
+
+      function openRescheduleEventPopup(eventId) {
+        if (!window.Swal || typeof window.Swal.fire !== "function") {
+          showToast("error", "No esta disponible el popup para trasladar eventos.");
+          return;
+        }
+        var row = calendarEventById(eventId);
+        if (!row) {
+          showToast("error", "No encontre el evento seleccionado.");
+          return;
+        }
+        var title = String(row.titulo || row.title || "Evento #" + eventId).trim();
+        var categoryName = categoryNameForRow(row);
+        var dateValue = datePartFromDateTime(row.fecha_inicio) || selectedDay || toDateKey(new Date());
+        var startValue = timePartFromDateTime(row.fecha_inicio);
+        var endValue = timePartFromDateTime(row.fecha_fin);
+        var ticket = String(row.id_ticket || "").trim();
+        var html = '<form class="scm-calendar-popup-form scm-calendar-reschedule-form" autocomplete="off">' +
+          '<div class="scm-calendar-reschedule-summary">' +
+          '<strong>' + escHtml(title) + '</strong>' +
+          '<span>' + escHtml(categoryName) + (ticket ? " · Ticket #" + escHtml(ticket) : "") + '</span>' +
+          '</div>' +
+          '<div class="scm-calendar-popup-grid">' +
+          '<label class="scm-seg-field"><span>Nueva fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + escHtml(dateValue) + '"></label>' +
+          '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required value="' + escHtml(startValue) + '"></label>' +
+          '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required value="' + escHtml(endValue) + '"></label>' +
+          '<label class="scm-seg-field"><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="si"' + (ticket ? " selected" : "") + '>Si</option><option value="no"' + (!ticket ? " selected" : "") + '>No</option></select></label>' +
+          '<label class="scm-seg-field scm-calendar-field-full"><span>Motivo del traslado</span><textarea class="textarea textarea-bordered scm-input" name="observacion" rows="3" required placeholder="Explica por qu&eacute; se traslada este evento..."></textarea></label>' +
+          '<label class="scm-seg-field scm-calendar-field-full"><span>Mensaje para el ticket</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="5" placeholder="Este texto se enviar&aacute; al proceso del ticket si el evento est&aacute; relacionado."></textarea><small>Si es una cita preventiva o correctiva, el texto se genera autom&aacute;ticamente y puedes editarlo.</small></label>' +
+          '</div></form>';
+        window.Swal.fire({
+          title: "Trasladar evento",
+          html: html,
+          width: 760,
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-reschedule-swal" },
+          showCancelButton: true,
+          confirmButtonText: "Guardar traslado",
+          cancelButtonText: "Cerrar",
+          focusConfirm: false,
+          didOpen: function () {
+            var popup = window.Swal.getPopup();
+            var form = popup ? popup.querySelector(".scm-calendar-reschedule-form") : null;
+            if (!form) return;
+            var dateInput = form.querySelector('[name="fecha"]');
+            var startInput = form.querySelector('[name="hora_inicio"]');
+            var endInput = form.querySelector('[name="hora_fin"]');
+            var citaSelect = form.querySelector('[name="es_cita"]');
+            var observationInput = form.querySelector('[name="observacion"]');
+            var descriptionInput = form.querySelector('[name="descripcion"]');
+            function maybeAutofillRescheduleDescription() {
+              if (!descriptionInput || !dateInput || !startInput || !endInput) return;
+              if (!ticket || !isCalendarAppointmentCategoryName(categoryName) || (citaSelect && citaSelect.value !== "si")) return;
+              if (descriptionInput.value && descriptionInput.getAttribute("data-auto-calendar-text") !== "1") return;
+              descriptionInput.value = buildRescheduleDescription(title, dateInput.value, startInput.value, endInput.value, observationInput ? observationInput.value.trim() : "");
+              descriptionInput.setAttribute("data-auto-calendar-text", "1");
+            }
+            [dateInput, startInput, endInput, citaSelect, observationInput].forEach(function (field) {
+              if (field) field.addEventListener("input", maybeAutofillRescheduleDescription);
+              if (field) field.addEventListener("change", maybeAutofillRescheduleDescription);
+            });
+            if (descriptionInput) {
+              descriptionInput.addEventListener("input", function () {
+                descriptionInput.setAttribute("data-auto-calendar-text", "0");
+              });
+            }
+            maybeAutofillRescheduleDescription();
+          },
+          preConfirm: function () {
+            var popup = window.Swal.getPopup();
+            var form = popup ? popup.querySelector(".scm-calendar-reschedule-form") : null;
+            if (!form) {
+              window.Swal.showValidationMessage("No se encontro el formulario.");
+              return false;
+            }
+            var fd = new FormData(form);
+            var date = String(fd.get("fecha") || "");
+            var start = String(fd.get("hora_inicio") || "");
+            var end = String(fd.get("hora_fin") || "");
+            var err = validateCalendarEventTimes(date, start, end);
+            if (err) {
+              window.Swal.showValidationMessage(err);
+              return false;
+            }
+            var observation = String(fd.get("observacion") || "").trim();
+            if (!observation) {
+              window.Swal.showValidationMessage("Escribe el motivo del traslado.");
+              return false;
+            }
+            var payload = {
+              id_evento: eventId,
+              fecha_inicio: date + " " + start + ":00",
+              fecha_fin: date + " " + end + ":00",
+              observacion: observation,
+              es_cita: String(fd.get("es_cita") || "no"),
+              descripcion: String(fd.get("descripcion") || "").trim(),
+            };
+            if (ticket && payload.es_cita === "si" && !payload.descripcion) {
+              payload.descripcion = buildRescheduleDescription(title, date, start, end, observation);
+            }
+            window.Swal.showLoading();
+            return calendarApi("trasladar_evento", payload).then(function (json) {
+              if (!json || !json.success) throw new Error((json && json.message) || "No se pudo trasladar el evento.");
+              return json;
+            }).catch(function (err2) {
+              window.Swal.showValidationMessage(err2.message || "No se pudo trasladar el evento.");
+              return false;
+            });
+          },
+        }).then(function (result) {
+          if (!result.isConfirmed || !result.value) return;
+          showToast("success", result.value.message || "Evento trasladado.");
+          loadEvents();
+        });
+      }
+
       function openCreateEventPopup(mode) {
         mode = mode === "multiple" ? "multiple" : "single";
         var preselectedEmployee = selectedEmployeeFromFilter();
         var employeeOptions = allowedEmployees.map(function (row) { return employeeOptionHtml(row, preselectedEmployee); }).join("");
-        var categoryOptions = categories.map(function (row) {
-          var id = String(row.id || row._ID || "").trim();
-          var name = String(row.nombre || row.categoria || id).trim();
+        var categoryOptions = calendarAdminCategories().map(function (row) {
+          var id = String(row.id || row._ID || row.id_categoria || "").trim();
+          var name = calendarCategoryLabel(row) || id;
           return id ? '<option value="' + escHtml(id) + '">' + escHtml(name) + "</option>" : "";
         }).join("");
         var employeesControl = mode === "multiple"
@@ -1192,6 +1391,16 @@
             }
             function maybeAutofillPreventiveDescription() {
               if (!categorySelect || !dateInput || !startInput || !endInput || !descriptionInput) return;
+              var selectedOption = categorySelect.options[categorySelect.selectedIndex];
+              var categoryName = selectedOption ? selectedOption.textContent : "";
+              if (!isCalendarAppointmentCategoryName(categoryName)) return;
+              if (relatedTicketSelect && relatedTicketSelect.value !== "si") {
+                relatedTicketSelect.value = "si";
+                applyRelatedTicketVisibility();
+              }
+              if (citaSelect && citaSelect.value !== "si") {
+                citaSelect.value = "si";
+              }
               if (isTicketRelated() && citaSelect && citaSelect.value !== "si") {
                 if (descriptionInput.getAttribute("data-auto-calendar-text") === "1") {
                   descriptionInput.value = "";
@@ -1199,9 +1408,7 @@
                 }
                 return;
               }
-              var selectedOption = categorySelect.options[categorySelect.selectedIndex];
-              var categoryName = selectedOption ? selectedOption.textContent : "";
-              if (normalizeText(categoryName).indexOf("preventiva") === -1) return;
+              maybeAutofillTitleAndLocation(false);
               if (!dateInput.value || !startInput.value || !endInput.value) return;
               if (descriptionInput.value && descriptionInput.getAttribute("data-auto-calendar-text") !== "1") return;
               descriptionInput.value = buildPreventiveDescription(categoryName, dateInput.value, startInput.value, endInput.value);
@@ -1456,7 +1663,7 @@
           if (id) categoriesById[id] = row;
         });
         fillEmployeeOptions(Array.prototype.slice.call(panel.querySelectorAll("[data-scm-calendar-filter-employees]")), funcionarios, "Selecciona funcionario");
-        fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), categories, "Todas");
+        fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), calendarAdminCategories(), "Todas");
       }).finally(loadEvents);
 
       if (filterForm) {
@@ -1481,6 +1688,13 @@
 
       var reportBtn = panel.querySelector("[data-scm-calendar-open-report]");
       if (reportBtn) reportBtn.addEventListener("click", openCalendarReport);
+
+      panel.addEventListener("click", function (e) {
+        var rescheduleBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-reschedule-event]") : null;
+        if (!rescheduleBtn || !panel.contains(rescheduleBtn)) return;
+        e.preventDefault();
+        openRescheduleEventPopup(rescheduleBtn.getAttribute("data-event-id") || "");
+      });
 
       var openEmployeeCalendarBtn = panel.querySelector("[data-scm-calendar-open-employee]");
       if (openEmployeeCalendarBtn) {
