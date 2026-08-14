@@ -798,28 +798,6 @@
         return "";
       }
 
-      function isCustomerServiceTicket(ticket) {
-        return normalizeText(ticket && ticket.departamento).indexOf("servicio al cliente") !== -1;
-      }
-
-      function estadoComercialOptionsHtml() {
-        return [
-          "Contactado",
-          "En busqueda",
-          "En cierre",
-          "En estudio",
-          "Prospectado",
-          "Mostrando",
-          "En ruta",
-          "Retocando",
-          "En actividad comercial",
-          "Por publicar",
-          "Pendiente colocar aviso",
-        ].map(function (value) {
-          return '<option value="' + escHtml(value) + '">' + escHtml(value) + "</option>";
-        }).join("");
-      }
-
       function estadoAdministrativoOptionsHtml() {
         return [
           "Por inspecccionar",
@@ -1103,9 +1081,8 @@
           '<div class="scm-calendar-custom-dates" data-calendar-custom-dates hidden><div data-calendar-custom-rows></div><button type="button" class="scm-case-work-btn" data-calendar-add-custom-date>Agregar fecha personalizada</button></div>' +
           '</div></div>' +
           '<label class="scm-seg-field"><span>Relacionado con ticket</span><select class="select select-bordered select-sm scm-select" name="relacionado_ticket" data-calendar-related-ticket><option value="">Selecciona una opci&oacute;n</option><option value="si">S&iacute;, est&aacute; relacionado</option><option value="no">No, evento libre</option></select></label>' +
-          '<label class="scm-seg-field scm-calendar-field-full" data-calendar-ticket-field hidden><span>Ticket relacionado</span><input class="input input-bordered input-sm scm-input" type="search" name="ticket_search" placeholder="Buscar por ticket, contrato, inmueble o solicitante" data-calendar-ticket-search><select class="select select-bordered select-sm scm-select scm-calendar-ticket-select" name="id_ticket" data-calendar-ticket-select><option value="">Selecciona funcionario para cargar tickets</option></select><small>Al escoger un ticket se autocompleta el t&iacute;tulo y la direcci&oacute;n.</small></label>' +
+          '<label class="scm-seg-field scm-calendar-field-full" data-calendar-ticket-field hidden><span>Ticket relacionado</span><select class="select select-bordered select-sm scm-select scm-calendar-ticket-select" name="id_ticket" data-calendar-ticket-select><option value="">Selecciona funcionario para cargar tickets</option></select><small>Busca dentro del selector y escoge el ticket; se autocompleta t&iacute;tulo y direcci&oacute;n.</small></label>' +
           '<label class="scm-seg-field" data-calendar-cita-field hidden><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="">Selecciona si es cita</option><option value="si">Si</option><option value="no">No</option></select></label>' +
-          '<label class="scm-seg-field scm-calendar-ticket-state" data-calendar-commercial-state hidden><span>Estado comercial</span><select class="select select-bordered select-sm scm-select" name="estado_comercial"><option value="">Selecciona estado comercial</option>' + estadoComercialOptionsHtml() + '</select></label>' +
           '<label class="scm-seg-field scm-calendar-ticket-state" data-calendar-admin-state hidden><span>Estado administrativo</span><select class="select select-bordered select-sm scm-select" name="estado_administrativo"><option value="">Selecciona estado administrativo</option>' + estadoAdministrativoOptionsHtml() + '</select></label>' +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" placeholder="Direcci&oacute;n o lugar"></label>' +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required></textarea></label>' +
@@ -1151,11 +1128,8 @@
             var ticketFieldWrap = popup.querySelector("[data-calendar-ticket-field]");
             var citaFieldWrap = popup.querySelector("[data-calendar-cita-field]");
             var citaSelect = popup.querySelector('[name="es_cita"]');
-            var ticketSearch = popup.querySelector("[data-calendar-ticket-search]");
             var ticketSelect = popup.querySelector("[data-calendar-ticket-select]");
-            var commercialStateWrap = popup.querySelector("[data-calendar-commercial-state]");
             var adminStateWrap = popup.querySelector("[data-calendar-admin-state]");
-            var commercialStateSelect = popup.querySelector('[name="estado_comercial"]');
             var adminStateSelect = popup.querySelector('[name="estado_administrativo"]');
             var currentTicketRows = [];
             function selectedEmployees() {
@@ -1192,7 +1166,6 @@
               if (citaFieldWrap) citaFieldWrap.hidden = !related;
               if (!related) {
                 if (ticketSelect) ticketSelect.value = "";
-                if (ticketSearch) ticketSearch.value = "";
                 if (citaSelect) citaSelect.value = "";
               } else if (citaSelect && !citaSelect.value) {
                 citaSelect.value = "si";
@@ -1201,43 +1174,16 @@
             }
             function applyTicketStateVisibility() {
               var ticket = isTicketRelated() ? selectedTicket() : null;
-              var showCommercial = !!ticket && isCustomerServiceTicket(ticket);
-              var showAdmin = !!ticket && !showCommercial;
-              if (commercialStateWrap) commercialStateWrap.hidden = !showCommercial;
+              var showAdmin = !!ticket;
               if (adminStateWrap) adminStateWrap.hidden = !showAdmin;
-              if (!showCommercial && commercialStateSelect) commercialStateSelect.value = "";
               if (!showAdmin && adminStateSelect) adminStateSelect.value = "";
-            }
-            function applyTicketStateToTitle() {
-              var ticket = isTicketRelated() ? selectedTicket() : null;
-              if (!ticket || !titleInput) return;
-              if (isCustomerServiceTicket(ticket)) {
-                var estadoComercial = commercialStateSelect ? String(commercialStateSelect.value || "").trim() : "";
-                var solicitante = String(ticket.solicitante || "").trim();
-                var baseTitle = String(titleInput.value || buildCalendarTitle(categoryNameFromSelect(categorySelect), ticket)).split(" - ")[0];
-                if (estadoComercial && (titleInput.getAttribute("data-auto-calendar-title") === "1" || !titleInput.value)) {
-                  titleInput.value = (baseTitle || estadoComercial) + (solicitante ? " - " + solicitante : "");
-                  titleInput.setAttribute("data-auto-calendar-title", "1");
-                }
-                return;
-              }
-              var estadoAdministrativo = adminStateSelect ? String(adminStateSelect.value || "").trim() : "";
-              var contrato = String(ticket.contrato || "").trim();
-              var prefix = contrato ? "Contrato #" + contrato + " - " : "";
-              var current = String(titleInput.value || buildCalendarTitle(categoryNameFromSelect(categorySelect), ticket)).trim();
-              var suffix = current && prefix && current.indexOf(prefix) === 0 ? current.slice(prefix.length) : current;
-              if (estadoAdministrativo) suffix = estadoAdministrativo;
-              if (prefix && (titleInput.getAttribute("data-auto-calendar-title") === "1" || !titleInput.value)) {
-                titleInput.value = (prefix + (suffix || categoryNameFromSelect(categorySelect) || "Actividad")).trim();
-                titleInput.setAttribute("data-auto-calendar-title", "1");
-              }
             }
             function refreshTickets() {
               var selected = selectedEmployees();
               if (ticketSelect) ticketSelect.innerHTML = '<option value="">Cargando tickets...</option>';
               loadTicketsForEmployees(selected).then(function (rows) {
                 currentTicketRows = rows || [];
-                renderTicketSelector(ticketSelect, currentTicketRows, ticketSearch ? ticketSearch.value : "");
+                renderTicketSelector(ticketSelect, currentTicketRows, "");
                 maybeAutofillTitleAndLocation(false);
               });
             }
@@ -1305,16 +1251,10 @@
                 });
               });
             }
-            if (ticketSearch) {
-              ticketSearch.addEventListener("input", function () {
-                renderTicketSelector(ticketSelect, currentTicketRows, ticketSearch.value);
-              });
-            }
             if (ticketSelect) {
               ticketSelect.addEventListener("change", function () {
                 maybeAutofillTitleAndLocation(true);
                 applyTicketStateVisibility();
-                applyTicketStateToTitle();
                 maybeAutofillPreventiveDescription();
               });
             }
@@ -1325,11 +1265,6 @@
                 maybeAutofillPreventiveDescription();
               });
             }
-            [commercialStateSelect, adminStateSelect].forEach(function (field) {
-              if (field) field.addEventListener("change", function () {
-                applyTicketStateToTitle();
-              });
-            });
             if (citaSelect) {
               citaSelect.addEventListener("change", maybeAutofillPreventiveDescription);
             }
@@ -1406,7 +1341,6 @@
               id_ticket: relatedTicket ? fd.get("id_ticket") || "" : "",
               es_cita: isCita,
               estado_administrativo: relatedTicket ? fd.get("estado_administrativo") || "" : "",
-              estado_comercial: relatedTicket ? fd.get("estado_comercial") || "" : "",
             };
             var recurrent = fd.get("es_recurrente") === "1";
             var recurrenceTypeValue = String(fd.get("tipo_recurrencia") || "diario");
