@@ -16,6 +16,8 @@ trait RendersDashboard
       'correctiva_url' => self::DEFAULT_CORRECTIVA_URL,
       'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
       'acta_url'       => self::DEFAULT_ACTA_URL,
+      'calendar_app_url' => self::DEFAULT_CALENDAR_APP_URL,
+      'calendar_api_url' => self::DEFAULT_CALENDAR_API_URL,
     ], $overrideConfig);
 
     $tabla = $this->db->table('jet_cct_tickets');
@@ -111,6 +113,11 @@ trait RendersDashboard
       'cotizaciones-mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
       'cotizaciones' => 'scm-panel-cotizaciones-mantenimiento',
       'scm-panel-cotizaciones-mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
+      'calendario_actividades' => 'scm-panel-calendario-actividades',
+      'calendario-actividades' => 'scm-panel-calendario-actividades',
+      'calendario' => 'scm-panel-calendario-actividades',
+      'agenda' => 'scm-panel-calendario-actividades',
+      'scm-panel-calendario-actividades' => 'scm-panel-calendario-actividades',
       'actividades_administrativas' => 'scm-panel-actividades-administrativas',
       'actividades-administrativas' => 'scm-panel-actividades-administrativas',
       'actividades administrativas' => 'scm-panel-actividades-administrativas',
@@ -135,6 +142,10 @@ trait RendersDashboard
       'cotizaciones_mantenimiento' => [
         'panel' => 'scm-panel-cotizaciones-mantenimiento',
         'label' => $dashboardPermissionTabs['cotizaciones_mantenimiento'] ?? 'Cotizaciones de Mantenimiento',
+      ],
+      'calendario_actividades' => [
+        'panel' => 'scm-panel-calendario-actividades',
+        'label' => $dashboardPermissionTabs['calendario_actividades'] ?? 'Calendario',
       ],
       'preventivas_pendientes' => [
         'panel' => 'scm-panel-preventivas-pendientes',
@@ -710,6 +721,12 @@ trait RendersDashboard
             </div>
           <?php endif; ?>
 
+          <?php if (in_array('calendario_actividades', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'calendario_actividades' ? ' active' : ''; ?>" id="scm-panel-calendario-actividades" data-permission-tab="calendario_actividades" data-admin-activity-panel="calendario_actividades">
+              <?php echo $this->render_calendario_actividades_panel($config); ?>
+            </div>
+          <?php endif; ?>
+
           <?php if (in_array('preventivas_pendientes', $allowedAdministrativeActivityTabs, true)): ?>
             <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'preventivas_pendientes' ? ' active' : ''; ?>" id="scm-panel-preventivas-pendientes" data-permission-tab="preventivas_pendientes" data-admin-activity-panel="preventivas_pendientes">
               <?php echo $preventivasPendientesHtml; ?>
@@ -967,6 +984,7 @@ trait RendersDashboard
   {
     $activityPermissionKeys = [
       'cotizaciones_mantenimiento',
+      'calendario_actividades',
       'preventivas_pendientes',
       'servicios_publicos_pendientes',
       'reportes_administrativos_pendientes',
@@ -1255,6 +1273,104 @@ trait RendersDashboard
       . $form
       . '<div class="scm-cards-wrap"><div class="scm-ticket-cards" id="scm-cards-mis_tickets">' . $cards . '</div></div>'
       . '<div class="scm-pagination" id="scm-pagination-mis_tickets">' . $pagination . '</div>';
+  }
+
+  /** @param array<string,mixed> $config */
+  private function render_calendario_actividades_panel(array $config): string
+  {
+    $appUrl = rtrim(trim((string) ($config['calendar_app_url'] ?? self::DEFAULT_CALENDAR_APP_URL)), '/');
+    $apiUrl = trim((string) ($config['calendar_api_url'] ?? self::DEFAULT_CALENDAR_API_URL));
+    if ($appUrl === '') {
+      $appUrl = rtrim(self::DEFAULT_CALENDAR_APP_URL, '/');
+    }
+    if ($apiUrl === '') {
+      $apiUrl = self::DEFAULT_CALENDAR_API_URL;
+    }
+    $today = date('Y-m-d');
+    $nextWeek = date('Y-m-d', strtotime('+7 days') ?: time());
+
+    ob_start();
+?>
+    <div class="scm-calendar-panel" data-scm-calendar-panel data-calendar-app-url="<?php echo esc_attr($appUrl); ?>" data-calendar-api-url="<?php echo esc_attr($apiUrl); ?>">
+      <div class="scm-status-topic-head scm-calendar-head">
+        <div>
+          <h3>Calendario</h3>
+          <p>Crea eventos, agenda citas por ticket y consulta calendarios de funcionarios sin salir del control.</p>
+        </div>
+        <div class="scm-calendar-head-actions">
+          <span class="scm-status-count"><strong data-scm-calendar-total>0</strong> eventos</span>
+          <button type="button" class="scm-case-work-btn" data-scm-calendar-open-path="/" data-iframe-title="Calendario en grande">Ver en grande</button>
+        </div>
+      </div>
+
+      <div class="scm-calendar-kpis">
+        <div class="scm-kpi"><div class="scm-kpi-label">Pendientes</div><div class="scm-kpi-value" data-scm-calendar-pending>0</div></div>
+        <div class="scm-kpi"><div class="scm-kpi-label">Realizados</div><div class="scm-kpi-value" data-scm-calendar-done>0</div></div>
+        <div class="scm-kpi"><div class="scm-kpi-label">Rango</div><div class="scm-kpi-value scm-calendar-range-value" data-scm-calendar-range><?php echo esc_html($today); ?></div></div>
+      </div>
+
+      <div class="scm-calendar-layout">
+        <section class="scm-calendar-card scm-calendar-create-card">
+          <div class="scm-calendar-card-head">
+            <div>
+              <span class="scm-calendar-action-kicker">Crear</span>
+              <h4>Nuevo evento</h4>
+              <p>Usa uno o varios funcionarios. Si colocas ticket, se enlaza al caso.</p>
+            </div>
+            <button type="button" class="scm-case-work-btn" data-scm-calendar-open-path="/crear-evento-multiple" data-iframe-title="Formulario original de evento multiple">Formulario original</button>
+          </div>
+          <form class="scm-calendar-create-form" data-scm-calendar-create autocomplete="off">
+            <div class="scm-grid">
+              <div class="scm-field"><label>Título</label><input class="input input-bordered input-sm scm-input" name="titulo" required placeholder="Ej: Cita revisión preventiva"></div>
+              <div class="scm-field"><label>Categoría</label><select class="select select-bordered select-sm scm-select" name="id_categoria" data-scm-calendar-categories required><option value="">Cargando...</option></select></div>
+              <div class="scm-field scm-calendar-field-wide"><label>Funcionarios</label><select class="select select-bordered select-sm scm-select" name="empleados[]" data-scm-calendar-employees multiple required><option value="">Cargando...</option></select><small>Ctrl+clic para seleccionar varios.</small></div>
+              <div class="scm-field"><label>Fecha</label><input class="input input-bordered input-sm scm-input" type="date" name="fecha" value="<?php echo esc_attr($today); ?>" required></div>
+              <div class="scm-field"><label>Hora inicio</label><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required></div>
+              <div class="scm-field"><label>Hora fin</label><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required></div>
+              <div class="scm-field"><label>Ticket opcional</label><input class="input input-bordered input-sm scm-input" name="id_ticket" placeholder="Ej: 10266"></div>
+              <div class="scm-field"><label>Es cita</label><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="no">No</option><option value="si">Sí</option></select></div>
+              <div class="scm-field scm-calendar-field-wide"><label>Ubicación</label><input class="input input-bordered input-sm scm-input" name="ubicacion" placeholder="Dirección o lugar del evento"></div>
+              <div class="scm-field scm-calendar-field-full"><label>Descripción</label><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required placeholder="Describe la actividad a realizar"></textarea></div>
+            </div>
+            <div class="scm-actions">
+              <button class="scm-btn-primary btn btn-primary" type="submit">Crear evento</button>
+              <span class="scm-spinner" data-scm-calendar-create-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
+              <p class="scm-seg-msg" data-scm-calendar-create-msg aria-live="polite"></p>
+            </div>
+          </form>
+        </section>
+
+        <section class="scm-calendar-card">
+          <div class="scm-calendar-card-head">
+            <div>
+              <span class="scm-calendar-action-kicker">Agenda</span>
+              <h4>Eventos del calendario</h4>
+              <p>Filtra por funcionario, categoría, estado y fecha.</p>
+            </div>
+            <button type="button" class="scm-case-work-btn" data-scm-calendar-refresh>Actualizar</button>
+          </div>
+          <form class="scm-calendar-filter-form" data-scm-calendar-filters autocomplete="off">
+            <div class="scm-grid">
+              <div class="scm-field"><label>Funcionario</label><select class="select select-bordered select-sm scm-select" name="id_empleado" data-scm-calendar-filter-employees><option value="">Todos</option></select></div>
+              <div class="scm-field"><label>Categoría</label><select class="select select-bordered select-sm scm-select" name="id_categoria" data-scm-calendar-filter-categories><option value="">Todas</option></select></div>
+              <div class="scm-field"><label>Estado</label><select class="select select-bordered select-sm scm-select" name="estado"><option value="">Todos</option><option value="No" selected>Pendientes</option><option value="Si">Realizados</option></select></div>
+              <div class="scm-field"><label>Desde</label><input class="input input-bordered input-sm scm-input" type="date" name="fecha_inicio" value="<?php echo esc_attr($today); ?>"></div>
+              <div class="scm-field"><label>Hasta</label><input class="input input-bordered input-sm scm-input" type="date" name="fecha_fin" value="<?php echo esc_attr($nextWeek); ?>"></div>
+            </div>
+            <div class="scm-actions">
+              <button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button>
+              <button class="scm-btn-secondary btn btn-outline" type="button" data-scm-calendar-clear>Limpiar</button>
+              <span class="scm-spinner" data-scm-calendar-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
+            </div>
+          </form>
+          <div class="scm-calendar-events" data-scm-calendar-events>
+            <div class="scm-empty scm-empty-cards">Cargando eventos...</div>
+          </div>
+        </section>
+      </div>
+    </div>
+<?php
+    return (string) ob_get_clean();
   }
 
   private function render_cotizaciones_mantenimiento_panel(array $result, array $params): string

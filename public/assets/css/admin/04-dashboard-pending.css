@@ -468,6 +468,305 @@
   padding: 9px 12px !important;
 }
 
+/* ── Calendario de actividades ───────────────────────────────── */
+#scm-app .scm-calendar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#scm-app .scm-calendar-head {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #dbe6f2;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  margin-bottom: 0 !important;
+  padding: 16px 18px !important;
+}
+
+#scm-app .scm-calendar-head p {
+  max-width: 780px;
+}
+
+#scm-app .scm-calendar-head-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+#scm-app .scm-calendar-kpis {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#scm-app .scm-calendar-range-value {
+  font-size: 16px !important;
+}
+
+#scm-app .scm-calendar-layout {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(360px, 0.9fr) minmax(0, 1.35fr);
+}
+
+#scm-app .scm-calendar-card {
+  background: #fff;
+  border: 1px solid #dbe6f2;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  padding: 18px !important;
+}
+
+#scm-app .scm-calendar-card-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+#scm-app .scm-calendar-card-head h4 {
+  color: var(--scm-text-main);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.25px;
+  margin: 0;
+}
+
+#scm-app .scm-calendar-card-head p {
+  color: var(--scm-text-soft);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 3px 0 0;
+}
+
+#scm-app .scm-calendar-create-card {
+  position: sticky;
+  top: 12px;
+}
+
+#scm-app .scm-calendar-field-wide {
+  grid-column: span 2;
+}
+
+#scm-app .scm-calendar-field-full {
+  grid-column: 1 / -1;
+}
+
+#scm-app .scm-calendar-create-form select[multiple] {
+  min-height: 118px;
+}
+
+#scm-app .scm-calendar-create-form small {
+  color: var(--scm-text-muted);
+  display: block;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+#scm-app .scm-calendar-events {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+#scm-app .scm-calendar-event-card {
+  background: #fff;
+  border: 1px solid #dbe6f2;
+  border-radius: 13px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+#scm-app .scm-calendar-event-color {
+  min-height: 100%;
+}
+
+#scm-app .scm-calendar-event-main {
+  padding: 13px 14px !important;
+}
+
+#scm-app .scm-calendar-event-title-row {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+#scm-app .scm-calendar-event-title-row h5 {
+  color: var(--scm-text-main);
+  font-size: 15px;
+  font-weight: 900;
+  margin: 0;
+}
+
+#scm-app .scm-calendar-event-main p {
+  color: var(--scm-text-soft);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 6px 0 0;
+}
+
+#scm-app .scm-calendar-event-state {
+  background: #eff6ff;
+  border: 1px solid #cfe0f4;
+  border-radius: 999px;
+  color: #2563eb;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 4px 9px;
+}
+
+#scm-app .scm-calendar-event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+#scm-app .scm-calendar-event-meta span {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: var(--scm-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 7px;
+}
+
+#scm-app .scm-calendar-event-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+#scm-app .scm-calendar-quick-grid,
+#scm-app .scm-calendar-select-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#scm-app .scm-calendar-action-card,
+#scm-app .scm-calendar-select-card {
+  background: #fff;
+  border: 1px solid #dbe6f2;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 190px;
+  padding: 18px !important;
+}
+
+#scm-app .scm-calendar-action-card {
+  border-top: 3px solid var(--scm-orange-500);
+}
+
+#scm-app .scm-calendar-select-card {
+  min-height: 245px;
+}
+
+#scm-app .scm-calendar-action-kicker {
+  color: var(--scm-orange-700);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-calendar-action-card h4,
+#scm-app .scm-calendar-select-card h4 {
+  color: var(--scm-text-main);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.25px;
+  margin: 0;
+}
+
+#scm-app .scm-calendar-action-card p,
+#scm-app .scm-calendar-select-card p {
+  color: var(--scm-text-soft);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+#scm-app .scm-calendar-action-card .scm-case-work-btn,
+#scm-app .scm-calendar-select-card .scm-case-work-btn {
+  justify-content: center;
+  margin-top: auto;
+  min-height: 42px;
+  width: 100%;
+}
+
+#scm-app .scm-calendar-select-card .scm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+#scm-app .scm-calendar-select-card .scm-field span {
+  color: var(--scm-text-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-calendar-open-selected:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+#scm-app .scm-calendar-case-note {
+  background: #fff7ed;
+  border: 1px solid rgba(249, 115, 22, 0.28);
+  border-radius: 12px;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+  margin-bottom: 14px;
+  padding: 12px 14px !important;
+}
+
+@media (max-width: 1100px) {
+  #scm-app .scm-calendar-layout,
+  #scm-app .scm-calendar-kpis,
+  #scm-app .scm-calendar-quick-grid,
+  #scm-app .scm-calendar-select-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-calendar-create-card {
+    position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  #scm-app .scm-calendar-card-head,
+  #scm-app .scm-calendar-head-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #scm-app .scm-calendar-field-wide {
+    grid-column: 1 / -1;
+  }
+}
+
 .swal2-container {
   z-index: 1000000 !important;
 }

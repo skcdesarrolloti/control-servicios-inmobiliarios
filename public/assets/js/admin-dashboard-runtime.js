@@ -124,6 +124,280 @@
       actions.dashboard_permissions_read || "";
     var actionDashboardPermissionsSave =
       actions.dashboard_permissions_save || "";
+    var calendarAppUrl = String(
+      (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
+    ).replace(/\/+$/, "");
+    var calendarApiUrl = String(
+      (config && config.calendar_api_url) ||
+        "https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action=",
+    );
+
+    function buildCalendarUrl(path) {
+      var cleanPath = String(path || "").trim();
+      if (!cleanPath) {
+        cleanPath = "/";
+      }
+      if (/^https?:\/\//i.test(cleanPath)) {
+        return cleanPath;
+      }
+      if (cleanPath.charAt(0) !== "/") {
+        cleanPath = "/" + cleanPath;
+      }
+      return calendarAppUrl + cleanPath;
+    }
+
+    function openCalendarPath(path, title) {
+      openIframeModal(buildCalendarUrl(path), title || "Calendario", false);
+    }
+
+    function initCalendarPanel() {
+      var panel = root.querySelector("[data-scm-calendar-panel]");
+      if (!panel || panel.getAttribute("data-scm-calendar-init") === "1") {
+        return;
+      }
+      panel.setAttribute("data-scm-calendar-init", "1");
+      var panelAppUrl = String(panel.getAttribute("data-calendar-app-url") || "").replace(/\/+$/, "");
+      var panelApiUrl = String(panel.getAttribute("data-calendar-api-url") || "");
+      if (panelAppUrl) {
+        calendarAppUrl = panelAppUrl;
+      }
+      if (panelApiUrl) {
+        calendarApiUrl = panelApiUrl;
+      }
+
+      panel.querySelectorAll("[data-scm-calendar-open-path]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          openCalendarPath(
+            btn.getAttribute("data-scm-calendar-open-path") || "/",
+            btn.getAttribute("data-iframe-title") || "Calendario",
+          );
+        });
+      });
+
+      var filterForm = panel.querySelector("[data-scm-calendar-filters]");
+      var createForm = panel.querySelector("[data-scm-calendar-create]");
+      var eventsWrap = panel.querySelector("[data-scm-calendar-events]");
+      var spinner = panel.querySelector("[data-scm-calendar-spinner]");
+      var createSpinner = panel.querySelector("[data-scm-calendar-create-spinner]");
+      var createMsg = panel.querySelector("[data-scm-calendar-create-msg]");
+      var totalEl = panel.querySelector("[data-scm-calendar-total]");
+      var pendingEl = panel.querySelector("[data-scm-calendar-pending]");
+      var doneEl = panel.querySelector("[data-scm-calendar-done]");
+      var rangeEl = panel.querySelector("[data-scm-calendar-range]");
+
+      function calendarApi(action, payload, method) {
+        var options = {
+          method: method || (payload ? "POST" : "GET"),
+          credentials: "same-origin",
+        };
+        if (payload) {
+          options.headers = { "Content-Type": "application/json" };
+          options.body = JSON.stringify(payload);
+        }
+        return fetch(calendarApiUrl + encodeURIComponent(action), options).then(function (r) {
+          return r.json();
+        });
+      }
+
+      function fillOptions(selects, rows, firstLabel) {
+        selects.forEach(function (select) {
+          var current = select.value || "";
+          select.innerHTML = '<option value="">' + firstLabel + "</option>";
+          rows.forEach(function (row) {
+            var id = String(row.id_empleado || row.id || row._ID || "").trim();
+            var name = String(row.nombre || row.empleado || row.categoria || id).trim();
+            if (!id) return;
+            var option = document.createElement("option");
+            option.value = id;
+            option.textContent = name ? name + (row.id_empleado ? " (" + id + ")" : "") : id;
+            select.appendChild(option);
+          });
+          if (current) {
+            select.value = current;
+          }
+        });
+      }
+
+      function formToObject(form) {
+        var fd = new FormData(form);
+        var out = {};
+        fd.forEach(function (value, key) {
+          if (key.slice(-2) === "[]") {
+            var cleanKey = key.slice(0, -2);
+            if (!out[cleanKey]) out[cleanKey] = [];
+            if (value) out[cleanKey].push(value);
+          } else {
+            out[key] = value;
+          }
+        });
+        return out;
+      }
+
+      function formatDateTime(value) {
+        var raw = String(value || "").replace("T", " ");
+        if (!raw) return "-";
+        return raw.replace(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2}).*$/, "$3/$2/$1 $4");
+      }
+
+      function renderEvents(payload) {
+        var rows = Array.isArray(payload) ? payload : Array.isArray(payload.data) ? payload.data : [];
+        var total = typeof payload.total !== "undefined" ? payload.total : rows.length;
+        var pending = rows.filter(function (row) {
+          return String(row.estado || "").toLowerCase() !== "si";
+        }).length;
+        var done = rows.filter(function (row) {
+          return String(row.estado || "").toLowerCase() === "si";
+        }).length;
+        if (totalEl) totalEl.textContent = String(total || 0);
+        if (pendingEl) pendingEl.textContent = String(pending || 0);
+        if (doneEl) doneEl.textContent = String(done || 0);
+        if (filterForm && rangeEl) {
+          var fi = filterForm.querySelector('[name="fecha_inicio"]');
+          var ff = filterForm.querySelector('[name="fecha_fin"]');
+          rangeEl.textContent = (fi && fi.value ? fi.value : "-") + " / " + (ff && ff.value ? ff.value : "-");
+        }
+        if (!eventsWrap) return;
+        if (!rows.length) {
+          eventsWrap.innerHTML = '<div class="scm-empty scm-empty-cards">No hay eventos con los filtros actuales.</div>';
+          return;
+        }
+        eventsWrap.innerHTML = rows.map(function (row) {
+          var id = String(row.id || "").trim();
+          var ticket = String(row.id_ticket || "").trim();
+          var estado = String(row.estado || "").toLowerCase() === "si" ? "Realizado" : "Pendiente";
+          var color = String(row.color || "#f59e0b").trim() || "#f59e0b";
+          var eventoUrl = id ? buildCalendarUrl("/evento/" + encodeURIComponent(id)) : "";
+          var ticketUrl = ticket ? "https://sucasainmobiliaria.com.co/ticket/?id_ticket=" + encodeURIComponent(ticket) : "";
+          return (
+            '<article class="scm-calendar-event-card">' +
+            '<div class="scm-calendar-event-color" style="background:' + escHtml(color) + '"></div>' +
+            '<div class="scm-calendar-event-main">' +
+            '<div class="scm-calendar-event-title-row"><h5>' + escHtml(row.titulo || "Evento") + '</h5><span class="scm-calendar-event-state">' + escHtml(estado) + "</span></div>" +
+            '<p>' + escHtml(row.descripcion || "Sin descripcion") + "</p>" +
+            '<div class="scm-calendar-event-meta">' +
+            '<span>' + escHtml(formatDateTime(row.fecha_inicio)) + " - " + escHtml(formatDateTime(row.fecha_fin)) + "</span>" +
+            '<span>' + escHtml(row.funcionario || row.nombre || "Funcionario") + "</span>" +
+            '<span>' + escHtml(row.categoria || "Sin categoria") + "</span>" +
+            (ticket ? '<span>Ticket #' + escHtml(ticket) + "</span>" : "") +
+            "</div>" +
+            '<div class="scm-calendar-event-actions">' +
+            (eventoUrl ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' + escHtml(eventoUrl) + '" data-iframe-title="Evento #' + escHtml(id) + '">Ver evento</button>' : "") +
+            (ticketUrl ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' + escHtml(ticketUrl) + '" data-iframe-title="Ticket #' + escHtml(ticket) + '">Ver ticket</button>' : "") +
+            "</div></div></article>"
+          );
+        }).join("");
+      }
+
+      function loadEvents() {
+        if (!filterForm) return Promise.resolve();
+        if (spinner) spinner.classList.add("active");
+        var filters = formToObject(filterForm);
+        filters.pagina = 1;
+        filters.limite = 80;
+        return calendarApi("filtrar_eventos_admin", filters)
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error((json && json.message) || "No se pudieron cargar eventos.");
+            }
+            renderEvents(json.data || []);
+          })
+          .catch(function (err) {
+            if (eventsWrap) {
+              eventsWrap.innerHTML = '<div class="scm-empty scm-empty-cards">No se pudieron cargar eventos.</div>';
+            }
+            showToast("error", err.message || "No se pudieron cargar eventos.");
+          })
+          .finally(function () {
+            if (spinner) spinner.classList.remove("active");
+          });
+      }
+
+      Promise.all([
+        calendarApi("listar_funcionarios"),
+        calendarApi("listar_categorias"),
+      ]).then(function (results) {
+        var funcionarios = results[0] && results[0].success && Array.isArray(results[0].data) ? results[0].data : [];
+        var categorias = results[1] && results[1].success && Array.isArray(results[1].data) ? results[1].data : [];
+        fillOptions(Array.prototype.slice.call(panel.querySelectorAll("[data-scm-calendar-employees], [data-scm-calendar-filter-employees]")), funcionarios, "Todos");
+        fillOptions(Array.prototype.slice.call(panel.querySelectorAll("[data-scm-calendar-categories], [data-scm-calendar-filter-categories]")), categorias, "Todas");
+      }).finally(loadEvents);
+
+      if (filterForm) {
+        filterForm.addEventListener("submit", function (e) {
+          e.preventDefault();
+          loadEvents();
+        });
+        filterForm.querySelectorAll("select, input").forEach(function (field) {
+          field.addEventListener("change", loadEvents);
+        });
+      }
+
+      var clearBtn = panel.querySelector("[data-scm-calendar-clear]");
+      if (clearBtn && filterForm) {
+        clearBtn.addEventListener("click", function () {
+          filterForm.reset();
+          loadEvents();
+        });
+      }
+      var refreshBtn = panel.querySelector("[data-scm-calendar-refresh]");
+      if (refreshBtn) {
+        refreshBtn.addEventListener("click", loadEvents);
+      }
+
+      if (createForm) {
+        createForm.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var data = formToObject(createForm);
+          var empleados = Array.isArray(data.empleados) ? data.empleados : [];
+          if (!empleados.length) {
+            showToast("error", "Selecciona al menos un funcionario.");
+            return;
+          }
+          var fechaInicio = (data.fecha || "") + " " + (data.hora_inicio || "") + ":00";
+          var fechaFin = (data.fecha || "") + " " + (data.hora_fin || "") + ":00";
+          var eventPayload = {
+            titulo: data.titulo || "",
+            descripcion: data.descripcion || "",
+            ubicacion: data.ubicacion || "",
+            fecha_inicio: fechaInicio,
+            fecha_fin: fechaFin,
+            id_categoria: data.id_categoria || "",
+            id_ticket: data.id_ticket || "",
+            es_cita: data.es_cita || "no",
+            estado_administrativo: "Cita agendada",
+            estado_comercial: "Cita agendada",
+          };
+          if (createSpinner) createSpinner.classList.add("active");
+          if (createMsg) {
+            createMsg.textContent = "Guardando evento...";
+            createMsg.classList.remove("error");
+          }
+          var request = empleados.length > 1
+            ? calendarApi("crear_eventos", { eventos: [eventPayload], empleados: empleados })
+            : calendarApi("crear_evento", Object.assign({}, eventPayload, { id_empleado: empleados[0] }));
+          request
+            .then(function (json) {
+              if (!json || !json.success) {
+                throw new Error((json && json.message) || "No se pudo crear el evento.");
+              }
+              showToast("success", json.message || "Evento creado.");
+              if (createMsg) createMsg.textContent = json.message || "Evento creado.";
+              createForm.reset();
+              return loadEvents();
+            })
+            .catch(function (err) {
+              if (createMsg) {
+                createMsg.textContent = err.message || "No se pudo crear el evento.";
+                createMsg.classList.add("error");
+              }
+              showToast("error", err.message || "No se pudo crear el evento.");
+            })
+            .finally(function () {
+              if (createSpinner) createSpinner.classList.remove("active");
+            });
+        });
+      }
+    }
 
     function setListLoading(cardsEl, isLoading, label) {
       if (!cardsEl) {
@@ -901,6 +1175,15 @@
       }
       if (activeKey === "mant" && form) {
         return doFetch(new FormData(form));
+      } else if (activeKey === "calendario_actividades") {
+        initCalendarPanel();
+        var calendarRefresh = root.querySelector(
+          "#scm-panel-calendario-actividades [data-scm-calendar-refresh]",
+        );
+        if (calendarRefresh) {
+          calendarRefresh.click();
+        }
+        return Promise.resolve();
       } else if (tabFetchers[activeKey]) {
         return tabFetchers[activeKey].fetchTab(
           new FormData(tabFetchers[activeKey].form),
@@ -955,6 +1238,9 @@
     function administrativeActivityKeyFromPanelId(panelId) {
       if (panelId === "scm-panel-cotizaciones-mantenimiento") {
         return "cotizaciones_mantenimiento";
+      }
+      if (panelId === "scm-panel-calendario-actividades") {
+        return "calendario_actividades";
       }
       if (panelId === "scm-panel-preventivas-pendientes") {
         return "preventivas_pendientes";
@@ -3449,6 +3735,12 @@
           administrativeKey === "cotizaciones_mantenimiento"
         ) {
           return loadPanelOnce(activeAdministrativePanel, administrativeKey);
+        }
+        if (
+          activeAdministrativePanel &&
+          administrativeKey === "calendario_actividades"
+        ) {
+          initCalendarPanel();
         }
       }
       return Promise.resolve();

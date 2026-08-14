@@ -109,6 +109,7 @@ trait TableRowsConcern
       $timeline = $this->renderTimeline($steps, $stepLinks);
 
       $employee = trim((string) ($row['nombre_empleado'] ?? $row['empleado'] ?? ''));
+      $employeeId = trim((string) ($row['id_empleado'] ?? ''));
       $historialItems = $this->normalizeHistorialItems($row['_scm_historial_items'] ?? []);
       $seguimientosItems = $this->normalizeHistorialItems($row['_scm_seguimientos_ticket'] ?? []);
       $notasItems = $this->normalizeHistorialItems($row['_scm_notas_ticket'] ?? []);
@@ -241,6 +242,7 @@ trait TableRowsConcern
         . ' data-direccion="' . esc_attr($direccion !== '' ? $direccion : '-') . '"'
         . ' data-creado="' . esc_attr($creado) . '"'
         . ' data-empleado="' . esc_attr($employee !== '' ? $employee : '-') . '"'
+        . ' data-empleado-id="' . esc_attr($employeeId) . '"'
         . ' data-propietario="' . esc_attr($propietario) . '"'
         . ' data-correo-propietario="' . esc_attr($correoPropietario) . '"'
         . ' data-celular-propietario="' . esc_attr($celularPropietario) . '"'

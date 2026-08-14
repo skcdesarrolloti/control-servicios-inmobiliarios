@@ -75,6 +75,8 @@ final class SuCasaControlServiciosInmobiliarios
   const DEFAULT_CORRECTIVA_URL = 'https://sucasainmobiliaria.com.co/revision-correctiva/?numero=';
   const DEFAULT_COTIZACION_URL = 'https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero=';
   const DEFAULT_ACTA_URL = 'https://sucasainmobiliaria.com.co/acta-de-satisfaccion/?numero=';
+  const DEFAULT_CALENDAR_APP_URL = 'https://calendar-skc.netlify.app';
+  const DEFAULT_CALENDAR_API_URL = 'https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action=';
 
   private Database $db;
   private array $tableExistsCache = [];
@@ -110,6 +112,7 @@ final class SuCasaControlServiciosInmobiliarios
       'cerrados' => 'Cerrados',
       'mis_tickets' => 'Mis tickets',
       'cotizaciones_mantenimiento' => 'Cotizaciones de Mantenimiento',
+      'calendario_actividades' => 'Calendario',
       'preventivas_pendientes' => 'Preventivas Pendientes',
       'contratos_arrendamiento' => 'Contratos de arrendamiento',
       'servicios_publicos_pendientes' => 'Servicios Publicos Pendientes',

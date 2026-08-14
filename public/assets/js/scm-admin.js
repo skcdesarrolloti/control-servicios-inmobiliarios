@@ -1439,6 +1439,154 @@
     sub.setAttribute("aria-hidden", "false");
   }
 
+  var scmCalendarCategoriesCache = null;
+
+  function calendarApiBase(root) {
+    var runtime = root ? parseRuntime(root) || {} : {};
+    var config = runtime.config || {};
+    return String(
+      config.calendar_api_url ||
+        "https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action=",
+    );
+  }
+
+  function calendarApiRequest(root, action, payload) {
+    var options = {
+      method: payload ? "POST" : "GET",
+      credentials: "same-origin",
+    };
+    if (payload) {
+      options.headers = { "Content-Type": "application/json" };
+      options.body = JSON.stringify(payload);
+    }
+    return fetch(calendarApiBase(root) + encodeURIComponent(action), options).then(function (response) {
+      return response.json();
+    });
+  }
+
+  function loadCalendarCategories(root) {
+    if (scmCalendarCategoriesCache) {
+      return Promise.resolve(scmCalendarCategoriesCache);
+    }
+    return calendarApiRequest(root, "listar_categorias").then(function (json) {
+      if (!json || !json.success || !Array.isArray(json.data)) {
+        throw new Error((json && json.message) || "No se pudieron cargar categorias.");
+      }
+      scmCalendarCategoriesCache = json.data;
+      return scmCalendarCategoriesCache;
+    });
+  }
+
+  function openCalendarCaseEventEditor(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var root = findRootFromNode(caseBtn);
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = String(caseBtn.dataset.ticketPk || "").trim();
+    var employeeId = String(caseBtn.dataset.empleadoId || "").trim();
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, "0");
+    var dd = String(today.getDate()).padStart(2, "0");
+    var dateValue = yyyy + "-" + mm + "-" + dd;
+    if (title) title.textContent = "Agendar cita del caso";
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML =
+        '<form class="scm-calendar-case-form" method="post" autocomplete="off">' +
+        '<input type="hidden" name="id_ticket" value="' + escHtml(ticketPk) + '">' +
+        '<input type="hidden" name="id_empleado" value="' + escHtml(employeeId) + '">' +
+        '<div class="scm-calendar-case-note">Se crear&aacute; el evento en el calendario y quedar&aacute; enlazado al ticket #' + escHtml(ticketPk || "-") + '.</div>' +
+        '<div class="scm-grid">' +
+        '<label class="scm-seg-field"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required value="' + escHtml("Cita ticket #" + (ticketPk || "")) + '"></label>' +
+        '<label class="scm-seg-field"><span>Categor&iacute;a</span><select class="select select-bordered select-sm scm-select" name="id_categoria" required data-scm-calendar-case-categories><option value="">Cargando...</option></select></label>' +
+        '<label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + escHtml(dateValue) + '"></label>' +
+        '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required></label>' +
+        '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required></label>' +
+        '<label class="scm-seg-field"><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="si" selected>S&iacute;</option><option value="no">No</option></select></label>' +
+        '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" value="' + escHtml(caseBtn.dataset.direccion || "") + '"></label>' +
+        '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required>' + escHtml(caseBtn.dataset.asunto || "") + '</textarea></label>' +
+        "</div>" +
+        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear evento</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        "</form>";
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+
+    var form = body ? body.querySelector(".scm-calendar-case-form") : null;
+    var categorySelect = body ? body.querySelector("[data-scm-calendar-case-categories]") : null;
+    loadCalendarCategories(root)
+      .then(function (rows) {
+        if (!categorySelect) return;
+        categorySelect.innerHTML = '<option value="">Selecciona categoria</option>';
+        rows.forEach(function (row) {
+          var id = String(row.id || row._ID || "").trim();
+          var name = String(row.nombre || row.categoria || id).trim();
+          if (!id) return;
+          categorySelect.innerHTML += '<option value="' + escHtml(id) + '">' + escHtml(name) + "</option>";
+        });
+      })
+      .catch(function (error) {
+        if (categorySelect) {
+          categorySelect.innerHTML = '<option value="">No se pudieron cargar categorias</option>';
+        }
+        scmNotify("error", error.message || "No se pudieron cargar categorias.");
+      });
+
+    if (form) {
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (!employeeId) {
+          scmNotify("error", "Este caso no tiene id_empleado para agendar la cita.");
+          return;
+        }
+        var submitBtn = form.querySelector("button[type='submit']");
+        var msg = form.querySelector(".scm-seg-msg");
+        var fd = new FormData(form);
+        var payload = {
+          titulo: fd.get("titulo") || "",
+          descripcion: fd.get("descripcion") || "",
+          ubicacion: fd.get("ubicacion") || "",
+          fecha_inicio: (fd.get("fecha") || "") + " " + (fd.get("hora_inicio") || "") + ":00",
+          fecha_fin: (fd.get("fecha") || "") + " " + (fd.get("hora_fin") || "") + ":00",
+          id_empleado: employeeId,
+          id_categoria: fd.get("id_categoria") || "",
+          id_ticket: ticketPk,
+          es_cita: fd.get("es_cita") || "si",
+          estado_administrativo: "Cita agendada",
+          estado_comercial: "Cita agendada",
+        };
+        if (submitBtn) submitBtn.disabled = true;
+        if (msg) {
+          msg.textContent = "Creando evento...";
+          msg.classList.remove("error");
+        }
+        calendarApiRequest(root, "crear_evento", payload)
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error((json && json.message) || "No se pudo crear el evento.");
+            }
+            if (msg) msg.textContent = json.message || "Evento creado.";
+            scmNotify("success", json.message || "Evento creado.", "Calendario");
+            if (root) {
+              root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+            }
+          })
+          .catch(function (error) {
+            if (msg) {
+              msg.textContent = error.message || "No se pudo crear el evento.";
+              msg.classList.add("error");
+            }
+            scmNotify("error", error.message || "No se pudo crear el evento.");
+          })
+          .finally(function () {
+            if (submitBtn) submitBtn.disabled = false;
+          });
+      });
+    }
+  }
+
   function renderNotifyTargets(exclude) {
     exclude = Array.isArray(exclude) ? exclude : [];
     var all = [
@@ -2253,6 +2401,11 @@
         var cotizacionSinResponder =
           cotEstado === "" || cotEstado === "esperando respuesta";
         var statusBucket = (btn.dataset.statusBucket || "").trim();
+        var calendarAppUrl = String(
+          runtimeConfig.calendar_app_url || "https://calendar-skc.netlify.app",
+        ).replace(/\/+$/, "");
+        var calendarTicketPk = String(btn.dataset.ticketPk || "").trim();
+        var calendarEmployeeId = String(btn.dataset.empleadoId || "").trim();
         if (seguimientoWrap) {
           seguimientoWrap.setAttribute("id", "scm-sec-seguimiento");
           seguimientoWrap.style.display = "none";
@@ -2296,6 +2449,16 @@
             '<button type="button" class="scm-case-work-btn" data-scm-view-contacts>Ver contactos</button>';
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-view-property-map>Ubicaci&oacute;n del inmueble</button>';
+          if (calendarTicketPk) {
+            caseActionsHtml +=
+              '<button type="button" class="scm-case-work-btn" data-scm-calendar-create-case>Agendar cita del caso</button>';
+          }
+          if (calendarEmployeeId) {
+            caseActionsHtml +=
+              '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' +
+              escHtml(calendarAppUrl + "/funcionario/" + encodeURIComponent(calendarEmployeeId)) +
+              '" data-iframe-title="Calendario responsable">Calendario responsable</button>';
+          }
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>';
           caseActionsHtml +=
@@ -2594,6 +2757,14 @@
         .forEach(function (mapBtn) {
           mapBtn.addEventListener("click", function () {
             openPropertyMapViewer(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-calendar-create-case]")
+        .forEach(function (calendarBtn) {
+          calendarBtn.addEventListener("click", function () {
+            openCalendarCaseEventEditor(modal, btn);
           });
         });
 
