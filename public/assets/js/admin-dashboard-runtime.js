@@ -777,7 +777,61 @@
           var ticketId = String(ticket._ID || ticket.id_ticket || ticket.id || "").trim();
           return "Ticket #" + ticketId + " - " + (categoryName || String(ticket.solicitante || "Actividad").trim());
         }
-        return categoryName ? "Cita " + categoryName.toLowerCase() : "";
+        return "";
+      }
+
+      function validateCalendarEventTimes(dateValue, startValue, endValue) {
+        if (!dateValue || !startValue || !endValue) return "Debes ingresar fecha, hora de inicio y hora de fin.";
+        var start = new Date(dateValue + "T" + startValue);
+        var end = new Date(dateValue + "T" + endValue);
+        var now = new Date();
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "Debes ingresar fechas y horas validas.";
+        if (end < start) return "La hora de finalizacion no puede ser menor que la hora de inicio.";
+        var startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+        var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (startDay < today) return "No puedes seleccionar una fecha pasada.";
+        if (end < now) return "No puedes seleccionar una hora de finalizacion pasada.";
+        var startHour = start.getHours() + start.getMinutes() / 60;
+        var endHour = end.getHours() + end.getMinutes() / 60;
+        if (startHour < 8 || startHour > 21) return "La hora de inicio debe estar entre las 8:00 a. m. y las 9:00 p. m.";
+        if (endHour < 8 || endHour > 21) return "La hora de finalizacion debe estar entre las 8:00 a. m. y las 9:00 p. m.";
+        return "";
+      }
+
+      function isCustomerServiceTicket(ticket) {
+        return normalizeText(ticket && ticket.departamento).indexOf("servicio al cliente") !== -1;
+      }
+
+      function estadoComercialOptionsHtml() {
+        return [
+          "Contactado",
+          "En busqueda",
+          "En cierre",
+          "En estudio",
+          "Prospectado",
+          "Mostrando",
+          "En ruta",
+          "Retocando",
+          "En actividad comercial",
+          "Por publicar",
+          "Pendiente colocar aviso",
+        ].map(function (value) {
+          return '<option value="' + escHtml(value) + '">' + escHtml(value) + "</option>";
+        }).join("");
+      }
+
+      function estadoAdministrativoOptionsHtml() {
+        return [
+          "Por inspecccionar",
+          "Inspeccionado",
+          "Cotizado",
+          "En ejecucion por inmobiliaria",
+          "En ejecucion por propietario",
+          "En ejecucion por arrendatario",
+          "En ejecucion por copropiedad",
+        ].map(function (value) {
+          return '<option value="' + escHtml(value) + '">' + escHtml(value) + "</option>";
+        }).join("");
       }
 
       function categoryNameForRow(row) {
@@ -949,8 +1003,19 @@
           '<label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + escHtml(selectedDay || toDateKey(new Date())) + '"></label>' +
           '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required></label>' +
           '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required></label>' +
-          '<label class="scm-seg-field scm-calendar-field-full"><span>Ticket relacionado</span><input class="input input-bordered input-sm scm-input" type="search" name="ticket_search" placeholder="Buscar por ticket, contrato, inmueble o solicitante" data-calendar-ticket-search><select class="select select-bordered select-sm scm-select scm-calendar-ticket-select" name="id_ticket" data-calendar-ticket-select><option value="">Selecciona funcionario para cargar tickets</option></select><small>Al escoger un ticket se autocompleta el t&iacute;tulo y la direcci&oacute;n.</small></label>' +
-          '<label class="scm-seg-field"><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="si">Si</option><option value="no">No</option></select></label>' +
+          '<div class="scm-calendar-recurrence scm-calendar-field-full" data-calendar-recurrence>' +
+          '<label class="scm-calendar-recurrence-toggle"><input type="checkbox" name="es_recurrente" value="1" data-calendar-recurrence-toggle><span>Evento recurrente / m&uacute;ltiples fechas</span></label>' +
+          '<div class="scm-calendar-recurrence-body" data-calendar-recurrence-body hidden>' +
+          '<label class="scm-seg-field"><span>Tipo recurrencia</span><select class="select select-bordered select-sm scm-select" name="tipo_recurrencia" data-calendar-recurrence-type><option value="diario">Diario</option><option value="semanal">Semanal</option><option value="personalizado">Personalizado</option></select></label>' +
+          '<label class="scm-seg-field" data-calendar-recurrence-end><span>Fecha fin</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha_fin_recurrencia"></label>' +
+          '<div class="scm-calendar-week-picker" data-calendar-week-picker hidden><span>D&iacute;as de la semana</span><label><input type="checkbox" value="1" name="dias_semana"> Lun</label><label><input type="checkbox" value="2" name="dias_semana"> Mar</label><label><input type="checkbox" value="3" name="dias_semana"> Mi&eacute;</label><label><input type="checkbox" value="4" name="dias_semana"> Jue</label><label><input type="checkbox" value="5" name="dias_semana"> Vie</label><label><input type="checkbox" value="6" name="dias_semana"> S&aacute;b</label><label><input type="checkbox" value="0" name="dias_semana"> Dom</label></div>' +
+          '<div class="scm-calendar-custom-dates" data-calendar-custom-dates hidden><div data-calendar-custom-rows></div><button type="button" class="scm-case-work-btn" data-calendar-add-custom-date>Agregar fecha personalizada</button></div>' +
+          '</div></div>' +
+          '<label class="scm-seg-field"><span>Relacionado con ticket</span><select class="select select-bordered select-sm scm-select" name="relacionado_ticket" data-calendar-related-ticket><option value="">Selecciona una opci&oacute;n</option><option value="si">S&iacute;, est&aacute; relacionado</option><option value="no">No, evento libre</option></select></label>' +
+          '<label class="scm-seg-field scm-calendar-field-full" data-calendar-ticket-field hidden><span>Ticket relacionado</span><input class="input input-bordered input-sm scm-input" type="search" name="ticket_search" placeholder="Buscar por ticket, contrato, inmueble o solicitante" data-calendar-ticket-search><select class="select select-bordered select-sm scm-select scm-calendar-ticket-select" name="id_ticket" data-calendar-ticket-select><option value="">Selecciona funcionario para cargar tickets</option></select><small>Al escoger un ticket se autocompleta el t&iacute;tulo y la direcci&oacute;n.</small></label>' +
+          '<label class="scm-seg-field" data-calendar-cita-field hidden><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="">Selecciona si es cita</option><option value="si">Si</option><option value="no">No</option></select></label>' +
+          '<label class="scm-seg-field scm-calendar-ticket-state" data-calendar-commercial-state hidden><span>Estado comercial</span><select class="select select-bordered select-sm scm-select" name="estado_comercial"><option value="">Selecciona estado comercial</option>' + estadoComercialOptionsHtml() + '</select></label>' +
+          '<label class="scm-seg-field scm-calendar-ticket-state" data-calendar-admin-state hidden><span>Estado administrativo</span><select class="select select-bordered select-sm scm-select" name="estado_administrativo"><option value="">Selecciona estado administrativo</option>' + estadoAdministrativoOptionsHtml() + '</select></label>' +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" placeholder="Direcci&oacute;n o lugar"></label>' +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required></textarea></label>' +
           '</div><div class="scm-calendar-popup-agenda"><h4>' + (mode === "multiple" ? "Agenda por funcionario" : "Agenda del funcionario") + '</h4><div data-scm-calendar-popup-agenda>' + popupEmployeeAgendaHtml(preselectedEmployee) + '</div></div></form>';
@@ -980,11 +1045,27 @@
             var dateInput = popup.querySelector('[name="fecha"]');
             var startInput = popup.querySelector('[name="hora_inicio"]');
             var endInput = popup.querySelector('[name="hora_fin"]');
+            var recurrenceToggle = popup.querySelector("[data-calendar-recurrence-toggle]");
+            var recurrenceBody = popup.querySelector("[data-calendar-recurrence-body]");
+            var recurrenceType = popup.querySelector("[data-calendar-recurrence-type]");
+            var recurrenceEndWrap = popup.querySelector("[data-calendar-recurrence-end]");
+            var weekPicker = popup.querySelector("[data-calendar-week-picker]");
+            var customDatesWrap = popup.querySelector("[data-calendar-custom-dates]");
+            var customRows = popup.querySelector("[data-calendar-custom-rows]");
+            var addCustomDateBtn = popup.querySelector("[data-calendar-add-custom-date]");
             var titleInput = popup.querySelector('[name="titulo"]');
             var locationInput = popup.querySelector('[name="ubicacion"]');
             var descriptionInput = popup.querySelector('[name="descripcion"]');
+            var relatedTicketSelect = popup.querySelector("[data-calendar-related-ticket]");
+            var ticketFieldWrap = popup.querySelector("[data-calendar-ticket-field]");
+            var citaFieldWrap = popup.querySelector("[data-calendar-cita-field]");
+            var citaSelect = popup.querySelector('[name="es_cita"]');
             var ticketSearch = popup.querySelector("[data-calendar-ticket-search]");
             var ticketSelect = popup.querySelector("[data-calendar-ticket-select]");
+            var commercialStateWrap = popup.querySelector("[data-calendar-commercial-state]");
+            var adminStateWrap = popup.querySelector("[data-calendar-admin-state]");
+            var commercialStateSelect = popup.querySelector('[name="estado_comercial"]');
+            var adminStateSelect = popup.querySelector('[name="estado_administrativo"]');
             var currentTicketRows = [];
             function selectedEmployees() {
               return selectedEmployeesFromPopup(popup.querySelector(".scm-calendar-popup-form"));
@@ -996,9 +1077,12 @@
                 return String(ticket._ID || ticket.id_ticket || ticket.id || "").trim() === value;
               }) || null;
             }
+            function isTicketRelated() {
+              return relatedTicketSelect && relatedTicketSelect.value === "si";
+            }
             function maybeAutofillTitleAndLocation(force) {
               var categoryName = categoryNameFromSelect(categorySelect);
-              var ticket = selectedTicket();
+              var ticket = isTicketRelated() ? selectedTicket() : null;
               if (titleInput) {
                 var title = buildCalendarTitle(categoryName, ticket);
                 if (title && (force || !titleInput.value || titleInput.getAttribute("data-auto-calendar-title") === "1")) {
@@ -1009,6 +1093,52 @@
               if (locationInput && ticket && ticket.direccion && (force || !locationInput.value || locationInput.getAttribute("data-auto-calendar-location") === "1")) {
                 locationInput.value = ticket.direccion;
                 locationInput.setAttribute("data-auto-calendar-location", "1");
+              }
+            }
+            function applyRelatedTicketVisibility() {
+              var related = isTicketRelated();
+              if (ticketFieldWrap) ticketFieldWrap.hidden = !related;
+              if (citaFieldWrap) citaFieldWrap.hidden = !related;
+              if (!related) {
+                if (ticketSelect) ticketSelect.value = "";
+                if (ticketSearch) ticketSearch.value = "";
+                if (citaSelect) citaSelect.value = "";
+              } else if (citaSelect && !citaSelect.value) {
+                citaSelect.value = "si";
+              }
+              applyTicketStateVisibility();
+            }
+            function applyTicketStateVisibility() {
+              var ticket = isTicketRelated() ? selectedTicket() : null;
+              var showCommercial = !!ticket && isCustomerServiceTicket(ticket);
+              var showAdmin = !!ticket && !showCommercial;
+              if (commercialStateWrap) commercialStateWrap.hidden = !showCommercial;
+              if (adminStateWrap) adminStateWrap.hidden = !showAdmin;
+              if (!showCommercial && commercialStateSelect) commercialStateSelect.value = "";
+              if (!showAdmin && adminStateSelect) adminStateSelect.value = "";
+            }
+            function applyTicketStateToTitle() {
+              var ticket = isTicketRelated() ? selectedTicket() : null;
+              if (!ticket || !titleInput) return;
+              if (isCustomerServiceTicket(ticket)) {
+                var estadoComercial = commercialStateSelect ? String(commercialStateSelect.value || "").trim() : "";
+                var solicitante = String(ticket.solicitante || "").trim();
+                var baseTitle = String(titleInput.value || buildCalendarTitle(categoryNameFromSelect(categorySelect), ticket)).split(" - ")[0];
+                if (estadoComercial && (titleInput.getAttribute("data-auto-calendar-title") === "1" || !titleInput.value)) {
+                  titleInput.value = (baseTitle || estadoComercial) + (solicitante ? " - " + solicitante : "");
+                  titleInput.setAttribute("data-auto-calendar-title", "1");
+                }
+                return;
+              }
+              var estadoAdministrativo = adminStateSelect ? String(adminStateSelect.value || "").trim() : "";
+              var contrato = String(ticket.contrato || "").trim();
+              var prefix = contrato ? "Contrato #" + contrato + " - " : "";
+              var current = String(titleInput.value || buildCalendarTitle(categoryNameFromSelect(categorySelect), ticket)).trim();
+              var suffix = current && prefix && current.indexOf(prefix) === 0 ? current.slice(prefix.length) : current;
+              if (estadoAdministrativo) suffix = estadoAdministrativo;
+              if (prefix && (titleInput.getAttribute("data-auto-calendar-title") === "1" || !titleInput.value)) {
+                titleInput.value = (prefix + (suffix || categoryNameFromSelect(categorySelect) || "Actividad")).trim();
+                titleInput.setAttribute("data-auto-calendar-title", "1");
               }
             }
             function refreshTickets() {
@@ -1025,6 +1155,13 @@
             }
             function maybeAutofillPreventiveDescription() {
               if (!categorySelect || !dateInput || !startInput || !endInput || !descriptionInput) return;
+              if (isTicketRelated() && citaSelect && citaSelect.value !== "si") {
+                if (descriptionInput.getAttribute("data-auto-calendar-text") === "1") {
+                  descriptionInput.value = "";
+                  descriptionInput.setAttribute("data-auto-calendar-text", "0");
+                }
+                return;
+              }
               var selectedOption = categorySelect.options[categorySelect.selectedIndex];
               var categoryName = selectedOption ? selectedOption.textContent : "";
               if (normalizeText(categoryName).indexOf("preventiva") === -1) return;
@@ -1032,6 +1169,28 @@
               if (descriptionInput.value && descriptionInput.getAttribute("data-auto-calendar-text") !== "1") return;
               descriptionInput.value = buildPreventiveDescription(categoryName, dateInput.value, startInput.value, endInput.value);
               descriptionInput.setAttribute("data-auto-calendar-text", "1");
+            }
+            function customDateRowHtml() {
+              var defaultDate = dateInput ? dateInput.value : "";
+              var defaultStart = startInput ? startInput.value : "";
+              var defaultEnd = endInput ? endInput.value : "";
+              return '<div class="scm-calendar-custom-date-row">' +
+                '<input class="input input-bordered input-sm scm-input" type="date" name="custom_fecha" value="' + escHtml(defaultDate) + '">' +
+                '<input class="input input-bordered input-sm scm-input" type="time" name="custom_hora_inicio" value="' + escHtml(defaultStart) + '">' +
+                '<input class="input input-bordered input-sm scm-input" type="time" name="custom_hora_fin" value="' + escHtml(defaultEnd) + '">' +
+                '<button type="button" class="scm-case-work-btn" data-calendar-remove-custom-date>Quitar</button>' +
+                '</div>';
+            }
+            function refreshRecurrenceUi() {
+              var active = !!(recurrenceToggle && recurrenceToggle.checked);
+              if (recurrenceBody) recurrenceBody.hidden = !active;
+              var type = recurrenceType ? recurrenceType.value : "diario";
+              if (recurrenceEndWrap) recurrenceEndWrap.hidden = !active || type === "personalizado";
+              if (weekPicker) weekPicker.hidden = !active || type !== "semanal";
+              if (customDatesWrap) customDatesWrap.hidden = !active || type !== "personalizado";
+              if (active && type === "personalizado" && customRows && !customRows.children.length) {
+                customRows.insertAdjacentHTML("beforeend", customDateRowHtml());
+              }
             }
             if (employeesSelect) {
               employeesSelect.addEventListener("change", function () {
@@ -1063,8 +1222,25 @@
             if (ticketSelect) {
               ticketSelect.addEventListener("change", function () {
                 maybeAutofillTitleAndLocation(true);
+                applyTicketStateVisibility();
+                applyTicketStateToTitle();
                 maybeAutofillPreventiveDescription();
               });
+            }
+            if (relatedTicketSelect) {
+              relatedTicketSelect.addEventListener("change", function () {
+                applyRelatedTicketVisibility();
+                maybeAutofillTitleAndLocation(true);
+                maybeAutofillPreventiveDescription();
+              });
+            }
+            [commercialStateSelect, adminStateSelect].forEach(function (field) {
+              if (field) field.addEventListener("change", function () {
+                applyTicketStateToTitle();
+              });
+            });
+            if (citaSelect) {
+              citaSelect.addEventListener("change", maybeAutofillPreventiveDescription);
             }
             if (titleInput) {
               titleInput.addEventListener("input", function () {
@@ -1082,6 +1258,20 @@
                 maybeAutofillPreventiveDescription();
               });
             });
+            if (recurrenceToggle) recurrenceToggle.addEventListener("change", refreshRecurrenceUi);
+            if (recurrenceType) recurrenceType.addEventListener("change", refreshRecurrenceUi);
+            if (addCustomDateBtn && customRows) {
+              addCustomDateBtn.addEventListener("click", function () {
+                customRows.insertAdjacentHTML("beforeend", customDateRowHtml());
+              });
+              customRows.addEventListener("click", function (e) {
+                var removeBtn = e.target && e.target.closest ? e.target.closest("[data-calendar-remove-custom-date]") : null;
+                if (removeBtn) {
+                  var row = removeBtn.closest(".scm-calendar-custom-date-row");
+                  if (row) row.remove();
+                }
+              });
+            }
             if (descriptionInput) {
               descriptionInput.addEventListener("input", function () {
                 descriptionInput.setAttribute("data-auto-calendar-text", "0");
@@ -1089,6 +1279,8 @@
             }
             refreshAgenda();
             refreshTickets();
+            applyRelatedTicketVisibility();
+            refreshRecurrenceUi();
             maybeAutofillTitleAndLocation(false);
             maybeAutofillPreventiveDescription();
           },
@@ -1105,20 +1297,103 @@
               return false;
             }
             var fd = new FormData(form);
-            var payload = {
+            var relatedTicket = fd.get("relacionado_ticket") === "si";
+            var isCita = relatedTicket ? String(fd.get("es_cita") || "") : "";
+            if (!String(fd.get("titulo") || "").trim() || !String(fd.get("ubicacion") || "").trim() || !String(fd.get("id_categoria") || "").trim()) {
+              window.Swal.showValidationMessage("Titulo, ubicacion y categoria son obligatorios.");
+              return false;
+            }
+            if (relatedTicket && isCita === "no" && !String(fd.get("descripcion") || "").trim()) {
+              window.Swal.showValidationMessage("La descripcion es obligatoria si el evento no es una cita.");
+              return false;
+            }
+            var basePayload = {
               titulo: fd.get("titulo") || "",
               descripcion: fd.get("descripcion") || "",
               ubicacion: fd.get("ubicacion") || "",
-              fecha_inicio: (fd.get("fecha") || "") + " " + (fd.get("hora_inicio") || "") + ":00",
-              fecha_fin: (fd.get("fecha") || "") + " " + (fd.get("hora_fin") || "") + ":00",
               id_categoria: fd.get("id_categoria") || "",
-              id_ticket: fd.get("id_ticket") || "",
-              es_cita: fd.get("es_cita") || "si",
-              estado_administrativo: "Cita agendada",
-              estado_comercial: "Cita agendada",
+              id_ticket: relatedTicket ? fd.get("id_ticket") || "" : "",
+              es_cita: isCita,
+              estado_administrativo: relatedTicket ? fd.get("estado_administrativo") || "" : "",
+              estado_comercial: relatedTicket ? fd.get("estado_comercial") || "" : "",
             };
+            var recurrent = fd.get("es_recurrente") === "1";
+            var recurrenceTypeValue = String(fd.get("tipo_recurrencia") || "diario");
+            var eventsToCreate = [];
+            function makePayload(dateValue, startValue, endValue) {
+              return Object.assign({}, basePayload, {
+                fecha_inicio: dateValue + " " + startValue + ":00",
+                fecha_fin: dateValue + " " + endValue + ":00",
+              });
+            }
+            function addValidatedPayload(dateValue, startValue, endValue) {
+              var err = validateCalendarEventTimes(dateValue, startValue, endValue);
+              if (err) return err;
+              eventsToCreate.push(makePayload(dateValue, startValue, endValue));
+              return "";
+            }
+            if (recurrent && recurrenceTypeValue === "personalizado") {
+              var customRowsList = Array.prototype.slice.call(form.querySelectorAll(".scm-calendar-custom-date-row"));
+              if (!customRowsList.length) {
+                window.Swal.showValidationMessage("Agrega al menos una fecha personalizada.");
+                return false;
+              }
+              for (var customIndex = 0; customIndex < customRowsList.length; customIndex += 1) {
+                var row = customRowsList[customIndex];
+                var customDate = row.querySelector('[name="custom_fecha"]');
+                var customStart = row.querySelector('[name="custom_hora_inicio"]');
+                var customEnd = row.querySelector('[name="custom_hora_fin"]');
+                var customError = addValidatedPayload(customDate ? customDate.value : "", customStart ? customStart.value : "", customEnd ? customEnd.value : "");
+                if (customError) {
+                  window.Swal.showValidationMessage(customError);
+                  return false;
+                }
+              }
+            } else {
+              var baseDate = String(fd.get("fecha") || "");
+              var baseStart = String(fd.get("hora_inicio") || "");
+              var baseEnd = String(fd.get("hora_fin") || "");
+              var baseError = validateCalendarEventTimes(baseDate, baseStart, baseEnd);
+              if (baseError) {
+                window.Swal.showValidationMessage(baseError);
+                return false;
+              }
+              if (!recurrent) {
+                eventsToCreate.push(makePayload(baseDate, baseStart, baseEnd));
+              } else {
+                var endRecurrence = String(fd.get("fecha_fin_recurrencia") || "");
+                if (!endRecurrence) {
+                  window.Swal.showValidationMessage("Debes seleccionar una fecha fin para la recurrencia.");
+                  return false;
+                }
+                var current = new Date(baseDate + "T00:00:00");
+                var endDate = new Date(endRecurrence + "T00:00:00");
+                if (Number.isNaN(endDate.getTime()) || endDate < current) {
+                  window.Swal.showValidationMessage("La fecha fin de recurrencia no puede ser menor a la fecha de inicio.");
+                  return false;
+                }
+                var selectedDays = fd.getAll("dias_semana").map(function (value) { return parseInt(value, 10); });
+                if (recurrenceTypeValue === "semanal" && !selectedDays.length) {
+                  window.Swal.showValidationMessage("Selecciona al menos un dia de la semana.");
+                  return false;
+                }
+                while (current <= endDate) {
+                  var shouldAdd = recurrenceTypeValue === "diario" || selectedDays.indexOf(current.getDay()) !== -1;
+                  if (shouldAdd) {
+                    eventsToCreate.push(makePayload(toDateKey(current), baseStart, baseEnd));
+                  }
+                  current = addDays(current, 1);
+                }
+                if (!eventsToCreate.length) {
+                  window.Swal.showValidationMessage("No se generaron eventos con la configuracion seleccionada.");
+                  return false;
+                }
+              }
+            }
             window.Swal.showLoading();
-            var request = selected.length > 1 ? calendarApi("crear_eventos", { eventos: [payload], empleados: selected }) : calendarApi("crear_evento", Object.assign({}, payload, { id_empleado: selected[0] }));
+            var request = selected.length > 1 || eventsToCreate.length > 1
+              ? calendarApi("crear_eventos", { eventos: eventsToCreate, empleados: selected })
+              : calendarApi("crear_evento", Object.assign({}, eventsToCreate[0], { id_empleado: selected[0] }));
             return request.then(function (json) {
               if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el evento.");
               return json;

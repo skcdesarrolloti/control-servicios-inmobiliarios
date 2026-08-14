@@ -1117,6 +1117,84 @@
   margin-top: 8px !important;
 }
 
+.swal2-popup .scm-calendar-recurrence {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  padding: 12px !important;
+}
+
+.swal2-popup .scm-calendar-recurrence-toggle {
+  align-items: center;
+  color: #10243d;
+  cursor: pointer;
+  display: flex !important;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 950;
+  margin: 0 !important;
+}
+
+.swal2-popup .scm-calendar-recurrence-toggle input {
+  min-height: auto !important;
+  width: auto !important;
+}
+
+.swal2-popup .scm-calendar-recurrence-body {
+  border-top: 1px solid #fed7aa;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 12px;
+  padding-top: 12px !important;
+}
+
+.swal2-popup .scm-calendar-week-picker,
+.swal2-popup .scm-calendar-custom-dates {
+  background: #fff;
+  border: 1px solid #dbe6f2;
+  border-radius: 12px;
+  grid-column: 1 / -1;
+  padding: 10px !important;
+}
+
+.swal2-popup .scm-calendar-week-picker > span {
+  color: #64748b;
+  display: block;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-calendar-week-picker label {
+  align-items: center;
+  color: #334155;
+  display: inline-flex !important;
+  font-size: 12px;
+  font-weight: 850;
+  gap: 5px;
+  margin: 0 10px 8px 0 !important;
+}
+
+.swal2-popup .scm-calendar-week-picker input {
+  min-height: auto !important;
+  width: auto !important;
+}
+
+.swal2-popup .scm-calendar-custom-date-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(120px, 1fr) minmax(95px, 0.7fr) minmax(95px, 0.7fr) auto;
+  margin-bottom: 8px;
+}
+
+.swal2-popup .scm-calendar-custom-dates .scm-case-work-btn {
+  background: #fff !important;
+}
+
 .swal2-popup .scm-calendar-employee-picker {
   background: #f8fafc;
   border: 1px solid #dbe6f2;
