@@ -742,15 +742,267 @@
   padding: 12px 14px !important;
 }
 
+#scm-app .scm-calendar-filter-card {
+  padding: 16px 18px !important;
+}
+
+#scm-app .scm-calendar-filter-card .scm-grid {
+  align-items: end;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(150px, 0.75fr) minmax(190px, 0.8fr);
+}
+
+#scm-app .scm-calendar-filter-note span {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #dbe6f2;
+  border-radius: 10px;
+  color: #486179;
+  display: flex;
+  font-size: 12px;
+  font-weight: 900;
+  min-height: 38px;
+  padding: 8px 10px !important;
+}
+
+#scm-app .scm-calendar-layout {
+  grid-template-columns: minmax(640px, 1.35fr) minmax(320px, 0.65fr);
+}
+
+#scm-app .scm-calendar-board-card {
+  min-height: 640px;
+}
+
+#scm-app .scm-calendar-month-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+#scm-app .scm-calendar-weekdays,
+#scm-app .scm-calendar-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+#scm-app .scm-calendar-weekdays {
+  background: #eef5fb;
+  border: 1px solid #dbe6f2;
+  border-bottom: 0;
+  border-radius: 13px 13px 0 0;
+  overflow: hidden;
+}
+
+#scm-app .scm-calendar-weekdays span {
+  color: #54708c;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  padding: 10px 8px !important;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-calendar-month-grid {
+  background: #dbe6f2;
+  border: 1px solid #dbe6f2;
+  border-radius: 0 0 13px 13px;
+  gap: 1px;
+  overflow: hidden;
+}
+
+#scm-app .scm-calendar-day {
+  background: #fff;
+  border: 0;
+  color: var(--scm-text-main);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 108px;
+  padding: 10px !important;
+  text-align: left;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+#scm-app .scm-calendar-day:hover {
+  background: #fffaf0;
+  box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.28);
+}
+
+#scm-app .scm-calendar-day.is-muted {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+#scm-app .scm-calendar-day.is-today {
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.24);
+}
+
+#scm-app .scm-calendar-day.is-selected {
+  background: #fff7ed;
+  box-shadow: inset 0 0 0 2px var(--scm-orange-500);
+}
+
+#scm-app .scm-calendar-day-number {
+  color: inherit;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+#scm-app .scm-calendar-day-events-count {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  min-height: 13px;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-calendar-day-pill {
+  background: #f8fafc;
+  border-left: 4px solid #f59e0b;
+  border-radius: 7px;
+  color: #24364b;
+  display: block;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.2;
+  overflow: hidden;
+  padding: 4px 6px !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+#scm-app .scm-calendar-day-more {
+  color: #f59e0b;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+#scm-app .scm-calendar-loading {
+  align-items: center;
+  background: #fff;
+  color: #64748b;
+  display: flex;
+  font-size: 13px;
+  font-weight: 850;
+  grid-column: 1 / -1;
+  justify-content: center;
+  min-height: 320px;
+  padding: 24px !important;
+}
+
+#scm-app .scm-calendar-day-card {
+  position: sticky;
+  top: 12px;
+}
+
+#scm-app .scm-calendar-day-card .scm-calendar-events {
+  max-height: 560px;
+  overflow: auto;
+  padding-right: 4px !important;
+}
+
+#scm-app .scm-calendar-day-create {
+  justify-content: center;
+  margin-top: 14px;
+  min-height: 44px;
+  width: 100%;
+}
+
+.swal2-popup .scm-calendar-popup-form {
+  color: #0f2742;
+  text-align: left;
+}
+
+.swal2-popup .scm-calendar-popup-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.swal2-popup .scm-calendar-popup-form .scm-seg-field {
+  margin: 0;
+}
+
+.swal2-popup .scm-calendar-field-full {
+  grid-column: 1 / -1;
+}
+
+.swal2-popup .scm-calendar-popup-form select[multiple] {
+  min-height: 132px;
+}
+
+.swal2-popup .scm-calendar-popup-form small {
+  color: #64748b;
+  display: block;
+  font-size: 11px;
+  margin-top: 5px;
+}
+
+.swal2-popup .scm-calendar-popup-agenda,
+#scm-app .scm-calendar-popup-agenda {
+  background: #f8fafc;
+  border: 1px dashed #bfdbfe;
+  border-radius: 14px;
+  margin-top: 14px;
+  padding: 14px !important;
+}
+
+.swal2-popup .scm-calendar-popup-agenda h4,
+#scm-app .scm-calendar-popup-agenda h4 {
+  color: #10243d;
+  font-size: 14px;
+  font-weight: 950;
+  margin: 0 0 10px;
+}
+
+.swal2-popup .scm-calendar-popup-agenda-item,
+#scm-app .scm-calendar-popup-agenda-item {
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #dbe6f2;
+  border-radius: 10px;
+  display: grid;
+  gap: 3px;
+  margin-top: 8px;
+  padding: 9px 10px !important;
+}
+
+.swal2-popup .scm-calendar-popup-agenda-item strong,
+#scm-app .scm-calendar-popup-agenda-item strong {
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.swal2-popup .scm-calendar-popup-agenda-item span,
+#scm-app .scm-calendar-popup-agenda-item span {
+  color: #24364b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.swal2-popup .scm-calendar-popup-agenda-empty,
+#scm-app .scm-calendar-popup-agenda-empty {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
 @media (max-width: 1100px) {
   #scm-app .scm-calendar-layout,
   #scm-app .scm-calendar-kpis,
+  #scm-app .scm-calendar-filter-card .scm-grid,
   #scm-app .scm-calendar-quick-grid,
   #scm-app .scm-calendar-select-grid {
     grid-template-columns: 1fr;
   }
 
-  #scm-app .scm-calendar-create-card {
+  #scm-app .scm-calendar-create-card,
+  #scm-app .scm-calendar-day-card {
     position: static;
   }
 }
@@ -764,6 +1016,22 @@
 
   #scm-app .scm-calendar-field-wide {
     grid-column: 1 / -1;
+  }
+
+  #scm-app .scm-calendar-weekdays {
+    display: none;
+  }
+
+  #scm-app .scm-calendar-month-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-calendar-day {
+    min-height: 88px;
+  }
+
+  .swal2-popup .scm-calendar-popup-grid {
+    grid-template-columns: 1fr;
   }
 }
 

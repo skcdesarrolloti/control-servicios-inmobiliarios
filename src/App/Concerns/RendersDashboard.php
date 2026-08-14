@@ -27,6 +27,12 @@ trait RendersDashboard
 
     $module = $this->get_servicios_inmobiliarios_module();
     $filterOptions = $module->getFilterOptions();
+    $calendarAllowedFuncionarios = $this->get_calendar_allowed_funcionarios();
+    $config['calendar_allowed_cargos'] = ['3', '4', '5', '7', '8', '11', '12', '14', '18'];
+    $config['calendar_allowed_funcionarios'] = $calendarAllowedFuncionarios;
+    $config['calendar_allowed_employee_ids'] = array_values(array_filter(array_map(static function ($row): string {
+      return trim((string) ($row['id_empleado'] ?? ''));
+    }, $calendarAllowedFuncionarios)));
     $params = $module->parseParams($_GET);
     $result = $module->run($params, $config);
     $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];
@@ -1286,19 +1292,28 @@ trait RendersDashboard
     if ($apiUrl === '') {
       $apiUrl = self::DEFAULT_CALENDAR_API_URL;
     }
-    $today = date('Y-m-d');
-    $nextWeek = date('Y-m-d', strtotime('+7 days') ?: time());
+    $allowedFuncionarios = is_array($config['calendar_allowed_funcionarios'] ?? null) ? $config['calendar_allowed_funcionarios'] : [];
+    $allowedCargos = is_array($config['calendar_allowed_cargos'] ?? null) ? $config['calendar_allowed_cargos'] : ['3', '4', '5', '7', '8', '11', '12', '14', '18'];
+    $allowedFuncionariosJson = json_encode($allowedFuncionarios, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+    $todayLabel = date('Y-m-d');
 
     ob_start();
 ?>
-    <div class="scm-calendar-panel" data-scm-calendar-panel data-calendar-app-url="<?php echo esc_attr($appUrl); ?>" data-calendar-api-url="<?php echo esc_attr($apiUrl); ?>">
+    <div class="scm-calendar-panel"
+      data-scm-calendar-panel
+      data-calendar-app-url="<?php echo esc_attr($appUrl); ?>"
+      data-calendar-api-url="<?php echo esc_attr($apiUrl); ?>"
+      data-calendar-allowed-cargos="<?php echo esc_attr(implode(',', array_map('strval', $allowedCargos))); ?>"
+      data-calendar-employees-json="<?php echo esc_attr($allowedFuncionariosJson ?: '[]'); ?>">
       <div class="scm-status-topic-head scm-calendar-head">
         <div>
           <h3>Calendario</h3>
-          <p>Crea eventos, agenda citas por ticket y consulta calendarios de funcionarios sin salir del control.</p>
+          <p>Agenda citas, consulta disponibilidad y crea eventos solo para los cargos operativos permitidos.</p>
         </div>
         <div class="scm-calendar-head-actions">
           <span class="scm-status-count"><strong data-scm-calendar-total>0</strong> eventos</span>
+          <button type="button" class="scm-btn-primary btn btn-primary" data-scm-calendar-open-create data-calendar-mode="single">Crear evento</button>
+          <button type="button" class="scm-case-work-btn" data-scm-calendar-open-create data-calendar-mode="multiple">Evento m&uacute;ltiple</button>
           <button type="button" class="scm-case-work-btn" data-scm-calendar-open-path="/" data-iframe-title="Calendario en grande">Ver en grande</button>
         </div>
       </div>
@@ -1306,71 +1321,102 @@ trait RendersDashboard
       <div class="scm-calendar-kpis">
         <div class="scm-kpi"><div class="scm-kpi-label">Pendientes</div><div class="scm-kpi-value" data-scm-calendar-pending>0</div></div>
         <div class="scm-kpi"><div class="scm-kpi-label">Realizados</div><div class="scm-kpi-value" data-scm-calendar-done>0</div></div>
-        <div class="scm-kpi"><div class="scm-kpi-label">Rango</div><div class="scm-kpi-value scm-calendar-range-value" data-scm-calendar-range><?php echo esc_html($today); ?></div></div>
+        <div class="scm-kpi"><div class="scm-kpi-label">Hoy</div><div class="scm-kpi-value" data-scm-calendar-today>0</div></div>
+        <div class="scm-kpi"><div class="scm-kpi-label">Mes visible</div><div class="scm-kpi-value scm-calendar-range-value" data-scm-calendar-range><?php echo esc_html($todayLabel); ?></div></div>
       </div>
 
+      <section class="scm-calendar-card scm-calendar-filter-card">
+        <form class="scm-calendar-filter-form" data-scm-calendar-filters autocomplete="off">
+          <div class="scm-grid">
+            <div class="scm-field"><label>Funcionario</label><select class="select select-bordered select-sm scm-select" name="id_empleado" data-scm-calendar-filter-employees><option value="">Todos</option></select></div>
+            <div class="scm-field"><label>Categor&iacute;a</label><select class="select select-bordered select-sm scm-select" name="id_categoria" data-scm-calendar-filter-categories><option value="">Todas</option></select></div>
+            <div class="scm-field"><label>Estado</label><select class="select select-bordered select-sm scm-select" name="estado"><option value="">Todos</option><option value="No" selected>Pendientes</option><option value="Si">Realizados</option></select></div>
+            <div class="scm-field scm-calendar-filter-note"><label>Cargos visibles</label><span><?php echo esc_html(implode(', ', array_map('strval', $allowedCargos))); ?></span></div>
+          </div>
+          <div class="scm-actions">
+            <button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button>
+            <button class="scm-btn-secondary btn btn-outline" type="button" data-scm-calendar-clear>Limpiar</button>
+            <span class="scm-spinner" data-scm-calendar-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
+          </div>
+        </form>
+      </section>
+
       <div class="scm-calendar-layout">
-        <section class="scm-calendar-card scm-calendar-create-card">
+        <section class="scm-calendar-card scm-calendar-board-card">
           <div class="scm-calendar-card-head">
             <div>
-              <span class="scm-calendar-action-kicker">Crear</span>
-              <h4>Nuevo evento</h4>
-              <p>Usa uno o varios funcionarios. Si colocas ticket, se enlaza al caso.</p>
+              <span class="scm-calendar-action-kicker">Vista mensual</span>
+              <h4 data-scm-calendar-title>Calendario</h4>
+              <p>Haz clic en un d&iacute;a para ver sus eventos o crear uno nuevo.</p>
             </div>
-            <button type="button" class="scm-case-work-btn" data-scm-calendar-open-path="/crear-evento-multiple" data-iframe-title="Formulario original de evento multiple">Formulario original</button>
+            <div class="scm-calendar-month-actions">
+              <button type="button" class="scm-case-work-btn" data-scm-calendar-prev aria-label="Mes anterior">&lsaquo;</button>
+              <button type="button" class="scm-case-work-btn" data-scm-calendar-today-btn>Hoy</button>
+              <button type="button" class="scm-case-work-btn" data-scm-calendar-next aria-label="Mes siguiente">&rsaquo;</button>
+            </div>
           </div>
-          <form class="scm-calendar-create-form" data-scm-calendar-create autocomplete="off">
-            <div class="scm-grid">
-              <div class="scm-field"><label>Título</label><input class="input input-bordered input-sm scm-input" name="titulo" required placeholder="Ej: Cita revisión preventiva"></div>
-              <div class="scm-field"><label>Categoría</label><select class="select select-bordered select-sm scm-select" name="id_categoria" data-scm-calendar-categories required><option value="">Cargando...</option></select></div>
-              <div class="scm-field scm-calendar-field-wide"><label>Funcionarios</label><select class="select select-bordered select-sm scm-select" name="empleados[]" data-scm-calendar-employees multiple required><option value="">Cargando...</option></select><small>Ctrl+clic para seleccionar varios.</small></div>
-              <div class="scm-field"><label>Fecha</label><input class="input input-bordered input-sm scm-input" type="date" name="fecha" value="<?php echo esc_attr($today); ?>" required></div>
-              <div class="scm-field"><label>Hora inicio</label><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required></div>
-              <div class="scm-field"><label>Hora fin</label><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required></div>
-              <div class="scm-field"><label>Ticket opcional</label><input class="input input-bordered input-sm scm-input" name="id_ticket" placeholder="Ej: 10266"></div>
-              <div class="scm-field"><label>Es cita</label><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="no">No</option><option value="si">Sí</option></select></div>
-              <div class="scm-field scm-calendar-field-wide"><label>Ubicación</label><input class="input input-bordered input-sm scm-input" name="ubicacion" placeholder="Dirección o lugar del evento"></div>
-              <div class="scm-field scm-calendar-field-full"><label>Descripción</label><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required placeholder="Describe la actividad a realizar"></textarea></div>
-            </div>
-            <div class="scm-actions">
-              <button class="scm-btn-primary btn btn-primary" type="submit">Crear evento</button>
-              <span class="scm-spinner" data-scm-calendar-create-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
-              <p class="scm-seg-msg" data-scm-calendar-create-msg aria-live="polite"></p>
-            </div>
-          </form>
+          <div class="scm-calendar-weekdays" aria-hidden="true"><span>Lun</span><span>Mar</span><span>Mi&eacute;</span><span>Jue</span><span>Vie</span><span>S&aacute;b</span><span>Dom</span></div>
+          <div class="scm-calendar-month-grid" data-scm-calendar-grid aria-live="polite">
+            <div class="scm-calendar-loading">Cargando calendario...</div>
+          </div>
         </section>
 
-        <section class="scm-calendar-card">
+        <section class="scm-calendar-card scm-calendar-day-card">
           <div class="scm-calendar-card-head">
             <div>
-              <span class="scm-calendar-action-kicker">Agenda</span>
-              <h4>Eventos del calendario</h4>
-              <p>Filtra por funcionario, categoría, estado y fecha.</p>
+              <span class="scm-calendar-action-kicker">Agenda del d&iacute;a</span>
+              <h4 data-scm-calendar-day-title>Selecciona un d&iacute;a</h4>
+              <p data-scm-calendar-day-subtitle>Los eventos se muestran seg&uacute;n funcionario, estado y categor&iacute;a.</p>
             </div>
             <button type="button" class="scm-case-work-btn" data-scm-calendar-refresh>Actualizar</button>
           </div>
-          <form class="scm-calendar-filter-form" data-scm-calendar-filters autocomplete="off">
-            <div class="scm-grid">
-              <div class="scm-field"><label>Funcionario</label><select class="select select-bordered select-sm scm-select" name="id_empleado" data-scm-calendar-filter-employees><option value="">Todos</option></select></div>
-              <div class="scm-field"><label>Categoría</label><select class="select select-bordered select-sm scm-select" name="id_categoria" data-scm-calendar-filter-categories><option value="">Todas</option></select></div>
-              <div class="scm-field"><label>Estado</label><select class="select select-bordered select-sm scm-select" name="estado"><option value="">Todos</option><option value="No" selected>Pendientes</option><option value="Si">Realizados</option></select></div>
-              <div class="scm-field"><label>Desde</label><input class="input input-bordered input-sm scm-input" type="date" name="fecha_inicio" value="<?php echo esc_attr($today); ?>"></div>
-              <div class="scm-field"><label>Hasta</label><input class="input input-bordered input-sm scm-input" type="date" name="fecha_fin" value="<?php echo esc_attr($nextWeek); ?>"></div>
-            </div>
-            <div class="scm-actions">
-              <button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button>
-              <button class="scm-btn-secondary btn btn-outline" type="button" data-scm-calendar-clear>Limpiar</button>
-              <span class="scm-spinner" data-scm-calendar-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
-            </div>
-          </form>
-          <div class="scm-calendar-events" data-scm-calendar-events>
-            <div class="scm-empty scm-empty-cards">Cargando eventos...</div>
-          </div>
+          <div class="scm-calendar-events" data-scm-calendar-events><div class="scm-empty scm-empty-cards">Selecciona un d&iacute;a del calendario.</div></div>
+          <button type="button" class="scm-btn-primary btn btn-primary scm-calendar-day-create" data-scm-calendar-open-create data-calendar-mode="single">Crear evento para este d&iacute;a</button>
         </section>
       </div>
     </div>
 <?php
     return (string) ob_get_clean();
+  }
+
+  /** @return array<int,array<string,string>> */
+  private function get_calendar_allowed_funcionarios(): array
+  {
+    $allowedCargos = ['3', '4', '5', '7', '8', '11', '12', '14', '18'];
+    $table = $this->db->table('jet_cct_funcionarios');
+    if (!$this->table_exists($table) || !$this->column_exists($table, 'id_empleado') || !$this->column_exists($table, 'id_cargo')) {
+      return [];
+    }
+    $nameColumn = $this->detect_first_existing_column($table, ['nombre', 'empleado', 'nombre_funcionario']);
+    $roleColumn = $this->column_exists($table, 'rol') ? 'rol' : '';
+    $nameSelect = $nameColumn !== '' ? "TRIM(COALESCE(`{$nameColumn}`, ''))" : "TRIM(COALESCE(`id_empleado`, ''))";
+    $roleSelect = $roleColumn !== '' ? "TRIM(COALESCE(`{$roleColumn}`, ''))" : "''";
+    $placeholders = implode(',', array_fill(0, count($allowedCargos), '?'));
+    $rows = $this->db->getResults(
+      "SELECT TRIM(COALESCE(`id_empleado`, '')) AS id_empleado,
+              {$nameSelect} AS nombre,
+              {$roleSelect} AS rol,
+              TRIM(COALESCE(`id_cargo`, '')) AS id_cargo
+         FROM `{$table}`
+        WHERE TRIM(COALESCE(`id_empleado`, '')) <> ''
+          AND TRIM(COALESCE(`id_cargo`, '')) IN ({$placeholders})
+        ORDER BY {$nameSelect} ASC",
+      $allowedCargos
+    );
+    $out = [];
+    foreach ($rows as $row) {
+      $employeeId = trim((string) ($row['id_empleado'] ?? ''));
+      if ($employeeId === '') {
+        continue;
+      }
+      $out[] = [
+        'id_empleado' => $employeeId,
+        'nombre' => trim((string) ($row['nombre'] ?? $employeeId)),
+        'rol' => trim((string) ($row['rol'] ?? '')),
+        'id_cargo' => trim((string) ($row['id_cargo'] ?? '')),
+      ];
+    }
+    return $out;
   }
 
   private function render_cotizaciones_mantenimiento_panel(array $result, array $params): string

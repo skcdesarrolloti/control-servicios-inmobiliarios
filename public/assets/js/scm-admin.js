@@ -1477,6 +1477,86 @@
     });
   }
 
+  function calendarAllowedEmployeeIds(root) {
+    var runtime = root ? parseRuntime(root) || {} : {};
+    var config = runtime.config || {};
+    var ids = Array.isArray(config.calendar_allowed_employee_ids) ? config.calendar_allowed_employee_ids : [];
+    return ids.map(function (id) { return String(id || "").trim(); }).filter(Boolean);
+  }
+
+  function isCalendarEmployeeAllowed(root, employeeId) {
+    var ids = calendarAllowedEmployeeIds(root);
+    employeeId = String(employeeId || "").trim();
+    return !ids.length || (employeeId !== "" && ids.indexOf(employeeId) !== -1);
+  }
+
+  function calendarDateKey(date) {
+    return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+  }
+
+  function calendarCurrentMonthRange() {
+    var now = new Date();
+    var first = new Date(now.getFullYear(), now.getMonth(), 1);
+    var last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { from: calendarDateKey(first), to: calendarDateKey(last) };
+  }
+
+  function formatCalendarDateTime(value) {
+    var raw = String(value || "").replace("T", " ");
+    if (!raw) return "-";
+    return raw.replace(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2}).*$/, "$3/$2/$1 $4");
+  }
+
+  function extractCalendarRows(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (!payload) return [];
+    if (Array.isArray(payload.data)) return payload.data;
+    if (payload.data && Array.isArray(payload.data.data)) return payload.data.data;
+    if (payload.data && Array.isArray(payload.data.eventos)) return payload.data.eventos;
+    if (Array.isArray(payload.eventos)) return payload.eventos;
+    if (Array.isArray(payload.rows)) return payload.rows;
+    return [];
+  }
+
+  function renderCalendarCaseEmployeeAgenda(root, body, employeeId) {
+    var agenda = body ? body.querySelector("[data-scm-calendar-case-agenda]") : null;
+    if (!agenda) return;
+    if (!employeeId) {
+      agenda.innerHTML = '<div class="scm-calendar-popup-agenda-empty">Este caso no tiene funcionario asignado.</div>';
+      return;
+    }
+    if (!isCalendarEmployeeAllowed(root, employeeId)) {
+      agenda.innerHTML = '<div class="scm-calendar-popup-agenda-empty">El funcionario asignado no pertenece a los cargos visibles del calendario.</div>';
+      return;
+    }
+    agenda.innerHTML = '<div class="scm-calendar-popup-agenda-empty">Cargando agenda del funcionario...</div>';
+    var range = calendarCurrentMonthRange();
+    calendarApiRequest(root, "filtrar_eventos_admin", {
+      id_empleado: employeeId,
+      fecha_inicio: range.from,
+      fecha_fin: range.to,
+      pagina: 1,
+      limite: 80,
+    }).then(function (json) {
+      if (!json || !json.success) {
+        throw new Error((json && json.message) || "No se pudo cargar la agenda.");
+      }
+      var rows = extractCalendarRows(json.data || []).sort(function (a, b) {
+        return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+      });
+      if (!rows.length) {
+        agenda.innerHTML = '<div class="scm-calendar-popup-agenda-empty">El funcionario no tiene eventos en el mes visible.</div>';
+        return;
+      }
+      agenda.innerHTML = rows.slice(0, 12).map(function (row) {
+        return '<div class="scm-calendar-popup-agenda-item"><strong>' + escHtml(formatCalendarDateTime(row.fecha_inicio)) + '</strong><span>' + escHtml(row.titulo || "Evento") + '</span></div>';
+      }).join("");
+    }).catch(function (error) {
+      agenda.innerHTML = '<div class="scm-calendar-popup-agenda-empty">No se pudo cargar la agenda.</div>';
+      scmNotify("error", error.message || "No se pudo cargar la agenda.");
+    });
+  }
+
   function openCalendarCaseEventEditor(modal, caseBtn) {
     var sub = ensureCaseSubmodal(modal);
     if (!sub || !caseBtn) return;
@@ -1508,11 +1588,13 @@
         '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" value="' + escHtml(caseBtn.dataset.direccion || "") + '"></label>' +
         '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required>' + escHtml(caseBtn.dataset.asunto || "") + '</textarea></label>' +
         "</div>" +
+        '<div class="scm-calendar-popup-agenda scm-calendar-case-agenda"><h4>Agenda del funcionario</h4><div data-scm-calendar-case-agenda><div class="scm-calendar-popup-agenda-empty">Cargando agenda...</div></div></div>' +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear evento</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
     }
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
+    renderCalendarCaseEmployeeAgenda(root, body, employeeId);
 
     var form = body ? body.querySelector(".scm-calendar-case-form") : null;
     var categorySelect = body ? body.querySelector("[data-scm-calendar-case-categories]") : null;
@@ -1539,6 +1621,10 @@
         event.preventDefault();
         if (!employeeId) {
           scmNotify("error", "Este caso no tiene id_empleado para agendar la cita.");
+          return;
+        }
+        if (!isCalendarEmployeeAllowed(root, employeeId)) {
+          scmNotify("error", "El funcionario asignado no pertenece a los cargos visibles del calendario.");
           return;
         }
         var submitBtn = form.querySelector("button[type='submit']");
