@@ -486,25 +486,28 @@
           : '<select class="select select-bordered select-sm scm-select" name="empleados" required><option value="">Selecciona funcionario</option>' + employeeOptions + "</select>";
         var html = '<form class="scm-calendar-popup-form" autocomplete="off">' +
           '<div class="scm-calendar-popup-grid">' +
-          '<label class="scm-seg-field"><span>Titulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required placeholder="Ej: Cita revision preventiva"></label>' +
-          '<label class="scm-seg-field"><span>Categoria</span><select class="select select-bordered select-sm scm-select" name="id_categoria" required><option value="">Selecciona categoria</option>' + categoryOptions + '</select></label>' +
+          '<label class="scm-seg-field"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required placeholder="Ej: Cita revisi&oacute;n preventiva"></label>' +
+          '<label class="scm-seg-field"><span>Categor&iacute;a</span><select class="select select-bordered select-sm scm-select" name="id_categoria" required><option value="">Selecciona categor&iacute;a</option>' + categoryOptions + '</select></label>' +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Funcionario(s)</span>' + employeesControl + '</label>' +
           '<label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + escHtml(selectedDay || toDateKey(new Date())) + '"></label>' +
           '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required></label>' +
           '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required></label>' +
           '<label class="scm-seg-field"><span>Ticket opcional</span><input class="input input-bordered input-sm scm-input" name="id_ticket" placeholder="Ej: 10266"></label>' +
           '<label class="scm-seg-field"><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="si">Si</option><option value="no">No</option></select></label>' +
-          '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicacion</span><input class="input input-bordered input-sm scm-input" name="ubicacion" placeholder="Direccion o lugar"></label>' +
-          '<label class="scm-seg-field scm-calendar-field-full"><span>Descripcion</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required></textarea></label>' +
+          '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" placeholder="Direcci&oacute;n o lugar"></label>' +
+          '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required></textarea></label>' +
           '</div><div class="scm-calendar-popup-agenda"><h4>Agenda del funcionario</h4><div data-scm-calendar-popup-agenda>' + popupEmployeeAgendaHtml(preselectedEmployee) + '</div></div></form>';
         if (!window.Swal || typeof window.Swal.fire !== "function") {
           showToast("error", "No esta disponible el popup para crear eventos.");
           return;
         }
         window.Swal.fire({
-          title: mode === "multiple" ? "Crear evento multiple" : "Crear evento",
+          title: mode === "multiple" ? "Crear evento múltiple" : "Crear evento",
           html: html,
-          width: 860,
+          width: 1060,
+          customClass: {
+            popup: "scm-calendar-swal-popup",
+          },
           showCancelButton: true,
           confirmButtonText: "Crear evento",
           cancelButtonText: "Cerrar",
