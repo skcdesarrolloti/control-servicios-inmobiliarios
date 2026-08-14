@@ -780,46 +780,152 @@
         return categoryName ? "Cita " + categoryName.toLowerCase() : "";
       }
 
-      function calendarReportHtml() {
+      function categoryNameForRow(row) {
+        var id = getCategoryId(row);
+        return String((row && row.categoria) || (id && categoriesById[id] && (categoriesById[id].nombre || categoriesById[id].categoria)) || "Sin categoria").trim();
+      }
+
+      function employeeNameForRow(row) {
+        return String((row && (row.funcionario || row.nombre_empleado || row.nombre)) || employeeDisplayName(getEventEmployeeId(row)) || "Funcionario").trim();
+      }
+
+      function uniqueReportRows(rows) {
+        var seen = {};
+        return (rows || []).filter(function (row) {
+          var key = String(row.id || row._ID || "").trim();
+          if (!key) {
+            key = [
+              getEventEmployeeId(row),
+              eventDateKey(row),
+              row.fecha_inicio || "",
+              row.titulo || "",
+              row.id_ticket || "",
+            ].join("|");
+          }
+          if (seen[key]) return false;
+          seen[key] = true;
+          return true;
+        });
+      }
+
+      function countReportGroups(rows, labelFn) {
+        var map = {};
+        (rows || []).forEach(function (row) {
+          var label = String(labelFn(row) || "Sin dato").trim() || "Sin dato";
+          if (!map[label]) map[label] = { label: label, count: 0, rows: [] };
+          map[label].count += 1;
+          map[label].rows.push(row);
+        });
+        return Object.keys(map).map(function (key) { return map[key]; }).sort(function (a, b) {
+          return b.count - a.count || a.label.localeCompare(b.label);
+        });
+      }
+
+      function reportGroupListHtml(title, groups, emptyText) {
+        if (!groups.length) {
+          return '<section class="scm-calendar-report-section"><h4>' + escHtml(title) + '</h4><div class="scm-calendar-report-empty">' + escHtml(emptyText) + '</div></section>';
+        }
+        var max = groups.reduce(function (acc, item) { return Math.max(acc, item.count); }, 1);
+        return '<section class="scm-calendar-report-section"><h4>' + escHtml(title) + '</h4>' + groups.map(function (item) {
+          var width = Math.max(8, Math.round((item.count / max) * 100));
+          return '<div class="scm-calendar-report-bar"><div><span>' + escHtml(item.label) + '</span><strong>' + item.count + '</strong></div><i style="width:' + width + '%"></i></div>';
+        }).join("") + '</section>';
+      }
+
+      function reportEventsListHtml(rows) {
+        if (!rows.length) {
+          return '<section class="scm-calendar-report-section scm-calendar-report-events-section"><h4>Eventos de hoy</h4><div class="scm-calendar-report-empty">No hay eventos creados para hoy.</div></section>';
+        }
+        return '<section class="scm-calendar-report-section scm-calendar-report-events-section"><h4>Eventos de hoy</h4><div class="scm-calendar-report-events">' + rows.map(function (row) {
+          var ticket = String(row.id_ticket || "").trim();
+          return '<article class="scm-calendar-report-event">' +
+            '<div><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + '</span></div>' +
+            '<p><b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (ticket ? ' <b>Ticket:</b> #' + escHtml(ticket) : "") + '</p>' +
+            '</article>';
+        }).join("") + '</div></section>';
+      }
+
+      function reportScopeEmployeeIds() {
+        var selectedEmployee = selectedEmployeeFromFilter();
+        if (selectedEmployee) return [selectedEmployee];
+        return allowedEmployees.map(getEmployeeId).filter(Boolean);
+      }
+
+      function loadCalendarReportRows() {
         var todayKey = toDateKey(new Date());
+        var ids = reportScopeEmployeeIds();
+        if (!ids.length) return Promise.resolve([]);
+        return Promise.all(ids.map(function (employeeId) {
+          return calendarApi("filtrar_eventos_admin", {
+            pagina: 1,
+            limite: 250,
+            fecha_inicio: todayKey,
+            fecha_fin: todayKey,
+            id_empleado: employeeId,
+          }).then(function (json) {
+            return json && json.success ? extractRows(json.data || []) : [];
+          }).catch(function () {
+            return [];
+          });
+        })).then(function (groups) {
+          var rows = [];
+          groups.forEach(function (group) {
+            rows = rows.concat(group || []);
+          });
+          return uniqueReportRows(filterRowsByAllowedEmployees(rows)).filter(function (row) {
+            return eventDateKey(row) === todayKey;
+          }).sort(function (a, b) {
+            return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+          });
+        });
+      }
+
+      function calendarReportHtml(rowsToday) {
+        rowsToday = rowsToday || [];
         var selectedEmployee = selectedEmployeeFromFilter();
         var employee = allowedEmployees.find(function (row) { return getEmployeeId(row) === selectedEmployee; });
-        var rowsToday = calendarEvents.filter(function (row) { return eventDateKey(row) === todayKey; });
-        var preventiveRows = rowsToday.filter(function (row) {
-          return normalizeText(row.categoria || (categoriesById[getCategoryId(row)] && categoriesById[getCategoryId(row)].nombre) || row.titulo).indexOf("preventiva") !== -1;
-        });
         var pendingRows = rowsToday.filter(function (row) { return String(row.estado || "").toLowerCase() !== "si"; });
         var doneRows = rowsToday.filter(function (row) { return String(row.estado || "").toLowerCase() === "si"; });
+        var categoryGroups = countReportGroups(rowsToday, categoryNameForRow);
+        var employeeGroups = countReportGroups(rowsToday, employeeNameForRow);
+        var scopeLabel = employee ? (employee.nombre || employee.funcionario || selectedEmployee) : "Todos los funcionarios visibles";
         return '<div class="scm-calendar-report-modal">' +
-          '<p class="scm-calendar-report-employee">' + escHtml(employee ? (employee.nombre || employee.funcionario || selectedEmployee) : (selectedEmployee || "Funcionario no seleccionado")) + '</p>' +
+          '<p class="scm-calendar-report-employee"><span>Corte del d&iacute;a</span><strong>' + escHtml(scopeLabel) + '</strong></p>' +
           '<div class="scm-calendar-report-grid">' +
           '<div><span>Total hoy</span><strong>' + rowsToday.length + '</strong></div>' +
-          '<div><span>Preventivas hoy</span><strong>' + preventiveRows.length + '</strong></div>' +
+          '<div><span>Categor&iacute;as</span><strong>' + categoryGroups.length + '</strong></div>' +
+          '<div><span>Funcionarios</span><strong>' + employeeGroups.length + '</strong></div>' +
           '<div><span>Pendientes</span><strong>' + pendingRows.length + '</strong></div>' +
           '<div><span>Realizadas</span><strong>' + doneRows.length + '</strong></div>' +
           '</div>' +
-          (preventiveRows.length ? '<div class="scm-calendar-report-list"><h4>Preventivas de hoy</h4>' + preventiveRows.map(function (row) {
-            return '<p><strong>' + escHtml(formatDateTime(row.fecha_inicio)) + '</strong><span>' + escHtml(row.titulo || "Cita preventiva") + '</span></p>';
-          }).join("") + '</div>' : '<div class="scm-calendar-report-empty">No hay citas preventivas visibles para hoy.</div>') +
+          '<div class="scm-calendar-report-columns">' +
+          reportGroupListHtml("Por categor&iacute;a", categoryGroups, "Sin categorias para hoy.") +
+          reportGroupListHtml("Por funcionario", employeeGroups, "Sin funcionarios para hoy.") +
+          '</div>' +
+          reportEventsListHtml(rowsToday) +
           '</div>';
       }
 
       function openCalendarReport() {
-        if (!selectedEmployeeFromFilter()) {
-          showToast("error", "Selecciona un funcionario para ver el informe.");
-          return;
-        }
         if (!window.Swal || typeof window.Swal.fire !== "function") {
           showToast("error", "No esta disponible el popup de informe.");
           return;
         }
         window.Swal.fire({
           title: "Informe del día",
-          html: calendarReportHtml(),
-          width: 720,
+          html: '<div class="scm-calendar-report-loading">Cargando informe del d&iacute;a...</div>',
+          width: 900,
           customClass: { popup: "scm-calendar-swal-popup scm-calendar-report-swal" },
           confirmButtonText: "Cerrar",
           showCancelButton: false,
+          didOpen: function () {
+            var htmlContainer = window.Swal.getHtmlContainer();
+            loadCalendarReportRows().then(function (rows) {
+              if (htmlContainer) htmlContainer.innerHTML = calendarReportHtml(rows);
+            }).catch(function () {
+              if (htmlContainer) htmlContainer.innerHTML = '<div class="scm-calendar-report-empty">No se pudo cargar el informe del d&iacute;a.</div>';
+            });
+          },
         });
       }
 
