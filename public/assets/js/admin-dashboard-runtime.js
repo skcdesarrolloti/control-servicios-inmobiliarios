@@ -182,6 +182,8 @@
       var currentMonth = startOfMonth(new Date());
       var selectedDay = toDateKey(new Date());
       var calendarEvents = [];
+      var popupAgendaRequestId = 0;
+      var ticketCacheByEmployee = {};
       var holidayCache = {};
 
       panel.querySelectorAll("[data-scm-calendar-open-path]").forEach(function (btn) {
@@ -376,6 +378,7 @@
       function calendarRichTextHtml(value) {
         var html = escHtml(value || "Sin descripcion");
         html = html
+          .replace(/\r?\n/g, "<br>")
           .replace(/&lt;\/?br\s*\/?&gt;/gi, "<br>")
           .replace(/&lt;b&gt;/gi, "<strong>")
           .replace(/&lt;\/b&gt;/gi, "</strong>")
@@ -406,15 +409,15 @@
 
       function buildPreventiveDescription(categoryName, dateValue, startValue, endValue) {
         if (!categoryName || !dateValue || !startValue || !endValue) return "";
-        return "Por medio de la presente, le confirmo que he dispuesto de un espacio con el propósito de reunirnos, ya sea de forma presencial o por medios virtuales, a fin de atender cualquier inquietud o asunto pendiente.<br/><br/>En cumplimiento de <b>" +
+        return "Por medio de la presente, le confirmo que he dispuesto de un espacio con el propósito de reunirnos, ya sea de forma presencial o por medios virtuales, a fin de atender cualquier inquietud o asunto pendiente.\n\nEn cumplimiento de " +
           categoryName +
-          "</b>, se ha programado una visita y/o reunión, la cual ha quedado agendada para el día <b>" +
+          ", se ha programado una visita y/o reunión, la cual ha quedado agendada para el día " +
           formatDateForMessage(dateValue) +
-          "</b>, de <b>" +
+          ", de " +
           formatTimeForMessage(startValue) +
-          "</b> a <b>" +
+          " a " +
           formatTimeForMessage(endValue) +
-          "</b>. En caso de no ser posible contar con su atención en la fecha indicada, le agradecemos nos lo comunique por este mismo medio con al menos 3 horas de antelación.";
+          ". En caso de no ser posible contar con su atención en la fecha indicada, le agradecemos nos lo comunique por este mismo medio con al menos 3 horas de antelación.";
       }
 
       function extractRows(payload) {
@@ -595,15 +598,186 @@
         return field ? String(field.value || "").trim() : "";
       }
 
-      function popupEmployeeAgendaHtml(employeeId) {
-        if (!employeeId) return '<div class="scm-calendar-popup-agenda-empty">Selecciona un funcionario para ver su agenda del mes.</div>';
-        var rows = calendarEvents.filter(function (row) { return getEventEmployeeId(row) === String(employeeId); }).sort(function (a, b) {
+      function employeeDisplayName(employeeId) {
+        employeeId = String(employeeId || "").trim();
+        var employee = allowedEmployees.find(function (row) { return getEmployeeId(row) === employeeId; });
+        if (!employee) return employeeId || "Funcionario";
+        return String(employee.nombre || employee.empleado || employee.funcionario || employeeId).trim();
+      }
+
+      function employeeOptionHtml(row, selected) {
+        var id = getEmployeeId(row);
+        if (!id) return "";
+        var name = String(row.nombre || row.empleado || row.funcionario || id).trim();
+        var label = name ? name + " (" + id + ")" : id;
+        return '<option value="' + escHtml(id) + '"' + (selected && id === selected ? " selected" : "") + '>' + escHtml(label) + "</option>";
+      }
+
+      function employeeMultiPickerHtml(preselectedEmployee) {
+        var rows = allowedEmployees.map(function (row) {
+          var id = getEmployeeId(row);
+          if (!id) return "";
+          var name = String(row.nombre || row.empleado || row.funcionario || id).trim();
+          var checked = preselectedEmployee && id === preselectedEmployee ? " checked" : "";
+          return '<label class="scm-calendar-employee-option" data-employee-option data-search-text="' + escHtml((name + " " + id).toLowerCase()) + '">' +
+            '<input type="checkbox" name="empleados_multi" value="' + escHtml(id) + '"' + checked + ' data-calendar-employee-check>' +
+            '<span><strong>' + escHtml(name || id) + '</strong><small>ID ' + escHtml(id) + '</small></span>' +
+            '</label>';
+        }).join("");
+        return '<div class="scm-calendar-employee-picker" data-calendar-employee-picker>' +
+          '<input class="input input-bordered input-sm scm-input scm-calendar-employee-search" type="search" placeholder="Buscar funcionario..." data-calendar-employee-search>' +
+          '<div class="scm-calendar-employee-options">' + rows + '</div>' +
+          '<small>Marca uno o varios funcionarios. La agenda se agrupa abajo por cada seleccionado.</small>' +
+          '</div>';
+      }
+
+      function selectedEmployeesFromPopup(form) {
+        if (!form) return [];
+        var multi = form.querySelector("[data-calendar-employee-picker]");
+        if (multi) {
+          return Array.prototype.slice.call(form.querySelectorAll("[data-calendar-employee-check]:checked")).map(function (input) {
+            return input.value;
+          }).filter(Boolean);
+        }
+        var select = form.querySelector('[name="empleados"]');
+        return Array.prototype.slice.call(select ? select.selectedOptions : []).map(function (opt) { return opt.value; }).filter(Boolean);
+      }
+
+      function currentMonthEventsForEmployee(employeeId) {
+        return calendarEvents.filter(function (row) { return getEventEmployeeId(row) === String(employeeId); }).sort(function (a, b) {
           return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
         });
-        if (!rows.length) return '<div class="scm-calendar-popup-agenda-empty">Ese funcionario no tiene eventos visibles este mes.</div>';
+      }
+
+      function fetchEmployeeMonthEvents(employeeId) {
+        employeeId = String(employeeId || "").trim();
+        if (!employeeId) return Promise.resolve([]);
+        var rows = currentMonthEventsForEmployee(employeeId);
+        if (rows.length) return Promise.resolve(rows);
+        var range = monthRange(currentMonth);
+        return calendarApi("filtrar_eventos_admin", {
+          pagina: 1,
+          limite: 120,
+          fecha_inicio: range.from,
+          fecha_fin: range.to,
+          id_empleado: employeeId,
+        }).then(function (json) {
+          if (!json || !json.success) return [];
+          return filterRowsByAllowedEmployees(extractRows(json.data || [])).filter(function (row) {
+            return getEventEmployeeId(row) === employeeId;
+          }).sort(function (a, b) {
+            return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+          });
+        }).catch(function () {
+          return [];
+        });
+      }
+
+      function agendaRowsHtml(rows) {
+        if (!rows.length) return '<div class="scm-calendar-popup-agenda-empty">Sin eventos visibles este mes.</div>';
         return rows.slice(0, 12).map(function (row) {
           return '<div class="scm-calendar-popup-agenda-item"><strong>' + escHtml(formatDateTime(row.fecha_inicio)) + '</strong><span>' + escHtml(row.titulo || "Evento") + '</span></div>';
         }).join("");
+      }
+
+      function popupEmployeeAgendaHtml(employeeId) {
+        if (!employeeId) return '<div class="scm-calendar-popup-agenda-empty">Selecciona un funcionario para ver su agenda del mes.</div>';
+        return agendaRowsHtml(currentMonthEventsForEmployee(employeeId));
+      }
+
+      function updatePopupAgenda(agenda, employeeIds, isMultiple) {
+        if (!agenda) return;
+        employeeIds = (employeeIds || []).filter(Boolean);
+        if (!employeeIds.length) {
+          agenda.innerHTML = '<div class="scm-calendar-popup-agenda-empty">Selecciona funcionario para ver su agenda del mes.</div>';
+          return;
+        }
+        var requestId = ++popupAgendaRequestId;
+        agenda.innerHTML = '<div class="scm-calendar-popup-agenda-empty">Cargando agenda...</div>';
+        Promise.all(employeeIds.map(fetchEmployeeMonthEvents)).then(function (allRows) {
+          if (requestId !== popupAgendaRequestId) return;
+          if (isMultiple) {
+            agenda.innerHTML = employeeIds.map(function (employeeId, index) {
+              var openAttr = index === 0 ? " open" : "";
+              return '<details class="scm-calendar-agenda-accordion"' + openAttr + '><summary>' + escHtml(employeeDisplayName(employeeId)) + '<span>' + (allRows[index] || []).length + ' evento(s)</span></summary><div>' + agendaRowsHtml(allRows[index] || []) + '</div></details>';
+            }).join("");
+          } else {
+            agenda.innerHTML = agendaRowsHtml(allRows[0] || []);
+          }
+        });
+      }
+
+      function ticketLabel(ticket) {
+        if (!ticket) return "";
+        var id = String(ticket._ID || ticket.id_ticket || ticket.id || "").trim();
+        if (String(ticket.departamento || "").trim() === "Servicio al cliente") {
+          return "Ticket #" + id + " - Solicitante: " + String(ticket.solicitante || "").trim();
+        }
+        return "Ticket #" + id + " - Contrato #" + String(ticket.contrato || "-").trim() + " - Inmueble #" + String(ticket.inmueble || "-").trim();
+      }
+
+      function loadTicketsForEmployee(employeeId) {
+        employeeId = String(employeeId || "").trim();
+        if (!employeeId) return Promise.resolve([]);
+        if (ticketCacheByEmployee[employeeId]) return Promise.resolve(ticketCacheByEmployee[employeeId]);
+        return calendarApi("obtener_tickets_funcionario", { id_empleado: employeeId }).then(function (json) {
+          var rows = json && json.success ? extractRows(json.data || []) : [];
+          ticketCacheByEmployee[employeeId] = rows;
+          return rows;
+        }).catch(function () {
+          ticketCacheByEmployee[employeeId] = [];
+          return [];
+        });
+      }
+
+      function loadTicketsForEmployees(employeeIds) {
+        employeeIds = (employeeIds || []).filter(Boolean);
+        if (!employeeIds.length) return Promise.resolve([]);
+        return Promise.all(employeeIds.map(loadTicketsForEmployee)).then(function (groups) {
+          var seen = {};
+          var rows = [];
+          groups.forEach(function (group) {
+            (group || []).forEach(function (ticket) {
+              var id = String(ticket._ID || ticket.id_ticket || ticket.id || "").trim();
+              if (!id || seen[id]) return;
+              seen[id] = true;
+              rows.push(ticket);
+            });
+          });
+          return rows;
+        });
+      }
+
+      function renderTicketSelector(select, rows, query) {
+        if (!select) return;
+        query = normalizeText(query || "");
+        var current = select.value || "";
+        var filtered = (rows || []).filter(function (ticket) {
+          if (!query) return true;
+          return normalizeText(ticketLabel(ticket) + " " + (ticket.direccion || "") + " " + (ticket.solicitante || "")).indexOf(query) !== -1;
+        }).slice(0, 80);
+        select.innerHTML = '<option value="">Sin ticket relacionado</option>' + filtered.map(function (ticket) {
+          var id = String(ticket._ID || ticket.id_ticket || ticket.id || "").trim();
+          return id ? '<option value="' + escHtml(id) + '">' + escHtml(ticketLabel(ticket)) + "</option>" : "";
+        }).join("");
+        if (current) select.value = current;
+      }
+
+      function categoryNameFromSelect(select) {
+        if (!select || select.selectedIndex < 0) return "";
+        var option = select.options[select.selectedIndex];
+        return option ? String(option.textContent || "").trim() : "";
+      }
+
+      function buildCalendarTitle(categoryName, ticket) {
+        categoryName = String(categoryName || "").trim();
+        if (ticket) {
+          var contrato = String(ticket.contrato || "").trim();
+          if (contrato) return "Contrato #" + contrato + " - " + (categoryName || "Actividad");
+          var ticketId = String(ticket._ID || ticket.id_ticket || ticket.id || "").trim();
+          return "Ticket #" + ticketId + " - " + (categoryName || String(ticket.solicitante || "Actividad").trim());
+        }
+        return categoryName ? "Cita " + categoryName.toLowerCase() : "";
       }
 
       function calendarReportHtml() {
@@ -652,19 +826,14 @@
       function openCreateEventPopup(mode) {
         mode = mode === "multiple" ? "multiple" : "single";
         var preselectedEmployee = selectedEmployeeFromFilter();
-        var employeeOptions = allowedEmployees.map(function (row) {
-          var id = getEmployeeId(row);
-          if (!id) return "";
-          var name = String(row.nombre || row.funcionario || id).trim();
-          return '<option value="' + escHtml(id) + '"' + (preselectedEmployee && id === preselectedEmployee ? " selected" : "") + '>' + escHtml(name + " (" + id + ")") + "</option>";
-        }).join("");
+        var employeeOptions = allowedEmployees.map(function (row) { return employeeOptionHtml(row, preselectedEmployee); }).join("");
         var categoryOptions = categories.map(function (row) {
           var id = String(row.id || row._ID || "").trim();
           var name = String(row.nombre || row.categoria || id).trim();
           return id ? '<option value="' + escHtml(id) + '">' + escHtml(name) + "</option>" : "";
         }).join("");
         var employeesControl = mode === "multiple"
-          ? '<select class="select select-bordered select-sm scm-select" name="empleados" multiple required size="7">' + employeeOptions + '</select><small>Ctrl/Command + clic para seleccionar varios.</small>'
+          ? employeeMultiPickerHtml(preselectedEmployee)
           : '<select class="select select-bordered select-sm scm-select" name="empleados" required><option value="">Selecciona funcionario</option>' + employeeOptions + "</select>";
         var html = '<form class="scm-calendar-popup-form" autocomplete="off">' +
           '<div class="scm-calendar-popup-grid">' +
@@ -674,11 +843,11 @@
           '<label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + escHtml(selectedDay || toDateKey(new Date())) + '"></label>' +
           '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required></label>' +
           '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required></label>' +
-          '<label class="scm-seg-field"><span>Ticket opcional</span><input class="input input-bordered input-sm scm-input" name="id_ticket" placeholder="Ej: 10266"></label>' +
+          '<label class="scm-seg-field scm-calendar-field-full"><span>Ticket relacionado</span><input class="input input-bordered input-sm scm-input" type="search" name="ticket_search" placeholder="Buscar por ticket, contrato, inmueble o solicitante" data-calendar-ticket-search><select class="select select-bordered select-sm scm-select scm-calendar-ticket-select" name="id_ticket" data-calendar-ticket-select><option value="">Selecciona funcionario para cargar tickets</option></select><small>Al escoger un ticket se autocompleta el t&iacute;tulo y la direcci&oacute;n.</small></label>' +
           '<label class="scm-seg-field"><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="si">Si</option><option value="no">No</option></select></label>' +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" placeholder="Direcci&oacute;n o lugar"></label>' +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required></textarea></label>' +
-          '</div><div class="scm-calendar-popup-agenda"><h4>Agenda del funcionario</h4><div data-scm-calendar-popup-agenda>' + popupEmployeeAgendaHtml(preselectedEmployee) + '</div></div></form>';
+          '</div><div class="scm-calendar-popup-agenda"><h4>' + (mode === "multiple" ? "Agenda por funcionario" : "Agenda del funcionario") + '</h4><div data-scm-calendar-popup-agenda>' + popupEmployeeAgendaHtml(preselectedEmployee) + '</div></div></form>';
         if (!window.Swal || typeof window.Swal.fire !== "function") {
           showToast("error", "No esta disponible el popup para crear eventos.");
           return;
@@ -698,12 +867,56 @@
             var popup = window.Swal.getPopup();
             if (!popup) return;
             var employeesSelect = popup.querySelector('[name="empleados"]');
+            var employeePicker = popup.querySelector("[data-calendar-employee-picker]");
+            var employeeSearch = popup.querySelector("[data-calendar-employee-search]");
             var agenda = popup.querySelector("[data-scm-calendar-popup-agenda]");
             var categorySelect = popup.querySelector('[name="id_categoria"]');
             var dateInput = popup.querySelector('[name="fecha"]');
             var startInput = popup.querySelector('[name="hora_inicio"]');
             var endInput = popup.querySelector('[name="hora_fin"]');
+            var titleInput = popup.querySelector('[name="titulo"]');
+            var locationInput = popup.querySelector('[name="ubicacion"]');
             var descriptionInput = popup.querySelector('[name="descripcion"]');
+            var ticketSearch = popup.querySelector("[data-calendar-ticket-search]");
+            var ticketSelect = popup.querySelector("[data-calendar-ticket-select]");
+            var currentTicketRows = [];
+            function selectedEmployees() {
+              return selectedEmployeesFromPopup(popup.querySelector(".scm-calendar-popup-form"));
+            }
+            function selectedTicket() {
+              var value = ticketSelect ? String(ticketSelect.value || "").trim() : "";
+              if (!value) return null;
+              return currentTicketRows.find(function (ticket) {
+                return String(ticket._ID || ticket.id_ticket || ticket.id || "").trim() === value;
+              }) || null;
+            }
+            function maybeAutofillTitleAndLocation(force) {
+              var categoryName = categoryNameFromSelect(categorySelect);
+              var ticket = selectedTicket();
+              if (titleInput) {
+                var title = buildCalendarTitle(categoryName, ticket);
+                if (title && (force || !titleInput.value || titleInput.getAttribute("data-auto-calendar-title") === "1")) {
+                  titleInput.value = title;
+                  titleInput.setAttribute("data-auto-calendar-title", "1");
+                }
+              }
+              if (locationInput && ticket && ticket.direccion && (force || !locationInput.value || locationInput.getAttribute("data-auto-calendar-location") === "1")) {
+                locationInput.value = ticket.direccion;
+                locationInput.setAttribute("data-auto-calendar-location", "1");
+              }
+            }
+            function refreshTickets() {
+              var selected = selectedEmployees();
+              if (ticketSelect) ticketSelect.innerHTML = '<option value="">Cargando tickets...</option>';
+              loadTicketsForEmployees(selected).then(function (rows) {
+                currentTicketRows = rows || [];
+                renderTicketSelector(ticketSelect, currentTicketRows, ticketSearch ? ticketSearch.value : "");
+                maybeAutofillTitleAndLocation(false);
+              });
+            }
+            function refreshAgenda() {
+              updatePopupAgenda(agenda, selectedEmployees(), mode === "multiple");
+            }
             function maybeAutofillPreventiveDescription() {
               if (!categorySelect || !dateInput || !startInput || !endInput || !descriptionInput) return;
               var selectedOption = categorySelect.options[categorySelect.selectedIndex];
@@ -714,20 +927,63 @@
               descriptionInput.value = buildPreventiveDescription(categoryName, dateInput.value, startInput.value, endInput.value);
               descriptionInput.setAttribute("data-auto-calendar-text", "1");
             }
-            if (employeesSelect && agenda) {
+            if (employeesSelect) {
               employeesSelect.addEventListener("change", function () {
-                var selected = employeesSelect.multiple ? Array.prototype.slice.call(employeesSelect.selectedOptions).map(function (opt) { return opt.value; }).filter(Boolean)[0] || "" : employeesSelect.value || "";
-                agenda.innerHTML = popupEmployeeAgendaHtml(selected);
+                refreshAgenda();
+                refreshTickets();
+              });
+            }
+            if (employeePicker) {
+              employeePicker.querySelectorAll("[data-calendar-employee-check]").forEach(function (input) {
+                input.addEventListener("change", function () {
+                  refreshAgenda();
+                  refreshTickets();
+                });
+              });
+            }
+            if (employeeSearch) {
+              employeeSearch.addEventListener("input", function () {
+                var term = normalizeText(employeeSearch.value);
+                employeePicker.querySelectorAll("[data-employee-option]").forEach(function (option) {
+                  option.style.display = !term || normalizeText(option.getAttribute("data-search-text") || "").indexOf(term) !== -1 ? "" : "none";
+                });
+              });
+            }
+            if (ticketSearch) {
+              ticketSearch.addEventListener("input", function () {
+                renderTicketSelector(ticketSelect, currentTicketRows, ticketSearch.value);
+              });
+            }
+            if (ticketSelect) {
+              ticketSelect.addEventListener("change", function () {
+                maybeAutofillTitleAndLocation(true);
+                maybeAutofillPreventiveDescription();
+              });
+            }
+            if (titleInput) {
+              titleInput.addEventListener("input", function () {
+                titleInput.setAttribute("data-auto-calendar-title", "0");
+              });
+            }
+            if (locationInput) {
+              locationInput.addEventListener("input", function () {
+                locationInput.setAttribute("data-auto-calendar-location", "0");
               });
             }
             [categorySelect, dateInput, startInput, endInput].forEach(function (field) {
-              if (field) field.addEventListener("change", maybeAutofillPreventiveDescription);
+              if (field) field.addEventListener("change", function () {
+                maybeAutofillTitleAndLocation(false);
+                maybeAutofillPreventiveDescription();
+              });
             });
             if (descriptionInput) {
               descriptionInput.addEventListener("input", function () {
                 descriptionInput.setAttribute("data-auto-calendar-text", "0");
               });
             }
+            refreshAgenda();
+            refreshTickets();
+            maybeAutofillTitleAndLocation(false);
             maybeAutofillPreventiveDescription();
           },
           preConfirm: function () {
@@ -737,8 +993,7 @@
               window.Swal.showValidationMessage("No se encontro el formulario.");
               return false;
             }
-            var employeesSelect = form.querySelector('[name="empleados"]');
-            var selected = Array.prototype.slice.call(employeesSelect ? employeesSelect.selectedOptions : []).map(function (opt) { return opt.value; }).filter(Boolean);
+            var selected = selectedEmployeesFromPopup(form);
             if (!selected.length) {
               window.Swal.showValidationMessage("Selecciona al menos un funcionario.");
               return false;
