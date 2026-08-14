@@ -182,6 +182,7 @@
       var currentMonth = startOfMonth(new Date());
       var selectedDay = toDateKey(new Date());
       var calendarEvents = [];
+      var holidayCache = {};
 
       panel.querySelectorAll("[data-scm-calendar-open-path]").forEach(function (btn) {
         btn.addEventListener("click", function () {
@@ -300,6 +301,122 @@
         return { from: toDateKey(startOfMonth(date)), to: toDateKey(endOfMonth(date)) };
       }
 
+      function capitalizeFirst(value) {
+        value = String(value || "");
+        return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
+      }
+
+      function addDays(date, days) {
+        var d = new Date(date);
+        d.setDate(d.getDate() + days);
+        return d;
+      }
+
+      function nextMonday(date) {
+        var d = new Date(date);
+        var diff = (8 - d.getDay()) % 7;
+        d.setDate(d.getDate() + diff);
+        return d;
+      }
+
+      function easterSunday(year) {
+        var a = year % 19;
+        var b = Math.floor(year / 100);
+        var c = year % 100;
+        var d = Math.floor(b / 4);
+        var e = b % 4;
+        var f = Math.floor((b + 8) / 25);
+        var g = Math.floor((b - f + 1) / 3);
+        var h = (19 * a + b - d - g + 15) % 30;
+        var i = Math.floor(c / 4);
+        var k = c % 4;
+        var l = (32 + 2 * e + 2 * i - h - k) % 7;
+        var m = Math.floor((a + 11 * h + 22 * l) / 451);
+        var month = Math.floor((h + l - 7 * m + 114) / 31);
+        var day = ((h + l - 7 * m + 114) % 31) + 1;
+        return new Date(year, month - 1, day);
+      }
+
+      function addHoliday(map, date, name) {
+        map[toDateKey(date)] = name;
+      }
+
+      function colombiaHolidays(year) {
+        if (holidayCache[year]) return holidayCache[year];
+        var map = {};
+        addHoliday(map, new Date(year, 0, 1), "Año Nuevo");
+        addHoliday(map, nextMonday(new Date(year, 0, 6)), "Reyes Magos");
+        addHoliday(map, nextMonday(new Date(year, 2, 19)), "San José");
+        addHoliday(map, new Date(year, 4, 1), "Día del Trabajo");
+        addHoliday(map, nextMonday(new Date(year, 5, 29)), "San Pedro y San Pablo");
+        addHoliday(map, new Date(year, 6, 20), "Independencia de Colombia");
+        addHoliday(map, new Date(year, 7, 7), "Batalla de Boyacá");
+        addHoliday(map, nextMonday(new Date(year, 7, 15)), "Asunción de la Virgen");
+        addHoliday(map, nextMonday(new Date(year, 9, 12)), "Día de la Raza");
+        addHoliday(map, nextMonday(new Date(year, 10, 1)), "Todos los Santos");
+        addHoliday(map, nextMonday(new Date(year, 10, 11)), "Independencia de Cartagena");
+        addHoliday(map, new Date(year, 11, 8), "Inmaculada Concepción");
+        addHoliday(map, new Date(year, 11, 25), "Navidad");
+        var easter = easterSunday(year);
+        addHoliday(map, addDays(easter, -3), "Jueves Santo");
+        addHoliday(map, addDays(easter, -2), "Viernes Santo");
+        addHoliday(map, nextMonday(addDays(easter, 39)), "Ascensión del Señor");
+        addHoliday(map, nextMonday(addDays(easter, 60)), "Corpus Christi");
+        addHoliday(map, nextMonday(addDays(easter, 68)), "Sagrado Corazón");
+        holidayCache[year] = map;
+        return map;
+      }
+
+      function holidayForDateKey(key) {
+        var year = parseInt(String(key || "").slice(0, 4), 10);
+        if (!year) return "";
+        return colombiaHolidays(year)[key] || "";
+      }
+
+      function calendarRichTextHtml(value) {
+        var html = escHtml(value || "Sin descripcion");
+        html = html
+          .replace(/&lt;\/?br\s*\/?&gt;/gi, "<br>")
+          .replace(/&lt;b&gt;/gi, "<strong>")
+          .replace(/&lt;\/b&gt;/gi, "</strong>")
+          .replace(/&lt;strong&gt;/gi, "<strong>")
+          .replace(/&lt;\/strong&gt;/gi, "</strong>");
+        return html;
+      }
+
+      function normalizeText(value) {
+        return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      }
+
+      function formatDateForMessage(value) {
+        var parts = String(value || "").split("-");
+        if (parts.length !== 3) return value || "";
+        return parts[2] + "/" + parts[1] + "/" + parts[0];
+      }
+
+      function formatTimeForMessage(value) {
+        var pieces = String(value || "").split(":");
+        var hour = parseInt(pieces[0] || "0", 10);
+        var minute = pieces[1] || "00";
+        if (Number.isNaN(hour)) return value || "";
+        var suffix = hour >= 12 ? "p. m." : "a. m.";
+        var displayHour = hour % 12 || 12;
+        return String(displayHour).padStart(2, "0") + ":" + minute + " " + suffix;
+      }
+
+      function buildPreventiveDescription(categoryName, dateValue, startValue, endValue) {
+        if (!categoryName || !dateValue || !startValue || !endValue) return "";
+        return "Por medio de la presente, le confirmo que he dispuesto de un espacio con el propósito de reunirnos, ya sea de forma presencial o por medios virtuales, a fin de atender cualquier inquietud o asunto pendiente.<br/><br/>En cumplimiento de <b>" +
+          categoryName +
+          "</b>, se ha programado una visita y/o reunión, la cual ha quedado agendada para el día <b>" +
+          formatDateForMessage(dateValue) +
+          "</b>, de <b>" +
+          formatTimeForMessage(startValue) +
+          "</b> a <b>" +
+          formatTimeForMessage(endValue) +
+          "</b>. En caso de no ser posible contar con su atención en la fecha indicada, le agradecemos nos lo comunique por este mismo medio con al menos 3 horas de antelación.";
+      }
+
       function extractRows(payload) {
         if (Array.isArray(payload)) return payload;
         if (!payload) return [];
@@ -362,7 +479,7 @@
           '<div class="scm-calendar-event-color" style="background:' + escHtml(color) + '"></div>' +
           '<div class="scm-calendar-event-main">' +
           '<div class="scm-calendar-event-title-row"><h5>' + escHtml(row.titulo || "Evento") + '</h5><span class="scm-calendar-event-state">' + escHtml(estado) + "</span></div>" +
-          '<p>' + escHtml(row.descripcion || "Sin descripcion") + "</p>" +
+          '<div class="scm-calendar-event-description">' + calendarRichTextHtml(row.descripcion || "Sin descripcion") + "</div>" +
           '<div class="scm-calendar-event-meta">' +
           '<span>' + escHtml(formatDateTime(row.fecha_inicio)) + " - " + escHtml(formatDateTime(row.fecha_fin)) + "</span>" +
           '<span>' + escHtml(row.funcionario || row.nombre || "Funcionario") + "</span>" +
@@ -377,8 +494,9 @@
 
       function renderSelectedDay() {
         var dayRows = calendarEvents.filter(function (row) { return eventDateKey(row) === selectedDay; });
+        var holiday = holidayForDateKey(selectedDay);
         if (dayTitleEl) dayTitleEl.textContent = selectedDay || "Selecciona un dia";
-        if (daySubtitleEl) daySubtitleEl.textContent = dayRows.length ? dayRows.length + " evento(s) para este dia." : "Sin eventos para este dia.";
+        if (daySubtitleEl) daySubtitleEl.textContent = (holiday ? "Festivo Colombia: " + holiday + ". " : "") + (dayRows.length ? dayRows.length + " evento(s) para este dia." : "Sin eventos para este dia.");
         if (!eventsWrap) return;
         eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<div class="scm-empty scm-empty-cards">No hay eventos para este dia.</div>';
       }
@@ -386,6 +504,10 @@
       function renderCalendarGrid() {
         if (!monthGrid) return;
         if (titleEl) titleEl.textContent = monthLabel(currentMonth);
+        var prevMonthBtn = panel.querySelector("[data-scm-calendar-prev]");
+        var nextMonthBtn = panel.querySelector("[data-scm-calendar-next]");
+        if (prevMonthBtn) prevMonthBtn.textContent = "‹ " + capitalizeFirst(monthLabel(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1)).replace(/\s+\d{4}$/, ""));
+        if (nextMonthBtn) nextMonthBtn.textContent = capitalizeFirst(monthLabel(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)).replace(/\s+\d{4}$/, "")) + " ›";
         var first = startOfMonth(currentMonth);
         var start = new Date(first);
         var weekday = first.getDay();
@@ -396,13 +518,16 @@
           var cellDate = new Date(start);
           cellDate.setDate(start.getDate() + i);
           var key = toDateKey(cellDate);
+          var holiday = holidayForDateKey(key);
           var dayEvents = calendarEvents.filter(function (row) { return eventDateKey(row) === key; });
           var classes = "scm-calendar-day";
           if (cellDate.getMonth() !== currentMonth.getMonth()) classes += " is-muted";
           if (key === todayKey) classes += " is-today";
           if (key === selectedDay) classes += " is-selected";
+          if (holiday) classes += " is-holiday";
           html += '<button type="button" class="' + classes + '" data-scm-calendar-day="' + escHtml(key) + '">';
           html += '<span class="scm-calendar-day-number">' + String(cellDate.getDate()) + "</span>";
+          if (holiday) html += '<span class="scm-calendar-day-holiday">Festivo · ' + escHtml(holiday) + "</span>";
           html += '<span class="scm-calendar-day-events-count">' + (dayEvents.length ? dayEvents.length + " evento(s)" : "") + "</span>";
           dayEvents.slice(0, 3).forEach(function (row) {
             html += '<span class="scm-calendar-day-pill" style="border-color:' + escHtml(row.color || "#f59e0b") + '">' + escHtml(row.titulo || "Evento") + "</span>";
@@ -481,6 +606,49 @@
         }).join("");
       }
 
+      function calendarReportHtml() {
+        var todayKey = toDateKey(new Date());
+        var selectedEmployee = selectedEmployeeFromFilter();
+        var employee = allowedEmployees.find(function (row) { return getEmployeeId(row) === selectedEmployee; });
+        var rowsToday = calendarEvents.filter(function (row) { return eventDateKey(row) === todayKey; });
+        var preventiveRows = rowsToday.filter(function (row) {
+          return normalizeText(row.categoria || (categoriesById[getCategoryId(row)] && categoriesById[getCategoryId(row)].nombre) || row.titulo).indexOf("preventiva") !== -1;
+        });
+        var pendingRows = rowsToday.filter(function (row) { return String(row.estado || "").toLowerCase() !== "si"; });
+        var doneRows = rowsToday.filter(function (row) { return String(row.estado || "").toLowerCase() === "si"; });
+        return '<div class="scm-calendar-report-modal">' +
+          '<p class="scm-calendar-report-employee">' + escHtml(employee ? (employee.nombre || employee.funcionario || selectedEmployee) : (selectedEmployee || "Funcionario no seleccionado")) + '</p>' +
+          '<div class="scm-calendar-report-grid">' +
+          '<div><span>Total hoy</span><strong>' + rowsToday.length + '</strong></div>' +
+          '<div><span>Preventivas hoy</span><strong>' + preventiveRows.length + '</strong></div>' +
+          '<div><span>Pendientes</span><strong>' + pendingRows.length + '</strong></div>' +
+          '<div><span>Realizadas</span><strong>' + doneRows.length + '</strong></div>' +
+          '</div>' +
+          (preventiveRows.length ? '<div class="scm-calendar-report-list"><h4>Preventivas de hoy</h4>' + preventiveRows.map(function (row) {
+            return '<p><strong>' + escHtml(formatDateTime(row.fecha_inicio)) + '</strong><span>' + escHtml(row.titulo || "Cita preventiva") + '</span></p>';
+          }).join("") + '</div>' : '<div class="scm-calendar-report-empty">No hay citas preventivas visibles para hoy.</div>') +
+          '</div>';
+      }
+
+      function openCalendarReport() {
+        if (!selectedEmployeeFromFilter()) {
+          showToast("error", "Selecciona un funcionario para ver el informe.");
+          return;
+        }
+        if (!window.Swal || typeof window.Swal.fire !== "function") {
+          showToast("error", "No esta disponible el popup de informe.");
+          return;
+        }
+        window.Swal.fire({
+          title: "Informe del día",
+          html: calendarReportHtml(),
+          width: 720,
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-report-swal" },
+          confirmButtonText: "Cerrar",
+          showCancelButton: false,
+        });
+      }
+
       function openCreateEventPopup(mode) {
         mode = mode === "multiple" ? "multiple" : "single";
         var preselectedEmployee = selectedEmployeeFromFilter();
@@ -531,12 +699,36 @@
             if (!popup) return;
             var employeesSelect = popup.querySelector('[name="empleados"]');
             var agenda = popup.querySelector("[data-scm-calendar-popup-agenda]");
+            var categorySelect = popup.querySelector('[name="id_categoria"]');
+            var dateInput = popup.querySelector('[name="fecha"]');
+            var startInput = popup.querySelector('[name="hora_inicio"]');
+            var endInput = popup.querySelector('[name="hora_fin"]');
+            var descriptionInput = popup.querySelector('[name="descripcion"]');
+            function maybeAutofillPreventiveDescription() {
+              if (!categorySelect || !dateInput || !startInput || !endInput || !descriptionInput) return;
+              var selectedOption = categorySelect.options[categorySelect.selectedIndex];
+              var categoryName = selectedOption ? selectedOption.textContent : "";
+              if (normalizeText(categoryName).indexOf("preventiva") === -1) return;
+              if (!dateInput.value || !startInput.value || !endInput.value) return;
+              if (descriptionInput.value && descriptionInput.getAttribute("data-auto-calendar-text") !== "1") return;
+              descriptionInput.value = buildPreventiveDescription(categoryName, dateInput.value, startInput.value, endInput.value);
+              descriptionInput.setAttribute("data-auto-calendar-text", "1");
+            }
             if (employeesSelect && agenda) {
               employeesSelect.addEventListener("change", function () {
                 var selected = employeesSelect.multiple ? Array.prototype.slice.call(employeesSelect.selectedOptions).map(function (opt) { return opt.value; }).filter(Boolean)[0] || "" : employeesSelect.value || "";
                 agenda.innerHTML = popupEmployeeAgendaHtml(selected);
               });
             }
+            [categorySelect, dateInput, startInput, endInput].forEach(function (field) {
+              if (field) field.addEventListener("change", maybeAutofillPreventiveDescription);
+            });
+            if (descriptionInput) {
+              descriptionInput.addEventListener("input", function () {
+                descriptionInput.setAttribute("data-auto-calendar-text", "0");
+              });
+            }
+            maybeAutofillPreventiveDescription();
           },
           preConfirm: function () {
             var popup = window.Swal.getPopup();
@@ -625,6 +817,9 @@
       }
       var refreshBtn = panel.querySelector("[data-scm-calendar-refresh]");
       if (refreshBtn) refreshBtn.addEventListener("click", loadEvents);
+
+      var reportBtn = panel.querySelector("[data-scm-calendar-open-report]");
+      if (reportBtn) reportBtn.addEventListener("click", openCalendarReport);
 
       var openEmployeeCalendarBtn = panel.querySelector("[data-scm-calendar-open-employee]");
       if (openEmployeeCalendarBtn) {

@@ -1317,6 +1317,7 @@ trait RendersDashboard
           <span class="scm-status-count"><strong data-scm-calendar-total>0</strong> eventos</span>
           <button type="button" class="scm-btn-primary btn btn-primary" data-scm-calendar-open-create data-calendar-mode="single">Crear evento</button>
           <button type="button" class="scm-case-work-btn" data-scm-calendar-open-create data-calendar-mode="multiple">Evento m&uacute;ltiple</button>
+          <button type="button" class="scm-case-work-btn scm-calendar-report-btn" data-scm-calendar-open-report>Informe del d&iacute;a</button>
           <button type="button" class="scm-case-work-btn" data-scm-calendar-open-employee data-iframe-title="Calendario del funcionario">Ver calendario del funcionario</button>
         </div>
       </div>
@@ -1334,7 +1335,6 @@ trait RendersDashboard
             <div class="scm-field"><label>Funcionario</label><select class="select select-bordered select-sm scm-select" name="id_empleado" data-scm-calendar-filter-employees><option value="">Selecciona funcionario</option></select></div>
             <div class="scm-field"><label>Categor&iacute;a</label><select class="select select-bordered select-sm scm-select" name="id_categoria" data-scm-calendar-filter-categories><option value="">Todas</option></select></div>
             <div class="scm-field"><label>Estado</label><select class="select select-bordered select-sm scm-select" name="estado"><option value="">Todos</option><option value="No" selected>Pendientes</option><option value="Si">Realizados</option></select></div>
-            <div class="scm-field scm-calendar-filter-note"><label>Cargos visibles</label><span><?php echo esc_html(implode(', ', array_map('strval', $allowedCargos))); ?></span></div>
           </div>
           <div class="scm-actions">
             <button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button>
