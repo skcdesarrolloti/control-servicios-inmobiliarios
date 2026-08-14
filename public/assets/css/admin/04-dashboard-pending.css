@@ -1388,6 +1388,55 @@
   text-align: left;
 }
 
+.swal2-popup .scm-calendar-report-shell {
+  color: #0f2742;
+  text-align: left;
+}
+
+.swal2-popup .scm-calendar-report-filters {
+  align-items: end;
+  background: #f8fafc;
+  border: 1px solid #dbe6f2;
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(220px, 1fr) minmax(220px, 1fr) auto;
+  margin: 0 0 14px;
+  padding: 13px !important;
+}
+
+.swal2-popup .scm-calendar-report-filters label {
+  display: grid;
+  gap: 6px;
+  margin: 0 !important;
+}
+
+.swal2-popup .scm-calendar-report-filters span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-calendar-report-filters input,
+.swal2-popup .scm-calendar-report-filters select {
+  background: #fff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 10px !important;
+  color: #10243d !important;
+  font-size: 13px !important;
+  font-weight: 850 !important;
+  min-height: 40px !important;
+  padding: 9px 11px !important;
+  width: 100% !important;
+}
+
+.swal2-popup .scm-calendar-report-filters button {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
 .swal2-popup .scm-calendar-report-employee {
   align-items: flex-start;
   background: #f8fafc;
@@ -1416,10 +1465,17 @@
   font-weight: 950;
 }
 
+.swal2-popup .scm-calendar-report-employee em {
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+}
+
 .swal2-popup .scm-calendar-report-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .swal2-popup .scm-calendar-report-grid div {
@@ -1679,6 +1735,10 @@
 
   .swal2-popup .scm-calendar-report-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .swal2-popup .scm-calendar-report-filters {
+    grid-template-columns: 1fr;
   }
 
   .swal2-popup .scm-calendar-report-columns {

@@ -888,38 +888,94 @@
 
       function reportEventsListHtml(rows) {
         if (!rows.length) {
-          return '<section class="scm-calendar-report-section scm-calendar-report-events-section"><h4>Eventos de hoy</h4><div class="scm-calendar-report-empty">No hay eventos creados para hoy.</div></section>';
+          return '<section class="scm-calendar-report-section scm-calendar-report-events-section"><h4>Eventos creados</h4><div class="scm-calendar-report-empty">No hay eventos creados con esos filtros.</div></section>';
         }
-        return '<section class="scm-calendar-report-section scm-calendar-report-events-section"><h4>Eventos de hoy</h4><div class="scm-calendar-report-events">' + rows.map(function (row) {
+        return '<section class="scm-calendar-report-section scm-calendar-report-events-section"><h4>Cu&aacute;les eventos se crearon</h4><div class="scm-calendar-report-events">' + rows.map(function (row) {
           var ticket = String(row.id_ticket || "").trim();
+          var created = eventCreatedValue(row);
           return '<article class="scm-calendar-report-event">' +
-            '<div><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + '</span></div>' +
-            '<p><b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (ticket ? ' <b>Ticket:</b> #' + escHtml(ticket) : "") + '</p>' +
+            '<div><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>Creado: ' + escHtml(created ? formatDateTime(created) : "Sin fecha") + '</span></div>' +
+            '<p><b>Programado:</b> ' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + ' <b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (ticket ? ' <b>Ticket:</b> #' + escHtml(ticket) : "") + '</p>' +
             '</article>';
         }).join("") + '</div></section>';
       }
 
-      function reportScopeEmployeeIds() {
-        var selectedEmployee = selectedEmployeeFromFilter();
+      function eventCreatedValue(row) {
+        return String(row && (row.creado_en || row.created_at || row.cct_created || row.fecha_creacion || row.fecha_registro || row.created || "")).trim();
+      }
+
+      function eventCreatedKey(row) {
+        return eventCreatedValue(row).slice(0, 10);
+      }
+
+      function reportScopeEmployeeIds(filters) {
+        var selectedEmployee = String((filters && filters.id_empleado) || "").trim();
         if (selectedEmployee) return [selectedEmployee];
         return allowedEmployees.map(getEmployeeId).filter(Boolean);
       }
 
-      function loadCalendarReportRows() {
-        var todayKey = toDateKey(new Date());
-        var ids = reportScopeEmployeeIds();
+      function reportCategoryOptionsHtml(current) {
+        current = String(current || "");
+        return '<option value="">Todas las categor&iacute;as</option>' + categories.map(function (row) {
+          var id = String(row.id || row._ID || row.id_categoria || "").trim();
+          var name = String(row.nombre || row.categoria || id).trim();
+          return id ? '<option value="' + escHtml(id) + '"' + (id === current ? " selected" : "") + '>' + escHtml(name) + "</option>" : "";
+        }).join("");
+      }
+
+      function reportEmployeeOptionsHtml(current) {
+        current = String(current || "");
+        return '<option value="">Todos los funcionarios visibles</option>' + allowedEmployees.map(function (row) {
+          return employeeOptionHtml(row, current);
+        }).join("");
+      }
+
+      function calendarReportShellHtml(defaultDate, defaultEmployee, defaultCategory) {
+        return '<div class="scm-calendar-report-shell">' +
+          '<form class="scm-calendar-report-filters" data-calendar-report-filters autocomplete="off">' +
+          '<label><span>Creado el d&iacute;a</span><input class="input input-bordered input-sm scm-input" type="date" name="creado_en" value="' + escHtml(defaultDate) + '"></label>' +
+          '<label><span>Funcionario</span><select class="select select-bordered select-sm scm-select" name="id_empleado">' + reportEmployeeOptionsHtml(defaultEmployee) + '</select></label>' +
+          '<label><span>Categor&iacute;a</span><select class="select select-bordered select-sm scm-select" name="id_categoria">' + reportCategoryOptionsHtml(defaultCategory) + '</select></label>' +
+          '<button type="submit" class="scm-btn-primary btn btn-primary">Aplicar</button>' +
+          '</form>' +
+          '<div data-calendar-report-content><div class="scm-calendar-report-loading">Cargando informe...</div></div>' +
+          '</div>';
+      }
+
+      function fetchCalendarReportPage(employeeId, page, limit) {
+        return calendarApi("filtrar_eventos_admin", {
+          pagina: page,
+          limite: limit,
+          id_empleado: employeeId,
+        }).then(function (json) {
+          var rows = json && json.success ? extractRows(json.data || []) : [];
+          var total = json && json.data && typeof json.data.total !== "undefined" ? parseInt(json.data.total, 10) : rows.length;
+          return { rows: rows, total: Number.isNaN(total) ? rows.length : total };
+        }).catch(function () {
+          return { rows: [], total: 0 };
+        });
+      }
+
+      function loadCalendarReportRows(filters) {
+        filters = filters || {};
+        var createdKey = String(filters.creado_en || toDateKey(new Date())).slice(0, 10);
+        var categoryId = String(filters.id_categoria || "").trim();
+        var ids = reportScopeEmployeeIds(filters);
         if (!ids.length) return Promise.resolve([]);
+        var limit = 500;
         return Promise.all(ids.map(function (employeeId) {
-          return calendarApi("filtrar_eventos_admin", {
-            pagina: 1,
-            limite: 250,
-            fecha_inicio: todayKey,
-            fecha_fin: todayKey,
-            id_empleado: employeeId,
-          }).then(function (json) {
-            return json && json.success ? extractRows(json.data || []) : [];
-          }).catch(function () {
-            return [];
+          return fetchCalendarReportPage(employeeId, 1, limit).then(function (first) {
+            var pages = Math.min(20, Math.max(1, Math.ceil((first.total || first.rows.length) / limit)));
+            if (pages <= 1) return first.rows;
+            var requests = [];
+            for (var page = 2; page <= pages; page += 1) {
+              requests.push(fetchCalendarReportPage(employeeId, page, limit));
+            }
+            return Promise.all(requests).then(function (rest) {
+              var rows = first.rows.slice();
+              rest.forEach(function (item) { rows = rows.concat(item.rows || []); });
+              return rows;
+            });
           });
         })).then(function (groups) {
           var rows = [];
@@ -927,28 +983,35 @@
             rows = rows.concat(group || []);
           });
           return uniqueReportRows(filterRowsByAllowedEmployees(rows)).filter(function (row) {
-            return eventDateKey(row) === todayKey;
+            if (eventCreatedKey(row) !== createdKey) return false;
+            if (categoryId && getCategoryId(row) !== categoryId) return false;
+            return true;
           }).sort(function (a, b) {
-            return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+            return String(eventCreatedValue(b) || "").localeCompare(String(eventCreatedValue(a) || ""));
           });
         });
       }
 
-      function calendarReportHtml(rowsToday) {
+      function calendarReportHtml(rowsToday, filters) {
         rowsToday = rowsToday || [];
-        var selectedEmployee = selectedEmployeeFromFilter();
+        filters = filters || {};
+        var selectedEmployee = String(filters.id_empleado || "").trim();
         var employee = allowedEmployees.find(function (row) { return getEmployeeId(row) === selectedEmployee; });
+        var categoryId = String(filters.id_categoria || "").trim();
+        var categoryLabel = categoryId && categoriesById[categoryId] ? String(categoriesById[categoryId].nombre || categoriesById[categoryId].categoria || categoryId) : "Todas las categorias";
         var pendingRows = rowsToday.filter(function (row) { return String(row.estado || "").toLowerCase() !== "si"; });
         var doneRows = rowsToday.filter(function (row) { return String(row.estado || "").toLowerCase() === "si"; });
+        var scheduledTodayRows = rowsToday.filter(function (row) { return eventDateKey(row) === String(filters.creado_en || "").slice(0, 10); });
         var categoryGroups = countReportGroups(rowsToday, categoryNameForRow);
         var employeeGroups = countReportGroups(rowsToday, employeeNameForRow);
         var scopeLabel = employee ? (employee.nombre || employee.funcionario || selectedEmployee) : "Todos los funcionarios visibles";
         return '<div class="scm-calendar-report-modal">' +
-          '<p class="scm-calendar-report-employee"><span>Corte del d&iacute;a</span><strong>' + escHtml(scopeLabel) + '</strong></p>' +
+          '<p class="scm-calendar-report-employee"><span>Eventos creados el ' + escHtml(filters.creado_en || toDateKey(new Date())) + '</span><strong>' + escHtml(scopeLabel) + '</strong><em>' + escHtml(categoryLabel) + '</em></p>' +
           '<div class="scm-calendar-report-grid">' +
-          '<div><span>Total hoy</span><strong>' + rowsToday.length + '</strong></div>' +
+          '<div><span>Creados</span><strong>' + rowsToday.length + '</strong></div>' +
           '<div><span>Categor&iacute;as</span><strong>' + categoryGroups.length + '</strong></div>' +
           '<div><span>Funcionarios</span><strong>' + employeeGroups.length + '</strong></div>' +
+          '<div><span>Para ese mismo d&iacute;a</span><strong>' + scheduledTodayRows.length + '</strong></div>' +
           '<div><span>Pendientes</span><strong>' + pendingRows.length + '</strong></div>' +
           '<div><span>Realizadas</span><strong>' + doneRows.length + '</strong></div>' +
           '</div>' +
@@ -965,20 +1028,48 @@
           showToast("error", "No esta disponible el popup de informe.");
           return;
         }
+        var defaultDate = toDateKey(new Date());
+        var defaultEmployee = selectedEmployeeFromFilter();
+        var defaultCategory = filterForm && filterForm.querySelector('[name="id_categoria"]') ? filterForm.querySelector('[name="id_categoria"]').value : "";
         window.Swal.fire({
           title: "Informe del día",
-          html: '<div class="scm-calendar-report-loading">Cargando informe del d&iacute;a...</div>',
-          width: 900,
+          html: calendarReportShellHtml(defaultDate, defaultEmployee, defaultCategory),
+          width: 980,
           customClass: { popup: "scm-calendar-swal-popup scm-calendar-report-swal" },
           confirmButtonText: "Cerrar",
           showCancelButton: false,
           didOpen: function () {
-            var htmlContainer = window.Swal.getHtmlContainer();
-            loadCalendarReportRows().then(function (rows) {
-              if (htmlContainer) htmlContainer.innerHTML = calendarReportHtml(rows);
-            }).catch(function () {
-              if (htmlContainer) htmlContainer.innerHTML = '<div class="scm-calendar-report-empty">No se pudo cargar el informe del d&iacute;a.</div>';
-            });
+            var popup = window.Swal.getPopup();
+            var form = popup ? popup.querySelector("[data-calendar-report-filters]") : null;
+            var content = popup ? popup.querySelector("[data-calendar-report-content]") : null;
+            function currentReportFilters() {
+              if (!form) return { creado_en: defaultDate, id_empleado: defaultEmployee, id_categoria: defaultCategory };
+              var fd = new FormData(form);
+              return {
+                creado_en: fd.get("creado_en") || defaultDate,
+                id_empleado: fd.get("id_empleado") || "",
+                id_categoria: fd.get("id_categoria") || "",
+              };
+            }
+            function renderReport() {
+              var filters = currentReportFilters();
+              if (content) content.innerHTML = '<div class="scm-calendar-report-loading">Cargando informe por fecha de creaci&oacute;n...</div>';
+              loadCalendarReportRows(filters).then(function (rows) {
+                if (content) content.innerHTML = calendarReportHtml(rows, filters);
+              }).catch(function () {
+                if (content) content.innerHTML = '<div class="scm-calendar-report-empty">No se pudo cargar el informe del d&iacute;a.</div>';
+              });
+            }
+            if (form) {
+              form.addEventListener("submit", function (e) {
+                e.preventDefault();
+                renderReport();
+              });
+              form.querySelectorAll("input, select").forEach(function (field) {
+                field.addEventListener("change", renderReport);
+              });
+            }
+            renderReport();
           },
         });
       }
