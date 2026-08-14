@@ -76,6 +76,7 @@ trait RendersDashboard
     $statusTopicDefs = $this->get_status_topic_definitions();
     $statusResults = $this->build_status_bucket_results($statusBucketDefs, $statusTopicDefs, $config, $filterOptions, false);
     $currentEmployeeId = $this->current_employee_id();
+    $config['calendar_current_employee_id'] = $currentEmployeeId;
     $myTicketsParams = $module->parseParams($_GET, 'scm_my_');
     $myTicketsParams['fEmpleado'] = $currentEmployeeId !== '' ? $currentEmployeeId : '__sin_funcionario__';
     $myTicketsParams['_scmEmpleadoExact'] = '1';
@@ -1294,6 +1295,7 @@ trait RendersDashboard
     }
     $allowedFuncionarios = is_array($config['calendar_allowed_funcionarios'] ?? null) ? $config['calendar_allowed_funcionarios'] : [];
     $allowedCargos = is_array($config['calendar_allowed_cargos'] ?? null) ? $config['calendar_allowed_cargos'] : ['3', '4', '5', '7', '8', '11', '12', '14', '18'];
+    $currentCalendarEmployeeId = trim((string) ($config['calendar_current_employee_id'] ?? ''));
     $allowedFuncionariosJson = json_encode($allowedFuncionarios, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
     $todayLabel = date('Y-m-d');
 
@@ -1303,6 +1305,7 @@ trait RendersDashboard
       data-scm-calendar-panel
       data-calendar-app-url="<?php echo esc_attr($appUrl); ?>"
       data-calendar-api-url="<?php echo esc_attr($apiUrl); ?>"
+      data-calendar-current-employee-id="<?php echo esc_attr($currentCalendarEmployeeId); ?>"
       data-calendar-allowed-cargos="<?php echo esc_attr(implode(',', array_map('strval', $allowedCargos))); ?>"
       data-calendar-employees-json="<?php echo esc_attr($allowedFuncionariosJson ?: '[]'); ?>">
       <div class="scm-status-topic-head scm-calendar-head">
@@ -1314,7 +1317,7 @@ trait RendersDashboard
           <span class="scm-status-count"><strong data-scm-calendar-total>0</strong> eventos</span>
           <button type="button" class="scm-btn-primary btn btn-primary" data-scm-calendar-open-create data-calendar-mode="single">Crear evento</button>
           <button type="button" class="scm-case-work-btn" data-scm-calendar-open-create data-calendar-mode="multiple">Evento m&uacute;ltiple</button>
-          <button type="button" class="scm-case-work-btn" data-scm-calendar-open-path="/" data-iframe-title="Calendario en grande">Ver en grande</button>
+          <button type="button" class="scm-case-work-btn" data-scm-calendar-open-employee data-iframe-title="Calendario del funcionario">Ver calendario del funcionario</button>
         </div>
       </div>
 
@@ -1328,7 +1331,7 @@ trait RendersDashboard
       <section class="scm-calendar-card scm-calendar-filter-card">
         <form class="scm-calendar-filter-form" data-scm-calendar-filters autocomplete="off">
           <div class="scm-grid">
-            <div class="scm-field"><label>Funcionario</label><select class="select select-bordered select-sm scm-select" name="id_empleado" data-scm-calendar-filter-employees><option value="">Todos</option></select></div>
+            <div class="scm-field"><label>Funcionario</label><select class="select select-bordered select-sm scm-select" name="id_empleado" data-scm-calendar-filter-employees><option value="">Selecciona funcionario</option></select></div>
             <div class="scm-field"><label>Categor&iacute;a</label><select class="select select-bordered select-sm scm-select" name="id_categoria" data-scm-calendar-filter-categories><option value="">Todas</option></select></div>
             <div class="scm-field"><label>Estado</label><select class="select select-bordered select-sm scm-select" name="estado"><option value="">Todos</option><option value="No" selected>Pendientes</option><option value="Si">Realizados</option></select></div>
             <div class="scm-field scm-calendar-filter-note"><label>Cargos visibles</label><span><?php echo esc_html(implode(', ', array_map('strval', $allowedCargos))); ?></span></div>

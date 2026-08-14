@@ -175,6 +175,7 @@
       var rangeEl = panel.querySelector("[data-scm-calendar-range]");
       var allowedCargos = String(panel.getAttribute("data-calendar-allowed-cargos") || "").split(",").map(function (v) { return v.trim(); }).filter(Boolean);
       var allowedEmployees = parseCalendarEmployees(panel.getAttribute("data-calendar-employees-json") || "[]");
+      var currentCalendarEmployeeId = String(panel.getAttribute("data-calendar-current-employee-id") || "").trim();
       var allowedEmployeeIds = {};
       var categories = [];
       var categoriesById = {};
@@ -235,7 +236,10 @@
 
       function fillEmployeeOptions(selects, rows, firstLabel) {
         selects.forEach(function (select) {
-          var current = select.value || "";
+          var current = select.value || currentCalendarEmployeeId || "";
+          if (current && !rows.some(function (row) { return getEmployeeId(row) === current; })) {
+            current = rows.length ? getEmployeeId(rows[0]) : "";
+          }
           select.innerHTML = '<option value="">' + firstLabel + "</option>";
           rows.forEach(function (row) {
             var id = getEmployeeId(row);
@@ -428,13 +432,23 @@
         if (spinner) spinner.classList.add("active");
         var range = monthRange(currentMonth);
         var filters = { pagina: 1, limite: 500, fecha_inicio: range.from, fecha_fin: range.to };
+        var selectedEmployeeId = "";
         if (filterForm) {
           var employeeField = filterForm.querySelector('[name="id_empleado"]');
           var categoryField = filterForm.querySelector('[name="id_categoria"]');
           var estadoField = filterForm.querySelector('[name="estado"]');
-          if (employeeField && employeeField.value) filters.id_empleado = employeeField.value;
+          selectedEmployeeId = employeeField ? String(employeeField.value || "").trim() : "";
+          if (selectedEmployeeId) filters.id_empleado = selectedEmployeeId;
           if (categoryField && categoryField.value) filters.id_categoria = categoryField.value;
           if (estadoField && estadoField.value) filters.estado = estadoField.value;
+        }
+        if (!selectedEmployeeId) {
+          calendarEvents = [];
+          renderKpis(calendarEvents);
+          if (monthGrid) monthGrid.innerHTML = '<div class="scm-calendar-loading">Selecciona un funcionario para ver su calendario.</div>';
+          if (eventsWrap) eventsWrap.innerHTML = '<div class="scm-empty scm-empty-cards">Este apartado funciona por calendario de funcionario, no como calendario general.</div>';
+          if (spinner) spinner.classList.remove("active");
+          return Promise.resolve();
         }
         return calendarApi("filtrar_eventos_admin", filters)
           .then(function (json) {
@@ -588,7 +602,7 @@
           var id = String(row.id || row._ID || row.id_categoria || "").trim();
           if (id) categoriesById[id] = row;
         });
-        fillEmployeeOptions(Array.prototype.slice.call(panel.querySelectorAll("[data-scm-calendar-filter-employees]")), funcionarios, "Todos");
+        fillEmployeeOptions(Array.prototype.slice.call(panel.querySelectorAll("[data-scm-calendar-filter-employees]")), funcionarios, "Selecciona funcionario");
         fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), categories, "Todas");
       }).finally(loadEvents);
 
@@ -611,6 +625,21 @@
       }
       var refreshBtn = panel.querySelector("[data-scm-calendar-refresh]");
       if (refreshBtn) refreshBtn.addEventListener("click", loadEvents);
+
+      var openEmployeeCalendarBtn = panel.querySelector("[data-scm-calendar-open-employee]");
+      if (openEmployeeCalendarBtn) {
+        openEmployeeCalendarBtn.addEventListener("click", function () {
+          var employeeId = selectedEmployeeFromFilter();
+          if (!employeeId) {
+            showToast("error", "Selecciona un funcionario para abrir su calendario.");
+            return;
+          }
+          openCalendarPath(
+            "/funcionario/" + encodeURIComponent(employeeId),
+            openEmployeeCalendarBtn.getAttribute("data-iframe-title") || "Calendario del funcionario",
+          );
+        });
+      }
 
       var prevBtn = panel.querySelector("[data-scm-calendar-prev]");
       var nextBtn = panel.querySelector("[data-scm-calendar-next]");
