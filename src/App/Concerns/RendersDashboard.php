@@ -514,7 +514,8 @@ trait RendersDashboard
               <div class="scm-field"><label for="scm_barrio">Barrio</label><select id="scm_barrio" name="scm_barrio" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["barrios"] ?? []) as $barrioOpt): ?><option value="<?php echo esc_attr((string)$barrioOpt); ?>" <?php selected((string)($params["fBarrio"] ?? ""), (string)$barrioOpt); ?>><?php echo esc_html((string)$barrioOpt); ?></option><?php endforeach; ?>
                 </select></div>
-              <div class="scm-field"><label for="scm_fecha">Fecha</label><input id="scm_fecha" name="scm_fecha" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string)($params["fFecha"] ?? "")); ?>"></div>
+              <div class="scm-field"><label for="scm_fecha_desde">Fecha desde</label><input id="scm_fecha_desde" name="scm_fecha_desde" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string)($params["fFechaDesde"] ?? "")); ?>"></div>
+              <div class="scm-field"><label for="scm_fecha_hasta">Fecha hasta</label><input id="scm_fecha_hasta" name="scm_fecha_hasta" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string)($params["fFechaHasta"] ?? "")); ?>"></div>
 
               <div class="scm-field"><label for="scm_cotizacion">Cotizaci&oacute;n</label><select id="scm_cotizacion" name="scm_cotizacion" class="select select-bordered select-sm scm-select">
                   <option value="">Todas</option>
@@ -1088,12 +1089,22 @@ trait RendersDashboard
     $page = max(1, (int) $clean($input[$prefix . 'page'] ?? '1'));
     $perPage = max(10, min(60, (int) $clean($input[$prefix . 'per_page'] ?? '20')));
 
+    $singleDate = $clean($input[$prefix . 'fecha'] ?? '');
+    $dateFrom = $clean($input[$prefix . 'fecha_desde'] ?? '');
+    $dateTo = $clean($input[$prefix . 'fecha_hasta'] ?? '');
+    if ($singleDate !== '' && $dateFrom === '' && $dateTo === '') {
+      $dateFrom = $singleDate;
+      $dateTo = $singleDate;
+    }
+
     return [
       'fPage' => (string) $page,
       'fPerPage' => (string) $perPage,
       'fCotizacion' => $clean($input[$prefix . 'cotizacion'] ?? ''),
       'fTicket' => $clean($input[$prefix . 'ticket'] ?? ''),
-      'fFecha' => $clean($input[$prefix . 'fecha'] ?? ''),
+      'fFecha' => $singleDate,
+      'fFechaDesde' => $dateFrom,
+      'fFechaHasta' => $dateTo,
       'fDestinatario' => $clean($input[$prefix . 'destinatario'] ?? ''),
       'fFuncionario' => $clean($input[$prefix . 'funcionario'] ?? ''),
       'fInmueble' => $clean($input[$prefix . 'inmueble'] ?? ''),
@@ -1141,13 +1152,18 @@ trait RendersDashboard
       $args[] = $term;
     }
 
-    if (($p['fFecha'] ?? '') !== '') {
-      $tsStart = strtotime((string) $p['fFecha'] . ' 00:00:00');
-      $tsEnd = strtotime((string) $p['fFecha'] . ' 23:59:59');
-      if ($tsStart !== false && $tsEnd !== false) {
-        $where[] = 'COALESCE(c.`fecha`, 0) BETWEEN ? AND ?';
-        $args[] = (int) $tsStart;
-        $args[] = (int) $tsEnd;
+    if (($p['fFechaDesde'] ?? '') !== '') {
+      $ts = strtotime((string) $p['fFechaDesde'] . ' 00:00:00');
+      if ($ts !== false) {
+        $where[] = 'COALESCE(c.`fecha`, 0) >= ?';
+        $args[] = (int) $ts;
+      }
+    }
+    if (($p['fFechaHasta'] ?? '') !== '') {
+      $ts = strtotime((string) $p['fFechaHasta'] . ' 23:59:59');
+      if ($ts !== false) {
+        $where[] = 'COALESCE(c.`fecha`, 0) <= ?';
+        $args[] = (int) $ts;
       }
     }
 
@@ -1445,7 +1461,8 @@ trait RendersDashboard
         <div class="scm-grid">
           <div class="scm-field"><label for="scmqt_cotizacion">Cotizaci&oacute;n</label><input id="scmqt_cotizacion" name="scmqt_cotizacion" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fCotizacion'] ?? '')); ?>" placeholder="Ej: 528"></div>
           <div class="scm-field"><label for="scmqt_ticket">Ticket</label><input id="scmqt_ticket" name="scmqt_ticket" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fTicket'] ?? '')); ?>" placeholder="Ej: 10055"></div>
-          <div class="scm-field"><label for="scmqt_fecha">Fecha</label><input id="scmqt_fecha" name="scmqt_fecha" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string) ($p['fFecha'] ?? '')); ?>"></div>
+          <div class="scm-field"><label for="scmqt_fecha_desde">Fecha desde</label><input id="scmqt_fecha_desde" name="scmqt_fecha_desde" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string) ($p['fFechaDesde'] ?? '')); ?>"></div>
+          <div class="scm-field"><label for="scmqt_fecha_hasta">Fecha hasta</label><input id="scmqt_fecha_hasta" name="scmqt_fecha_hasta" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string) ($p['fFechaHasta'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="scmqt_destinatario">Destinatario</label><input id="scmqt_destinatario" name="scmqt_destinatario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fDestinatario'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="scmqt_funcionario">Funcionario</label><input id="scmqt_funcionario" name="scmqt_funcionario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fFuncionario'] ?? '')); ?>" placeholder="ID empleado"></div>
           <div class="scm-field"><label for="scmqt_inmueble">Inmueble SIMI</label><input id="scmqt_inmueble" name="scmqt_inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fInmueble'] ?? '')); ?>"></div>

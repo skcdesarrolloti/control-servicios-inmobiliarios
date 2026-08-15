@@ -23,12 +23,12 @@ trait GenericQueryConcern
     $singleDate = $clean($input[$prefix . 'fecha'] ?? '');
     $dateFrom = $clean($input[$prefix . 'fecha_desde'] ?? '');
     $dateTo = $clean($input[$prefix . 'fecha_hasta'] ?? '');
-    if ($singleDate === '' && $dateFrom !== '' && $dateFrom === $dateTo) {
-      $singleDate = $dateFrom;
+    if ($singleDate !== '' && $dateFrom === '' && $dateTo === '') {
+      $dateFrom = $singleDate;
+      $dateTo = $singleDate;
     }
-    if ($singleDate !== '') {
-      $dateFrom = '';
-      $dateTo = '';
+    if ($dateFrom !== '' || $dateTo !== '') {
+      $singleDate = '';
     }
 
     return [
