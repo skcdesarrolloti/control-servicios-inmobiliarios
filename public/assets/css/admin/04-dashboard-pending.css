@@ -86,6 +86,73 @@
   min-width: 0 !important;
 }
 
+#scm-app .scm-case-timeline-head-btn {
+  border-color: #fed7aa !important;
+  background: #fff7ed !important;
+  color: #b45309 !important;
+}
+
+#scm-app .scm-case-timeline-head-btn:hover {
+  background: #ffedd5 !important;
+  color: #92400e !important;
+}
+
+#scm-app .scm-case-submodal-body .scm-modal-timeline-popup {
+  background: #f8fafc;
+  border: 1px solid #dbe6f2;
+  border-radius: 14px;
+  padding: 14px !important;
+}
+
+#scm-app .scm-case-submodal-body .scm-modal-timeline-popup .scm-tl-wrap {
+  display: block !important;
+  grid-template-columns: 1fr !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+#scm-app .scm-case-submodal-body .scm-modal-timeline-popup .scm-timeline {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  overflow-x: hidden !important;
+  gap: 10px !important;
+}
+
+#scm-app .scm-case-submodal-body .scm-modal-timeline-popup .scm-tl-item {
+  flex: 1 1 210px !important;
+  min-width: 210px !important;
+  max-width: none !important;
+}
+
+#scm-app .scm-case-submodal-body .scm-modal-timeline-popup .scm-tl-line {
+  display: block !important;
+  flex: 0 0 30px !important;
+  min-width: 30px !important;
+  height: 2px !important;
+  margin-top: 42px !important;
+  position: relative !important;
+  background: #b8c7da !important;
+  border-radius: 2px !important;
+}
+
+#scm-app .scm-case-submodal-body .scm-modal-timeline-popup .scm-tl-line::after {
+  content: "" !important;
+  position: absolute !important;
+  right: -1px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  border-top: 5px solid transparent !important;
+  border-bottom: 5px solid transparent !important;
+  border-left: 7px solid #b8c7da !important;
+}
+
 #scm-app .scm-case-sidebar {
   padding: 12px !important;
 }

@@ -316,6 +316,7 @@
     if (headActions) {
       headActions.innerHTML = "";
     }
+    modal._scmTimelineHtml = "";
   }
 
   function ensureCaseSubmodal(modal) {
@@ -382,6 +383,27 @@
     }
     meta.textContent = "Codigo inmueble web: " + propertyCode;
     meta.style.display = "block";
+  }
+
+  function openCaseTimelineSubmodal(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var timelineHtml = String((modal && modal._scmTimelineHtml) || "").trim();
+    if (title) {
+      title.textContent = "Línea de tiempo del caso";
+    }
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML = timelineHtml
+        ? '<div class="scm-modal-timeline-only scm-modal-timeline-popup">' +
+          timelineHtml +
+          "</div>"
+        : '<p class="scm-muted">Este caso no tiene línea de tiempo disponible.</p>';
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
   }
 
   function cleanCaseValue(value) {
@@ -2885,6 +2907,13 @@
           );
           floatingActionWrap.remove();
         }
+        var timelineWrap = srcWrap.querySelector(".scm-modal-timeline-only");
+        var timelineHtml = "";
+        if (timelineWrap) {
+          timelineHtml = timelineWrap.innerHTML || "";
+          timelineWrap.remove();
+        }
+        modal._scmTimelineHtml = timelineHtml;
         var ticketUrl = (btn.dataset.ticketUrl || "").trim();
         if (!ticketUrl) {
           var baseTicketUrl = String(runtimeConfig.ticket_url || "").trim();
@@ -3092,6 +3121,10 @@
               escHtml(label) +
               "</button>";
           });
+          if (timelineHtml) {
+            headActions.innerHTML +=
+              '<button type="button" class="scm-case-side-link scm-case-timeline-head-btn" data-scm-open-timeline>Ver l&iacute;nea de tiempo</button>';
+          }
           var tabKeyHead = (btn.dataset.tabKey || "").trim();
           var idEstudioHead = (btn.dataset.idEstudioAseguradora || "").trim();
           var anexosHead = (btn.dataset.anexosEntrega || "").trim();
@@ -3147,6 +3180,14 @@
               return;
             }
             openCaseSubmodal(modal, scrollBtn, targetId);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-timeline]")
+        .forEach(function (timelineBtn) {
+          timelineBtn.addEventListener("click", function () {
+            openCaseTimelineSubmodal(modal, btn);
           });
         });
 
