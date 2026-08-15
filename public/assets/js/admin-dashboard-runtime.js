@@ -1071,7 +1071,7 @@
           '<div><span>Realizadas</span><strong>' + doneRows.length + '</strong></div>' +
           '</div>' +
           '<div class="scm-calendar-report-columns">' +
-          reportGroupListHtml("Por categor&iacute;a", categoryGroups, "Sin categorias para hoy.") +
+          reportGroupListHtml("Eventos por categoría", categoryGroups, "Sin categorías para hoy.") +
           reportGroupListHtml("Por funcionario", employeeGroups, "Sin funcionarios para hoy.") +
           '</div>' +
           reportEventsListHtml(rowsToday) +
@@ -1701,21 +1701,6 @@
         e.preventDefault();
         openRescheduleEventPopup(rescheduleBtn.getAttribute("data-event-id") || "");
       });
-
-      var openEmployeeCalendarBtn = panel.querySelector("[data-scm-calendar-open-employee]");
-      if (openEmployeeCalendarBtn) {
-        openEmployeeCalendarBtn.addEventListener("click", function () {
-          var employeeId = selectedEmployeeFromFilter();
-          if (!employeeId) {
-            showToast("error", "Selecciona un funcionario para abrir su calendario.");
-            return;
-          }
-          openCalendarPath(
-            "/funcionario/" + encodeURIComponent(employeeId),
-            openEmployeeCalendarBtn.getAttribute("data-iframe-title") || "Calendario del funcionario",
-          );
-        });
-      }
 
       var prevBtn = panel.querySelector("[data-scm-calendar-prev]");
       var nextBtn = panel.querySelector("[data-scm-calendar-next]");

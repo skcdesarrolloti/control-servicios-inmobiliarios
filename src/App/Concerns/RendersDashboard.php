@@ -146,13 +146,13 @@ trait RendersDashboard
     ];
     $initialTab = $tabMap[$tabKey] ?? '';
     $administrativeActivityTabs = [
-      'cotizaciones_mantenimiento' => [
-        'panel' => 'scm-panel-cotizaciones-mantenimiento',
-        'label' => $dashboardPermissionTabs['cotizaciones_mantenimiento'] ?? 'Cotizaciones de Mantenimiento',
-      ],
       'calendario_actividades' => [
         'panel' => 'scm-panel-calendario-actividades',
         'label' => $dashboardPermissionTabs['calendario_actividades'] ?? 'Calendario',
+      ],
+      'cotizaciones_mantenimiento' => [
+        'panel' => 'scm-panel-cotizaciones-mantenimiento',
+        'label' => $dashboardPermissionTabs['cotizaciones_mantenimiento'] ?? 'Cotizaciones de Mantenimiento',
       ],
       'preventivas_pendientes' => [
         'panel' => 'scm-panel-preventivas-pendientes',
@@ -722,15 +722,15 @@ trait RendersDashboard
             <?php endforeach; ?>
           </div>
 
-          <?php if (in_array('cotizaciones_mantenimiento', $allowedAdministrativeActivityTabs, true)): ?>
-            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'cotizaciones_mantenimiento' ? ' active' : ''; ?>" id="scm-panel-cotizaciones-mantenimiento" data-permission-tab="cotizaciones_mantenimiento" data-admin-activity-panel="cotizaciones_mantenimiento">
-              <?php echo $this->render_cotizaciones_mantenimiento_panel($cotizacionesResult, $cotizacionesParams); ?>
-            </div>
-          <?php endif; ?>
-
           <?php if (in_array('calendario_actividades', $allowedAdministrativeActivityTabs, true)): ?>
             <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'calendario_actividades' ? ' active' : ''; ?>" id="scm-panel-calendario-actividades" data-permission-tab="calendario_actividades" data-admin-activity-panel="calendario_actividades">
               <?php echo $this->render_calendario_actividades_panel($config); ?>
+            </div>
+          <?php endif; ?>
+
+          <?php if (in_array('cotizaciones_mantenimiento', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'cotizaciones_mantenimiento' ? ' active' : ''; ?>" id="scm-panel-cotizaciones-mantenimiento" data-permission-tab="cotizaciones_mantenimiento" data-admin-activity-panel="cotizaciones_mantenimiento">
+              <?php echo $this->render_cotizaciones_mantenimiento_panel($cotizacionesResult, $cotizacionesParams); ?>
             </div>
           <?php endif; ?>
 
@@ -1318,7 +1318,6 @@ trait RendersDashboard
           <button type="button" class="scm-btn-primary btn btn-primary" data-scm-calendar-open-create data-calendar-mode="single">Crear evento</button>
           <button type="button" class="scm-case-work-btn" data-scm-calendar-open-create data-calendar-mode="multiple">Evento m&uacute;ltiple</button>
           <button type="button" class="scm-case-work-btn scm-calendar-report-btn" data-scm-calendar-open-report>Informe del d&iacute;a</button>
-          <button type="button" class="scm-case-work-btn" data-scm-calendar-open-employee data-iframe-title="Calendario del funcionario">Ver calendario del funcionario</button>
         </div>
       </div>
 
