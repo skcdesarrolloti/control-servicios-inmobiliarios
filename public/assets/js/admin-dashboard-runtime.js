@@ -832,7 +832,7 @@
         var filtered = (rows || []).filter(function (ticket) {
           if (!query) return true;
           return normalizeText(ticketLabel(ticket) + " " + (ticket.direccion || "") + " " + (ticket.solicitante || "")).indexOf(query) !== -1;
-        }).slice(0, 80);
+        }).slice(0, 500);
         select.innerHTML = '<option value="">Sin ticket relacionado</option>' + filtered.map(function (ticket) {
           var id = String(ticket._ID || ticket.id_ticket || ticket.id || "").trim();
           return id ? '<option value="' + escHtml(id) + '">' + escHtml(ticketLabel(ticket)) + "</option>" : "";
@@ -1264,8 +1264,10 @@
           ? employeeMultiPickerHtml(preselectedEmployee)
           : '<select class="select select-bordered select-sm scm-select" name="empleados" required><option value="">Selecciona funcionario</option>' + employeeOptions + "</select>";
         var ticketFieldsHtml = mode === "single"
-          ? '<label class="scm-seg-field"><span>Relacionado con ticket</span><select class="select select-bordered select-sm scm-select" name="relacionado_ticket" data-calendar-related-ticket><option value="">Selecciona una opci&oacute;n</option><option value="si">S&iacute;, est&aacute; relacionado</option><option value="no">No, evento libre</option></select></label>' +
-            '<label class="scm-seg-field scm-calendar-field-full" data-calendar-ticket-field hidden><span>Ticket relacionado</span><select class="select select-bordered select-sm scm-select scm-calendar-ticket-select" name="id_ticket" data-calendar-ticket-select><option value="">Selecciona funcionario para cargar tickets</option></select><small>Busca dentro del selector y escoge el ticket; se autocompleta t&iacute;tulo y direcci&oacute;n.</small></label>' +
+          ? '<div class="scm-calendar-ticket-inline scm-calendar-field-full">' +
+            '<label class="scm-seg-field"><span>Relacionado con ticket</span><select class="select select-bordered select-sm scm-select" name="relacionado_ticket" data-calendar-related-ticket><option value="">Selecciona una opci&oacute;n</option><option value="si">S&iacute;, est&aacute; relacionado</option><option value="no">No, evento libre</option></select></label>' +
+            '<label class="scm-seg-field" data-calendar-ticket-field hidden><span>Ticket relacionado</span><select class="select select-bordered select-sm scm-select scm-calendar-ticket-select" name="id_ticket" data-calendar-ticket-select><option value="">Selecciona funcionario para cargar tickets</option></select><small>Busca y escoge el ticket; se autocompleta t&iacute;tulo y direcci&oacute;n.</small></label>' +
+            "</div>" +
             '<label class="scm-seg-field" data-calendar-cita-field hidden><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="">Selecciona si es cita</option><option value="si">Si</option><option value="no">No</option></select></label>' +
             '<label class="scm-seg-field scm-calendar-ticket-state" data-calendar-admin-state hidden><span>Estado administrativo</span><select class="select select-bordered select-sm scm-select" name="estado_administrativo"><option value="">Selecciona estado administrativo</option>' + estadoAdministrativoOptionsHtml() + '</select></label>'
           : "";
@@ -1334,6 +1336,27 @@
             var adminStateWrap = popup.querySelector("[data-calendar-admin-state]");
             var adminStateSelect = popup.querySelector('[name="estado_administrativo"]');
             var currentTicketRows = [];
+            function canUseSelect2() {
+              return !!(window.jQuery && window.jQuery.fn && window.jQuery.fn.select2);
+            }
+            function destroyTicketSelect2() {
+              if (!ticketSelect || !canUseSelect2()) return;
+              var $ticket = window.jQuery(ticketSelect);
+              if ($ticket.data("select2")) {
+                $ticket.select2("destroy");
+              }
+            }
+            function initTicketSelect2() {
+              if (!ticketSelect || !canUseSelect2() || !isTicketRelated()) return;
+              var $ticket = window.jQuery(ticketSelect);
+              if ($ticket.data("select2")) return;
+              $ticket.select2({
+                width: "100%",
+                dropdownParent: window.jQuery(popup),
+                placeholder: "Buscar ticket por número, contrato, inmueble o solicitante",
+                allowClear: true,
+              });
+            }
             function selectedEmployees() {
               return selectedEmployeesFromPopup(popup.querySelector(".scm-calendar-popup-form"));
             }
@@ -1368,10 +1391,12 @@
               if (citaFieldWrap) citaFieldWrap.hidden = !related;
               if (!related) {
                 if (ticketSelect) ticketSelect.value = "";
+                destroyTicketSelect2();
                 if (citaSelect) citaSelect.value = "";
               } else if (citaSelect && !citaSelect.value) {
                 citaSelect.value = "si";
               }
+              if (related) initTicketSelect2();
               applyTicketStateVisibility();
             }
             function applyTicketStateVisibility() {
@@ -1383,10 +1408,12 @@
             function refreshTickets() {
               if (mode !== "single") return;
               var selected = selectedEmployees();
+              destroyTicketSelect2();
               if (ticketSelect) ticketSelect.innerHTML = '<option value="">Cargando tickets...</option>';
               loadTicketsForEmployees(selected).then(function (rows) {
                 currentTicketRows = rows || [];
                 renderTicketSelector(ticketSelect, currentTicketRows, "");
+                initTicketSelect2();
                 maybeAutofillTitleAndLocation(false);
               });
             }
@@ -1520,6 +1547,16 @@
             refreshRecurrenceUi();
             maybeAutofillTitleAndLocation(false);
             maybeAutofillPreventiveDescription();
+          },
+          willClose: function () {
+            if (!(window.jQuery && window.jQuery.fn && window.jQuery.fn.select2)) return;
+            var popup = window.Swal.getPopup();
+            var select = popup ? popup.querySelector("[data-calendar-ticket-select]") : null;
+            if (!select) return;
+            var $select = window.jQuery(select);
+            if ($select.data("select2")) {
+              $select.select2("destroy");
+            }
           },
           preConfirm: function () {
             var popup = window.Swal.getPopup();

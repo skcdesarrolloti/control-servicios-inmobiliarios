@@ -1193,6 +1193,91 @@
   grid-column: 1 / -1;
 }
 
+.swal2-popup .scm-calendar-ticket-inline {
+  align-items: start;
+  display: grid;
+  gap: 13px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(210px, 0.75fr) minmax(0, 1.45fr);
+}
+
+.swal2-popup .scm-calendar-ticket-inline .scm-seg-field {
+  min-width: 0;
+}
+
+.swal2-popup .scm-calendar-ticket-inline [hidden] {
+  display: none !important;
+}
+
+.swal2-popup.scm-calendar-swal-popup .select2-container {
+  width: 100% !important;
+}
+
+.swal2-popup.scm-calendar-swal-popup .select2-container .select2-selection--single {
+  align-items: center;
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  display: flex;
+  min-height: 40px !important;
+}
+
+.swal2-popup.scm-calendar-swal-popup .select2-container--default .select2-selection--single .select2-selection__rendered {
+  color: #10243d !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  line-height: 38px !important;
+  padding-left: 11px !important;
+  padding-right: 34px !important;
+}
+
+.swal2-popup.scm-calendar-swal-popup .select2-container--default .select2-selection--single .select2-selection__arrow {
+  height: 38px !important;
+  right: 7px !important;
+}
+
+.swal2-popup.scm-calendar-swal-popup .select2-container--default.select2-container--focus .select2-selection--single,
+.swal2-popup.scm-calendar-swal-popup .select2-container--default.select2-container--open .select2-selection--single {
+  background: #fff !important;
+  border-color: var(--scm-orange-500) !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.16) !important;
+}
+
+.swal2-container .select2-dropdown {
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18) !important;
+  overflow: hidden;
+  z-index: 100000 !important;
+}
+
+.swal2-container .select2-search--dropdown {
+  padding: 8px !important;
+}
+
+.swal2-container .select2-search--dropdown .select2-search__field {
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 10px !important;
+  color: #10243d !important;
+  font-size: 13px !important;
+  min-height: 38px !important;
+  outline: none !important;
+  padding: 8px 10px !important;
+}
+
+.swal2-container .select2-results__option {
+  color: #10243d;
+  font-size: 12px;
+  font-weight: 750;
+  padding: 9px 11px !important;
+}
+
+.swal2-container .select2-container--default .select2-results__option--highlighted[aria-selected] {
+  background: #f59e0b !important;
+  color: #fff !important;
+}
+
 .swal2-popup .scm-calendar-popup-form select[multiple] {
   min-height: 128px !important;
 }
@@ -1203,10 +1288,6 @@
   font-size: 11px;
   font-weight: 750;
   margin-top: 5px;
-}
-
-.swal2-popup .scm-calendar-ticket-select {
-  margin-top: 8px !important;
 }
 
 .swal2-popup .scm-calendar-recurrence {
@@ -2034,6 +2115,10 @@
   }
 
   .swal2-popup .scm-calendar-popup-form {
+    grid-template-columns: 1fr;
+  }
+
+  .swal2-popup .scm-calendar-ticket-inline {
     grid-template-columns: 1fr;
   }
 
