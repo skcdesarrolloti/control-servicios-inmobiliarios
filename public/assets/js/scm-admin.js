@@ -2968,16 +2968,13 @@
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-cotizacion-response>Responder cotizaci&oacute;n</button>';
         }
-        if (ticketUrl) {
+        if (isPublicPqr && ticketUrl) {
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-iframe' +
             (isPublicPqr ? ' data-scm-compact-iframe' : '') +
             ' data-iframe-url="' +
             escHtml(ticketUrl) +
-            '" data-iframe-title="' +
-            (isPublicPqr ? "Solicitud" : "Ticket") +
-            '">' +
-            (isPublicPqr ? "Abrir solicitud original" : "Abrir ticket") +
+            '" data-iframe-title="Solicitud">Abrir solicitud original' +
             "</button>";
         }
         if (!isPublicPqr && cotizacionUrl) {

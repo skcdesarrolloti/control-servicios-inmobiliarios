@@ -553,6 +553,7 @@
                   if (rowMsg) rowMsg.textContent = data.message || 'Actualizado';
 
                   if (isAssignForm) {
+                    var ticketPkForRefresh = String(fd.get('ticket_pk') || '').trim();
                     var row = form.closest('[data-pqr-row]');
                     if (!row) {
                       var ticketInput = form.querySelector('input[name="ticket_pk"]');
@@ -591,10 +592,18 @@
                     }
 
                     if (form.classList.contains('scm-public-pqr-form-modal')) {
-                      setTimeout(function() {
-                        closeTransferModal();
-                      }, 220);
+                      closeTransferModal();
                     }
+                    if (app && typeof window.CustomEvent === 'function') {
+                      app.dispatchEvent(new CustomEvent('scm:case-action-saved', {
+                        detail: {
+                          ticketPk: ticketPkForRefresh,
+                          fromNode: form
+                        }
+                      }));
+                    }
+                  } else if (app && typeof window.CustomEvent === 'function') {
+                    app.dispatchEvent(new CustomEvent('scm:refresh-active-tab'));
                   }
                 })
                 .catch(function(err) {

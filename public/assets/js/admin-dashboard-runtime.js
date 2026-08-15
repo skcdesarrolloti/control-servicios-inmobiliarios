@@ -2339,18 +2339,25 @@
     function reopenCaseFromUpdatedCard(ticketPk) {
       ticketPk = String(ticketPk || "").trim();
       if (!ticketPk) {
-        return;
+        return false;
       }
       var modal = root.querySelector("#scm-case-modal.open");
       if (!modal) {
-        return;
+        return false;
       }
       var btn = root.querySelector(
         '.scm-btn-case[data-ticket-pk="' + cssAttrValue(ticketPk) + '"]',
       );
       if (btn) {
         window.scmOpenCase(btn);
+        return true;
       }
+      closeCaseModal(modal);
+      showToast(
+        "success",
+        "Cambios guardados. El caso ya no aparece en el filtro actual.",
+      );
+      return false;
     }
 
     function refreshCaseAfterSave(ticketPk, fromNode) {
@@ -2371,6 +2378,8 @@
         return;
       }
       refreshed.then(function () {
+        reopenCaseFromUpdatedCard(ticketPk);
+      }).catch(function () {
         reopenCaseFromUpdatedCard(ticketPk);
       });
     }
