@@ -1416,7 +1416,7 @@
         escHtml(ticketPk) +
         '">' +
         '<label class="scm-seg-field"><span>Estado administrativo</span><select name="estado_administrativo">' +
-        '<option value="__keep__">Sin cambio</option><option value="Nuevo">Nuevo</option><option value="Por inspecccionar">Por inspecccionar</option><option value="Inspeccionado">Inspeccionado</option><option value="Cotizado">Cotizado</option><option value="En ejecucion por inmobiliaria">En ejecucion por inmobiliaria</option><option value="En ejecucion por propietario">En ejecucion por propietario</option><option value="En ejecucion por arrendatario">En ejecucion por arrendatario</option><option value="En ejecucion por copropiedad">En ejecucion por copropiedad</option><option value="Finalizado">Finalizado</option><option value="Trasladado">Trasladado</option><option value="Entregado">Entregado</option><option value="Recibido">Recibido</option><option value="Desistido">Desistido</option>' +
+        '<option value="__keep__">Sin cambio</option><option value="Nuevo">Nuevo</option><option value="Por inspeccionar">Por inspeccionar</option><option value="Inspeccionado">Inspeccionado</option><option value="Cotizado">Cotizado</option><option value="En ejecucion por inmobiliaria">En ejecucion por inmobiliaria</option><option value="En ejecucion por propietario">En ejecucion por propietario</option><option value="En ejecucion por arrendatario">En ejecucion por arrendatario</option><option value="En ejecucion por copropiedad">En ejecucion por copropiedad</option><option value="Finalizado">Finalizado</option><option value="Trasladado">Trasladado</option><option value="Entregado">Entregado</option><option value="Recibido">Recibido</option><option value="Desistido">Desistido</option>' +
         "</select></label>" +
         '<label class="scm-seg-field"><span>Respuesta</span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
         renderCotizacionInlineFields(!isPublicPqr && caseCotizacionCanRespond(caseBtn)) +
@@ -1758,6 +1758,56 @@
     return String((row && (row.fecha_inicio || row.fecha || row.start)) || "").slice(0, 10);
   }
 
+  function caseCalendarEventDetailValue(row, keys) {
+    for (var i = 0; i < keys.length; i += 1) {
+      var value = row && row[keys[i]];
+      if (value !== undefined && value !== null && String(value).trim() !== "") {
+        return String(value).trim();
+      }
+    }
+    return "";
+  }
+
+  function closeCaseCalendarEventMini(shell) {
+    var current = shell ? shell.querySelector("[data-scm-case-calendar-event-mini]") : null;
+    if (current) current.remove();
+  }
+
+  function openCaseCalendarEventMini(shell, row) {
+    if (!shell || !row) return;
+    closeCaseCalendarEventMini(shell);
+    var title = caseCalendarEventDetailValue(row, ["titulo", "title"]) || "Evento";
+    var category = caseCalendarEventDetailValue(row, ["categoria", "nombre_categoria"]);
+    var employee = caseCalendarEventDetailValue(row, ["funcionario", "nombre_empleado", "empleado", "nombre"]);
+    var ticket = caseCalendarEventDetailValue(row, ["id_ticket", "ticket"]);
+    var location = caseCalendarEventDetailValue(row, ["ubicacion", "lugar", "direccion"]);
+    var description = caseCalendarEventDetailValue(row, ["descripcion", "observacion", "detalle"]);
+    var html =
+      '<div class="scm-case-calendar-event-mini" data-scm-case-calendar-event-mini>' +
+      '<div class="scm-case-calendar-event-mini-card" role="dialog" aria-modal="true" aria-label="Detalle del evento">' +
+      '<button type="button" class="scm-case-calendar-event-mini-close" data-scm-case-calendar-event-mini-close aria-label="Cerrar detalle">&times;</button>' +
+      '<div class="scm-case-calendar-event-mini-head"><span>Detalle del evento</span><strong>' + escHtml(title) + '</strong></div>' +
+      '<div class="scm-case-calendar-event-mini-grid">' +
+      '<div><small>Inicio</small><strong>' + escHtml(formatCalendarDateTime(row.fecha_inicio || row.fecha || row.start)) + '</strong></div>' +
+      '<div><small>Fin</small><strong>' + escHtml(formatCalendarDateTime(row.fecha_fin || row.end)) + '</strong></div>' +
+      (category ? '<div><small>Categor&iacute;a</small><strong>' + escHtml(category) + '</strong></div>' : "") +
+      (employee ? '<div><small>Funcionario</small><strong>' + escHtml(employee) + '</strong></div>' : "") +
+      (ticket ? '<div><small>Ticket</small><strong>#' + escHtml(ticket) + '</strong></div>' : "") +
+      (location ? '<div class="is-wide"><small>Ubicaci&oacute;n</small><strong>' + escHtml(location) + '</strong></div>' : "") +
+      "</div>" +
+      (description ? '<div class="scm-case-calendar-event-mini-description"><small>Descripci&oacute;n</small><p>' + escHtml(description).replace(/\n/g, "<br>") + "</p></div>" : "") +
+      "</div>" +
+      "</div>";
+    shell.insertAdjacentHTML("beforeend", html);
+    var mini = shell.querySelector("[data-scm-case-calendar-event-mini]");
+    if (!mini) return;
+    mini.addEventListener("click", function (event) {
+      if (event.target === mini || (event.target && event.target.closest && event.target.closest("[data-scm-case-calendar-event-mini-close]"))) {
+        closeCaseCalendarEventMini(shell);
+      }
+    });
+  }
+
   function renderCaseCalendarMonth(root, shell, employeeId, monthDate) {
     var grid = shell ? shell.querySelector("[data-scm-case-calendar-grid]") : null;
     var title = shell ? shell.querySelector("[data-scm-case-calendar-title]") : null;
@@ -1801,6 +1851,7 @@
       var cursor = addCalendarDays(first, -startOffset);
       var todayKey = calendarDateKey(new Date());
       var cells = [];
+      var eventDetails = [];
       for (var i = 0; i < 42; i += 1) {
         var current = addCalendarDays(cursor, i);
         var key = calendarDateKey(current);
@@ -1816,13 +1867,23 @@
           (holiday ? '<span class="scm-case-calendar-day-holiday">' + escHtml(holiday) + '</span>' : "") +
           "</div>" +
           rows.slice(0, 3).map(function (row) {
-            return '<div class="scm-case-calendar-day-pill"><strong>' + escHtml(formatCalendarDateTime(row.fecha_inicio)) + '</strong><span>' + escHtml(row.titulo || "Evento") + '</span></div>';
+            var detailIndex = eventDetails.push(row) - 1;
+            return '<div class="scm-case-calendar-day-pill"><div><strong>' + escHtml(formatCalendarDateTime(row.fecha_inicio)) + '</strong><span>' + escHtml(row.titulo || "Evento") + '</span></div><button type="button" class="scm-case-calendar-event-detail-btn" data-scm-case-calendar-event-detail="' + detailIndex + '" aria-label="Ver detalle de ' + escHtml(row.titulo || "evento") + '">Ver</button></div>';
           }).join("") +
           (rows.length > 3 ? '<div class="scm-case-calendar-day-more">+' + (rows.length - 3) + " más</div>" : "") +
           "</div>",
         );
       }
       grid.innerHTML = cells.join("");
+      shell._scmCaseCalendarEventDetails = eventDetails;
+      grid.querySelectorAll("[data-scm-case-calendar-event-detail]").forEach(function (btn) {
+        btn.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          var index = parseInt(btn.getAttribute("data-scm-case-calendar-event-detail") || "-1", 10);
+          openCaseCalendarEventMini(shell, shell._scmCaseCalendarEventDetails[index]);
+        });
+      });
     }).catch(function (error) {
       grid.innerHTML = '<div class="scm-case-calendar-empty">No se pudo cargar el calendario.</div>';
       scmNotify("error", error.message || "No se pudo cargar el calendario.");
@@ -2075,7 +2136,7 @@
           id_categoria: fd.get("id_categoria") || "",
           id_ticket: ticketPk,
           es_cita: "si",
-          estado_administrativo: "Cita agendada",
+          estado_administrativo: "Por inspeccionar",
         };
         if (submitBtn) submitBtn.disabled = true;
         if (msg) {

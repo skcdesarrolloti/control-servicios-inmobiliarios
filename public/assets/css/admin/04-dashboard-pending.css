@@ -1542,7 +1542,14 @@
   color: #10243d;
   display: grid;
   gap: 12px;
+  position: relative;
   text-align: left;
+}
+
+.swal2-popup .scm-calendar-ticket-state select.is-forced-cita {
+  background: #f8fafc;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
 }
 
 .swal2-popup .scm-case-calendar-toolbar {
@@ -1679,13 +1686,21 @@
 }
 
 .swal2-popup .scm-case-calendar-day-pill {
+  align-items: start;
   background: #f8fafc;
   border: 1px solid #dbe6f2;
   border-radius: 10px;
-  display: grid;
-  gap: 2px;
+  display: flex;
+  gap: 7px;
+  justify-content: space-between;
   margin-top: 5px;
   padding: 6px 7px !important;
+}
+
+.swal2-popup .scm-case-calendar-day-pill > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .swal2-popup .scm-case-calendar-day-pill strong {
@@ -1699,6 +1714,139 @@
   font-size: 11px;
   font-weight: 850;
   line-height: 1.25;
+}
+
+.swal2-popup .scm-case-calendar-event-detail-btn {
+  align-items: center;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  color: #c45a00;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 950;
+  height: 24px;
+  justify-content: center;
+  line-height: 1;
+  margin-top: 1px;
+  min-width: 34px;
+  padding: 0 8px !important;
+}
+
+.swal2-popup .scm-case-calendar-event-detail-btn:hover {
+  background: #ffedd5;
+  border-color: #fb923c;
+  color: #9a3412;
+}
+
+.swal2-popup .scm-case-calendar-event-mini {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.44);
+  border-radius: 18px;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px !important;
+  position: absolute;
+  z-index: 5;
+}
+
+.swal2-popup .scm-case-calendar-event-mini-card {
+  background: #fff;
+  border: 1px solid #dbe6f2;
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+  color: #10243d;
+  max-width: 620px;
+  padding: 18px !important;
+  position: relative;
+  text-align: left;
+  width: min(620px, 100%);
+}
+
+.swal2-popup .scm-case-calendar-event-mini-close {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #dbe6f2;
+  border-radius: 12px;
+  color: #24364b;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 20px;
+  font-weight: 900;
+  height: 34px;
+  justify-content: center;
+  line-height: 1;
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 34px;
+}
+
+.swal2-popup .scm-case-calendar-event-mini-head {
+  display: grid;
+  gap: 5px;
+  padding-right: 44px !important;
+}
+
+.swal2-popup .scm-case-calendar-event-mini-head span,
+.swal2-popup .scm-case-calendar-event-mini-grid small,
+.swal2-popup .scm-case-calendar-event-mini-description small {
+  color: #6b7f9c;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-case-calendar-event-mini-head strong {
+  color: #10243d;
+  font-size: 20px;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.swal2-popup .scm-case-calendar-event-mini-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.swal2-popup .scm-case-calendar-event-mini-grid > div,
+.swal2-popup .scm-case-calendar-event-mini-description {
+  background: #f8fafc;
+  border: 1px solid #dbe6f2;
+  border-radius: 13px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px !important;
+}
+
+.swal2-popup .scm-case-calendar-event-mini-grid .is-wide {
+  grid-column: 1 / -1;
+}
+
+.swal2-popup .scm-case-calendar-event-mini-grid strong {
+  color: #10243d;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.swal2-popup .scm-case-calendar-event-mini-description {
+  margin-top: 10px;
+}
+
+.swal2-popup .scm-case-calendar-event-mini-description p {
+  color: #24364b;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+  margin: 0;
 }
 
 .swal2-popup .scm-case-calendar-day-more {

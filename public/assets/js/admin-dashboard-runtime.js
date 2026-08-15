@@ -877,7 +877,7 @@
 
       function estadoAdministrativoOptionsHtml() {
         return [
-          "Por inspecccionar",
+          "Por inspeccionar",
           "Inspeccionado",
           "Cotizado",
           "En ejecucion por inmobiliaria",
@@ -1404,6 +1404,34 @@
               var showAdmin = !!ticket;
               if (adminStateWrap) adminStateWrap.hidden = !showAdmin;
               if (!showAdmin && adminStateSelect) adminStateSelect.value = "";
+              applyCitaAdminState();
+            }
+            function isAutoCalendarDescription() {
+              if (!descriptionInput) return false;
+              var value = String(descriptionInput.value || "").trim();
+              return descriptionInput.getAttribute("data-auto-calendar-text") === "1" ||
+                value.indexOf("Por medio de la presente") === 0 ||
+                value.indexOf("En cumplimiento de") !== -1;
+            }
+            function clearAutoCalendarDescription() {
+              if (!descriptionInput) return;
+              if (!descriptionInput.value || isAutoCalendarDescription()) {
+                descriptionInput.value = "";
+              }
+              descriptionInput.setAttribute("data-auto-calendar-text", "0");
+            }
+            function applyCitaAdminState() {
+              if (!adminStateSelect) return;
+              if (isTicketRelated() && citaSelect && citaSelect.value === "si") {
+                adminStateSelect.value = "Por inspeccionar";
+                adminStateSelect.setAttribute("data-forced-cita", "1");
+                adminStateSelect.classList.add("is-forced-cita");
+                adminStateSelect.title = "Cuando es cita, el estado administrativo queda Por inspeccionar.";
+                return;
+              }
+              adminStateSelect.removeAttribute("data-forced-cita");
+              adminStateSelect.classList.remove("is-forced-cita");
+              adminStateSelect.removeAttribute("title");
             }
             function refreshTickets() {
               if (mode !== "single") return;
@@ -1429,14 +1457,12 @@
                 relatedTicketSelect.value = "si";
                 applyRelatedTicketVisibility();
               }
-              if (citaSelect && citaSelect.value !== "si") {
+              if (citaSelect && !citaSelect.value) {
                 citaSelect.value = "si";
               }
-              if (isTicketRelated() && citaSelect && citaSelect.value !== "si") {
-                if (descriptionInput.getAttribute("data-auto-calendar-text") === "1") {
-                  descriptionInput.value = "";
-                  descriptionInput.setAttribute("data-auto-calendar-text", "0");
-                }
+              applyCitaAdminState();
+              if (isTicketRelated() && citaSelect && citaSelect.value === "no") {
+                clearAutoCalendarDescription();
                 return;
               }
               maybeAutofillTitleAndLocation(false);
@@ -1504,7 +1530,16 @@
               });
             }
             if (citaSelect) {
-              citaSelect.addEventListener("change", maybeAutofillPreventiveDescription);
+              citaSelect.addEventListener("change", function () {
+                if (citaSelect.value === "no") {
+                  clearAutoCalendarDescription();
+                }
+                applyCitaAdminState();
+                maybeAutofillPreventiveDescription();
+              });
+            }
+            if (adminStateSelect) {
+              adminStateSelect.addEventListener("change", applyCitaAdminState);
             }
             if (titleInput) {
               titleInput.addEventListener("input", function () {
@@ -1590,7 +1625,7 @@
             if (mode === "single") {
               basePayload.id_ticket = relatedTicket ? fd.get("id_ticket") || "" : "";
               basePayload.es_cita = isCita;
-              basePayload.estado_administrativo = relatedTicket ? fd.get("estado_administrativo") || "" : "";
+              basePayload.estado_administrativo = relatedTicket ? (isCita === "si" ? "Por inspeccionar" : fd.get("estado_administrativo") || "") : "";
             }
             var recurrent = fd.get("es_recurrente") === "1";
             var recurrenceTypeValue = String(fd.get("tipo_recurrencia") || "diario");
