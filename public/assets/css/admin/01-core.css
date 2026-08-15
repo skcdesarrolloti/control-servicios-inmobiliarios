@@ -877,6 +877,84 @@
   box-shadow: 0 0 0 3px var(--scm-accent-glow);
 }
 
+#scm-app .scm-date-range-field {
+  min-width: 280px;
+}
+
+#scm-app .scm-date-range-control {
+  width: 100%;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border: 1.5px solid var(--scm-border);
+  border-radius: var(--scm-r-sm);
+  padding: 6px 9px;
+  background: var(--scm-surface-2);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    background 0.15s;
+}
+
+#scm-app .scm-date-range-control:hover {
+  border-color: var(--scm-surface-3);
+}
+
+#scm-app .scm-date-range-control:focus-within {
+  border-color: var(--scm-accent);
+  background: var(--scm-surface);
+  box-shadow: 0 0 0 3px var(--scm-accent-glow);
+}
+
+#scm-app .scm-date-range-part {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#scm-app .scm-date-range-part span {
+  flex: 0 0 auto;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--scm-text-soft);
+}
+
+#scm-app .scm-date-range-part input[type="date"] {
+  min-width: 0;
+  height: auto;
+  border: 0 !important;
+  border-radius: 0;
+  padding: 2px 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 12.5px;
+}
+
+#scm-app .scm-date-range-separator {
+  color: var(--scm-text-muted);
+  font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  #scm-app .scm-date-range-field {
+    min-width: 0;
+  }
+
+  #scm-app .scm-date-range-control {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  #scm-app .scm-date-range-separator {
+    display: none;
+  }
+}
+
 /* â”€â”€ Actions bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 #scm-app .scm-actions {
   margin-top: 16px;
