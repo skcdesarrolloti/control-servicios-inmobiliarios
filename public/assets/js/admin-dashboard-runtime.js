@@ -1263,6 +1263,12 @@
         var employeesControl = mode === "multiple"
           ? employeeMultiPickerHtml(preselectedEmployee)
           : '<select class="select select-bordered select-sm scm-select" name="empleados" required><option value="">Selecciona funcionario</option>' + employeeOptions + "</select>";
+        var ticketFieldsHtml = mode === "single"
+          ? '<label class="scm-seg-field"><span>Relacionado con ticket</span><select class="select select-bordered select-sm scm-select" name="relacionado_ticket" data-calendar-related-ticket><option value="">Selecciona una opci&oacute;n</option><option value="si">S&iacute;, est&aacute; relacionado</option><option value="no">No, evento libre</option></select></label>' +
+            '<label class="scm-seg-field scm-calendar-field-full" data-calendar-ticket-field hidden><span>Ticket relacionado</span><select class="select select-bordered select-sm scm-select scm-calendar-ticket-select" name="id_ticket" data-calendar-ticket-select><option value="">Selecciona funcionario para cargar tickets</option></select><small>Busca dentro del selector y escoge el ticket; se autocompleta t&iacute;tulo y direcci&oacute;n.</small></label>' +
+            '<label class="scm-seg-field" data-calendar-cita-field hidden><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="">Selecciona si es cita</option><option value="si">Si</option><option value="no">No</option></select></label>' +
+            '<label class="scm-seg-field scm-calendar-ticket-state" data-calendar-admin-state hidden><span>Estado administrativo</span><select class="select select-bordered select-sm scm-select" name="estado_administrativo"><option value="">Selecciona estado administrativo</option>' + estadoAdministrativoOptionsHtml() + '</select></label>'
+          : "";
         var html = '<form class="scm-calendar-popup-form" autocomplete="off">' +
           '<div class="scm-calendar-popup-grid">' +
           '<label class="scm-seg-field"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required placeholder="Ej: Cita revisi&oacute;n preventiva"></label>' +
@@ -1279,10 +1285,7 @@
           '<div class="scm-calendar-week-picker" data-calendar-week-picker hidden><span>D&iacute;as de la semana</span><label><input type="checkbox" value="1" name="dias_semana"> Lun</label><label><input type="checkbox" value="2" name="dias_semana"> Mar</label><label><input type="checkbox" value="3" name="dias_semana"> Mi&eacute;</label><label><input type="checkbox" value="4" name="dias_semana"> Jue</label><label><input type="checkbox" value="5" name="dias_semana"> Vie</label><label><input type="checkbox" value="6" name="dias_semana"> S&aacute;b</label><label><input type="checkbox" value="0" name="dias_semana"> Dom</label></div>' +
           '<div class="scm-calendar-custom-dates" data-calendar-custom-dates hidden><div data-calendar-custom-rows></div><button type="button" class="scm-case-work-btn" data-calendar-add-custom-date>Agregar fecha personalizada</button></div>' +
           '</div></div>' +
-          '<label class="scm-seg-field"><span>Relacionado con ticket</span><select class="select select-bordered select-sm scm-select" name="relacionado_ticket" data-calendar-related-ticket><option value="">Selecciona una opci&oacute;n</option><option value="si">S&iacute;, est&aacute; relacionado</option><option value="no">No, evento libre</option></select></label>' +
-          '<label class="scm-seg-field scm-calendar-field-full" data-calendar-ticket-field hidden><span>Ticket relacionado</span><select class="select select-bordered select-sm scm-select scm-calendar-ticket-select" name="id_ticket" data-calendar-ticket-select><option value="">Selecciona funcionario para cargar tickets</option></select><small>Busca dentro del selector y escoge el ticket; se autocompleta t&iacute;tulo y direcci&oacute;n.</small></label>' +
-          '<label class="scm-seg-field" data-calendar-cita-field hidden><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="">Selecciona si es cita</option><option value="si">Si</option><option value="no">No</option></select></label>' +
-          '<label class="scm-seg-field scm-calendar-ticket-state" data-calendar-admin-state hidden><span>Estado administrativo</span><select class="select select-bordered select-sm scm-select" name="estado_administrativo"><option value="">Selecciona estado administrativo</option>' + estadoAdministrativoOptionsHtml() + '</select></label>' +
+          ticketFieldsHtml +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" placeholder="Direcci&oacute;n o lugar"></label>' +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required></textarea></label>' +
           '</div><div class="scm-calendar-popup-agenda"><h4>' + (mode === "multiple" ? "Agenda por funcionario" : "Agenda del funcionario") + '</h4><div data-scm-calendar-popup-agenda>' + popupEmployeeAgendaHtml(preselectedEmployee) + '</div></div></form>';
@@ -1378,6 +1381,7 @@
               if (!showAdmin && adminStateSelect) adminStateSelect.value = "";
             }
             function refreshTickets() {
+              if (mode !== "single") return;
               var selected = selectedEmployees();
               if (ticketSelect) ticketSelect.innerHTML = '<option value="">Cargando tickets...</option>';
               loadTicketsForEmployees(selected).then(function (rows) {
@@ -1530,7 +1534,7 @@
               return false;
             }
             var fd = new FormData(form);
-            var relatedTicket = fd.get("relacionado_ticket") === "si";
+            var relatedTicket = mode === "single" && fd.get("relacionado_ticket") === "si";
             var isCita = relatedTicket ? String(fd.get("es_cita") || "") : "";
             if (!String(fd.get("titulo") || "").trim() || !String(fd.get("ubicacion") || "").trim() || !String(fd.get("id_categoria") || "").trim()) {
               window.Swal.showValidationMessage("Titulo, ubicacion y categoria son obligatorios.");
@@ -1545,10 +1549,12 @@
               descripcion: fd.get("descripcion") || "",
               ubicacion: fd.get("ubicacion") || "",
               id_categoria: fd.get("id_categoria") || "",
-              id_ticket: relatedTicket ? fd.get("id_ticket") || "" : "",
-              es_cita: isCita,
-              estado_administrativo: relatedTicket ? fd.get("estado_administrativo") || "" : "",
             };
+            if (mode === "single") {
+              basePayload.id_ticket = relatedTicket ? fd.get("id_ticket") || "" : "";
+              basePayload.es_cita = isCita;
+              basePayload.estado_administrativo = relatedTicket ? fd.get("estado_administrativo") || "" : "";
+            }
             var recurrent = fd.get("es_recurrente") === "1";
             var recurrenceTypeValue = String(fd.get("tipo_recurrencia") || "diario");
             var eventsToCreate = [];
