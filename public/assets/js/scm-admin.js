@@ -2974,6 +2974,10 @@
             '<button type="button" class="scm-case-work-btn" data-scm-view-contacts>Ver contactos</button>';
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-view-property-map>Ubicaci&oacute;n del inmueble</button>';
+          caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-edit-case-magnitude data-ticket-pk="' +
+            escHtml(btn.dataset.ticketPk || "") +
+            '">Editar magnitud caso</button>';
           if (calendarTicketPk) {
             caseActionsHtml +=
               '<button type="button" class="scm-case-work-btn" data-scm-calendar-create-case>Agendar cita del caso</button>';
