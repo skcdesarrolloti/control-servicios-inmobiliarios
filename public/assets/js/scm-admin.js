@@ -1477,6 +1477,124 @@
     });
   }
 
+  function normalizeCalendarText(value) {
+    return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
+  function calendarCategoryLabel(row) {
+    return String((row && (row.nombre || row.categoria || row.name || row.id || row._ID || row.id_categoria)) || "").trim();
+  }
+
+  function isAdministrativeCalendarCategory(row) {
+    var name = normalizeCalendarText(calendarCategoryLabel(row));
+    if (!name) return false;
+    var commercialTerms = [
+      "comercial",
+      "captacion",
+      "captado",
+      "recaptado",
+      "prospect",
+      "mostrando",
+      "contactado",
+      "entregado",
+      "por publicar",
+      "publicar",
+      "en cierre",
+      "en busqueda",
+      "venta",
+      "banco",
+      "aseguradora",
+    ];
+    if (commercialTerms.some(function (term) { return name.indexOf(term) !== -1; })) return false;
+    var adminTerms = [
+      "administr",
+      "preventiva",
+      "correctiva",
+      "revision",
+      "mantenimiento",
+      "servicio",
+      "cita",
+      "inspeccion",
+      "contrato",
+      "inmueble",
+      "pendiente",
+      "visita",
+      "recibo",
+    ];
+    return adminTerms.some(function (term) { return name.indexOf(term) !== -1; });
+  }
+
+  function administrativeCalendarCategories(rows) {
+    rows = Array.isArray(rows) ? rows : [];
+    var filtered = rows.filter(isAdministrativeCalendarCategory);
+    return filtered.length ? filtered : rows;
+  }
+
+  function selectedCalendarCategoryName(select) {
+    if (!select || select.selectedIndex < 0) return "";
+    var option = select.options[select.selectedIndex];
+    return option ? String(option.textContent || "").trim() : "";
+  }
+
+  function cleanCalendarContractLabel(value) {
+    return String(value || "").replace(/^#+\s*/, "").trim();
+  }
+
+  function buildCaseCalendarTitle(categoryName, contractLabel, ticketPk) {
+    categoryName = String(categoryName || "Actividad").trim();
+    var contract = cleanCalendarContractLabel(contractLabel);
+    if (contract && contract !== "-") return "Contrato #" + contract + " - " + categoryName;
+    return "Ticket #" + String(ticketPk || "").trim() + " - " + categoryName;
+  }
+
+  function formatCalendarDateForMessage(value) {
+    var parts = String(value || "").split("-");
+    if (parts.length !== 3) return value || "";
+    return parts[2] + "/" + parts[1] + "/" + parts[0];
+  }
+
+  function formatCalendarTimeForMessage(value) {
+    var pieces = String(value || "").split(":");
+    var hour = parseInt(pieces[0] || "0", 10);
+    var minute = pieces[1] || "00";
+    if (Number.isNaN(hour)) return value || "";
+    var suffix = hour >= 12 ? "p. m." : "a. m.";
+    var displayHour = hour % 12 || 12;
+    return String(displayHour).padStart(2, "0") + ":" + minute + " " + suffix;
+  }
+
+  function buildCaseCalendarDescription(categoryName, dateValue, startValue, endValue, asunto) {
+    if (!categoryName || !dateValue || !startValue || !endValue) return String(asunto || "").trim();
+    return "Por medio de la presente, le confirmo que he dispuesto de un espacio con el propósito de reunirnos, ya sea de forma presencial o por medios virtuales, a fin de atender cualquier inquietud o asunto pendiente.\n\nEn cumplimiento de " +
+      categoryName +
+      ", se ha programado una visita y/o reunión, la cual ha quedado agendada para el día " +
+      formatCalendarDateForMessage(dateValue) +
+      ", de " +
+      formatCalendarTimeForMessage(startValue) +
+      " a " +
+      formatCalendarTimeForMessage(endValue) +
+      ". En caso de no ser posible contar con su atención en la fecha indicada, le agradecemos nos lo comunique por este mismo medio con al menos 3 horas de antelación." +
+      (asunto && asunto !== "-" ? "\n\nCaso: " + asunto : "");
+  }
+
+  function validateCalendarCaseEventTimes(dateValue, startValue, endValue) {
+    if (!dateValue || !startValue || !endValue) return "Debes ingresar fecha, hora de inicio y hora de fin.";
+    var start = new Date(dateValue + "T" + startValue);
+    var end = new Date(dateValue + "T" + endValue);
+    var now = new Date();
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "Debes ingresar fechas y horas válidas.";
+    if (end < start) return "La hora de finalización no puede ser menor que la hora de inicio.";
+    var startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (startDay < today) return "No puedes seleccionar una fecha pasada.";
+    if (end < now) return "No puedes seleccionar una hora de finalización pasada.";
+    var startHour = start.getHours() + start.getMinutes() / 60;
+    var endHour = end.getHours() + end.getMinutes() / 60;
+    if (startHour < 8 || startHour > 21) return "La hora de inicio debe estar entre las 8:00 a. m. y las 9:00 p. m.";
+    if (endHour < 8 || endHour > 21) return "La hora de finalización debe estar entre las 8:00 a. m. y las 9:00 p. m.";
+    return "";
+  }
+
   function calendarAllowedEmployeeIds(root) {
     var runtime = root ? parseRuntime(root) || {} : {};
     var config = runtime.config || {};
@@ -1565,6 +1683,9 @@
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = String(caseBtn.dataset.ticketPk || "").trim();
     var employeeId = String(caseBtn.dataset.empleadoId || "").trim();
+    var contractLabel = String(caseBtn.dataset.contrato || "").trim();
+    var asuntoLabel = String(caseBtn.dataset.asunto || "").trim();
+    var addressLabel = String(caseBtn.dataset.direccion || "").trim();
     var today = new Date();
     var yyyy = today.getFullYear();
     var mm = String(today.getMonth() + 1).padStart(2, "0");
@@ -1577,16 +1698,16 @@
         '<form class="scm-calendar-case-form" method="post" autocomplete="off">' +
         '<input type="hidden" name="id_ticket" value="' + escHtml(ticketPk) + '">' +
         '<input type="hidden" name="id_empleado" value="' + escHtml(employeeId) + '">' +
+        '<input type="hidden" name="es_cita" value="si">' +
         '<div class="scm-calendar-case-note">Se crear&aacute; el evento en el calendario y quedar&aacute; enlazado al ticket #' + escHtml(ticketPk || "-") + '.</div>' +
         '<div class="scm-grid">' +
-        '<label class="scm-seg-field"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required value="' + escHtml("Cita ticket #" + (ticketPk || "")) + '"></label>' +
+        '<label class="scm-seg-field"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required value="' + escHtml(buildCaseCalendarTitle("", contractLabel, ticketPk)) + '" data-auto-calendar-title="1"></label>' +
         '<label class="scm-seg-field"><span>Categor&iacute;a</span><select class="select select-bordered select-sm scm-select" name="id_categoria" required data-scm-calendar-case-categories><option value="">Cargando...</option></select></label>' +
         '<label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + escHtml(dateValue) + '"></label>' +
         '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required></label>' +
         '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required></label>' +
-        '<label class="scm-seg-field"><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="si" selected>S&iacute;</option><option value="no">No</option></select></label>' +
-        '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" value="' + escHtml(caseBtn.dataset.direccion || "") + '"></label>' +
-        '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required>' + escHtml(caseBtn.dataset.asunto || "") + '</textarea></label>' +
+        '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" value="' + escHtml(addressLabel && addressLabel !== "-" ? addressLabel : "") + '" data-auto-calendar-location="1"></label>' +
+        '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required data-auto-calendar-text="1">' + escHtml(asuntoLabel && asuntoLabel !== "-" ? asuntoLabel : "") + '</textarea><small>Se autocompleta con el texto de cita y puedes editarlo si necesitas ajustar el mensaje.</small></label>' +
         "</div>" +
         '<div class="scm-calendar-popup-agenda scm-calendar-case-agenda"><h4>Agenda del funcionario</h4><div data-scm-calendar-case-agenda><div class="scm-calendar-popup-agenda-empty">Cargando agenda...</div></div></div>' +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear evento</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
@@ -1598,16 +1719,42 @@
 
     var form = body ? body.querySelector(".scm-calendar-case-form") : null;
     var categorySelect = body ? body.querySelector("[data-scm-calendar-case-categories]") : null;
+    var titleInput = form ? form.querySelector('[name="titulo"]') : null;
+    var locationInput = form ? form.querySelector('[name="ubicacion"]') : null;
+    var descriptionInput = form ? form.querySelector('[name="descripcion"]') : null;
+    var dateInput = form ? form.querySelector('[name="fecha"]') : null;
+    var startInput = form ? form.querySelector('[name="hora_inicio"]') : null;
+    var endInput = form ? form.querySelector('[name="hora_fin"]') : null;
+    function maybeAutofillCaseCalendarFields(force) {
+      var categoryName = selectedCalendarCategoryName(categorySelect);
+      if (titleInput) {
+        var nextTitle = buildCaseCalendarTitle(categoryName, contractLabel, ticketPk);
+        if (nextTitle && (force || !titleInput.value || titleInput.getAttribute("data-auto-calendar-title") === "1")) {
+          titleInput.value = nextTitle;
+          titleInput.setAttribute("data-auto-calendar-title", "1");
+        }
+      }
+      if (locationInput && addressLabel && addressLabel !== "-" && (force || !locationInput.value || locationInput.getAttribute("data-auto-calendar-location") === "1")) {
+        locationInput.value = addressLabel;
+        locationInput.setAttribute("data-auto-calendar-location", "1");
+      }
+      if (!descriptionInput || !dateInput || !startInput || !endInput) return;
+      if (!dateInput.value || !startInput.value || !endInput.value || !categoryName) return;
+      if (descriptionInput.value && descriptionInput.getAttribute("data-auto-calendar-text") !== "1") return;
+      descriptionInput.value = buildCaseCalendarDescription(categoryName, dateInput.value, startInput.value, endInput.value, asuntoLabel);
+      descriptionInput.setAttribute("data-auto-calendar-text", "1");
+    }
     loadCalendarCategories(root)
       .then(function (rows) {
         if (!categorySelect) return;
         categorySelect.innerHTML = '<option value="">Selecciona categoria</option>';
-        rows.forEach(function (row) {
-          var id = String(row.id || row._ID || "").trim();
-          var name = String(row.nombre || row.categoria || id).trim();
+        administrativeCalendarCategories(rows).forEach(function (row) {
+          var id = String(row.id || row._ID || row.id_categoria || "").trim();
+          var name = calendarCategoryLabel(row) || id;
           if (!id) return;
           categorySelect.innerHTML += '<option value="' + escHtml(id) + '">' + escHtml(name) + "</option>";
         });
+        maybeAutofillCaseCalendarFields(false);
       })
       .catch(function (error) {
         if (categorySelect) {
@@ -1617,6 +1764,27 @@
       });
 
     if (form) {
+      [categorySelect, dateInput, startInput, endInput].forEach(function (field) {
+        if (!field) return;
+        field.addEventListener("change", function () {
+          maybeAutofillCaseCalendarFields(false);
+        });
+      });
+      if (titleInput) {
+        titleInput.addEventListener("input", function () {
+          titleInput.setAttribute("data-auto-calendar-title", "0");
+        });
+      }
+      if (locationInput) {
+        locationInput.addEventListener("input", function () {
+          locationInput.setAttribute("data-auto-calendar-location", "0");
+        });
+      }
+      if (descriptionInput) {
+        descriptionInput.addEventListener("input", function () {
+          descriptionInput.setAttribute("data-auto-calendar-text", "0");
+        });
+      }
       form.addEventListener("submit", function (event) {
         event.preventDefault();
         if (!employeeId) {
@@ -1630,18 +1798,29 @@
         var submitBtn = form.querySelector("button[type='submit']");
         var msg = form.querySelector(".scm-seg-msg");
         var fd = new FormData(form);
+        var dateValue = String(fd.get("fecha") || "");
+        var startValue = String(fd.get("hora_inicio") || "");
+        var endValue = String(fd.get("hora_fin") || "");
+        var timeError = validateCalendarCaseEventTimes(dateValue, startValue, endValue);
+        if (timeError) {
+          if (msg) {
+            msg.textContent = timeError;
+            msg.classList.add("error");
+          }
+          scmNotify("error", timeError, "Calendario");
+          return;
+        }
         var payload = {
           titulo: fd.get("titulo") || "",
           descripcion: fd.get("descripcion") || "",
           ubicacion: fd.get("ubicacion") || "",
-          fecha_inicio: (fd.get("fecha") || "") + " " + (fd.get("hora_inicio") || "") + ":00",
-          fecha_fin: (fd.get("fecha") || "") + " " + (fd.get("hora_fin") || "") + ":00",
+          fecha_inicio: dateValue + " " + startValue + ":00",
+          fecha_fin: dateValue + " " + endValue + ":00",
           id_empleado: employeeId,
           id_categoria: fd.get("id_categoria") || "",
           id_ticket: ticketPk,
-          es_cita: fd.get("es_cita") || "si",
+          es_cita: "si",
           estado_administrativo: "Cita agendada",
-          estado_comercial: "Cita agendada",
         };
         if (submitBtn) submitBtn.disabled = true;
         if (msg) {
@@ -2487,11 +2666,7 @@
         var cotizacionSinResponder =
           cotEstado === "" || cotEstado === "esperando respuesta";
         var statusBucket = (btn.dataset.statusBucket || "").trim();
-        var calendarAppUrl = String(
-          runtimeConfig.calendar_app_url || "https://calendar-skc.netlify.app",
-        ).replace(/\/+$/, "");
         var calendarTicketPk = String(btn.dataset.ticketPk || "").trim();
-        var calendarEmployeeId = String(btn.dataset.empleadoId || "").trim();
         if (seguimientoWrap) {
           seguimientoWrap.setAttribute("id", "scm-sec-seguimiento");
           seguimientoWrap.style.display = "none";
@@ -2538,12 +2713,6 @@
           if (calendarTicketPk) {
             caseActionsHtml +=
               '<button type="button" class="scm-case-work-btn" data-scm-calendar-create-case>Agendar cita del caso</button>';
-          }
-          if (calendarEmployeeId) {
-            caseActionsHtml +=
-              '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' +
-              escHtml(calendarAppUrl + "/funcionario/" + encodeURIComponent(calendarEmployeeId)) +
-              '" data-iframe-title="Calendario responsable">Calendario responsable</button>';
           }
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>';
