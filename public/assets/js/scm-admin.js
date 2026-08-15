@@ -1097,7 +1097,9 @@
               "Magnitud actualizada",
             );
             if (root && typeof window.CustomEvent === "function") {
-              root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+              root.dispatchEvent(new CustomEvent("scm:case-action-saved", {
+                detail: { ticketPk: ticketPk, fromNode: sub },
+              }));
             }
             setTimeout(function () {
               sub.classList.remove("open");
@@ -1636,6 +1638,227 @@
     return [];
   }
 
+  var scmCaseHolidayCache = {};
+
+  function addCalendarDays(date, amount) {
+    var next = new Date(date.getTime());
+    next.setDate(next.getDate() + amount);
+    return next;
+  }
+
+  function nextCalendarMonday(date) {
+    var next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    var diff = (8 - next.getDay()) % 7;
+    return addCalendarDays(next, diff);
+  }
+
+  function calendarEasterDate(year) {
+    var a = year % 19;
+    var b = Math.floor(year / 100);
+    var c = year % 100;
+    var d = Math.floor(b / 4);
+    var e = b % 4;
+    var f = Math.floor((b + 8) / 25);
+    var g = Math.floor((b - f + 1) / 3);
+    var h = (19 * a + b - d - g + 15) % 30;
+    var i = Math.floor(c / 4);
+    var k = c % 4;
+    var l = (32 + 2 * e + 2 * i - h - k) % 7;
+    var m = Math.floor((a + 11 * h + 22 * l) / 451);
+    var month = Math.floor((h + l - 7 * m + 114) / 31);
+    var day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+  }
+
+  function addCaseHoliday(map, date, label) {
+    map[calendarDateKey(date)] = label;
+  }
+
+  function caseCalendarHolidays(year) {
+    if (scmCaseHolidayCache[year]) return scmCaseHolidayCache[year];
+    var map = {};
+    addCaseHoliday(map, new Date(year, 0, 1), "Año Nuevo");
+    addCaseHoliday(map, nextCalendarMonday(new Date(year, 0, 6)), "Reyes Magos");
+    addCaseHoliday(map, nextCalendarMonday(new Date(year, 2, 19)), "San José");
+    addCaseHoliday(map, new Date(year, 4, 1), "Día del Trabajo");
+    addCaseHoliday(map, new Date(year, 6, 20), "Independencia");
+    addCaseHoliday(map, new Date(year, 7, 7), "Batalla de Boyacá");
+    addCaseHoliday(map, nextCalendarMonday(new Date(year, 7, 15)), "Asunción");
+    addCaseHoliday(map, nextCalendarMonday(new Date(year, 9, 12)), "Día de la Raza");
+    addCaseHoliday(map, nextCalendarMonday(new Date(year, 10, 1)), "Todos los Santos");
+    addCaseHoliday(map, nextCalendarMonday(new Date(year, 10, 11)), "Independencia de Cartagena");
+    addCaseHoliday(map, new Date(year, 11, 8), "Inmaculada Concepción");
+    addCaseHoliday(map, new Date(year, 11, 25), "Navidad");
+
+    var easter = calendarEasterDate(year);
+    addCaseHoliday(map, addCalendarDays(easter, -3), "Jueves Santo");
+    addCaseHoliday(map, addCalendarDays(easter, -2), "Viernes Santo");
+    addCaseHoliday(map, nextCalendarMonday(addCalendarDays(easter, 43)), "Ascensión");
+    addCaseHoliday(map, nextCalendarMonday(addCalendarDays(easter, 64)), "Corpus Christi");
+    addCaseHoliday(map, nextCalendarMonday(addCalendarDays(easter, 71)), "Sagrado Corazón");
+
+    scmCaseHolidayCache[year] = map;
+    return map;
+  }
+
+  function caseCalendarHolidayLabel(date) {
+    var year = date.getFullYear();
+    return caseCalendarHolidays(year)[calendarDateKey(date)] || "";
+  }
+
+  function caseCalendarMonthDate(value) {
+    var raw = String(value || "").trim();
+    if (raw) {
+      var parsed = new Date(raw + "T00:00:00");
+      if (!Number.isNaN(parsed.getTime())) {
+        return new Date(parsed.getFullYear(), parsed.getMonth(), 1);
+      }
+    }
+    var now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+
+  function caseCalendarMonthTitle(date) {
+    try {
+      return date.toLocaleDateString("es-CO", { month: "long", year: "numeric" });
+    } catch (error) {
+      return String(date.getMonth() + 1).padStart(2, "0") + "/" + date.getFullYear();
+    }
+  }
+
+  function caseCalendarMonthRange(date) {
+    var first = new Date(date.getFullYear(), date.getMonth(), 1);
+    var last = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    return { from: calendarDateKey(first), to: calendarDateKey(last) };
+  }
+
+  function caseCalendarEventDateKey(row) {
+    return String((row && (row.fecha_inicio || row.fecha || row.start)) || "").slice(0, 10);
+  }
+
+  function renderCaseCalendarMonth(root, shell, employeeId, monthDate) {
+    var grid = shell ? shell.querySelector("[data-scm-case-calendar-grid]") : null;
+    var title = shell ? shell.querySelector("[data-scm-case-calendar-title]") : null;
+    if (title) title.textContent = caseCalendarMonthTitle(monthDate);
+    if (!grid) return Promise.resolve();
+    if (!employeeId) {
+      grid.innerHTML = '<div class="scm-case-calendar-empty">Este caso no tiene funcionario asignado.</div>';
+      return Promise.resolve();
+    }
+    if (!isCalendarEmployeeAllowed(root, employeeId)) {
+      grid.innerHTML = '<div class="scm-case-calendar-empty">El funcionario asignado no pertenece a los cargos visibles del calendario.</div>';
+      return Promise.resolve();
+    }
+    grid.innerHTML = '<div class="scm-case-calendar-empty">Cargando calendario...</div>';
+    var range = caseCalendarMonthRange(monthDate);
+    return calendarApiRequest(root, "filtrar_eventos_admin", {
+      id_empleado: employeeId,
+      fecha_inicio: range.from,
+      fecha_fin: range.to,
+      pagina: 1,
+      limite: 250,
+    }).then(function (json) {
+      if (!json || !json.success) {
+        throw new Error((json && json.message) || "No se pudo cargar el calendario.");
+      }
+      var rowsByDay = {};
+      extractCalendarRows(json.data || []).forEach(function (row) {
+        var key = caseCalendarEventDateKey(row);
+        if (!key) return;
+        if (!rowsByDay[key]) rowsByDay[key] = [];
+        rowsByDay[key].push(row);
+      });
+      Object.keys(rowsByDay).forEach(function (key) {
+        rowsByDay[key].sort(function (a, b) {
+          return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+        });
+      });
+
+      var first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+      var startOffset = (first.getDay() + 6) % 7;
+      var cursor = addCalendarDays(first, -startOffset);
+      var todayKey = calendarDateKey(new Date());
+      var cells = [];
+      for (var i = 0; i < 42; i += 1) {
+        var current = addCalendarDays(cursor, i);
+        var key = calendarDateKey(current);
+        var rows = rowsByDay[key] || [];
+        var holiday = caseCalendarHolidayLabel(current);
+        var classes = ["scm-case-calendar-day"];
+        if (current.getMonth() !== monthDate.getMonth()) classes.push("is-muted");
+        if (key === todayKey) classes.push("is-today");
+        if (holiday) classes.push("is-holiday");
+        cells.push(
+          '<div class="' + classes.join(" ") + '">' +
+          '<div class="scm-case-calendar-day-head"><span class="scm-case-calendar-day-number">' + current.getDate() + '</span>' +
+          (holiday ? '<span class="scm-case-calendar-day-holiday">' + escHtml(holiday) + '</span>' : "") +
+          "</div>" +
+          rows.slice(0, 3).map(function (row) {
+            return '<div class="scm-case-calendar-day-pill"><strong>' + escHtml(formatCalendarDateTime(row.fecha_inicio)) + '</strong><span>' + escHtml(row.titulo || "Evento") + '</span></div>';
+          }).join("") +
+          (rows.length > 3 ? '<div class="scm-case-calendar-day-more">+' + (rows.length - 3) + " más</div>" : "") +
+          "</div>",
+        );
+      }
+      grid.innerHTML = cells.join("");
+    }).catch(function (error) {
+      grid.innerHTML = '<div class="scm-case-calendar-empty">No se pudo cargar el calendario.</div>';
+      scmNotify("error", error.message || "No se pudo cargar el calendario.");
+    });
+  }
+
+  function openCalendarCaseMonthPopup(root, employeeId, employeeName, selectedDate) {
+    if (!window.Swal || typeof window.Swal.fire !== "function") {
+      scmNotify("error", "No se pudo abrir el calendario.");
+      return;
+    }
+    var currentMonth = caseCalendarMonthDate(selectedDate);
+    window.Swal.fire({
+      title: "Calendario del funcionario",
+      html:
+        '<div class="scm-case-calendar-month-shell" data-scm-case-calendar-popup>' +
+        '<div class="scm-case-calendar-toolbar">' +
+        '<button type="button" class="scm-case-calendar-nav" data-scm-case-calendar-prev aria-label="Mes anterior">&lsaquo;</button>' +
+        '<div class="scm-case-calendar-heading"><span>' + escHtml(employeeName || "Funcionario asignado") + '</span><strong data-scm-case-calendar-title>' + escHtml(caseCalendarMonthTitle(currentMonth)) + '</strong><small>Eventos y festivos de Colombia</small></div>' +
+        '<button type="button" class="scm-case-calendar-nav" data-scm-case-calendar-next aria-label="Mes siguiente">&rsaquo;</button>' +
+        "</div>" +
+        '<div class="scm-case-calendar-weekdays"><span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sa</span><span>Do</span></div>' +
+        '<div class="scm-case-calendar-grid" data-scm-case-calendar-grid><div class="scm-case-calendar-empty">Cargando calendario...</div></div>' +
+        "</div>",
+      width: 1120,
+      showConfirmButton: false,
+      showCancelButton: true,
+      cancelButtonText: "Cerrar calendario",
+      confirmButtonColor: "#f59e0b",
+      cancelButtonColor: "#e2e8f0",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      customClass: { popup: "scm-calendar-swal-popup scm-case-calendar-swal" },
+      didOpen: function () {
+        var popup = window.Swal.getPopup();
+        var shell = popup ? popup.querySelector("[data-scm-case-calendar-popup]") : null;
+        var render = function () {
+          renderCaseCalendarMonth(root, shell, employeeId, currentMonth);
+        };
+        var prev = popup ? popup.querySelector("[data-scm-case-calendar-prev]") : null;
+        var next = popup ? popup.querySelector("[data-scm-case-calendar-next]") : null;
+        if (prev) {
+          prev.addEventListener("click", function () {
+            currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+            render();
+          });
+        }
+        if (next) {
+          next.addEventListener("click", function () {
+            currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+            render();
+          });
+        }
+        render();
+      },
+    });
+  }
+
   function renderCalendarCaseEmployeeAgenda(root, body, employeeId) {
     var agenda = body ? body.querySelector("[data-scm-calendar-case-agenda]") : null;
     if (!agenda) return;
@@ -1709,13 +1932,12 @@
         '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" value="' + escHtml(addressLabel && addressLabel !== "-" ? addressLabel : "") + '" data-auto-calendar-location="1"></label>' +
         '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required data-auto-calendar-text="1">' + escHtml(asuntoLabel && asuntoLabel !== "-" ? asuntoLabel : "") + '</textarea><small>Se autocompleta con el texto de cita y puedes editarlo si necesitas ajustar el mensaje.</small></label>' +
         "</div>" +
-        '<div class="scm-calendar-popup-agenda scm-calendar-case-agenda"><h4>Agenda del funcionario</h4><div data-scm-calendar-case-agenda><div class="scm-calendar-popup-agenda-empty">Cargando agenda...</div></div></div>' +
+        '<div class="scm-calendar-case-tools"><div><strong>Disponibilidad del funcionario</strong><span>Revisa el calendario sin cerrar este formulario.</span></div><button type="button" class="scm-case-work-btn scm-calendar-case-open-btn" data-scm-calendar-case-open-month>Ver calendario</button></div>' +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear evento</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
     }
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
-    renderCalendarCaseEmployeeAgenda(root, body, employeeId);
 
     var form = body ? body.querySelector(".scm-calendar-case-form") : null;
     var categorySelect = body ? body.querySelector("[data-scm-calendar-case-categories]") : null;
@@ -1725,6 +1947,7 @@
     var dateInput = form ? form.querySelector('[name="fecha"]') : null;
     var startInput = form ? form.querySelector('[name="hora_inicio"]') : null;
     var endInput = form ? form.querySelector('[name="hora_fin"]') : null;
+    var calendarMonthBtn = form ? form.querySelector("[data-scm-calendar-case-open-month]") : null;
     function maybeAutofillCaseCalendarFields(force) {
       var categoryName = selectedCalendarCategoryName(categorySelect);
       if (titleInput) {
@@ -1785,6 +2008,16 @@
           descriptionInput.setAttribute("data-auto-calendar-text", "0");
         });
       }
+      if (calendarMonthBtn) {
+        calendarMonthBtn.addEventListener("click", function () {
+          openCalendarCaseMonthPopup(
+            root,
+            employeeId,
+            caseBtn.dataset.empleado || caseBtn.dataset.asignado || "",
+            dateInput ? dateInput.value : "",
+          );
+        });
+      }
       form.addEventListener("submit", function (event) {
         event.preventDefault();
         if (!employeeId) {
@@ -1834,8 +2067,10 @@
             }
             if (msg) msg.textContent = json.message || "Evento creado.";
             scmNotify("success", json.message || "Evento creado.", "Calendario");
-            if (root) {
-              root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+            if (root && typeof window.CustomEvent === "function") {
+              root.dispatchEvent(new CustomEvent("scm:case-action-saved", {
+                detail: { ticketPk: ticketPk, fromNode: form },
+              }));
             }
           })
           .catch(function (error) {

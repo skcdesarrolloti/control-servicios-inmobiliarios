@@ -2569,6 +2569,11 @@
       refreshActiveTab();
     });
 
+    root.addEventListener("scm:case-action-saved", function (event) {
+      var detail = event && event.detail ? event.detail : {};
+      refreshCaseAfterSave(detail.ticketPk || "", detail.fromNode || root);
+    });
+
     function administrativeActivityKeyFromPanelId(panelId) {
       if (panelId === "scm-panel-cotizaciones-mantenimiento") {
         return "cotizaciones_mantenimiento";
