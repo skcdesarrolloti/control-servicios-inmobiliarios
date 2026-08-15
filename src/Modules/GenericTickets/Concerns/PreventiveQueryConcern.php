@@ -83,13 +83,46 @@ trait PreventiveQueryConcern
       $where[] = "LOWER(TRIM(COALESCE(`cct_status`, ''))) = ?";
       $args[]  = strtolower(trim((string) $p['fEstado']));
     }
-    if (!empty($p['fFechaDesde'])) {
-      $where[] = '`cct_created` >= ?';
-      $args[]  = $p['fFechaDesde'] . ' 00:00:00';
-    }
-    if (!empty($p['fFechaHasta'])) {
-      $where[] = '`cct_created` <= ?';
-      $args[]  = $p['fFechaHasta'] . ' 23:59:59';
+    $hasFechaColumn = $this->column_exists($tabla, 'fecha');
+    if (!empty($p['fFecha'])) {
+      $tsStart = strtotime((string) $p['fFecha'] . ' 00:00:00');
+      $tsEnd = strtotime((string) $p['fFecha'] . ' 23:59:59');
+      if ($tsStart !== false && $tsEnd !== false) {
+        if ($hasFechaColumn) {
+          $where[] = 'COALESCE(`fecha`, 0) BETWEEN ? AND ?';
+          $args[] = (int) $tsStart;
+          $args[] = (int) $tsEnd;
+        } else {
+          $where[] = '`cct_created` BETWEEN ? AND ?';
+          $args[]  = $p['fFecha'] . ' 00:00:00';
+          $args[]  = $p['fFecha'] . ' 23:59:59';
+        }
+      }
+    } else {
+      if (!empty($p['fFechaDesde'])) {
+        if ($hasFechaColumn) {
+          $ts = strtotime((string) $p['fFechaDesde'] . ' 00:00:00');
+          if ($ts !== false) {
+            $where[] = 'COALESCE(`fecha`, 0) >= ?';
+            $args[]  = (int) $ts;
+          }
+        } else {
+          $where[] = '`cct_created` >= ?';
+          $args[]  = $p['fFechaDesde'] . ' 00:00:00';
+        }
+      }
+      if (!empty($p['fFechaHasta'])) {
+        if ($hasFechaColumn) {
+          $ts = strtotime((string) $p['fFechaHasta'] . ' 23:59:59');
+          if ($ts !== false) {
+            $where[] = 'COALESCE(`fecha`, 0) <= ?';
+            $args[]  = (int) $ts;
+          }
+        } else {
+          $where[] = '`cct_created` <= ?';
+          $args[]  = $p['fFechaHasta'] . ' 23:59:59';
+        }
+      }
     }
     if (!empty($p['fCotizacion']) && $this->table_exists($cotTabla) && $this->column_exists($cotTabla, 'id_ticket') && $this->column_exists($tabla, 'id_ticket')) {
       $cotExists = "EXISTS (

@@ -514,7 +514,7 @@ trait RendersDashboard
               <div class="scm-field"><label for="scm_barrio">Barrio</label><select id="scm_barrio" name="scm_barrio" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["barrios"] ?? []) as $barrioOpt): ?><option value="<?php echo esc_attr((string)$barrioOpt); ?>" <?php selected((string)($params["fBarrio"] ?? ""), (string)$barrioOpt); ?>><?php echo esc_html((string)$barrioOpt); ?></option><?php endforeach; ?>
                 </select></div>
-              <div class="scm-field"><label for="scm_fecha">Fecha</label><input id="scm_fecha" name="scm_fecha" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string)($params["fFecha"] ?? (($params["fFechaDesde"] ?? "") === ($params["fFechaHasta"] ?? "") ? ($params["fFechaDesde"] ?? "") : ($params["fFechaDesde"] ?? "")))); ?>"></div>
+              <div class="scm-field"><label for="scm_fecha">Fecha</label><input id="scm_fecha" name="scm_fecha" class="input input-bordered input-sm scm-input" type="date" value="<?php echo esc_attr((string)($params["fFecha"] ?? "")); ?>"></div>
 
               <div class="scm-field"><label for="scm_cotizacion">Cotizaci&oacute;n</label><select id="scm_cotizacion" name="scm_cotizacion" class="select select-bordered select-sm scm-select">
                   <option value="">Todas</option>
@@ -1145,7 +1145,7 @@ trait RendersDashboard
       $tsStart = strtotime((string) $p['fFecha'] . ' 00:00:00');
       $tsEnd = strtotime((string) $p['fFecha'] . ' 23:59:59');
       if ($tsStart !== false && $tsEnd !== false) {
-        $where[] = 'COALESCE(NULLIF(c.`fecha`, 0), UNIX_TIMESTAMP(c.`cct_created`)) BETWEEN ? AND ?';
+        $where[] = 'COALESCE(c.`fecha`, 0) BETWEEN ? AND ?';
         $args[] = (int) $tsStart;
         $args[] = (int) $tsEnd;
       }

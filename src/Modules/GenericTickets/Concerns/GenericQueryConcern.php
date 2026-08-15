@@ -21,8 +21,15 @@ trait GenericQueryConcern
       return sanitize_text_field((string) ($v ?? ''));
     };
     $singleDate = $clean($input[$prefix . 'fecha'] ?? '');
-    $dateFrom = $singleDate !== '' ? $singleDate : $clean($input[$prefix . 'fecha_desde'] ?? '');
-    $dateTo = $singleDate !== '' ? $singleDate : $clean($input[$prefix . 'fecha_hasta'] ?? '');
+    $dateFrom = $clean($input[$prefix . 'fecha_desde'] ?? '');
+    $dateTo = $clean($input[$prefix . 'fecha_hasta'] ?? '');
+    if ($singleDate === '' && $dateFrom !== '' && $dateFrom === $dateTo) {
+      $singleDate = $dateFrom;
+    }
+    if ($singleDate !== '') {
+      $dateFrom = '';
+      $dateTo = '';
+    }
 
     return [
       'fEstado' => $clean($input[$prefix . 'estado'] ?? ''),
@@ -215,19 +222,29 @@ trait GenericQueryConcern
       }
     }
 
-    if (!empty($p['fFechaDesde'])) {
-      $ts = strtotime($p['fFechaDesde']);
-      if ($ts !== false && $ts > 0) {
-        $where[] = 'fecha >= ?';
-        $args[] = $ts;
+    if (!empty($p['fFecha'])) {
+      $tsStart = strtotime((string) $p['fFecha'] . ' 00:00:00');
+      $tsEnd = strtotime((string) $p['fFecha'] . ' 23:59:59');
+      if ($tsStart !== false && $tsEnd !== false && $tsStart > 0 && $tsEnd > 0) {
+        $where[] = 'COALESCE(fecha, 0) BETWEEN ? AND ?';
+        $args[] = (int) $tsStart;
+        $args[] = (int) $tsEnd;
       }
-    }
+    } else {
+      if (!empty($p['fFechaDesde'])) {
+        $ts = strtotime($p['fFechaDesde'] . ' 00:00:00');
+        if ($ts !== false && $ts > 0) {
+          $where[] = 'COALESCE(fecha, 0) >= ?';
+          $args[] = (int) $ts;
+        }
+      }
 
-    if (!empty($p['fFechaHasta'])) {
-      $ts = strtotime($p['fFechaHasta'] . ' 23:59:59');
-      if ($ts !== false && $ts > 0) {
-        $where[] = 'fecha <= ?';
-        $args[] = $ts;
+      if (!empty($p['fFechaHasta'])) {
+        $ts = strtotime($p['fFechaHasta'] . ' 23:59:59');
+        if ($ts !== false && $ts > 0) {
+          $where[] = 'COALESCE(fecha, 0) <= ?';
+          $args[] = (int) $ts;
+        }
       }
     }
     if (!empty($p['fCotizacion'])) {

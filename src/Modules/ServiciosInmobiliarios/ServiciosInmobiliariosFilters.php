@@ -21,8 +21,15 @@ final class ServiciosInmobiliariosFilters
     }
 
     $singleDate = $this->value($input, $prefix . 'fecha');
-    $dateFrom = $singleDate !== '' ? $singleDate : $this->value($input, $prefix . 'fecha_desde');
-    $dateTo = $singleDate !== '' ? $singleDate : $this->value($input, $prefix . 'fecha_hasta');
+    $dateFrom = $this->value($input, $prefix . 'fecha_desde');
+    $dateTo = $this->value($input, $prefix . 'fecha_hasta');
+    if ($singleDate === '' && $dateFrom !== '' && $dateFrom === $dateTo) {
+      $singleDate = $dateFrom;
+    }
+    if ($singleDate !== '') {
+      $dateFrom = '';
+      $dateTo = '';
+    }
 
     return [
       'fTema' => $this->value($input, $prefix . 'tema'),

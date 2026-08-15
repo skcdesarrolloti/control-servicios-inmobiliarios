@@ -318,19 +318,29 @@ trait MaintenanceQueriesConcern
       $args[] = $term;
     }
 
-    if ($filters['fFechaDesde'] !== '') {
-      $ts = strtotime($filters['fFechaDesde'] . ' 00:00:00');
-      if ($ts !== false) {
-        $where[] = 'COALESCE(t.fecha, 0) >= %d';
-        $args[] = (int) $ts;
+    if (($filters['fFecha'] ?? '') !== '') {
+      $tsStart = strtotime((string) $filters['fFecha'] . ' 00:00:00');
+      $tsEnd = strtotime((string) $filters['fFecha'] . ' 23:59:59');
+      if ($tsStart !== false && $tsEnd !== false) {
+        $where[] = 'COALESCE(t.fecha, 0) BETWEEN %d AND %d';
+        $args[] = (int) $tsStart;
+        $args[] = (int) $tsEnd;
       }
-    }
+    } else {
+      if ($filters['fFechaDesde'] !== '') {
+        $ts = strtotime($filters['fFechaDesde'] . ' 00:00:00');
+        if ($ts !== false) {
+          $where[] = 'COALESCE(t.fecha, 0) >= %d';
+          $args[] = (int) $ts;
+        }
+      }
 
-    if ($filters['fFechaHasta'] !== '') {
-      $ts = strtotime($filters['fFechaHasta'] . ' 23:59:59');
-      if ($ts !== false) {
-        $where[] = 'COALESCE(t.fecha, 0) <= %d';
-        $args[] = (int) $ts;
+      if ($filters['fFechaHasta'] !== '') {
+        $ts = strtotime($filters['fFechaHasta'] . ' 23:59:59');
+        if ($ts !== false) {
+          $where[] = 'COALESCE(t.fecha, 0) <= %d';
+          $args[] = (int) $ts;
+        }
       }
     }
 
