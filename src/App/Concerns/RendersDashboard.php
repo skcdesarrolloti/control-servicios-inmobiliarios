@@ -299,6 +299,7 @@ trait RendersDashboard
         'notif_responsable_pqr' => self::AJAX_GUARDAR_NOTIF_RESPONSABLE_PQR,
         'dashboard_permissions_read' => self::AJAX_DASHBOARD_PERMISSIONS_READ,
         'dashboard_permissions_save' => self::AJAX_DASHBOARD_PERMISSIONS_SAVE,
+        'calendar_cita_notify' => self::AJAX_CALENDAR_CITA_NOTIFY,
         // Guía
         'guide_gcd_read' => self::AJAX_GUIDE_GCD_READ,
         'guide_gcd_save' => self::AJAX_GUIDE_GCD_SAVE,

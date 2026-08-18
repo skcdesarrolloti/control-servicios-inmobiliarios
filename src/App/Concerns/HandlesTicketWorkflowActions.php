@@ -587,6 +587,354 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk($result);
   }
 
+  public function ajax_handler_calendar_cita_notify(): void
+  {
+    $this->verifyCsrf();
+
+    $rawAppointments = stripslashes((string) ($_POST['appointments'] ?? '[]'));
+    $appointments = json_decode($rawAppointments, true);
+    if (!is_array($appointments)) {
+      $appointments = [];
+    }
+
+    if (empty($appointments)) {
+      $appointments[] = [
+        'id_ticket' => $_POST['id_ticket'] ?? '',
+        'id_empleado' => $_POST['id_empleado'] ?? '',
+        'categoria' => $_POST['categoria'] ?? '',
+        'titulo' => $_POST['titulo'] ?? '',
+        'fecha_inicio' => $_POST['fecha_inicio'] ?? '',
+        'fecha_fin' => $_POST['fecha_fin'] ?? '',
+        'ubicacion' => $_POST['ubicacion'] ?? '',
+        'es_cita' => $_POST['es_cita'] ?? 'si',
+      ];
+    }
+
+    $smsQueue = new \SCM\Support\SmsQueue($this->db);
+    $creator = $this->calendarCitaCreatorContact();
+    $queued = 0;
+    $skipped = 0;
+    $errors = [];
+    $requesterDedupe = [];
+
+    foreach ($appointments as $appointment) {
+      if (!is_array($appointment)) {
+        $skipped++;
+        continue;
+      }
+
+      $isCita = strtolower(trim((string) ($appointment['es_cita'] ?? 'si'))) === 'si';
+      $ticketLookup = trim(strip_tags((string) ($appointment['id_ticket'] ?? '')));
+      $employeeId = trim(strip_tags((string) ($appointment['id_empleado'] ?? '')));
+      if (!$isCita || $ticketLookup === '') {
+        $skipped++;
+        continue;
+      }
+
+      $ticket = $this->calendarCitaTicketRow($ticketLookup);
+      $logicalTicket = trim((string) ($ticket['id_ticket'] ?? ''));
+      if ($logicalTicket === '') {
+        $logicalTicket = $ticketLookup;
+      }
+      $category = trim(strip_tags((string) ($appointment['categoria'] ?? '')));
+      if ($category === '') {
+        $category = trim((string) ($ticket['tipo_pqrs'] ?? $ticket['tema_ayuda'] ?? $ticket['asunto'] ?? 'cita'));
+      }
+      $location = trim(strip_tags((string) ($appointment['ubicacion'] ?? '')));
+      if ($location === '') {
+        $location = trim((string) ($ticket['direccion'] ?? ''));
+      }
+      $start = trim(strip_tags((string) ($appointment['fecha_inicio'] ?? '')));
+      $end = trim(strip_tags((string) ($appointment['fecha_fin'] ?? '')));
+      $dateLabel = $this->calendarCitaDateLabel($start);
+      $timeLabel = $this->calendarCitaTimeRangeLabel($start, $end);
+
+      if ($employeeId !== '') {
+        $employee = $this->calendarCitaFuncionarioRow($employeeId, 'id_empleado');
+        $employeeName = trim((string) ($employee['name'] ?? ''));
+        if ($employeeName === '') {
+          $employeeName = 'Funcionario';
+        }
+        $employeePhone = trim((string) ($employee['phone'] ?? ''));
+        if ($employeePhone !== '') {
+          $ok = $smsQueue->enqueue($employeePhone, $employeeName, $this->calendarCitaEmployeeMessage($employeeName, $category, $logicalTicket, $dateLabel, $timeLabel, $location), [
+            'source_module' => 'calendar_cita_funcionario',
+            'campaign_tag' => 'calendar_cita_funcionario',
+            'categoria_mensaje' => 'informacion',
+            'id_funcionario' => is_numeric($employeeId) ? (int) $employeeId : 0,
+            'id_ticket' => $logicalTicket,
+            'ticket_pk' => (string) ($ticket['_ID'] ?? $ticketLookup),
+            'categoria_cita' => $category,
+            'fecha_inicio' => $start,
+            'fecha_fin' => $end,
+            'creado_por' => $creator['name'],
+            'creado_por_telefono' => $creator['phone'],
+            'dedupe_key' => 'calendar_cita_funcionario:' . $logicalTicket . ':' . $employeeId . ':' . $start,
+            'template_name' => 'scm_cita_funcionario_v1',
+            'template_language' => 'es_CO',
+            'template_components' => [
+              [
+                'type' => 'body',
+                'parameters' => [
+                  ['type' => 'text', 'text' => $employeeName],
+                  ['type' => 'text', 'text' => $category],
+                  ['type' => 'text', 'text' => $logicalTicket],
+                  ['type' => 'text', 'text' => $dateLabel],
+                  ['type' => 'text', 'text' => $timeLabel],
+                  ['type' => 'text', 'text' => $location !== '' ? $location : '-'],
+                ],
+              ],
+              [
+                'type' => 'button',
+                'sub_type' => 'url',
+                'index' => '0',
+                'parameters' => [
+                  ['type' => 'text', 'text' => $logicalTicket],
+                ],
+              ],
+            ],
+          ]);
+          if ($ok) {
+            $queued++;
+          } else {
+            $errors[] = 'No se pudo encolar WhatsApp al funcionario del ticket #' . $logicalTicket . '.';
+          }
+        } else {
+          $skipped++;
+        }
+      }
+
+      $requester = $this->calendarCitaRequesterContact($ticket);
+      $requesterPhone = trim((string) ($requester['phone'] ?? ''));
+      $requesterName = trim((string) ($requester['name'] ?? ''));
+      $requesterKey = $logicalTicket . ':' . $start . ':' . $requesterPhone;
+      if ($requesterPhone !== '' && !isset($requesterDedupe[$requesterKey])) {
+        $requesterDedupe[$requesterKey] = true;
+        $creatorContact = $this->calendarCitaCreatorLabel($creator);
+        $ok = $smsQueue->enqueue($requesterPhone, $requesterName, $this->calendarCitaRequesterMessage($requesterName, $category, $logicalTicket, $dateLabel, $timeLabel, $location, $creatorContact), [
+          'source_module' => 'calendar_cita_solicitante',
+          'campaign_tag' => 'calendar_cita_solicitante',
+          'categoria_mensaje' => 'informacion',
+          'id_ticket' => $logicalTicket,
+          'ticket_pk' => (string) ($ticket['_ID'] ?? $ticketLookup),
+          'categoria_cita' => $category,
+          'fecha_inicio' => $start,
+          'fecha_fin' => $end,
+          'creado_por' => $creator['name'],
+          'creado_por_telefono' => $creator['phone'],
+          'dedupe_key' => 'calendar_cita_solicitante:' . $logicalTicket . ':' . $start,
+          'template_name' => 'scm_cita_solicitante_v1',
+          'template_language' => 'es_CO',
+          'template_components' => [
+            [
+              'type' => 'body',
+              'parameters' => [
+                ['type' => 'text', 'text' => $requesterName !== '' ? $requesterName : 'Cliente'],
+                ['type' => 'text', 'text' => $category],
+                ['type' => 'text', 'text' => $logicalTicket],
+                ['type' => 'text', 'text' => $dateLabel],
+                ['type' => 'text', 'text' => $timeLabel],
+                ['type' => 'text', 'text' => $location !== '' ? $location : '-'],
+                ['type' => 'text', 'text' => $creatorContact],
+              ],
+            ],
+            [
+              'type' => 'button',
+              'sub_type' => 'url',
+              'index' => '0',
+              'parameters' => [
+                ['type' => 'text', 'text' => $logicalTicket],
+              ],
+            ],
+          ],
+        ]);
+        if ($ok) {
+          $queued++;
+        } else {
+          $errors[] = 'No se pudo encolar WhatsApp al solicitante del ticket #' . $logicalTicket . '.';
+        }
+      } elseif ($requesterPhone === '') {
+        $skipped++;
+      }
+    }
+
+    $this->jsonOk([
+      'message' => $queued > 0 ? 'Notificaciones de cita encoladas.' : 'No habia destinatarios con WhatsApp para notificar.',
+      'queued' => $queued,
+      'skipped' => $skipped,
+      'errors' => $errors,
+    ]);
+  }
+
+  /** @return array<string,string> */
+  private function calendarCitaTicketRow(string $ticketLookup): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+
+    $candidates = [
+      '_ID',
+      'id_ticket',
+      'tipo_pqrs',
+      'tema_ayuda',
+      'asunto',
+      'direccion',
+      'solicitante',
+      'celular_solicitante',
+      'creador_por',
+      'creado_por',
+      'propietario',
+      'celular_propietario',
+      'arrendatario',
+      'celular_arrendatario',
+    ];
+    $select = [];
+    foreach ($candidates as $column) {
+      if ($this->column_exists($table, $column)) {
+        $select[] = "`{$column}`";
+      }
+    }
+    if (empty($select)) {
+      return [];
+    }
+
+    $where = [];
+    $args = [];
+    if ($this->column_exists($table, '_ID') && ctype_digit($ticketLookup)) {
+      $where[] = '`_ID` = ?';
+      $args[] = (int) $ticketLookup;
+    }
+    if ($this->column_exists($table, 'id_ticket')) {
+      $where[] = "TRIM(COALESCE(`id_ticket`, '')) = ?";
+      $args[] = $ticketLookup;
+    }
+    if (empty($where)) {
+      return [];
+    }
+
+    $row = $this->db->getRow(
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE (" . implode(' OR ', $where) . ') LIMIT 1',
+      $args
+    );
+
+    return is_array($row) ? $row : [];
+  }
+
+  /** @return array{name:string,phone:string,id_empleado:string} */
+  private function calendarCitaFuncionarioRow(string $lookup, string $mode): array
+  {
+    $table = $this->db->table('jet_cct_funcionarios');
+    if (!$this->table_exists($table)) {
+      return ['name' => '', 'phone' => '', 'id_empleado' => ''];
+    }
+
+    $nameColumn = $this->detect_first_existing_column($table, ['nombre', 'empleado', 'nombre_empleado', 'nombre_funcionario']);
+    $phoneColumn = $this->detect_first_existing_column($table, ['celular_empleado', 'celular', 'telefono', 'whatsapp', 'phone']);
+    $select = [];
+    $select[] = $nameColumn !== '' ? "TRIM(COALESCE(`{$nameColumn}`, '')) AS nombre" : "'' AS nombre";
+    $select[] = $phoneColumn !== '' ? "TRIM(COALESCE(`{$phoneColumn}`, '')) AS telefono" : "'' AS telefono";
+    $select[] = $this->column_exists($table, 'id_empleado') ? "TRIM(COALESCE(`id_empleado`, '')) AS id_empleado" : "'' AS id_empleado";
+
+    $whereColumn = $mode === 'internal' ? '_ID' : 'id_empleado';
+    if (!$this->column_exists($table, $whereColumn)) {
+      return ['name' => '', 'phone' => '', 'id_empleado' => ''];
+    }
+
+    $row = $this->db->getRow(
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE TRIM(COALESCE(`{$whereColumn}`, '')) = ? LIMIT 1",
+      [$lookup]
+    );
+    if (!is_array($row)) {
+      return ['name' => '', 'phone' => '', 'id_empleado' => ''];
+    }
+
+    return [
+      'name' => trim((string) ($row['nombre'] ?? '')),
+      'phone' => trim((string) ($row['telefono'] ?? '')),
+      'id_empleado' => trim((string) ($row['id_empleado'] ?? '')),
+    ];
+  }
+
+  /** @return array{name:string,phone:string} */
+  private function calendarCitaCreatorContact(): array
+  {
+    $creator = $this->calendarCitaFuncionarioRow((string) Auth::userId(), 'internal');
+    $name = trim((string) ($creator['name'] ?? ''));
+    if ($name === '') {
+      $name = Auth::user();
+    }
+    return [
+      'name' => $name !== '' ? $name : 'Funcionario de Su Casa',
+      'phone' => trim((string) ($creator['phone'] ?? '')),
+    ];
+  }
+
+  /** @param array<string,mixed> $ticket @return array{name:string,phone:string} */
+  private function calendarCitaRequesterContact(array $ticket): array
+  {
+    $creator = strtolower(trim((string) ($ticket['creador_por'] ?? $ticket['creado_por'] ?? '')));
+    $name = trim((string) ($ticket['solicitante'] ?? ''));
+    $phone = trim((string) ($ticket['celular_solicitante'] ?? ''));
+
+    if ($phone === '' && strpos($creator, 'propiet') !== false) {
+      $phone = trim((string) ($ticket['celular_propietario'] ?? ''));
+      $name = trim((string) ($ticket['propietario'] ?? $name));
+    }
+    if ($phone === '' && strpos($creator, 'arrend') !== false) {
+      $phone = trim((string) ($ticket['celular_arrendatario'] ?? ''));
+      $name = trim((string) ($ticket['arrendatario'] ?? $name));
+    }
+
+    return ['name' => $name !== '' ? $name : 'Cliente', 'phone' => $phone];
+  }
+
+  /** @param array{name:string,phone:string} $creator */
+  private function calendarCitaCreatorLabel(array $creator): string
+  {
+    $name = trim((string) ($creator['name'] ?? ''));
+    $phone = trim((string) ($creator['phone'] ?? ''));
+    if ($name === '') {
+      $name = 'la persona que agendo la cita';
+    }
+    return $phone !== '' ? ($name . ' - ' . $phone) : $name;
+  }
+
+  private function calendarCitaDateLabel(string $start): string
+  {
+    $ts = strtotime($start);
+    if ($ts <= 0) {
+      return '-';
+    }
+    return date('d/m/Y', $ts);
+  }
+
+  private function calendarCitaTimeRangeLabel(string $start, string $end): string
+  {
+    $startTs = strtotime($start);
+    $endTs = strtotime($end);
+    $startLabel = $startTs > 0 ? $this->calendarCitaHourLabel($startTs) : '-';
+    $endLabel = $endTs > 0 ? $this->calendarCitaHourLabel($endTs) : '';
+    return $endLabel !== '' ? ($startLabel . ' a ' . $endLabel) : $startLabel;
+  }
+
+  private function calendarCitaHourLabel(int $ts): string
+  {
+    $label = date('g:i a', $ts);
+    return str_replace(['am', 'pm'], ['a. m.', 'p. m.'], $label);
+  }
+
+  private function calendarCitaEmployeeMessage(string $name, string $category, string $ticket, string $date, string $time, string $location): string
+  {
+    return "Hola {$name}, se te ha agendado una cita de {$category}.\n\nTicket: #{$ticket}\nFecha: {$date}\nHora: {$time}\nDireccion: " . ($location !== '' ? $location : '-');
+  }
+
+  private function calendarCitaRequesterMessage(string $name, string $category, string $ticket, string $date, string $time, string $location, string $creatorContact): string
+  {
+    return "Hola {$name}, se te ha agendado una cita de {$category}.\n\nTicket: #{$ticket}\nFecha: {$date}\nHora: {$time}\nLugar: " . ($location !== '' ? $location : '-') . "\n\nSi no puedes atenderla, contacta a {$creatorContact}.";
+  }
+
   /** @param mixed $raw @return string[] */
   private function parse_notify_recipients($raw): array
   {

@@ -2150,6 +2150,11 @@
             }
             if (msg) msg.textContent = json.message || "Evento creado.";
             scmNotify("success", json.message || "Evento creado.", "Calendario");
+            notifyCalendarAppointment(root, [
+              Object.assign({}, payload, {
+                categoria: selectedCalendarCategoryName(categorySelect),
+              }),
+            ]);
             if (root && typeof window.CustomEvent === "function") {
               root.dispatchEvent(new CustomEvent("scm:case-action-saved", {
                 detail: { ticketPk: ticketPk, fromNode: form },
@@ -3495,6 +3500,43 @@
     }
   });
 
+  function notifyCalendarAppointment(root, appointments) {
+    var runtime = parseRuntime(root) || {};
+    var action =
+      (runtime.actions && runtime.actions.calendar_cita_notify) ||
+      "scm_calendar_cita_notificar";
+    if (!Array.isArray(appointments) || !appointments.length) {
+      return Promise.resolve({ queued: 0, skipped: 0 });
+    }
+    var fd = new FormData();
+    fd.set("action", action);
+    fd.set("nonce", runtime.nonce || "");
+    fd.set("appointments", JSON.stringify(appointments));
+
+    return fetch(runtime.ajaxUrl || "api.php", {
+      method: "POST",
+      body: fd,
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (json) {
+        if (!json || !json.success) {
+          throw new Error(
+            (json && json.data && json.data.message) ||
+              "No se pudieron encolar las notificaciones de la cita.",
+          );
+        }
+        return json.data || {};
+      })
+      .catch(function (error) {
+        console.warn("SCM calendar cita notify:", error);
+        return { queued: 0, skipped: appointments.length, error: error.message || "" };
+      });
+  }
+
   window.SCMAdminCore = {
     parseRuntime: parseRuntime,
     escHtml: escHtml,
@@ -3510,6 +3552,7 @@
     renderTicketDocumentFields: renderTicketDocumentFields,
     renderPasteEvidenceBox: renderPasteEvidenceBox,
     renderNotifyTargets: renderNotifyTargets,
+    notifyCalendarAppointment: notifyCalendarAppointment,
     getLlavesDetailPayload: getLlavesDetailPayload,
     getConsultorEntregaDetailPayload: getConsultorEntregaDetailPayload,
     openStandaloneDetail: openStandaloneDetail

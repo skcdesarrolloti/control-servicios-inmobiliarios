@@ -19,6 +19,7 @@
   var renderTicketDocumentFields = core.renderTicketDocumentFields;
   var renderPasteEvidenceBox = core.renderPasteEvidenceBox || function () { return ""; };
   var renderNotifyTargets = core.renderNotifyTargets;
+  var notifyCalendarAppointment = core.notifyCalendarAppointment || function () { return Promise.resolve({ queued: 0, skipped: 0 }); };
   var getLlavesDetailPayload = core.getLlavesDetailPayload;
   var getConsultorEntregaDetailPayload = core.getConsultorEntregaDetailPayload;
   var openStandaloneDetail = core.openStandaloneDetail;
@@ -1701,11 +1702,28 @@
               }
             }
             window.Swal.showLoading();
+            var citaNotificationAppointments = [];
+            if (mode === "single" && relatedTicket && isCita === "si") {
+              var notificationCategoryName = categoryNameFromSelect(categorySelect) || fd.get("id_categoria") || "cita";
+              eventsToCreate.forEach(function (eventPayload) {
+                selected.forEach(function (employeeId) {
+                  citaNotificationAppointments.push(Object.assign({}, eventPayload, {
+                    id_ticket: basePayload.id_ticket,
+                    id_empleado: employeeId,
+                    categoria: notificationCategoryName,
+                    titulo: basePayload.titulo,
+                    ubicacion: basePayload.ubicacion,
+                    es_cita: "si",
+                  }));
+                });
+              });
+            }
             var request = selected.length > 1 || eventsToCreate.length > 1
               ? calendarApi("crear_eventos", { eventos: eventsToCreate, empleados: selected })
               : calendarApi("crear_evento", Object.assign({}, eventsToCreate[0], { id_empleado: selected[0] }));
             return request.then(function (json) {
               if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el evento.");
+              json._scmCitaNotificationAppointments = citaNotificationAppointments;
               return json;
             }).catch(function (err) {
               window.Swal.showValidationMessage(err.message || "No se pudo crear el evento.");
@@ -1715,6 +1733,9 @@
         }).then(function (result) {
           if (!result.isConfirmed || !result.value) return;
           showToast("success", result.value.message || "Evento creado.");
+          if (Array.isArray(result.value._scmCitaNotificationAppointments) && result.value._scmCitaNotificationAppointments.length) {
+            notifyCalendarAppointment(root, result.value._scmCitaNotificationAppointments);
+          }
           loadEvents();
         });
       }

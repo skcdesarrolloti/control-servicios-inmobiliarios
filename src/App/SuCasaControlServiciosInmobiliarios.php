@@ -51,6 +51,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_FILTER_PQR_PUBLICO = 'scm_filtrar_pqr_publico';
   const AJAX_DASHBOARD_PERMISSIONS_READ = 'scm_dashboard_permissions_read';
   const AJAX_DASHBOARD_PERMISSIONS_SAVE = 'scm_dashboard_permissions_save';
+  const AJAX_CALENDAR_CITA_NOTIFY = 'scm_calendar_cita_notificar';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';
