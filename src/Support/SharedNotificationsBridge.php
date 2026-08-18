@@ -15,10 +15,12 @@ final class SharedNotificationsBridge
   private ?array $config = null;
 
   private ?\SharedNotifications\Config\QueueConfig $queueConfig = null;
+  private ?\SharedNotifications\Storage\PdoStorageAdapter $storage = null;
   private ?\SharedNotifications\NotificationQueue $queue = null;
   private ?\SharedNotifications\NotificationWorker $worker = null;
   private ?string $lastError = null;
-  private bool $booted = false;
+  private bool $queueBooted = false;
+  private bool $workerBooted = false;
 
   public function __construct(Database $db, string $packageRoot = '')
   {
@@ -31,7 +33,7 @@ final class SharedNotificationsBridge
 
   public function isAvailable(): bool
   {
-    return $this->boot();
+    return $this->bootQueue();
   }
 
   public function lastError(): string
@@ -46,12 +48,12 @@ final class SharedNotificationsBridge
 
   public function queue(): ?\SharedNotifications\NotificationQueue
   {
-    return $this->boot() ? $this->queue : null;
+    return $this->bootQueue() ? $this->queue : null;
   }
 
   public function worker(): ?\SharedNotifications\NotificationWorker
   {
-    return $this->boot() ? $this->worker : null;
+    return $this->bootWorker() ? $this->worker : null;
   }
 
   public function queueTable(): string
@@ -67,7 +69,7 @@ final class SharedNotificationsBridge
   public function statsByChannel(string $channel): array
   {
     $stats = ['pending' => 0, 'processing' => 0, 'sent' => 0, 'failed' => 0, 'cancelled' => 0];
-    if (!$this->boot()) {
+    if (!$this->bootQueue()) {
       return $stats;
     }
 
@@ -95,14 +97,13 @@ final class SharedNotificationsBridge
     return $stats;
   }
 
-  private function boot(): bool
+  private function bootQueue(): bool
   {
-    if ($this->booted) {
-      return $this->queue instanceof \SharedNotifications\NotificationQueue
-        && $this->worker instanceof \SharedNotifications\NotificationWorker;
+    if ($this->queueBooted) {
+      return $this->queue instanceof \SharedNotifications\NotificationQueue;
     }
 
-    $this->booted = true;
+    $this->queueBooted = true;
 
     $autoloadFile = $this->packageRoot . '/autoload.php';
     $configFile = $this->packageRoot . '/config.php';
@@ -135,8 +136,25 @@ final class SharedNotificationsBridge
       (int) ($queueCfg['default_max_attempts'] ?? 3)
     );
 
-    $storage = new \SharedNotifications\Storage\PdoStorageAdapter($this->db->pdo());
-    $this->queue = new \SharedNotifications\NotificationQueue($storage, $this->queueConfig);
+    $this->storage = new \SharedNotifications\Storage\PdoStorageAdapter($this->db->pdo());
+    $this->queue = new \SharedNotifications\NotificationQueue($this->storage, $this->queueConfig);
+
+    return true;
+  }
+
+  private function bootWorker(): bool
+  {
+    if ($this->workerBooted) {
+      return $this->worker instanceof \SharedNotifications\NotificationWorker;
+    }
+
+    $this->workerBooted = true;
+
+    if (!$this->bootQueue()) {
+      return false;
+    }
+
+    $providersCfg = is_array($this->config['providers'] ?? null) ? $this->config['providers'] : [];
 
     $registry = new \SharedNotifications\Providers\ProviderRegistry();
 
@@ -168,7 +186,7 @@ final class SharedNotificationsBridge
     }
 
     $this->worker = new \SharedNotifications\NotificationWorker(
-      $storage,
+      $this->storage,
       $registry,
       $this->queueConfig,
       'scm-control-servicios:' . getmypid(),
