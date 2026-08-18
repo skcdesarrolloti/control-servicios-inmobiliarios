@@ -1933,6 +1933,7 @@
 }
 
 .swal2-popup .scm-case-calendar-complete-btn,
+.swal2-popup .scm-case-calendar-transfer-btn,
 .swal2-popup .scm-case-calendar-complete-save,
 .swal2-popup .scm-calendar-action-btn {
   align-items: center;
@@ -1957,7 +1958,20 @@
   color: #fff;
 }
 
+.swal2-popup .scm-case-calendar-transfer-btn {
+  background: #fff;
+  border-color: #dbe6f2;
+  color: #10243d;
+}
+
+.swal2-popup .scm-case-calendar-transfer-btn:hover {
+  background: #f8fafc;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
 .swal2-popup .scm-case-calendar-complete-btn:hover,
+.swal2-popup .scm-case-calendar-transfer-btn:hover,
 .swal2-popup .scm-case-calendar-complete-save:hover,
 .swal2-popup .scm-calendar-action-btn:hover {
   transform: translateY(-1px);
@@ -2027,6 +2041,31 @@
   display: flex;
   flex-wrap: wrap;
   gap: 9px;
+}
+
+.swal2-popup .scm-case-calendar-transfer-grid {
+  display: grid !important;
+  gap: 10px !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.swal2-popup .scm-case-calendar-transfer-panel input {
+  background: #fff;
+  border: 1px solid #cfe0f4;
+  border-radius: 12px;
+  color: #10243d;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 42px;
+  padding: 9px 11px !important;
+  width: 100%;
+}
+
+.swal2-popup .scm-case-calendar-transfer-panel input:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
+  outline: none;
 }
 
 .swal2-popup .scm-case-calendar-complete-cancel {

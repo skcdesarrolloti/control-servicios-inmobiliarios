@@ -1600,6 +1600,20 @@
       (asunto && asunto !== "-" ? "\n\nCaso: " + asunto : "");
   }
 
+  function buildCaseCalendarRescheduleDescription(title, dateValue, startValue, endValue, observation) {
+    if (!title || !dateValue || !startValue || !endValue) return "";
+    return "Por medio de la presente, se informa que la cita " +
+      title +
+      " fue reprogramada para el día " +
+      formatCalendarDateForMessage(dateValue) +
+      ", de " +
+      formatCalendarTimeForMessage(startValue) +
+      " a " +
+      formatCalendarTimeForMessage(endValue) +
+      "." +
+      (observation ? "\n\nMotivo: " + observation : "");
+  }
+
   function validateCalendarCaseEventTimes(dateValue, startValue, endValue) {
     if (!dateValue || !startValue || !endValue) return "Debes ingresar fecha, hora de inicio y hora de fin.";
     var start = new Date(dateValue + "T" + startValue);
@@ -1646,6 +1660,15 @@
     var raw = String(value || "").replace("T", " ");
     if (!raw) return "-";
     return raw.replace(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2}).*$/, "$3/$2/$1 $4");
+  }
+
+  function calendarDatePartFromDateTime(value) {
+    return String(value || "").replace("T", " ").slice(0, 10);
+  }
+
+  function calendarTimePartFromDateTime(value) {
+    var match = String(value || "").replace("T", " ").match(/\s(\d{2}:\d{2})/);
+    return match ? match[1] : "";
   }
 
   function extractCalendarRows(payload) {
@@ -1812,8 +1835,21 @@
       (description ? '<div class="scm-case-calendar-event-mini-description"><small>Descripci&oacute;n</small><p>' + escHtml(description).replace(/\n/g, "<br>") + "</p></div>" : "") +
       '<div class="scm-case-calendar-event-mini-actions" data-scm-case-calendar-mini-actions>' +
       '<span class="scm-case-calendar-event-state-badge' + (isDone ? " is-done" : "") + '" data-scm-case-calendar-event-state>' + (isDone ? "Realizado" : "Pendiente") + "</span>" +
+      (eventId ? '<button type="button" class="scm-case-calendar-transfer-btn" data-scm-case-calendar-transfer-open>Trasladar evento</button>' : "") +
       (eventId && !isDone ? '<button type="button" class="scm-case-calendar-complete-btn" data-scm-case-calendar-complete-open>Marcar realizado</button>' : "") +
       "</div>" +
+      (eventId
+        ? '<form class="scm-case-calendar-complete-panel scm-case-calendar-transfer-panel" data-scm-case-calendar-transfer-panel hidden autocomplete="off">' +
+          '<div class="scm-case-calendar-transfer-grid">' +
+          '<label><span>Nueva fecha</span><input type="date" name="fecha" required value="' + escHtml(calendarDatePartFromDateTime(row.fecha_inicio || row.fecha || row.start)) + '"></label>' +
+          '<label><span>Hora inicio</span><input type="time" name="hora_inicio" required value="' + escHtml(calendarTimePartFromDateTime(row.fecha_inicio || row.fecha || row.start)) + '"></label>' +
+          '<label><span>Hora fin</span><input type="time" name="hora_fin" required value="' + escHtml(calendarTimePartFromDateTime(row.fecha_fin || row.end)) + '"></label>' +
+          '</div>' +
+          '<label><span>Motivo del traslado</span><textarea name="observacion" rows="3" required placeholder="Explica por qu&eacute; se traslada este evento..."></textarea><small>Si es una cita relacionada con ticket, tambi&eacute;n se preparar&aacute; el mensaje de reprogramaci&oacute;n.</small></label>' +
+          '<div><button type="submit" class="scm-case-calendar-complete-save">Guardar traslado</button><button type="button" class="scm-case-calendar-complete-cancel" data-scm-case-calendar-transfer-cancel>Cancelar</button></div>' +
+          '<small data-scm-case-calendar-transfer-msg aria-live="polite"></small>' +
+          "</form>"
+        : "") +
       (eventId && !isDone
         ? '<form class="scm-case-calendar-complete-panel" data-scm-case-calendar-complete-panel hidden autocomplete="off">' +
           '<label><span>Observaci&oacute;n de realizaci&oacute;n</span><textarea name="observacion" rows="3" required>Realizado</textarea><small>Este texto se guardar&aacute; por defecto. Si tienes informaci&oacute;n adicional, puedes ampliarlo antes de guardar.</small></label>' +
@@ -1831,9 +1867,23 @@
         closeCaseCalendarEventMini(shell);
         return;
       }
+      var transferBtn = event.target && event.target.closest ? event.target.closest("[data-scm-case-calendar-transfer-open]") : null;
+      if (transferBtn) {
+        var transferPanel = mini.querySelector("[data-scm-case-calendar-transfer-panel]");
+        var completePanel = mini.querySelector("[data-scm-case-calendar-complete-panel]");
+        if (completePanel) completePanel.hidden = true;
+        if (transferPanel) {
+          transferPanel.hidden = false;
+          var firstField = transferPanel.querySelector("input, textarea");
+          if (firstField) firstField.focus();
+        }
+        return;
+      }
       var openBtn = event.target && event.target.closest ? event.target.closest("[data-scm-case-calendar-complete-open]") : null;
       if (openBtn) {
         var panel = mini.querySelector("[data-scm-case-calendar-complete-panel]");
+        var openTransferPanel = mini.querySelector("[data-scm-case-calendar-transfer-panel]");
+        if (openTransferPanel) openTransferPanel.hidden = true;
         if (panel) {
           panel.hidden = false;
           var textarea = panel.querySelector("textarea");
@@ -1845,7 +1895,96 @@
         var cancelPanel = mini.querySelector("[data-scm-case-calendar-complete-panel]");
         if (cancelPanel) cancelPanel.hidden = true;
       }
+      if (event.target && event.target.closest && event.target.closest("[data-scm-case-calendar-transfer-cancel]")) {
+        var cancelTransferPanel = mini.querySelector("[data-scm-case-calendar-transfer-panel]");
+        if (cancelTransferPanel) cancelTransferPanel.hidden = true;
+      }
     });
+    var transferForm = mini.querySelector("[data-scm-case-calendar-transfer-panel]");
+    if (transferForm && eventId) {
+      transferForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var msg = transferForm.querySelector("[data-scm-case-calendar-transfer-msg]");
+        var saveBtn = transferForm.querySelector("button[type='submit']");
+        var fd = new FormData(transferForm);
+        var dateValue = String(fd.get("fecha") || "");
+        var startValue = String(fd.get("hora_inicio") || "");
+        var endValue = String(fd.get("hora_fin") || "");
+        var observation = String(fd.get("observacion") || "").trim();
+        var timeError = validateCalendarCaseEventTimes(dateValue, startValue, endValue);
+        if (timeError || !observation) {
+          if (msg) {
+            msg.textContent = timeError || "Escribe el motivo del traslado.";
+            msg.classList.add("is-error");
+          }
+          return;
+        }
+        if (saveBtn) saveBtn.disabled = true;
+        if (msg) {
+          msg.textContent = "Guardando traslado...";
+          msg.classList.remove("is-error");
+        }
+        var payload = {
+          id_evento: eventId,
+          fecha_inicio: dateValue + " " + startValue + ":00",
+          fecha_fin: dateValue + " " + endValue + ":00",
+          observacion: observation,
+          es_cita: ticket ? "si" : "no",
+          descripcion: ticket ? buildCaseCalendarRescheduleDescription(title, dateValue, startValue, endValue, observation) : "",
+        };
+        calendarApiRequest(root, "trasladar_evento", payload).then(function (json) {
+          if (!json || !json.success) {
+            throw new Error((json && json.message) || "No se pudo trasladar el evento.");
+          }
+          row.fecha_inicio = payload.fecha_inicio;
+          row.fecha_fin = payload.fecha_fin;
+          if (payload.descripcion) row.descripcion = payload.descripcion;
+          var cells = mini.querySelectorAll(".scm-case-calendar-event-mini-grid > div strong");
+          if (cells[0]) cells[0].textContent = formatCalendarDateTime(payload.fecha_inicio);
+          if (cells[1]) cells[1].textContent = formatCalendarDateTime(payload.fecha_fin);
+          if (msg) msg.textContent = json.message || "Evento trasladado.";
+          scmNotify("success", json.message || "Evento trasladado.", "Calendario");
+          if (typeof shell._scmCaseCalendarRender === "function") {
+            shell._scmCaseCalendarRender();
+          }
+          if (ticket) {
+            notifyCalendarAppointment(root, [{
+              id_ticket: ticket,
+              id_empleado: caseCalendarEventDetailValue(row, ["id_empleado", "funcionario_id", "empleado_id"]),
+              categoria: category || "cita",
+              titulo: title,
+              fecha_inicio: payload.fecha_inicio,
+              fecha_fin: payload.fecha_fin,
+              ubicacion: location,
+              es_cita: "si",
+            }]).then(function (result) {
+              result = result || {};
+              var queued = Number(result.queued || 0);
+              var errors = Array.isArray(result.errors) ? result.errors.filter(Boolean) : [];
+              var errorText = String(result.error || errors[0] || "").trim();
+              if (queued > 0) {
+                if (msg) msg.textContent = "Evento trasladado. " + queued + " notificación" + (queued === 1 ? "" : "es") + " WhatsApp encolada" + (queued === 1 ? "" : "s") + ".";
+                scmNotify("success", "WhatsApp de traslado encolado.", "WhatsApp");
+              } else if (errorText) {
+                if (msg) {
+                  msg.textContent = "Evento trasladado, pero WhatsApp no se encoló: " + errorText;
+                  msg.classList.add("is-error");
+                }
+                scmNotify("error", errorText, "WhatsApp");
+              }
+            });
+          }
+        }).catch(function (error) {
+          if (msg) {
+            msg.textContent = error.message || "No se pudo trasladar el evento.";
+            msg.classList.add("is-error");
+          }
+          scmNotify("error", error.message || "No se pudo trasladar el evento.");
+        }).finally(function () {
+          if (saveBtn) saveBtn.disabled = false;
+        });
+      });
+    }
     var form = mini.querySelector("[data-scm-case-calendar-complete-panel]");
     if (form && eventId) {
       form.addEventListener("submit", function (event) {
@@ -2079,6 +2218,7 @@
         var render = function () {
           renderCaseCalendarMonth(root, shell, employeeId, currentMonth);
         };
+        if (shell) shell._scmCaseCalendarRender = render;
         var prev = popup ? popup.querySelector("[data-scm-case-calendar-prev]") : null;
         var next = popup ? popup.querySelector("[data-scm-case-calendar-next]") : null;
         var pending = popup ? popup.querySelector("[data-scm-case-calendar-pending]") : null;
