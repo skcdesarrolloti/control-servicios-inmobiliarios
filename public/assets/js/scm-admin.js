@@ -2150,11 +2150,16 @@
             }
             if (msg) msg.textContent = json.message || "Evento creado.";
             scmNotify("success", json.message || "Evento creado.", "Calendario");
-            notifyCalendarAppointment(root, [
+            return notifyCalendarAppointment(root, [
               Object.assign({}, payload, {
                 categoria: selectedCalendarCategoryName(categorySelect),
               }),
-            ]);
+            ]).then(function (notifyResult) {
+              showCalendarCitaNotificationResult(notifyResult, msg);
+              return json;
+            });
+          })
+          .then(function () {
             if (root && typeof window.CustomEvent === "function") {
               root.dispatchEvent(new CustomEvent("scm:case-action-saved", {
                 detail: { ticketPk: ticketPk, fromNode: form },
@@ -3537,6 +3542,34 @@
       });
   }
 
+  function showCalendarCitaNotificationResult(result, msg) {
+    result = result || {};
+    var queued = Number(result.queued || 0);
+    var skipped = Number(result.skipped || 0);
+    var error = String(result.error || "").trim();
+    var errors = Array.isArray(result.errors) ? result.errors.filter(Boolean) : [];
+    if (queued > 0) {
+      var okText = queued + " notificación" + (queued === 1 ? "" : "es") + " WhatsApp encolada" + (queued === 1 ? "" : "s") + ".";
+      if (msg) msg.textContent = "Evento creado. " + okText;
+      scmNotify("success", okText, "WhatsApp");
+      return;
+    }
+    if (error || errors.length) {
+      var errorText = error || errors[0] || "No se pudieron encolar las notificaciones WhatsApp.";
+      if (msg) {
+        msg.textContent = "Evento creado, pero WhatsApp no se encoló: " + errorText;
+        msg.classList.add("error");
+      }
+      scmNotify("error", errorText, "WhatsApp");
+      return;
+    }
+    if (skipped > 0) {
+      var skippedText = "Evento creado, pero no se encoló WhatsApp. Revisa celular del ticket o funcionario.";
+      if (msg) msg.textContent = skippedText;
+      scmNotify("warning", skippedText, "WhatsApp");
+    }
+  }
+
   window.SCMAdminCore = {
     parseRuntime: parseRuntime,
     escHtml: escHtml,
@@ -3553,6 +3586,7 @@
     renderPasteEvidenceBox: renderPasteEvidenceBox,
     renderNotifyTargets: renderNotifyTargets,
     notifyCalendarAppointment: notifyCalendarAppointment,
+    showCalendarCitaNotificationResult: showCalendarCitaNotificationResult,
     getLlavesDetailPayload: getLlavesDetailPayload,
     getConsultorEntregaDetailPayload: getConsultorEntregaDetailPayload,
     openStandaloneDetail: openStandaloneDetail

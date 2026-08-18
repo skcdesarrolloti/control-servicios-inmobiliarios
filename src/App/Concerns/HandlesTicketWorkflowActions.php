@@ -697,7 +697,8 @@ trait HandlesTicketWorkflowActions
           if ($ok) {
             $queued++;
           } else {
-            $errors[] = 'No se pudo encolar WhatsApp al funcionario del ticket #' . $logicalTicket . '.';
+            $detail = method_exists($smsQueue, 'lastError') ? trim((string) $smsQueue->lastError()) : '';
+            $errors[] = 'No se pudo encolar WhatsApp al funcionario del ticket #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : '.') ;
           }
         } else {
           $skipped++;
@@ -751,7 +752,8 @@ trait HandlesTicketWorkflowActions
         if ($ok) {
           $queued++;
         } else {
-          $errors[] = 'No se pudo encolar WhatsApp al solicitante del ticket #' . $logicalTicket . '.';
+          $detail = method_exists($smsQueue, 'lastError') ? trim((string) $smsQueue->lastError()) : '';
+          $errors[] = 'No se pudo encolar WhatsApp al solicitante del ticket #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : '.') ;
         }
       } elseif ($requesterPhone === '') {
         $skipped++;

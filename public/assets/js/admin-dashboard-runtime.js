@@ -19,7 +19,33 @@
   var renderTicketDocumentFields = core.renderTicketDocumentFields;
   var renderPasteEvidenceBox = core.renderPasteEvidenceBox || function () { return ""; };
   var renderNotifyTargets = core.renderNotifyTargets;
-  var notifyCalendarAppointment = core.notifyCalendarAppointment || function () { return Promise.resolve({ queued: 0, skipped: 0 }); };
+  function notifyCalendarAppointment(root, appointments) {
+    var helper = window.SCMAdminCore && window.SCMAdminCore.notifyCalendarAppointment;
+    if (typeof helper === "function") {
+      return helper(root, appointments);
+    }
+    console.warn("SCM calendar cita notify: helper no disponible.");
+    return Promise.resolve({ queued: 0, skipped: Array.isArray(appointments) ? appointments.length : 0, error: "Helper no disponible" });
+  }
+
+  function showCalendarNotificationResult(result) {
+    result = result || {};
+    var queued = Number(result.queued || 0);
+    var skipped = Number(result.skipped || 0);
+    var error = String(result.error || "").trim();
+    var errors = Array.isArray(result.errors) ? result.errors.filter(Boolean) : [];
+    if (queued > 0) {
+      showToast("success", queued + " notificación" + (queued === 1 ? "" : "es") + " WhatsApp encolada" + (queued === 1 ? "" : "s") + ".");
+      return;
+    }
+    if (error || errors.length) {
+      showToast("error", error || errors[0] || "No se pudieron encolar las notificaciones WhatsApp.");
+      return;
+    }
+    if (skipped > 0) {
+      showToast("warning", "No se encoló WhatsApp: revisa si el ticket/funcionario tiene celular.");
+    }
+  }
   var getLlavesDetailPayload = core.getLlavesDetailPayload;
   var getConsultorEntregaDetailPayload = core.getConsultorEntregaDetailPayload;
   var openStandaloneDetail = core.openStandaloneDetail;
@@ -1734,7 +1760,8 @@
           if (!result.isConfirmed || !result.value) return;
           showToast("success", result.value.message || "Evento creado.");
           if (Array.isArray(result.value._scmCitaNotificationAppointments) && result.value._scmCitaNotificationAppointments.length) {
-            notifyCalendarAppointment(root, result.value._scmCitaNotificationAppointments);
+            notifyCalendarAppointment(root, result.value._scmCitaNotificationAppointments)
+              .then(showCalendarNotificationResult);
           }
           loadEvents();
         });

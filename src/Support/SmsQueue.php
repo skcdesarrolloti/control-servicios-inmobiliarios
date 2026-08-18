@@ -10,6 +10,7 @@ final class SmsQueue
   private const DEFAULT_TEMPLATE_LANGUAGE = 'es_CO';
 
   private SharedNotificationsBridge $bridge;
+  private string $lastError = '';
 
   public function __construct(Database $db)
   {
@@ -21,8 +22,10 @@ final class SmsQueue
    */
   public function enqueue(string $phone, string $name, string $message, array $meta = []): bool
   {
+    $this->lastError = '';
     $queue = $this->bridge->queue();
     if (!$queue instanceof \SharedNotifications\NotificationQueue) {
+      $this->lastError = $this->bridge->lastError() ?: 'La cola compartida no esta disponible.';
       return false;
     }
 
@@ -46,6 +49,7 @@ final class SmsQueue
     $templateLanguage = trim((string) ($meta['template_language'] ?? self::DEFAULT_TEMPLATE_LANGUAGE));
     $templateComponents = $meta['template_components'] ?? [];
     if ($templateName === '' || !is_array($templateComponents)) {
+      $this->lastError = 'Falta template_name o template_components para WhatsApp.';
       return false;
     }
 
@@ -88,8 +92,15 @@ final class SmsQueue
       ]);
       return true;
     } catch (\Throwable $exception) {
+      $this->lastError = $exception->getMessage();
+      error_log('control-servicios-inmobiliarios: fallo encolando WhatsApp: ' . $exception->getMessage());
       return false;
     }
+  }
+
+  public function lastError(): string
+  {
+    return $this->lastError;
   }
 
   /**
