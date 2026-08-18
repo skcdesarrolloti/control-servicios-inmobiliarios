@@ -353,6 +353,13 @@
     return wrap;
   }
 
+  function closeCaseSubmodal(modal) {
+    var sub = modal ? modal.querySelector(".scm-case-submodal") : null;
+    if (!sub) return;
+    sub.classList.remove("open");
+    sub.setAttribute("aria-hidden", "true");
+  }
+
   function getCasePropertyCode(caseBtn, fallbackNode) {
     var value = "";
     if (caseBtn && caseBtn.dataset) {
@@ -1947,6 +1954,15 @@
           if (typeof shell._scmCaseCalendarRender === "function") {
             shell._scmCaseCalendarRender();
           }
+          closeCaseCalendarEventMini(shell);
+          if (shell && typeof shell._scmCaseCalendarEventTransferred === "function") {
+            shell._scmCaseCalendarEventTransferred({
+              eventId: eventId,
+              payload: payload,
+              response: json,
+              row: row,
+            });
+          }
           if (ticket) {
             notifyCalendarAppointment(root, [{
               id_ticket: ticket,
@@ -1963,13 +1979,8 @@
               var errors = Array.isArray(result.errors) ? result.errors.filter(Boolean) : [];
               var errorText = String(result.error || errors[0] || "").trim();
               if (queued > 0) {
-                if (msg) msg.textContent = "Evento trasladado. " + queued + " notificación" + (queued === 1 ? "" : "es") + " WhatsApp encolada" + (queued === 1 ? "" : "s") + ".";
                 scmNotify("success", "WhatsApp de traslado encolado.", "WhatsApp");
               } else if (errorText) {
-                if (msg) {
-                  msg.textContent = "Evento trasladado, pero WhatsApp no se encoló: " + errorText;
-                  msg.classList.add("is-error");
-                }
                 scmNotify("error", errorText, "WhatsApp");
               }
             });
@@ -2184,11 +2195,12 @@
     });
   }
 
-  function openCalendarCaseMonthPopup(root, employeeId, employeeName, selectedDate) {
+  function openCalendarCaseMonthPopup(root, employeeId, employeeName, selectedDate, options) {
     if (!window.Swal || typeof window.Swal.fire !== "function") {
       scmNotify("error", "No se pudo abrir el calendario.");
       return;
     }
+    options = options || {};
     var currentMonth = caseCalendarMonthDate(selectedDate);
     window.Swal.fire({
       title: "Calendario del funcionario",
@@ -2218,7 +2230,10 @@
         var render = function () {
           renderCaseCalendarMonth(root, shell, employeeId, currentMonth);
         };
-        if (shell) shell._scmCaseCalendarRender = render;
+        if (shell) {
+          shell._scmCaseCalendarRender = render;
+          shell._scmCaseCalendarEventTransferred = typeof options.onEventTransferred === "function" ? options.onEventTransferred : null;
+        }
         var prev = popup ? popup.querySelector("[data-scm-case-calendar-prev]") : null;
         var next = popup ? popup.querySelector("[data-scm-case-calendar-next]") : null;
         var pending = popup ? popup.querySelector("[data-scm-case-calendar-pending]") : null;
@@ -2400,6 +2415,11 @@
             employeeId,
             caseBtn.dataset.empleado || caseBtn.dataset.asignado || "",
             dateInput ? dateInput.value : "",
+            {
+              onEventTransferred: function () {
+                closeCaseSubmodal(modal);
+              },
+            },
           );
         });
       }
@@ -3347,6 +3367,10 @@
             '<button type="button" class="scm-case-work-btn" data-scm-view-contacts>Ver contactos</button>';
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-view-property-map>Ubicaci&oacute;n del inmueble</button>';
+          if (String(btn.dataset.empleadoId || "").trim()) {
+            caseActionsHtml +=
+              '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-employee>Ver calendario del funcionario</button>';
+          }
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-edit-case-magnitude data-ticket-pk="' +
             escHtml(btn.dataset.ticketPk || "") +
@@ -3670,6 +3694,24 @@
         .forEach(function (calendarBtn) {
           calendarBtn.addEventListener("click", function () {
             openCalendarCaseEventEditor(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-calendar-view-employee]")
+        .forEach(function (calendarBtn) {
+          calendarBtn.addEventListener("click", function () {
+            var employeeId = String(btn.dataset.empleadoId || "").trim();
+            if (!employeeId) {
+              scmNotify("error", "Este caso no tiene funcionario asignado para ver calendario.");
+              return;
+            }
+            openCalendarCaseMonthPopup(
+              findRootFromNode(btn),
+              employeeId,
+              btn.dataset.empleado || btn.dataset.asignado || "",
+              "",
+            );
           });
         });
 
