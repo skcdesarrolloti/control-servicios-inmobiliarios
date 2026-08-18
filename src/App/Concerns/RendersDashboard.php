@@ -1333,6 +1333,7 @@ trait RendersDashboard
           <span class="scm-status-count"><strong data-scm-calendar-total>0</strong> eventos</span>
           <button type="button" class="scm-btn-primary btn btn-primary" data-scm-calendar-open-create data-calendar-mode="single">Crear evento</button>
           <button type="button" class="scm-case-work-btn" data-scm-calendar-open-create data-calendar-mode="multiple">Evento m&uacute;ltiple</button>
+          <button type="button" class="scm-case-work-btn" data-scm-calendar-open-pending>Eventos pendientes</button>
           <button type="button" class="scm-case-work-btn scm-calendar-report-btn" data-scm-calendar-open-report>Informe del d&iacute;a</button>
         </div>
       </div>
