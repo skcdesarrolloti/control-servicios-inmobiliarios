@@ -828,7 +828,7 @@ trait HandlesTicketWorkflowActions
       $args[] = (int) $ticketLookup;
     }
     if ($this->column_exists($table, 'id_ticket')) {
-      $where[] = "TRIM(COALESCE(`id_ticket`, '')) = ?";
+      $where[] = "CONVERT(TRIM(COALESCE(`id_ticket`, '')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci";
       $args[] = $ticketLookup;
     }
     if (empty($where)) {
@@ -864,7 +864,7 @@ trait HandlesTicketWorkflowActions
     }
 
     $row = $this->db->getRow(
-      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE TRIM(COALESCE(`{$whereColumn}`, '')) = ? LIMIT 1",
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE CONVERT(TRIM(COALESCE(`{$whereColumn}`, '')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci LIMIT 1",
       [$lookup]
     );
     if (!is_array($row)) {
