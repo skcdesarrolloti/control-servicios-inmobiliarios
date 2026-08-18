@@ -1781,6 +1781,11 @@
     if (current) current.remove();
   }
 
+  function closeCaseCalendarPendingMini(shell) {
+    var current = shell ? shell.querySelector("[data-scm-case-calendar-pending-mini]") : null;
+    if (current) current.remove();
+  }
+
   function openCaseCalendarEventMini(root, shell, row) {
     if (!shell || !row) return;
     closeCaseCalendarEventMini(shell);
@@ -1953,7 +1958,8 @@
           "</div>" +
           rows.slice(0, 3).map(function (row) {
             var detailIndex = eventDetails.push(row) - 1;
-            return '<div class="scm-case-calendar-day-pill"><div><strong>' + escHtml(formatCalendarDateTime(row.fecha_inicio)) + '</strong><span>' + escHtml(row.titulo || "Evento") + '</span></div><button type="button" class="scm-case-calendar-event-detail-btn" data-scm-case-calendar-event-detail="' + detailIndex + '" aria-label="Ver detalle de ' + escHtml(row.titulo || "evento") + '">Ver</button></div>';
+            var done = isCaseCalendarEventDone(row);
+            return '<div class="scm-case-calendar-day-pill"><div><strong>' + escHtml(formatCalendarDateTime(row.fecha_inicio)) + '</strong><span>' + escHtml(row.titulo || "Evento") + '</span><em class="scm-case-calendar-day-status' + (done ? " is-done" : "") + '">' + (done ? "Realizado" : "Pendiente") + '</em></div><button type="button" class="scm-case-calendar-event-detail-btn" data-scm-case-calendar-event-detail="' + detailIndex + '" aria-label="Ver detalle de ' + escHtml(row.titulo || "evento") + '">Ver</button></div>';
           }).join("") +
           (rows.length > 3 ? '<div class="scm-case-calendar-day-more">+' + (rows.length - 3) + " más</div>" : "") +
           "</div>",
@@ -1975,6 +1981,71 @@
     });
   }
 
+  function renderCaseCalendarPendingRows(rows) {
+    rows = Array.isArray(rows) ? rows : [];
+    if (!rows.length) {
+      return '<div class="scm-case-calendar-pending-empty">No hay eventos pendientes vencidos para este funcionario.</div>';
+    }
+    return rows.map(function (row, index) {
+      var ticket = caseCalendarEventDetailValue(row, ["id_ticket", "ticket"]);
+      var category = caseCalendarEventDetailValue(row, ["categoria", "nombre_categoria"]);
+      return '<article class="scm-case-calendar-pending-row">' +
+        '<div><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>' + escHtml(formatCalendarDateTime(row.fecha_inicio || row.fecha || row.start)) + (row.fecha_fin ? " - " + escHtml(formatCalendarDateTime(row.fecha_fin)) : "") + '</span></div>' +
+        '<p>' + (category ? '<b>Categor&iacute;a:</b> ' + escHtml(category) + ' ' : "") + (ticket ? '<b>Ticket:</b> #' + escHtml(ticket) : "") + '</p>' +
+        '<button type="button" class="scm-case-calendar-complete-btn" data-scm-case-calendar-pending-detail="' + index + '">Ver detalle</button>' +
+        '</article>';
+    }).join("");
+  }
+
+  function openCaseCalendarPendingMini(root, shell, employeeId, employeeName) {
+    if (!shell) return;
+    closeCaseCalendarEventMini(shell);
+    closeCaseCalendarPendingMini(shell);
+    var html =
+      '<div class="scm-case-calendar-event-mini scm-case-calendar-pending-mini" data-scm-case-calendar-pending-mini>' +
+      '<div class="scm-case-calendar-event-mini-card scm-case-calendar-pending-card" role="dialog" aria-modal="true" aria-label="Eventos pendientes">' +
+      '<button type="button" class="scm-case-calendar-event-mini-close" data-scm-case-calendar-pending-close aria-label="Cerrar pendientes">&times;</button>' +
+      '<div class="scm-case-calendar-event-mini-head"><span>Eventos pendientes</span><strong>' + escHtml(employeeName || "Funcionario asignado") + '</strong></div>' +
+      '<div class="scm-case-calendar-pending-list" data-scm-case-calendar-pending-list><div class="scm-case-calendar-pending-empty">Cargando pendientes...</div></div>' +
+      "</div>" +
+      "</div>";
+    shell.insertAdjacentHTML("beforeend", html);
+    var mini = shell.querySelector("[data-scm-case-calendar-pending-mini]");
+    var list = mini ? mini.querySelector("[data-scm-case-calendar-pending-list]") : null;
+    if (!mini || !list) return;
+    mini.addEventListener("click", function (event) {
+      if (event.target === mini || (event.target && event.target.closest && event.target.closest("[data-scm-case-calendar-pending-close]"))) {
+        closeCaseCalendarPendingMini(shell);
+        return;
+      }
+      var detailBtn = event.target && event.target.closest ? event.target.closest("[data-scm-case-calendar-pending-detail]") : null;
+      if (detailBtn) {
+        event.preventDefault();
+        var index = parseInt(detailBtn.getAttribute("data-scm-case-calendar-pending-detail") || "-1", 10);
+        var row = shell._scmCaseCalendarPendingRows && shell._scmCaseCalendarPendingRows[index];
+        closeCaseCalendarPendingMini(shell);
+        openCaseCalendarEventMini(root, shell, row);
+      }
+    });
+    if (!employeeId) {
+      list.innerHTML = '<div class="scm-case-calendar-pending-empty">Este caso no tiene funcionario asignado.</div>';
+      return;
+    }
+    calendarApiRequest(root, "listar_pendientes_vencidos", {
+      id_empleado: employeeId,
+    }).then(function (json) {
+      if (!json || !json.success) {
+        throw new Error((json && json.message) || "No se pudieron cargar pendientes.");
+      }
+      var rows = extractCalendarRows(json.data || []);
+      shell._scmCaseCalendarPendingRows = rows;
+      list.innerHTML = renderCaseCalendarPendingRows(rows);
+    }).catch(function (error) {
+      list.innerHTML = '<div class="scm-case-calendar-pending-empty">No se pudieron cargar pendientes.</div>';
+      scmNotify("error", error.message || "No se pudieron cargar pendientes.");
+    });
+  }
+
   function openCalendarCaseMonthPopup(root, employeeId, employeeName, selectedDate) {
     if (!window.Swal || typeof window.Swal.fire !== "function") {
       scmNotify("error", "No se pudo abrir el calendario.");
@@ -1990,6 +2061,7 @@
         '<div class="scm-case-calendar-heading"><span>' + escHtml(employeeName || "Funcionario asignado") + '</span><strong data-scm-case-calendar-title>' + escHtml(caseCalendarMonthTitle(currentMonth)) + '</strong><small>Eventos y festivos de Colombia</small></div>' +
         '<button type="button" class="scm-case-calendar-nav" data-scm-case-calendar-next aria-label="Mes siguiente">&rsaquo;</button>' +
         "</div>" +
+        '<div class="scm-case-calendar-top-actions"><button type="button" class="scm-case-calendar-pending-btn" data-scm-case-calendar-pending>Eventos pendientes</button></div>' +
         '<div class="scm-case-calendar-weekdays"><span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sa</span><span>Do</span></div>' +
         '<div class="scm-case-calendar-grid" data-scm-case-calendar-grid><div class="scm-case-calendar-empty">Cargando calendario...</div></div>' +
         "</div>",
@@ -2010,6 +2082,7 @@
         };
         var prev = popup ? popup.querySelector("[data-scm-case-calendar-prev]") : null;
         var next = popup ? popup.querySelector("[data-scm-case-calendar-next]") : null;
+        var pending = popup ? popup.querySelector("[data-scm-case-calendar-pending]") : null;
         if (prev) {
           prev.addEventListener("click", function () {
             currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
@@ -2020,6 +2093,11 @@
           next.addEventListener("click", function () {
             currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
             render();
+          });
+        }
+        if (pending) {
+          pending.addEventListener("click", function () {
+            openCaseCalendarPendingMini(root, shell, employeeId, employeeName);
           });
         }
         render();

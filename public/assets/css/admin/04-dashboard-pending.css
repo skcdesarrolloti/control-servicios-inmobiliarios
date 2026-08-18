@@ -1608,6 +1608,35 @@
   transform: translateY(-1px);
 }
 
+.swal2-popup .scm-case-calendar-top-actions {
+  align-items: center;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -2px;
+}
+
+.swal2-popup .scm-case-calendar-pending-btn {
+  align-items: center;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  color: #c45a00;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 950;
+  justify-content: center;
+  min-height: 38px;
+  padding: 9px 14px !important;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.swal2-popup .scm-case-calendar-pending-btn:hover {
+  background: #ffedd5;
+  border-color: #fb923c;
+  transform: translateY(-1px);
+}
+
 .swal2-popup .scm-case-calendar-weekdays,
 .swal2-popup .scm-case-calendar-grid {
   display: grid;
@@ -1714,6 +1743,30 @@
   font-size: 11px;
   font-weight: 850;
   line-height: 1.25;
+}
+
+.swal2-popup .scm-case-calendar-day-status {
+  align-items: center;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  color: #c45a00;
+  display: inline-flex;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 950;
+  justify-content: center;
+  line-height: 1;
+  margin-top: 3px;
+  min-height: 18px;
+  padding: 3px 7px !important;
+  width: fit-content;
+}
+
+.swal2-popup .scm-case-calendar-day-status.is-done {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
 }
 
 .swal2-popup .scm-case-calendar-event-detail-btn {
@@ -1996,6 +2049,72 @@
 
 .swal2-popup .scm-case-calendar-complete-panel small.is-error {
   color: #dc2626;
+}
+
+.swal2-popup .scm-case-calendar-pending-card {
+  max-width: 760px;
+  width: min(760px, 100%);
+}
+
+.swal2-popup .scm-case-calendar-pending-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  max-height: 430px;
+  overflow: auto;
+  padding-right: 4px !important;
+}
+
+.swal2-popup .scm-case-calendar-pending-row {
+  background: #fff;
+  border: 1px solid #dbe6f2;
+  border-left: 4px solid #f59e0b;
+  border-radius: 13px;
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px !important;
+}
+
+.swal2-popup .scm-case-calendar-pending-row > div {
+  align-items: flex-start;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.swal2-popup .scm-case-calendar-pending-row strong {
+  color: #10243d;
+  font-size: 14px;
+  font-weight: 950;
+  line-height: 1.25;
+}
+
+.swal2-popup .scm-case-calendar-pending-row span {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 950;
+  padding: 5px 9px !important;
+  white-space: nowrap;
+}
+
+.swal2-popup .scm-case-calendar-pending-row p,
+.swal2-popup .scm-case-calendar-pending-empty {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.swal2-popup .scm-case-calendar-pending-empty {
+  background: #f8fafc;
+  border: 1px dashed #bfdbfe;
+  border-radius: 14px;
+  padding: 18px !important;
+  text-align: center;
 }
 
 .swal2-popup .scm-case-calendar-day-more {
