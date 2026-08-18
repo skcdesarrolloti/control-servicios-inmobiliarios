@@ -360,6 +360,18 @@
     sub.setAttribute("aria-hidden", "true");
   }
 
+  function dispatchCaseActionSaved(root, ticketPk, fromNode) {
+    if (!root || typeof window.CustomEvent !== "function") return;
+    ticketPk = String(ticketPk || "").trim();
+    if (ticketPk) {
+      root.dispatchEvent(new CustomEvent("scm:case-action-saved", {
+        detail: { ticketPk: ticketPk, fromNode: fromNode || root },
+      }));
+      return;
+    }
+    root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+  }
+
   function getCasePropertyCode(caseBtn, fallbackNode) {
     var value = "";
     if (caseBtn && caseBtn.dataset) {
@@ -1955,6 +1967,7 @@
             shell._scmCaseCalendarRender();
           }
           closeCaseCalendarEventMini(shell);
+          dispatchCaseActionSaved(root, ticket, shell);
           if (shell && typeof shell._scmCaseCalendarEventTransferred === "function") {
             shell._scmCaseCalendarEventTransferred({
               eventId: eventId,
@@ -1962,6 +1975,11 @@
               response: json,
               row: row,
             });
+          }
+          if (shell && shell._scmCaseCalendarCloseOnTransferred && window.Swal && typeof window.Swal.close === "function") {
+            window.setTimeout(function () {
+              window.Swal.close();
+            }, 250);
           }
           if (ticket) {
             notifyCalendarAppointment(root, [{
@@ -2233,6 +2251,7 @@
         if (shell) {
           shell._scmCaseCalendarRender = render;
           shell._scmCaseCalendarEventTransferred = typeof options.onEventTransferred === "function" ? options.onEventTransferred : null;
+          shell._scmCaseCalendarCloseOnTransferred = options.closeOnEventTransferred === true;
         }
         var prev = popup ? popup.querySelector("[data-scm-case-calendar-prev]") : null;
         var next = popup ? popup.querySelector("[data-scm-case-calendar-next]") : null;
@@ -2416,6 +2435,7 @@
             caseBtn.dataset.empleado || caseBtn.dataset.asignado || "",
             dateInput ? dateInput.value : "",
             {
+              closeOnEventTransferred: true,
               onEventTransferred: function () {
                 closeCaseSubmodal(modal);
               },
