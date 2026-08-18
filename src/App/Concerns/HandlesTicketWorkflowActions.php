@@ -828,8 +828,13 @@ trait HandlesTicketWorkflowActions
       $args[] = (int) $ticketLookup;
     }
     if ($this->column_exists($table, 'id_ticket')) {
-      $where[] = "CONVERT(TRIM(COALESCE(`id_ticket`, '')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci";
-      $args[] = $ticketLookup;
+      if (ctype_digit($ticketLookup)) {
+        $where[] = 'CAST(`id_ticket` AS UNSIGNED) = ?';
+        $args[] = (int) $ticketLookup;
+      } else {
+        $where[] = "CONVERT(TRIM(COALESCE(`id_ticket`, '')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci";
+        $args[] = $ticketLookup;
+      }
     }
     if (empty($where)) {
       return [];
@@ -863,9 +868,17 @@ trait HandlesTicketWorkflowActions
       return ['name' => '', 'phone' => '', 'id_empleado' => ''];
     }
 
+    if (ctype_digit($lookup)) {
+      $whereSql = "CAST(`{$whereColumn}` AS UNSIGNED) = ?";
+      $whereArgs = [(int) $lookup];
+    } else {
+      $whereSql = "CONVERT(TRIM(COALESCE(`{$whereColumn}`, '')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci";
+      $whereArgs = [$lookup];
+    }
+
     $row = $this->db->getRow(
-      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE CONVERT(TRIM(COALESCE(`{$whereColumn}`, '')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci LIMIT 1",
-      [$lookup]
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE {$whereSql} LIMIT 1",
+      $whereArgs
     );
     if (!is_array($row)) {
       return ['name' => '', 'phone' => '', 'id_empleado' => ''];

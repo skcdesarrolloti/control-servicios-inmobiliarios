@@ -29,8 +29,8 @@ final class SchemaInspector
     $found = $this->db->getVar(
       'SELECT 1
          FROM information_schema.TABLES
-        WHERE CONVERT(TABLE_SCHEMA USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(DATABASE() USING utf8mb4) COLLATE utf8mb4_unicode_ci
-          AND CONVERT(TABLE_NAME USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
         LIMIT 1',
       [$table]
     );
@@ -54,9 +54,9 @@ final class SchemaInspector
     $found = $this->db->getVar(
       'SELECT 1
          FROM information_schema.COLUMNS
-        WHERE CONVERT(TABLE_SCHEMA USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(DATABASE() USING utf8mb4) COLLATE utf8mb4_unicode_ci
-          AND CONVERT(TABLE_NAME USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
-          AND CONVERT(COLUMN_NAME USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND COLUMN_NAME = ?
         LIMIT 1',
       [$table, $column]
     );
@@ -121,7 +121,7 @@ final class SchemaInspector
     $rows = $this->db->getResults(
       'SELECT TABLE_NAME, COLUMN_NAME
          FROM information_schema.COLUMNS
-        WHERE CONVERT(TABLE_SCHEMA USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(DATABASE() USING utf8mb4) COLLATE utf8mb4_unicode_ci
+        WHERE TABLE_SCHEMA = DATABASE()
         ORDER BY TABLE_NAME, ORDINAL_POSITION',
       []
     );
