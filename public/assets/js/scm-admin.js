@@ -1768,14 +1768,24 @@
     return "";
   }
 
+  function caseCalendarEventId(row) {
+    return String((row && (row.id || row._ID || row.event_id || row.id_evento)) || "").trim();
+  }
+
+  function isCaseCalendarEventDone(row) {
+    return normalizeCalendarText((row && row.estado) || "") === "si";
+  }
+
   function closeCaseCalendarEventMini(shell) {
     var current = shell ? shell.querySelector("[data-scm-case-calendar-event-mini]") : null;
     if (current) current.remove();
   }
 
-  function openCaseCalendarEventMini(shell, row) {
+  function openCaseCalendarEventMini(root, shell, row) {
     if (!shell || !row) return;
     closeCaseCalendarEventMini(shell);
+    var eventId = caseCalendarEventId(row);
+    var isDone = isCaseCalendarEventDone(row);
     var title = caseCalendarEventDetailValue(row, ["titulo", "title"]) || "Evento";
     var category = caseCalendarEventDetailValue(row, ["categoria", "nombre_categoria"]);
     var employee = caseCalendarEventDetailValue(row, ["funcionario", "nombre_empleado", "empleado", "nombre"]);
@@ -1796,6 +1806,17 @@
       (location ? '<div class="is-wide"><small>Ubicaci&oacute;n</small><strong>' + escHtml(location) + '</strong></div>' : "") +
       "</div>" +
       (description ? '<div class="scm-case-calendar-event-mini-description"><small>Descripci&oacute;n</small><p>' + escHtml(description).replace(/\n/g, "<br>") + "</p></div>" : "") +
+      '<div class="scm-case-calendar-event-mini-actions" data-scm-case-calendar-mini-actions>' +
+      '<span class="scm-case-calendar-event-state-badge' + (isDone ? " is-done" : "") + '" data-scm-case-calendar-event-state>' + (isDone ? "Realizado" : "Pendiente") + "</span>" +
+      (eventId && !isDone ? '<button type="button" class="scm-case-calendar-complete-btn" data-scm-case-calendar-complete-open>Marcar realizado</button>' : "") +
+      "</div>" +
+      (eventId && !isDone
+        ? '<form class="scm-case-calendar-complete-panel" data-scm-case-calendar-complete-panel hidden autocomplete="off">' +
+          '<label><span>Observaci&oacute;n de realizaci&oacute;n</span><textarea name="observacion" rows="3" required placeholder="Describe qu&eacute; se realiz&oacute; en este evento..."></textarea></label>' +
+          '<div><button type="submit" class="scm-case-calendar-complete-save">Guardar realizado</button><button type="button" class="scm-case-calendar-complete-cancel" data-scm-case-calendar-complete-cancel>Cancelar</button></div>' +
+          '<small data-scm-case-calendar-complete-msg aria-live="polite"></small>' +
+          "</form>"
+        : "") +
       "</div>" +
       "</div>";
     shell.insertAdjacentHTML("beforeend", html);
@@ -1804,8 +1825,72 @@
     mini.addEventListener("click", function (event) {
       if (event.target === mini || (event.target && event.target.closest && event.target.closest("[data-scm-case-calendar-event-mini-close]"))) {
         closeCaseCalendarEventMini(shell);
+        return;
+      }
+      var openBtn = event.target && event.target.closest ? event.target.closest("[data-scm-case-calendar-complete-open]") : null;
+      if (openBtn) {
+        var panel = mini.querySelector("[data-scm-case-calendar-complete-panel]");
+        if (panel) {
+          panel.hidden = false;
+          var textarea = panel.querySelector("textarea");
+          if (textarea) textarea.focus();
+        }
+        return;
+      }
+      if (event.target && event.target.closest && event.target.closest("[data-scm-case-calendar-complete-cancel]")) {
+        var cancelPanel = mini.querySelector("[data-scm-case-calendar-complete-panel]");
+        if (cancelPanel) cancelPanel.hidden = true;
       }
     });
+    var form = mini.querySelector("[data-scm-case-calendar-complete-panel]");
+    if (form && eventId) {
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var msg = form.querySelector("[data-scm-case-calendar-complete-msg]");
+        var saveBtn = form.querySelector("button[type='submit']");
+        var observation = String(new FormData(form).get("observacion") || "").trim();
+        if (!observation) {
+          if (msg) {
+            msg.textContent = "La observación es obligatoria.";
+            msg.classList.add("is-error");
+          }
+          return;
+        }
+        if (saveBtn) saveBtn.disabled = true;
+        if (msg) {
+          msg.textContent = "Guardando cambio...";
+          msg.classList.remove("is-error");
+        }
+        calendarApiRequest(root, "cambiar_estado", {
+          id_evento: eventId,
+          observacion: observation,
+        }).then(function (json) {
+          if (!json || !json.success) {
+            throw new Error((json && json.message) || "No se pudo marcar el evento como realizado.");
+          }
+          row.estado = "Si";
+          var status = mini.querySelector("[data-scm-case-calendar-event-state]");
+          if (status) {
+            status.textContent = "Realizado";
+            status.classList.add("is-done");
+          }
+          var actions = mini.querySelector("[data-scm-case-calendar-mini-actions]");
+          if (actions) {
+            actions.innerHTML = '<span class="scm-case-calendar-event-state-badge is-done">Realizado</span>';
+          }
+          form.hidden = true;
+          scmNotify("success", json.message || "Evento marcado como realizado.", "Calendario");
+        }).catch(function (error) {
+          if (msg) {
+            msg.textContent = error.message || "No se pudo marcar el evento como realizado.";
+            msg.classList.add("is-error");
+          }
+          scmNotify("error", error.message || "No se pudo marcar el evento como realizado.");
+        }).finally(function () {
+          if (saveBtn) saveBtn.disabled = false;
+        });
+      });
+    }
   }
 
   function renderCaseCalendarMonth(root, shell, employeeId, monthDate) {
@@ -1881,7 +1966,7 @@
           event.preventDefault();
           event.stopPropagation();
           var index = parseInt(btn.getAttribute("data-scm-case-calendar-event-detail") || "-1", 10);
-          openCaseCalendarEventMini(shell, shell._scmCaseCalendarEventDetails[index]);
+          openCaseCalendarEventMini(root, shell, shell._scmCaseCalendarEventDetails[index]);
         });
       });
     }).catch(function (error) {
