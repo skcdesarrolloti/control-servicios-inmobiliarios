@@ -643,10 +643,6 @@ trait WorkflowCommandsConcern
     string $newEmpCelular = '',
     string $newEmpId = ''
   ): int {
-    if (!$this->queue instanceof EmailQueue) {
-      return 0;
-    }
-
     $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
     $subject   = 'Traslado del caso — ticket #' . $logicalTicket;
@@ -664,7 +660,7 @@ trait WorkflowCommandsConcern
     ];
 
     // Notificar empleado anterior
-    if ($notifyOldEmp && $oldEmpCorreo !== '' && filter_var($oldEmpCorreo, FILTER_VALIDATE_EMAIL)) {
+    if ($this->queue instanceof EmailQueue && $notifyOldEmp && $oldEmpCorreo !== '' && filter_var($oldEmpCorreo, FILTER_VALIDATE_EMAIL)) {
       $html = EmailTemplate::renderNamed('traslado_caso', array_merge($baseVars, [
         'destinatario'      => EmailTemplate::e($oldEmpNombre ?: 'funcionario'),
         'mensaje_principal' => 'Te informamos que el caso ha sido trasladado a otro funcionario.',
@@ -673,7 +669,7 @@ trait WorkflowCommandsConcern
     }
 
     // Notificar empleado nuevo
-    if ($notifyNewEmp && $newEmpCorreo !== '' && filter_var($newEmpCorreo, FILTER_VALIDATE_EMAIL)) {
+    if ($this->queue instanceof EmailQueue && $notifyNewEmp && $newEmpCorreo !== '' && filter_var($newEmpCorreo, FILTER_VALIDATE_EMAIL)) {
       $html = EmailTemplate::renderNamed('traslado_caso', array_merge($baseVars, [
         'destinatario'      => EmailTemplate::e($newEmpNombre ?: 'funcionario'),
         'mensaje_principal' => 'Se te ha asignado un nuevo caso.',
@@ -683,7 +679,7 @@ trait WorkflowCommandsConcern
 
     // Notificar destinatarios adicionales seleccionados
     $targets = $this->normalizeTargets($notifyTargets);
-    if (!in_array('none', $targets, true) && !empty($targets)) {
+    if ($this->queue instanceof EmailQueue && !in_array('none', $targets, true) && !empty($targets)) {
       $ticketWithNewEmp = array_merge($ticket, [
         'id_empleado'      => $ticket['id_empleado'] ?? '',
         'correo_empleado'  => $newEmpCorreo,
@@ -715,7 +711,8 @@ trait WorkflowCommandsConcern
         $message .= "*Responsable anterior:* {$previousName}\n\n";
         $message .= "Consulta los detalles en el botón.";
 
-        $ok = (new \SCM\Support\SmsQueue($this->db))->enqueue($newEmpCelular, $destinationName, $message, [
+        $smsQueue = new \SCM\Support\SmsQueue($this->db);
+        $ok = $smsQueue->enqueue($newEmpCelular, $destinationName, $message, [
           'source_module' => 'case_transfer_funcionario',
           'campaign_tag' => 'pqr_trasladada_funcionario',
           'categoria_mensaje' => 'informacion',
@@ -747,7 +744,8 @@ trait WorkflowCommandsConcern
           ],
         ]);
         if (!$ok) {
-          error_log('control-servicios-inmobiliarios: no se pudo encolar WhatsApp de traslado del caso #' . $logicalTicket);
+          $detail = trim($smsQueue->lastError());
+          error_log('control-servicios-inmobiliarios: no se pudo encolar WhatsApp de traslado del caso #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : ''));
         }
       } catch (\Throwable $exception) {
         error_log('control-servicios-inmobiliarios: error preparando WhatsApp de traslado del caso #' . $logicalTicket . ': ' . $exception->getMessage());

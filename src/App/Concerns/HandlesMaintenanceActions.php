@@ -423,7 +423,14 @@ trait HandlesMaintenanceActions
 
     $newNombre  = trim((string) ($newEmp['nombre'] ?? ''));
     $newCorreo  = trim((string) ($newEmp['correo'] ?? ''));
-    $newCelular = trim((string) ($newEmp['celular'] ?? ''));
+    $newCelular = '';
+    foreach (['celular', 'celular_empleado', 'telefono', 'whatsapp', 'phone'] as $phoneColumn) {
+      $candidatePhone = trim((string) ($newEmp[$phoneColumn] ?? ''));
+      if ($candidatePhone !== '') {
+        $newCelular = $candidatePhone;
+        break;
+      }
+    }
 
     $nowTs    = time();
     $nowMysql = date('Y-m-d H:i:s', $nowTs);
