@@ -1400,6 +1400,16 @@
               });
             if (popup) {
               popup.addEventListener("click", function (event) {
+                var iframeBtn = event.target && event.target.closest ? event.target.closest("[data-scm-open-iframe]") : null;
+                if (iframeBtn) {
+                  event.preventDefault();
+                  openIframeModal(
+                    iframeBtn.dataset.iframeUrl || "",
+                    iframeBtn.dataset.iframeTitle || "",
+                    iframeBtn.hasAttribute("data-scm-compact-iframe"),
+                  );
+                  return;
+                }
                 var completeBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-complete-event]") : null;
                 if (completeBtn) {
                   event.preventDefault();
