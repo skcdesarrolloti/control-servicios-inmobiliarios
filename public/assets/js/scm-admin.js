@@ -1191,9 +1191,8 @@
         '<label class="scm-seg-field"><span>Nuevo funcionario</span><select name="new_empleado_id" required>' +
         empOptions +
         "</select></label>" +
-        '<fieldset class="scm-notify-targets scm-notify-traslado"><legend>Notificar por correo (empleados)</legend>' +
-        '<label class="scm-seg-check"><input type="checkbox" name="notify_anterior" value="1" checked> Notificar al funcionario anterior</label>' +
-        '<label class="scm-seg-check"><input type="checkbox" name="notify_nuevo" value="1" checked> Notificar al funcionario nuevo</label>' +
+        '<fieldset class="scm-notify-targets scm-notify-traslado"><legend>Notificaci&oacute;n del traslado</legend>' +
+        '<label class="scm-seg-check"><input type="checkbox" name="notify_funcionario" value="1" checked> Notificar al funcionario responsable</label>' +
         "</fieldset>" +
         renderNotifyTargets(["empleado"]) +
         '<div class="scm-seg-actions">' +

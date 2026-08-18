@@ -389,8 +389,8 @@ trait HandlesMaintenanceActions
     $ticketPk    = (int) ($_POST['ticket_pk'] ?? 0);
     $newEmpId    = trim(sanitize_text_field(wp_unslash((string) ($_POST['new_empleado_id'] ?? ''))));
     $notifyTargets = $this->parse_notify_recipients($_POST['notify_recipients'] ?? []);
-    $notifyOldEmp  = !empty($_POST['notify_anterior']);
-    $notifyNewEmp  = !empty($_POST['notify_nuevo']);
+    $notifyOldEmp  = false;
+    $notifyNewEmp  = !empty($_POST['notify_funcionario']) || !empty($_POST['notify_nuevo']);
 
     if ($ticketPk <= 0) {
       $this->jsonFail('Ticket invalido.');
