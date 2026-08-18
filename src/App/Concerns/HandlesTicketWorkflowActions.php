@@ -591,6 +591,7 @@ trait HandlesTicketWorkflowActions
   {
     $this->verifyCsrf();
 
+    try {
     $rawAppointments = stripslashes((string) ($_POST['appointments'] ?? '[]'));
     $appointments = json_decode($rawAppointments, true);
     if (!is_array($appointments)) {
@@ -766,6 +767,24 @@ trait HandlesTicketWorkflowActions
       'skipped' => $skipped,
       'errors' => $errors,
     ]);
+    } catch (\Throwable $exception) {
+      error_log(
+        'control-servicios-inmobiliarios: error preparando WhatsApp de cita: '
+        . $exception->getMessage()
+        . ' in '
+        . $exception->getFile()
+        . ':'
+        . $exception->getLine()
+      );
+      $this->jsonOk([
+        'message' => 'Evento creado, pero no se pudo preparar WhatsApp.',
+        'queued' => 0,
+        'skipped' => 0,
+        'errors' => [
+          'Error preparando WhatsApp: ' . $exception->getMessage(),
+        ],
+      ]);
+    }
   }
 
   /** @return array<string,string> */

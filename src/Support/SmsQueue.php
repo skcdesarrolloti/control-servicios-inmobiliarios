@@ -23,7 +23,14 @@ final class SmsQueue
   public function enqueue(string $phone, string $name, string $message, array $meta = []): bool
   {
     $this->lastError = '';
-    $queue = $this->bridge->queue();
+    try {
+      $queue = $this->bridge->queue();
+    } catch (\Throwable $exception) {
+      $this->lastError = $exception->getMessage();
+      error_log('control-servicios-inmobiliarios: no se pudo iniciar cola WhatsApp: ' . $exception->getMessage());
+      return false;
+    }
+
     if (!$queue instanceof \SharedNotifications\NotificationQueue) {
       $this->lastError = $this->bridge->lastError() ?: 'La cola compartida no esta disponible.';
       return false;
