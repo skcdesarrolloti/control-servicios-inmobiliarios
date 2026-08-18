@@ -1812,7 +1812,7 @@
       "</div>" +
       (eventId && !isDone
         ? '<form class="scm-case-calendar-complete-panel" data-scm-case-calendar-complete-panel hidden autocomplete="off">' +
-          '<label><span>Observaci&oacute;n de realizaci&oacute;n</span><textarea name="observacion" rows="3" required placeholder="Describe qu&eacute; se realiz&oacute; en este evento..."></textarea></label>' +
+          '<label><span>Observaci&oacute;n de realizaci&oacute;n</span><textarea name="observacion" rows="3" required>Realizado</textarea><small>Este texto se guardar&aacute; por defecto. Si tienes informaci&oacute;n adicional, puedes ampliarlo antes de guardar.</small></label>' +
           '<div><button type="submit" class="scm-case-calendar-complete-save">Guardar realizado</button><button type="button" class="scm-case-calendar-complete-cancel" data-scm-case-calendar-complete-cancel>Cancelar</button></div>' +
           '<small data-scm-case-calendar-complete-msg aria-live="polite"></small>' +
           "</form>"

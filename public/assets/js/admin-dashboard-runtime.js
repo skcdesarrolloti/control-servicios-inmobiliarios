@@ -1293,7 +1293,7 @@
           '<strong>' + escHtml(title) + '</strong>' +
           '<span>' + escHtml(formatDateTime(row.fecha_inicio || "")) + (ticket ? " · Ticket #" + escHtml(ticket) : "") + '</span>' +
           '</div>' +
-          '<label class="scm-seg-field scm-calendar-field-full"><span>Observaci&oacute;n de cierre</span><textarea class="textarea textarea-bordered scm-input" name="observacion" rows="4" required placeholder="Describe qu&eacute; se realiz&oacute; en este evento..."></textarea></label>' +
+          '<label class="scm-seg-field scm-calendar-field-full"><span>Observaci&oacute;n de cierre</span><textarea class="textarea textarea-bordered scm-input" name="observacion" rows="4" required>Realizado</textarea><small>Este texto se guardar&aacute; por defecto. Si tienes informaci&oacute;n adicional, puedes ampliarlo antes de guardar.</small></label>' +
           '</form>';
         window.Swal.fire({
           title: "Marcar evento realizado",
