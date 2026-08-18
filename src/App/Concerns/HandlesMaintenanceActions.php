@@ -467,7 +467,9 @@ trait HandlesMaintenanceActions
       $userName,
       $notifyTargets,
       $notifyOldEmp,
-      $notifyNewEmp
+      $notifyNewEmp,
+      $newCelular,
+      $newEmpId
     );
 
     $this->jsonOk([

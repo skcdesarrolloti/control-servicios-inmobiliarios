@@ -1267,6 +1267,18 @@
             window.Swal.showLoading();
             return calendarApi("trasladar_evento", payload).then(function (json) {
               if (!json || !json.success) throw new Error((json && json.message) || "No se pudo trasladar el evento.");
+              if (ticket && payload.es_cita === "si") {
+                json._scmCitaNotificationAppointments = [{
+                  id_ticket: ticket,
+                  id_empleado: getEventEmployeeId(row) || selectedEmployeeFromFilter(),
+                  categoria: categoryName,
+                  titulo: title,
+                  fecha_inicio: payload.fecha_inicio,
+                  fecha_fin: payload.fecha_fin,
+                  ubicacion: String(row.ubicacion || row.lugar || row.direccion || "").trim(),
+                  es_cita: "si",
+                }];
+              }
               return json;
             }).catch(function (err2) {
               window.Swal.showValidationMessage(err2.message || "No se pudo trasladar el evento.");
@@ -1276,6 +1288,10 @@
         }).then(function (result) {
           if (!result.isConfirmed || !result.value) return;
           showToast("success", result.value.message || "Evento trasladado.");
+          if (Array.isArray(result.value._scmCitaNotificationAppointments) && result.value._scmCitaNotificationAppointments.length) {
+            notifyCalendarAppointment(root, result.value._scmCitaNotificationAppointments)
+              .then(showCalendarNotificationResult);
+          }
           loadEvents();
         });
       }

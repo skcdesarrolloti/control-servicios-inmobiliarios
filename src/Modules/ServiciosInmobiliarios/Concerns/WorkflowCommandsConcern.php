@@ -639,7 +639,9 @@ trait WorkflowCommandsConcern
     string $userName,
     array  $notifyTargets = [],
     bool   $notifyOldEmp  = true,
-    bool   $notifyNewEmp  = true
+    bool   $notifyNewEmp  = true,
+    string $newEmpCelular = '',
+    string $newEmpId = ''
   ): int {
     if (!$this->queue instanceof EmailQueue) {
       return 0;
@@ -694,6 +696,61 @@ trait WorkflowCommandsConcern
           'mensaje_principal' => 'Te informamos que el caso ha sido trasladado a un nuevo funcionario.',
         ]));
         $sent += $this->sendMailToUnique($recipient['email'], $subject, $html);
+      }
+    }
+
+    if ($notifyNewEmp && trim($newEmpCelular) !== '') {
+      try {
+        $tipo = $this->firstNonEmpty([
+          $ticket['tipo_pqrs'] ?? '',
+          $ticket['tema_ayuda'] ?? '',
+          $ticket['asunto'] ?? '',
+          'Caso',
+        ]);
+        $destinationName = $newEmpNombre !== '' ? $newEmpNombre : 'Funcionario';
+        $previousName = $oldEmpNombre !== '' ? $oldEmpNombre : 'Sin asignar';
+        $message = "Hola {$destinationName}.\n\n";
+        $message .= "La solicitud #{$logicalTicket} fue trasladada a tu gestión.\n\n";
+        $message .= "*Tipo:* {$tipo}\n";
+        $message .= "*Responsable anterior:* {$previousName}\n\n";
+        $message .= "Consulta los detalles en el botón.";
+
+        $ok = (new \SCM\Support\SmsQueue($this->db))->enqueue($newEmpCelular, $destinationName, $message, [
+          'source_module' => 'case_transfer_funcionario',
+          'campaign_tag' => 'pqr_trasladada_funcionario',
+          'categoria_mensaje' => 'informacion',
+          'id_funcionario' => is_numeric($newEmpId) ? (int) $newEmpId : 0,
+          'id_ticket' => $logicalTicket,
+          'tipo_solicitud' => $tipo,
+          'responsable_anterior' => $previousName,
+          'dedupe_key' => 'pqr_trasladada_funcionario:' . $logicalTicket . ':' . ($newEmpId !== '' ? $newEmpId : $destinationName),
+          'template_name' => 'pqr_trasladada_funcionario_v1',
+          'template_language' => 'es_CO',
+          'template_components' => [
+            [
+              'type' => 'body',
+              'parameters' => [
+                ['type' => 'text', 'text' => $destinationName],
+                ['type' => 'text', 'text' => $logicalTicket],
+                ['type' => 'text', 'text' => $tipo],
+                ['type' => 'text', 'text' => $previousName],
+              ],
+            ],
+            [
+              'type' => 'button',
+              'sub_type' => 'url',
+              'index' => '0',
+              'parameters' => [
+                ['type' => 'text', 'text' => $logicalTicket],
+              ],
+            ],
+          ],
+        ]);
+        if (!$ok) {
+          error_log('control-servicios-inmobiliarios: no se pudo encolar WhatsApp de traslado del caso #' . $logicalTicket);
+        }
+      } catch (\Throwable $exception) {
+        error_log('control-servicios-inmobiliarios: error preparando WhatsApp de traslado del caso #' . $logicalTicket . ': ' . $exception->getMessage());
       }
     }
 
