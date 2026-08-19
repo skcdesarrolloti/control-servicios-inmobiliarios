@@ -1463,13 +1463,20 @@ trait RendersDashboard
     $stats = $service->stats();
     $emailTemplates = $service->emailTemplates();
     $whatsappTemplates = $service->whatsappTemplates();
+    $senderProfile = $service->senderProfile();
     $firstType = (string) array_key_first($types);
     $firstEmailTemplate = is_array(reset($emailTemplates)) ? reset($emailTemplates) : [];
     $defaultEmailSubject = (string) ($firstEmailTemplate['subject'] ?? '');
 
     ob_start();
 ?>
-    <div class="scm-admin-notifications" data-scm-admin-notifications>
+    <div class="scm-admin-notifications"
+      data-scm-admin-notifications
+      data-admin-notif-sms-prefix="<?php echo esc_attr(\SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService::SMS_PREFIX); ?>"
+      data-admin-notif-sender-name="<?php echo esc_attr((string) ($senderProfile['name'] ?? '')); ?>"
+      data-admin-notif-sender-cargo="<?php echo esc_attr((string) ($senderProfile['cargo'] ?? '')); ?>"
+      data-admin-notif-sender-phone="<?php echo esc_attr((string) ($senderProfile['phone'] ?? '')); ?>"
+      data-admin-notif-sender-signature="<?php echo esc_attr((string) ($senderProfile['signature'] ?? '')); ?>">
       <div class="scm-status-topic-head scm-admin-notif-head">
         <div>
           <h3>Notificaciones</h3>
@@ -1605,14 +1612,15 @@ trait RendersDashboard
                 <button type="button" data-admin-notif-insert-var="{{correo}}">{{correo}}</button>
                 <button type="button" data-admin-notif-insert-var="{{celular}}">{{celular}}</button>
                 <button type="button" data-admin-notif-insert-var="{{tipo_actor}}">{{tipo_actor}}</button>
-                <button type="button" data-admin-notif-preview-toggle>Vista previa</button>
+                <button type="button" data-admin-notif-insert-var="{{firma_funcionario}}">Firma</button>
+                <button type="button" data-admin-notif-preview-toggle>Ocultar vista previa</button>
                 <button type="button" data-admin-notif-copy-message>Copiar</button>
                 <button type="button" data-admin-notif-clear-message>Limpiar</button>
               </div>
               <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." required data-admin-notif-message></textarea>
-              <small class="scm-admin-notif-helper">Variables: {{nombre}}, {{correo}}, {{celular}}, {{tipo_actor}}, {{rol_persona}}.</small>
+              <small class="scm-admin-notif-helper">Variables: {{nombre}}, {{correo}}, {{celular}}, {{tipo_actor}}, {{rol_persona}}, {{funcionario}}, {{cargo_funcionario}}, {{celular_funcionario}}, {{firma_funcionario}}.</small>
               <small class="scm-admin-notif-sms-counter" data-admin-notif-sms-counter>0/160 SMS</small>
-              <div class="scm-admin-notif-preview" data-admin-notif-preview hidden></div>
+              <div class="scm-admin-notif-preview" data-admin-notif-preview></div>
             </div>
 
             <div class="scm-admin-notif-template-card" data-admin-notif-whatsapp-template-wrap>

@@ -15,11 +15,14 @@ final class AdministrativeNotificationsService
   public const SOURCE_MODULE = 'admin_notifications';
   public const QUEUE_TABLE = 'skc_notification_queue';
   public const SMS_MAX = 160;
+  public const SMS_PREFIX = 'SKC SuCasa Inmobiliaria ';
   public const DEFAULT_EMAIL_TEMPLATE = 'scm_email_generica_v1';
   public const DEFAULT_WHATSAPP_TEMPLATE = 'scm_notificacion_general_v1';
 
   private Database $db;
   private SchemaInspector $schema;
+  /** @var array{name:string,cargo:string,phone:string,signature:string}|null */
+  private ?array $senderProfile = null;
 
   public function __construct(Database $db)
   {
@@ -140,7 +143,7 @@ final class AdministrativeNotificationsService
         'label' => 'Generica',
         'subject' => 'Informacion importante',
         'description' => 'Plantilla base reutilizable: solo cambia el mensaje escrito por el funcionario.',
-        'body' => "Hola {{nombre}},\n\n{{mensaje}}\n\nAtentamente,\nControl Servicios Inmobiliarios",
+        'body' => "Hola {{nombre}},\n\n{{mensaje}}\n\n{{firma_funcionario}}",
         'source' => 'sistema',
         'message_only' => true,
         'editable_message' => '',
@@ -299,7 +302,7 @@ final class AdministrativeNotificationsService
     if (in_array('email', $channels, true) && $subject === '') {
       throw new \RuntimeException('El asunto es obligatorio para Email.');
     }
-    if (in_array('sms', $channels, true) && mb_strlen($messageText) > self::SMS_MAX) {
+    if (in_array('sms', $channels, true) && mb_strlen(self::SMS_PREFIX . $messageText) > self::SMS_MAX) {
       throw new \RuntimeException('El SMS supera ' . self::SMS_MAX . ' caracteres.');
     }
     if (in_array('whatsapp', $channels, true) && $whatsappTemplateConfig === []) {
@@ -331,6 +334,12 @@ final class AdministrativeNotificationsService
         $resolvedSubject = $this->resolveVariables($subject, $recipient, $config);
         if ($channel === 'email') {
           $resolvedMessage = $this->renderEmailTemplate($emailTemplateConfig, $resolvedMessage, $recipient, $config);
+        } elseif ($channel === 'sms') {
+          $resolvedMessage = self::SMS_PREFIX . $this->plainText($resolvedMessage);
+          if (mb_strlen($resolvedMessage) > self::SMS_MAX) {
+            $invalid++;
+            continue;
+          }
         } else {
           $resolvedMessage = $this->plainText($resolvedMessage);
         }
@@ -744,7 +753,7 @@ final class AdministrativeNotificationsService
     foreach ($rows as $row) {
       $id = (int) ($row['_ID'] ?? 0);
       $label = trim((string) ($row['nombre'] ?? ''));
-      $body = trim((string) ($row['contenido'] ?? ''));
+      $body = $this->normalizeEmailTemplateBody(trim((string) ($row['contenido'] ?? '')));
       if ($id <= 0 || $label === '' || $body === '') {
         continue;
       }
@@ -767,10 +776,28 @@ final class AdministrativeNotificationsService
     return $out;
   }
 
+  private function normalizeEmailTemplateBody(string $body): string
+  {
+    if ($body === '') {
+      return '';
+    }
+
+    $replacements = [
+      "Atentamente,\nControl Servicios Inmobiliarios" => '{{firma_funcionario}}',
+      "Atentamente,\r\nControl Servicios Inmobiliarios" => '{{firma_funcionario}}',
+      "Atentamente,<br>Control Servicios Inmobiliarios" => '{{firma_funcionario}}',
+      "Atentamente,<br />Control Servicios Inmobiliarios" => '{{firma_funcionario}}',
+      "Atentamente,<br/>Control Servicios Inmobiliarios" => '{{firma_funcionario}}',
+      "Atentamente, Control Servicios Inmobiliarios" => '{{firma_funcionario}}',
+    ];
+
+    return strtr($body, $replacements);
+  }
+
   /** @param array<string,mixed> $templateConfig @param array<string,mixed> $config */
   private function renderEmailTemplate(array $templateConfig, string $message, array $recipient, array $config): string
   {
-    $body = trim((string) ($templateConfig['body'] ?? ''));
+    $body = $this->normalizeEmailTemplateBody(trim((string) ($templateConfig['body'] ?? '')));
     if ($body === '') {
       $body = "{{mensaje}}";
     }
@@ -847,14 +874,103 @@ final class AdministrativeNotificationsService
   /** @param array<string,mixed> $config */
   private function resolveVariables(string $template, array $recipient, array $config): string
   {
+    $sender = $this->senderProfile();
     $map = [
       '{{nombre}}' => trim((string) ($recipient['nombre'] ?? '')),
       '{{correo}}' => trim((string) ($recipient['correo'] ?? '')),
       '{{celular}}' => trim((string) ($recipient['celular'] ?? '')),
       '{{tipo_actor}}' => trim((string) ($recipient['tipo_label'] ?? $config['label'] ?? '')),
       '{{rol_persona}}' => trim((string) ($recipient['rol_persona'] ?? $config['role'] ?? '')),
+      '{{funcionario}}' => $sender['name'],
+      '{{cargo_funcionario}}' => $sender['cargo'],
+      '{{celular_funcionario}}' => $sender['phone'],
+      '{{firma_funcionario}}' => $sender['signature'],
     ];
     return strtr($template, $map);
+  }
+
+  /** @return array{name:string,cargo:string,phone:string,signature:string} */
+  public function senderProfile(): array
+  {
+    if ($this->senderProfile !== null) {
+      return $this->senderProfile;
+    }
+
+    $name = trim(Auth::user());
+    $cargo = trim(Auth::userRol());
+    $phone = '';
+    $userId = Auth::userId();
+    $funcTable = $this->db->table('jet_cct_funcionarios');
+    if ($userId > 0 && $this->schema->tableExists($funcTable)) {
+      $select = [];
+      foreach (['nombre', 'rol', 'id_cargo', 'celular', 'celular_empleado', 'telefono', 'whatsapp'] as $column) {
+        if ($this->schema->columnExists($funcTable, $column)) {
+          $select[] = "`{$column}`";
+        }
+      }
+      if ($select !== []) {
+        $row = $this->db->getRow('SELECT ' . implode(', ', $select) . " FROM `{$funcTable}` WHERE `_ID` = ? LIMIT 1", [$userId]) ?: [];
+        $name = trim((string) ($row['nombre'] ?? $name)) ?: $name;
+        $phone = $this->firstNonEmpty([
+          $row['celular'] ?? '',
+          $row['celular_empleado'] ?? '',
+          $row['telefono'] ?? '',
+          $row['whatsapp'] ?? '',
+        ]);
+        $cargoId = trim((string) ($row['id_cargo'] ?? Auth::userCargo()));
+        $cargo = trim((string) ($row['rol'] ?? $cargo)) ?: $cargo;
+        $cargoName = $this->cargoName($cargoId);
+        if ($cargoName !== '') {
+          $cargo = $cargoName;
+        }
+      }
+    }
+
+    if ($name === '') {
+      $name = 'Funcionario';
+    }
+    if ($cargo === '') {
+      $cargo = 'Control Servicios Inmobiliarios';
+    }
+
+    $signatureLines = ['Atentamente,', $name, $cargo];
+    if ($phone !== '') {
+      $signatureLines[] = 'Cel. ' . $phone;
+    }
+
+    $this->senderProfile = [
+      'name' => $name,
+      'cargo' => $cargo,
+      'phone' => $phone,
+      'signature' => implode("\n", $signatureLines),
+    ];
+
+    return $this->senderProfile;
+  }
+
+  private function cargoName(string $cargoId): string
+  {
+    $cargoId = trim($cargoId);
+    if ($cargoId === '') {
+      return '';
+    }
+    $table = $this->db->table('jet_cct_cargos');
+    if (!$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'nombre_cargo')) {
+      return '';
+    }
+    return trim((string) ($this->db->getVar("SELECT TRIM(COALESCE(`nombre_cargo`, '')) FROM `{$table}` WHERE CAST(`_ID` AS CHAR) = ? LIMIT 1", [$cargoId]) ?? ''));
+  }
+
+  /** @param array<int,mixed> $values */
+  private function firstNonEmpty(array $values): string
+  {
+    foreach ($values as $value) {
+      $value = trim((string) $value);
+      if ($value !== '') {
+        return $value;
+      }
+    }
+    return '';
   }
 
   /** @return array<string,mixed> */

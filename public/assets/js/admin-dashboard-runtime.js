@@ -2110,6 +2110,20 @@
         return String(contractStatusSelect.value || "").trim();
       }
 
+      function senderProfile() {
+        var signature = panel.getAttribute("data-admin-notif-sender-signature") || "";
+        return {
+          name: panel.getAttribute("data-admin-notif-sender-name") || "Funcionario",
+          cargo: panel.getAttribute("data-admin-notif-sender-cargo") || "Control Servicios Inmobiliarios",
+          phone: panel.getAttribute("data-admin-notif-sender-phone") || "",
+          signature: signature || "Atentamente,\nFuncionario\nControl Servicios Inmobiliarios",
+        };
+      }
+
+      function smsPrefix() {
+        return panel.getAttribute("data-admin-notif-sms-prefix") || "SKC SuCasa Inmobiliaria ";
+      }
+
       function setLoading(isLoading) {
         panel.classList.toggle("is-loading", !!isLoading);
         if (spinner) {
@@ -2233,30 +2247,134 @@
       }
 
       function previewMessage(value) {
+        var sender = senderProfile();
         return String(value || "")
           .replace(/\{\{nombre\}\}/g, "Nombre del destinatario")
           .replace(/\{\{correo\}\}/g, "correo@ejemplo.com")
           .replace(/\{\{celular\}\}/g, "+573001112233")
           .replace(/\{\{tipo_actor\}\}/g, currentType())
-          .replace(/\{\{rol_persona\}\}/g, "Rol");
+          .replace(/\{\{rol_persona\}\}/g, "Rol")
+          .replace(/\{\{funcionario\}\}/g, sender.name)
+          .replace(/\{\{cargo_funcionario\}\}/g, sender.cargo)
+          .replace(/\{\{celular_funcionario\}\}/g, sender.phone || "Sin celular registrado")
+          .replace(/\{\{firma_funcionario\}\}/g, sender.signature);
+      }
+
+      function stripHtml(value) {
+        var div = document.createElement("div");
+        div.innerHTML = String(value || "").replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
+        return (div.textContent || div.innerText || "").trim();
+      }
+
+      function safePreviewHtml(value) {
+        return String(value || "")
+          .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "")
+          .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, "")
+          .replace(/\s(href|src)\s*=\s*(['"])\s*javascript:[\s\S]*?\2/gi, "");
+      }
+
+      function escapeSelectorValue(value) {
+        if (window.CSS && typeof window.CSS.escape === "function") {
+          return window.CSS.escape(String(value || ""));
+        }
+        return String(value || "").replace(/["\\]/g, "\\$&");
+      }
+
+      function selectedTemplateBody() {
+        if (!emailTemplateSelect) {
+          return "{{mensaje}}";
+        }
+        var option = emailTemplateSelect.options[emailTemplateSelect.selectedIndex];
+        return option ? option.getAttribute("data-preview-template") || "{{mensaje}}" : "{{mensaje}}";
+      }
+
+      function renderEmailPreviewBody() {
+        var rawMessage = messageInput ? String(messageInput.value || "") : "";
+        var template = selectedTemplateBody();
+        var hasSlot = template.indexOf("{{mensaje}}") !== -1 || template.indexOf("{{custom_message}}") !== -1;
+        var body = hasSlot
+          ? template
+              .replace(/\{\{mensaje\}\}/g, rawMessage || "Mensaje escrito por el funcionario.")
+              .replace(/\{\{custom_message\}\}/g, rawMessage || "Mensaje escrito por el funcionario.")
+          : rawMessage || template || "Mensaje escrito por el funcionario.";
+        body = previewMessage(body);
+        if (body === stripHtml(body)) {
+          body = escHtml(body).replace(/\n/g, "<br>");
+        }
+        return safePreviewHtml(body);
+      }
+
+      function renderWhatsappPreviewText() {
+        var rawMessage = messageInput ? String(messageInput.value || "") : "";
+        var name = "Nombre del destinatario";
+        var template = "Hola {{1}}.\n\n{{2}}";
+        if (whatsappTemplateSelect) {
+          var guide = panel.querySelector(
+            '[data-admin-notif-template-guide="' + escapeSelectorValue(whatsappTemplateSelect.value) + '"] p',
+          );
+          if (guide) {
+            template = guide.textContent || template;
+          }
+        }
+        return template
+          .replace(/\{\{1\}\}/g, name)
+          .replace(/\{\{2\}\}/g, previewMessage(rawMessage || "Mensaje escrito por el funcionario."));
       }
 
       function updatePreview() {
         if (!previewEl || !messageInput || previewEl.hidden) {
           return;
         }
-        var text = previewMessage(messageInput.value || "");
-        if (emailTemplateSelect) {
-          var option = emailTemplateSelect.options[emailTemplateSelect.selectedIndex];
-          var template = option ? option.getAttribute("data-preview-template") || "" : "";
-          if (template !== "" && (template.indexOf("{{mensaje}}") !== -1 || template.indexOf("{{custom_message}}") !== -1)) {
-            text = previewMessage(template)
-              .replace(/\{\{mensaje\}\}/g, previewMessage(messageInput.value || "Mensaje escrito por el funcionario."))
-              .replace(/\{\{custom_message\}\}/g, previewMessage(messageInput.value || "Mensaje escrito por el funcionario."));
-          }
+        var channels = Array.prototype.slice.call(
+          panel.querySelectorAll("[data-admin-notif-channel]:checked"),
+        ).map(function (input) {
+          return String(input.value || "");
+        });
+        if (channels.length === 0) {
+          previewEl.innerHTML =
+            '<strong>Vista previa</strong><p>Selecciona al menos un canal para ver el mensaje.</p>';
+          return;
         }
-        previewEl.innerHTML =
-          '<strong>Vista previa</strong><p>' + escHtml(text || "Sin mensaje.") + "</p>";
+        var rawMessage = messageInput ? String(messageInput.value || "") : "";
+        var smsText = smsPrefix() + previewMessage(stripHtml(rawMessage));
+        var smsClass = smsText.length > 160 ? " is-over" : "";
+        var cards = channels.map(function (channel) {
+          if (channel === "email") {
+            return (
+              '<article class="scm-admin-notif-preview-card is-email">' +
+              "<h5>Email / HTML</h5>" +
+              '<div class="scm-admin-notif-email-frame">' +
+              renderEmailPreviewBody() +
+              "</div>" +
+              "</article>"
+            );
+          }
+          if (channel === "sms") {
+            return (
+              '<article class="scm-admin-notif-preview-card is-sms' +
+              smsClass +
+              '">' +
+              "<h5>SMS</h5>" +
+              '<p class="scm-admin-notif-preview-text">' +
+              escHtml(smsText || smsPrefix() + "Mensaje escrito por el funcionario.") +
+              "</p>" +
+              "<small>" +
+              smsText.length +
+              "/160 caracteres incluyendo la marca.</small>" +
+              "</article>"
+            );
+          }
+          return (
+            '<article class="scm-admin-notif-preview-card is-whatsapp">' +
+            "<h5>WhatsApp oficial</h5>" +
+            '<p class="scm-admin-notif-preview-text">' +
+            escHtml(renderWhatsappPreviewText()).replace(/\n/g, "<br>") +
+            "</p>" +
+            "</article>"
+          );
+        }).join("");
+        previewEl.innerHTML = '<strong>Vista previa por canal</strong><div>' + cards + "</div>";
       }
 
       function updateVisibleChecks() {
@@ -2270,11 +2388,12 @@
           return;
         }
         var value = String(messageInput.value || "");
+        var smsText = smsPrefix() + previewMessage(stripHtml(value));
         var smsChecked = !!panel.querySelector(
           '[data-admin-notif-channel][value="sms"]:checked',
         );
-        smsCounter.textContent = value.length + "/160 SMS";
-        smsCounter.classList.toggle("is-over", smsChecked && value.length > 160);
+        smsCounter.textContent = smsText.length + "/160 SMS con marca incluida";
+        smsCounter.classList.toggle("is-over", smsChecked && smsText.length > 160);
       }
 
       function loadRecipients(page) {
@@ -2492,11 +2611,12 @@
           updateSmsCounter();
           updatePreview();
         });
-        panel.querySelector("[data-admin-notif-preview-toggle]")?.addEventListener("click", function () {
+        panel.querySelector("[data-admin-notif-preview-toggle]")?.addEventListener("click", function (event) {
           if (!previewEl) {
             return;
           }
           previewEl.hidden = !previewEl.hidden;
+          event.target.textContent = previewEl.hidden ? "Ver vista previa" : "Ocultar vista previa";
           updatePreview();
         });
         panel.querySelector("[data-admin-notif-copy-message]")?.addEventListener("click", function () {
