@@ -1467,6 +1467,9 @@ trait RendersDashboard
     $firstType = (string) array_key_first($types);
     $firstEmailTemplate = is_array(reset($emailTemplates)) ? reset($emailTemplates) : [];
     $defaultEmailSubject = (string) ($firstEmailTemplate['subject'] ?? '');
+    $emailBannerUrl = function_exists('system_image')
+      ? system_image('banner_sitio_web', 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png')
+      : 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png';
 
     ob_start();
 ?>
@@ -1476,7 +1479,8 @@ trait RendersDashboard
       data-admin-notif-sender-name="<?php echo esc_attr((string) ($senderProfile['name'] ?? '')); ?>"
       data-admin-notif-sender-cargo="<?php echo esc_attr((string) ($senderProfile['cargo'] ?? '')); ?>"
       data-admin-notif-sender-phone="<?php echo esc_attr((string) ($senderProfile['phone'] ?? '')); ?>"
-      data-admin-notif-sender-signature="<?php echo esc_attr((string) ($senderProfile['signature'] ?? '')); ?>">
+      data-admin-notif-sender-signature="<?php echo esc_attr((string) ($senderProfile['signature'] ?? '')); ?>"
+      data-admin-notif-email-banner="<?php echo esc_attr((string) $emailBannerUrl); ?>">
       <div class="scm-status-topic-head scm-admin-notif-head">
         <div>
           <h3>Notificaciones</h3>
@@ -1527,7 +1531,7 @@ trait RendersDashboard
         </form>
       </section>
 
-      <div class="scm-admin-notif-layout">
+      <div class="scm-admin-notif-layout scm-admin-notif-layout--single">
         <section class="scm-admin-notif-card">
           <div class="scm-admin-notif-section-head">
             <div>
@@ -1535,25 +1539,40 @@ trait RendersDashboard
               <h4 data-admin-notif-list-title>Propietarios</h4>
               <p>Selecciona registros visibles o marca el env&iacute;o a todos los resultados filtrados.</p>
             </div>
-            <button type="button" class="scm-case-work-btn" data-admin-notif-select-visible>Seleccionar visibles</button>
+            <div class="scm-admin-notif-section-actions">
+              <button type="button" class="scm-case-work-btn" data-admin-notif-select-visible>Seleccionar visibles</button>
+              <button type="button" class="scm-case-work-btn" data-admin-notif-open-filtered>Enviar a todos los filtrados</button>
+              <button type="button" class="scm-btn-primary btn btn-primary" data-admin-notif-open-composer>Enviar notificaci&oacute;n</button>
+            </div>
           </div>
           <div class="scm-admin-notif-recipients" data-admin-notif-recipients>
             <div class="scm-admin-notif-empty"><strong>Cargando destinatarios...</strong><span>Un momento mientras preparamos la lista.</span></div>
           </div>
           <div class="scm-admin-notif-pagination" data-admin-notif-pagination></div>
         </section>
+      </div>
 
-        <section class="scm-admin-notif-card scm-admin-notif-composer">
+      <div class="scm-admin-notif-modal" data-admin-notif-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-modal-title">
+        <div class="scm-admin-notif-modal-backdrop" aria-hidden="true"></div>
+        <section class="scm-admin-notif-card scm-admin-notif-composer scm-admin-notif-modal-panel">
+          <div class="scm-admin-notif-modal-head">
+            <div>
+              <span class="scm-calendar-action-kicker">Mensaje</span>
+              <h4 id="scm-admin-notif-modal-title">Enviar notificaci&oacute;n</h4>
+              <p>El popup solo se cierra con el bot&oacute;n de cerrar. Si hay texto escrito, pide confirmaci&oacute;n.</p>
+            </div>
+            <button type="button" class="scm-modal-close" data-admin-notif-close-composer aria-label="Cerrar">&times;</button>
+          </div>
           <form data-admin-notif-send autocomplete="off">
             <input type="hidden" name="type" value="<?php echo esc_attr($firstType); ?>" data-admin-notif-send-type>
             <input type="hidden" name="q" value="" data-admin-notif-send-query>
             <input type="hidden" name="contract_status" value="" data-admin-notif-send-contract-status>
 
-            <div class="scm-admin-notif-section-head">
+            <div class="scm-admin-notif-section-head scm-admin-notif-selected-head">
               <div>
-                <span class="scm-calendar-action-kicker">Mensaje</span>
-                <h4>Enviar notificaci&oacute;n</h4>
-                <p><strong data-admin-notif-selected-count>0</strong> seleccionados.</p>
+                <span class="scm-calendar-action-kicker">Destinatarios</span>
+                <h4><strong data-admin-notif-selected-count>0</strong> seleccionados</h4>
+                <p>Escoge canales, plantilla y revisa la vista previa antes de encolar.</p>
               </div>
             </div>
 
@@ -1568,7 +1587,7 @@ trait RendersDashboard
               <span>Enviar a todos los resultados filtrados</span>
             </label>
             <button type="button" class="scm-admin-notif-send-filtered" data-admin-notif-send-filtered>
-              Enviar a todos los filtrados
+              Usar todos los resultados filtrados
             </button>
 
             <div class="scm-admin-notif-template-card" data-admin-notif-email-template-wrap>
@@ -1581,7 +1600,9 @@ trait RendersDashboard
                         data-subject="<?php echo esc_attr((string) ($template['subject'] ?? '')); ?>"
                         data-message="<?php echo esc_attr((string) ($template['editable_message'] ?? $template['body'] ?? '')); ?>"
                         data-preview-template="<?php echo esc_attr((string) ($template['body'] ?? '')); ?>"
-                        data-message-only="<?php echo !empty($template['message_only']) ? '1' : '0'; ?>">
+                        data-message-only="<?php echo !empty($template['message_only']) ? '1' : '0'; ?>"
+                        data-template-html="<?php echo !empty($template['is_html']) ? '1' : '0'; ?>"
+                        data-template-full="<?php echo !empty($template['is_full_document']) ? '1' : '0'; ?>">
                         <?php echo esc_html((string) ($template['label'] ?? $template['name'] ?? 'Plantilla')); ?>
                       </option>
                     <?php endforeach; ?>
@@ -1594,7 +1615,8 @@ trait RendersDashboard
                   <strong><?php echo esc_html((string) ($template['label'] ?? $template['name'] ?? 'Plantilla')); ?></strong>
                   <span>Origen: <?php echo esc_html((string) ($template['source'] ?? 'sistema')); ?></span>
                   <span>Asunto: <?php echo esc_html((string) ($template['subject'] ?? '')); ?></span>
-                  <p><?php echo nl2br(esc_html((string) ($template['body'] ?? ''))); ?></p>
+                  <span>Tipo: <?php echo !empty($template['is_full_document']) ? 'HTML completo con diseno propio' : (!empty($template['message_only']) ? 'Base editable con {{mensaje}}' : 'Contenido editable'); ?></span>
+                  <div class="scm-admin-notif-template-summary"><?php echo esc_html((string) ($template['preview_excerpt'] ?? 'Revisa la vista previa para confirmar el diseno final.')); ?></div>
                   <small><?php echo esc_html((string) ($template['description'] ?? '')); ?></small>
                 </div>
               <?php endforeach; ?>
@@ -1617,7 +1639,7 @@ trait RendersDashboard
                 <button type="button" data-admin-notif-copy-message>Copiar</button>
                 <button type="button" data-admin-notif-clear-message>Limpiar</button>
               </div>
-              <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." required data-admin-notif-message></textarea>
+              <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." data-admin-notif-message></textarea>
               <small class="scm-admin-notif-helper">Variables: {{nombre}}, {{correo}}, {{celular}}, {{tipo_actor}}, {{rol_persona}}, {{funcionario}}, {{cargo_funcionario}}, {{celular_funcionario}}, {{firma_funcionario}}.</small>
               <small class="scm-admin-notif-sms-counter" data-admin-notif-sms-counter>0/160 SMS</small>
               <div class="scm-admin-notif-preview" data-admin-notif-preview></div>

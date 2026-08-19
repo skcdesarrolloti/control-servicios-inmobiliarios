@@ -9,6 +9,13 @@ final class EmailTemplate
   {
     $ticketUrl = trim((string)($vars['ticket_url'] ?? ''));
     $quoteUrl = trim((string)($vars['cotizacion_url'] ?? ''));
+    $bannerUrl = trim((string)($vars['banner_url'] ?? ''));
+    if ($bannerUrl === '' && function_exists('system_image')) {
+      $bannerUrl = (string)system_image('banner_sitio_web', 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png');
+    }
+    if ($bannerUrl === '') {
+      $bannerUrl = 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png';
+    }
     $extraButtons = $vars['buttons'] ?? [];
 
     $buttons = '';
@@ -23,16 +30,22 @@ final class EmailTemplate
     }
 
     return '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>' . self::e($title) . '</title></head>'
-      . '<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">'
-      . '<table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:760px;border:3px solid #ebecec;background:#fff;margin:20px auto;">'
-      . '<tr><td style="background:#f59120;height:14px;font-size:0;line-height:0;">&nbsp;</td></tr>'
-      . '<tr><td style="padding:24px;text-align:center;color:#061d49;">'
-      . '<h3 style="font-size:18px;margin:0 0 18px;">' . self::e($title) . '</h3>'
+      . '<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">'
+      . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f8fafc;">'
+      . '<tr><td align="center" style="padding:28px 12px;">'
+      . '<table role="presentation" width="700" cellpadding="0" cellspacing="0" border="0" style="max-width:700px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 14px 30px rgba(15,23,42,.08);">'
+      . '<tr><td style="padding:0;"><img src="' . self::e($bannerUrl) . '" alt="Su Casa Inmobiliaria" style="display:block;width:100%;height:auto;border:0;"></td></tr>'
+      . '<tr><td style="background:#f59120;height:8px;font-size:0;line-height:0;">&nbsp;</td></tr>'
+      . '<tr><td style="padding:36px 34px;text-align:left;color:#334155;">'
+      . '<h3 style="color:#061d49;font-size:22px;margin:0 0 22px;text-align:center;">' . self::e($title) . '</h3>'
       . $contentHtml
       . ($buttons !== '' ? '<div style="margin-top:20px;">' . $buttons . '</div>' : '')
       . '</td></tr>'
-      . '<tr><td style="background:#f59120;text-align:center;font-weight:600;font-size:16px;padding:16px;color:white;">Una empresa para lograr sus sue&ntilde;os.</td></tr>'
-      . '</table></body></html>';
+      . '<tr><td style="background:#0f172a;text-align:center;font-size:14px;padding:22px 20px;color:#cbd5e1;">'
+      . '<p style="margin:0 0 6px;color:#ffffff;font-weight:700;">Una empresa para lograr sus sue&ntilde;os.</p>'
+      . '<p style="margin:0;color:#94a3b8;">&copy; ' . date('Y') . ' Su Casa Inmobiliaria</p>'
+      . '</td></tr>'
+      . '</table></td></tr></table></body></html>';
   }
 
   /** @param array<string,string> $vars */

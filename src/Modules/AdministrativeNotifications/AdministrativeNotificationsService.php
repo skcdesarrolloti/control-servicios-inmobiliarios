@@ -147,6 +147,9 @@ final class AdministrativeNotificationsService
         'source' => 'sistema',
         'message_only' => true,
         'editable_message' => '',
+        'is_html' => false,
+        'is_full_document' => false,
+        'preview_excerpt' => 'Base corporativa con banner, mensaje editable y firma del funcionario logueado.',
       ],
     ];
 
@@ -293,7 +296,10 @@ final class AdministrativeNotificationsService
     if ($channels === []) {
       throw new \RuntimeException('Selecciona al menos un canal.');
     }
-    if ($messageText === '') {
+    $messageRequired = in_array('sms', $channels, true)
+      || in_array('whatsapp', $channels, true)
+      || $this->emailTemplateNeedsMessage($emailTemplateConfig);
+    if ($messageRequired && $messageText === '') {
       throw new \RuntimeException('El mensaje no puede estar vacio.');
     }
     if (in_array('email', $channels, true) && $subject === '') {
@@ -671,7 +677,7 @@ final class AdministrativeNotificationsService
       'destination' => $destination,
       'destination_name' => $name,
       'subject' => $channel === 'email' ? $subject : '',
-      'message_html' => $channel === 'email' ? EmailTemplate::render($subject, $this->emailContentHtml($message)) : '',
+      'message_html' => $channel === 'email' ? $this->queueEmailHtml($subject, $message) : '',
       'message_text' => trim(html_entity_decode(strip_tags($message), ENT_QUOTES, 'UTF-8')),
       'template_name' => $templateName,
       'template_language' => $templateLanguage,
@@ -758,6 +764,9 @@ final class AdministrativeNotificationsService
         continue;
       }
       $hasMessageSlot = str_contains($body, '{{mensaje}}') || str_contains($body, '{{custom_message}}');
+      $isFullDocument = $this->isFullEmailHtml($body);
+      $plainExcerpt = preg_replace('/\s+/', ' ', $this->plainText($body)) ?? '';
+      $plainExcerpt = trim(mb_substr($plainExcerpt, 0, 220, 'UTF-8'));
       $name = 'tpl_email_' . $id;
       $out[$name] = [
         'name' => $name,
@@ -765,11 +774,14 @@ final class AdministrativeNotificationsService
         'subject' => trim((string) ($row['asunto'] ?? '')),
         'description' => $hasMessageSlot
           ? 'Plantilla guardada con zona editable {{mensaje}}.'
-          : 'Plantilla guardada en el gestor de plantillas.',
+          : ($isFullDocument ? 'Plantilla HTML completa: se usa su diseno guardado y no se pega codigo en el mensaje.' : 'Plantilla guardada en el gestor de plantillas.'),
         'body' => $body,
         'source' => 'jet_cct_plantillas',
         'message_only' => $hasMessageSlot,
-        'editable_message' => $hasMessageSlot ? '' : $body,
+        'editable_message' => ($hasMessageSlot || $isFullDocument) ? '' : $body,
+        'is_html' => $body !== strip_tags($body),
+        'is_full_document' => $isFullDocument,
+        'preview_excerpt' => $plainExcerpt !== '' ? $plainExcerpt : 'Plantilla HTML guardada.',
       ];
     }
 
@@ -802,10 +814,50 @@ final class AdministrativeNotificationsService
       $body = "{{mensaje}}";
     }
     if (!str_contains($body, '{{mensaje}}') && !str_contains($body, '{{custom_message}}')) {
-      return $this->resolveVariables($message, $recipient, $config);
+      if (!empty($templateConfig['is_full_document']) || $this->isFullEmailHtml($body)) {
+        return $this->resolveVariables($body, $recipient, $config);
+      }
+      return $this->resolveVariables($message !== '' ? $message : $body, $recipient, $config);
     }
     $body = str_replace(['{{mensaje}}', '{{custom_message}}'], $message, $body);
     return $this->resolveVariables($body, $recipient, $config);
+  }
+
+  /** @param array<string,mixed> $templateConfig */
+  private function emailTemplateNeedsMessage(array $templateConfig): bool
+  {
+    $body = trim((string) ($templateConfig['body'] ?? ''));
+    if ($body === '') {
+      return true;
+    }
+    if (str_contains($body, '{{mensaje}}') || str_contains($body, '{{custom_message}}')) {
+      return true;
+    }
+    return !(!empty($templateConfig['is_full_document']) || $this->isFullEmailHtml($body));
+  }
+
+  private function queueEmailHtml(string $subject, string $message): string
+  {
+    return $this->isFullEmailHtml($message)
+      ? $this->sanitizeFullEmailHtml($message)
+      : EmailTemplate::render($subject, $this->emailContentHtml($message));
+  }
+
+  private function isFullEmailHtml(string $value): bool
+  {
+    $value = trim($value);
+    if ($value === '') {
+      return false;
+    }
+    return preg_match('/<!doctype\s+html|<html[\s>]|<body[\s>]/i', $value) === 1;
+  }
+
+  private function sanitizeFullEmailHtml(string $value): string
+  {
+    $value = preg_replace('@<(script|iframe|object|embed)[^>]*?>.*?</\\1>@si', '', $value) ?? $value;
+    $value = preg_replace('/\son[a-z]+\s*=\s*(["\']).*?\\1/si', '', $value) ?? $value;
+    $value = preg_replace('/\s(href|src)\s*=\s*(["\'])\s*javascript:[\s\S]*?\\2/si', '', $value) ?? $value;
+    return trim($value);
   }
 
   private function plainText(string $value): string

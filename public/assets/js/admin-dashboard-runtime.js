@@ -2079,6 +2079,10 @@
       var submitBtn = panel.querySelector("[data-admin-notif-submit]");
       var spinner = panel.querySelector("[data-admin-notif-spinner]");
       var resultEl = panel.querySelector("[data-admin-notif-result]");
+      var composerModal = panel.querySelector("[data-admin-notif-modal]");
+      var openComposerBtn = panel.querySelector("[data-admin-notif-open-composer]");
+      var openFilteredBtn = panel.querySelector("[data-admin-notif-open-filtered]");
+      var closeComposerBtn = panel.querySelector("[data-admin-notif-close-composer]");
       if (!searchForm || !sendForm || !typeSelect || !recipientsEl) {
         return Promise.resolve();
       }
@@ -2090,6 +2094,7 @@
 
       var selected = new Set();
       var currentPage = 1;
+      var composerDirty = false;
 
       function currentType() {
         return typeSelect ? String(typeSelect.value || "propietarios") : "propietarios";
@@ -2132,6 +2137,53 @@
         if (submitBtn) {
           submitBtn.disabled = !!isLoading;
         }
+      }
+
+      function markComposerDirty() {
+        composerDirty = true;
+      }
+
+      function openComposer() {
+        if (!composerModal) {
+          return;
+        }
+        composerModal.hidden = false;
+        composerModal.classList.add("is-open");
+        document.body.classList.add("scm-admin-notif-modal-open");
+        syncContext();
+        setTimeout(function () {
+          if (messageInput) {
+            messageInput.focus();
+          }
+        }, 30);
+      }
+
+      function closeComposer(force) {
+        if (!composerModal) {
+          return;
+        }
+        if (!force && composerDirty) {
+          var ok = window.confirm(
+            "Tienes una notificacion en edicion. ¿Cerrar sin enviar?",
+          );
+          if (!ok) {
+            return;
+          }
+        }
+        composerModal.hidden = true;
+        composerModal.classList.remove("is-open");
+        document.body.classList.remove("scm-admin-notif-modal-open");
+      }
+
+      function useAllFilteredAndOpen() {
+        if (allFiltered) {
+          allFiltered.checked = true;
+        }
+        selected.clear();
+        updateVisibleChecks();
+        markComposerDirty();
+        syncContext();
+        openComposer();
       }
 
       function syncContext() {
@@ -2228,20 +2280,27 @@
         var subject = option.getAttribute("data-subject") || "";
         var message = option.getAttribute("data-message") || "";
         var messageOnly = option.getAttribute("data-message-only") === "1";
+        var isFullTemplate = option.getAttribute("data-template-full") === "1";
         if (subjectInput && subject !== "") {
           subjectInput.value = subject;
         }
         if (messageInput) {
-          messageInput.placeholder = messageOnly
+          messageInput.placeholder = isFullTemplate
+            ? "Esta plantilla ya trae un diseno HTML completo. Escribe solo si tambien enviaras SMS o WhatsApp."
+            : messageOnly
             ? "Escribe solo el mensaje que va dentro de la plantilla..."
             : "Edita el contenido de la plantilla...";
         }
-        if (message !== "" || !messageOnly) {
+        if (isFullTemplate) {
+          messageInput.value = "";
+          messageInput.focus();
+        } else if (message !== "" || !messageOnly) {
           messageInput.value = message;
           messageInput.focus();
         } else {
           messageInput.focus();
         }
+        markComposerDirty();
         updateSmsCounter();
         updatePreview();
       }
@@ -2274,6 +2333,14 @@
           .replace(/\s(href|src)\s*=\s*(['"])\s*javascript:[\s\S]*?\2/gi, "");
       }
 
+      function escAttr(value) {
+        return escHtml(value).replace(/"/g, "&quot;");
+      }
+
+      function isFullEmailHtml(value) {
+        return /<!doctype\s+html|<html[\s>]|<body[\s>]/i.test(String(value || ""));
+      }
+
       function escapeSelectorValue(value) {
         if (window.CSS && typeof window.CSS.escape === "function") {
           return window.CSS.escape(String(value || ""));
@@ -2289,20 +2356,56 @@
         return option ? option.getAttribute("data-preview-template") || "{{mensaje}}" : "{{mensaje}}";
       }
 
-      function renderEmailPreviewBody() {
+      function selectedEmailOption() {
+        return emailTemplateSelect ? emailTemplateSelect.options[emailTemplateSelect.selectedIndex] : null;
+      }
+
+      function emailBannerUrl() {
+        return panel.getAttribute("data-admin-notif-email-banner") || "https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png";
+      }
+
+      function wrapEmailPreviewHtml(title, contentHtml) {
+        return (
+          '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>' +
+          escHtml(title || "Notificacion") +
+          '</title></head><body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">' +
+          '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f8fafc;"><tr><td align="center" style="padding:24px 10px;">' +
+          '<table role="presentation" width="700" cellpadding="0" cellspacing="0" border="0" style="max-width:700px;width:100%;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;">' +
+          '<tr><td style="padding:0;"><img src="' +
+          escAttr(emailBannerUrl()) +
+          '" alt="Su Casa Inmobiliaria" style="display:block;width:100%;height:auto;border:0;"></td></tr>' +
+          '<tr><td style="background:#f59120;height:8px;font-size:0;line-height:0;">&nbsp;</td></tr>' +
+          '<tr><td style="padding:34px 30px;text-align:left;color:#334155;">' +
+          '<h3 style="color:#061d49;font-size:22px;margin:0 0 22px;text-align:center;">' +
+          escHtml(title || "Notificacion") +
+          "</h3>" +
+          contentHtml +
+          '</td></tr><tr><td style="background:#0f172a;text-align:center;font-size:14px;padding:22px 20px;color:#cbd5e1;">' +
+          '<p style="margin:0 0 6px;color:#fff;font-weight:700;">Una empresa para lograr sus sue&ntilde;os.</p>' +
+          '<p style="margin:0;color:#94a3b8;">&copy; Su Casa Inmobiliaria</p>' +
+          "</td></tr></table></td></tr></table></body></html>"
+        );
+      }
+
+      function renderEmailPreviewHtml() {
         var rawMessage = messageInput ? String(messageInput.value || "") : "";
         var template = selectedTemplateBody();
         var hasSlot = template.indexOf("{{mensaje}}") !== -1 || template.indexOf("{{custom_message}}") !== -1;
+        var option = selectedEmailOption();
+        var isFullTemplate = !!(option && option.getAttribute("data-template-full") === "1");
         var body = hasSlot
           ? template
               .replace(/\{\{mensaje\}\}/g, rawMessage || "Mensaje escrito por el funcionario.")
               .replace(/\{\{custom_message\}\}/g, rawMessage || "Mensaje escrito por el funcionario.")
-          : rawMessage || template || "Mensaje escrito por el funcionario.";
+          : (isFullTemplate || isFullEmailHtml(template) ? template : rawMessage || template || "Mensaje escrito por el funcionario.");
         body = previewMessage(body);
         if (body === stripHtml(body)) {
           body = escHtml(body).replace(/\n/g, "<br>");
         }
-        return safePreviewHtml(body);
+        body = safePreviewHtml(body);
+        return isFullEmailHtml(body)
+          ? body
+          : wrapEmailPreviewHtml(subjectInput ? subjectInput.value : "Notificacion", body);
       }
 
       function renderWhatsappPreviewText() {
@@ -2341,12 +2444,13 @@
         var smsClass = smsText.length > 160 ? " is-over" : "";
         var cards = channels.map(function (channel) {
           if (channel === "email") {
+            var emailHtml = renderEmailPreviewHtml();
             return (
               '<article class="scm-admin-notif-preview-card is-email">' +
               "<h5>Email / HTML</h5>" +
-              '<div class="scm-admin-notif-email-frame">' +
-              renderEmailPreviewBody() +
-              "</div>" +
+              '<iframe class="scm-admin-notif-email-frame" sandbox srcdoc="' +
+              escAttr(emailHtml) +
+              '"></iframe>' +
               "</article>"
             );
           }
@@ -2447,6 +2551,18 @@
 
       if (!panel.dataset.scmAdminNotificationsEvents) {
         panel.dataset.scmAdminNotificationsEvents = "1";
+
+        if (openComposerBtn) {
+          openComposerBtn.addEventListener("click", openComposer);
+        }
+        if (openFilteredBtn) {
+          openFilteredBtn.addEventListener("click", useAllFilteredAndOpen);
+        }
+        if (closeComposerBtn) {
+          closeComposerBtn.addEventListener("click", function () {
+            closeComposer(false);
+          });
+        }
 
         searchForm.addEventListener("submit", function (event) {
           event.preventDefault();
@@ -2553,19 +2669,7 @@
         }
 
         if (sendFilteredBtn) {
-          sendFilteredBtn.addEventListener("click", function () {
-            if (allFiltered) {
-              allFiltered.checked = true;
-            }
-            selected.clear();
-            updateVisibleChecks();
-            syncContext();
-            if (sendForm.requestSubmit) {
-              sendForm.requestSubmit();
-            } else {
-              submitBtn && submitBtn.click();
-            }
-          });
+          sendFilteredBtn.addEventListener("click", useAllFilteredAndOpen);
         }
 
         if (paginationEl) {
@@ -2582,16 +2686,22 @@
         }
 
         panel.querySelectorAll("[data-admin-notif-channel]").forEach(function (input) {
-          input.addEventListener("change", syncContext);
+          input.addEventListener("change", function () {
+            markComposerDirty();
+            syncContext();
+          });
         });
         if (emailTemplateSelect) {
           emailTemplateSelect.addEventListener("change", function () {
             var option = emailTemplateSelect.options[emailTemplateSelect.selectedIndex];
             if (messageInput && option) {
-              messageInput.placeholder = option.getAttribute("data-message-only") === "1"
+              messageInput.placeholder = option.getAttribute("data-template-full") === "1"
+                ? "Esta plantilla ya trae un diseno HTML completo. Escribe solo si tambien enviaras SMS o WhatsApp."
+                : option.getAttribute("data-message-only") === "1"
                 ? "Escribe solo el mensaje que va dentro de la plantilla..."
                 : "Edita el contenido de la plantilla...";
             }
+            markComposerDirty();
             syncContext();
           });
         }
@@ -2601,6 +2711,7 @@
         panel.querySelectorAll("[data-admin-notif-insert-var]").forEach(function (btn) {
           btn.addEventListener("click", function () {
             insertAtCursor(messageInput, btn.getAttribute("data-admin-notif-insert-var") || "");
+            markComposerDirty();
           });
         });
         panel.querySelector("[data-admin-notif-clear-message]")?.addEventListener("click", function () {
@@ -2608,6 +2719,7 @@
             messageInput.value = "";
             messageInput.focus();
           }
+          markComposerDirty();
           updateSmsCounter();
           updatePreview();
         });
@@ -2636,11 +2748,21 @@
           }
         });
         if (whatsappTemplateSelect) {
-          whatsappTemplateSelect.addEventListener("change", syncContext);
+          whatsappTemplateSelect.addEventListener("change", function () {
+            markComposerDirty();
+            syncContext();
+          });
         }
         if (messageInput) {
           messageInput.addEventListener("input", function () {
+            markComposerDirty();
             updateSmsCounter();
+            updatePreview();
+          });
+        }
+        if (subjectInput) {
+          subjectInput.addEventListener("input", function () {
+            markComposerDirty();
             updatePreview();
           });
         }
@@ -2650,6 +2772,7 @@
               selected.clear();
               updateVisibleChecks();
             }
+            markComposerDirty();
             syncContext();
           });
         }
@@ -2696,6 +2819,7 @@
                 resultEl.textContent = msg;
                 resultEl.classList.remove("is-error");
               }
+              composerDirty = false;
               showToast((data.queued || 0) > 0 ? "success" : "warning", msg);
             })
             .catch(function (err) {
