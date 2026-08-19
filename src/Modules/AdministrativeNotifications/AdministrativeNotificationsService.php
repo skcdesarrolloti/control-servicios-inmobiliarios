@@ -139,6 +139,26 @@ final class AdministrativeNotificationsService
         'button_label' => 'Responder',
         'button_type' => 'quick_reply',
       ],
+      'scm_propietario_arriendo_consignado_v1' => [
+        'name' => 'scm_propietario_arriendo_consignado_v1',
+        'label' => 'Propietario - arriendo consignado',
+        'language' => 'es_CO',
+        'description' => 'Aviso para propietarios cuando el arriendo fue consignado a la cuenta registrada.',
+        'body' => "Buen dia, {{1}}.\n\nLe informamos que el pago del arriendo correspondiente a su inmueble en administracion fue consignado a la cuenta registrada.\n\nDetalle del abono:\n\n{{2}}\n\nAtentamente,\n{{3}}\n\nGracias por elegirnos y confiar en nuestro equipo.",
+        'variables' => ['Nombre del propietario', 'Detalle del pago, inmueble, mes o valor', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'button_label' => 'Responder',
+        'button_type' => 'quick_reply',
+      ],
+      'scm_copropiedad_soportes_pago_v1' => [
+        'name' => 'scm_copropiedad_soportes_pago_v1',
+        'label' => 'Copropiedad - soportes de pago',
+        'language' => 'es_CO',
+        'description' => 'Envio de soportes de pago a copropiedades para verificacion y recibo de caja.',
+        'body' => "Buen dia, {{1}}.\n\nAdjuntamos los soportes de pago correspondientes para su respectiva verificacion.\n\nDetalle de los soportes:\n\n{{2}}\n\nAgradecemos su colaboracion con el envio del recibo de caja correspondiente a estos pagos.\n\nAtentamente,\n{{3}}\n\nGracias por su atencion.",
+        'variables' => ['Nombre de la copropiedad o contacto', 'Mes, inmueble y detalle de los soportes', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'button_label' => 'Responder',
+        'button_type' => 'quick_reply',
+      ],
     ];
   }
 
