@@ -1464,6 +1464,8 @@ trait RendersDashboard
     $emailTemplates = $service->emailTemplates();
     $whatsappTemplates = $service->whatsappTemplates();
     $firstType = (string) array_key_first($types);
+    $firstEmailTemplate = is_array(reset($emailTemplates)) ? reset($emailTemplates) : [];
+    $defaultEmailSubject = (string) ($firstEmailTemplate['subject'] ?? '');
 
     ob_start();
 ?>
@@ -1566,11 +1568,13 @@ trait RendersDashboard
               <div class="scm-admin-notif-template-row">
                 <div class="scm-field">
                   <label for="scm-admin-notif-email-template">Plantilla Email</label>
-                  <select id="scm-admin-notif-email-template" class="select select-bordered select-sm scm-select" data-admin-notif-email-template>
+                  <select id="scm-admin-notif-email-template" name="email_template" class="select select-bordered select-sm scm-select" data-admin-notif-email-template>
                     <?php foreach ($emailTemplates as $template): ?>
                       <option value="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>"
                         data-subject="<?php echo esc_attr((string) ($template['subject'] ?? '')); ?>"
-                        data-message="<?php echo esc_attr((string) ($template['body'] ?? '')); ?>">
+                        data-message="<?php echo esc_attr((string) ($template['editable_message'] ?? $template['body'] ?? '')); ?>"
+                        data-preview-template="<?php echo esc_attr((string) ($template['body'] ?? '')); ?>"
+                        data-message-only="<?php echo !empty($template['message_only']) ? '1' : '0'; ?>">
                         <?php echo esc_html((string) ($template['label'] ?? $template['name'] ?? 'Plantilla')); ?>
                       </option>
                     <?php endforeach; ?>
@@ -1581,6 +1585,7 @@ trait RendersDashboard
               <?php foreach ($emailTemplates as $template): ?>
                 <div class="scm-admin-notif-template-guide" data-admin-notif-email-guide="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>">
                   <strong><?php echo esc_html((string) ($template['label'] ?? $template['name'] ?? 'Plantilla')); ?></strong>
+                  <span>Origen: <?php echo esc_html((string) ($template['source'] ?? 'sistema')); ?></span>
                   <span>Asunto: <?php echo esc_html((string) ($template['subject'] ?? '')); ?></span>
                   <p><?php echo nl2br(esc_html((string) ($template['body'] ?? ''))); ?></p>
                   <small><?php echo esc_html((string) ($template['description'] ?? '')); ?></small>
@@ -1590,7 +1595,7 @@ trait RendersDashboard
 
             <div class="scm-field" data-admin-notif-subject-wrap>
               <label for="scm-admin-notif-subject">Asunto para Email</label>
-              <input id="scm-admin-notif-subject" name="subject" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: Informaci&oacute;n importante" data-admin-notif-subject>
+              <input id="scm-admin-notif-subject" name="subject" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: Informaci&oacute;n importante" value="<?php echo esc_attr($defaultEmailSubject); ?>" data-admin-notif-subject>
             </div>
 
             <div class="scm-field scm-admin-notif-message-field">

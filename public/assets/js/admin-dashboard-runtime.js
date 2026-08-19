@@ -2213,11 +2213,19 @@
         }
         var subject = option.getAttribute("data-subject") || "";
         var message = option.getAttribute("data-message") || "";
+        var messageOnly = option.getAttribute("data-message-only") === "1";
         if (subjectInput && subject !== "") {
           subjectInput.value = subject;
         }
-        if (message !== "") {
+        if (messageInput) {
+          messageInput.placeholder = messageOnly
+            ? "Escribe solo el mensaje que va dentro de la plantilla..."
+            : "Edita el contenido de la plantilla...";
+        }
+        if (message !== "" || !messageOnly) {
           messageInput.value = message;
+          messageInput.focus();
+        } else {
           messageInput.focus();
         }
         updateSmsCounter();
@@ -2238,6 +2246,15 @@
           return;
         }
         var text = previewMessage(messageInput.value || "");
+        if (emailTemplateSelect) {
+          var option = emailTemplateSelect.options[emailTemplateSelect.selectedIndex];
+          var template = option ? option.getAttribute("data-preview-template") || "" : "";
+          if (template !== "" && (template.indexOf("{{mensaje}}") !== -1 || template.indexOf("{{custom_message}}") !== -1)) {
+            text = previewMessage(template)
+              .replace(/\{\{mensaje\}\}/g, previewMessage(messageInput.value || "Mensaje escrito por el funcionario."))
+              .replace(/\{\{custom_message\}\}/g, previewMessage(messageInput.value || "Mensaje escrito por el funcionario."));
+          }
+        }
         previewEl.innerHTML =
           '<strong>Vista previa</strong><p>' + escHtml(text || "Sin mensaje.") + "</p>";
       }
@@ -2449,7 +2466,15 @@
           input.addEventListener("change", syncContext);
         });
         if (emailTemplateSelect) {
-          emailTemplateSelect.addEventListener("change", syncContext);
+          emailTemplateSelect.addEventListener("change", function () {
+            var option = emailTemplateSelect.options[emailTemplateSelect.selectedIndex];
+            if (messageInput && option) {
+              messageInput.placeholder = option.getAttribute("data-message-only") === "1"
+                ? "Escribe solo el mensaje que va dentro de la plantilla..."
+                : "Edita el contenido de la plantilla...";
+            }
+            syncContext();
+          });
         }
         if (applyEmailTemplateBtn) {
           applyEmailTemplateBtn.addEventListener("click", applyEmailTemplate);

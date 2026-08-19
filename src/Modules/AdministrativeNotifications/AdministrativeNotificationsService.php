@@ -6,6 +6,7 @@ namespace SCM\Modules\AdministrativeNotifications;
 
 use SCM\Core\Auth;
 use SCM\Core\Database;
+use SCM\Support\EmailTemplate;
 use SCM\Support\SchemaInspector;
 
 final class AdministrativeNotificationsService
@@ -14,6 +15,7 @@ final class AdministrativeNotificationsService
   public const SOURCE_MODULE = 'admin_notifications';
   public const QUEUE_TABLE = 'skc_notification_queue';
   public const SMS_MAX = 160;
+  public const DEFAULT_EMAIL_TEMPLATE = 'scm_email_generica_v1';
   public const DEFAULT_WHATSAPP_TEMPLATE = 'scm_notificacion_general_v1';
 
   private Database $db;
@@ -129,32 +131,31 @@ final class AdministrativeNotificationsService
     ];
   }
 
-  /** @return array<string,array{name:string,label:string,subject:string,body:string,description:string}> */
+  /** @return array<string,array{name:string,label:string,subject:string,body:string,description:string,source:string,message_only:bool,editable_message:string}> */
   public function emailTemplates(): array
   {
-    return [
-      'scm_email_general_v1' => [
-        'name' => 'scm_email_general_v1',
-        'label' => 'Notificacion general',
+    $templates = [
+      self::DEFAULT_EMAIL_TEMPLATE => [
+        'name' => self::DEFAULT_EMAIL_TEMPLATE,
+        'label' => 'Generica',
         'subject' => 'Informacion importante',
-        'description' => 'Plantilla base para avisos generales por correo.',
-        'body' => "Hola {{nombre}},\n\n[Escribe aqui tu mensaje]\n\nAtentamente,\nControl Servicios Inmobiliarios",
-      ],
-      'scm_email_aviso_v1' => [
-        'name' => 'scm_email_aviso_v1',
-        'label' => 'Aviso informativo',
-        'subject' => 'Aviso de Control Servicios Inmobiliarios',
-        'description' => 'Para comunicar novedades o informacion operativa.',
-        'body' => "Hola {{nombre}},\n\nTe compartimos la siguiente informacion:\n\n[Escribe aqui el aviso]\n\nSi tienes alguna inquietud, responde a este correo.",
-      ],
-      'scm_email_recordatorio_v1' => [
-        'name' => 'scm_email_recordatorio_v1',
-        'label' => 'Recordatorio',
-        'subject' => 'Recordatorio importante',
-        'description' => 'Para recordar pendientes, fechas o gestiones.',
-        'body' => "Hola {{nombre}},\n\nTe recordamos lo siguiente:\n\n[Escribe aqui el recordatorio]\n\nGracias por tu atencion.",
+        'description' => 'Plantilla base reutilizable: solo cambia el mensaje escrito por el funcionario.',
+        'body' => "Hola {{nombre}},\n\n{{mensaje}}\n\nAtentamente,\nControl Servicios Inmobiliarios",
+        'source' => 'sistema',
+        'message_only' => true,
+        'editable_message' => '',
       ],
     ];
+
+    foreach ($this->storedEmailTemplates() as $template) {
+      $name = (string) ($template['name'] ?? '');
+      if ($name === '') {
+        continue;
+      }
+      $templates[$name] = $template;
+    }
+
+    return $templates;
   }
 
   /** @return array{rows:array<int,array<string,mixed>>,total:int,page:int,pages:int,per_page:int,type:string,type_label:string,contract_status:string} */
@@ -272,14 +273,16 @@ final class AdministrativeNotificationsService
    * @param string[] $channels
    * @return array{queued:int,failed:int,invalid:int,filtered:int,selected:int,channels:array<int,string>,type:string}
    */
-  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = ''): array
+  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = ''): array
   {
     $config = $this->typeConfig($type);
     $channels = $this->sanitizeChannels($channels);
     $whatsappTemplateConfig = $this->whatsappTemplateConfig($whatsappTemplate);
+    $emailTemplateConfig = $this->emailTemplateConfig($emailTemplate);
     $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
     $subject = trim($subject);
     $message = trim($message);
+    $messageText = $this->plainText($message);
 
     if ($ids === []) {
       throw new \RuntimeException('Selecciona al menos un destinatario.');
@@ -287,13 +290,16 @@ final class AdministrativeNotificationsService
     if ($channels === []) {
       throw new \RuntimeException('Selecciona al menos un canal.');
     }
-    if ($message === '') {
+    if ($messageText === '') {
       throw new \RuntimeException('El mensaje no puede estar vacio.');
+    }
+    if (in_array('email', $channels, true) && $subject === '') {
+      $subject = trim((string) ($emailTemplateConfig['subject'] ?? ''));
     }
     if (in_array('email', $channels, true) && $subject === '') {
       throw new \RuntimeException('El asunto es obligatorio para Email.');
     }
-    if (in_array('sms', $channels, true) && mb_strlen($message) > self::SMS_MAX) {
+    if (in_array('sms', $channels, true) && mb_strlen($messageText) > self::SMS_MAX) {
       throw new \RuntimeException('El SMS supera ' . self::SMS_MAX . ' caracteres.');
     }
     if (in_array('whatsapp', $channels, true) && $whatsappTemplateConfig === []) {
@@ -323,7 +329,12 @@ final class AdministrativeNotificationsService
         }
         $resolvedMessage = $this->resolveVariables($message, $recipient, $config);
         $resolvedSubject = $this->resolveVariables($subject, $recipient, $config);
-        if ($this->insertQueueRow($channel, $destination, $recipient, $resolvedSubject, $resolvedMessage, $batchId, $whatsappTemplateConfig)) {
+        if ($channel === 'email') {
+          $resolvedMessage = $this->renderEmailTemplate($emailTemplateConfig, $resolvedMessage, $recipient, $config);
+        } else {
+          $resolvedMessage = $this->plainText($resolvedMessage);
+        }
+        if ($this->insertQueueRow($channel, $destination, $recipient, $resolvedSubject, $resolvedMessage, $batchId, $whatsappTemplateConfig, $emailTemplateConfig)) {
           $queued++;
         } else {
           $failed++;
@@ -595,7 +606,7 @@ final class AdministrativeNotificationsService
   }
 
   /** @param array<string,mixed> $whatsappTemplateConfig */
-  private function insertQueueRow(string $channel, string $destination, array $recipient, string $subject, string $message, string $batchId, array $whatsappTemplateConfig = []): bool
+  private function insertQueueRow(string $channel, string $destination, array $recipient, string $subject, string $message, string $batchId, array $whatsappTemplateConfig = [], array $emailTemplateConfig = []): bool
   {
     $now = gmdate('Y-m-d H:i:s');
     $actorId = (int) ($recipient['_ID'] ?? 0);
@@ -626,6 +637,8 @@ final class AdministrativeNotificationsService
           ],
         ],
       ];
+    } elseif ($channel === 'email') {
+      $templateName = trim((string) ($emailTemplateConfig['name'] ?? ''));
     }
     $meta = [
       'admin_notifications' => [
@@ -637,7 +650,8 @@ final class AdministrativeNotificationsService
         'id_funcionario' => Auth::userId(),
         'nombre_funcionario' => Auth::user(),
         'source_module' => self::SOURCE_MODULE,
-        'whatsapp_template' => $templateName,
+        'whatsapp_template' => $channel === 'whatsapp' ? $templateName : '',
+        'email_template' => $channel === 'email' ? $templateName : '',
       ],
     ];
     $data = [
@@ -648,7 +662,7 @@ final class AdministrativeNotificationsService
       'destination' => $destination,
       'destination_name' => $name,
       'subject' => $channel === 'email' ? $subject : '',
-      'message_html' => $channel === 'email' ? nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8')) : '',
+      'message_html' => $channel === 'email' ? EmailTemplate::render($subject, $this->emailContentHtml($message)) : '',
       'message_text' => trim(html_entity_decode(strip_tags($message), ENT_QUOTES, 'UTF-8')),
       'template_name' => $templateName,
       'template_language' => $templateLanguage,
@@ -681,6 +695,107 @@ final class AdministrativeNotificationsService
     }
     $templates = $this->whatsappTemplates();
     return is_array($templates[$templateName] ?? null) ? $templates[$templateName] : [];
+  }
+
+  /** @return array<string,mixed> */
+  private function emailTemplateConfig(string $templateName): array
+  {
+    $templateName = trim($templateName);
+    if ($templateName === '') {
+      $templateName = self::DEFAULT_EMAIL_TEMPLATE;
+    }
+    $templates = $this->emailTemplates();
+    return is_array($templates[$templateName] ?? null) ? $templates[$templateName] : $templates[self::DEFAULT_EMAIL_TEMPLATE];
+  }
+
+  /**
+   * @return array<string,array{name:string,label:string,subject:string,body:string,description:string,source:string,message_only:bool,editable_message:string}>
+   */
+  private function storedEmailTemplates(): array
+  {
+    $table = $this->db->table('jet_cct_plantillas');
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+
+    $columns = array_flip($this->schema->getTableColumns($table));
+    $select = ['_ID'];
+    foreach (['nombre', 'tipo', 'asunto', 'contenido', 'cct_status'] as $column) {
+      if (isset($columns[$column])) {
+        $select[] = $column;
+      }
+    }
+
+    $where = '1=1';
+    $args = [];
+    if (isset($columns['tipo'])) {
+      $where .= " AND LOWER(TRIM(COALESCE(`tipo`, 'email'))) = 'email'";
+    }
+    if (isset($columns['cct_status'])) {
+      $where .= " AND LOWER(TRIM(COALESCE(`cct_status`, 'publish'))) <> 'trash'";
+    }
+
+    $rows = $this->db->getResults(
+      'SELECT `' . implode('`, `', $select) . "` FROM `{$table}` WHERE {$where} ORDER BY `_ID` DESC LIMIT 200",
+      $args
+    );
+
+    $out = [];
+    foreach ($rows as $row) {
+      $id = (int) ($row['_ID'] ?? 0);
+      $label = trim((string) ($row['nombre'] ?? ''));
+      $body = trim((string) ($row['contenido'] ?? ''));
+      if ($id <= 0 || $label === '' || $body === '') {
+        continue;
+      }
+      $hasMessageSlot = str_contains($body, '{{mensaje}}') || str_contains($body, '{{custom_message}}');
+      $name = 'tpl_email_' . $id;
+      $out[$name] = [
+        'name' => $name,
+        'label' => $label,
+        'subject' => trim((string) ($row['asunto'] ?? '')),
+        'description' => $hasMessageSlot
+          ? 'Plantilla guardada con zona editable {{mensaje}}.'
+          : 'Plantilla guardada en el gestor de plantillas.',
+        'body' => $body,
+        'source' => 'jet_cct_plantillas',
+        'message_only' => $hasMessageSlot,
+        'editable_message' => $hasMessageSlot ? '' : $body,
+      ];
+    }
+
+    return $out;
+  }
+
+  /** @param array<string,mixed> $templateConfig @param array<string,mixed> $config */
+  private function renderEmailTemplate(array $templateConfig, string $message, array $recipient, array $config): string
+  {
+    $body = trim((string) ($templateConfig['body'] ?? ''));
+    if ($body === '') {
+      $body = "{{mensaje}}";
+    }
+    if (!str_contains($body, '{{mensaje}}') && !str_contains($body, '{{custom_message}}')) {
+      return $this->resolveVariables($message, $recipient, $config);
+    }
+    $body = str_replace(['{{mensaje}}', '{{custom_message}}'], $message, $body);
+    return $this->resolveVariables($body, $recipient, $config);
+  }
+
+  private function plainText(string $value): string
+  {
+    return trim(html_entity_decode(wp_strip_all_tags($value, false), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+  }
+
+  private function emailContentHtml(string $value): string
+  {
+    $value = trim($value);
+    if ($value === '') {
+      return '';
+    }
+    if ($value !== strip_tags($value)) {
+      return wp_kses_post($value);
+    }
+    return nl2br(htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
   }
 
   /** @return string[] */

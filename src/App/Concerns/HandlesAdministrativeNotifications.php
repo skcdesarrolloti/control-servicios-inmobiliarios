@@ -64,11 +64,12 @@ trait HandlesAdministrativeNotifications
       : array_map('intval', is_array($rawIds) ? $rawIds : [$rawIds]);
 
     $subject = trim(sanitize_text_field(wp_unslash((string) ($_POST['subject'] ?? ''))));
-    $message = trim(wp_strip_all_tags(wp_unslash((string) ($_POST['message'] ?? '')), false));
+    $message = trim(wp_kses_post(wp_unslash((string) ($_POST['message'] ?? ''))));
     $whatsappTemplate = sanitize_key((string) ($_POST['whatsapp_template'] ?? ''));
+    $emailTemplate = sanitize_key((string) ($_POST['email_template'] ?? ''));
 
     try {
-      $result = $service->enqueue($type, $ids, $channels, $subject, $message, $whatsappTemplate);
+      $result = $service->enqueue($type, $ids, $channels, $subject, $message, $whatsappTemplate, $emailTemplate);
       $queued = (int) ($result['queued'] ?? 0);
       $invalid = (int) ($result['invalid'] ?? 0);
       $failed = (int) ($result['failed'] ?? 0);
