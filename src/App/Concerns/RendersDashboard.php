@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
+use SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService;
 
 trait RendersDashboard
 {
@@ -125,6 +126,10 @@ trait RendersDashboard
       'calendario' => 'scm-panel-calendario-actividades',
       'agenda' => 'scm-panel-calendario-actividades',
       'scm-panel-calendario-actividades' => 'scm-panel-calendario-actividades',
+      'notificaciones' => 'scm-panel-admin-notificaciones',
+      'notificaciones-administrativas' => 'scm-panel-admin-notificaciones',
+      'notificaciones_administrativas' => 'scm-panel-admin-notificaciones',
+      'scm-panel-admin-notificaciones' => 'scm-panel-admin-notificaciones',
       'actividades_administrativas' => 'scm-panel-actividades-administrativas',
       'actividades-administrativas' => 'scm-panel-actividades-administrativas',
       'actividades administrativas' => 'scm-panel-actividades-administrativas',
@@ -149,6 +154,10 @@ trait RendersDashboard
       'calendario_actividades' => [
         'panel' => 'scm-panel-calendario-actividades',
         'label' => $dashboardPermissionTabs['calendario_actividades'] ?? 'Calendario',
+      ],
+      'notificaciones' => [
+        'panel' => 'scm-panel-admin-notificaciones',
+        'label' => $dashboardPermissionTabs['notificaciones'] ?? 'Notificaciones',
       ],
       'cotizaciones_mantenimiento' => [
         'panel' => 'scm-panel-cotizaciones-mantenimiento',
@@ -300,6 +309,8 @@ trait RendersDashboard
         'dashboard_permissions_read' => self::AJAX_DASHBOARD_PERMISSIONS_READ,
         'dashboard_permissions_save' => self::AJAX_DASHBOARD_PERMISSIONS_SAVE,
         'calendar_cita_notify' => self::AJAX_CALENDAR_CITA_NOTIFY,
+        'admin_notifications_recipients' => self::AJAX_ADMIN_NOTIFICATIONS_RECIPIENTS,
+        'admin_notifications_send' => self::AJAX_ADMIN_NOTIFICATIONS_SEND,
         // Guía
         'guide_gcd_read' => self::AJAX_GUIDE_GCD_READ,
         'guide_gcd_save' => self::AJAX_GUIDE_GCD_SAVE,
@@ -729,6 +740,12 @@ trait RendersDashboard
             </div>
           <?php endif; ?>
 
+          <?php if (in_array('notificaciones', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'notificaciones' ? ' active' : ''; ?>" id="scm-panel-admin-notificaciones" data-permission-tab="notificaciones" data-admin-activity-panel="notificaciones">
+              <?php echo $this->render_admin_notifications_panel(); ?>
+            </div>
+          <?php endif; ?>
+
           <?php if (in_array('cotizaciones_mantenimiento', $allowedAdministrativeActivityTabs, true)): ?>
             <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'cotizaciones_mantenimiento' ? ' active' : ''; ?>" id="scm-panel-cotizaciones-mantenimiento" data-permission-tab="cotizaciones_mantenimiento" data-admin-activity-panel="cotizaciones_mantenimiento">
               <?php echo $this->render_cotizaciones_mantenimiento_panel($cotizacionesResult, $cotizacionesParams); ?>
@@ -993,6 +1010,7 @@ trait RendersDashboard
     $activityPermissionKeys = [
       'cotizaciones_mantenimiento',
       'calendario_actividades',
+      'notificaciones',
       'preventivas_pendientes',
       'servicios_publicos_pendientes',
       'reportes_administrativos_pendientes',
@@ -1436,6 +1454,122 @@ trait RendersDashboard
       ];
     }
     return $out;
+  }
+
+  private function render_admin_notifications_panel(): string
+  {
+    $service = new AdministrativeNotificationsService($this->db);
+    $types = $service->types();
+    $stats = $service->stats();
+    $firstType = (string) array_key_first($types);
+
+    ob_start();
+?>
+    <div class="scm-admin-notifications" data-scm-admin-notifications>
+      <div class="scm-status-topic-head scm-admin-notif-head">
+        <div>
+          <h3>Notificaciones</h3>
+          <p>Busca destinatarios y encola mensajes por Email, SMS o WhatsApp sin crear campa&ntilde;as.</p>
+        </div>
+        <span class="scm-status-count"><strong data-admin-notif-total>0</strong> destinatarios</span>
+      </div>
+
+      <div class="scm-admin-notif-stats" aria-label="Resumen de destinatarios">
+        <?php foreach ($types as $typeKey => $typeDef): $typeStats = $stats[$typeKey] ?? ['total' => 0, 'email' => 0, 'phone' => 0]; ?>
+          <button type="button" class="scm-admin-notif-stat<?php echo $typeKey === $firstType ? ' active' : ''; ?>" data-admin-notif-type-shortcut="<?php echo esc_attr((string) $typeKey); ?>">
+            <span><?php echo esc_html((string) ($typeDef['label'] ?? $typeKey)); ?></span>
+            <strong><?php echo esc_html((string) ($typeStats['total'] ?? 0)); ?></strong>
+            <small><?php echo esc_html((string) ($typeStats['email'] ?? 0)); ?> email · <?php echo esc_html((string) ($typeStats['phone'] ?? 0)); ?> celular</small>
+          </button>
+        <?php endforeach; ?>
+      </div>
+
+      <section class="scm-admin-notif-card scm-admin-notif-filter-card">
+        <form data-admin-notif-search autocomplete="off">
+          <div class="scm-admin-notif-filter-grid">
+            <div class="scm-field">
+              <label for="scm-admin-notif-type">Destinatarios</label>
+              <select id="scm-admin-notif-type" name="type" class="select select-bordered select-sm scm-select" data-admin-notif-type>
+                <?php foreach ($types as $typeKey => $typeDef): ?>
+                  <option value="<?php echo esc_attr((string) $typeKey); ?>"><?php echo esc_html((string) ($typeDef['label'] ?? $typeKey)); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="scm-field scm-admin-notif-search-field">
+              <label for="scm-admin-notif-q">Buscar</label>
+              <input id="scm-admin-notif-q" name="q" type="search" class="input input-bordered input-sm scm-input" placeholder="Nombre, correo, celular, documento..." data-admin-notif-query>
+            </div>
+            <div class="scm-admin-notif-filter-actions">
+              <button type="submit" class="scm-btn-primary btn btn-primary">Buscar</button>
+              <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-clear>Limpiar</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <div class="scm-admin-notif-layout">
+        <section class="scm-admin-notif-card">
+          <div class="scm-admin-notif-section-head">
+            <div>
+              <span class="scm-calendar-action-kicker">Lista de contactos</span>
+              <h4 data-admin-notif-list-title>Propietarios</h4>
+              <p>Selecciona registros visibles o marca el env&iacute;o a todos los resultados filtrados.</p>
+            </div>
+            <button type="button" class="scm-case-work-btn" data-admin-notif-select-visible>Seleccionar visibles</button>
+          </div>
+          <div class="scm-admin-notif-recipients" data-admin-notif-recipients>
+            <div class="scm-admin-notif-empty"><strong>Cargando destinatarios...</strong><span>Un momento mientras preparamos la lista.</span></div>
+          </div>
+          <div class="scm-admin-notif-pagination" data-admin-notif-pagination></div>
+        </section>
+
+        <section class="scm-admin-notif-card scm-admin-notif-composer">
+          <form data-admin-notif-send autocomplete="off">
+            <input type="hidden" name="type" value="<?php echo esc_attr($firstType); ?>" data-admin-notif-send-type>
+            <input type="hidden" name="q" value="" data-admin-notif-send-query>
+
+            <div class="scm-admin-notif-section-head">
+              <div>
+                <span class="scm-calendar-action-kicker">Mensaje</span>
+                <h4>Enviar notificaci&oacute;n</h4>
+                <p><strong data-admin-notif-selected-count>0</strong> seleccionados.</p>
+              </div>
+            </div>
+
+            <div class="scm-admin-notif-channel-group" role="group" aria-label="Canales">
+              <label><input type="checkbox" name="channels[]" value="email" data-admin-notif-channel checked> Email</label>
+              <label><input type="checkbox" name="channels[]" value="sms" data-admin-notif-channel> SMS</label>
+              <label><input type="checkbox" name="channels[]" value="whatsapp" data-admin-notif-channel> WhatsApp</label>
+            </div>
+
+            <label class="scm-admin-notif-all">
+              <input type="checkbox" name="all_filtered" value="1" data-admin-notif-all-filtered>
+              <span>Enviar a todos los resultados filtrados</span>
+            </label>
+
+            <div class="scm-field" data-admin-notif-subject-wrap>
+              <label for="scm-admin-notif-subject">Asunto para Email</label>
+              <input id="scm-admin-notif-subject" name="subject" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: Informaci&oacute;n importante">
+            </div>
+
+            <div class="scm-field">
+              <label for="scm-admin-notif-message">Mensaje</label>
+              <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." required data-admin-notif-message></textarea>
+              <small class="scm-admin-notif-helper">Variables: {{nombre}}, {{correo}}, {{celular}}, {{tipo_actor}}, {{rol_persona}}.</small>
+              <small class="scm-admin-notif-sms-counter" data-admin-notif-sms-counter>0/160 SMS</small>
+            </div>
+
+            <div class="scm-admin-notif-submit-row">
+              <span class="scm-spinner" data-admin-notif-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
+              <button type="submit" class="scm-btn-primary btn btn-primary" data-admin-notif-submit>Encolar notificaci&oacute;n</button>
+            </div>
+            <p class="scm-admin-notif-result" data-admin-notif-result aria-live="polite"></p>
+          </form>
+        </section>
+      </div>
+    </div>
+<?php
+    return (string) ob_get_clean();
   }
 
   private function render_cotizaciones_mantenimiento_panel(array $result, array $params): string

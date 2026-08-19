@@ -151,6 +151,9 @@
       actions.dashboard_permissions_read || "";
     var actionDashboardPermissionsSave =
       actions.dashboard_permissions_save || "";
+    var actionAdminNotificationsRecipients =
+      actions.admin_notifications_recipients || "";
+    var actionAdminNotificationsSend = actions.admin_notifications_send || "";
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
     ).replace(/\/+$/, "");
@@ -2041,6 +2044,340 @@
       scmNotify(type, message);
     }
 
+    function initAdminNotificationsPanel(forceReload) {
+      var panel = root.querySelector("[data-scm-admin-notifications]");
+      if (!panel || !actionAdminNotificationsRecipients || !actionAdminNotificationsSend) {
+        return Promise.resolve();
+      }
+      var searchForm = panel.querySelector("[data-admin-notif-search]");
+      var sendForm = panel.querySelector("[data-admin-notif-send]");
+      var typeSelect = panel.querySelector("[data-admin-notif-type]");
+      var queryInput = panel.querySelector("[data-admin-notif-query]");
+      var sendType = panel.querySelector("[data-admin-notif-send-type]");
+      var sendQuery = panel.querySelector("[data-admin-notif-send-query]");
+      var recipientsEl = panel.querySelector("[data-admin-notif-recipients]");
+      var paginationEl = panel.querySelector("[data-admin-notif-pagination]");
+      var totalEl = panel.querySelector("[data-admin-notif-total]");
+      var listTitle = panel.querySelector("[data-admin-notif-list-title]");
+      var selectedCountEl = panel.querySelector("[data-admin-notif-selected-count]");
+      var selectVisibleBtn = panel.querySelector("[data-admin-notif-select-visible]");
+      var allFiltered = panel.querySelector("[data-admin-notif-all-filtered]");
+      var subjectWrap = panel.querySelector("[data-admin-notif-subject-wrap]");
+      var messageInput = panel.querySelector("[data-admin-notif-message]");
+      var smsCounter = panel.querySelector("[data-admin-notif-sms-counter]");
+      var submitBtn = panel.querySelector("[data-admin-notif-submit]");
+      var spinner = panel.querySelector("[data-admin-notif-spinner]");
+      var resultEl = panel.querySelector("[data-admin-notif-result]");
+      if (!searchForm || !sendForm || !typeSelect || !recipientsEl) {
+        return Promise.resolve();
+      }
+
+      if (panel.dataset.scmAdminNotificationsInit === "1" && !forceReload) {
+        return Promise.resolve();
+      }
+      panel.dataset.scmAdminNotificationsInit = "1";
+
+      var selected = new Set();
+      var currentPage = 1;
+
+      function currentType() {
+        return typeSelect ? String(typeSelect.value || "propietarios") : "propietarios";
+      }
+
+      function currentQuery() {
+        return queryInput ? String(queryInput.value || "").trim() : "";
+      }
+
+      function setLoading(isLoading) {
+        panel.classList.toggle("is-loading", !!isLoading);
+        if (spinner) {
+          spinner.classList.toggle("active", !!isLoading);
+        }
+        if (submitBtn) {
+          submitBtn.disabled = !!isLoading;
+        }
+      }
+
+      function syncContext() {
+        if (sendType) {
+          sendType.value = currentType();
+        }
+        if (sendQuery) {
+          sendQuery.value = currentQuery();
+        }
+        if (selectedCountEl) {
+          selectedCountEl.textContent =
+            allFiltered && allFiltered.checked
+              ? String(totalEl ? totalEl.textContent || "todos" : "todos")
+              : String(selected.size);
+        }
+        panel.querySelectorAll("[data-admin-notif-type-shortcut]").forEach(function (btn) {
+          btn.classList.toggle(
+            "active",
+            btn.getAttribute("data-admin-notif-type-shortcut") === currentType(),
+          );
+        });
+        if (subjectWrap) {
+          var emailChecked = !!panel.querySelector(
+            '[data-admin-notif-channel][value="email"]:checked',
+          );
+          subjectWrap.style.display = emailChecked ? "" : "none";
+        }
+        updateSmsCounter();
+      }
+
+      function updateVisibleChecks() {
+        recipientsEl.querySelectorAll("[data-admin-notif-recipient]").forEach(function (input) {
+          input.checked = selected.has(String(input.value || ""));
+        });
+      }
+
+      function updateSmsCounter() {
+        if (!smsCounter || !messageInput) {
+          return;
+        }
+        var value = String(messageInput.value || "");
+        var smsChecked = !!panel.querySelector(
+          '[data-admin-notif-channel][value="sms"]:checked',
+        );
+        smsCounter.textContent = value.length + "/160 SMS";
+        smsCounter.classList.toggle("is-over", smsChecked && value.length > 160);
+      }
+
+      function loadRecipients(page) {
+        currentPage = page || 1;
+        var fd = new FormData();
+        fd.append("action", actionAdminNotificationsRecipients);
+        fd.append("nonce", nonce);
+        fd.append("type", currentType());
+        fd.append("q", currentQuery());
+        fd.append("page", String(currentPage));
+        recipientsEl.innerHTML =
+          '<div class="scm-admin-notif-empty"><strong>Cargando destinatarios...</strong><span>Un momento mientras actualizamos la lista.</span></div>';
+        setLoading(true);
+        return fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (response) {
+            return response.json();
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error(
+                (json && json.data && json.data.message) ||
+                  "No se pudieron cargar los destinatarios.",
+              );
+            }
+            var data = json.data || {};
+            recipientsEl.innerHTML = data.html || "";
+            if (paginationEl) {
+              paginationEl.innerHTML = data.pagination || "";
+            }
+            if (totalEl) {
+              totalEl.textContent = String(data.total || 0);
+            }
+            if (listTitle) {
+              listTitle.textContent = data.type_label || typeSelect.options[typeSelect.selectedIndex].text || "";
+            }
+            updateVisibleChecks();
+            syncContext();
+          })
+          .catch(function (err) {
+            recipientsEl.innerHTML =
+              '<div class="scm-admin-notif-empty is-error"><strong>No se pudo cargar.</strong><span>' +
+              escHtml(err.message || "Error desconocido") +
+              "</span></div>";
+            showToast("error", err.message || "No se pudieron cargar los destinatarios.");
+          })
+          .finally(function () {
+            setLoading(false);
+          });
+      }
+
+      if (!panel.dataset.scmAdminNotificationsEvents) {
+        panel.dataset.scmAdminNotificationsEvents = "1";
+
+        searchForm.addEventListener("submit", function (event) {
+          event.preventDefault();
+          selected.clear();
+          if (allFiltered) {
+            allFiltered.checked = false;
+          }
+          syncContext();
+          loadRecipients(1);
+        });
+
+        panel.querySelector("[data-admin-notif-clear]")?.addEventListener("click", function () {
+          if (queryInput) {
+            queryInput.value = "";
+          }
+          selected.clear();
+          if (allFiltered) {
+            allFiltered.checked = false;
+          }
+          syncContext();
+          loadRecipients(1);
+        });
+
+        typeSelect.addEventListener("change", function () {
+          selected.clear();
+          if (allFiltered) {
+            allFiltered.checked = false;
+          }
+          syncContext();
+          loadRecipients(1);
+        });
+
+        panel.querySelectorAll("[data-admin-notif-type-shortcut]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var nextType = btn.getAttribute("data-admin-notif-type-shortcut") || "";
+            if (!nextType || !typeSelect) {
+              return;
+            }
+            typeSelect.value = nextType;
+            selected.clear();
+            if (allFiltered) {
+              allFiltered.checked = false;
+            }
+            syncContext();
+            loadRecipients(1);
+          });
+        });
+
+        recipientsEl.addEventListener("change", function (event) {
+          var input = event.target && event.target.closest
+            ? event.target.closest("[data-admin-notif-recipient]")
+            : null;
+          if (!input) {
+            return;
+          }
+          var value = String(input.value || "");
+          if (input.checked) {
+            selected.add(value);
+          } else {
+            selected.delete(value);
+          }
+          if (allFiltered && selected.size > 0) {
+            allFiltered.checked = false;
+          }
+          syncContext();
+        });
+
+        if (selectVisibleBtn) {
+          selectVisibleBtn.addEventListener("click", function () {
+            var visible = Array.prototype.slice.call(
+              recipientsEl.querySelectorAll("[data-admin-notif-recipient]"),
+            );
+            var shouldSelect = visible.some(function (input) {
+              return !input.checked;
+            });
+            visible.forEach(function (input) {
+              input.checked = shouldSelect;
+              var value = String(input.value || "");
+              if (shouldSelect) {
+                selected.add(value);
+              } else {
+                selected.delete(value);
+              }
+            });
+            if (allFiltered && selected.size > 0) {
+              allFiltered.checked = false;
+            }
+            syncContext();
+          });
+        }
+
+        if (paginationEl) {
+          paginationEl.addEventListener("click", function (event) {
+            var btn = event.target && event.target.closest
+              ? event.target.closest("[data-admin-notif-page]")
+              : null;
+            if (!btn || btn.disabled) {
+              return;
+            }
+            event.preventDefault();
+            loadRecipients(parseInt(btn.getAttribute("data-admin-notif-page") || "1", 10));
+          });
+        }
+
+        panel.querySelectorAll("[data-admin-notif-channel]").forEach(function (input) {
+          input.addEventListener("change", syncContext);
+        });
+        if (messageInput) {
+          messageInput.addEventListener("input", updateSmsCounter);
+        }
+        if (allFiltered) {
+          allFiltered.addEventListener("change", function () {
+            if (allFiltered.checked) {
+              selected.clear();
+              updateVisibleChecks();
+            }
+            syncContext();
+          });
+        }
+
+        sendForm.addEventListener("submit", function (event) {
+          event.preventDefault();
+          syncContext();
+          var useAll = !!(allFiltered && allFiltered.checked);
+          if (!useAll && selected.size === 0) {
+            showToast("error", "Selecciona destinatarios o activa todos los filtrados.");
+            return;
+          }
+          var fd = new FormData(sendForm);
+          fd.set("action", actionAdminNotificationsSend);
+          fd.set("nonce", nonce);
+          fd.set("type", currentType());
+          fd.set("q", currentQuery());
+          fd.set("all_filtered", useAll ? "1" : "0");
+          if (!useAll) {
+            selected.forEach(function (id) {
+              fd.append("ids[]", id);
+            });
+          }
+          setLoading(true);
+          if (resultEl) {
+            resultEl.textContent = "Encolando notificaciones...";
+            resultEl.classList.remove("is-error");
+          }
+          fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+            .then(function (response) {
+              return response.json();
+            })
+            .then(function (json) {
+              if (!json || !json.success) {
+                throw new Error(
+                  (json && json.data && json.data.message) ||
+                    "No se pudo encolar la notificacion.",
+                );
+              }
+              var data = json.data || {};
+              var msg = data.message || "Notificacion encolada.";
+              if (resultEl) {
+                resultEl.textContent = msg;
+                resultEl.classList.remove("is-error");
+              }
+              showToast((data.queued || 0) > 0 ? "success" : "warning", msg);
+            })
+            .catch(function (err) {
+              if (resultEl) {
+                resultEl.textContent = err.message || "Error desconocido.";
+                resultEl.classList.add("is-error");
+              }
+              showToast("error", err.message || "No se pudo encolar la notificacion.");
+            })
+            .finally(function () {
+              setLoading(false);
+            });
+        });
+      }
+
+      syncContext();
+      if (!panel.dataset.scmAdminNotificationsLoaded || forceReload) {
+        panel.dataset.scmAdminNotificationsLoaded = "1";
+        return loadRecipients(currentPage);
+      }
+      return Promise.resolve();
+    }
+
     function bindDashboardPermissions() {
       var permConfig = runtime.dashboardPermissions || {};
       if (!permConfig.canManage) {
@@ -2862,6 +3199,9 @@
       }
       if (panelId === "scm-panel-calendario-actividades") {
         return "calendario_actividades";
+      }
+      if (panelId === "scm-panel-admin-notificaciones") {
+        return "notificaciones";
       }
       if (panelId === "scm-panel-preventivas-pendientes") {
         return "preventivas_pendientes";
@@ -5362,6 +5702,12 @@
           administrativeKey === "calendario_actividades"
         ) {
           initCalendarPanel();
+        }
+        if (
+          activeAdministrativePanel &&
+          administrativeKey === "notificaciones"
+        ) {
+          return initAdminNotificationsPanel(false);
         }
       }
       return Promise.resolve();

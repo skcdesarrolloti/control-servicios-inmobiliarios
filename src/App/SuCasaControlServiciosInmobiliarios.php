@@ -10,6 +10,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesTicketWorkflowActions;
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   use \SCM\App\Concerns\HandlesPublicPqrActions;
+  use \SCM\App\Concerns\HandlesAdministrativeNotifications;
   use \SCM\App\Concerns\RendersPublicPqr;
   use \SCM\App\Concerns\RendersDashboard;
 
@@ -52,6 +53,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_DASHBOARD_PERMISSIONS_READ = 'scm_dashboard_permissions_read';
   const AJAX_DASHBOARD_PERMISSIONS_SAVE = 'scm_dashboard_permissions_save';
   const AJAX_CALENDAR_CITA_NOTIFY = 'scm_calendar_cita_notificar';
+  const AJAX_ADMIN_NOTIFICATIONS_RECIPIENTS = 'scm_admin_notifications_recipients';
+  const AJAX_ADMIN_NOTIFICATIONS_SEND = 'scm_admin_notifications_send';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';
@@ -114,6 +117,7 @@ final class SuCasaControlServiciosInmobiliarios
       'mis_tickets' => 'Mis tickets',
       'cotizaciones_mantenimiento' => 'Cotizaciones de Mantenimiento',
       'calendario_actividades' => 'Calendario',
+      'notificaciones' => 'Notificaciones',
       'preventivas_pendientes' => 'Preventivas Pendientes',
       'contratos_arrendamiento' => 'Contratos de arrendamiento',
       'servicios_publicos_pendientes' => 'Servicios Publicos Pendientes',
