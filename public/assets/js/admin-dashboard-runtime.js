@@ -2054,10 +2054,15 @@
       var typeSelect = panel.querySelector("[data-admin-notif-type]");
       var queryInput = panel.querySelector("[data-admin-notif-query]");
       var contractStatusWrap = panel.querySelector("[data-admin-notif-contract-status-wrap]");
+      var contractExtraWraps = panel.querySelectorAll("[data-admin-notif-contract-extra-wrap]");
       var contractStatusSelect = panel.querySelector("[data-admin-notif-contract-status]");
+      var inmuebleSimiInput = panel.querySelector("[data-admin-notif-inmueble-simi]");
+      var contractNumberInput = panel.querySelector("[data-admin-notif-contract-number]");
       var sendType = panel.querySelector("[data-admin-notif-send-type]");
       var sendQuery = panel.querySelector("[data-admin-notif-send-query]");
       var sendContractStatus = panel.querySelector("[data-admin-notif-send-contract-status]");
+      var sendInmuebleSimi = panel.querySelector("[data-admin-notif-send-inmueble-simi]");
+      var sendContractNumber = panel.querySelector("[data-admin-notif-send-contract-number]");
       var recipientsEl = panel.querySelector("[data-admin-notif-recipients]");
       var paginationEl = panel.querySelector("[data-admin-notif-pagination]");
       var totalEl = panel.querySelector("[data-admin-notif-total]");
@@ -2113,6 +2118,20 @@
           return "";
         }
         return String(contractStatusSelect.value || "").trim();
+      }
+
+      function currentInmuebleSimi() {
+        if (!inmuebleSimiInput || !supportsContractStatus(currentType())) {
+          return "";
+        }
+        return String(inmuebleSimiInput.value || "").trim();
+      }
+
+      function currentContractNumber() {
+        if (!contractNumberInput || !supportsContractStatus(currentType())) {
+          return "";
+        }
+        return String(contractNumberInput.value || "").trim();
       }
 
       function senderProfile() {
@@ -2201,6 +2220,12 @@
         if (sendContractStatus) {
           sendContractStatus.value = currentContractStatus();
         }
+        if (sendInmuebleSimi) {
+          sendInmuebleSimi.value = currentInmuebleSimi();
+        }
+        if (sendContractNumber) {
+          sendContractNumber.value = currentContractNumber();
+        }
         if (contractStatusWrap) {
           var canFilterContracts = supportsContractStatus(currentType());
           contractStatusWrap.hidden = !canFilterContracts;
@@ -2209,6 +2234,11 @@
             contractStatusSelect.value = "";
           }
         }
+        contractExtraWraps.forEach(function (wrap) {
+          var canFilterContracts = supportsContractStatus(currentType());
+          wrap.hidden = !canFilterContracts;
+          wrap.classList.toggle("is-hidden", !canFilterContracts);
+        });
         if (selectedCountEl) {
           selectedCountEl.textContent =
             allFiltered && allFiltered.checked
@@ -2517,6 +2547,8 @@
         fd.append("type", currentType());
         fd.append("q", currentQuery());
         fd.append("contract_status", currentContractStatus());
+        fd.append("inmueble_simi", currentInmuebleSimi());
+        fd.append("contract_number", currentContractNumber());
         fd.append("page", String(currentPage));
         recipientsEl.innerHTML =
           '<div class="scm-admin-notif-empty"><strong>Cargando destinatarios...</strong><span>Un momento mientras actualizamos la lista.</span></div>';
@@ -2590,6 +2622,12 @@
           if (contractStatusSelect) {
             contractStatusSelect.value = "";
           }
+          if (inmuebleSimiInput) {
+            inmuebleSimiInput.value = "";
+          }
+          if (contractNumberInput) {
+            contractNumberInput.value = "";
+          }
           selected.clear();
           if (allFiltered) {
             allFiltered.checked = false;
@@ -2617,6 +2655,14 @@
             loadRecipients(1);
           });
         }
+        [inmuebleSimiInput, contractNumberInput].forEach(function (input) {
+          if (!input) {
+            return;
+          }
+          input.addEventListener("input", function () {
+            syncContext();
+          });
+        });
 
         panel.querySelectorAll("[data-admin-notif-type-shortcut]").forEach(function (btn) {
           btn.addEventListener("click", function () {
@@ -2800,6 +2846,8 @@
           fd.set("type", currentType());
           fd.set("q", currentQuery());
           fd.set("contract_status", currentContractStatus());
+          fd.set("inmueble_simi", currentInmuebleSimi());
+          fd.set("contract_number", currentContractNumber());
           fd.set("all_filtered", useAll ? "1" : "0");
           if (!useAll) {
             selected.forEach(function (id) {

@@ -1523,6 +1523,14 @@ trait RendersDashboard
               </select>
               <small>Activo = tiene Entregado · No activo = solo Recibido</small>
             </div>
+            <div class="scm-field scm-admin-notif-contract-extra" data-admin-notif-contract-extra-wrap>
+              <label for="scm-admin-notif-inmueble-simi">Inmueble SIMI</label>
+              <input id="scm-admin-notif-inmueble-simi" name="inmueble_simi" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: 10628" data-admin-notif-inmueble-simi>
+            </div>
+            <div class="scm-field scm-admin-notif-contract-extra" data-admin-notif-contract-extra-wrap>
+              <label for="scm-admin-notif-contract-number">Contrato</label>
+              <input id="scm-admin-notif-contract-number" name="contract_number" type="text" class="input input-bordered input-sm scm-input" placeholder="N&uacute;mero de contrato" data-admin-notif-contract-number>
+            </div>
             <div class="scm-admin-notif-filter-actions">
               <button type="submit" class="scm-btn-primary btn btn-primary">Buscar</button>
               <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-clear>Limpiar</button>
@@ -1567,6 +1575,8 @@ trait RendersDashboard
             <input type="hidden" name="type" value="<?php echo esc_attr($firstType); ?>" data-admin-notif-send-type>
             <input type="hidden" name="q" value="" data-admin-notif-send-query>
             <input type="hidden" name="contract_status" value="" data-admin-notif-send-contract-status>
+            <input type="hidden" name="inmueble_simi" value="" data-admin-notif-send-inmueble-simi>
+            <input type="hidden" name="contract_number" value="" data-admin-notif-send-contract-number>
 
             <div class="scm-admin-notif-section-head scm-admin-notif-selected-head">
               <div>
@@ -1661,6 +1671,7 @@ trait RendersDashboard
                   <strong><?php echo esc_html((string) ($template['name'] ?? '')); ?></strong>
                   <span>Idioma: <?php echo esc_html((string) ($template['language'] ?? 'es_CO')); ?></span>
                   <p><?php echo nl2br(esc_html((string) ($template['body'] ?? ''))); ?></p>
+                  <small>Este selector solo muestra las plantillas WhatsApp configuradas para este m&oacute;dulo.</small>
                   <small>Crea esta plantilla en Meta como Utilidad/Utility. Body exacto: Hola {{1}}. + salto de linea + {{2}}.</small>
                   <small>Variables en Meta: {{1}} = nombre del destinatario · {{2}} = mensaje escrito arriba.</small>
                 </div>

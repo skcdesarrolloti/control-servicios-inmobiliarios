@@ -154,14 +154,16 @@ final class AdministrativeNotificationsService
     ];
   }
 
-  /** @return array{rows:array<int,array<string,mixed>>,total:int,page:int,pages:int,per_page:int,type:string,type_label:string,contract_status:string} */
-  public function search(string $type, string $query, int $page = 1, int $perPage = 20, string $contractStatus = ''): array
+  /** @return array{rows:array<int,array<string,mixed>>,total:int,page:int,pages:int,per_page:int,type:string,type_label:string,contract_status:string,inmueble_simi:string,contract_number:string} */
+  public function search(string $type, string $query, int $page = 1, int $perPage = 20, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = ''): array
   {
     $config = $this->typeConfig($type);
     $contractStatus = $this->sanitizeContractStatus($contractStatus);
+    $inmuebleSimi = trim($inmuebleSimi);
+    $contractNumber = trim($contractNumber);
     $table = (string) $config['table'];
     if (!$this->schema->tableExists($table)) {
-      return ['rows' => [], 'total' => 0, 'page' => 1, 'pages' => 1, 'per_page' => $perPage, 'type' => $type, 'type_label' => (string) $config['label'], 'contract_status' => $contractStatus];
+      return ['rows' => [], 'total' => 0, 'page' => 1, 'pages' => 1, 'per_page' => $perPage, 'type' => $type, 'type_label' => (string) $config['label'], 'contract_status' => $contractStatus, 'inmueble_simi' => $inmuebleSimi, 'contract_number' => $contractNumber];
     }
 
     $columns = $this->resolveColumns($config);
@@ -179,7 +181,7 @@ final class AdministrativeNotificationsService
         $where .= ' AND (' . implode(' OR ', $parts) . ')';
       }
     }
-    $this->applyContractStatusFilter($where, $args, $type, $config, $contractStatus);
+    $this->applyContractFilters($where, $args, $type, $config, $contractStatus, $inmuebleSimi, $contractNumber);
 
     $total = (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` WHERE {$where}", $args);
     $page = max(1, $page);
@@ -218,7 +220,7 @@ final class AdministrativeNotificationsService
       $row['tipo_label'] = (string) $config['label'];
       $row['rol_persona'] = (string) $config['role'];
       $row['celular_normalizado'] = $this->normalizePhone((string) ($row['celular'] ?? ''), (string) ($row['indicativo'] ?? ''), true);
-      $contractInfo = $this->contractActivityInfo($type, $config, $row, $contractStatus);
+      $contractInfo = $this->contractActivityInfo($type, $config, $row, $contractStatus, $inmuebleSimi, $contractNumber);
       $row['contrato_arrendamiento_estado'] = $contractInfo['label'];
       $row['contratos_arrendamiento_resumen'] = $contractInfo['summary'];
     }
@@ -233,14 +235,18 @@ final class AdministrativeNotificationsService
       'type' => $type,
       'type_label' => (string) $config['label'],
       'contract_status' => $contractStatus,
+      'inmueble_simi' => $inmuebleSimi,
+      'contract_number' => $contractNumber,
     ];
   }
 
   /** @return int[] */
-  public function idsForFilter(string $type, string $query, int $limit = 5000, string $contractStatus = ''): array
+  public function idsForFilter(string $type, string $query, int $limit = 5000, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = ''): array
   {
     $config = $this->typeConfig($type);
     $contractStatus = $this->sanitizeContractStatus($contractStatus);
+    $inmuebleSimi = trim($inmuebleSimi);
+    $contractNumber = trim($contractNumber);
     $table = (string) $config['table'];
     if (!$this->schema->tableExists($table)) {
       return [];
@@ -259,7 +265,7 @@ final class AdministrativeNotificationsService
         $where .= ' AND (' . implode(' OR ', $parts) . ')';
       }
     }
-    $this->applyContractStatusFilter($where, $args, $type, $config, $contractStatus);
+    $this->applyContractFilters($where, $args, $type, $config, $contractStatus, $inmuebleSimi, $contractNumber);
     $rows = $this->db->getResults("SELECT `_ID` FROM `{$table}` WHERE {$where} ORDER BY `_ID` DESC LIMIT ?", array_merge($args, [max(1, $limit)]));
     return array_values(array_map(static fn(array $row): int => (int) ($row['_ID'] ?? 0), $rows));
   }
@@ -413,9 +419,11 @@ final class AdministrativeNotificationsService
   }
 
   /** @param array<string,mixed> $config @param array<int,mixed> $args */
-  private function applyContractStatusFilter(string &$where, array &$args, string $type, array $config, string $contractStatus): void
+  private function applyContractFilters(string &$where, array &$args, string $type, array $config, string $contractStatus, string $inmuebleSimi = '', string $contractNumber = ''): void
   {
-    if ($contractStatus === '' || !in_array($type, ['propietarios', 'arrendatarios', 'copropiedades'], true)) {
+    $inmuebleSimi = trim($inmuebleSimi);
+    $contractNumber = trim($contractNumber);
+    if (($contractStatus === '' && $inmuebleSimi === '' && $contractNumber === '') || !in_array($type, ['propietarios', 'arrendatarios', 'copropiedades'], true)) {
       return;
     }
     $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
@@ -430,14 +438,46 @@ final class AdministrativeNotificationsService
       return;
     }
 
+    $existsConditions = [
+      $this->contractActorComparisonSql($actorTable, $contractActorColumn, $config),
+    ];
+    $existsArgs = [];
+    if ($contractStatus !== '') {
+      $existsConditions[] = "LOWER(TRIM(COALESCE(ca.`estado`, ''))) = ?";
+      $existsArgs[] = $contractStatus === 'activos' ? 'entregado' : 'recibido';
+    }
+    if ($inmuebleSimi !== '') {
+      $inmuebleParts = [];
+      foreach (['inmueble', 'id_inmueble', 'id_inmueble_data'] as $column) {
+        if ($this->schema->columnExists($contractTable, $column)) {
+          $inmuebleParts[] = $this->collatedTextSql("COALESCE(ca.`{$column}`, '')") . " LIKE ?";
+          $existsArgs[] = '%' . $this->db->escapeLike($inmuebleSimi) . '%';
+        }
+      }
+      if ($inmuebleParts !== []) {
+        $existsConditions[] = '(' . implode(' OR ', $inmuebleParts) . ')';
+      }
+    }
+    if ($contractNumber !== '') {
+      $contractParts = [];
+      foreach (['contrato', 'contrato_arrendamiento', '_ID'] as $column) {
+        if ($this->schema->columnExists($contractTable, $column)) {
+          $contractParts[] = $this->collatedTextSql("COALESCE(ca.`{$column}`, '')") . " LIKE ?";
+          $existsArgs[] = '%' . $this->db->escapeLike($contractNumber) . '%';
+        }
+      }
+      if ($contractParts !== []) {
+        $existsConditions[] = '(' . implode(' OR ', $contractParts) . ')';
+      }
+    }
+
     $where .= " AND EXISTS (
       SELECT 1
         FROM `{$contractTable}` ca
-       WHERE {$this->contractActorComparisonSql($actorTable, $contractActorColumn, $config)}
-         AND LOWER(TRIM(COALESCE(ca.`estado`, ''))) = ?
+       WHERE " . implode(' AND ', $existsConditions) . "
        LIMIT 1
     )";
-    $args[] = $contractStatus === 'activos' ? 'entregado' : 'recibido';
+    array_push($args, ...$existsArgs);
 
     if ($contractStatus === 'no_activos') {
       $where .= " AND NOT EXISTS (
@@ -456,7 +496,7 @@ final class AdministrativeNotificationsService
    * @param array<string,mixed> $recipient
    * @return array{label:string,summary:string}
    */
-  private function contractActivityInfo(string $type, array $config, array $recipient, string $contractStatus = ''): array
+  private function contractActivityInfo(string $type, array $config, array $recipient, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = ''): array
   {
     if (!in_array($type, ['propietarios', 'arrendatarios', 'copropiedades'], true)) {
       return ['label' => '', 'summary' => ''];
@@ -477,21 +517,52 @@ final class AdministrativeNotificationsService
     if ($matchWhere === '') {
       return ['label' => 'Sin contrato', 'summary' => ''];
     }
+    $extraWhere = '';
+    $extraArgs = [];
+    $inmuebleSimi = trim($inmuebleSimi);
+    if ($inmuebleSimi !== '') {
+      $inmuebleParts = [];
+      foreach (['inmueble', 'id_inmueble', 'id_inmueble_data'] as $column) {
+        if ($this->schema->columnExists($contractTable, $column)) {
+          $inmuebleParts[] = $this->collatedTextSql("COALESCE(`{$column}`, '')") . " LIKE ?";
+          $extraArgs[] = '%' . $this->db->escapeLike($inmuebleSimi) . '%';
+        }
+      }
+      if ($inmuebleParts !== []) {
+        $extraWhere .= ' AND (' . implode(' OR ', $inmuebleParts) . ')';
+      }
+    }
+    $contractNumber = trim($contractNumber);
+    if ($contractNumber !== '') {
+      $contractParts = [];
+      foreach (['contrato', 'contrato_arrendamiento', '_ID'] as $column) {
+        if ($this->schema->columnExists($contractTable, $column)) {
+          $contractParts[] = $this->collatedTextSql("COALESCE(`{$column}`, '')") . " LIKE ?";
+          $extraArgs[] = '%' . $this->db->escapeLike($contractNumber) . '%';
+        }
+      }
+      if ($contractParts !== []) {
+        $extraWhere .= ' AND (' . implode(' OR ', $contractParts) . ')';
+      }
+    }
 
     $rows = $this->db->getResults(
       "SELECT LOWER(TRIM(COALESCE(`estado`, ''))) AS estado,
               COUNT(1) AS total,
-              GROUP_CONCAT(DISTINCT NULLIF(TRIM(COALESCE(`contrato`, '')), '') ORDER BY `_ID` DESC SEPARATOR ', ') AS contratos
+              GROUP_CONCAT(DISTINCT COALESCE(NULLIF(TRIM(`contrato`), ''), NULLIF(TRIM(`contrato_arrendamiento`), ''), CAST(`_ID` AS CHAR)) ORDER BY `_ID` DESC SEPARATOR ', ') AS contratos,
+              GROUP_CONCAT(DISTINCT COALESCE(NULLIF(TRIM(`inmueble`), ''), NULLIF(TRIM(`id_inmueble`), ''), NULLIF(TRIM(`id_inmueble_data`), '')) ORDER BY `_ID` DESC SEPARATOR ', ') AS inmuebles
          FROM `{$contractTable}`
         WHERE ({$matchWhere})
+          {$extraWhere}
           AND LOWER(TRIM(COALESCE(`estado`, ''))) IN ('entregado', 'recibido')
         GROUP BY LOWER(TRIM(COALESCE(`estado`, '')))",
-      $matchArgs
+      array_merge($matchArgs, $extraArgs)
     );
 
     $hasDelivered = false;
     $hasReceived = false;
     $contracts = [];
+    $properties = [];
     foreach ($rows as $row) {
       $state = trim((string) ($row['estado'] ?? ''));
       $hasDelivered = $hasDelivered || $state === 'entregado';
@@ -502,8 +573,14 @@ final class AdministrativeNotificationsService
           $contracts[$contract] = $contract;
         }
       }
+      foreach (explode(',', (string) ($row['inmuebles'] ?? '')) as $property) {
+        $property = trim($property);
+        if ($property !== '') {
+          $properties[$property] = $property;
+        }
+      }
     }
-    $summary = $this->contractSummary(array_values($contracts));
+    $summary = $this->contractSummary(array_values($contracts), array_values($properties));
     if ($hasDelivered) {
       return ['label' => 'Activo', 'summary' => $summary];
     }
@@ -554,7 +631,7 @@ final class AdministrativeNotificationsService
         $parts[] = "CAST(`{$contractColumn}` AS UNSIGNED) = ?";
         $args[] = $numeric;
       } else {
-        $parts[] = "LOWER(TRIM(COALESCE(`{$contractColumn}`, ''))) = LOWER(TRIM(?))";
+        $parts[] = "LOWER(" . $this->collatedTextSql("TRIM(COALESCE(`{$contractColumn}`, ''))") . ") = LOWER(CONVERT(TRIM(?) USING utf8mb4) COLLATE utf8mb4_unicode_ci)";
         $args[] = $value;
       }
     }
@@ -562,21 +639,29 @@ final class AdministrativeNotificationsService
     return $parts === [] ? ['', []] : ['(' . implode(' OR ', $parts) . ')', $args];
   }
 
-  /** @param string[] $contracts */
-  private function contractSummary(array $contracts): string
+  /** @param string[] $contracts @param string[] $properties */
+  private function contractSummary(array $contracts, array $properties = []): string
   {
     $contracts = array_values(array_unique(array_filter(array_map(
       static fn($contract): string => trim((string) $contract),
       $contracts
     ), static fn(string $contract): bool => $contract !== '')));
-    if ($contracts === []) {
-      return '';
-    }
+    $properties = array_values(array_unique(array_filter(array_map(
+      static fn($property): string => trim((string) $property),
+      $properties
+    ), static fn(string $property): bool => $property !== '')));
     $visible = array_slice($contracts, 0, 4);
-    $summary = 'Contratos: #' . implode(', #', $visible);
+    $summary = $visible !== [] ? 'Contrato: #' . implode(', #', $visible) : '';
     $remaining = count($contracts) - count($visible);
     if ($remaining > 0) {
       $summary .= ' +' . $remaining . ' mas';
+    }
+    if ($properties !== []) {
+      $summary .= ($summary !== '' ? ' · ' : '') . 'Inmueble SIMI: ' . implode(', ', array_slice($properties, 0, 3));
+      $remainingProperties = count($properties) - min(3, count($properties));
+      if ($remainingProperties > 0) {
+        $summary .= ' +' . $remainingProperties . ' mas';
+      }
     }
     return $summary;
   }
@@ -604,10 +689,17 @@ final class AdministrativeNotificationsService
       if (preg_match('/^id_/', $actorColumn) === 1 || preg_match('/^id_/', $contractColumn) === 1) {
         $parts[] = "CAST(ca.`{$contractColumn}` AS UNSIGNED) = CAST(`{$actorTable}`.`{$actorColumn}` AS UNSIGNED)";
       } else {
-        $parts[] = "TRIM(COALESCE(ca.`{$contractColumn}`, '')) <> '' AND TRIM(COALESCE(`{$actorTable}`.`{$actorColumn}`, '')) <> '' AND LOWER(TRIM(COALESCE(ca.`{$contractColumn}`, ''))) = LOWER(TRIM(COALESCE(`{$actorTable}`.`{$actorColumn}`, '')))";
+        $caExpr = $this->collatedTextSql("TRIM(COALESCE(ca.`{$contractColumn}`, ''))");
+        $actorExpr = $this->collatedTextSql("TRIM(COALESCE(`{$actorTable}`.`{$actorColumn}`, ''))");
+        $parts[] = "TRIM(COALESCE(ca.`{$contractColumn}`, '')) <> '' AND TRIM(COALESCE(`{$actorTable}`.`{$actorColumn}`, '')) <> '' AND LOWER({$caExpr}) = LOWER({$actorExpr})";
       }
     }
     return '(' . implode(' OR ', $parts) . ')';
+  }
+
+  private function collatedTextSql(string $expression): string
+  {
+    return "CONVERT({$expression} USING utf8mb4) COLLATE utf8mb4_unicode_ci";
   }
 
   /** @param array<string,mixed> $whatsappTemplateConfig */

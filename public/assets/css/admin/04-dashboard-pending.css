@@ -3229,7 +3229,7 @@
 
 #scm-app .scm-admin-notif-filter-grid {
   display: grid;
-  grid-template-columns: minmax(190px, 230px) minmax(170px, 220px) 1fr auto;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
   align-items: end;
 }
@@ -3242,11 +3242,20 @@
   font-weight: 700;
 }
 
+#scm-app .scm-admin-notif-contract-extra.is-hidden,
+#scm-app .scm-admin-notif-contract-status.is-hidden {
+  display: none;
+}
+
 #scm-app .scm-admin-notif-filter-actions,
 #scm-app .scm-admin-notif-submit-row {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+#scm-app .scm-admin-notif-filter-actions {
+  justify-content: flex-end;
 }
 
 #scm-app .scm-admin-notif-layout {

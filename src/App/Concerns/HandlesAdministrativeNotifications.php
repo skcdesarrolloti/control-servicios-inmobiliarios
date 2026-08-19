@@ -23,10 +23,12 @@ trait HandlesAdministrativeNotifications
     $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'propietarios'));
     $query = trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? ''))));
     $contractStatus = $this->sanitize_admin_notification_contract_status((string) ($_POST['contract_status'] ?? ''));
+    $inmuebleSimi = trim(sanitize_text_field(wp_unslash((string) ($_POST['inmueble_simi'] ?? ''))));
+    $contractNumber = trim(sanitize_text_field(wp_unslash((string) ($_POST['contract_number'] ?? ''))));
     $page = max(1, (int) ($_POST['page'] ?? 1));
 
     try {
-      $result = $this->get_admin_notifications_service()->search($type, $query, $page, 20, $contractStatus);
+      $result = $this->get_admin_notifications_service()->search($type, $query, $page, 20, $contractStatus, $inmuebleSimi, $contractNumber);
       $this->jsonOk([
         'html' => $this->render_admin_notification_recipient_rows($result['rows']),
         'pagination' => $this->render_admin_notification_pagination($result),
@@ -51,6 +53,8 @@ trait HandlesAdministrativeNotifications
     $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'propietarios'));
     $query = trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? ''))));
     $contractStatus = $this->sanitize_admin_notification_contract_status((string) ($_POST['contract_status'] ?? ''));
+    $inmuebleSimi = trim(sanitize_text_field(wp_unslash((string) ($_POST['inmueble_simi'] ?? ''))));
+    $contractNumber = trim(sanitize_text_field(wp_unslash((string) ($_POST['contract_number'] ?? ''))));
     $allFiltered = trim((string) ($_POST['all_filtered'] ?? '')) === '1';
     $rawChannels = $_POST['channels'] ?? [];
     $rawIds = $_POST['ids'] ?? [];
@@ -60,7 +64,7 @@ trait HandlesAdministrativeNotifications
       is_array($rawChannels) ? $rawChannels : [$rawChannels]
     );
     $ids = $allFiltered
-      ? $service->idsForFilter($type, $query, 5000, $contractStatus)
+      ? $service->idsForFilter($type, $query, 5000, $contractStatus, $inmuebleSimi, $contractNumber)
       : array_map('intval', is_array($rawIds) ? $rawIds : [$rawIds]);
 
     $subject = trim(sanitize_text_field(wp_unslash((string) ($_POST['subject'] ?? ''))));
