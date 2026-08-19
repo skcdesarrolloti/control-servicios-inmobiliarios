@@ -3682,6 +3682,105 @@
   outline: 3px solid rgba(245, 158, 11, 0.16);
 }
 
+#scm-app .scm-admin-notif-guides {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dbe7f4;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+#scm-app .scm-admin-notif-guides-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+#scm-app .scm-admin-notif-guides-head strong {
+  display: block;
+  margin: 3px 0;
+  color: #0f172a;
+  font-size: 16px;
+}
+
+#scm-app .scm-admin-notif-guides-head p,
+#scm-app .scm-admin-notif-guides-head small {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+#scm-app .scm-admin-notif-guide-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#scm-app .scm-admin-notif-guide-tabs button {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid #dbe7f4;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+#scm-app .scm-admin-notif-guide-tabs button.active,
+#scm-app .scm-admin-notif-guide-tabs button:focus-visible {
+  border-color: #f59e0b;
+  background: #fff7ed;
+  color: #9a3412;
+  outline: 3px solid rgba(245, 158, 11, 0.14);
+}
+
+#scm-app .scm-admin-notif-guide-panel {
+  display: none;
+  gap: 10px;
+}
+
+#scm-app .scm-admin-notif-guide-panel.active {
+  display: grid;
+}
+
+#scm-app .scm-admin-notif-guide-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+#scm-app .scm-admin-notif-guide-card strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+#scm-app .scm-admin-notif-guide-card p {
+  margin: 0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+#scm-app .scm-admin-notif-guide-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 #scm-app .scm-admin-notif-preview {
   padding: 12px;
   border: 1px solid #bfdbfe;
@@ -3809,5 +3908,16 @@
 
   #scm-app .scm-admin-notif-template-row {
     grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-admin-notif-guides-head,
+  #scm-app .scm-admin-notif-guide-card {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  #scm-app .scm-admin-notif-guide-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 }

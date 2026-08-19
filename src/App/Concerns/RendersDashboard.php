@@ -1467,6 +1467,7 @@ trait RendersDashboard
     $firstType = (string) array_key_first($types);
     $firstEmailTemplate = is_array(reset($emailTemplates)) ? reset($emailTemplates) : [];
     $defaultEmailSubject = (string) ($firstEmailTemplate['subject'] ?? '');
+    $messageGuides = $this->admin_notification_message_guides();
     $emailBannerUrl = function_exists('system_image')
       ? system_image('banner_sitio_web', 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png')
       : 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png';
@@ -1640,6 +1641,39 @@ trait RendersDashboard
                 <button type="button" data-admin-notif-copy-message>Copiar</button>
                 <button type="button" data-admin-notif-clear-message>Limpiar</button>
               </div>
+              <section class="scm-admin-notif-guides" aria-label="Guias de mensajes">
+                <div class="scm-admin-notif-guides-head">
+                  <div>
+                    <span class="scm-calendar-action-kicker">Gu&iacute;as copiables</span>
+                    <strong>Ejemplos por actor</strong>
+                    <p>Usa estas bases para Email, SMS o WhatsApp. En WhatsApp se env&iacute;an dentro de la plantilla gen&eacute;rica oficial.</p>
+                  </div>
+                  <small>Variables permitidas: {{nombre}}, {{funcionario}}, {{firma_funcionario_linea}}</small>
+                </div>
+                <div class="scm-admin-notif-guide-tabs" role="tablist" aria-label="Actores">
+                  <?php $guideIndex = 0; foreach ($messageGuides as $actorKey => $actorGuide): ?>
+                    <button type="button" class="<?php echo $guideIndex === 0 ? 'active' : ''; ?>" data-admin-notif-guide-tab="<?php echo esc_attr($actorKey); ?>" role="tab" aria-selected="<?php echo $guideIndex === 0 ? 'true' : 'false'; ?>">
+                      <?php echo esc_html((string) ($actorGuide['label'] ?? $actorKey)); ?>
+                    </button>
+                  <?php $guideIndex++; endforeach; ?>
+                </div>
+                <?php $guideIndex = 0; foreach ($messageGuides as $actorKey => $actorGuide): ?>
+                  <div class="scm-admin-notif-guide-panel<?php echo $guideIndex === 0 ? ' active' : ''; ?>" data-admin-notif-guide-panel="<?php echo esc_attr($actorKey); ?>">
+                    <?php foreach ((array) ($actorGuide['items'] ?? []) as $item): $guideText = (string) ($item['text'] ?? ''); ?>
+                      <article class="scm-admin-notif-guide-card">
+                        <div>
+                          <strong><?php echo esc_html((string) ($item['title'] ?? 'Mensaje sugerido')); ?></strong>
+                          <p><?php echo nl2br(esc_html($guideText)); ?></p>
+                        </div>
+                        <div class="scm-admin-notif-guide-actions">
+                          <button type="button" class="scm-case-work-btn" data-admin-notif-guide-use="<?php echo esc_attr($guideText); ?>">Usar mensaje</button>
+                          <button type="button" class="scm-case-work-btn" data-admin-notif-guide-copy="<?php echo esc_attr($guideText); ?>">Copiar</button>
+                        </div>
+                      </article>
+                    <?php endforeach; ?>
+                  </div>
+                <?php $guideIndex++; endforeach; ?>
+              </section>
               <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." data-admin-notif-message></textarea>
               <small class="scm-admin-notif-helper">Variables: {{nombre}}, {{correo}}, {{celular}}, {{tipo_actor}}, {{rol_persona}}, {{funcionario}}, {{cargo_funcionario}}, {{celular_funcionario}}, {{firma_funcionario}}, {{firma_funcionario_linea}}.</small>
               <small class="scm-admin-notif-sms-counter" data-admin-notif-sms-counter>0/160 SMS</small>
@@ -1680,6 +1714,94 @@ trait RendersDashboard
     </div>
 <?php
     return (string) ob_get_clean();
+  }
+
+  /** @return array<string,array{label:string,items:array<int,array{title:string,text:string}>}> */
+  private function admin_notification_message_guides(): array
+  {
+    return [
+      'propietarios' => [
+        'label' => 'Propietarios',
+        'items' => [
+          [
+            'title' => 'Renta abonada',
+            'text' => "Sr(a). Propietario(a), cordial saludo.\n\nLe informamos que el pago de la renta correspondiente a su inmueble en administración fue abonado a la cuenta registrada.\n\nAgradecemos verificar la transacción y comunicarnos cualquier novedad.\n\nAtentamente,\n{{firma_funcionario_linea}}",
+          ],
+          [
+            'title' => 'Confirmación de gestión',
+            'text' => "Sr(a). Propietario(a), cordial saludo.\n\nLe confirmamos que su solicitud fue recibida y se encuentra en gestión por parte de nuestro equipo. Le estaremos informando cualquier avance o requerimiento adicional.\n\nAtentamente,\n{{firma_funcionario_linea}}",
+          ],
+          [
+            'title' => 'Actualización de datos',
+            'text' => "Sr(a). Propietario(a), cordial saludo.\n\nCon el fin de mantener actualizada la información de contacto y pagos, agradecemos confirmar si sus datos registrados continúan vigentes.\n\nAtentamente,\n{{firma_funcionario_linea}}",
+          ],
+        ],
+      ],
+      'arrendatarios' => [
+        'label' => 'Arrendatarios',
+        'items' => [
+          [
+            'title' => 'Recordatorio amable',
+            'text' => "Sr(a). Arrendatario(a), cordial saludo.\n\nLe recordamos revisar sus obligaciones pendientes relacionadas con el inmueble arrendado. Si ya realizó el pago o gestión correspondiente, puede hacer caso omiso a este mensaje.\n\nAtentamente,\n{{firma_funcionario_linea}}",
+          ],
+          [
+            'title' => 'Soporte recibido',
+            'text' => "Sr(a). Arrendatario(a), cordial saludo.\n\nConfirmamos la recepción del soporte enviado. Nuestro equipo realizará la verificación correspondiente y le informará si se requiere información adicional.\n\nAtentamente,\n{{firma_funcionario_linea}}",
+          ],
+          [
+            'title' => 'Solicitud de información',
+            'text' => "Sr(a). Arrendatario(a), cordial saludo.\n\nPara continuar con la gestión solicitada, agradecemos enviarnos la información o soporte pendiente por este mismo medio.\n\nAtentamente,\n{{firma_funcionario_linea}}",
+          ],
+        ],
+      ],
+      'copropiedades' => [
+        'label' => 'Copropiedades',
+        'items' => [
+          [
+            'title' => 'Envío de soportes de pago',
+            'text' => "Buenos días, cordial saludo.\n\nAdjuntamos los soportes de pago correspondientes al mes de agosto de 2026 del Apto \"----------\", para su respectiva verificación.\n\nAgradecemos su colaboración con el envío del recibo de caja correspondiente a dichos pagos.\n\nQuedamos atentos.\n\nCordialmente,\n{{firma_funcionario_linea}}",
+          ],
+          [
+            'title' => 'Solicitud de recibo de caja',
+            'text' => "Buenos días, cordial saludo.\n\nAgradecemos nos compartan el recibo de caja correspondiente al pago realizado del inmueble \"----------\", con el fin de completar el soporte en nuestro sistema.\n\nQuedamos atentos a su amable respuesta.\n\nCordialmente,\n{{firma_funcionario_linea}}",
+          ],
+          [
+            'title' => 'Confirmación de pago administración',
+            'text' => "Buenos días, cordial saludo.\n\nLes informamos que se realizó el pago de administración correspondiente al inmueble \"----------\". Agradecemos validar el ingreso y remitir el soporte o recibo de caja correspondiente.\n\nCordialmente,\n{{firma_funcionario_linea}}",
+          ],
+          [
+            'title' => 'Consulta de estado de cuenta',
+            'text' => "Buenos días, cordial saludo.\n\nSolicitamos amablemente el estado de cuenta actualizado del inmueble \"----------\" para realizar la revisión y gestión correspondiente.\n\nQuedamos atentos.\n\nCordialmente,\n{{firma_funcionario_linea}}",
+          ],
+        ],
+      ],
+      'proveedores' => [
+        'label' => 'Proveedores',
+        'items' => [
+          [
+            'title' => 'Solicitud de cotización',
+            'text' => "Cordial saludo.\n\nAgradecemos nos compartan cotización para la solicitud relacionada, incluyendo descripción del servicio, valor, tiempo estimado de ejecución y condiciones de garantía.\n\nAtentamente,\n{{firma_funcionario_linea}}",
+          ],
+          [
+            'title' => 'Seguimiento de servicio',
+            'text' => "Cordial saludo.\n\nSolicitamos amablemente confirmar el estado del servicio asignado e informar la fecha estimada de atención o finalización.\n\nAtentamente,\n{{firma_funcionario_linea}}",
+          ],
+        ],
+      ],
+      'funcionarios' => [
+        'label' => 'Funcionarios',
+        'items' => [
+          [
+            'title' => 'Asignación interna',
+            'text' => "Hola {{nombre}}.\n\nSe te ha asignado una gestión para revisión. Por favor valida la información y actualiza el estado correspondiente cuando avances.\n\nAtentamente,\n{{firma_funcionario_linea}}",
+          ],
+          [
+            'title' => 'Recordatorio interno',
+            'text' => "Hola {{nombre}}.\n\nTe recordamos revisar las gestiones pendientes asignadas para mantener actualizada la trazabilidad del proceso.\n\nAtentamente,\n{{firma_funcionario_linea}}",
+          ],
+        ],
+      ],
+    ];
   }
 
   private function render_cotizaciones_mantenimiento_panel(array $result, array $params): string

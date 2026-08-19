@@ -2105,6 +2105,30 @@
         return typeSelect ? String(typeSelect.value || "propietarios") : "propietarios";
       }
 
+      function actorGuideKey(type) {
+        type = String(type || currentType());
+        if (type.indexOf("arrendatarios") === 0) return "arrendatarios";
+        if (type.indexOf("copropiedades") === 0) return "copropiedades";
+        if (type.indexOf("proveedores") === 0) return "proveedores";
+        if (type.indexOf("funcionarios") === 0) return "funcionarios";
+        return "propietarios";
+      }
+
+      function activateGuideTab(actorKey) {
+        actorKey = actorKey || actorGuideKey(currentType());
+        panel.querySelectorAll("[data-admin-notif-guide-tab]").forEach(function (btn) {
+          var active = btn.getAttribute("data-admin-notif-guide-tab") === actorKey;
+          btn.classList.toggle("active", active);
+          btn.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        panel.querySelectorAll("[data-admin-notif-guide-panel]").forEach(function (guidePanel) {
+          guidePanel.classList.toggle(
+            "active",
+            guidePanel.getAttribute("data-admin-notif-guide-panel") === actorKey,
+          );
+        });
+      }
+
       function currentQuery() {
         return queryInput ? String(queryInput.value || "").trim() : "";
       }
@@ -2226,6 +2250,7 @@
         if (sendContractNumber) {
           sendContractNumber.value = currentContractNumber();
         }
+        activateGuideTab(actorGuideKey(currentType()));
         if (contractStatusWrap) {
           var canFilterContracts = supportsContractStatus(currentType());
           contractStatusWrap.hidden = !canFilterContracts;
@@ -2801,6 +2826,43 @@
           } else {
             showToast("warning", "Tu navegador no permite copiar automaticamente.");
           }
+        });
+        panel.querySelectorAll("[data-admin-notif-guide-tab]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            activateGuideTab(btn.getAttribute("data-admin-notif-guide-tab") || "");
+          });
+        });
+        panel.querySelectorAll("[data-admin-notif-guide-use]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var value = btn.getAttribute("data-admin-notif-guide-use") || "";
+            if (!messageInput || value === "") {
+              return;
+            }
+            messageInput.value = value;
+            messageInput.focus();
+            markComposerDirty();
+            updateSmsCounter();
+            updatePreview();
+            showToast("success", "Mensaje sugerido aplicado.");
+          });
+        });
+        panel.querySelectorAll("[data-admin-notif-guide-copy]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var value = btn.getAttribute("data-admin-notif-guide-copy") || "";
+            if (value === "") {
+              showToast("warning", "No hay guia para copiar.");
+              return;
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(value).then(function () {
+                showToast("success", "Guia copiada.");
+              }).catch(function () {
+                showToast("warning", "No fue posible copiar automaticamente.");
+              });
+            } else {
+              showToast("warning", "Tu navegador no permite copiar automaticamente.");
+            }
+          });
         });
         if (whatsappTemplateSelect) {
           whatsappTemplateSelect.addEventListener("change", function () {
