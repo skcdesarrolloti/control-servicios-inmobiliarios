@@ -33,45 +33,49 @@ final class AdministrativeNotificationsService
   /** @return array<string,array<string,mixed>> */
   public function types(): array
   {
+    $propietarios = [
+      'role' => 'Propietario',
+      'table' => $this->db->table('jet_cct_propietarios'),
+      'contract_actor_column' => 'id_propietario',
+      'name' => ['nombre', 'nombre_juridico', 'titular'],
+      'email' => ['correo', 'correo_cuenta'],
+      'phone' => ['celular', 'telefono', 'contacto'],
+      'indicator' => ['indicativo'],
+      'search' => ['nombre', 'nombre_juridico', 'documento', 'correo', 'celular', 'ciudad'],
+    ];
+    $arrendatarios = [
+      'role' => 'Arrendatario',
+      'table' => $this->db->table('jet_cct_arrendatarios'),
+      'contract_actor_column' => 'id_arrendatario',
+      'name' => ['nombre', 'nombre_juridico'],
+      'email' => ['correo'],
+      'phone' => ['celular', 'telefono', 'contacto'],
+      'indicator' => ['indicativo'],
+      'search' => ['nombre', 'nombre_juridico', 'documento', 'correo', 'celular', 'ciudad'],
+    ];
+    $copropiedades = [
+      'role' => 'Copropiedad',
+      'table' => $this->db->table('jet_cct_copropiedades'),
+      'contract_actor_column' => 'id_copropiedad',
+      'contract_match_columns' => [
+        'nit' => 'nit_copropiedad',
+        'copropiedad' => 'copropiedad',
+        'id_inmueble' => 'id_inmueble',
+      ],
+      'name' => ['copropiedad', 'nombre', 'administrador'],
+      'email' => ['correo'],
+      'phone' => ['contacto', 'celular', 'telefono'],
+      'indicator' => ['indicativo'],
+      'search' => ['copropiedad', 'administrador', 'nit', 'correo', 'contacto', 'barrio', 'direccion'],
+    ];
+
     return [
-      'propietarios' => [
-        'label' => 'Propietarios',
-        'role' => 'Propietario',
-        'table' => $this->db->table('jet_cct_propietarios'),
-        'contract_actor_column' => 'id_propietario',
-        'name' => ['nombre', 'nombre_juridico', 'titular'],
-        'email' => ['correo', 'correo_cuenta'],
-        'phone' => ['celular', 'telefono', 'contacto'],
-        'indicator' => ['indicativo'],
-        'search' => ['nombre', 'nombre_juridico', 'documento', 'correo', 'celular', 'ciudad'],
-      ],
-      'arrendatarios' => [
-        'label' => 'Arrendatarios',
-        'role' => 'Arrendatario',
-        'table' => $this->db->table('jet_cct_arrendatarios'),
-        'contract_actor_column' => 'id_arrendatario',
-        'name' => ['nombre', 'nombre_juridico'],
-        'email' => ['correo'],
-        'phone' => ['celular', 'telefono', 'contacto'],
-        'indicator' => ['indicativo'],
-        'search' => ['nombre', 'nombre_juridico', 'documento', 'correo', 'celular', 'ciudad'],
-      ],
-      'copropiedades' => [
-        'label' => 'Copropiedades',
-        'role' => 'Copropiedad',
-        'table' => $this->db->table('jet_cct_copropiedades'),
-        'contract_actor_column' => 'id_copropiedad',
-        'contract_match_columns' => [
-          'nit' => 'nit_copropiedad',
-          'copropiedad' => 'copropiedad',
-          'id_inmueble' => 'id_inmueble',
-        ],
-        'name' => ['copropiedad', 'nombre', 'administrador'],
-        'email' => ['correo'],
-        'phone' => ['contacto', 'celular', 'telefono'],
-        'indicator' => ['indicativo'],
-        'search' => ['copropiedad', 'administrador', 'nit', 'correo', 'contacto', 'barrio', 'direccion'],
-      ],
+      'propietarios_activos' => $propietarios + ['label' => 'Propietarios activos', 'contract_status_fixed' => 'activos'],
+      'propietarios_no_activos' => $propietarios + ['label' => 'Propietarios no activos', 'contract_status_fixed' => 'no_activos'],
+      'arrendatarios_activos' => $arrendatarios + ['label' => 'Arrendatarios activos', 'contract_status_fixed' => 'activos'],
+      'arrendatarios_no_activos' => $arrendatarios + ['label' => 'Arrendatarios no activos', 'contract_status_fixed' => 'no_activos'],
+      'copropiedades_activas' => $copropiedades + ['label' => 'Copropiedades activas', 'contract_status_fixed' => 'activos'],
+      'copropiedades_no_activas' => $copropiedades + ['label' => 'Copropiedades no activas', 'contract_status_fixed' => 'no_activos'],
       'proveedores' => [
         'label' => 'Proveedores',
         'role' => 'Proveedor',
@@ -109,10 +113,12 @@ final class AdministrativeNotificationsService
       $emailColumn = $this->detect($table, (array) $config['email']);
       $phoneColumn = $this->detect($table, (array) $config['phone']);
       $where = $this->baseWhere($config);
+      $args = [];
+      $this->applyContractFilters($where, $args, $type, $config, (string) ($config['contract_status_fixed'] ?? ''), '', '');
       $out[$type] = [
-        'total' => (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` WHERE {$where}"),
-        'email' => $emailColumn !== '' ? (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` WHERE {$where} AND TRIM(COALESCE(`{$emailColumn}`, '')) <> ''") : 0,
-        'phone' => $phoneColumn !== '' ? (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` WHERE {$where} AND TRIM(COALESCE(`{$phoneColumn}`, '')) <> ''") : 0,
+        'total' => (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` WHERE {$where}", $args),
+        'email' => $emailColumn !== '' ? (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` WHERE {$where} AND TRIM(COALESCE(`{$emailColumn}`, '')) <> ''", $args) : 0,
+        'phone' => $phoneColumn !== '' ? (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` WHERE {$where} AND TRIM(COALESCE(`{$phoneColumn}`, '')) <> ''", $args) : 0,
         'label' => (string) $config['label'],
       ];
     }
@@ -158,7 +164,7 @@ final class AdministrativeNotificationsService
   public function search(string $type, string $query, int $page = 1, int $perPage = 20, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = ''): array
   {
     $config = $this->typeConfig($type);
-    $contractStatus = $this->sanitizeContractStatus($contractStatus);
+    $contractStatus = $this->effectiveContractStatus($config, $contractStatus);
     $inmuebleSimi = trim($inmuebleSimi);
     $contractNumber = trim($contractNumber);
     $table = (string) $config['table'];
@@ -244,7 +250,7 @@ final class AdministrativeNotificationsService
   public function idsForFilter(string $type, string $query, int $limit = 5000, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = ''): array
   {
     $config = $this->typeConfig($type);
-    $contractStatus = $this->sanitizeContractStatus($contractStatus);
+    $contractStatus = $this->effectiveContractStatus($config, $contractStatus);
     $inmuebleSimi = trim($inmuebleSimi);
     $contractNumber = trim($contractNumber);
     $table = (string) $config['table'];
@@ -418,12 +424,19 @@ final class AdministrativeNotificationsService
     return in_array($status, ['activos', 'no_activos'], true) ? $status : '';
   }
 
+  /** @param array<string,mixed> $config */
+  private function effectiveContractStatus(array $config, string $status): string
+  {
+    $fixed = $this->sanitizeContractStatus((string) ($config['contract_status_fixed'] ?? ''));
+    return $fixed !== '' ? $fixed : $this->sanitizeContractStatus($status);
+  }
+
   /** @param array<string,mixed> $config @param array<int,mixed> $args */
   private function applyContractFilters(string &$where, array &$args, string $type, array $config, string $contractStatus, string $inmuebleSimi = '', string $contractNumber = ''): void
   {
     $inmuebleSimi = trim($inmuebleSimi);
     $contractNumber = trim($contractNumber);
-    if (($contractStatus === '' && $inmuebleSimi === '' && $contractNumber === '') || !in_array($type, ['propietarios', 'arrendatarios', 'copropiedades'], true)) {
+    if (($contractStatus === '' && $inmuebleSimi === '' && $contractNumber === '') || empty($config['contract_actor_column'])) {
       return;
     }
     $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
@@ -498,7 +511,7 @@ final class AdministrativeNotificationsService
    */
   private function contractActivityInfo(string $type, array $config, array $recipient, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = ''): array
   {
-    if (!in_array($type, ['propietarios', 'arrendatarios', 'copropiedades'], true)) {
+    if (empty($config['contract_actor_column'])) {
       return ['label' => '', 'summary' => ''];
     }
     $contractStatus = $this->sanitizeContractStatus($contractStatus);

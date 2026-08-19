@@ -90,9 +90,9 @@ trait HandlesAdministrativeNotifications
   private function sanitize_admin_notification_type(string $type): string
   {
     $type = sanitize_key($type);
-    return in_array($type, ['propietarios', 'arrendatarios', 'copropiedades', 'proveedores', 'funcionarios'], true)
+    return array_key_exists($type, $this->get_admin_notifications_service()->types())
       ? $type
-      : 'propietarios';
+      : 'propietarios_activos';
   }
 
   private function sanitize_admin_notification_contract_status(string $status): string

@@ -2110,7 +2110,7 @@
       }
 
       function supportsContractStatus(type) {
-        return type === "propietarios" || type === "arrendatarios" || type === "copropiedades";
+        return /^(propietarios|arrendatarios|copropiedades)/.test(String(type || ""));
       }
 
       function currentContractStatus() {

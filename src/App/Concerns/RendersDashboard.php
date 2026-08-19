@@ -1514,15 +1514,6 @@ trait RendersDashboard
               <label for="scm-admin-notif-q">Buscar</label>
               <input id="scm-admin-notif-q" name="q" type="search" class="input input-bordered input-sm scm-input" placeholder="Nombre, correo, celular, documento..." data-admin-notif-query>
             </div>
-            <div class="scm-field scm-admin-notif-contract-status" data-admin-notif-contract-status-wrap>
-              <label for="scm-admin-notif-contract-status">Contrato arrendamiento</label>
-              <select id="scm-admin-notif-contract-status" name="contract_status" class="select select-bordered select-sm scm-select" data-admin-notif-contract-status>
-                <option value="">Todos</option>
-                <option value="activos">Activos</option>
-                <option value="no_activos">No activos</option>
-              </select>
-              <small>Activo = tiene Entregado · No activo = solo Recibido</small>
-            </div>
             <div class="scm-field scm-admin-notif-contract-extra" data-admin-notif-contract-extra-wrap>
               <label for="scm-admin-notif-inmueble-simi">Inmueble SIMI</label>
               <input id="scm-admin-notif-inmueble-simi" name="inmueble_simi" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: 10628" data-admin-notif-inmueble-simi>
