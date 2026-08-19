@@ -2065,8 +2065,11 @@
       var selectedCountEl = panel.querySelector("[data-admin-notif-selected-count]");
       var selectVisibleBtn = panel.querySelector("[data-admin-notif-select-visible]");
       var allFiltered = panel.querySelector("[data-admin-notif-all-filtered]");
+      var sendFilteredBtn = panel.querySelector("[data-admin-notif-send-filtered]");
       var subjectWrap = panel.querySelector("[data-admin-notif-subject-wrap]");
       var messageInput = panel.querySelector("[data-admin-notif-message]");
+      var whatsappTemplateWrap = panel.querySelector("[data-admin-notif-whatsapp-template-wrap]");
+      var whatsappTemplateSelect = panel.querySelector("[data-admin-notif-whatsapp-template]");
       var smsCounter = panel.querySelector("[data-admin-notif-sms-counter]");
       var submitBtn = panel.querySelector("[data-admin-notif-submit]");
       var spinner = panel.querySelector("[data-admin-notif-spinner]");
@@ -2147,6 +2150,20 @@
             '[data-admin-notif-channel][value="email"]:checked',
           );
           subjectWrap.style.display = emailChecked ? "" : "none";
+        }
+        var whatsappChecked = !!panel.querySelector(
+          '[data-admin-notif-channel][value="whatsapp"]:checked',
+        );
+        if (whatsappTemplateWrap) {
+          whatsappTemplateWrap.hidden = !whatsappChecked;
+          whatsappTemplateWrap.classList.toggle("is-hidden", !whatsappChecked);
+        }
+        if (whatsappTemplateSelect) {
+          panel.querySelectorAll("[data-admin-notif-template-guide]").forEach(function (guide) {
+            guide.hidden =
+              !whatsappChecked ||
+              guide.getAttribute("data-admin-notif-template-guide") !== whatsappTemplateSelect.value;
+          });
         }
         updateSmsCounter();
       }
@@ -2325,6 +2342,22 @@
           });
         }
 
+        if (sendFilteredBtn) {
+          sendFilteredBtn.addEventListener("click", function () {
+            if (allFiltered) {
+              allFiltered.checked = true;
+            }
+            selected.clear();
+            updateVisibleChecks();
+            syncContext();
+            if (sendForm.requestSubmit) {
+              sendForm.requestSubmit();
+            } else {
+              submitBtn && submitBtn.click();
+            }
+          });
+        }
+
         if (paginationEl) {
           paginationEl.addEventListener("click", function (event) {
             var btn = event.target && event.target.closest
@@ -2341,6 +2374,9 @@
         panel.querySelectorAll("[data-admin-notif-channel]").forEach(function (input) {
           input.addEventListener("change", syncContext);
         });
+        if (whatsappTemplateSelect) {
+          whatsappTemplateSelect.addEventListener("change", syncContext);
+        }
         if (messageInput) {
           messageInput.addEventListener("input", updateSmsCounter);
         }

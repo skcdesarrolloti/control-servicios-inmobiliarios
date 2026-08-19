@@ -14,6 +14,7 @@ final class AdministrativeNotificationsService
   public const SOURCE_MODULE = 'admin_notifications';
   public const QUEUE_TABLE = 'skc_notification_queue';
   public const SMS_MAX = 160;
+  public const DEFAULT_WHATSAPP_TEMPLATE = 'scm_notificacion_general_v1';
 
   private Database $db;
   private SchemaInspector $schema;
@@ -111,6 +112,21 @@ final class AdministrativeNotificationsService
       ];
     }
     return $out;
+  }
+
+  /** @return array<string,array{name:string,label:string,language:string,description:string,body:string,variables:array<int,string>}> */
+  public function whatsappTemplates(): array
+  {
+    return [
+      self::DEFAULT_WHATSAPP_TEMPLATE => [
+        'name' => self::DEFAULT_WHATSAPP_TEMPLATE,
+        'label' => 'Notificacion general',
+        'language' => 'es_CO',
+        'description' => 'Plantilla oficial para enviar avisos generales desde Notificaciones.',
+        'body' => "Hola {{1}}.\n\n{{2}}",
+        'variables' => ['Nombre del destinatario', 'Mensaje escrito en esta pantalla'],
+      ],
+    ];
   }
 
   /** @return array{rows:array<int,array<string,mixed>>,total:int,page:int,pages:int,per_page:int,type:string,type_label:string,contract_status:string} */
@@ -228,10 +244,11 @@ final class AdministrativeNotificationsService
    * @param string[] $channels
    * @return array{queued:int,failed:int,invalid:int,filtered:int,selected:int,channels:array<int,string>,type:string}
    */
-  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message): array
+  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = ''): array
   {
     $config = $this->typeConfig($type);
     $channels = $this->sanitizeChannels($channels);
+    $whatsappTemplateConfig = $this->whatsappTemplateConfig($whatsappTemplate);
     $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
     $subject = trim($subject);
     $message = trim($message);
@@ -250,6 +267,9 @@ final class AdministrativeNotificationsService
     }
     if (in_array('sms', $channels, true) && mb_strlen($message) > self::SMS_MAX) {
       throw new \RuntimeException('El SMS supera ' . self::SMS_MAX . ' caracteres.');
+    }
+    if (in_array('whatsapp', $channels, true) && $whatsappTemplateConfig === []) {
+      throw new \RuntimeException('Selecciona una plantilla valida para WhatsApp.');
     }
     if (!$this->schema->tableExists(self::QUEUE_TABLE)) {
       throw new \RuntimeException('La tabla skc_notification_queue no esta disponible.');
@@ -275,7 +295,7 @@ final class AdministrativeNotificationsService
         }
         $resolvedMessage = $this->resolveVariables($message, $recipient, $config);
         $resolvedSubject = $this->resolveVariables($subject, $recipient, $config);
-        if ($this->insertQueueRow($channel, $destination, $recipient, $resolvedSubject, $resolvedMessage, $batchId)) {
+        if ($this->insertQueueRow($channel, $destination, $recipient, $resolvedSubject, $resolvedMessage, $batchId, $whatsappTemplateConfig)) {
           $queued++;
         } else {
           $failed++;
@@ -546,7 +566,8 @@ final class AdministrativeNotificationsService
     return '(' . implode(' OR ', $parts) . ')';
   }
 
-  private function insertQueueRow(string $channel, string $destination, array $recipient, string $subject, string $message, string $batchId): bool
+  /** @param array<string,mixed> $whatsappTemplateConfig */
+  private function insertQueueRow(string $channel, string $destination, array $recipient, string $subject, string $message, string $batchId, array $whatsappTemplateConfig = []): bool
   {
     $now = gmdate('Y-m-d H:i:s');
     $actorId = (int) ($recipient['_ID'] ?? 0);
@@ -554,9 +575,30 @@ final class AdministrativeNotificationsService
     $name = trim((string) ($recipient['nombre'] ?? ''));
     $provider = match ($channel) {
       'sms' => 'sms_onurix',
-      'whatsapp' => 'whatsapp',
+      'whatsapp' => 'whatsapp_official',
       default => 'email_smtp',
     };
+    $templateName = '';
+    $templateLanguage = '';
+    $payload = [];
+    if ($channel === 'whatsapp') {
+      $templateName = trim((string) ($whatsappTemplateConfig['name'] ?? ''));
+      $templateLanguage = trim((string) ($whatsappTemplateConfig['language'] ?? 'es_CO')) ?: 'es_CO';
+      $payload = [
+        'type' => 'template',
+        'template_name' => $templateName,
+        'template_language' => $templateLanguage,
+        'components' => [
+          [
+            'type' => 'body',
+            'parameters' => [
+              ['type' => 'text', 'text' => $name !== '' ? $name : 'Cliente'],
+              ['type' => 'text', 'text' => $message],
+            ],
+          ],
+        ],
+      ];
+    }
     $meta = [
       'admin_notifications' => [
         'batch_id' => $batchId,
@@ -567,6 +609,7 @@ final class AdministrativeNotificationsService
         'id_funcionario' => Auth::userId(),
         'nombre_funcionario' => Auth::user(),
         'source_module' => self::SOURCE_MODULE,
+        'whatsapp_template' => $templateName,
       ],
     ];
     $data = [
@@ -579,8 +622,9 @@ final class AdministrativeNotificationsService
       'subject' => $channel === 'email' ? $subject : '',
       'message_html' => $channel === 'email' ? nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8')) : '',
       'message_text' => trim(html_entity_decode(strip_tags($message), ENT_QUOTES, 'UTF-8')),
-      'template_name' => '',
-      'payload_json' => json_encode([], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+      'template_name' => $templateName,
+      'template_language' => $templateLanguage,
+      'payload_json' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
       'meta_json' => json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
       'status' => 'pending',
       'priority' => 100,
@@ -598,6 +642,17 @@ final class AdministrativeNotificationsService
     } catch (\Throwable) {
       return false;
     }
+  }
+
+  /** @return array<string,mixed> */
+  private function whatsappTemplateConfig(string $templateName): array
+  {
+    $templateName = trim($templateName);
+    if ($templateName === '') {
+      $templateName = self::DEFAULT_WHATSAPP_TEMPLATE;
+    }
+    $templates = $this->whatsappTemplates();
+    return is_array($templates[$templateName] ?? null) ? $templates[$templateName] : [];
   }
 
   /** @return string[] */

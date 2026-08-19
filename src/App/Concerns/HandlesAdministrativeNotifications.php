@@ -65,9 +65,10 @@ trait HandlesAdministrativeNotifications
 
     $subject = trim(sanitize_text_field(wp_unslash((string) ($_POST['subject'] ?? ''))));
     $message = trim(wp_strip_all_tags(wp_unslash((string) ($_POST['message'] ?? '')), false));
+    $whatsappTemplate = sanitize_key((string) ($_POST['whatsapp_template'] ?? ''));
 
     try {
-      $result = $service->enqueue($type, $ids, $channels, $subject, $message);
+      $result = $service->enqueue($type, $ids, $channels, $subject, $message, $whatsappTemplate);
       $queued = (int) ($result['queued'] ?? 0);
       $invalid = (int) ($result['invalid'] ?? 0);
       $failed = (int) ($result['failed'] ?? 0);

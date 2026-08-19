@@ -1461,6 +1461,7 @@ trait RendersDashboard
     $service = new AdministrativeNotificationsService($this->db);
     $types = $service->types();
     $stats = $service->stats();
+    $whatsappTemplates = $service->whatsappTemplates();
     $firstType = (string) array_key_first($types);
 
     ob_start();
@@ -1556,6 +1557,9 @@ trait RendersDashboard
               <input type="checkbox" name="all_filtered" value="1" data-admin-notif-all-filtered>
               <span>Enviar a todos los resultados filtrados</span>
             </label>
+            <button type="button" class="scm-admin-notif-send-filtered" data-admin-notif-send-filtered>
+              Enviar a todos los filtrados
+            </button>
 
             <div class="scm-field" data-admin-notif-subject-wrap>
               <label for="scm-admin-notif-subject">Asunto para Email</label>
@@ -1567,6 +1571,28 @@ trait RendersDashboard
               <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." required data-admin-notif-message></textarea>
               <small class="scm-admin-notif-helper">Variables: {{nombre}}, {{correo}}, {{celular}}, {{tipo_actor}}, {{rol_persona}}.</small>
               <small class="scm-admin-notif-sms-counter" data-admin-notif-sms-counter>0/160 SMS</small>
+            </div>
+
+            <div class="scm-admin-notif-template-card" data-admin-notif-whatsapp-template-wrap>
+              <div class="scm-field">
+                <label for="scm-admin-notif-whatsapp-template">Plantilla WhatsApp oficial</label>
+                <select id="scm-admin-notif-whatsapp-template" name="whatsapp_template" class="select select-bordered select-sm scm-select" data-admin-notif-whatsapp-template>
+                  <?php foreach ($whatsappTemplates as $template): ?>
+                    <option value="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>">
+                      <?php echo esc_html((string) ($template['label'] ?? $template['name'] ?? 'Plantilla')); ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <?php foreach ($whatsappTemplates as $template): ?>
+                <div class="scm-admin-notif-template-guide" data-admin-notif-template-guide="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>">
+                  <strong><?php echo esc_html((string) ($template['name'] ?? '')); ?></strong>
+                  <span>Idioma: <?php echo esc_html((string) ($template['language'] ?? 'es_CO')); ?></span>
+                  <p><?php echo nl2br(esc_html((string) ($template['body'] ?? ''))); ?></p>
+                  <small>Crea esta plantilla en Meta como Utilidad/Utility. Body exacto: Hola {{1}}. + salto de linea + {{2}}.</small>
+                  <small>Variables en Meta: {{1}} = nombre del destinatario · {{2}} = mensaje escrito arriba.</small>
+                </div>
+              <?php endforeach; ?>
             </div>
 
             <div class="scm-admin-notif-submit-row">
