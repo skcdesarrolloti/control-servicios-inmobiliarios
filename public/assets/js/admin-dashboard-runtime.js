@@ -2117,11 +2117,16 @@
 
       function senderProfile() {
         var signature = panel.getAttribute("data-admin-notif-sender-signature") || "";
+        var name = panel.getAttribute("data-admin-notif-sender-name") || "Funcionario";
+        var cargo = panel.getAttribute("data-admin-notif-sender-cargo") || "Control Servicios Inmobiliarios";
+        var phone = panel.getAttribute("data-admin-notif-sender-phone") || "";
+        var signatureLine = [name, cargo, phone ? "Cel. " + phone : ""].filter(Boolean).join(" - ");
         return {
-          name: panel.getAttribute("data-admin-notif-sender-name") || "Funcionario",
-          cargo: panel.getAttribute("data-admin-notif-sender-cargo") || "Control Servicios Inmobiliarios",
-          phone: panel.getAttribute("data-admin-notif-sender-phone") || "",
-          signature: signature || "Atentamente,\nFuncionario\nControl Servicios Inmobiliarios",
+          name: name,
+          cargo: cargo,
+          phone: phone,
+          signature: signature || "Atentamente,\n" + signatureLine,
+          signatureLine: signatureLine,
         };
       }
 
@@ -2316,7 +2321,8 @@
           .replace(/\{\{funcionario\}\}/g, sender.name)
           .replace(/\{\{cargo_funcionario\}\}/g, sender.cargo)
           .replace(/\{\{celular_funcionario\}\}/g, sender.phone || "Sin celular registrado")
-          .replace(/\{\{firma_funcionario\}\}/g, sender.signature);
+          .replace(/\{\{firma_funcionario\}\}/g, sender.signature)
+          .replace(/\{\{firma_funcionario_linea\}\}/g, sender.signatureLine);
       }
 
       function stripHtml(value) {
@@ -2393,10 +2399,13 @@
         var hasSlot = template.indexOf("{{mensaje}}") !== -1 || template.indexOf("{{custom_message}}") !== -1;
         var option = selectedEmailOption();
         var isFullTemplate = !!(option && option.getAttribute("data-template-full") === "1");
+        var messageForEmail = template !== stripHtml(template)
+          ? safePreviewHtml(rawMessage !== stripHtml(rawMessage) ? rawMessage : escHtml(rawMessage).replace(/\n/g, "<br>"))
+          : rawMessage;
         var body = hasSlot
           ? template
-              .replace(/\{\{mensaje\}\}/g, rawMessage || "Mensaje escrito por el funcionario.")
-              .replace(/\{\{custom_message\}\}/g, rawMessage || "Mensaje escrito por el funcionario.")
+              .replace(/\{\{mensaje\}\}/g, messageForEmail || "Mensaje escrito por el funcionario.")
+              .replace(/\{\{custom_message\}\}/g, messageForEmail || "Mensaje escrito por el funcionario.")
           : (isFullTemplate || isFullEmailHtml(template) ? template : rawMessage || template || "Mensaje escrito por el funcionario.");
         body = previewMessage(body);
         if (body === stripHtml(body)) {

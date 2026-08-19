@@ -137,31 +137,21 @@ final class AdministrativeNotificationsService
   /** @return array<string,array{name:string,label:string,subject:string,body:string,description:string,source:string,message_only:bool,editable_message:string}> */
   public function emailTemplates(): array
   {
-    $templates = [
+    return [
       self::DEFAULT_EMAIL_TEMPLATE => [
         'name' => self::DEFAULT_EMAIL_TEMPLATE,
         'label' => 'Generica',
         'subject' => 'Informacion importante',
         'description' => 'Plantilla base reutilizable: solo cambia el mensaje escrito por el funcionario.',
-        'body' => "Hola {{nombre}},\n\n{{mensaje}}\n\n{{firma_funcionario}}",
+        'body' => '<p><strong>Hola {{nombre}}</strong>,</p><div>{{mensaje}}</div><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
         'source' => 'sistema',
         'message_only' => true,
         'editable_message' => '',
-        'is_html' => false,
+        'is_html' => true,
         'is_full_document' => false,
-        'preview_excerpt' => 'Base corporativa con banner, mensaje editable y firma del funcionario logueado.',
+        'preview_excerpt' => 'Base corporativa con banner, saludo en negrita, mensaje editable y firma en formato Nombre - Cargo - Celular.',
       ],
     ];
-
-    foreach ($this->storedEmailTemplates() as $template) {
-      $name = (string) ($template['name'] ?? '');
-      if ($name === '') {
-        continue;
-      }
-      $templates[$name] = $template;
-    }
-
-    return $templates;
   }
 
   /** @return array{rows:array<int,array<string,mixed>>,total:int,page:int,pages:int,per_page:int,type:string,type_label:string,contract_status:string} */
@@ -819,7 +809,8 @@ final class AdministrativeNotificationsService
       }
       return $this->resolveVariables($message !== '' ? $message : $body, $recipient, $config);
     }
-    $body = str_replace(['{{mensaje}}', '{{custom_message}}'], $message, $body);
+    $messageForEmail = $body !== strip_tags($body) ? $this->emailContentHtml($message) : $message;
+    $body = str_replace(['{{mensaje}}', '{{custom_message}}'], $messageForEmail, $body);
     return $this->resolveVariables($body, $recipient, $config);
   }
 
@@ -937,11 +928,12 @@ final class AdministrativeNotificationsService
       '{{cargo_funcionario}}' => $sender['cargo'],
       '{{celular_funcionario}}' => $sender['phone'],
       '{{firma_funcionario}}' => $sender['signature'],
+      '{{firma_funcionario_linea}}' => $sender['signature_line'],
     ];
     return strtr($template, $map);
   }
 
-  /** @return array{name:string,cargo:string,phone:string,signature:string} */
+  /** @return array{name:string,cargo:string,phone:string,signature:string,signature_line:string} */
   public function senderProfile(): array
   {
     if ($this->senderProfile !== null) {
@@ -985,16 +977,18 @@ final class AdministrativeNotificationsService
       $cargo = 'Control Servicios Inmobiliarios';
     }
 
-    $signatureLines = ['Atentamente,', $name, $cargo];
+    $signatureLineParts = [$name, $cargo];
     if ($phone !== '') {
-      $signatureLines[] = 'Cel. ' . $phone;
+      $signatureLineParts[] = 'Cel. ' . $phone;
     }
+    $signatureLine = implode(' - ', array_filter($signatureLineParts, static fn(string $value): bool => trim($value) !== ''));
 
     $this->senderProfile = [
       'name' => $name,
       'cargo' => $cargo,
       'phone' => $phone,
-      'signature' => implode("\n", $signatureLines),
+      'signature' => "Atentamente,\n" . $signatureLine,
+      'signature_line' => $signatureLine,
     ];
 
     return $this->senderProfile;
