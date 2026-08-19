@@ -2491,10 +2491,6 @@
           .replace(/\{\{3\}\}/g, sender.signatureLine || "Funcionario - Control Servicios Inmobiliarios");
       }
 
-      function renderWhatsappReplyPreview() {
-        return '<div class="scm-admin-notif-wa-button-preview">Responder</div>';
-      }
-
       function updatePreview() {
         if (!previewEl || !messageInput || previewEl.hidden) {
           return;
@@ -2545,7 +2541,6 @@
             '<p class="scm-admin-notif-preview-text">' +
             escHtml(renderWhatsappPreviewText()).replace(/\n/g, "<br>") +
             "</p>" +
-            renderWhatsappReplyPreview() +
             "</article>"
           );
         }).join("");

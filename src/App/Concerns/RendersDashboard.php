@@ -1698,9 +1698,8 @@ trait RendersDashboard
                   <p><?php echo nl2br(esc_html((string) ($template['body'] ?? ''))); ?></p>
                   <small>Este selector solo muestra las plantillas WhatsApp configuradas para este m&oacute;dulo.</small>
                   <small>Crea esta plantilla en Meta como Utilidad/Utility con el cuerpo exacto mostrado arriba.</small>
-                  <small>Agrega un bot&oacute;n de Respuesta r&aacute;pida / Quick reply con texto "<?php echo esc_html((string) ($template['button_label'] ?? 'Responder')); ?>".</small>
                   <small>Variables en Meta: {{1}} = nombre del destinatario · {{2}} = mensaje escrito arriba · {{3}} = Nombre - Cargo - Celular del funcionario.</small>
-                  <small>No uses enlaces wa.me en botones: Meta puede rechazarlos. La respuesta llega a la l&iacute;nea oficial de WhatsApp.</small>
+                  <small>No agregues botones a esta plantilla. La firma del funcionario queda dentro del cuerpo del mensaje.</small>
                 </div>
               <?php endforeach; ?>
             </div>
