@@ -32,6 +32,7 @@ final class AdministrativeNotificationsService
         'label' => 'Propietarios',
         'role' => 'Propietario',
         'table' => $this->db->table('jet_cct_propietarios'),
+        'contract_actor_column' => 'id_propietario',
         'name' => ['nombre', 'nombre_juridico', 'titular'],
         'email' => ['correo', 'correo_cuenta'],
         'phone' => ['celular', 'telefono', 'contacto'],
@@ -42,6 +43,7 @@ final class AdministrativeNotificationsService
         'label' => 'Arrendatarios',
         'role' => 'Arrendatario',
         'table' => $this->db->table('jet_cct_arrendatarios'),
+        'contract_actor_column' => 'id_arrendatario',
         'name' => ['nombre', 'nombre_juridico'],
         'email' => ['correo'],
         'phone' => ['celular', 'telefono', 'contacto'],
@@ -105,13 +107,14 @@ final class AdministrativeNotificationsService
     return $out;
   }
 
-  /** @return array{rows:array<int,array<string,mixed>>,total:int,page:int,pages:int,per_page:int,type:string,type_label:string} */
-  public function search(string $type, string $query, int $page = 1, int $perPage = 20): array
+  /** @return array{rows:array<int,array<string,mixed>>,total:int,page:int,pages:int,per_page:int,type:string,type_label:string,contract_status:string} */
+  public function search(string $type, string $query, int $page = 1, int $perPage = 20, string $contractStatus = ''): array
   {
     $config = $this->typeConfig($type);
+    $contractStatus = $this->sanitizeContractStatus($contractStatus);
     $table = (string) $config['table'];
     if (!$this->schema->tableExists($table)) {
-      return ['rows' => [], 'total' => 0, 'page' => 1, 'pages' => 1, 'per_page' => $perPage, 'type' => $type, 'type_label' => (string) $config['label']];
+      return ['rows' => [], 'total' => 0, 'page' => 1, 'pages' => 1, 'per_page' => $perPage, 'type' => $type, 'type_label' => (string) $config['label'], 'contract_status' => $contractStatus];
     }
 
     $columns = $this->resolveColumns($config);
@@ -129,6 +132,7 @@ final class AdministrativeNotificationsService
         $where .= ' AND (' . implode(' OR ', $parts) . ')';
       }
     }
+    $this->applyContractStatusFilter($where, $args, $type, $config, $contractStatus);
 
     $total = (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` WHERE {$where}", $args);
     $page = max(1, $page);
@@ -144,6 +148,12 @@ final class AdministrativeNotificationsService
       $columns['phone'] !== '' ? "`{$columns['phone']}` AS celular" : "'' AS celular",
       $columns['indicator'] !== '' ? "`{$columns['indicator']}` AS indicativo" : "'' AS indicativo",
     ];
+    $contractActorColumn = (string) ($config['contract_actor_column'] ?? '');
+    if ($contractActorColumn !== '' && $this->schema->columnExists($table, $contractActorColumn)) {
+      $select[] = "`{$contractActorColumn}` AS contrato_actor_ref";
+    } else {
+      $select[] = "'' AS contrato_actor_ref";
+    }
 
     $rows = $this->db->getResults(
       'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE {$where} ORDER BY `_ID` DESC LIMIT ? OFFSET ?",
@@ -155,6 +165,7 @@ final class AdministrativeNotificationsService
       $row['tipo_label'] = (string) $config['label'];
       $row['rol_persona'] = (string) $config['role'];
       $row['celular_normalizado'] = $this->normalizePhone((string) ($row['celular'] ?? ''), (string) ($row['indicativo'] ?? ''), true);
+      $row['contrato_arrendamiento_estado'] = $this->contractActivityLabel($type, $config, $row, $contractStatus);
     }
     unset($row);
 
@@ -166,13 +177,15 @@ final class AdministrativeNotificationsService
       'per_page' => $perPage,
       'type' => $type,
       'type_label' => (string) $config['label'],
+      'contract_status' => $contractStatus,
     ];
   }
 
   /** @return int[] */
-  public function idsForFilter(string $type, string $query, int $limit = 5000): array
+  public function idsForFilter(string $type, string $query, int $limit = 5000, string $contractStatus = ''): array
   {
     $config = $this->typeConfig($type);
+    $contractStatus = $this->sanitizeContractStatus($contractStatus);
     $table = (string) $config['table'];
     if (!$this->schema->tableExists($table)) {
       return [];
@@ -191,6 +204,7 @@ final class AdministrativeNotificationsService
         $where .= ' AND (' . implode(' OR ', $parts) . ')';
       }
     }
+    $this->applyContractStatusFilter($where, $args, $type, $config, $contractStatus);
     $rows = $this->db->getResults("SELECT `_ID` FROM `{$table}` WHERE {$where} ORDER BY `_ID` DESC LIMIT ?", array_merge($args, [max(1, $limit)]));
     return array_values(array_map(static fn(array $row): int => (int) ($row['_ID'] ?? 0), $rows));
   }
@@ -312,6 +326,109 @@ final class AdministrativeNotificationsService
       default => 'bloqueo_email',
     };
     return array_key_exists($field, $recipient) && (int) ($recipient[$field] ?? 0) === 1;
+  }
+
+  private function sanitizeContractStatus(string $status): string
+  {
+    $status = strtolower(trim($status));
+    return in_array($status, ['activos', 'no_activos'], true) ? $status : '';
+  }
+
+  /** @param array<string,mixed> $config @param array<int,mixed> $args */
+  private function applyContractStatusFilter(string &$where, array &$args, string $type, array $config, string $contractStatus): void
+  {
+    if ($contractStatus === '' || !in_array($type, ['propietarios', 'arrendatarios'], true)) {
+      return;
+    }
+    $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    $actorTable = (string) $config['table'];
+    $contractActorColumn = (string) ($config['contract_actor_column'] ?? '');
+    if (
+      $contractActorColumn === ''
+      || !$this->schema->tableExists($contractTable)
+      || !$this->schema->columnExists($contractTable, $contractActorColumn)
+      || !$this->schema->columnExists($contractTable, 'estado')
+    ) {
+      return;
+    }
+
+    $where .= " AND EXISTS (
+      SELECT 1
+        FROM `{$contractTable}` ca
+       WHERE {$this->contractActorComparisonSql($actorTable, $contractActorColumn)}
+         AND LOWER(TRIM(COALESCE(ca.`estado`, ''))) = ?
+       LIMIT 1
+    )";
+    $args[] = $contractStatus === 'activos' ? 'entregado' : 'recibido';
+  }
+
+  /** @param array<string,mixed> $config @param array<string,mixed> $recipient */
+  private function contractActivityLabel(string $type, array $config, array $recipient, string $contractStatus = ''): string
+  {
+    if (!in_array($type, ['propietarios', 'arrendatarios'], true)) {
+      return '';
+    }
+    $contractStatus = $this->sanitizeContractStatus($contractStatus);
+    if ($contractStatus === 'activos') {
+      return 'Activo';
+    }
+    if ($contractStatus === 'no_activos') {
+      return 'No activo';
+    }
+    $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    $contractActorColumn = (string) ($config['contract_actor_column'] ?? '');
+    if (
+      $contractActorColumn === ''
+      || !$this->schema->tableExists($contractTable)
+      || !$this->schema->columnExists($contractTable, $contractActorColumn)
+      || !$this->schema->columnExists($contractTable, 'estado')
+    ) {
+      return '';
+    }
+
+    $ids = array_values(array_unique(array_filter(array_map(
+      static fn($value): int => (int) preg_replace('/\D+/', '', (string) $value),
+      [$recipient['_ID'] ?? '', $recipient['contrato_actor_ref'] ?? '']
+    ), static fn(int $id): bool => $id > 0)));
+    if ($ids === []) {
+      return 'Sin contrato';
+    }
+
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $rows = $this->db->getResults(
+      "SELECT LOWER(TRIM(COALESCE(`estado`, ''))) AS estado, COUNT(1) AS total
+         FROM `{$contractTable}`
+        WHERE CAST(`{$contractActorColumn}` AS UNSIGNED) IN ({$placeholders})
+          AND LOWER(TRIM(COALESCE(`estado`, ''))) IN ('entregado', 'recibido')
+        GROUP BY LOWER(TRIM(COALESCE(`estado`, '')))",
+      $ids
+    );
+
+    $hasDelivered = false;
+    $hasReceived = false;
+    foreach ($rows as $row) {
+      $state = trim((string) ($row['estado'] ?? ''));
+      $hasDelivered = $hasDelivered || $state === 'entregado';
+      $hasReceived = $hasReceived || $state === 'recibido';
+    }
+    if ($hasDelivered) {
+      return 'Activo';
+    }
+    if ($hasReceived) {
+      return 'No activo';
+    }
+    return 'Sin contrato';
+  }
+
+  private function contractActorComparisonSql(string $actorTable, string $contractActorColumn): string
+  {
+    $parts = [
+      "CAST(ca.`{$contractActorColumn}` AS UNSIGNED) = CAST(`{$actorTable}`.`_ID` AS UNSIGNED)",
+    ];
+    if ($this->schema->columnExists($actorTable, $contractActorColumn)) {
+      $parts[] = "CAST(ca.`{$contractActorColumn}` AS UNSIGNED) = CAST(`{$actorTable}`.`{$contractActorColumn}` AS UNSIGNED)";
+    }
+    return '(' . implode(' OR ', $parts) . ')';
   }
 
   private function insertQueueRow(string $channel, string $destination, array $recipient, string $subject, string $message, string $batchId): bool

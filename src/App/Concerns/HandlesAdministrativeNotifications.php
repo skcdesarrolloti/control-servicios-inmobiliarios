@@ -22,10 +22,11 @@ trait HandlesAdministrativeNotifications
 
     $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'propietarios'));
     $query = trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? ''))));
+    $contractStatus = $this->sanitize_admin_notification_contract_status((string) ($_POST['contract_status'] ?? ''));
     $page = max(1, (int) ($_POST['page'] ?? 1));
 
     try {
-      $result = $this->get_admin_notifications_service()->search($type, $query, $page, 20);
+      $result = $this->get_admin_notifications_service()->search($type, $query, $page, 20, $contractStatus);
       $this->jsonOk([
         'html' => $this->render_admin_notification_recipient_rows($result['rows']),
         'pagination' => $this->render_admin_notification_pagination($result),
@@ -49,6 +50,7 @@ trait HandlesAdministrativeNotifications
     $service = $this->get_admin_notifications_service();
     $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'propietarios'));
     $query = trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? ''))));
+    $contractStatus = $this->sanitize_admin_notification_contract_status((string) ($_POST['contract_status'] ?? ''));
     $allFiltered = trim((string) ($_POST['all_filtered'] ?? '')) === '1';
     $rawChannels = $_POST['channels'] ?? [];
     $rawIds = $_POST['ids'] ?? [];
@@ -58,7 +60,7 @@ trait HandlesAdministrativeNotifications
       is_array($rawChannels) ? $rawChannels : [$rawChannels]
     );
     $ids = $allFiltered
-      ? $service->idsForFilter($type, $query, 5000)
+      ? $service->idsForFilter($type, $query, 5000, $contractStatus)
       : array_map('intval', is_array($rawIds) ? $rawIds : [$rawIds]);
 
     $subject = trim(sanitize_text_field(wp_unslash((string) ($_POST['subject'] ?? ''))));
@@ -87,6 +89,12 @@ trait HandlesAdministrativeNotifications
       : 'propietarios';
   }
 
+  private function sanitize_admin_notification_contract_status(string $status): string
+  {
+    $status = sanitize_key($status);
+    return in_array($status, ['activos', 'no_activos'], true) ? $status : '';
+  }
+
   /** @param array<int,array<string,mixed>> $rows */
   private function render_admin_notification_recipient_rows(array $rows): string
   {
@@ -105,6 +113,13 @@ trait HandlesAdministrativeNotifications
       $email = trim((string) ($row['correo'] ?? ''));
       $phone = trim((string) ($row['celular_normalizado'] ?? ($row['celular'] ?? '')));
       $rawPhone = trim((string) ($row['celular'] ?? ''));
+      $contractLabel = trim((string) ($row['contrato_arrendamiento_estado'] ?? ''));
+      $contractClass = match ($contractLabel) {
+        'Activo' => 'is-active-contract',
+        'No activo' => 'is-inactive-contract',
+        'Sin contrato' => 'is-empty-contract',
+        default => '',
+      };
 
       $html .= '<label class="scm-admin-notif-recipient" data-admin-notif-recipient-row>';
       $html .= '<input type="checkbox" value="' . esc_attr((string) $id) . '" data-admin-notif-recipient>';
@@ -112,6 +127,9 @@ trait HandlesAdministrativeNotifications
       $html .= '<span class="scm-admin-notif-person">';
       $html .= '<strong>' . esc_html($name) . '</strong>';
       $html .= '<small>' . esc_html($typeLabel) . ' · ID ' . esc_html((string) $id) . '</small>';
+      if ($contractLabel !== '') {
+        $html .= '<span class="scm-admin-notif-contract-badge ' . esc_attr($contractClass) . '">' . esc_html($contractLabel) . '</span>';
+      }
       $html .= '</span>';
       $html .= '<span class="scm-admin-notif-contact">';
       $html .= '<span class="' . ($email !== '' ? 'is-ready' : 'is-missing') . '">Email: ' . esc_html($email !== '' ? $email : 'Sin correo') . '</span>';

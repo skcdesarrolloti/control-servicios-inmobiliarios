@@ -3229,9 +3229,17 @@
 
 #scm-app .scm-admin-notif-filter-grid {
   display: grid;
-  grid-template-columns: minmax(210px, 260px) 1fr auto;
+  grid-template-columns: minmax(190px, 230px) minmax(170px, 220px) 1fr auto;
   gap: 12px;
   align-items: end;
+}
+
+#scm-app .scm-admin-notif-contract-status small {
+  display: block;
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 #scm-app .scm-admin-notif-filter-actions,
@@ -3328,6 +3336,35 @@
   color: #64748b;
   font-size: 12px;
   font-weight: 700;
+}
+
+#scm-app .scm-admin-notif-contract-badge {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 22px;
+  align-items: center;
+  margin-top: 4px;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+#scm-app .scm-admin-notif-contract-badge.is-active-contract {
+  background: #dcfce7;
+  color: #166534;
+}
+
+#scm-app .scm-admin-notif-contract-badge.is-inactive-contract {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+#scm-app .scm-admin-notif-contract-badge.is-empty-contract {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 #scm-app .scm-admin-notif-contact .is-ready {

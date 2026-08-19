@@ -2053,8 +2053,11 @@
       var sendForm = panel.querySelector("[data-admin-notif-send]");
       var typeSelect = panel.querySelector("[data-admin-notif-type]");
       var queryInput = panel.querySelector("[data-admin-notif-query]");
+      var contractStatusWrap = panel.querySelector("[data-admin-notif-contract-status-wrap]");
+      var contractStatusSelect = panel.querySelector("[data-admin-notif-contract-status]");
       var sendType = panel.querySelector("[data-admin-notif-send-type]");
       var sendQuery = panel.querySelector("[data-admin-notif-send-query]");
+      var sendContractStatus = panel.querySelector("[data-admin-notif-send-contract-status]");
       var recipientsEl = panel.querySelector("[data-admin-notif-recipients]");
       var paginationEl = panel.querySelector("[data-admin-notif-pagination]");
       var totalEl = panel.querySelector("[data-admin-notif-total]");
@@ -2088,6 +2091,17 @@
         return queryInput ? String(queryInput.value || "").trim() : "";
       }
 
+      function supportsContractStatus(type) {
+        return type === "propietarios" || type === "arrendatarios";
+      }
+
+      function currentContractStatus() {
+        if (!contractStatusSelect || !supportsContractStatus(currentType())) {
+          return "";
+        }
+        return String(contractStatusSelect.value || "").trim();
+      }
+
       function setLoading(isLoading) {
         panel.classList.toggle("is-loading", !!isLoading);
         if (spinner) {
@@ -2104,6 +2118,17 @@
         }
         if (sendQuery) {
           sendQuery.value = currentQuery();
+        }
+        if (sendContractStatus) {
+          sendContractStatus.value = currentContractStatus();
+        }
+        if (contractStatusWrap) {
+          var canFilterContracts = supportsContractStatus(currentType());
+          contractStatusWrap.hidden = !canFilterContracts;
+          contractStatusWrap.classList.toggle("is-hidden", !canFilterContracts);
+          if (!canFilterContracts && contractStatusSelect) {
+            contractStatusSelect.value = "";
+          }
         }
         if (selectedCountEl) {
           selectedCountEl.textContent =
@@ -2151,6 +2176,7 @@
         fd.append("nonce", nonce);
         fd.append("type", currentType());
         fd.append("q", currentQuery());
+        fd.append("contract_status", currentContractStatus());
         fd.append("page", String(currentPage));
         recipientsEl.innerHTML =
           '<div class="scm-admin-notif-empty"><strong>Cargando destinatarios...</strong><span>Un momento mientras actualizamos la lista.</span></div>';
@@ -2209,6 +2235,9 @@
           if (queryInput) {
             queryInput.value = "";
           }
+          if (contractStatusSelect) {
+            contractStatusSelect.value = "";
+          }
           selected.clear();
           if (allFiltered) {
             allFiltered.checked = false;
@@ -2225,6 +2254,17 @@
           syncContext();
           loadRecipients(1);
         });
+
+        if (contractStatusSelect) {
+          contractStatusSelect.addEventListener("change", function () {
+            selected.clear();
+            if (allFiltered) {
+              allFiltered.checked = false;
+            }
+            syncContext();
+            loadRecipients(1);
+          });
+        }
 
         panel.querySelectorAll("[data-admin-notif-type-shortcut]").forEach(function (btn) {
           btn.addEventListener("click", function () {
@@ -2327,6 +2367,7 @@
           fd.set("nonce", nonce);
           fd.set("type", currentType());
           fd.set("q", currentQuery());
+          fd.set("contract_status", currentContractStatus());
           fd.set("all_filtered", useAll ? "1" : "0");
           if (!useAll) {
             selected.forEach(function (id) {

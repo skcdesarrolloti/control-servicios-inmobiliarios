@@ -1499,6 +1499,15 @@ trait RendersDashboard
               <label for="scm-admin-notif-q">Buscar</label>
               <input id="scm-admin-notif-q" name="q" type="search" class="input input-bordered input-sm scm-input" placeholder="Nombre, correo, celular, documento..." data-admin-notif-query>
             </div>
+            <div class="scm-field scm-admin-notif-contract-status" data-admin-notif-contract-status-wrap>
+              <label for="scm-admin-notif-contract-status">Contrato arrendamiento</label>
+              <select id="scm-admin-notif-contract-status" name="contract_status" class="select select-bordered select-sm scm-select" data-admin-notif-contract-status>
+                <option value="">Todos</option>
+                <option value="activos">Activos</option>
+                <option value="no_activos">No activos</option>
+              </select>
+              <small>Activo = Entregado · No activo = Recibido</small>
+            </div>
             <div class="scm-admin-notif-filter-actions">
               <button type="submit" class="scm-btn-primary btn btn-primary">Buscar</button>
               <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-clear>Limpiar</button>
@@ -1527,6 +1536,7 @@ trait RendersDashboard
           <form data-admin-notif-send autocomplete="off">
             <input type="hidden" name="type" value="<?php echo esc_attr($firstType); ?>" data-admin-notif-send-type>
             <input type="hidden" name="q" value="" data-admin-notif-send-query>
+            <input type="hidden" name="contract_status" value="" data-admin-notif-send-contract-status>
 
             <div class="scm-admin-notif-section-head">
               <div>
