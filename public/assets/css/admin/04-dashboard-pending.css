@@ -3628,6 +3628,17 @@
   gap: 10px;
 }
 
+#scm-app .scm-admin-notif-channel-group[hidden],
+#scm-app .scm-admin-notif-modal.is-channel-specific .scm-admin-notif-channel-group {
+  display: none !important;
+}
+
+#scm-app .scm-admin-notif-modal.is-channel-specific .scm-admin-notif-selected-head {
+  border-color: #fed7aa;
+  background: linear-gradient(180deg, #fffaf3, #fff);
+  box-shadow: inset 4px 0 0 #f59120;
+}
+
 #scm-app .scm-admin-notif-all,
 #scm-app .scm-admin-notif-send-filtered {
   display: flex;

@@ -1561,7 +1561,7 @@ trait RendersDashboard
             <div class="scm-admin-notif-modal-titleblock">
               <span class="scm-calendar-action-kicker">Mensaje</span>
               <h4 id="scm-admin-notif-modal-title">Enviar notificaci&oacute;n</h4>
-              <p>Prepara el mensaje, elige canales y revisa la vista previa antes de encolar. Si hay texto escrito, el cierre pide confirmaci&oacute;n.</p>
+              <p data-admin-notif-modal-description>Prepara el mensaje, elige canales y revisa la vista previa antes de encolar. Si hay texto escrito, el cierre pide confirmaci&oacute;n.</p>
             </div>
             <button type="button" class="scm-modal-close" data-admin-notif-close-composer aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
           </div>

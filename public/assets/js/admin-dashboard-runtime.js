@@ -2085,6 +2085,9 @@
       var spinner = panel.querySelector("[data-admin-notif-spinner]");
       var resultEl = panel.querySelector("[data-admin-notif-result]");
       var composerModal = panel.querySelector("[data-admin-notif-modal]");
+      var composerTitle = panel.querySelector("#scm-admin-notif-modal-title");
+      var composerDescription = panel.querySelector("[data-admin-notif-modal-description]");
+      var channelGroup = panel.querySelector(".scm-admin-notif-channel-group");
       var openComposerBtn = panel.querySelector("[data-admin-notif-open-composer]");
       var closeComposerBtn = panel.querySelector("[data-admin-notif-close-composer]");
       if (!searchForm || !sendForm || !typeSelect || !recipientsEl) {
@@ -2099,6 +2102,13 @@
       var selected = new Set();
       var currentPage = 1;
       var composerDirty = false;
+      var composerChannelMode = "";
+
+      var channelNames = {
+        email: "Email",
+        sms: "SMS",
+        whatsapp: "WhatsApp",
+      };
 
       function currentType() {
         return typeSelect ? String(typeSelect.value || "propietarios") : "propietarios";
@@ -2190,10 +2200,43 @@
         composerDirty = true;
       }
 
+      function normalizeComposerGuidesPosition() {
+        var guides = panel.querySelector(".scm-admin-notif-guides");
+        var allFilteredRow = panel.querySelector(".scm-admin-notif-all");
+        if (!guides || !allFilteredRow || guides.dataset.adminNotifMoved === "1") {
+          return;
+        }
+        allFilteredRow.insertAdjacentElement("afterend", guides);
+        guides.dataset.adminNotifMoved = "1";
+      }
+
+      function updateComposerMode() {
+        var mode = String(composerChannelMode || "").trim().toLowerCase();
+        var isChannelMode = !!mode;
+        var label = channelNames[mode] || "notificación";
+        if (composerModal) {
+          composerModal.classList.toggle("is-channel-specific", isChannelMode);
+          composerModal.setAttribute("data-admin-notif-channel-mode", mode);
+        }
+        if (channelGroup) {
+          channelGroup.hidden = isChannelMode;
+        }
+        if (composerTitle) {
+          composerTitle.textContent = isChannelMode ? "Enviar notificación por " + label : "Enviar notificación";
+        }
+        if (composerDescription) {
+          composerDescription.textContent = isChannelMode
+            ? "Vista dedicada para " + label + ". Revisa las guías copiables, el mensaje y la vista previa antes de encolar."
+            : "Prepara el mensaje, elige canales y revisa la vista previa antes de encolar. Si hay texto escrito, el cierre pide confirmación.";
+        }
+      }
+
       function openComposer() {
         if (!composerModal) {
           return;
         }
+        normalizeComposerGuidesPosition();
+        updateComposerMode();
         composerModal.hidden = false;
         composerModal.classList.add("is-open");
         document.body.classList.add("scm-admin-notif-modal-open");
@@ -2219,7 +2262,15 @@
         }
         composerModal.hidden = true;
         composerModal.classList.remove("is-open");
+        composerChannelMode = "";
+        updateComposerMode();
         document.body.classList.remove("scm-admin-notif-modal-open");
+      }
+
+      function openGeneralComposer() {
+        composerChannelMode = "";
+        syncContext();
+        openComposer();
       }
 
       function useAllFilteredAndOpen() {
@@ -2235,6 +2286,7 @@
 
       function openComposerForChannel(channel) {
         var wanted = String(channel || "").trim().toLowerCase();
+        composerChannelMode = wanted;
         var changed = false;
         panel.querySelectorAll("[data-admin-notif-channel]").forEach(function (input) {
           var shouldCheck = String(input.value || "").toLowerCase() === wanted;
@@ -2269,6 +2321,7 @@
         if (sendContractNumber) {
           sendContractNumber.value = currentContractNumber();
         }
+        updateComposerMode();
         activateGuideTab(actorGuideKey(currentType()));
         if (contractStatusWrap) {
           var canFilterContracts = supportsContractStatus(currentType());
@@ -2640,7 +2693,7 @@
         panel.dataset.scmAdminNotificationsEvents = "1";
 
         if (openComposerBtn) {
-          openComposerBtn.addEventListener("click", openComposer);
+          openComposerBtn.addEventListener("click", openGeneralComposer);
         }
         panel.querySelectorAll("[data-admin-notif-open-channel]").forEach(function (btn) {
           btn.addEventListener("click", function () {
