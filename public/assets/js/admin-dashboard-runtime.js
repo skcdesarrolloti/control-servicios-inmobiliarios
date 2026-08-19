@@ -2484,17 +2484,15 @@
             template = guide.textContent || template;
           }
         }
+        var sender = senderProfile();
         return template
           .replace(/\{\{1\}\}/g, name)
-          .replace(/\{\{2\}\}/g, previewMessage(rawMessage || "Mensaje escrito por el funcionario."));
+          .replace(/\{\{2\}\}/g, previewMessage(rawMessage || "Mensaje escrito por el funcionario."))
+          .replace(/\{\{3\}\}/g, sender.signatureLine || "Funcionario - Control Servicios Inmobiliarios");
       }
 
       function renderWhatsappReplyPreview() {
-        var sender = senderProfile();
-        var label = sender.phone
-          ? "Responder por WhatsApp a " + sender.name + " (" + sender.phone + ")"
-          : "Responder por WhatsApp (configura el celular del funcionario)";
-        return '<div class="scm-admin-notif-wa-button-preview">' + escHtml(label) + "</div>";
+        return '<div class="scm-admin-notif-wa-button-preview">Responder</div>';
       }
 
       function updatePreview() {
