@@ -54,6 +54,12 @@ final class AdministrativeNotificationsService
         'label' => 'Copropiedades',
         'role' => 'Copropiedad',
         'table' => $this->db->table('jet_cct_copropiedades'),
+        'contract_actor_column' => 'id_copropiedad',
+        'contract_match_columns' => [
+          'nit' => 'nit_copropiedad',
+          'copropiedad' => 'copropiedad',
+          'id_inmueble' => 'id_inmueble',
+        ],
         'name' => ['copropiedad', 'nombre', 'administrador'],
         'email' => ['correo'],
         'phone' => ['contacto', 'celular', 'telefono'],
@@ -154,6 +160,12 @@ final class AdministrativeNotificationsService
     } else {
       $select[] = "'' AS contrato_actor_ref";
     }
+    foreach ((array) ($config['contract_match_columns'] ?? []) as $actorColumn => $contractColumn) {
+      $actorColumn = trim((string) $actorColumn);
+      if ($actorColumn !== '' && $this->schema->columnExists($table, $actorColumn)) {
+        $select[] = "`{$actorColumn}` AS `contrato_ref_{$actorColumn}`";
+      }
+    }
 
     $rows = $this->db->getResults(
       'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE {$where} ORDER BY `_ID` DESC LIMIT ? OFFSET ?",
@@ -165,7 +177,9 @@ final class AdministrativeNotificationsService
       $row['tipo_label'] = (string) $config['label'];
       $row['rol_persona'] = (string) $config['role'];
       $row['celular_normalizado'] = $this->normalizePhone((string) ($row['celular'] ?? ''), (string) ($row['indicativo'] ?? ''), true);
-      $row['contrato_arrendamiento_estado'] = $this->contractActivityLabel($type, $config, $row, $contractStatus);
+      $contractInfo = $this->contractActivityInfo($type, $config, $row, $contractStatus);
+      $row['contrato_arrendamiento_estado'] = $contractInfo['label'];
+      $row['contratos_arrendamiento_resumen'] = $contractInfo['summary'];
     }
     unset($row);
 
@@ -337,7 +351,7 @@ final class AdministrativeNotificationsService
   /** @param array<string,mixed> $config @param array<int,mixed> $args */
   private function applyContractStatusFilter(string &$where, array &$args, string $type, array $config, string $contractStatus): void
   {
-    if ($contractStatus === '' || !in_array($type, ['propietarios', 'arrendatarios'], true)) {
+    if ($contractStatus === '' || !in_array($type, ['propietarios', 'arrendatarios', 'copropiedades'], true)) {
       return;
     }
     $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
@@ -355,26 +369,24 @@ final class AdministrativeNotificationsService
     $where .= " AND EXISTS (
       SELECT 1
         FROM `{$contractTable}` ca
-       WHERE {$this->contractActorComparisonSql($actorTable, $contractActorColumn)}
+       WHERE {$this->contractActorComparisonSql($actorTable, $contractActorColumn, $config)}
          AND LOWER(TRIM(COALESCE(ca.`estado`, ''))) = ?
        LIMIT 1
     )";
     $args[] = $contractStatus === 'activos' ? 'entregado' : 'recibido';
   }
 
-  /** @param array<string,mixed> $config @param array<string,mixed> $recipient */
-  private function contractActivityLabel(string $type, array $config, array $recipient, string $contractStatus = ''): string
+  /**
+   * @param array<string,mixed> $config
+   * @param array<string,mixed> $recipient
+   * @return array{label:string,summary:string}
+   */
+  private function contractActivityInfo(string $type, array $config, array $recipient, string $contractStatus = ''): array
   {
-    if (!in_array($type, ['propietarios', 'arrendatarios'], true)) {
-      return '';
+    if (!in_array($type, ['propietarios', 'arrendatarios', 'copropiedades'], true)) {
+      return ['label' => '', 'summary' => ''];
     }
     $contractStatus = $this->sanitizeContractStatus($contractStatus);
-    if ($contractStatus === 'activos') {
-      return 'Activo';
-    }
-    if ($contractStatus === 'no_activos') {
-      return 'No activo';
-    }
     $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
     $contractActorColumn = (string) ($config['contract_actor_column'] ?? '');
     if (
@@ -383,50 +395,148 @@ final class AdministrativeNotificationsService
       || !$this->schema->columnExists($contractTable, $contractActorColumn)
       || !$this->schema->columnExists($contractTable, 'estado')
     ) {
-      return '';
+      return ['label' => '', 'summary' => ''];
     }
 
-    $ids = array_values(array_unique(array_filter(array_map(
-      static fn($value): int => (int) preg_replace('/\D+/', '', (string) $value),
-      [$recipient['_ID'] ?? '', $recipient['contrato_actor_ref'] ?? '']
-    ), static fn(int $id): bool => $id > 0)));
-    if ($ids === []) {
-      return 'Sin contrato';
+    [$matchWhere, $matchArgs] = $this->contractRecipientMatch($config, $recipient);
+    if ($matchWhere === '') {
+      return ['label' => 'Sin contrato', 'summary' => ''];
     }
 
-    $placeholders = implode(',', array_fill(0, count($ids), '?'));
     $rows = $this->db->getResults(
-      "SELECT LOWER(TRIM(COALESCE(`estado`, ''))) AS estado, COUNT(1) AS total
+      "SELECT LOWER(TRIM(COALESCE(`estado`, ''))) AS estado,
+              COUNT(1) AS total,
+              GROUP_CONCAT(DISTINCT NULLIF(TRIM(COALESCE(`contrato`, '')), '') ORDER BY `_ID` DESC SEPARATOR ', ') AS contratos
          FROM `{$contractTable}`
-        WHERE CAST(`{$contractActorColumn}` AS UNSIGNED) IN ({$placeholders})
+        WHERE ({$matchWhere})
           AND LOWER(TRIM(COALESCE(`estado`, ''))) IN ('entregado', 'recibido')
         GROUP BY LOWER(TRIM(COALESCE(`estado`, '')))",
-      $ids
+      $matchArgs
     );
 
     $hasDelivered = false;
     $hasReceived = false;
+    $contracts = [];
     foreach ($rows as $row) {
       $state = trim((string) ($row['estado'] ?? ''));
       $hasDelivered = $hasDelivered || $state === 'entregado';
       $hasReceived = $hasReceived || $state === 'recibido';
+      foreach (explode(',', (string) ($row['contratos'] ?? '')) as $contract) {
+        $contract = trim($contract);
+        if ($contract !== '') {
+          $contracts[$contract] = $contract;
+        }
+      }
+    }
+    $summary = $this->contractSummary(array_values($contracts));
+    if ($contractStatus === 'activos') {
+      return ['label' => 'Activo', 'summary' => $summary];
+    }
+    if ($contractStatus === 'no_activos') {
+      return ['label' => 'No activo', 'summary' => $summary];
     }
     if ($hasDelivered) {
-      return 'Activo';
+      return ['label' => 'Activo', 'summary' => $summary];
     }
     if ($hasReceived) {
-      return 'No activo';
+      return ['label' => 'No activo', 'summary' => $summary];
     }
-    return 'Sin contrato';
+    return ['label' => 'Sin contrato', 'summary' => ''];
   }
 
-  private function contractActorComparisonSql(string $actorTable, string $contractActorColumn): string
+  /**
+   * @param array<string,mixed> $config
+   * @param array<string,mixed> $recipient
+   * @return array{0:string,1:array<int,mixed>}
+   */
+  private function contractRecipientMatch(array $config, array $recipient): array
+  {
+    $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    $contractActorColumn = (string) ($config['contract_actor_column'] ?? '');
+    $parts = [];
+    $args = [];
+    $ids = array_values(array_unique(array_filter(array_map(
+      static fn($value): int => (int) preg_replace('/\D+/', '', (string) $value),
+      [$recipient['_ID'] ?? '', $recipient['contrato_actor_ref'] ?? '']
+    ), static fn(int $id): bool => $id > 0)));
+    if ($contractActorColumn !== '' && $this->schema->columnExists($contractTable, $contractActorColumn) && $ids !== []) {
+      $placeholders = implode(',', array_fill(0, count($ids), '?'));
+      $parts[] = "CAST(`{$contractActorColumn}` AS UNSIGNED) IN ({$placeholders})";
+      array_push($args, ...$ids);
+    }
+
+    foreach ((array) ($config['contract_match_columns'] ?? []) as $actorColumn => $contractColumn) {
+      $actorColumn = trim((string) $actorColumn);
+      $contractColumn = trim((string) $contractColumn);
+      $value = trim((string) ($recipient["contrato_ref_{$actorColumn}"] ?? ''));
+      if (
+        $actorColumn === ''
+        || $contractColumn === ''
+        || $value === ''
+        || !$this->schema->columnExists($contractTable, $contractColumn)
+      ) {
+        continue;
+      }
+      if (preg_match('/^id_/', $actorColumn) === 1 || preg_match('/^id_/', $contractColumn) === 1) {
+        $numeric = (int) preg_replace('/\D+/', '', $value);
+        if ($numeric <= 0) {
+          continue;
+        }
+        $parts[] = "CAST(`{$contractColumn}` AS UNSIGNED) = ?";
+        $args[] = $numeric;
+      } else {
+        $parts[] = "LOWER(TRIM(COALESCE(`{$contractColumn}`, ''))) = LOWER(TRIM(?))";
+        $args[] = $value;
+      }
+    }
+
+    return $parts === [] ? ['', []] : ['(' . implode(' OR ', $parts) . ')', $args];
+  }
+
+  /** @param string[] $contracts */
+  private function contractSummary(array $contracts): string
+  {
+    $contracts = array_values(array_unique(array_filter(array_map(
+      static fn($contract): string => trim((string) $contract),
+      $contracts
+    ), static fn(string $contract): bool => $contract !== '')));
+    if ($contracts === []) {
+      return '';
+    }
+    $visible = array_slice($contracts, 0, 4);
+    $summary = 'Contratos: #' . implode(', #', $visible);
+    $remaining = count($contracts) - count($visible);
+    if ($remaining > 0) {
+      $summary .= ' +' . $remaining . ' mas';
+    }
+    return $summary;
+  }
+
+  /** @param array<string,mixed> $config */
+  private function contractActorComparisonSql(string $actorTable, string $contractActorColumn, array $config = []): string
   {
     $parts = [
       "CAST(ca.`{$contractActorColumn}` AS UNSIGNED) = CAST(`{$actorTable}`.`_ID` AS UNSIGNED)",
     ];
     if ($this->schema->columnExists($actorTable, $contractActorColumn)) {
       $parts[] = "CAST(ca.`{$contractActorColumn}` AS UNSIGNED) = CAST(`{$actorTable}`.`{$contractActorColumn}` AS UNSIGNED)";
+    }
+    foreach ((array) ($config['contract_match_columns'] ?? []) as $actorColumn => $contractColumn) {
+      $actorColumn = trim((string) $actorColumn);
+      $contractColumn = trim((string) $contractColumn);
+      if (
+        $actorColumn === ''
+        || $contractColumn === ''
+        || !$this->schema->columnExists($actorTable, $actorColumn)
+        || !$this->schema->columnExists($this->db->table('jet_cct_contratos_arrendamiento'), $contractColumn)
+      ) {
+        continue;
+      }
+      if (preg_match('/^id_/', $actorColumn) === 1 || preg_match('/^id_/', $contractColumn) === 1) {
+        $parts[] = "CAST(ca.`{$contractColumn}` AS UNSIGNED) = CAST(`{$actorTable}`.`{$actorColumn}` AS UNSIGNED)";
+      } else {
+        $parts[] = "TRIM(COALESCE(ca.`{$contractColumn}`, '')) <> '' AND TRIM(COALESCE(`{$actorTable}`.`{$actorColumn}`, '')) <> '' AND LOWER(TRIM(COALESCE(ca.`{$contractColumn}`, ''))) = LOWER(TRIM(COALESCE(`{$actorTable}`.`{$actorColumn}`, '')))";
+      }
     }
     return '(' . implode(' OR ', $parts) . ')';
   }

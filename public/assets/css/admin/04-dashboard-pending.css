@@ -3367,6 +3367,15 @@
   color: #64748b;
 }
 
+#scm-app .scm-admin-notif-contract-summary {
+  display: block;
+  margin-top: 5px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 #scm-app .scm-admin-notif-contact .is-ready {
   color: #166534;
 }

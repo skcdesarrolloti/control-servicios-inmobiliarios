@@ -114,6 +114,7 @@ trait HandlesAdministrativeNotifications
       $phone = trim((string) ($row['celular_normalizado'] ?? ($row['celular'] ?? '')));
       $rawPhone = trim((string) ($row['celular'] ?? ''));
       $contractLabel = trim((string) ($row['contrato_arrendamiento_estado'] ?? ''));
+      $contractSummary = trim((string) ($row['contratos_arrendamiento_resumen'] ?? ''));
       $contractClass = match ($contractLabel) {
         'Activo' => 'is-active-contract',
         'No activo' => 'is-inactive-contract',
@@ -129,6 +130,9 @@ trait HandlesAdministrativeNotifications
       $html .= '<small>' . esc_html($typeLabel) . ' · ID ' . esc_html((string) $id) . '</small>';
       if ($contractLabel !== '') {
         $html .= '<span class="scm-admin-notif-contract-badge ' . esc_attr($contractClass) . '">' . esc_html($contractLabel) . '</span>';
+      }
+      if ($contractSummary !== '') {
+        $html .= '<span class="scm-admin-notif-contract-summary">' . esc_html($contractSummary) . '</span>';
       }
       $html .= '</span>';
       $html .= '<span class="scm-admin-notif-contact">';
