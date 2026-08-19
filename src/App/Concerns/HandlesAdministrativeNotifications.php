@@ -92,7 +92,7 @@ trait HandlesAdministrativeNotifications
   private function sanitize_admin_notification_contract_status(string $status): string
   {
     $status = sanitize_key($status);
-    return in_array($status, ['activos', 'no_activos'], true) ? $status : '';
+    return in_array($status, ['activos', 'no_activos', 'mixtos'], true) ? $status : '';
   }
 
   /** @param array<int,array<string,mixed>> $rows */
@@ -118,6 +118,7 @@ trait HandlesAdministrativeNotifications
       $contractClass = match ($contractLabel) {
         'Activo' => 'is-active-contract',
         'No activo' => 'is-inactive-contract',
+        'Activo y no activo' => 'is-mixed-contract',
         'Sin contrato' => 'is-empty-contract',
         default => '',
       };

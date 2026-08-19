@@ -3362,6 +3362,11 @@
   color: #991b1b;
 }
 
+#scm-app .scm-admin-notif-contract-badge.is-mixed-contract {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 #scm-app .scm-admin-notif-contract-badge.is-empty-contract {
   background: #f1f5f9;
   color: #64748b;

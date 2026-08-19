@@ -345,7 +345,7 @@ final class AdministrativeNotificationsService
   private function sanitizeContractStatus(string $status): string
   {
     $status = strtolower(trim($status));
-    return in_array($status, ['activos', 'no_activos'], true) ? $status : '';
+    return in_array($status, ['activos', 'no_activos', 'mixtos'], true) ? $status : '';
   }
 
   /** @param array<string,mixed> $config @param array<int,mixed> $args */
@@ -363,6 +363,26 @@ final class AdministrativeNotificationsService
       || !$this->schema->columnExists($contractTable, $contractActorColumn)
       || !$this->schema->columnExists($contractTable, 'estado')
     ) {
+      return;
+    }
+
+    if ($contractStatus === 'mixtos') {
+      $comparison = $this->contractActorComparisonSql($actorTable, $contractActorColumn, $config);
+      $where .= " AND EXISTS (
+        SELECT 1
+          FROM `{$contractTable}` ca
+         WHERE {$comparison}
+           AND LOWER(TRIM(COALESCE(ca.`estado`, ''))) = ?
+         LIMIT 1
+      ) AND EXISTS (
+        SELECT 1
+          FROM `{$contractTable}` ca
+         WHERE {$comparison}
+           AND LOWER(TRIM(COALESCE(ca.`estado`, ''))) = ?
+         LIMIT 1
+      )";
+      $args[] = 'entregado';
+      $args[] = 'recibido';
       return;
     }
 
@@ -429,11 +449,8 @@ final class AdministrativeNotificationsService
       }
     }
     $summary = $this->contractSummary(array_values($contracts));
-    if ($contractStatus === 'activos') {
-      return ['label' => 'Activo', 'summary' => $summary];
-    }
-    if ($contractStatus === 'no_activos') {
-      return ['label' => 'No activo', 'summary' => $summary];
+    if ($hasDelivered && $hasReceived) {
+      return ['label' => 'Activo y no activo', 'summary' => $summary];
     }
     if ($hasDelivered) {
       return ['label' => 'Activo', 'summary' => $summary];
