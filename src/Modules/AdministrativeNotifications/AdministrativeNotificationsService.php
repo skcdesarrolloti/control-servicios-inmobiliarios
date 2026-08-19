@@ -125,7 +125,7 @@ final class AdministrativeNotificationsService
     return $out;
   }
 
-  /** @return array<string,array{name:string,label:string,language:string,description:string,body:string,variables:array<int,string>}> */
+  /** @return array<string,array{name:string,label:string,language:string,description:string,body:string,variables:array<int,string>,button_label?:string,button_url?:string,button_variable?:string}> */
   public function whatsappTemplates(): array
   {
     return [
@@ -133,9 +133,12 @@ final class AdministrativeNotificationsService
         'name' => self::DEFAULT_WHATSAPP_TEMPLATE,
         'label' => 'Notificacion general',
         'language' => 'es_CO',
-        'description' => 'Plantilla oficial para enviar avisos generales desde Notificaciones.',
+        'description' => 'Plantilla oficial para avisos generales. Incluye un boton para responder por WhatsApp al funcionario que envio el mensaje.',
         'body' => "Hola {{1}}.\n\n{{2}}",
-        'variables' => ['Nombre del destinatario', 'Mensaje escrito en esta pantalla'],
+        'variables' => ['Nombre del destinatario', 'Mensaje escrito en esta pantalla', 'Boton URL dinamica: telefono del funcionario con texto precargado'],
+        'button_label' => 'Responder por WhatsApp',
+        'button_url' => 'https://wa.me/{{1}}',
+        'button_variable' => '573001112233?text=Hola%2C%20me%20llego%20una%20comunicacion%20y%20quiero%20recibir%20apoyo.',
       ],
     ];
   }
@@ -315,6 +318,13 @@ final class AdministrativeNotificationsService
     }
     if (in_array('whatsapp', $channels, true) && $whatsappTemplateConfig === []) {
       throw new \RuntimeException('Selecciona una plantilla valida para WhatsApp.');
+    }
+    if (
+      in_array('whatsapp', $channels, true)
+      && !empty($whatsappTemplateConfig['button_url'])
+      && $this->normalizePhone((string) ($this->senderProfile()['phone'] ?? ''), '', false) === ''
+    ) {
+      throw new \RuntimeException('Tu usuario no tiene celular configurado. Agrega el celular del funcionario para poder crear el boton de respuesta por WhatsApp.');
     }
     if (!$this->schema->tableExists(self::QUEUE_TABLE)) {
       throw new \RuntimeException('La tabla skc_notification_queue no esta disponible.');
@@ -733,19 +743,31 @@ final class AdministrativeNotificationsService
     if ($channel === 'whatsapp') {
       $templateName = trim((string) ($whatsappTemplateConfig['name'] ?? ''));
       $templateLanguage = trim((string) ($whatsappTemplateConfig['language'] ?? 'es_CO')) ?: 'es_CO';
+      $components = [
+        [
+          'type' => 'body',
+          'parameters' => [
+            ['type' => 'text', 'text' => $name !== '' ? $name : 'Cliente'],
+            ['type' => 'text', 'text' => $message],
+          ],
+        ],
+      ];
+      $replyButtonValue = $this->whatsappReplyButtonValue($message);
+      if ($replyButtonValue !== '') {
+        $components[] = [
+          'type' => 'button',
+          'sub_type' => 'url',
+          'index' => '0',
+          'parameters' => [
+            ['type' => 'text', 'text' => $replyButtonValue],
+          ],
+        ];
+      }
       $payload = [
         'type' => 'template',
         'template_name' => $templateName,
         'template_language' => $templateLanguage,
-        'components' => [
-          [
-            'type' => 'body',
-            'parameters' => [
-              ['type' => 'text', 'text' => $name !== '' ? $name : 'Cliente'],
-              ['type' => 'text', 'text' => $message],
-            ],
-          ],
-        ],
+        'components' => $components,
       ];
     } elseif ($channel === 'email') {
       $templateName = trim((string) ($emailTemplateConfig['name'] ?? ''));
@@ -959,6 +981,36 @@ final class AdministrativeNotificationsService
   private function plainText(string $value): string
   {
     return trim(html_entity_decode(wp_strip_all_tags($value, false), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+  }
+
+  private function whatsappReplyButtonValue(string $message): string
+  {
+    $sender = $this->senderProfile();
+    $phone = $this->normalizePhone((string) ($sender['phone'] ?? ''), '', false);
+    if ($phone === '') {
+      return '';
+    }
+
+    $senderName = trim((string) ($sender['name'] ?? ''));
+    $excerpt = preg_replace('/\s+/', ' ', $this->plainText($message)) ?? '';
+    $excerpt = trim($excerpt);
+    if (function_exists('mb_substr')) {
+      $excerpt = mb_substr($excerpt, 0, 180, 'UTF-8');
+    } else {
+      $excerpt = substr($excerpt, 0, 180);
+    }
+
+    $replyText = 'Hola';
+    if ($senderName !== '') {
+      $replyText .= ' ' . $senderName;
+    }
+    $replyText .= ', me llego una comunicacion';
+    if ($excerpt !== '') {
+      $replyText .= ' sobre: "' . $excerpt . '"';
+    }
+    $replyText .= '. Quiero recibir apoyo, gracias.';
+
+    return $phone . '?text=' . rawurlencode($replyText);
   }
 
   private function emailContentHtml(string $value): string

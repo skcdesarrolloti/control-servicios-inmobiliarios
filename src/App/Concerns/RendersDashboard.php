@@ -1697,8 +1697,10 @@ trait RendersDashboard
                   <span>Idioma: <?php echo esc_html((string) ($template['language'] ?? 'es_CO')); ?></span>
                   <p><?php echo nl2br(esc_html((string) ($template['body'] ?? ''))); ?></p>
                   <small>Este selector solo muestra las plantillas WhatsApp configuradas para este m&oacute;dulo.</small>
-                  <small>Crea esta plantilla en Meta como Utilidad/Utility. Body exacto: Hola {{1}}. + salto de linea + {{2}}.</small>
-                  <small>Variables en Meta: {{1}} = nombre del destinatario · {{2}} = mensaje escrito arriba.</small>
+                  <small>Crea esta plantilla en Meta como Utilidad/Utility. Body exacto: Hola {{1}}. + dos saltos de linea + {{2}}.</small>
+                  <small>Agrega un bot&oacute;n de URL din&aacute;mica con texto "Responder por WhatsApp" y URL: https://wa.me/{{1}}.</small>
+                  <small>Variables en Meta: body {{1}} = nombre del destinatario · body {{2}} = mensaje escrito arriba · bot&oacute;n {{1}} = celular del funcionario + texto precargado.</small>
+                  <small>Ejemplo para el bot&oacute;n: <?php echo esc_html((string) ($template['button_variable'] ?? '573001112233?text=Hola%2C%20me%20llego%20una%20comunicacion.')); ?></small>
                 </div>
               <?php endforeach; ?>
             </div>

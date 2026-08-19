@@ -2489,6 +2489,14 @@
           .replace(/\{\{2\}\}/g, previewMessage(rawMessage || "Mensaje escrito por el funcionario."));
       }
 
+      function renderWhatsappReplyPreview() {
+        var sender = senderProfile();
+        var label = sender.phone
+          ? "Responder por WhatsApp a " + sender.name + " (" + sender.phone + ")"
+          : "Responder por WhatsApp (configura el celular del funcionario)";
+        return '<div class="scm-admin-notif-wa-button-preview">' + escHtml(label) + "</div>";
+      }
+
       function updatePreview() {
         if (!previewEl || !messageInput || previewEl.hidden) {
           return;
@@ -2539,6 +2547,7 @@
             '<p class="scm-admin-notif-preview-text">' +
             escHtml(renderWhatsappPreviewText()).replace(/\n/g, "<br>") +
             "</p>" +
+            renderWhatsappReplyPreview() +
             "</article>"
           );
         }).join("");
