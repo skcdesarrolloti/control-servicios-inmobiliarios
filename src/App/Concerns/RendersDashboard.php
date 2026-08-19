@@ -1556,12 +1556,12 @@ trait RendersDashboard
         <div class="scm-admin-notif-modal-backdrop" aria-hidden="true"></div>
         <section class="scm-admin-notif-card scm-admin-notif-composer scm-admin-notif-modal-panel">
           <div class="scm-admin-notif-modal-head">
-            <div>
+            <div class="scm-admin-notif-modal-titleblock">
               <span class="scm-calendar-action-kicker">Mensaje</span>
               <h4 id="scm-admin-notif-modal-title">Enviar notificaci&oacute;n</h4>
-              <p>El popup solo se cierra con el bot&oacute;n de cerrar. Si hay texto escrito, pide confirmaci&oacute;n.</p>
+              <p>Prepara el mensaje, elige canales y revisa la vista previa antes de encolar. Si hay texto escrito, el cierre pide confirmaci&oacute;n.</p>
             </div>
-            <button type="button" class="scm-modal-close" data-admin-notif-close-composer aria-label="Cerrar">&times;</button>
+            <button type="button" class="scm-modal-close" data-admin-notif-close-composer aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
           </div>
           <form data-admin-notif-send autocomplete="off">
             <input type="hidden" name="type" value="<?php echo esc_attr($firstType); ?>" data-admin-notif-send-type>
@@ -1576,21 +1576,33 @@ trait RendersDashboard
                 <h4><strong data-admin-notif-selected-count>0</strong> seleccionados</h4>
                 <p>Escoge canales, plantilla y revisa la vista previa antes de encolar.</p>
               </div>
+              <button type="button" class="scm-admin-notif-send-filtered" data-admin-notif-send-filtered>
+                Enviar a todos los filtrados
+              </button>
             </div>
 
             <div class="scm-admin-notif-channel-group" role="group" aria-label="Canales">
-              <label><input type="checkbox" name="channels[]" value="email" data-admin-notif-channel checked> Email</label>
-              <label><input type="checkbox" name="channels[]" value="sms" data-admin-notif-channel> SMS</label>
-              <label><input type="checkbox" name="channels[]" value="whatsapp" data-admin-notif-channel> WhatsApp</label>
+              <label class="scm-admin-notif-channel-pill scm-admin-notif-channel-pill--email">
+                <input type="checkbox" name="channels[]" value="email" data-admin-notif-channel checked>
+                <span class="scm-admin-notif-channel-icon" aria-hidden="true">E</span>
+                <span class="scm-admin-notif-channel-copy"><strong>Email</strong><small>HTML con banner y firma</small></span>
+              </label>
+              <label class="scm-admin-notif-channel-pill scm-admin-notif-channel-pill--sms">
+                <input type="checkbox" name="channels[]" value="sms" data-admin-notif-channel>
+                <span class="scm-admin-notif-channel-icon" aria-hidden="true">S</span>
+                <span class="scm-admin-notif-channel-copy"><strong>SMS</strong><small>Texto corto con marca</small></span>
+              </label>
+              <label class="scm-admin-notif-channel-pill scm-admin-notif-channel-pill--whatsapp">
+                <input type="checkbox" name="channels[]" value="whatsapp" data-admin-notif-channel>
+                <span class="scm-admin-notif-channel-icon" aria-hidden="true">W</span>
+                <span class="scm-admin-notif-channel-copy"><strong>WhatsApp</strong><small>Plantilla oficial Meta</small></span>
+              </label>
             </div>
 
             <label class="scm-admin-notif-all">
               <input type="checkbox" name="all_filtered" value="1" data-admin-notif-all-filtered>
               <span>Enviar a todos los resultados filtrados</span>
             </label>
-            <button type="button" class="scm-admin-notif-send-filtered" data-admin-notif-send-filtered>
-              Usar todos los resultados filtrados
-            </button>
 
             <div class="scm-admin-notif-template-card" data-admin-notif-email-template-wrap>
               <div class="scm-admin-notif-template-row">

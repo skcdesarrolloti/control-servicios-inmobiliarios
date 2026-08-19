@@ -3485,37 +3485,78 @@
 #scm-app .scm-admin-notif-modal-panel {
   position: relative;
   z-index: 1;
-  width: min(980px, calc(100vw - 38px));
+  width: min(1120px, calc(100vw - 38px));
   max-height: calc(100vh - 48px);
   overflow: auto;
   padding: 0;
   border-radius: 20px;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.34);
 }
 
 #scm-app .scm-admin-notif-modal-head {
+  position: relative;
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
-  padding: 22px 24px;
+  padding: 28px 30px 24px;
   border-radius: 20px 20px 0 0;
-  background: linear-gradient(135deg, #1f3858, #243b5a);
+  background:
+    radial-gradient(circle at 96% 0%, rgba(245, 145, 32, 0.24), transparent 30%),
+    linear-gradient(135deg, #1b314f 0%, #243b5a 58%, #1f3858 100%);
   color: #fff;
+  overflow: hidden;
+}
+
+#scm-app .scm-admin-notif-modal-titleblock {
+  position: relative;
+  z-index: 1;
 }
 
 #scm-app .scm-admin-notif-modal-head h4 {
-  margin: 4px 0 6px;
+  margin: 6px 0 8px;
   color: #fff;
-  font-size: 24px;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
 }
 
 #scm-app .scm-admin-notif-modal-head p {
   margin: 0;
-  max-width: 620px;
-  color: rgba(255, 255, 255, 0.82);
+  max-width: 720px;
+  color: rgba(255, 255, 255, 0.9);
   font-size: 13px;
   font-weight: 700;
-  line-height: 1.45;
+  line-height: 1.55;
+}
+
+#scm-app .scm-admin-notif-modal-head .scm-modal-close {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #1f3858;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.22);
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+#scm-app .scm-admin-notif-modal-head .scm-modal-close:hover,
+#scm-app .scm-admin-notif-modal-head .scm-modal-close:focus-visible {
+  transform: translateY(-1px);
+  background: #fff7ed;
+  outline: 3px solid rgba(245, 145, 32, 0.28);
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.28);
 }
 
 #scm-app .scm-admin-notif-modal-panel form {
@@ -3523,6 +3564,10 @@
 }
 
 #scm-app .scm-admin-notif-selected-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
   padding: 12px 14px;
   border: 1px solid #dbe7f4;
   border-radius: 14px;
@@ -3537,10 +3582,9 @@
 #scm-app .scm-admin-notif-channel-group {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
-#scm-app .scm-admin-notif-channel-group label,
 #scm-app .scm-admin-notif-all,
 #scm-app .scm-admin-notif-send-filtered {
   display: flex;
@@ -3556,7 +3600,116 @@
   font-weight: 800;
 }
 
+#scm-app .scm-admin-notif-channel-pill {
+  position: relative;
+  display: flex;
+  min-height: 74px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dbe7f4;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fff, #f8fbff);
+  color: #10233f;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+#scm-app .scm-admin-notif-channel-pill input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+#scm-app .scm-admin-notif-channel-pill:hover,
+#scm-app .scm-admin-notif-channel-pill:has(input:focus-visible) {
+  transform: translateY(-1px);
+  border-color: #93c5fd;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
+}
+
+#scm-app .scm-admin-notif-channel-pill:has(input:checked) {
+  border-color: #f59120;
+  background: linear-gradient(180deg, #fffaf3, #fff7ed);
+  box-shadow: 0 18px 34px rgba(245, 145, 32, 0.16);
+}
+
+#scm-app .scm-admin-notif-channel-pill:has(input:checked)::after {
+  content: "Activo";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f59120;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-admin-notif-channel-icon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: #eaf2fb;
+  color: #1f3858;
+  font-size: 15px;
+  font-weight: 950;
+  box-shadow: inset 0 0 0 1px rgba(31, 56, 88, 0.08);
+}
+
+#scm-app .scm-admin-notif-channel-pill--email .scm-admin-notif-channel-icon {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+#scm-app .scm-admin-notif-channel-pill--sms .scm-admin-notif-channel-icon {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+#scm-app .scm-admin-notif-channel-pill--whatsapp .scm-admin-notif-channel-icon {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+#scm-app .scm-admin-notif-channel-copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 3px;
+  padding-right: 54px;
+}
+
+#scm-app .scm-admin-notif-channel-copy strong {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+#scm-app .scm-admin-notif-channel-copy small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
 #scm-app .scm-admin-notif-send-filtered {
+  width: fit-content;
+  min-width: 210px;
   justify-content: center;
   border-color: #fed7aa;
   background: #fff7ed;
@@ -3894,6 +4047,28 @@
 }
 
 @media (max-width: 720px) {
+  #scm-app .scm-admin-notif-modal {
+    padding: 12px;
+  }
+
+  #scm-app .scm-admin-notif-modal-panel {
+    width: min(100%, calc(100vw - 16px));
+    max-height: calc(100vh - 24px);
+  }
+
+  #scm-app .scm-admin-notif-modal-head {
+    padding: 22px 18px;
+  }
+
+  #scm-app .scm-admin-notif-selected-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #scm-app .scm-admin-notif-send-filtered {
+    width: 100%;
+  }
+
   #scm-app .scm-admin-notif-recipient {
     grid-template-columns: 22px 38px 1fr;
   }
@@ -3904,6 +4079,10 @@
 
   #scm-app .scm-admin-notif-channel-group {
     grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-admin-notif-channel-copy {
+    padding-right: 64px;
   }
 
   #scm-app .scm-admin-notif-template-row {
