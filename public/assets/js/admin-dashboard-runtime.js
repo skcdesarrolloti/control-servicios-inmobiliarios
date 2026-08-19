@@ -2086,7 +2086,6 @@
       var resultEl = panel.querySelector("[data-admin-notif-result]");
       var composerModal = panel.querySelector("[data-admin-notif-modal]");
       var openComposerBtn = panel.querySelector("[data-admin-notif-open-composer]");
-      var openFilteredBtn = panel.querySelector("[data-admin-notif-open-filtered]");
       var closeComposerBtn = panel.querySelector("[data-admin-notif-close-composer]");
       if (!searchForm || !sendForm || !typeSelect || !recipientsEl) {
         return Promise.resolve();
@@ -2230,6 +2229,26 @@
         selected.clear();
         updateVisibleChecks();
         markComposerDirty();
+        syncContext();
+        openComposer();
+      }
+
+      function openComposerForChannel(channel) {
+        var wanted = String(channel || "").trim().toLowerCase();
+        var changed = false;
+        panel.querySelectorAll("[data-admin-notif-channel]").forEach(function (input) {
+          var shouldCheck = String(input.value || "").toLowerCase() === wanted;
+          if (input.checked !== shouldCheck) {
+            changed = true;
+          }
+          input.checked = shouldCheck;
+        });
+        if (allFiltered) {
+          allFiltered.checked = false;
+        }
+        if (changed) {
+          markComposerDirty();
+        }
         syncContext();
         openComposer();
       }
@@ -2623,9 +2642,11 @@
         if (openComposerBtn) {
           openComposerBtn.addEventListener("click", openComposer);
         }
-        if (openFilteredBtn) {
-          openFilteredBtn.addEventListener("click", useAllFilteredAndOpen);
-        }
+        panel.querySelectorAll("[data-admin-notif-open-channel]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            openComposerForChannel(btn.getAttribute("data-admin-notif-open-channel") || "");
+          });
+        });
         if (closeComposerBtn) {
           closeComposerBtn.addEventListener("click", function () {
             closeComposer(false);

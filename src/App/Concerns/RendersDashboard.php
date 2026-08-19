@@ -1541,7 +1541,9 @@ trait RendersDashboard
             </div>
             <div class="scm-admin-notif-section-actions">
               <button type="button" class="scm-case-work-btn" data-admin-notif-select-visible>Seleccionar visibles</button>
-              <button type="button" class="scm-case-work-btn" data-admin-notif-open-filtered>Enviar a todos los filtrados</button>
+              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--email" data-admin-notif-open-channel="email">Noti Email</button>
+              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--sms" data-admin-notif-open-channel="sms">Noti SMS</button>
+              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--whatsapp" data-admin-notif-open-channel="whatsapp">Noti WhatsApp</button>
               <button type="button" class="scm-btn-primary btn btn-primary" data-admin-notif-open-composer>Enviar notificaci&oacute;n</button>
             </div>
           </div>

@@ -3284,6 +3284,49 @@
   gap: 10px;
 }
 
+#scm-app .scm-admin-notif-channel-launch {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border: 1px solid #dbe7f4;
+  border-radius: 12px;
+  background: #fff;
+  color: #10233f;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.1;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+#scm-app .scm-admin-notif-channel-launch:hover,
+#scm-app .scm-admin-notif-channel-launch:focus-visible {
+  transform: translateY(-1px);
+  outline: 3px solid rgba(245, 145, 32, 0.14);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.1);
+}
+
+#scm-app .scm-admin-notif-channel-launch--email {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+#scm-app .scm-admin-notif-channel-launch--sms {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+#scm-app .scm-admin-notif-channel-launch--whatsapp {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  color: #0f766e;
+}
+
 #scm-app .scm-admin-notif-section-head h4 {
   margin: 4px 0;
   color: #0f172a;
