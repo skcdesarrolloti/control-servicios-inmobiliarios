@@ -2067,9 +2067,14 @@
       var allFiltered = panel.querySelector("[data-admin-notif-all-filtered]");
       var sendFilteredBtn = panel.querySelector("[data-admin-notif-send-filtered]");
       var subjectWrap = panel.querySelector("[data-admin-notif-subject-wrap]");
+      var subjectInput = panel.querySelector("[data-admin-notif-subject]");
       var messageInput = panel.querySelector("[data-admin-notif-message]");
+      var emailTemplateWrap = panel.querySelector("[data-admin-notif-email-template-wrap]");
+      var emailTemplateSelect = panel.querySelector("[data-admin-notif-email-template]");
+      var applyEmailTemplateBtn = panel.querySelector("[data-admin-notif-apply-email-template]");
       var whatsappTemplateWrap = panel.querySelector("[data-admin-notif-whatsapp-template-wrap]");
       var whatsappTemplateSelect = panel.querySelector("[data-admin-notif-whatsapp-template]");
+      var previewEl = panel.querySelector("[data-admin-notif-preview]");
       var smsCounter = panel.querySelector("[data-admin-notif-sms-counter]");
       var submitBtn = panel.querySelector("[data-admin-notif-submit]");
       var spinner = panel.querySelector("[data-admin-notif-spinner]");
@@ -2150,6 +2155,17 @@
             '[data-admin-notif-channel][value="email"]:checked',
           );
           subjectWrap.style.display = emailChecked ? "" : "none";
+          if (emailTemplateWrap) {
+            emailTemplateWrap.hidden = !emailChecked;
+            emailTemplateWrap.classList.toggle("is-hidden", !emailChecked);
+          }
+          if (emailTemplateSelect) {
+            panel.querySelectorAll("[data-admin-notif-email-guide]").forEach(function (guide) {
+              guide.hidden =
+                !emailChecked ||
+                guide.getAttribute("data-admin-notif-email-guide") !== emailTemplateSelect.value;
+            });
+          }
         }
         var whatsappChecked = !!panel.querySelector(
           '[data-admin-notif-channel][value="whatsapp"]:checked',
@@ -2166,6 +2182,64 @@
           });
         }
         updateSmsCounter();
+        updatePreview();
+      }
+
+      function insertAtCursor(input, text) {
+        if (!input || !text) {
+          return;
+        }
+        var start = typeof input.selectionStart === "number" ? input.selectionStart : input.value.length;
+        var end = typeof input.selectionEnd === "number" ? input.selectionEnd : input.value.length;
+        var before = input.value.slice(0, start);
+        var after = input.value.slice(end);
+        input.value = before + text + after;
+        var nextCursor = start + text.length;
+        input.focus();
+        if (input.setSelectionRange) {
+          input.setSelectionRange(nextCursor, nextCursor);
+        }
+        updateSmsCounter();
+        updatePreview();
+      }
+
+      function applyEmailTemplate() {
+        if (!emailTemplateSelect || !messageInput) {
+          return;
+        }
+        var option = emailTemplateSelect.options[emailTemplateSelect.selectedIndex];
+        if (!option) {
+          return;
+        }
+        var subject = option.getAttribute("data-subject") || "";
+        var message = option.getAttribute("data-message") || "";
+        if (subjectInput && subject !== "") {
+          subjectInput.value = subject;
+        }
+        if (message !== "") {
+          messageInput.value = message;
+          messageInput.focus();
+        }
+        updateSmsCounter();
+        updatePreview();
+      }
+
+      function previewMessage(value) {
+        return String(value || "")
+          .replace(/\{\{nombre\}\}/g, "Nombre del destinatario")
+          .replace(/\{\{correo\}\}/g, "correo@ejemplo.com")
+          .replace(/\{\{celular\}\}/g, "+573001112233")
+          .replace(/\{\{tipo_actor\}\}/g, currentType())
+          .replace(/\{\{rol_persona\}\}/g, "Rol");
+      }
+
+      function updatePreview() {
+        if (!previewEl || !messageInput || previewEl.hidden) {
+          return;
+        }
+        var text = previewMessage(messageInput.value || "");
+        previewEl.innerHTML =
+          '<strong>Vista previa</strong><p>' + escHtml(text || "Sin mensaje.") + "</p>";
       }
 
       function updateVisibleChecks() {
@@ -2374,11 +2448,56 @@
         panel.querySelectorAll("[data-admin-notif-channel]").forEach(function (input) {
           input.addEventListener("change", syncContext);
         });
+        if (emailTemplateSelect) {
+          emailTemplateSelect.addEventListener("change", syncContext);
+        }
+        if (applyEmailTemplateBtn) {
+          applyEmailTemplateBtn.addEventListener("click", applyEmailTemplate);
+        }
+        panel.querySelectorAll("[data-admin-notif-insert-var]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            insertAtCursor(messageInput, btn.getAttribute("data-admin-notif-insert-var") || "");
+          });
+        });
+        panel.querySelector("[data-admin-notif-clear-message]")?.addEventListener("click", function () {
+          if (messageInput) {
+            messageInput.value = "";
+            messageInput.focus();
+          }
+          updateSmsCounter();
+          updatePreview();
+        });
+        panel.querySelector("[data-admin-notif-preview-toggle]")?.addEventListener("click", function () {
+          if (!previewEl) {
+            return;
+          }
+          previewEl.hidden = !previewEl.hidden;
+          updatePreview();
+        });
+        panel.querySelector("[data-admin-notif-copy-message]")?.addEventListener("click", function () {
+          var value = messageInput ? String(messageInput.value || "") : "";
+          if (value === "") {
+            showToast("warning", "No hay mensaje para copiar.");
+            return;
+          }
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(value).then(function () {
+              showToast("success", "Mensaje copiado.");
+            }).catch(function () {
+              showToast("warning", "No fue posible copiar automaticamente.");
+            });
+          } else {
+            showToast("warning", "Tu navegador no permite copiar automaticamente.");
+          }
+        });
         if (whatsappTemplateSelect) {
           whatsappTemplateSelect.addEventListener("change", syncContext);
         }
         if (messageInput) {
-          messageInput.addEventListener("input", updateSmsCounter);
+          messageInput.addEventListener("input", function () {
+            updateSmsCounter();
+            updatePreview();
+          });
         }
         if (allFiltered) {
           allFiltered.addEventListener("change", function () {

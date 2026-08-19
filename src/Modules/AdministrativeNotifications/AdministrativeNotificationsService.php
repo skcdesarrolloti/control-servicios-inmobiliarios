@@ -129,6 +129,34 @@ final class AdministrativeNotificationsService
     ];
   }
 
+  /** @return array<string,array{name:string,label:string,subject:string,body:string,description:string}> */
+  public function emailTemplates(): array
+  {
+    return [
+      'scm_email_general_v1' => [
+        'name' => 'scm_email_general_v1',
+        'label' => 'Notificacion general',
+        'subject' => 'Informacion importante',
+        'description' => 'Plantilla base para avisos generales por correo.',
+        'body' => "Hola {{nombre}},\n\n[Escribe aqui tu mensaje]\n\nAtentamente,\nControl Servicios Inmobiliarios",
+      ],
+      'scm_email_aviso_v1' => [
+        'name' => 'scm_email_aviso_v1',
+        'label' => 'Aviso informativo',
+        'subject' => 'Aviso de Control Servicios Inmobiliarios',
+        'description' => 'Para comunicar novedades o informacion operativa.',
+        'body' => "Hola {{nombre}},\n\nTe compartimos la siguiente informacion:\n\n[Escribe aqui el aviso]\n\nSi tienes alguna inquietud, responde a este correo.",
+      ],
+      'scm_email_recordatorio_v1' => [
+        'name' => 'scm_email_recordatorio_v1',
+        'label' => 'Recordatorio',
+        'subject' => 'Recordatorio importante',
+        'description' => 'Para recordar pendientes, fechas o gestiones.',
+        'body' => "Hola {{nombre}},\n\nTe recordamos lo siguiente:\n\n[Escribe aqui el recordatorio]\n\nGracias por tu atencion.",
+      ],
+    ];
+  }
+
   /** @return array{rows:array<int,array<string,mixed>>,total:int,page:int,pages:int,per_page:int,type:string,type_label:string,contract_status:string} */
   public function search(string $type, string $query, int $page = 1, int $perPage = 20, string $contractStatus = ''): array
   {

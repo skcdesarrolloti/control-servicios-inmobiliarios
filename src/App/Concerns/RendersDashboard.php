@@ -1461,6 +1461,7 @@ trait RendersDashboard
     $service = new AdministrativeNotificationsService($this->db);
     $types = $service->types();
     $stats = $service->stats();
+    $emailTemplates = $service->emailTemplates();
     $whatsappTemplates = $service->whatsappTemplates();
     $firstType = (string) array_key_first($types);
 
@@ -1561,16 +1562,52 @@ trait RendersDashboard
               Enviar a todos los filtrados
             </button>
 
-            <div class="scm-field" data-admin-notif-subject-wrap>
-              <label for="scm-admin-notif-subject">Asunto para Email</label>
-              <input id="scm-admin-notif-subject" name="subject" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: Informaci&oacute;n importante">
+            <div class="scm-admin-notif-template-card" data-admin-notif-email-template-wrap>
+              <div class="scm-admin-notif-template-row">
+                <div class="scm-field">
+                  <label for="scm-admin-notif-email-template">Plantilla Email</label>
+                  <select id="scm-admin-notif-email-template" class="select select-bordered select-sm scm-select" data-admin-notif-email-template>
+                    <?php foreach ($emailTemplates as $template): ?>
+                      <option value="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>"
+                        data-subject="<?php echo esc_attr((string) ($template['subject'] ?? '')); ?>"
+                        data-message="<?php echo esc_attr((string) ($template['body'] ?? '')); ?>">
+                        <?php echo esc_html((string) ($template['label'] ?? $template['name'] ?? 'Plantilla')); ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+                <button type="button" class="scm-case-work-btn" data-admin-notif-apply-email-template>Usar plantilla</button>
+              </div>
+              <?php foreach ($emailTemplates as $template): ?>
+                <div class="scm-admin-notif-template-guide" data-admin-notif-email-guide="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>">
+                  <strong><?php echo esc_html((string) ($template['label'] ?? $template['name'] ?? 'Plantilla')); ?></strong>
+                  <span>Asunto: <?php echo esc_html((string) ($template['subject'] ?? '')); ?></span>
+                  <p><?php echo nl2br(esc_html((string) ($template['body'] ?? ''))); ?></p>
+                  <small><?php echo esc_html((string) ($template['description'] ?? '')); ?></small>
+                </div>
+              <?php endforeach; ?>
             </div>
 
-            <div class="scm-field">
+            <div class="scm-field" data-admin-notif-subject-wrap>
+              <label for="scm-admin-notif-subject">Asunto para Email</label>
+              <input id="scm-admin-notif-subject" name="subject" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: Informaci&oacute;n importante" data-admin-notif-subject>
+            </div>
+
+            <div class="scm-field scm-admin-notif-message-field">
               <label for="scm-admin-notif-message">Mensaje</label>
+              <div class="scm-admin-notif-message-toolbar" aria-label="Herramientas del mensaje">
+                <button type="button" data-admin-notif-insert-var="{{nombre}}">{{nombre}}</button>
+                <button type="button" data-admin-notif-insert-var="{{correo}}">{{correo}}</button>
+                <button type="button" data-admin-notif-insert-var="{{celular}}">{{celular}}</button>
+                <button type="button" data-admin-notif-insert-var="{{tipo_actor}}">{{tipo_actor}}</button>
+                <button type="button" data-admin-notif-preview-toggle>Vista previa</button>
+                <button type="button" data-admin-notif-copy-message>Copiar</button>
+                <button type="button" data-admin-notif-clear-message>Limpiar</button>
+              </div>
               <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." required data-admin-notif-message></textarea>
               <small class="scm-admin-notif-helper">Variables: {{nombre}}, {{correo}}, {{celular}}, {{tipo_actor}}, {{rol_persona}}.</small>
               <small class="scm-admin-notif-sms-counter" data-admin-notif-sms-counter>0/160 SMS</small>
+              <div class="scm-admin-notif-preview" data-admin-notif-preview hidden></div>
             </div>
 
             <div class="scm-admin-notif-template-card" data-admin-notif-whatsapp-template-wrap>
