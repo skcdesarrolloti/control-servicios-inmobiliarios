@@ -1505,9 +1505,8 @@ trait RendersDashboard
                 <option value="">Todos</option>
                 <option value="activos">Activos</option>
                 <option value="no_activos">No activos</option>
-                <option value="mixtos">Activos y no activos</option>
               </select>
-              <small>Activo = Entregado · No activo = Recibido · Mixto = ambos estados</small>
+              <small>Activo = tiene Entregado · No activo = solo Recibido</small>
             </div>
             <div class="scm-admin-notif-filter-actions">
               <button type="submit" class="scm-btn-primary btn btn-primary">Buscar</button>

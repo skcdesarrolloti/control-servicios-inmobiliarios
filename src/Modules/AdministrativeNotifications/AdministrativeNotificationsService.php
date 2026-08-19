@@ -345,7 +345,7 @@ final class AdministrativeNotificationsService
   private function sanitizeContractStatus(string $status): string
   {
     $status = strtolower(trim($status));
-    return in_array($status, ['activos', 'no_activos', 'mixtos'], true) ? $status : '';
+    return in_array($status, ['activos', 'no_activos'], true) ? $status : '';
   }
 
   /** @param array<string,mixed> $config @param array<int,mixed> $args */
@@ -366,26 +366,6 @@ final class AdministrativeNotificationsService
       return;
     }
 
-    if ($contractStatus === 'mixtos') {
-      $comparison = $this->contractActorComparisonSql($actorTable, $contractActorColumn, $config);
-      $where .= " AND EXISTS (
-        SELECT 1
-          FROM `{$contractTable}` ca
-         WHERE {$comparison}
-           AND LOWER(TRIM(COALESCE(ca.`estado`, ''))) = ?
-         LIMIT 1
-      ) AND EXISTS (
-        SELECT 1
-          FROM `{$contractTable}` ca
-         WHERE {$comparison}
-           AND LOWER(TRIM(COALESCE(ca.`estado`, ''))) = ?
-         LIMIT 1
-      )";
-      $args[] = 'entregado';
-      $args[] = 'recibido';
-      return;
-    }
-
     $where .= " AND EXISTS (
       SELECT 1
         FROM `{$contractTable}` ca
@@ -394,6 +374,17 @@ final class AdministrativeNotificationsService
        LIMIT 1
     )";
     $args[] = $contractStatus === 'activos' ? 'entregado' : 'recibido';
+
+    if ($contractStatus === 'no_activos') {
+      $where .= " AND NOT EXISTS (
+        SELECT 1
+          FROM `{$contractTable}` ca
+         WHERE {$this->contractActorComparisonSql($actorTable, $contractActorColumn, $config)}
+           AND LOWER(TRIM(COALESCE(ca.`estado`, ''))) = ?
+         LIMIT 1
+      )";
+      $args[] = 'entregado';
+    }
   }
 
   /**
@@ -449,9 +440,6 @@ final class AdministrativeNotificationsService
       }
     }
     $summary = $this->contractSummary(array_values($contracts));
-    if ($hasDelivered && $hasReceived) {
-      return ['label' => 'Activo y no activo', 'summary' => $summary];
-    }
     if ($hasDelivered) {
       return ['label' => 'Activo', 'summary' => $summary];
     }
