@@ -3625,6 +3625,110 @@
           '<div class="scm-admin-ticket-fixed"><span>Solicitante</span><strong>Arrendatario</strong></div>'
         : '<label class="scm-seg-field"><span>Solicitante</span><select name="solicitante_tipo"><option value="arrendatario">Arrendatario</option><option value="propietario" selected>Propietario</option></select></label>';
 
+      function adminTicketHiddenField(name, value) {
+        return (
+          '<input type="hidden" name="' +
+          escHtml(name) +
+          '" value="' +
+          escHtml(value) +
+          '">'
+        );
+      }
+
+      function adminTicketHiddenFields(fields) {
+        return fields
+          .map(function (field) {
+            return adminTicketHiddenField(field[0], field[1]);
+          })
+          .join("");
+      }
+
+      function adminTicketPreviewItem(label, value) {
+        return (
+          '<div class="scm-admin-ticket-preview-item"><span>' +
+          escHtml(label) +
+          "</span><strong>" +
+          escHtml(value || "-") +
+          "</strong></div>"
+        );
+      }
+
+      var commonTicketHiddenFields = adminTicketHiddenFields([
+        ["ticket_mode", mode],
+        ["contract_pk", contractDataset(btn, "contractPk")],
+        ["id_contrato", contractDataset(btn, "contractPk")],
+        ["id_inmueble", contractDataset(btn, "idInmueble")],
+        ["id_arrendatario", contractDataset(btn, "idArrendatario")],
+        ["id_propietario", contractDataset(btn, "idPropietario")],
+        ["id_sucursal", contractDataset(btn, "idSucursal")],
+        ["id_inventario", contractDataset(btn, "idInventario")],
+        ["fecha_final_contrato", contractDataset(btn, "fechaFinalContrato")],
+      ]);
+
+      if (isPreventiva) {
+        body.innerHTML =
+          '<form class="scm-admin-ticket-form scm-admin-ticket-form--preview" method="post" enctype="multipart/form-data" autocomplete="off">' +
+          commonTicketHiddenFields +
+          adminTicketHiddenFields([
+            ["solicitante_tipo", "arrendatario"],
+            ["prioridad", defaultPrioridad],
+            ["departamento", defaultDepartamento],
+            ["tema_ayuda", defaultTema],
+            ["contrato", contractCode],
+            ["inmueble", inmueble],
+            ["direccion", direccion],
+            ["barrio", contractDataset(btn, "barrio")],
+            ["registro_fotografico", contractDataset(btn, "registroFotografico")],
+            ["propietario", contractDataset(btn, "propietario")],
+            ["correo_propietario", contractDataset(btn, "correoPropietario")],
+            ["celular_propietario", contractDataset(btn, "celularPropietario")],
+            ["arrendatario", contractDataset(btn, "arrendatario")],
+            ["correo_arrendatario", contractDataset(btn, "correoArrendatario")],
+            ["celular_arrendatario", contractDataset(btn, "celularArrendatario")],
+            ["asunto", defaultAsunto],
+            ["descripcion", defaultDescripcion],
+          ]) +
+          '<div class="scm-admin-ticket-summary scm-admin-ticket-summary--locked">' +
+          '<span><b>Contrato:</b> ' +
+          escHtml(contractCode || "-") +
+          "</span>" +
+          '<span><b>Inmueble:</b> ' +
+          escHtml(inmueble || "-") +
+          "</span>" +
+          '<span><b>Direccion:</b> ' +
+          escHtml(direccion || "-") +
+          "</span>" +
+          "</div>" +
+          '<section class="scm-admin-ticket-section scm-admin-ticket-section--locked">' +
+          '<h5 class="scm-admin-ticket-section-title">Datos fijos de la preventiva</h5>' +
+          '<p class="scm-admin-ticket-preview-note">Estos datos se generan automaticamente para revision preventiva y no se pueden modificar desde este apartado.</p>' +
+          '<div class="scm-admin-ticket-preview-grid">' +
+          adminTicketPreviewItem("Prioridad", defaultPrioridad) +
+          adminTicketPreviewItem("Departamento", defaultDepartamento) +
+          adminTicketPreviewItem("Tema de ayuda", defaultTema) +
+          adminTicketPreviewItem("Solicitante", "Arrendatario") +
+          adminTicketPreviewItem("Contrato", contractCode) +
+          adminTicketPreviewItem("Inmueble", inmueble) +
+          adminTicketPreviewItem("Direccion", direccion) +
+          adminTicketPreviewItem("Barrio", contractDataset(btn, "barrio")) +
+          adminTicketPreviewItem("Propietario", contractDataset(btn, "propietario")) +
+          adminTicketPreviewItem("Arrendatario", contractDataset(btn, "arrendatario")) +
+          adminTicketPreviewItem("Correo propietario", contractDataset(btn, "correoPropietario")) +
+          adminTicketPreviewItem("Correo arrendatario", contractDataset(btn, "correoArrendatario")) +
+          "</div>" +
+          "</section>" +
+          '<section class="scm-admin-ticket-section">' +
+          '<h5 class="scm-admin-ticket-section-title">Responsable</h5>' +
+          '<div class="scm-admin-ticket-responsible-row">' +
+          '<label class="scm-seg-field"><span>Funcionario responsable</span><select name="id_empleado" required>' +
+          adminTicketEmployeeOptions(defaultEmpleado) +
+          "</select></label>" +
+          "</div>" +
+          "</section>" +
+          renderNotifyTargets(["solicitante"], ["arrendatario", "empleado"]) +
+          '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear ticket</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+          "</form>";
+      } else {
       body.innerHTML =
         '<form class="scm-admin-ticket-form" method="post" enctype="multipart/form-data" autocomplete="off">' +
         '<input type="hidden" name="ticket_mode" value="' +
@@ -3744,6 +3848,7 @@
         ) +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear ticket</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
+      }
 
       modal.classList.add("open");
       modal.setAttribute("aria-hidden", "false");

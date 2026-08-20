@@ -684,6 +684,68 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+#scm-app .scm-admin-ticket-form--preview .scm-admin-ticket-section--locked {
+  border-top-color: rgba(246, 143, 0, 0.24);
+}
+
+#scm-app .scm-admin-ticket-summary--locked span {
+  border-color: rgba(246, 143, 0, 0.24);
+  background: #fff8ef;
+  color: var(--scm-text);
+}
+
+#scm-app .scm-admin-ticket-preview-note {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(246, 143, 0, 0.28);
+  border-radius: var(--scm-r-sm);
+  background: #fff8ef;
+  color: var(--scm-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+#scm-app .scm-admin-ticket-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#scm-app .scm-admin-ticket-preview-item {
+  min-height: 66px;
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-sm);
+  background: var(--scm-surface-2);
+  padding: 10px 12px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+}
+
+#scm-app .scm-admin-ticket-preview-item span {
+  display: block;
+  margin: 0 0 5px;
+  color: var(--scm-text-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-admin-ticket-preview-item strong {
+  display: block;
+  color: var(--scm-text);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+#scm-app .scm-admin-ticket-responsible-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px);
+  gap: 12px;
+}
+
 #scm-app .scm-admin-ticket-fixed {
   min-height: 64px;
   border: 1px solid var(--scm-border);
@@ -769,6 +831,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  #scm-app .scm-admin-ticket-preview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   #scm-app .scm-admin-ticket-grid--contact {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -780,6 +846,11 @@
   }
 
   #scm-app .scm-admin-ticket-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-admin-ticket-preview-grid,
+  #scm-app .scm-admin-ticket-responsible-row {
     grid-template-columns: 1fr;
   }
 
