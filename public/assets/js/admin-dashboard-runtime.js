@@ -154,6 +154,8 @@
     var actionAdminNotificationsRecipients =
       actions.admin_notifications_recipients || "";
     var actionAdminNotificationsSend = actions.admin_notifications_send || "";
+    var actionAdminNotificationsImport =
+      actions.admin_notifications_import || "";
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
     ).replace(/\/+$/, "");
@@ -2050,6 +2052,11 @@
         return Promise.resolve();
       }
       var searchForm = panel.querySelector("[data-admin-notif-search]");
+      var importForm = panel.querySelector("[data-admin-notif-import]");
+      var importWrap = panel.querySelector("[data-admin-notif-import-wrap]");
+      var importFileInput = panel.querySelector("[data-admin-notif-import-file]");
+      var importClearBtn = panel.querySelector("[data-admin-notif-import-clear]");
+      var importResultEl = panel.querySelector("[data-admin-notif-import-result]");
       var sendForm = panel.querySelector("[data-admin-notif-send]");
       var typeSelect = panel.querySelector("[data-admin-notif-type]");
       var queryInput = panel.querySelector("[data-admin-notif-query]");
@@ -2063,6 +2070,7 @@
       var sendContractStatus = panel.querySelector("[data-admin-notif-send-contract-status]");
       var sendInmuebleSimi = panel.querySelector("[data-admin-notif-send-inmueble-simi]");
       var sendContractNumber = panel.querySelector("[data-admin-notif-send-contract-number]");
+      var sendImportPayload = panel.querySelector("[data-admin-notif-import-payload]");
       var recipientsEl = panel.querySelector("[data-admin-notif-recipients]");
       var paginationEl = panel.querySelector("[data-admin-notif-pagination]");
       var totalEl = panel.querySelector("[data-admin-notif-total]");
@@ -2105,6 +2113,7 @@
       var composerDirty = false;
       var subjectDirty = false;
       var composerChannelMode = "";
+      var importedPayload = {};
 
       var channelNames = {
         email: "Email",
@@ -2122,6 +2131,20 @@
 
       function supportsContractStatus(type) {
         return /^(propietarios|arrendatarios|copropiedades)/.test(String(type || ""));
+      }
+
+      function resetImportState(clearFile) {
+        importedPayload = {};
+        if (sendImportPayload) {
+          sendImportPayload.value = "";
+        }
+        if (importResultEl) {
+          importResultEl.textContent = "";
+          importResultEl.classList.remove("is-error", "is-success");
+        }
+        if (clearFile && importFileInput) {
+          importFileInput.value = "";
+        }
       }
 
       function currentContractStatus() {
@@ -2388,6 +2411,14 @@
           wrap.hidden = !canFilterContracts;
           wrap.classList.toggle("is-hidden", !canFilterContracts);
         });
+        if (importWrap) {
+          var canImport = supportsContractStatus(currentType());
+          importWrap.hidden = !canImport;
+          importWrap.classList.toggle("is-hidden", !canImport);
+        }
+        if (sendImportPayload) {
+          sendImportPayload.value = JSON.stringify(importedPayload || {});
+        }
         if (selectedCountEl) {
           selectedCountEl.textContent =
             allFiltered && allFiltered.checked
@@ -2433,7 +2464,17 @@
           .replace(/\{\{cargo_funcionario\}\}/g, sender.cargo)
           .replace(/\{\{celular_funcionario\}\}/g, sender.phone || "Sin celular registrado")
           .replace(/\{\{firma_funcionario\}\}/g, sender.signature)
-          .replace(/\{\{firma_funcionario_linea\}\}/g, sender.signatureLine);
+          .replace(/\{\{firma_funcionario_linea\}\}/g, sender.signatureLine)
+          .replace(/\{\{canon_excel\}\}/g, "$1.850.000")
+          .replace(/\{\{valor_canon\}\}/g, "$1.850.000")
+          .replace(/\{\{canon\}\}/g, "$1.850.000")
+          .replace(/\{\{contrato_excel\}\}/g, "700")
+          .replace(/\{\{inmueble_simi_excel\}\}/g, "10578")
+          .replace(/\{\{mes_excel\}\}/g, "Agosto 2026")
+          .replace(/\{\{direccion_excel\}\}/g, "DG 49 #51-66 Apto 1")
+          .replace(/\{\{detalle_excel\}\}/g, "Canon: $1.850.000\nContrato: #700\nInmueble SIMI: 10578\nPeriodo: Agosto 2026")
+          .replace(/\{\{mes_excel_linea\}\}/g, "<br>Periodo: <strong>Agosto 2026</strong>")
+          .replace(/\{\{direccion_excel_linea\}\}/g, "<br>Dirección: <strong>DG 49 #51-66 Apto 1</strong>");
       }
 
       function stripHtml(value) {
@@ -2545,7 +2586,7 @@
       function selectedWhatsappNeedsMessage() {
         var option = selectedMessageTemplateOption();
         var mode = option ? option.getAttribute("data-template-mode") || "name_message_signature" : "name_message_signature";
-        return mode !== "name_signature";
+        return mode === "name_message_signature";
       }
 
       function messageRequiredForCurrentSelection() {
@@ -2586,6 +2627,12 @@
             .replace(/\{\{1\}\}/g, name)
             .replace(/\{\{2\}\}/g, signature)
             .replace(/\{\{3\}\}/g, previewMessage(rawMessage || "Mensaje escrito por el funcionario."));
+        }
+        if (mode === "name_import_canon_summary_signature") {
+          return template
+            .replace(/\{\{1\}\}/g, name)
+            .replace(/\{\{2\}\}/g, "Canon: $1.850.000\nContrato: #700\nInmueble SIMI: 10578\nPeriodo: Agosto 2026")
+            .replace(/\{\{3\}\}/g, signature);
         }
         return template
           .replace(/\{\{1\}\}/g, name)
@@ -2720,6 +2767,92 @@
           });
       }
 
+      function importRecipientsFromFile() {
+        if (!importForm || !importFileInput || !actionAdminNotificationsImport) {
+          showToast("error", "La importacion no esta disponible.");
+          return;
+        }
+        if (!supportsContractStatus(currentType())) {
+          showToast("warning", "Este destinatario no se cruza por contrato o inmueble.");
+          return;
+        }
+        if (!importFileInput.files || importFileInput.files.length === 0) {
+          showToast("warning", "Selecciona un archivo Excel o CSV.");
+          return;
+        }
+        var fd = new FormData(importForm);
+        fd.set("action", actionAdminNotificationsImport);
+        fd.set("nonce", nonce);
+        fd.set("type", currentType());
+        recipientsEl.innerHTML =
+          '<div class="scm-admin-notif-empty"><strong>Importando archivo...</strong><span>Estamos cruzando contrato e inmueble SIMI.</span></div>';
+        if (paginationEl) {
+          paginationEl.innerHTML = "";
+        }
+        if (importResultEl) {
+          importResultEl.textContent = "Importando y cruzando datos...";
+          importResultEl.classList.remove("is-error", "is-success");
+        }
+        setLoading(true);
+        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (response) {
+            return response.json();
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error(
+                (json && json.data && json.data.message) ||
+                  "No se pudo importar el archivo.",
+              );
+            }
+            var data = json.data || {};
+            importedPayload = data.payload || {};
+            selected.clear();
+            Object.keys(importedPayload).forEach(function (id) {
+              selected.add(String(id));
+            });
+            if (allFiltered) {
+              allFiltered.checked = false;
+            }
+            recipientsEl.innerHTML = data.html || "";
+            if (paginationEl) {
+              paginationEl.innerHTML =
+                '<span class="scm-admin-notif-page-info">Importados seleccionados: ' +
+                String(data.matched || 0) +
+                "</span>";
+            }
+            if (totalEl) {
+              totalEl.textContent = String(data.matched || 0);
+            }
+            if (listTitle && data.type_label) {
+              listTitle.textContent = data.type_label + " importados";
+            }
+            if (importResultEl) {
+              importResultEl.textContent = data.message || "Archivo importado.";
+              importResultEl.classList.add((data.matched || 0) > 0 ? "is-success" : "is-error");
+            }
+            updateVisibleChecks();
+            syncContext();
+            showToast((data.matched || 0) > 0 ? "success" : "warning", data.message || "Archivo importado.");
+          })
+          .catch(function (err) {
+            importedPayload = {};
+            recipientsEl.innerHTML =
+              '<div class="scm-admin-notif-empty is-error"><strong>No se pudo importar.</strong><span>' +
+              escHtml(err.message || "Error desconocido") +
+              "</span></div>";
+            if (importResultEl) {
+              importResultEl.textContent = err.message || "Error desconocido.";
+              importResultEl.classList.add("is-error");
+            }
+            syncContext();
+            showToast("error", err.message || "No se pudo importar el archivo.");
+          })
+          .finally(function () {
+            setLoading(false);
+          });
+      }
+
       if (!panel.dataset.scmAdminNotificationsEvents) {
         panel.dataset.scmAdminNotificationsEvents = "1";
 
@@ -2754,6 +2887,7 @@
 
         searchForm.addEventListener("submit", function (event) {
           event.preventDefault();
+          resetImportState(false);
           selected.clear();
           if (allFiltered) {
             allFiltered.checked = false;
@@ -2763,6 +2897,7 @@
         });
 
         panel.querySelector("[data-admin-notif-clear]")?.addEventListener("click", function () {
+          resetImportState(true);
           if (queryInput) {
             queryInput.value = "";
           }
@@ -2784,6 +2919,7 @@
         });
 
         typeSelect.addEventListener("change", function () {
+          resetImportState(true);
           selected.clear();
           if (allFiltered) {
             allFiltered.checked = false;
@@ -2794,6 +2930,7 @@
 
         if (contractStatusSelect) {
           contractStatusSelect.addEventListener("change", function () {
+            resetImportState(false);
             selected.clear();
             if (allFiltered) {
               allFiltered.checked = false;
@@ -2872,6 +3009,23 @@
 
         if (sendFilteredBtn) {
           sendFilteredBtn.addEventListener("click", useAllFilteredAndOpen);
+        }
+        if (importForm) {
+          importForm.addEventListener("submit", function (event) {
+            event.preventDefault();
+            importRecipientsFromFile();
+          });
+        }
+        if (importClearBtn) {
+          importClearBtn.addEventListener("click", function () {
+            resetImportState(true);
+            selected.clear();
+            if (allFiltered) {
+              allFiltered.checked = false;
+            }
+            syncContext();
+            loadRecipients(1);
+          });
         }
 
         if (paginationEl) {
@@ -2988,6 +3142,7 @@
           fd.set("contract_status", currentContractStatus());
           fd.set("inmueble_simi", currentInmuebleSimi());
           fd.set("contract_number", currentContractNumber());
+          fd.set("import_payload", JSON.stringify(importedPayload || {}));
           fd.set("all_filtered", useAll ? "1" : "0");
           if (!useAll) {
             selected.forEach(function (id) {

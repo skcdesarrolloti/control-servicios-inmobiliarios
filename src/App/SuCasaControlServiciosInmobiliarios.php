@@ -55,6 +55,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CALENDAR_CITA_NOTIFY = 'scm_calendar_cita_notificar';
   const AJAX_ADMIN_NOTIFICATIONS_RECIPIENTS = 'scm_admin_notifications_recipients';
   const AJAX_ADMIN_NOTIFICATIONS_SEND = 'scm_admin_notifications_send';
+  const AJAX_ADMIN_NOTIFICATIONS_IMPORT = 'scm_admin_notifications_import';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';

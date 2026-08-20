@@ -155,6 +155,17 @@ final class AdministrativeNotificationsService
         'email_template' => 'scm_email_propietario_arriendo_consignado_v1',
         'parameter_mode' => 'name_message_signature',
       ],
+      'scm_propietario_canon_excel_v1' => [
+        'name' => 'scm_propietario_canon_excel_v1',
+        'label' => 'Canon desde Excel',
+        'language' => 'es_CO',
+        'description' => 'Aviso para propietarios usando el canon, contrato e inmueble detectados desde el Excel de SIMI.',
+        'body' => "Buen dia, {{1}}.\n\nLe informamos que el canon de arrendamiento reportado para su inmueble en administracion es:\n\n{{2}}\n\nAtentamente,\n{{3}}\n\nGracias por elegirnos y confiar en nuestro equipo.",
+        'variables' => ['Nombre del propietario', 'Detalle automatico del Excel: canon, contrato e inmueble', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'actors' => $propietarios,
+        'email_template' => 'scm_email_propietario_canon_excel_v1',
+        'parameter_mode' => 'name_import_canon_summary_signature',
+      ],
       'scm_copropiedad_soportes_pago_v1' => [
         'name' => 'scm_copropiedad_soportes_pago_v1',
         'label' => 'Soportes de pago',
@@ -278,6 +289,21 @@ final class AdministrativeNotificationsService
         'is_full_document' => false,
         'requires_message' => true,
         'preview_excerpt' => 'Aviso de arriendo consignado con detalle editable.',
+      ],
+      'scm_email_propietario_canon_excel_v1' => [
+        'name' => 'scm_email_propietario_canon_excel_v1',
+        'label' => 'Canon desde Excel',
+        'subject' => 'Canon de arrendamiento reportado',
+        'description' => 'Email para propietarios usando canon, contrato e inmueble importados desde Excel.',
+        'body' => '<p><strong>Buen d&iacute;a, {{nombre}}</strong>.</p><p>Le informamos que el canon de arrendamiento reportado para su inmueble en administraci&oacute;n es:</p><div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:14px 16px;margin:18px 0;color:#7c2d12;"><p style="margin:0 0 8px;font-size:18px;"><strong>{{canon_excel}}</strong></p><p style="margin:0;">Contrato: <strong>{{contrato_excel}}</strong><br>Inmueble SIMI: <strong>{{inmueble_simi_excel}}</strong>{{mes_excel_linea}}{{direccion_excel_linea}}</p></div><p>Agradecemos verificar la informaci&oacute;n y comunicarnos cualquier novedad.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
+        'source' => 'sistema',
+        'message_only' => false,
+        'editable_message' => '',
+        'is_html' => true,
+        'is_full_document' => false,
+        'fixed_body' => true,
+        'requires_message' => false,
+        'preview_excerpt' => 'Aviso con canon automatico del Excel de SIMI.',
       ],
       'scm_email_copropiedad_soportes_pago_v1' => [
         'name' => 'scm_email_copropiedad_soportes_pago_v1',
@@ -413,11 +439,80 @@ final class AdministrativeNotificationsService
   }
 
   /**
+   * @param array<string,mixed> $file
+   * @return array{rows:array<int,array<string,mixed>>,payload:array<string,array<string,string>>,total_rows:int,usable_rows:int,matched:int,unmatched:int,duplicates:int,type:string,type_label:string}
+   */
+  public function importRecipientsFromFile(string $type, array $file): array
+  {
+    $config = $this->typeConfig($type);
+    if (empty($config['contract_actor_column'])) {
+      throw new \RuntimeException('Este tipo de destinatario no se puede cruzar por contrato o inmueble SIMI.');
+    }
+
+    $rows = $this->parseImportFile($file);
+    if ($rows === []) {
+      throw new \RuntimeException('El archivo no tiene filas para importar.');
+    }
+
+    [$headers, $dataRows] = $this->normalizeImportRows($rows);
+    if ($headers === [] || $dataRows === []) {
+      throw new \RuntimeException('No se encontraron encabezados validos. Usa columnas como contrato, inmueble_simi y canon.');
+    }
+
+    $outRows = [];
+    $payload = [];
+    $seen = [];
+    $usable = 0;
+    $unmatched = 0;
+    $duplicates = 0;
+
+    foreach ($dataRows as $row) {
+      $meta = $this->importMetaForRow($headers, $row);
+      if (($meta['contrato_excel'] ?? '') === '' && ($meta['inmueble_simi_excel'] ?? '') === '') {
+        continue;
+      }
+      $usable++;
+      $result = $this->search($type, '', 1, 100, '', (string) ($meta['inmueble_simi_excel'] ?? ''), (string) ($meta['contrato_excel'] ?? ''));
+      $matches = (array) ($result['rows'] ?? []);
+      if ($matches === []) {
+        $unmatched++;
+        continue;
+      }
+      foreach ($matches as $recipient) {
+        $id = (int) ($recipient['_ID'] ?? 0);
+        if ($id <= 0) {
+          continue;
+        }
+        if (isset($seen[$id])) {
+          $duplicates++;
+          continue;
+        }
+        $seen[$id] = true;
+        $recipient['_scm_import_meta'] = $meta;
+        $outRows[] = $recipient;
+        $payload[(string) $id] = $meta;
+      }
+    }
+
+    return [
+      'rows' => $outRows,
+      'payload' => $payload,
+      'total_rows' => count($dataRows),
+      'usable_rows' => $usable,
+      'matched' => count($outRows),
+      'unmatched' => $unmatched,
+      'duplicates' => $duplicates,
+      'type' => $type,
+      'type_label' => (string) ($config['label'] ?? $type),
+    ];
+  }
+
+  /**
    * @param int[] $ids
    * @param string[] $channels
    * @return array{queued:int,failed:int,invalid:int,filtered:int,selected:int,channels:array<int,string>,type:string}
    */
-  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = ''): array
+  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = '', array $recipientMetaMap = []): array
   {
     $config = $this->typeConfig($type);
     $channels = $this->sanitizeChannels($channels);
@@ -456,14 +551,26 @@ final class AdministrativeNotificationsService
       throw new \RuntimeException('La tabla skc_notification_queue no esta disponible.');
     }
 
-    $recipients = $this->recipients($type, $ids);
+    $recipientMetaMap = $this->sanitizeImportMetaMap($recipientMetaMap);
+    $recipients = $this->recipients($type, $ids, $recipientMetaMap);
     $batchId = bin2hex(random_bytes(8));
     $queued = 0;
     $failed = 0;
     $invalid = 0;
     $filtered = 0;
+    $requiresImportMeta = (
+      in_array('whatsapp', $channels, true)
+      && (string) ($whatsappTemplateConfig['parameter_mode'] ?? '') === 'name_import_canon_summary_signature'
+    ) || (
+      in_array('email', $channels, true)
+      && str_contains((string) ($emailTemplateConfig['body'] ?? ''), '_excel')
+    );
 
     foreach ($recipients as $recipient) {
+      if ($requiresImportMeta && !is_array($recipient['_scm_import_meta'] ?? null)) {
+        $invalid += count($channels);
+        continue;
+      }
       foreach ($channels as $channel) {
         if ($this->isBlockedByPreference($recipient, $channel, $type)) {
           $filtered++;
@@ -506,8 +613,382 @@ final class AdministrativeNotificationsService
     ];
   }
 
-  /** @return array<int,array<string,mixed>> */
-  private function recipients(string $type, array $ids): array
+  /**
+   * @param array<string,mixed> $file
+   * @return array<int,array<int,string>>
+   */
+  private function parseImportFile(array $file): array
+  {
+    $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($error !== UPLOAD_ERR_OK) {
+      throw new \RuntimeException('No se pudo subir el archivo.');
+    }
+    $tmp = (string) ($file['tmp_name'] ?? '');
+    $name = (string) ($file['name'] ?? '');
+    if ($tmp === '' || !is_readable($tmp)) {
+      throw new \RuntimeException('El archivo temporal no se puede leer.');
+    }
+    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    if (in_array($ext, ['csv', 'txt'], true)) {
+      return $this->parseCsvImportFile($tmp);
+    }
+    if ($ext === 'xlsx') {
+      return $this->parseXlsxImportFile($tmp);
+    }
+    throw new \RuntimeException('Formato no soportado. Sube un archivo .xlsx o .csv.');
+  }
+
+  /** @return array<int,array<int,string>> */
+  private function parseCsvImportFile(string $path): array
+  {
+    $sample = (string) file_get_contents($path, false, null, 0, 4096);
+    $semicolon = substr_count($sample, ';');
+    $comma = substr_count($sample, ',');
+    $delimiter = $semicolon > $comma ? ';' : ',';
+    $handle = fopen($path, 'rb');
+    if (!is_resource($handle)) {
+      throw new \RuntimeException('No se pudo abrir el CSV.');
+    }
+    $rows = [];
+    while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+      $rows[] = array_map(static function ($value): string {
+        $value = (string) $value;
+        $value = preg_replace('/^\xEF\xBB\xBF/', '', $value) ?? $value;
+        return trim($value);
+      }, $row);
+      if (count($rows) > 3000) {
+        break;
+      }
+    }
+    fclose($handle);
+    return $rows;
+  }
+
+  /** @return array<int,array<int,string>> */
+  private function parseXlsxImportFile(string $path): array
+  {
+    $entries = $this->readZipEntries($path);
+    $shared = $this->xlsxSharedStrings($entries);
+    $sheetXml = $entries['xl/worksheets/sheet1.xml'] ?? '';
+    if (!is_string($sheetXml) || trim($sheetXml) === '') {
+      throw new \RuntimeException('No se encontro la primera hoja del XLSX.');
+    }
+    $sheet = simplexml_load_string($sheetXml);
+    if (!$sheet instanceof \SimpleXMLElement) {
+      throw new \RuntimeException('No se pudo leer la primera hoja del XLSX.');
+    }
+    $mainNs = $this->xlsxMainNamespace($sheet);
+    $sheetRoot = $mainNs !== '' ? $sheet->children($mainNs) : $sheet;
+    $sheetData = $sheetRoot->sheetData ?? null;
+
+    $rows = [];
+    foreach (($sheetData ? ($mainNs !== '' ? $sheetData->children($mainNs)->row : $sheetData->row) : []) as $xmlRow) {
+      $cells = [];
+      $max = -1;
+      foreach (($mainNs !== '' ? $xmlRow->children($mainNs)->c : $xmlRow->c) ?? [] as $cell) {
+        $ref = (string) ($cell['r'] ?? '');
+        $index = $this->xlsxColumnIndex($ref);
+        if ($index < 0) {
+          $index = count($cells);
+        }
+        $cells[$index] = $this->xlsxCellValue($cell, $shared);
+        $max = max($max, $index);
+      }
+      if ($max >= 0) {
+        $row = [];
+        for ($i = 0; $i <= $max; $i++) {
+          $row[] = trim((string) ($cells[$i] ?? ''));
+        }
+        $rows[] = $row;
+      }
+      if (count($rows) > 3000) {
+        break;
+      }
+    }
+    return $rows;
+  }
+
+  /** @return array<string,string> */
+  private function readZipEntries(string $path): array
+  {
+    $data = file_get_contents($path);
+    if (!is_string($data) || $data === '') {
+      throw new \RuntimeException('No se pudo leer el XLSX.');
+    }
+    $eocd = strrpos($data, "PK\x05\x06");
+    if ($eocd === false) {
+      throw new \RuntimeException('El archivo XLSX no tiene estructura ZIP valida.');
+    }
+    $total = unpack('v', substr($data, $eocd + 10, 2))[1] ?? 0;
+    $centralOffset = unpack('V', substr($data, $eocd + 16, 4))[1] ?? 0;
+    $entries = [];
+    $pos = (int) $centralOffset;
+    $length = strlen($data);
+    for ($i = 0; $i < (int) $total && $pos + 46 <= $length; $i++) {
+      if (substr($data, $pos, 4) !== "PK\x01\x02") {
+        break;
+      }
+      $method = unpack('v', substr($data, $pos + 10, 2))[1] ?? 0;
+      $compressedSize = unpack('V', substr($data, $pos + 20, 4))[1] ?? 0;
+      $nameLength = unpack('v', substr($data, $pos + 28, 2))[1] ?? 0;
+      $extraLength = unpack('v', substr($data, $pos + 30, 2))[1] ?? 0;
+      $commentLength = unpack('v', substr($data, $pos + 32, 2))[1] ?? 0;
+      $localOffset = unpack('V', substr($data, $pos + 42, 4))[1] ?? 0;
+      $name = str_replace('\\', '/', substr($data, $pos + 46, (int) $nameLength));
+      $pos += 46 + (int) $nameLength + (int) $extraLength + (int) $commentLength;
+      if ($name === '' || substr($data, (int) $localOffset, 4) !== "PK\x03\x04") {
+        continue;
+      }
+      $localNameLength = unpack('v', substr($data, (int) $localOffset + 26, 2))[1] ?? 0;
+      $localExtraLength = unpack('v', substr($data, (int) $localOffset + 28, 2))[1] ?? 0;
+      $dataStart = (int) $localOffset + 30 + (int) $localNameLength + (int) $localExtraLength;
+      $compressed = substr($data, $dataStart, (int) $compressedSize);
+      if ((int) $method === 0) {
+        $entries[$name] = $compressed;
+      } elseif ((int) $method === 8) {
+        $inflated = @gzinflate($compressed);
+        if (is_string($inflated)) {
+          $entries[$name] = $inflated;
+        }
+      }
+    }
+    return $entries;
+  }
+
+  /** @param array<string,string> $entries @return array<int,string> */
+  private function xlsxSharedStrings(array $entries): array
+  {
+    $xml = $entries['xl/sharedStrings.xml'] ?? '';
+    if (!is_string($xml) || trim($xml) === '') {
+      return [];
+    }
+    $sharedXml = simplexml_load_string($xml);
+    if (!$sharedXml instanceof \SimpleXMLElement) {
+      return [];
+    }
+    $mainNs = $this->xlsxMainNamespace($sharedXml);
+    $root = $mainNs !== '' ? $sharedXml->children($mainNs) : $sharedXml;
+    $out = [];
+    foreach ($root->si ?? [] as $si) {
+      $siChildren = $mainNs !== '' ? $si->children($mainNs) : $si;
+      $text = '';
+      if (isset($siChildren->t)) {
+        $text = (string) $siChildren->t;
+      } elseif (isset($siChildren->r)) {
+        foreach ($siChildren->r as $run) {
+          $runChildren = $mainNs !== '' ? $run->children($mainNs) : $run;
+          $text .= (string) ($runChildren->t ?? '');
+        }
+      }
+      $out[] = trim($text);
+    }
+    return $out;
+  }
+
+  /** @param array<int,string> $shared */
+  private function xlsxCellValue(\SimpleXMLElement $cell, array $shared): string
+  {
+    $type = (string) ($cell['t'] ?? '');
+    $mainNs = $this->xlsxMainNamespace($cell);
+    $children = $mainNs !== '' ? $cell->children($mainNs) : $cell;
+    if ($type === 's') {
+      $index = (int) ($children->v ?? -1);
+      return trim((string) ($shared[$index] ?? ''));
+    }
+    if ($type === 'inlineStr') {
+      $inline = $children->is ?? null;
+      $inlineChildren = $inline instanceof \SimpleXMLElement && $mainNs !== '' ? $inline->children($mainNs) : $inline;
+      return trim((string) ($inlineChildren->t ?? ''));
+    }
+    return trim((string) ($children->v ?? ''));
+  }
+
+  private function xlsxMainNamespace(\SimpleXMLElement $xml): string
+  {
+    $namespaces = $xml->getNamespaces(true);
+    return (string) ($namespaces['x'] ?? $namespaces[''] ?? 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+  }
+
+  private function xlsxColumnIndex(string $cellRef): int
+  {
+    if (!preg_match('/^([A-Z]+)/i', $cellRef, $m)) {
+      return -1;
+    }
+    $letters = strtoupper($m[1]);
+    $index = 0;
+    for ($i = 0, $len = strlen($letters); $i < $len; $i++) {
+      $index = ($index * 26) + (ord($letters[$i]) - 64);
+    }
+    return $index - 1;
+  }
+
+  /**
+   * @param array<int,array<int,string>> $rows
+   * @return array{0:array<int,string>,1:array<int,array<int,string>>}
+   */
+  private function normalizeImportRows(array $rows): array
+  {
+    $headerIndex = -1;
+    $headers = [];
+    foreach (array_slice($rows, 0, 20, true) as $i => $row) {
+      $normalized = array_map(fn($value): string => $this->normalizeImportHeader((string) $value), $row);
+      $score = 0;
+      foreach ($normalized as $header) {
+        if ($this->isImportAlias($header, ['contrato', 'contrato_arrendamiento', 'numero_contrato', 'nro_contrato'])) {
+          $score += 2;
+        }
+        if ($this->isImportAlias($header, ['inmueble', 'inmueble_simi', 'codigo_inmueble', 'id_inmueble', 'simi'])) {
+          $score += 2;
+        }
+        if ($this->isImportAlias($header, ['canon', 'valor_canon', 'canon_arrendamiento', 'valor_arriendo', 'renta'])) {
+          $score++;
+        }
+      }
+      if ($score >= 2) {
+        $headerIndex = (int) $i;
+        $headers = $normalized;
+        break;
+      }
+    }
+    if ($headerIndex < 0) {
+      return [[], []];
+    }
+    $dataRows = [];
+    foreach (array_slice($rows, $headerIndex + 1) as $row) {
+      $hasData = false;
+      foreach ($row as $value) {
+        if (trim((string) $value) !== '') {
+          $hasData = true;
+          break;
+        }
+      }
+      if ($hasData) {
+        $dataRows[] = $row;
+      }
+    }
+    return [$headers, $dataRows];
+  }
+
+  private function normalizeImportHeader(string $value): string
+  {
+    $value = trim(mb_strtolower($value, 'UTF-8'));
+    $value = strtr($value, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ñ' => 'n']);
+    $value = preg_replace('/[^a-z0-9]+/u', '_', $value) ?? $value;
+    return trim($value, '_');
+  }
+
+  /** @param string[] $aliases */
+  private function isImportAlias(string $header, array $aliases): bool
+  {
+    return in_array($header, $aliases, true);
+  }
+
+  /** @param array<int,string> $headers @param array<int,string> $row @param string[] $aliases */
+  private function importValue(array $headers, array $row, array $aliases): string
+  {
+    foreach ($headers as $index => $header) {
+      if ($this->isImportAlias($header, $aliases)) {
+        return trim((string) ($row[$index] ?? ''));
+      }
+    }
+    return '';
+  }
+
+  /** @param array<int,string> $headers @param array<int,string> $row @return array<string,string> */
+  private function importMetaForRow(array $headers, array $row): array
+  {
+    $contract = $this->normalizeImportIdentifier($this->importValue($headers, $row, ['contrato', 'contrato_arrendamiento', 'numero_contrato', 'nro_contrato']));
+    $property = $this->normalizeImportIdentifier($this->importValue($headers, $row, ['inmueble', 'inmueble_simi', 'codigo_inmueble', 'id_inmueble', 'simi']));
+    $canonRaw = $this->importValue($headers, $row, ['canon', 'valor_canon', 'canon_arrendamiento', 'valor_arriendo', 'renta']);
+    $meta = [
+      'contrato_excel' => $contract,
+      'inmueble_simi_excel' => $property,
+      'canon_excel' => $this->formatImportMoney($canonRaw),
+      'canon_excel_raw' => trim($canonRaw),
+      'mes_excel' => trim($this->importValue($headers, $row, ['mes', 'periodo', 'mes_canon', 'periodo_canon'])),
+      'direccion_excel' => trim($this->importValue($headers, $row, ['direccion', 'direccion_inmueble'])),
+    ];
+    $meta['detalle_excel'] = $this->importCanonSummary($meta);
+    return $meta;
+  }
+
+  private function normalizeImportIdentifier(string $value): string
+  {
+    $value = trim($value);
+    if ($value === '') {
+      return '';
+    }
+    if (preg_match('/^\d+(?:[.,]0+)?$/', $value) === 1) {
+      return (string) ((int) ((float) str_replace(',', '.', $value)));
+    }
+    return $value;
+  }
+
+  private function formatImportMoney(string $value): string
+  {
+    $value = trim($value);
+    if ($value === '') {
+      return 'Sin canon en Excel';
+    }
+    $clean = preg_replace('/[^\d,.\-]/', '', $value) ?? $value;
+    if (preg_match('/,\d{1,2}$/', $clean) === 1) {
+      $clean = str_replace('.', '', $clean);
+      $clean = str_replace(',', '.', $clean);
+    } else {
+      $clean = str_replace(',', '', $clean);
+    }
+    if (is_numeric($clean)) {
+      return '$' . number_format((float) $clean, 0, ',', '.');
+    }
+    return $value;
+  }
+
+  /** @param array<string,string> $meta */
+  private function importCanonSummary(array $meta): string
+  {
+    $parts = [];
+    $canon = trim((string) ($meta['canon_excel'] ?? ''));
+    if ($canon !== '' && $canon !== 'Sin canon en Excel') {
+      $parts[] = 'Canon: ' . $canon;
+    }
+    $contract = trim((string) ($meta['contrato_excel'] ?? ''));
+    if ($contract !== '') {
+      $parts[] = 'Contrato: #' . $contract;
+    }
+    $property = trim((string) ($meta['inmueble_simi_excel'] ?? ''));
+    if ($property !== '') {
+      $parts[] = 'Inmueble SIMI: ' . $property;
+    }
+    $month = trim((string) ($meta['mes_excel'] ?? ''));
+    if ($month !== '') {
+      $parts[] = 'Periodo: ' . $month;
+    }
+    return implode("\n", $parts);
+  }
+
+  /** @param array<mixed> $metaMap @return array<string,array<string,string>> */
+  private function sanitizeImportMetaMap(array $metaMap): array
+  {
+    $out = [];
+    foreach ($metaMap as $id => $meta) {
+      $id = (string) ((int) $id);
+      if ($id === '0' || !is_array($meta)) {
+        continue;
+      }
+      $clean = [];
+      foreach (['contrato_excel', 'inmueble_simi_excel', 'canon_excel', 'canon_excel_raw', 'mes_excel', 'direccion_excel', 'detalle_excel'] as $key) {
+        $clean[$key] = trim(mb_substr((string) ($meta[$key] ?? ''), 0, 500, 'UTF-8'));
+      }
+      if (($clean['detalle_excel'] ?? '') === '') {
+        $clean['detalle_excel'] = $this->importCanonSummary($clean);
+      }
+      $out[$id] = $clean;
+    }
+    return $out;
+  }
+
+  /** @param array<string,array<string,string>> $metaMap @return array<int,array<string,mixed>> */
+  private function recipients(string $type, array $ids, array $metaMap = []): array
   {
     $config = $this->typeConfig($type);
     $table = (string) $config['table'];
@@ -536,6 +1017,10 @@ final class AdministrativeNotificationsService
       $row['tipo_actor'] = $type;
       $row['tipo_label'] = (string) $config['label'];
       $row['rol_persona'] = (string) $config['role'];
+      $id = (string) ((int) ($row['_ID'] ?? 0));
+      if ($id !== '0' && isset($metaMap[$id])) {
+        $row['_scm_import_meta'] = $metaMap[$id];
+      }
     }
     unset($row);
     return $rows;
@@ -872,7 +1357,7 @@ final class AdministrativeNotificationsService
       $components = [
         [
           'type' => 'body',
-          'parameters' => $this->whatsappTemplateParameters($whatsappTemplateConfig, $name, $message),
+          'parameters' => $this->whatsappTemplateParameters($whatsappTemplateConfig, $name, $message, $recipient),
         ],
       ];
       $payload = [
@@ -896,6 +1381,7 @@ final class AdministrativeNotificationsService
         'source_module' => self::SOURCE_MODULE,
         'whatsapp_template' => $channel === 'whatsapp' ? $templateName : '',
         'email_template' => $channel === 'email' ? $templateName : '',
+        'import_meta' => is_array($recipient['_scm_import_meta'] ?? null) ? $recipient['_scm_import_meta'] : [],
       ],
     ];
     $data = [
@@ -959,7 +1445,7 @@ final class AdministrativeNotificationsService
   }
 
   /** @param array<string,mixed> $templateConfig @return array<int,array{type:string,text:string}> */
-  private function whatsappTemplateParameters(array $templateConfig, string $recipientName, string $message): array
+  private function whatsappTemplateParameters(array $templateConfig, string $recipientName, string $message, array $recipient = []): array
   {
     $name = trim($recipientName) !== '' ? trim($recipientName) : 'Cliente';
     $signature = (string) ($this->senderProfile()['signature_line'] ?? 'Control Servicios Inmobiliarios');
@@ -967,6 +1453,18 @@ final class AdministrativeNotificationsService
     if ($mode === 'name_signature') {
       return [
         ['type' => 'text', 'text' => $name],
+        ['type' => 'text', 'text' => $signature],
+      ];
+    }
+    if ($mode === 'name_import_canon_summary_signature') {
+      $meta = is_array($recipient['_scm_import_meta'] ?? null) ? $recipient['_scm_import_meta'] : [];
+      $detail = $this->importCanonSummary($this->sanitizeImportMetaMap(['1' => $meta])['1'] ?? []);
+      if ($detail === '') {
+        $detail = 'Canon: pendiente por verificar en el archivo importado.';
+      }
+      return [
+        ['type' => 'text', 'text' => $name],
+        ['type' => 'text', 'text' => $detail],
         ['type' => 'text', 'text' => $signature],
       ];
     }
@@ -1188,6 +1686,12 @@ final class AdministrativeNotificationsService
   private function resolveVariables(string $template, array $recipient, array $config): string
   {
     $sender = $this->senderProfile();
+    $importMeta = is_array($recipient['_scm_import_meta'] ?? null) ? $recipient['_scm_import_meta'] : [];
+    $canonExcel = trim((string) ($importMeta['canon_excel'] ?? ''));
+    $contractExcel = trim((string) ($importMeta['contrato_excel'] ?? ''));
+    $propertyExcel = trim((string) ($importMeta['inmueble_simi_excel'] ?? ''));
+    $monthExcel = trim((string) ($importMeta['mes_excel'] ?? ''));
+    $addressExcel = trim((string) ($importMeta['direccion_excel'] ?? ''));
     $map = [
       '{{nombre}}' => trim((string) ($recipient['nombre'] ?? '')),
       '{{correo}}' => trim((string) ($recipient['correo'] ?? '')),
@@ -1199,6 +1703,16 @@ final class AdministrativeNotificationsService
       '{{celular_funcionario}}' => $sender['phone'],
       '{{firma_funcionario}}' => $sender['signature'],
       '{{firma_funcionario_linea}}' => $sender['signature_line'],
+      '{{canon_excel}}' => $canonExcel !== '' ? $canonExcel : 'Sin canon en Excel',
+      '{{valor_canon}}' => $canonExcel !== '' ? $canonExcel : 'Sin canon en Excel',
+      '{{canon}}' => $canonExcel !== '' ? $canonExcel : 'Sin canon en Excel',
+      '{{contrato_excel}}' => $contractExcel !== '' ? $contractExcel : 'Sin contrato en Excel',
+      '{{inmueble_simi_excel}}' => $propertyExcel !== '' ? $propertyExcel : 'Sin inmueble SIMI en Excel',
+      '{{mes_excel}}' => $monthExcel,
+      '{{direccion_excel}}' => $addressExcel,
+      '{{detalle_excel}}' => trim((string) ($importMeta['detalle_excel'] ?? '')),
+      '{{mes_excel_linea}}' => $monthExcel !== '' ? '<br>Periodo: <strong>' . htmlspecialchars($monthExcel, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong>' : '',
+      '{{direccion_excel_linea}}' => $addressExcel !== '' ? '<br>Direcci&oacute;n: <strong>' . htmlspecialchars($addressExcel, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong>' : '',
     ];
     return strtr($template, $map);
   }

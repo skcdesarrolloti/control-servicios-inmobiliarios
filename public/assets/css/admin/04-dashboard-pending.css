@@ -3339,6 +3339,98 @@
   font-size: 13px;
 }
 
+#scm-app .scm-admin-notif-import-card {
+  margin-top: 12px;
+}
+
+#scm-app .scm-admin-notif-import-card.is-hidden,
+#scm-app .scm-admin-notif-import-card[hidden] {
+  display: none !important;
+}
+
+#scm-app .scm-admin-notif-import-card form {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(300px, 0.9fr);
+  gap: 14px;
+  align-items: center;
+}
+
+#scm-app .scm-admin-notif-import-copy h4 {
+  margin: 4px 0 6px;
+  color: #0f172a;
+  font-size: 17px;
+}
+
+#scm-app .scm-admin-notif-import-copy p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+#scm-app .scm-admin-notif-import-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px !important;
+}
+
+#scm-app .scm-admin-notif-import-examples a {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+#scm-app .scm-admin-notif-import-examples a:hover,
+#scm-app .scm-admin-notif-import-examples a:focus-visible {
+  border-color: #fb923c;
+  background: #ffedd5;
+  outline: 3px solid rgba(249, 115, 22, 0.16);
+}
+
+#scm-app .scm-admin-notif-import-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#scm-app .scm-admin-notif-import-controls input[type="file"] {
+  min-height: 42px;
+  max-width: 320px;
+  padding: 8px;
+  border: 1px solid #dbe7f4;
+  border-radius: 12px;
+  background: #f8fbff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#scm-app .scm-admin-notif-import-result {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#scm-app .scm-admin-notif-import-result.is-success {
+  color: #166534;
+}
+
+#scm-app .scm-admin-notif-import-result.is-error {
+  color: #991b1b;
+}
+
 #scm-app .scm-admin-notif-recipients {
   display: grid;
   gap: 8px;
@@ -3436,6 +3528,19 @@
   color: #475569;
   font-size: 11px;
   font-weight: 800;
+  line-height: 1.35;
+}
+
+#scm-app .scm-admin-notif-import-summary {
+  display: block;
+  width: fit-content;
+  margin-top: 6px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 11px;
+  font-weight: 900;
   line-height: 1.35;
 }
 
@@ -4055,6 +4160,20 @@
 
   #scm-app .scm-admin-notif-channel-group {
     grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-admin-notif-import-card form {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-admin-notif-import-controls {
+    justify-content: stretch;
+  }
+
+  #scm-app .scm-admin-notif-import-controls input[type="file"],
+  #scm-app .scm-admin-notif-import-controls button {
+    width: 100%;
+    max-width: none;
   }
 
   #scm-app .scm-admin-notif-channel-copy {

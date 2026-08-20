@@ -71,9 +71,17 @@ trait HandlesAdministrativeNotifications
     $message = trim(wp_kses_post(wp_unslash((string) ($_POST['message'] ?? ''))));
     $whatsappTemplate = sanitize_key((string) ($_POST['whatsapp_template'] ?? ''));
     $emailTemplate = sanitize_key((string) ($_POST['email_template'] ?? ''));
+    $importPayloadRaw = trim((string) wp_unslash($_POST['import_payload'] ?? ''));
+    $importPayload = [];
+    if ($importPayloadRaw !== '') {
+      $decoded = json_decode($importPayloadRaw, true);
+      if (is_array($decoded)) {
+        $importPayload = $decoded;
+      }
+    }
 
     try {
-      $result = $service->enqueue($type, $ids, $channels, $subject, $message, $whatsappTemplate, $emailTemplate);
+      $result = $service->enqueue($type, $ids, $channels, $subject, $message, $whatsappTemplate, $emailTemplate, $importPayload);
       $queued = (int) ($result['queued'] ?? 0);
       $invalid = (int) ($result['invalid'] ?? 0);
       $failed = (int) ($result['failed'] ?? 0);
@@ -82,6 +90,40 @@ trait HandlesAdministrativeNotifications
         ? sprintf('Se encolaron %d notificaciones.%s%s%s', $queued, $invalid > 0 ? " {$invalid} sin contacto valido." : '', $filtered > 0 ? " {$filtered} bloqueadas por preferencia." : '', $failed > 0 ? " {$failed} fallaron." : '')
         : 'No se pudo encolar ninguna notificacion. Revisa contactos y canales.';
       $this->jsonOk($result + ['message' => $messageText]);
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
+  public function ajax_handler_admin_notifications_import(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para usar Notificaciones.');
+    }
+
+    $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'propietarios_activos'));
+    $file = is_array($_FILES['file'] ?? null) ? $_FILES['file'] : [];
+
+    try {
+      $result = $this->get_admin_notifications_service()->importRecipientsFromFile($type, $file);
+      $matched = (int) ($result['matched'] ?? 0);
+      $unmatched = (int) ($result['unmatched'] ?? 0);
+      $duplicates = (int) ($result['duplicates'] ?? 0);
+      $usable = (int) ($result['usable_rows'] ?? 0);
+      $message = $matched > 0
+        ? sprintf('Excel importado: %d destinatarios encontrados de %d filas utiles.%s%s', $matched, $usable, $unmatched > 0 ? " {$unmatched} filas sin coincidencia." : '', $duplicates > 0 ? " {$duplicates} duplicados omitidos." : '')
+        : 'No se encontraron destinatarios con ese Excel. Revisa columnas contrato o inmueble_simi.';
+      $this->jsonOk([
+        'html' => $this->render_admin_notification_recipient_rows((array) ($result['rows'] ?? [])),
+        'payload' => (array) ($result['payload'] ?? []),
+        'matched' => $matched,
+        'unmatched' => $unmatched,
+        'duplicates' => $duplicates,
+        'usable_rows' => $usable,
+        'type_label' => (string) ($result['type_label'] ?? ''),
+        'message' => $message,
+      ]);
     } catch (\Throwable $e) {
       $this->jsonFail($e->getMessage());
     }
@@ -121,6 +163,7 @@ trait HandlesAdministrativeNotifications
       $rawPhone = trim((string) ($row['celular'] ?? ''));
       $contractLabel = trim((string) ($row['contrato_arrendamiento_estado'] ?? ''));
       $contractSummary = trim((string) ($row['contratos_arrendamiento_resumen'] ?? ''));
+      $importMeta = is_array($row['_scm_import_meta'] ?? null) ? $row['_scm_import_meta'] : [];
       $contractClass = match ($contractLabel) {
         'Activo' => 'is-active-contract',
         'No activo' => 'is-inactive-contract',
@@ -139,6 +182,23 @@ trait HandlesAdministrativeNotifications
       }
       if ($contractSummary !== '') {
         $html .= '<span class="scm-admin-notif-contract-summary">' . esc_html($contractSummary) . '</span>';
+      }
+      if ($importMeta !== []) {
+        $importBits = [];
+        foreach ([
+          'contrato_excel' => 'Contrato',
+          'inmueble_simi_excel' => 'Inmueble',
+          'canon_excel' => 'Canon',
+          'mes_excel' => 'Periodo',
+        ] as $key => $label) {
+          $value = trim((string) ($importMeta[$key] ?? ''));
+          if ($value !== '' && $value !== 'Sin canon en Excel') {
+            $importBits[] = $label . ': ' . $value;
+          }
+        }
+        if ($importBits !== []) {
+          $html .= '<span class="scm-admin-notif-import-summary">' . esc_html('Excel · ' . implode(' · ', $importBits)) . '</span>';
+        }
       }
       $html .= '</span>';
       $html .= '<span class="scm-admin-notif-contact">';
