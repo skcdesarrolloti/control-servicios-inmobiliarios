@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Modules\Pending\Concerns;
 
 use SCM\Core\Auth;
+use SCM\Modules\Pending\TicketPdfGenerator;
 use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
 use SCM\Support\SchemaInspector;
@@ -211,7 +212,6 @@ trait AdministrativeTicketCreationConcern
         }
       }
 
-      $this->insertTicketHistory($schema, $ticketId, $ticketPayload, $imagenes, $documentos, $userName, $idEmpleado, $nowTs, $nowMysql);
       $this->insertPropertyHistory($schema, $ticketId, $ticketPayload, $userName, $idEmpleado, $nowTs, $nowMysql, $mode);
       $this->updateContractAfterTicket($schema, $contract, $ticketId, $ticketPayload);
       if ($mode === 'preventiva' && function_exists('do_action')) {
