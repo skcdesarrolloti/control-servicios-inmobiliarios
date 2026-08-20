@@ -2894,16 +2894,16 @@
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--scm-teal-700), var(--scm-teal-500));
+  height: 4px;
+  background: linear-gradient(90deg, #064e3b, #059669, #f59e0b);
 }
 
 #scm-app .scm-pending-header--teal::before {
-  background: linear-gradient(90deg, var(--scm-teal-700), var(--scm-teal-500));
+  background: linear-gradient(90deg, #064e3b, #059669, #f59e0b);
 }
 
 #scm-app .scm-pending-header--green::before {
-  background: linear-gradient(90deg, var(--scm-blue-700), var(--scm-blue-400));
+  background: linear-gradient(90deg, #065f46, #10b981, #f59e0b);
 }
 
 #scm-app .scm-pending-header h2 {
@@ -2947,15 +2947,50 @@
   font-weight: 700;
 }
 
+#scm-app .scm-contract-state {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 900;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  min-height: 24px;
+  padding: 3px 10px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#scm-app .scm-contract-state--active {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+#scm-app .scm-contract-state--closed {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+#scm-app .scm-contract-state--neutral {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #9a3412;
+}
+
 /* Action button in pending table rows */
 #scm-app .scm-pending-action-btn {
-  background: linear-gradient(135deg, var(--scm-teal-700), var(--scm-teal-500));
+  background: linear-gradient(135deg, #064e3b 0%, #059669 52%, #16a34a 100%);
   color: #fff;
   border: none;
-  border-radius: var(--scm-r-sm);
-  padding: 6px 13px;
+  border-radius: 10px;
+  box-shadow: 0 8px 18px rgba(5, 150, 105, 0.2);
+  min-height: 36px;
+  padding: 8px 14px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 900;
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
@@ -2965,20 +3000,24 @@
   transition: opacity 0.15s;
   font-family: inherit;
   line-height: 1.4;
+  transform: translateY(0);
+  transition: box-shadow 0.16s ease, opacity 0.16s ease, transform 0.16s ease;
 }
 
 #scm-app .scm-pending-action-btn:hover {
   opacity: 0.85;
+  box-shadow: 0 12px 24px rgba(5, 150, 105, 0.28);
   color: #fff;
   text-decoration: none;
+  transform: translateY(-1px);
 }
 
 #scm-app .scm-pending-action-btn--blue {
-  background: linear-gradient(135deg, var(--scm-blue-700), var(--scm-blue-600));
+  background: linear-gradient(135deg, #0f766e, #059669);
 }
 
 #scm-app .scm-contract-received-btn {
-  background: linear-gradient(135deg, #047857, #10b981);
+  background: linear-gradient(135deg, #0f172a, #0f766e 55%, #10b981);
 }
 
 #scm-app .scm-contract-received-btn:disabled {
@@ -2988,11 +3027,20 @@
 
 /* Pending panels: restore dark table header (overrides the flat-pass rule) */
 #scm-app .scm-pending-wrap .scm-table-prev thead tr {
-  background: linear-gradient(130deg, var(--scm-teal-700), #0d4a46) !important;
+  background: linear-gradient(130deg, #0f172a, #064e3b 58%, #0f766e) !important;
   color: rgba(255, 255, 255, 0.9) !important;
 }
 #scm-app .scm-pending-wrap .scm-table-prev thead th {
   color: rgba(255, 255, 255, 0.9) !important;
+}
+
+#scm-app .scm-pending-wrap .scm-table-wrap {
+  border-color: #cfe1d9;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+}
+
+#scm-app .scm-pending-wrap .scm-table tbody tr:hover {
+  background: #f0fdf4;
 }
 
 /* Ticket status badges in pending table action cells */

@@ -51,36 +51,36 @@ final class TicketPdfGenerator
     $nombreDest = $isOwner
       ? $this->value($ticket, 'propietario', 'propietario')
       : $this->value($ticket, 'arrendatario', 'arrendatario');
+    $contrato = $this->value($ticket, 'contrato', '-');
+    $inmueble = $this->value($ticket, 'id_inmueble', $this->value($ticket, 'inmueble', '-'));
+    $direccion = $this->value($ticket, 'direccion', '');
+    $ciudad = $this->value($ticket, 'ciudad', 'Cartagena de Indias');
+    $repairLabel = $isOwner
+      ? 'Reparaciones Necesarias, Utiles y/o Voluntarias'
+      : 'Reparaciones Locativas';
 
-    $pdf->title('Ofrecimiento de la Revision gratuita preventiva dirigida al ' . $destinatario);
     $pdf->logo();
-    $pdf->heading('Encabezado');
-    $pdf->heading('Encabezado');
-    $pdf->line($this->value($ticket, 'ciudad', 'Cartagena de Indias') . ', ' . date('d-m-Y'));
-    $pdf->line('Apreciado(a) ' . $nombreDest);
-    $pdf->spacer(8);
-    $pdf->heading('Encabezado');
-    $pdf->heading('Encabezado');
-    $pdf->paragraph('Conscientes de la importancia de mantener el INMUEBLE en optimas condiciones para el disfrute, goce y satisfaccion del mismo, se hace necesario practicar una REVISION ANUAL PREVENTIVA GRATUITA.');
-
-    if ($isOwner) {
-      $pdf->paragraph('Esta REVISION GRATUITA permite realizar una evaluacion del estado del inmueble, detectar danos, y hacer el diagnostico de las Reparaciones Necesarias, Utiles y/o Voluntarias que ordinariamente se producen por el normal uso, evidenciando despues de haber transcurrido un ano de vigencia de estar ocupado el inmueble.');
-    } else {
-      $pdf->paragraph('Esta REVISION GRATUITA permite realizar una evaluacion del estado del inmueble, detectar danos, y hacer el diagnostico de las Reparaciones Locativas que ordinariamente se producen por el normal uso, evidenciando despues de haber transcurrido un ano de vigencia de estar ocupado el inmueble.');
+    $pdf->title('Ofrecimiento de revision anual preventiva gratuita');
+    $pdf->line($ciudad . ', ' . date('d-m-Y'), 9);
+    $pdf->line('Apreciado(a) ' . $nombreDest, 10, 'F2');
+    $pdf->line('Contrato: ' . $contrato . ' | Inmueble: ' . $inmueble, 8, 'F2');
+    if ($direccion !== '') {
+      $pdf->line('Direccion: ' . $direccion, 8);
     }
+    $pdf->spacer(8);
+    $pdf->paragraph('Conscientes de la importancia de mantener el inmueble en optimas condiciones para el disfrute, goce y satisfaccion de quienes lo habitan y administran, nos permitimos ofrecer la realizacion de una revision anual preventiva gratuita.');
+    $pdf->paragraph('Esta revision permite evaluar el estado general del inmueble, detectar oportunamente posibles danos y emitir un diagnostico sobre las ' . $repairLabel . ' que puedan presentarse por el uso normal del bien despues de un periodo de ocupacion.');
 
-    $pdf->line('BENEFICIOS DE LA REVISION PREVENTIVA GRATUITA:', 8, 'F2');
+    $pdf->line('Beneficios de la revision preventiva gratuita:', 9, 'F2');
     $pdf->bullets([
-      'Permitir cumplir con el Articulo 1985 del Codigo Civil Colombiano.',
-      'Detectar problemas de deterioros a tiempo y que su costo actual sea de facil alcance, evitando reparaciones futuras costosas.',
-      'Revision de la funcionalidad de los servicios publicos instalados con el fin de mantenerlos controlados con relacion a su costo-beneficio.',
-      'Autorizar o no las reparaciones con nuestro personal altamente calificado y al menor costo del Mercado.',
-      'Evidencia del resultado de la visita haciendo entrega del informe correspondiente.',
+      'Facilitar el cumplimiento de las obligaciones de conservacion del inmueble conforme al Codigo Civil Colombiano.',
+      'Detectar deterioros a tiempo y evitar que se conviertan en reparaciones futuras de mayor costo.',
+      'Revisar la funcionalidad de los servicios publicos e instalaciones del inmueble.',
+      'Contar con evidencia del resultado de la visita mediante el informe correspondiente.',
+      'Coordinar oportunamente las acciones que deban ser autorizadas por las partes responsables.',
     ]);
 
-    $pdf->paragraph('Cumpliendo nuestra mision con el fin de satisfacer todas sus expectativas y necesidades, sorprendiendolo de forma unica e inesperada, buscando que su permanencia en la empresa sea Positiva y Memorable.');
-    $pdf->heading('Encabezado');
-    $pdf->heading('Encabezado');
+    $pdf->paragraph('Nuestro proposito es acompanar la gestion del inmueble de manera preventiva, ordenada y transparente, procurando que la permanencia en nuestra empresa sea positiva y memorable.');
     $pdf->line('Coordinador Contractual, Mantenimiento y Servicios Publicos:', 8, 'F2');
     $pdf->line($this->contactLine($ticket, 'contractual'));
     $pdf->spacer(8);

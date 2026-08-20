@@ -393,7 +393,7 @@ final class PendingView
     $html = '<div class="scm-table-wrap">'
       . '<table class="scm-table scm-table-prev">'
       . '<thead><tr>'
-      . '<th>Contrato</th><th>Inmueble</th><th>Direccion</th>'
+      . '<th>Contrato</th><th>Estado</th><th>Inmueble</th><th>Direccion</th>'
       . '<th>Propietario</th><th>Arrendatario</th>'
       . '<th>Inicio</th><th>Fin</th><th>Entrega</th>'
       . '<th>Ult. revision</th><th>Sig. revision</th><th>Acciones</th>'
@@ -402,8 +402,14 @@ final class PendingView
     foreach ($items as $item) {
       $row  = (array) ($item['row']  ?? []);
       $link = (string) ($item['link'] ?? '#');
+      $estadoContrato = trim((string) ($row['estado'] ?? ''));
+      $estadoNorm = strtolower($estadoContrato);
+      $estadoClass = $estadoNorm === 'entregado'
+        ? 'scm-contract-state--active'
+        : ($estadoNorm === 'recibido' ? 'scm-contract-state--closed' : 'scm-contract-state--neutral');
       $html .= '<tr>';
       $html .= '<td><span class="scm-ticket-badge">'   . esc_html((string) ($row['contrato']  ?? $row['_ID'] ?? '-')) . '</span></td>';
+      $html .= '<td><span class="scm-contract-state ' . esc_attr($estadoClass) . '">' . esc_html($estadoContrato !== '' ? $estadoContrato : '-') . '</span></td>';
       $html .= '<td><span class="scm-inmueble-badge">' . esc_html((string) ($row['inmueble']  ?? '-')) . '</span></td>';
       $html .= '<td style="max-width:200px;">'         . esc_html((string) ($row['direccion'] ?? '-')) . '</td>';
       $html .= '<td>'                                  . esc_html((string) ($row['propietario']  ?? '-')) . '</td>';

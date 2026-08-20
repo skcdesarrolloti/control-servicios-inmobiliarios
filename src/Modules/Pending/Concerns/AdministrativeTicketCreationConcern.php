@@ -50,7 +50,7 @@ trait AdministrativeTicketCreationConcern
     ];
 
     if ($mode === 'preventiva' && $descripcion === '') {
-      $descripcion = 'Espero que se encuentre bien. Se llevará acabo un revision preventiva programada según la fecha de inicio del contrato de arrendamiento. En este ticket se documentará todo el proceso realizado.';
+      $descripcion = 'Se crea este ticket para coordinar y documentar la revisión preventiva anual del inmueble conforme a la fecha de inicio del contrato de arrendamiento.';
     }
     if ($tema === '' || $departamento === '' || $prioridad === '' || $asunto === '' || $descripcion === '') {
       return ['ok' => '0', 'message' => 'Completa responsable, prioridad, departamento, tema, asunto y descripcion.'];

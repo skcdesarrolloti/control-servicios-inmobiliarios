@@ -11,4 +11,5 @@
 !/storage/data/.gitkeep
 !/storage/logs/.gitkeep
 !/storage/uploads/.gitkeep
+/output/
 /.vscode/mcp.json

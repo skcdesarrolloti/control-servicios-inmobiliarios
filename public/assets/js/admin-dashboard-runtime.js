@@ -3576,8 +3576,13 @@
       var defaultPrioridad = isPreventiva ? "Prioridad urgente" : "";
       var defaultAsunto = isPreventiva ? "REVISION PREVENTIVA" : "";
       var defaultDescripcion = isPreventiva
-        ? "Espero que se encuentre bien. Se llevara acabo un revision preventiva programada segun la fecha de inicio del contrato de arrendamiento. En este ticket se documentara todo el proceso realizado."
+        ? "Se crea este ticket para coordinar y documentar la revision preventiva anual del inmueble conforme a la fecha de inicio del contrato de arrendamiento."
         : "";
+      var evidenceFields = isPreventiva
+        ? ""
+        : '<label class="scm-seg-field"><span>Imagenes / evidencias</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
+          renderPasteEvidenceBox("imagen[]") +
+          renderTicketDocumentFields();
 
       if (title) {
         title.textContent = contractDataset(btn, "ticketTitle") || "Crear ticket";
@@ -3732,9 +3737,7 @@
         '<label class="scm-seg-field"><span>Descripcion</span><textarea name="descripcion" rows="6" required>' +
         escHtml(defaultDescripcion) +
         "</textarea></label>" +
-        '<label class="scm-seg-field"><span>Imagenes / evidencias</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
-        renderPasteEvidenceBox("imagen[]") +
-        renderTicketDocumentFields() +
+        evidenceFields +
         renderNotifyTargets() +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear ticket</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
