@@ -1604,37 +1604,16 @@ trait RendersDashboard
               <span>Enviar a todos los resultados filtrados</span>
             </label>
 
-            <div class="scm-admin-notif-template-card" data-admin-notif-email-template-wrap>
-              <div class="scm-admin-notif-template-row">
-                <div class="scm-field">
-                  <label for="scm-admin-notif-email-template">Plantilla Email</label>
-                  <select id="scm-admin-notif-email-template" name="email_template" class="select select-bordered select-sm scm-select" data-admin-notif-email-template>
-                    <?php foreach ($emailTemplates as $template): ?>
-                      <option value="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>"
-                        data-subject="<?php echo esc_attr((string) ($template['subject'] ?? '')); ?>"
-                        data-message="<?php echo esc_attr((string) ($template['editable_message'] ?? $template['body'] ?? '')); ?>"
-                        data-preview-template="<?php echo esc_attr((string) ($template['body'] ?? '')); ?>"
-                        data-message-only="<?php echo !empty($template['message_only']) ? '1' : '0'; ?>"
-                        data-template-html="<?php echo !empty($template['is_html']) ? '1' : '0'; ?>"
-                        data-template-full="<?php echo !empty($template['is_full_document']) ? '1' : '0'; ?>">
-                        <?php echo esc_html((string) ($template['label'] ?? $template['name'] ?? 'Plantilla')); ?>
-                      </option>
-                    <?php endforeach; ?>
-                  </select>
-                </div>
-                <button type="button" class="scm-case-work-btn" data-admin-notif-apply-email-template>Usar plantilla</button>
-              </div>
-              <?php foreach ($emailTemplates as $template): ?>
-                <div class="scm-admin-notif-template-guide" data-admin-notif-email-guide="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>">
-                  <strong><?php echo esc_html((string) ($template['label'] ?? $template['name'] ?? 'Plantilla')); ?></strong>
-                  <span>Origen: <?php echo esc_html((string) ($template['source'] ?? 'sistema')); ?></span>
-                  <span>Asunto: <?php echo esc_html((string) ($template['subject'] ?? '')); ?></span>
-                  <span>Tipo: <?php echo !empty($template['is_full_document']) ? 'HTML completo con diseno propio' : (!empty($template['message_only']) ? 'Base editable con {{mensaje}}' : 'Contenido editable'); ?></span>
-                  <div class="scm-admin-notif-template-summary"><?php echo esc_html((string) ($template['preview_excerpt'] ?? 'Revisa la vista previa para confirmar el diseno final.')); ?></div>
-                  <small><?php echo esc_html((string) ($template['description'] ?? '')); ?></small>
-                </div>
-              <?php endforeach; ?>
-            </div>
+            <input type="hidden"
+              name="email_template"
+              value="<?php echo esc_attr((string) ($firstEmailTemplate['name'] ?? '')); ?>"
+              data-admin-notif-email-template
+              data-subject="<?php echo esc_attr((string) ($firstEmailTemplate['subject'] ?? '')); ?>"
+              data-message="<?php echo esc_attr((string) ($firstEmailTemplate['editable_message'] ?? $firstEmailTemplate['body'] ?? '')); ?>"
+              data-preview-template="<?php echo esc_attr((string) ($firstEmailTemplate['body'] ?? '')); ?>"
+              data-message-only="<?php echo !empty($firstEmailTemplate['message_only']) ? '1' : '0'; ?>"
+              data-template-html="<?php echo !empty($firstEmailTemplate['is_html']) ? '1' : '0'; ?>"
+              data-template-full="<?php echo !empty($firstEmailTemplate['is_full_document']) ? '1' : '0'; ?>">
 
             <div class="scm-field" data-admin-notif-subject-wrap>
               <label for="scm-admin-notif-subject">Asunto para Email</label>

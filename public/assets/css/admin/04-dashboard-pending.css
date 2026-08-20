@@ -3787,13 +3787,6 @@
   background: #f8fbff;
 }
 
-#scm-app .scm-admin-notif-template-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: end;
-}
-
 #scm-app .scm-admin-notif-template-card.is-hidden {
   display: none;
 }
@@ -4038,10 +4031,6 @@
 
   #scm-app .scm-admin-notif-channel-copy {
     padding-right: 64px;
-  }
-
-  #scm-app .scm-admin-notif-template-row {
-    grid-template-columns: 1fr;
   }
 
 }

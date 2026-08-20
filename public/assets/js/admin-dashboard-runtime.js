@@ -2074,9 +2074,7 @@
       var subjectWrap = panel.querySelector("[data-admin-notif-subject-wrap]");
       var subjectInput = panel.querySelector("[data-admin-notif-subject]");
       var messageInput = panel.querySelector("[data-admin-notif-message]");
-      var emailTemplateWrap = panel.querySelector("[data-admin-notif-email-template-wrap]");
       var emailTemplateSelect = panel.querySelector("[data-admin-notif-email-template]");
-      var applyEmailTemplateBtn = panel.querySelector("[data-admin-notif-apply-email-template]");
       var whatsappTemplateWrap = panel.querySelector("[data-admin-notif-whatsapp-template-wrap]");
       var whatsappTemplateSelect = panel.querySelector("[data-admin-notif-whatsapp-template]");
       var previewEl = panel.querySelector("[data-admin-notif-preview]");
@@ -2310,17 +2308,6 @@
             '[data-admin-notif-channel][value="email"]:checked',
           );
           subjectWrap.style.display = emailChecked ? "" : "none";
-          if (emailTemplateWrap) {
-            emailTemplateWrap.hidden = !emailChecked;
-            emailTemplateWrap.classList.toggle("is-hidden", !emailChecked);
-          }
-          if (emailTemplateSelect) {
-            panel.querySelectorAll("[data-admin-notif-email-guide]").forEach(function (guide) {
-              guide.hidden =
-                !emailChecked ||
-                guide.getAttribute("data-admin-notif-email-guide") !== emailTemplateSelect.value;
-            });
-          }
         }
         var whatsappChecked = !!panel.querySelector(
           '[data-admin-notif-channel][value="whatsapp"]:checked',
@@ -2354,42 +2341,6 @@
         if (input.setSelectionRange) {
           input.setSelectionRange(nextCursor, nextCursor);
         }
-        updateSmsCounter();
-        updatePreview();
-      }
-
-      function applyEmailTemplate() {
-        if (!emailTemplateSelect || !messageInput) {
-          return;
-        }
-        var option = emailTemplateSelect.options[emailTemplateSelect.selectedIndex];
-        if (!option) {
-          return;
-        }
-        var subject = option.getAttribute("data-subject") || "";
-        var message = option.getAttribute("data-message") || "";
-        var messageOnly = option.getAttribute("data-message-only") === "1";
-        var isFullTemplate = option.getAttribute("data-template-full") === "1";
-        if (subjectInput && subject !== "") {
-          subjectInput.value = subject;
-        }
-        if (messageInput) {
-          messageInput.placeholder = isFullTemplate
-            ? "Esta plantilla ya trae un diseno HTML completo. Escribe solo si tambien enviaras SMS o WhatsApp."
-            : messageOnly
-            ? "Escribe solo el mensaje que va dentro de la plantilla..."
-            : "Edita el contenido de la plantilla...";
-        }
-        if (isFullTemplate) {
-          messageInput.value = "";
-          messageInput.focus();
-        } else if (message !== "" || !messageOnly) {
-          messageInput.value = message;
-          messageInput.focus();
-        } else {
-          messageInput.focus();
-        }
-        markComposerDirty();
         updateSmsCounter();
         updatePreview();
       }
@@ -2442,12 +2393,19 @@
         if (!emailTemplateSelect) {
           return "{{mensaje}}";
         }
-        var option = emailTemplateSelect.options[emailTemplateSelect.selectedIndex];
+        var option = emailTemplateSelect.options
+          ? emailTemplateSelect.options[emailTemplateSelect.selectedIndex]
+          : emailTemplateSelect;
         return option ? option.getAttribute("data-preview-template") || "{{mensaje}}" : "{{mensaje}}";
       }
 
       function selectedEmailOption() {
-        return emailTemplateSelect ? emailTemplateSelect.options[emailTemplateSelect.selectedIndex] : null;
+        if (!emailTemplateSelect) {
+          return null;
+        }
+        return emailTemplateSelect.options
+          ? emailTemplateSelect.options[emailTemplateSelect.selectedIndex]
+          : emailTemplateSelect;
       }
 
       function emailBannerUrl() {
@@ -2803,7 +2761,7 @@
         });
         if (emailTemplateSelect) {
           emailTemplateSelect.addEventListener("change", function () {
-            var option = emailTemplateSelect.options[emailTemplateSelect.selectedIndex];
+            var option = selectedEmailOption();
             if (messageInput && option) {
               messageInput.placeholder = option.getAttribute("data-template-full") === "1"
                 ? "Esta plantilla ya trae un diseno HTML completo. Escribe solo si tambien enviaras SMS o WhatsApp."
@@ -2814,9 +2772,6 @@
             markComposerDirty();
             syncContext();
           });
-        }
-        if (applyEmailTemplateBtn) {
-          applyEmailTemplateBtn.addEventListener("click", applyEmailTemplate);
         }
         panel.querySelectorAll("[data-admin-notif-insert-var]").forEach(function (btn) {
           btn.addEventListener("click", function () {
