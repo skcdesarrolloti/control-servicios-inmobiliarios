@@ -3844,6 +3844,11 @@
   gap: 8px;
 }
 
+#scm-app .scm-admin-notif-message-field[hidden],
+#scm-app .scm-admin-notif-message-field.is-hidden {
+  display: none !important;
+}
+
 #scm-app .scm-admin-notif-message-field .scm-textarea {
   width: 100% !important;
   min-width: 100% !important;
@@ -3975,6 +3980,65 @@
 
 #scm-app .scm-admin-notif-sms-counter.is-over {
   color: #b91c1c;
+}
+
+#scm-app .scm-admin-notif-confirm[hidden] {
+  display: none !important;
+}
+
+#scm-app .scm-admin-notif-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+#scm-app .scm-admin-notif-confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+#scm-app .scm-admin-notif-confirm-panel {
+  position: relative;
+  z-index: 1;
+  width: min(460px, 100%);
+  padding: 22px;
+  border: 1px solid #fed7aa;
+  border-radius: 18px;
+  background: #fff;
+  color: #10233f;
+  box-shadow: 0 24px 68px rgba(15, 23, 42, 0.28);
+}
+
+#scm-app .scm-admin-notif-confirm-panel h5 {
+  margin: 6px 0 8px;
+  color: #10233f;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+#scm-app .scm-admin-notif-confirm-panel p {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+#scm-app .scm-admin-notif-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+#scm-app .scm-admin-notif-confirm-actions button {
+  min-height: 44px;
 }
 
 #scm-app .scm-admin-notif-submit-row {

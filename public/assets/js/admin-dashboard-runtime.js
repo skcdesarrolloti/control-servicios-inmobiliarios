@@ -2073,6 +2073,7 @@
       var sendFilteredBtn = panel.querySelector("[data-admin-notif-send-filtered]");
       var subjectWrap = panel.querySelector("[data-admin-notif-subject-wrap]");
       var subjectInput = panel.querySelector("[data-admin-notif-subject]");
+      var messageFieldWrap = panel.querySelector(".scm-admin-notif-message-field");
       var messageInput = panel.querySelector("[data-admin-notif-message]");
       var emailTemplateSelect = panel.querySelector("[data-admin-notif-email-template]");
       var whatsappTemplateWrap = panel.querySelector("[data-admin-notif-whatsapp-template-wrap]");
@@ -2087,6 +2088,9 @@
       var composerDescription = panel.querySelector("[data-admin-notif-modal-description]");
       var channelGroup = panel.querySelector(".scm-admin-notif-channel-group");
       var closeComposerBtn = panel.querySelector("[data-admin-notif-close-composer]");
+      var closeConfirmModal = panel.querySelector("[data-admin-notif-confirm]");
+      var closeConfirmAcceptBtn = panel.querySelector("[data-admin-notif-confirm-accept]");
+      var closeConfirmCancelBtn = panel.querySelector("[data-admin-notif-confirm-cancel]");
       if (!searchForm || !sendForm || !typeSelect || !recipientsEl) {
         return Promise.resolve();
       }
@@ -2194,6 +2198,7 @@
         emailTemplateSelect.setAttribute("data-subject", option.getAttribute("data-email-subject") || "");
         emailTemplateSelect.setAttribute("data-message", option.getAttribute("data-email-message") || "");
         emailTemplateSelect.setAttribute("data-preview-template", option.getAttribute("data-email-preview-template") || "{{mensaje}}");
+        emailTemplateSelect.setAttribute("data-requires-message", option.getAttribute("data-email-requires-message") || "0");
         emailTemplateSelect.setAttribute("data-message-only", option.getAttribute("data-email-message-only") || "0");
         emailTemplateSelect.setAttribute("data-template-html", option.getAttribute("data-email-template-html") || "1");
         emailTemplateSelect.setAttribute("data-template-fixed", option.getAttribute("data-email-template-fixed") || "0");
@@ -2267,29 +2272,58 @@
         document.body.classList.add("scm-admin-notif-modal-open");
         syncContext();
         setTimeout(function () {
-          if (messageInput) {
+          if (messageInput && !(messageFieldWrap && messageFieldWrap.hidden)) {
             messageInput.focus();
+          } else if (whatsappTemplateSelect && !(whatsappTemplateWrap && whatsappTemplateWrap.hidden)) {
+            whatsappTemplateSelect.focus();
+          } else if (subjectInput && subjectWrap && subjectWrap.style.display !== "none") {
+            subjectInput.focus();
           }
         }, 30);
+      }
+
+      function hideCloseConfirm() {
+        if (!closeConfirmModal) {
+          return;
+        }
+        closeConfirmModal.hidden = true;
+        closeConfirmModal.classList.remove("is-open");
+      }
+
+      function showCloseConfirm() {
+        if (!closeConfirmModal) {
+          return false;
+        }
+        closeConfirmModal.hidden = false;
+        closeConfirmModal.classList.add("is-open");
+        setTimeout(function () {
+          if (closeConfirmCancelBtn) {
+            closeConfirmCancelBtn.focus();
+          }
+        }, 20);
+        return true;
+      }
+
+      function performCloseComposer() {
+        if (!composerModal) {
+          return;
+        }
+        hideCloseConfirm();
+        composerModal.hidden = true;
+        composerModal.classList.remove("is-open");
+        composerChannelMode = "";
+        updateComposerMode();
+        document.body.classList.remove("scm-admin-notif-modal-open");
       }
 
       function closeComposer(force) {
         if (!composerModal) {
           return;
         }
-        if (!force && composerDirty) {
-          var ok = window.confirm(
-            "Tienes una notificacion en edicion. ¿Cerrar sin enviar?",
-          );
-          if (!ok) {
-            return;
-          }
+        if (!force && composerDirty && showCloseConfirm()) {
+          return;
         }
-        composerModal.hidden = true;
-        composerModal.classList.remove("is-open");
-        composerChannelMode = "";
-        updateComposerMode();
-        document.body.classList.remove("scm-admin-notif-modal-open");
+        performCloseComposer();
       }
 
       function useAllFilteredAndOpen() {
@@ -2389,24 +2423,7 @@
               guide.getAttribute("data-admin-notif-template-guide") !== whatsappTemplateSelect.value;
           });
         }
-        updateSmsCounter();
-        updatePreview();
-      }
-
-      function insertAtCursor(input, text) {
-        if (!input || !text) {
-          return;
-        }
-        var start = typeof input.selectionStart === "number" ? input.selectionStart : input.value.length;
-        var end = typeof input.selectionEnd === "number" ? input.selectionEnd : input.value.length;
-        var before = input.value.slice(0, start);
-        var after = input.value.slice(end);
-        input.value = before + text + after;
-        var nextCursor = start + text.length;
-        input.focus();
-        if (input.setSelectionRange) {
-          input.setSelectionRange(nextCursor, nextCursor);
-        }
+        updateMessageVisibility();
         updateSmsCounter();
         updatePreview();
       }
@@ -2526,6 +2543,47 @@
           : wrapEmailPreviewHtml(subjectInput ? subjectInput.value : "Notificacion", body);
       }
 
+      function selectedEmailNeedsMessage() {
+        var option = selectedEmailOption();
+        if (!option) {
+          return true;
+        }
+        var explicit = option.getAttribute("data-requires-message");
+        if (explicit === "0" || explicit === "1") {
+          return explicit === "1";
+        }
+        var template = option.getAttribute("data-preview-template") || "";
+        return template.indexOf("{{mensaje}}") !== -1 || template.indexOf("{{custom_message}}") !== -1;
+      }
+
+      function selectedWhatsappNeedsMessage() {
+        var option = selectedMessageTemplateOption();
+        var mode = option ? option.getAttribute("data-template-mode") || "name_message_signature" : "name_message_signature";
+        return mode !== "name_signature";
+      }
+
+      function messageRequiredForCurrentSelection() {
+        var emailChecked = !!panel.querySelector(
+          '[data-admin-notif-channel][value="email"]:checked',
+        );
+        var smsChecked = !!panel.querySelector(
+          '[data-admin-notif-channel][value="sms"]:checked',
+        );
+        var whatsappChecked = !!panel.querySelector(
+          '[data-admin-notif-channel][value="whatsapp"]:checked',
+        );
+        return smsChecked || (emailChecked && selectedEmailNeedsMessage()) || (whatsappChecked && selectedWhatsappNeedsMessage());
+      }
+
+      function updateMessageVisibility() {
+        if (!messageFieldWrap) {
+          return;
+        }
+        var shouldShow = messageRequiredForCurrentSelection();
+        messageFieldWrap.hidden = !shouldShow;
+        messageFieldWrap.classList.toggle("is-hidden", !shouldShow);
+      }
+
       function renderWhatsappPreviewText() {
         var rawMessage = messageInput ? String(messageInput.value || "") : "";
         var name = "Nombre del destinatario";
@@ -2625,6 +2683,7 @@
         var smsChecked = !!panel.querySelector(
           '[data-admin-notif-channel][value="sms"]:checked',
         );
+        smsCounter.hidden = !smsChecked;
         smsCounter.textContent = smsText.length + "/160 SMS con marca incluida";
         smsCounter.classList.toggle("is-over", smsChecked && smsText.length > 160);
       }
@@ -2691,6 +2750,24 @@
         if (closeComposerBtn) {
           closeComposerBtn.addEventListener("click", function () {
             closeComposer(false);
+          });
+        }
+        if (closeConfirmAcceptBtn) {
+          closeConfirmAcceptBtn.addEventListener("click", function () {
+            performCloseComposer();
+          });
+        }
+        if (closeConfirmCancelBtn) {
+          closeConfirmCancelBtn.addEventListener("click", hideCloseConfirm);
+        }
+        if (closeConfirmModal) {
+          closeConfirmModal.addEventListener("click", function (event) {
+            var shouldCancel = event.target && event.target.closest
+              ? !!event.target.closest("[data-admin-notif-confirm-cancel], .scm-admin-notif-confirm-backdrop")
+              : false;
+            if (shouldCancel) {
+              hideCloseConfirm();
+            }
           });
         }
 
@@ -2849,12 +2926,6 @@
             syncContext();
           });
         }
-        panel.querySelectorAll("[data-admin-notif-insert-var]").forEach(function (btn) {
-          btn.addEventListener("click", function () {
-            insertAtCursor(messageInput, btn.getAttribute("data-admin-notif-insert-var") || "");
-            markComposerDirty();
-          });
-        });
         panel.querySelector("[data-admin-notif-clear-message]")?.addEventListener("click", function () {
           if (messageInput) {
             messageInput.value = "";
@@ -5310,9 +5381,7 @@
           }
         })
         .catch(function (err) {
-          alert(
-            "No se pudo clasificar la magnitud: " + (err.message || "error"),
-          );
+          showToast("error", "No se pudo clasificar la magnitud: " + (err.message || "error"));
         })
         .finally(function () {
           if (typeof afterFinally === "function") {

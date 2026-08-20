@@ -1611,6 +1611,7 @@ trait RendersDashboard
               data-subject="<?php echo esc_attr((string) ($firstEmailTemplate['subject'] ?? '')); ?>"
               data-message="<?php echo esc_attr((string) ($firstEmailTemplate['editable_message'] ?? $firstEmailTemplate['body'] ?? '')); ?>"
               data-preview-template="<?php echo esc_attr((string) ($firstEmailTemplate['body'] ?? '')); ?>"
+              data-requires-message="<?php echo !empty($firstEmailTemplate['requires_message']) ? '1' : '0'; ?>"
               data-message-only="<?php echo !empty($firstEmailTemplate['message_only']) ? '1' : '0'; ?>"
               data-template-html="<?php echo !empty($firstEmailTemplate['is_html']) ? '1' : '0'; ?>"
               data-template-fixed="<?php echo !empty($firstEmailTemplate['fixed_body']) ? '1' : '0'; ?>"
@@ -1624,11 +1625,6 @@ trait RendersDashboard
             <div class="scm-field scm-admin-notif-message-field">
               <label for="scm-admin-notif-message">Mensaje</label>
               <div class="scm-admin-notif-message-toolbar" aria-label="Herramientas del mensaje">
-                <button type="button" data-admin-notif-insert-var="{{nombre}}">{{nombre}}</button>
-                <button type="button" data-admin-notif-insert-var="{{correo}}">{{correo}}</button>
-                <button type="button" data-admin-notif-insert-var="{{celular}}">{{celular}}</button>
-                <button type="button" data-admin-notif-insert-var="{{tipo_actor}}">{{tipo_actor}}</button>
-                <button type="button" data-admin-notif-insert-var="{{firma_funcionario}}">Firma</button>
                 <button type="button" data-admin-notif-preview-toggle>Ocultar vista previa</button>
                 <button type="button" data-admin-notif-copy-message>Copiar</button>
                 <button type="button" data-admin-notif-clear-message>Limpiar</button>
@@ -1655,6 +1651,7 @@ trait RendersDashboard
                       data-email-subject="<?php echo esc_attr((string) ($linkedEmailTemplate['subject'] ?? '')); ?>"
                       data-email-message="<?php echo esc_attr((string) ($linkedEmailTemplate['editable_message'] ?? $linkedEmailTemplate['body'] ?? '')); ?>"
                       data-email-preview-template="<?php echo esc_attr((string) ($linkedEmailTemplate['body'] ?? '')); ?>"
+                      data-email-requires-message="<?php echo !empty($linkedEmailTemplate['requires_message']) ? '1' : '0'; ?>"
                       data-email-message-only="<?php echo !empty($linkedEmailTemplate['message_only']) ? '1' : '0'; ?>"
                       data-email-template-html="<?php echo !empty($linkedEmailTemplate['is_html']) ? '1' : '0'; ?>"
                       data-email-template-fixed="<?php echo !empty($linkedEmailTemplate['fixed_body']) ? '1' : '0'; ?>"
@@ -1672,7 +1669,6 @@ trait RendersDashboard
                   <p><?php echo nl2br(esc_html((string) ($template['body'] ?? ''))); ?></p>
                   <small><?php echo esc_html((string) ($template['description'] ?? '')); ?></small>
                   <small>Plantilla Meta: <?php echo esc_html((string) ($template['name'] ?? '')); ?>.</small>
-                  <small>Variables: <?php echo esc_html(implode(' · ', array_map('strval', (array) ($template['variables'] ?? [])))); ?>.</small>
                 </div>
               <?php endforeach; ?>
             </div>
@@ -1686,6 +1682,18 @@ trait RendersDashboard
             <p class="scm-admin-notif-result" data-admin-notif-result aria-live="polite"></p>
           </form>
         </section>
+        <div class="scm-admin-notif-confirm" data-admin-notif-confirm hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-confirm-title">
+          <div class="scm-admin-notif-confirm-backdrop" aria-hidden="true"></div>
+          <section class="scm-admin-notif-confirm-panel">
+            <span class="scm-calendar-action-kicker">Confirmaci&oacute;n</span>
+            <h5 id="scm-admin-notif-confirm-title">Cerrar notificaci&oacute;n</h5>
+            <p>Tienes una notificaci&oacute;n en edici&oacute;n. &iquest;Quieres cerrar sin enviarla?</p>
+            <div class="scm-admin-notif-confirm-actions">
+              <button type="button" class="scm-case-work-btn" data-admin-notif-confirm-cancel>Seguir editando</button>
+              <button type="button" class="scm-btn-primary btn btn-primary" data-admin-notif-confirm-accept>Cerrar sin enviar</button>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
 <?php
