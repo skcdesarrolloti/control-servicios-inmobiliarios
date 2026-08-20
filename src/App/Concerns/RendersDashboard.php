@@ -1467,7 +1467,6 @@ trait RendersDashboard
     $firstType = (string) array_key_first($types);
     $firstEmailTemplate = is_array(reset($emailTemplates)) ? reset($emailTemplates) : [];
     $defaultEmailSubject = (string) ($firstEmailTemplate['subject'] ?? '');
-    $messageGuides = $this->admin_notification_message_guides();
     $emailBannerUrl = function_exists('system_image')
       ? system_image('banner_sitio_web', 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png')
       : 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png';
@@ -1541,10 +1540,9 @@ trait RendersDashboard
             </div>
             <div class="scm-admin-notif-section-actions">
               <button type="button" class="scm-case-work-btn" data-admin-notif-select-visible>Seleccionar visibles</button>
-              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--email" data-admin-notif-open-channel="email">Noti Email</button>
-              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--sms" data-admin-notif-open-channel="sms">Noti SMS</button>
-              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--whatsapp" data-admin-notif-open-channel="whatsapp">Noti WhatsApp</button>
-              <button type="button" class="scm-btn-primary btn btn-primary" data-admin-notif-open-composer>Enviar notificaci&oacute;n</button>
+              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--email" data-admin-notif-open-channel="email">Notificaci&oacute;n Email</button>
+              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--sms" data-admin-notif-open-channel="sms">Notificaci&oacute;n SMS</button>
+              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--whatsapp" data-admin-notif-open-channel="whatsapp">Notificaci&oacute;n WhatsApp</button>
             </div>
           </div>
           <div class="scm-admin-notif-recipients" data-admin-notif-recipients>
@@ -1655,39 +1653,6 @@ trait RendersDashboard
                 <button type="button" data-admin-notif-copy-message>Copiar</button>
                 <button type="button" data-admin-notif-clear-message>Limpiar</button>
               </div>
-              <section class="scm-admin-notif-guides" aria-label="Guias de mensajes">
-                <div class="scm-admin-notif-guides-head">
-                  <div>
-                    <span class="scm-calendar-action-kicker">Gu&iacute;as copiables</span>
-                    <strong>Ejemplos por actor</strong>
-                    <p>Usa estas bases para Email, SMS o WhatsApp. En WhatsApp se env&iacute;an dentro de la plantilla gen&eacute;rica oficial.</p>
-                  </div>
-                  <small>Variables permitidas: {{nombre}}, {{funcionario}}, {{firma_funcionario_linea}}</small>
-                </div>
-                <div class="scm-admin-notif-guide-tabs" role="tablist" aria-label="Actores">
-                  <?php $guideIndex = 0; foreach ($messageGuides as $actorKey => $actorGuide): ?>
-                    <button type="button" class="<?php echo $guideIndex === 0 ? 'active' : ''; ?>" data-admin-notif-guide-tab="<?php echo esc_attr($actorKey); ?>" role="tab" aria-selected="<?php echo $guideIndex === 0 ? 'true' : 'false'; ?>">
-                      <?php echo esc_html((string) ($actorGuide['label'] ?? $actorKey)); ?>
-                    </button>
-                  <?php $guideIndex++; endforeach; ?>
-                </div>
-                <?php $guideIndex = 0; foreach ($messageGuides as $actorKey => $actorGuide): ?>
-                  <div class="scm-admin-notif-guide-panel<?php echo $guideIndex === 0 ? ' active' : ''; ?>" data-admin-notif-guide-panel="<?php echo esc_attr($actorKey); ?>">
-                    <?php foreach ((array) ($actorGuide['items'] ?? []) as $item): $guideText = (string) ($item['text'] ?? ''); ?>
-                      <article class="scm-admin-notif-guide-card">
-                        <div>
-                          <strong><?php echo esc_html((string) ($item['title'] ?? 'Mensaje sugerido')); ?></strong>
-                          <p><?php echo nl2br(esc_html($guideText)); ?></p>
-                        </div>
-                        <div class="scm-admin-notif-guide-actions">
-                          <button type="button" class="scm-case-work-btn" data-admin-notif-guide-use="<?php echo esc_attr($guideText); ?>">Usar mensaje</button>
-                          <button type="button" class="scm-case-work-btn" data-admin-notif-guide-copy="<?php echo esc_attr($guideText); ?>">Copiar</button>
-                        </div>
-                      </article>
-                    <?php endforeach; ?>
-                  </div>
-                <?php $guideIndex++; endforeach; ?>
-              </section>
               <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." data-admin-notif-message></textarea>
               <small class="scm-admin-notif-helper">Variables: {{nombre}}, {{correo}}, {{celular}}, {{tipo_actor}}, {{rol_persona}}, {{funcionario}}, {{cargo_funcionario}}, {{celular_funcionario}}, {{firma_funcionario}}, {{firma_funcionario_linea}}.</small>
               <small class="scm-admin-notif-sms-counter" data-admin-notif-sms-counter>0/160 SMS</small>

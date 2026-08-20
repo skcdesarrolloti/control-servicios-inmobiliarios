@@ -2088,7 +2088,6 @@
       var composerTitle = panel.querySelector("#scm-admin-notif-modal-title");
       var composerDescription = panel.querySelector("[data-admin-notif-modal-description]");
       var channelGroup = panel.querySelector(".scm-admin-notif-channel-group");
-      var openComposerBtn = panel.querySelector("[data-admin-notif-open-composer]");
       var closeComposerBtn = panel.querySelector("[data-admin-notif-close-composer]");
       if (!searchForm || !sendForm || !typeSelect || !recipientsEl) {
         return Promise.resolve();
@@ -2112,30 +2111,6 @@
 
       function currentType() {
         return typeSelect ? String(typeSelect.value || "propietarios") : "propietarios";
-      }
-
-      function actorGuideKey(type) {
-        type = String(type || currentType());
-        if (type.indexOf("arrendatarios") === 0) return "arrendatarios";
-        if (type.indexOf("copropiedades") === 0) return "copropiedades";
-        if (type.indexOf("proveedores") === 0) return "proveedores";
-        if (type.indexOf("funcionarios") === 0) return "funcionarios";
-        return "propietarios";
-      }
-
-      function activateGuideTab(actorKey) {
-        actorKey = actorKey || actorGuideKey(currentType());
-        panel.querySelectorAll("[data-admin-notif-guide-tab]").forEach(function (btn) {
-          var active = btn.getAttribute("data-admin-notif-guide-tab") === actorKey;
-          btn.classList.toggle("active", active);
-          btn.setAttribute("aria-selected", active ? "true" : "false");
-        });
-        panel.querySelectorAll("[data-admin-notif-guide-panel]").forEach(function (guidePanel) {
-          guidePanel.classList.toggle(
-            "active",
-            guidePanel.getAttribute("data-admin-notif-guide-panel") === actorKey,
-          );
-        });
       }
 
       function currentQuery() {
@@ -2200,16 +2175,6 @@
         composerDirty = true;
       }
 
-      function normalizeComposerGuidesPosition() {
-        var guides = panel.querySelector(".scm-admin-notif-guides");
-        var allFilteredRow = panel.querySelector(".scm-admin-notif-all");
-        if (!guides || !allFilteredRow || guides.dataset.adminNotifMoved === "1") {
-          return;
-        }
-        allFilteredRow.insertAdjacentElement("afterend", guides);
-        guides.dataset.adminNotifMoved = "1";
-      }
-
       function updateComposerMode() {
         var mode = String(composerChannelMode || "").trim().toLowerCase();
         var isChannelMode = !!mode;
@@ -2226,7 +2191,7 @@
         }
         if (composerDescription) {
           composerDescription.textContent = isChannelMode
-            ? "Vista dedicada para " + label + ". Revisa las guías copiables, el mensaje y la vista previa antes de encolar."
+            ? "Vista dedicada para " + label + ". Revisa el mensaje y la vista previa antes de encolar."
             : "Prepara el mensaje, elige canales y revisa la vista previa antes de encolar. Si hay texto escrito, el cierre pide confirmación.";
         }
       }
@@ -2235,7 +2200,6 @@
         if (!composerModal) {
           return;
         }
-        normalizeComposerGuidesPosition();
         updateComposerMode();
         composerModal.hidden = false;
         composerModal.classList.add("is-open");
@@ -2265,12 +2229,6 @@
         composerChannelMode = "";
         updateComposerMode();
         document.body.classList.remove("scm-admin-notif-modal-open");
-      }
-
-      function openGeneralComposer() {
-        composerChannelMode = "";
-        syncContext();
-        openComposer();
       }
 
       function useAllFilteredAndOpen() {
@@ -2322,7 +2280,6 @@
           sendContractNumber.value = currentContractNumber();
         }
         updateComposerMode();
-        activateGuideTab(actorGuideKey(currentType()));
         if (contractStatusWrap) {
           var canFilterContracts = supportsContractStatus(currentType());
           contractStatusWrap.hidden = !canFilterContracts;
@@ -2692,9 +2649,6 @@
       if (!panel.dataset.scmAdminNotificationsEvents) {
         panel.dataset.scmAdminNotificationsEvents = "1";
 
-        if (openComposerBtn) {
-          openComposerBtn.addEventListener("click", openGeneralComposer);
-        }
         panel.querySelectorAll("[data-admin-notif-open-channel]").forEach(function (btn) {
           btn.addEventListener("click", function () {
             openComposerForChannel(btn.getAttribute("data-admin-notif-open-channel") || "");
@@ -2902,43 +2856,6 @@
           } else {
             showToast("warning", "Tu navegador no permite copiar automaticamente.");
           }
-        });
-        panel.querySelectorAll("[data-admin-notif-guide-tab]").forEach(function (btn) {
-          btn.addEventListener("click", function () {
-            activateGuideTab(btn.getAttribute("data-admin-notif-guide-tab") || "");
-          });
-        });
-        panel.querySelectorAll("[data-admin-notif-guide-use]").forEach(function (btn) {
-          btn.addEventListener("click", function () {
-            var value = btn.getAttribute("data-admin-notif-guide-use") || "";
-            if (!messageInput || value === "") {
-              return;
-            }
-            messageInput.value = value;
-            messageInput.focus();
-            markComposerDirty();
-            updateSmsCounter();
-            updatePreview();
-            showToast("success", "Mensaje sugerido aplicado.");
-          });
-        });
-        panel.querySelectorAll("[data-admin-notif-guide-copy]").forEach(function (btn) {
-          btn.addEventListener("click", function () {
-            var value = btn.getAttribute("data-admin-notif-guide-copy") || "";
-            if (value === "") {
-              showToast("warning", "No hay guia para copiar.");
-              return;
-            }
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(value).then(function () {
-                showToast("success", "Guia copiada.");
-              }).catch(function () {
-                showToast("warning", "No fue posible copiar automaticamente.");
-              });
-            } else {
-              showToast("warning", "Tu navegador no permite copiar automaticamente.");
-            }
-          });
         });
         if (whatsappTemplateSelect) {
           whatsappTemplateSelect.addEventListener("change", function () {
