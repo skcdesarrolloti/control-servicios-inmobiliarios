@@ -2099,6 +2099,7 @@
       var selected = new Set();
       var currentPage = 1;
       var composerDirty = false;
+      var subjectDirty = false;
       var composerChannelMode = "";
 
       var channelNames = {
@@ -2138,6 +2139,68 @@
           return "";
         }
         return String(contractNumberInput.value || "").trim();
+      }
+
+      function selectedMessageTemplateOption() {
+        return whatsappTemplateSelect && whatsappTemplateSelect.options
+          ? whatsappTemplateSelect.options[whatsappTemplateSelect.selectedIndex]
+          : null;
+      }
+
+      function messageTemplateAllowedForType(option, type) {
+        if (!option) {
+          return false;
+        }
+        var actors = String(option.getAttribute("data-actors") || "")
+          .split(",")
+          .map(function (value) {
+            return value.trim();
+          })
+          .filter(Boolean);
+        return actors.length === 0 || actors.indexOf(String(type || currentType())) !== -1;
+      }
+
+      function filterMessageTemplateOptions() {
+        if (!whatsappTemplateSelect || !whatsappTemplateSelect.options) {
+          return;
+        }
+        var type = currentType();
+        var firstAllowed = null;
+        Array.prototype.slice.call(whatsappTemplateSelect.options).forEach(function (option) {
+          var allowed = messageTemplateAllowedForType(option, type);
+          option.disabled = !allowed;
+          option.hidden = !allowed;
+          if (allowed && !firstAllowed) {
+            firstAllowed = option;
+          }
+        });
+        var current = selectedMessageTemplateOption();
+        if (current && current.disabled && firstAllowed) {
+          whatsappTemplateSelect.value = firstAllowed.value;
+          subjectDirty = false;
+        }
+      }
+
+      function syncEmailTemplateFromMessageTemplate() {
+        if (!emailTemplateSelect) {
+          return;
+        }
+        var option = selectedMessageTemplateOption();
+        if (!option) {
+          return;
+        }
+        var emailTemplate = option.getAttribute("data-email-template") || emailTemplateSelect.value || "";
+        emailTemplateSelect.value = emailTemplate;
+        emailTemplateSelect.setAttribute("data-subject", option.getAttribute("data-email-subject") || "");
+        emailTemplateSelect.setAttribute("data-message", option.getAttribute("data-email-message") || "");
+        emailTemplateSelect.setAttribute("data-preview-template", option.getAttribute("data-email-preview-template") || "{{mensaje}}");
+        emailTemplateSelect.setAttribute("data-message-only", option.getAttribute("data-email-message-only") || "0");
+        emailTemplateSelect.setAttribute("data-template-html", option.getAttribute("data-email-template-html") || "1");
+        emailTemplateSelect.setAttribute("data-template-fixed", option.getAttribute("data-email-template-fixed") || "0");
+        emailTemplateSelect.setAttribute("data-template-full", option.getAttribute("data-email-template-full") || "0");
+        if (subjectInput && !subjectDirty) {
+          subjectInput.value = option.getAttribute("data-email-subject") || subjectInput.value || "";
+        }
       }
 
       function senderProfile() {
@@ -2303,23 +2366,26 @@
             btn.getAttribute("data-admin-notif-type-shortcut") === currentType(),
           );
         });
-        if (subjectWrap) {
-          var emailChecked = !!panel.querySelector(
-            '[data-admin-notif-channel][value="email"]:checked',
-          );
-          subjectWrap.style.display = emailChecked ? "" : "none";
-        }
+        var emailChecked = !!panel.querySelector(
+          '[data-admin-notif-channel][value="email"]:checked',
+        );
         var whatsappChecked = !!panel.querySelector(
           '[data-admin-notif-channel][value="whatsapp"]:checked',
         );
+        var templateVisible = emailChecked || whatsappChecked;
+        filterMessageTemplateOptions();
+        syncEmailTemplateFromMessageTemplate();
+        if (subjectWrap) {
+          subjectWrap.style.display = emailChecked ? "" : "none";
+        }
         if (whatsappTemplateWrap) {
-          whatsappTemplateWrap.hidden = !whatsappChecked;
-          whatsappTemplateWrap.classList.toggle("is-hidden", !whatsappChecked);
+          whatsappTemplateWrap.hidden = !templateVisible;
+          whatsappTemplateWrap.classList.toggle("is-hidden", !templateVisible);
         }
         if (whatsappTemplateSelect) {
           panel.querySelectorAll("[data-admin-notif-template-guide]").forEach(function (guide) {
             guide.hidden =
-              !whatsappChecked ||
+              !templateVisible ||
               guide.getAttribute("data-admin-notif-template-guide") !== whatsappTemplateSelect.value;
           });
         }
@@ -2441,6 +2507,7 @@
         var hasSlot = template.indexOf("{{mensaje}}") !== -1 || template.indexOf("{{custom_message}}") !== -1;
         var option = selectedEmailOption();
         var isFullTemplate = !!(option && option.getAttribute("data-template-full") === "1");
+        var isFixedTemplate = !!(option && option.getAttribute("data-template-fixed") === "1");
         var messageForEmail = template !== stripHtml(template)
           ? safePreviewHtml(rawMessage !== stripHtml(rawMessage) ? rawMessage : escHtml(rawMessage).replace(/\n/g, "<br>"))
           : rawMessage;
@@ -2448,7 +2515,7 @@
           ? template
               .replace(/\{\{mensaje\}\}/g, messageForEmail || "Mensaje escrito por el funcionario.")
               .replace(/\{\{custom_message\}\}/g, messageForEmail || "Mensaje escrito por el funcionario.")
-          : (isFullTemplate || isFullEmailHtml(template) ? template : rawMessage || template || "Mensaje escrito por el funcionario.");
+          : (isFixedTemplate || isFullTemplate || isFullEmailHtml(template) ? template : rawMessage || template || "Mensaje escrito por el funcionario.");
         body = previewMessage(body);
         if (body === stripHtml(body)) {
           body = escHtml(body).replace(/\n/g, "<br>");
@@ -2463,6 +2530,8 @@
         var rawMessage = messageInput ? String(messageInput.value || "") : "";
         var name = "Nombre del destinatario";
         var template = "Hola {{1}}.\n\n{{2}}";
+        var option = selectedMessageTemplateOption();
+        var mode = option ? option.getAttribute("data-template-mode") || "name_message_signature" : "name_message_signature";
         if (whatsappTemplateSelect) {
           var guide = panel.querySelector(
             '[data-admin-notif-template-guide="' + escapeSelectorValue(whatsappTemplateSelect.value) + '"] p',
@@ -2472,10 +2541,17 @@
           }
         }
         var sender = senderProfile();
+        var signature = sender.signatureLine || "Funcionario - Control Servicios Inmobiliarios";
+        if (mode === "name_signature") {
+          return template
+            .replace(/\{\{1\}\}/g, name)
+            .replace(/\{\{2\}\}/g, signature)
+            .replace(/\{\{3\}\}/g, previewMessage(rawMessage || "Mensaje escrito por el funcionario."));
+        }
         return template
           .replace(/\{\{1\}\}/g, name)
           .replace(/\{\{2\}\}/g, previewMessage(rawMessage || "Mensaje escrito por el funcionario."))
-          .replace(/\{\{3\}\}/g, sender.signatureLine || "Funcionario - Control Servicios Inmobiliarios");
+          .replace(/\{\{3\}\}/g, signature);
       }
 
       function updatePreview() {
@@ -2814,6 +2890,7 @@
         });
         if (whatsappTemplateSelect) {
           whatsappTemplateSelect.addEventListener("change", function () {
+            subjectDirty = false;
             markComposerDirty();
             syncContext();
           });
@@ -2827,6 +2904,7 @@
         }
         if (subjectInput) {
           subjectInput.addEventListener("input", function () {
+            subjectDirty = true;
             markComposerDirty();
             updatePreview();
           });

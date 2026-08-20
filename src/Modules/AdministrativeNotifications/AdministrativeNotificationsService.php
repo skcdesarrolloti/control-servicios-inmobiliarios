@@ -128,6 +128,10 @@ final class AdministrativeNotificationsService
   /** @return array<string,array{name:string,label:string,language:string,description:string,body:string,variables:array<int,string>}> */
   public function whatsappTemplates(): array
   {
+    $propietarios = ['propietarios_activos', 'propietarios_no_activos'];
+    $arrendatarios = ['arrendatarios_activos', 'arrendatarios_no_activos'];
+    $copropiedades = ['copropiedades_activas', 'copropiedades_no_activas'];
+
     return [
       self::DEFAULT_WHATSAPP_TEMPLATE => [
         'name' => self::DEFAULT_WHATSAPP_TEMPLATE,
@@ -136,22 +140,64 @@ final class AdministrativeNotificationsService
         'description' => 'Plantilla oficial para avisos generales. Incluye la firma del funcionario.',
         'body' => "Buen dia, {{1}}.\n\nLe compartimos la siguiente informacion desde Su Casa Inmobiliaria:\n\n{{2}}\n\nAtentamente,\n{{3}}\n\nGracias por elegirnos y confiar en nuestro equipo.",
         'variables' => ['Nombre del destinatario', 'Mensaje escrito en esta pantalla', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'actors' => [],
+        'email_template' => self::DEFAULT_EMAIL_TEMPLATE,
+        'parameter_mode' => 'name_message_signature',
       ],
       'scm_propietario_arriendo_consignado_v1' => [
         'name' => 'scm_propietario_arriendo_consignado_v1',
-        'label' => 'Propietario - arriendo consignado',
+        'label' => 'Arriendo consignado',
         'language' => 'es_CO',
         'description' => 'Aviso para propietarios cuando el arriendo fue consignado a la cuenta registrada.',
         'body' => "Buen dia, {{1}}.\n\nLe informamos que el pago del arriendo correspondiente a su inmueble en administracion fue consignado a la cuenta registrada.\n\nDetalle del abono:\n\n{{2}}\n\nAtentamente,\n{{3}}\n\nGracias por elegirnos y confiar en nuestro equipo.",
         'variables' => ['Nombre del propietario', 'Detalle del pago, inmueble, mes o valor', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'actors' => $propietarios,
+        'email_template' => 'scm_email_propietario_arriendo_consignado_v1',
+        'parameter_mode' => 'name_message_signature',
       ],
       'scm_copropiedad_soportes_pago_v1' => [
         'name' => 'scm_copropiedad_soportes_pago_v1',
-        'label' => 'Copropiedad - soportes de pago',
+        'label' => 'Soportes de pago',
         'language' => 'es_CO',
         'description' => 'Envio de soportes de pago a copropiedades para verificacion y recibo de caja.',
         'body' => "Buen dia, {{1}}.\n\nAdjuntamos los soportes de pago correspondientes para su respectiva verificacion.\n\nDetalle de los soportes:\n\n{{2}}\n\nAgradecemos su colaboracion con el envio del recibo de caja correspondiente a estos pagos.\n\nAtentamente,\n{{3}}\n\nGracias por su atencion.",
         'variables' => ['Nombre de la copropiedad o contacto', 'Mes, inmueble y detalle de los soportes', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'actors' => $copropiedades,
+        'email_template' => 'scm_email_copropiedad_soportes_pago_v1',
+        'parameter_mode' => 'name_message_signature',
+      ],
+      'scm_arrendatario_aviso_pago_canon_v1' => [
+        'name' => 'scm_arrendatario_aviso_pago_canon_v1',
+        'label' => 'Aviso pago canon',
+        'language' => 'es_CO',
+        'description' => 'Aviso formal para arrendatarios por incumplimiento en el pago del canon.',
+        'body' => "Estimado(a) {{1}}, reciba un cordial saludo.\n\nLe recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.\n\nUna vez activado el proceso con la aseguradora, se puede generar un recargo adicional del 50% sobre el valor del canon adeudado, ademas de los costos y gestiones asociados al tramite.\n\nPara evitar mayores consecuencias economicas y administrativas, le solicitamos realizar el pago de manera inmediata.\n\nAtentamente,\n{{2}}\n\nGracias por su atencion.",
+        'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'actors' => $arrendatarios,
+        'email_template' => 'scm_email_arrendatario_aviso_pago_canon_v1',
+        'parameter_mode' => 'name_signature',
+      ],
+      'scm_factura_disponible_v1' => [
+        'name' => 'scm_factura_disponible_v1',
+        'label' => 'Factura disponible',
+        'language' => 'es_CO',
+        'description' => 'Aviso para arrendatarios cuando tienen una factura nueva disponible.',
+        'body' => "Estimado(a) {{1}}, tienes una nueva factura disponible.\n\nTu factura ya se encuentra lista para revision. Te invitamos a consultarla y realizar el pago oportunamente para mantenerte al dia.\n\nSi ya realizaste el pago, puedes hacer caso omiso a este mensaje.\n\nAtentamente,\n{{2}}\n\nGracias por elegirnos y confiar en nuestro equipo.",
+        'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'actors' => $arrendatarios,
+        'email_template' => 'scm_email_factura_disponible_v1',
+        'parameter_mode' => 'name_signature',
+      ],
+      'scm_mes_generado_pago_v1' => [
+        'name' => 'scm_mes_generado_pago_v1',
+        'label' => 'Mes generado para pago',
+        'language' => 'es_CO',
+        'description' => 'Aviso para arrendatarios cuando el mes fue generado y queda disponible para pago.',
+        'body' => "Hola {{1}}, tu mes ha sido generado exitosamente.\n\nPuedes realizar el pago a traves del boton de pago disponible o por ventanilla en Banco Caja Social, ingresando tu cedula o NIT sin digito de verificacion.\n\nCuando realices el pago, por favor envianos el soporte para validarlo en el sistema.\n\nEstoy para servirte.\n\nAtentamente,\n{{2}}",
+        'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'actors' => $arrendatarios,
+        'email_template' => 'scm_email_mes_generado_pago_v1',
+        'parameter_mode' => 'name_signature',
       ],
     ];
   }
@@ -172,6 +218,80 @@ final class AdministrativeNotificationsService
         'is_html' => true,
         'is_full_document' => false,
         'preview_excerpt' => 'Base corporativa con banner, saludo en negrita, mensaje editable y firma en formato Nombre - Cargo - Celular.',
+        'requires_message' => true,
+      ],
+      'scm_email_arrendatario_aviso_pago_canon_v1' => [
+        'name' => 'scm_email_arrendatario_aviso_pago_canon_v1',
+        'label' => 'Aviso pago canon',
+        'subject' => 'Aviso importante sobre canon de arrendamiento',
+        'description' => 'Email formal para arrendatarios por incumplimiento en el pago del canon.',
+        'body' => '<p><strong>Estimado(a) {{nombre}}</strong>,</p><p>Reciba un cordial saludo.</p><p>Le recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.</p><p>Una vez activado el proceso con la aseguradora, se puede generar un recargo adicional del <strong>50%</strong> sobre el valor del canon adeudado, adem&aacute;s de los costos y gestiones asociados al tr&aacute;mite.</p><p>Para evitar mayores consecuencias econ&oacute;micas y administrativas, le solicitamos realizar el pago de manera inmediata.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
+        'source' => 'sistema',
+        'message_only' => false,
+        'editable_message' => '',
+        'is_html' => true,
+        'is_full_document' => false,
+        'fixed_body' => true,
+        'requires_message' => false,
+        'preview_excerpt' => 'Aviso formal de canon vencido con firma del funcionario.',
+      ],
+      'scm_email_factura_disponible_v1' => [
+        'name' => 'scm_email_factura_disponible_v1',
+        'label' => 'Factura disponible',
+        'subject' => 'Tienes una nueva factura disponible',
+        'description' => 'Email para arrendatarios con factura nueva disponible.',
+        'body' => '<p><strong>Estimado(a) {{nombre}}</strong>,</p><p>Tienes una nueva factura disponible.</p><p>Tu factura ya se encuentra lista para revisi&oacute;n. Te invitamos a consultarla y realizar el pago oportunamente para mantenerte al d&iacute;a.</p><p>Si ya realizaste el pago, puedes hacer caso omiso a este mensaje.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
+        'source' => 'sistema',
+        'message_only' => false,
+        'editable_message' => '',
+        'is_html' => true,
+        'is_full_document' => false,
+        'fixed_body' => true,
+        'requires_message' => false,
+        'preview_excerpt' => 'Aviso de factura disponible con banner corporativo y firma.',
+      ],
+      'scm_email_mes_generado_pago_v1' => [
+        'name' => 'scm_email_mes_generado_pago_v1',
+        'label' => 'Mes generado para pago',
+        'subject' => 'Tu mes ha sido generado exitosamente',
+        'description' => 'Email para arrendatarios con mes generado y opciones de pago.',
+        'body' => '<p><strong>Hola {{nombre}}</strong>,</p><p>Tu mes ha sido generado exitosamente.</p><p>Puedes realizar el pago a trav&eacute;s del enlace de pago disponible o por ventanilla en Banco Caja Social, ingresando tu c&eacute;dula o NIT sin d&iacute;gito de verificaci&oacute;n.</p><p><a href="https://www.mipagoamigo.com/MPA_WebSite/ServicePayments/StartPayment?id=6329&amp;searchedCategoryId=&amp;searchedAgreementName=SOLUCIONES%20COMERCIALES%20Y%20CONSTRUCTIVAS%20SAS" style="display:inline-block;background:#f59120;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:8px;">Pagar ahora</a></p><p>Cuando realices el pago, por favor env&iacute;anos el soporte para validarlo en el sistema.</p><p>Estoy para servirte.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
+        'source' => 'sistema',
+        'message_only' => false,
+        'editable_message' => '',
+        'is_html' => true,
+        'is_full_document' => false,
+        'fixed_body' => true,
+        'requires_message' => false,
+        'preview_excerpt' => 'Aviso de mes generado con boton de pago y firma.',
+      ],
+      'scm_email_propietario_arriendo_consignado_v1' => [
+        'name' => 'scm_email_propietario_arriendo_consignado_v1',
+        'label' => 'Arriendo consignado',
+        'subject' => 'Pago de arriendo consignado',
+        'description' => 'Email para propietarios cuando el arriendo fue consignado.',
+        'body' => '<p><strong>Buen d&iacute;a, {{nombre}}</strong>.</p><p>Le informamos que el pago del arriendo correspondiente a su inmueble en administraci&oacute;n fue consignado a la cuenta registrada.</p><div>{{mensaje}}</div><p>Agradecemos verificar la transacci&oacute;n y comunicarnos cualquier novedad.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
+        'source' => 'sistema',
+        'message_only' => true,
+        'editable_message' => '',
+        'is_html' => true,
+        'is_full_document' => false,
+        'requires_message' => true,
+        'preview_excerpt' => 'Aviso de arriendo consignado con detalle editable.',
+      ],
+      'scm_email_copropiedad_soportes_pago_v1' => [
+        'name' => 'scm_email_copropiedad_soportes_pago_v1',
+        'label' => 'Soportes de pago',
+        'subject' => 'Envio de soportes de pago',
+        'description' => 'Email para copropiedades con soportes de pago.',
+        'body' => '<p><strong>Buen d&iacute;a, {{nombre}}</strong>.</p><p>Adjuntamos los soportes de pago correspondientes para su respectiva verificaci&oacute;n.</p><div>{{mensaje}}</div><p>Agradecemos su colaboraci&oacute;n con el env&iacute;o del recibo de caja correspondiente a estos pagos.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
+        'source' => 'sistema',
+        'message_only' => true,
+        'editable_message' => '',
+        'is_html' => true,
+        'is_full_document' => false,
+        'requires_message' => true,
+        'preview_excerpt' => 'Envio de soportes de pago con detalle editable.',
       ],
     ];
   }
@@ -315,7 +435,7 @@ final class AdministrativeNotificationsService
       throw new \RuntimeException('Selecciona al menos un canal.');
     }
     $messageRequired = in_array('sms', $channels, true)
-      || in_array('whatsapp', $channels, true)
+      || (in_array('whatsapp', $channels, true) && $this->whatsappTemplateNeedsMessage($whatsappTemplateConfig))
       || $this->emailTemplateNeedsMessage($emailTemplateConfig);
     if ($messageRequired && $messageText === '') {
       throw new \RuntimeException('El mensaje no puede estar vacio.');
@@ -752,11 +872,7 @@ final class AdministrativeNotificationsService
       $components = [
         [
           'type' => 'body',
-          'parameters' => [
-            ['type' => 'text', 'text' => $name !== '' ? $name : 'Cliente'],
-            ['type' => 'text', 'text' => $message],
-            ['type' => 'text', 'text' => (string) ($this->senderProfile()['signature_line'] ?? 'Control Servicios Inmobiliarios')],
-          ],
+          'parameters' => $this->whatsappTemplateParameters($whatsappTemplateConfig, $name, $message),
         ],
       ];
       $payload = [
@@ -834,6 +950,31 @@ final class AdministrativeNotificationsService
     }
     $templates = $this->emailTemplates();
     return is_array($templates[$templateName] ?? null) ? $templates[$templateName] : $templates[self::DEFAULT_EMAIL_TEMPLATE];
+  }
+
+  /** @param array<string,mixed> $templateConfig */
+  private function whatsappTemplateNeedsMessage(array $templateConfig): bool
+  {
+    return (string) ($templateConfig['parameter_mode'] ?? 'name_message_signature') === 'name_message_signature';
+  }
+
+  /** @param array<string,mixed> $templateConfig @return array<int,array{type:string,text:string}> */
+  private function whatsappTemplateParameters(array $templateConfig, string $recipientName, string $message): array
+  {
+    $name = trim($recipientName) !== '' ? trim($recipientName) : 'Cliente';
+    $signature = (string) ($this->senderProfile()['signature_line'] ?? 'Control Servicios Inmobiliarios');
+    $mode = (string) ($templateConfig['parameter_mode'] ?? 'name_message_signature');
+    if ($mode === 'name_signature') {
+      return [
+        ['type' => 'text', 'text' => $name],
+        ['type' => 'text', 'text' => $signature],
+      ];
+    }
+    return [
+      ['type' => 'text', 'text' => $name],
+      ['type' => 'text', 'text' => $message],
+      ['type' => 'text', 'text' => $signature],
+    ];
   }
 
   /**
@@ -926,6 +1067,9 @@ final class AdministrativeNotificationsService
     if ($body === '') {
       $body = "{{mensaje}}";
     }
+    if (!empty($templateConfig['fixed_body'])) {
+      return $this->resolveVariables($body, $recipient, $config);
+    }
     if (!str_contains($body, '{{mensaje}}') && !str_contains($body, '{{custom_message}}')) {
       if (!empty($templateConfig['is_full_document']) || $this->isFullEmailHtml($body)) {
         return $this->resolveVariables($body, $recipient, $config);
@@ -940,6 +1084,9 @@ final class AdministrativeNotificationsService
   /** @param array<string,mixed> $templateConfig */
   private function emailTemplateNeedsMessage(array $templateConfig): bool
   {
+    if (array_key_exists('requires_message', $templateConfig)) {
+      return (bool) $templateConfig['requires_message'];
+    }
     $body = trim((string) ($templateConfig['body'] ?? ''));
     if ($body === '') {
       return true;

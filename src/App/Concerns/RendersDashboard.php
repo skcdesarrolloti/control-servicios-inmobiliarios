@@ -1613,6 +1613,7 @@ trait RendersDashboard
               data-preview-template="<?php echo esc_attr((string) ($firstEmailTemplate['body'] ?? '')); ?>"
               data-message-only="<?php echo !empty($firstEmailTemplate['message_only']) ? '1' : '0'; ?>"
               data-template-html="<?php echo !empty($firstEmailTemplate['is_html']) ? '1' : '0'; ?>"
+              data-template-fixed="<?php echo !empty($firstEmailTemplate['fixed_body']) ? '1' : '0'; ?>"
               data-template-full="<?php echo !empty($firstEmailTemplate['is_full_document']) ? '1' : '0'; ?>">
 
             <div class="scm-field" data-admin-notif-subject-wrap>
@@ -1638,24 +1639,40 @@ trait RendersDashboard
 
             <div class="scm-admin-notif-template-card" data-admin-notif-whatsapp-template-wrap>
               <div class="scm-field">
-                <label for="scm-admin-notif-whatsapp-template">Plantilla WhatsApp oficial</label>
+                <label for="scm-admin-notif-whatsapp-template">Tipo de mensaje</label>
                 <select id="scm-admin-notif-whatsapp-template" name="whatsapp_template" class="select select-bordered select-sm scm-select" data-admin-notif-whatsapp-template>
-                  <?php foreach ($whatsappTemplates as $template): ?>
-                    <option value="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>">
+                  <?php foreach ($whatsappTemplates as $template):
+                    $linkedEmailTemplateName = (string) ($template['email_template'] ?? \SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE);
+                    $linkedEmailTemplate = is_array($emailTemplates[$linkedEmailTemplateName] ?? null)
+                      ? $emailTemplates[$linkedEmailTemplateName]
+                      : ($emailTemplates[\SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE] ?? $firstEmailTemplate);
+                    $templateActors = implode(',', array_map('strval', (array) ($template['actors'] ?? [])));
+                    ?>
+                    <option value="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>"
+                      data-actors="<?php echo esc_attr($templateActors); ?>"
+                      data-template-mode="<?php echo esc_attr((string) ($template['parameter_mode'] ?? 'name_message_signature')); ?>"
+                      data-email-template="<?php echo esc_attr((string) ($linkedEmailTemplate['name'] ?? $linkedEmailTemplateName)); ?>"
+                      data-email-subject="<?php echo esc_attr((string) ($linkedEmailTemplate['subject'] ?? '')); ?>"
+                      data-email-message="<?php echo esc_attr((string) ($linkedEmailTemplate['editable_message'] ?? $linkedEmailTemplate['body'] ?? '')); ?>"
+                      data-email-preview-template="<?php echo esc_attr((string) ($linkedEmailTemplate['body'] ?? '')); ?>"
+                      data-email-message-only="<?php echo !empty($linkedEmailTemplate['message_only']) ? '1' : '0'; ?>"
+                      data-email-template-html="<?php echo !empty($linkedEmailTemplate['is_html']) ? '1' : '0'; ?>"
+                      data-email-template-fixed="<?php echo !empty($linkedEmailTemplate['fixed_body']) ? '1' : '0'; ?>"
+                      data-email-template-full="<?php echo !empty($linkedEmailTemplate['is_full_document']) ? '1' : '0'; ?>">
                       <?php echo esc_html((string) ($template['label'] ?? $template['name'] ?? 'Plantilla')); ?>
                     </option>
                   <?php endforeach; ?>
                 </select>
+                <small>Se muestran opciones seg&uacute;n el tipo de destinatario. Email usa la plantilla equivalente con banner y firma.</small>
               </div>
               <?php foreach ($whatsappTemplates as $template): ?>
                 <div class="scm-admin-notif-template-guide" data-admin-notif-template-guide="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>">
-                  <strong><?php echo esc_html((string) ($template['name'] ?? '')); ?></strong>
+                  <strong><?php echo esc_html((string) ($template['label'] ?? $template['name'] ?? 'Plantilla')); ?></strong>
                   <span>Idioma: <?php echo esc_html((string) ($template['language'] ?? 'es_CO')); ?></span>
                   <p><?php echo nl2br(esc_html((string) ($template['body'] ?? ''))); ?></p>
-                  <small>Este selector solo muestra las plantillas WhatsApp configuradas para este m&oacute;dulo.</small>
-                  <small>Crea esta plantilla en Meta como Utilidad/Utility con el cuerpo exacto mostrado arriba.</small>
-                  <small>Variables en Meta: {{1}} = nombre del destinatario · {{2}} = mensaje escrito arriba · {{3}} = Nombre - Cargo - Celular del funcionario.</small>
-                  <small>No agregues botones a esta plantilla. La firma del funcionario queda dentro del cuerpo del mensaje.</small>
+                  <small><?php echo esc_html((string) ($template['description'] ?? '')); ?></small>
+                  <small>Plantilla Meta: <?php echo esc_html((string) ($template['name'] ?? '')); ?>.</small>
+                  <small>Variables: <?php echo esc_html(implode(' · ', array_map('strval', (array) ($template['variables'] ?? [])))); ?>.</small>
                 </div>
               <?php endforeach; ?>
             </div>
