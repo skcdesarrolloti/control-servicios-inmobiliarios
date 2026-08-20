@@ -13,7 +13,7 @@ final class PendingView
     <div class="scm-pending-wrap">
 
       <!-- Header -->
-      <div class="scm-pending-header scm-pending-header--teal">
+      <div class="scm-pending-header scm-pending-header--brand">
         <div>
           <h2>Revision Preventiva &mdash; Pendientes</h2>
           <p>Contratos <strong>estado = Entregado</strong> sin revision en <?php echo esc_html((string) date('Y')); ?></p>
@@ -91,7 +91,7 @@ final class PendingView
     <div class="scm-pending-wrap">
 
       <!-- Header -->
-      <div class="scm-pending-header scm-pending-header--green">
+      <div class="scm-pending-header scm-pending-header--brand">
         <div>
           <h2>Servicios Publicos &mdash; Pendientes</h2>
           <p>Contratos <strong>estado = Entregado</strong> con siguiente revision calculada desde la ultima revision y el mes configurado</p>
@@ -165,7 +165,7 @@ final class PendingView
     ob_start();
 ?>
     <div class="scm-pending-wrap" id="sra_panel">
-      <div class="scm-pending-header scm-pending-header--green">
+      <div class="scm-pending-header scm-pending-header--brand">
         <div>
           <h2>Reportes Administrativos Pendientes</h2>
           <p>Reportes con estado <strong>Pendiente</strong> antes de pasar al consolidado administrativo</p>
@@ -246,7 +246,7 @@ final class PendingView
     ob_start();
 ?>
     <div class="scm-pending-wrap scm-contracts-wrap" data-scm-contracts>
-      <div class="scm-pending-header scm-pending-header--green">
+      <div class="scm-pending-header scm-pending-header--brand">
         <div>
           <h2>Contratos de Arrendamiento</h2>
           <p>Consulta contratos por estado y crea tickets administrativos sin salir del panel.</p>
