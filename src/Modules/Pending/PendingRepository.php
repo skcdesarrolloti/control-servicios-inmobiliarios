@@ -302,6 +302,7 @@ final class PendingRepository
     $columns = [
       '_ID',
       'contrato',
+      'estado',
       'direccion',
       'inmueble',
       'id_inmueble',
