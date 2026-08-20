@@ -11,12 +11,30 @@ final class SimplePdf
   private array $pages = [];
   private string $content = '';
   private float $margin = 46.0;
+  private float $topMargin = 46.0;
+  private float $bottomMargin = 46.0;
+  private float $contentWidth = 505.0;
   private float $y = 46.0;
+  private ?string $backgroundImagePath = null;
 
   public function __construct()
   {
     $this->content = '';
-    $this->y = $this->margin;
+    $this->y = $this->topMargin;
+  }
+
+  public function layout(float $margin = 46.0, float $topMargin = 46.0, float $bottomMargin = 46.0): void
+  {
+    $this->margin = max(24.0, $margin);
+    $this->topMargin = max(24.0, $topMargin);
+    $this->bottomMargin = max(24.0, $bottomMargin);
+    $this->contentWidth = max(260.0, self::PAGE_W - ($this->margin * 2));
+    $this->y = $this->topMargin;
+  }
+
+  public function backgroundImage(string $path): void
+  {
+    $this->backgroundImagePath = is_file($path) ? $path : null;
   }
 
   public function save(string $path): void
@@ -32,14 +50,44 @@ final class SimplePdf
     $objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
     $objects[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
 
-    $kids = [];
     $next = 5;
+    $backgroundObjectId = null;
+    $backgroundDraw = null;
+    if ($this->backgroundImagePath !== null && is_file($this->backgroundImagePath)) {
+      $imageInfo = @getimagesize($this->backgroundImagePath);
+      $imageData = @file_get_contents($this->backgroundImagePath);
+      if (is_array($imageInfo) && is_string($imageData) && $imageData !== '') {
+        $imageWidth = max(1, (int) ($imageInfo[0] ?? 1));
+        $imageHeight = max(1, (int) ($imageInfo[1] ?? 1));
+        $channels = (int) ($imageInfo['channels'] ?? 3);
+        $colorSpace = $channels === 4 ? '/DeviceCMYK' : '/DeviceRGB';
+        $backgroundObjectId = $next++;
+        $objects[$backgroundObjectId] = '<< /Type /XObject /Subtype /Image /Width ' . $imageWidth
+          . ' /Height ' . $imageHeight . ' /ColorSpace ' . $colorSpace
+          . " /BitsPerComponent 8 /Filter /DCTDecode /Length " . strlen($imageData)
+          . " >>\nstream\n" . $imageData . "\nendstream";
+
+        $scale = max(self::PAGE_W / $imageWidth, self::PAGE_H / $imageHeight);
+        $drawW = $imageWidth * $scale;
+        $drawH = $imageHeight * $scale;
+        $drawX = (self::PAGE_W - $drawW) / 2;
+        $drawY = (self::PAGE_H - $drawH) / 2;
+        $backgroundDraw = [$drawW, $drawH, $drawX, $drawY];
+      }
+    }
+
+    $kids = [];
     foreach ($this->pages as $pageContent) {
       $contentId = $next++;
       $pageId = $next++;
+      if ($backgroundObjectId !== null && is_array($backgroundDraw)) {
+        [$drawW, $drawH, $drawX, $drawY] = $backgroundDraw;
+        $pageContent = 'q ' . $this->n($drawW) . ' 0 0 ' . $this->n($drawH) . ' ' . $this->n($drawX) . ' ' . $this->n($drawY) . " cm /ImBg Do Q\n" . $pageContent;
+      }
       $objects[$contentId] = "<< /Length " . strlen($pageContent) . " >>\nstream\n" . $pageContent . "\nendstream";
+      $xObject = $backgroundObjectId !== null ? ' /XObject << /ImBg ' . $backgroundObjectId . ' 0 R >>' : '';
       $objects[$pageId] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' . self::PAGE_W . ' ' . self::PAGE_H . '] '
-        . '/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ' . $contentId . ' 0 R >>';
+        . '/Resources << /Font << /F1 3 0 R /F2 4 0 R >>' . $xObject . ' >> /Contents ' . $contentId . ' 0 R >>';
       $kids[] = $pageId . ' 0 R';
     }
     $objects[2] = '<< /Type /Pages /Kids [' . implode(' ', $kids) . '] /Count ' . count($kids) . ' >>';
@@ -80,18 +128,20 @@ final class SimplePdf
   public function title(string $text): void
   {
     $this->ensureSpace(42);
-    $this->fill(0, 0, 0);
-    foreach ($this->wrap($text, 505, 18) as $line) {
-      $this->text($this->margin, $this->y, $line, 18, 'F2');
-      $this->y += 25;
+    $this->fill(6, 29, 73);
+    foreach ($this->wrap($text, $this->contentWidth, 17) as $line) {
+      $this->text($this->margin, $this->y, $line, 17, 'F2');
+      $this->y += 24;
     }
-    $this->y += 20;
+    $this->fill(245, 145, 32);
+    $this->rect($this->margin, $this->y + 2, 82, 2.5);
+    $this->y += 24;
   }
 
   public function heading(string $text): void
   {
     $this->ensureSpace(24);
-    $this->fill(92, 92, 92);
+    $this->fill(6, 29, 73);
     $this->text($this->margin, $this->y, $text, 12, 'F2');
     $this->fill(0, 0, 0);
     $this->y += 22;
@@ -100,18 +150,19 @@ final class SimplePdf
   public function line(string $text, int $size = 8, string $font = 'F1'): void
   {
     $this->ensureSpace($size + 8);
-    $this->fill(0, 0, 0);
+    $this->fill(13, 33, 58);
     $this->text($this->margin, $this->y, $text, $size, $font);
     $this->y += $size + 8;
   }
 
   public function paragraph(string $text, int $size = 8): void
   {
-    $lines = $this->wrap($text, 505, $size);
-    $this->ensureSpace(max(18, count($lines) * ($size + 5)));
+    $lines = $this->wrap($text, $this->contentWidth, $size);
+    $this->ensureSpace(max(18, count($lines) * ($size + 6)));
+    $this->fill(25, 43, 69);
     foreach ($lines as $line) {
       $this->text($this->margin, $this->y, $line, $size, 'F1');
-      $this->y += $size + 5;
+      $this->y += $size + 6;
     }
     $this->y += 8;
   }
@@ -120,9 +171,11 @@ final class SimplePdf
   public function bullets(array $items, int $size = 8): void
   {
     foreach ($items as $item) {
-      $lines = $this->wrap($item, 488, $size);
+      $lines = $this->wrap($item, $this->contentWidth - 17, $size);
       $this->ensureSpace(max(16, count($lines) * ($size + 5)));
+      $this->fill(245, 145, 32);
       $this->text($this->margin + 2, $this->y, '*', $size, 'F2');
+      $this->fill(25, 43, 69);
       foreach ($lines as $idx => $line) {
         $this->text($this->margin + 14, $this->y, $line, $size, 'F1');
         $this->y += $size + 5;
@@ -148,14 +201,36 @@ final class SimplePdf
     $this->y += $height;
   }
 
+  public function signatureBlock(string $label, string $name, string $details): void
+  {
+    $this->ensureSpace(54);
+    $this->fill(245, 145, 32);
+    $this->rect($this->margin, $this->y + 1, 52, 2);
+    $this->y += 12;
+    $this->fill(100, 116, 139);
+    $this->text($this->margin, $this->y, strtoupper($label), 7, 'F2');
+    $this->y += 13;
+    $this->fill(6, 29, 73);
+    $this->text($this->margin, $this->y, $name, 10, 'F2');
+    $this->y += 15;
+    if (trim($details) !== '') {
+      $this->fill(71, 85, 105);
+      foreach ($this->wrap($details, $this->contentWidth, 7) as $line) {
+        $this->text($this->margin, $this->y, $line, 7, 'F1');
+        $this->y += 11;
+      }
+    }
+    $this->y += 8;
+  }
+
   private function ensureSpace(float $height): void
   {
-    if ($this->y + $height <= self::PAGE_H - $this->margin) {
+    if ($this->y + $height <= self::PAGE_H - $this->bottomMargin) {
       return;
     }
     $this->finishPage();
     $this->content = '';
-    $this->y = $this->margin;
+    $this->y = $this->topMargin;
   }
 
   private function finishPage(): void

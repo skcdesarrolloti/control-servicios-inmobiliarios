@@ -47,6 +47,9 @@ final class TicketPdfGenerator
   private function buildPreventiva(array $ticket, string $destinatario): SimplePdf
   {
     $pdf = new SimplePdf();
+    $pdf->backgroundImage($this->letterheadPath());
+    $pdf->layout(58, 170, 118);
+
     $isOwner = $destinatario === 'propietario';
     $nombreDest = $isOwner
       ? $this->value($ticket, 'propietario', 'propietario')
@@ -58,20 +61,23 @@ final class TicketPdfGenerator
     $repairLabel = $isOwner
       ? 'Reparaciones Necesarias, Utiles y/o Voluntarias'
       : 'Reparaciones Locativas';
+    $recipientLabel = $isOwner ? 'propietario(a)' : 'arrendatario(a)';
+    $creator = $this->contactParts($ticket, 'creador');
+    $checker = $this->contactParts($ticket, 'empleado');
 
-    $pdf->logo();
     $pdf->title('Ofrecimiento de revision anual preventiva gratuita');
-    $pdf->line($ciudad . ', ' . date('d-m-Y'), 9);
-    $pdf->line('Apreciado(a) ' . $nombreDest, 10, 'F2');
-    $pdf->line('Contrato: ' . $contrato . ' | Inmueble: ' . $inmueble, 8, 'F2');
+    $pdf->line($ciudad . ', ' . date('d/m/Y'), 8);
+    $pdf->spacer(5);
+    $pdf->line('Apreciado(a) ' . $recipientLabel . ': ' . $nombreDest, 10, 'F2');
+    $pdf->line('Contrato: ' . $contrato . ' | Inmueble SIMI: ' . $inmueble, 8, 'F2');
     if ($direccion !== '') {
       $pdf->line('Direccion: ' . $direccion, 8);
     }
-    $pdf->spacer(8);
-    $pdf->paragraph('Conscientes de la importancia de mantener el inmueble en optimas condiciones para el disfrute, goce y satisfaccion de quienes lo habitan y administran, nos permitimos ofrecer la realizacion de una revision anual preventiva gratuita.');
-    $pdf->paragraph('Esta revision permite evaluar el estado general del inmueble, detectar oportunamente posibles danos y emitir un diagnostico sobre las ' . $repairLabel . ' que puedan presentarse por el uso normal del bien despues de un periodo de ocupacion.');
+    $pdf->spacer(12);
+    $pdf->paragraph('En SuCasa Inmobiliaria sabemos que la conservacion preventiva del inmueble evita novedades mayores y facilita una gestion mas clara entre las partes. Por eso, nos permitimos ofrecer la realizacion de una revision anual preventiva gratuita.');
+    $pdf->paragraph('Esta visita permite evaluar el estado general del inmueble, detectar oportunamente posibles danos y dejar un diagnostico sobre las ' . $repairLabel . ' que puedan presentarse por el uso normal del bien despues de un periodo de ocupacion.');
 
-    $pdf->line('Beneficios de la revision preventiva gratuita:', 9, 'F2');
+    $pdf->line('Beneficios de la revision preventiva:', 9, 'F2');
     $pdf->bullets([
       'Facilitar el cumplimiento de las obligaciones de conservacion del inmueble conforme al Codigo Civil Colombiano.',
       'Detectar deterioros a tiempo y evitar que se conviertan en reparaciones futuras de mayor costo.',
@@ -80,12 +86,10 @@ final class TicketPdfGenerator
       'Coordinar oportunamente las acciones que deban ser autorizadas por las partes responsables.',
     ]);
 
-    $pdf->paragraph('Nuestro proposito es acompanar la gestion del inmueble de manera preventiva, ordenada y transparente, procurando que la permanencia en nuestra empresa sea positiva y memorable.');
-    $pdf->line('Coordinador Contractual, Mantenimiento y Servicios Publicos:', 8, 'F2');
-    $pdf->line($this->contactLine($ticket, 'contractual'));
+    $pdf->paragraph('Nuestro proposito es acompanar la gestion del inmueble de manera preventiva, ordenada y transparente, procurando una experiencia de servicio clara, oportuna y memorable.');
     $pdf->spacer(8);
-    $pdf->line('Verificador de inmuebles:', 8, 'F2');
-    $pdf->line($this->contactLine($ticket, 'empleado'));
+    $pdf->signatureBlock('Creado por', $creator['name'], $creator['details']);
+    $pdf->signatureBlock('Verificador asignado', $checker['name'], $checker['details']);
 
     return $pdf;
   }
@@ -143,16 +147,49 @@ final class TicketPdfGenerator
   /** @param array<string,mixed> $ticket */
   private function contactLine(array $ticket, string $prefix): string
   {
+    $parts = $this->contactParts($ticket, $prefix);
+    return trim($parts['name'] . ' | ' . $parts['details'], ' |-');
+  }
+
+  /** @param array<string,mixed> $ticket @return array{name:string,details:string} */
+  private function contactParts(array $ticket, string $prefix): array
+  {
     if ($prefix === 'contractual') {
-      $name = $this->value($ticket, 'nombre_contractual', '');
+      $name = $this->value($ticket, 'nombre_contractual', 'Control Servicios Inmobiliarios');
       $phone = $this->value($ticket, 'celular_contractual', '');
       $email = $this->value($ticket, 'correo_contractual', '');
+      $cargo = 'Coordinacion contractual';
+    } elseif ($prefix === 'creador') {
+      $name = $this->value($ticket, 'nombre_creador_ticket', $this->value($ticket, 'creador_nombre', 'Funcionario'));
+      $phone = $this->value($ticket, 'celular_creador_ticket', $this->value($ticket, 'creador_celular', ''));
+      $email = $this->value($ticket, 'correo_creador_ticket', $this->value($ticket, 'creador_correo', ''));
+      $cargo = $this->value($ticket, 'cargo_creador_ticket', $this->value($ticket, 'creador_cargo', 'Control Servicios Inmobiliarios'));
     } else {
-      $name = $this->value($ticket, 'nombre_empleado', '');
+      $name = $this->value($ticket, 'nombre_empleado', $this->value($ticket, 'empleado', 'Funcionario asignado'));
       $phone = $this->value($ticket, 'celular_empleado', '');
       $email = $this->value($ticket, 'correo_empleado', '');
+      $cargo = 'Verificador de inmuebles';
     }
-    return trim($name . ' | ' . $phone . ' - ' . $email, ' |-');
+
+    $details = [];
+    if ($cargo !== '') {
+      $details[] = $cargo;
+    }
+    if ($phone !== '') {
+      $details[] = 'Cel. ' . $phone;
+    }
+    if ($email !== '') {
+      $details[] = $email;
+    }
+    return [
+      'name' => $name,
+      'details' => implode(' | ', $details),
+    ];
+  }
+
+  private function letterheadPath(): string
+  {
+    return dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg';
   }
 
   /** @param array<string,mixed> $row */

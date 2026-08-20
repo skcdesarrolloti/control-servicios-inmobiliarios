@@ -97,6 +97,7 @@ trait AdministrativeTicketCreationConcern
     $contractualPhone = $this->firstNonEmpty([$sucursal['celular_contractual'] ?? '', $sucursal['telefono'] ?? '']);
     $contractualEmail = $this->firstNonEmpty([$sucursal['correo_contractual'] ?? '', $sucursal['correo'] ?? '']);
     $ciudad = $this->firstNonEmpty([$sucursal['ciudad'] ?? '', $contract['ciudad'] ?? '', 'Cartagena de Indias']);
+    $creatorProfile = $this->ticketCreatorProfile($schema);
 
     $ticketPayload = [
       'cct_status' => 'publish',
@@ -155,6 +156,10 @@ trait AdministrativeTicketCreationConcern
       'nombre_contractual' => $contractualName,
       'celular_contractual' => $contractualPhone,
       'correo_contractual' => $contractualEmail,
+      'nombre_creador_ticket' => $creatorProfile['name'],
+      'cargo_creador_ticket' => $creatorProfile['cargo'],
+      'celular_creador_ticket' => $creatorProfile['phone'],
+      'correo_creador_ticket' => $creatorProfile['email'],
       'id_inventario' => $idInventario,
       'estado_inventario' => trim($idInventario) !== '' && trim($idInventario) !== '0' ? 'Si' : 'No',
       'fecha_terminacion_contrato' => $this->firstNonEmpty([$input['fecha_final_contrato'] ?? '', $contract['fin_contrato'] ?? '']),
@@ -330,6 +335,56 @@ trait AdministrativeTicketCreationConcern
       }
     }
     return '';
+  }
+
+  /** @return array{name:string,cargo:string,phone:string,email:string} */
+  private function ticketCreatorProfile(SchemaInspector $schema): array
+  {
+    $db = $this->repo->getDb();
+    $name = trim(Auth::user());
+    $cargo = trim(Auth::userRol());
+    $phone = '';
+    $email = '';
+    $userId = Auth::userId();
+    $funcTable = $db->table('jet_cct_funcionarios');
+
+    if ($userId > 0 && $schema->tableExists($funcTable)) {
+      $select = [];
+      foreach (['nombre', 'rol', 'id_cargo', 'celular', 'celular_empleado', 'telefono', 'whatsapp', 'correo', 'correo_empleado', 'email'] as $column) {
+        if ($schema->columnExists($funcTable, $column)) {
+          $select[] = "`{$column}`";
+        }
+      }
+      if ($select !== []) {
+        $row = $db->getRow('SELECT ' . implode(', ', $select) . " FROM `{$funcTable}` WHERE `_ID` = ? LIMIT 1", [$userId]) ?: [];
+        $name = $this->firstNonEmpty([$row['nombre'] ?? '', $name, 'Funcionario']);
+        $phone = $this->firstNonEmpty([$row['celular'] ?? '', $row['celular_empleado'] ?? '', $row['telefono'] ?? '', $row['whatsapp'] ?? '']);
+        $email = $this->firstNonEmpty([$row['correo'] ?? '', $row['correo_empleado'] ?? '', $row['email'] ?? '']);
+        $cargoId = trim((string) ($row['id_cargo'] ?? Auth::userCargo()));
+        $cargo = $this->firstNonEmpty([$this->ticketCargoName($schema, $cargoId), $row['rol'] ?? '', $cargo]);
+      }
+    }
+
+    return [
+      'name' => $name !== '' ? $name : 'Funcionario',
+      'cargo' => $cargo !== '' ? $cargo : 'Control Servicios Inmobiliarios',
+      'phone' => $phone,
+      'email' => $email,
+    ];
+  }
+
+  private function ticketCargoName(SchemaInspector $schema, string $cargoId): string
+  {
+    $cargoId = trim($cargoId);
+    if ($cargoId === '') {
+      return '';
+    }
+    $db = $this->repo->getDb();
+    $table = $db->table('jet_cct_cargos');
+    if (!$schema->tableExists($table) || !$schema->columnExists($table, 'nombre_cargo')) {
+      return '';
+    }
+    return trim((string) ($db->getVar("SELECT TRIM(COALESCE(`nombre_cargo`, '')) FROM `{$table}` WHERE CAST(`_ID` AS CHAR) = ? LIMIT 1", [$cargoId]) ?? ''));
   }
 
   /** @param array<string,mixed> $ticketPayload */
