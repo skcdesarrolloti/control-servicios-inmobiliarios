@@ -2547,19 +2547,22 @@
 
       function renderEmailPreviewHtml() {
         var rawMessage = messageInput ? String(messageInput.value || "") : "";
+        var slotMessage = selectedTemplateUsesImportedDetail()
+          ? importedDetailPreview()
+          : rawMessage;
         var template = selectedTemplateBody();
         var hasSlot = template.indexOf("{{mensaje}}") !== -1 || template.indexOf("{{custom_message}}") !== -1;
         var option = selectedEmailOption();
         var isFullTemplate = !!(option && option.getAttribute("data-template-full") === "1");
         var isFixedTemplate = !!(option && option.getAttribute("data-template-fixed") === "1");
         var messageForEmail = template !== stripHtml(template)
-          ? safePreviewHtml(rawMessage !== stripHtml(rawMessage) ? rawMessage : escHtml(rawMessage).replace(/\n/g, "<br>"))
-          : rawMessage;
+          ? safePreviewHtml(slotMessage !== stripHtml(slotMessage) ? slotMessage : escHtml(slotMessage).replace(/\n/g, "<br>"))
+          : slotMessage;
         var body = hasSlot
           ? template
               .replace(/\{\{mensaje\}\}/g, messageForEmail || "Mensaje escrito por el funcionario.")
               .replace(/\{\{custom_message\}\}/g, messageForEmail || "Mensaje escrito por el funcionario.")
-          : (isFixedTemplate || isFullTemplate || isFullEmailHtml(template) ? template : rawMessage || template || "Mensaje escrito por el funcionario.");
+          : (isFixedTemplate || isFullTemplate || isFullEmailHtml(template) ? template : slotMessage || template || "Mensaje escrito por el funcionario.");
         body = previewMessage(body);
         if (body === stripHtml(body)) {
           body = escHtml(body).replace(/\n/g, "<br>");
@@ -2586,7 +2589,23 @@
       function selectedWhatsappNeedsMessage() {
         var option = selectedMessageTemplateOption();
         var mode = option ? option.getAttribute("data-template-mode") || "name_message_signature" : "name_message_signature";
-        return mode === "name_message_signature";
+        return mode === "name_message_signature" && !selectedTemplateUsesImportedDetail();
+      }
+
+      function hasImportedRecipients() {
+        return importedPayload && Object.keys(importedPayload).length > 0;
+      }
+
+      function selectedTemplateUsesImportedDetail() {
+        var option = selectedMessageTemplateOption();
+        if (!option || !hasImportedRecipients()) {
+          return false;
+        }
+        return String(option.value || "") === "scm_propietario_arriendo_consignado_v1";
+      }
+
+      function importedDetailPreview() {
+        return "Canon: $1.850.000\nContrato: #700\nInmueble SIMI: 10578\nPeriodo: Agosto 2026";
       }
 
       function messageRequiredForCurrentSelection() {
@@ -2599,7 +2618,7 @@
         var whatsappChecked = !!panel.querySelector(
           '[data-admin-notif-channel][value="whatsapp"]:checked',
         );
-        return smsChecked || (emailChecked && selectedEmailNeedsMessage()) || (whatsappChecked && selectedWhatsappNeedsMessage());
+        return smsChecked || (emailChecked && selectedEmailNeedsMessage() && !selectedTemplateUsesImportedDetail()) || (whatsappChecked && selectedWhatsappNeedsMessage());
       }
 
       function updateMessageVisibility() {
@@ -2628,15 +2647,12 @@
             .replace(/\{\{2\}\}/g, signature)
             .replace(/\{\{3\}\}/g, previewMessage(rawMessage || "Mensaje escrito por el funcionario."));
         }
-        if (mode === "name_import_canon_summary_signature") {
-          return template
-            .replace(/\{\{1\}\}/g, name)
-            .replace(/\{\{2\}\}/g, "Canon: $1.850.000\nContrato: #700\nInmueble SIMI: 10578\nPeriodo: Agosto 2026")
-            .replace(/\{\{3\}\}/g, signature);
-        }
+        var messagePreview = selectedTemplateUsesImportedDetail()
+          ? importedDetailPreview()
+          : previewMessage(rawMessage || "Mensaje escrito por el funcionario.");
         return template
           .replace(/\{\{1\}\}/g, name)
-          .replace(/\{\{2\}\}/g, previewMessage(rawMessage || "Mensaje escrito por el funcionario."))
+          .replace(/\{\{2\}\}/g, messagePreview)
           .replace(/\{\{3\}\}/g, signature);
       }
 

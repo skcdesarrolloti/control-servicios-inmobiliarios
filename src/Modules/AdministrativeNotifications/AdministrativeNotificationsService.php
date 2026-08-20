@@ -155,17 +155,6 @@ final class AdministrativeNotificationsService
         'email_template' => 'scm_email_propietario_arriendo_consignado_v1',
         'parameter_mode' => 'name_message_signature',
       ],
-      'scm_propietario_canon_excel_v1' => [
-        'name' => 'scm_propietario_canon_excel_v1',
-        'label' => 'Canon desde Excel',
-        'language' => 'es_CO',
-        'description' => 'Aviso para propietarios usando el canon, contrato e inmueble detectados desde el Excel de SIMI.',
-        'body' => "Buen dia, {{1}}.\n\nLe informamos que el canon de arrendamiento reportado para su inmueble en administracion es:\n\n{{2}}\n\nAtentamente,\n{{3}}\n\nGracias por elegirnos y confiar en nuestro equipo.",
-        'variables' => ['Nombre del propietario', 'Detalle automatico del Excel: canon, contrato e inmueble', 'Firma del funcionario: Nombre - Cargo - Celular'],
-        'actors' => $propietarios,
-        'email_template' => 'scm_email_propietario_canon_excel_v1',
-        'parameter_mode' => 'name_import_canon_summary_signature',
-      ],
       'scm_copropiedad_soportes_pago_v1' => [
         'name' => 'scm_copropiedad_soportes_pago_v1',
         'label' => 'Soportes de pago',
@@ -289,21 +278,6 @@ final class AdministrativeNotificationsService
         'is_full_document' => false,
         'requires_message' => true,
         'preview_excerpt' => 'Aviso de arriendo consignado con detalle editable.',
-      ],
-      'scm_email_propietario_canon_excel_v1' => [
-        'name' => 'scm_email_propietario_canon_excel_v1',
-        'label' => 'Canon desde Excel',
-        'subject' => 'Canon de arrendamiento reportado',
-        'description' => 'Email para propietarios usando canon, contrato e inmueble importados desde Excel.',
-        'body' => '<p><strong>Buen d&iacute;a, {{nombre}}</strong>.</p><p>Le informamos que el canon de arrendamiento reportado para su inmueble en administraci&oacute;n es:</p><div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:14px 16px;margin:18px 0;color:#7c2d12;"><p style="margin:0 0 8px;font-size:18px;"><strong>{{canon_excel}}</strong></p><p style="margin:0;">Contrato: <strong>{{contrato_excel}}</strong><br>Inmueble SIMI: <strong>{{inmueble_simi_excel}}</strong>{{mes_excel_linea}}{{direccion_excel_linea}}</p></div><p>Agradecemos verificar la informaci&oacute;n y comunicarnos cualquier novedad.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
-        'source' => 'sistema',
-        'message_only' => false,
-        'editable_message' => '',
-        'is_html' => true,
-        'is_full_document' => false,
-        'fixed_body' => true,
-        'requires_message' => false,
-        'preview_excerpt' => 'Aviso con canon automatico del Excel de SIMI.',
       ],
       'scm_email_copropiedad_soportes_pago_v1' => [
         'name' => 'scm_email_copropiedad_soportes_pago_v1',
@@ -529,9 +503,12 @@ final class AdministrativeNotificationsService
     if ($channels === []) {
       throw new \RuntimeException('Selecciona al menos un canal.');
     }
+    $recipientMetaMap = $this->sanitizeImportMetaMap($recipientMetaMap);
+    $canUseImportDetail = $this->templateCanUseImportDetail($whatsappTemplateConfig, $emailTemplateConfig);
+    $hasImportedDetail = $canUseImportDetail && $recipientMetaMap !== [];
     $messageRequired = in_array('sms', $channels, true)
-      || (in_array('whatsapp', $channels, true) && $this->whatsappTemplateNeedsMessage($whatsappTemplateConfig))
-      || $this->emailTemplateNeedsMessage($emailTemplateConfig);
+      || (in_array('whatsapp', $channels, true) && $this->whatsappTemplateNeedsMessage($whatsappTemplateConfig) && !$hasImportedDetail)
+      || (in_array('email', $channels, true) && $this->emailTemplateNeedsMessage($emailTemplateConfig) && !$hasImportedDetail);
     if ($messageRequired && $messageText === '') {
       throw new \RuntimeException('El mensaje no puede estar vacio.');
     }
@@ -551,26 +528,14 @@ final class AdministrativeNotificationsService
       throw new \RuntimeException('La tabla skc_notification_queue no esta disponible.');
     }
 
-    $recipientMetaMap = $this->sanitizeImportMetaMap($recipientMetaMap);
     $recipients = $this->recipients($type, $ids, $recipientMetaMap);
     $batchId = bin2hex(random_bytes(8));
     $queued = 0;
     $failed = 0;
     $invalid = 0;
     $filtered = 0;
-    $requiresImportMeta = (
-      in_array('whatsapp', $channels, true)
-      && (string) ($whatsappTemplateConfig['parameter_mode'] ?? '') === 'name_import_canon_summary_signature'
-    ) || (
-      in_array('email', $channels, true)
-      && str_contains((string) ($emailTemplateConfig['body'] ?? ''), '_excel')
-    );
 
     foreach ($recipients as $recipient) {
-      if ($requiresImportMeta && !is_array($recipient['_scm_import_meta'] ?? null)) {
-        $invalid += count($channels);
-        continue;
-      }
       foreach ($channels as $channel) {
         if ($this->isBlockedByPreference($recipient, $channel, $type)) {
           $filtered++;
@@ -581,7 +546,15 @@ final class AdministrativeNotificationsService
           $invalid++;
           continue;
         }
-        $resolvedMessage = $this->resolveVariables($message, $recipient, $config);
+        $baseMessage = $this->messageForRecipient($message, $recipient, $whatsappTemplateConfig, $emailTemplateConfig);
+        $channelNeedsMessage = $channel === 'sms'
+          || ($channel === 'whatsapp' && $this->whatsappTemplateNeedsMessage($whatsappTemplateConfig))
+          || ($channel === 'email' && $this->emailTemplateNeedsMessage($emailTemplateConfig));
+        if ($channelNeedsMessage && $this->plainText($baseMessage) === '') {
+          $invalid++;
+          continue;
+        }
+        $resolvedMessage = $this->resolveVariables($baseMessage, $recipient, $config);
         $resolvedSubject = $this->resolveVariables($subject, $recipient, $config);
         if ($channel === 'email') {
           $resolvedMessage = $this->renderEmailTemplate($emailTemplateConfig, $resolvedMessage, $recipient, $config);
@@ -1444,6 +1417,27 @@ final class AdministrativeNotificationsService
     return (string) ($templateConfig['parameter_mode'] ?? 'name_message_signature') === 'name_message_signature';
   }
 
+  /** @param array<string,mixed> $whatsappTemplateConfig @param array<string,mixed> $emailTemplateConfig */
+  private function templateCanUseImportDetail(array $whatsappTemplateConfig, array $emailTemplateConfig): bool
+  {
+    return (string) ($whatsappTemplateConfig['name'] ?? '') === 'scm_propietario_arriendo_consignado_v1'
+      || (string) ($emailTemplateConfig['name'] ?? '') === 'scm_email_propietario_arriendo_consignado_v1';
+  }
+
+  /** @param array<string,mixed> $recipient @param array<string,mixed> $whatsappTemplateConfig @param array<string,mixed> $emailTemplateConfig */
+  private function messageForRecipient(string $message, array $recipient, array $whatsappTemplateConfig, array $emailTemplateConfig): string
+  {
+    if (!$this->templateCanUseImportDetail($whatsappTemplateConfig, $emailTemplateConfig)) {
+      return $message;
+    }
+    $meta = is_array($recipient['_scm_import_meta'] ?? null) ? $recipient['_scm_import_meta'] : [];
+    if ($meta === []) {
+      return $message;
+    }
+    $detail = $this->importCanonSummary($this->sanitizeImportMetaMap(['1' => $meta])['1'] ?? []);
+    return $detail !== '' ? $detail : $message;
+  }
+
   /** @param array<string,mixed> $templateConfig @return array<int,array{type:string,text:string}> */
   private function whatsappTemplateParameters(array $templateConfig, string $recipientName, string $message, array $recipient = []): array
   {
@@ -1453,18 +1447,6 @@ final class AdministrativeNotificationsService
     if ($mode === 'name_signature') {
       return [
         ['type' => 'text', 'text' => $name],
-        ['type' => 'text', 'text' => $signature],
-      ];
-    }
-    if ($mode === 'name_import_canon_summary_signature') {
-      $meta = is_array($recipient['_scm_import_meta'] ?? null) ? $recipient['_scm_import_meta'] : [];
-      $detail = $this->importCanonSummary($this->sanitizeImportMetaMap(['1' => $meta])['1'] ?? []);
-      if ($detail === '') {
-        $detail = 'Canon: pendiente por verificar en el archivo importado.';
-      }
-      return [
-        ['type' => 'text', 'text' => $name],
-        ['type' => 'text', 'text' => $detail],
         ['type' => 'text', 'text' => $signature],
       ];
     }
