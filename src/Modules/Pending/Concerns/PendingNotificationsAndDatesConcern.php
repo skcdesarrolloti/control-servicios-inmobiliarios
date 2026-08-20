@@ -13,9 +13,12 @@ trait PendingNotificationsAndDatesConcern
 {
   private function queueCreationEmails(int $ticketId, array $ticketPayload, array $notifyRecipients, string $mode, array $generatedPdfs = []): int
   {
+    $notifyRecipients = $this->normalizeCreationNotifyRecipients($notifyRecipients, $mode, (string) ($ticketPayload['solicitante_tipo'] ?? ''));
     $notifyRecipients = array_values(array_unique(array_filter(array_map('strval', $notifyRecipients))));
     if (empty($notifyRecipients)) {
-      $notifyRecipients = ['empleado', 'solicitante', 'admin'];
+      $notifyRecipients = strtolower(trim($mode)) === 'preventiva'
+        ? ['empleado', 'arrendatario', 'admin']
+        : ['empleado', 'solicitante', 'admin'];
     }
     if (in_array('none', $notifyRecipients, true)) {
       return 0;
@@ -109,6 +112,28 @@ trait PendingNotificationsAndDatesConcern
       ]);
     }
     return count($jobs);
+  }
+
+  /** @param array<int,string> $notifyRecipients @return array<int,string> */
+  private function normalizeCreationNotifyRecipients(array $notifyRecipients, string $mode, string $solicitanteTipo): array
+  {
+    $mode = strtolower(trim($mode));
+    $solicitanteTipo = strtolower(trim($solicitanteTipo));
+    if ($mode !== 'preventiva') {
+      return $notifyRecipients;
+    }
+
+    $out = [];
+    foreach ($notifyRecipients as $target) {
+      $target = strtolower(trim((string) $target));
+      if ($target === 'solicitante') {
+        $target = $solicitanteTipo === 'propietario' ? 'propietario' : 'arrendatario';
+      }
+      if ($target !== '') {
+        $out[] = $target;
+      }
+    }
+    return $out;
   }
 
   /**

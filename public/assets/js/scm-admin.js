@@ -2522,8 +2522,9 @@
     }
   }
 
-  function renderNotifyTargets(exclude) {
+  function renderNotifyTargets(exclude, checkedValues) {
     exclude = Array.isArray(exclude) ? exclude : [];
+    checkedValues = Array.isArray(checkedValues) ? checkedValues : null;
     var all = [
       { value: "solicitante", label: "Solicitante" },
       { value: "arrendatario", label: "Arrendatario" },
@@ -2536,10 +2537,13 @@
       '<fieldset class="scm-notify-targets"><legend>Notificar por correo</legend>';
     all.forEach(function (opt) {
       if (exclude.indexOf(opt.value) !== -1) return;
+      var checked = checkedValues ? checkedValues.indexOf(opt.value) !== -1 : true;
       html +=
         '<label class="scm-seg-check"><input type="checkbox" name="notify_recipients[]" value="' +
         opt.value +
-        '" checked> ' +
+        '"' +
+        (checked ? " checked" : "") +
+        "> " +
         opt.label +
         "</label>";
     });

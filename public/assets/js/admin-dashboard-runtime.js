@@ -3738,7 +3738,10 @@
         escHtml(defaultDescripcion) +
         "</textarea></label>" +
         evidenceFields +
-        renderNotifyTargets() +
+        renderNotifyTargets(
+          isPreventiva ? ["solicitante"] : [],
+          isPreventiva ? ["arrendatario", "empleado"] : null
+        ) +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear ticket</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
 
