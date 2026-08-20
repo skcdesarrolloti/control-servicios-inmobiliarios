@@ -1633,9 +1633,7 @@ trait RendersDashboard
                 <button type="button" data-admin-notif-clear-message>Limpiar</button>
               </div>
               <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." data-admin-notif-message></textarea>
-              <small class="scm-admin-notif-helper">Variables: {{nombre}}, {{correo}}, {{celular}}, {{tipo_actor}}, {{rol_persona}}, {{funcionario}}, {{cargo_funcionario}}, {{celular_funcionario}}, {{firma_funcionario}}, {{firma_funcionario_linea}}.</small>
               <small class="scm-admin-notif-sms-counter" data-admin-notif-sms-counter>0/160 SMS</small>
-              <div class="scm-admin-notif-preview" data-admin-notif-preview></div>
             </div>
 
             <div class="scm-admin-notif-template-card" data-admin-notif-whatsapp-template-wrap>
@@ -1661,6 +1659,8 @@ trait RendersDashboard
                 </div>
               <?php endforeach; ?>
             </div>
+
+            <div class="scm-admin-notif-preview" data-admin-notif-preview></div>
 
             <div class="scm-admin-notif-submit-row">
               <span class="scm-spinner" data-admin-notif-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>

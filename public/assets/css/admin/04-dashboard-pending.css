@@ -3964,7 +3964,6 @@
   white-space: pre-wrap;
 }
 
-#scm-app .scm-admin-notif-helper,
 #scm-app .scm-admin-notif-sms-counter,
 #scm-app .scm-admin-notif-result {
   display: block;
