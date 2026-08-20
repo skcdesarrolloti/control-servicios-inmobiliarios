@@ -2416,13 +2416,6 @@
           whatsappTemplateWrap.hidden = !templateVisible;
           whatsappTemplateWrap.classList.toggle("is-hidden", !templateVisible);
         }
-        if (whatsappTemplateSelect) {
-          panel.querySelectorAll("[data-admin-notif-template-guide]").forEach(function (guide) {
-            guide.hidden =
-              !templateVisible ||
-              guide.getAttribute("data-admin-notif-template-guide") !== whatsappTemplateSelect.value;
-          });
-        }
         updateMessageVisibility();
         updateSmsCounter();
         updatePreview();
@@ -2463,13 +2456,6 @@
 
       function isFullEmailHtml(value) {
         return /<!doctype\s+html|<html[\s>]|<body[\s>]/i.test(String(value || ""));
-      }
-
-      function escapeSelectorValue(value) {
-        if (window.CSS && typeof window.CSS.escape === "function") {
-          return window.CSS.escape(String(value || ""));
-        }
-        return String(value || "").replace(/["\\]/g, "\\$&");
       }
 
       function selectedTemplateBody() {
@@ -2590,13 +2576,8 @@
         var template = "Hola {{1}}.\n\n{{2}}";
         var option = selectedMessageTemplateOption();
         var mode = option ? option.getAttribute("data-template-mode") || "name_message_signature" : "name_message_signature";
-        if (whatsappTemplateSelect) {
-          var guide = panel.querySelector(
-            '[data-admin-notif-template-guide="' + escapeSelectorValue(whatsappTemplateSelect.value) + '"] p',
-          );
-          if (guide) {
-            template = guide.textContent || template;
-          }
+        if (option) {
+          template = option.getAttribute("data-template-body") || template;
         }
         var sender = senderProfile();
         var signature = sender.signatureLine || "Funcionario - Control Servicios Inmobiliarios";

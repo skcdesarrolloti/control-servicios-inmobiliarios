@@ -1617,22 +1617,6 @@ trait RendersDashboard
               data-template-fixed="<?php echo !empty($firstEmailTemplate['fixed_body']) ? '1' : '0'; ?>"
               data-template-full="<?php echo !empty($firstEmailTemplate['is_full_document']) ? '1' : '0'; ?>">
 
-            <div class="scm-field" data-admin-notif-subject-wrap>
-              <label for="scm-admin-notif-subject">Asunto para Email</label>
-              <input id="scm-admin-notif-subject" name="subject" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: Informaci&oacute;n importante" value="<?php echo esc_attr($defaultEmailSubject); ?>" data-admin-notif-subject>
-            </div>
-
-            <div class="scm-field scm-admin-notif-message-field">
-              <label for="scm-admin-notif-message">Mensaje</label>
-              <div class="scm-admin-notif-message-toolbar" aria-label="Herramientas del mensaje">
-                <button type="button" data-admin-notif-preview-toggle>Ocultar vista previa</button>
-                <button type="button" data-admin-notif-copy-message>Copiar</button>
-                <button type="button" data-admin-notif-clear-message>Limpiar</button>
-              </div>
-              <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." data-admin-notif-message></textarea>
-              <small class="scm-admin-notif-sms-counter" data-admin-notif-sms-counter>0/160 SMS</small>
-            </div>
-
             <div class="scm-admin-notif-template-card" data-admin-notif-whatsapp-template-wrap>
               <div class="scm-field">
                 <label for="scm-admin-notif-whatsapp-template">Tipo de mensaje</label>
@@ -1647,6 +1631,7 @@ trait RendersDashboard
                     <option value="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>"
                       data-actors="<?php echo esc_attr($templateActors); ?>"
                       data-template-mode="<?php echo esc_attr((string) ($template['parameter_mode'] ?? 'name_message_signature')); ?>"
+                      data-template-body="<?php echo esc_attr((string) ($template['body'] ?? '')); ?>"
                       data-email-template="<?php echo esc_attr((string) ($linkedEmailTemplate['name'] ?? $linkedEmailTemplateName)); ?>"
                       data-email-subject="<?php echo esc_attr((string) ($linkedEmailTemplate['subject'] ?? '')); ?>"
                       data-email-message="<?php echo esc_attr((string) ($linkedEmailTemplate['editable_message'] ?? $linkedEmailTemplate['body'] ?? '')); ?>"
@@ -1660,17 +1645,23 @@ trait RendersDashboard
                     </option>
                   <?php endforeach; ?>
                 </select>
-                <small>Se muestran opciones seg&uacute;n el tipo de destinatario. Email usa la plantilla equivalente con banner y firma.</small>
               </div>
-              <?php foreach ($whatsappTemplates as $template): ?>
-                <div class="scm-admin-notif-template-guide" data-admin-notif-template-guide="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>">
-                  <strong><?php echo esc_html((string) ($template['label'] ?? $template['name'] ?? 'Plantilla')); ?></strong>
-                  <span>Idioma: <?php echo esc_html((string) ($template['language'] ?? 'es_CO')); ?></span>
-                  <p><?php echo nl2br(esc_html((string) ($template['body'] ?? ''))); ?></p>
-                  <small><?php echo esc_html((string) ($template['description'] ?? '')); ?></small>
-                  <small>Plantilla Meta: <?php echo esc_html((string) ($template['name'] ?? '')); ?>.</small>
-                </div>
-              <?php endforeach; ?>
+            </div>
+
+            <div class="scm-field" data-admin-notif-subject-wrap>
+              <label for="scm-admin-notif-subject">Asunto para Email</label>
+              <input id="scm-admin-notif-subject" name="subject" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: Informaci&oacute;n importante" value="<?php echo esc_attr($defaultEmailSubject); ?>" data-admin-notif-subject>
+            </div>
+
+            <div class="scm-field scm-admin-notif-message-field">
+              <label for="scm-admin-notif-message">Mensaje</label>
+              <div class="scm-admin-notif-message-toolbar" aria-label="Herramientas del mensaje">
+                <button type="button" data-admin-notif-preview-toggle>Ocultar vista previa</button>
+                <button type="button" data-admin-notif-copy-message>Copiar</button>
+                <button type="button" data-admin-notif-clear-message>Limpiar</button>
+              </div>
+              <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." data-admin-notif-message></textarea>
+              <small class="scm-admin-notif-sms-counter" data-admin-notif-sms-counter>0/160 SMS</small>
             </div>
 
             <div class="scm-admin-notif-preview" data-admin-notif-preview></div>
