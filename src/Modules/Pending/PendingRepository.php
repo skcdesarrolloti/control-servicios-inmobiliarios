@@ -435,7 +435,12 @@ final class PendingRepository
       . " AND LOWER(TRIM(COALESCE(tema_ayuda,''))) = 'revision preventiva'"
       . " ORDER BY _ID DESC";
 
-    $rows = $this->enrichPreventivaTicketRows($this->db->getResults($sql, $ids));
+    $rows = $this->db->getResults($sql, $ids);
+    try {
+      $rows = $this->enrichPreventivaTicketRows($rows);
+    } catch (\Throwable $exception) {
+      error_log('[pending.preventiva.enrich] ' . $exception->getMessage());
+    }
 
     $out = [];
     foreach ($rows as $row) {

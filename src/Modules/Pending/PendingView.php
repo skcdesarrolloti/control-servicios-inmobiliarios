@@ -629,7 +629,13 @@ final class PendingView
     if ($html === '') {
       $html = '<div class="scm-case-description"><strong>Detalle del caso:</strong><div class="scm-case-description-content">Ticket preventivo creado desde contratos pendientes.</div></div>';
     }
-    $html .= '<div class="scm-seg-wrap">' . (new \SCM\Views\SeguimientoFormView())->render($ticketPk, \SCM\Core\Auth::isLoggedIn(), $hasCotizacionPendiente) . '</div>';
+    $seguimientoHtml = '<div class="scm-seg-readonly">No se pudo cargar el formulario de seguimiento en este momento.</div>';
+    try {
+      $seguimientoHtml = (new \SCM\Views\SeguimientoFormView())->render($ticketPk, \SCM\Core\Auth::isLoggedIn(), $hasCotizacionPendiente);
+    } catch (\Throwable $exception) {
+      error_log('[pending.preventiva.followup-form] ' . $exception->getMessage());
+    }
+    $html .= '<div class="scm-seg-wrap">' . $seguimientoHtml . '</div>';
     $html .= $this->renderPendingHistorialBlock($historialItems);
     $html .= $this->renderPendingRecordSection('Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);
     $html .= $this->renderPendingRecordSection('Notas del ticket', $notasItems);
