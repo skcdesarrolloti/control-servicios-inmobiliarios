@@ -35,6 +35,13 @@ trait PendingNotificationsAndDatesConcern
     $content .= '<p style="margin:4px 0;"><b>Contrato:</b> ' . EmailTemplate::e((string) ($ticketPayload['contrato'] ?? '')) . '</p>';
     $content .= '<p style="margin:4px 0;"><b>Inmueble:</b> ' . EmailTemplate::e((string) ($ticketPayload['inmueble'] ?? '')) . '</p>';
     $content .= '<p style="margin:4px 0;"><b>Responsable:</b> ' . EmailTemplate::e((string) ($ticketPayload['nombre_empleado'] ?? '')) . '</p>';
+    $descripcion = trim(html_entity_decode(strip_tags((string) ($ticketPayload['descripcion'] ?? '')), ENT_QUOTES, 'UTF-8'));
+    if ($descripcion !== '') {
+      $content .= '<div style="margin:14px 0 0;padding:14px 16px;border:1px solid #334155;background:#1f2937;border-radius:10px;">';
+      $content .= '<p style="margin:0 0 6px;color:#f8fafc;font-weight:700;">Descripcion</p>';
+      $content .= '<p style="margin:0;color:#cbd5e1;line-height:1.55;">' . nl2br(EmailTemplate::e($descripcion)) . '</p>';
+      $content .= '</div>';
+    }
 
     $jobs = [];
     $addJob = static function (array &$jobs, string $email, string $target, array $pdfs): void {
@@ -76,26 +83,26 @@ trait PendingNotificationsAndDatesConcern
     $queue = new EmailQueue($this->repo->getDb());
     foreach ($jobs as $job) {
       $pdfButtons = [];
-      $attachments = [];
+      $documents = [];
       foreach ((array) ($job['pdfs'] ?? []) as $pdf) {
         $url = trim((string) ($pdf['url'] ?? ''));
         if ($url === '') {
           continue;
         }
         $title = (string) ($pdf['title'] ?? 'Documento PDF');
-        $pdfButtons[] = ['url' => $url, 'label' => $title];
-        $attachments[] = [
+        $label = $this->documentButtonLabel($mode, $title);
+        $pdfButtons[] = ['url' => $url, 'label' => $label];
+        $documents[] = [
           'title' => $title,
           'url' => $url,
-          'path' => (string) ($pdf['path'] ?? ''),
         ];
       }
       $extraContent = $content;
       if (!empty($pdfButtons)) {
-        $extraContent .= '<p style="margin:12px 0 4px;"><b>Documentos generados:</b></p>';
-        foreach ($pdfButtons as $button) {
-          $extraContent .= '<p style="margin:4px 0;">' . EmailTemplate::e((string) $button['label']) . '</p>';
-        }
+        $extraContent .= '<div style="margin:16px 0;padding:14px 16px;border:1px solid #fde2bd;background:#fff8ef;border-radius:10px;">';
+        $extraContent .= '<p style="margin:0 0 6px;color:#061d49;font-weight:700;">Documento generado</p>';
+        $extraContent .= '<p style="margin:0;color:#475569;">Consulta el documento desde el boton de acceso. No se adjunta archivo fisico al correo.</p>';
+        $extraContent .= '</div>';
       }
       $html = EmailTemplate::render($subject, $extraContent, [
         'ticket_url' => $ticketUrl,
@@ -104,9 +111,8 @@ trait PendingNotificationsAndDatesConcern
       $queue->enqueue((string) $job['email'], $subject, $html, [
         'source' => 'scm_ticket_administrativo_nativo',
         'dedupe_key' => 'ticket_admin_created_' . $ticketId,
-        'attachments' => $attachments,
         'meta' => [
-          'attachments' => $attachments,
+          'documents' => $documents,
           'targets' => array_values(array_unique((array) ($job['targets'] ?? []))),
         ],
       ]);
@@ -158,6 +164,22 @@ trait PendingNotificationsAndDatesConcern
         : [];
     }
     return $pdfs;
+  }
+
+  private function documentButtonLabel(string $mode, string $title): string
+  {
+    if (strtolower(trim($mode)) !== 'preventiva') {
+      return 'Ver ' . $title;
+    }
+
+    $titleNorm = strtolower(trim($title));
+    if (str_contains($titleNorm, 'propietario')) {
+      return 'Ver documento propietario';
+    }
+    if (str_contains($titleNorm, 'arrendatario')) {
+      return 'Ver documento arrendatario';
+    }
+    return 'Ver documento generado';
   }
 
   private function parseTs($value): int
