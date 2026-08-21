@@ -435,9 +435,9 @@ final class PendingView
           . 'Contrato recibido</button>';
       }
       if ($ticketId !== '') {
-        $viewUrl = esc_attr('https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($ticketId));
-        $html .= '<button type="button" class="scm-pending-action-btn"'
-          . ' data-scm-open-iframe data-no-emp-check data-iframe-url="' . $viewUrl . '" data-iframe-title="Ver ticket">'
+        $html .= '<button type="button" class="scm-pending-action-btn scm-btn-case"'
+          . $this->preventivaTicketCaseAttrs((array) $ticket, $row, (int) ($item['ultima'] ?? 0), (int) ($item['due'] ?? 0))
+          . ' onclick="scmOpenCase(this)">'
           . 'Ver ticket</button>';
       } else {
         $html .= '<button type="button" class="scm-pending-action-btn"'
@@ -450,6 +450,11 @@ final class PendingView
       $html .= '</td>';
 
       $html .= '</tr>';
+      if ($ticketId !== '') {
+        $html .= '<tr class="scm-tl-row" style="display:none;"><td colspan="12">'
+          . $this->renderPreventivaTicketCaseSource((array) $ticket)
+          . '</td></tr>';
+      }
     }
 
     return $html . '</tbody></table></div>';
@@ -600,6 +605,158 @@ final class PendingView
       $attrs .= ' data-' . esc_attr($attr) . '="' . esc_attr($value) . '"';
     }
     return $attrs;
+  }
+
+  private function renderPreventivaTicketCaseSource(array $ticket): string
+  {
+    $descripcion = trim((string) ($ticket['descripcion'] ?? ''));
+    $documentsHtml = $this->renderPendingTicketDocumentsSection($ticket['archivos'] ?? '', 'scm-sec-documentos');
+
+    $html = '';
+    if ($descripcion !== '') {
+      $html .= '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">' . wp_kses_post($descripcion) . '</div></div>';
+    }
+    if ($documentsHtml !== '') {
+      $html .= '<div class="scm-case-action-buttons"><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Ver documentos</button></div>';
+      $html .= '<div class="scm-case-hidden-sections" style="display:none;">' . $documentsHtml . '</div>';
+    }
+    if ($html === '') {
+      $html = '<div class="scm-case-description"><strong>Detalle del caso:</strong><div class="scm-case-description-content">Ticket preventivo creado desde contratos pendientes.</div></div>';
+    }
+    return $html;
+  }
+
+  private function preventivaTicketCaseAttrs(array $ticket, array $contractRow, int $ultimaTs, int $dueTs): string
+  {
+    $ticketPk = trim((string) ($ticket['ticket_id'] ?? $ticket['_ID'] ?? ''));
+    $ticketLabel = trim((string) ($ticket['id_ticket'] ?? $ticketPk));
+    $estado = trim((string) ($ticket['estado'] ?? ''));
+    $estadoAdmin = trim((string) ($ticket['estado_administrativo'] ?? ''));
+    $asunto = trim((string) ($ticket['asunto'] ?? 'REVISION PREVENTIVA'));
+    $contrato = trim((string) ($ticket['contrato'] ?? $contractRow['contrato'] ?? $contractRow['_ID'] ?? ''));
+    $inmueble = trim((string) ($ticket['inmueble'] ?? $contractRow['inmueble'] ?? ''));
+    $direccion = trim((string) ($ticket['direccion'] ?? $contractRow['direccion'] ?? ''));
+    $barrio = trim((string) ($ticket['barrio'] ?? $contractRow['barrio'] ?? ''));
+    $empleado = trim((string) ($ticket['nombre_empleado'] ?? $ticket['empleado'] ?? $ticket['id_empleado'] ?? ''));
+    $createdTs = $this->ts($ticket['cct_created'] ?? $ticket['fecha'] ?? null);
+    $updatedTs = $this->ts($ticket['fecha_actualizacion'] ?? null);
+    $total = $createdTs > 0 ? $this->durationSince($createdTs) : '';
+    $sinActualizar = ($updatedTs > 0 || $createdTs > 0) ? $this->durationSince($updatedTs > 0 ? $updatedTs : $createdTs) : '';
+
+    return ' data-ticket="' . esc_attr($ticketLabel !== '' ? $ticketLabel : $ticketPk) . '"'
+      . ' data-ticket-pk="' . esc_attr($ticketPk) . '"'
+      . ' data-asunto="' . esc_attr($asunto !== '' ? $asunto : '-') . '"'
+      . ' data-estado="' . esc_attr($estado !== '' ? $estado : '-') . '"'
+      . ' data-admin="' . esc_attr($estadoAdmin !== '' ? $estadoAdmin : '-') . '"'
+      . ' data-prioridad="' . esc_attr(trim((string) ($ticket['prioridad'] ?? '')) ?: '-') . '"'
+      . ' data-magnitud-caso="' . esc_attr(trim((string) ($ticket['magnitud_caso'] ?? '')) ?: '-') . '"'
+      . ' data-perturbacion="' . esc_attr((string) ($ticket['perturbacion'] ?? '')) . '"'
+      . ' data-justificacion-perturbacion="' . esc_attr((string) ($ticket['justificacion_perturbacion'] ?? '')) . '"'
+      . ' data-valor-bonificacion="' . esc_attr((string) ($ticket['valor_bonificacion'] ?? '')) . '"'
+      . ' data-area-afectada="' . esc_attr((string) ($ticket['area_afectada'] ?? '')) . '"'
+      . ' data-resumen-calculo-perturbacion="' . esc_attr((string) ($ticket['resumen_calculo_perturbacion'] ?? '')) . '"'
+      . ' data-contrato="' . esc_attr($contrato !== '' ? ('#' . ltrim($contrato, '#')) : '-') . '"'
+      . ' data-inmueble="' . esc_attr($inmueble !== '' ? $inmueble : '-') . '"'
+      . ' data-id-inmueble-web="' . esc_attr(trim((string) ($ticket['id_inmueble'] ?? $contractRow['id_inmueble'] ?? '')) ?: '-') . '"'
+      . ' data-barrio="' . esc_attr($barrio !== '' ? $barrio : '-') . '"'
+      . ' data-direccion="' . esc_attr($direccion !== '' ? $direccion : '-') . '"'
+      . ' data-creado="' . esc_attr($createdTs > 0 ? $this->fmt($createdTs) : '-') . '"'
+      . ' data-empleado="' . esc_attr($empleado !== '' ? $empleado : '-') . '"'
+      . ' data-empleado-id="' . esc_attr((string) ($ticket['id_empleado'] ?? '')) . '"'
+      . ' data-propietario="' . esc_attr((string) ($ticket['propietario'] ?? $contractRow['propietario'] ?? '')) . '"'
+      . ' data-correo-propietario="' . esc_attr((string) ($ticket['correo_propietario'] ?? '')) . '"'
+      . ' data-celular-propietario="' . esc_attr((string) ($ticket['celular_propietario'] ?? '')) . '"'
+      . ' data-indicativo-propietario="' . esc_attr((string) ($ticket['indicativo_propietario'] ?? '')) . '"'
+      . ' data-arrendatario="' . esc_attr((string) ($ticket['arrendatario'] ?? $contractRow['arrendatario'] ?? '')) . '"'
+      . ' data-correo-arrendatario="' . esc_attr((string) ($ticket['correo_arrendatario'] ?? '')) . '"'
+      . ' data-celular-arrendatario="' . esc_attr((string) ($ticket['celular_arrendatario'] ?? '')) . '"'
+      . ' data-indicativo-arrendatario="' . esc_attr((string) ($ticket['indicativo_arrendatario'] ?? '')) . '"'
+      . ' data-id-revision-preventiva="' . esc_attr((string) ($ticket['id_revision_preventiva'] ?? '')) . '"'
+      . ' data-id-revision-correctiva="' . esc_attr((string) ($ticket['id_revision_correctiva'] ?? '')) . '"'
+      . ' data-cotizacion-id="' . esc_attr((string) ($ticket['id_cotizacion_mantenimiento'] ?? '')) . '"'
+      . ' data-cot-estado="' . esc_attr((string) ($ticket['estado_cotizacion_mantenimiento'] ?? '')) . '"'
+      . ' data-ejecucion="' . esc_attr($total) . '"'
+      . ' data-sin-actualizar="' . esc_attr($sinActualizar) . '"'
+      . ' data-tab-key="preventiva"'
+      . ' data-status-bucket="abiertos"';
+  }
+
+  private function renderPendingTicketDocumentsSection($raw, string $sectionId): string
+  {
+    $docs = $this->extractPendingTicketDocuments($raw);
+    if (empty($docs)) {
+      return '';
+    }
+
+    $html = '<section class="scm-case-history scm-case-documents-section" id="' . esc_attr($sectionId) . '">';
+    $html .= '<h4>Documentos del caso</h4>';
+    $html .= '<div class="scm-case-document-grid">';
+    foreach ($docs as $doc) {
+      $label = trim((string) ($doc['nombre_archivo'] ?? ''));
+      $url = trim((string) ($doc['archivo'] ?? ''));
+      if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+        continue;
+      }
+      if ($label === '') {
+        $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
+      }
+      $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="scm-case-action-btn scm-case-document-link">' . esc_html($label) . '</a>';
+    }
+    $html .= '</div></section>';
+    return $html;
+  }
+
+  /** @return array<int,array{nombre_archivo:string,archivo:string}> */
+  private function extractPendingTicketDocuments($raw): array
+  {
+    if (is_array($raw)) {
+      $decoded = $raw;
+    } else {
+      $value = trim((string) $raw);
+      if ($value === '') {
+        return [];
+      }
+      $decoded = preg_match('/^[aObis]:/', $value) ? @unserialize($value, ['allowed_classes' => false]) : null;
+      if (!is_array($decoded)) {
+        $json = json_decode($value, true);
+        $decoded = is_array($json) ? $json : [['nombre_archivo' => '', 'archivo' => $value]];
+      }
+    }
+
+    $out = [];
+    foreach ($decoded as $doc) {
+      $label = '';
+      $url = '';
+      if (is_array($doc)) {
+        $label = trim((string) ($doc['nombre_archivo'] ?? $doc['title'] ?? $doc['label'] ?? ''));
+        $url = trim((string) ($doc['archivo'] ?? $doc['url'] ?? ''));
+      } else {
+        $url = trim((string) $doc);
+      }
+      if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+        continue;
+      }
+      $out[] = ['nombre_archivo' => $label, 'archivo' => $url];
+    }
+    return $out;
+  }
+
+  private function durationSince(int $ts): string
+  {
+    if ($ts <= 0) {
+      return '';
+    }
+    $seconds = max(0, time() - $ts);
+    $days = intdiv($seconds, 86400);
+    $hours = intdiv($seconds % 86400, 3600);
+    if ($days > 0) {
+      return $days . 'd ' . $hours . 'h';
+    }
+    $minutes = intdiv($seconds % 3600, 60);
+    if ($hours > 0) {
+      return $hours . 'h ' . $minutes . 'm';
+    }
+    return $minutes . 'm';
   }
 
   private function monthName(int $month): string

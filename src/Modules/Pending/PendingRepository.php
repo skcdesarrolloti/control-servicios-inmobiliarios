@@ -373,8 +373,62 @@ final class PendingRepository
 
     $table        = $this->db->table('jet_cct_tickets');
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
-    $sql = "SELECT TRIM(COALESCE(id_contrato,'')) AS id_contrato, _ID AS ticket_id,"
-      . " TRIM(COALESCE(estado,'')) AS estado"
+
+    $select = [
+      "TRIM(COALESCE(id_contrato,'')) AS id_contrato",
+      "_ID AS ticket_id",
+    ];
+    foreach ([
+      'id_ticket',
+      'estado',
+      'estado_administrativo',
+      'prioridad',
+      'tema_ayuda',
+      'asunto',
+      'descripcion',
+      'contrato',
+      'id_inmueble',
+      'inmueble',
+      'barrio',
+      'direccion',
+      'id_empleado',
+      'empleado',
+      'nombre_empleado',
+      'id_propietario',
+      'propietario',
+      'correo_propietario',
+      'celular_propietario',
+      'indicativo_propietario',
+      'id_arrendatario',
+      'arrendatario',
+      'correo_arrendatario',
+      'celular_arrendatario',
+      'indicativo_arrendatario',
+      'solicitante',
+      'creador_por',
+      'fecha',
+      'fecha_actualizacion',
+      'cct_created',
+      'id_revision_preventiva',
+      'id_revision_correctiva',
+      'id_cotizacion_mantenimiento',
+      'estado_cotizacion_mantenimiento',
+      'magnitud_caso',
+      'perturbacion',
+      'justificacion_perturbacion',
+      'valor_bonificacion',
+      'area_afectada',
+      'resumen_calculo_perturbacion',
+      'archivos',
+      'acta_revision_preventiva_arrendatario',
+      'acta_revision_preventiva_propietario',
+    ] as $column) {
+      if ($this->schema()->columnExists($table, $column)) {
+        $select[] = "`{$column}`";
+      }
+    }
+
+    $sql = "SELECT " . implode(', ', $select)
       . " FROM `{$table}`"
       . " WHERE TRIM(COALESCE(id_contrato,'')) IN ({$placeholders})"
       . " AND LOWER(TRIM(COALESCE(estado,''))) IN ('nuevo','en proceso')"
@@ -387,10 +441,7 @@ final class PendingRepository
     foreach ($rows as $row) {
       $idContrato = trim((string) ($row['id_contrato'] ?? ''));
       if ($idContrato !== '' && !isset($out[$idContrato])) {
-        $out[$idContrato] = [
-          'ticket_id' => (string) ($row['ticket_id'] ?? ''),
-          'estado'    => (string) ($row['estado'] ?? ''),
-        ];
+        $out[$idContrato] = array_map('strval', $row);
       }
     }
 

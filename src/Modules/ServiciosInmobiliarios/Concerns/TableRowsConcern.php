@@ -164,6 +164,7 @@ trait TableRowsConcern
       if ($descripcionRaw !== '') {
         $caseSource .= '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">' . $descripcionRaw . '</div></div>';
       }
+      $ticketDocumentsHtml = $this->renderTicketRootDocumentsSection($row['archivos'] ?? '', 'scm-sec-documentos');
       $caseSource .= '<div class="scm-modal-timeline-only">';
       $caseSource .= $timeline;
       $caseSource .= '</div>';
@@ -177,11 +178,15 @@ trait TableRowsConcern
       $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-contrato">Ver contrato</button>';
       $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-inmueble">Ver inmueble</button>';
       $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-hist-inmueble">Ver historial del inmueble</button>';
+      if ($ticketDocumentsHtml !== '') {
+        $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Ver documentos</button>';
+      }
       $caseSource .= '</div>';
       $caseSource .= '<div class="scm-case-hidden-sections" style="display:none;">';
       $caseSource .= $this->renderSingleRecordSection('Contrato', $contratoData, 'scm-sec-contrato');
       $caseSource .= $this->renderSingleRecordSection('Inmueble', $inmuebleData, 'scm-sec-inmueble');
       $caseSource .= $this->renderRecordSection('Historial del inmueble', $historialInmuebleItems, 'scm-sec-hist-inmueble');
+      $caseSource .= $ticketDocumentsHtml;
       $caseSource .= '</div>';
 
       $html .= '<article class="scm-ticket-card card" data-pk="' . esc_attr((string) $ticketPk) . '">';
@@ -290,7 +295,64 @@ trait TableRowsConcern
     }
     return '<span class="scm-magnitude-badge scm-magnitude-' . esc_attr($key) . '">' . $labels[$key] . '</span>';
   }
-  /**
-   * @param array<int,array<string,mixed>> $items
-   */
+
+  private function renderTicketRootDocumentsSection($raw, string $sectionId): string
+  {
+    $docs = $this->extractTicketRootDocuments($raw);
+    if (empty($docs)) {
+      return '';
+    }
+
+    $html = '<section class="scm-case-history scm-case-documents-section" id="' . esc_attr($sectionId) . '">';
+    $html .= '<h4>Documentos del caso</h4>';
+    $html .= '<div class="scm-case-document-grid">';
+    foreach ($docs as $doc) {
+      $label = trim((string) ($doc['nombre_archivo'] ?? ''));
+      $url = trim((string) ($doc['archivo'] ?? ''));
+      if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+        continue;
+      }
+      if ($label === '') {
+        $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
+      }
+      $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="scm-case-action-btn scm-case-document-link">' . esc_html($label) . '</a>';
+    }
+    $html .= '</div></section>';
+    return $html;
+  }
+
+  /** @return array<int,array{nombre_archivo:string,archivo:string}> */
+  private function extractTicketRootDocuments($raw): array
+  {
+    if (is_array($raw)) {
+      $decoded = $raw;
+    } else {
+      $value = trim((string) $raw);
+      if ($value === '') {
+        return [];
+      }
+      $decoded = preg_match('/^[aObis]:/', $value) ? @unserialize($value, ['allowed_classes' => false]) : null;
+      if (!is_array($decoded)) {
+        $json = json_decode($value, true);
+        $decoded = is_array($json) ? $json : [['nombre_archivo' => '', 'archivo' => $value]];
+      }
+    }
+
+    $out = [];
+    foreach ($decoded as $doc) {
+      $label = '';
+      $url = '';
+      if (is_array($doc)) {
+        $label = trim((string) ($doc['nombre_archivo'] ?? $doc['title'] ?? $doc['label'] ?? ''));
+        $url = trim((string) ($doc['archivo'] ?? $doc['url'] ?? ''));
+      } else {
+        $url = trim((string) $doc);
+      }
+      if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+        continue;
+      }
+      $out[] = ['nombre_archivo' => $label, 'archivo' => $url];
+    }
+    return $out;
+  }
 }

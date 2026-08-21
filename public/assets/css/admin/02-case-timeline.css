@@ -708,6 +708,23 @@
   font-size: 13px;
 }
 
+#scm-app .scm-case-document-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+#scm-app .scm-case-document-link {
+  min-height: 44px;
+  border-color: rgba(246, 143, 0, 0.35);
+  background: linear-gradient(135deg, #f68f00, #404041);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.1);
+}
+
+#scm-app .scm-case-document-link:hover {
+  background: linear-gradient(135deg, #e07f00, #2f3031);
+}
+
 #scm-app .scm-case-history-list {
   display: grid;
   gap: 8px;
