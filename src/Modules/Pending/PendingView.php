@@ -611,18 +611,42 @@ final class PendingView
   {
     $descripcion = trim((string) ($ticket['descripcion'] ?? ''));
     $documentsHtml = $this->renderPendingTicketDocumentsSection($ticket['archivos'] ?? '', 'scm-sec-documentos');
+    $contratoData = is_array($ticket['_scm_contrato_data'] ?? null) ? $ticket['_scm_contrato_data'] : [];
+    $inmuebleData = is_array($ticket['_scm_inmueble_data'] ?? null) ? $ticket['_scm_inmueble_data'] : [];
+    $historialItems = is_array($ticket['_scm_historial_items'] ?? null) ? $ticket['_scm_historial_items'] : [];
+    $seguimientosItems = is_array($ticket['_scm_seguimientos_ticket'] ?? null) ? $ticket['_scm_seguimientos_ticket'] : [];
+    $notasItems = is_array($ticket['_scm_notas_ticket'] ?? null) ? $ticket['_scm_notas_ticket'] : [];
+    $historialInmuebleItems = is_array($ticket['_scm_historial_inmueble'] ?? null) ? $ticket['_scm_historial_inmueble'] : [];
+    $ticketPk = (int) ($ticket['ticket_id'] ?? $ticket['_ID'] ?? 0);
+    $cotId = trim((string) ($ticket['id_cotizacion_mantenimiento'] ?? ''));
+    $cotEstado = strtolower(trim((string) ($ticket['estado_cotizacion_mantenimiento'] ?? $ticket['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
+    $hasCotizacionPendiente = $cotId !== '' && in_array($cotEstado, ['', 'esperando respuesta'], true);
 
     $html = '';
     if ($descripcion !== '') {
       $html .= '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">' . wp_kses_post($descripcion) . '</div></div>';
     }
-    if ($documentsHtml !== '') {
-      $html .= '<div class="scm-case-action-buttons"><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Ver documentos</button></div>';
-      $html .= '<div class="scm-case-hidden-sections" style="display:none;">' . $documentsHtml . '</div>';
-    }
     if ($html === '') {
       $html = '<div class="scm-case-description"><strong>Detalle del caso:</strong><div class="scm-case-description-content">Ticket preventivo creado desde contratos pendientes.</div></div>';
     }
+    $html .= '<div class="scm-seg-wrap">' . (new \SCM\Views\SeguimientoFormView())->render($ticketPk, \SCM\Core\Auth::isLoggedIn(), $hasCotizacionPendiente) . '</div>';
+    $html .= $this->renderPendingHistorialBlock($historialItems);
+    $html .= $this->renderPendingRecordSection('Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);
+    $html .= $this->renderPendingRecordSection('Notas del ticket', $notasItems);
+    $html .= '<div class="scm-case-action-buttons">';
+    $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-contrato">Ver contrato</button>';
+    $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-inmueble">Ver inmueble</button>';
+    $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-hist-inmueble">Ver historial del inmueble</button>';
+    if ($documentsHtml !== '') {
+      $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Ver documentos</button>';
+    }
+    $html .= '</div>';
+    $html .= '<div class="scm-case-hidden-sections" style="display:none;">';
+    $html .= $this->renderPendingSingleRecordSection('Contrato', $contratoData, 'scm-sec-contrato');
+    $html .= $this->renderPendingSingleRecordSection('Inmueble', $inmuebleData, 'scm-sec-inmueble');
+    $html .= $this->renderPendingRecordSection('Historial del inmueble', $historialInmuebleItems, 'scm-sec-hist-inmueble');
+    $html .= $documentsHtml;
+    $html .= '</div>';
     return $html;
   }
 
@@ -638,6 +662,11 @@ final class PendingView
     $direccion = trim((string) ($ticket['direccion'] ?? $contractRow['direccion'] ?? ''));
     $barrio = trim((string) ($ticket['barrio'] ?? $contractRow['barrio'] ?? ''));
     $empleado = trim((string) ($ticket['nombre_empleado'] ?? $ticket['empleado'] ?? $ticket['id_empleado'] ?? ''));
+    $inmuebleData = is_array($ticket['_scm_inmueble_data'] ?? null) ? $ticket['_scm_inmueble_data'] : [];
+    $propertyDataId = trim((string) ($inmuebleData['_ID'] ?? $inmuebleData['id_inmueble_data'] ?? ''));
+    $propertyGoogleMaps = trim((string) ($inmuebleData['ubicacion_google_maps'] ?? ''));
+    $cotizacionId = trim((string) ($ticket['id_cotizacion_mantenimiento'] ?? ''));
+    $cotizacionUrl = $cotizacionId !== '' ? ('https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero=' . rawurlencode($cotizacionId)) : '';
     $createdTs = $this->ts($ticket['cct_created'] ?? $ticket['fecha'] ?? null);
     $updatedTs = $this->ts($ticket['fecha_actualizacion'] ?? null);
     $total = $createdTs > 0 ? $this->durationSince($createdTs) : '';
@@ -658,6 +687,8 @@ final class PendingView
       . ' data-contrato="' . esc_attr($contrato !== '' ? ('#' . ltrim($contrato, '#')) : '-') . '"'
       . ' data-inmueble="' . esc_attr($inmueble !== '' ? $inmueble : '-') . '"'
       . ' data-id-inmueble-web="' . esc_attr(trim((string) ($ticket['id_inmueble'] ?? $contractRow['id_inmueble'] ?? '')) ?: '-') . '"'
+      . ' data-id-inmueble-data="' . esc_attr($propertyDataId) . '"'
+      . ' data-ubicacion-google-maps="' . esc_attr($propertyGoogleMaps) . '"'
       . ' data-barrio="' . esc_attr($barrio !== '' ? $barrio : '-') . '"'
       . ' data-direccion="' . esc_attr($direccion !== '' ? $direccion : '-') . '"'
       . ' data-creado="' . esc_attr($createdTs > 0 ? $this->fmt($createdTs) : '-') . '"'
@@ -673,12 +704,153 @@ final class PendingView
       . ' data-indicativo-arrendatario="' . esc_attr((string) ($ticket['indicativo_arrendatario'] ?? '')) . '"'
       . ' data-id-revision-preventiva="' . esc_attr((string) ($ticket['id_revision_preventiva'] ?? '')) . '"'
       . ' data-id-revision-correctiva="' . esc_attr((string) ($ticket['id_revision_correctiva'] ?? '')) . '"'
-      . ' data-cotizacion-id="' . esc_attr((string) ($ticket['id_cotizacion_mantenimiento'] ?? '')) . '"'
+      . ' data-cotizacion-id="' . esc_attr($cotizacionId) . '"'
+      . ' data-cotizacion-url="' . esc_attr($cotizacionUrl) . '"'
       . ' data-cot-estado="' . esc_attr((string) ($ticket['estado_cotizacion_mantenimiento'] ?? '')) . '"'
       . ' data-ejecucion="' . esc_attr($total) . '"'
       . ' data-sin-actualizar="' . esc_attr($sinActualizar) . '"'
       . ' data-tab-key="preventiva"'
       . ' data-status-bucket="abiertos"';
+  }
+
+  /** @param array<int,array<string,mixed>> $items */
+  private function renderPendingHistorialBlock(array $items): string
+  {
+    return $this->renderPendingRecordSection('Historial del caso', $items);
+  }
+
+  /** @param array<int,array<string,mixed>> $items @param array<string,string> $visibleFields */
+  private function renderPendingRecordSection(string $title, array $items, string $sectionId = '', array $visibleFields = []): string
+  {
+    $sectionAttr = $sectionId !== '' ? ' id="' . esc_attr($sectionId) . '"' : '';
+    $empty = $title === 'Historial del caso' ? 'Sin historial registrado.' : 'Sin registros.';
+    $html = '<section class="scm-case-history"' . $sectionAttr . '><h4>' . esc_html($title) . '</h4>';
+    if (empty($items)) {
+      return $html . '<p class="scm-case-history-empty">' . esc_html($empty) . '</p></section>';
+    }
+
+    $html .= '<div class="scm-case-history-list">';
+    foreach ($items as $item) {
+      if (!is_array($item)) {
+        continue;
+      }
+      $detail = trim((string) ($item['observacion'] ?? $item['respuesta'] ?? $item['descripcion'] ?? ''));
+      $type = trim((string) ($item['tipo_reporte'] ?? ''));
+      if ($detail === '') {
+        $detail = 'Sin detalle';
+      }
+      $html .= '<article class="scm-case-history-item scm-case-record-card">';
+      $html .= '<div class="scm-case-record-head"><div class="scm-case-record-title"><span class="scm-case-record-user-icon" aria-hidden="true"></span><strong>' . esc_html($this->pendingRecordAuthor($item)) . '</strong></div></div>';
+      $html .= '<div class="scm-case-history-detail scm-case-record-detail">';
+      if ($type !== '') {
+        $html .= '<strong>' . esc_html($type) . ':</strong> ';
+      }
+      $html .= wp_kses_post(nl2br(esc_html($detail))) . '</div>';
+      foreach ($visibleFields as $field => $label) {
+        $value = trim((string) ($item[$field] ?? ''));
+        if ($value === '') {
+          continue;
+        }
+        $html .= '<div class="scm-case-history-detail"><p><strong>' . esc_html($label) . ':</strong> ' . esc_html($value) . '</p></div>';
+      }
+      $html .= $this->renderPendingHistoryImages($item['evidencia'] ?? $item['imagen'] ?? '');
+      $html .= $this->renderPendingHistoryDocuments($item['archivos'] ?? '');
+      $html .= '<div class="scm-case-record-date"><span class="scm-case-record-date-icon" aria-hidden="true"></span><strong>' . esc_html($this->pendingRecordDate($item)) . '</strong></div>';
+      $html .= '</article>';
+    }
+    return $html . '</div></section>';
+  }
+
+  /** @param array<string,mixed> $record */
+  private function renderPendingSingleRecordSection(string $title, array $record, string $sectionId): string
+  {
+    $html = '<section class="scm-case-history" id="' . esc_attr($sectionId) . '"><h4>' . esc_html($title) . '</h4>';
+    if (empty($record)) {
+      return $html . '<p class="scm-case-history-empty">Sin datos.</p></section>';
+    }
+    $html .= '<article class="scm-case-history-item"><div class="scm-case-history-detail">';
+    foreach ($record as $key => $value) {
+      if (is_array($value) || strpos((string) $key, '_scm_') === 0) {
+        continue;
+      }
+      $text = trim((string) $value);
+      if ($text === '') {
+        continue;
+      }
+      $html .= '<p><strong>' . esc_html($this->pendingLabel((string) $key)) . ':</strong> ' . esc_html($text) . '</p>';
+    }
+    return $html . '</div></article></section>';
+  }
+
+  /** @param array<string,mixed> $item */
+  private function pendingRecordAuthor(array $item): string
+  {
+    $author = trim((string) ($item['nombre'] ?? $item['funcionario'] ?? ''));
+    if ($author !== '') {
+      return $author;
+    }
+    $authorId = trim((string) ($item['id_empleado'] ?? $item['cct_author_id'] ?? ''));
+    return $authorId !== '' ? ('Usuario #' . $authorId) : 'Registro';
+  }
+
+  /** @param array<string,mixed> $item */
+  private function pendingRecordDate(array $item): string
+  {
+    $ts = $this->ts($item['fecha'] ?? $item['cct_created'] ?? $item['cct_modified'] ?? null);
+    return $ts > 0 ? $this->fmt($ts) : '-';
+  }
+
+  private function pendingLabel(string $key): string
+  {
+    return ucwords(str_replace('_', ' ', $key));
+  }
+
+  private function renderPendingHistoryImages($raw): string
+  {
+    $urls = $this->extractPendingAttachmentUrls($raw);
+    if (empty($urls)) {
+      return '';
+    }
+    $html = '<div class="scm-case-history-img">';
+    foreach ($urls as $url) {
+      $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer"><img src="' . esc_url($url) . '" alt="Imagen adjunta" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:8px;margin-top:6px;"></a>';
+    }
+    return $html . '</div>';
+  }
+
+  private function renderPendingHistoryDocuments($raw): string
+  {
+    $docs = $this->extractPendingTicketDocuments($raw);
+    if (empty($docs)) {
+      return '';
+    }
+    $html = '<div class="scm-case-actions">';
+    foreach ($docs as $doc) {
+      $label = trim((string) ($doc['nombre_archivo'] ?? '')) ?: 'Ver documento';
+      $html .= '<a class="scm-case-action-btn" href="' . esc_url((string) $doc['archivo']) . '" target="_blank" rel="noopener noreferrer">' . esc_html($label) . '</a>';
+    }
+    return $html . '</div>';
+  }
+
+  /** @return array<int,string> */
+  private function extractPendingAttachmentUrls($raw): array
+  {
+    $value = trim((string) $raw);
+    if ($value === '') {
+      return [];
+    }
+    $decoded = preg_match('/^[aObis]:/', $value) ? @unserialize($value, ['allowed_classes' => false]) : null;
+    if (!is_array($decoded)) {
+      return filter_var($value, FILTER_VALIDATE_URL) ? [$value] : [];
+    }
+    $out = [];
+    foreach ($decoded as $item) {
+      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['archivo'] ?? '')) : trim((string) $item);
+      if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
+        $out[] = $url;
+      }
+    }
+    return $out;
   }
 
   private function renderPendingTicketDocumentsSection($raw, string $sectionId): string

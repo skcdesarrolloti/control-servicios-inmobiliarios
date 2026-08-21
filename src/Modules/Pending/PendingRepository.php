@@ -350,7 +350,7 @@ final class PendingRepository
    * tema_ayuda = 'Revision preventiva', and estado IN ('Nuevo','En proceso').
    *
    * @param  array<int,array<string,mixed>> $contractRows  rows from contratos table (each has _ID)
-   * @return array<string,array<string,string>>            keyed by _ID string
+   * @return array<string,array<string,mixed>>             keyed by _ID string
    */
   public function getTicketsRevisionPreventiva(array $contractRows): array
   {
@@ -435,17 +435,265 @@ final class PendingRepository
       . " AND LOWER(TRIM(COALESCE(tema_ayuda,''))) = 'revision preventiva'"
       . " ORDER BY _ID DESC";
 
-    $rows = $this->db->getResults($sql, $ids);
+    $rows = $this->enrichPreventivaTicketRows($this->db->getResults($sql, $ids));
 
     $out = [];
     foreach ($rows as $row) {
       $idContrato = trim((string) ($row['id_contrato'] ?? ''));
       if ($idContrato !== '' && !isset($out[$idContrato])) {
-        $out[$idContrato] = array_map('strval', $row);
+        $out[$idContrato] = $row;
       }
     }
 
     return $out;
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @return array<int,array<string,mixed>> */
+  private function enrichPreventivaTicketRows(array $rows): array
+  {
+    if (empty($rows)) {
+      return $rows;
+    }
+
+    $ticketKeys = [];
+    $contractIds = [];
+    $propertyIds = [];
+    foreach ($rows as $row) {
+      foreach ([$row['ticket_id'] ?? '', $row['id_ticket'] ?? ''] as $key) {
+        $key = trim((string) $key);
+        if ($key !== '') {
+          $ticketKeys[$key] = true;
+        }
+      }
+      foreach ([$row['id_contrato'] ?? '', $row['contrato'] ?? ''] as $id) {
+        $id = trim((string) $id);
+        if ($id !== '') {
+          $contractIds[$id] = true;
+        }
+      }
+      foreach ([$row['id_inmueble'] ?? '', $row['inmueble'] ?? ''] as $id) {
+        $id = trim((string) $id);
+        if ($id !== '') {
+          $propertyIds[$id] = true;
+        }
+      }
+    }
+
+    $segByTicket = $this->fetchPendingRowsGrouped(
+      $this->db->table('jet_cct_seguimiento_ticket'),
+      'id_ticket',
+      array_keys($ticketKeys),
+      ['_ID', 'cct_status', 'id_ticket', 'fecha', 'nombre', 'observacion', 'cct_author_id', 'cct_created', 'cct_modified', 'id_coordinador', 'id_empleado', 'evidencia', 'archivos']
+    );
+    $notesByTicket = $this->fetchPendingRowsGrouped(
+      $this->db->table('jet_cct_notas_ticket'),
+      'id_ticket',
+      array_keys($ticketKeys),
+      ['_ID', 'cct_status', 'id_ticket', 'id_empleado', 'fecha', 'nombre', 'observacion', 'cct_author_id', 'cct_created', 'cct_modified']
+    );
+    $contractById = $this->fetchPendingSingleRows(
+      $this->db->table('jet_cct_contratos_arrendamiento'),
+      ['_ID', 'contrato'],
+      array_keys($contractIds)
+    );
+    $propertyById = $this->fetchPendingSingleRows(
+      $this->db->table('jet_cct_inmuebles'),
+      ['codigo', '_ID', 'id_inmueble'],
+      array_keys($propertyIds)
+    );
+    $histByProperty = $this->fetchPendingRowsGrouped(
+      $this->db->table('jet_cct_historial_del_inmueble'),
+      'id_inmueble',
+      array_keys($propertyIds),
+      ['_ID', 'id_inmueble', 'id_inmueble_data', 'id_ticket', 'fecha', 'tipo_reporte', 'observacion', 'funcionario', 'cct_created', 'cct_modified', 'cct_author_id', 'archivos', 'imagen']
+    );
+    $histByTicket = $this->fetchPendingRowsGrouped(
+      $this->db->table('jet_cct_historial_del_inmueble'),
+      'id_ticket',
+      array_keys($ticketKeys),
+      ['_ID', 'id_inmueble', 'id_inmueble_data', 'id_ticket', 'fecha', 'tipo_reporte', 'observacion', 'funcionario', 'cct_created', 'cct_modified', 'cct_author_id', 'archivos', 'imagen']
+    );
+
+    foreach ($rows as &$row) {
+      $row['_scm_seguimientos_ticket'] = [];
+      $row['_scm_notas_ticket'] = [];
+      $row['_scm_historial_items'] = [];
+      $row['_scm_historial_inmueble'] = [];
+      $row['_scm_contrato_data'] = [];
+      $row['_scm_inmueble_data'] = [];
+
+      foreach ([$row['ticket_id'] ?? '', $row['id_ticket'] ?? ''] as $key) {
+        $key = trim((string) $key);
+        if ($key === '') {
+          continue;
+        }
+        if (!empty($segByTicket[$key])) {
+          $row['_scm_seguimientos_ticket'] = array_merge($row['_scm_seguimientos_ticket'], $segByTicket[$key]);
+        }
+        if (!empty($notesByTicket[$key])) {
+          $row['_scm_notas_ticket'] = array_merge($row['_scm_notas_ticket'], $notesByTicket[$key]);
+        }
+        if (!empty($histByTicket[$key])) {
+          $row['_scm_historial_inmueble'] = array_merge($row['_scm_historial_inmueble'], $histByTicket[$key]);
+        }
+      }
+
+      $contractId = trim((string) ($row['id_contrato'] ?? $row['contrato'] ?? ''));
+      if ($contractId !== '' && isset($contractById[$contractId])) {
+        $row['_scm_contrato_data'] = $contractById[$contractId];
+      }
+
+      $propertyId = '';
+      foreach ([$row['inmueble'] ?? '', $row['id_inmueble'] ?? '', $row['_scm_contrato_data']['inmueble'] ?? '', $row['_scm_contrato_data']['id_inmueble'] ?? ''] as $candidate) {
+        $candidate = trim((string) $candidate);
+        if ($candidate !== '' && isset($propertyById[$candidate])) {
+          $propertyId = $candidate;
+          break;
+        }
+      }
+      if ($propertyId === '') {
+        $propertyId = trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? ''));
+      }
+      if ($propertyId !== '' && isset($propertyById[$propertyId])) {
+        $row['_scm_inmueble_data'] = $propertyById[$propertyId];
+      }
+      if ($propertyId !== '' && !empty($histByProperty[$propertyId])) {
+        $row['_scm_historial_inmueble'] = array_merge($row['_scm_historial_inmueble'], $histByProperty[$propertyId]);
+      }
+
+      $created = trim((string) ($row['cct_created'] ?? $row['fecha'] ?? ''));
+      $row['_scm_historial_items'][] = [
+        'nombre' => trim((string) ($row['nombre_empleado'] ?? $row['empleado'] ?? $row['id_empleado'] ?? 'Sistema')),
+        'fecha' => $created,
+        'observacion' => 'Ticket preventivo creado.',
+        'tipo_reporte' => 'Creaci&oacute;n',
+      ];
+
+      $row['_scm_seguimientos_ticket'] = $this->sortPendingRowsByDate($this->uniquePendingRows($row['_scm_seguimientos_ticket']));
+      $row['_scm_notas_ticket'] = $this->sortPendingRowsByDate($this->uniquePendingRows($row['_scm_notas_ticket']));
+      $row['_scm_historial_items'] = $this->sortPendingRowsByDate($this->uniquePendingRows($row['_scm_historial_items']));
+      $row['_scm_historial_inmueble'] = $this->sortPendingRowsByDate($this->uniquePendingRows($row['_scm_historial_inmueble']));
+    }
+    unset($row);
+
+    return $rows;
+  }
+
+  /** @param array<int,string> $keys @param array<int,string> $wantedColumns @return array<string,array<int,array<string,mixed>>> */
+  private function fetchPendingRowsGrouped(string $table, string $keyColumn, array $keys, array $wantedColumns): array
+  {
+    $keys = array_values(array_filter(array_unique(array_map('strval', $keys)), static fn($v): bool => trim($v) !== ''));
+    if (empty($keys) || !$this->schema()->tableExists($table) || !$this->schema()->columnExists($table, $keyColumn)) {
+      return [];
+    }
+    $columns = $this->pendingSelectableColumns($table, array_values(array_unique(array_merge([$keyColumn], $wantedColumns))));
+    $placeholders = implode(',', array_fill(0, count($keys), '?'));
+    $rows = $this->db->getResults(
+      "SELECT " . implode(', ', $columns) . " FROM `{$table}` WHERE TRIM(COALESCE(`{$keyColumn}`,'')) IN ({$placeholders}) ORDER BY `_ID` DESC",
+      $keys
+    );
+    $out = [];
+    foreach ($rows as $row) {
+      $key = trim((string) ($row[$keyColumn] ?? ''));
+      if ($key === '') {
+        continue;
+      }
+      $out[$key][] = $row;
+    }
+    return $out;
+  }
+
+  /** @param array<int,string> $idColumns @param array<int,string> $ids @return array<string,array<string,mixed>> */
+  private function fetchPendingSingleRows(string $table, array $idColumns, array $ids): array
+  {
+    $ids = array_values(array_filter(array_unique(array_map('strval', $ids)), static fn($v): bool => trim($v) !== ''));
+    if (empty($ids) || !$this->schema()->tableExists($table)) {
+      return [];
+    }
+    $where = [];
+    $args = [];
+    foreach ($idColumns as $column) {
+      if (!$this->schema()->columnExists($table, $column)) {
+        continue;
+      }
+      $where[] = "TRIM(COALESCE(`{$column}`,'')) IN (" . implode(',', array_fill(0, count($ids), '?')) . ")";
+      foreach ($ids as $id) {
+        $args[] = $id;
+      }
+    }
+    if (empty($where)) {
+      return [];
+    }
+    $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE " . implode(' OR ', $where) . " ORDER BY `_ID` DESC", $args);
+    $out = [];
+    foreach ($rows as $row) {
+      foreach ($idColumns as $column) {
+        $id = trim((string) ($row[$column] ?? ''));
+        if ($id !== '' && !isset($out[$id])) {
+          $out[$id] = $row;
+        }
+      }
+    }
+    return $out;
+  }
+
+  /** @param array<int,string> $columns @return array<int,string> */
+  private function pendingSelectableColumns(string $table, array $columns): array
+  {
+    $select = [];
+    foreach ($columns as $column) {
+      if ($this->schema()->columnExists($table, $column)) {
+        $select[] = "`{$column}`";
+      }
+    }
+    return !empty($select) ? $select : ['`_ID`'];
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @return array<int,array<string,mixed>> */
+  private function uniquePendingRows(array $rows): array
+  {
+    $seen = [];
+    $out = [];
+    foreach ($rows as $row) {
+      if (!is_array($row)) {
+        continue;
+      }
+      $key = trim((string) ($row['_ID'] ?? ''));
+      if ($key === '') {
+        $key = md5(json_encode($row) ?: serialize($row));
+      }
+      if (isset($seen[$key])) {
+        continue;
+      }
+      $seen[$key] = true;
+      $out[] = $row;
+    }
+    return $out;
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @return array<int,array<string,mixed>> */
+  private function sortPendingRowsByDate(array $rows): array
+  {
+    usort($rows, function (array $a, array $b): int {
+      return $this->pendingRowTs($b) <=> $this->pendingRowTs($a);
+    });
+    return $rows;
+  }
+
+  /** @param array<string,mixed> $row */
+  private function pendingRowTs(array $row): int
+  {
+    foreach (['fecha', 'cct_created', 'cct_modified'] as $key) {
+      $value = $row[$key] ?? '';
+      if (is_numeric($value)) {
+        return (int) $value;
+      }
+      $ts = strtotime((string) $value);
+      if ($ts !== false) {
+        return (int) $ts;
+      }
+    }
+    return 0;
   }
 
   /** @return array<string,string> */
