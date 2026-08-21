@@ -20,13 +20,13 @@ final class TicketPdfGenerator
       $out['acta_revision_preventiva_arrendatario'] = $this->save(
         $this->buildPreventiva($ticket, 'arrendatario'),
         'ofrecimiento_revision_preventiva_arrendatario_' . $ticketId,
-        'Ofrecimiento revision preventiva arrendatario',
+        'Ofrecimiento de revision preventiva para arrendatario',
         'acta_revision_preventiva_arrendatario'
       );
       $out['acta_revision_preventiva_propietario'] = $this->save(
         $this->buildPreventiva($ticket, 'propietario'),
         'ofrecimiento_revision_preventiva_propietario_' . $ticketId,
-        'Ofrecimiento revision preventiva propietario',
+        'Ofrecimiento de revision preventiva para propietario',
         'acta_revision_preventiva_propietario'
       );
     }

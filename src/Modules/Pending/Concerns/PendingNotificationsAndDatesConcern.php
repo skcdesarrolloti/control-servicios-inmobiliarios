@@ -100,8 +100,8 @@ trait PendingNotificationsAndDatesConcern
       $extraContent = $content;
       if (!empty($pdfButtons)) {
         $extraContent .= '<div style="margin:16px 0;padding:14px 16px;border:1px solid #fde2bd;background:#fff8ef;border-radius:10px;">';
-        $extraContent .= '<p style="margin:0 0 6px;color:#061d49;font-weight:700;">Documento generado</p>';
-        $extraContent .= '<p style="margin:0;color:#475569;">Consulta el documento desde el boton de acceso. No se adjunta archivo fisico al correo.</p>';
+        $extraContent .= '<p style="margin:0 0 6px;color:#061d49;font-weight:700;">Ofrecimiento de revision preventiva</p>';
+        $extraContent .= '<p style="margin:0;color:#475569;">Consulta el ofrecimiento correspondiente desde el boton de acceso. No se adjunta archivo fisico al correo.</p>';
         $extraContent .= '</div>';
       }
       $html = EmailTemplate::render($subject, $extraContent, [
@@ -174,12 +174,12 @@ trait PendingNotificationsAndDatesConcern
 
     $titleNorm = strtolower(trim($title));
     if (str_contains($titleNorm, 'propietario')) {
-      return 'Ver documento propietario';
+      return 'Ver ofrecimiento de revision preventiva - Propietario';
     }
     if (str_contains($titleNorm, 'arrendatario')) {
-      return 'Ver documento arrendatario';
+      return 'Ver ofrecimiento de revision preventiva - Arrendatario';
     }
-    return 'Ver documento generado';
+    return 'Ver ofrecimiento de revision preventiva';
   }
 
   private function parseTs($value): int
