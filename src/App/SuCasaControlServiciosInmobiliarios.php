@@ -578,11 +578,13 @@ final class SuCasaControlServiciosInmobiliarios
     $low = strtolower($label);
     $cls = 'badge-neutral';
     if ($low === 'nuevo' || $low === 'abierto') {
-      $cls = 'badge-info';
+      $cls = 'badge-success';
     } elseif ($low === 'en proceso') {
       $cls = 'badge-warning';
-    } elseif ($low === 'cerrado') {
-      $cls = 'badge-success';
+    } elseif ($low === 'postergado' || $low === 'postergada' || $low === 'postergados') {
+      $cls = 'badge-info';
+    } elseif ($low === 'cerrado' || $low === 'cerrada' || $low === 'cerrados' || $low === 'resuelto' || $low === 'finalizado') {
+      $cls = 'badge-error';
     } elseif ($low === 'cancelado' || $low === 'vencido') {
       $cls = 'badge-error';
     }
