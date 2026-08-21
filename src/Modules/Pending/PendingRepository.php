@@ -506,9 +506,9 @@ final class PendingRepository
       ['codigo', '_ID', 'id_inmueble'],
       array_keys($propertyIds)
     );
-    $histByProperty = $this->fetchPendingRowsGrouped(
+    $histByProperty = $this->fetchPendingRowsGroupedByColumns(
       $this->db->table('jet_cct_historial_del_inmueble'),
-      'id_inmueble',
+      ['id_inmueble', 'id_inmueble_data'],
       array_keys($propertyIds),
       ['_ID', 'id_inmueble', 'id_inmueble_data', 'id_ticket', 'fecha', 'tipo_reporte', 'observacion', 'funcionario', 'cct_created', 'cct_modified', 'cct_author_id', 'archivos', 'imagen']
     );
@@ -587,23 +587,42 @@ final class PendingRepository
   /** @param array<int,string> $keys @param array<int,string> $wantedColumns @return array<string,array<int,array<string,mixed>>> */
   private function fetchPendingRowsGrouped(string $table, string $keyColumn, array $keys, array $wantedColumns): array
   {
+    return $this->fetchPendingRowsGroupedByColumns($table, [$keyColumn], $keys, $wantedColumns);
+  }
+
+  /** @param array<int,string> $keyColumns @param array<int,string> $keys @param array<int,string> $wantedColumns @return array<string,array<int,array<string,mixed>>> */
+  private function fetchPendingRowsGroupedByColumns(string $table, array $keyColumns, array $keys, array $wantedColumns): array
+  {
     $keys = array_values(array_filter(array_unique(array_map('strval', $keys)), static fn($v): bool => trim($v) !== ''));
-    if (empty($keys) || !$this->schema()->tableExists($table) || !$this->schema()->columnExists($table, $keyColumn)) {
+    if (empty($keys) || !$this->schema()->tableExists($table)) {
       return [];
     }
-    $columns = $this->pendingSelectableColumns($table, array_values(array_unique(array_merge([$keyColumn], $wantedColumns))));
-    $placeholders = implode(',', array_fill(0, count($keys), '?'));
+    $existingKeyColumns = array_values(array_filter($keyColumns, fn(string $column): bool => $this->schema()->columnExists($table, $column)));
+    if (empty($existingKeyColumns)) {
+      return [];
+    }
+    $columns = $this->pendingSelectableColumns($table, array_values(array_unique(array_merge($existingKeyColumns, $wantedColumns))));
+    $where = [];
+    $args = [];
+    foreach ($existingKeyColumns as $column) {
+      $where[] = "BINARY TRIM(COALESCE(`{$column}`,'')) IN (" . implode(',', array_fill(0, count($keys), '?')) . ")";
+      foreach ($keys as $key) {
+        $args[] = $key;
+      }
+    }
     $rows = $this->db->getResults(
-      "SELECT " . implode(', ', $columns) . " FROM `{$table}` WHERE TRIM(COALESCE(`{$keyColumn}`,'')) IN ({$placeholders}) ORDER BY `_ID` DESC",
-      $keys
+      "SELECT " . implode(', ', $columns) . " FROM `{$table}` WHERE " . implode(' OR ', $where) . " ORDER BY `_ID` DESC",
+      $args
     );
     $out = [];
     foreach ($rows as $row) {
-      $key = trim((string) ($row[$keyColumn] ?? ''));
-      if ($key === '') {
-        continue;
+      foreach ($existingKeyColumns as $column) {
+        $key = trim((string) ($row[$column] ?? ''));
+        if ($key === '') {
+          continue;
+        }
+        $out[$key][] = $row;
       }
-      $out[$key][] = $row;
     }
     return $out;
   }
@@ -621,7 +640,7 @@ final class PendingRepository
       if (!$this->schema()->columnExists($table, $column)) {
         continue;
       }
-      $where[] = "TRIM(COALESCE(`{$column}`,'')) IN (" . implode(',', array_fill(0, count($ids), '?')) . ")";
+      $where[] = "BINARY TRIM(COALESCE(`{$column}`,'')) IN (" . implode(',', array_fill(0, count($ids), '?')) . ")";
       foreach ($ids as $id) {
         $args[] = $id;
       }

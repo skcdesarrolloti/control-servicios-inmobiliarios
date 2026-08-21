@@ -734,6 +734,9 @@ final class PendingView
   /** @param array<int,array<string,mixed>> $items @param array<string,string> $visibleFields */
   private function renderPendingRecordSection(string $title, array $items, string $sectionId = '', array $visibleFields = []): string
   {
+    static $recordSeq = 0;
+    $recordSeq++;
+    $listId = 'scm-pending-record-list-' . $recordSeq;
     $sectionAttr = $sectionId !== '' ? ' id="' . esc_attr($sectionId) . '"' : '';
     $empty = $title === 'Historial del caso' ? 'Sin historial registrado.' : 'Sin registros.';
     $html = '<section class="scm-case-history"' . $sectionAttr . '><h4>' . esc_html($title) . '</h4>';
@@ -741,17 +744,24 @@ final class PendingView
       return $html . '<p class="scm-case-history-empty">' . esc_html($empty) . '</p></section>';
     }
 
-    $html .= '<div class="scm-case-history-list">';
+    $perPage = 10;
+    $totalItems = count($items);
+    $totalPages = max(1, (int) ceil($totalItems / $perPage));
+    $html .= '<div class="scm-case-history-list" id="' . esc_attr($listId) . '" data-current-page="1">';
+    $index = 0;
     foreach ($items as $item) {
       if (!is_array($item)) {
         continue;
       }
+      $index++;
+      $page = (int) ceil($index / $perPage);
+      $itemStyle = $page === 1 ? '' : ' style="display:none;"';
       $detail = trim((string) ($item['observacion'] ?? $item['respuesta'] ?? $item['descripcion'] ?? ''));
       $type = trim((string) ($item['tipo_reporte'] ?? ''));
       if ($detail === '') {
         $detail = 'Sin detalle';
       }
-      $html .= '<article class="scm-case-history-item scm-case-record-card">';
+      $html .= '<article class="scm-case-history-item scm-case-record-card" data-page="' . esc_attr((string) $page) . '"' . $itemStyle . '>';
       $html .= '<div class="scm-case-record-head"><div class="scm-case-record-title"><span class="scm-case-record-user-icon" aria-hidden="true"></span><strong>' . esc_html($this->pendingRecordAuthor($item)) . '</strong></div></div>';
       $html .= '<div class="scm-case-history-detail scm-case-record-detail">';
       if ($type !== '') {
@@ -770,7 +780,16 @@ final class PendingView
       $html .= '<div class="scm-case-record-date"><span class="scm-case-record-date-icon" aria-hidden="true"></span><strong>' . esc_html($this->pendingRecordDate($item)) . '</strong></div>';
       $html .= '</article>';
     }
-    return $html . '</div></section>';
+    $html .= '</div>';
+    if ($totalPages > 1) {
+      $firstEnd = min($perPage, $totalItems);
+      $html .= '<div class="scm-history-pagination">';
+      $html .= '<button type="button" class="scm-history-page-btn" data-target="' . esc_attr($listId) . '" data-dir="prev" disabled>&lsaquo; Anterior</button>';
+      $html .= '<span class="scm-history-page-status" data-target="' . esc_attr($listId) . '" data-total="' . esc_attr((string) $totalItems) . '" data-per-page="' . esc_attr((string) $perPage) . '">Mostrando 1-' . esc_html((string) $firstEnd) . ' de ' . esc_html((string) $totalItems) . ' | Pagina 1 de ' . esc_html((string) $totalPages) . '</span>';
+      $html .= '<button type="button" class="scm-history-page-btn" data-target="' . esc_attr($listId) . '" data-dir="next">Siguiente &rsaquo;</button>';
+      $html .= '</div>';
+    }
+    return $html . '</section>';
   }
 
   /** @param array<string,mixed> $record */
@@ -781,20 +800,96 @@ final class PendingView
       return $html . '<p class="scm-case-history-empty">Sin datos.</p></section>';
     }
     $details = '';
-    foreach ($record as $key => $value) {
+    $fields = $this->pendingSingleRecordFields($title, $record);
+    foreach ($fields as $key => $label) {
+      if (!array_key_exists($key, $record)) {
+        continue;
+      }
+      $value = $record[$key];
       if (is_array($value) || strpos((string) $key, '_scm_') === 0) {
         continue;
       }
-      $text = trim((string) $value);
+      $text = $this->pendingRecordValue((string) $key, $value);
       if ($text === '') {
         continue;
       }
-      $details .= '<p><strong>' . esc_html($this->pendingLabel((string) $key)) . ':</strong> ' . esc_html($text) . '</p>';
+      $details .= '<p><strong>' . esc_html((string) $label) . ':</strong> ' . $this->pendingDetailValueHtml($text) . '</p>';
     }
     if ($details === '') {
       return $html . '<p class="scm-case-history-empty">Sin datos.</p></section>';
     }
     return $html . '<article class="scm-case-history-item"><div class="scm-case-history-detail">' . $details . '</div></article></section>';
+  }
+
+  /** @param array<string,mixed> $record @return array<string,string> */
+  private function pendingSingleRecordFields(string $title, array $record): array
+  {
+    if ($title === 'Contrato') {
+      return [
+        'contrato' => 'Contrato',
+        'estado' => 'Estado',
+        'tipo' => 'Tipo',
+        'direccion' => 'Dirección',
+        'inmueble' => 'Inmueble Simi',
+        'id_inmueble' => 'Código inmueble web',
+        'barrio' => 'Barrio',
+        'propietario' => 'Propietario',
+        'celular_propietario' => 'Celular propietario',
+        'correo_propietario' => 'Correo propietario',
+        'arrendatario' => 'Arrendatario',
+        'celular_arrendatario' => 'Celular arrendatario',
+        'correo_arrendatario' => 'Correo arrendatario',
+        'inicio_contrato' => 'Inicio contrato',
+        'fecha_entrega' => 'Fecha entrega',
+        'fin_contrato' => 'Fin contrato',
+        'registro_fotografico' => 'Registro fotográfico',
+      ];
+    }
+
+    if ($title === 'Inmueble') {
+      return [
+        'codigo' => 'Código Simi',
+        'inmueble' => 'Inmueble Simi',
+        'id_inmueble' => 'Código inmueble web',
+        'codigo_inmueble_web' => 'Código inmueble web',
+        'direccion' => 'Dirección',
+        'barrio' => 'Barrio',
+        'propietario' => 'Propietario',
+        'arrendatario' => 'Arrendatario',
+        'ubicacion_google_maps' => 'Google Maps',
+        'ubicacion_openstreetmap' => 'OpenStreetMap',
+      ];
+    }
+
+    $fields = [];
+    foreach ($record as $key => $value) {
+      if ((string) $key === '_ID' || strpos((string) $key, '_scm_') === 0 || is_array($value)) {
+        continue;
+      }
+      $fields[(string) $key] = $this->pendingLabel((string) $key);
+    }
+    return $fields;
+  }
+
+  private function pendingRecordValue(string $key, $value): string
+  {
+    $text = trim((string) $value);
+    if ($text === '') {
+      return '';
+    }
+    if (in_array($key, ['fecha', 'fecha_entrega', 'inicio_contrato', 'fin_contrato', 'cct_created', 'cct_modified'], true)) {
+      $ts = $this->ts($text);
+      return $ts > 0 ? $this->fmt($ts) : $text;
+    }
+    return $text;
+  }
+
+  private function pendingDetailValueHtml(string $text): string
+  {
+    if (filter_var($text, FILTER_VALIDATE_URL)) {
+      return '<a class="scm-case-action-btn" href="' . esc_url($text) . '" target="_blank" rel="noopener noreferrer">Abrir enlace</a>';
+    }
+    return esc_html($text);
   }
 
   /** @param array<string,mixed> $ticket @param array<string,mixed> $contractRow */
@@ -803,8 +898,8 @@ final class PendingView
     return array_filter([
       'contrato' => $ticket['contrato'] ?? $contractRow['contrato'] ?? $contractRow['_ID'] ?? '',
       'estado' => $contractRow['estado'] ?? '',
-      'id_inmueble' => $ticket['inmueble'] ?? $contractRow['inmueble'] ?? '',
-      'codigo_inmueble_web' => $ticket['id_inmueble'] ?? $contractRow['id_inmueble'] ?? '',
+      'inmueble' => $ticket['inmueble'] ?? $contractRow['inmueble'] ?? '',
+      'id_inmueble' => $ticket['id_inmueble'] ?? $contractRow['id_inmueble'] ?? '',
       'direccion' => $ticket['direccion'] ?? $contractRow['direccion'] ?? '',
       'barrio' => $ticket['barrio'] ?? $contractRow['barrio'] ?? '',
       'propietario' => $ticket['propietario'] ?? $contractRow['propietario'] ?? '',
