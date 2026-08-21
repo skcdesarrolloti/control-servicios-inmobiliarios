@@ -756,8 +756,8 @@ final class PendingView
       $index++;
       $page = (int) ceil($index / $perPage);
       $itemStyle = $page === 1 ? '' : ' style="display:none;"';
-      $detail = trim((string) ($item['observacion'] ?? $item['respuesta'] ?? $item['descripcion'] ?? ''));
-      $type = trim((string) ($item['tipo_reporte'] ?? ''));
+      $detail = trim((string) ($item['observacion'] ?? $item['observacion_his'] ?? $item['respuesta'] ?? $item['descripcion'] ?? ''));
+      $type = trim((string) ($item['tipo_reporte'] ?? $item['tipo_de_reporte_his'] ?? ''));
       if ($detail === '') {
         $detail = 'Sin detalle';
       }
@@ -835,12 +835,26 @@ final class PendingView
         'inmueble' => 'Inmueble Simi',
         'id_inmueble' => 'Código inmueble web',
         'barrio' => 'Barrio',
+        'ciudad' => 'Ciudad',
         'propietario' => 'Propietario',
         'celular_propietario' => 'Celular propietario',
         'correo_propietario' => 'Correo propietario',
         'arrendatario' => 'Arrendatario',
         'celular_arrendatario' => 'Celular arrendatario',
         'correo_arrendatario' => 'Correo arrendatario',
+        'valor_canon' => 'Canon',
+        'valor_administracion' => 'Administración',
+        'tasa_administracion' => 'Tasa administración',
+        'derechos_inmobiliarios' => 'Derechos inmobiliarios',
+        'aseguradora' => 'Aseguradora',
+        'numero_solicitud' => 'Número solicitud',
+        'id_estudio_aseguradora' => 'Estudio aseguradora',
+        'id_contrato_mandato' => 'Contrato de mandato',
+        'id_revision_preventiva' => 'Revisión preventiva',
+        'id_revision_entrega' => 'Revisión de entrega',
+        'id_revision_recibo' => 'Revisión de recibo',
+        'id_cierre' => 'Hoja de cierre',
+        'id_hoja_cierre' => 'Hoja de cierre',
         'inicio_contrato' => 'Inicio contrato',
         'fecha_entrega' => 'Fecha entrega',
         'fin_contrato' => 'Fin contrato',
@@ -855,9 +869,30 @@ final class PendingView
         'id_inmueble' => 'Código inmueble web',
         'codigo_inmueble_web' => 'Código inmueble web',
         'direccion' => 'Dirección',
+        'direccion_fisica' => 'Dirección física',
         'barrio' => 'Barrio',
+        'ciudad' => 'Ciudad',
+        'estado' => 'Estado',
+        'tipo_inmueble' => 'Tipo',
+        'tipo_negocio' => 'Negocio',
+        'destinacion' => 'Destinación',
+        'precio_arriendo' => 'Precio arriendo',
+        'precio_venta' => 'Precio venta',
+        'precio_admin' => 'Administración',
+        'area_construida' => 'Área construida',
+        'area_privada' => 'Área privada',
+        'habitaciones' => 'Habitaciones',
+        'banos' => 'Baños',
+        'parqueaderos' => 'Parqueaderos',
+        'estrato' => 'Estrato',
+        'copropiedad' => 'Copropiedad',
         'propietario' => 'Propietario',
         'arrendatario' => 'Arrendatario',
+        'matricula_inmobiliaria' => 'Matrícula inmobiliaria',
+        'id_estudio_aseguradora' => 'Estudio aseguradora',
+        'id_contrato_mandato' => 'Contrato de mandato',
+        'id_hoja_cierre' => 'Hoja de cierre',
+        'id_contrato_arrendamiento' => 'Contrato de arrendamiento',
         'ubicacion_google_maps' => 'Google Maps',
         'ubicacion_openstreetmap' => 'OpenStreetMap',
       ];
@@ -969,6 +1004,39 @@ final class PendingView
       }
     }
 
+    $hojaCierre = trim((string) ($item['id_hoja_cierre'] ?? ''));
+    if ($hojaCierre !== '' && $hojaCierre !== '-' && $hojaCierre !== '0') {
+      $url = 'https://sucasainmobiliaria.com.co/hoja-de-cierre/?numero=' . rawurlencode($hojaCierre);
+      $extraMap = [
+        'id_inmueble' => 'id_inmueble',
+        'id_inventario' => 'id_inmueble_data',
+        'id_contrato' => 'id_contrato',
+        'id_empleado' => 'id_empleado',
+      ];
+      foreach ($extraMap as $field => $param) {
+        $value = trim((string) ($item[$field] ?? ''));
+        if ($value !== '' && $value !== '-' && $value !== '0') {
+          $url .= '&' . $param . '=' . rawurlencode($value);
+        }
+      }
+      $buttons[] = ['url' => $url, 'label' => 'Ver hoja de cierre'];
+    }
+
+    $raw = (string) ($item['respuesta'] ?? $item['observacion'] ?? $item['observacion_his'] ?? $item['descripcion'] ?? '');
+    if ($raw !== '') {
+      foreach ($this->pendingLinksFromHtml($raw) as $link) {
+        $label = trim((string) ($link['label'] ?? ''));
+        $url = trim((string) ($link['url'] ?? ''));
+        if ($label === '' || $url === '') {
+          continue;
+        }
+        if (stripos($label, 'ver ') !== 0) {
+          $label = 'Ver recurso';
+        }
+        $buttons[] = ['url' => $url, 'label' => $label];
+      }
+    }
+
     if ($context === 'Inmueble') {
       $webId = trim((string) ($item['id_inmueble'] ?? $item['codigo_inmueble_web'] ?? $item['codigo'] ?? ''));
       if ($webId !== '' && $webId !== '-' && $webId !== '0') {
@@ -979,7 +1047,51 @@ final class PendingView
       }
     }
 
-    return $buttons;
+    $unique = [];
+    $out = [];
+    foreach ($buttons as $button) {
+      $url = trim((string) ($button['url'] ?? ''));
+      $label = trim((string) ($button['label'] ?? ''));
+      if ($url === '' || $label === '') {
+        continue;
+      }
+      $key = strtolower($label . '|' . $url);
+      if (isset($unique[$key])) {
+        continue;
+      }
+      $unique[$key] = true;
+      $out[] = ['url' => esc_url_raw($url), 'label' => $label];
+    }
+
+    return $out;
+  }
+
+  /** @return array<int,array{url:string,label:string}> */
+  private function pendingLinksFromHtml(string $raw): array
+  {
+    $decoded = html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if ($decoded === '') {
+      return [];
+    }
+    if (!preg_match_all('/<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $decoded, $matches, PREG_SET_ORDER)) {
+      return [];
+    }
+
+    $links = [];
+    foreach ($matches as $match) {
+      $href = trim((string) ($match[1] ?? ''));
+      $labelRaw = trim((string) ($match[2] ?? ''));
+      if ($href === '' || $labelRaw === '') {
+        continue;
+      }
+      $label = trim((string) preg_replace('/\s+/', ' ', wp_strip_all_tags($labelRaw)));
+      if ($label === '') {
+        continue;
+      }
+      $links[] = ['url' => $href, 'label' => $label];
+    }
+
+    return $links;
   }
 
   /** @param array<string,mixed> $ticket @param array<string,mixed> $contractRow */
@@ -987,6 +1099,7 @@ final class PendingView
   {
     return array_filter([
       'contrato' => $ticket['contrato'] ?? $contractRow['contrato'] ?? $contractRow['_ID'] ?? '',
+      'id_contrato' => $ticket['id_contrato'] ?? $contractRow['_ID'] ?? '',
       'estado' => $contractRow['estado'] ?? '',
       'inmueble' => $ticket['inmueble'] ?? $contractRow['inmueble'] ?? '',
       'id_inmueble' => $ticket['id_inmueble'] ?? $contractRow['id_inmueble'] ?? '',
@@ -994,6 +1107,12 @@ final class PendingView
       'barrio' => $ticket['barrio'] ?? $contractRow['barrio'] ?? '',
       'propietario' => $ticket['propietario'] ?? $contractRow['propietario'] ?? '',
       'arrendatario' => $ticket['arrendatario'] ?? $contractRow['arrendatario'] ?? '',
+      'valor_canon' => $contractRow['valor_canon'] ?? '',
+      'valor_administracion' => $contractRow['valor_administracion'] ?? '',
+      'id_estudio_aseguradora' => $contractRow['id_estudio_aseguradora'] ?? '',
+      'numero_solicitud' => $contractRow['numero_solicitud'] ?? '',
+      'id_contrato_mandato' => $contractRow['id_contrato_mandato'] ?? '',
+      'id_hoja_cierre' => $contractRow['id_hoja_cierre'] ?? $contractRow['id_cierre'] ?? '',
       'inicio_contrato' => $this->fmt($this->ts($contractRow['inicio_contrato'] ?? null)),
       'fin_contrato' => $this->fmt($this->ts($contractRow['fin_contrato'] ?? null)),
       'fecha_entrega' => $this->fmt($this->ts($contractRow['fecha_entrega'] ?? null)),
@@ -1010,13 +1129,16 @@ final class PendingView
       'barrio' => $ticket['barrio'] ?? $contractRow['barrio'] ?? '',
       'propietario' => $ticket['propietario'] ?? $contractRow['propietario'] ?? '',
       'arrendatario' => $ticket['arrendatario'] ?? $contractRow['arrendatario'] ?? '',
+      'id_estudio_aseguradora' => $contractRow['id_estudio_aseguradora'] ?? '',
+      'id_contrato_mandato' => $contractRow['id_contrato_mandato'] ?? '',
+      'id_hoja_cierre' => $contractRow['id_hoja_cierre'] ?? $contractRow['id_cierre'] ?? '',
     ], static fn($value): bool => trim((string) $value) !== '');
   }
 
   /** @param array<string,mixed> $item */
   private function pendingRecordAuthor(array $item): string
   {
-    $author = trim((string) ($item['nombre'] ?? $item['funcionario'] ?? ''));
+    $author = trim((string) ($item['nombre'] ?? $item['funcionario'] ?? $item['reporte_realizado_por_his'] ?? ''));
     if ($author !== '') {
       return $author;
     }

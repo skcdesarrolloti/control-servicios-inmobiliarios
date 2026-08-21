@@ -3,6 +3,7 @@
 namespace SCM\Modules\Pending;
 
 use SCM\Core\Database;
+use SCM\Support\HistoryLinkMap;
 use SCM\Support\SchemaInspector;
 
 final class PendingRepository
@@ -506,17 +507,18 @@ final class PendingRepository
       ['codigo', '_ID', 'id_inmueble'],
       array_keys($propertyIds)
     );
+    $historyColumns = $this->pendingHistoryColumns();
     $histByProperty = $this->fetchPendingRowsGroupedByColumns(
       $this->db->table('jet_cct_historial_del_inmueble'),
       ['id_inmueble', 'id_inmueble_data'],
       array_keys($propertyIds),
-      ['_ID', 'id_inmueble', 'id_inmueble_data', 'id_ticket', 'fecha', 'tipo_reporte', 'observacion', 'funcionario', 'cct_created', 'cct_modified', 'cct_author_id', 'archivos', 'imagen']
+      $historyColumns
     );
     $histByTicket = $this->fetchPendingRowsGrouped(
       $this->db->table('jet_cct_historial_del_inmueble'),
       'id_ticket',
       array_keys($ticketKeys),
-      ['_ID', 'id_inmueble', 'id_inmueble_data', 'id_ticket', 'fecha', 'tipo_reporte', 'observacion', 'funcionario', 'cct_created', 'cct_modified', 'cct_author_id', 'archivos', 'imagen']
+      $historyColumns
     );
 
     foreach ($rows as &$row) {
@@ -663,6 +665,37 @@ final class PendingRepository
       }
     }
     return !empty($select) ? $select : ['`_ID`'];
+  }
+
+  /** @return array<int,string> */
+  private function pendingHistoryColumns(): array
+  {
+    return array_values(array_unique(array_merge(
+      [
+        '_ID',
+        'cct_status',
+        'id_inmueble',
+        'id_inmueble_data',
+        'id_ticket',
+        'fecha',
+        'tipo_reporte',
+        'tipo_de_reporte_his',
+        'observacion',
+        'observacion_his',
+        'respuesta',
+        'descripcion',
+        'funcionario',
+        'reporte_realizado_por_his',
+        'cct_created',
+        'cct_modified',
+        'cct_author_id',
+        'id_empleado',
+        'archivos',
+        'imagen',
+      ],
+      array_keys(HistoryLinkMap::idButtons()),
+      ['id_hoja_cierre']
+    )));
   }
 
   /** @param array<int,array<string,mixed>> $rows @return array<int,array<string,mixed>> */
