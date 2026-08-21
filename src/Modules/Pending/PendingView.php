@@ -452,7 +452,7 @@ final class PendingView
       $html .= '</tr>';
       if ($ticketId !== '') {
         $html .= '<tr class="scm-tl-row" style="display:none;"><td colspan="12">'
-          . $this->renderPreventivaTicketCaseSource((array) $ticket)
+          . $this->renderPreventivaTicketCaseSource((array) $ticket, $row)
           . '</td></tr>';
       }
     }
@@ -607,12 +607,18 @@ final class PendingView
     return $attrs;
   }
 
-  private function renderPreventivaTicketCaseSource(array $ticket): string
+  private function renderPreventivaTicketCaseSource(array $ticket, array $contractRow = []): string
   {
     $descripcion = trim((string) ($ticket['descripcion'] ?? ''));
     $documentsHtml = $this->renderPendingTicketDocumentsSection($ticket['archivos'] ?? '', 'scm-sec-documentos');
     $contratoData = is_array($ticket['_scm_contrato_data'] ?? null) ? $ticket['_scm_contrato_data'] : [];
     $inmuebleData = is_array($ticket['_scm_inmueble_data'] ?? null) ? $ticket['_scm_inmueble_data'] : [];
+    if (empty($contratoData)) {
+      $contratoData = $this->preventivaContractFallbackData($ticket, $contractRow);
+    }
+    if (empty($inmuebleData)) {
+      $inmuebleData = $this->preventivaPropertyFallbackData($ticket, $contractRow);
+    }
     $historialItems = is_array($ticket['_scm_historial_items'] ?? null) ? $ticket['_scm_historial_items'] : [];
     $seguimientosItems = is_array($ticket['_scm_seguimientos_ticket'] ?? null) ? $ticket['_scm_seguimientos_ticket'] : [];
     $notasItems = is_array($ticket['_scm_notas_ticket'] ?? null) ? $ticket['_scm_notas_ticket'] : [];
@@ -774,7 +780,7 @@ final class PendingView
     if (empty($record)) {
       return $html . '<p class="scm-case-history-empty">Sin datos.</p></section>';
     }
-    $html .= '<article class="scm-case-history-item"><div class="scm-case-history-detail">';
+    $details = '';
     foreach ($record as $key => $value) {
       if (is_array($value) || strpos((string) $key, '_scm_') === 0) {
         continue;
@@ -783,9 +789,43 @@ final class PendingView
       if ($text === '') {
         continue;
       }
-      $html .= '<p><strong>' . esc_html($this->pendingLabel((string) $key)) . ':</strong> ' . esc_html($text) . '</p>';
+      $details .= '<p><strong>' . esc_html($this->pendingLabel((string) $key)) . ':</strong> ' . esc_html($text) . '</p>';
     }
-    return $html . '</div></article></section>';
+    if ($details === '') {
+      return $html . '<p class="scm-case-history-empty">Sin datos.</p></section>';
+    }
+    return $html . '<article class="scm-case-history-item"><div class="scm-case-history-detail">' . $details . '</div></article></section>';
+  }
+
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $contractRow */
+  private function preventivaContractFallbackData(array $ticket, array $contractRow): array
+  {
+    return array_filter([
+      'contrato' => $ticket['contrato'] ?? $contractRow['contrato'] ?? $contractRow['_ID'] ?? '',
+      'estado' => $contractRow['estado'] ?? '',
+      'id_inmueble' => $ticket['inmueble'] ?? $contractRow['inmueble'] ?? '',
+      'codigo_inmueble_web' => $ticket['id_inmueble'] ?? $contractRow['id_inmueble'] ?? '',
+      'direccion' => $ticket['direccion'] ?? $contractRow['direccion'] ?? '',
+      'barrio' => $ticket['barrio'] ?? $contractRow['barrio'] ?? '',
+      'propietario' => $ticket['propietario'] ?? $contractRow['propietario'] ?? '',
+      'arrendatario' => $ticket['arrendatario'] ?? $contractRow['arrendatario'] ?? '',
+      'inicio_contrato' => $this->fmt($this->ts($contractRow['inicio_contrato'] ?? null)),
+      'fin_contrato' => $this->fmt($this->ts($contractRow['fin_contrato'] ?? null)),
+      'fecha_entrega' => $this->fmt($this->ts($contractRow['fecha_entrega'] ?? null)),
+    ], static fn($value): bool => trim((string) $value) !== '');
+  }
+
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $contractRow */
+  private function preventivaPropertyFallbackData(array $ticket, array $contractRow): array
+  {
+    return array_filter([
+      'codigo' => $ticket['inmueble'] ?? $contractRow['inmueble'] ?? '',
+      'codigo_inmueble_web' => $ticket['id_inmueble'] ?? $contractRow['id_inmueble'] ?? '',
+      'direccion' => $ticket['direccion'] ?? $contractRow['direccion'] ?? '',
+      'barrio' => $ticket['barrio'] ?? $contractRow['barrio'] ?? '',
+      'propietario' => $ticket['propietario'] ?? $contractRow['propietario'] ?? '',
+      'arrendatario' => $ticket['arrendatario'] ?? $contractRow['arrendatario'] ?? '',
+    ], static fn($value): bool => trim((string) $value) !== '');
   }
 
   /** @param array<string,mixed> $item */
