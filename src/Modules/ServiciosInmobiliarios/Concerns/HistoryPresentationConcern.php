@@ -305,12 +305,53 @@ trait HistoryPresentationConcern
     }
 
     $html .= '<article class="scm-case-history-item"><div class="scm-case-history-detail">' . $details . '</div>';
-    $itemButtons = $this->buildHistoryItemButtons($record);
+    $baseButtons = $this->buildHistoryItemButtons($record);
+    $extraButtons = $this->singleRecordExtraButtons($title, $record);
+    $itemButtons = strtolower(trim($title)) === 'inmueble'
+      ? $this->mergeCaseActionButtons($extraButtons, $baseButtons)
+      : $this->mergeCaseActionButtons($baseButtons, $extraButtons);
     if (!empty($itemButtons)) {
       $html .= $this->renderCaseActionButtons($itemButtons);
     }
     $html .= '</article></section>';
     return $html;
+  }
+
+  /**
+   * @param array<string,mixed> $record
+   * @return array<int,array{url:string,label:string}>
+   */
+  private function singleRecordExtraButtons(string $title, array $record): array
+  {
+    $key = strtolower(trim($title));
+    $buttons = [];
+
+    if ($key === 'inmueble') {
+      $webId = $this->firstNonEmptyRecordValue($record, ['id_inmueble', 'codigo_inmueble_web', 'codigo']);
+      if ($webId !== '') {
+        $buttons[] = [
+          'url' => 'https://sucasainmobiliaria.com.co/inmueble/?id_inmueble=' . rawurlencode($webId),
+          'label' => 'Ver inmueble en web',
+        ];
+      }
+    }
+
+    return $buttons;
+  }
+
+  /**
+   * @param array<string,mixed> $record
+   * @param array<int,string> $keys
+   */
+  private function firstNonEmptyRecordValue(array $record, array $keys): string
+  {
+    foreach ($keys as $key) {
+      $value = trim((string) ($record[$key] ?? ''));
+      if ($value !== '' && $value !== '-' && $value !== '0') {
+        return $value;
+      }
+    }
+    return '';
   }
 
   /** @return array<string,string> */
@@ -333,6 +374,15 @@ trait HistoryPresentationConcern
         'aseguradora' => 'Aseguradora',
         'numero_solicitud' => 'Numero solicitud',
         'id_estudio_aseguradora' => 'Estudio aseguradora',
+        'id_contrato_mandato' => 'Contrato de mandato',
+        'id_revision_preventiva' => 'Revision preventiva',
+        'id_revision_entrega' => 'Revision de entrega',
+        'id_revision_recibo' => 'Revision de recibo',
+        'id_revision_sp' => 'Revision de servicios publicos',
+        'id_revision_servicios_publicos' => 'Revision de servicios publicos',
+        'id_cierre' => 'Hoja de cierre',
+        'id_hoja_cierre' => 'Hoja de cierre',
+        'registro_fotografico' => 'Registro fotografico',
       ];
     }
     if ($key === 'inmueble') {
@@ -358,6 +408,12 @@ trait HistoryPresentationConcern
         'copropiedad' => 'Copropiedad',
         'matricula_inmobiliaria' => 'Matricula inmobiliaria',
         'id_estudio_aseguradora' => 'Estudio aseguradora',
+        'codigo_inmueble_web' => 'Codigo inmueble web',
+        'id_contrato_mandato' => 'Contrato de mandato',
+        'id_hoja_cierre' => 'Hoja de cierre',
+        'id_contrato_arrendamiento' => 'Contrato de arrendamiento',
+        'ubicacion_google_maps' => 'Google Maps',
+        'ubicacion_openstreetmap' => 'OpenStreetMap',
       ];
     }
     return [];
@@ -487,6 +543,34 @@ trait HistoryPresentationConcern
     }
     $html .= '</div>';
     return $html;
+  }
+
+  /**
+   * @param array<int,array<string,mixed>> $primary
+   * @param array<int,array<string,mixed>> $extra
+   * @return array<int,array{url:string,label:string}>
+   */
+  private function mergeCaseActionButtons(array $primary, array $extra): array
+  {
+    $out = [];
+    $seenUrls = [];
+    $seenPairs = [];
+    foreach (array_merge($primary, $extra) as $button) {
+      $url = trim((string) ($button['url'] ?? ''));
+      $label = trim((string) ($button['label'] ?? ''));
+      if ($url === '' || $label === '') {
+        continue;
+      }
+      $urlKey = strtolower($url);
+      $pairKey = strtolower($label . '|' . $url);
+      if (isset($seenUrls[$urlKey]) || isset($seenPairs[$pairKey])) {
+        continue;
+      }
+      $seenUrls[$urlKey] = true;
+      $seenPairs[$pairKey] = true;
+      $out[] = ['url' => esc_url_raw($url), 'label' => $label];
+    }
+    return $out;
   }
 
   /**

@@ -65,6 +65,15 @@ trait GenericPresentationConcern
         'aseguradora' => 'Aseguradora',
         'numero_solicitud' => 'Numero solicitud',
         'id_estudio_aseguradora' => 'Estudio aseguradora',
+        'id_contrato_mandato' => 'Contrato de mandato',
+        'id_revision_preventiva' => 'Revision preventiva',
+        'id_revision_entrega' => 'Revision de entrega',
+        'id_revision_recibo' => 'Revision de recibo',
+        'id_revision_sp' => 'Revision de servicios publicos',
+        'id_revision_servicios_publicos' => 'Revision de servicios publicos',
+        'id_cierre' => 'Hoja de cierre',
+        'id_hoja_cierre' => 'Hoja de cierre',
+        'registro_fotografico' => 'Registro fotografico',
       ];
     }
     if ($key === 'inmueble') {
@@ -90,6 +99,12 @@ trait GenericPresentationConcern
         'copropiedad' => 'Copropiedad',
         'matricula_inmobiliaria' => 'Matricula inmobiliaria',
         'id_estudio_aseguradora' => 'Estudio aseguradora',
+        'codigo_inmueble_web' => 'Codigo inmueble web',
+        'id_contrato_mandato' => 'Contrato de mandato',
+        'id_hoja_cierre' => 'Hoja de cierre',
+        'id_contrato_arrendamiento' => 'Contrato de arrendamiento',
+        'ubicacion_google_maps' => 'Google Maps',
+        'ubicacion_openstreetmap' => 'OpenStreetMap',
       ];
     }
     return [];
