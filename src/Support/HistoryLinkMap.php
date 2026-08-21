@@ -31,7 +31,7 @@ final class HistoryLinkMap
       'id_revision_servicios_publicos' => ['label' => 'Ver revision de servicios publicos', 'base' => 'https://sucasainmobiliaria.com.co/revision-de-servicios-publicos/?numero='],
 
       // Inmueble / inventario
-      'id_inmueble' => ['label' => 'Ver inmueble', 'base' => 'https://sucasainmobiliaria.com.co/inmueble/?id_inmueble='],
+      'id_inmueble' => ['label' => 'Ver inmueble en web', 'base' => 'https://sucasainmobiliaria.com.co/inmuebles/inmueble/'],
       'id_inventario' => ['label' => 'Ver inventario inmueble', 'base' => 'https://sucasainmobiliaria.com.co/inventario-inmueble/?numero='],
 
       // Cotizaciones

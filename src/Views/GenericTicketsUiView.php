@@ -408,6 +408,9 @@ final class GenericTicketsUiView
     }
     $html .= '<article class="scm-case-history-item"><div class="scm-case-history-detail">' . $details . '</div>';
     $baseButtons = (array) call_user_func($this->buildHistoryItemButtons, $record);
+    if (in_array(strtolower(trim($title)), ['contrato', 'inmueble'], true)) {
+      $baseButtons = $this->withoutInmuebleWebButtons($baseButtons);
+    }
     $extraButtons = $this->singleRecordExtraButtons($title, $record);
     $itemButtons = strtolower(trim($title)) === 'inmueble'
       ? $this->mergeCaseActionButtons($extraButtons, $baseButtons)
@@ -427,11 +430,11 @@ final class GenericTicketsUiView
     $key = strtolower(trim($title));
     $buttons = [];
 
-    if ($key === 'inmueble') {
-      $webId = $this->firstNonEmptyRecordValue($record, ['id_inmueble', 'codigo_inmueble_web', 'codigo']);
+    if (in_array($key, ['contrato', 'inmueble'], true)) {
+      $webId = $this->firstNonEmptyRecordValue($record, ['codigo_inmueble_web', 'codigo', 'id_inmueble']);
       if ($webId !== '') {
         $buttons[] = [
-          'url' => 'https://sucasainmobiliaria.com.co/inmueble/?id_inmueble=' . rawurlencode($webId),
+          'url' => 'https://sucasainmobiliaria.com.co/inmuebles/inmueble/' . rawurlencode($webId),
           'label' => 'Ver inmueble en web',
         ];
       }
@@ -453,6 +456,23 @@ final class GenericTicketsUiView
       }
     }
     return '';
+  }
+
+  /**
+   * @param array<int,array<string,mixed>> $buttons
+   * @return array<int,array<string,mixed>>
+   */
+  private function withoutInmuebleWebButtons(array $buttons): array
+  {
+    return array_values(array_filter($buttons, static function ($button): bool {
+      $label = strtolower(trim((string) ($button['label'] ?? '')));
+      $url = strtolower(trim((string) ($button['url'] ?? '')));
+      if (in_array($label, ['ver inmueble', 'ver inmueble en web'], true)) {
+        return false;
+      }
+      return strpos($url, 'sucasainmobiliaria.com.co/inmueble/') === false
+        && strpos($url, 'sucasainmobiliaria.com.co/inmuebles/inmueble/') === false;
+    }));
   }
 
   /**

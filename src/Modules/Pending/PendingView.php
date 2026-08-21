@@ -975,6 +975,9 @@ final class PendingView
   {
     $buttons = [];
     foreach (\SCM\Support\HistoryLinkMap::idButtons() as $field => $meta) {
+      if (in_array($context, ['Contrato', 'Inmueble', 'Historial del inmueble'], true) && $field === 'id_inmueble') {
+        continue;
+      }
       if (!array_key_exists($field, $item)) {
         continue;
       }
@@ -992,10 +995,6 @@ final class PendingView
         }
 
         $label = (string) ($meta['label'] ?? 'Ver detalle');
-        if ($context === 'Inmueble' && $field === 'id_inmueble') {
-          $label = 'Ver inmueble en web';
-        }
-
         $url = (string) ($meta['base'] ?? '') . rawurlencode($value);
         if ($field === 'id_estudio_aseguradora') {
           $ticketId = trim((string) ($item['id_ticket'] ?? $item['ticket'] ?? ''));
@@ -1041,11 +1040,11 @@ final class PendingView
       }
     }
 
-    if ($context === 'Inmueble') {
-      $webId = trim((string) ($item['id_inmueble'] ?? $item['codigo_inmueble_web'] ?? $item['codigo'] ?? ''));
+    if (in_array($context, ['Contrato', 'Inmueble'], true)) {
+      $webId = trim((string) ($item['codigo_inmueble_web'] ?? $item['codigo'] ?? $item['id_inmueble'] ?? ''));
       if ($webId !== '' && $webId !== '-' && $webId !== '0') {
         $buttons[] = [
-          'url' => 'https://sucasainmobiliaria.com.co/inmueble/?id_inmueble=' . rawurlencode($webId),
+          'url' => 'https://sucasainmobiliaria.com.co/inmuebles/inmueble/' . rawurlencode($webId),
           'label' => 'Ver inmueble en web',
         ];
       }
