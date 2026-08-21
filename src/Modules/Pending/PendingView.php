@@ -1058,7 +1058,11 @@ final class PendingView
     $html = '<div class="scm-case-actions">';
     foreach ($docs as $doc) {
       $label = trim((string) ($doc['nombre_archivo'] ?? '')) ?: 'Ver documento';
-      $html .= '<a class="scm-case-action-btn" href="' . esc_url((string) $doc['archivo']) . '" target="_blank" rel="noopener noreferrer">' . esc_html($label) . '</a>';
+      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+      if ($url === '') {
+        continue;
+      }
+      $html .= '<a class="scm-case-action-btn" href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($label) . '</a>';
     }
     return $html . '</div>';
   }
@@ -1076,7 +1080,7 @@ final class PendingView
     }
     $out = [];
     foreach ($decoded as $item) {
-      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['archivo'] ?? '')) : trim((string) $item);
+      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
         $out[] = $url;
       }
@@ -1096,7 +1100,7 @@ final class PendingView
     $html .= '<div class="scm-case-document-grid">';
     foreach ($docs as $doc) {
       $label = trim((string) ($doc['nombre_archivo'] ?? ''));
-      $url = trim((string) ($doc['archivo'] ?? ''));
+      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
       if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
         continue;
       }
@@ -1109,7 +1113,7 @@ final class PendingView
     return $html;
   }
 
-  /** @return array<int,array{nombre_archivo:string,archivo:string}> */
+  /** @return array<int,array{nombre_archivo:string,archivo:string,media_archivo:string}> */
   private function extractPendingTicketDocuments($raw): array
   {
     if (is_array($raw)) {
@@ -1132,14 +1136,14 @@ final class PendingView
       $url = '';
       if (is_array($doc)) {
         $label = trim((string) ($doc['nombre_archivo'] ?? $doc['title'] ?? $doc['label'] ?? ''));
-        $url = trim((string) ($doc['archivo'] ?? $doc['url'] ?? ''));
+        $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? $doc['url'] ?? ''));
       } else {
         $url = trim((string) $doc);
       }
       if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
         continue;
       }
-      $out[] = ['nombre_archivo' => $label, 'archivo' => $url];
+      $out[] = ['nombre_archivo' => $label, 'media_archivo' => $url, 'archivo' => $url];
     }
     return $out;
   }

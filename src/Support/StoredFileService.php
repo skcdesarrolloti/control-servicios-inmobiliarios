@@ -45,7 +45,7 @@ final class StoredFileService
     return $stored;
   }
 
-  /** @param string[] $titles @return array<int,array{nombre_archivo:string,archivo:string}> */
+  /** @param string[] $titles @return array<int,array{nombre_archivo:string,archivo:string,media_archivo:string}> */
   public function storeDocuments(string $fieldName, array $titles = [], int $maximumFiles = 10): array
   {
     $stored = [];
@@ -57,9 +57,11 @@ final class StoredFileService
       if ($name === '') {
         continue;
       }
+      $url = $this->urlFor($name);
       $stored[] = [
         'nombre_archivo' => trim(strip_tags(stripslashes((string) ($titles[$index] ?? '')))),
-        'archivo' => $this->urlFor($name),
+        'media_archivo' => $url,
+        'archivo' => $url,
       ];
     }
     return $stored;

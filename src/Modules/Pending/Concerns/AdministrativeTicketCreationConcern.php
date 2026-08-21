@@ -263,7 +263,7 @@ trait AdministrativeTicketCreationConcern
 
   /**
    * @param array<string,mixed> $ticketPayload
-   * @param array<int,array{nombre_archivo:string,archivo:string}> $documentos
+   * @param array<int,array{nombre_archivo:string,archivo:string,media_archivo?:string}> $documentos
    * @param array<string,array<string,string>> $generatedPdfs
    */
   private function applyGeneratedPdfsToPayload(array &$ticketPayload, array &$documentos, array $generatedPdfs): void
@@ -285,6 +285,7 @@ trait AdministrativeTicketCreationConcern
       }
       $documentos[] = [
         'nombre_archivo' => (string) ($pdf['title'] ?? $key),
+        'media_archivo' => $url,
         'archivo' => $url,
       ];
     }

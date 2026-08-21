@@ -195,7 +195,7 @@ trait PersistenceAndContactsConcern
       $payload['imagen'] = serialize($imagenes);
     }
     $documentos = array_values(array_filter($documentos, static function ($doc): bool {
-      return is_array($doc) && trim((string) ($doc['archivo'] ?? '')) !== '';
+      return is_array($doc) && trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? '')) !== '';
     }));
     if (!empty($documentos)) {
       $payload['archivos'] = serialize($documentos);

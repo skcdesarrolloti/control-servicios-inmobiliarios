@@ -151,7 +151,7 @@ trait HistoryPresentationConcern
     $html = '<div class="scm-case-history-docs">';
     foreach ($docs as $doc) {
       $label = trim((string) ($doc['nombre_archivo'] ?? ''));
-      $url = $this->normalizeHistoryAttachmentUrl(trim((string) ($doc['archivo'] ?? '')));
+      $url = $this->normalizeHistoryAttachmentUrl(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? '')));
       if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
         continue;
       }
@@ -186,7 +186,7 @@ trait HistoryPresentationConcern
 
     $out = [];
     foreach ($items as $item) {
-      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['archivo'] ?? '')) : trim((string) $item);
+      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
         $out[] = $this->normalizeHistoryAttachmentUrl($url);
       }
@@ -225,7 +225,7 @@ trait HistoryPresentationConcern
   }
 
   /**
-   * @return array<int,array{nombre_archivo:string,archivo:string}>
+   * @return array<int,array{nombre_archivo:string,archivo:string,media_archivo:string}>
    */
   private function extractHistoryDocuments($raw): array
   {
@@ -236,7 +236,7 @@ trait HistoryPresentationConcern
     $decoded = preg_match('/^[aObis]:/', $value) ? @unserialize($value, ['allowed_classes' => false]) : null;
     if (!is_array($decoded)) {
       $url = $this->normalizeHistoryAttachmentUrl($value);
-      return filter_var($url, FILTER_VALIDATE_URL) ? [['nombre_archivo' => '', 'archivo' => $url]] : [];
+      return filter_var($url, FILTER_VALIDATE_URL) ? [['nombre_archivo' => '', 'media_archivo' => $url, 'archivo' => $url]] : [];
     }
 
     $out = [];
@@ -244,12 +244,13 @@ trait HistoryPresentationConcern
       if (!is_array($doc)) {
         continue;
       }
-      $url = $this->normalizeHistoryAttachmentUrl(trim((string) ($doc['archivo'] ?? '')));
+      $url = $this->normalizeHistoryAttachmentUrl(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? '')));
       if ($url === '') {
         continue;
       }
       $out[] = [
         'nombre_archivo' => trim((string) ($doc['nombre_archivo'] ?? '')),
+        'media_archivo' => $url,
         'archivo' => $url,
       ];
     }

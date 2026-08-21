@@ -48,7 +48,7 @@ trait WorkflowCommandsConcern
     $evidencias = array_values(array_filter($evidencias, static fn(string $url): bool => $url !== ''));
     $evidenciaUrl = (string) ($evidencias[0] ?? '');
     $documentos = array_values(array_filter($documentos, static function ($doc): bool {
-      return is_array($doc) && trim((string) ($doc['archivo'] ?? '')) !== '';
+      return is_array($doc) && trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? '')) !== '';
     }));
 
     $currentSeg = isset($ticket['seguimientos']) ? (int) $ticket['seguimientos'] : 0;
@@ -163,7 +163,7 @@ trait WorkflowCommandsConcern
     $imagenes = is_array($imagenes) ? array_values(array_filter(array_map('strval', $imagenes))) : [trim((string) $imagenes)];
     $imagenes = array_values(array_filter($imagenes, static fn(string $url): bool => $url !== ''));
     $documentos = array_values(array_filter($documentos, static function ($doc): bool {
-      return is_array($doc) && trim((string) ($doc['archivo'] ?? '')) !== '';
+      return is_array($doc) && trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? '')) !== '';
     }));
 
     $histPayload = [
@@ -262,7 +262,7 @@ trait WorkflowCommandsConcern
     $evidencias = array_values(array_filter($evidencias, static fn(string $url): bool => $url !== ''));
     $evidenciaUrl = (string) ($evidencias[0] ?? '');
     $documentos = array_values(array_filter($documentos, static function ($doc): bool {
-      return is_array($doc) && trim((string) ($doc['archivo'] ?? '')) !== '';
+      return is_array($doc) && trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? '')) !== '';
     }));
 
     $histSaved = $this->insertHistorial(

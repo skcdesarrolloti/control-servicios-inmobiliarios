@@ -168,7 +168,7 @@ final class PendingController
   /**
    * @param array<string,string> $input
    * @param array<int,string> $imagenes
-   * @param array<int,array{nombre_archivo:string,archivo:string}> $documentos
+   * @param array<int,array{nombre_archivo:string,archivo:string,media_archivo?:string}> $documentos
    * @param array<int,string> $notifyRecipients
    * @return array<string,mixed>
    */
