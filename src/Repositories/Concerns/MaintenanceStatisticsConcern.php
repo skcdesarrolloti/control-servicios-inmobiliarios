@@ -243,7 +243,51 @@ trait MaintenanceStatisticsConcern
       $args[] = $term;
       $args[] = $term;
     }
-    $this->buildLikeCondition($where, $args, "COALESCE(t.contrato, '')", (string) ($filters['fContrato'] ?? ''));
+    if (($filters['fCaso'] ?? '') !== '') {
+      $term = '%' . $this->db->escapeLike(trim((string) $filters['fCaso'])) . '%';
+      $caseParts = [];
+      $caseParts[] = "CAST(t._ID AS CHAR) LIKE ?";
+      $args[] = $term;
+      if ($this->schema->columnExists($table, 'id_ticket')) {
+        $caseParts[] = "CAST(t.id_ticket AS CHAR) LIKE ?";
+        $args[] = $term;
+      }
+      $where[] = '(' . implode(' OR ', $caseParts) . ')';
+    }
+    if (($filters['fContrato'] ?? '') !== '') {
+      $term = '%' . $this->db->escapeLike(trim((string) $filters['fContrato'])) . '%';
+      $contractParts = [];
+      foreach (['contrato', 'id_contrato', 'numero_contrato', 'id_contrato_arrendamiento'] as $contractCol) {
+        if ($this->schema->columnExists($table, $contractCol)) {
+          $contractParts[] = "CAST(t.`{$contractCol}` AS CHAR) LIKE ?";
+          $args[] = $term;
+        }
+      }
+      $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
+      if ($this->schema->tableExists($contractTable) && $this->schema->columnExists($contractTable, '_ID')) {
+        $outerJoinParts = [];
+        foreach (['contrato', 'id_contrato', 'numero_contrato', 'id_contrato_arrendamiento'] as $contractCol) {
+          if ($this->schema->columnExists($table, $contractCol)) {
+            $outerJoinParts[] = "TRIM(COALESCE(t.`{$contractCol}`, '')) = CAST(ca_filter.`_ID` AS CHAR)";
+            if ($this->schema->columnExists($contractTable, 'contrato')) {
+              $outerJoinParts[] = "TRIM(COALESCE(t.`{$contractCol}`, '')) = TRIM(COALESCE(ca_filter.`contrato`, ''))";
+            }
+          }
+        }
+        if (!empty($outerJoinParts)) {
+          $contractMatchParts = ["CAST(ca_filter.`_ID` AS CHAR) LIKE ?"];
+          $args[] = $term;
+          if ($this->schema->columnExists($contractTable, 'contrato')) {
+            $contractMatchParts[] = "COALESCE(ca_filter.`contrato`, '') LIKE ?";
+            $args[] = $term;
+          }
+          $contractParts[] = "EXISTS (SELECT 1 FROM `{$contractTable}` ca_filter WHERE (" . implode(' OR ', $outerJoinParts) . ') AND (' . implode(' OR ', $contractMatchParts) . '))';
+        }
+      }
+      if (!empty($contractParts)) {
+        $where[] = '(' . implode(' OR ', $contractParts) . ')';
+      }
+    }
     if (($filters['fEmpleado'] ?? '') !== '') {
       if (!empty($filters['_scmEmpleadoExact'])) {
         $where[] = "TRIM(COALESCE(t.id_empleado, '')) = ?";

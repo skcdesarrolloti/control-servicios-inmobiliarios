@@ -197,7 +197,7 @@ final class PendingRepository
     }
 
     $likeFilters = [
-      'contrato' => ['contrato'],
+      'contrato' => ['contrato', '_ID'],
       'inmueble' => ['inmueble', 'id_inmueble'],
       'direccion' => ['direccion'],
       'propietario' => ['propietario', 'id_propietario'],
@@ -211,7 +211,7 @@ final class PendingRepository
       $parts = [];
       foreach ($columns as $column) {
         if ($this->schema()->columnExists($table, $column)) {
-          $parts[] = "COALESCE(`{$column}`, '') LIKE ?";
+          $parts[] = $column === '_ID' ? "CAST(`_ID` AS CHAR) LIKE ?" : "COALESCE(`{$column}`, '') LIKE ?";
           $args[] = '%' . $this->db->escapeLike($value) . '%';
         }
       }
@@ -296,8 +296,22 @@ final class PendingRepository
       if ($v === '') {
         continue;
       }
-      $where[] = "COALESCE({$k},'') LIKE ?";
-      $args[] = '%' . $this->db->escapeLike($v) . '%';
+      $term = '%' . $this->db->escapeLike($v) . '%';
+      if ($k === 'contrato') {
+        $parts = [];
+        foreach (['contrato', '_ID'] as $column) {
+          if ($this->schema()->columnExists($table, $column)) {
+            $parts[] = $column === '_ID' ? "CAST(`_ID` AS CHAR) LIKE ?" : "COALESCE(`{$column}`,'') LIKE ?";
+            $args[] = $term;
+          }
+        }
+        if (!empty($parts)) {
+          $where[] = '(' . implode(' OR ', $parts) . ')';
+        }
+        continue;
+      }
+      $where[] = "COALESCE(`{$k}`,'') LIKE ?";
+      $args[] = $term;
     }
 
     $columns = [
@@ -787,8 +801,20 @@ final class PendingRepository
       if ($value === '') {
         continue;
       }
-      $where[] = "COALESCE({$key}, '') LIKE ?";
-      $args[] = '%' . $this->db->escapeLike($value) . '%';
+      $term = '%' . $this->db->escapeLike($value) . '%';
+      $parts = [];
+      $columns = $key === 'contrato' ? ['contrato', 'id_contrato'] : [$key];
+      foreach ($columns as $column) {
+        if ($this->schema()->columnExists($table, $column)) {
+          $parts[] = in_array($column, ['id_ticket', 'id_contrato'], true)
+            ? "CAST(`{$column}` AS CHAR) LIKE ?"
+            : "COALESCE(`{$column}`, '') LIKE ?";
+          $args[] = $term;
+        }
+      }
+      if (!empty($parts)) {
+        $where[] = '(' . implode(' OR ', $parts) . ')';
+      }
     }
 
     $sql = "SELECT * FROM `{$table}` WHERE " . implode(' AND ', $where) . " ORDER BY fecha DESC, _ID DESC";

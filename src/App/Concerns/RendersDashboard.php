@@ -521,6 +521,7 @@ trait RendersDashboard
                 </select></div>
               <div class="scm-field"><label for="scm_inmueble">Inmueble SIMI</label><input id="scm_inmueble" name="scm_inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params['fInmueble'] ?? '')); ?>"></div>
               <div class="scm-field"><label for="scm_contrato">Contrato</label><input id="scm_contrato" name="scm_contrato" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fContrato"] ?? "")); ?>"></div>
+              <div class="scm-field"><label for="scm_caso"># caso</label><input id="scm_caso" name="scm_caso" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fCaso"] ?? "")); ?>" placeholder="Ej: 10368"></div>
               <div class="scm-field"><label for="scm_asunto">Asunto</label><input id="scm_asunto" name="scm_asunto" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fAsunto"] ?? "")); ?>"></div>
               <div class="scm-field"><label for="scm_arrendatario">Arrendatario</label><input id="scm_arrendatario" name="scm_arrendatario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fArrendatario"] ?? "")); ?>"></div>
               <div class="scm-field"><label for="scm_propietario">Propietario</label><input id="scm_propietario" name="scm_propietario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fPropietario"] ?? "")); ?>"></div>
@@ -1120,7 +1121,7 @@ trait RendersDashboard
       'fPage' => (string) $page,
       'fPerPage' => (string) $perPage,
       'fCotizacion' => $clean($input[$prefix . 'cotizacion'] ?? ''),
-      'fTicket' => $clean($input[$prefix . 'ticket'] ?? ''),
+      'fTicket' => $clean($input[$prefix . 'caso'] ?? $input[$prefix . 'ticket'] ?? $input[$prefix . 'id_ticket'] ?? ''),
       'fFecha' => $singleDate,
       'fFechaDesde' => $dateFrom,
       'fFechaHasta' => $dateTo,
@@ -1154,7 +1155,10 @@ trait RendersDashboard
       $args[] = '%' . $this->db->escapeLike($value) . '%';
     };
 
-    $like('_ID', (string) ($p['fCotizacion'] ?? ''));
+    if (($p['fCotizacion'] ?? '') !== '') {
+      $where[] = 'CAST(c.`_ID` AS CHAR) LIKE ?';
+      $args[] = '%' . $this->db->escapeLike((string) $p['fCotizacion']) . '%';
+    }
     $like('id_ticket', (string) ($p['fTicket'] ?? ''));
     $like('destinatario', (string) ($p['fDestinatario'] ?? ''));
     $like('id_empleado', (string) ($p['fFuncionario'] ?? ''));
@@ -1824,7 +1828,7 @@ trait RendersDashboard
         <input type="hidden" id="scmqt_page" name="scmqt_page" value="<?php echo esc_attr((string) ($p['fPage'] ?? '1')); ?>">
         <div class="scm-grid">
           <div class="scm-field"><label for="scmqt_cotizacion">Cotizaci&oacute;n</label><input id="scmqt_cotizacion" name="scmqt_cotizacion" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fCotizacion'] ?? '')); ?>" placeholder="Ej: 528"></div>
-          <div class="scm-field"><label for="scmqt_ticket">Ticket</label><input id="scmqt_ticket" name="scmqt_ticket" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fTicket'] ?? '')); ?>" placeholder="Ej: 10055"></div>
+          <div class="scm-field"><label for="scmqt_ticket"># caso</label><input id="scmqt_ticket" name="scmqt_ticket" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fTicket'] ?? '')); ?>" placeholder="Ej: 10055"></div>
           <div class="scm-field scm-date-range-field"><label id="scmqt_fecha_rango_label">Fecha</label><div class="scm-date-range-control" role="group" aria-labelledby="scmqt_fecha_rango_label"><div class="scm-date-range-part"><span>Desde</span><input id="scmqt_fecha_desde" name="scmqt_fecha_desde" type="date" value="<?php echo esc_attr((string) ($p['fFechaDesde'] ?? '')); ?>" aria-label="Fecha desde"></div><span class="scm-date-range-separator" aria-hidden="true">&rarr;</span><div class="scm-date-range-part"><span>Hasta</span><input id="scmqt_fecha_hasta" name="scmqt_fecha_hasta" type="date" value="<?php echo esc_attr((string) ($p['fFechaHasta'] ?? '')); ?>" aria-label="Fecha hasta"></div></div></div>
           <div class="scm-field"><label for="scmqt_destinatario">Destinatario</label><input id="scmqt_destinatario" name="scmqt_destinatario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fDestinatario'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="scmqt_funcionario">Funcionario</label><input id="scmqt_funcionario" name="scmqt_funcionario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fFuncionario'] ?? '')); ?>" placeholder="ID empleado"></div>

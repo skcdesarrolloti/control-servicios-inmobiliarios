@@ -25,6 +25,7 @@ final class PendingController
       'propietario' => $clean($input[$prefix . 'propietario'] ?? ''),
       'arrendatario' => $clean($input[$prefix . 'arrendatario'] ?? ''),
       'contrato' => $clean($input[$prefix . 'contrato'] ?? ''),
+      'id_ticket' => $clean($input[$prefix . 'caso'] ?? $input[$prefix . 'ticket'] ?? $input[$prefix . 'id_ticket'] ?? ''),
     ];
   }
 

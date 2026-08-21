@@ -120,6 +120,24 @@ trait PendingQueriesConcern
     }
     unset($item);
 
+    $fCaso = trim((string) ($filters['id_ticket'] ?? ''));
+    if ($fCaso !== '') {
+      $items = array_values(array_filter($items, static function (array $item) use ($fCaso): bool {
+        $ticket = is_array($item['ticket'] ?? null) ? $item['ticket'] : [];
+        $haystack = [
+          (string) ($ticket['ticket_id'] ?? ''),
+          (string) ($ticket['_ID'] ?? ''),
+          (string) ($ticket['id_ticket'] ?? ''),
+        ];
+        foreach ($haystack as $value) {
+          if ($value !== '' && stripos($value, $fCaso) !== false) {
+            return true;
+          }
+        }
+        return false;
+      }));
+    }
+
     $months = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     $corte = (string) $year . ($fMes > 0 ? (' — ' . ($months[$fMes] ?? (string) $fMes)) : '');
 

@@ -28,7 +28,7 @@ final class PendingView
       <div class="scm-filter-card">
         <h3>Filtros</h3>
         <form method="post" autocomplete="off" id="spp_form">
-          <div class="scm-grid" style="grid-template-columns:repeat(5,minmax(0,1fr));">
+          <div class="scm-grid" style="grid-template-columns:repeat(6,minmax(0,1fr));">
             <div class="scm-field">
               <label for="spp_mes">Mes</label>
               <select id="spp_mes" name="spp_mes">
@@ -53,6 +53,10 @@ final class PendingView
             <div class="scm-field">
               <label for="spp_contrato">Contrato</label>
               <input id="spp_contrato" name="spp_contrato" type="text" value="<?php echo esc_attr((string) ($filters['contrato'] ?? '')); ?>" placeholder="Codigo">
+            </div>
+            <div class="scm-field">
+              <label for="spp_caso"># caso</label>
+              <input id="spp_caso" name="spp_caso" type="text" value="<?php echo esc_attr((string) ($filters['id_ticket'] ?? '')); ?>" placeholder="Ej: 10368">
             </div>
           </div>
           <div class="scm-actions">
@@ -211,7 +215,7 @@ final class PendingView
               <input id="sra_categoria" name="sra_categoria" type="text" value="<?php echo esc_attr((string) ($filters['categoria'] ?? '')); ?>" placeholder="Categoria">
             </div>
             <div class="scm-field">
-              <label for="sra_ticket">Ticket</label>
+              <label for="sra_ticket"># caso</label>
               <input id="sra_ticket" name="sra_ticket" type="text" value="<?php echo esc_attr((string) ($filters['id_ticket'] ?? '')); ?>" placeholder="ID ticket">
             </div>
             <div class="scm-field">
