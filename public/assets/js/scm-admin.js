@@ -730,7 +730,22 @@
     var clone = source.cloneNode(true);
     clone.removeAttribute("id");
     clone.style.display = "";
+    var cloneSuffix = String(Date.now()) + "-" + String(Math.floor(Math.random() * 10000));
+    clone.querySelectorAll(".scm-case-history-list[id]").forEach(function (list, index) {
+      var oldId = list.getAttribute("id") || "";
+      if (!oldId) {
+        return;
+      }
+      var newId = oldId + "-clone-" + cloneSuffix + "-" + String(index);
+      list.setAttribute("id", newId);
+      clone.querySelectorAll('[data-target="' + oldId + '"]').forEach(function (pager) {
+        pager.setAttribute("data-target", newId);
+      });
+    });
     clone.querySelectorAll("[id]").forEach(function (el) {
+      if (el.classList && el.classList.contains("scm-case-history-list")) {
+        return;
+      }
       el.removeAttribute("id");
     });
 

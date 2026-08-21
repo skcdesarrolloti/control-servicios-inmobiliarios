@@ -566,14 +566,6 @@ final class PendingRepository
         $row['_scm_historial_inmueble'] = array_merge($row['_scm_historial_inmueble'], $histByProperty[$propertyId]);
       }
 
-      $created = trim((string) ($row['cct_created'] ?? $row['fecha'] ?? ''));
-      $row['_scm_historial_items'][] = [
-        'nombre' => trim((string) ($row['nombre_empleado'] ?? $row['empleado'] ?? $row['id_empleado'] ?? 'Sistema')),
-        'fecha' => $created,
-        'observacion' => 'Ticket preventivo creado.',
-        'tipo_reporte' => 'Creaci&oacute;n',
-      ];
-
       $row['_scm_seguimientos_ticket'] = $this->sortPendingRowsByDate($this->uniquePendingRows($row['_scm_seguimientos_ticket']));
       $row['_scm_notas_ticket'] = $this->sortPendingRowsByDate($this->uniquePendingRows($row['_scm_notas_ticket']));
       $row['_scm_historial_items'] = $this->sortPendingRowsByDate($this->uniquePendingRows($row['_scm_historial_items']));

@@ -765,9 +765,9 @@ final class PendingView
       $html .= '<div class="scm-case-record-head"><div class="scm-case-record-title"><span class="scm-case-record-user-icon" aria-hidden="true"></span><strong>' . esc_html($this->pendingRecordAuthor($item)) . '</strong></div></div>';
       $html .= '<div class="scm-case-history-detail scm-case-record-detail">';
       if ($type !== '') {
-        $html .= '<strong>' . esc_html($type) . ':</strong> ';
+        $html .= '<strong>' . esc_html($this->pendingDecodedText($type)) . ':</strong> ';
       }
-      $html .= wp_kses_post(nl2br(esc_html($detail))) . '</div>';
+      $html .= $this->pendingDetailContentHtml($detail) . '</div>';
       foreach ($visibleFields as $field => $label) {
         $value = trim((string) ($item[$field] ?? ''));
         if ($value === '') {
@@ -775,6 +775,7 @@ final class PendingView
         }
         $html .= '<div class="scm-case-history-detail"><p><strong>' . esc_html($label) . ':</strong> ' . esc_html($value) . '</p></div>';
       }
+      $html .= $this->renderPendingCaseActionButtons($this->pendingHistoryItemButtons($item, $title));
       $html .= $this->renderPendingHistoryImages($item['evidencia'] ?? $item['imagen'] ?? '');
       $html .= $this->renderPendingHistoryDocuments($item['archivos'] ?? '');
       $html .= '<div class="scm-case-record-date"><span class="scm-case-record-date-icon" aria-hidden="true"></span><strong>' . esc_html($this->pendingRecordDate($item)) . '</strong></div>';
@@ -818,7 +819,8 @@ final class PendingView
     if ($details === '') {
       return $html . '<p class="scm-case-history-empty">Sin datos.</p></section>';
     }
-    return $html . '<article class="scm-case-history-item"><div class="scm-case-history-detail">' . $details . '</div></article></section>';
+    $buttons = $this->renderPendingCaseActionButtons($this->pendingHistoryItemButtons($record, $title));
+    return $html . '<article class="scm-case-history-item"><div class="scm-case-history-detail">' . $details . '</div>' . $buttons . '</article></section>';
   }
 
   /** @param array<string,mixed> $record @return array<string,string> */
@@ -889,7 +891,95 @@ final class PendingView
     if (filter_var($text, FILTER_VALIDATE_URL)) {
       return '<a class="scm-case-action-btn" href="' . esc_url($text) . '" target="_blank" rel="noopener noreferrer">Abrir enlace</a>';
     }
-    return esc_html($text);
+    return esc_html($this->pendingDecodedText($text));
+  }
+
+  private function pendingDetailContentHtml(string $text): string
+  {
+    $decoded = $this->pendingDecodedText($text);
+    return wp_kses_post(nl2br(esc_html($decoded)));
+  }
+
+  private function pendingDecodedText(string $text): string
+  {
+    return html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+  }
+
+  /** @param array<int,array{url:string,label:string}> $buttons */
+  private function renderPendingCaseActionButtons(array $buttons): string
+  {
+    if (empty($buttons)) {
+      return '';
+    }
+
+    $html = '<div class="scm-case-actions">';
+    $seen = [];
+    foreach ($buttons as $button) {
+      $url = trim((string) ($button['url'] ?? ''));
+      $label = trim((string) ($button['label'] ?? ''));
+      if ($url === '' || $label === '') {
+        continue;
+      }
+      $key = strtolower($label . '|' . $url);
+      if (isset($seen[$key])) {
+        continue;
+      }
+      $seen[$key] = true;
+      $html .= '<a class="scm-case-action-btn" href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($label) . '</a>';
+    }
+
+    return $html . '</div>';
+  }
+
+  /** @param array<string,mixed> $item @return array<int,array{url:string,label:string}> */
+  private function pendingHistoryItemButtons(array $item, string $context = ''): array
+  {
+    $buttons = [];
+    foreach (\SCM\Support\HistoryLinkMap::idButtons() as $field => $meta) {
+      if (!array_key_exists($field, $item)) {
+        continue;
+      }
+
+      $raw = trim((string) ($item[$field] ?? ''));
+      if ($raw === '' || $raw === '-' || $raw === '0') {
+        continue;
+      }
+
+      $values = preg_split('/[\s,;|]+/', $raw) ?: [];
+      foreach ($values as $value) {
+        $value = trim((string) $value);
+        if ($value === '' || $value === '-' || $value === '0') {
+          continue;
+        }
+
+        $label = (string) ($meta['label'] ?? 'Ver detalle');
+        if ($context === 'Inmueble' && $field === 'id_inmueble') {
+          $label = 'Ver inmueble en web';
+        }
+
+        $url = (string) ($meta['base'] ?? '') . rawurlencode($value);
+        if ($field === 'id_estudio_aseguradora') {
+          $ticketId = trim((string) ($item['id_ticket'] ?? $item['ticket'] ?? ''));
+          if ($ticketId !== '') {
+            $url .= '&id_ticket=' . rawurlencode($ticketId);
+          }
+        }
+
+        $buttons[] = ['url' => $url, 'label' => $label];
+      }
+    }
+
+    if ($context === 'Inmueble') {
+      $webId = trim((string) ($item['id_inmueble'] ?? $item['codigo_inmueble_web'] ?? $item['codigo'] ?? ''));
+      if ($webId !== '' && $webId !== '-' && $webId !== '0') {
+        $buttons[] = [
+          'url' => 'https://sucasainmobiliaria.com.co/inmueble/?id_inmueble=' . rawurlencode($webId),
+          'label' => 'Ver inmueble en web',
+        ];
+      }
+    }
+
+    return $buttons;
   }
 
   /** @param array<string,mixed> $ticket @param array<string,mixed> $contractRow */
