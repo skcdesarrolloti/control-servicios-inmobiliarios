@@ -140,6 +140,10 @@ trait HandlesMaintenanceActions
       'kpi_no_enviadas' => (string) ($stats['no_enviadas'] ?? 0),
       'kpi_aprobadas' => (string) ($stats['aprobadas'] ?? 0),
       'kpi_desaprobadas' => (string) ($stats['desaprobadas'] ?? 0),
+      'kpi_esperando_respuesta' => (string) ($stats['esperando_respuesta'] ?? 0),
+      'kpi_finalizadas' => (string) ($stats['finalizadas'] ?? 0),
+      'kpi_sin_estado' => (string) ($stats['sin_estado'] ?? 0),
+      'kpi_valor_total' => $this->format_cop_currency($stats['valor_total'] ?? 0),
     ]);
   }
 

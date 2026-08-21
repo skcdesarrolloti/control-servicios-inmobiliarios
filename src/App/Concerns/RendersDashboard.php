@@ -1116,6 +1116,10 @@ trait RendersDashboard
       $dateFrom = $singleDate;
       $dateTo = $singleDate;
     }
+    $estado = $clean($input[$prefix . 'estado'] ?? '');
+    if (in_array(strtolower(trim($estado)), ['sin_estado', 'sin estado'], true)) {
+      $estado = '__sin_estado__';
+    }
 
     return [
       'fPage' => (string) $page,
@@ -1130,7 +1134,7 @@ trait RendersDashboard
       'fInmueble' => $clean($input[$prefix . 'inmueble'] ?? ''),
       'fContrato' => $clean($input[$prefix . 'contrato'] ?? ''),
       'fEnviada' => $clean($input[$prefix . 'enviada'] ?? ''),
-      'fEstado' => $clean($input[$prefix . 'estado'] ?? ''),
+      'fEstado' => $estado,
       'fTipoMantenimiento' => $clean($input[$prefix . 'tipo_mantenimiento'] ?? ''),
       'fCategoria' => $clean($input[$prefix . 'categoria'] ?? ''),
     ];
@@ -1161,7 +1165,13 @@ trait RendersDashboard
     }
     $like('id_ticket', (string) ($p['fTicket'] ?? ''));
     $like('destinatario', (string) ($p['fDestinatario'] ?? ''));
-    $like('id_empleado', (string) ($p['fFuncionario'] ?? ''));
+    if (($p['fFuncionario'] ?? '') !== '') {
+      $term = '%' . $this->db->escapeLike((string) $p['fFuncionario']) . '%';
+      $where[] = "(COALESCE(c.`id_empleado`, '') LIKE ? OR COALESCE(c.`coordinador`, '') LIKE ? OR COALESCE(c.`creador`, '') LIKE ?)";
+      $args[] = $term;
+      $args[] = $term;
+      $args[] = $term;
+    }
     if (($p['fInmueble'] ?? '') !== '') {
       $term = '%' . $this->db->escapeLike((string) $p['fInmueble']) . '%';
       $where[] = "(COALESCE(c.`inmueble`, '') LIKE ? OR COALESCE(c.`id_inmueble`, '') LIKE ?)";
@@ -1190,8 +1200,13 @@ trait RendersDashboard
     }
 
     if (($p['fEstado'] ?? '') !== '') {
-      $where[] = "LOWER(TRIM(COALESCE(c.`estado`, ''))) = ?";
-      $args[] = strtolower(trim((string) $p['fEstado']));
+      $stateFilter = strtolower(trim((string) $p['fEstado']));
+      if (in_array($stateFilter, ['__sin_estado__', 'sin_estado', 'sin estado'], true)) {
+        $where[] = "(TRIM(COALESCE(c.`estado`, '')) = '' OR LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'sin estado')";
+      } else {
+        $where[] = "LOWER(TRIM(COALESCE(c.`estado`, ''))) = ?";
+        $args[] = $stateFilter;
+      }
     }
     if (($p['fTipoMantenimiento'] ?? '') !== '') {
       $where[] = "LOWER(TRIM(COALESCE(c.`tipo_mantenimiento`, ''))) = ?";
@@ -1293,7 +1308,11 @@ trait RendersDashboard
         SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`se_envio`, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado') THEN 1 ELSE 0 END) AS enviadas,
         SUM(CASE WHEN TRIM(COALESCE(c.`se_envio`, '')) = '' OR LOWER(TRIM(COALESCE(c.`se_envio`, ''))) IN ('no', '0', 'false') THEN 1 ELSE 0 END) AS no_enviadas,
         SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'aprobada' THEN 1 ELSE 0 END) AS aprobadas,
-        SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'desaprobada' THEN 1 ELSE 0 END) AS desaprobadas
+        SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'desaprobada' THEN 1 ELSE 0 END) AS desaprobadas,
+        SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'esperando respuesta' THEN 1 ELSE 0 END) AS esperando_respuesta,
+        SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'finalizado' THEN 1 ELSE 0 END) AS finalizadas,
+        SUM(CASE WHEN TRIM(COALESCE(c.`estado`, '')) = '' OR LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'sin estado' THEN 1 ELSE 0 END) AS sin_estado,
+        SUM(COALESCE(c.`total`, 0)) AS valor_total
        FROM `{$table}` c
        WHERE {$whereSql}",
       $args
@@ -1305,6 +1324,10 @@ trait RendersDashboard
       'no_enviadas' => (int) ($row['no_enviadas'] ?? 0),
       'aprobadas' => (int) ($row['aprobadas'] ?? 0),
       'desaprobadas' => (int) ($row['desaprobadas'] ?? 0),
+      'esperando_respuesta' => (int) ($row['esperando_respuesta'] ?? 0),
+      'finalizadas' => (int) ($row['finalizadas'] ?? 0),
+      'sin_estado' => (int) ($row['sin_estado'] ?? 0),
+      'valor_total' => (float) ($row['valor_total'] ?? 0),
     ];
   }
 
@@ -1811,7 +1834,8 @@ trait RendersDashboard
     $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
     return '<span id="scm-cotizaciones_mantenimiento-count" style="display:none;">' . esc_html((string) ($stats['total'] ?? 0)) . '</span>'
       . '<div class="scm-status-topic-head"><div><h3>Cotizaciones de Mantenimiento</h3><p>Control de envio, respuesta, ordenes y acciones de cotizacion.</p></div><span class="scm-status-count"><strong id="scm-cotizaciones_mantenimiento-kpi-total">' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> cotizaciones</span></div>'
-      . '<div class="scm-kpis scm-kpis-daisy scm-cotizaciones-kpis"><div class="scm-kpi"><div class="scm-kpi-label">Enviadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-enviadas">' . esc_html((string) ($stats['enviadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">No enviadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-no-enviadas">' . esc_html((string) ($stats['no_enviadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Aprobadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-aprobadas">' . esc_html((string) ($stats['aprobadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Desaprobadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-desaprobadas">' . esc_html((string) ($stats['desaprobadas'] ?? 0)) . '</div></div></div>'
+      . $this->render_cotizaciones_mantenimiento_state_tabs($params)
+      . '<div class="scm-kpis scm-kpis-daisy scm-cotizaciones-kpis"><div class="scm-kpi"><div class="scm-kpi-label">Enviadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-enviadas">' . esc_html((string) ($stats['enviadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">No enviadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-no-enviadas">' . esc_html((string) ($stats['no_enviadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Aprobadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-aprobadas">' . esc_html((string) ($stats['aprobadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Desaprobadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-desaprobadas">' . esc_html((string) ($stats['desaprobadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Esperando respuesta</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-esperando-respuesta">' . esc_html((string) ($stats['esperando_respuesta'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Finalizadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-finalizadas">' . esc_html((string) ($stats['finalizadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Sin estado</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-sin-estado">' . esc_html((string) ($stats['sin_estado'] ?? 0)) . '</div></div><div class="scm-kpi scm-kpi-money"><div class="scm-kpi-label">Total cotizaciones</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-valor-total">' . esc_html($this->format_cop_currency($stats['valor_total'] ?? 0)) . '</div></div></div>'
       . $this->render_cotizaciones_mantenimiento_filter_form($params)
       . '<div class="scm-cotizaciones-list" id="scm-cards-cotizaciones_mantenimiento">' . $this->render_cotizaciones_mantenimiento_cards($rows) . '</div>'
       . '<div class="scm-pagination" id="scm-pagination-cotizaciones_mantenimiento">' . $this->render_cotizaciones_mantenimiento_pagination($pagination) . '</div>';
@@ -1819,22 +1843,23 @@ trait RendersDashboard
 
   private function render_cotizaciones_mantenimiento_filter_form(array $p): string
   {
+    $funcionarios = $this->cotizaciones_funcionario_options();
     ob_start();
 ?>
     <div class="scm-filter-card card">
       <h3>Filtros</h3>
       <form id="scm-form-cotizaciones_mantenimiento" autocomplete="off">
         <input type="hidden" id="scmqt_page" name="scmqt_page" value="<?php echo esc_attr((string) ($p['fPage'] ?? '1')); ?>">
+        <input type="hidden" id="scmqt_estado" name="scmqt_estado" value="<?php echo esc_attr((string) ($p['fEstado'] ?? '')); ?>">
         <div class="scm-grid">
           <div class="scm-field"><label for="scmqt_cotizacion">Cotizaci&oacute;n</label><input id="scmqt_cotizacion" name="scmqt_cotizacion" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fCotizacion'] ?? '')); ?>" placeholder="Ej: 528"></div>
           <div class="scm-field"><label for="scmqt_ticket"># caso</label><input id="scmqt_ticket" name="scmqt_ticket" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fTicket'] ?? '')); ?>" placeholder="Ej: 10055"></div>
           <div class="scm-field scm-date-range-field"><label id="scmqt_fecha_rango_label">Fecha</label><div class="scm-date-range-control" role="group" aria-labelledby="scmqt_fecha_rango_label"><div class="scm-date-range-part"><span>Desde</span><input id="scmqt_fecha_desde" name="scmqt_fecha_desde" type="date" value="<?php echo esc_attr((string) ($p['fFechaDesde'] ?? '')); ?>" aria-label="Fecha desde"></div><span class="scm-date-range-separator" aria-hidden="true">&rarr;</span><div class="scm-date-range-part"><span>Hasta</span><input id="scmqt_fecha_hasta" name="scmqt_fecha_hasta" type="date" value="<?php echo esc_attr((string) ($p['fFechaHasta'] ?? '')); ?>" aria-label="Fecha hasta"></div></div></div>
           <div class="scm-field"><label for="scmqt_destinatario">Destinatario</label><input id="scmqt_destinatario" name="scmqt_destinatario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fDestinatario'] ?? '')); ?>"></div>
-          <div class="scm-field"><label for="scmqt_funcionario">Funcionario</label><input id="scmqt_funcionario" name="scmqt_funcionario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fFuncionario'] ?? '')); ?>" placeholder="ID empleado"></div>
+          <div class="scm-field"><label for="scmqt_funcionario">Funcionario</label><select id="scmqt_funcionario" name="scmqt_funcionario" class="select select-bordered select-sm scm-select"><option value="">Todos</option><?php foreach ($funcionarios as $func): $fId = trim((string) ($func['id'] ?? '')); ?><option value="<?php echo esc_attr($fId); ?>" <?php selected((string) ($p['fFuncionario'] ?? ''), $fId); ?>><?php echo esc_html((string) ($func['label'] ?? $fId)); ?></option><?php endforeach; ?></select></div>
           <div class="scm-field"><label for="scmqt_inmueble">Inmueble SIMI</label><input id="scmqt_inmueble" name="scmqt_inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fInmueble'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="scmqt_contrato">Contrato</label><input id="scmqt_contrato" name="scmqt_contrato" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fContrato'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="scmqt_enviada">Fue enviada</label><select id="scmqt_enviada" name="scmqt_enviada" class="select select-bordered select-sm scm-select"><option value="">Todas</option><option value="si" <?php selected((string) ($p['fEnviada'] ?? ''), 'si'); ?>>S&iacute;</option><option value="no" <?php selected((string) ($p['fEnviada'] ?? ''), 'no'); ?>>No</option></select></div>
-          <div class="scm-field"><label for="scmqt_estado">Estado</label><select id="scmqt_estado" name="scmqt_estado" class="select select-bordered select-sm scm-select"><option value="">Todos</option><?php foreach ($this->cotizaciones_distinct_options('estado') as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected((string) ($p['fEstado'] ?? ''), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?></select></div>
           <div class="scm-field"><label for="scmqt_tipo_mantenimiento">Tipo mantenimiento</label><select id="scmqt_tipo_mantenimiento" name="scmqt_tipo_mantenimiento" class="select select-bordered select-sm scm-select"><option value="">Todos</option><?php foreach ($this->cotizaciones_distinct_options('tipo_mantenimiento') as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected((string) ($p['fTipoMantenimiento'] ?? ''), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?></select></div>
           <div class="scm-field"><label for="scmqt_categoria">Categoria</label><select id="scmqt_categoria" name="scmqt_categoria" class="select select-bordered select-sm scm-select"><option value="">Todas</option><?php foreach ($this->cotizaciones_distinct_options('categoria_cotizacion') as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected((string) ($p['fCategoria'] ?? ''), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?></select></div>
         </div>
@@ -1843,6 +1868,59 @@ trait RendersDashboard
     </div>
 <?php
     return (string) ob_get_clean();
+  }
+
+  private function render_cotizaciones_mantenimiento_state_tabs(array $p): string
+  {
+    $active = strtolower(trim((string) ($p['fEstado'] ?? '')));
+    $states = [
+      '' => 'Todos',
+      'Aprobada' => 'Aprobadas',
+      'Desaprobada' => 'Desaprobadas',
+      'Esperando respuesta' => 'Esperando respuesta',
+      'Finalizado' => 'Finalizadas',
+      '__sin_estado__' => 'Sin estado',
+    ];
+
+    $html = '<div class="scm-cotizacion-state-tabs" role="tablist" aria-label="Estados de cotizaciones">';
+    foreach ($states as $value => $label) {
+      $normalizedValue = strtolower(trim((string) $value));
+      $isActive = $active === $normalizedValue || ($active === '' && $normalizedValue === '');
+      $html .= '<button type="button" class="scm-cotizacion-state-tab' . ($isActive ? ' active' : '') . '" data-cotizacion-state="' . esc_attr((string) $value) . '" aria-selected="' . ($isActive ? 'true' : 'false') . '">' . esc_html($label) . '</button>';
+    }
+    return $html . '</div>';
+  }
+
+  /** @return array<int,array{id:string,label:string}> */
+  private function cotizaciones_funcionario_options(): array
+  {
+    $table = $this->db->table('jet_cct_funcionarios');
+    if (!$this->table_exists($table) || !$this->column_exists($table, 'id_empleado')) {
+      return [];
+    }
+    $nameCol = $this->detect_first_existing_column($table, ['nombre', 'empleado', 'nombre_empleado', 'nombre_funcionario']);
+    $nameExpr = $nameCol !== '' ? "TRIM(COALESCE(`{$nameCol}`, ''))" : "''";
+    $activeFilter = $this->column_exists($table, 'activo')
+      ? " AND LOWER(TRIM(COALESCE(`activo`, 'si'))) NOT IN ('no', '0', 'false', 'inactivo')"
+      : '';
+    $rows = $this->db->getResults(
+      "SELECT TRIM(COALESCE(`id_empleado`, '')) AS id, {$nameExpr} AS nombre
+       FROM `{$table}`
+       WHERE TRIM(COALESCE(`id_empleado`, '')) <> ''{$activeFilter}
+       ORDER BY nombre ASC, id ASC
+       LIMIT 500"
+    );
+
+    $out = [];
+    foreach ($rows as $row) {
+      $id = trim((string) ($row['id'] ?? ''));
+      if ($id === '') {
+        continue;
+      }
+      $name = trim((string) ($row['nombre'] ?? ''));
+      $out[] = ['id' => $id, 'label' => ($name !== '' ? $name : 'Funcionario') . ' (' . $id . ')'];
+    }
+    return $out;
   }
 
   /** @return array<int,string> */
@@ -1890,7 +1968,7 @@ trait RendersDashboard
     $contrato = trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? ''));
     $idContrato = trim((string) ($row['id_contrato'] ?? $contrato));
     $sucursal = trim((string) ($row['sucursal'] ?? '1'));
-    $estado = trim((string) ($row['estado'] ?? 'Inicial'));
+    $estado = trim((string) ($row['estado'] ?? ''));
     $seEnvio = strtolower(trim((string) ($row['se_envio'] ?? '')));
     $enviada = in_array($seEnvio, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true);
     $fechaTs = (int) ($row['fecha'] ?? 0);
@@ -1910,12 +1988,18 @@ trait RendersDashboard
     $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
     $ordersHtml = empty($orders) ? '<p class="scm-case-history-empty">Sin ordenes registradas para esta cotizacion.</p>' : '';
     foreach ($orders as $order) {
-      $ordersHtml .= '<article class="scm-case-history-item"><div class="scm-case-history-meta"><strong>Orden #' . esc_html((string) ($order['_ID'] ?? '')) . '</strong><span>' . esc_html((string) ($order['estado'] ?? '-')) . '</span></div><div class="scm-case-history-detail"><p><strong>Proveedor:</strong> ' . esc_html((string) ($order['proveedor'] ?? '-')) . '</p><p><strong>Actividad:</strong> ' . esc_html((string) ($order['actividad'] ?? '-')) . '</p><p><strong>Valor:</strong> ' . esc_html((string) ($order['valor'] ?? '-')) . '</p></div></article>';
+      $ordersHtml .= '<article class="scm-case-history-item"><div class="scm-case-history-meta"><strong>Orden #' . esc_html((string) ($order['_ID'] ?? '')) . '</strong><span>' . esc_html((string) ($order['estado'] ?? '-')) . '</span></div><div class="scm-case-history-detail"><p><strong>Proveedor:</strong> ' . esc_html((string) ($order['proveedor'] ?? '-')) . '</p><p><strong>Actividad:</strong> ' . esc_html((string) ($order['actividad'] ?? '-')) . '</p><p><strong>Valor:</strong> ' . esc_html($this->format_cop_currency($order['valor'] ?? 0)) . '</p></div></article>';
     }
 
+    $saldoObra = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_obra', 'total_mano_obra']));
+    $saldoMateriales = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_materiales', 'total_materiales']));
+    $saldoMaquinarias = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_maquinarias', 'total_maquinarias']));
+    $saldoOtros = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_otros_costo', 'total_otros_costos']));
+    $totalCotizacion = $this->format_cop_currency($this->cotizacion_money_value($row, ['total']));
+
     return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '">'
-      . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Ticket <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'No fue enviada') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : '-') . '</span></div></div>'
-      . '<div class="scm-cotizacion-meta"><div><span>Fecha</span><strong>' . esc_html($fecha) . '</strong></div><div><span>Destinatario</span><strong>' . esc_html($destinatario !== '' ? $destinatario : '-') . '</strong></div><div><span>Contacto</span><strong>' . esc_html($contacto !== '' ? $contacto : '-') . '</strong></div><div><span>Empleado</span><strong>' . esc_html($empleado !== '' ? $empleado : '-') . '</strong></div><div><span>Mano de obra</span><strong>' . esc_html((string) ($row['saldo_obra'] ?? $row['total_mano_obra'] ?? '-')) . '</strong></div><div><span>Materiales</span><strong>' . esc_html((string) ($row['saldo_materiales'] ?? $row['total_materiales'] ?? '-')) . '</strong></div><div><span>Otros costos</span><strong>' . esc_html((string) ($row['saldo_otros_costo'] ?? $row['total_otros_costos'] ?? '-')) . '</strong></div><div><span>Ordenes</span><strong>' . esc_html((string) ($row['ordenes_total'] ?? count($orders))) . '</strong></div></div>'
+      . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Ticket <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'No fue enviada') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</span></div></div>'
+      . '<div class="scm-cotizacion-meta"><div><span>Fecha</span><strong>' . esc_html($fecha) . '</strong></div><div><span>Destinatario</span><strong>' . esc_html($destinatario !== '' ? $destinatario : '-') . '</strong></div><div><span>Contacto</span><strong>' . esc_html($contacto !== '' ? $contacto : '-') . '</strong></div><div><span>Empleado</span><strong>' . esc_html($empleado !== '' ? $empleado : '-') . '</strong></div><div><span>Saldo mano de obra</span><strong>' . esc_html($saldoObra) . '</strong></div><div><span>Saldo materiales</span><strong>' . esc_html($saldoMateriales) . '</strong></div><div><span>Saldo equipos</span><strong>' . esc_html($saldoMaquinarias) . '</strong></div><div><span>Saldo otros costos</span><strong>' . esc_html($saldoOtros) . '</strong></div><div><span>Total cotizaci&oacute;n</span><strong>' . esc_html($totalCotizacion) . '</strong></div><div><span>Ordenes</span><strong>' . esc_html((string) ($row['ordenes_total'] ?? count($orders))) . '</strong></div></div>'
       . '<div class="scm-cotizacion-actions">'
       . ($cotUrl !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($cotUrl) . '" data-iframe-title="Cotizacion #' . esc_attr($id) . '">Ver cotizacion</button>' : '')
       . ($ticketUrl !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($ticketUrl) . '" data-iframe-title="Ticket #' . esc_attr($ticket) . '">Ver ticket</button>' : '')
@@ -1926,6 +2010,54 @@ trait RendersDashboard
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($orderUrl) . '" data-iframe-title="Anadir orden de mantenimiento">Anadir orden</button>'
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($actaUrl) . '" data-iframe-title="Anadir acta de satisfaccion">Anadir acta</button>'
       . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div></article>';
+  }
+
+  /** @param array<string,mixed> $row @param array<int,string> $keys */
+  private function cotizacion_money_value(array $row, array $keys): float
+  {
+    foreach ($keys as $key) {
+      if (!array_key_exists($key, $row)) {
+        continue;
+      }
+      $value = $this->parse_cop_number($row[$key]);
+      if ($value !== null) {
+        return $value;
+      }
+    }
+    return 0.0;
+  }
+
+  private function parse_cop_number($value): ?float
+  {
+    if (is_int($value) || is_float($value)) {
+      return (float) $value;
+    }
+    $text = trim((string) $value);
+    if ($text === '' || $text === '-') {
+      return null;
+    }
+    $text = preg_replace('/[^\d,.\-]/', '', $text) ?: '';
+    if ($text === '' || $text === '-') {
+      return null;
+    }
+    $hasComma = strpos($text, ',') !== false;
+    $hasDot = strpos($text, '.') !== false;
+    if ($hasComma && $hasDot) {
+      $text = str_replace('.', '', $text);
+      $text = str_replace(',', '.', $text);
+    } elseif ($hasComma) {
+      $text = str_replace(',', '.', $text);
+    }
+    return is_numeric($text) ? (float) $text : null;
+  }
+
+  private function format_cop_currency($value): string
+  {
+    $amount = $this->parse_cop_number($value);
+    if ($amount === null) {
+      $amount = 0.0;
+    }
+    return '$' . number_format((float) $amount, 0, ',', '.');
   }
 
   private function render_cotizaciones_mantenimiento_pagination(array $pagination): string

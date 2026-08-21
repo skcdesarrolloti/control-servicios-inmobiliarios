@@ -5619,6 +5619,22 @@
       }
     }
 
+    function updateCotizacionStateTabs(form) {
+      if (!form) {
+        return;
+      }
+      var stateInput = form.querySelector("input[name='scmqt_estado']");
+      var current = String(stateInput ? stateInput.value || "" : "").trim();
+      root
+        .querySelectorAll(".scm-cotizacion-state-tab")
+        .forEach(function (btn) {
+          var value = String(btn.getAttribute("data-cotizacion-state") || "").trim();
+          var active = value === current || (!value && !current);
+          btn.classList.toggle("active", active);
+          btn.setAttribute("aria-selected", active ? "true" : "false");
+        });
+    }
+
     function classifyMagnitude(revisionType, afterDone, afterFinally) {
       var fd = new FormData();
       fd.append(
@@ -5724,6 +5740,27 @@
                 "desaprobadas",
                 d.kpi_desaprobadas || "0",
               );
+              updateGenericKPI(
+                tabKey,
+                "esperando-respuesta",
+                d.kpi_esperando_respuesta || "0",
+              );
+              updateGenericKPI(
+                tabKey,
+                "finalizadas",
+                d.kpi_finalizadas || "0",
+              );
+              updateGenericKPI(
+                tabKey,
+                "sin-estado",
+                d.kpi_sin_estado || "0",
+              );
+              updateGenericKPI(
+                tabKey,
+                "valor-total",
+                d.kpi_valor_total || "$0",
+              );
+              updateCotizacionStateTabs(tabForm);
             }
             updateGenericKPI(tabKey, "con-cotz", d.kpi_con_cotz || "0");
             updateGenericKPI(tabKey, "sin-cotz", d.kpi_sin_cotz || "0");
@@ -5829,6 +5866,25 @@
         fetchTab(new FormData(tabForm));
       });
 
+      if (tabKey === "cotizaciones_mantenimiento") {
+        root
+          .querySelectorAll(".scm-cotizacion-state-tab")
+          .forEach(function (stateBtn) {
+            stateBtn.addEventListener("click", function () {
+              var stateInput = tabForm.querySelector("input[name='scmqt_estado']");
+              if (stateInput) {
+                stateInput.value =
+                  stateBtn.getAttribute("data-cotizacion-state") || "";
+              }
+              if (pageInput) {
+                pageInput.value = "1";
+              }
+              updateCotizacionStateTabs(tabForm);
+              fetchTab(new FormData(tabForm));
+            });
+          });
+      }
+
       var tabCotizacionSelect = tabForm.querySelector("[name$='cotizacion']");
       if (tabCotizacionSelect) {
         tabCotizacionSelect.addEventListener("change", function () {
@@ -5882,8 +5938,17 @@
             .forEach(function (i) {
               i.value = "";
             });
+          if (tabKey === "cotizaciones_mantenimiento") {
+            var stateInput = tabForm.querySelector("input[name='scmqt_estado']");
+            if (stateInput) {
+              stateInput.value = "";
+            }
+          }
           if (pageInput) {
             pageInput.value = "1";
+          }
+          if (tabKey === "cotizaciones_mantenimiento") {
+            updateCotizacionStateTabs(tabForm);
           }
           applyBinaryFilterKpiVisibility(
             "scm-" + tabKey + "-",

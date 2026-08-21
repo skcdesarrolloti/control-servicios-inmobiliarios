@@ -3118,6 +3118,51 @@
 }
 
 /* Cotizaciones de mantenimiento */
+#scm-app .scm-cotizacion-state-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 16px;
+  padding: 10px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef5ff 100%);
+}
+
+#scm-app .scm-cotizacion-state-tab {
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid #dbe7f5;
+  border-radius: 12px;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+#scm-app .scm-cotizacion-state-tab:hover {
+  border-color: rgba(245, 158, 11, 0.65);
+  color: #f59e0b;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+#scm-app .scm-cotizacion-state-tab.active {
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, #ff9f0a 0%, #f97316 100%);
+  color: #fff;
+  box-shadow: 0 14px 30px rgba(249, 115, 22, 0.22);
+}
+
+#scm-app .scm-cotizaciones-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+#scm-app .scm-cotizaciones-kpis .scm-kpi-money {
+  min-width: 190px;
+}
+
 #scm-app .scm-cotizaciones-list {
   display: grid;
   grid-template-columns: 1fr;
@@ -3207,6 +3252,7 @@
   margin-top: 4px;
   color: #0f172a;
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 #scm-app .scm-cotizacion-actions {
