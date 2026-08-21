@@ -85,7 +85,7 @@ final class GenericTicketsUiView
         $html .= $this->renderCaseActionButtons($itemButtons);
       }
       $html .= '</div>';
-      $html .= '<div class="scm-case-history-detail scm-case-record-detail"><strong>' . $detailHtml . '</strong></div>';
+      $html .= '<div class="scm-case-history-detail scm-case-record-detail">' . $detailHtml . '</div>';
       $html .= $this->renderHistoryImages($item['imagen'] ?? '');
       $html .= $this->renderHistoryDocuments($item['archivos'] ?? '');
       $html .= '<div class="scm-case-record-date"><span class="scm-case-record-date-icon" aria-hidden="true"></span><strong>' . esc_html($date) . '</strong></div>';
@@ -145,7 +145,7 @@ final class GenericTicketsUiView
         $html .= $this->renderCaseActionButtons($itemButtons);
       }
       $html .= '</div>';
-      $html .= '<div class="scm-case-history-detail scm-case-record-detail"><strong>' . (string) call_user_func($this->formatDetailHtml, $detail) . '</strong></div>';
+      $html .= '<div class="scm-case-history-detail scm-case-record-detail">' . (string) call_user_func($this->formatDetailHtml, $detail) . '</div>';
       $html .= $this->renderRecordItemFields($item, $visibleFields);
       $html .= $this->renderHistoryImages($item['evidencia'] ?? $item['imagen'] ?? '');
       $html .= $this->renderHistoryDocuments($item['archivos'] ?? '');

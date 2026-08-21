@@ -812,9 +812,14 @@
 #scm-app .scm-case-record-detail {
   color: var(--scm-text);
   font-size: 12px;
-  font-weight: 500;
-  line-height: 1.35;
+  font-weight: 400;
+  line-height: 1.45;
   margin-top: 4px;
+}
+
+#scm-app .scm-case-record-detail strong {
+  color: var(--scm-text-main);
+  font-weight: 700;
 }
 
 #scm-app .scm-case-record-date {
@@ -914,8 +919,8 @@
 #scm-app .scm-case-record-card .scm-case-record-detail p {
   color: var(--scm-text);
   font-size: 12px;
-  font-weight: 500;
-  line-height: 1.35;
+  font-weight: 400;
+  line-height: 1.45;
 }
 
 #scm-app .scm-history-pagination {
