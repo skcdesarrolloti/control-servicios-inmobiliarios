@@ -197,7 +197,7 @@ final class PendingRepository
     }
 
     $likeFilters = [
-      'contrato' => ['contrato', '_ID'],
+      'contrato' => ['contrato'],
       'inmueble' => ['inmueble', 'id_inmueble'],
       'direccion' => ['direccion'],
       'propietario' => ['propietario', 'id_propietario'],
@@ -299,9 +299,9 @@ final class PendingRepository
       $term = '%' . $this->db->escapeLike($v) . '%';
       if ($k === 'contrato') {
         $parts = [];
-        foreach (['contrato', '_ID'] as $column) {
+        foreach (['contrato'] as $column) {
           if ($this->schema()->columnExists($table, $column)) {
-            $parts[] = $column === '_ID' ? "CAST(`_ID` AS CHAR) LIKE ?" : "COALESCE(`{$column}`,'') LIKE ?";
+            $parts[] = "COALESCE(`{$column}`,'') LIKE ?";
             $args[] = $term;
           }
         }
@@ -803,7 +803,7 @@ final class PendingRepository
       }
       $term = '%' . $this->db->escapeLike($value) . '%';
       $parts = [];
-      $columns = $key === 'contrato' ? ['contrato', 'id_contrato'] : [$key];
+      $columns = [$key];
       foreach ($columns as $column) {
         if ($this->schema()->columnExists($table, $column)) {
           $parts[] = in_array($column, ['id_ticket', 'id_contrato'], true)

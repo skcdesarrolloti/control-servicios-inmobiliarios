@@ -1170,8 +1170,7 @@ trait RendersDashboard
     }
     if (($p['fContrato'] ?? '') !== '') {
       $term = '%' . $this->db->escapeLike((string) $p['fContrato']) . '%';
-      $where[] = "(COALESCE(c.`contrato`, '') LIKE ? OR COALESCE(c.`id_contrato`, '') LIKE ?)";
-      $args[] = $term;
+      $where[] = "CAST(c.`contrato` AS CHAR) LIKE ?";
       $args[] = $term;
     }
 

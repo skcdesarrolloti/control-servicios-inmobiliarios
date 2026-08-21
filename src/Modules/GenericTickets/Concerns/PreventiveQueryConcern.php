@@ -66,36 +66,9 @@ trait PreventiveQueryConcern
     }
     if (!empty($p['fContrato'])) {
       $term = '%' . $this->db->escapeLike((string) $p['fContrato']) . '%';
-      $contractParts = [];
-      foreach (['contrato', 'id_contrato', 'numero_contrato', 'id_contrato_arrendamiento'] as $candidate) {
-        if ($this->column_exists($tabla, $candidate)) {
-          $contractParts[] = "CAST(`{$candidate}` AS CHAR) LIKE ?";
-          $args[] = $term;
-        }
-      }
-      $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
-      if ($this->table_exists($contractTable) && $this->column_exists($contractTable, '_ID')) {
-        $outerJoinParts = [];
-        foreach (['contrato', 'id_contrato', 'numero_contrato', 'id_contrato_arrendamiento'] as $candidate) {
-          if ($this->column_exists($tabla, $candidate)) {
-            $outerJoinParts[] = "TRIM(COALESCE(`{$tabla}`.`{$candidate}`, '')) = CAST(ca_filter.`_ID` AS CHAR)";
-            if ($this->column_exists($contractTable, 'contrato')) {
-              $outerJoinParts[] = "TRIM(COALESCE(`{$tabla}`.`{$candidate}`, '')) = TRIM(COALESCE(ca_filter.`contrato`, ''))";
-            }
-          }
-        }
-        if (!empty($outerJoinParts)) {
-          $contractMatchParts = ["CAST(ca_filter.`_ID` AS CHAR) LIKE ?"];
-          $args[] = $term;
-          if ($this->column_exists($contractTable, 'contrato')) {
-            $contractMatchParts[] = "COALESCE(ca_filter.`contrato`, '') LIKE ?";
-            $args[] = $term;
-          }
-          $contractParts[] = "EXISTS (SELECT 1 FROM `{$contractTable}` ca_filter WHERE (" . implode(' OR ', $outerJoinParts) . ') AND (' . implode(' OR ', $contractMatchParts) . '))';
-        }
-      }
-      if (!empty($contractParts)) {
-        $where[] = '(' . implode(' OR ', $contractParts) . ')';
+      if ($this->column_exists($tabla, 'contrato')) {
+        $where[] = 'CAST(`contrato` AS CHAR) LIKE ?';
+        $args[] = $term;
       }
     }
     if (!empty($p['fArrendatario'])) {
