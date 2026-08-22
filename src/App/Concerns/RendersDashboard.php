@@ -100,8 +100,8 @@ trait RendersDashboard
     ];
 
     $pendingController = $this->get_pending_controller();
-    $preventivasPendientesHtml = $pendingController->renderPreventivasTab($_GET);
-    $serviciosPublicosPendientesHtml = $pendingController->renderServiciosPublicosTab($_GET);
+    $preventivasPendientesHtml = $pendingController->renderPreventivasTabShell($_GET);
+    $serviciosPublicosPendientesHtml = $pendingController->renderServiciosPublicosTabShell($_GET);
     $reportesAdministrativosPendientesHtml = $pendingController->renderReportesAdministrativosTab();
     $contratosArrendamientoHtml = $pendingController->renderContratosArrendamientoTab();
     $dashboardPermissionTabs = $this->dashboardPermissionTabs();
@@ -755,19 +755,19 @@ trait RendersDashboard
           <?php endif; ?>
 
           <?php if (in_array('preventivas_pendientes', $allowedAdministrativeActivityTabs, true)): ?>
-            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'preventivas_pendientes' ? ' active' : ''; ?>" id="scm-panel-preventivas-pendientes" data-permission-tab="preventivas_pendientes" data-admin-activity-panel="preventivas_pendientes">
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'preventivas_pendientes' ? ' active' : ''; ?>" id="scm-panel-preventivas-pendientes" data-permission-tab="preventivas_pendientes" data-admin-activity-panel="preventivas_pendientes" data-scm-loaded="0">
               <?php echo $preventivasPendientesHtml; ?>
             </div>
           <?php endif; ?>
 
           <?php if (in_array('servicios_publicos_pendientes', $allowedAdministrativeActivityTabs, true)): ?>
-            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'servicios_publicos_pendientes' ? ' active' : ''; ?>" id="scm-panel-servicios-publicos-pendientes" data-permission-tab="servicios_publicos_pendientes" data-admin-activity-panel="servicios_publicos_pendientes">
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'servicios_publicos_pendientes' ? ' active' : ''; ?>" id="scm-panel-servicios-publicos-pendientes" data-permission-tab="servicios_publicos_pendientes" data-admin-activity-panel="servicios_publicos_pendientes" data-scm-loaded="0">
               <?php echo $serviciosPublicosPendientesHtml; ?>
             </div>
           <?php endif; ?>
 
           <?php if (in_array('reportes_administrativos_pendientes', $allowedAdministrativeActivityTabs, true)): ?>
-            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'reportes_administrativos_pendientes' ? ' active' : ''; ?>" id="scm-panel-reportes-administrativos-pendientes" data-permission-tab="reportes_administrativos_pendientes" data-admin-activity-panel="reportes_administrativos_pendientes">
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'reportes_administrativos_pendientes' ? ' active' : ''; ?>" id="scm-panel-reportes-administrativos-pendientes" data-permission-tab="reportes_administrativos_pendientes" data-admin-activity-panel="reportes_administrativos_pendientes" data-scm-loaded="1">
               <?php echo $reportesAdministrativosPendientesHtml; ?>
             </div>
           <?php endif; ?>

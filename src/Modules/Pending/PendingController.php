@@ -41,6 +41,12 @@ final class PendingController
     );
   }
 
+  public function renderPreventivasTabShell(array $input): string
+  {
+    $filters = $this->parseFilters($input, 'spp_');
+    return $this->view->renderPreventivasPanel($filters, [], [], 0, (string) date('Y'), true);
+  }
+
   public function renderServiciosPublicosTab(array $input): string
   {
     $payload = $this->buildServiciosPublicosPayload($input);
@@ -50,6 +56,12 @@ final class PendingController
       (int) ($payload['count'] ?? 0),
       (string) ($payload['corte'] ?? '')
     );
+  }
+
+  public function renderServiciosPublicosTabShell(array $input): string
+  {
+    $filters = $this->parseFilters($input, 'rsp_');
+    return $this->view->renderServiciosPublicosPanel($filters, [], [], 0, (string) date('Y'), true);
   }
 
   public function renderReportesAdministrativosTab(): string
