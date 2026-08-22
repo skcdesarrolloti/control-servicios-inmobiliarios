@@ -5645,6 +5645,57 @@
         });
     }
 
+    function updateCotizacionStateTabCounts(data) {
+      if (!data) {
+        return;
+      }
+      var map = {
+        "total": data.kpi_total || "0",
+        "no-enviadas": data.kpi_no_enviadas || "0",
+        "enviadas": data.kpi_enviadas || "0",
+        "aprobadas": data.kpi_aprobadas || "0",
+        "desaprobadas": data.kpi_desaprobadas || "0",
+        "esperando-respuesta": data.kpi_esperando_respuesta || "0",
+        "finalizadas": data.kpi_finalizadas || "0",
+      };
+      Object.keys(map).forEach(function (key) {
+        var el = root.querySelector("#scm-cotizaciones_mantenimiento-tab-" + key);
+        if (el) {
+          el.textContent = map[key];
+        }
+      });
+    }
+
+    function enhanceCotizacionSelects(form) {
+      if (
+        !form ||
+        !(window.jQuery && window.jQuery.fn && window.jQuery.fn.select2)
+      ) {
+        return;
+      }
+      var $ = window.jQuery;
+      form.querySelectorAll("select.scm-select2").forEach(function (selectEl) {
+        var $select = $(selectEl);
+        if ($select.data("select2")) {
+          return;
+        }
+        $select.select2({
+          width: "100%",
+          placeholder:
+            selectEl.getAttribute("data-placeholder") || "Buscar y seleccionar...",
+          allowClear: true,
+          language: {
+            noResults: function () {
+              return "Sin resultados";
+            },
+            searching: function () {
+              return "Buscando...";
+            },
+          },
+        });
+      });
+    }
+
     function classifyMagnitude(revisionType, afterDone, afterFinally) {
       var fd = new FormData();
       fd.append(
@@ -5738,6 +5789,7 @@
             }
             updateGenericKPI(tabKey, "total", d.kpi_total || "0");
             if (tabKey === "cotizaciones_mantenimiento") {
+              updateGenericKPI(tabKey, "total-card", d.kpi_total || "0");
               updateGenericKPI(tabKey, "enviadas", d.kpi_enviadas || "0");
               updateGenericKPI(
                 tabKey,
@@ -5762,8 +5814,8 @@
               );
               updateGenericKPI(
                 tabKey,
-                "sin-estado",
-                d.kpi_sin_estado || "0",
+                "ordenes",
+                d.kpi_ordenes_total || "0",
               );
               updateGenericKPI(
                 tabKey,
@@ -5771,6 +5823,7 @@
                 d.kpi_valor_total || "$0",
               );
               updateCotizacionStateTabs(tabForm);
+              updateCotizacionStateTabCounts(d);
             }
             updateGenericKPI(tabKey, "con-cotz", d.kpi_con_cotz || "0");
             updateGenericKPI(tabKey, "sin-cotz", d.kpi_sin_cotz || "0");
@@ -5877,6 +5930,7 @@
       });
 
       if (tabKey === "cotizaciones_mantenimiento") {
+        enhanceCotizacionSelects(tabForm);
         root
           .querySelectorAll(".scm-cotizacion-state-tab")
           .forEach(function (stateBtn) {
@@ -5947,6 +6001,9 @@
         tabClear.addEventListener("click", function () {
           tabForm.querySelectorAll("select").forEach(function (s) {
             s.selectedIndex = 0;
+            if (window.jQuery && window.jQuery.fn && window.jQuery(s).data("select2")) {
+              window.jQuery(s).trigger("change.select2");
+            }
           });
           tabForm
             .querySelectorAll("input[type='text'], input[type='date']")

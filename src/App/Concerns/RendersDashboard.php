@@ -86,7 +86,7 @@ trait RendersDashboard
     $cotizacionesParams = $this->parse_cotizaciones_mantenimiento_params($_GET, 'scmqt_');
     $cotizacionesResult = [
       'rows' => [],
-      'stats' => ['total' => 0, 'enviadas' => 0, 'no_enviadas' => 0, 'aprobadas' => 0, 'desaprobadas' => 0],
+      'stats' => ['total' => 0, 'enviadas' => 0, 'no_enviadas' => 0, 'aprobadas' => 0, 'desaprobadas' => 0, 'esperando_respuesta' => 0, 'finalizadas' => 0, 'ordenes_total' => 0, 'valor_total' => 0],
       'pagination' => ['page' => 1, 'per_page' => 20, 'total' => 0, 'total_pages' => 1],
     ];
     $openTopicDefs = [
@@ -1204,8 +1204,12 @@ trait RendersDashboard
       if (in_array($stateFilter, ['__sin_estado__', 'sin_estado', 'sin estado'], true)) {
         $where[] = "(TRIM(COALESCE(c.`estado`, '')) = '' OR LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'sin estado')";
       } else {
-        $where[] = "LOWER(TRIM(COALESCE(c.`estado`, ''))) = ?";
-        $args[] = $stateFilter;
+        if (in_array($stateFilter, ['finalizado', 'finalizada'], true)) {
+          $where[] = "LOWER(TRIM(COALESCE(c.`estado`, ''))) IN ('finalizado', 'finalizada')";
+        } else {
+          $where[] = "LOWER(TRIM(COALESCE(c.`estado`, ''))) = ?";
+          $args[] = $stateFilter;
+        }
       }
     }
     if (($p['fTipoMantenimiento'] ?? '') !== '') {
@@ -1298,10 +1302,11 @@ trait RendersDashboard
     return $rows;
   }
 
-  /** @return array<string,int> */
+  /** @return array<string,int|float> */
   private function aggregate_cotizaciones_mantenimiento(string $whereSql, array $args): array
   {
     $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    $ordersTable = $this->db->table('jet_cct_ordenes');
     $row = $this->db->getRow(
       "SELECT
         COUNT(1) AS total,
@@ -1310,13 +1315,24 @@ trait RendersDashboard
         SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'aprobada' THEN 1 ELSE 0 END) AS aprobadas,
         SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'desaprobada' THEN 1 ELSE 0 END) AS desaprobadas,
         SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'esperando respuesta' THEN 1 ELSE 0 END) AS esperando_respuesta,
-        SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'finalizado' THEN 1 ELSE 0 END) AS finalizadas,
+        SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) IN ('finalizado', 'finalizada') THEN 1 ELSE 0 END) AS finalizadas,
         SUM(CASE WHEN TRIM(COALESCE(c.`estado`, '')) = '' OR LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'sin estado' THEN 1 ELSE 0 END) AS sin_estado,
         SUM(COALESCE(c.`total`, 0)) AS valor_total
        FROM `{$table}` c
        WHERE {$whereSql}",
       $args
     ) ?: [];
+
+    $ordersTotal = 0;
+    if ($this->table_exists($ordersTable)) {
+      $ordersTotal = (int) $this->db->getVar(
+        "SELECT COUNT(1)
+         FROM `{$ordersTable}` o
+         INNER JOIN `{$table}` c ON TRIM(COALESCE(o.`id_cotizacion`, '')) = CAST(c.`_ID` AS CHAR)
+         WHERE {$whereSql}",
+        $args
+      );
+    }
 
     return [
       'total' => (int) ($row['total'] ?? 0),
@@ -1327,6 +1343,7 @@ trait RendersDashboard
       'esperando_respuesta' => (int) ($row['esperando_respuesta'] ?? 0),
       'finalizadas' => (int) ($row['finalizadas'] ?? 0),
       'sin_estado' => (int) ($row['sin_estado'] ?? 0),
+      'ordenes_total' => $ordersTotal,
       'valor_total' => (float) ($row['valor_total'] ?? 0),
     ];
   }
@@ -1834,8 +1851,8 @@ trait RendersDashboard
     $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
     return '<span id="scm-cotizaciones_mantenimiento-count" style="display:none;">' . esc_html((string) ($stats['total'] ?? 0)) . '</span>'
       . '<div class="scm-status-topic-head"><div><h3>Cotizaciones de Mantenimiento</h3><p>Control de envio, respuesta, ordenes y acciones de cotizacion.</p></div><span class="scm-status-count"><strong id="scm-cotizaciones_mantenimiento-kpi-total">' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> cotizaciones</span></div>'
-      . $this->render_cotizaciones_mantenimiento_state_tabs($params)
-      . '<div class="scm-kpis scm-kpis-daisy scm-cotizaciones-kpis"><div class="scm-kpi"><div class="scm-kpi-label">Enviadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-enviadas">' . esc_html((string) ($stats['enviadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">No enviadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-no-enviadas">' . esc_html((string) ($stats['no_enviadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Aprobadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-aprobadas">' . esc_html((string) ($stats['aprobadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Desaprobadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-desaprobadas">' . esc_html((string) ($stats['desaprobadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Esperando respuesta</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-esperando-respuesta">' . esc_html((string) ($stats['esperando_respuesta'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Finalizadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-finalizadas">' . esc_html((string) ($stats['finalizadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Sin estado</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-sin-estado">' . esc_html((string) ($stats['sin_estado'] ?? 0)) . '</div></div><div class="scm-kpi scm-kpi-money"><div class="scm-kpi-label">Total cotizaciones</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-valor-total">' . esc_html($this->format_cop_currency($stats['valor_total'] ?? 0)) . '</div></div></div>'
+      . $this->render_cotizaciones_mantenimiento_state_tabs($params, $stats)
+      . '<div class="scm-kpis scm-kpis-daisy scm-cotizaciones-kpis"><div class="scm-kpi"><div class="scm-kpi-label">Total</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-total-card">' . esc_html((string) ($stats['total'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Enviadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-enviadas">' . esc_html((string) ($stats['enviadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Sin enviar</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-no-enviadas">' . esc_html((string) ($stats['no_enviadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Aprobadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-aprobadas">' . esc_html((string) ($stats['aprobadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Desaprobadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-desaprobadas">' . esc_html((string) ($stats['desaprobadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Esperando respuesta</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-esperando-respuesta">' . esc_html((string) ($stats['esperando_respuesta'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Finalizadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-finalizadas">' . esc_html((string) ($stats['finalizadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">&Oacute;rdenes</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-ordenes">' . esc_html((string) ($stats['ordenes_total'] ?? 0)) . '</div></div><div class="scm-kpi scm-kpi-money"><div class="scm-kpi-label">Total cotizaciones</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-valor-total">' . esc_html($this->format_cop_currency($stats['valor_total'] ?? 0)) . '</div></div></div>'
       . $this->render_cotizaciones_mantenimiento_filter_form($params)
       . '<div class="scm-cotizaciones-list" id="scm-cards-cotizaciones_mantenimiento">' . $this->render_cotizaciones_mantenimiento_cards($rows) . '</div>'
       . '<div class="scm-pagination" id="scm-pagination-cotizaciones_mantenimiento">' . $this->render_cotizaciones_mantenimiento_pagination($pagination) . '</div>';
@@ -1856,7 +1873,7 @@ trait RendersDashboard
           <div class="scm-field"><label for="scmqt_ticket"># caso</label><input id="scmqt_ticket" name="scmqt_ticket" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fTicket'] ?? '')); ?>" placeholder="Ej: 10055"></div>
           <div class="scm-field scm-date-range-field"><label id="scmqt_fecha_rango_label">Fecha</label><div class="scm-date-range-control" role="group" aria-labelledby="scmqt_fecha_rango_label"><div class="scm-date-range-part"><span>Desde</span><input id="scmqt_fecha_desde" name="scmqt_fecha_desde" type="date" value="<?php echo esc_attr((string) ($p['fFechaDesde'] ?? '')); ?>" aria-label="Fecha desde"></div><span class="scm-date-range-separator" aria-hidden="true">&rarr;</span><div class="scm-date-range-part"><span>Hasta</span><input id="scmqt_fecha_hasta" name="scmqt_fecha_hasta" type="date" value="<?php echo esc_attr((string) ($p['fFechaHasta'] ?? '')); ?>" aria-label="Fecha hasta"></div></div></div>
           <div class="scm-field"><label for="scmqt_destinatario">Destinatario</label><input id="scmqt_destinatario" name="scmqt_destinatario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fDestinatario'] ?? '')); ?>"></div>
-          <div class="scm-field"><label for="scmqt_funcionario">Funcionario</label><select id="scmqt_funcionario" name="scmqt_funcionario" class="select select-bordered select-sm scm-select"><option value="">Todos</option><?php foreach ($funcionarios as $func): $fId = trim((string) ($func['id'] ?? '')); ?><option value="<?php echo esc_attr($fId); ?>" <?php selected((string) ($p['fFuncionario'] ?? ''), $fId); ?>><?php echo esc_html((string) ($func['label'] ?? $fId)); ?></option><?php endforeach; ?></select></div>
+          <div class="scm-field"><label for="scmqt_funcionario">Funcionario</label><select id="scmqt_funcionario" name="scmqt_funcionario" class="select select-bordered select-sm scm-select scm-select2" data-placeholder="Buscar funcionario..."><option value="">Todos</option><?php foreach ($funcionarios as $func): $fId = trim((string) ($func['id'] ?? '')); ?><option value="<?php echo esc_attr($fId); ?>" <?php selected((string) ($p['fFuncionario'] ?? ''), $fId); ?>><?php echo esc_html((string) ($func['label'] ?? $fId)); ?></option><?php endforeach; ?></select></div>
           <div class="scm-field"><label for="scmqt_inmueble">Inmueble SIMI</label><input id="scmqt_inmueble" name="scmqt_inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fInmueble'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="scmqt_contrato">Contrato</label><input id="scmqt_contrato" name="scmqt_contrato" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fContrato'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="scmqt_enviada">Fue enviada</label><select id="scmqt_enviada" name="scmqt_enviada" class="select select-bordered select-sm scm-select"><option value="">Todas</option><option value="si" <?php selected((string) ($p['fEnviada'] ?? ''), 'si'); ?>>S&iacute;</option><option value="no" <?php selected((string) ($p['fEnviada'] ?? ''), 'no'); ?>>No</option></select></div>
@@ -1870,17 +1887,18 @@ trait RendersDashboard
     return (string) ob_get_clean();
   }
 
-  private function render_cotizaciones_mantenimiento_state_tabs(array $p): string
+  private function render_cotizaciones_mantenimiento_state_tabs(array $p, array $stats = []): string
   {
     $activeState = strtolower(trim((string) ($p['fEstado'] ?? '')));
     $activeSent = strtolower(trim((string) ($p['fEnviada'] ?? '')));
     $states = [
-      ['state' => '', 'sent' => '', 'label' => 'Todos'],
-      ['state' => 'Aprobada', 'sent' => '', 'label' => 'Aprobadas'],
-      ['state' => 'Desaprobada', 'sent' => '', 'label' => 'Desaprobadas'],
-      ['state' => 'Esperando respuesta', 'sent' => '', 'label' => 'Esperando respuesta'],
-      ['state' => 'Finalizado', 'sent' => '', 'label' => 'Finalizadas'],
-      ['state' => '', 'sent' => 'no', 'label' => 'Sin enviar'],
+      ['state' => '', 'sent' => '', 'label' => 'Todos', 'key' => 'total'],
+      ['state' => '', 'sent' => 'no', 'label' => 'Sin enviar', 'key' => 'no_enviadas'],
+      ['state' => '', 'sent' => 'si', 'label' => 'Enviadas', 'key' => 'enviadas'],
+      ['state' => 'Aprobada', 'sent' => '', 'label' => 'Aprobadas', 'key' => 'aprobadas'],
+      ['state' => 'Desaprobada', 'sent' => '', 'label' => 'Desaprobadas', 'key' => 'desaprobadas'],
+      ['state' => 'Esperando respuesta', 'sent' => '', 'label' => 'Esperando respuesta', 'key' => 'esperando_respuesta'],
+      ['state' => 'Finalizado', 'sent' => '', 'label' => 'Finalizadas', 'key' => 'finalizadas'],
     ];
 
     $html = '<div class="scm-cotizacion-state-tabs" role="tablist" aria-label="Estados de cotizaciones">';
@@ -1888,12 +1906,15 @@ trait RendersDashboard
       $state = (string) ($tab['state'] ?? '');
       $sent = (string) ($tab['sent'] ?? '');
       $label = (string) ($tab['label'] ?? '');
+      $key = (string) ($tab['key'] ?? '');
       $normalizedState = strtolower(trim($state));
       $normalizedSent = strtolower(trim($sent));
       $isActive = $normalizedSent !== ''
         ? ($activeSent === $normalizedSent && $activeState === '')
         : ($activeSent === '' && ($activeState === $normalizedState || ($activeState === '' && $normalizedState === '')));
-      $html .= '<button type="button" class="scm-cotizacion-state-tab' . ($isActive ? ' active' : '') . '" data-cotizacion-state="' . esc_attr($state) . '" data-cotizacion-sent="' . esc_attr($sent) . '" aria-selected="' . ($isActive ? 'true' : 'false') . '">' . esc_html($label) . '</button>';
+      $count = $key !== '' ? (string) ($stats[$key] ?? 0) : '0';
+      $countId = $key !== '' ? ' id="scm-cotizaciones_mantenimiento-tab-' . esc_attr(str_replace('_', '-', $key)) . '"' : '';
+      $html .= '<button type="button" class="scm-cotizacion-state-tab' . ($isActive ? ' active' : '') . '" data-cotizacion-state="' . esc_attr($state) . '" data-cotizacion-sent="' . esc_attr($sent) . '" aria-selected="' . ($isActive ? 'true' : 'false') . '"><span>' . esc_html($label) . '</span><strong' . $countId . '>' . esc_html($count) . '</strong></button>';
     }
     return $html . '</div>';
   }
@@ -2010,7 +2031,7 @@ trait RendersDashboard
     $ordenesTotal = (string) ($row['ordenes_total'] ?? count($orders));
 
     return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '">'
-      . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Ticket <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'No fue enviada') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</span></div></div>'
+      . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Ticket <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</span></div></div>'
       . '<div class="scm-cotizacion-meta"><div><span>Fecha</span><strong>' . esc_html($fecha) . '</strong></div><div><span>Destinatario</span><strong>' . esc_html($destinatario !== '' ? $destinatario : '-') . '</strong></div><div><span>Contacto</span><strong>' . esc_html($contacto !== '' ? $contacto : '-') . '</strong></div><div><span>Empleado</span><strong>' . esc_html($empleado !== '' ? $empleado : '-') . '</strong></div><div><span>Ordenes</span><strong>' . esc_html($ordenesTotal) . '</strong></div></div>'
       . '<div class="scm-cotizacion-finance-actions"><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="saldos" aria-expanded="false">Ver saldos</button><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="totales" aria-expanded="false">Ver totales</button></div>'
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="saldos" hidden><div class="scm-cotizacion-finance-grid"><div><span>Saldo mano de obra</span><strong>' . esc_html($saldoObra) . '</strong></div><div><span>Saldo materiales</span><strong>' . esc_html($saldoMateriales) . '</strong></div><div><span>Saldo equipos</span><strong>' . esc_html($saldoMaquinarias) . '</strong></div><div><span>Saldo otros costos</span><strong>' . esc_html($saldoOtros) . '</strong></div></div></div>'

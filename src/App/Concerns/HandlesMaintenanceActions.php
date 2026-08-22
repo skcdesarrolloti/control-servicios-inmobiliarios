@@ -143,6 +143,7 @@ trait HandlesMaintenanceActions
       'kpi_esperando_respuesta' => (string) ($stats['esperando_respuesta'] ?? 0),
       'kpi_finalizadas' => (string) ($stats['finalizadas'] ?? 0),
       'kpi_sin_estado' => (string) ($stats['sin_estado'] ?? 0),
+      'kpi_ordenes_total' => (string) ($stats['ordenes_total'] ?? 0),
       'kpi_valor_total' => $this->format_cop_currency($stats['valor_total'] ?? 0),
     ]);
   }

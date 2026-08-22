@@ -3121,15 +3121,19 @@
 #scm-app .scm-cotizacion-state-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin: 12px 0 16px;
-  padding: 10px;
+  gap: 12px;
+  margin: 14px 0 16px;
+  padding: 12px;
   border: 1px solid rgba(226, 232, 240, 0.95);
-  border-radius: 16px;
+  border-radius: 18px;
   background: linear-gradient(135deg, #f8fafc 0%, #eef5ff 100%);
 }
 
 #scm-app .scm-cotizacion-state-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
   min-height: 42px;
   padding: 10px 16px;
   border: 1px solid #dbe7f5;
@@ -3140,6 +3144,17 @@
   font-weight: 800;
   cursor: pointer;
   transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+#scm-app .scm-cotizacion-state-tab strong {
+  min-width: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
 }
 
 #scm-app .scm-cotizacion-state-tab:hover {
@@ -3155,8 +3170,13 @@
   box-shadow: 0 14px 30px rgba(249, 115, 22, 0.22);
 }
 
+#scm-app .scm-cotizacion-state-tab.active strong {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
 #scm-app .scm-cotizaciones-kpis {
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
 }
 
 #scm-app .scm-cotizaciones-kpis .scm-kpi-money {
@@ -3210,13 +3230,15 @@
 }
 
 #scm-app .scm-cotizacion-pill.is-sent {
-  background: #dcfce7;
-  color: #166534;
+  background: #eaf2ff;
+  color: #1e3a8a;
+  border: 1px solid #bfdbfe;
 }
 
 #scm-app .scm-cotizacion-pill.is-pending {
   background: #fef3c7;
   color: #92400e;
+  border: 1px solid #fde68a;
 }
 
 #scm-app .scm-cotizacion-pill.is-state {
@@ -3269,6 +3291,12 @@
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px dashed rgba(148, 163, 184, 0.35);
+}
+
+#scm-app .scm-cotizacion-finance-actions .scm-case-work-btn {
+  min-height: 40px;
+  padding-inline: 16px;
+  background: #fff;
 }
 
 #scm-app .scm-cotizacion-finance-actions .scm-case-work-btn.active {
