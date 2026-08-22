@@ -75,6 +75,21 @@ final class PendingController
     );
   }
 
+  public function renderReportesAdministrativosTabShell(array $input = []): string
+  {
+    $filters = [
+      'estado' => trim((string) ($input['sra_estado'] ?? 'Pendiente')),
+      'id_empleado' => trim((string) ($input['sra_id_empleado'] ?? '')),
+      'arrendatario' => trim((string) ($input['sra_arrendatario'] ?? '')),
+      'inmueble' => trim((string) ($input['sra_inmueble'] ?? '')),
+      'categoria' => trim((string) ($input['sra_categoria'] ?? '')),
+      'id_ticket' => trim((string) ($input['sra_ticket'] ?? '')),
+      'contrato' => trim((string) ($input['sra_contrato'] ?? '')),
+    ];
+
+    return $this->view->renderReportesAdministrativosPanel($filters, $this->service->funcionarios(), [], 0, true);
+  }
+
   public function renderContratosArrendamientoTab(): string
   {
     return $this->view->renderContratosArrendamientoPanel($this->getContratoBucketDefinitions());

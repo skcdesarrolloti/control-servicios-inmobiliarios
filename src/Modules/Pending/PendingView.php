@@ -164,7 +164,7 @@ final class PendingView
     return (string) ob_get_clean();
   }
 
-  public function renderReportesAdministrativosPanel(array $filters, array $funcionarios, array $items, int $count): string
+  public function renderReportesAdministrativosPanel(array $filters, array $funcionarios, array $items, int $count, bool $lazy = false): string
   {
     ob_start();
 ?>
@@ -236,7 +236,7 @@ final class PendingView
       </div>
 
       <div id="sra_table">
-        <?php echo $this->renderReportesAdministrativosTable($items); ?>
+        <?php echo $lazy ? $this->renderPendingLazyPlaceholder('Abre esta pesta&ntilde;a para cargar reportes administrativos.') : $this->renderReportesAdministrativosTable($items); ?>
       </div>
     </div>
 <?php
