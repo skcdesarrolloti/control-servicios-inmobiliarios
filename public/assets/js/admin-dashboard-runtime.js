@@ -5650,13 +5650,16 @@
         return;
       }
       var map = {
-        "total": data.kpi_total || "0",
-        "no-enviadas": data.kpi_no_enviadas || "0",
-        "enviadas": data.kpi_enviadas || "0",
-        "aprobadas": data.kpi_aprobadas || "0",
-        "desaprobadas": data.kpi_desaprobadas || "0",
-        "esperando-respuesta": data.kpi_esperando_respuesta || "0",
-        "finalizadas": data.kpi_finalizadas || "0",
+        "total": data.kpi_tab_total || data.kpi_total || "0",
+        "no-enviadas": data.kpi_tab_no_enviadas || data.kpi_no_enviadas || "0",
+        "enviadas": data.kpi_tab_enviadas || data.kpi_enviadas || "0",
+        "aprobadas": data.kpi_tab_aprobadas || data.kpi_aprobadas || "0",
+        "desaprobadas": data.kpi_tab_desaprobadas || data.kpi_desaprobadas || "0",
+        "esperando-respuesta":
+          data.kpi_tab_esperando_respuesta ||
+          data.kpi_esperando_respuesta ||
+          "0",
+        "finalizadas": data.kpi_tab_finalizadas || data.kpi_finalizadas || "0",
       };
       Object.keys(map).forEach(function (key) {
         var el = root.querySelector("#scm-cotizaciones_mantenimiento-tab-" + key);
