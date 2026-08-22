@@ -31,13 +31,15 @@
             } catch (e) {}
             var ajaxUrl = runtime.ajaxUrl || '/api.php';
             var nonce = runtime.nonce || '';
+            var pendingPanel = form.closest('.scm-admin-activity-panel') || form.closest('.scm-tab-panel') || null;
 
             function submitForm() {
               var fd = new FormData(form);
               fd.append('action', action);
               fd.append('nonce', nonce);
               if (spinner) spinner.classList.add('active');
-              setInlineListLoading(form.closest('.scm-tab-panel') || document, true, 'Cargando datos...');
+              if (pendingPanel) pendingPanel.setAttribute('data-scm-loading', '1');
+              setInlineListLoading(pendingPanel || form.closest('.scm-tab-panel') || document, true, 'Cargando datos...');
               fetch(ajaxUrl, {
                   method: 'POST',
                   body: fd,
@@ -61,10 +63,12 @@
                     var rspHeaderCount = document.getElementById('rsp-kpi-count');
                     if (rspHeaderCount && typeof d.count === 'string') rspHeaderCount.textContent = d.count;
                   }
+                  if (pendingPanel) pendingPanel.setAttribute('data-scm-loaded', '1');
                 })
                 .finally(function() {
                   if (spinner) spinner.classList.remove('active');
-                  setInlineListLoading(form.closest('.scm-tab-panel') || document, false);
+                  if (pendingPanel) pendingPanel.setAttribute('data-scm-loading', '0');
+                  setInlineListLoading(pendingPanel || form.closest('.scm-tab-panel') || document, false);
                 });
             }
 

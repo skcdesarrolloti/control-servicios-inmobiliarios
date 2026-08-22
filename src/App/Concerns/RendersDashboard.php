@@ -100,8 +100,8 @@ trait RendersDashboard
     ];
 
     $pendingController = $this->get_pending_controller();
-    $preventivasPendientesHtml = $pendingController->renderPreventivasTab($_GET);
-    $serviciosPublicosPendientesHtml = $pendingController->renderServiciosPublicosTab($_GET);
+    $preventivasPendientesHtml = $this->render_pending_preventivas_shell($_GET);
+    $serviciosPublicosPendientesHtml = $this->render_pending_servicios_publicos_shell($_GET);
     $reportesAdministrativosPendientesHtml = $pendingController->renderReportesAdministrativosTab();
     $contratosArrendamientoHtml = $pendingController->renderContratosArrendamientoTab();
     $dashboardPermissionTabs = $this->dashboardPermissionTabs();
@@ -755,13 +755,13 @@ trait RendersDashboard
           <?php endif; ?>
 
           <?php if (in_array('preventivas_pendientes', $allowedAdministrativeActivityTabs, true)): ?>
-            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'preventivas_pendientes' ? ' active' : ''; ?>" id="scm-panel-preventivas-pendientes" data-permission-tab="preventivas_pendientes" data-admin-activity-panel="preventivas_pendientes">
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'preventivas_pendientes' ? ' active' : ''; ?>" id="scm-panel-preventivas-pendientes" data-permission-tab="preventivas_pendientes" data-admin-activity-panel="preventivas_pendientes" data-scm-loaded="0">
               <?php echo $preventivasPendientesHtml; ?>
             </div>
           <?php endif; ?>
 
           <?php if (in_array('servicios_publicos_pendientes', $allowedAdministrativeActivityTabs, true)): ?>
-            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'servicios_publicos_pendientes' ? ' active' : ''; ?>" id="scm-panel-servicios-publicos-pendientes" data-permission-tab="servicios_publicos_pendientes" data-admin-activity-panel="servicios_publicos_pendientes">
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'servicios_publicos_pendientes' ? ' active' : ''; ?>" id="scm-panel-servicios-publicos-pendientes" data-permission-tab="servicios_publicos_pendientes" data-admin-activity-panel="servicios_publicos_pendientes" data-scm-loaded="0">
               <?php echo $serviciosPublicosPendientesHtml; ?>
             </div>
           <?php endif; ?>
@@ -2094,6 +2094,58 @@ trait RendersDashboard
       $html .= '<button type="button" class="scm-page-btn btn btn-sm btn-outline scm-page-btn-generic" data-tab="cotizaciones_mantenimiento" data-page="' . esc_attr((string) $p) . '"' . ($page >= $totalPages ? ' disabled' : '') . '>' . $label . '</button>';
     }
     return $html . '</div></div>';
+  }
+
+  /** @return array<string,string> */
+  private function parse_pending_shell_filters(array $input, string $prefix): array
+  {
+    $clean = static fn($value): string => trim((string) ($value ?? ''));
+
+    return [
+      'mes' => $clean($input[$prefix . 'mes'] ?? ''),
+      'empleado' => $clean($input[$prefix . 'id_empleado'] ?? ''),
+      'tuvo' => $clean($input[$prefix . 'tuvo_preventiva'] ?? ''),
+      'inmueble' => $clean($input[$prefix . 'inmueble'] ?? ''),
+      'propietario' => $clean($input[$prefix . 'propietario'] ?? ''),
+      'arrendatario' => $clean($input[$prefix . 'arrendatario'] ?? ''),
+      'contrato' => $clean($input[$prefix . 'contrato'] ?? ''),
+      'id_ticket' => $clean($input[$prefix . 'caso'] ?? $input[$prefix . 'ticket'] ?? $input[$prefix . 'id_ticket'] ?? ''),
+    ];
+  }
+
+  private function render_pending_preventivas_shell(array $input): string
+  {
+    $view = new \SCM\Modules\Pending\PendingView();
+    $html = $view->renderPreventivasPanel(
+      $this->parse_pending_shell_filters($input, 'spp_'),
+      [],
+      [],
+      0,
+      (string) date('Y')
+    );
+
+    return str_replace(
+      'No hay contratos pendientes con los filtros actuales.',
+      'Abre esta pestaña para cargar preventivas pendientes.',
+      $html
+    );
+  }
+
+  private function render_pending_servicios_publicos_shell(array $input): string
+  {
+    $view = new \SCM\Modules\Pending\PendingView();
+    $html = $view->renderServiciosPublicosPanel(
+      $this->parse_pending_shell_filters($input, 'rsp_'),
+      [],
+      0,
+      (string) date('Y')
+    );
+
+    return str_replace(
+      'No hay contratos pendientes con los filtros actuales.',
+      'Abre esta pestaña para cargar servicios publicos pendientes.',
+      $html
+    );
   }
 
   /** @return array<string,mixed> */
