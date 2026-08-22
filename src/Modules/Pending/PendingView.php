@@ -6,7 +6,7 @@ final class PendingView
 {
   // Preventivas ----------------------------------------------------------------
 
-  public function renderPreventivasPanel(array $filters, array $funcionarios, array $items, int $count, string $corte, bool $lazy = false): string
+  public function renderPreventivasPanel(array $filters, array $funcionarios, array $items, int $count, string $corte): string
   {
     ob_start();
 ?>
@@ -78,7 +78,7 @@ final class PendingView
 
       <!-- Tabla -->
       <div id="spp_table">
-        <?php echo $lazy ? $this->renderPendingLazyPlaceholder('Abre esta pesta&ntilde;a para cargar preventivas pendientes.') : $this->renderPreventivasTable($items); ?>
+        <?php echo $this->renderPreventivasTable($items); ?>
       </div>
 
     </div>
@@ -88,7 +88,7 @@ final class PendingView
 
   // Servicios Publicos ---------------------------------------------------------
 
-  public function renderServiciosPublicosPanel(array $filters, array $items, int $count, string $corte, bool $lazy = false): string
+  public function renderServiciosPublicosPanel(array $filters, array $items, int $count, string $corte): string
   {
     ob_start();
   ?>
@@ -156,7 +156,7 @@ final class PendingView
 
       <!-- Tabla -->
       <div id="rsp_table">
-        <?php echo $lazy ? $this->renderPendingLazyPlaceholder('Abre esta pesta&ntilde;a para cargar servicios p&uacute;blicos pendientes.') : $this->renderServiciosPublicosTable($items); ?>
+        <?php echo $this->renderServiciosPublicosTable($items); ?>
       </div>
 
     </div>
@@ -577,11 +577,6 @@ final class PendingView
   }
 
   // Helpers --------------------------------------------------------------------
-
-  private function renderPendingLazyPlaceholder(string $message): string
-  {
-    return '<div class="scm-table-wrap"><div class="scm-empty scm-lazy-empty"><p>' . $message . '</p></div></div>';
-  }
 
   /** @param array<string,mixed> $row */
   private function contractTicketAttrs(array $row): string

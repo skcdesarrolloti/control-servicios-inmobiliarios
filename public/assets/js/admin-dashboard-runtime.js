@@ -6729,22 +6729,6 @@
       return loadPanelOnce(panel, panel.getAttribute("data-status-key") || "");
     }
 
-    function loadPendingFormOnce(panel, formSelector) {
-      if (!panel || !formSelector) {
-        return Promise.resolve();
-      }
-      if (panel.getAttribute("data-scm-loaded") === "1") {
-        return Promise.resolve();
-      }
-      var form = panel.querySelector(formSelector);
-      if (!form) {
-        return Promise.resolve();
-      }
-      panel.setAttribute("data-scm-loaded", "1");
-      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-      return Promise.resolve();
-    }
-
     function loadActiveLazyPanel() {
       var activePanel = root.querySelector(".scm-tab-panel.active");
       if (!activePanel) {
@@ -6793,24 +6777,6 @@
           administrativeKey === "notificaciones"
         ) {
           return initAdminNotificationsPanel(false);
-        }
-        if (
-          activeAdministrativePanel &&
-          administrativeKey === "preventivas_pendientes"
-        ) {
-          return loadPendingFormOnce(activeAdministrativePanel, "#spp_form");
-        }
-        if (
-          activeAdministrativePanel &&
-          administrativeKey === "servicios_publicos_pendientes"
-        ) {
-          return loadPendingFormOnce(activeAdministrativePanel, "#rsp_form");
-        }
-        if (
-          activeAdministrativePanel &&
-          administrativeKey === "reportes_administrativos_pendientes"
-        ) {
-          return loadPendingFormOnce(activeAdministrativePanel, "#sra_form");
         }
       }
       return Promise.resolve();
