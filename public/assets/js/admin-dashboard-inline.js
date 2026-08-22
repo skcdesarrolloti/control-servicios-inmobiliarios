@@ -36,10 +36,8 @@
               var fd = new FormData(form);
               fd.append('action', action);
               fd.append('nonce', nonce);
-              var panel = form.closest('.scm-admin-activity-panel') || form.closest('.scm-tab-panel') || null;
               if (spinner) spinner.classList.add('active');
-              if (panel) panel.setAttribute('data-scm-loading', '1');
-              setInlineListLoading(panel || document, true, 'Cargando datos...');
+              setInlineListLoading(form.closest('.scm-tab-panel') || document, true, 'Cargando datos...');
               fetch(ajaxUrl, {
                   method: 'POST',
                   body: fd,
@@ -63,18 +61,10 @@
                     var rspHeaderCount = document.getElementById('rsp-kpi-count');
                     if (rspHeaderCount && typeof d.count === 'string') rspHeaderCount.textContent = d.count;
                   }
-                  if (panel) {
-                    panel.setAttribute('data-scm-loaded', '1');
-                    panel.dispatchEvent(new CustomEvent('scm:pending-loaded', {
-                      bubbles: true,
-                      detail: { prefix: prefix, count: d.count || '0' }
-                    }));
-                  }
                 })
                 .finally(function() {
                   if (spinner) spinner.classList.remove('active');
-                  if (panel) panel.setAttribute('data-scm-loading', '0');
-                  setInlineListLoading(panel || document, false);
+                  setInlineListLoading(form.closest('.scm-tab-panel') || document, false);
                 });
             }
 
@@ -116,7 +106,6 @@
               fd.append('action', actionsSra.reportes_administrativos_pendientes || 'scm_reportes_administrativos_pendientes');
               fd.append('nonce', nonceSra);
               if (sraSpinner) sraSpinner.classList.add('active');
-              sraPanel.setAttribute('data-scm-loading', '1');
               setInlineListLoading(sraPanel, true, 'Cargando reportes...');
               fetch(ajaxUrlSra, {
                   method: 'POST',
@@ -133,15 +122,9 @@
                   var count = document.getElementById('sra-kpi-count');
                   if (table && typeof data.table_html === 'string') table.innerHTML = data.table_html;
                   if (count && typeof data.count === 'string') count.textContent = data.count;
-                  sraPanel.setAttribute('data-scm-loaded', '1');
-                  sraPanel.dispatchEvent(new CustomEvent('scm:pending-loaded', {
-                    bubbles: true,
-                    detail: { prefix: 'sra_', count: data.count || '0' }
-                  }));
                 })
                 .finally(function() {
                   if (sraSpinner) sraSpinner.classList.remove('active');
-                  sraPanel.setAttribute('data-scm-loading', '0');
                   setInlineListLoading(sraPanel, false);
                 });
             }

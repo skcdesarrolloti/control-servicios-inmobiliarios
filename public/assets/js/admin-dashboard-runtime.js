@@ -6736,14 +6736,11 @@
       if (panel.getAttribute("data-scm-loaded") === "1") {
         return Promise.resolve();
       }
-      if (panel.getAttribute("data-scm-loading") === "1") {
-        return Promise.resolve();
-      }
       var form = panel.querySelector(formSelector);
       if (!form) {
         return Promise.resolve();
       }
-      panel.setAttribute("data-scm-loading", "1");
+      panel.setAttribute("data-scm-loaded", "1");
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       return Promise.resolve();
     }

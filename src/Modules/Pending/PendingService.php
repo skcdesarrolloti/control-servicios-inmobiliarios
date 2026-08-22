@@ -20,12 +20,6 @@ final class PendingService
     $this->repo = $repo;
   }
 
-  /** @return array<int,array{id:string,label:string}> */
-  public function funcionarios(): array
-  {
-    return $this->repo->getFuncionarios();
-  }
-
   /** @return array<string,mixed> */
   public function markContratoRecibido(int $contractId, string $fechaRecibo): array
   {
