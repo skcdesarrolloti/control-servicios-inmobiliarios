@@ -5624,12 +5624,22 @@
         return;
       }
       var stateInput = form.querySelector("input[name='scmqt_estado']");
+      var sentSelect = form.querySelector("[name='scmqt_enviada']");
       var current = String(stateInput ? stateInput.value || "" : "").trim();
+      var currentSent = String(sentSelect ? sentSelect.value || "" : "").trim();
       root
         .querySelectorAll(".scm-cotizacion-state-tab")
         .forEach(function (btn) {
           var value = String(btn.getAttribute("data-cotizacion-state") || "").trim();
-          var active = value === current || (!value && !current);
+          var sent = String(btn.getAttribute("data-cotizacion-sent") || "").trim();
+          var active = false;
+          if (sent) {
+            active = sent === currentSent && !current;
+          } else if (!value) {
+            active = !current && !currentSent;
+          } else {
+            active = value === current && !currentSent;
+          }
           btn.classList.toggle("active", active);
           btn.setAttribute("aria-selected", active ? "true" : "false");
         });
@@ -5872,9 +5882,14 @@
           .forEach(function (stateBtn) {
             stateBtn.addEventListener("click", function () {
               var stateInput = tabForm.querySelector("input[name='scmqt_estado']");
+              var sentSelect = tabForm.querySelector("[name='scmqt_enviada']");
               if (stateInput) {
                 stateInput.value =
                   stateBtn.getAttribute("data-cotizacion-state") || "";
+              }
+              if (sentSelect) {
+                sentSelect.value =
+                  stateBtn.getAttribute("data-cotizacion-sent") || "";
               }
               if (pageInput) {
                 pageInput.value = "1";
@@ -6458,6 +6473,53 @@
     }
 
     root.addEventListener("click", function (e) {
+      var financeBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-cotizacion-toggle-panel]")
+          : null;
+      if (financeBtn) {
+        e.preventDefault();
+        var panelKey = financeBtn.getAttribute("data-scm-cotizacion-toggle-panel") || "";
+        var financeCard = financeBtn.closest(".scm-cotizacion-card");
+        var targetPanel = financeCard
+          ? financeCard.querySelector(
+              '[data-scm-cotizacion-finance-panel="' + panelKey + '"]',
+            )
+          : null;
+        if (!targetPanel) {
+          return;
+        }
+        var willOpen = targetPanel.hasAttribute("hidden");
+        if (financeCard) {
+          financeCard
+            .querySelectorAll("[data-scm-cotizacion-finance-panel]")
+            .forEach(function (panel) {
+              if (panel !== targetPanel) {
+                panel.setAttribute("hidden", "hidden");
+              }
+            });
+          financeCard
+            .querySelectorAll("[data-scm-cotizacion-toggle-panel]")
+            .forEach(function (btn) {
+              var key = btn.getAttribute("data-scm-cotizacion-toggle-panel") || "";
+              var isThis = key === panelKey;
+              btn.classList.toggle("active", isThis && willOpen);
+              btn.setAttribute("aria-expanded", isThis && willOpen ? "true" : "false");
+              if (key === "saldos") {
+                btn.textContent = isThis && willOpen ? "Ocultar saldos" : "Ver saldos";
+              } else if (key === "totales") {
+                btn.textContent = isThis && willOpen ? "Ocultar totales" : "Ver totales";
+              }
+            });
+        }
+        if (willOpen) {
+          targetPanel.removeAttribute("hidden");
+        } else {
+          targetPanel.setAttribute("hidden", "hidden");
+        }
+        return;
+      }
+
       var ordersBtn =
         e.target && e.target.closest
           ? e.target.closest("[data-scm-view-cotizacion-orders]")

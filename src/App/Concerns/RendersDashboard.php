@@ -1872,21 +1872,28 @@ trait RendersDashboard
 
   private function render_cotizaciones_mantenimiento_state_tabs(array $p): string
   {
-    $active = strtolower(trim((string) ($p['fEstado'] ?? '')));
+    $activeState = strtolower(trim((string) ($p['fEstado'] ?? '')));
+    $activeSent = strtolower(trim((string) ($p['fEnviada'] ?? '')));
     $states = [
-      '' => 'Todos',
-      'Aprobada' => 'Aprobadas',
-      'Desaprobada' => 'Desaprobadas',
-      'Esperando respuesta' => 'Esperando respuesta',
-      'Finalizado' => 'Finalizadas',
-      '__sin_estado__' => 'Sin estado',
+      ['state' => '', 'sent' => '', 'label' => 'Todos'],
+      ['state' => 'Aprobada', 'sent' => '', 'label' => 'Aprobadas'],
+      ['state' => 'Desaprobada', 'sent' => '', 'label' => 'Desaprobadas'],
+      ['state' => 'Esperando respuesta', 'sent' => '', 'label' => 'Esperando respuesta'],
+      ['state' => 'Finalizado', 'sent' => '', 'label' => 'Finalizadas'],
+      ['state' => '', 'sent' => 'no', 'label' => 'Sin enviar'],
     ];
 
     $html = '<div class="scm-cotizacion-state-tabs" role="tablist" aria-label="Estados de cotizaciones">';
-    foreach ($states as $value => $label) {
-      $normalizedValue = strtolower(trim((string) $value));
-      $isActive = $active === $normalizedValue || ($active === '' && $normalizedValue === '');
-      $html .= '<button type="button" class="scm-cotizacion-state-tab' . ($isActive ? ' active' : '') . '" data-cotizacion-state="' . esc_attr((string) $value) . '" aria-selected="' . ($isActive ? 'true' : 'false') . '">' . esc_html($label) . '</button>';
+    foreach ($states as $tab) {
+      $state = (string) ($tab['state'] ?? '');
+      $sent = (string) ($tab['sent'] ?? '');
+      $label = (string) ($tab['label'] ?? '');
+      $normalizedState = strtolower(trim($state));
+      $normalizedSent = strtolower(trim($sent));
+      $isActive = $normalizedSent !== ''
+        ? ($activeSent === $normalizedSent && $activeState === '')
+        : ($activeSent === '' && ($activeState === $normalizedState || ($activeState === '' && $normalizedState === '')));
+      $html .= '<button type="button" class="scm-cotizacion-state-tab' . ($isActive ? ' active' : '') . '" data-cotizacion-state="' . esc_attr($state) . '" data-cotizacion-sent="' . esc_attr($sent) . '" aria-selected="' . ($isActive ? 'true' : 'false') . '">' . esc_html($label) . '</button>';
     }
     return $html . '</div>';
   }
@@ -1991,15 +1998,23 @@ trait RendersDashboard
       $ordersHtml .= '<article class="scm-case-history-item"><div class="scm-case-history-meta"><strong>Orden #' . esc_html((string) ($order['_ID'] ?? '')) . '</strong><span>' . esc_html((string) ($order['estado'] ?? '-')) . '</span></div><div class="scm-case-history-detail"><p><strong>Proveedor:</strong> ' . esc_html((string) ($order['proveedor'] ?? '-')) . '</p><p><strong>Actividad:</strong> ' . esc_html((string) ($order['actividad'] ?? '-')) . '</p><p><strong>Valor:</strong> ' . esc_html($this->format_cop_currency($order['valor'] ?? 0)) . '</p></div></article>';
     }
 
-    $saldoObra = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_obra', 'total_mano_obra']));
-    $saldoMateriales = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_materiales', 'total_materiales']));
-    $saldoMaquinarias = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_maquinarias', 'total_maquinarias']));
-    $saldoOtros = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_otros_costo', 'total_otros_costos']));
+    $saldoObra = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_obra']));
+    $saldoMateriales = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_materiales']));
+    $saldoMaquinarias = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_maquinarias']));
+    $saldoOtros = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_otros_costo']));
+    $totalObra = $this->format_cop_currency($this->cotizacion_money_value($row, ['total_mano_obra']));
+    $totalMateriales = $this->format_cop_currency($this->cotizacion_money_value($row, ['total_materiales']));
+    $totalMaquinarias = $this->format_cop_currency($this->cotizacion_money_value($row, ['total_maquinarias']));
+    $totalOtros = $this->format_cop_currency($this->cotizacion_money_value($row, ['total_otros_costos']));
     $totalCotizacion = $this->format_cop_currency($this->cotizacion_money_value($row, ['total']));
+    $ordenesTotal = (string) ($row['ordenes_total'] ?? count($orders));
 
     return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '">'
       . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Ticket <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'No fue enviada') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</span></div></div>'
-      . '<div class="scm-cotizacion-meta"><div><span>Fecha</span><strong>' . esc_html($fecha) . '</strong></div><div><span>Destinatario</span><strong>' . esc_html($destinatario !== '' ? $destinatario : '-') . '</strong></div><div><span>Contacto</span><strong>' . esc_html($contacto !== '' ? $contacto : '-') . '</strong></div><div><span>Empleado</span><strong>' . esc_html($empleado !== '' ? $empleado : '-') . '</strong></div><div><span>Saldo mano de obra</span><strong>' . esc_html($saldoObra) . '</strong></div><div><span>Saldo materiales</span><strong>' . esc_html($saldoMateriales) . '</strong></div><div><span>Saldo equipos</span><strong>' . esc_html($saldoMaquinarias) . '</strong></div><div><span>Saldo otros costos</span><strong>' . esc_html($saldoOtros) . '</strong></div><div><span>Total cotizaci&oacute;n</span><strong>' . esc_html($totalCotizacion) . '</strong></div><div><span>Ordenes</span><strong>' . esc_html((string) ($row['ordenes_total'] ?? count($orders))) . '</strong></div></div>'
+      . '<div class="scm-cotizacion-meta"><div><span>Fecha</span><strong>' . esc_html($fecha) . '</strong></div><div><span>Destinatario</span><strong>' . esc_html($destinatario !== '' ? $destinatario : '-') . '</strong></div><div><span>Contacto</span><strong>' . esc_html($contacto !== '' ? $contacto : '-') . '</strong></div><div><span>Empleado</span><strong>' . esc_html($empleado !== '' ? $empleado : '-') . '</strong></div><div><span>Ordenes</span><strong>' . esc_html($ordenesTotal) . '</strong></div></div>'
+      . '<div class="scm-cotizacion-finance-actions"><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="saldos" aria-expanded="false">Ver saldos</button><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="totales" aria-expanded="false">Ver totales</button></div>'
+      . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="saldos" hidden><div class="scm-cotizacion-finance-grid"><div><span>Saldo mano de obra</span><strong>' . esc_html($saldoObra) . '</strong></div><div><span>Saldo materiales</span><strong>' . esc_html($saldoMateriales) . '</strong></div><div><span>Saldo equipos</span><strong>' . esc_html($saldoMaquinarias) . '</strong></div><div><span>Saldo otros costos</span><strong>' . esc_html($saldoOtros) . '</strong></div></div></div>'
+      . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="totales" hidden><div class="scm-cotizacion-finance-grid"><div><span>Total mano de obra</span><strong>' . esc_html($totalObra) . '</strong></div><div><span>Total materiales</span><strong>' . esc_html($totalMateriales) . '</strong></div><div><span>Total equipos</span><strong>' . esc_html($totalMaquinarias) . '</strong></div><div><span>Total otros costos</span><strong>' . esc_html($totalOtros) . '</strong></div><div class="scm-cotizacion-finance-total"><span>Total cotizaci&oacute;n</span><strong>' . esc_html($totalCotizacion) . '</strong></div></div></div>'
       . '<div class="scm-cotizacion-actions">'
       . ($cotUrl !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($cotUrl) . '" data-iframe-title="Cotizacion #' . esc_attr($id) . '">Ver cotizacion</button>' : '')
       . ($ticketUrl !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($ticketUrl) . '" data-iframe-title="Ticket #' . esc_attr($ticket) . '">Ver ticket</button>' : '')
