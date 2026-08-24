@@ -4,8 +4,113 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bc8e3204d1da4f87040be0ec3ed324cc",
-    "packages": [],
+    "content-hash": "648dbff3a179f9da0617bbe9b4114299",
+    "packages": [
+        {
+            "name": "shuchkin/simplexls",
+            "version": "1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/shuchkin/simplexls.git",
+                "reference": "0aad1dd0c8703c8fcc3234eda9d22d08e25b6579"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/shuchkin/simplexls/zipball/0aad1dd0c8703c8fcc3234eda9d22d08e25b6579",
+                "reference": "0aad1dd0c8703c8fcc3234eda9d22d08e25b6579",
+                "shasum": ""
+            },
+            "require": {
+                "ext-mbstring": "*",
+                "php": ">=5.5"
+            },
+            "type": "library",
+            "autoload": {
+                "classmap": [
+                    "src/SimpleXLS.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Sergey Shuchkin (SMSPILOT)",
+                    "email": "sergey.shuchkin@gmail.com",
+                    "homepage": "https://shuchkin.ru"
+                }
+            ],
+            "description": "Parse and retrieve data from old format Excel XLS files. MS Excel 97 workbooks PHP reader.",
+            "homepage": "https://github.com/shuchkin/simplexls",
+            "keywords": [
+                "backend",
+                "excel",
+                "parser",
+                "php",
+                "xls"
+            ],
+            "support": {
+                "issues": "https://github.com/shuchkin/simplexls/issues",
+                "source": "https://github.com/shuchkin/simplexls/tree/1.0.0"
+            },
+            "time": "2025-03-03T21:58:30+00:00"
+        },
+        {
+            "name": "shuchkin/simplexlsx",
+            "version": "1.1.17",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/shuchkin/simplexlsx.git",
+                "reference": "6e702e73a792fa906319df119e95f8e919e1c157"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/shuchkin/simplexlsx/zipball/6e702e73a792fa906319df119e95f8e919e1c157",
+                "reference": "6e702e73a792fa906319df119e95f8e919e1c157",
+                "shasum": ""
+            },
+            "require": {
+                "ext-libxml": "*",
+                "ext-mbstring": "*",
+                "ext-simplexml": "*",
+                "ext-zlib": "*",
+                "php": ">=5.5"
+            },
+            "type": "library",
+            "autoload": {
+                "classmap": [
+                    "src/SimpleXLSX.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Sergey Shuchkin (SMSPILOT)",
+                    "email": "sergey.shuchkin@gmail.com",
+                    "homepage": "https://github.com/shuchkin"
+                }
+            ],
+            "description": "Parse and retrieve data from Excel XLSx files. MS Excel 2007 workbooks PHP reader.",
+            "homepage": "https://github.com/shuchkin/simplexlsx",
+            "keywords": [
+                "backend",
+                "excel",
+                "parser",
+                "php",
+                "reader",
+                "xlsx"
+            ],
+            "support": {
+                "issues": "https://github.com/shuchkin/simplexlsx/issues",
+                "source": "https://github.com/shuchkin/simplexlsx/tree/1.1.17"
+            },
+            "time": "2026-08-11T12:02:19+00:00"
+        }
+    ],
     "packages-dev": [
         {
             "name": "myclabs/deep-copy",

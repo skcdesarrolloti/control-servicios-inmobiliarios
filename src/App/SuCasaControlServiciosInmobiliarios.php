@@ -11,6 +11,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   use \SCM\App\Concerns\HandlesPublicPqrActions;
   use \SCM\App\Concerns\HandlesAdministrativeNotifications;
+  use \SCM\App\Concerns\HandlesCanonInsuranceAudits;
   use \SCM\App\Concerns\RendersPublicPqr;
   use \SCM\App\Concerns\RendersDashboard;
 
@@ -58,6 +59,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_ADMIN_NOTIFICATIONS_SEND = 'scm_admin_notifications_send';
   const AJAX_ADMIN_NOTIFICATIONS_IMPORT = 'scm_admin_notifications_import';
   const AJAX_METRICS_EXECUTION = 'scm_metricas_ejecucion_funcionario';
+  const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';
+  const AJAX_CANON_INSURANCE_AUDIT_IMPORT = 'scm_auditoria_canon_aseguradoras_importar';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';
@@ -125,6 +128,7 @@ final class SuCasaControlServiciosInmobiliarios
       'contratos_arrendamiento' => 'Contratos de arrendamiento',
       'servicios_publicos_pendientes' => 'Servicios Publicos Pendientes',
       'reportes_administrativos_pendientes' => 'Reportes Administrativos',
+      'auditoria_canon_aseguradoras' => 'Auditoría de canon y aseguradoras',
       'metricas' => 'Metricas',
     ];
   }

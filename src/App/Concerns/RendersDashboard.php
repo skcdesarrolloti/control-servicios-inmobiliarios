@@ -148,6 +148,10 @@ trait RendersDashboard
       'reportes_administrativos_pendientes' => 'scm-panel-reportes-administrativos-pendientes',
       'reportes-administrativos-pendientes' => 'scm-panel-reportes-administrativos-pendientes',
       'scm-panel-reportes-administrativos-pendientes' => 'scm-panel-reportes-administrativos-pendientes',
+      'auditoria_canon_aseguradoras' => 'scm-panel-auditoria-canon-aseguradoras',
+      'auditoria-canon-aseguradoras' => 'scm-panel-auditoria-canon-aseguradoras',
+      'auditoria de canon y aseguradoras' => 'scm-panel-auditoria-canon-aseguradoras',
+      'scm-panel-auditoria-canon-aseguradoras' => 'scm-panel-auditoria-canon-aseguradoras',
     ];
     $initialTab = $tabMap[$tabKey] ?? '';
     $administrativeActivityTabs = [
@@ -174,6 +178,10 @@ trait RendersDashboard
       'reportes_administrativos_pendientes' => [
         'panel' => 'scm-panel-reportes-administrativos-pendientes',
         'label' => $dashboardPermissionTabs['reportes_administrativos_pendientes'] ?? 'Reportes Administrativos',
+      ],
+      'auditoria_canon_aseguradoras' => [
+        'panel' => 'scm-panel-auditoria-canon-aseguradoras',
+        'label' => $dashboardPermissionTabs['auditoria_canon_aseguradoras'] ?? 'Auditoría de canon y aseguradoras',
       ],
     ];
     $administrativePanelToTab = [];
@@ -314,6 +322,8 @@ trait RendersDashboard
         'admin_notifications_send' => self::AJAX_ADMIN_NOTIFICATIONS_SEND,
         'admin_notifications_import' => self::AJAX_ADMIN_NOTIFICATIONS_IMPORT,
         'metrics_execution' => self::AJAX_METRICS_EXECUTION,
+        'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
+        'canon_insurance_audit_import' => self::AJAX_CANON_INSURANCE_AUDIT_IMPORT,
         // Guía
         'guide_gcd_read' => self::AJAX_GUIDE_GCD_READ,
         'guide_gcd_save' => self::AJAX_GUIDE_GCD_SAVE,
@@ -393,24 +403,28 @@ trait RendersDashboard
     $cssRel = 'assets/css/scm-admin.css';
     $jsRel  = 'assets/js/scm-admin.js';
     $dashboardRuntimeJsRel = 'assets/js/admin-dashboard-runtime.js';
+    $canonInsuranceAuditJsRel = 'assets/js/admin-canon-insurance-audit.js';
     $guideJsRel = 'assets/js/admin-guide.js';
     $damageCssRel = 'assets/css/scm-damage-magnitude.css';
     $damageJsRel  = 'assets/js/scm-damage-magnitude.js';
     $cssPath = $assetBasePath . $cssRel;
     $jsPath  = $assetBasePath . $jsRel;
     $dashboardRuntimeJsPath = $assetBasePath . $dashboardRuntimeJsRel;
+    $canonInsuranceAuditJsPath = $assetBasePath . $canonInsuranceAuditJsRel;
     $guideJsPath = $assetBasePath . $guideJsRel;
     $damageCssPath = $assetBasePath . $damageCssRel;
     $damageJsPath  = $assetBasePath . $damageJsRel;
     $cssVer = file_exists($cssPath) ? (string)filemtime($cssPath) : SCM_VERSION;
     $jsVer  = file_exists($jsPath)  ? (string)filemtime($jsPath)  : SCM_VERSION;
     $dashboardRuntimeJsVer = file_exists($dashboardRuntimeJsPath) ? (string)filemtime($dashboardRuntimeJsPath) : SCM_VERSION;
+    $canonInsuranceAuditJsVer = file_exists($canonInsuranceAuditJsPath) ? (string)filemtime($canonInsuranceAuditJsPath) : SCM_VERSION;
     $guideJsVer = file_exists($guideJsPath) ? (string)filemtime($guideJsPath) : SCM_VERSION;
     $damageCssVer = file_exists($damageCssPath) ? (string)filemtime($damageCssPath) : SCM_VERSION;
     $damageJsVer  = file_exists($damageJsPath)  ? (string)filemtime($damageJsPath)  : SCM_VERSION;
     $cssUrl = self::h($assetBaseUrl . $cssRel . '?v=' . rawurlencode($cssVer));
     $jsUrl  = self::h($assetBaseUrl . $jsRel  . '?v=' . rawurlencode($jsVer));
     $dashboardRuntimeJsUrl = self::h($assetBaseUrl . $dashboardRuntimeJsRel . '?v=' . rawurlencode($dashboardRuntimeJsVer));
+    $canonInsuranceAuditJsUrl = self::h($assetBaseUrl . $canonInsuranceAuditJsRel . '?v=' . rawurlencode($canonInsuranceAuditJsVer));
     $guideJsUrl = self::h($assetBaseUrl . $guideJsRel . '?v=' . rawurlencode($guideJsVer));
     $damageCssUrl = self::h($assetBaseUrl . $damageCssRel . '?v=' . rawurlencode($damageCssVer));
     $damageJsUrl  = self::h($assetBaseUrl . $damageJsRel  . '?v=' . rawurlencode($damageJsVer));
@@ -773,6 +787,12 @@ trait RendersDashboard
               <?php echo $reportesAdministrativosPendientesHtml; ?>
             </div>
           <?php endif; ?>
+
+          <?php if (in_array('auditoria_canon_aseguradoras', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'auditoria_canon_aseguradoras' ? ' active' : ''; ?>" id="scm-panel-auditoria-canon-aseguradoras" data-permission-tab="auditoria_canon_aseguradoras" data-admin-activity-panel="auditoria_canon_aseguradoras">
+              <?php echo (new \SCM\Modules\CanonInsuranceAudit\CanonInsuranceAuditView())->renderPanel(); ?>
+            </div>
+          <?php endif; ?>
         </div>
       </div>
 
@@ -925,6 +945,7 @@ trait RendersDashboard
     </div>
     <script src="<?php echo $jsUrl; ?>" defer></script>
     <script src="<?php echo $dashboardRuntimeJsUrl; ?>" defer></script>
+    <script src="<?php echo $canonInsuranceAuditJsUrl; ?>" defer></script>
     <script src="<?php echo $guideJsUrl; ?>" defer></script>
     <script src="<?php echo $damageJsUrl; ?>" defer></script>
 <?php

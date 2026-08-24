@@ -4172,6 +4172,9 @@
       if (panelId === "scm-panel-reportes-administrativos-pendientes") {
         return "reportes_administrativos_pendientes";
       }
+      if (panelId === "scm-panel-auditoria-canon-aseguradoras") {
+        return "auditoria_canon_aseguradoras";
+      }
       return "";
     }
 
