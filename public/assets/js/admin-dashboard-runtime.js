@@ -136,6 +136,7 @@
     var actionCotizacionesMantenimiento =
       actions.cotizaciones_mantenimiento || "";
     var actionDeleteCotizacion = actions.delete_cotizacion || "";
+    var actionCotizacionPdf = actions.cotizacion_pdf || "";
     var actionActivateTicket = actions.activate_ticket || "";
     var actionCloseTicket = actions.close_ticket || "";
     var actionContactsUpdate = actions.contacts_update || "";
@@ -6610,6 +6611,70 @@
       printWin.document.close();
     }
 
+    function downloadCotizacionPdf(cotizacionId, button) {
+      if (!ajaxUrl || !actionCotizacionPdf || !cotizacionId) {
+        showToast("error", "No se pudo generar el PDF de la cotizacion.");
+        return;
+      }
+      var originalText = button ? button.textContent : "";
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Generando...";
+      }
+      var formData = new FormData();
+      formData.append("action", actionCotizacionPdf);
+      formData.append("nonce", nonce);
+      formData.append("id_cotizacion", cotizacionId);
+      fetch(ajaxUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin",
+      })
+        .then(function (response) {
+          var contentType = response.headers.get("content-type") || "";
+          if (!response.ok || contentType.indexOf("application/pdf") === -1) {
+            return response.text().then(function (text) {
+              var message = "No se pudo generar el PDF.";
+              try {
+                var json = JSON.parse(text);
+                message =
+                  (json && json.data && json.data.message) ||
+                  json.message ||
+                  message;
+              } catch (ignore) {
+                if (text) {
+                  message = text.replace(/<[^>]+>/g, " ").trim() || message;
+                }
+              }
+              throw new Error(message);
+            });
+          }
+          return response.blob();
+        })
+        .then(function (blob) {
+          var url = URL.createObjectURL(blob);
+          var link = document.createElement("a");
+          link.href = url;
+          link.download = "cotizacion-mantenimiento-" + cotizacionId + ".pdf";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(function () {
+            URL.revokeObjectURL(url);
+          }, 1500);
+          showToast("success", "PDF de cotizacion generado.");
+        })
+        .catch(function (err) {
+          showToast("error", err.message || "No se pudo generar el PDF.");
+        })
+        .finally(function () {
+          if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Generar PDF";
+          }
+        });
+    }
+
     function openCotizacionNativeModal(button) {
       var card = button.closest(".scm-cotizacion-card");
       var source = card ? card.querySelector(".scm-cotizacion-native-source") : null;
@@ -6632,7 +6697,7 @@
           '<div><span>Cotizacion de mantenimiento</span><strong>#' + escHtml(cotizacionId || "-") + "</strong></div>" +
           '<div class="scm-cotizacion-native-toolbar-actions">' +
           '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-open-large>Ver en grande</button>' +
-          '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-cotizacion-print>Exportar PDF</button>' +
+          '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-cotizacion-print>Generar PDF</button>' +
           "</div></div>" +
           '<div class="scm-cotizacion-native-scroll"><div class="scm-cotizacion-native-print-root">' +
           content +
@@ -6659,7 +6724,7 @@
           }
           if (printBtn) {
             printBtn.addEventListener("click", function () {
-              openCotizacionPrintWindow(title, printable, true);
+              downloadCotizacionPdf(cotizacionId, printBtn);
             });
           }
         },

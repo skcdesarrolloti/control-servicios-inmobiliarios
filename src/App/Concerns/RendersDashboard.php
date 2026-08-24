@@ -279,6 +279,7 @@ trait RendersDashboard
         'my_tickets'      => self::AJAX_MY_TICKETS,
         'cotizaciones_mantenimiento' => self::AJAX_COTIZACIONES_MANTENIMIENTO,
         'delete_cotizacion' => self::AJAX_DELETE_COTIZACION,
+        'cotizacion_pdf' => self::AJAX_COTIZACION_MANTENIMIENTO_PDF,
         'activate_ticket' => self::AJAX_ACTIVATE_TICKET,
         'cotizacion_response' => self::AJAX_COTIZACION_RESPONSE,
         'close_ticket'    => self::AJAX_CLOSE_TICKET,
