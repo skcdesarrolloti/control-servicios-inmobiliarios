@@ -5645,6 +5645,51 @@
         });
     }
 
+    function updateCotizacionKpiVisibility(form) {
+      if (!form) {
+        return;
+      }
+      var stateInput = form.querySelector("input[name='scmqt_estado']");
+      var sentSelect = form.querySelector("[name='scmqt_enviada']");
+      var current = String(stateInput ? stateInput.value || "" : "").trim().toLowerCase();
+      var currentSent = String(sentSelect ? sentSelect.value || "" : "").trim().toLowerCase();
+      var visible = {
+        total: true,
+        ordenes: true,
+        "valor-total": true,
+      };
+
+      if (!current && !currentSent) {
+        ["enviadas", "no-enviadas", "aprobadas", "desaprobadas", "esperando-respuesta", "finalizadas"].forEach(function (key) {
+          visible[key] = true;
+        });
+      } else if (currentSent === "no" && !current) {
+        visible["no-enviadas"] = true;
+      } else if (currentSent === "si" && !current) {
+        ["enviadas", "aprobadas", "desaprobadas", "esperando-respuesta", "finalizadas"].forEach(function (key) {
+          visible[key] = true;
+        });
+      } else if (current) {
+        var stateMap = {
+          aprobada: "aprobadas",
+          desaprobada: "desaprobadas",
+          "esperando respuesta": "esperando-respuesta",
+          finalizado: "finalizadas",
+          finalizada: "finalizadas",
+        };
+        if (stateMap[current]) {
+          visible[stateMap[current]] = true;
+        }
+      }
+
+      root.querySelectorAll("[data-scm-cotizacion-kpi]").forEach(function (card) {
+        var key = card.getAttribute("data-scm-cotizacion-kpi") || "";
+        var show = !!visible[key];
+        card.classList.toggle("scm-kpi-context-hidden", !show);
+        card.setAttribute("aria-hidden", show ? "false" : "true");
+      });
+    }
+
     function updateCotizacionStateTabCounts(data) {
       if (!data) {
         return;
@@ -5827,6 +5872,7 @@
               );
               updateCotizacionStateTabs(tabForm);
               updateCotizacionStateTabCounts(d);
+              updateCotizacionKpiVisibility(tabForm);
             }
             updateGenericKPI(tabKey, "con-cotz", d.kpi_con_cotz || "0");
             updateGenericKPI(tabKey, "sin-cotz", d.kpi_sin_cotz || "0");
@@ -5952,6 +5998,7 @@
                 pageInput.value = "1";
               }
               updateCotizacionStateTabs(tabForm);
+              updateCotizacionKpiVisibility(tabForm);
               fetchTab(new FormData(tabForm));
             });
           });
@@ -6024,6 +6071,7 @@
           }
           if (tabKey === "cotizaciones_mantenimiento") {
             updateCotizacionStateTabs(tabForm);
+            updateCotizacionKpiVisibility(tabForm);
           }
           applyBinaryFilterKpiVisibility(
             "scm-" + tabKey + "-",
@@ -6046,6 +6094,9 @@
       );
       if (tabCotizacionSelect) {
         applyCotizacionDependentFilters(tabForm, tabCotizacionSelect);
+      }
+      if (tabKey === "cotizaciones_mantenimiento") {
+        updateCotizacionKpiVisibility(tabForm);
       }
 
       if (tabPagination) {

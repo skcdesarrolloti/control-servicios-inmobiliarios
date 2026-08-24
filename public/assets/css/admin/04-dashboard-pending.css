@@ -3179,6 +3179,10 @@
   grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
 }
 
+#scm-app .scm-cotizaciones-kpis .scm-kpi-context-hidden {
+  display: none;
+}
+
 #scm-app .scm-cotizaciones-kpis .scm-kpi-money {
   min-width: 190px;
 }

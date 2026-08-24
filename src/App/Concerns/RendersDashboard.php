@@ -1858,10 +1858,31 @@ trait RendersDashboard
     return '<span id="scm-cotizaciones_mantenimiento-count" style="display:none;">' . esc_html((string) ($stats['total'] ?? 0)) . '</span>'
       . '<div class="scm-status-topic-head"><div><h3>Cotizaciones de Mantenimiento</h3><p>Control de envio, respuesta, ordenes y acciones de cotizacion.</p></div><span class="scm-status-count"><strong id="scm-cotizaciones_mantenimiento-kpi-total">' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> cotizaciones</span></div>'
       . $this->render_cotizaciones_mantenimiento_state_tabs($params, $tabStats)
-      . '<div class="scm-kpis scm-kpis-daisy scm-cotizaciones-kpis"><div class="scm-kpi"><div class="scm-kpi-label">Total</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-total-card">' . esc_html((string) ($stats['total'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Enviadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-enviadas">' . esc_html((string) ($stats['enviadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Sin enviar</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-no-enviadas">' . esc_html((string) ($stats['no_enviadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Aprobadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-aprobadas">' . esc_html((string) ($stats['aprobadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Desaprobadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-desaprobadas">' . esc_html((string) ($stats['desaprobadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Esperando respuesta</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-esperando-respuesta">' . esc_html((string) ($stats['esperando_respuesta'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">Finalizadas</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-finalizadas">' . esc_html((string) ($stats['finalizadas'] ?? 0)) . '</div></div><div class="scm-kpi"><div class="scm-kpi-label">&Oacute;rdenes</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-ordenes">' . esc_html((string) ($stats['ordenes_total'] ?? 0)) . '</div></div><div class="scm-kpi scm-kpi-money"><div class="scm-kpi-label">Total cotizaciones</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-valor-total">' . esc_html($this->format_cop_currency($stats['valor_total'] ?? 0)) . '</div></div></div>'
+      . $this->render_cotizaciones_mantenimiento_kpis($stats)
       . $this->render_cotizaciones_mantenimiento_filter_form($params)
       . '<div class="scm-cotizaciones-list" id="scm-cards-cotizaciones_mantenimiento">' . $this->render_cotizaciones_mantenimiento_cards($rows) . '</div>'
       . '<div class="scm-pagination" id="scm-pagination-cotizaciones_mantenimiento">' . $this->render_cotizaciones_mantenimiento_pagination($pagination) . '</div>';
+  }
+
+  private function render_cotizaciones_mantenimiento_kpis(array $stats): string
+  {
+    $items = [
+      ['key' => 'total', 'label' => 'Total', 'id' => 'total-card', 'value' => (string) ($stats['total'] ?? 0)],
+      ['key' => 'enviadas', 'label' => 'Enviadas', 'id' => 'enviadas', 'value' => (string) ($stats['enviadas'] ?? 0)],
+      ['key' => 'no-enviadas', 'label' => 'Sin enviar', 'id' => 'no-enviadas', 'value' => (string) ($stats['no_enviadas'] ?? 0)],
+      ['key' => 'aprobadas', 'label' => 'Aprobadas', 'id' => 'aprobadas', 'value' => (string) ($stats['aprobadas'] ?? 0)],
+      ['key' => 'desaprobadas', 'label' => 'Desaprobadas', 'id' => 'desaprobadas', 'value' => (string) ($stats['desaprobadas'] ?? 0)],
+      ['key' => 'esperando-respuesta', 'label' => 'Esperando respuesta', 'id' => 'esperando-respuesta', 'value' => (string) ($stats['esperando_respuesta'] ?? 0)],
+      ['key' => 'finalizadas', 'label' => 'Finalizadas', 'id' => 'finalizadas', 'value' => (string) ($stats['finalizadas'] ?? 0)],
+      ['key' => 'ordenes', 'label' => '&Oacute;rdenes', 'id' => 'ordenes', 'value' => (string) ($stats['ordenes_total'] ?? 0)],
+      ['key' => 'valor-total', 'label' => 'Total cotizaciones', 'id' => 'valor-total', 'value' => $this->format_cop_currency($stats['valor_total'] ?? 0), 'class' => ' scm-kpi-money'],
+    ];
+
+    $html = '<div class="scm-kpis scm-kpis-daisy scm-cotizaciones-kpis">';
+    foreach ($items as $item) {
+      $html .= '<div class="scm-kpi' . esc_attr((string) ($item['class'] ?? '')) . '" data-scm-cotizacion-kpi="' . esc_attr((string) $item['key']) . '"><div class="scm-kpi-label">' . (string) $item['label'] . '</div><div class="scm-kpi-value" id="scm-cotizaciones_mantenimiento-kpi-' . esc_attr((string) $item['id']) . '">' . esc_html((string) $item['value']) . '</div></div>';
+    }
+    return $html . '</div>';
   }
 
   private function render_cotizaciones_mantenimiento_filter_form(array $p): string
