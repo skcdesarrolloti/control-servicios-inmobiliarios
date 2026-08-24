@@ -14,8 +14,8 @@ final class CanonInsuranceAuditService
 
   private Database $db;
   private SpreadsheetReader $reader;
-  /** @var array<string,string> */
-  private array $employeeNameCache = [];
+  /** @var array<string,array{id:string,name:string}> */
+  private array $employeeIdentityCache = [];
 
   public function __construct(Database $db, ?SpreadsheetReader $reader = null)
   {
@@ -169,6 +169,14 @@ final class CanonInsuranceAuditService
     $incrementChanges = $this->db->getResults(
       "SELECT * FROM `{$this->incrementChangesTable()}` ORDER BY `changed_at` DESC, `id` DESC LIMIT 100"
     );
+    foreach ($incrementChanges as &$incrementChange) {
+      $identity = $this->employeeIdentity((string) ($incrementChange['changed_by_id'] ?? ''));
+      $incrementChange['changed_by_id'] = $identity['id'];
+      if ($identity['name'] !== '') {
+        $incrementChange['changed_by_name'] = $identity['name'];
+      }
+    }
+    unset($incrementChange);
 
     return [
       'audits' => $audits,
@@ -223,7 +231,8 @@ final class CanonInsuranceAuditService
       }
 
       $authorId = AuditValueNormalizer::text($row['cct_author_id'] ?? '');
-      $authorName = $this->employeeName($authorId);
+      $authorIdentity = $this->employeeIdentity($authorId);
+      $authorName = $authorIdentity['name'] !== '' ? $authorIdentity['name'] : 'No identificado';
       $changedAt = AuditValueNormalizer::text($row['cct_modified'] ?? '');
       if ($changedAt === '') {
         $changedAt = date('Y-m-d H:i:s');
@@ -620,21 +629,30 @@ final class CanonInsuranceAuditService
     ];
   }
 
-  private function employeeName(string $id): string
+  /** @return array{id:string,name:string} */
+  private function employeeIdentity(string $internalId): array
   {
-    if ($id === '') {
-      return 'No identificado';
+    if ($internalId === '') {
+      return ['id' => '', 'name' => ''];
     }
-    if (isset($this->employeeNameCache[$id])) {
-      return $this->employeeNameCache[$id];
+    if (isset($this->employeeIdentityCache[$internalId])) {
+      return $this->employeeIdentityCache[$internalId];
     }
     $table = $this->db->table('jet_cct_funcionarios');
     $row = $this->db->getRow(
-      "SELECT TRIM(COALESCE(`nombre`, '')) AS nombre FROM `{$table}` WHERE CAST(`_ID` AS CHAR) = ? OR TRIM(COALESCE(`id_empleado`, '')) = ? LIMIT 1",
-      [$id, $id]
+      "SELECT TRIM(COALESCE(`id_empleado`, '')) AS id_empleado,
+              TRIM(COALESCE(`nombre`, '')) AS nombre
+         FROM `{$table}`
+        WHERE CAST(`_ID` AS CHAR) = ?
+        LIMIT 1",
+      [$internalId]
     );
+    $employeeId = AuditValueNormalizer::text($row['id_empleado'] ?? '');
     $name = AuditValueNormalizer::text($row['nombre'] ?? '');
-    return $this->employeeNameCache[$id] = ($name !== '' ? $name : 'Usuario #' . $id);
+    return $this->employeeIdentityCache[$internalId] = [
+      'id' => $employeeId,
+      'name' => $name,
+    ];
   }
 
   private function ensureSchema(): void
