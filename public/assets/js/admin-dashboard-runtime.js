@@ -6601,32 +6601,17 @@
           return;
         }
         var willOpen = targetPanel.hasAttribute("hidden");
-        if (financeCard) {
-          financeCard
-            .querySelectorAll("[data-scm-cotizacion-finance-panel]")
-            .forEach(function (panel) {
-              if (panel !== targetPanel) {
-                panel.setAttribute("hidden", "hidden");
-              }
-            });
-          financeCard
-            .querySelectorAll("[data-scm-cotizacion-toggle-panel]")
-            .forEach(function (btn) {
-              var key = btn.getAttribute("data-scm-cotizacion-toggle-panel") || "";
-              var isThis = key === panelKey;
-              btn.classList.toggle("active", isThis && willOpen);
-              btn.setAttribute("aria-expanded", isThis && willOpen ? "true" : "false");
-              if (key === "saldos") {
-                btn.textContent = isThis && willOpen ? "Ocultar saldos" : "Ver saldos";
-              } else if (key === "totales") {
-                btn.textContent = isThis && willOpen ? "Ocultar totales" : "Ver totales";
-              }
-            });
-        }
         if (willOpen) {
           targetPanel.removeAttribute("hidden");
         } else {
           targetPanel.setAttribute("hidden", "hidden");
+        }
+        financeBtn.classList.toggle("active", willOpen);
+        financeBtn.setAttribute("aria-expanded", willOpen ? "true" : "false");
+        if (panelKey === "saldos") {
+          financeBtn.textContent = willOpen ? "Ocultar saldos" : "Ver saldos";
+        } else if (panelKey === "totales") {
+          financeBtn.textContent = willOpen ? "Ocultar totales" : "Ver totales";
         }
         return;
       }
