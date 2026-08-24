@@ -2289,39 +2289,48 @@ trait RendersDashboard
     $equipos = $this->cotizacion_parse_list($row['items_otros_equi'] ?? '');
     $otros = $this->cotizacion_parse_list($row['items_otros_costos'] ?? '');
     $resumen = $this->cotizacion_parse_json($row['resumen_calculo_perturbacion'] ?? '');
+    $totalCotizacion = $this->format_cop_currency($row['total'] ?? 0);
+    $coordinadorNombre = $this->cotizacion_clean_text($row['coordinador'] ?? '');
+    $coordinadorEmail = $this->cotizacion_clean_text($row['email_coordinador'] ?? '');
+    $coordinadorCelular = $this->cotizacion_clean_text($row['celular_coordinador'] ?? '');
+    $coordinadorCargo = $this->cotizacion_clean_text($row['cargo_coordinador'] ?? 'Coordinador contractual');
+    $creadorNombre = $this->cotizacion_clean_text($row['creador'] ?? '');
+    $creadorEmail = $this->cotizacion_clean_text($row['email_creador'] ?? '');
+    $creadorCelular = $this->cotizacion_clean_text($row['celular_creador'] ?? '');
 
-    $html = '<article class="scm-cotizacion-native-doc" data-cotizacion-print-title="Cotizacion #' . esc_attr($id) . '">';
+    $html = '<article class="scm-cotizacion-native-doc" data-cotizacion-print-title="Cotización #' . esc_attr($id) . '">';
     $html .= '<header class="scm-cotizacion-native-hero">';
-    $html .= '<div class="scm-cotizacion-native-brand"><img src="' . esc_attr($logo) . '" alt="SuCasa Inmobiliaria"><div><span>Cotizaci&oacute;n de mantenimiento</span><strong>#' . esc_html($id !== '' ? $id : '-') . '</strong></div></div>';
-    $html .= '<div class="scm-cotizacion-native-state"><span class="' . ($enviada ? 'is-sent' : 'is-pending') . '">' . esc_html($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><strong>' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</strong></div>';
-    $html .= '<h2>Cotizaci&oacute;n #' . esc_html($id !== '' ? $id : '-') . ' de la revisi&oacute;n ' . esc_html($tipo !== '' ? strtolower($tipo) : 'de mantenimiento') . '</h2>';
+    $html .= '<div class="scm-cotizacion-native-brand"><div class="scm-cotizacion-native-logo"><img src="' . esc_attr($logo) . '" alt="SuCasa Inmobiliaria"><strong>SuCasa Inmobiliaria</strong><span>Control Servicios Inmobiliarios</span></div><div class="scm-cotizacion-native-number"><span>Cotización de mantenimiento</span><strong>#' . esc_html($id !== '' ? $id : '-') . '</strong></div></div>';
+    $html .= '<div class="scm-cotizacion-native-hero-bottom"><div><p class="scm-cotizacion-native-eyebrow">Documento comercial</p><h2>Cotización de mantenimiento para revisión ' . esc_html($tipo !== '' ? strtolower($this->cotizacion_clean_text($tipo)) : 'de mantenimiento') . '</h2></div><div class="scm-cotizacion-native-state"><span class="' . ($enviada ? 'is-sent' : 'is-pending') . '">' . esc_html($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><strong>' . esc_html($estado !== '' ? $this->cotizacion_clean_text($estado) : 'Sin estado') . '</strong><em>Total ' . esc_html($totalCotizacion) . '</em></div></div>';
     $html .= '</header>';
 
     $html .= '<section class="scm-cotizacion-native-grid scm-cotizacion-native-summary">';
     foreach ([
       'Fecha' => $fecha,
-      'Fecha de env&iacute;o' => $fechaEnvio,
+      'Fecha de envío' => $fechaEnvio,
       'Contrato' => (string) ($row['contrato'] ?? '-'),
       'Destinatario' => (string) ($row['destinatario'] ?? '-'),
-      'Validez' => trim((string) ($row['valides_oferta'] ?? '')) !== '' ? trim((string) ($row['valides_oferta'] ?? '')) . ' d&iacute;a/s' : '-',
-      'Duraci&oacute;n del trabajo' => trim((string) ($row['duracion'] ?? '')) !== '' ? trim((string) ($row['duracion'] ?? '')) . ' d&iacute;a/s' : '-',
+      'Validez' => $this->cotizacion_days_label($row['valides_oferta'] ?? ''),
+      'Duración del trabajo' => $this->cotizacion_days_label($row['duracion'] ?? ''),
       'Inmueble' => (string) ($row['inmueble'] ?? '-'),
-      'Direcci&oacute;n' => (string) ($row['direccion'] ?? '-'),
-      'Responsable' => (string) ($row['coordinador'] ?? $row['creador'] ?? '-'),
+      'Dirección' => (string) ($row['direccion'] ?? '-'),
+      'Coordinador contractual' => $coordinadorNombre !== '' ? $coordinadorNombre : '-',
+      'Elaboró la cotización' => $creadorNombre !== '' ? $creadorNombre : '-',
       'Ticket / Inmueble' => ($ticket !== '' ? '#' . $ticket : '-') . ' / ' . trim((string) ($row['id_inmueble'] ?? '-')),
     ] as $label => $value) {
-      $html .= '<div><span>' . $label . '</span><strong>' . esc_html(trim((string) $value) !== '' ? (string) $value : '-') . '</strong></div>';
+      $cleanValue = $this->cotizacion_clean_text($value);
+      $html .= '<div><span>' . esc_html($label) . '</span><strong>' . esc_html($cleanValue !== '' ? $cleanValue : '-') . '</strong></div>';
     }
     $html .= '</section>';
 
     $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-offers"><h3>Ofertas y soportes</h3><div class="scm-cotizacion-native-two-col">';
     $html .= '<div><h4>Mejor oferta</h4>' . $this->render_cotizacion_media_grid($mejorOferta, 'Sin mejor oferta adjunta.') . '</div>';
-    $html .= '<div><h4>Otras ofertas</h4>' . $this->render_cotizacion_media_grid($otrasOfertas, 'No se present&oacute; ninguna otra oferta.') . '</div>';
+    $html .= '<div><h4>Otras ofertas</h4>' . $this->render_cotizacion_media_grid($otrasOfertas, 'No se presentó ninguna otra oferta.') . '</div>';
     $html .= '</div></section>';
 
-    $html .= '<section class="scm-cotizacion-native-section"><h3>Da&ntilde;os encontrados</h3>';
+    $html .= '<section class="scm-cotizacion-native-section"><h3>Daños encontrados</h3>';
     if (empty($danos)) {
-      $html .= '<p class="scm-cotizacion-native-empty">Sin da&ntilde;os registrados.</p>';
+      $html .= '<p class="scm-cotizacion-native-empty">Sin daños registrados.</p>';
     }
     foreach ($danos as $damage) {
       $damageMedia = $this->cotizacion_media_items($this->cotizacion_split_ids($damage['registro_foto_dano'] ?? ''));
@@ -2332,10 +2341,10 @@ trait RendersDashboard
         trim((string) ($damage['area_afectada_4'] ?? '')),
       ]);
       $html .= '<article class="scm-cotizacion-damage-card">';
-      $html .= '<div class="scm-cotizacion-damage-head"><div><span>&Iacute;ndice</span><strong>' . esc_html((string) ($damage['indice'] ?? '-')) . '</strong></div><div><span>Corresponde a</span><strong>' . esc_html((string) ($damage['a_quien_corresponde'] ?? '-')) . '</strong></div><div><span>Nivel</span><strong>' . esc_html((string) ($damage['nivel_dano'] ?? '-')) . '</strong></div><div><span>Tiempo atenci&oacute;n</span><strong>' . esc_html((string) ($damage['tiempo_atencion'] ?? '-')) . '</strong></div></div>';
-      $html .= '<div class="scm-cotizacion-native-tags">' . (empty($areas) ? '<span>-</span>' : implode('', array_map(static fn($area): string => '<span>' . esc_html($area) . '</span>', $areas))) . '</div>';
-      $html .= '<div class="scm-cotizacion-native-rich"><h4>Descripci&oacute;n del da&ntilde;o</h4>' . $this->cotizacion_rich_text($damage['descripcion_dano'] ?? '') . '<h4>Consecuencia</h4>' . $this->cotizacion_rich_text($damage['consecuencia'] ?? '') . '</div>';
-      $html .= $this->render_cotizacion_media_grid($damageMedia, 'Sin registro fotogr&aacute;fico.');
+      $html .= '<div class="scm-cotizacion-damage-head"><div><span>Índice</span><strong>' . esc_html($this->cotizacion_clean_text($damage['indice'] ?? '-')) . '</strong></div><div><span>Corresponde a</span><strong>' . esc_html($this->cotizacion_clean_text($damage['a_quien_corresponde'] ?? '-')) . '</strong></div><div><span>Nivel</span><strong>' . esc_html($this->cotizacion_clean_text($damage['nivel_dano'] ?? '-')) . '</strong></div><div><span>Tiempo de atención</span><strong>' . esc_html($this->cotizacion_clean_text($damage['tiempo_atencion'] ?? '-')) . '</strong></div></div>';
+      $html .= '<div class="scm-cotizacion-native-tags">' . (empty($areas) ? '<span>-</span>' : implode('', array_map(fn($area): string => '<span>' . esc_html($this->cotizacion_clean_text($area)) . '</span>', $areas))) . '</div>';
+      $html .= '<div class="scm-cotizacion-native-rich"><h4>Descripción del daño</h4>' . $this->cotizacion_rich_text($damage['descripcion_dano'] ?? '') . '<h4>Consecuencia</h4>' . $this->cotizacion_rich_text($damage['consecuencia'] ?? '') . '</div>';
+      $html .= $this->render_cotizacion_media_grid($damageMedia, 'Sin registro fotográfico.');
       $html .= '</article>';
     }
     $html .= '</section>';
@@ -2351,28 +2360,28 @@ trait RendersDashboard
       'Mano de obra' => $row['total_mano_obra'] ?? 0,
       'Equipos' => $row['total_maquinarias'] ?? 0,
       'Otros costos' => $row['total_otros_costos'] ?? 0,
-      'Administraci&oacute;n ' . esc_html((string) ($row['porcentaje_admon'] ?? '0')) . '%' => $row['total_admon'] ?? 0,
+      'Administración ' . esc_html((string) ($row['porcentaje_admon'] ?? '0')) . '%' => $row['total_admon'] ?? 0,
       'IVA ' . esc_html((string) ($row['iva'] ?? '0')) . '%' => $row['iva_admon'] ?? 0,
     ] as $label => $value) {
       $html .= '<div><span>' . $label . '</span><strong>' . esc_html($this->format_cop_currency($value)) . '</strong></div>';
     }
-    $html .= '<div class="is-grand-total"><span>Total del trabajo</span><strong>' . esc_html($this->format_cop_currency($row['total'] ?? 0)) . '</strong></div>';
+    $html .= '<div class="is-grand-total"><span>Total cotización</span><strong>' . esc_html($totalCotizacion) . '</strong></div>';
     $html .= '</div></section>';
 
-    $html .= '<section class="scm-cotizacion-native-section"><h3>Observaciones y perturbaci&oacute;n</h3>';
+    $html .= '<section class="scm-cotizacion-native-section"><h3>Observaciones y perturbación</h3>';
     if (trim((string) ($row['observaciones'] ?? '')) !== '') {
       $html .= '<div class="scm-cotizacion-native-note">' . $this->cotizacion_rich_text($row['observaciones']) . '</div>';
     }
     $html .= '<div class="scm-cotizacion-native-grid">';
     foreach ([
-      'Perturbaci&oacute;n sugerida' => trim((string) ($row['perturbacion'] ?? '')) . '%',
-      'Bonificaci&oacute;n sugerida' => $this->format_cop_currency($row['valor_bonificacion'] ?? 0),
-      'D&iacute;as calculados' => (string) ($row['dias_afectacion_calculados'] ?? '-'),
-      '&Aacute;rea afectada' => trim((string) ($row['area_afectada'] ?? '')) !== '' ? trim((string) ($row['area_afectada'] ?? '')) . ' m2' : '-',
+      'Perturbación sugerida' => trim((string) ($row['perturbacion'] ?? '')) . '%',
+      'Bonificación sugerida' => $this->format_cop_currency($row['valor_bonificacion'] ?? 0),
+      'Días calculados' => (string) ($row['dias_afectacion_calculados'] ?? '-'),
+      'Área afectada' => trim((string) ($row['area_afectada'] ?? '')) !== '' ? trim((string) ($row['area_afectada'] ?? '')) . ' m2' : '-',
       'Tipo inmueble' => (string) ($row['tipo_inmueble'] ?? '-'),
-      'Destinaci&oacute;n' => (string) ($row['destinacion'] ?? '-'),
+      'Destinación' => (string) ($row['destinacion'] ?? '-'),
     ] as $label => $value) {
-      $html .= '<div><span>' . $label . '</span><strong>' . esc_html((string) $value) . '</strong></div>';
+      $html .= '<div><span>' . esc_html($label) . '</span><strong>' . esc_html($this->cotizacion_clean_text($value)) . '</strong></div>';
     }
     $html .= '</div>';
     if (!empty($resumen['criterios']) && is_array($resumen['criterios'])) {
@@ -2383,12 +2392,12 @@ trait RendersDashboard
       $html .= '</ol>';
     }
     if (trim((string) ($row['justificacion_perturbacion'] ?? '')) !== '') {
-      $html .= '<h4>Justificaci&oacute;n</h4><div class="scm-cotizacion-native-note">' . $this->cotizacion_rich_text($row['justificacion_perturbacion']) . '</div>';
+      $html .= '<h4>Justificación</h4><div class="scm-cotizacion-native-note">' . $this->cotizacion_rich_text($row['justificacion_perturbacion']) . '</div>';
     }
     $html .= '</section>';
 
-    $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-legal"><h3>Favor tener en cuenta</h3><p>Cuando las reparaciones sean responsabilidad de los propietarios, el administrador informar&aacute; la novedad. Si no se atiende dentro del plazo contractual, la administraci&oacute;n podr&aacute; realizar la gesti&oacute;n y descontar el valor correspondiente del canon de arrendamiento, de acuerdo con el contrato de mandato vigente.</p></section>';
-    $html .= '<footer class="scm-cotizacion-native-footer"><div><span>Verificador de inmuebles</span><strong>' . esc_html((string) ($row['coordinador'] ?? $row['creador'] ?? '-')) . '</strong><p>Email: ' . esc_html((string) ($row['email_coordinador'] ?? $row['email_creador'] ?? '-')) . '</p><p>Celular: ' . esc_html((string) ($row['celular_coordinador'] ?? $row['celular_creador'] ?? '-')) . '</p></div><div><strong>SuCasa Inmobiliaria</strong><p>NIT 900.623.242-4</p><p>Cartagena de Indias - Colombia</p></div></footer>';
+    $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-legal"><h3>Favor tener en cuenta</h3><p>Cuando las reparaciones sean responsabilidad de los propietarios, el administrador informará la novedad. Si no se atiende dentro del plazo contractual, la administración podrá realizar la gestión y descontar el valor correspondiente del canon de arrendamiento, de acuerdo con el contrato de mandato vigente.</p></section>';
+    $html .= '<footer class="scm-cotizacion-native-footer"><div><span>Coordinador contractual</span><strong>' . esc_html($coordinadorNombre !== '' ? $coordinadorNombre : '-') . '</strong><p>' . esc_html($coordinadorCargo !== '' ? $coordinadorCargo : 'Coordinador contractual') . '</p><p>Email: ' . esc_html($coordinadorEmail !== '' ? $coordinadorEmail : '-') . '</p><p>Celular: ' . esc_html($coordinadorCelular !== '' ? $coordinadorCelular : '-') . '</p></div><div><span>Elaboró la cotización</span><strong>' . esc_html($creadorNombre !== '' ? $creadorNombre : '-') . '</strong><p>Email: ' . esc_html($creadorEmail !== '' ? $creadorEmail : '-') . '</p><p>Celular: ' . esc_html($creadorCelular !== '' ? $creadorCelular : '-') . '</p></div><div><span>Empresa</span><strong>SuCasa Inmobiliaria</strong><p>NIT 900.623.242-4</p><p>Cartagena de Indias - Colombia</p></div></footer>';
     return $html . '</article>';
   }
 
@@ -2400,6 +2409,38 @@ trait RendersDashboard
       $ts = strtotime((string) $raw) ?: 0;
     }
     return $ts > 0 ? date('d-m-Y', $ts) : '-';
+  }
+
+  private function cotizacion_clean_text($value): string
+  {
+    $text = (string) $value;
+    for ($i = 0; $i < 3; $i++) {
+      $decoded = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+      if ($decoded === $text) {
+        break;
+      }
+      $text = $decoded;
+    }
+    $text = strip_tags($text);
+    $text = preg_replace('/\s+/', ' ', $text) ?: '';
+    return trim($text);
+  }
+
+  private function cotizacion_days_label($value): string
+  {
+    $text = $this->cotizacion_clean_text($value);
+    if ($text === '' || $text === '-') {
+      return '-';
+    }
+    $numeric = $this->parse_cop_number($text);
+    if ($numeric === null) {
+      return $text;
+    }
+    $days = (int) round($numeric);
+    if ($days <= 0) {
+      return '-';
+    }
+    return $days . ' ' . ($days === 1 ? 'día' : 'días');
   }
 
   /** @return array<string,mixed> */
@@ -2504,13 +2545,14 @@ trait RendersDashboard
     $html = '<div class="scm-cotizacion-media-grid">';
     foreach ($items as $item) {
       $isImage = strpos(strtolower($item['mime'] ?? ''), 'image/') === 0;
+      $title = $this->cotizacion_clean_text($item['title'] !== '' ? $item['title'] : 'Ver adjunto');
       $html .= '<a href="' . esc_attr($item['url']) . '" target="_blank" rel="noopener noreferrer" class="scm-cotizacion-media-item">';
       if ($isImage) {
-        $html .= '<img src="' . esc_attr($item['url']) . '" alt="' . esc_attr($item['title'] !== '' ? $item['title'] : 'Imagen adjunta') . '">';
+        $html .= '<img src="' . esc_attr($item['url']) . '" alt="' . esc_attr($title !== '' ? $title : 'Imagen adjunta') . '">';
       } else {
         $html .= '<span class="scm-cotizacion-media-file">Documento</span>';
       }
-      $html .= '<strong>' . esc_html($item['title'] !== '' ? $item['title'] : 'Ver adjunto') . '</strong></a>';
+      $html .= '<strong>' . esc_html($title !== '' ? $title : 'Ver adjunto') . '</strong></a>';
     }
     return $html . '</div>';
   }
@@ -2522,11 +2564,11 @@ trait RendersDashboard
     if (empty($items)) {
       $html .= '<p class="scm-cotizacion-native-empty">Sin items registrados.</p>';
     } else {
-      $html .= '<table class="scm-cotizacion-budget-table"><thead><tr><th>Descripci&oacute;n / proveedor</th><th>Valor</th></tr></thead><tbody>';
+      $html .= '<table class="scm-cotizacion-budget-table"><thead><tr><th>Descripción / proveedor</th><th>Valor</th></tr></thead><tbody>';
       foreach ($items as $item) {
         $label = $this->cotizacion_first_matching_value($item, ['prove', 'descripcion', 'actividad', 'concepto', 'detalle']);
         $value = $this->cotizacion_first_matching_value($item, ['valor', 'total', 'saldo']);
-        $html .= '<tr><td>' . esc_html($label !== '' ? $label : '-') . '</td><td>' . esc_html($this->format_cop_currency($value)) . '</td></tr>';
+        $html .= '<tr><td>' . esc_html($label !== '' ? $this->cotizacion_clean_text($label) : '-') . '</td><td>' . esc_html($this->format_cop_currency($value)) . '</td></tr>';
       }
       $html .= '</tbody></table>';
     }
@@ -2541,7 +2583,7 @@ trait RendersDashboard
       $keyNorm = strtolower((string) $key);
       foreach ($needles as $needle) {
         if (strpos($keyNorm, $needle) !== false) {
-          return trim(strip_tags((string) $value));
+          return $this->cotizacion_clean_text($value);
         }
       }
     }
@@ -2550,7 +2592,14 @@ trait RendersDashboard
 
   private function cotizacion_rich_text($value): string
   {
-    $html = html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $html = (string) $value;
+    for ($i = 0; $i < 3; $i++) {
+      $decoded = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+      if ($decoded === $html) {
+        break;
+      }
+      $html = $decoded;
+    }
     $html = strip_tags($html, '<p><br><strong><b><em><i><ul><ol><li>');
     $html = preg_replace('/<([a-z][a-z0-9]*)\b[^>]*>/i', '<$1>', $html) ?: '';
     $html = trim($html);

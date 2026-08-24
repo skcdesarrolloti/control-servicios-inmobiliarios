@@ -4143,6 +4143,193 @@
   font-weight: 700;
 }
 
+/* Refinamiento factura nativa de cotización */
+.scm-cotizacion-native-modal,
+.scm-cotizacion-native-modal * {
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.scm-cotizacion-native-doc {
+  border-top-width: 6px;
+  border-radius: 26px;
+  color: #0b1f3a;
+}
+
+.scm-cotizacion-native-hero {
+  display: grid;
+  gap: 26px;
+  padding: 26px;
+  border: 0;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 91% 8%, rgba(255, 255, 255, 0.2), transparent 25%),
+    linear-gradient(135deg, #061d49 0%, #123765 58%, #f28c00 145%);
+  color: #fff;
+}
+
+.scm-cotizacion-native-logo {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 14px;
+  min-width: min(430px, 100%);
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: #fff;
+  color: #061d49;
+  box-shadow: 0 18px 36px rgba(8, 34, 71, 0.16);
+}
+
+.scm-cotizacion-native-logo img {
+  grid-row: span 2;
+  width: 82px !important;
+  max-width: 82px !important;
+  max-height: 58px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.scm-cotizacion-native-logo strong {
+  margin: 0;
+  color: #061d49;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.scm-cotizacion-native-logo span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.scm-cotizacion-native-number {
+  text-align: right;
+}
+
+.scm-cotizacion-native-number span,
+.scm-cotizacion-native-eyebrow {
+  color: rgba(255, 255, 255, 0.78) !important;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.scm-cotizacion-native-number strong {
+  color: #fff;
+  font-size: clamp(36px, 5vw, 54px);
+  font-weight: 900;
+  letter-spacing: -0.06em;
+}
+
+.scm-cotizacion-native-hero-bottom {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.scm-cotizacion-native-eyebrow {
+  margin: 0 0 7px;
+}
+
+.scm-cotizacion-native-hero h2 {
+  max-width: 720px;
+  margin: 0;
+  color: #fff;
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 900;
+  letter-spacing: -0.045em;
+}
+
+.scm-cotizacion-native-state {
+  min-width: 220px;
+}
+
+.scm-cotizacion-native-state strong {
+  background: #fff;
+  color: #061d49;
+  box-shadow: 0 10px 22px rgba(8, 34, 71, 0.14);
+}
+
+.scm-cotizacion-native-state em {
+  display: block;
+  margin-top: 10px;
+  color: #fff;
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.scm-cotizacion-native-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.scm-cotizacion-native-summary > div {
+  min-height: 72px;
+  background: #f8fbff;
+}
+
+.scm-cotizacion-native-section {
+  padding: 18px;
+}
+
+.scm-cotizacion-budget-block + .scm-cotizacion-budget-block {
+  margin-top: 14px;
+}
+
+.scm-cotizacion-native-footer {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px;
+}
+
+.scm-cotizacion-native-footer > div {
+  min-height: 118px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.scm-cotizacion-native-footer strong {
+  display: block;
+  margin-top: 6px;
+  color: #fff;
+  font-size: 15px;
+}
+
+@media (max-width: 980px) {
+  .scm-cotizacion-native-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scm-cotizacion-native-hero-bottom,
+  .scm-cotizacion-native-brand,
+  .scm-cotizacion-native-footer {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .scm-cotizacion-native-hero-bottom {
+    display: grid;
+  }
+
+  .scm-cotizacion-native-number,
+  .scm-cotizacion-native-state {
+    text-align: left;
+  }
+}
+
 /* Notificaciones administrativas */
 #scm-app .scm-admin-notifications {
   display: grid;

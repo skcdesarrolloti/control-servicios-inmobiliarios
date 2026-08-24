@@ -611,25 +611,32 @@ trait HandlesMaintenanceActions
     $enviada = in_array($seEnvio, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true);
     $fecha = $this->cotizacion_date_label($row['fecha'] ?? $row['cct_created'] ?? '');
     $fechaEnvio = $this->cotizacion_date_label($row['fecha_envio'] ?? '');
-    $destinatario = trim((string) ($row['destinatario'] ?? '-'));
-    $direccion = trim((string) ($row['direccion'] ?? '-'));
-    $responsable = trim((string) ($row['coordinador'] ?? $row['creador'] ?? 'Control Servicios Inmobiliarios'));
+    $destinatario = $this->cotizacion_clean_text($row['destinatario'] ?? '-');
+    $direccion = $this->cotizacion_clean_text($row['direccion'] ?? '-');
+    $coordinador = $this->cotizacion_clean_text($row['coordinador'] ?? '');
+    $coordinadorCargo = $this->cotizacion_clean_text($row['cargo_coordinador'] ?? 'Coordinador contractual');
+    $coordinadorEmail = $this->cotizacion_clean_text($row['email_coordinador'] ?? '');
+    $coordinadorCelular = $this->cotizacion_clean_text($row['celular_coordinador'] ?? '');
+    $creador = $this->cotizacion_clean_text($row['creador'] ?? '');
+    $creadorEmail = $this->cotizacion_clean_text($row['email_creador'] ?? '');
+    $creadorCelular = $this->cotizacion_clean_text($row['celular_creador'] ?? '');
 
-    $pdf->title('Cotizacion de mantenimiento #' . ($id !== '' ? $id : '-'));
-    $pdf->line('Estado: ' . ($estado !== '' ? $estado : 'Sin estado') . ' | Envio: ' . ($enviada ? 'Fue enviada' : 'Sin enviar'), 8, 'F2');
-    $pdf->line('Fecha: ' . $fecha . ' | Fecha de envio: ' . $fechaEnvio, 8);
+    $pdf->title('Cotización de mantenimiento #' . ($id !== '' ? $id : '-'));
+    $pdf->line('Estado: ' . ($estado !== '' ? $this->cotizacion_clean_text($estado) : 'Sin estado') . ' | Envío: ' . ($enviada ? 'Fue enviada' : 'Sin enviar'), 8, 'F2');
+    $pdf->line('Fecha: ' . $fecha . ' | Fecha de envío: ' . $fechaEnvio, 8);
     $pdf->spacer(5);
 
     $pdf->heading('Datos generales');
     $pdf->line('Ticket: ' . ($ticket !== '' ? '#' . $ticket : '-') . ' | Contrato: ' . trim((string) ($row['contrato'] ?? '-')) . ' | Inmueble SIMI: ' . trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '-')), 8, 'F2');
-    $pdf->line('Destinatario: ' . ($destinatario !== '' ? $destinatario : '-') . ' | Contacto: ' . trim((string) ($row['celular_destinatario'] ?? '-')), 8);
-    $pdf->paragraph('Direccion: ' . ($direccion !== '' ? $direccion : '-'), 8);
-    $pdf->line('Tipo de mantenimiento: ' . ($tipo !== '' ? $tipo : 'Mantenimiento'), 8);
+    $pdf->line('Destinatario: ' . ($destinatario !== '' ? $destinatario : '-') . ' | Contacto: ' . $this->cotizacion_clean_text($row['celular_destinatario'] ?? '-'), 8);
+    $pdf->paragraph('Dirección: ' . ($direccion !== '' ? $direccion : '-'), 8);
+    $pdf->line('Tipo de mantenimiento: ' . ($tipo !== '' ? $this->cotizacion_clean_text($tipo) : 'Mantenimiento'), 8);
+    $pdf->line('Validez: ' . $this->cotizacion_days_label($row['valides_oferta'] ?? '') . ' | Duración del trabajo: ' . $this->cotizacion_days_label($row['duracion'] ?? ''), 8);
 
-    $pdf->heading('Resumen economico');
+    $pdf->heading('Resumen económico');
     $pdf->line('Materiales: ' . $this->format_cop_currency($row['total_materiales'] ?? 0) . ' | Mano de obra: ' . $this->format_cop_currency($row['total_mano_obra'] ?? 0) . ' | Equipos: ' . $this->format_cop_currency($row['total_maquinarias'] ?? 0), 8, 'F2');
-    $pdf->line('Otros costos: ' . $this->format_cop_currency($row['total_otros_costos'] ?? 0) . ' | Administracion: ' . $this->format_cop_currency($row['total_admon'] ?? 0) . ' | IVA admon: ' . $this->format_cop_currency($row['iva_admon'] ?? 0), 8);
-    $pdf->line('TOTAL COTIZACION: ' . $this->format_cop_currency($row['total'] ?? 0), 12, 'F2');
+    $pdf->line('Otros costos: ' . $this->format_cop_currency($row['total_otros_costos'] ?? 0) . ' | Administración: ' . $this->format_cop_currency($row['total_admon'] ?? 0) . ' | IVA administración: ' . $this->format_cop_currency($row['iva_admon'] ?? 0), 8);
+    $pdf->line('TOTAL COTIZACIÓN: ' . $this->format_cop_currency($row['total'] ?? 0), 12, 'F2');
 
     foreach ([
       'Materiales' => ['items' => $this->cotizacion_parse_list($row['items_materiales'] ?? ''), 'total' => $row['total_materiales'] ?? 0],
@@ -648,7 +655,7 @@ trait HandlesMaintenanceActions
         }
         $label = $this->cotizacion_first_matching_value($item, ['prove', 'descripcion', 'actividad', 'concepto', 'detalle']);
         $value = $this->cotizacion_first_matching_value($item, ['valor', 'total', 'saldo']);
-        $pdf->line('- ' . ($label !== '' ? $label : 'Item') . ': ' . $this->format_cop_currency($value), 8);
+        $pdf->line('- ' . ($label !== '' ? $this->cotizacion_clean_text($label) : 'Ítem') . ': ' . $this->format_cop_currency($value), 8);
       }
       $pdf->line('Subtotal ' . strtolower((string) $section) . ': ' . $this->format_cop_currency($data['total'] ?? 0), 8, 'F2');
     }
@@ -656,20 +663,19 @@ trait HandlesMaintenanceActions
     $revision = $this->cotizacion_revision_row($row);
     $danos = $this->cotizacion_parse_list($revision['evaluacion_de_danos'] ?? '');
     if (!empty($danos)) {
-      $pdf->heading('Danos evaluados');
+      $pdf->heading('Daños evaluados');
       foreach ($danos as $damage) {
         if (!is_array($damage)) {
           continue;
         }
-        $summary = trim((string) ($damage['descripcion_dano'] ?? ''));
-        $summary = trim(strip_tags(html_entity_decode($summary, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
-        $responsableDano = trim((string) ($damage['a_quien_corresponde'] ?? '-'));
-        $nivel = trim((string) ($damage['nivel_dano'] ?? '-'));
-        $pdf->paragraph('Corresponde a: ' . ($responsableDano !== '' ? $responsableDano : '-') . ' | Nivel: ' . ($nivel !== '' ? $nivel : '-') . '. ' . ($summary !== '' ? $summary : 'Sin descripcion registrada.'), 8);
+        $summary = $this->cotizacion_clean_text($damage['descripcion_dano'] ?? '');
+        $responsableDano = $this->cotizacion_clean_text($damage['a_quien_corresponde'] ?? '-');
+        $nivel = $this->cotizacion_clean_text($damage['nivel_dano'] ?? '-');
+        $pdf->paragraph('Corresponde a: ' . ($responsableDano !== '' ? $responsableDano : '-') . ' | Nivel: ' . ($nivel !== '' ? $nivel : '-') . '. ' . ($summary !== '' ? $summary : 'Sin descripción registrada.'), 8);
       }
     }
 
-    $observaciones = trim(strip_tags(html_entity_decode((string) ($row['observaciones'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+    $observaciones = $this->cotizacion_clean_text($row['observaciones'] ?? '');
     if ($observaciones !== '') {
       $pdf->heading('Observaciones');
       $pdf->paragraph($observaciones, 8);
@@ -687,20 +693,21 @@ trait HandlesMaintenanceActions
       }
     }
 
-    $pdf->heading('Ordenes de mantenimiento');
+    $pdf->heading('Órdenes de mantenimiento');
     if (empty($orders)) {
-      $pdf->paragraph('Sin ordenes registradas para esta cotizacion.', 8);
+      $pdf->paragraph('Sin órdenes registradas para esta cotización.', 8);
     } else {
       foreach ($orders as $order) {
-        $pdf->line('Orden #' . trim((string) ($order['_ID'] ?? '-')) . ' | Estado: ' . trim((string) ($order['estado'] ?? '-')) . ' | Valor: ' . $this->format_cop_currency($order['valor'] ?? 0), 8, 'F2');
-        $pdf->paragraph('Proveedor: ' . trim((string) ($order['proveedor'] ?? '-')) . '. Actividad: ' . trim((string) ($order['actividad'] ?? '-')), 8);
+        $pdf->line('Orden #' . trim((string) ($order['_ID'] ?? '-')) . ' | Estado: ' . $this->cotizacion_clean_text($order['estado'] ?? '-') . ' | Valor: ' . $this->format_cop_currency($order['valor'] ?? 0), 8, 'F2');
+        $pdf->paragraph('Proveedor: ' . $this->cotizacion_clean_text($order['proveedor'] ?? '-') . '. Actividad: ' . $this->cotizacion_clean_text($order['actividad'] ?? '-'), 8);
       }
     }
 
     $pdf->heading('Nota contractual');
-    $pdf->paragraph('Cuando las reparaciones sean responsabilidad de los propietarios, el administrador informara la novedad. Si no se atiende dentro del plazo contractual, la administracion podra realizar la gestion y descontar el valor correspondiente del canon de arrendamiento, de acuerdo con el contrato de mandato vigente.', 8);
+    $pdf->paragraph('Cuando las reparaciones sean responsabilidad de los propietarios, el administrador informará la novedad. Si no se atiende dentro del plazo contractual, la administración podrá realizar la gestión y descontar el valor correspondiente del canon de arrendamiento, de acuerdo con el contrato de mandato vigente.', 8);
     $pdf->spacer(8);
-    $pdf->signatureBlock('Responsable de la cotizacion', $responsable !== '' ? $responsable : 'Control Servicios Inmobiliarios', trim('Email: ' . (string) ($row['email_coordinador'] ?? $row['email_creador'] ?? '-') . ' | Cel. ' . (string) ($row['celular_coordinador'] ?? $row['celular_creador'] ?? '-'), ' |'));
+    $pdf->signatureBlock('Coordinador contractual', $coordinador !== '' ? $coordinador : 'Control Servicios Inmobiliarios', trim(($coordinadorCargo !== '' ? $coordinadorCargo : 'Coordinador contractual') . ' | Email: ' . ($coordinadorEmail !== '' ? $coordinadorEmail : '-') . ' | Cel. ' . ($coordinadorCelular !== '' ? $coordinadorCelular : '-'), ' |'));
+    $pdf->signatureBlock('Elaboró la cotización', $creador !== '' ? $creador : 'Control Servicios Inmobiliarios', trim('Email: ' . ($creadorEmail !== '' ? $creadorEmail : '-') . ' | Cel. ' . ($creadorCelular !== '' ? $creadorCelular : '-'), ' |'));
 
     return $pdf;
   }
