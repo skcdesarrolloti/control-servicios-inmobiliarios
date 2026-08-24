@@ -26,13 +26,13 @@ final class CanonInsuranceAuditView
           <input id="scm_cia_period" name="period" type="month" value="<?php echo esc_attr(date('Y-m')); ?>" required>
         </div>
         <div class="scm-field scm-cia-file-field">
-          <label for="scm_cia_file">Extracto de aseguradora</label>
-          <input id="scm_cia_file" name="file" type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
-          <small>Formatos admitidos: XLS y XLSX. El formato se detecta autom&aacute;ticamente.</small>
+          <label for="scm_cia_file">Extractos de aseguradoras</label>
+          <input id="scm_cia_file" name="files" type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple required>
+          <small>Selecciona uno o varios archivos XLS/XLSX. Cada archivo se audita y registra por separado para el mismo periodo.</small>
         </div>
-        <button type="submit" class="scm-btn-primary btn btn-primary" data-cia-upload-button>Auditar archivo</button>
+        <button type="submit" class="scm-btn-primary btn btn-primary" data-cia-upload-button>Auditar archivos</button>
       </form>
-      <div class="scm-cia-status" data-cia-status aria-live="polite">Carga un extracto o consulta el &uacute;ltimo registro.</div>
+      <div class="scm-cia-status" data-cia-status aria-live="polite">Carga uno o varios extractos, o consulta el &uacute;ltimo registro.</div>
       <div class="scm-cia-content" data-cia-content>
         <div class="scm-cia-loading" role="status">Cargando auditor&iacute;as registradas&hellip;</div>
       </div>
@@ -186,11 +186,12 @@ final class CanonInsuranceAuditView
     ob_start();
 ?>
     <section class="scm-cia-section scm-cia-increments">
-      <div class="scm-cia-section-head"><div><h3>Trazabilidad de actas de incremento</h3><p>Registra qui&eacute;n cambi&oacute; el dato, cu&aacute;ndo ocurri&oacute; y en qu&eacute; campo del contrato.</p></div><span><?php echo esc_html((string) count($changes)); ?> cambios recientes</span></div>
+      <?php $changeCount = count($changes); ?>
+      <div class="scm-cia-section-head"><div><h3>Historial de cambios de incrementos</h3><p>Muestra qui&eacute;n modific&oacute; las fechas, porcentajes o documentos de incremento de canon y administraci&oacute;n, cu&aacute;ndo lo hizo y en qu&eacute; contrato.</p></div><span><?php echo esc_html((string) $changeCount); ?> <?php echo $changeCount === 1 ? 'cambio reciente' : 'cambios recientes'; ?></span></div>
       <?php if ($changes === []): ?>
-        <div class="scm-cia-empty"><strong>No hay cambios de incremento registrados.</strong><span>Los nuevos cambios de canon o administraci&oacute;n aparecer&aacute;n aqu&iacute; al sincronizar esta pesta&ntilde;a.</span></div>
+        <div class="scm-cia-empty"><strong>No hay modificaciones de incrementos registradas.</strong><span>Cuando cambien fechas, porcentajes o documentos de canon o administraci&oacute;n, aparecer&aacute;n aqu&iacute; al sincronizar esta pesta&ntilde;a.</span></div>
       <?php else: ?>
-        <div class="scm-cia-table-wrap"><table class="scm-cia-table scm-cia-change-table"><thead><tr><th>Cu&aacute;ndo</th><th>Qui&eacute;n</th><th>Contrato</th><th>D&oacute;nde</th><th>Valor anterior</th><th>Valor nuevo</th></tr></thead><tbody>
+        <div class="scm-cia-table-wrap"><table class="scm-cia-table scm-cia-change-table"><thead><tr><th>Cu&aacute;ndo</th><th>Qui&eacute;n</th><th>Contrato</th><th>Campo modificado</th><th>Valor anterior</th><th>Valor nuevo</th></tr></thead><tbody>
         <?php foreach ($changes as $change): ?>
           <tr><td><?php echo esc_html($this->dateTime((string) ($change['changed_at'] ?? ''))); ?></td><td><strong><?php echo esc_html((string) ($change['changed_by_name'] ?? 'No identificado')); ?></strong><small><?php $employeeId = trim((string) ($change['changed_by_id'] ?? '')); echo $employeeId !== '' ? 'ID ' . esc_html($employeeId) : 'ID de empleado no disponible'; ?></small></td><td><?php echo esc_html((string) ($change['contract_number'] ?? '—')); ?><small>ID <?php echo esc_html((string) ($change['contract_id'] ?? '')); ?></small></td><td><strong><?php echo esc_html((string) ($change['field_label'] ?? '')); ?></strong><small><?php echo esc_html((string) ($change['source_location'] ?? '')); ?></small></td><td><?php echo esc_html((string) (($change['old_value'] ?? '') !== '' ? $change['old_value'] : 'Sin valor')); ?></td><td><?php echo esc_html((string) (($change['new_value'] ?? '') !== '' ? $change['new_value'] : 'Sin valor')); ?></td></tr>
         <?php endforeach; ?>

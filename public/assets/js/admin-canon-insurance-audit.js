@@ -80,39 +80,89 @@
         }
         var fileInput = uploadForm.querySelector('input[type="file"]');
         if (!fileInput || !fileInput.files || !fileInput.files.length) {
-          setStatus("Selecciona un archivo XLS o XLSX.", "error");
+          setStatus("Selecciona uno o varios archivos XLS o XLSX.", "error");
           if (fileInput) fileInput.focus();
           return;
         }
+        var files = Array.prototype.slice.call(fileInput.files);
+        var periodInput = uploadForm.querySelector('[name="period"]');
+        var period = periodInput ? periodInput.value : "";
         var button = uploadForm.querySelector("[data-cia-upload-button]");
         if (button) {
           button.disabled = true;
           button.setAttribute("aria-busy", "true");
-          button.textContent = "Auditando...";
+          button.textContent = "Preparando " + files.length + " archivo(s)...";
         }
-        var uploadData = new FormData(uploadForm);
-        uploadData.append("action", importAction);
-        setStatus(
-          "Leyendo el extracto y comparando contratos y mandatos...",
-          "loading",
-        );
-        request(uploadData)
-          .then(function (data) {
-            replaceContent(data);
-            setStatus(data.message || "Auditoria registrada.", "success");
+        var completed = 0;
+        var duplicates = 0;
+        var failures = [];
+        var sequence = Promise.resolve();
+
+        files.forEach(function (file, index) {
+          sequence = sequence.then(function () {
+            var position = index + 1;
+            var uploadData = new FormData();
+            uploadData.append("action", importAction);
+            uploadData.append("period", period);
+            uploadData.append("file", file, file.name);
+            if (button) {
+              button.textContent =
+                "Auditando " + position + " de " + files.length + "...";
+            }
+            setStatus(
+              "Procesando " + position + " de " + files.length + ": " + file.name,
+              "loading",
+            );
+            return request(uploadData)
+              .then(function (data) {
+                completed += 1;
+                if (data.duplicate) duplicates += 1;
+                replaceContent(data);
+              })
+              .catch(function (error) {
+                failures.push({
+                  name: file.name,
+                  message: error.message || "No se pudo procesar el archivo.",
+                });
+              });
+          });
+        });
+
+        sequence
+          .then(function () {
             uploadForm.reset();
-          })
-          .catch(function (error) {
-            setStatus(error.message || "No se pudo auditar el archivo.", "error");
-            if (core.scmNotify) {
-              core.scmNotify("error", error.message, "No se pudo auditar");
+            var summary =
+              completed +
+              " de " +
+              files.length +
+              " archivos procesados" +
+              (duplicates ? " (" + duplicates + " ya estaban registrados)" : "") +
+              ".";
+            if (failures.length) {
+              summary +=
+                " No se procesaron: " +
+                failures
+                  .map(function (failure) {
+                    return failure.name + " — " + failure.message;
+                  })
+                  .join("; ");
+              setStatus(summary, "error");
+              if (core.scmNotify) {
+                core.scmNotify(
+                  "error",
+                  summary,
+                  "Carga finalizada con novedades",
+                );
+              }
+            } else {
+              setStatus(summary, "success");
             }
           })
           .finally(function () {
             if (button) {
               button.disabled = false;
               button.removeAttribute("aria-busy");
-              button.textContent = "Auditar archivo";
+              button.textContent = "Auditar archivos";
             }
           });
         return;
