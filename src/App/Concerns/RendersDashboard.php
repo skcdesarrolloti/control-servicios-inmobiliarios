@@ -2035,6 +2035,12 @@ trait RendersDashboard
     $contacto = trim((string) ($row['celular_destinatario'] ?? '-'));
     $empleado = trim((string) ($row['coordinador'] ?? $row['creador'] ?? $row['id_empleado'] ?? '-'));
     $direccion = trim((string) ($row['direccion'] ?? '-'));
+    $asuntoCaso = trim((string) ($row['asunto'] ?? $row['categoria_cotizacion'] ?? $row['tipo_mantenimiento'] ?? 'Cotizacion de mantenimiento'));
+    $estadoTicket = trim((string) ($row['estado_ticket'] ?? $row['estado_caso'] ?? ''));
+    $estadoAdminTicket = trim((string) ($row['estado_administrativo'] ?? $row['estado_administrativo_ticket'] ?? ''));
+    $propietario = trim((string) ($row['propietario'] ?? $row['nombre_propietario'] ?? ''));
+    $arrendatario = trim((string) ($row['arrendatario'] ?? $row['nombre_arrendatario'] ?? ''));
+    $barrio = trim((string) ($row['barrio'] ?? ''));
     $ticketUrl = $ticket !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticket) : '';
     $cotUrl = $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '';
     $noteUrl = 'https://sucasainmobiliaria.com.co/mi-cuenta/anadir-nota-a-cotizacion-de-mantenimiento/?id_cotizacion=' . rawurlencode($id) . '&id_inmueble=' . rawurlencode($idInmueble) . '&id_sucursal=' . rawurlencode($sucursal) . '&id_contrato=' . rawurlencode($idContrato);
@@ -2056,6 +2062,47 @@ trait RendersDashboard
     $totalOtros = $this->format_cop_currency($this->cotizacion_money_value($row, ['total_otros_costos']));
     $totalCotizacion = $this->format_cop_currency($this->cotizacion_money_value($row, ['total']));
     $ordenesTotal = (string) ($row['ordenes_total'] ?? count($orders));
+    $cotizacionSinResponder = in_array(strtolower($estado), ['', 'esperando respuesta'], true);
+    $caseDescription = 'Cotizacion de mantenimiento #' . ($id !== '' ? $id : '-') . ($ticket !== '' ? ' relacionada con el ticket #' . $ticket . '.' : '.');
+    if ($direccion !== '' && $direccion !== '-') {
+      $caseDescription .= ' Direccion: ' . $direccion . '.';
+    }
+    $caseSource = '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">' . esc_html($caseDescription) . '</div></div>';
+    if ($ticket !== '') {
+      $caseSource .= '<div class="scm-seg-wrap">' . $this->render_seguimiento_form((int) $ticket, Auth::isLoggedIn(), $cotizacionSinResponder) . '</div>';
+    }
+    $caseSource .= '<section class="scm-case-history"><h4>Detalle de la cotizaci&oacute;n</h4><article class="scm-case-history-item"><div class="scm-case-history-detail">';
+    $caseSource .= '<p><strong>Cotizaci&oacute;n:</strong> #' . esc_html($id !== '' ? $id : '-') . '</p>';
+    $caseSource .= '<p><strong>Estado cotizaci&oacute;n:</strong> ' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</p>';
+    $caseSource .= '<p><strong>Env&iacute;o:</strong> ' . esc_html($enviada ? 'Fue enviada' : 'Sin enviar') . '</p>';
+    $caseSource .= '<p><strong>Total cotizaci&oacute;n:</strong> ' . esc_html($totalCotizacion) . '</p>';
+    $caseSource .= '<p><strong>Destinatario:</strong> ' . esc_html($destinatario !== '' ? $destinatario : '-') . '</p>';
+    $caseSource .= '<p><strong>Contacto:</strong> ' . esc_html($contacto !== '' ? $contacto : '-') . '</p>';
+    $caseSource .= '</div></article></section>';
+    $caseSource .= '<section class="scm-case-history"><h4>&Oacute;rdenes de mantenimiento</h4>' . $ordersHtml . '</section>';
+    $ticketCaseButton = '';
+    if ($ticket !== '') {
+      $ticketCaseButton = '<button type="button" class="scm-case-work-btn scm-btn-case" onclick="scmOpenCase(this)"'
+        . ' data-ticket="' . esc_attr($ticket) . '"'
+        . ' data-ticket-pk="' . esc_attr($ticket) . '"'
+        . ' data-asunto="' . esc_attr($asuntoCaso !== '' ? $asuntoCaso : 'Cotizacion de mantenimiento') . '"'
+        . ' data-estado="' . esc_attr($estadoTicket !== '' ? $estadoTicket : '-') . '"'
+        . ' data-admin="' . esc_attr($estadoAdminTicket !== '' ? $estadoAdminTicket : '-') . '"'
+        . ' data-contrato="' . esc_attr($contrato !== '' ? '#' . $contrato : '-') . '"'
+        . ' data-inmueble="' . esc_attr($inmueble !== '' ? $inmueble : '-') . '"'
+        . ' data-id-inmueble-web="' . esc_attr($idInmueble !== '' ? $idInmueble : '-') . '"'
+        . ' data-barrio="' . esc_attr($barrio !== '' ? $barrio : '-') . '"'
+        . ' data-direccion="' . esc_attr($direccion !== '' ? $direccion : '-') . '"'
+        . ' data-creado="' . esc_attr($fecha) . '"'
+        . ' data-empleado="' . esc_attr($empleado !== '' ? $empleado : '-') . '"'
+        . ' data-propietario="' . esc_attr($propietario) . '"'
+        . ' data-arrendatario="' . esc_attr($arrendatario) . '"'
+        . ' data-ticket-url="' . esc_attr($ticketUrl) . '"'
+        . ' data-cotizacion-id="' . esc_attr($id) . '"'
+        . ' data-cotizacion-url="' . esc_attr($cotUrl) . '"'
+        . ' data-cot-estado="' . esc_attr($estado) . '"'
+        . '>Ver ticket</button>';
+    }
 
     return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '">'
       . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Ticket <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</span></div></div>'
@@ -2065,14 +2112,14 @@ trait RendersDashboard
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="totales" hidden><div class="scm-cotizacion-finance-grid"><div><span>Total mano de obra</span><strong>' . esc_html($totalObra) . '</strong></div><div><span>Total materiales</span><strong>' . esc_html($totalMateriales) . '</strong></div><div><span>Total equipos</span><strong>' . esc_html($totalMaquinarias) . '</strong></div><div><span>Total otros costos</span><strong>' . esc_html($totalOtros) . '</strong></div><div class="scm-cotizacion-finance-total"><span>Total cotizaci&oacute;n</span><strong>' . esc_html($totalCotizacion) . '</strong></div></div></div>'
       . '<div class="scm-cotizacion-actions">'
       . ($cotUrl !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($cotUrl) . '" data-iframe-title="Cotizacion #' . esc_attr($id) . '">Ver cotizacion</button>' : '')
-      . ($ticketUrl !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($ticketUrl) . '" data-iframe-title="Ticket #' . esc_attr($ticket) . '">Ver ticket</button>' : '')
+      . $ticketCaseButton
       . '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-orders>Ver ordenes</button>'
       . '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizacion</button>'
       . '<button type="button" class="scm-case-work-btn scm-danger-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizacion</button>'
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($noteUrl) . '" data-iframe-title="Anadir nota a cotizacion">Anadir nota</button>'
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($orderUrl) . '" data-iframe-title="Anadir orden de mantenimiento">Anadir orden</button>'
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($actaUrl) . '" data-iframe-title="Anadir acta de satisfaccion">Anadir acta</button>'
-      . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div></article>';
+      . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div></article>';
   }
 
   /** @param array<string,mixed> $row @param array<int,string> $keys */

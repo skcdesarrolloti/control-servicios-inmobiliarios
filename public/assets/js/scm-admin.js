@@ -3220,7 +3220,7 @@
 
     try {
       var sourceHtml = "";
-      var card = btn.closest(".scm-ticket-card");
+      var card = btn.closest(".scm-ticket-card, .scm-cotizacion-card");
       var isPublicPqr = (btn.dataset.caseKind || "") === "public-pqr";
       if (card) {
         var cardSource = card.querySelector(".scm-case-source");
