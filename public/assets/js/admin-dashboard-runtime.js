@@ -157,6 +157,7 @@
     var actionAdminNotificationsSend = actions.admin_notifications_send || "";
     var actionAdminNotificationsImport =
       actions.admin_notifications_import || "";
+    var actionMetricsExecution = actions.metrics_execution || "";
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
     ).replace(/\/+$/, "");
@@ -181,6 +182,20 @@
 
     function openCalendarPath(path, title) {
       openIframeModal(buildCalendarUrl(path), title || "Calendario", false);
+    }
+
+    function calendarApiRequest(action, payload, method) {
+      var options = {
+        method: method || (payload ? "POST" : "GET"),
+        credentials: "same-origin",
+      };
+      if (payload) {
+        options.headers = { "Content-Type": "application/json" };
+        options.body = JSON.stringify(payload);
+      }
+      return fetch(calendarApiUrl + encodeURIComponent(action), options).then(function (r) {
+        return r.json();
+      });
     }
 
     function initCalendarPanel() {
@@ -4983,6 +4998,338 @@
       );
     }
 
+    function parseExecutionDate(value) {
+      var raw = String(value || "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return "";
+      }
+      return raw;
+    }
+
+    function executionNumber(value) {
+      var n = Number(value || 0);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function unwrapCalendarRows(json) {
+      var data = json && json.data ? json.data : json;
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.data)) return data.data;
+      if (data && Array.isArray(data.eventos)) return data.eventos;
+      if (data && data.data && Array.isArray(data.data.data)) return data.data.data;
+      return [];
+    }
+
+    function isCalendarDone(row) {
+      var value = String(
+        row && (row.estado || row.realizado || row.fue_realizado || ""),
+      ).trim().toLowerCase();
+      return ["si", "sí", "realizado", "realizada", "1", "true"].indexOf(value) !== -1;
+    }
+
+    function isCalendarAppointment(row) {
+      var esCita = String(row && (row.es_cita || row.cita || "")).trim().toLowerCase();
+      if (["si", "sí", "1", "true"].indexOf(esCita) !== -1) {
+        return true;
+      }
+      var text = [
+        row && row.categoria,
+        row && row.nombre_categoria,
+        row && row.titulo,
+        row && row.title,
+      ].join(" ").toLowerCase();
+      return /cita|preventiva|correctiva|revisi[oó]n/.test(text);
+    }
+
+    function formatExecutionDate(value) {
+      var raw = String(value || "").trim();
+      if (!raw) return "-";
+      var normalized = raw.replace(" ", "T");
+      var date = new Date(normalized);
+      if (Number.isNaN(date.getTime())) {
+        return raw;
+      }
+      var pad = function (n) { return String(n).padStart(2, "0"); };
+      return (
+        pad(date.getDate()) +
+        "/" +
+        pad(date.getMonth() + 1) +
+        "/" +
+        date.getFullYear() +
+        " " +
+        pad(date.getHours()) +
+        ":" +
+        pad(date.getMinutes())
+      );
+    }
+
+    function addExecutionSummary(summary, item) {
+      var key = item.funcionario_key || ("name:" + String(item.funcionario || "Sin funcionario").toLowerCase());
+      if (!summary[key]) {
+        summary[key] = {
+          funcionario_key: key,
+          funcionario_id: item.funcionario_id || "",
+          funcionario: item.funcionario || "Sin funcionario",
+          funcionario_label: item.funcionario_label || item.funcionario || "Sin funcionario",
+          respuestas: 0,
+          actualizaciones: 0,
+          seguimientos: 0,
+          citas_realizadas: 0,
+          total_acciones: 0,
+          _casos: {},
+        };
+      }
+      if (item.type === "respuesta") summary[key].respuestas += 1;
+      if (item.type === "actualizacion") summary[key].actualizaciones += 1;
+      if (item.type === "seguimiento") summary[key].seguimientos += 1;
+      if (item.type === "cita_realizada") summary[key].citas_realizadas += 1;
+      summary[key].total_acciones += 1;
+      if (item.ticket && item.ticket !== "-") {
+        summary[key]._casos[String(item.ticket)] = true;
+      }
+    }
+
+    function mergeExecutionCalendar(baseData, calendarRows) {
+      var data = Object.assign({}, baseData || {});
+      var details = Array.isArray(data.details) ? data.details.slice() : [];
+      var summaryMap = {};
+      (Array.isArray(data.summary) ? data.summary : []).forEach(function (row) {
+        var key = row.funcionario_key || ("name:" + String(row.funcionario || "Sin funcionario").toLowerCase());
+        summaryMap[key] = Object.assign({ _casos: {} }, row);
+        if (Array.isArray(row.case_keys)) {
+          row.case_keys.forEach(function (caseKey) {
+            if (caseKey) summaryMap[key]._casos[String(caseKey)] = true;
+          });
+        } else if (row.casos && !summaryMap[key]._casos.__base_count) {
+          summaryMap[key]._casos.__base_count = Number(row.casos || 0);
+        }
+      });
+
+      calendarRows.forEach(function (row) {
+        if (!isCalendarDone(row) || !isCalendarAppointment(row)) {
+          return;
+        }
+        var employeeId = String(row.id_empleado || row.funcionario_id || row.id_funcionario || "").trim();
+        var employeeName = String(row.funcionario || row.nombre_funcionario || row.empleado || "").trim() || "Sin funcionario";
+        var key = employeeId ? "id:" + employeeId : "name:" + employeeName.toLowerCase();
+        var ticket = String(row.id_ticket || row.ticket || "").trim();
+        var item = {
+          id: String(row.id || row._ID || ""),
+          type: "cita_realizada",
+          label: "Cita realizada",
+          fecha_ts: Math.floor(new Date(String(row.fecha_inicio || row.inicio || "").replace(" ", "T")).getTime() / 1000) || 0,
+          fecha: formatExecutionDate(row.fecha_inicio || row.inicio || ""),
+          funcionario_id: employeeId,
+          funcionario: employeeName,
+          funcionario_label: employeeId ? employeeName + " (" + employeeId + ")" : employeeName,
+          funcionario_key: key,
+          ticket_pk: ticket,
+          ticket: ticket || "-",
+          asunto: String(row.titulo || row.title || row.categoria || "Cita realizada"),
+          contrato: "",
+          inmueble: "",
+          estado: "Realizado",
+          estado_admin: "",
+          detalle: String(row.observacion || row.descripcion || row.titulo || "Cita marcada como realizada."),
+        };
+        details.push(item);
+        addExecutionSummary(summaryMap, item);
+      });
+
+      details.sort(function (a, b) {
+        return executionNumber(b.fecha_ts) - executionNumber(a.fecha_ts);
+      });
+      data.details = details.slice(0, 1000);
+      data.summary = Object.keys(summaryMap).map(function (key) {
+        var row = summaryMap[key];
+        var caseKeys = Object.keys(row._casos || {}).filter(function (key) {
+          return key !== "__base_count";
+        });
+        var baseCount = row._casos && row._casos.__base_count ? Number(row._casos.__base_count) : 0;
+        var caseCount = Math.max(baseCount, caseKeys.length);
+        delete row._casos;
+        delete row.case_keys;
+        row.casos = caseCount;
+        return row;
+      }).sort(function (a, b) {
+        return executionNumber(b.total_acciones) - executionNumber(a.total_acciones);
+      });
+      var totals = {
+        funcionarios: data.summary.length,
+        respuestas: 0,
+        actualizaciones: 0,
+        seguimientos: 0,
+        citas_realizadas: 0,
+        casos: 0,
+        total_acciones: 0,
+      };
+      var caseSet = {};
+      data.summary.forEach(function (row) {
+        totals.respuestas += executionNumber(row.respuestas);
+        totals.actualizaciones += executionNumber(row.actualizaciones);
+        totals.seguimientos += executionNumber(row.seguimientos);
+        totals.citas_realizadas += executionNumber(row.citas_realizadas);
+        totals.total_acciones += executionNumber(row.total_acciones);
+      });
+      data.details.forEach(function (item) {
+        if (item.ticket && item.ticket !== "-") caseSet[String(item.ticket)] = true;
+      });
+      totals.casos = Object.keys(caseSet).length;
+      data.totals = totals;
+      return data;
+    }
+
+    function renderExecutionMetrics(data, warning) {
+      var panel = root.querySelector("[data-scm-execution-panel]");
+      if (!panel) return;
+      var kpis = panel.querySelector("[data-scm-execution-kpis]");
+      var summary = panel.querySelector("[data-scm-execution-summary]");
+      var details = panel.querySelector("[data-scm-execution-details]");
+      var status = panel.querySelector("[data-scm-execution-status]");
+      var totals = (data && data.totals) || {};
+      if (status) {
+        status.textContent = warning || ("Resumen del " + (data.from || "-") + " al " + (data.to || "-") + ".");
+        status.classList.toggle("is-warning", Boolean(warning));
+      }
+      if (kpis) {
+        var kpiRows = [
+          ["Funcionarios", totals.funcionarios || 0],
+          ["Respuestas", totals.respuestas || 0],
+          ["Actualizaciones", totals.actualizaciones || 0],
+          ["Seguimientos", totals.seguimientos || 0],
+          ["Citas realizadas", totals.citas_realizadas || 0],
+          ["Casos trabajados", totals.casos || 0],
+          ["Acciones totales", totals.total_acciones || 0],
+        ];
+        kpis.innerHTML = kpiRows.map(function (row) {
+          return '<article class="scm-execution-kpi"><span>' + escHtml(row[0]) + '</span><strong>' + escHtml(String(row[1])) + "</strong></article>";
+        }).join("");
+      }
+      if (summary) {
+        var summaryRows = Array.isArray(data.summary) ? data.summary : [];
+        summary.innerHTML = summaryRows.length
+          ? '<div class="scm-execution-card-grid">' + summaryRows.map(function (row) {
+              return (
+                '<article class="scm-execution-employee-card">' +
+                '<h4>' + escHtml(row.funcionario_label || row.funcionario || "Sin funcionario") + '</h4>' +
+                '<div class="scm-execution-card-stats">' +
+                '<span><strong>' + escHtml(String(row.respuestas || 0)) + '</strong> Respuestas</span>' +
+                '<span><strong>' + escHtml(String(row.actualizaciones || 0)) + '</strong> Actualizaciones</span>' +
+                '<span><strong>' + escHtml(String(row.seguimientos || 0)) + '</strong> Seguimientos</span>' +
+                '<span><strong>' + escHtml(String(row.citas_realizadas || 0)) + '</strong> Citas realizadas</span>' +
+                '<span><strong>' + escHtml(String(row.casos || 0)) + '</strong> Casos</span>' +
+                '</div>' +
+                '</article>'
+              );
+            }).join("") + '</div>'
+          : '<div class="scm-empty">No hay movimientos para el rango seleccionado.</div>';
+      }
+      if (details) {
+        var detailRows = Array.isArray(data.details) ? data.details : [];
+        details.innerHTML = detailRows.length
+          ? '<div class="scm-execution-table-wrap"><table class="scm-execution-table"><thead><tr><th>Fecha</th><th>Funcionario</th><th>Caso</th><th>Acci&oacute;n</th><th>Detalle</th></tr></thead><tbody>' +
+            detailRows.map(function (item) {
+              var meta = [];
+              if (item.asunto) meta.push(item.asunto);
+              if (item.contrato) meta.push("Contrato #" + item.contrato);
+              if (item.inmueble) meta.push("Inmueble " + item.inmueble);
+              var typeClass = "is-" + String(item.type || "accion").replace(/_/g, "-");
+              return (
+                '<tr>' +
+                '<td><strong>' + escHtml(item.fecha || "-") + '</strong></td>' +
+                '<td>' + escHtml(item.funcionario_label || item.funcionario || "-") + '</td>' +
+                '<td><span class="scm-execution-case">#' + escHtml(item.ticket || "-") + '</span>' + (meta.length ? '<small>' + escHtml(meta.join(" · ")) + '</small>' : '') + '</td>' +
+                '<td><span class="scm-execution-badge ' + escHtml(typeClass) + '">' + escHtml(item.label || "Acci\u00f3n") + '</span></td>' +
+                '<td>' + escHtml(item.detalle || "-") + '</td>' +
+                '</tr>'
+              );
+            }).join("") +
+            '</tbody></table></div>'
+          : '<div class="scm-empty">No hay detalle caso por caso para mostrar.</div>';
+      }
+    }
+
+    function loadExecutionCalendarRows(filters) {
+      return calendarApiRequest("filtrar_eventos_admin", {
+        id_empleado: filters.funcionario || "",
+        fecha_inicio: filters.fecha_desde,
+        fecha_fin: filters.fecha_hasta,
+        estado: "Si",
+        pagina: 1,
+        limite: 1000,
+      }).then(function (json) {
+        if (!json || json.success === false) {
+          throw new Error((json && json.message) || "No se pudieron cargar las citas.");
+        }
+        return unwrapCalendarRows(json);
+      });
+    }
+
+    function loadMetricsExecution(force) {
+      var panel = root.querySelector("[data-scm-execution-panel]");
+      if (!panel || !ajaxUrl || !actionMetricsExecution) {
+        return Promise.resolve();
+      }
+      if (!force && panel.getAttribute("data-scm-execution-loaded") === "1") {
+        return Promise.resolve();
+      }
+      var form = panel.querySelector("[data-scm-execution-form]");
+      var status = panel.querySelector("[data-scm-execution-status]");
+      var fd = form ? new FormData(form) : new FormData();
+      var filters = {
+        fecha_desde: parseExecutionDate(fd.get("fecha_desde")) || new Date().toISOString().slice(0, 10),
+        fecha_hasta: parseExecutionDate(fd.get("fecha_hasta")) || new Date().toISOString().slice(0, 10),
+        funcionario: String(fd.get("funcionario") || "").trim(),
+      };
+      if (status) {
+        status.textContent = "Cargando resumen de ejecuci\u00f3n...";
+        status.classList.remove("is-warning");
+      }
+      fd.append("action", actionMetricsExecution);
+      fd.append("nonce", nonce);
+      panel.classList.add("is-loading");
+      return fetch(ajaxUrl, {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error((json && json.data && json.data.message) || "No se pudo cargar el resumen.");
+          }
+          var baseData = json.data || {};
+          return loadExecutionCalendarRows(filters)
+            .then(function (calendarRows) {
+              return { data: mergeExecutionCalendar(baseData, calendarRows), warning: "" };
+            })
+            .catch(function () {
+              return { data: baseData, warning: "Resumen cargado, pero no fue posible traer citas realizadas del calendario." };
+            });
+        })
+        .then(function (result) {
+          panel.setAttribute("data-scm-execution-loaded", "1");
+          renderExecutionMetrics(result.data, result.warning);
+        })
+        .catch(function (err) {
+          if (status) {
+            status.textContent = err && err.message ? err.message : "No se pudo cargar el resumen.";
+            status.classList.add("is-warning");
+          }
+        })
+        .finally(function () {
+          panel.classList.remove("is-loading");
+        });
+    }
+
+    var executionForm = root.querySelector("[data-scm-execution-form]");
+    if (executionForm) {
+      executionForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        loadMetricsExecution(true);
+      });
+    }
+
     var initialMetrics = readInitialMetrics();
     if (initialMetrics) {
       var initialCategoryMetrics = getCategoryMetricSet(
@@ -4999,7 +5346,7 @@
       var metricTabsWrap = root.querySelector("#scm-metric-tabs");
       if (metricTabsWrap) {
         function showMetricsPane(name) {
-          name = name === "guardian" ? "guardian" : "operativas";
+          name = name === "guardian" || name === "ejecucion" ? name : "operativas";
           root.querySelectorAll("[data-scm-metrics-pane]").forEach(function (pane) {
             pane.classList.toggle(
               "active",
@@ -5042,8 +5389,13 @@
                   b.classList.remove("active");
                 });
               btn.classList.add("active");
-              showMetricsPane(btn.getAttribute("data-scm-metric-panel") || "guardian");
-              renderGuardianMetrics(initialMetrics.web || {});
+              var paneName = btn.getAttribute("data-scm-metric-panel") || "guardian";
+              showMetricsPane(paneName);
+              if (paneName === "ejecucion") {
+                loadMetricsExecution(false);
+              } else {
+                renderGuardianMetrics(initialMetrics.web || {});
+              }
             });
           });
       }

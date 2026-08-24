@@ -118,6 +118,179 @@ trait HandlesMaintenanceActions
     ]);
   }
 
+  public function ajax_handler_metrics_execution(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('metricas')) {
+      $this->jsonFail('No tienes permiso para ver metricas.');
+    }
+
+    $range = $this->metrics_execution_date_range($_POST);
+    $funcionario = trim(sanitize_text_field(wp_unslash((string) ($_POST['funcionario'] ?? ''))));
+
+    $ticketsTable = $this->db->table('jet_cct_tickets');
+    $histTable = $this->db->table('jet_cct_historial_del_ticket');
+    $segTable = $this->db->table('jet_cct_seguimiento_ticket');
+    $funcTable = $this->db->table('jet_cct_funcionarios');
+
+    if (!$this->table_exists($ticketsTable)) {
+      $this->jsonFail('La tabla de tickets no esta disponible.');
+    }
+
+    $employees = $this->metrics_execution_employee_map($funcTable);
+    $details = [];
+    $summary = [];
+    $seguimientoSignatures = [];
+
+    if ($this->table_exists($segTable)) {
+      $where = ['COALESCE(s.`fecha`, 0) BETWEEN ? AND ?'];
+      $args = [$range['from_ts'], $range['to_ts']];
+      if ($funcionario !== '') {
+        $where[] = "(TRIM(COALESCE(s.`id_coordinador`, '')) = ? OR TRIM(COALESCE(s.`id_empleado`, '')) = ?)";
+        $args[] = $funcionario;
+        $args[] = $funcionario;
+      }
+
+      $rows = $this->db->getResults(
+        "SELECT
+            s.`_ID` AS movimiento_id,
+            COALESCE(s.`fecha`, 0) AS fecha_ts,
+            TRIM(COALESCE(s.`id_ticket`, '')) AS ticket_ref,
+            TRIM(COALESCE(s.`id_coordinador`, '')) AS funcionario_id,
+            TRIM(COALESCE(s.`nombre`, '')) AS funcionario_nombre,
+            TRIM(COALESCE(s.`observacion`, '')) AS detalle,
+            t.`_ID` AS ticket_pk,
+            TRIM(COALESCE(t.`id_ticket`, '')) AS ticket_logico,
+            TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, '')) AS asunto,
+            TRIM(COALESCE(t.`contrato`, t.`id_contrato`, '')) AS contrato,
+            TRIM(COALESCE(t.`inmueble`, t.`id_inmueble`, '')) AS inmueble,
+            TRIM(COALESCE(t.`estado`, '')) AS estado,
+            TRIM(COALESCE(t.`estado_administrativo`, '')) AS estado_admin
+          FROM `{$segTable}` s
+          LEFT JOIN `{$ticketsTable}` t
+            ON TRIM(COALESCE(t.`id_ticket`, '')) = TRIM(COALESCE(s.`id_ticket`, ''))
+            OR CAST(t.`_ID` AS CHAR) = TRIM(COALESCE(s.`id_ticket`, ''))
+          WHERE " . implode(' AND ', $where) . "
+          ORDER BY COALESCE(s.`fecha`, 0) DESC
+          LIMIT 900",
+        $args
+      );
+
+      foreach ($rows as $row) {
+        $detailText = $this->metrics_execution_clean_text((string) ($row['detalle'] ?? ''));
+        if ($detailText === '') {
+          continue;
+        }
+        $employee = $this->metrics_execution_employee_label($row, $employees);
+        $item = $this->metrics_execution_detail_item($row, 'seguimiento', 'Seguimiento', $detailText, $employee);
+        $details[] = $item;
+        $this->metrics_execution_add_summary($summary, $item);
+        $seguimientoSignatures[$this->metrics_execution_signature($item)] = true;
+      }
+    }
+
+    if ($this->table_exists($histTable)) {
+      $where = ['COALESCE(h.`fecha`, 0) BETWEEN ? AND ?'];
+      $args = [$range['from_ts'], $range['to_ts']];
+      if ($funcionario !== '') {
+        $where[] = "TRIM(COALESCE(h.`id_empleado`, '')) = ?";
+        $args[] = $funcionario;
+      }
+
+      $rows = $this->db->getResults(
+        "SELECT
+            h.`_ID` AS movimiento_id,
+            COALESCE(h.`fecha`, 0) AS fecha_ts,
+            CAST(h.`id_ticket` AS CHAR) AS ticket_ref,
+            TRIM(COALESCE(h.`id_empleado`, '')) AS funcionario_id,
+            TRIM(COALESCE(h.`nombre`, '')) AS funcionario_nombre,
+            TRIM(COALESCE(h.`respuesta`, '')) AS detalle,
+            t.`_ID` AS ticket_pk,
+            TRIM(COALESCE(t.`id_ticket`, '')) AS ticket_logico,
+            TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, '')) AS asunto,
+            TRIM(COALESCE(t.`contrato`, t.`id_contrato`, '')) AS contrato,
+            TRIM(COALESCE(t.`inmueble`, t.`id_inmueble`, '')) AS inmueble,
+            TRIM(COALESCE(t.`estado`, '')) AS estado,
+            TRIM(COALESCE(t.`estado_administrativo`, '')) AS estado_admin
+          FROM `{$histTable}` h
+          LEFT JOIN `{$ticketsTable}` t
+            ON t.`_ID` = h.`id_ticket`
+            OR TRIM(COALESCE(t.`id_ticket`, '')) = CAST(h.`id_ticket` AS CHAR)
+          WHERE " . implode(' AND ', $where) . "
+          ORDER BY COALESCE(h.`fecha`, 0) DESC
+          LIMIT 1200",
+        $args
+      );
+
+      foreach ($rows as $row) {
+        $detailText = $this->metrics_execution_clean_text((string) ($row['detalle'] ?? ''));
+        if ($detailText === '') {
+          continue;
+        }
+        $classification = $this->metrics_execution_classify_history($detailText);
+        if ($classification === 'ignore') {
+          continue;
+        }
+        $employee = $this->metrics_execution_employee_label($row, $employees);
+        $label = $classification === 'actualizacion' ? 'Actualizaci&oacute;n' : 'Respuesta';
+        $item = $this->metrics_execution_detail_item($row, $classification, $label, $detailText, $employee);
+        if (isset($seguimientoSignatures[$this->metrics_execution_signature($item)])) {
+          continue;
+        }
+        $details[] = $item;
+        $this->metrics_execution_add_summary($summary, $item);
+      }
+    }
+
+    usort($details, static function (array $a, array $b): int {
+      return (int) ($b['fecha_ts'] ?? 0) <=> (int) ($a['fecha_ts'] ?? 0);
+    });
+
+    $details = array_slice($details, 0, 1000);
+    $summaryRows = array_values($summary);
+    usort($summaryRows, static function (array $a, array $b): int {
+      return (int) ($b['total_acciones'] ?? 0) <=> (int) ($a['total_acciones'] ?? 0);
+    });
+
+    $totals = [
+      'funcionarios' => count($summaryRows),
+      'respuestas' => 0,
+      'actualizaciones' => 0,
+      'seguimientos' => 0,
+      'citas_realizadas' => 0,
+      'casos' => 0,
+      'total_acciones' => 0,
+    ];
+    $caseSet = [];
+    foreach ($summaryRows as $row) {
+      $totals['respuestas'] += (int) ($row['respuestas'] ?? 0);
+      $totals['actualizaciones'] += (int) ($row['actualizaciones'] ?? 0);
+      $totals['seguimientos'] += (int) ($row['seguimientos'] ?? 0);
+      $totals['citas_realizadas'] += (int) ($row['citas_realizadas'] ?? 0);
+      $totals['total_acciones'] += (int) ($row['total_acciones'] ?? 0);
+      foreach ((array) ($row['_casos'] ?? []) as $caseKey => $_) {
+        $caseSet[(string) $caseKey] = true;
+      }
+    }
+    $totals['casos'] = count($caseSet);
+    foreach ($summaryRows as &$row) {
+      $caseKeys = array_keys((array) ($row['_casos'] ?? []));
+      $row['case_keys'] = array_values(array_map('strval', $caseKeys));
+      $row['casos'] = count($caseKeys);
+      unset($row['_casos']);
+    }
+    unset($row);
+
+    $this->jsonOk([
+      'from' => $range['from'],
+      'to' => $range['to'],
+      'funcionario' => $funcionario,
+      'totals' => $totals,
+      'summary' => $summaryRows,
+      'details' => $details,
+    ]);
+  }
+
   public function ajax_handler_cotizaciones_mantenimiento(): void
   {
     $this->verifyCsrf();
@@ -153,6 +326,180 @@ trait HandlesMaintenanceActions
       'kpi_tab_desaprobadas' => (string) ($tabStats['desaprobadas'] ?? 0),
       'kpi_tab_esperando_respuesta' => (string) ($tabStats['esperando_respuesta'] ?? 0),
       'kpi_tab_finalizadas' => (string) ($tabStats['finalizadas'] ?? 0),
+    ]);
+  }
+
+  /** @return array{from:string,to:string,from_ts:int,to_ts:int} */
+  private function metrics_execution_date_range(array $input): array
+  {
+    $clean = static function ($value): string {
+      return trim(sanitize_text_field(wp_unslash((string) ($value ?? ''))));
+    };
+    $from = $clean($input['fecha_desde'] ?? '');
+    $to = $clean($input['fecha_hasta'] ?? '');
+    $today = date('Y-m-d');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) {
+      $from = date('Y-m-01');
+    }
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+      $to = $today;
+    }
+    if (strtotime($from) > strtotime($to)) {
+      [$from, $to] = [$to, $from];
+    }
+    return [
+      'from' => $from,
+      'to' => $to,
+      'from_ts' => (int) strtotime($from . ' 00:00:00'),
+      'to_ts' => (int) strtotime($to . ' 23:59:59'),
+    ];
+  }
+
+  /** @return array<string,array{id:string,nombre:string,label:string}> */
+  private function metrics_execution_employee_map(string $funcTable): array
+  {
+    if (!$this->table_exists($funcTable) || !$this->column_exists($funcTable, 'id_empleado')) {
+      return [];
+    }
+    $rows = $this->db->getResults(
+      "SELECT TRIM(COALESCE(`id_empleado`, '')) AS id,
+              TRIM(COALESCE(`nombre`, `id_empleado`, '')) AS nombre
+       FROM `{$funcTable}`
+       WHERE TRIM(COALESCE(`id_empleado`, '')) <> ''"
+    );
+    $map = [];
+    foreach ($rows as $row) {
+      $id = trim((string) ($row['id'] ?? ''));
+      if ($id === '') {
+        continue;
+      }
+      $name = trim((string) ($row['nombre'] ?? ''));
+      $label = $name !== '' ? $name : $id;
+      $map[$id] = ['id' => $id, 'nombre' => $name, 'label' => $label];
+    }
+    return $map;
+  }
+
+  /** @param array<string,mixed> $row @param array<string,array{id:string,nombre:string,label:string}> $employees @return array{id:string,nombre:string,label:string,key:string} */
+  private function metrics_execution_employee_label(array $row, array $employees): array
+  {
+    $id = trim((string) ($row['funcionario_id'] ?? ''));
+    $name = trim((string) ($row['funcionario_nombre'] ?? ''));
+    if ($id !== '' && isset($employees[$id])) {
+      $name = $name !== '' ? $name : $employees[$id]['nombre'];
+      return [
+        'id' => $id,
+        'nombre' => $name !== '' ? $name : $employees[$id]['label'],
+        'label' => $name !== '' ? ($name . ' (' . $id . ')') : $employees[$id]['label'] . ' (' . $id . ')',
+        'key' => 'id:' . $id,
+      ];
+    }
+    $label = $name !== '' ? $name : ($id !== '' ? $id : 'Sin funcionario');
+    return [
+      'id' => $id,
+      'nombre' => $name !== '' ? $name : $label,
+      'label' => $id !== '' && $name !== '' ? ($name . ' (' . $id . ')') : $label,
+      'key' => $id !== '' ? ('id:' . $id) : ('name:' . mb_strtolower($label, 'UTF-8')),
+    ];
+  }
+
+  private function metrics_execution_clean_text(string $value): string
+  {
+    $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $value = wp_strip_all_tags($value);
+    $value = preg_replace('/\s+/u', ' ', $value) ?: '';
+    return trim($value);
+  }
+
+  private function metrics_execution_classify_history(string $text): string
+  {
+    $plain = mb_strtolower($this->metrics_execution_clean_text($text), 'UTF-8');
+    if ($plain === '') {
+      return 'ignore';
+    }
+    if (preg_match('/ticket\s+(administrativo\s+)?creado|creado:\s*revision preventiva|se crea este ticket/u', $plain)) {
+      return 'ignore';
+    }
+    if (preg_match('/postergad|activad|trasladad|cerrad|magnitud|ubicaci[oó]n|cotizaci[oó]n|orden|acta|estado/u', $plain)) {
+      return 'actualizacion';
+    }
+    return 'respuesta';
+  }
+
+  /** @param array<string,mixed> $row @param array{id:string,nombre:string,label:string,key:string} $employee @return array<string,mixed> */
+  private function metrics_execution_detail_item(array $row, string $type, string $label, string $detailText, array $employee): array
+  {
+    $ticketPk = trim((string) ($row['ticket_pk'] ?? ''));
+    $ticketLogico = trim((string) ($row['ticket_logico'] ?? ''));
+    $ticketRef = trim((string) ($row['ticket_ref'] ?? ''));
+    $caseNumber = $ticketLogico !== '' ? $ticketLogico : ($ticketPk !== '' ? $ticketPk : $ticketRef);
+    $ts = (int) ($row['fecha_ts'] ?? 0);
+    return [
+      'id' => (string) ($row['movimiento_id'] ?? ''),
+      'type' => $type,
+      'label' => $label,
+      'fecha_ts' => $ts,
+      'fecha' => $ts > 0 ? date('d/m/Y H:i', $ts) : '-',
+      'funcionario_id' => $employee['id'],
+      'funcionario' => $employee['nombre'],
+      'funcionario_label' => $employee['label'],
+      'funcionario_key' => $employee['key'],
+      'ticket_pk' => $ticketPk,
+      'ticket' => $caseNumber !== '' ? $caseNumber : '-',
+      'asunto' => $this->metrics_execution_clean_text((string) ($row['asunto'] ?? '')),
+      'contrato' => trim((string) ($row['contrato'] ?? '')),
+      'inmueble' => trim((string) ($row['inmueble'] ?? '')),
+      'estado' => trim((string) ($row['estado'] ?? '')),
+      'estado_admin' => trim((string) ($row['estado_admin'] ?? '')),
+      'detalle' => $detailText,
+    ];
+  }
+
+  /** @param array<string,array<string,mixed>> $summary @param array<string,mixed> $item */
+  private function metrics_execution_add_summary(array &$summary, array $item): void
+  {
+    $key = (string) ($item['funcionario_key'] ?? 'name:sin_funcionario');
+    if (!isset($summary[$key])) {
+      $summary[$key] = [
+        'funcionario_key' => $key,
+        'funcionario_id' => (string) ($item['funcionario_id'] ?? ''),
+        'funcionario' => (string) ($item['funcionario'] ?? 'Sin funcionario'),
+        'funcionario_label' => (string) ($item['funcionario_label'] ?? 'Sin funcionario'),
+        'respuestas' => 0,
+        'actualizaciones' => 0,
+        'seguimientos' => 0,
+        'citas_realizadas' => 0,
+        'total_acciones' => 0,
+        '_casos' => [],
+      ];
+    }
+    $type = (string) ($item['type'] ?? '');
+    if ($type === 'respuesta') {
+      $summary[$key]['respuestas']++;
+    } elseif ($type === 'actualizacion') {
+      $summary[$key]['actualizaciones']++;
+    } elseif ($type === 'seguimiento') {
+      $summary[$key]['seguimientos']++;
+    } elseif ($type === 'cita_realizada') {
+      $summary[$key]['citas_realizadas']++;
+    }
+    $summary[$key]['total_acciones']++;
+    $ticketKey = trim((string) ($item['ticket_pk'] ?? $item['ticket'] ?? ''));
+    if ($ticketKey !== '' && $ticketKey !== '-') {
+      $summary[$key]['_casos'][$ticketKey] = true;
+    }
+  }
+
+  /** @param array<string,mixed> $item */
+  private function metrics_execution_signature(array $item): string
+  {
+    $minuteBucket = (string) floor(max(0, (int) ($item['fecha_ts'] ?? 0)) / 60);
+    $textHash = sha1(mb_strtolower((string) ($item['detalle'] ?? ''), 'UTF-8'));
+    return implode('|', [
+      (string) ($item['ticket'] ?? ''),
+      (string) ($item['funcionario_key'] ?? ''),
+      $minuteBucket,
+      $textHash,
     ]);
   }
 

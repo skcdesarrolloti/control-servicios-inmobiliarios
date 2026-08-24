@@ -313,6 +313,7 @@ trait RendersDashboard
         'admin_notifications_recipients' => self::AJAX_ADMIN_NOTIFICATIONS_RECIPIENTS,
         'admin_notifications_send' => self::AJAX_ADMIN_NOTIFICATIONS_SEND,
         'admin_notifications_import' => self::AJAX_ADMIN_NOTIFICATIONS_IMPORT,
+        'metrics_execution' => self::AJAX_METRICS_EXECUTION,
         // Guía
         'guide_gcd_read' => self::AJAX_GUIDE_GCD_READ,
         'guide_gcd_save' => self::AJAX_GUIDE_GCD_SAVE,
@@ -794,6 +795,7 @@ trait RendersDashboard
           <button class="scm-tab" type="button" data-scm-metric-cat="certificaciones">Certificaciones</button>
           <button class="scm-tab" type="button" data-scm-metric-cat="contractual">Contractual</button>
           <button class="scm-tab" type="button" data-scm-metric-panel="guardian">Solicitudes Guardian</button>
+          <button class="scm-tab" type="button" data-scm-metric-panel="ejecucion">Ejecuci&oacute;n por funcionario</button>
         </div>
 
         <div class="scm-metrics-pane active" data-scm-metrics-pane="operativas">
@@ -860,6 +862,41 @@ trait RendersDashboard
               <div class="scm-bars" id="scm-chart-web-admin"></div>
             </section>
           </div>
+        </div>
+        <div class="scm-metrics-pane" data-scm-metrics-pane="ejecucion">
+          <section class="scm-execution-panel" data-scm-execution-panel>
+            <div class="scm-execution-head">
+              <div>
+                <span class="scm-eyebrow">Resumen para gerencia</span>
+                <h3>Ejecuci&oacute;n por funcionario</h3>
+                <p>Consulta respuestas, actualizaciones, seguimientos y citas realizadas en cada caso durante el rango seleccionado.</p>
+              </div>
+            </div>
+            <form class="scm-execution-filters" data-scm-execution-form autocomplete="off">
+              <div class="scm-field">
+                <label for="scm_exec_desde">Fecha desde</label>
+                <input id="scm_exec_desde" name="fecha_desde" class="input input-bordered input-sm" type="date" value="<?php echo esc_attr(date('Y-m-01')); ?>">
+              </div>
+              <div class="scm-field">
+                <label for="scm_exec_hasta">Fecha hasta</label>
+                <input id="scm_exec_hasta" name="fecha_hasta" class="input input-bordered input-sm" type="date" value="<?php echo esc_attr(date('Y-m-d')); ?>">
+              </div>
+              <div class="scm-field scm-execution-funcionario-field">
+                <label for="scm_exec_funcionario">Funcionario</label>
+                <select id="scm_exec_funcionario" name="funcionario" class="select select-bordered select-sm scm-select scm-select2" data-placeholder="Todos los funcionarios">
+                  <option value="">Todos</option>
+                  <?php foreach (($filterOptions['funcionarios'] ?? []) as $func): $fId = trim((string)($func['id'] ?? '')); if ($fId === '') continue; ?>
+                    <option value="<?php echo esc_attr($fId); ?>"><?php echo esc_html((string)($func['label'] ?? $fId)); ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <button type="submit" class="scm-btn-primary btn btn-primary">Ver resumen</button>
+            </form>
+            <div class="scm-execution-status" data-scm-execution-status aria-live="polite">Selecciona un rango y consulta la ejecuci&oacute;n.</div>
+            <div class="scm-execution-kpis" data-scm-execution-kpis></div>
+            <div class="scm-execution-summary" data-scm-execution-summary></div>
+            <div class="scm-execution-details" data-scm-execution-details></div>
+          </section>
         </div>
       </div>
 

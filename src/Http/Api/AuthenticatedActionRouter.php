@@ -60,6 +60,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_ADMIN_NOTIFICATIONS_RECIPIENTS => 'ajax_handler_admin_notifications_recipients',
       SuCasaControlServiciosInmobiliarios::AJAX_ADMIN_NOTIFICATIONS_SEND => 'ajax_handler_admin_notifications_send',
       SuCasaControlServiciosInmobiliarios::AJAX_ADMIN_NOTIFICATIONS_IMPORT => 'ajax_handler_admin_notifications_import',
+      SuCasaControlServiciosInmobiliarios::AJAX_METRICS_EXECUTION => 'ajax_handler_metrics_execution',
     ];
 
     $this->guideRoutes = [
