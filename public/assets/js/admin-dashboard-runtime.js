@@ -6667,6 +6667,38 @@
     }
 
     root.addEventListener("click", function (e) {
+      var linkedTicketCaseBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-open-linked-ticket-case]")
+          : null;
+      if (linkedTicketCaseBtn) {
+        e.preventDefault();
+        var cotizacionCard = linkedTicketCaseBtn.closest(".scm-cotizacion-card");
+        var sourceTemplate = cotizacionCard
+          ? cotizacionCard.querySelector(".scm-cotizacion-linked-ticket-source")
+          : null;
+        if (!cotizacionCard || !sourceTemplate) {
+          showToast("error", "No se encontro el ticket completo de la cotizacion.");
+          return;
+        }
+        var holder = cotizacionCard.querySelector(".scm-cotizacion-linked-ticket-dom");
+        if (!holder) {
+          holder = document.createElement("div");
+          holder.className = "scm-cotizacion-linked-ticket-dom";
+          holder.setAttribute("aria-hidden", "true");
+          holder.style.display = "none";
+          holder.innerHTML = sourceTemplate.innerHTML || "";
+          cotizacionCard.appendChild(holder);
+        }
+        var caseButton = holder.querySelector(".scm-btn-case");
+        if (!caseButton || typeof window.scmOpenCase !== "function") {
+          showToast("error", "No se pudo abrir el popup completo del ticket.");
+          return;
+        }
+        window.scmOpenCase(caseButton);
+        return;
+      }
+
       var nativeCotizacionBtn =
         e.target && e.target.closest
           ? e.target.closest("[data-scm-view-cotizacion-native]")

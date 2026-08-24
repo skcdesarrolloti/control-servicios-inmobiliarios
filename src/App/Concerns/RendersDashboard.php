@@ -2006,15 +2006,16 @@ trait RendersDashboard
     if (empty($rows)) {
       return '<div class="scm-empty scm-empty-cards">No hay cotizaciones con los filtros actuales.</div>';
     }
+    $linkedTicketCards = $this->cotizacion_linked_ticket_cards_by_rows($rows);
     $html = '';
     foreach ($rows as $row) {
-      $html .= $this->render_cotizacion_mantenimiento_card($row);
+      $html .= $this->render_cotizacion_mantenimiento_card($row, $linkedTicketCards);
     }
     return $html;
   }
 
-  /** @param array<string,mixed> $row */
-  private function render_cotizacion_mantenimiento_card(array $row): string
+  /** @param array<string,mixed> $row @param array<string,string> $linkedTicketCards */
+  private function render_cotizacion_mantenimiento_card(array $row, array $linkedTicketCards = []): string
   {
     $id = trim((string) ($row['_ID'] ?? ''));
     $ticket = trim((string) ($row['id_ticket'] ?? ''));
@@ -2082,27 +2083,35 @@ trait RendersDashboard
     $caseSource .= '</div></article></section>';
     $caseSource .= '<section class="scm-case-history"><h4>&Oacute;rdenes de mantenimiento</h4>' . $ordersHtml . '</section>';
     $ticketCaseButton = '';
+    $linkedTicketCardHtml = $ticket !== '' ? (string) ($linkedTicketCards[$ticket] ?? '') : '';
+    $linkedTicketSource = $linkedTicketCardHtml !== ''
+      ? '<template class="scm-cotizacion-linked-ticket-source">' . $linkedTicketCardHtml . '</template>'
+      : '';
     if ($ticket !== '') {
-      $ticketCaseButton = '<button type="button" class="scm-case-work-btn scm-btn-case" onclick="scmOpenCase(this)"'
-        . ' data-ticket="' . esc_attr($ticket) . '"'
-        . ' data-ticket-pk="' . esc_attr($ticket) . '"'
-        . ' data-asunto="' . esc_attr($asuntoCaso !== '' ? $asuntoCaso : 'Cotizacion de mantenimiento') . '"'
-        . ' data-estado="' . esc_attr($estadoTicket !== '' ? $estadoTicket : '-') . '"'
-        . ' data-admin="' . esc_attr($estadoAdminTicket !== '' ? $estadoAdminTicket : '-') . '"'
-        . ' data-contrato="' . esc_attr($contrato !== '' ? '#' . $contrato : '-') . '"'
-        . ' data-inmueble="' . esc_attr($inmueble !== '' ? $inmueble : '-') . '"'
-        . ' data-id-inmueble-web="' . esc_attr($idInmueble !== '' ? $idInmueble : '-') . '"'
-        . ' data-barrio="' . esc_attr($barrio !== '' ? $barrio : '-') . '"'
-        . ' data-direccion="' . esc_attr($direccion !== '' ? $direccion : '-') . '"'
-        . ' data-creado="' . esc_attr($fecha) . '"'
-        . ' data-empleado="' . esc_attr($empleado !== '' ? $empleado : '-') . '"'
-        . ' data-propietario="' . esc_attr($propietario) . '"'
-        . ' data-arrendatario="' . esc_attr($arrendatario) . '"'
-        . ' data-ticket-url="' . esc_attr($ticketUrl) . '"'
-        . ' data-cotizacion-id="' . esc_attr($id) . '"'
-        . ' data-cotizacion-url="' . esc_attr($cotUrl) . '"'
-        . ' data-cot-estado="' . esc_attr($estado) . '"'
-        . '>Ver ticket</button>';
+      if ($linkedTicketCardHtml !== '') {
+        $ticketCaseButton = '<button type="button" class="scm-case-work-btn" data-scm-open-linked-ticket-case data-ticket-pk="' . esc_attr($ticket) . '">Ver ticket</button>';
+      } else {
+        $ticketCaseButton = '<button type="button" class="scm-case-work-btn scm-btn-case" onclick="scmOpenCase(this)"'
+          . ' data-ticket="' . esc_attr($ticket) . '"'
+          . ' data-ticket-pk="' . esc_attr($ticket) . '"'
+          . ' data-asunto="' . esc_attr($asuntoCaso !== '' ? $asuntoCaso : 'Cotizacion de mantenimiento') . '"'
+          . ' data-estado="' . esc_attr($estadoTicket !== '' ? $estadoTicket : '-') . '"'
+          . ' data-admin="' . esc_attr($estadoAdminTicket !== '' ? $estadoAdminTicket : '-') . '"'
+          . ' data-contrato="' . esc_attr($contrato !== '' ? '#' . $contrato : '-') . '"'
+          . ' data-inmueble="' . esc_attr($inmueble !== '' ? $inmueble : '-') . '"'
+          . ' data-id-inmueble-web="' . esc_attr($idInmueble !== '' ? $idInmueble : '-') . '"'
+          . ' data-barrio="' . esc_attr($barrio !== '' ? $barrio : '-') . '"'
+          . ' data-direccion="' . esc_attr($direccion !== '' ? $direccion : '-') . '"'
+          . ' data-creado="' . esc_attr($fecha) . '"'
+          . ' data-empleado="' . esc_attr($empleado !== '' ? $empleado : '-') . '"'
+          . ' data-propietario="' . esc_attr($propietario) . '"'
+          . ' data-arrendatario="' . esc_attr($arrendatario) . '"'
+          . ' data-ticket-url="' . esc_attr($ticketUrl) . '"'
+          . ' data-cotizacion-id="' . esc_attr($id) . '"'
+          . ' data-cotizacion-url="' . esc_attr($cotUrl) . '"'
+          . ' data-cot-estado="' . esc_attr($estado) . '"'
+          . '>Ver ticket</button>';
+      }
     }
 
     return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '">'
@@ -2120,7 +2129,105 @@ trait RendersDashboard
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($noteUrl) . '" data-iframe-title="Anadir nota a cotizacion">Anadir nota</button>'
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($orderUrl) . '" data-iframe-title="Anadir orden de mantenimiento">Anadir orden</button>'
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($actaUrl) . '" data-iframe-title="Anadir acta de satisfaccion">Anadir acta</button>'
-      . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div><template class="scm-cotizacion-native-source">' . $nativeCotizacionHtml . '</template><div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div></article>';
+      . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div><template class="scm-cotizacion-native-source">' . $nativeCotizacionHtml . '</template>' . $linkedTicketSource . '<div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div></article>';
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @return array<string,string> */
+  private function cotizacion_linked_ticket_cards_by_rows(array $rows): array
+  {
+    $refs = [];
+    foreach ($rows as $row) {
+      $ref = trim((string) ($row['id_ticket'] ?? ''));
+      if ($ref !== '') {
+        $refs[$ref] = $ref;
+      }
+    }
+    if (empty($refs)) {
+      return [];
+    }
+
+    $primaryByRef = $this->cotizacion_resolve_ticket_primary_keys(array_values($refs));
+    if (empty($primaryByRef)) {
+      return [];
+    }
+
+    try {
+      $cardsByPk = $this->get_servicios_inmobiliarios_module()->renderCardsByTicketIds(
+        array_values(array_unique(array_values($primaryByRef))),
+        [
+          'ticket_url' => self::DEFAULT_TICKET_URL,
+          'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
+          'correctiva_url' => self::DEFAULT_CORRECTIVA_URL,
+          'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
+          'acta_url' => self::DEFAULT_ACTA_URL,
+        ]
+      );
+    } catch (\Throwable $e) {
+      return [];
+    }
+
+    $out = [];
+    foreach ($primaryByRef as $ref => $pk) {
+      $card = (string) ($cardsByPk[$pk] ?? '');
+      if ($card !== '') {
+        $out[$ref] = $card;
+      }
+    }
+    return $out;
+  }
+
+  /** @param array<int,string> $ticketRefs @return array<string,string> */
+  private function cotizacion_resolve_ticket_primary_keys(array $ticketRefs): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+
+    $refs = [];
+    foreach ($ticketRefs as $ref) {
+      $ref = trim((string) $ref);
+      if ($ref !== '') {
+        $refs[$ref] = $ref;
+      }
+    }
+    if (empty($refs)) {
+      return [];
+    }
+
+    $refs = array_values($refs);
+    $placeholders = implode(',', array_fill(0, count($refs), '?'));
+    $where = ["CAST(`_ID` AS CHAR) IN ({$placeholders})"];
+    $args = $refs;
+    if ($this->column_exists($table, 'id_ticket')) {
+      $where[] = "CAST(`id_ticket` AS CHAR) IN ({$placeholders})";
+      $args = array_merge($args, $refs);
+    }
+
+    $rows = $this->db->getResults(
+      "SELECT `_ID`, " . ($this->column_exists($table, 'id_ticket') ? '`id_ticket`' : "'' AS `id_ticket`") . " FROM `{$table}` WHERE " . implode(' OR ', $where),
+      $args
+    );
+    if (empty($rows)) {
+      return [];
+    }
+
+    $wanted = array_flip($refs);
+    $out = [];
+    foreach ($rows as $row) {
+      $pk = trim((string) ($row['_ID'] ?? ''));
+      if ($pk === '') {
+        continue;
+      }
+      if (isset($wanted[$pk])) {
+        $out[$pk] = $pk;
+      }
+      $logical = trim((string) ($row['id_ticket'] ?? ''));
+      if ($logical !== '' && isset($wanted[$logical])) {
+        $out[$logical] = $pk;
+      }
+    }
+    return $out;
   }
 
   /** @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders */
