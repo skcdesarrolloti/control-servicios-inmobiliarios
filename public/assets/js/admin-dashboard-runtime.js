@@ -6583,7 +6583,100 @@
         });
     }
 
+    function buildCotizacionPrintDocument(title, contentHtml, autoPrint) {
+      var safeTitle = escHtml(title || "Cotizacion de mantenimiento");
+      return (
+        '<!doctype html><html lang="es"><head><meta charset="utf-8">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        "<title>" + safeTitle + "</title>" +
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">' +
+        "<style>" +
+        "@page{size:A4;margin:10mm}*{box-sizing:border-box}body{margin:0;background:#fff;color:#0b1f3a;font-family:Poppins,Arial,sans-serif;font-size:11px;line-height:1.45}.scm-cotizacion-native-doc{max-width:980px;margin:0 auto;background:#fff}.scm-cotizacion-native-hero{border-radius:18px;padding:22px 24px;margin-bottom:16px;color:#fff;background:linear-gradient(135deg,#0b1f3a 0%,#1f4f99 68%,#f28c00 170%)}.scm-cotizacion-native-brand{display:flex;align-items:center;justify-content:space-between;gap:18px}.scm-cotizacion-native-brand img{max-width:190px;max-height:58px;object-fit:contain;background:#fff;border-radius:14px;padding:8px}.scm-cotizacion-native-brand span,.scm-cotizacion-native-state span{display:block;text-transform:uppercase;letter-spacing:.08em;font-size:9px;font-weight:800;opacity:.82}.scm-cotizacion-native-brand strong{display:block;font-size:28px;line-height:1.05}.scm-cotizacion-native-state{text-align:right}.scm-cotizacion-native-state strong{display:inline-block;margin-top:7px;padding:7px 11px;border-radius:999px;background:#fff;color:#0b1f3a}.scm-cotizacion-native-state .is-pending{color:#fed7aa}.scm-cotizacion-native-state .is-sent{color:#bfdbfe}.scm-cotizacion-native-hero h2{margin:20px 0 0;font-size:21px;line-height:1.2}.scm-cotizacion-native-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.scm-cotizacion-native-grid>div,.scm-cotizacion-native-section,.scm-cotizacion-damage-card{border:1px solid #d9e4f2;border-radius:14px;background:#f8fafc;padding:12px}.scm-cotizacion-native-grid span,.scm-cotizacion-damage-head span{display:block;text-transform:uppercase;letter-spacing:.07em;color:#64748b;font-size:8.5px;font-weight:800}.scm-cotizacion-native-grid strong,.scm-cotizacion-damage-head strong{display:block;margin-top:3px;color:#0b1f3a;font-weight:800}.scm-cotizacion-native-section{margin-top:12px;background:#fff}.scm-cotizacion-native-section h3{margin:0 0 10px;color:#0b1f3a;font-size:14px}.scm-cotizacion-native-section h4{margin:8px 0 6px;color:#1f4f99;font-size:11px}.scm-cotizacion-native-two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}.scm-cotizacion-media-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.scm-cotizacion-media-item{display:block;border:1px solid #d9e4f2;border-radius:12px;padding:8px;text-decoration:none;color:#0b1f3a;background:#f8fafc}.scm-cotizacion-media-item img{width:100%;height:115px;object-fit:cover;border-radius:9px;border:1px solid #e2e8f0}.scm-cotizacion-media-item strong{display:block;margin-top:6px;font-size:9px}.scm-cotizacion-damage-head{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.scm-cotizacion-native-tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.scm-cotizacion-native-tags span{border:1px solid #fed7aa;border-radius:999px;background:#fff7ed;color:#c2410c;padding:4px 8px;font-size:9px;font-weight:800}.scm-cotizacion-native-rich p{margin:0 0 8px}.scm-cotizacion-budget-block{margin-top:10px}.scm-cotizacion-budget-table{width:100%;border-collapse:collapse;border-radius:12px;overflow:hidden}.scm-cotizacion-budget-table th,.scm-cotizacion-budget-table td{padding:8px;border-bottom:1px solid #e2e8f0;text-align:left}.scm-cotizacion-budget-table th{background:#0b1f3a;color:#fff;font-size:9px;text-transform:uppercase;letter-spacing:.06em}.scm-cotizacion-budget-table td:last-child{text-align:right;font-weight:800}.scm-cotizacion-budget-subtotal,.scm-cotizacion-native-total-box>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-bottom:1px solid #e2e8f0}.scm-cotizacion-native-total-box{margin-top:12px;border:1px solid #fed7aa;border-radius:14px;overflow:hidden;background:#fff7ed}.scm-cotizacion-native-total-box .is-grand-total{background:#0b1f3a;color:#fff}.scm-cotizacion-native-total-box .is-grand-total strong{font-size:16px;color:#fff}.scm-cotizacion-native-note{border-left:4px solid #f28c00;padding:10px 12px;background:#fff7ed;border-radius:10px}.scm-cotizacion-native-criteria{margin:8px 0 0;padding-left:20px}.scm-cotizacion-native-empty{margin:0;color:#64748b;font-weight:600}.scm-cotizacion-native-legal{background:#fff7ed;border-color:#fed7aa}.scm-cotizacion-native-footer{display:flex;justify-content:space-between;gap:18px;margin-top:14px;padding:16px;border-radius:16px;background:#0b1f3a;color:#fff}.scm-cotizacion-native-footer span{display:block;color:#fed7aa;text-transform:uppercase;letter-spacing:.08em;font-size:9px;font-weight:800}.scm-cotizacion-native-footer p{margin:4px 0 0;color:#dbeafe}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.scm-cotizacion-native-section,.scm-cotizacion-damage-card,.scm-cotizacion-budget-block{break-inside:avoid}.scm-cotizacion-media-item img{height:95px}}@media(max-width:760px){.scm-cotizacion-native-grid,.scm-cotizacion-native-two-col,.scm-cotizacion-damage-head{grid-template-columns:1fr}.scm-cotizacion-native-brand{display:grid}.scm-cotizacion-native-state{text-align:left}}" +
+        "</style></head><body>" +
+        contentHtml +
+        (autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){window.focus();window.print();},450);});<\/script>' : "") +
+        "</body></html>"
+      );
+    }
+
+    function openCotizacionPrintWindow(title, contentHtml, autoPrint) {
+      var printWin = window.open("", "_blank");
+      if (!printWin) {
+        showToast("error", "El navegador bloqueo la ventana. Permite ventanas emergentes para exportar.");
+        return;
+      }
+      printWin.document.open();
+      printWin.document.write(buildCotizacionPrintDocument(title, contentHtml, autoPrint));
+      printWin.document.close();
+    }
+
+    function openCotizacionNativeModal(button) {
+      var card = button.closest(".scm-cotizacion-card");
+      var source = card ? card.querySelector(".scm-cotizacion-native-source") : null;
+      var cotizacionId = button.getAttribute("data-cotizacion-id") || "";
+      var content = source ? source.innerHTML : "";
+      var title = "Cotizacion #" + (cotizacionId || "");
+      if (!content) {
+        showToast("error", "No se encontro la informacion de la cotizacion.");
+        return;
+      }
+      if (!window.Swal) {
+        openCotizacionPrintWindow(title, content, false);
+        return;
+      }
+      window.Swal.fire({
+        title: "",
+        html:
+          '<div class="scm-cotizacion-native-modal">' +
+          '<div class="scm-cotizacion-native-toolbar">' +
+          '<div><span>Cotizacion de mantenimiento</span><strong>#' + escHtml(cotizacionId || "-") + "</strong></div>" +
+          '<div class="scm-cotizacion-native-toolbar-actions">' +
+          '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-open-large>Ver en grande</button>' +
+          '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-cotizacion-print>Exportar PDF</button>' +
+          "</div></div>" +
+          '<div class="scm-cotizacion-native-scroll"><div class="scm-cotizacion-native-print-root">' +
+          content +
+          "</div></div></div>",
+        width: "min(1180px, 96vw)",
+        padding: 0,
+        showConfirmButton: false,
+        showCloseButton: true,
+        customClass: {
+          popup: "scm-cotizacion-native-swal",
+          closeButton: "scm-swal-close-round",
+        },
+        didOpen: function () {
+          var popup = window.Swal.getPopup();
+          if (!popup) return;
+          var printRoot = popup.querySelector(".scm-cotizacion-native-print-root");
+          var printable = printRoot ? printRoot.innerHTML : content;
+          var openLarge = popup.querySelector("[data-scm-cotizacion-open-large]");
+          var printBtn = popup.querySelector("[data-scm-cotizacion-print]");
+          if (openLarge) {
+            openLarge.addEventListener("click", function () {
+              openCotizacionPrintWindow(title, printable, false);
+            });
+          }
+          if (printBtn) {
+            printBtn.addEventListener("click", function () {
+              openCotizacionPrintWindow(title, printable, true);
+            });
+          }
+        },
+      });
+    }
+
     root.addEventListener("click", function (e) {
+      var nativeCotizacionBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-view-cotizacion-native]")
+          : null;
+      if (nativeCotizacionBtn) {
+        e.preventDefault();
+        openCotizacionNativeModal(nativeCotizacionBtn);
+        return;
+      }
+
       var financeBtn =
         e.target && e.target.closest
           ? e.target.closest("[data-scm-cotizacion-toggle-panel]")
