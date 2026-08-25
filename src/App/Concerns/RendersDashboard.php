@@ -1607,6 +1607,26 @@ trait RendersDashboard
         <?php endforeach; ?>
       </div>
 
+      <section class="scm-admin-notif-card scm-admin-notif-import-card" data-admin-notif-import-wrap>
+        <form data-admin-notif-import enctype="multipart/form-data">
+          <div class="scm-admin-notif-import-copy">
+            <span class="scm-calendar-action-kicker">Cruce por Excel SIMI</span>
+            <h4>Importar y seleccionar destinatarios</h4>
+            <p>Sube un .xlsx o .csv con columnas como <strong>contrato</strong>, <strong>inmueble_simi</strong> y <strong>canon</strong>. El sistema cruza el archivo con propietarios, arrendatarios o copropiedades.</p>
+            <p class="scm-admin-notif-import-examples">
+              <a href="assets/examples/notificaciones-importacion-simi.xlsx" download>Descargar ejemplo XLSX</a>
+              <a href="assets/examples/notificaciones-importacion-simi.csv" download>Descargar ejemplo CSV</a>
+            </p>
+          </div>
+          <div class="scm-admin-notif-import-controls">
+            <input type="file" name="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-admin-notif-import-file>
+            <button type="submit" class="scm-btn-primary btn btn-primary">Importar Excel</button>
+            <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-import-clear>Quitar importaci&oacute;n</button>
+          </div>
+          <p class="scm-admin-notif-import-result" data-admin-notif-import-result aria-live="polite"></p>
+        </form>
+      </section>
+
       <section class="scm-admin-notif-card scm-admin-notif-filter-card">
         <form data-admin-notif-search autocomplete="off">
           <div class="scm-admin-notif-filter-grid">
@@ -1635,26 +1655,6 @@ trait RendersDashboard
               <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-clear>Limpiar</button>
             </div>
           </div>
-        </form>
-      </section>
-
-      <section class="scm-admin-notif-card scm-admin-notif-import-card" data-admin-notif-import-wrap>
-        <form data-admin-notif-import enctype="multipart/form-data">
-          <div class="scm-admin-notif-import-copy">
-            <span class="scm-calendar-action-kicker">Cruce por Excel SIMI</span>
-            <h4>Importar y seleccionar destinatarios</h4>
-            <p>Sube un .xlsx o .csv con columnas como <strong>contrato</strong>, <strong>inmueble_simi</strong> y <strong>canon</strong>. El sistema cruza el archivo con propietarios, arrendatarios o copropiedades.</p>
-            <p class="scm-admin-notif-import-examples">
-              <a href="assets/examples/notificaciones-importacion-simi.xlsx" download>Descargar ejemplo XLSX</a>
-              <a href="assets/examples/notificaciones-importacion-simi.csv" download>Descargar ejemplo CSV</a>
-            </p>
-          </div>
-          <div class="scm-admin-notif-import-controls">
-            <input type="file" name="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-admin-notif-import-file>
-            <button type="submit" class="scm-btn-primary btn btn-primary">Importar Excel</button>
-            <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-import-clear>Quitar importaci&oacute;n</button>
-          </div>
-          <p class="scm-admin-notif-import-result" data-admin-notif-import-result aria-live="polite"></p>
         </form>
       </section>
 
