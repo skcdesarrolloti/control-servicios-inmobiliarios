@@ -5058,6 +5058,23 @@
   box-shadow: 0 12px 24px rgba(245, 145, 32, 0.12);
 }
 
+#scm-app .scm-admin-notif-collection-modal .scm-field small {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+#scm-app .scm-admin-notif-collection-preview {
+  background: #f8fbff;
+}
+
+#scm-app .scm-admin-notif-collection-preview .scm-admin-notif-email-frame {
+  min-height: 340px;
+}
+
 #scm-app .scm-admin-notif-mini-channel input {
   width: 16px;
   height: 16px;

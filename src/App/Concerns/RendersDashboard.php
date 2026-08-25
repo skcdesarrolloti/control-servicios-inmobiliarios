@@ -1859,11 +1859,12 @@ trait RendersDashboard
                 </select>
               </div>
               <div class="scm-field">
-                <label for="scm-admin-notif-collection-call">Volver a llamar</label>
+                <label for="scm-admin-notif-collection-call">Programar siguiente gesti&oacute;n</label>
                 <select id="scm-admin-notif-collection-call" name="volver_llamar" class="select select-bordered select-sm scm-select" data-admin-notif-collection-call>
                   <option value="No">No</option>
                   <option value="Si">S&iacute;</option>
                 </select>
+                <small>Si marcas S&iacute;, se guarda una fecha/hora para volver a contactar al arrendatario.</small>
               </div>
             </div>
 
@@ -1893,19 +1894,21 @@ trait RendersDashboard
               <span>Usa la plantilla &ldquo;Gesti&oacute;n de cobro&rdquo; y encola la notificaci&oacute;n en el mismo guardado. Si no quieres enviar nada, deja los canales sin marcar.</span>
               <div class="scm-admin-notif-collection-channels" role="group" aria-label="Canales para gestion de cobro">
                 <label class="scm-admin-notif-mini-channel">
-                  <input type="checkbox" name="notify_channels[]" value="whatsapp" checked>
+                  <input type="checkbox" name="notify_channels[]" value="whatsapp" data-admin-notif-collection-channel checked>
                   <span>WhatsApp</span>
                 </label>
                 <label class="scm-admin-notif-mini-channel">
-                  <input type="checkbox" name="notify_channels[]" value="email">
+                  <input type="checkbox" name="notify_channels[]" value="email" data-admin-notif-collection-channel>
                   <span>Email</span>
                 </label>
                 <label class="scm-admin-notif-mini-channel">
-                  <input type="checkbox" name="notify_channels[]" value="sms">
+                  <input type="checkbox" name="notify_channels[]" value="sms" data-admin-notif-collection-channel>
                   <span>SMS</span>
                 </label>
               </div>
             </div>
+
+            <div class="scm-admin-notif-preview scm-admin-notif-collection-preview" data-admin-notif-collection-preview aria-live="polite"></div>
 
             <div class="scm-admin-notif-submit-row">
               <span class="scm-spinner" data-admin-notif-collection-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>

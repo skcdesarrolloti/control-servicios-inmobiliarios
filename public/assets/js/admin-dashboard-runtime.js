@@ -2132,6 +2132,12 @@
       var collectionSelectedCountEl = panel.querySelector("[data-admin-notif-collection-selected-count]");
       var collectionCallSelect = panel.querySelector("[data-admin-notif-collection-call]");
       var collectionFollowWrap = panel.querySelector("[data-admin-notif-collection-follow]");
+      var collectionTypeSelect = panel.querySelector("#scm-admin-notif-collection-type");
+      var collectionObservationInput = panel.querySelector("#scm-admin-notif-collection-observation");
+      var collectionDateInput = panel.querySelector("#scm-admin-notif-collection-date");
+      var collectionHourInput = panel.querySelector("#scm-admin-notif-collection-hour");
+      var collectionAltInput = panel.querySelector("#scm-admin-notif-collection-alt");
+      var collectionPreviewEl = panel.querySelector("[data-admin-notif-collection-preview]");
       var collectionSpinner = panel.querySelector("[data-admin-notif-collection-spinner]");
       var collectionSubmitBtn = panel.querySelector("[data-admin-notif-collection-submit]");
       var collectionResultEl = panel.querySelector("[data-admin-notif-collection-result]");
@@ -2456,6 +2462,108 @@
         var shouldShow = String(collectionCallSelect.value || "").toLowerCase() === "si";
         collectionFollowWrap.hidden = !shouldShow;
         collectionFollowWrap.classList.toggle("is-hidden", !shouldShow);
+        updateCollectionPreview();
+      }
+
+      function collectionSelectedChannels() {
+        return Array.prototype.slice.call(
+          panel.querySelectorAll("[data-admin-notif-collection-channel]:checked"),
+        ).map(function (input) {
+          return String(input.value || "").trim().toLowerCase();
+        }).filter(Boolean);
+      }
+
+      function collectionDetailText() {
+        var type = collectionTypeSelect ? String(collectionTypeSelect.value || "Canon").trim() : "Canon";
+        var observation = collectionObservationInput ? String(collectionObservationInput.value || "").trim() : "";
+        var lines = ["Tipo de gestion: " + (type || "Canon")];
+        lines.push("Observacion: " + (observation || "Detalle de la gestion escrito por el funcionario."));
+        if (collectionCallSelect && String(collectionCallSelect.value || "").toLowerCase() === "si") {
+          var date = collectionDateInput ? String(collectionDateInput.value || "").trim() : "";
+          var hour = collectionHourInput ? String(collectionHourInput.value || "").trim() : "";
+          var alt = collectionAltInput ? String(collectionAltInput.value || "").trim() : "";
+          var next = [date, hour].filter(Boolean).join(" ");
+          lines.push("Proxima gestion: " + (next || "pendiente por confirmar"));
+          if (alt) {
+            lines.push("Nota de horario: " + alt);
+          }
+        }
+        return lines.join("\n");
+      }
+
+      function renderCollectionWhatsappPreviewText() {
+        var sender = senderProfile();
+        var signature = sender.signatureLine || "Funcionario - Control Servicios Inmobiliarios";
+        return (
+          "Buen dia, Nombre del destinatario.\n\n" +
+          "Le informamos que se registro una gestion de cobro relacionada con su contrato de arrendamiento.\n\n" +
+          "Detalle de la gestion:\n\n" +
+          previewMessage(collectionDetailText()) +
+          "\n\nSi ya realizo el pago o tiene alguna novedad, por favor comuniquese con nosotros.\n\n" +
+          "Atentamente,\n" +
+          signature +
+          "\n\nGracias por su atencion."
+        );
+      }
+
+      function renderCollectionEmailPreviewHtml() {
+        var content = (
+          "<p><strong>Buen d&iacute;a, Nombre del destinatario</strong>.</p>" +
+          "<p>Le informamos que se registr&oacute; una gesti&oacute;n de cobro relacionada con su contrato de arrendamiento.</p>" +
+          "<div>" + escHtml(previewMessage(collectionDetailText())).replace(/\n/g, "<br>") + "</div>" +
+          "<p>Si ya realiz&oacute; el pago o tiene alguna novedad, por favor comun&iacute;quese con nosotros.</p>" +
+          '<p style="margin-top:24px;">Atentamente,<br><strong>' +
+          escHtml(senderProfile().signatureLine || "Funcionario - Control Servicios Inmobiliarios") +
+          "</strong></p>"
+        );
+        return wrapEmailPreviewHtml("Gestion de cobro de contrato de arrendamiento", content);
+      }
+
+      function updateCollectionPreview() {
+        if (!collectionPreviewEl) {
+          return;
+        }
+        var channels = collectionSelectedChannels();
+        if (channels.length === 0) {
+          collectionPreviewEl.innerHTML =
+            "<strong>Vista previa</strong><p>No se enviara notificacion. Solo se guardara la gestion de cobro y el historial.</p>";
+          return;
+        }
+        var detail = previewMessage(collectionDetailText());
+        var smsText = smsPrefix() + detail;
+        var cards = channels.map(function (channel) {
+          if (channel === "email") {
+            return (
+              '<article class="scm-admin-notif-preview-card is-email">' +
+              "<h5>Email / HTML</h5>" +
+              '<iframe class="scm-admin-notif-email-frame" sandbox srcdoc="' +
+              escAttr(renderCollectionEmailPreviewHtml()) +
+              '"></iframe>' +
+              "</article>"
+            );
+          }
+          if (channel === "sms") {
+            return (
+              '<article class="scm-admin-notif-preview-card is-sms' +
+              (smsText.length > 160 ? " is-over" : "") +
+              '">' +
+              "<h5>SMS</h5>" +
+              '<p class="scm-admin-notif-preview-text">' +
+              escHtml(smsText) +
+              "</p><small>" +
+              smsText.length +
+              "/160 caracteres incluyendo la marca.</small></article>"
+            );
+          }
+          return (
+            '<article class="scm-admin-notif-preview-card is-whatsapp">' +
+            "<h5>WhatsApp oficial</h5>" +
+            '<p class="scm-admin-notif-preview-text">' +
+            escHtml(renderCollectionWhatsappPreviewText()).replace(/\n/g, "<br>") +
+            "</p></article>"
+          );
+        }).join("");
+        collectionPreviewEl.innerHTML = '<strong>Vista previa de gestion de cobro</strong><div>' + cards + "</div>";
       }
 
       function openCollectionModal() {
@@ -2478,6 +2586,7 @@
           collectionResultEl.classList.remove("is-error");
         }
         updateCollectionFollowVisibility();
+        updateCollectionPreview();
         syncContext();
         collectionModal.hidden = false;
         collectionModal.classList.add("is-open");
@@ -2609,6 +2718,7 @@
         updateMessageVisibility();
         updateSmsCounter();
         updatePreview();
+        updateCollectionPreview();
       }
 
       function previewMessage(value) {
@@ -3374,6 +3484,22 @@
         if (collectionCallSelect) {
           collectionCallSelect.addEventListener("change", updateCollectionFollowVisibility);
         }
+        [
+          collectionTypeSelect,
+          collectionObservationInput,
+          collectionDateInput,
+          collectionHourInput,
+          collectionAltInput,
+        ].forEach(function (input) {
+          if (!input) {
+            return;
+          }
+          input.addEventListener("input", updateCollectionPreview);
+          input.addEventListener("change", updateCollectionPreview);
+        });
+        panel.querySelectorAll("[data-admin-notif-collection-channel]").forEach(function (input) {
+          input.addEventListener("change", updateCollectionPreview);
+        });
 
         if (collectionForm) {
           collectionForm.addEventListener("submit", function (event) {
