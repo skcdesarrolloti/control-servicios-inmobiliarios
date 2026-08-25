@@ -4504,6 +4504,17 @@
   color: #0f766e;
 }
 
+#scm-app .scm-admin-notif-channel-launch--collection {
+  border-color: #fed7aa;
+  background: linear-gradient(135deg, #fff7ed, #fff);
+  color: #c2410c;
+}
+
+#scm-app .scm-admin-notif-channel-launch--collection.is-hidden,
+#scm-app .scm-admin-notif-channel-launch--collection[hidden] {
+  display: none !important;
+}
+
 #scm-app .scm-admin-notif-section-head h4 {
   margin: 4px 0;
   color: #0f172a;
@@ -4902,6 +4913,43 @@
 #scm-app .scm-admin-notif-composer form {
   display: grid;
   gap: 14px;
+}
+
+#scm-app .scm-admin-notif-collection-grid,
+#scm-app .scm-admin-notif-collection-follow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+#scm-app .scm-admin-notif-collection-follow[hidden],
+#scm-app .scm-admin-notif-collection-follow.is-hidden {
+  display: none !important;
+}
+
+#scm-app .scm-admin-notif-collection-help {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px dashed #fed7aa;
+  border-radius: 14px;
+  background: #fff7ed;
+  color: #10233f;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+#scm-app .scm-admin-notif-collection-help strong {
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-admin-notif-collection-help span {
+  color: #475569;
+  font-weight: 750;
 }
 
 #scm-app .scm-admin-notif-channel-group {

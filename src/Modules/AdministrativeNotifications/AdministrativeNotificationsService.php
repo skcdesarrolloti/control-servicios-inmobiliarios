@@ -183,6 +183,17 @@ final class AdministrativeNotificationsService
         'email_template' => 'scm_email_arrendatario_aviso_pago_canon_v1',
         'parameter_mode' => 'name_signature',
       ],
+      'scm_arrendatario_gestion_cobro_v1' => [
+        'name' => 'scm_arrendatario_gestion_cobro_v1',
+        'label' => 'Gestion de cobro',
+        'language' => 'es_CO',
+        'description' => 'Aviso para arrendatarios cuando se registra una gestion de cobro.',
+        'body' => "Buen dia, {{1}}.\n\nLe informamos que se registro una gestion de cobro relacionada con su contrato de arrendamiento.\n\nDetalle de la gestion:\n\n{{2}}\n\nSi ya realizo el pago o tiene alguna novedad, por favor comuniquese con nosotros.\n\nAtentamente,\n{{3}}\n\nGracias por su atencion.",
+        'variables' => ['Nombre del arrendatario', 'Detalle de la gestion, contrato, canon, observacion o proxima llamada', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'actors' => array_merge($arrendatarios, $funcionarios),
+        'email_template' => 'scm_email_arrendatario_gestion_cobro_v1',
+        'parameter_mode' => 'name_message_signature',
+      ],
       'scm_factura_disponible_v1' => [
         'name' => 'scm_factura_disponible_v1',
         'label' => 'Factura disponible',
@@ -240,6 +251,20 @@ final class AdministrativeNotificationsService
         'fixed_body' => true,
         'requires_message' => false,
         'preview_excerpt' => 'Aviso formal de canon vencido con firma del funcionario.',
+      ],
+      'scm_email_arrendatario_gestion_cobro_v1' => [
+        'name' => 'scm_email_arrendatario_gestion_cobro_v1',
+        'label' => 'Gestion de cobro',
+        'subject' => 'Gestion de cobro de contrato de arrendamiento',
+        'description' => 'Email para arrendatarios cuando se registra una gestion de cobro.',
+        'body' => '<p><strong>Buen d&iacute;a, {{nombre}}</strong>.</p><p>Le informamos que se registr&oacute; una gesti&oacute;n de cobro relacionada con su contrato de arrendamiento.</p><div>{{mensaje}}</div><p>Si ya realiz&oacute; el pago o tiene alguna novedad, por favor comun&iacute;quese con nosotros.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
+        'source' => 'sistema',
+        'message_only' => true,
+        'editable_message' => '',
+        'is_html' => true,
+        'is_full_document' => false,
+        'requires_message' => true,
+        'preview_excerpt' => 'Gestion de cobro con detalle editable y firma del funcionario.',
       ],
       'scm_email_factura_disponible_v1' => [
         'name' => 'scm_email_factura_disponible_v1',
@@ -300,6 +325,319 @@ final class AdministrativeNotificationsService
         'preview_excerpt' => 'Envio de soportes de pago con detalle editable.',
       ],
     ];
+  }
+
+  /**
+   * Registra gestiones de cobro usando los mismos campos del formulario JetForm legacy.
+   *
+   * @param int[] $ids IDs de arrendatarios seleccionados.
+   * @param array<string,mixed> $payload
+   * @return array{selected:int,contracts:int,created:int,updated_contracts:int,history:int,properties:int,skipped:int}
+   */
+  public function registerCollectionManagement(array $ids, array $payload): array
+  {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
+    if ($ids === []) {
+      throw new \RuntimeException('Selecciona al menos un arrendatario activo.');
+    }
+
+    $gestionesTable = $this->db->table('jet_cct_gestiones_cobro');
+    $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    if (!$this->schema->tableExists($gestionesTable)) {
+      throw new \RuntimeException('La tabla de gestiones de cobro no esta disponible.');
+    }
+    if (!$this->schema->tableExists($contractTable)) {
+      throw new \RuntimeException('La tabla de contratos de arrendamiento no esta disponible.');
+    }
+
+    $data = $this->normalizeCollectionPayload($payload);
+    $contracts = $this->activeArrendatarioContracts($ids);
+    if ($contracts === []) {
+      return ['selected' => count($ids), 'contracts' => 0, 'created' => 0, 'updated_contracts' => 0, 'history' => 0, 'properties' => 0, 'skipped' => count($ids)];
+    }
+
+    $nowTs = time();
+    $nowMysql = date('Y-m-d H:i:s', $nowTs);
+    $sender = $this->senderProfile();
+    $userId = Auth::userId();
+    $nextTs = $this->collectionNextTimestamp($data['siguiente_fecha'], $data['siguiente_hora']);
+
+    $created = 0;
+    $updatedContracts = 0;
+    $history = 0;
+    $properties = 0;
+    $skipped = 0;
+    $seenContracts = [];
+
+    foreach ($contracts as $contract) {
+      $contractId = (string) ($contract['_ID'] ?? '');
+      if ($contractId === '' || isset($seenContracts[$contractId])) {
+        $skipped++;
+        continue;
+      }
+      $seenContracts[$contractId] = true;
+      $nextCount = $this->nextCollectionCount($contract);
+
+      $gestionPayload = [
+        'cct_status' => 'publish',
+        'cct_author_id' => $userId,
+        'cct_created' => $nowMysql,
+        'cct_modified' => $nowMysql,
+        'id_inmueble' => $this->firstNonEmpty([$contract['id_inmueble'] ?? '', $contract['inmueble'] ?? '']),
+        'id_contrato' => $contractId,
+        'id_empleado' => $userId,
+        'realizado_por' => $sender['name'],
+        'cargo' => $sender['cargo'],
+        'fecha' => $nowTs,
+        'contrato' => $this->firstNonEmpty([$contract['contrato'] ?? '', $contract['contrato_arrendamiento'] ?? '', $contractId]),
+        'inmueble' => $this->firstNonEmpty([$contract['inmueble'] ?? '', $contract['id_inmueble'] ?? '']),
+        'direccion' => $this->firstNonEmpty([$contract['direccion'] ?? '', $contract['direccion_inmueble'] ?? '']),
+        'arrendatario' => $this->firstNonEmpty([$contract['arrendatario'] ?? '', $contract['nombre_arrendatario'] ?? '']),
+        'propietario' => $this->firstNonEmpty([$contract['propietario'] ?? '', $contract['nombre_propietario'] ?? '']),
+        'sucursal' => $contract['sucursal'] ?? '',
+        'id_arrendatario' => $contract['id_arrendatario'] ?? '',
+        'id_propietario' => $contract['id_propietario'] ?? '',
+        'gestiones_cobro' => $nextCount,
+        'observacion' => $data['observacion'],
+        'volver_llamar' => $data['volver_llamar'],
+        'siguiente_gestion_cobro' => $nextTs,
+        'otro_horario_cobro' => $data['otro_horario_cobro'],
+        'dia_cobro' => $data['siguiente_fecha'],
+        'hora_cobro' => $data['siguiente_hora'],
+        'tipo_gestion' => $data['tipo_gestion_cobro'],
+      ];
+      $insert = $this->schema->filterTableData($gestionesTable, $gestionPayload);
+      if ($insert === [] || !$this->db->insert($gestionesTable, $insert)) {
+        $skipped++;
+        continue;
+      }
+      $created++;
+      $gestionId = (int) $this->db->lastInsertId();
+
+      $contractUpdate = [
+        'cct_modified' => $nowMysql,
+        'fecha_gestion_cobro' => $nowTs,
+        'id_gestion_cobro' => $gestionId,
+        'gestiones_cobro' => $nextCount,
+        'siguiente_gestion_cobro' => $nextTs,
+        'otro_horario_cobro' => $data['otro_horario_cobro'],
+        'dia_cobro' => $data['siguiente_fecha'],
+        'hora_cobro' => $data['siguiente_hora'],
+        'id_empleado' => $userId,
+        'realizado_por' => $sender['name'],
+        'tuvo_revision' => 'Si',
+      ];
+      $contractUpdate = $this->schema->filterTableData($contractTable, $contractUpdate);
+      if ($contractUpdate !== []) {
+        $updatedContracts += $this->db->update($contractTable, $contractUpdate, ['_ID' => $contractId]) > 0 ? 1 : 0;
+      }
+
+      $history += $this->insertCollectionPropertyHistory($contract, $sender['name'], $userId, $nowTs, $nowMysql, $data) ? 1 : 0;
+      $properties += $this->updateCollectionPropertyCounter($contract, $nextCount, $nowMysql) ? 1 : 0;
+    }
+
+    return [
+      'selected' => count($ids),
+      'contracts' => count($contracts),
+      'created' => $created,
+      'updated_contracts' => $updatedContracts,
+      'history' => $history,
+      'properties' => $properties,
+      'skipped' => $skipped,
+    ];
+  }
+
+  /** @param array<string,mixed> $payload @return array{tipo_gestion_cobro:string,observacion:string,volver_llamar:string,siguiente_fecha:string,siguiente_hora:string,otro_horario_cobro:string} */
+  private function normalizeCollectionPayload(array $payload): array
+  {
+    $type = trim((string) ($payload['tipo_gestion_cobro'] ?? 'Canon'));
+    if ($type === '') {
+      $type = 'Canon';
+    }
+    $normalizedType = strtolower(strtr($type, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U']));
+    $type = str_contains($normalizedType, 'admin') ? 'Administracion' : 'Canon';
+
+    $volver = strtolower(trim((string) ($payload['volver_llamar'] ?? 'No')));
+    $volver = in_array($volver, ['si', 's', '1', 'true'], true) ? 'Si' : 'No';
+    $date = trim((string) ($payload['siguiente_fecha'] ?? ''));
+    $hour = trim((string) ($payload['siguiente_hora'] ?? ''));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+      $date = '';
+    }
+    if (!preg_match('/^\d{2}:\d{2}$/', $hour)) {
+      $hour = '';
+    }
+    if ($volver !== 'Si') {
+      $date = '';
+      $hour = '';
+    }
+
+    return [
+      'tipo_gestion_cobro' => $type,
+      'observacion' => trim(wp_strip_all_tags((string) ($payload['observacion'] ?? ''))),
+      'volver_llamar' => $volver,
+      'siguiente_fecha' => $date,
+      'siguiente_hora' => $hour,
+      'otro_horario_cobro' => mb_substr(trim(wp_strip_all_tags((string) ($payload['otro_horario_cobro'] ?? ''))), 0, 240, 'UTF-8'),
+    ];
+  }
+
+  private function collectionNextTimestamp(string $date, string $hour): int
+  {
+    if ($date === '') {
+      return 0;
+    }
+    $time = $hour !== '' ? $hour : '08:00';
+    $ts = strtotime($date . ' ' . $time . ':00');
+    return is_int($ts) && $ts > 0 ? $ts : 0;
+  }
+
+  /**
+   * @param int[] $ids
+   * @return array<int,array<string,mixed>>
+   */
+  private function activeArrendatarioContracts(array $ids): array
+  {
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    if (!$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'id_arrendatario')) {
+      return [];
+    }
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $select = ['_ID'];
+    foreach ([
+      'estado',
+      'contrato',
+      'contrato_arrendamiento',
+      'id_inmueble',
+      'inmueble',
+      'id_inmueble_data',
+      'direccion',
+      'direccion_inmueble',
+      'arrendatario',
+      'nombre_arrendatario',
+      'propietario',
+      'nombre_propietario',
+      'sucursal',
+      'id_arrendatario',
+      'id_propietario',
+      'gestiones_cobro',
+      'codigo_inmueble_web',
+    ] as $column) {
+      if ($this->schema->columnExists($table, $column)) {
+        $select[] = $column;
+      }
+    }
+
+    return $this->db->getResults(
+      'SELECT `' . implode('`, `', array_values(array_unique($select))) . "` FROM `{$table}`
+        WHERE CAST(`id_arrendatario` AS UNSIGNED) IN ({$placeholders})
+          AND LOWER(TRIM(COALESCE(`estado`, ''))) = 'entregado'
+        ORDER BY `_ID` DESC",
+      $ids
+    );
+  }
+
+  /** @param array<string,mixed> $contract */
+  private function nextCollectionCount(array $contract): int
+  {
+    $raw = trim((string) ($contract['gestiones_cobro'] ?? '0'));
+    $count = 0;
+    if ($raw !== '') {
+      if (is_numeric($raw)) {
+        $count = (int) $raw;
+      } elseif (preg_match_all('/\d+/', $raw, $matches)) {
+        $numbers = array_map('intval', $matches[0] ?? []);
+        $count = $numbers !== [] ? max($numbers) : 0;
+      }
+    }
+    return max(0, $count) + 1;
+  }
+
+  /** @param array<string,mixed> $contract @param array<string,string> $data */
+  private function insertCollectionPropertyHistory(array $contract, string $employeeName, int $employeeId, int $nowTs, string $nowMysql, array $data): bool
+  {
+    $table = $this->db->table('jet_cct_historial_del_inmueble');
+    if (!$this->schema->tableExists($table)) {
+      return false;
+    }
+    $propertyId = $this->firstNonEmpty([$contract['id_inmueble'] ?? '', $contract['inmueble'] ?? '', $contract['id_inmueble_data'] ?? '']);
+    $detail = 'Se ha realizado una gestion de cobro en su inmueble.';
+    if ($data['observacion'] !== '') {
+      $detail .= ' Observacion: ' . $data['observacion'];
+    }
+    if ($data['volver_llamar'] === 'Si' && $data['siguiente_fecha'] !== '') {
+      $detail .= ' Proxima gestion: ' . $data['siguiente_fecha'] . ($data['siguiente_hora'] !== '' ? ' ' . $data['siguiente_hora'] : '');
+    }
+    $payload = [
+      'cct_status' => 'publish',
+      'cct_author_id' => $employeeId,
+      'cct_created' => $nowMysql,
+      'cct_modified' => $nowMysql,
+      'id_inmueble' => $propertyId,
+      'id_inmueble_data' => $propertyId,
+      'id_empleado' => $employeeId,
+      'fecha' => $nowTs,
+      'tipo_reporte' => 'Cobro',
+      'tipo_de_reporte_his' => 'Cobro',
+      'observacion' => $detail,
+      'observacion_his' => $detail,
+      'funcionario' => $employeeName,
+      'reporte_realizado_por_his' => $employeeName,
+    ];
+    $payload = $this->schema->filterTableData($table, $payload);
+    return $payload !== [] && $this->db->insert($table, $payload);
+  }
+
+  /** @param array<string,mixed> $contract */
+  private function updateCollectionPropertyCounter(array $contract, int $nextCount, string $nowMysql): bool
+  {
+    $updated = $this->updateCollectionPropertyPostMetaCounter($contract, $nextCount);
+    $table = $this->db->table('jet_cct_inmuebles');
+    if (!$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'cobros')) {
+      return $updated;
+    }
+    $payload = $this->schema->filterTableData($table, [
+      'cobros' => $nextCount,
+      'cct_modified' => $nowMysql,
+    ]);
+    if ($payload === []) {
+      return $updated;
+    }
+    $candidateIds = array_values(array_unique(array_filter(array_map(
+      static fn($value): string => trim((string) $value),
+      [$contract['id_inmueble'] ?? '', $contract['id_inmueble_data'] ?? '', $contract['inmueble'] ?? '', $contract['codigo_inmueble_web'] ?? '']
+    ), static fn(string $value): bool => $value !== '')));
+    foreach ($candidateIds as $candidate) {
+      if ($this->db->update($table, $payload, ['_ID' => $candidate]) > 0) {
+        $updated = true;
+      }
+      if ($this->schema->columnExists($table, 'codigo') && $this->db->update($table, $payload, ['codigo' => $candidate]) > 0) {
+        $updated = true;
+      }
+    }
+    return $updated;
+  }
+
+  /** @param array<string,mixed> $contract */
+  private function updateCollectionPropertyPostMetaCounter(array $contract, int $nextCount): bool
+  {
+    $postMetaTable = $this->db->table('postmeta');
+    if (!$this->schema->tableExists($postMetaTable)) {
+      return false;
+    }
+    $postId = (int) preg_replace('/\D+/', '', (string) ($contract['id_inmueble'] ?? '0'));
+    if ($postId <= 0) {
+      return false;
+    }
+    $exists = (int) ($this->db->getVar("SELECT `meta_id` FROM `{$postMetaTable}` WHERE `post_id` = ? AND `meta_key` = 'cobros' LIMIT 1", [$postId]) ?? 0);
+    if ($exists > 0) {
+      return $this->db->update($postMetaTable, ['meta_value' => (string) $nextCount], ['meta_id' => $exists]) >= 0;
+    }
+    return $this->db->insert($postMetaTable, [
+      'post_id' => $postId,
+      'meta_key' => 'cobros',
+      'meta_value' => (string) $nextCount,
+    ]);
   }
 
   /** @param array<string,string> $fieldFilters @return array{rows:array<int,array<string,mixed>>,total:int,page:int,pages:int,per_page:int,type:string,type_label:string,contract_status:string,inmueble_simi:string,contract_number:string,field_filters:array<string,string>} */

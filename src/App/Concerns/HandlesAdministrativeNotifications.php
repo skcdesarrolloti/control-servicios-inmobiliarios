@@ -131,6 +131,52 @@ trait HandlesAdministrativeNotifications
     }
   }
 
+  public function ajax_handler_admin_notifications_collection(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para registrar gestiones de cobro.');
+    }
+
+    $service = $this->get_admin_notifications_service();
+    $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'arrendatarios_activos'));
+    if ($type !== 'arrendatarios_activos') {
+      $this->jsonFail('La gestion de cobro solo aplica para Arrendatarios activos.');
+    }
+
+    $query = trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? ''))));
+    $fieldFilters = $this->admin_notification_field_filters($_POST);
+    $contractStatus = $this->sanitize_admin_notification_contract_status((string) ($_POST['contract_status'] ?? ''));
+    $inmuebleSimi = trim(sanitize_text_field(wp_unslash((string) ($_POST['inmueble_simi'] ?? ''))));
+    $contractNumber = trim(sanitize_text_field(wp_unslash((string) ($_POST['contract_number'] ?? ''))));
+    $allFiltered = trim((string) ($_POST['all_filtered'] ?? '')) === '1';
+    $rawIds = $_POST['ids'] ?? [];
+    $ids = $allFiltered
+      ? $service->idsForFilter($type, $query, 5000, $contractStatus, $inmuebleSimi, $contractNumber, $fieldFilters)
+      : array_map('intval', is_array($rawIds) ? $rawIds : [$rawIds]);
+
+    $payload = [
+      'tipo_gestion_cobro' => sanitize_text_field(wp_unslash((string) ($_POST['tipo_gestion_cobro'] ?? 'Canon'))),
+      'observacion' => trim(wp_kses_post(wp_unslash((string) ($_POST['observacion'] ?? '')))),
+      'volver_llamar' => sanitize_text_field(wp_unslash((string) ($_POST['volver_llamar'] ?? 'No'))),
+      'siguiente_fecha' => sanitize_text_field(wp_unslash((string) ($_POST['siguiente_fecha'] ?? ''))),
+      'siguiente_hora' => sanitize_text_field(wp_unslash((string) ($_POST['siguiente_hora'] ?? ''))),
+      'otro_horario_cobro' => trim(sanitize_text_field(wp_unslash((string) ($_POST['otro_horario_cobro'] ?? '')))),
+    ];
+
+    try {
+      $result = $service->registerCollectionManagement($ids, $payload);
+      $created = (int) ($result['created'] ?? 0);
+      $skipped = (int) ($result['skipped'] ?? 0);
+      $message = $created > 0
+        ? sprintf('Se registraron %d gestiones de cobro.%s', $created, $skipped > 0 ? " {$skipped} contratos omitidos." : '')
+        : 'No se registro ninguna gestion de cobro. Revisa que los arrendatarios tengan contratos activos.';
+      $this->jsonOk($result + ['message' => $message]);
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
   private function sanitize_admin_notification_type(string $type): string
   {
     $type = sanitize_key($type);

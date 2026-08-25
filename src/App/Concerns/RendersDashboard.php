@@ -321,6 +321,7 @@ trait RendersDashboard
         'admin_notifications_recipients' => self::AJAX_ADMIN_NOTIFICATIONS_RECIPIENTS,
         'admin_notifications_send' => self::AJAX_ADMIN_NOTIFICATIONS_SEND,
         'admin_notifications_import' => self::AJAX_ADMIN_NOTIFICATIONS_IMPORT,
+        'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'metrics_execution' => self::AJAX_METRICS_EXECUTION,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
         'canon_insurance_audit_import' => self::AJAX_CANON_INSURANCE_AUDIT_IMPORT,
@@ -1677,6 +1678,7 @@ trait RendersDashboard
               <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--email" data-admin-notif-open-channel="email">Notificaci&oacute;n Email</button>
               <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--sms" data-admin-notif-open-channel="sms">Notificaci&oacute;n SMS</button>
               <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--whatsapp" data-admin-notif-open-channel="whatsapp">Notificaci&oacute;n WhatsApp</button>
+              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--collection" data-admin-notif-open-collection hidden>Gesti&oacute;n de cobro</button>
             </div>
           </div>
           <div class="scm-admin-notif-recipients" data-admin-notif-recipients>
@@ -1821,6 +1823,83 @@ trait RendersDashboard
             </div>
           </section>
         </div>
+      </div>
+
+      <div class="scm-admin-notif-modal scm-admin-notif-collection-modal" data-admin-notif-collection-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-collection-title">
+        <div class="scm-admin-notif-modal-backdrop" aria-hidden="true"></div>
+        <section class="scm-admin-notif-card scm-admin-notif-composer scm-admin-notif-modal-panel">
+          <div class="scm-admin-notif-modal-head">
+            <div class="scm-admin-notif-modal-titleblock">
+              <span class="scm-calendar-action-kicker">Cobranza</span>
+              <h4 id="scm-admin-notif-collection-title">Registrar gesti&oacute;n de cobro</h4>
+              <p>Aplica para arrendatarios activos. Crea la gesti&oacute;n, actualiza el contrato y deja registro en el historial del inmueble.</p>
+            </div>
+            <button type="button" class="scm-modal-close" data-admin-notif-close-collection aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
+          </div>
+          <form data-admin-notif-collection autocomplete="off">
+            <div class="scm-admin-notif-section-head scm-admin-notif-selected-head">
+              <div>
+                <span class="scm-calendar-action-kicker">Destinatarios</span>
+                <h4><strong data-admin-notif-collection-selected-count>0</strong> seleccionados</h4>
+                <p>Se registrar&aacute; una gesti&oacute;n por cada contrato activo encontrado.</p>
+              </div>
+            </div>
+
+            <label class="scm-admin-notif-all">
+              <input type="checkbox" name="all_filtered" value="1" data-admin-notif-collection-all-filtered>
+              <span>Usar todos los arrendatarios activos filtrados</span>
+            </label>
+
+            <div class="scm-admin-notif-collection-grid">
+              <div class="scm-field">
+                <label for="scm-admin-notif-collection-type">Tipo de gesti&oacute;n</label>
+                <select id="scm-admin-notif-collection-type" name="tipo_gestion_cobro" class="select select-bordered select-sm scm-select">
+                  <option value="Canon">Canon</option>
+                  <option value="Administracion">Administraci&oacute;n</option>
+                </select>
+              </div>
+              <div class="scm-field">
+                <label for="scm-admin-notif-collection-call">Volver a llamar</label>
+                <select id="scm-admin-notif-collection-call" name="volver_llamar" class="select select-bordered select-sm scm-select" data-admin-notif-collection-call>
+                  <option value="No">No</option>
+                  <option value="Si">S&iacute;</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="scm-admin-notif-collection-follow" data-admin-notif-collection-follow hidden>
+              <div class="scm-field">
+                <label for="scm-admin-notif-collection-date">Siguiente gesti&oacute;n</label>
+                <input id="scm-admin-notif-collection-date" name="siguiente_fecha" type="date" class="input input-bordered input-sm scm-input">
+              </div>
+              <div class="scm-field">
+                <label for="scm-admin-notif-collection-hour">Hora</label>
+                <input id="scm-admin-notif-collection-hour" name="siguiente_hora" type="time" class="input input-bordered input-sm scm-input">
+              </div>
+              <div class="scm-field">
+                <label for="scm-admin-notif-collection-alt">Otro horario / nota de llamada</label>
+                <input id="scm-admin-notif-collection-alt" name="otro_horario_cobro" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: llamar en horario de almuerzo">
+              </div>
+            </div>
+
+            <div class="scm-field scm-admin-notif-message-field">
+              <label for="scm-admin-notif-collection-observation">Observaci&oacute;n de la gesti&oacute;n</label>
+              <textarea id="scm-admin-notif-collection-observation" name="observacion" class="textarea textarea-bordered scm-textarea" rows="6" placeholder="Describe la gesti&oacute;n realizada, acuerdo de pago, novedad o detalle relevante..."></textarea>
+              <small>Este texto queda en la gesti&oacute;n y en el historial del inmueble. No env&iacute;a notificaciones por s&iacute; solo.</small>
+            </div>
+
+            <div class="scm-admin-notif-collection-help">
+              <strong>Para notificar al arrendatario:</strong>
+              <span>Usa Notificaci&oacute;n WhatsApp o Email con la plantilla &ldquo;Gesti&oacute;n de cobro&rdquo; despu&eacute;s de guardar la gesti&oacute;n.</span>
+            </div>
+
+            <div class="scm-admin-notif-submit-row">
+              <span class="scm-spinner" data-admin-notif-collection-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
+              <button type="submit" class="scm-btn-primary btn btn-primary" data-admin-notif-collection-submit>Guardar gesti&oacute;n de cobro</button>
+            </div>
+            <p class="scm-admin-notif-result" data-admin-notif-collection-result aria-live="polite"></p>
+          </form>
+        </section>
       </div>
     </div>
 <?php

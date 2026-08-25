@@ -157,6 +157,8 @@
     var actionAdminNotificationsSend = actions.admin_notifications_send || "";
     var actionAdminNotificationsImport =
       actions.admin_notifications_import || "";
+    var actionAdminNotificationsCollection =
+      actions.admin_notifications_collection || "";
     var actionMetricsExecution = actions.metrics_execution || "";
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
@@ -2122,6 +2124,17 @@
       var closeConfirmModal = panel.querySelector("[data-admin-notif-confirm]");
       var closeConfirmAcceptBtn = panel.querySelector("[data-admin-notif-confirm-accept]");
       var closeConfirmCancelBtn = panel.querySelector("[data-admin-notif-confirm-cancel]");
+      var openCollectionBtn = panel.querySelector("[data-admin-notif-open-collection]");
+      var collectionModal = panel.querySelector("[data-admin-notif-collection-modal]");
+      var closeCollectionBtn = panel.querySelector("[data-admin-notif-close-collection]");
+      var collectionForm = panel.querySelector("[data-admin-notif-collection]");
+      var collectionAllFiltered = panel.querySelector("[data-admin-notif-collection-all-filtered]");
+      var collectionSelectedCountEl = panel.querySelector("[data-admin-notif-collection-selected-count]");
+      var collectionCallSelect = panel.querySelector("[data-admin-notif-collection-call]");
+      var collectionFollowWrap = panel.querySelector("[data-admin-notif-collection-follow]");
+      var collectionSpinner = panel.querySelector("[data-admin-notif-collection-spinner]");
+      var collectionSubmitBtn = panel.querySelector("[data-admin-notif-collection-submit]");
+      var collectionResultEl = panel.querySelector("[data-admin-notif-collection-result]");
       if (!searchForm || !sendForm || !typeSelect || !recipientsEl) {
         return Promise.resolve();
       }
@@ -2314,6 +2327,15 @@
         }
       }
 
+      function setCollectionLoading(isLoading) {
+        if (collectionSpinner) {
+          collectionSpinner.classList.toggle("active", !!isLoading);
+        }
+        if (collectionSubmitBtn) {
+          collectionSubmitBtn.disabled = !!isLoading;
+        }
+      }
+
       function markComposerDirty() {
         composerDirty = true;
       }
@@ -2424,6 +2446,56 @@
         openComposer();
       }
 
+      function updateCollectionFollowVisibility() {
+        if (!collectionFollowWrap || !collectionCallSelect) {
+          return;
+        }
+        var shouldShow = String(collectionCallSelect.value || "").toLowerCase() === "si";
+        collectionFollowWrap.hidden = !shouldShow;
+        collectionFollowWrap.classList.toggle("is-hidden", !shouldShow);
+      }
+
+      function openCollectionModal() {
+        if (!collectionModal) {
+          return;
+        }
+        if (currentType() !== "arrendatarios_activos") {
+          showToast("warning", "La gestion de cobro solo aplica para Arrendatarios activos.");
+          return;
+        }
+        if (!actionAdminNotificationsCollection) {
+          showToast("error", "La accion de gestion de cobro no esta disponible.");
+          return;
+        }
+        if (collectionAllFiltered) {
+          collectionAllFiltered.checked = false;
+        }
+        if (collectionResultEl) {
+          collectionResultEl.textContent = "";
+          collectionResultEl.classList.remove("is-error");
+        }
+        updateCollectionFollowVisibility();
+        syncContext();
+        collectionModal.hidden = false;
+        collectionModal.classList.add("is-open");
+        document.body.classList.add("scm-admin-notif-modal-open");
+        setTimeout(function () {
+          var field = collectionForm ? collectionForm.querySelector("textarea, select, input") : null;
+          if (field) {
+            field.focus();
+          }
+        }, 30);
+      }
+
+      function closeCollectionModal() {
+        if (!collectionModal) {
+          return;
+        }
+        collectionModal.hidden = true;
+        collectionModal.classList.remove("is-open");
+        document.body.classList.remove("scm-admin-notif-modal-open");
+      }
+
       function syncContext() {
         if (sendType) {
           sendType.value = currentType();
@@ -2479,6 +2551,17 @@
             allFiltered && allFiltered.checked
               ? String(totalEl ? totalEl.textContent || "todos" : "todos")
               : String(selected.size);
+        }
+        if (collectionSelectedCountEl) {
+          collectionSelectedCountEl.textContent =
+            collectionAllFiltered && collectionAllFiltered.checked
+              ? String(totalEl ? totalEl.textContent || "todos" : "todos")
+              : String(selected.size);
+        }
+        if (openCollectionBtn) {
+          var canCollection = currentType() === "arrendatarios_activos";
+          openCollectionBtn.hidden = !canCollection;
+          openCollectionBtn.classList.toggle("is-hidden", !canCollection);
         }
         panel.querySelectorAll("[data-admin-notif-type-shortcut]").forEach(function (btn) {
           btn.classList.toggle(
@@ -2959,6 +3042,19 @@
             }
           });
         }
+        if (openCollectionBtn) {
+          openCollectionBtn.addEventListener("click", openCollectionModal);
+        }
+        if (closeCollectionBtn) {
+          closeCollectionBtn.addEventListener("click", closeCollectionModal);
+        }
+        if (collectionModal) {
+          collectionModal.addEventListener("click", function (event) {
+            if (event.target && event.target.classList && event.target.classList.contains("scm-admin-notif-modal-backdrop")) {
+              closeCollectionModal();
+            }
+          });
+        }
 
         searchForm.addEventListener("submit", function (event) {
           event.preventDefault();
@@ -3200,6 +3296,87 @@
             }
             markComposerDirty();
             syncContext();
+          });
+        }
+        if (collectionAllFiltered) {
+          collectionAllFiltered.addEventListener("change", function () {
+            if (collectionAllFiltered.checked) {
+              selected.clear();
+              updateVisibleChecks();
+            }
+            syncContext();
+          });
+        }
+        if (collectionCallSelect) {
+          collectionCallSelect.addEventListener("change", updateCollectionFollowVisibility);
+        }
+
+        if (collectionForm) {
+          collectionForm.addEventListener("submit", function (event) {
+            event.preventDefault();
+            syncContext();
+            if (currentType() !== "arrendatarios_activos") {
+              showToast("warning", "La gestion de cobro solo aplica para Arrendatarios activos.");
+              return;
+            }
+            var useAll = !!(collectionAllFiltered && collectionAllFiltered.checked);
+            if (!useAll && selected.size === 0) {
+              showToast("error", "Selecciona arrendatarios o activa todos los filtrados.");
+              return;
+            }
+            var fd = new FormData(collectionForm);
+            fd.set("action", actionAdminNotificationsCollection);
+            fd.set("nonce", nonce);
+            fd.set("type", currentType());
+            fd.set("q", currentQuery());
+            fd.set("nombre", currentNameFilter());
+            fd.set("correo", currentEmailFilter());
+            fd.set("celular", currentPhoneFilter());
+            fd.set("documento", currentDocumentFilter());
+            fd.set("contract_status", currentContractStatus());
+            fd.set("inmueble_simi", currentInmuebleSimi());
+            fd.set("contract_number", currentContractNumber());
+            fd.set("all_filtered", useAll ? "1" : "0");
+            if (!useAll) {
+              selected.forEach(function (id) {
+                fd.append("ids[]", id);
+              });
+            }
+            setCollectionLoading(true);
+            if (collectionResultEl) {
+              collectionResultEl.textContent = "Guardando gestiones de cobro...";
+              collectionResultEl.classList.remove("is-error");
+            }
+            fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+              .then(function (response) {
+                return response.json();
+              })
+              .then(function (json) {
+                if (!json || !json.success) {
+                  throw new Error(
+                    (json && json.data && json.data.message) ||
+                      "No se pudo registrar la gestion de cobro.",
+                  );
+                }
+                var data = json.data || {};
+                var msg = data.message || "Gestion de cobro registrada.";
+                if (collectionResultEl) {
+                  collectionResultEl.textContent = msg;
+                  collectionResultEl.classList.remove("is-error");
+                }
+                showToast((data.created || 0) > 0 ? "success" : "warning", msg);
+                loadRecipients(currentPage);
+              })
+              .catch(function (err) {
+                if (collectionResultEl) {
+                  collectionResultEl.textContent = err.message || "Error desconocido.";
+                  collectionResultEl.classList.add("is-error");
+                }
+                showToast("error", err.message || "No se pudo registrar la gestion de cobro.");
+              })
+              .finally(function () {
+                setCollectionLoading(false);
+              });
           });
         }
 
