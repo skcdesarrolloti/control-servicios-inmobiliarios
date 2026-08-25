@@ -61,4 +61,41 @@ trait HandlesCanonInsuranceAudits
       $this->jsonFail($exception->getMessage());
     }
   }
+
+  public function ajax_handler_canon_insurance_audit_observation(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
+      $this->jsonFail('No tienes permiso para registrar observaciones.');
+    }
+    try {
+      $result = $this->canonInsuranceAuditService()->saveObservation(
+        (int) ($_POST['item_id'] ?? 0),
+        trim(sanitize_textarea_field(wp_unslash((string) ($_POST['observation'] ?? ''))))
+      );
+      $this->jsonOk([
+        'html' => (new CanonInsuranceAuditView())->renderContent($result),
+        'message' => 'Observacion guardada en el registro de auditoria.',
+      ]);
+    } catch (\Throwable $exception) {
+      $this->jsonFail($exception->getMessage());
+    }
+  }
+
+  public function ajax_handler_canon_insurance_audit_report(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
+      $this->jsonFail('No tienes permiso para enviar este informe.');
+    }
+    try {
+      $result = $this->canonInsuranceAuditService()->sendReport((int) ($_POST['audit_id'] ?? 0));
+      $this->jsonOk([
+        'html' => (new CanonInsuranceAuditView())->renderContent($result),
+        'message' => sprintf('Informe encolado para %d destinatario(s) del cargo Coordinador Contractual.', (int) ($result['queued'] ?? 0)),
+      ]);
+    } catch (\Throwable $exception) {
+      $this->jsonFail($exception->getMessage());
+    }
+  }
 }

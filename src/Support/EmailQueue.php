@@ -19,11 +19,11 @@ final class EmailQueue
   /**
    * @param string|string[] $to
    */
-  public function enqueue($to, string $subject, string $html, array $options = []): void
+  public function enqueue($to, string $subject, string $html, array $options = []): int
   {
     $queue = $this->bridge->queue();
     if (!$queue instanceof \SharedNotifications\NotificationQueue) {
-      return;
+      return 0;
     }
 
     $recipients = is_array($to) ? $to : [$to];
@@ -44,6 +44,7 @@ final class EmailQueue
       'destination_name',
       'dedupe_key',
     ]);
+    $queued = 0;
 
     foreach ($recipients as $email) {
       $email = trim((string) $email);
@@ -69,10 +70,12 @@ final class EmailQueue
           'dedupe_key' => $dedupeKey !== '' ? ($dedupeKey . ':' . strtolower($email)) : null,
           'created_by' => 'control-servicios-inmobiliarios',
         ]);
+        $queued++;
       } catch (\Throwable $exception) {
         // No interrumpir el flujo principal si la cola falla.
       }
     }
+    return $queued;
   }
 
   /**

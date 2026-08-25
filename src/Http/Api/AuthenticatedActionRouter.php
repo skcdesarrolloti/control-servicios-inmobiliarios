@@ -64,6 +64,8 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_METRICS_EXECUTION => 'ajax_handler_metrics_execution',
       SuCasaControlServiciosInmobiliarios::AJAX_CANON_INSURANCE_AUDIT_LIST => 'ajax_handler_canon_insurance_audit_list',
       SuCasaControlServiciosInmobiliarios::AJAX_CANON_INSURANCE_AUDIT_IMPORT => 'ajax_handler_canon_insurance_audit_import',
+      SuCasaControlServiciosInmobiliarios::AJAX_CANON_INSURANCE_AUDIT_OBSERVATION => 'ajax_handler_canon_insurance_audit_observation',
+      SuCasaControlServiciosInmobiliarios::AJAX_CANON_INSURANCE_AUDIT_REPORT => 'ajax_handler_canon_insurance_audit_report',
     ];
 
     $this->guideRoutes = [

@@ -325,6 +325,8 @@ trait RendersDashboard
         'metrics_execution' => self::AJAX_METRICS_EXECUTION,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
         'canon_insurance_audit_import' => self::AJAX_CANON_INSURANCE_AUDIT_IMPORT,
+        'canon_insurance_audit_observation' => self::AJAX_CANON_INSURANCE_AUDIT_OBSERVATION,
+        'canon_insurance_audit_report' => self::AJAX_CANON_INSURANCE_AUDIT_REPORT,
         // Guía
         'guide_gcd_read' => self::AJAX_GUIDE_GCD_READ,
         'guide_gcd_save' => self::AJAX_GUIDE_GCD_SAVE,

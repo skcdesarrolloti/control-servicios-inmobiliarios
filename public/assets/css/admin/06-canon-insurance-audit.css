@@ -58,6 +58,29 @@
   background: var(--cia-surface);
 }
 
+#scm-app .scm-cia-guide {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 16px;
+  border: 1px solid #c8d8ea;
+  border-radius: 14px;
+  padding: 15px 18px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-cia-guide > div { display: flex; flex-direction: column; gap: 3px; }
+#scm-app .scm-cia-guide span { color: var(--cia-muted); font-size: 11px; }
+#scm-app .scm-cia-guide ul { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0; list-style: none; }
+#scm-app .scm-cia-guide code { display: inline-block; border-radius: 7px; padding: 6px 8px; background: #e7f0fa; color: #174f87; font-size: 11px; }
+
+#scm-app .scm-cia-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 2px 0; }
+#scm-app .scm-cia-legend span { border-radius: 999px; padding: 5px 10px; font-size: 10px; font-weight: 800; }
+#scm-app .scm-cia-legend .is-green { background: #e9f8ef; color: #146c43; }
+#scm-app .scm-cia-legend .is-red { background: #fff0f0; color: #a61b1b; }
+#scm-app .scm-cia-legend .is-yellow { background: #fff7df; color: #7a4d08; }
+
 #scm-app .scm-cia-filters {
   grid-template-columns: minmax(260px, 1.4fr) minmax(180px, 0.7fr) minmax(240px, 1fr) auto;
   margin-top: 20px;
@@ -72,7 +95,8 @@
 }
 
 #scm-app .scm-cia input,
-#scm-app .scm-cia select {
+#scm-app .scm-cia select,
+#scm-app .scm-cia textarea {
   width: 100%;
   min-height: 44px;
   border: 1px solid #bcccdc;
@@ -85,6 +109,7 @@
 
 #scm-app .scm-cia input:focus-visible,
 #scm-app .scm-cia select:focus-visible,
+#scm-app .scm-cia textarea:focus-visible,
 #scm-app .scm-cia button:focus-visible {
   outline: 3px solid rgba(37, 99, 235, 0.24);
   outline-offset: 2px;
@@ -104,7 +129,7 @@
   white-space: nowrap;
 }
 
-#scm-app .scm-cia-upload button:disabled {
+#scm-app .scm-cia button:disabled {
   cursor: wait;
   opacity: 0.62;
 }
@@ -158,7 +183,7 @@
 
 #scm-app .scm-cia-kpis {
   display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
   gap: 12px;
   margin-top: 16px;
 }
@@ -186,6 +211,24 @@
   padding: 18px;
   background: var(--cia-surface);
 }
+
+#scm-app .scm-cia-report {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 20px;
+  border: 1px solid #b8cce2;
+  border-left: 4px solid #174f87;
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: #f6faff;
+}
+
+#scm-app .scm-cia-report > div { display: flex; flex-direction: column; gap: 3px; }
+#scm-app .scm-cia-report span,
+#scm-app .scm-cia-report small { color: var(--cia-muted); font-size: 11px; }
+#scm-app .scm-cia-report button { min-height: 44px; white-space: nowrap; }
 
 #scm-app .scm-cia-section-head {
   display: flex;
@@ -215,6 +258,7 @@
 }
 
 #scm-app .scm-cia-change-table { min-width: 900px; }
+#scm-app .scm-cia-results-table { min-width: 1180px; }
 
 #scm-app .scm-cia-table th {
   position: sticky;
@@ -264,12 +308,25 @@
 
 #scm-app .scm-cia-badge--coincide { border-color: #86c5a8; background: #ecfdf3; color: #146c43; }
 #scm-app .scm-cia-badge--diferencia { border-color: #ef9a9a; background: #fff0f0; color: #a61b1b; }
+#scm-app .scm-cia-badge--correcto { border-color: #86c5a8; background: #ecfdf3; color: #146c43; }
+#scm-app .scm-cia-badge--incorrecto { border-color: #ef9a9a; background: #fff0f0; color: #a61b1b; }
+#scm-app .scm-cia-badge--anomalia { border-color: #e9bd70; background: #fff8e8; color: #85520b; }
 #scm-app .scm-cia-badge--sin_contrato,
 #scm-app .scm-cia-badge--sin_mandato { border-color: #e9bd70; background: #fff8e8; color: #85520b; }
 #scm-app .scm-cia-badge--datos_incompletos { border-color: #aebdcc; background: #f2f5f8; color: #425466; }
 
 #scm-app .scm-cia-findings { margin: 0; padding-left: 16px; color: #7b2c2c; }
 #scm-app .scm-cia-findings li + li { margin-top: 4px; }
+
+#scm-app .scm-cia-row--correcto { box-shadow: inset 4px 0 #1f8a5b; }
+#scm-app .scm-cia-row--incorrecto { box-shadow: inset 4px 0 #c03434; }
+#scm-app .scm-cia-row--anomalia { box-shadow: inset 4px 0 #d69a2d; }
+#scm-app .scm-cia-libertador-note { color: #7a4d08 !important; font-weight: 700; }
+
+#scm-app .scm-cia-observation { display: grid; gap: 7px; min-width: 240px; margin-top: 10px; }
+#scm-app .scm-cia-observation label { color: #334e68; font-size: 10px; font-weight: 800; }
+#scm-app .scm-cia-observation textarea { min-height: 68px; margin-top: 5px; resize: vertical; font-size: 11px; line-height: 1.4; }
+#scm-app .scm-cia-observation button { min-height: 38px; justify-self: start; }
 
 #scm-app .scm-cia-history-grid {
   display: grid;
@@ -296,6 +353,8 @@
 
 @media (max-width: 900px) {
   #scm-app .scm-cia-hero { flex-direction: column; }
+  #scm-app .scm-cia-guide,
+  #scm-app .scm-cia-report { align-items: stretch; flex-direction: column; }
   #scm-app .scm-cia-trace { white-space: normal; }
   #scm-app .scm-cia-upload,
   #scm-app .scm-cia-filters { grid-template-columns: 1fr; }

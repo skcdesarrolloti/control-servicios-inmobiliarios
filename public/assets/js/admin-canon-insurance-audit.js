@@ -11,9 +11,20 @@
     var actions = runtime.actions || {};
     var listAction = actions.canon_insurance_audit_list || "";
     var importAction = actions.canon_insurance_audit_import || "";
+    var observationAction = actions.canon_insurance_audit_observation || "";
+    var reportAction = actions.canon_insurance_audit_report || "";
     var content = module.querySelector("[data-cia-content]");
     var status = module.querySelector("[data-cia-status]");
     module.dataset.ciaInit = "1";
+
+    function updateFilenameGuide(period) {
+      if (!/^\d{4}-\d{2}$/.test(period || "")) return;
+      var suffix = "_" + period.slice(5, 7) + "_" + period.slice(0, 4);
+      module.querySelectorAll("[data-cia-filename]").forEach(function (code) {
+        code.textContent =
+          code.dataset.ciaFilename + suffix + "." + code.dataset.extension;
+      });
+    }
 
     function setStatus(message, tone) {
       if (!status) return;
@@ -87,6 +98,26 @@
         var files = Array.prototype.slice.call(fileInput.files);
         var periodInput = uploadForm.querySelector('[name="period"]');
         var period = periodInput ? periodInput.value : "";
+        var expectedSuffix = period
+          ? "_" + period.slice(5, 7) + "_" + period.slice(0, 4)
+          : "";
+        var invalidNames = files.filter(function (file) {
+          return !new RegExp(
+            "^(simi|libertador|fianza_bogota|unifianza)" +
+              expectedSuffix +
+              "\\.(xls|xlsx)$",
+            "i",
+          ).test(file.name);
+        });
+        if (invalidNames.length) {
+          setStatus(
+            "Nombre no valido: " +
+              invalidNames.map(function (file) { return file.name; }).join(", ") +
+              ". Revisa la guia y el periodo seleccionado.",
+            "error",
+          );
+          return;
+        }
         var button = uploadForm.querySelector("[data-cia-upload-button]");
         if (button) {
           button.disabled = true;
@@ -168,6 +199,59 @@
         return;
       }
 
+      var observationForm = event.target.closest("[data-cia-observation-form]");
+      if (observationForm) {
+        event.preventDefault();
+        if (!observationAction) {
+          setStatus("La accion de observaciones no esta configurada.", "error");
+          return;
+        }
+        var observationData = new FormData(observationForm);
+        observationData.append("action", observationAction);
+        var observationButton = observationForm.querySelector('button[type="submit"]');
+        if (observationButton) observationButton.disabled = true;
+        setStatus("Guardando observacion...", "loading");
+        request(observationData)
+          .then(function (data) {
+            replaceContent(data);
+            setStatus(data.message || "Observacion guardada.", "success");
+          })
+          .catch(function (error) {
+            setStatus(error.message || "No se pudo guardar la observacion.", "error");
+          })
+          .finally(function () {
+            if (observationButton) observationButton.disabled = false;
+          });
+        return;
+      }
+
+      var reportForm = event.target.closest("[data-cia-report-form]");
+      if (reportForm) {
+        event.preventDefault();
+        if (!reportAction) {
+          setStatus("La accion del informe no esta configurada.", "error");
+          return;
+        }
+        if (!window.confirm("¿Enviar las diferencias y anomalias al Coordinador Contractual?")) return;
+        var reportData = new FormData(reportForm);
+        reportData.append("action", reportAction);
+        var reportButton = reportForm.querySelector('button[type="submit"]');
+        if (reportButton) reportButton.disabled = true;
+        setStatus("Preparando y encolando el informe...", "loading");
+        request(reportData)
+          .then(function (data) {
+            replaceContent(data);
+            setStatus(data.message || "Informe encolado.", "success");
+          })
+          .catch(function (error) {
+            setStatus(error.message || "No se pudo enviar el informe.", "error");
+          })
+          .finally(function () {
+            if (reportButton) reportButton.disabled = false;
+          });
+        return;
+      }
+
       var filterForm = event.target.closest("[data-cia-filter-form]");
       if (filterForm) {
         event.preventDefault();
@@ -176,12 +260,17 @@
     });
 
     module.addEventListener("change", function (event) {
+      if (event.target && event.target.name === "period") {
+        updateFilenameGuide(event.target.value);
+      }
       if (event.target && event.target.name === "audit_id") {
         var form = event.target.closest("[data-cia-filter-form]");
         if (form) load(new FormData(form));
       }
     });
 
+    var initialPeriod = module.querySelector('[name="period"]');
+    if (initialPeriod) updateFilenameGuide(initialPeriod.value);
     load();
   }
 

@@ -7,6 +7,7 @@ namespace SCM\Modules\CanonInsuranceAudit;
 use PDO;
 use SCM\Core\Auth;
 use SCM\Core\Database;
+use SCM\Support\EmailQueue;
 
 final class CanonInsuranceAuditService
 {
@@ -41,6 +42,7 @@ final class CanonInsuranceAuditService
     if (!in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), ['xls', 'xlsx'], true)) {
       throw new \RuntimeException('Formato no soportado. Sube un archivo .xls o .xlsx.');
     }
+    $source = AuditSourceCatalog::identify($name, $period);
 
     $this->ensureSchema();
     $hash = hash_file('sha256', $path);
@@ -56,26 +58,17 @@ final class CanonInsuranceAuditService
     }
 
     $rows = $this->reader->read($path, $name);
-    $parsed = $this->parseSpreadsheet($rows);
+    $parsed = $this->parseSpreadsheet($rows, $source['key']);
     $contracts = $this->contractsByRequestNumber();
     $items = [];
-    $insurerCounts = [];
     foreach ((array) ($parsed['records'] ?? []) as $record) {
-      $item = $this->compareRecord($record, $contracts, (string) ($parsed['insurer'] ?? ''));
+      $item = $this->compareRecord($record, $contracts, $source['key'], $source['label']);
       $items[] = $item;
-      $insurer = AuditValueNormalizer::text($item['insurer'] ?? '');
-      if ($insurer !== '') {
-        $insurerCounts[$insurer] = ($insurerCounts[$insurer] ?? 0) + 1;
-      }
     }
     if ($items === []) {
       throw new \RuntimeException('No se encontraron filas de contratos para auditar.');
     }
-    arsort($insurerCounts);
-    $insurer = AuditValueNormalizer::text($parsed['insurer'] ?? '');
-    if ($insurer === '') {
-      $insurer = (string) (array_key_first($insurerCounts) ?? 'No identificada');
-    }
+    $insurer = $source['label'];
 
     $stats = $this->summarize($items);
     $pdo = $this->db->pdo();
@@ -86,7 +79,7 @@ final class CanonInsuranceAuditService
         'source_filename' => mb_substr($name, 0, 255),
         'source_hash' => $hash,
         'insurer' => mb_substr($insurer, 0, 160),
-        'format_key' => (string) ($parsed['format_key'] ?? 'auto'),
+        'format_key' => $source['key'],
         'total_rows' => $stats['total'],
         'matched_rows' => $stats['matched'],
         'compliant_rows' => $stats['compliant'],
@@ -149,7 +142,7 @@ final class CanonInsuranceAuditService
       $where = ['`audit_id` = ?'];
       $args = [$auditId];
       $status = $this->sanitizeKey((string) ($filters['status'] ?? ''));
-      if (in_array($status, ['coincide', 'diferencia', 'sin_contrato', 'sin_mandato', 'datos_incompletos'], true)) {
+      if (in_array($status, ['correcto', 'incorrecto', 'anomalia'], true)) {
         $where[] = '`status` = ?';
         $args[] = $status;
       }
@@ -161,7 +154,7 @@ final class CanonInsuranceAuditService
       }
       $items = $this->db->getResults(
         "SELECT * FROM `{$this->itemsTable()}` WHERE " . implode(' AND ', $where)
-          . " ORDER BY FIELD(`status`, 'diferencia', 'datos_incompletos', 'sin_mandato', 'sin_contrato', 'coincide'), `source_row` ASC LIMIT 500",
+          . " ORDER BY FIELD(`status`, 'incorrecto', 'anomalia', 'correcto'), `source_row` ASC LIMIT 500",
         $args
       );
     }
@@ -178,10 +171,19 @@ final class CanonInsuranceAuditService
     }
     unset($incrementChange);
 
+    $reports = $auditId > 0
+      ? $this->db->getResults(
+        "SELECT * FROM `{$this->reportsTable()}` WHERE `audit_id` = ? ORDER BY `sent_at` DESC, `id` DESC LIMIT 10",
+        [$auditId]
+      )
+      : [];
+
     return [
       'audits' => $audits,
       'selected_audit' => $selectedAudit,
       'items' => $items,
+      'reports' => $reports,
+      'filename_examples' => AuditSourceCatalog::examples($period !== '' ? $period : date('Y-m')),
       'increment_changes' => $incrementChanges,
       'filters' => [
         'audit_id' => $auditId,
@@ -189,6 +191,136 @@ final class CanonInsuranceAuditService
         'search' => AuditValueNormalizer::text($filters['search'] ?? ''),
       ],
     ];
+  }
+
+  /** @return array<string,mixed> */
+  public function saveObservation(int $itemId, string $observation): array
+  {
+    $this->ensureSchema();
+    if ($itemId <= 0) {
+      throw new \RuntimeException('No se identifico la fila de auditoria.');
+    }
+    $item = $this->db->getRow("SELECT `id`, `audit_id`, `status` FROM `{$this->itemsTable()}` WHERE `id` = ? LIMIT 1", [$itemId]);
+    if (!is_array($item)) {
+      throw new \RuntimeException('La fila de auditoria ya no existe.');
+    }
+    if ((string) ($item['status'] ?? '') === 'correcto') {
+      throw new \RuntimeException('Las observaciones se registran en diferencias o anomalias.');
+    }
+    $observation = trim(preg_replace('/\s+/u', ' ', $observation) ?? '');
+    if (mb_strlen($observation) > 1000) {
+      throw new \RuntimeException('La observacion no puede superar 1.000 caracteres.');
+    }
+    $author = $this->employeeIdentity((string) Auth::userId());
+    $this->db->update($this->itemsTable(), [
+      'observation' => $observation,
+      'observation_by_id' => $author['id'],
+      'observation_by_name' => mb_substr($author['name'] !== '' ? $author['name'] : Auth::user(), 0, 190),
+      'observation_at' => date('Y-m-d H:i:s'),
+    ], ['id' => $itemId]);
+    return $this->dashboard(['audit_id' => (string) ($item['audit_id'] ?? 0)]);
+  }
+
+  /** @return array<string,mixed> */
+  public function sendReport(int $auditId): array
+  {
+    $this->ensureSchema();
+    $audit = $this->db->getRow("SELECT * FROM `{$this->auditsTable()}` WHERE `id` = ? LIMIT 1", [$auditId]);
+    if (!is_array($audit)) {
+      throw new \RuntimeException('La auditoria seleccionada no existe.');
+    }
+    $items = $this->db->getResults(
+      "SELECT * FROM `{$this->itemsTable()}` WHERE `audit_id` = ? AND `status` IN ('incorrecto', 'anomalia') ORDER BY FIELD(`status`, 'incorrecto', 'anomalia'), `source_row` ASC",
+      [$auditId]
+    );
+    if ($items === []) {
+      throw new \RuntimeException('Esta auditoria no tiene diferencias ni anomalias para informar.');
+    }
+    $recipients = $this->contractCoordinatorRecipients();
+    if ($recipients === []) {
+      throw new \RuntimeException('No se encontro un correo activo para el cargo Coordinador Contractual.');
+    }
+    $reportHash = hash('sha256', json_encode(array_map(static fn(array $item): array => [
+      $item['id'] ?? 0,
+      $item['status'] ?? '',
+      $item['differences_json'] ?? '',
+      $item['observation'] ?? '',
+    ], $items), JSON_UNESCAPED_UNICODE) ?: '');
+    $html = $this->reportHtml($audit, $items);
+    $subject = 'Informe de auditoria ' . (string) ($audit['insurer'] ?? '') . ' - ' . (string) ($audit['period'] ?? '');
+    $emails = array_column($recipients, 'email');
+    $queued = (new EmailQueue($this->db))->enqueue($emails, $subject, $html, [
+      'source_module' => 'auditoria-canon-aseguradoras',
+      'dedupe_key' => 'canon-insurance-audit:' . $auditId . ':' . $reportHash,
+      'meta' => [
+        'audit_id' => $auditId,
+        'period' => (string) ($audit['period'] ?? ''),
+        'source_filename' => (string) ($audit['source_filename'] ?? ''),
+        'report_hash' => $reportHash,
+      ],
+    ]);
+    if ($queued <= 0) {
+      throw new \RuntimeException('No fue posible encolar el informe. Verifica el servicio compartido de notificaciones.');
+    }
+    $author = $this->employeeIdentity((string) Auth::userId());
+    $this->db->insert($this->reportsTable(), [
+      'audit_id' => $auditId,
+      'recipients_json' => json_encode($recipients, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]',
+      'queued_count' => $queued,
+      'sent_by_id' => $author['id'],
+      'sent_by_name' => mb_substr($author['name'] !== '' ? $author['name'] : Auth::user(), 0, 190),
+      'sent_at' => date('Y-m-d H:i:s'),
+      'report_hash' => $reportHash,
+    ]);
+    return ['queued' => $queued] + $this->dashboard(['audit_id' => (string) $auditId]);
+  }
+
+  /** @return array<int,array{name:string,email:string}> */
+  private function contractCoordinatorRecipients(): array
+  {
+    $officials = $this->db->table('jet_cct_funcionarios');
+    $positions = $this->db->table('jet_cct_cargos');
+    $rows = $this->db->getResults(
+      "SELECT TRIM(COALESCE(f.`nombre`, '')) AS name, TRIM(COALESCE(f.`correo`, '')) AS email
+         FROM `{$officials}` f
+         INNER JOIN `{$positions}` c ON CAST(c.`_ID` AS CHAR) = TRIM(COALESCE(f.`id_cargo`, ''))
+        WHERE LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%ordinador%contractual%'
+          AND LOWER(TRIM(COALESCE(f.`activo`, ''))) = 'si'"
+    );
+    $recipients = [];
+    foreach ($rows as $row) {
+      $email = trim((string) ($row['email'] ?? ''));
+      if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $recipients[strtolower($email)] = ['name' => (string) ($row['name'] ?? ''), 'email' => $email];
+      }
+    }
+    return array_values($recipients);
+  }
+
+  /** @param array<string,mixed> $audit @param array<int,array<string,mixed>> $items */
+  private function reportHtml(array $audit, array $items): string
+  {
+    $h = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $money = static fn(mixed $value): string => ($value === null || $value === '') ? 'Sin dato' : '$' . number_format((float) $value, 2, ',', '.');
+    $rows = '';
+    foreach ($items as $item) {
+      $findings = json_decode((string) ($item['differences_json'] ?? '[]'), true);
+      $findingText = is_array($findings) ? implode(' ', array_map('strval', $findings)) : '';
+      $rows .= '<tr><td>' . $h((string) ($item['status'] ?? '') === 'incorrecto' ? 'Rojo - Incorrecto' : 'Amarillo - Anomalia') . '</td>'
+        . '<td>' . $h($item['request_number'] ?? '') . '</td><td>' . $h($item['contract_number'] ?? '') . '</td>'
+        . '<td>' . $h($item['tenant'] ?? '') . '<br>' . $h($item['property_address'] ?? '') . '</td>'
+        . '<td>' . $h($money($item['excel_canon'] ?? null)) . ' / ' . $h($money($item['system_canon'] ?? null)) . '</td>'
+        . '<td>' . $h($money($item['excel_administration'] ?? null)) . ' / ' . $h($money($item['system_administration'] ?? null)) . '</td>'
+        . '<td>' . $h($money($item['excel_iva'] ?? null)) . ' / ' . $h($money($item['system_iva'] ?? null)) . '</td>'
+        . '<td>' . $h($findingText) . '</td><td>' . $h($item['observation'] ?? '') . '</td></tr>';
+    }
+    return '<div style="font-family:Arial,sans-serif;color:#243b53"><h2>Informe de auditoria de canon y aseguradoras</h2>'
+      . '<p><strong>Periodo:</strong> ' . $h($audit['period'] ?? '') . '<br><strong>Fuente:</strong> ' . $h($audit['insurer'] ?? '')
+      . '<br><strong>Archivo:</strong> ' . $h($audit['source_filename'] ?? '') . '</p>'
+      . '<p>Se informan las diferencias y anomalias encontradas al comparar canon, administracion e IVA.</p>'
+      . '<table cellpadding="7" cellspacing="0" border="1" style="border-collapse:collapse;font-size:12px"><thead><tr>'
+      . '<th>Semaforo</th><th>Solicitud</th><th>Contrato</th><th>Arrendatario e inmueble</th><th>Canon Excel / sistema</th><th>Administracion Excel / sistema</th><th>IVA Excel / sistema</th><th>Hallazgo</th><th>Observacion</th>'
+      . '</tr></thead><tbody>' . $rows . '</tbody></table></div>';
   }
 
   public function syncIncrementChanges(): void
@@ -284,7 +416,7 @@ final class CanonInsuranceAuditService
   }
 
   /** @param array<int,array<int,mixed>> $rows @return array<string,mixed> */
-  private function parseSpreadsheet(array $rows): array
+  private function parseSpreadsheet(array $rows, string $sourceKey): array
   {
     $aliases = $this->headerAliases();
     $best = ['score' => 0, 'row' => -1, 'columns' => []];
@@ -299,15 +431,16 @@ final class CanonInsuranceAuditService
         }
       }
       $score = (isset($columns['request_number']) ? 5 : 0)
-        + (isset($columns['canon']) ? 2 : 0)
-        + (isset($columns['premium_canon']) ? 3 : 0)
+        + (isset($columns['canon']) ? 3 : 0)
+        + (isset($columns['administration']) ? 1 : 0)
+        + (isset($columns['vat']) ? 1 : 0)
         + (isset($columns['tenant']) ? 1 : 0);
       if ($score > $best['score']) {
         $best = ['score' => $score, 'row' => (int) $rowIndex, 'columns' => $columns];
       }
     }
     if ($best['score'] < 8 || $best['row'] < 0) {
-      throw new \RuntimeException('No se reconocieron las columnas de solicitud, canon y prima del extracto.');
+      throw new \RuntimeException('La estructura no coincide con el formato esperado de ' . AuditSourceCatalog::label($sourceKey) . '. Debe incluir solicitud y canon.');
     }
 
     /** @var array<string,int> $columns */
@@ -333,16 +466,6 @@ final class CanonInsuranceAuditService
       $columns['request_number'] = $bestRequestColumn;
     }
 
-    $insurer = '';
-    foreach (array_slice($rows, 0, 15) as $row) {
-      foreach ($row as $value) {
-        $text = AuditValueNormalizer::text($value);
-        if (preg_match('/aseguradora\s*:\s*(.+)$/iu', $text, $match) === 1) {
-          $insurer = trim($match[1]);
-        }
-      }
-    }
-
     $records = [];
     for ($rowIndex = $headerIndex + 1, $total = count($rows); $rowIndex < $total; $rowIndex++) {
       $row = $rows[$rowIndex];
@@ -360,34 +483,24 @@ final class CanonInsuranceAuditService
         'tenant' => $this->columnText($row, $columns, 'tenant'),
         'property_address' => $this->columnText($row, $columns, 'property_address'),
         'excel_canon' => $this->columnMoney($row, $columns, 'canon'),
-        'excel_administration' => $this->columnMoney($row, $columns, 'administration'),
-        'excel_premium' => $this->sumColumns($row, $columns, ['premium_canon', 'premium_administration', 'premium_rent_vat']),
-        'excel_service_premium' => $this->columnMoney($row, $columns, 'premium_services'),
-        'excel_service_coverage' => $this->columnMoney($row, $columns, 'services_coverage'),
+        'excel_administration' => $this->columnMoneyOrZero($row, $columns, 'administration'),
+        'excel_vat' => $this->columnMoneyOrZero($row, $columns, 'vat'),
       ];
     }
-
-    $formatKey = isset($columns['old_request_number']) ? 'fianza_detallada'
-      : (isset($columns['total_insurance']) ? 'el_libertador' : 'extracto_fianzas');
-    return ['records' => $records, 'insurer' => $insurer, 'format_key' => $formatKey];
+    return ['records' => $records, 'format_key' => $sourceKey];
   }
 
   /** @return array<string,array<int,string>> */
   private function headerAliases(): array
   {
     return [
-      'request_number' => ['nosolicitud', 'numerosolicitud'],
+      'request_number' => ['solicitud', 'nosolicitud', 'numerosolicitud'],
       'old_request_number' => ['numerosolicitudantiguo', 'solicitudantigua'],
       'tenant' => ['arrendatario'],
       'property_address' => ['inmueble', 'direccion'],
       'canon' => ['canon'],
       'administration' => ['admon', 'admonph', 'administracion'],
-      'premium_canon' => ['fianzacanon', 'primacanon'],
-      'premium_administration' => ['fianzaadmon', 'primaadmonph', 'primaadministracion'],
-      'premium_rent_vat' => ['fianzaivacomercial', 'primaivaarre', 'primaivaarrendamiento'],
-      'premium_services' => ['fianzaservicios', 'primaservicios'],
-      'services_coverage' => ['servicios'],
-      'total_insurance' => ['totalseguro', 'grantotal'],
+      'vat' => ['iva', 'ivacomercial', 'ivaarrendamiento', 'ivaarriendamiento'],
     ];
   }
 
@@ -401,9 +514,8 @@ final class CanonInsuranceAuditService
               c.`arrendatario`, c.`direccion`, c.`id_contrato_mandato`, c.`valor_canon`,
               c.`valor_administracion`, c.`aseguradora` AS contract_insurer,
               m.`_ID` AS mandate_id, m.`aseguradora` AS mandate_insurer,
-              m.`precio`, m.`administracion`, m.`precio_mes_garantia`,
-              m.`precio_mes_servicios`, m.`precio_anual_servicios`,
-              m.`tasa_servicios`, m.`pago_servicios`
+              m.`precio`, m.`administracion`, m.`incluye_iva`,
+              m.`iva_precio`, m.`iva_total_precio`
          FROM `{$contracts}` c
          LEFT JOIN `{$mandates}` m ON CAST(m.`_ID` AS CHAR) = TRIM(COALESCE(c.`id_contrato_mandato`, ''))
         WHERE TRIM(COALESCE(c.`numero_solicitud`, '')) <> ''
@@ -422,7 +534,7 @@ final class CanonInsuranceAuditService
   }
 
   /** @param array<string,mixed> $record @param array<string,array<string,mixed>> $contracts @return array<string,mixed> */
-  private function compareRecord(array $record, array $contracts, string $fileInsurer): array
+  private function compareRecord(array $record, array $contracts, string $sourceKey, string $sourceLabel): array
   {
     $request = (string) ($record['request_number'] ?? '');
     $contract = $contracts[$request] ?? null;
@@ -437,28 +549,27 @@ final class CanonInsuranceAuditService
     $base = [
       'source_row' => (int) ($record['source_row'] ?? 0),
       'request_number' => $request,
-      'insurer' => $fileInsurer,
+      'insurer' => $sourceLabel,
       'tenant' => (string) ($record['tenant'] ?? ''),
       'property_address' => (string) ($record['property_address'] ?? ''),
       'contract_id' => null,
       'contract_number' => '',
       'mandate_id' => null,
-      'status' => 'sin_contrato',
+      'status' => 'anomalia',
+      'canon_includes_iva' => $sourceKey === 'libertador' ? 1 : 0,
       'excel_canon' => $record['excel_canon'],
       'system_canon' => null,
       'difference_canon' => null,
       'excel_administration' => $record['excel_administration'],
       'system_administration' => null,
       'difference_administration' => null,
-      'excel_premium' => $record['excel_premium'],
-      'system_premium' => null,
-      'difference_premium' => null,
-      'excel_service_premium' => $record['excel_service_premium'],
-      'system_service_premium' => null,
-      'difference_service_premium' => null,
-      'excel_service_coverage' => $record['excel_service_coverage'],
-      'system_service_coverage' => null,
-      'difference_service_coverage' => null,
+      'excel_iva' => $record['excel_vat'],
+      'system_iva' => null,
+      'difference_iva' => null,
+      'observation' => '',
+      'observation_by_id' => '',
+      'observation_by_name' => '',
+      'observation_at' => null,
       'differences_json' => json_encode(['No se encontro la solicitud en contratos de arrendamiento.'], JSON_UNESCAPED_UNICODE),
     ];
     if (!is_array($contract)) {
@@ -473,42 +584,54 @@ final class CanonInsuranceAuditService
     $base['insurer'] = $this->firstNonEmptyText([
       $contract['contract_insurer'] ?? null,
       $contract['mandate_insurer'] ?? null,
-      $fileInsurer,
+      $sourceLabel,
     ]);
 
-    $base['system_canon'] = AuditValueNormalizer::money($contract['valor_canon'] ?? null)
-      ?? AuditValueNormalizer::money($contract['precio'] ?? null);
-    $base['system_administration'] = AuditValueNormalizer::money($contract['valor_administracion'] ?? null)
-      ?? AuditValueNormalizer::money($contract['administracion'] ?? null);
-    $base['system_premium'] = AuditValueNormalizer::money($contract['precio_mes_garantia'] ?? null);
-    $base['system_service_premium'] = AuditValueNormalizer::money($contract['precio_mes_servicios'] ?? null);
-    $annualServicePremium = AuditValueNormalizer::money($contract['precio_anual_servicios'] ?? null);
-    $serviceRate = AuditValueNormalizer::money($contract['tasa_servicios'] ?? null);
-    $payments = AuditValueNormalizer::money($contract['pago_servicios'] ?? null);
-    if ($annualServicePremium !== null && $serviceRate !== null && $serviceRate > 0) {
-      $base['system_service_coverage'] = round($annualServicePremium * 100 / $serviceRate, 2);
-    } elseif ($base['system_service_premium'] !== null && $payments !== null && $serviceRate !== null && $serviceRate > 0) {
-      $base['system_service_coverage'] = round($base['system_service_premium'] * $payments * 100 / $serviceRate, 2);
+    $base['system_canon'] = $this->databaseMoney($contract['valor_canon'] ?? null)
+      ?? $this->databaseMoney($contract['precio'] ?? null);
+    $base['system_administration'] = $this->databaseMoney($contract['valor_administracion'] ?? null)
+      ?? $this->databaseMoney($contract['administracion'] ?? null)
+      ?? 0.0;
+    $includesVat = AuditValueNormalizer::key($contract['incluye_iva'] ?? '');
+    if ($includesVat === 'si') {
+      $base['system_iva'] = $this->databaseMoney($contract['iva_total_precio'] ?? null);
+      if ($base['system_iva'] === null) {
+        $rate = AuditValueNormalizer::money($contract['iva_precio'] ?? null);
+        if ($base['system_canon'] !== null && $rate !== null && $rate > 0) {
+          $base['system_iva'] = round((float) $base['system_canon'] * $rate / 100, 2);
+        }
+      }
+    } elseif ($includesVat === 'no') {
+      $base['system_iva'] = 0.0;
     }
 
-    if ($base['mandate_id'] === null) {
-      $base['status'] = 'sin_mandato';
-      $base['differences_json'] = json_encode(['El contrato no tiene un mandato asociado.'], JSON_UNESCAPED_UNICODE);
-      return $base;
+    if ($sourceKey === 'libertador' && $base['excel_canon'] !== null) {
+      $libertadorTotal = (float) $base['excel_canon'];
+      if ($base['system_iva'] !== null && (float) $base['system_iva'] > self::MONEY_TOLERANCE) {
+        $base['excel_canon'] = round($libertadorTotal / 1.19, 2);
+        $base['excel_iva'] = round($libertadorTotal - (float) $base['excel_canon'], 2);
+      } else {
+        $base['excel_iva'] = 0.0;
+      }
     }
 
     $differences = [];
     $missing = false;
     $assessed = 0;
+    $hasDifference = false;
+    if ($base['mandate_id'] === null) {
+      $missing = true;
+      $differences[] = 'El contrato no tiene un mandato asociado para validar el IVA.';
+    }
     foreach ([
       ['Canon', 'excel_canon', 'system_canon', 'difference_canon'],
       ['Administracion', 'excel_administration', 'system_administration', 'difference_administration'],
-      ['Prima del seguro', 'excel_premium', 'system_premium', 'difference_premium'],
-      ['Prima de servicios publicos', 'excel_service_premium', 'system_service_premium', 'difference_service_premium'],
-      ['Cobertura de servicios publicos', 'excel_service_coverage', 'system_service_coverage', 'difference_service_coverage'],
+      ['IVA', 'excel_iva', 'system_iva', 'difference_iva'],
     ] as [$label, $excelKey, $systemKey, $differenceKey]) {
       $excelValue = $base[$excelKey];
       if ($excelValue === null) {
+        $missing = true;
+        $differences[] = $label . ': falta el valor en el archivo.';
         continue;
       }
       $assessed++;
@@ -521,17 +644,18 @@ final class CanonInsuranceAuditService
       $difference = round((float) $excelValue - (float) $systemValue, 2);
       $base[$differenceKey] = $difference;
       if (abs($difference) > self::MONEY_TOLERANCE) {
+        $hasDifference = true;
         $differences[] = $label . ': diferencia de $' . number_format($difference, 2, ',', '.');
       }
     }
 
-    if ($assessed === 0 || $missing) {
-      $base['status'] = 'datos_incompletos';
-    } elseif ($differences !== []) {
-      $base['status'] = 'diferencia';
+    if ($hasDifference) {
+      $base['status'] = 'incorrecto';
+    } elseif ($assessed < 3 || $missing) {
+      $base['status'] = 'anomalia';
     } else {
-      $base['status'] = 'coincide';
-      $differences[] = 'Todos los valores disponibles coinciden.';
+      $base['status'] = 'correcto';
+      $differences[] = 'Canon, administracion e IVA coinciden.';
     }
     $base['differences_json'] = json_encode($differences, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]';
     return $base;
@@ -556,17 +680,18 @@ final class CanonInsuranceAuditService
     $stats = ['total' => count($items), 'matched' => 0, 'compliant' => 0, 'differences' => 0, 'unmatched' => 0, 'incomplete' => 0];
     foreach ($items as $item) {
       $status = (string) ($item['status'] ?? '');
-      if (!in_array($status, ['sin_contrato'], true)) {
+      if (($item['contract_id'] ?? null) !== null) {
         $stats['matched']++;
       }
-      if ($status === 'coincide') {
+      if ($status === 'correcto') {
         $stats['compliant']++;
-      } elseif ($status === 'diferencia') {
+      } elseif ($status === 'incorrecto') {
         $stats['differences']++;
-      } elseif ($status === 'sin_contrato') {
-        $stats['unmatched']++;
       } else {
         $stats['incomplete']++;
+        if (($item['contract_id'] ?? null) === null) {
+          $stats['unmatched']++;
+        }
       }
     }
     return $stats;
@@ -584,19 +709,31 @@ final class CanonInsuranceAuditService
     return isset($columns[$key]) ? AuditValueNormalizer::money($row[$columns[$key]] ?? null) : null;
   }
 
-  /** @param array<int,mixed> $row @param array<string,int> $columns @param array<int,string> $keys */
-  private function sumColumns(array $row, array $columns, array $keys): ?float
+  /** @param array<int,mixed> $row @param array<string,int> $columns */
+  private function columnMoneyOrZero(array $row, array $columns, string $key): ?float
   {
-    $sum = 0.0;
-    $found = false;
-    foreach ($keys as $key) {
-      $value = $this->columnMoney($row, $columns, $key);
-      if ($value !== null) {
-        $sum += $value;
-        $found = true;
-      }
+    if (!isset($columns[$key])) {
+      return null;
     }
-    return $found ? round($sum, 2) : null;
+    return AuditValueNormalizer::money($row[$columns[$key]] ?? null) ?? 0.0;
+  }
+
+  private function databaseMoney(mixed $value): ?float
+  {
+    if (is_int($value) || is_float($value)) {
+      return (float) $value;
+    }
+    $text = trim((string) $value);
+    if ($text === '') {
+      return null;
+    }
+    if (preg_match('/^\d{1,3}(?:\.\d{3})+$/', $text) === 1) {
+      return (float) str_replace('.', '', $text);
+    }
+    if (preg_match('/^(\d{3,})\.(\d{1,2})$/', $text, $match) === 1) {
+      return (float) ($match[1] . str_pad($match[2], 3, '0'));
+    }
+    return AuditValueNormalizer::money($text);
   }
 
   private function validPeriod(string $period): string
@@ -691,15 +828,40 @@ final class CanonInsuranceAuditService
       `contract_number` VARCHAR(100) NOT NULL DEFAULT '',
       `mandate_id` BIGINT NULL,
       `status` VARCHAR(30) NOT NULL,
+      `canon_includes_iva` TINYINT(1) NOT NULL DEFAULT 0,
       `excel_canon` DECIMAL(18,2) NULL, `system_canon` DECIMAL(18,2) NULL, `difference_canon` DECIMAL(18,2) NULL,
       `excel_administration` DECIMAL(18,2) NULL, `system_administration` DECIMAL(18,2) NULL, `difference_administration` DECIMAL(18,2) NULL,
-      `excel_premium` DECIMAL(18,2) NULL, `system_premium` DECIMAL(18,2) NULL, `difference_premium` DECIMAL(18,2) NULL,
-      `excel_service_premium` DECIMAL(18,2) NULL, `system_service_premium` DECIMAL(18,2) NULL, `difference_service_premium` DECIMAL(18,2) NULL,
-      `excel_service_coverage` DECIMAL(18,2) NULL, `system_service_coverage` DECIMAL(18,2) NULL, `difference_service_coverage` DECIMAL(18,2) NULL,
+      `excel_iva` DECIMAL(18,2) NULL, `system_iva` DECIMAL(18,2) NULL, `difference_iva` DECIMAL(18,2) NULL,
+      `observation` VARCHAR(1000) NOT NULL DEFAULT '',
+      `observation_by_id` VARCHAR(80) NOT NULL DEFAULT '',
+      `observation_by_name` VARCHAR(190) NOT NULL DEFAULT '',
+      `observation_at` DATETIME NULL,
       `differences_json` LONGTEXT NOT NULL,
       PRIMARY KEY (`id`),
       KEY `idx_audit_status` (`audit_id`, `status`),
       KEY `idx_request` (`request_number`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $this->ensureColumn($this->itemsTable(), 'canon_includes_iva', 'TINYINT(1) NOT NULL DEFAULT 0');
+    $this->ensureColumn($this->itemsTable(), 'excel_iva', 'DECIMAL(18,2) NULL');
+    $this->ensureColumn($this->itemsTable(), 'system_iva', 'DECIMAL(18,2) NULL');
+    $this->ensureColumn($this->itemsTable(), 'difference_iva', 'DECIMAL(18,2) NULL');
+    $this->ensureColumn($this->itemsTable(), 'observation', "VARCHAR(1000) NOT NULL DEFAULT ''");
+    $this->ensureColumn($this->itemsTable(), 'observation_by_id', "VARCHAR(80) NOT NULL DEFAULT ''");
+    $this->ensureColumn($this->itemsTable(), 'observation_by_name', "VARCHAR(190) NOT NULL DEFAULT ''");
+    $this->ensureColumn($this->itemsTable(), 'observation_at', 'DATETIME NULL');
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `{$this->reportsTable()}` (
+      `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      `audit_id` BIGINT UNSIGNED NOT NULL,
+      `recipients_json` LONGTEXT NOT NULL,
+      `queued_count` INT UNSIGNED NOT NULL DEFAULT 0,
+      `sent_by_id` VARCHAR(80) NOT NULL DEFAULT '',
+      `sent_by_name` VARCHAR(190) NOT NULL DEFAULT '',
+      `sent_at` DATETIME NOT NULL,
+      `report_hash` CHAR(64) NOT NULL,
+      PRIMARY KEY (`id`),
+      KEY `idx_audit_sent` (`audit_id`, `sent_at`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `{$this->incrementSnapshotsTable()}` (
@@ -731,8 +893,20 @@ final class CanonInsuranceAuditService
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
   }
 
+  private function ensureColumn(string $table, string $column, string $definition): void
+  {
+    $exists = (int) ($this->db->getVar(
+      'SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+      [$table, $column]
+    ) ?? 0);
+    if ($exists === 0) {
+      $this->db->pdo()->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+    }
+  }
+
   private function auditsTable(): string { return $this->db->table('scm_canon_insurance_audits'); }
   private function itemsTable(): string { return $this->db->table('scm_canon_insurance_audit_items'); }
+  private function reportsTable(): string { return $this->db->table('scm_canon_insurance_reports'); }
   private function incrementSnapshotsTable(): string { return $this->db->table('scm_increment_snapshots'); }
   private function incrementChangesTable(): string { return $this->db->table('scm_increment_change_audit'); }
 }
