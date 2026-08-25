@@ -1885,17 +1885,31 @@ trait RendersDashboard
             <div class="scm-field scm-admin-notif-message-field">
               <label for="scm-admin-notif-collection-observation">Observaci&oacute;n de la gesti&oacute;n</label>
               <textarea id="scm-admin-notif-collection-observation" name="observacion" class="textarea textarea-bordered scm-textarea" rows="6" placeholder="Describe la gesti&oacute;n realizada, acuerdo de pago, novedad o detalle relevante..."></textarea>
-              <small>Este texto queda en la gesti&oacute;n y en el historial del inmueble. No env&iacute;a notificaciones por s&iacute; solo.</small>
+              <small>Este texto queda en la gesti&oacute;n, en el historial del inmueble y se usa como detalle si marcas canales de notificaci&oacute;n.</small>
             </div>
 
-            <div class="scm-admin-notif-collection-help">
-              <strong>Para notificar al arrendatario:</strong>
-              <span>Usa Notificaci&oacute;n WhatsApp o Email con la plantilla &ldquo;Gesti&oacute;n de cobro&rdquo; despu&eacute;s de guardar la gesti&oacute;n.</span>
+            <div class="scm-admin-notif-collection-help scm-admin-notif-collection-notify">
+              <strong>Notificar al guardar</strong>
+              <span>Usa la plantilla &ldquo;Gesti&oacute;n de cobro&rdquo; y encola la notificaci&oacute;n en el mismo guardado. Si no quieres enviar nada, deja los canales sin marcar.</span>
+              <div class="scm-admin-notif-collection-channels" role="group" aria-label="Canales para gestion de cobro">
+                <label class="scm-admin-notif-mini-channel">
+                  <input type="checkbox" name="notify_channels[]" value="whatsapp" checked>
+                  <span>WhatsApp</span>
+                </label>
+                <label class="scm-admin-notif-mini-channel">
+                  <input type="checkbox" name="notify_channels[]" value="email">
+                  <span>Email</span>
+                </label>
+                <label class="scm-admin-notif-mini-channel">
+                  <input type="checkbox" name="notify_channels[]" value="sms">
+                  <span>SMS</span>
+                </label>
+              </div>
             </div>
 
             <div class="scm-admin-notif-submit-row">
               <span class="scm-spinner" data-admin-notif-collection-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
-              <button type="submit" class="scm-btn-primary btn btn-primary" data-admin-notif-collection-submit>Guardar gesti&oacute;n de cobro</button>
+              <button type="submit" class="scm-btn-primary btn btn-primary" data-admin-notif-collection-submit>Guardar gesti&oacute;n y notificar</button>
             </div>
             <p class="scm-admin-notif-result" data-admin-notif-collection-result aria-live="polite"></p>
           </form>

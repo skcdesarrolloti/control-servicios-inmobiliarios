@@ -163,15 +163,43 @@ trait HandlesAdministrativeNotifications
       'siguiente_hora' => sanitize_text_field(wp_unslash((string) ($_POST['siguiente_hora'] ?? ''))),
       'otro_horario_cobro' => trim(sanitize_text_field(wp_unslash((string) ($_POST['otro_horario_cobro'] ?? '')))),
     ];
+    $rawChannels = $_POST['notify_channels'] ?? [];
+    $notifyChannels = array_map(
+      static fn($value): string => sanitize_key((string) $value),
+      is_array($rawChannels) ? $rawChannels : [$rawChannels]
+    );
 
     try {
       $result = $service->registerCollectionManagement($ids, $payload);
       $created = (int) ($result['created'] ?? 0);
       $skipped = (int) ($result['skipped'] ?? 0);
+      $notifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0];
+      $notifyError = '';
+      if ($created > 0 && $notifyChannels !== []) {
+        try {
+          $notifyIds = array_map('intval', (array) ($result['recipient_ids'] ?? $ids));
+          $notifyResult = $service->enqueue(
+            $type,
+            $notifyIds,
+            $notifyChannels,
+            'Gestion de cobro de contrato de arrendamiento',
+            $service->collectionNotificationMessage($payload),
+            'scm_arrendatario_gestion_cobro_v1',
+            'scm_email_arrendatario_gestion_cobro_v1'
+          );
+        } catch (\Throwable $notifyException) {
+          $notifyError = $notifyException->getMessage();
+        }
+      }
+      $queued = (int) ($notifyResult['queued'] ?? 0);
       $message = $created > 0
-        ? sprintf('Se registraron %d gestiones de cobro.%s', $created, $skipped > 0 ? " {$skipped} contratos omitidos." : '')
+        ? sprintf('Se registraron %d gestiones de cobro.%s%s%s', $created, $skipped > 0 ? " {$skipped} contratos omitidos." : '', $queued > 0 ? " {$queued} notificaciones encoladas." : '', $notifyError !== '' ? ' No se pudo encolar notificacion: ' . $notifyError : '')
         : 'No se registro ninguna gestion de cobro. Revisa que los arrendatarios tengan contratos activos.';
-      $this->jsonOk($result + ['message' => $message]);
+      $this->jsonOk($result + [
+        'message' => $message,
+        'notifications' => $notifyResult,
+        'notification_error' => $notifyError,
+      ]);
     } catch (\Throwable $e) {
       $this->jsonFail($e->getMessage());
     }

@@ -332,7 +332,7 @@ final class AdministrativeNotificationsService
    *
    * @param int[] $ids IDs de arrendatarios seleccionados.
    * @param array<string,mixed> $payload
-   * @return array{selected:int,contracts:int,created:int,updated_contracts:int,history:int,properties:int,skipped:int}
+   * @return array{selected:int,contracts:int,created:int,updated_contracts:int,history:int,properties:int,skipped:int,recipient_ids:int[]}
    */
   public function registerCollectionManagement(array $ids, array $payload): array
   {
@@ -353,7 +353,7 @@ final class AdministrativeNotificationsService
     $data = $this->normalizeCollectionPayload($payload);
     $contracts = $this->activeArrendatarioContracts($ids);
     if ($contracts === []) {
-      return ['selected' => count($ids), 'contracts' => 0, 'created' => 0, 'updated_contracts' => 0, 'history' => 0, 'properties' => 0, 'skipped' => count($ids)];
+      return ['selected' => count($ids), 'contracts' => 0, 'created' => 0, 'updated_contracts' => 0, 'history' => 0, 'properties' => 0, 'skipped' => count($ids), 'recipient_ids' => []];
     }
 
     $nowTs = time();
@@ -368,6 +368,7 @@ final class AdministrativeNotificationsService
     $properties = 0;
     $skipped = 0;
     $seenContracts = [];
+    $recipientIds = [];
 
     foreach ($contracts as $contract) {
       $contractId = (string) ($contract['_ID'] ?? '');
@@ -413,6 +414,10 @@ final class AdministrativeNotificationsService
       }
       $created++;
       $gestionId = (int) $this->db->lastInsertId();
+      $arrendatarioId = (int) preg_replace('/\D+/', '', (string) ($contract['id_arrendatario'] ?? '0'));
+      if ($arrendatarioId > 0) {
+        $recipientIds[$arrendatarioId] = $arrendatarioId;
+      }
 
       $contractUpdate = [
         'cct_modified' => $nowMysql,
@@ -444,7 +449,28 @@ final class AdministrativeNotificationsService
       'history' => $history,
       'properties' => $properties,
       'skipped' => $skipped,
+      'recipient_ids' => array_values($recipientIds),
     ];
+  }
+
+  /** @param array<string,mixed> $payload */
+  public function collectionNotificationMessage(array $payload): string
+  {
+    $data = $this->normalizeCollectionPayload($payload);
+    $lines = [
+      'Tipo de gestion: ' . $data['tipo_gestion_cobro'],
+    ];
+    if ($data['observacion'] !== '') {
+      $lines[] = 'Observacion: ' . $data['observacion'];
+    }
+    if ($data['volver_llamar'] === 'Si') {
+      $next = trim($data['siguiente_fecha'] . ' ' . $data['siguiente_hora']);
+      $lines[] = 'Proxima gestion: ' . ($next !== '' ? $next : 'pendiente por confirmar');
+      if ($data['otro_horario_cobro'] !== '') {
+        $lines[] = 'Nota de horario: ' . $data['otro_horario_cobro'];
+      }
+    }
+    return implode("\n", $lines);
   }
 
   /** @param array<string,mixed> $payload @return array{tipo_gestion_cobro:string,observacion:string,volver_llamar:string,siguiente_fecha:string,siguiente_hora:string,otro_horario_cobro:string} */
