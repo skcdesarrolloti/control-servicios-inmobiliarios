@@ -172,6 +172,44 @@
   background: #f4f9ff;
 }
 
+#scm-app .scm-cia-period-head {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.4fr) minmax(520px, 1.6fr);
+  gap: 16px;
+  margin-top: 20px;
+  border-left: 4px solid #2f80c9;
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: #f4f9ff;
+}
+
+#scm-app .scm-cia-period-head > div:first-child { display: flex; flex-direction: column; gap: 3px; }
+#scm-app .scm-cia-period-head span,
+#scm-app .scm-cia-period-head small { color: var(--cia-muted); font-size: 11px; }
+#scm-app .scm-cia-period-head strong { font-size: 17px; }
+
+#scm-app .scm-cia-source-state {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+#scm-app .scm-cia-source-state span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  border: 1px solid #d4deea;
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#scm-app .scm-cia-source-state .is-ready { border-color: #86c5a8; background: #ecfdf3; color: #146c43; }
+#scm-app .scm-cia-source-state .is-missing { border-color: #e9bd70; background: #fff8e8; color: #85520b; }
+
 #scm-app .scm-cia-latest > div {
   display: flex;
   flex-direction: column;
@@ -258,7 +296,7 @@
 }
 
 #scm-app .scm-cia-change-table { min-width: 900px; }
-#scm-app .scm-cia-results-table { min-width: 1180px; }
+#scm-app .scm-cia-results-table { min-width: 1680px; }
 
 #scm-app .scm-cia-table th {
   position: sticky;
@@ -293,6 +331,19 @@
 }
 
 #scm-app .scm-cia-value-cell.is-different { background: #fff7f7; }
+
+#scm-app .scm-cia-source-values {
+  min-width: 145px;
+  font-variant-numeric: tabular-nums;
+}
+
+#scm-app .scm-cia-source-values span { white-space: nowrap; }
+#scm-app .scm-cia-source-values.is-correcto { background: #f4fcf7; }
+#scm-app .scm-cia-source-values.is-incorrecto { background: #fff4f4; }
+#scm-app .scm-cia-source-values.is-anomalia,
+#scm-app .scm-cia-source-values.is-empty { background: #fffaf0; }
+#scm-app .scm-cia-source-values.is-empty strong { color: #85520b; }
+#scm-app .scm-cia-semaphore-cell { min-width: 145px; text-align: center; }
 
 #scm-app .scm-cia-badge {
   display: inline-flex !important;
@@ -360,6 +411,8 @@
   #scm-app .scm-cia-filters { grid-template-columns: 1fr; }
   #scm-app .scm-cia-kpis { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
   #scm-app .scm-cia-latest { grid-template-columns: 1fr; }
+  #scm-app .scm-cia-period-head { grid-template-columns: 1fr; }
+  #scm-app .scm-cia-source-state { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
 }
 
 @media (max-width: 480px) {
@@ -369,6 +422,8 @@
   #scm-app .scm-cia-filters { padding: 14px; }
   #scm-app .scm-cia-kpis { grid-template-columns: 1fr 1fr; gap: 8px; }
   #scm-app .scm-cia-section-head { flex-direction: column; }
+  #scm-app .scm-cia-period-head { padding: 14px; }
+  #scm-app .scm-cia-source-state { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

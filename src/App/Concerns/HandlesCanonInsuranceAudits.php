@@ -43,14 +43,14 @@ trait HandlesCanonInsuranceAudits
     $period = trim(sanitize_text_field(wp_unslash((string) ($_POST['period'] ?? ''))));
     try {
       $result = $this->canonInsuranceAuditService()->import($file, $period);
-      $selected = is_array($result['selected_audit'] ?? null) ? $result['selected_audit'] : [];
+      $summary = is_array($result['summary'] ?? null) ? $result['summary'] : [];
       $message = !empty($result['duplicate'])
         ? 'Este mismo archivo ya estaba registrado para el periodo. Se muestra la auditoria existente.'
         : sprintf(
-          'Auditoria registrada: %d filas, %d coincidencias y %d diferencias.',
-          (int) ($selected['total_rows'] ?? 0),
-          (int) ($selected['compliant_rows'] ?? 0),
-          (int) ($selected['difference_rows'] ?? 0)
+          'Conciliacion mensual actualizada: %d contratos, %d correctos y %d con diferencias.',
+          (int) ($summary['total'] ?? 0),
+          (int) ($summary['compliant'] ?? 0),
+          (int) ($summary['differences'] ?? 0)
         );
       $this->jsonOk([
         'html' => (new CanonInsuranceAuditView())->renderContent($result),
@@ -89,7 +89,9 @@ trait HandlesCanonInsuranceAudits
       $this->jsonFail('No tienes permiso para enviar este informe.');
     }
     try {
-      $result = $this->canonInsuranceAuditService()->sendReport((int) ($_POST['audit_id'] ?? 0));
+      $result = $this->canonInsuranceAuditService()->sendReport(
+        trim(sanitize_text_field(wp_unslash((string) ($_POST['period'] ?? ''))))
+      );
       $this->jsonOk([
         'html' => (new CanonInsuranceAuditView())->renderContent($result),
         'message' => sprintf('Informe encolado para %d destinatario(s) del cargo Coordinador Contractual.', (int) ($result['queued'] ?? 0)),

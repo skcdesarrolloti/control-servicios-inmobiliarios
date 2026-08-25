@@ -260,10 +260,18 @@
     });
 
     module.addEventListener("change", function (event) {
-      if (event.target && event.target.name === "period") {
+      if (
+        event.target &&
+        event.target.name === "period" &&
+        event.target.closest("[data-cia-upload-form]")
+      ) {
         updateFilenameGuide(event.target.value);
       }
-      if (event.target && event.target.name === "audit_id") {
+      if (
+        event.target &&
+        (event.target.name === "audit_id" || event.target.name === "period") &&
+        event.target.closest("[data-cia-filter-form]")
+      ) {
         var form = event.target.closest("[data-cia-filter-form]");
         if (form) load(new FormData(form));
       }
