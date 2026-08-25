@@ -167,18 +167,6 @@ final class CanonInsuranceAuditService
     }));
     $items = array_slice($items, 0, 500);
 
-    $incrementChanges = $this->db->getResults(
-      "SELECT * FROM `{$this->incrementChangesTable()}` ORDER BY `changed_at` DESC, `id` DESC LIMIT 100"
-    );
-    foreach ($incrementChanges as &$incrementChange) {
-      $identity = $this->employeeIdentity((string) ($incrementChange['changed_by_id'] ?? ''));
-      $incrementChange['changed_by_id'] = $identity['id'];
-      if ($identity['name'] !== '') {
-        $incrementChange['changed_by_name'] = $identity['name'];
-      }
-    }
-    unset($incrementChange);
-
     $sourceAuditIds = array_values(array_filter(array_map(static fn(array $audit): int => (int) ($audit['id'] ?? 0), $sourceAudits)));
     $reports = [];
     if ($sourceAuditIds !== []) {
@@ -198,7 +186,6 @@ final class CanonInsuranceAuditService
       'items' => $items,
       'reports' => $reports,
       'filename_examples' => AuditSourceCatalog::examples($period),
-      'increment_changes' => $incrementChanges,
       'filters' => [
         'period' => $period,
         'status' => $status,

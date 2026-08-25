@@ -32,13 +32,11 @@ final class CanonInsuranceAuditView
     $sourceAudits = (array) ($payload['source_audits'] ?? []);
     $summary = (array) ($payload['summary'] ?? []);
     $items = (array) ($payload['items'] ?? []);
-    $changes = (array) ($payload['increment_changes'] ?? []);
     $reports = (array) ($payload['reports'] ?? []);
     $filters = (array) ($payload['filters'] ?? []);
     ob_start();
     if ($sourceAudits === []) {
       echo '<div class="scm-cia-empty"><strong>A&uacute;n no hay archivos procesados para ' . esc_html($this->periodLabel($period)) . '.</strong><span>Selecciona el periodo y carga SIMI junto con los extractos de las tres aseguradoras.</span></div>';
-      echo $this->renderIncrementHistory($changes);
       return (string) ob_get_clean();
     }
 ?>
@@ -51,7 +49,6 @@ final class CanonInsuranceAuditView
     <?php echo $this->renderReportPanel($period, $summary, $reports); ?>
     <?php echo $this->renderItemsTable($items, $sourceAudits); ?>
     <?php echo $this->renderAuditHistory($audits); ?>
-    <?php echo $this->renderIncrementHistory($changes); ?>
 <?php
     return (string) ob_get_clean();
   }
@@ -116,16 +113,6 @@ final class CanonInsuranceAuditView
     ob_start();
 ?>
     <section class="scm-cia-section"><div class="scm-cia-section-head"><div><h3>Registro de archivos procesados</h3><p>Fuente, periodo, funcionario y resultado de cada carga vigente.</p></div></div><div class="scm-cia-history-grid"><?php foreach ($audits as $audit): ?><article class="scm-cia-history-card"><div><strong><?php echo esc_html($this->periodLabel((string) ($audit['period'] ?? ''))); ?></strong><span><?php echo esc_html((string) ($audit['insurer'] ?? '')); ?></span></div><p title="<?php echo esc_attr((string) ($audit['source_filename'] ?? '')); ?>"><?php echo esc_html((string) ($audit['source_filename'] ?? '')); ?></p><dl><div><dt>Verdes</dt><dd><?php echo esc_html((string) ($audit['compliant_rows'] ?? 0)); ?></dd></div><div><dt>Rojos</dt><dd><?php echo esc_html((string) ($audit['difference_rows'] ?? 0)); ?></dd></div><div><dt>Amarillos</dt><dd><?php echo esc_html((string) ($audit['incomplete_rows'] ?? 0)); ?></dd></div></dl><small><?php echo esc_html((string) ($audit['uploaded_by_name'] ?? '')); ?> &middot; <?php echo esc_html($this->dateTime((string) ($audit['uploaded_at'] ?? ''))); ?></small></article><?php endforeach; ?></div></section>
-<?php
-    return (string) ob_get_clean();
-  }
-
-  /** @param array<int,array<string,mixed>> $changes */
-  private function renderIncrementHistory(array $changes): string
-  {
-    ob_start();
-?>
-    <section class="scm-cia-section scm-cia-increments"><?php $count = count($changes); ?><div class="scm-cia-section-head"><div><h3>Historial de cambios de incrementos</h3><p>Registra qui&eacute;n modific&oacute; fechas, porcentajes o documentos de incremento, cu&aacute;ndo lo hizo y en qu&eacute; contrato.</p></div><span><?php echo esc_html((string) $count); ?> cambios recientes</span></div><?php if ($changes === []): ?><div class="scm-cia-empty"><strong>No hay modificaciones de incrementos registradas.</strong><span>Los cambios aparecer&aacute;n aqu&iacute; al sincronizar esta pesta&ntilde;a.</span></div><?php else: ?><div class="scm-cia-table-wrap"><table class="scm-cia-table scm-cia-change-table"><thead><tr><th>Cu&aacute;ndo</th><th>Qui&eacute;n</th><th>Contrato</th><th>Campo modificado</th><th>Valor anterior</th><th>Valor nuevo</th></tr></thead><tbody><?php foreach ($changes as $change): ?><tr><td><?php echo esc_html($this->dateTime((string) ($change['changed_at'] ?? ''))); ?></td><td><strong><?php echo esc_html((string) ($change['changed_by_name'] ?? 'No identificado')); ?></strong><small><?php $employeeId = trim((string) ($change['changed_by_id'] ?? '')); echo $employeeId !== '' ? 'ID ' . esc_html($employeeId) : 'ID de empleado no disponible'; ?></small></td><td><?php echo esc_html((string) (($change['contract_number'] ?? '') ?: '—')); ?><small>ID <?php echo esc_html((string) ($change['contract_id'] ?? '')); ?></small></td><td><strong><?php echo esc_html((string) ($change['field_label'] ?? '')); ?></strong><small><?php echo esc_html((string) ($change['source_location'] ?? '')); ?></small></td><td><?php echo esc_html((string) (($change['old_value'] ?? '') !== '' ? $change['old_value'] : 'Sin valor')); ?></td><td><?php echo esc_html((string) (($change['new_value'] ?? '') !== '' ? $change['new_value'] : 'Sin valor')); ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?></section>
 <?php
     return (string) ob_get_clean();
   }
