@@ -2122,8 +2122,6 @@
       var composerTitle = panel.querySelector("#scm-admin-notif-modal-title");
       var composerDescription = panel.querySelector("[data-admin-notif-modal-description]");
       var channelGroup = panel.querySelector(".scm-admin-notif-channel-group");
-      var channelQuick = panel.querySelector("[data-admin-notif-channel-quick]");
-      var allChannelsBtn = panel.querySelector("[data-admin-notif-all-channels]");
       var closeComposerBtn = panel.querySelector("[data-admin-notif-close-composer]");
       var closeConfirmModal = panel.querySelector("[data-admin-notif-confirm]");
       var closeConfirmAcceptBtn = panel.querySelector("[data-admin-notif-confirm-accept]");
@@ -2363,10 +2361,6 @@
         if (channelGroup) {
           channelGroup.hidden = isChannelMode;
         }
-        if (channelQuick) {
-          channelQuick.hidden = !isChannelMode;
-          channelQuick.classList.toggle("is-hidden", !isChannelMode);
-        }
         if (allFilteredWrap) {
           allFilteredWrap.hidden = composerSingleRecipient;
           allFilteredWrap.classList.toggle("is-hidden", composerSingleRecipient);
@@ -2478,7 +2472,9 @@
         openComposer();
       }
 
-      function enableAllComposerChannels() {
+      function openComposerForAllChannels(options) {
+        var opts = options || {};
+        composerSingleRecipient = !!opts.singleRecipient;
         composerChannelMode = "";
         var changed = false;
         panel.querySelectorAll("[data-admin-notif-channel]").forEach(function (input) {
@@ -2494,6 +2490,7 @@
           markComposerDirty();
         }
         syncContext();
+        openComposer();
       }
 
       function updateCollectionFollowVisibility() {
@@ -3197,11 +3194,11 @@
             });
           });
         });
-        if (allChannelsBtn) {
-          allChannelsBtn.addEventListener("click", function () {
-            enableAllComposerChannels();
+        panel.querySelector("[data-admin-notif-open-all-channels]")?.addEventListener("click", function () {
+          openComposerForAllChannels({
+            singleRecipient: false,
           });
-        }
+        });
         if (closeComposerBtn) {
           closeComposerBtn.addEventListener("click", function () {
             closeComposer(false);
@@ -3334,6 +3331,21 @@
               return;
             }
             openComposerForChannel(channelBtn.getAttribute("data-admin-notif-single-channel") || "", {
+              singleRecipient: true,
+            });
+            return;
+          }
+
+          var allChannelsRowBtn = event.target && event.target.closest
+            ? event.target.closest("[data-admin-notif-single-all-channels]")
+            : null;
+          if (allChannelsRowBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!selectOnlyRecipient(allChannelsRowBtn.getAttribute("data-admin-notif-single-id") || "")) {
+              return;
+            }
+            openComposerForAllChannels({
               singleRecipient: true,
             });
             return;

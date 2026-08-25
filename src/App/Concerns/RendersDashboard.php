@@ -1678,6 +1678,7 @@ trait RendersDashboard
               <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--email" data-admin-notif-open-channel="email">Notificaci&oacute;n Email</button>
               <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--sms" data-admin-notif-open-channel="sms">Notificaci&oacute;n SMS</button>
               <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--whatsapp" data-admin-notif-open-channel="whatsapp">Notificaci&oacute;n WhatsApp</button>
+              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--all" data-admin-notif-open-all-channels>Todos los canales</button>
               <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--collection" data-admin-notif-open-collection hidden>Gesti&oacute;n de cobro</button>
             </div>
           </div>
@@ -1735,11 +1736,6 @@ trait RendersDashboard
                 <span class="scm-admin-notif-channel-icon" aria-hidden="true">W</span>
                 <span class="scm-admin-notif-channel-copy"><strong>WhatsApp</strong><small>Plantilla oficial Meta</small></span>
               </label>
-            </div>
-
-            <div class="scm-admin-notif-channel-quick" data-admin-notif-channel-quick hidden>
-              <button type="button" class="scm-case-work-btn" data-admin-notif-all-channels>Enviar por todos los canales</button>
-              <span>Activa Email, SMS y WhatsApp manteniendo los destinatarios seleccionados.</span>
             </div>
 
             <label class="scm-admin-notif-all">
