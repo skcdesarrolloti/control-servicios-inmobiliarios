@@ -333,11 +333,63 @@
 #scm-app .scm-cia-value-cell.is-different { background: #fff7f7; }
 
 #scm-app .scm-cia-source-values {
-  min-width: 145px;
+  min-width: 330px;
   font-variant-numeric: tabular-nums;
 }
 
-#scm-app .scm-cia-source-values span { white-space: nowrap; }
+#scm-app .scm-cia-value-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(90px, 1fr));
+  gap: 8px;
+}
+
+#scm-app .scm-cia-value-grid span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#scm-app .scm-cia-metric-status {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 20px;
+  align-items: center;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+#scm-app .scm-cia-metric-status.is-correcto { background: #ecfdf3; color: #146c43; }
+#scm-app .scm-cia-metric-status.is-incorrecto { background: #fff1f1; color: #b42318; }
+#scm-app .scm-cia-metric-status.is-anomalia { background: #fff8e8; color: #85520b; }
+#scm-app .scm-cia-metric-status.is-reference { background: #edf5ff; color: #235f9b; }
+
+#scm-app .scm-cia-source-note {
+  display: block;
+  margin-bottom: 8px;
+  color: #85520b;
+  font-weight: 700;
+}
+
+#scm-app .scm-cia-value-grid b {
+  color: var(--cia-muted);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-cia-value-grid em {
+  color: var(--cia-ink);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+}
 #scm-app .scm-cia-source-values.is-correcto { background: #f4fcf7; }
 #scm-app .scm-cia-source-values.is-incorrecto { background: #fff4f4; }
 #scm-app .scm-cia-source-values.is-anomalia,

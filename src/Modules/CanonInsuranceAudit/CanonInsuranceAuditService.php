@@ -269,6 +269,11 @@ final class CanonInsuranceAuditService
         'canon' => $item['excel_canon'] ?? null,
         'administration' => $item['excel_administration'] ?? null,
         'iva' => $item['excel_iva'] ?? null,
+        'metric_statuses' => [
+          'canon' => $this->metricStatus($item['excel_canon'] ?? null, $item['system_canon'] ?? null, $item['difference_canon'] ?? null),
+          'administration' => $this->metricStatus($item['excel_administration'] ?? null, $item['system_administration'] ?? null, $item['difference_administration'] ?? null),
+          'iva' => $this->metricStatus($item['excel_iva'] ?? null, $item['system_iva'] ?? null, $item['difference_iva'] ?? null),
+        ],
         'findings' => $this->cleanFindings((string) ($item['differences_json'] ?? '[]')),
         'observation' => (string) ($item['observation'] ?? ''),
         'observation_by_name' => (string) ($item['observation_by_name'] ?? ''),
@@ -377,6 +382,17 @@ final class CanonInsuranceAuditService
       return 'unifianza';
     }
     return '';
+  }
+
+  private function metricStatus(mixed $sourceValue, mixed $platformValue, mixed $difference): string
+  {
+    if ($sourceValue === null || $sourceValue === '' || $platformValue === null || $platformValue === '') {
+      return 'anomalia';
+    }
+    $amountDifference = $difference === null || $difference === ''
+      ? (float) $sourceValue - (float) $platformValue
+      : (float) $difference;
+    return abs($amountDifference) > self::MONEY_TOLERANCE ? 'incorrecto' : 'correcto';
   }
 
   /** @return array<string,mixed> */
@@ -516,9 +532,9 @@ final class CanonInsuranceAuditService
         if (!is_array($source)) {
           return 'No aparece';
         }
-        return 'C: ' . $h($money($source['canon'] ?? null))
-          . '<br>A: ' . $h($money($source['administration'] ?? null))
-          . '<br>IVA: ' . $h($money($source['iva'] ?? null));
+        return '<strong>Canon</strong><br>' . $h($money($source['canon'] ?? null))
+          . '<br><strong>Administracion</strong><br>' . $h($money($source['administration'] ?? null))
+          . '<br><strong>IVA</strong><br>' . $h($money($source['iva'] ?? null));
       };
       $rows .= '<tr><td>' . $h($item['request_number'] ?? '') . '</td><td>' . $h($item['contract_number'] ?? '') . '</td>'
         . '<td>' . $h($item['tenant'] ?? '') . '<br>' . $h($item['property_address'] ?? '') . '</td>'
