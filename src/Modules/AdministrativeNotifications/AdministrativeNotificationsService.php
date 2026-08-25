@@ -136,6 +136,7 @@ final class AdministrativeNotificationsService
     $propietarios = ['propietarios_activos', 'propietarios_no_activos'];
     $arrendatarios = ['arrendatarios_activos', 'arrendatarios_no_activos'];
     $copropiedades = ['copropiedades_activas', 'copropiedades_no_activas'];
+    $funcionarios = ['funcionarios'];
 
     return [
       self::DEFAULT_WHATSAPP_TEMPLATE => [
@@ -156,7 +157,7 @@ final class AdministrativeNotificationsService
         'description' => 'Aviso para propietarios cuando el arriendo fue consignado a la cuenta registrada.',
         'body' => "Buen dia, {{1}}.\n\nLe informamos que el pago del arriendo correspondiente a su inmueble en administracion fue consignado a la cuenta registrada.\n\nDetalle del abono:\n\n{{2}}\n\nAtentamente,\n{{3}}\n\nGracias por elegirnos y confiar en nuestro equipo.",
         'variables' => ['Nombre del propietario', 'Detalle del pago, inmueble, mes o valor', 'Firma del funcionario: Nombre - Cargo - Celular'],
-        'actors' => $propietarios,
+        'actors' => array_merge($propietarios, $funcionarios),
         'email_template' => 'scm_email_propietario_arriendo_consignado_v1',
         'parameter_mode' => 'name_message_signature',
       ],
@@ -167,7 +168,7 @@ final class AdministrativeNotificationsService
         'description' => 'Envio de soportes de pago a copropiedades para verificacion y recibo de caja.',
         'body' => "Buen dia, {{1}}.\n\nAdjuntamos los soportes de pago correspondientes para su respectiva verificacion.\n\nDetalle de los soportes:\n\n{{2}}\n\nAgradecemos su colaboracion con el envio del recibo de caja correspondiente a estos pagos.\n\nAtentamente,\n{{3}}\n\nGracias por su atencion.",
         'variables' => ['Nombre de la copropiedad o contacto', 'Mes, inmueble y detalle de los soportes', 'Firma del funcionario: Nombre - Cargo - Celular'],
-        'actors' => $copropiedades,
+        'actors' => array_merge($copropiedades, $funcionarios),
         'email_template' => 'scm_email_copropiedad_soportes_pago_v1',
         'parameter_mode' => 'name_message_signature',
       ],
@@ -178,7 +179,7 @@ final class AdministrativeNotificationsService
         'description' => 'Aviso formal para arrendatarios por incumplimiento en el pago del canon.',
         'body' => "Estimado(a) {{1}}, reciba un cordial saludo.\n\nLe recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.\n\nUna vez activado el proceso con la aseguradora, se puede generar un recargo adicional del 50% sobre el valor del canon adeudado, ademas de los costos y gestiones asociados al tramite.\n\nPara evitar mayores consecuencias economicas y administrativas, le solicitamos realizar el pago de manera inmediata.\n\nAtentamente,\n{{2}}\n\nGracias por su atencion.",
         'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
-        'actors' => $arrendatarios,
+        'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_arrendatario_aviso_pago_canon_v1',
         'parameter_mode' => 'name_signature',
       ],
@@ -189,7 +190,7 @@ final class AdministrativeNotificationsService
         'description' => 'Aviso para arrendatarios cuando tienen una factura nueva disponible.',
         'body' => "Estimado(a) {{1}}, tienes una nueva factura disponible.\n\nTu factura ya se encuentra lista para revision. Te invitamos a consultarla y realizar el pago oportunamente para mantenerte al dia.\n\nSi ya realizaste el pago, puedes hacer caso omiso a este mensaje.\n\nAtentamente,\n{{2}}\n\nGracias por elegirnos y confiar en nuestro equipo.",
         'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
-        'actors' => $arrendatarios,
+        'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_factura_disponible_v1',
         'parameter_mode' => 'name_signature',
       ],
@@ -200,7 +201,7 @@ final class AdministrativeNotificationsService
         'description' => 'Aviso para arrendatarios cuando el mes fue generado y queda disponible para pago.',
         'body' => "Hola {{1}}, tu mes ha sido generado exitosamente.\n\nPuedes realizar el pago a traves del boton de pago disponible o por ventanilla en Banco Caja Social, ingresando tu cedula o NIT sin digito de verificacion.\n\nCuando realices el pago, por favor envianos el soporte para validarlo en el sistema.\n\nEstoy para servirte.\n\nAtentamente,\n{{2}}",
         'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
-        'actors' => $arrendatarios,
+        'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_mes_generado_pago_v1',
         'parameter_mode' => 'name_signature',
       ],
