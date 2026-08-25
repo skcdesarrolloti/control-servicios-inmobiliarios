@@ -4921,8 +4921,7 @@
   box-shadow: inset 4px 0 0 #f59120;
 }
 
-#scm-app .scm-admin-notif-all,
-#scm-app .scm-admin-notif-send-filtered {
+#scm-app .scm-admin-notif-all {
   display: flex;
   min-height: 44px;
   align-items: center;
@@ -5041,23 +5040,6 @@
   font-size: 11px;
   font-weight: 800;
   line-height: 1.25;
-}
-
-#scm-app .scm-admin-notif-send-filtered {
-  width: fit-content;
-  min-width: 210px;
-  justify-content: center;
-  border-color: #fed7aa;
-  background: #fff7ed;
-  color: #9a3412;
-  cursor: pointer;
-}
-
-#scm-app .scm-admin-notif-send-filtered:hover,
-#scm-app .scm-admin-notif-send-filtered:focus-visible {
-  border-color: #fb923c;
-  background: #ffedd5;
-  outline: 3px solid rgba(249, 115, 22, 0.16);
 }
 
 #scm-app .scm-admin-notif-template-card {
@@ -5342,10 +5324,6 @@
   #scm-app .scm-admin-notif-selected-head {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  #scm-app .scm-admin-notif-send-filtered {
-    width: 100%;
   }
 
   #scm-app .scm-admin-notif-recipient {

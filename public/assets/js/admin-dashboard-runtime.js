@@ -2102,7 +2102,6 @@
       var selectedCountEl = panel.querySelector("[data-admin-notif-selected-count]");
       var selectVisibleBtn = panel.querySelector("[data-admin-notif-select-visible]");
       var allFiltered = panel.querySelector("[data-admin-notif-all-filtered]");
-      var sendFilteredBtn = panel.querySelector("[data-admin-notif-send-filtered]");
       var subjectWrap = panel.querySelector("[data-admin-notif-subject-wrap]");
       var subjectInput = panel.querySelector("[data-admin-notif-subject]");
       var messageFieldWrap = panel.querySelector(".scm-admin-notif-message-field");
@@ -2402,17 +2401,6 @@
           return;
         }
         performCloseComposer();
-      }
-
-      function useAllFilteredAndOpen() {
-        if (allFiltered) {
-          allFiltered.checked = true;
-        }
-        selected.clear();
-        updateVisibleChecks();
-        markComposerDirty();
-        syncContext();
-        openComposer();
       }
 
       function openComposerForChannel(channel) {
@@ -3099,9 +3087,6 @@
           });
         }
 
-        if (sendFilteredBtn) {
-          sendFilteredBtn.addEventListener("click", useAllFilteredAndOpen);
-        }
         if (importForm) {
           importForm.addEventListener("submit", function (event) {
             event.preventDefault();

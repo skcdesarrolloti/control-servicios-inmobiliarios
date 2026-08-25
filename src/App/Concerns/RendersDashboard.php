@@ -1715,9 +1715,6 @@ trait RendersDashboard
                 <h4><strong data-admin-notif-selected-count>0</strong> seleccionados</h4>
                 <p>Escoge canales, plantilla y revisa la vista previa antes de encolar.</p>
               </div>
-              <button type="button" class="scm-admin-notif-send-filtered" data-admin-notif-send-filtered>
-                Enviar a todos los filtrados
-              </button>
             </div>
 
             <div class="scm-admin-notif-channel-group" role="group" aria-label="Canales">
@@ -1740,7 +1737,7 @@ trait RendersDashboard
 
             <label class="scm-admin-notif-all">
               <input type="checkbox" name="all_filtered" value="1" data-admin-notif-all-filtered>
-              <span>Enviar a todos los resultados filtrados</span>
+              <span>Usar todos los resultados filtrados al encolar</span>
             </label>
 
             <input type="hidden"
