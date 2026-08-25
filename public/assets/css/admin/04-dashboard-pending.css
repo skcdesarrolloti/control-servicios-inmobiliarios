@@ -4681,6 +4681,69 @@
   font-weight: 700;
 }
 
+#scm-app .scm-admin-notif-row-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+#scm-app .scm-admin-notif-row-action {
+  min-height: 36px;
+  border: 1px solid #dbe7f4;
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: #fff;
+  color: #0b2341;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+#scm-app .scm-admin-notif-row-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+}
+
+#scm-app .scm-admin-notif-row-action:focus-visible {
+  outline: 3px solid rgba(249, 115, 22, 0.28);
+  outline-offset: 2px;
+}
+
+#scm-app .scm-admin-notif-row-action--email {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+#scm-app .scm-admin-notif-row-action--sms {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+#scm-app .scm-admin-notif-row-action--whatsapp {
+  border-color: #99f6e4;
+  background: #ecfeff;
+  color: #0f766e;
+}
+
+#scm-app .scm-admin-notif-row-action--collection {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
 #scm-app .scm-admin-notif-contract-badge {
   display: inline-flex;
   width: fit-content;
@@ -5429,6 +5492,15 @@
 
   #scm-app .scm-admin-notif-contact {
     grid-column: 3;
+  }
+
+  #scm-app .scm-admin-notif-row-actions {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+
+  #scm-app .scm-admin-notif-row-action {
+    flex: 1 1 130px;
   }
 
   #scm-app .scm-admin-notif-channel-group {

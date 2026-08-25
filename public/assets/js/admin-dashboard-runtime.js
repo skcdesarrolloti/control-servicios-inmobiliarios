@@ -2427,6 +2427,9 @@
 
       function openComposerForChannel(channel) {
         var wanted = String(channel || "").trim().toLowerCase();
+        if (["email", "sms", "whatsapp"].indexOf(wanted) === -1) {
+          return;
+        }
         composerChannelMode = wanted;
         var changed = false;
         panel.querySelectorAll("[data-admin-notif-channel]").forEach(function (input) {
@@ -2485,6 +2488,24 @@
             field.focus();
           }
         }, 30);
+      }
+
+      function selectOnlyRecipient(id) {
+        var value = String(id || "").trim();
+        if (!value) {
+          return false;
+        }
+        selected.clear();
+        selected.add(value);
+        if (allFiltered) {
+          allFiltered.checked = false;
+        }
+        if (collectionAllFiltered) {
+          collectionAllFiltered.checked = false;
+        }
+        updateVisibleChecks();
+        syncContext();
+        return true;
       }
 
       function closeCollectionModal() {
@@ -3138,6 +3159,49 @@
             syncContext();
             loadRecipients(1);
           });
+        });
+
+        recipientsEl.addEventListener("click", function (event) {
+          var channelBtn = event.target && event.target.closest
+            ? event.target.closest("[data-admin-notif-single-channel]")
+            : null;
+          if (channelBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!selectOnlyRecipient(channelBtn.getAttribute("data-admin-notif-single-id") || "")) {
+              return;
+            }
+            openComposerForChannel(channelBtn.getAttribute("data-admin-notif-single-channel") || "");
+            return;
+          }
+
+          var collectionBtn = event.target && event.target.closest
+            ? event.target.closest("[data-admin-notif-single-collection]")
+            : null;
+          if (collectionBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!selectOnlyRecipient(collectionBtn.getAttribute("data-admin-notif-single-id") || "")) {
+              return;
+            }
+            openCollectionModal();
+            return;
+          }
+
+          var row = event.target && event.target.closest
+            ? event.target.closest("[data-admin-notif-recipient-row]")
+            : null;
+          var interactive = event.target && event.target.closest
+            ? event.target.closest("button, a, input, select, textarea")
+            : null;
+          if (row && !interactive) {
+            var checkbox = row.querySelector("[data-admin-notif-recipient]");
+            if (checkbox) {
+              event.preventDefault();
+              checkbox.checked = !checkbox.checked;
+              checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+          }
         });
 
         recipientsEl.addEventListener("change", function (event) {

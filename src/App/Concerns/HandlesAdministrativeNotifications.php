@@ -248,6 +248,7 @@ trait HandlesAdministrativeNotifications
       }
       $name = trim((string) ($row['nombre'] ?? 'Sin nombre'));
       $typeLabel = trim((string) ($row['tipo_label'] ?? 'Destinatario'));
+      $actorType = trim((string) ($row['tipo_actor'] ?? ''));
       $email = trim((string) ($row['correo'] ?? ''));
       $phone = trim((string) ($row['celular_normalizado'] ?? ($row['celular'] ?? '')));
       $rawPhone = trim((string) ($row['celular'] ?? ''));
@@ -261,8 +262,8 @@ trait HandlesAdministrativeNotifications
         default => '',
       };
 
-      $html .= '<label class="scm-admin-notif-recipient" data-admin-notif-recipient-row>';
-      $html .= '<input type="checkbox" value="' . esc_attr((string) $id) . '" data-admin-notif-recipient>';
+      $html .= '<div class="scm-admin-notif-recipient" data-admin-notif-recipient-row>';
+      $html .= '<input type="checkbox" value="' . esc_attr((string) $id) . '" data-admin-notif-recipient aria-label="Seleccionar ' . esc_attr($name) . '">';
       $html .= '<span class="scm-admin-notif-avatar" aria-hidden="true">' . esc_html(mb_strtoupper(mb_substr($name, 0, 1, 'UTF-8'), 'UTF-8')) . '</span>';
       $html .= '<span class="scm-admin-notif-person">';
       $html .= '<strong>' . esc_html($name) . '</strong>';
@@ -295,7 +296,15 @@ trait HandlesAdministrativeNotifications
       $html .= '<span class="' . ($email !== '' ? 'is-ready' : 'is-missing') . '">Email: ' . esc_html($email !== '' ? $email : 'Sin correo') . '</span>';
       $html .= '<span class="' . ($phone !== '' ? 'is-ready' : 'is-missing') . '">Celular: ' . esc_html($phone !== '' ? $phone : ($rawPhone !== '' ? $rawPhone : 'Sin numero')) . '</span>';
       $html .= '</span>';
-      $html .= '</label>';
+      $html .= '<span class="scm-admin-notif-row-actions" aria-label="Acciones rapidas de contacto">';
+      $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--email" data-admin-notif-single-channel="email" data-admin-notif-single-id="' . esc_attr((string) $id) . '">Email</button>';
+      $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--sms" data-admin-notif-single-channel="sms" data-admin-notif-single-id="' . esc_attr((string) $id) . '">SMS</button>';
+      $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--whatsapp" data-admin-notif-single-channel="whatsapp" data-admin-notif-single-id="' . esc_attr((string) $id) . '">WhatsApp</button>';
+      if ($actorType === 'arrendatarios_activos') {
+        $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--collection" data-admin-notif-single-collection data-admin-notif-single-id="' . esc_attr((string) $id) . '">Gestion de cobro</button>';
+      }
+      $html .= '</span>';
+      $html .= '</div>';
     }
 
     return $html !== '' ? $html : '<div class="scm-admin-notif-empty"><strong>No hay destinatarios validos.</strong></div>';
