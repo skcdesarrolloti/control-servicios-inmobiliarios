@@ -2076,6 +2076,10 @@
       var sendForm = panel.querySelector("[data-admin-notif-send]");
       var typeSelect = panel.querySelector("[data-admin-notif-type]");
       var queryInput = panel.querySelector("[data-admin-notif-query]");
+      var nameInput = panel.querySelector("[data-admin-notif-name]");
+      var emailInput = panel.querySelector("[data-admin-notif-email]");
+      var phoneInput = panel.querySelector("[data-admin-notif-phone]");
+      var documentInput = panel.querySelector("[data-admin-notif-document]");
       var contractStatusWrap = panel.querySelector("[data-admin-notif-contract-status-wrap]");
       var contractExtraWraps = panel.querySelectorAll("[data-admin-notif-contract-extra-wrap]");
       var contractStatusSelect = panel.querySelector("[data-admin-notif-contract-status]");
@@ -2083,6 +2087,10 @@
       var contractNumberInput = panel.querySelector("[data-admin-notif-contract-number]");
       var sendType = panel.querySelector("[data-admin-notif-send-type]");
       var sendQuery = panel.querySelector("[data-admin-notif-send-query]");
+      var sendName = panel.querySelector("[data-admin-notif-send-name]");
+      var sendEmail = panel.querySelector("[data-admin-notif-send-email]");
+      var sendPhone = panel.querySelector("[data-admin-notif-send-phone]");
+      var sendDocument = panel.querySelector("[data-admin-notif-send-document]");
       var sendContractStatus = panel.querySelector("[data-admin-notif-send-contract-status]");
       var sendInmuebleSimi = panel.querySelector("[data-admin-notif-send-inmueble-simi]");
       var sendContractNumber = panel.querySelector("[data-admin-notif-send-contract-number]");
@@ -2143,6 +2151,37 @@
 
       function currentQuery() {
         return queryInput ? String(queryInput.value || "").trim() : "";
+      }
+
+      function currentNameFilter() {
+        return nameInput ? String(nameInput.value || "").trim() : "";
+      }
+
+      function currentEmailFilter() {
+        return emailInput ? String(emailInput.value || "").trim() : "";
+      }
+
+      function currentPhoneFilter() {
+        return phoneInput ? String(phoneInput.value || "").trim() : "";
+      }
+
+      function currentDocumentFilter() {
+        return documentInput ? String(documentInput.value || "").trim() : "";
+      }
+
+      function currentTypeLabel() {
+        var active = panel.querySelector("[data-admin-notif-type-shortcut].active");
+        var label = active ? active.querySelector("span") : null;
+        if (label) {
+          return String(label.textContent || "").trim();
+        }
+        if (active) {
+          return String(active.textContent || "").trim();
+        }
+        if (typeSelect && typeSelect.options && typeSelect.selectedIndex >= 0) {
+          return String(typeSelect.options[typeSelect.selectedIndex].text || "").trim();
+        }
+        return "";
       }
 
       function supportsContractStatus(type) {
@@ -2403,6 +2442,18 @@
         }
         if (sendQuery) {
           sendQuery.value = currentQuery();
+        }
+        if (sendName) {
+          sendName.value = currentNameFilter();
+        }
+        if (sendEmail) {
+          sendEmail.value = currentEmailFilter();
+        }
+        if (sendPhone) {
+          sendPhone.value = currentPhoneFilter();
+        }
+        if (sendDocument) {
+          sendDocument.value = currentDocumentFilter();
         }
         if (sendContractStatus) {
           sendContractStatus.value = currentContractStatus();
@@ -2755,6 +2806,10 @@
         fd.append("nonce", nonce);
         fd.append("type", currentType());
         fd.append("q", currentQuery());
+        fd.append("nombre", currentNameFilter());
+        fd.append("correo", currentEmailFilter());
+        fd.append("celular", currentPhoneFilter());
+        fd.append("documento", currentDocumentFilter());
         fd.append("contract_status", currentContractStatus());
         fd.append("inmueble_simi", currentInmuebleSimi());
         fd.append("contract_number", currentContractNumber());
@@ -2782,7 +2837,7 @@
               totalEl.textContent = String(data.total || 0);
             }
             if (listTitle) {
-              listTitle.textContent = data.type_label || typeSelect.options[typeSelect.selectedIndex].text || "";
+              listTitle.textContent = data.type_label || currentTypeLabel();
             }
             updateVisibleChecks();
             syncContext();
@@ -2933,6 +2988,11 @@
           if (queryInput) {
             queryInput.value = "";
           }
+          [nameInput, emailInput, phoneInput, documentInput].forEach(function (input) {
+            if (input) {
+              input.value = "";
+            }
+          });
           if (contractStatusSelect) {
             contractStatusSelect.value = "";
           }
@@ -2971,7 +3031,7 @@
             loadRecipients(1);
           });
         }
-        [inmuebleSimiInput, contractNumberInput].forEach(function (input) {
+        [nameInput, emailInput, phoneInput, documentInput, inmuebleSimiInput, contractNumberInput].forEach(function (input) {
           if (!input) {
             return;
           }
@@ -3171,6 +3231,10 @@
           fd.set("nonce", nonce);
           fd.set("type", currentType());
           fd.set("q", currentQuery());
+          fd.set("nombre", currentNameFilter());
+          fd.set("correo", currentEmailFilter());
+          fd.set("celular", currentPhoneFilter());
+          fd.set("documento", currentDocumentFilter());
           fd.set("contract_status", currentContractStatus());
           fd.set("inmueble_simi", currentInmuebleSimi());
           fd.set("contract_number", currentContractNumber());

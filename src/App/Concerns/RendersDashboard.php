@@ -1630,10 +1630,23 @@ trait RendersDashboard
       <section class="scm-admin-notif-card scm-admin-notif-filter-card">
         <form data-admin-notif-search autocomplete="off">
           <input type="hidden" id="scm-admin-notif-type" name="type" value="<?php echo esc_attr($firstType); ?>" data-admin-notif-type>
+          <input type="hidden" id="scm-admin-notif-q" name="q" value="" data-admin-notif-query>
           <div class="scm-admin-notif-filter-grid">
             <div class="scm-field scm-admin-notif-search-field">
-              <label for="scm-admin-notif-q">Buscar</label>
-              <input id="scm-admin-notif-q" name="q" type="search" class="input input-bordered input-sm scm-input" placeholder="Nombre, correo, celular, documento..." data-admin-notif-query>
+              <label for="scm-admin-notif-name">Nombre</label>
+              <input id="scm-admin-notif-name" name="nombre" type="search" class="input input-bordered input-sm scm-input" placeholder="Nombre o raz&oacute;n social" data-admin-notif-name>
+            </div>
+            <div class="scm-field scm-admin-notif-search-field">
+              <label for="scm-admin-notif-email">Correo</label>
+              <input id="scm-admin-notif-email" name="correo" type="search" class="input input-bordered input-sm scm-input" placeholder="correo@ejemplo.com" data-admin-notif-email>
+            </div>
+            <div class="scm-field scm-admin-notif-search-field">
+              <label for="scm-admin-notif-phone">Celular</label>
+              <input id="scm-admin-notif-phone" name="celular" type="search" inputmode="tel" class="input input-bordered input-sm scm-input" placeholder="3001234567" data-admin-notif-phone>
+            </div>
+            <div class="scm-field scm-admin-notif-search-field">
+              <label for="scm-admin-notif-document">Documento</label>
+              <input id="scm-admin-notif-document" name="documento" type="search" class="input input-bordered input-sm scm-input" placeholder="C&eacute;dula, NIT o documento" data-admin-notif-document>
             </div>
             <div class="scm-field scm-admin-notif-contract-extra" data-admin-notif-contract-extra-wrap>
               <label for="scm-admin-notif-inmueble-simi">Inmueble SIMI</label>
@@ -1687,6 +1700,10 @@ trait RendersDashboard
           <form data-admin-notif-send autocomplete="off">
             <input type="hidden" name="type" value="<?php echo esc_attr($firstType); ?>" data-admin-notif-send-type>
             <input type="hidden" name="q" value="" data-admin-notif-send-query>
+            <input type="hidden" name="nombre" value="" data-admin-notif-send-name>
+            <input type="hidden" name="correo" value="" data-admin-notif-send-email>
+            <input type="hidden" name="celular" value="" data-admin-notif-send-phone>
+            <input type="hidden" name="documento" value="" data-admin-notif-send-document>
             <input type="hidden" name="contract_status" value="" data-admin-notif-send-contract-status>
             <input type="hidden" name="inmueble_simi" value="" data-admin-notif-send-inmueble-simi>
             <input type="hidden" name="contract_number" value="" data-admin-notif-send-contract-number>

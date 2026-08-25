@@ -40,6 +40,7 @@ final class AdministrativeNotificationsService
       'name' => ['nombre', 'nombre_juridico', 'titular'],
       'email' => ['correo', 'correo_cuenta'],
       'phone' => ['celular', 'telefono', 'contacto'],
+      'document' => ['documento', 'cedula', 'identificacion', 'nit'],
       'indicator' => ['indicativo'],
       'search' => ['nombre', 'nombre_juridico', 'documento', 'correo', 'celular', 'ciudad'],
     ];
@@ -50,6 +51,7 @@ final class AdministrativeNotificationsService
       'name' => ['nombre', 'nombre_juridico'],
       'email' => ['correo'],
       'phone' => ['celular', 'telefono', 'contacto'],
+      'document' => ['documento', 'cedula', 'identificacion', 'nit'],
       'indicator' => ['indicativo'],
       'search' => ['nombre', 'nombre_juridico', 'documento', 'correo', 'celular', 'ciudad'],
     ];
@@ -65,6 +67,7 @@ final class AdministrativeNotificationsService
       'name' => ['copropiedad', 'nombre', 'administrador'],
       'email' => ['correo'],
       'phone' => ['contacto', 'celular', 'telefono'],
+      'document' => ['nit', 'documento', 'identificacion'],
       'indicator' => ['indicativo'],
       'search' => ['copropiedad', 'administrador', 'nit', 'correo', 'contacto', 'barrio', 'direccion'],
     ];
@@ -83,6 +86,7 @@ final class AdministrativeNotificationsService
         'name' => ['proveedor', 'titular_proveedor', 'nombre'],
         'email' => ['correo_proveedor', 'correo_pago_proveedor', 'correo'],
         'phone' => ['celular_proveedor', 'celular', 'telefono', 'contacto'],
+        'document' => ['identificacion_proveedor', 'documento', 'nit'],
         'indicator' => ['indicativo'],
         'search' => ['proveedor', 'titular_proveedor', 'identificacion_proveedor', 'correo_proveedor', 'celular_proveedor', 'direccion_proveedor'],
       ],
@@ -93,6 +97,7 @@ final class AdministrativeNotificationsService
         'name' => ['nombre', 'empleado', 'nombre_funcionario'],
         'email' => ['correo', 'correo_dian'],
         'phone' => ['celular', 'celular_empleado', 'telefono', 'whatsapp'],
+        'document' => ['documento', 'cedula', 'identificacion', 'id_empleado'],
         'indicator' => ['indicativo'],
         'search' => ['nombre', 'id_empleado', 'documento', 'correo', 'celular', 'rol', 'gestion'],
         'only_active' => true,
@@ -296,16 +301,17 @@ final class AdministrativeNotificationsService
     ];
   }
 
-  /** @return array{rows:array<int,array<string,mixed>>,total:int,page:int,pages:int,per_page:int,type:string,type_label:string,contract_status:string,inmueble_simi:string,contract_number:string} */
-  public function search(string $type, string $query, int $page = 1, int $perPage = 20, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = ''): array
+  /** @param array<string,string> $fieldFilters @return array{rows:array<int,array<string,mixed>>,total:int,page:int,pages:int,per_page:int,type:string,type_label:string,contract_status:string,inmueble_simi:string,contract_number:string,field_filters:array<string,string>} */
+  public function search(string $type, string $query, int $page = 1, int $perPage = 20, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = '', array $fieldFilters = []): array
   {
     $config = $this->typeConfig($type);
     $contractStatus = $this->effectiveContractStatus($config, $contractStatus);
     $inmuebleSimi = trim($inmuebleSimi);
     $contractNumber = trim($contractNumber);
+    $fieldFilters = $this->normalizeFieldFilters($fieldFilters);
     $table = (string) $config['table'];
     if (!$this->schema->tableExists($table)) {
-      return ['rows' => [], 'total' => 0, 'page' => 1, 'pages' => 1, 'per_page' => $perPage, 'type' => $type, 'type_label' => (string) $config['label'], 'contract_status' => $contractStatus, 'inmueble_simi' => $inmuebleSimi, 'contract_number' => $contractNumber];
+      return ['rows' => [], 'total' => 0, 'page' => 1, 'pages' => 1, 'per_page' => $perPage, 'type' => $type, 'type_label' => (string) $config['label'], 'contract_status' => $contractStatus, 'inmueble_simi' => $inmuebleSimi, 'contract_number' => $contractNumber, 'field_filters' => $fieldFilters];
     }
 
     $columns = $this->resolveColumns($config);
@@ -323,6 +329,7 @@ final class AdministrativeNotificationsService
         $where .= ' AND (' . implode(' OR ', $parts) . ')';
       }
     }
+    $this->applyFieldTextFilters($where, $args, $table, $config, $fieldFilters);
     $this->applyContractFilters($where, $args, $type, $config, $contractStatus, $inmuebleSimi, $contractNumber);
 
     $total = (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` WHERE {$where}", $args);
@@ -379,16 +386,18 @@ final class AdministrativeNotificationsService
       'contract_status' => $contractStatus,
       'inmueble_simi' => $inmuebleSimi,
       'contract_number' => $contractNumber,
+      'field_filters' => $fieldFilters,
     ];
   }
 
   /** @return int[] */
-  public function idsForFilter(string $type, string $query, int $limit = 5000, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = ''): array
+  public function idsForFilter(string $type, string $query, int $limit = 5000, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = '', array $fieldFilters = []): array
   {
     $config = $this->typeConfig($type);
     $contractStatus = $this->effectiveContractStatus($config, $contractStatus);
     $inmuebleSimi = trim($inmuebleSimi);
     $contractNumber = trim($contractNumber);
+    $fieldFilters = $this->normalizeFieldFilters($fieldFilters);
     $table = (string) $config['table'];
     if (!$this->schema->tableExists($table)) {
       return [];
@@ -407,6 +416,7 @@ final class AdministrativeNotificationsService
         $where .= ' AND (' . implode(' OR ', $parts) . ')';
       }
     }
+    $this->applyFieldTextFilters($where, $args, $table, $config, $fieldFilters);
     $this->applyContractFilters($where, $args, $type, $config, $contractStatus, $inmuebleSimi, $contractNumber);
     $rows = $this->db->getResults("SELECT `_ID` FROM `{$table}` WHERE {$where} ORDER BY `_ID` DESC LIMIT ?", array_merge($args, [max(1, $limit)]));
     return array_values(array_map(static fn(array $row): int => (int) ($row['_ID'] ?? 0), $rows));
@@ -1023,6 +1033,50 @@ final class AdministrativeNotificationsService
   {
     $fixed = $this->sanitizeContractStatus((string) ($config['contract_status_fixed'] ?? ''));
     return $fixed !== '' ? $fixed : $this->sanitizeContractStatus($status);
+  }
+
+  /** @param array<string,string> $fieldFilters @return array{name:string,email:string,phone:string,document:string} */
+  private function normalizeFieldFilters(array $fieldFilters): array
+  {
+    return [
+      'name' => trim((string) ($fieldFilters['name'] ?? '')),
+      'email' => trim((string) ($fieldFilters['email'] ?? '')),
+      'phone' => trim((string) ($fieldFilters['phone'] ?? '')),
+      'document' => trim((string) ($fieldFilters['document'] ?? '')),
+    ];
+  }
+
+  /**
+   * @param array<int,mixed> $args
+   * @param array<string,mixed> $config
+   * @param array<string,string> $fieldFilters
+   */
+  private function applyFieldTextFilters(string &$where, array &$args, string $table, array $config, array $fieldFilters): void
+  {
+    $map = [
+      'name' => (array) ($config['name'] ?? []),
+      'email' => (array) ($config['email'] ?? []),
+      'phone' => (array) ($config['phone'] ?? []),
+      'document' => (array) ($config['document'] ?? []),
+    ];
+
+    foreach ($map as $filterKey => $candidates) {
+      $value = trim((string) ($fieldFilters[$filterKey] ?? ''));
+      if ($value === '') {
+        continue;
+      }
+      $columns = $this->detectMany($table, $candidates);
+      if ($columns === []) {
+        continue;
+      }
+      $parts = [];
+      $like = '%' . $this->db->escapeLike($value) . '%';
+      foreach ($columns as $column) {
+        $parts[] = $this->collatedTextSql("COALESCE(`{$column}`, '')") . ' LIKE ?';
+        $args[] = $like;
+      }
+      $where .= ' AND (' . implode(' OR ', $parts) . ')';
+    }
   }
 
   /** @param array<string,mixed> $config @param array<int,mixed> $args */
@@ -1828,6 +1882,19 @@ final class AdministrativeNotificationsService
       }
     }
     return '';
+  }
+
+  /** @param string[] $candidates @return string[] */
+  private function detectMany(string $table, array $candidates): array
+  {
+    $columns = [];
+    foreach ($candidates as $candidate) {
+      $candidate = trim((string) $candidate);
+      if ($candidate !== '' && $this->schema->columnExists($table, $candidate)) {
+        $columns[$candidate] = $candidate;
+      }
+    }
+    return array_values($columns);
   }
 
   /** @param array<string,mixed> $config @return string[] */

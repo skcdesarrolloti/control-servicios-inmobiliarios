@@ -22,13 +22,14 @@ trait HandlesAdministrativeNotifications
 
     $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'propietarios'));
     $query = trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? ''))));
+    $fieldFilters = $this->admin_notification_field_filters($_POST);
     $contractStatus = $this->sanitize_admin_notification_contract_status((string) ($_POST['contract_status'] ?? ''));
     $inmuebleSimi = trim(sanitize_text_field(wp_unslash((string) ($_POST['inmueble_simi'] ?? ''))));
     $contractNumber = trim(sanitize_text_field(wp_unslash((string) ($_POST['contract_number'] ?? ''))));
     $page = max(1, (int) ($_POST['page'] ?? 1));
 
     try {
-      $result = $this->get_admin_notifications_service()->search($type, $query, $page, 20, $contractStatus, $inmuebleSimi, $contractNumber);
+      $result = $this->get_admin_notifications_service()->search($type, $query, $page, 20, $contractStatus, $inmuebleSimi, $contractNumber, $fieldFilters);
       $this->jsonOk([
         'html' => $this->render_admin_notification_recipient_rows($result['rows']),
         'pagination' => $this->render_admin_notification_pagination($result),
@@ -52,6 +53,7 @@ trait HandlesAdministrativeNotifications
     $service = $this->get_admin_notifications_service();
     $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'propietarios'));
     $query = trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? ''))));
+    $fieldFilters = $this->admin_notification_field_filters($_POST);
     $contractStatus = $this->sanitize_admin_notification_contract_status((string) ($_POST['contract_status'] ?? ''));
     $inmuebleSimi = trim(sanitize_text_field(wp_unslash((string) ($_POST['inmueble_simi'] ?? ''))));
     $contractNumber = trim(sanitize_text_field(wp_unslash((string) ($_POST['contract_number'] ?? ''))));
@@ -64,7 +66,7 @@ trait HandlesAdministrativeNotifications
       is_array($rawChannels) ? $rawChannels : [$rawChannels]
     );
     $ids = $allFiltered
-      ? $service->idsForFilter($type, $query, 5000, $contractStatus, $inmuebleSimi, $contractNumber)
+      ? $service->idsForFilter($type, $query, 5000, $contractStatus, $inmuebleSimi, $contractNumber, $fieldFilters)
       : array_map('intval', is_array($rawIds) ? $rawIds : [$rawIds]);
 
     $subject = trim(sanitize_text_field(wp_unslash((string) ($_POST['subject'] ?? ''))));
@@ -141,6 +143,20 @@ trait HandlesAdministrativeNotifications
   {
     $status = sanitize_key($status);
     return in_array($status, ['activos', 'no_activos'], true) ? $status : '';
+  }
+
+  /**
+   * @param array<string,mixed> $input
+   * @return array{name:string,email:string,phone:string,document:string}
+   */
+  private function admin_notification_field_filters(array $input): array
+  {
+    return [
+      'name' => trim(sanitize_text_field(wp_unslash((string) ($input['nombre'] ?? $input['name'] ?? '')))),
+      'email' => trim(sanitize_text_field(wp_unslash((string) ($input['correo'] ?? $input['email'] ?? '')))),
+      'phone' => trim(sanitize_text_field(wp_unslash((string) ($input['celular'] ?? $input['phone'] ?? '')))),
+      'document' => trim(sanitize_text_field(wp_unslash((string) ($input['documento'] ?? $input['document'] ?? '')))),
+    ];
   }
 
   /** @param array<int,array<string,mixed>> $rows */
