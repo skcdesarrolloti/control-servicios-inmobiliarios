@@ -1629,15 +1629,8 @@ trait RendersDashboard
 
       <section class="scm-admin-notif-card scm-admin-notif-filter-card">
         <form data-admin-notif-search autocomplete="off">
+          <input type="hidden" id="scm-admin-notif-type" name="type" value="<?php echo esc_attr($firstType); ?>" data-admin-notif-type>
           <div class="scm-admin-notif-filter-grid">
-            <div class="scm-field">
-              <label for="scm-admin-notif-type">Destinatarios</label>
-              <select id="scm-admin-notif-type" name="type" class="select select-bordered select-sm scm-select" data-admin-notif-type>
-                <?php foreach ($types as $typeKey => $typeDef): ?>
-                  <option value="<?php echo esc_attr((string) $typeKey); ?>"><?php echo esc_html((string) ($typeDef['label'] ?? $typeKey)); ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
             <div class="scm-field scm-admin-notif-search-field">
               <label for="scm-admin-notif-q">Buscar</label>
               <input id="scm-admin-notif-q" name="q" type="search" class="input input-bordered input-sm scm-input" placeholder="Nombre, correo, celular, documento..." data-admin-notif-query>
