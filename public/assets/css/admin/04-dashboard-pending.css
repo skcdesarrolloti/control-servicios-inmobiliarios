@@ -5098,6 +5098,27 @@
   box-shadow: inset 4px 0 0 #f59120;
 }
 
+#scm-app .scm-admin-notif-channel-quick {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fffaf3, #fff);
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+#scm-app .scm-admin-notif-channel-quick[hidden],
+#scm-app .scm-admin-notif-channel-quick.is-hidden {
+  display: none !important;
+}
+
 #scm-app .scm-admin-notif-all {
   display: flex;
   min-height: 44px;
@@ -5110,6 +5131,11 @@
   color: #10233f;
   font-size: 13px;
   font-weight: 800;
+}
+
+#scm-app .scm-admin-notif-all[hidden],
+#scm-app .scm-admin-notif-all.is-hidden {
+  display: none !important;
 }
 
 #scm-app .scm-admin-notif-channel-pill {
@@ -5253,6 +5279,33 @@
 #scm-app .scm-admin-notif-message-field[hidden],
 #scm-app .scm-admin-notif-message-field.is-hidden {
   display: none !important;
+}
+
+#scm-app .scm-admin-notif-no-message-note {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+#scm-app .scm-admin-notif-no-message-note[hidden],
+#scm-app .scm-admin-notif-no-message-note.is-hidden {
+  display: none !important;
+}
+
+#scm-app .scm-admin-notif-no-message-note strong {
+  color: #0b2341;
+  font-weight: 950;
+}
+
+#scm-app .scm-admin-notif-no-message-note span {
+  color: #475569;
+  font-weight: 800;
 }
 
 #scm-app .scm-admin-notif-message-field .scm-textarea {

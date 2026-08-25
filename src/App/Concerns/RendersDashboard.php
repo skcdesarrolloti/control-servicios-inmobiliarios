@@ -1737,6 +1737,11 @@ trait RendersDashboard
               </label>
             </div>
 
+            <div class="scm-admin-notif-channel-quick" data-admin-notif-channel-quick hidden>
+              <button type="button" class="scm-case-work-btn" data-admin-notif-all-channels>Enviar por todos los canales</button>
+              <span>Activa Email, SMS y WhatsApp manteniendo los destinatarios seleccionados.</span>
+            </div>
+
             <label class="scm-admin-notif-all">
               <input type="checkbox" name="all_filtered" value="1" data-admin-notif-all-filtered>
               <span>Usar todos los resultados filtrados al encolar</span>
@@ -1800,6 +1805,11 @@ trait RendersDashboard
               </div>
               <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." data-admin-notif-message></textarea>
               <small class="scm-admin-notif-sms-counter" data-admin-notif-sms-counter>0/160 SMS</small>
+            </div>
+
+            <div class="scm-admin-notif-no-message-note" data-admin-notif-no-message-note hidden>
+              <strong>Esta plantilla no necesita mensaje adicional.</strong>
+              <span>Solo revisa la vista previa y encola la notificaci&oacute;n.</span>
             </div>
 
             <div class="scm-admin-notif-preview" data-admin-notif-preview></div>
