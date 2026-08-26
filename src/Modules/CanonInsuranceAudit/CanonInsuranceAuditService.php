@@ -12,7 +12,9 @@ use SCM\Support\EmailQueue;
 final class CanonInsuranceAuditService
 {
   private const MONEY_TOLERANCE = 1.0;
-  private const IMPORT_VERSION = 'canon-admin-iva-consolidado-v3';
+  private const COLOMBIA_IVA_RATE = 0.19;
+  private const COLOMBIA_IVA_FACTOR = 1.19;
+  private const IMPORT_VERSION = 'canon-admin-iva-consolidado-v4';
 
   private Database $db;
   private SpreadsheetReader $reader;
@@ -221,6 +223,7 @@ final class CanonInsuranceAuditService
       if ($sourceKey === '') {
         continue;
       }
+      $item = $this->normalizedComparisonItem($item, $sourceKey);
       $contractId = (int) ($item['contract_id'] ?? 0);
       $request = AuditValueNormalizer::requestNumber($item['request_number'] ?? '');
       $groupKey = $contractId > 0 ? 'contract:' . $contractId : 'request:' . $request;
@@ -490,6 +493,13 @@ final class CanonInsuranceAuditService
     } elseif ($includesVat === 'no') {
       $iva = 0.0;
     }
+    $insurer = $this->firstNonEmptyText([
+      $contract['contract_insurer'] ?? null,
+      $contract['mandate_insurer'] ?? null,
+    ]);
+    if ($iva === null && $this->insurerSourceKey($insurer) === 'libertador' && $canon !== null) {
+      $iva = round((float) $canon * self::COLOMBIA_IVA_RATE, 2);
+    }
     return ['canon' => $canon, 'administration' => $administration, 'iva' => $iva];
   }
 
@@ -502,6 +512,39 @@ final class CanonInsuranceAuditService
       ? (float) $sourceValue - (float) $platformValue
       : (float) $difference;
     return abs($amountDifference) > self::MONEY_TOLERANCE ? 'incorrecto' : 'correcto';
+  }
+
+  /** @param array<string,mixed> $item @return array<string,mixed> */
+  private function normalizedComparisonItem(array $item, string $sourceKey): array
+  {
+    if ($sourceKey !== 'libertador' || ($item['excel_canon'] ?? null) === null) {
+      return $item;
+    }
+    $excelIva = $this->databaseMoney($item['excel_iva'] ?? null);
+    if ($excelIva !== null && abs($excelIva) > self::MONEY_TOLERANCE) {
+      return $item;
+    }
+
+    $split = $this->splitIncludedIva((float) $item['excel_canon']);
+    $item['excel_canon'] = $split['base'];
+    $item['excel_iva'] = $split['iva'];
+    if (($item['system_iva'] ?? null) === null) {
+      $systemCanon = $this->databaseMoney($item['system_canon'] ?? null);
+      if ($systemCanon !== null) {
+        $item['system_iva'] = round($systemCanon * self::COLOMBIA_IVA_RATE, 2);
+      }
+    }
+    foreach ([
+      'canon' => ['excel_canon', 'system_canon', 'difference_canon'],
+      'administration' => ['excel_administration', 'system_administration', 'difference_administration'],
+      'iva' => ['excel_iva', 'system_iva', 'difference_iva'],
+    ] as [$excelKey, $systemKey, $differenceKey]) {
+      $excel = $item[$excelKey] ?? null;
+      $system = $item[$systemKey] ?? null;
+      $item[$differenceKey] = ($excel === null || $system === null) ? null : round((float) $excel - (float) $system, 2);
+    }
+    [$item['status'], $item['differences_json']] = $this->statusAndDifferencesForComparedItem($item);
+    return $item;
   }
 
   /** @return array<string,mixed> */
@@ -962,45 +1005,53 @@ final class CanonInsuranceAuditService
     } elseif ($includesVat === 'no') {
       $base['system_iva'] = 0.0;
     }
-
-    if ($sourceKey === 'libertador' && $base['excel_canon'] !== null) {
-      $libertadorTotal = (float) $base['excel_canon'];
-      if ($base['system_iva'] !== null && (float) $base['system_iva'] > self::MONEY_TOLERANCE) {
-        $base['excel_canon'] = round($libertadorTotal / 1.19, 2);
-        $base['excel_iva'] = round($libertadorTotal - (float) $base['excel_canon'], 2);
-      } else {
-        $base['excel_iva'] = 0.0;
-      }
+    if ($base['system_iva'] === null && $this->insurerSourceKey($base['insurer']) === 'libertador' && $base['system_canon'] !== null) {
+      $base['system_iva'] = round((float) $base['system_canon'] * self::COLOMBIA_IVA_RATE, 2);
     }
 
+    if ($sourceKey === 'libertador' && $base['excel_canon'] !== null) {
+      $split = $this->splitIncludedIva((float) $base['excel_canon']);
+      $base['excel_canon'] = $split['base'];
+      $base['excel_iva'] = $split['iva'];
+    }
+
+    [$base['status'], $base['differences_json']] = $this->statusAndDifferencesForComparedItem($base);
+    return $base;
+  }
+
+  /** @param array<string,mixed> $item @return array{0:string,1:string} */
+  private function statusAndDifferencesForComparedItem(array &$item): array
+  {
     $differences = [];
     $missing = false;
     $assessed = 0;
     $hasDifference = false;
-    if ($base['mandate_id'] === null) {
+    if (($item['mandate_id'] ?? null) === null) {
       $missing = true;
-      $differences[] = 'El contrato no tiene un mandato asociado para validar el IVA.';
+      $differences[] = $this->insurerSourceKey((string) ($item['insurer'] ?? '')) === 'libertador' && ($item['system_iva'] ?? null) !== null
+        ? 'El contrato no tiene mandato asociado; el IVA de Plataforma se toma como 19% del canon para validar El Libertador.'
+        : 'El contrato no tiene un mandato asociado para validar el IVA.';
     }
     foreach ([
       ['Canon', 'excel_canon', 'system_canon', 'difference_canon'],
       ['Administracion', 'excel_administration', 'system_administration', 'difference_administration'],
       ['IVA', 'excel_iva', 'system_iva', 'difference_iva'],
     ] as [$label, $excelKey, $systemKey, $differenceKey]) {
-      $excelValue = $base[$excelKey];
+      $excelValue = $item[$excelKey] ?? null;
       if ($excelValue === null) {
         $missing = true;
         $differences[] = $label . ': falta el valor en el archivo.';
         continue;
       }
       $assessed++;
-      $systemValue = $base[$systemKey];
+      $systemValue = $item[$systemKey] ?? null;
       if ($systemValue === null) {
         $missing = true;
         $differences[] = $label . ': falta el valor en la pagina.';
         continue;
       }
       $difference = round((float) $excelValue - (float) $systemValue, 2);
-      $base[$differenceKey] = $difference;
+      $item[$differenceKey] = $difference;
       if (abs($difference) > self::MONEY_TOLERANCE) {
         $hasDifference = true;
         $differences[] = $label . ': diferencia de $' . number_format($difference, 2, ',', '.');
@@ -1008,15 +1059,21 @@ final class CanonInsuranceAuditService
     }
 
     if ($hasDifference) {
-      $base['status'] = 'incorrecto';
+      $status = 'incorrecto';
     } elseif ($assessed < 3 || $missing) {
-      $base['status'] = 'anomalia';
+      $status = 'anomalia';
     } else {
-      $base['status'] = 'correcto';
+      $status = 'correcto';
       $differences[] = 'Canon, administracion e IVA coinciden.';
     }
-    $base['differences_json'] = json_encode($differences, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]';
-    return $base;
+    return [$status, json_encode($differences, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]'];
+  }
+
+  /** @return array{base:float,iva:float} */
+  private function splitIncludedIva(float $total): array
+  {
+    $base = round($total / self::COLOMBIA_IVA_FACTOR, 2);
+    return ['base' => $base, 'iva' => round($total - $base, 2)];
   }
 
   /** @param array<int, mixed> $values */
