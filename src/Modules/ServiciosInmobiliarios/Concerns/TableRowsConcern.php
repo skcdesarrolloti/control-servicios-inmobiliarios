@@ -77,6 +77,7 @@ trait TableRowsConcern
 
       $idPrev = trim((string) ($row['id_revision_preventiva'] ?? ''));
       $tienePrev = $idPrev !== '';
+      $isPreventivaTicket = $tienePrev || stripos($tema . ' ' . $asunto . ' ' . $descripcionRaw, 'preventiva') !== false;
 
       $idCorr = trim((string) ($row['id_revision_correctiva'] ?? ''));
       $tieneCorr = $idCorr !== '';
@@ -114,6 +115,7 @@ trait TableRowsConcern
       $seguimientosItems = $this->normalizeHistorialItems($row['_scm_seguimientos_ticket'] ?? []);
       $notasItems = $this->normalizeHistorialItems($row['_scm_notas_ticket'] ?? []);
       $historialInmuebleItems = $this->normalizeHistorialItems($row['_scm_historial_inmueble'] ?? []);
+      $preventivaNoAccessCount = $isPreventivaTicket ? $this->countPreventivaNoAccessNotices($row, $historialItems) : 0;
       $contratoData = is_array($row['_scm_contrato_data'] ?? null) ? $row['_scm_contrato_data'] : [];
       $inmuebleData = is_array($row['_scm_inmueble_data'] ?? null) ? $row['_scm_inmueble_data'] : [];
       $idInmuebleWeb = trim((string) ($row['id_inmueble'] ?? ($inmuebleData['codigo'] ?? '')));
@@ -163,6 +165,9 @@ trait TableRowsConcern
       $caseSource = '';
       if ($descripcionRaw !== '') {
         $caseSource .= '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">' . $descripcionRaw . '</div></div>';
+      }
+      if ($isPreventivaTicket) {
+        $caseSource .= $this->renderPreventivaNoAccessSummary($preventivaNoAccessCount);
       }
       $ticketDocumentsHtml = $this->renderTicketRootDocumentsSection($row['archivos'] ?? '', 'scm-sec-documentos');
       $caseSource .= '<div class="scm-modal-timeline-only">';
@@ -262,6 +267,7 @@ trait TableRowsConcern
         . ' data-cot-estado="' . esc_attr($cotEstadoRaw) . '"'
         . ' data-id-revision-correctiva="' . esc_attr($idCorrUrl) . '"'
         . ' data-id-revision-preventiva="' . esc_attr($idPrevUrl) . '"'
+        . ' data-preventiva-no-access-count="' . esc_attr((string) $preventivaNoAccessCount) . '"'
         . ($statusBucket !== '' ? ' data-status-bucket="' . esc_attr($statusBucket) . '"' : '')
         . ' onclick="scmOpenCase(this)" type="button">Ver caso</button>';
       $html .= '</div>';
@@ -276,6 +282,91 @@ trait TableRowsConcern
   {
     $creatorBy = strtolower(trim((string) ($row['creador_por'] ?? '')));
     return $creatorBy !== '' && $creatorBy !== 'funcionario';
+  }
+
+  /** @param array<int,array<string,mixed>> $historialItems */
+  private function countPreventivaNoAccessNotices(array $row, array $historialItems = []): int
+  {
+    $documents = [];
+    $collectDocuments = function ($raw) use (&$documents): void {
+      foreach ($this->extractTicketRootDocuments($raw) as $doc) {
+        $label = $this->normalizePreventivaNoAccessText((string) ($doc['nombre_archivo'] ?? ''));
+        $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+        $urlKey = strtolower($url);
+        if ($url !== '' && $this->looksLikePreventivaNoAccessNotice($label . ' ' . $urlKey)) {
+          $documents[$urlKey !== '' ? $urlKey : md5($label)] = true;
+        }
+      }
+    };
+
+    $collectDocuments($row['archivos'] ?? '');
+    foreach ($historialItems as $item) {
+      if (is_array($item)) {
+        $collectDocuments($item['archivos'] ?? '');
+      }
+    }
+
+    foreach (['acta_no_acceso_preventiva', 'pdf_no_acceso_preventiva'] as $column) {
+      $url = trim((string) ($row[$column] ?? ''));
+      if ($url !== '') {
+        $documents[strtolower($url)] = true;
+      }
+    }
+
+    if (!empty($documents)) {
+      return count($documents);
+    }
+
+    $fallback = 0;
+    foreach ($historialItems as $item) {
+      if (!is_array($item)) {
+        continue;
+      }
+      $text = $this->normalizePreventivaNoAccessText(implode(' ', [
+        (string) ($item['respuesta'] ?? ''),
+        (string) ($item['observacion'] ?? ''),
+        (string) ($item['descripcion'] ?? ''),
+        (string) ($item['nombre'] ?? ''),
+      ]));
+      if ($this->looksLikePreventivaNoAccessNotice($text)) {
+        $fallback++;
+      }
+    }
+
+    return $fallback;
+  }
+
+  private function looksLikePreventivaNoAccessNotice(string $text): bool
+  {
+    return strpos($text, 'preventiva') !== false
+      && (
+        strpos($text, 'no autorizacion') !== false
+        || strpos($text, 'no permitir acceso') !== false
+        || strpos($text, 'no acceso') !== false
+      );
+  }
+
+  private function normalizePreventivaNoAccessText(string $text): string
+  {
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = strtr($text, [
+      'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u', 'Ü' => 'u', 'Ñ' => 'n',
+      'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n',
+    ]);
+    return strtolower($text);
+  }
+
+  private function renderPreventivaNoAccessSummary(int $count): string
+  {
+    $next = $count + 1;
+    $label = $count === 1 ? '1 comunicaci&oacute;n registrada' : $count . ' comunicaciones registradas';
+    return '<section class="scm-preventiva-no-access-summary" data-scm-preventiva-no-access-summary>'
+      . '<div class="scm-preventiva-no-access-icon" aria-hidden="true">!</div>'
+      . '<div class="scm-preventiva-no-access-copy"><span>Constancias preventivas por no autorizaci&oacute;n</span>'
+      . '<strong data-scm-preventiva-no-access-count-label>' . esc_html($label) . '</strong>'
+      . '<p>Este contador ayuda a dejar trazabilidad cuando el arrendatario no responde o no permite coordinar la revisi&oacute;n preventiva.</p></div>'
+      . '<div class="scm-preventiva-no-access-next"><small>Pr&oacute;xima</small><b>#' . esc_html((string) $next) . '</b></div>'
+      . '</section>';
   }
 
   private function renderMagnitudeBadge(string $magnitud): string

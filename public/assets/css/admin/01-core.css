@@ -2230,6 +2230,93 @@ body.scm-modal-open {
   width: fit-content;
 }
 
+#scm-app .scm-preventiva-no-access-summary {
+  align-items: center;
+  background: linear-gradient(135deg, #fff8ed 0%, #ffffff 58%, #eef4ff 100%);
+  border: 1px solid #ffd19a;
+  border-radius: 16px;
+  box-shadow: 0 14px 32px rgba(6, 29, 73, 0.06);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  margin: 12px 0 14px;
+  padding: 16px 18px;
+}
+
+#scm-app .scm-preventiva-no-access-icon {
+  align-items: center;
+  background: #f59120;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(245, 145, 32, 0.22);
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 20px;
+  font-weight: 950;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+#scm-app .scm-preventiva-no-access-copy {
+  display: grid;
+  gap: 4px;
+}
+
+#scm-app .scm-preventiva-no-access-copy span,
+#scm-app .scm-preventiva-no-access-next small {
+  color: #71819a;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-preventiva-no-access-copy strong {
+  color: #061d49;
+  font-size: 18px;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+#scm-app .scm-preventiva-no-access-copy p {
+  color: #52627a;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+#scm-app .scm-preventiva-no-access-next {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  display: grid;
+  justify-items: center;
+  min-width: 82px;
+  padding: 10px 12px;
+}
+
+#scm-app .scm-preventiva-no-access-next b {
+  color: #d65f00;
+  font-size: 24px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+#scm-app .scm-case-side-no-access {
+  background: linear-gradient(135deg, #fff8ed 0%, #f8fbff 100%);
+  border-color: #fed7aa !important;
+  border-left: 4px solid #f59120 !important;
+}
+
+#scm-app .scm-case-side-no-access small {
+  color: #d65f00;
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  margin-top: 4px;
+}
+
 #scm-app .scm-ticket-document-row {
   display: grid;
   gap: 10px;

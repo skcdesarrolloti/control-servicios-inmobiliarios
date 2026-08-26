@@ -1478,6 +1478,8 @@
     var ticketPk = caseBtn.dataset.ticketPk || "";
     var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
     var isPreventiva = !isPublicPqr && isPreventivaCase(caseBtn);
+    var noAccessCount = Math.max(0, parseInt(caseBtn.dataset.preventivaNoAccessCount || "0", 10) || 0);
+    var nextNoAccessCount = noAccessCount + 1;
     if (title) title.textContent = isPublicPqr ? "Responder solicitud" : "Responder ticket";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
@@ -1491,7 +1493,15 @@
         "</select></label>" +
         '<label class="scm-seg-field"><span>Respuesta</span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
         (isPreventiva
-          ? '<section class="scm-preventiva-no-access-box" data-scm-preventiva-no-access-box hidden><div><strong>Comunicaci&oacute;n al arrendatario</strong><span>Al marcarla se genera el PDF de constancia, se anexa al caso y se env&iacute;a por correo al arrendatario. El sistema calcula cu&aacute;ntas comunicaciones lleva este ticket.</span></div><label class="scm-seg-check scm-preventiva-no-access-check"><input type="checkbox" name="generar_acta_no_acceso_preventiva" value="1"> Crear y enviar comunicaci&oacute;n de no autorizaci&oacute;n de revisi&oacute;n preventiva</label></section>'
+          ? '<section class="scm-preventiva-no-access-box" data-scm-preventiva-no-access-box hidden><div><strong>Comunicaci&oacute;n al arrendatario</strong><span>Este ticket lleva <b>' +
+            escHtml(String(noAccessCount)) +
+            '</b> comunicaci&oacute;n' +
+            (noAccessCount === 1 ? "" : "es") +
+            ' registrada' +
+            (noAccessCount === 1 ? "" : "s") +
+            '. Si marcas esta opci&oacute;n se generar&aacute; la comunicaci&oacute;n preventiva <b>#' +
+            escHtml(String(nextNoAccessCount)) +
+            '</b>, se anexar&aacute; al caso y se enviar&aacute; por correo al arrendatario.</span></div><label class="scm-seg-check scm-preventiva-no-access-check"><input type="checkbox" name="generar_acta_no_acceso_preventiva" value="1"> Crear y enviar comunicaci&oacute;n de no autorizaci&oacute;n de revisi&oacute;n preventiva</label></section>'
           : "") +
         renderCotizacionInlineFields(!isPublicPqr && caseCotizacionCanRespond(caseBtn)) +
         '<label class="scm-seg-field"><span>Imagenes (opcional)</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
@@ -3530,6 +3540,22 @@
             escHtml(btn.dataset.ticketPk || "") +
             '">Editar magnitud caso</button>' +
             "</div>";
+          if (isPreventivaCase(btn)) {
+            var noAccessSideCount = Math.max(
+              0,
+              parseInt(btn.dataset.preventivaNoAccessCount || "0", 10) || 0,
+            );
+            sidebarHtml +=
+              '<div class="scm-case-side-item scm-case-side-no-access">' +
+              '<span class="scm-case-side-label">Constancias preventivas</span>' +
+              '<span class="scm-case-side-value">' +
+              escHtml(String(noAccessSideCount)) +
+              (noAccessSideCount === 1 ? " comunicaci&oacute;n" : " comunicaciones") +
+              "</span>" +
+              '<small>Pr&oacute;xima #' +
+              escHtml(String(noAccessSideCount + 1)) +
+              "</small></div>";
+          }
         }
         var tabKeySide = (btn.dataset.tabKey || "").trim();
         var consultorEntrega = (btn.dataset.consultorEntrega || "").trim();
