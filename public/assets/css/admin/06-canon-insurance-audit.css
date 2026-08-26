@@ -503,6 +503,24 @@
 #scm-app .scm-cia-row--correcto { box-shadow: inset 4px 0 #1f8a5b; }
 #scm-app .scm-cia-row--incorrecto { box-shadow: inset 4px 0 #c03434; }
 #scm-app .scm-cia-row--anomalia { box-shadow: inset 4px 0 #d69a2d; }
+
+#scm-app .scm-cia-row-flash {
+  animation: scmCiaRowFlash 2.2s ease-out 1;
+}
+
+@keyframes scmCiaRowFlash {
+  0%,
+  55% {
+    background: #fff7ed;
+    box-shadow:
+      inset 6px 0 #ff8a00,
+      0 0 0 2px rgba(255, 138, 0, 0.28);
+  }
+
+  100% {
+    background: transparent;
+  }
+}
 #scm-app .scm-cia-libertador-note { color: #7a4d08 !important; font-weight: 700; }
 
 #scm-app .scm-cia-insurer-accordion {
@@ -1083,5 +1101,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #scm-app .scm-cia * { scroll-behavior: auto !important; transition: none !important; }
+  #scm-app .scm-cia * { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
 }

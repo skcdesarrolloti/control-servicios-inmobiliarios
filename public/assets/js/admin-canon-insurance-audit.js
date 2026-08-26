@@ -74,6 +74,69 @@
       }
     }
 
+    function insurerGroupKey(group, index) {
+      var title = group ? group.querySelector(".scm-cia-insurer-title b") : null;
+      var text = title ? title.textContent.trim() : "";
+      return text || "group-" + index;
+    }
+
+    function captureContentContext() {
+      var context = {
+        windowY: window.pageYOffset || document.documentElement.scrollTop || 0,
+        openGroups: [],
+        tableScroll: {},
+      };
+      if (!content) return context;
+      content.querySelectorAll(".scm-cia-insurer-group").forEach(function (group, index) {
+        var key = insurerGroupKey(group, index);
+        if (group.open) context.openGroups.push(key);
+        var tableWrap = group.querySelector(".scm-cia-table-wrap");
+        if (tableWrap) {
+          context.tableScroll[key] = {
+            left: tableWrap.scrollLeft || 0,
+            top: tableWrap.scrollTop || 0,
+          };
+        }
+      });
+      return context;
+    }
+
+    function restoreContentContext(context, focusContractId) {
+      if (!context || !content) return;
+      window.requestAnimationFrame(function () {
+        var openGroups = context.openGroups || [];
+        var tableScroll = context.tableScroll || {};
+        content.querySelectorAll(".scm-cia-insurer-group").forEach(function (group, index) {
+          var key = insurerGroupKey(group, index);
+          if (openGroups.indexOf(key) !== -1) group.open = true;
+          var tableWrap = group.querySelector(".scm-cia-table-wrap");
+          if (tableWrap && tableScroll[key]) {
+            tableWrap.scrollLeft = tableScroll[key].left || 0;
+            tableWrap.scrollTop = tableScroll[key].top || 0;
+          }
+        });
+        if (typeof context.windowY === "number") {
+          window.scrollTo({ top: context.windowY, behavior: "auto" });
+        }
+        if (focusContractId) {
+          var safeContractId = String(focusContractId).replace(/"/g, "");
+          var row = content.querySelector('[data-cia-contract-id="' + safeContractId + '"]');
+          if (row) {
+            row.classList.add("scm-cia-row-flash");
+            window.setTimeout(function () {
+              row.classList.remove("scm-cia-row-flash");
+            }, 2200);
+          }
+        }
+      });
+    }
+
+    function replaceContentKeepingPlace(data, focusContractId) {
+      var context = captureContentContext();
+      replaceContent(data);
+      restoreContentContext(context, focusContractId || "");
+    }
+
     function setMandateStatus(message, tone) {
       if (!mandateStatus) return;
       mandateStatus.textContent = message || "";
@@ -271,7 +334,10 @@
             }
             setMandateStatus(data.message || "Mandato vinculado.", "success");
             if (typeof data.dashboard_html === "string") {
-              replaceContent({ html: data.dashboard_html });
+              replaceContentKeepingPlace(
+                { html: data.dashboard_html },
+                mandateData.get("contract_id") || currentMandateContractId || ""
+              );
               setStatus("Auditorias actualizadas.", "success");
             } else if (activeFilterForm) {
               load(new FormData(activeFilterForm));
