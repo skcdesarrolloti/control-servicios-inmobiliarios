@@ -268,6 +268,14 @@ final class CanonInsuranceAuditService
       ];
     }
 
+    $existingContractIds = [];
+    foreach ($grouped as $row) {
+      $contractId = (int) ($row['contract_id'] ?? 0);
+      if ($contractId > 0) {
+        $existingContractIds[$contractId] = true;
+      }
+    }
+
     $rows = [];
     foreach ($grouped as $row) {
       $sources = (array) ($row['sources'] ?? []);
@@ -336,6 +344,9 @@ final class CanonInsuranceAuditService
       $row['observation_at'] = (string) ($observationSource['observation_at'] ?? '');
       $rows[] = $row;
     }
+    foreach ($this->platformIdentityGapRows(array_keys($existingContractIds)) as $gapRow) {
+      $rows[] = $gapRow;
+    }
     $priority = ['incorrecto' => 0, 'anomalia' => 1, 'correcto' => 2];
     usort($rows, static fn(array $a, array $b): int => ($priority[(string) ($a['status'] ?? '')] ?? 9) <=> ($priority[(string) ($b['status'] ?? '')] ?? 9));
     return $rows;
@@ -369,6 +380,117 @@ final class CanonInsuranceAuditService
       return 'unifianza';
     }
     return '';
+  }
+
+  /** @param array<int,int> $excludeContractIds @return array<int,array<string,mixed>> */
+  private function platformIdentityGapRows(array $excludeContractIds): array
+  {
+    $contracts = $this->db->table('jet_cct_contratos_arrendamiento');
+    $mandates = $this->db->table('jet_cct_contrato_mandato');
+    $where = [
+      "LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'entregado'",
+      "(TRIM(COALESCE(c.`numero_solicitud`, '')) = ''
+        OR TRIM(COALESCE(c.`aseguradora`, '')) = ''
+        OR TRIM(COALESCE(c.`id_contrato_mandato`, '')) = ''
+        OR TRIM(COALESCE(c.`id_contrato_mandato`, '')) = '0')",
+    ];
+    $args = [];
+    if ($excludeContractIds !== []) {
+      $where[] = 'c.`_ID` NOT IN (' . implode(',', array_fill(0, count($excludeContractIds), '?')) . ')';
+      $args = array_values($excludeContractIds);
+    }
+    $rows = $this->db->getResults(
+      "SELECT c.`_ID` AS contract_id, c.`contrato` AS contract_number, c.`numero_solicitud`,
+              c.`arrendatario`, c.`direccion`, c.`id_contrato_mandato`, c.`valor_canon`,
+              c.`valor_administracion`, c.`aseguradora` AS contract_insurer,
+              m.`_ID` AS mandate_id, m.`aseguradora` AS mandate_insurer,
+              m.`precio`, m.`administracion`, m.`incluye_iva`,
+              m.`iva_precio`, m.`iva_total_precio`
+         FROM `{$contracts}` c
+         LEFT JOIN `{$mandates}` m ON CAST(m.`_ID` AS CHAR) = TRIM(COALESCE(c.`id_contrato_mandato`, ''))
+        WHERE " . implode(' AND ', $where) . "
+        ORDER BY c.`_ID` DESC
+        LIMIT 300",
+      $args
+    );
+
+    $items = [];
+    foreach ($rows as $row) {
+      $contractId = (int) ($row['contract_id'] ?? 0);
+      if ($contractId <= 0) {
+        continue;
+      }
+      $insurer = $this->firstNonEmptyText([
+        $row['contract_insurer'] ?? null,
+        $row['mandate_insurer'] ?? null,
+      ]);
+      $expectedInsurer = $this->insurerSourceKey($insurer);
+      $request = AuditValueNormalizer::requestNumber($row['numero_solicitud'] ?? '');
+      $contractNumber = AuditValueNormalizer::text($row['contract_number'] ?? '');
+      $mandateId = (int) ($row['mandate_id'] ?? 0) ?: null;
+      $platform = $this->platformValuesFromContract($row);
+      $findings = [];
+      if ($request === '') {
+        $findings[] = 'Plataforma: el contrato no tiene numero de solicitud, por eso no se puede cruzar contra SIMI ni aseguradora.';
+      }
+      if ($expectedInsurer === '') {
+        $findings[] = 'Plataforma: no se pudo identificar la aseguradora asignada.';
+      }
+      if ($mandateId === null) {
+        $findings[] = 'Plataforma: el contrato no tiene mandato asociado para validar canon, administracion e IVA.';
+      }
+      foreach (['canon' => 'Canon', 'administration' => 'Administracion', 'iva' => 'IVA'] as $key => $label) {
+        if (($platform[$key] ?? null) === null) {
+          $findings[] = 'Plataforma: falta el valor de ' . $label . '.';
+        }
+      }
+      if ($findings === []) {
+        continue;
+      }
+      $items[] = [
+        'request_number' => $request,
+        'contract_id' => $contractId,
+        'contract_number' => $contractNumber,
+        'mandate_id' => $mandateId,
+        'tenant' => AuditValueNormalizer::text($row['arrendatario'] ?? ''),
+        'property_address' => AuditValueNormalizer::text($row['direccion'] ?? ''),
+        'insurer' => $insurer,
+        'platform' => $platform,
+        'sources' => [],
+        'status' => 'anomalia',
+        'expected_insurer' => $expectedInsurer,
+        'differences_json' => json_encode(array_values(array_unique($findings)), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]',
+        'observation_item_id' => 0,
+        'observation' => '',
+        'observation_by_name' => '',
+        'observation_at' => '',
+      ];
+    }
+    return $items;
+  }
+
+  /** @param array<string,mixed> $contract @return array<string,float|null> */
+  private function platformValuesFromContract(array $contract): array
+  {
+    $canon = $this->databaseMoney($contract['valor_canon'] ?? null)
+      ?? $this->databaseMoney($contract['precio'] ?? null);
+    $administration = $this->databaseMoney($contract['valor_administracion'] ?? null)
+      ?? $this->databaseMoney($contract['administracion'] ?? null)
+      ?? 0.0;
+    $iva = null;
+    $includesVat = AuditValueNormalizer::key($contract['incluye_iva'] ?? '');
+    if ($includesVat === 'si') {
+      $iva = $this->databaseMoney($contract['iva_total_precio'] ?? null);
+      if ($iva === null) {
+        $rate = AuditValueNormalizer::money($contract['iva_precio'] ?? null);
+        if ($canon !== null && $rate !== null && $rate > 0) {
+          $iva = round((float) $canon * $rate / 100, 2);
+        }
+      }
+    } elseif ($includesVat === 'no') {
+      $iva = 0.0;
+    }
+    return ['canon' => $canon, 'administration' => $administration, 'iva' => $iva];
   }
 
   private function metricStatus(mixed $sourceValue, mixed $platformValue, mixed $difference): string
@@ -510,36 +632,53 @@ final class CanonInsuranceAuditService
   {
     $h = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $money = static fn(mixed $value): string => ($value === null || $value === '') ? 'Sin dato' : '$' . number_format((float) $value, 2, ',', '.');
-    $rows = '';
+    $formatValues = static function (mixed $source) use ($h, $money): string {
+      if (!is_array($source)) {
+        return 'No aparece';
+      }
+      return '<strong>Canon</strong><br>' . $h($money($source['canon'] ?? null))
+        . '<br><strong>Administracion</strong><br>' . $h($money($source['administration'] ?? null))
+        . '<br><strong>IVA</strong><br>' . $h($money($source['iva'] ?? null));
+    };
+    $grouped = [];
     foreach ($items as $item) {
-      $findings = json_decode((string) ($item['differences_json'] ?? '[]'), true);
-      $findingText = is_array($findings) ? implode(' ', array_map('strval', $findings)) : '';
-      $sourceValues = (array) ($item['sources'] ?? []);
-      $formatValues = static function (mixed $source) use ($h, $money): string {
-        if (!is_array($source)) {
-          return 'No aparece';
-        }
-        return '<strong>Canon</strong><br>' . $h($money($source['canon'] ?? null))
-          . '<br><strong>Administracion</strong><br>' . $h($money($source['administration'] ?? null))
-          . '<br><strong>IVA</strong><br>' . $h($money($source['iva'] ?? null));
-      };
-      $rows .= '<tr><td>' . $h($item['request_number'] ?? '') . '</td><td>' . $h($item['contract_number'] ?? '') . '</td>'
-        . '<td>' . $h($item['tenant'] ?? '') . '<br>' . $h($item['property_address'] ?? '') . '</td>'
-        . '<td>' . $formatValues($item['platform'] ?? null) . '</td>'
-        . '<td>' . $formatValues($sourceValues['simi'] ?? null) . '</td>'
-        . '<td>' . $formatValues($sourceValues['libertador'] ?? null) . '</td>'
-        . '<td>' . $formatValues($sourceValues['fianza_bogota'] ?? null) . '</td>'
-        . '<td>' . $formatValues($sourceValues['unifianza'] ?? null) . '</td>'
-        . '<td>' . $h($findingText) . '</td><td>' . $h($item['observation'] ?? '') . '</td>'
-        . '<td>' . $h((string) ($item['status'] ?? '') === 'incorrecto' ? 'Rojo - Incorrecto' : 'Amarillo - Anomalia') . '</td></tr>';
+      $key = (string) ($item['expected_insurer'] ?? '');
+      $key = in_array($key, ['libertador', 'fianza_bogota', 'unifianza'], true) ? $key : 'sin_aseguradora';
+      $grouped[$key][] = $item;
+    }
+    $order = ['libertador', 'fianza_bogota', 'unifianza', 'sin_aseguradora'];
+    uksort($grouped, static function (string $a, string $b) use ($order): int {
+      $aIndex = array_search($a, $order, true);
+      $bIndex = array_search($b, $order, true);
+      return ($aIndex === false ? 99 : $aIndex) <=> ($bIndex === false ? 99 : $bIndex);
+    });
+    $sections = '';
+    foreach ($grouped as $groupKey => $groupItems) {
+      $label = $groupKey === 'sin_aseguradora' ? 'Sin aseguradora asignada' : AuditSourceCatalog::label((string) $groupKey);
+      $rows = '';
+      foreach ($groupItems as $item) {
+        $findings = json_decode((string) ($item['differences_json'] ?? '[]'), true);
+        $findingText = is_array($findings) ? implode(' ', array_map('strval', $findings)) : '';
+        $sourceValues = (array) ($item['sources'] ?? []);
+        $assignedSource = in_array($groupKey, ['libertador', 'fianza_bogota', 'unifianza'], true) ? ($sourceValues[$groupKey] ?? null) : null;
+        $rows .= '<tr><td>' . $h(($item['request_number'] ?? '') ?: 'Sin solicitud') . '</td><td>' . $h($item['contract_number'] ?? '') . '</td>'
+          . '<td>' . $h($item['tenant'] ?? '') . '<br>' . $h($item['property_address'] ?? '') . '</td>'
+          . '<td>' . $formatValues($item['platform'] ?? null) . '</td>'
+          . '<td>' . $formatValues($sourceValues['simi'] ?? null) . '</td>'
+          . '<td>' . $formatValues($assignedSource) . '</td>'
+          . '<td>' . $h($findingText) . '</td><td>' . $h($item['observation'] ?? '') . '</td>'
+          . '<td>' . $h((string) ($item['status'] ?? '') === 'incorrecto' ? 'Rojo - Incorrecto' : 'Amarillo - Anomalia') . '</td></tr>';
+      }
+      $sections .= '<h3 style="margin:22px 0 8px;color:#123b68">' . $h($label) . ' (' . count($groupItems) . ')</h3>'
+        . '<table cellpadding="7" cellspacing="0" border="1" style="border-collapse:collapse;font-size:12px;width:100%;margin-bottom:14px"><thead><tr>'
+        . '<th>Solicitud</th><th>Contrato</th><th>Arrendatario e inmueble</th><th>Plataforma</th><th>SIMI</th><th>' . $h($label) . '</th><th>Hallazgo</th><th>Observacion</th><th>Semaforo</th>'
+        . '</tr></thead><tbody>' . $rows . '</tbody></table>';
     }
     $files = implode(', ', array_map(static fn(array $audit): string => (string) ($audit['source_filename'] ?? ''), $sourceAudits));
     return '<div style="font-family:Arial,sans-serif;color:#243b53"><h2>Informe de auditoria de canon y aseguradoras</h2>'
       . '<p><strong>Periodo:</strong> ' . $h($period) . '<br><strong>Archivos:</strong> ' . $h($files) . '</p>'
       . '<p>Se informan las diferencias y anomalias encontradas al comparar canon, administracion e IVA entre Plataforma, SIMI y la aseguradora asignada.</p>'
-      . '<table cellpadding="7" cellspacing="0" border="1" style="border-collapse:collapse;font-size:12px"><thead><tr>'
-      . '<th>Solicitud</th><th>Contrato</th><th>Arrendatario e inmueble</th><th>Plataforma</th><th>SIMI</th><th>El Libertador</th><th>Fianza Bogota</th><th>Unifianza</th><th>Hallazgo</th><th>Observacion</th><th>Semaforo</th>'
-      . '</tr></thead><tbody>' . $rows . '</tbody></table></div>';
+      . $sections . '</div>';
   }
 
   public function syncIncrementChanges(): void

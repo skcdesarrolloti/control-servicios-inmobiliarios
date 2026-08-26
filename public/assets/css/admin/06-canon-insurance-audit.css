@@ -295,7 +295,7 @@
   font-size: 11px;
 }
 
-#scm-app .scm-cia-results-table { min-width: 1320px; }
+#scm-app .scm-cia-results-table { min-width: 1040px; }
 
 #scm-app .scm-cia-table th {
   position: sticky;
@@ -347,14 +347,18 @@
   min-width: 0;
   flex-direction: column;
   gap: 3px;
-  padding: 8px 0;
+  border-radius: 8px;
+  padding: 8px;
 }
-
-#scm-app .scm-cia-value-grid span:first-child { padding-top: 0; }
 
 #scm-app .scm-cia-value-grid span + span {
-  border-top: 1px solid rgba(188, 204, 220, 0.7);
+  margin-top: 6px;
 }
+
+#scm-app .scm-cia-value-grid span.is-correcto { background: #eefaf3; }
+#scm-app .scm-cia-value-grid span.is-incorrecto { background: #fff0f0; }
+#scm-app .scm-cia-value-grid span.is-anomalia { background: #fff8e8; }
+#scm-app .scm-cia-value-grid span.is-reference { background: #edf5ff; }
 
 #scm-app .scm-cia-metric-status {
   display: inline-flex;
@@ -397,10 +401,10 @@
   font-weight: 700;
   white-space: nowrap;
 }
-#scm-app .scm-cia-source-values.is-correcto { background: #f4fcf7; }
-#scm-app .scm-cia-source-values.is-incorrecto { background: #fff4f4; }
+#scm-app .scm-cia-source-values.is-correcto,
+#scm-app .scm-cia-source-values.is-incorrecto,
 #scm-app .scm-cia-source-values.is-anomalia,
-#scm-app .scm-cia-source-values.is-empty { background: #fffaf0; }
+#scm-app .scm-cia-source-values.is-empty { background: #fff; }
 #scm-app .scm-cia-source-values.is-empty strong { color: #85520b; }
 #scm-app .scm-cia-semaphore-cell { min-width: 145px; text-align: center; }
 
@@ -432,6 +436,44 @@
 #scm-app .scm-cia-row--incorrecto { box-shadow: inset 4px 0 #c03434; }
 #scm-app .scm-cia-row--anomalia { box-shadow: inset 4px 0 #d69a2d; }
 #scm-app .scm-cia-libertador-note { color: #7a4d08 !important; font-weight: 700; }
+
+#scm-app .scm-cia-insurer-accordion {
+  display: grid;
+  gap: 12px;
+}
+
+#scm-app .scm-cia-insurer-group {
+  border: 1px solid #d9e2ec;
+  border-radius: 10px;
+  background: #fff;
+}
+
+#scm-app .scm-cia-insurer-group summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  padding: 12px 14px;
+  color: #123b68;
+  font-weight: 800;
+}
+
+#scm-app .scm-cia-insurer-group summary::marker { color: #2f80c9; }
+
+#scm-app .scm-cia-insurer-group summary small {
+  color: var(--cia-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+#scm-app .scm-cia-insurer-group .scm-cia-table-wrap {
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0 0 10px 10px;
+}
 
 #scm-app .scm-cia-observation { display: grid; gap: 7px; min-width: 240px; margin-top: 10px; }
 #scm-app .scm-cia-observation label { color: #334e68; font-size: 10px; font-weight: 800; }

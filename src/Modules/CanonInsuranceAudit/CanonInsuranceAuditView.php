@@ -68,11 +68,16 @@ final class CanonInsuranceAuditView
   private function renderItemsTable(array $items, array $sourceAudits): string
   {
     if ($items === []) return '<div class="scm-cia-empty"><strong>No hay contratos con estos filtros.</strong><span>Cambia el resultado o la b&uacute;squeda.</span></div>';
+    $groups = $this->itemsByInsurer($items);
     ob_start();
 ?>
-    <section class="scm-cia-section"><div class="scm-cia-section-head"><div><h3>Comparaci&oacute;n consolidada</h3><p>Cada valor de Canon, Administraci&oacute;n e IVA tiene su sem&aacute;foro arriba. El Libertador se separa desde el total con IVA incluido.</p></div><span><?php echo esc_html((string) count($items)); ?> filas visibles</span></div><div class="scm-cia-table-wrap"><table class="scm-cia-table scm-cia-results-table"><thead><tr><th>Solicitud / contrato</th><th>Arrendatario e inmueble</th><th>Plataforma</th><th>SIMI</th><th>El Libertador</th><th>Fianza Bogot&aacute;</th><th>Unifianza</th><th>Hallazgo y observaci&oacute;n</th></tr></thead><tbody>
-      <?php foreach ($items as $item): $status = (string) ($item['status'] ?? 'anomalia'); $sources = (array) ($item['sources'] ?? []); ?><tr class="scm-cia-row--<?php echo esc_attr($status); ?>"><td><strong><?php echo esc_html((string) ($item['request_number'] ?? '')); ?></strong><span>Contrato <?php echo esc_html((string) (($item['contract_number'] ?? '') ?: '—')); ?></span><small>Mandato <?php echo esc_html((string) (($item['mandate_id'] ?? '') ?: '—')); ?></small></td><td><strong><?php echo esc_html((string) (($item['tenant'] ?? '') ?: '—')); ?></strong><span><?php echo esc_html((string) (($item['property_address'] ?? '') ?: '—')); ?></span><small>Aseguradora: <?php echo esc_html(AuditSourceCatalog::label((string) ($item['expected_insurer'] ?? ''))); ?></small></td><?php echo $this->sourceValueCell((array) ($item['platform'] ?? []), 'platform', true); ?><?php foreach (['simi', 'libertador', 'fianza_bogota', 'unifianza'] as $sourceKey): ?><?php echo $this->sourceValueCell($sources[$sourceKey] ?? null, $sourceKey, isset($sourceAudits[$sourceKey])); ?><?php endforeach; ?><td><?php echo $this->differenceList((string) ($item['differences_json'] ?? '[]')); ?><?php if ($status !== 'correcto' && (int) ($item['observation_item_id'] ?? 0) > 0): ?><form class="scm-cia-observation" data-cia-observation-form><input type="hidden" name="item_id" value="<?php echo esc_attr((string) ($item['observation_item_id'] ?? '')); ?>"><label>Observaci&oacute;n del funcionario<textarea name="observation" maxlength="1000" rows="2" placeholder="Explica la anomal&iacute;a o la gesti&oacute;n requerida"><?php echo esc_textarea((string) ($item['observation'] ?? '')); ?></textarea></label><button type="submit" class="scm-btn-secondary btn btn-outline">Guardar</button><?php if (($item['observation_at'] ?? '') !== ''): ?><small>Guardada por <?php echo esc_html((string) ($item['observation_by_name'] ?? '')); ?> · <?php echo esc_html($this->dateTime((string) $item['observation_at'])); ?></small><?php endif; ?></form><?php endif; ?></td></tr><?php endforeach; ?>
-    </tbody></table></div><div class="scm-cia-legend" aria-label="Significado del semaforo"><span class="is-green">Verde: el valor coincide</span><span class="is-red">Rojo: el valor est&aacute; equivocado</span><span class="is-yellow">Amarillo: falta la fuente o el dato</span></div></section>
+    <section class="scm-cia-section"><div class="scm-cia-section-head"><div><h3>Comparaci&oacute;n por aseguradora</h3><p>Cada contrato se muestra en la aseguradora asignada. El color de fondo pertenece al sem&aacute;foro de cada Canon, Administraci&oacute;n e IVA.</p></div><span><?php echo esc_html((string) count($items)); ?> filas visibles</span></div><div class="scm-cia-insurer-accordion">
+      <?php foreach ($groups as $groupKey => $group): $groupItems = (array) ($group['items'] ?? []); $label = (string) ($group['label'] ?? 'Sin aseguradora'); $counts = $this->statusCounts($groupItems); $open = $counts['incorrecto'] > 0 || $counts['anomalia'] > 0; ?>
+        <details class="scm-cia-insurer-group" <?php echo $open ? 'open' : ''; ?>><summary><span><?php echo esc_html($label); ?></span><small><?php echo esc_html((string) count($groupItems)); ?> contratos · <?php echo esc_html((string) $counts['incorrecto']); ?> rojos · <?php echo esc_html((string) $counts['anomalia']); ?> amarillos · <?php echo esc_html((string) $counts['correcto']); ?> verdes</small></summary><div class="scm-cia-table-wrap"><table class="scm-cia-table scm-cia-results-table"><thead><tr><th>Solicitud / contrato</th><th>Arrendatario e inmueble</th><th>Plataforma</th><th>SIMI</th><th><?php echo esc_html($label); ?></th><th>Hallazgo y observaci&oacute;n</th></tr></thead><tbody>
+          <?php foreach ($groupItems as $item): $status = (string) ($item['status'] ?? 'anomalia'); $sources = (array) ($item['sources'] ?? []); $sourceKey = (string) ($item['expected_insurer'] ?? ''); ?><tr class="scm-cia-row--<?php echo esc_attr($status); ?>"><td><strong><?php echo esc_html((string) (($item['request_number'] ?? '') ?: '—')); ?></strong><span>Contrato <?php echo esc_html((string) (($item['contract_number'] ?? '') ?: '—')); ?></span><small>Mandato <?php echo esc_html((string) (($item['mandate_id'] ?? '') ?: '—')); ?></small></td><td><strong><?php echo esc_html((string) (($item['tenant'] ?? '') ?: '—')); ?></strong><span><?php echo esc_html((string) (($item['property_address'] ?? '') ?: '—')); ?></span><small>Aseguradora: <?php echo esc_html($label); ?></small></td><?php echo $this->sourceValueCell((array) ($item['platform'] ?? []), 'platform', true); ?><?php echo $this->sourceValueCell($sources['simi'] ?? null, 'simi', isset($sourceAudits['simi'])); ?><?php echo $this->sourceValueCell($sourceKey !== '' ? ($sources[$sourceKey] ?? null) : null, $sourceKey, $sourceKey !== '' && isset($sourceAudits[$sourceKey])); ?><td><?php echo $this->differenceList((string) ($item['differences_json'] ?? '[]')); ?><?php if ($status !== 'correcto' && (int) ($item['observation_item_id'] ?? 0) > 0): ?><form class="scm-cia-observation" data-cia-observation-form><input type="hidden" name="item_id" value="<?php echo esc_attr((string) ($item['observation_item_id'] ?? '')); ?>"><label>Observaci&oacute;n del funcionario<textarea name="observation" maxlength="1000" rows="2" placeholder="Explica la anomal&iacute;a o la gesti&oacute;n requerida"><?php echo esc_textarea((string) ($item['observation'] ?? '')); ?></textarea></label><button type="submit" class="scm-btn-secondary btn btn-outline">Guardar</button><?php if (($item['observation_at'] ?? '') !== ''): ?><small>Guardada por <?php echo esc_html((string) ($item['observation_by_name'] ?? '')); ?> · <?php echo esc_html($this->dateTime((string) $item['observation_at'])); ?></small><?php endif; ?></form><?php endif; ?></td></tr><?php endforeach; ?>
+        </tbody></table></div></details>
+      <?php endforeach; ?>
+    </div><div class="scm-cia-legend" aria-label="Significado del semaforo"><span class="is-green">Verde: el valor coincide</span><span class="is-red">Rojo: el valor est&aacute; equivocado</span><span class="is-yellow">Amarillo: falta la fuente o el dato</span></div></section>
 <?php
     return (string) ob_get_clean();
   }
@@ -82,10 +87,10 @@ final class CanonInsuranceAuditView
   {
     $metrics = ['canon' => 'Canon', 'administration' => 'Administraci&oacute;n', 'iva' => 'IVA'];
     if ($source === null || $source === []) {
-      $message = $fileLoaded ? 'No aparece' : 'Archivo pendiente';
+      $message = $sourceKey === '' ? 'Sin aseguradora asignada' : ($fileLoaded ? 'No aparece' : 'Archivo pendiente');
       $values = '';
       foreach ($metrics as $label) {
-        $values .= '<span>' . $this->metricStatusBadge('anomalia') . '<b>' . $label . '</b><em>—</em></span>';
+        $values .= '<span class="is-anomalia">' . $this->metricStatusBadge('anomalia') . '<b>' . $label . '</b><em>—</em></span>';
       }
       return '<td class="scm-cia-source-values is-empty"><small class="scm-cia-source-note">' . esc_html($message) . '</small><div class="scm-cia-value-grid">' . $values . '</div></td>';
     }
@@ -93,8 +98,10 @@ final class CanonInsuranceAuditView
     $metricStatuses = (array) ($source['metric_statuses'] ?? []);
     $values = '';
     foreach ($metrics as $key => $label) {
-      $metricStatus = $sourceKey === 'platform' ? 'reference' : (string) ($metricStatuses[$key] ?? 'anomalia');
-      $values .= '<span>' . $this->metricStatusBadge($metricStatus) . '<b>' . $label . '</b><em>' . esc_html($this->money($source[$key] ?? null)) . '</em></span>';
+      $metricStatus = $sourceKey === 'platform'
+        ? (($source[$key] ?? null) === null || ($source[$key] ?? '') === '' ? 'anomalia' : 'reference')
+        : (string) ($metricStatuses[$key] ?? 'anomalia');
+      $values .= '<span class="is-' . esc_attr($metricStatus) . '">' . $this->metricStatusBadge($metricStatus) . '<b>' . $label . '</b><em>' . esc_html($this->money($source[$key] ?? null)) . '</em></span>';
     }
     return '<td class="scm-cia-source-values' . ($status !== '' ? ' is-' . esc_attr($status) : '') . '"><div class="scm-cia-value-grid">' . $values . '</div></td>';
   }
@@ -122,6 +129,38 @@ final class CanonInsuranceAuditView
     $decoded = json_decode($json, true);
     $messages = is_array($decoded) ? array_values(array_filter(array_map('strval', $decoded), static fn(string $message): bool => !str_contains(AuditValueNormalizer::key($message), 'prima'))) : [];
     return $messages === [] ? '<span>Sin hallazgos.</span>' : '<ul class="scm-cia-findings"><li>' . implode('</li><li>', array_map('esc_html', $messages)) . '</li></ul>';
+  }
+
+  /** @param array<int,array<string,mixed>> $items @return array<string,array{label:string,items:array<int,array<string,mixed>>}> */
+  private function itemsByInsurer(array $items): array
+  {
+    $order = ['libertador', 'fianza_bogota', 'unifianza', 'sin_aseguradora'];
+    $groups = [];
+    foreach ($items as $item) {
+      $key = (string) ($item['expected_insurer'] ?? '');
+      $key = in_array($key, ['libertador', 'fianza_bogota', 'unifianza'], true) ? $key : 'sin_aseguradora';
+      if (!isset($groups[$key])) {
+        $groups[$key] = ['label' => $key === 'sin_aseguradora' ? 'Sin aseguradora asignada' : AuditSourceCatalog::label($key), 'items' => []];
+      }
+      $groups[$key]['items'][] = $item;
+    }
+    uksort($groups, static function (string $a, string $b) use ($order): int {
+      $aIndex = array_search($a, $order, true);
+      $bIndex = array_search($b, $order, true);
+      return ($aIndex === false ? 99 : $aIndex) <=> ($bIndex === false ? 99 : $bIndex);
+    });
+    return $groups;
+  }
+
+  /** @param array<int,array<string,mixed>> $items @return array<string,int> */
+  private function statusCounts(array $items): array
+  {
+    $counts = ['correcto' => 0, 'incorrecto' => 0, 'anomalia' => 0];
+    foreach ($items as $item) {
+      $status = (string) ($item['status'] ?? 'anomalia');
+      $counts[isset($counts[$status]) ? $status : 'anomalia']++;
+    }
+    return $counts;
   }
 
   private function kpi(string $label, int $value, string $tone): string { return '<div class="scm-cia-kpi scm-cia-kpi--' . esc_attr($tone) . '"><span>' . esc_html($label) . '</span><strong>' . esc_html((string) $value) . '</strong></div>'; }
