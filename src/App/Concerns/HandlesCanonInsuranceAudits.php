@@ -14,6 +14,13 @@ trait HandlesCanonInsuranceAudits
     return new CanonInsuranceAuditService($this->db);
   }
 
+  /** @param array<string,mixed> $payload */
+  private function renderCanonInsuranceAuditContent(array $payload): string
+  {
+    $payload['can_purge'] = $this->canManageCanonInsuranceAuditCleanup();
+    return (new CanonInsuranceAuditView())->renderContent($payload);
+  }
+
   public function ajax_handler_canon_insurance_audit_list(): void
   {
     $this->verifyCsrf();
@@ -27,7 +34,7 @@ trait HandlesCanonInsuranceAudits
         'status' => sanitize_key((string) ($_POST['status'] ?? '')),
         'search' => trim(sanitize_text_field(wp_unslash((string) ($_POST['search'] ?? '')))),
       ]);
-      $this->jsonOk(['html' => (new CanonInsuranceAuditView())->renderContent($payload)]);
+      $this->jsonOk(['html' => $this->renderCanonInsuranceAuditContent($payload)]);
     } catch (\Throwable $exception) {
       $this->jsonFail($exception->getMessage());
     }
@@ -53,7 +60,7 @@ trait HandlesCanonInsuranceAudits
           (int) ($summary['differences'] ?? 0)
         );
       $this->jsonOk([
-        'html' => (new CanonInsuranceAuditView())->renderContent($result),
+        'html' => $this->renderCanonInsuranceAuditContent($result),
         'message' => $message,
         'duplicate' => !empty($result['duplicate']),
       ]);
@@ -74,7 +81,7 @@ trait HandlesCanonInsuranceAudits
         trim(sanitize_textarea_field(wp_unslash((string) ($_POST['observation'] ?? ''))))
       );
       $this->jsonOk([
-        'html' => (new CanonInsuranceAuditView())->renderContent($result),
+        'html' => $this->renderCanonInsuranceAuditContent($result),
         'message' => 'Observacion guardada en el registro de auditoria.',
       ]);
     } catch (\Throwable $exception) {
@@ -94,8 +101,39 @@ trait HandlesCanonInsuranceAudits
         trim(sanitize_textarea_field(wp_unslash((string) ($_POST['recipients'] ?? ''))))
       );
       $this->jsonOk([
-        'html' => (new CanonInsuranceAuditView())->renderContent($result),
+        'html' => $this->renderCanonInsuranceAuditContent($result),
         'message' => sprintf('Informe encolado para %d destinatario(s).', (int) ($result['queued'] ?? 0)),
+      ]);
+    } catch (\Throwable $exception) {
+      $this->jsonFail($exception->getMessage());
+    }
+  }
+
+  public function ajax_handler_canon_insurance_audit_purge(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
+      $this->jsonFail('No tienes permiso para ver esta auditoria.');
+    }
+    if (!$this->canManageCanonInsuranceAuditCleanup()) {
+      $this->jsonFail('Solo Gerencia Administrativa, Gerencia General o Desarrollo TI pueden borrar auditorias.');
+    }
+    $period = trim(sanitize_text_field(wp_unslash((string) ($_POST['period'] ?? ''))));
+    $confirmation = trim(sanitize_text_field(wp_unslash((string) ($_POST['confirmation'] ?? ''))));
+    if ($period === '' || $confirmation !== 'BORRAR ' . $period) {
+      $this->jsonFail('Para borrar, escribe exactamente: BORRAR ' . $period);
+    }
+    try {
+      $result = $this->canonInsuranceAuditService()->purgePeriod($period);
+      $this->jsonOk([
+        'html' => $this->renderCanonInsuranceAuditContent($result),
+        'message' => sprintf(
+          'Se borraron %d auditoria(s), %d fila(s) y %d informe(s) del periodo %s.',
+          (int) ($result['deleted_audits'] ?? 0),
+          (int) ($result['deleted_items'] ?? 0),
+          (int) ($result['deleted_reports'] ?? 0),
+          $period
+        ),
       ]);
     } catch (\Throwable $exception) {
       $this->jsonFail($exception->getMessage());
@@ -143,7 +181,7 @@ trait HandlesCanonInsuranceAudits
       $view = new CanonInsuranceAuditView();
       $this->jsonOk([
         'html' => $view->renderMandateLinking($payload),
-        'dashboard_html' => $view->renderContent($dashboardPayload),
+        'dashboard_html' => $this->renderCanonInsuranceAuditContent($dashboardPayload),
         'message' => (string) ($payload['message'] ?? 'Mandato vinculado.'),
       ]);
     } catch (\Throwable $exception) {

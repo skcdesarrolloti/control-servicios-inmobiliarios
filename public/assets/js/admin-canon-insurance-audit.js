@@ -17,6 +17,7 @@
     var linkMandateAction = actions.canon_insurance_audit_link_mandate || "";
     var requestsAction = actions.canon_insurance_audit_requests || "";
     var updateRequestAction = actions.canon_insurance_audit_update_request || "";
+    var purgeAction = actions.canon_insurance_audit_purge || "";
     var content = module.querySelector("[data-cia-content]");
     var status = module.querySelector("[data-cia-status]");
     var mandateModal = module.querySelector("[data-cia-mandate-modal]");
@@ -525,6 +526,48 @@
           })
           .finally(function () {
             if (reportButton) reportButton.disabled = false;
+          });
+        return;
+      }
+
+      var purgeForm = event.target.closest("[data-cia-purge-form]");
+      if (purgeForm) {
+        event.preventDefault();
+        if (!purgeAction) {
+          setStatus("La accion para borrar auditorias no esta configurada.", "error");
+          return;
+        }
+        var purgeData = new FormData(purgeForm);
+        var purgePeriod = (purgeData.get("period") || "").toString().trim();
+        var expectedConfirmation = "BORRAR " + purgePeriod;
+        var confirmation = (purgeData.get("confirmation") || "").toString().trim();
+        if (confirmation !== expectedConfirmation) {
+          setStatus("Para borrar, escribe exactamente: " + expectedConfirmation, "error");
+          var confirmationInput = purgeForm.querySelector('[name="confirmation"]');
+          if (confirmationInput) confirmationInput.focus();
+          return;
+        }
+        purgeData.append("action", purgeAction);
+        var purgeButton = purgeForm.querySelector('button[type="submit"]');
+        var originalText = purgeButton ? purgeButton.textContent : "";
+        if (purgeButton) {
+          purgeButton.disabled = true;
+          purgeButton.textContent = "Borrando...";
+        }
+        setStatus("Borrando auditorias de prueba...", "loading");
+        request(purgeData)
+          .then(function (data) {
+            replaceContent(data);
+            setStatus(data.message || "Auditorias borradas.", "success");
+          })
+          .catch(function (error) {
+            setStatus(error.message || "No se pudieron borrar las auditorias.", "error");
+          })
+          .finally(function () {
+            if (purgeButton) {
+              purgeButton.disabled = false;
+              purgeButton.textContent = originalText || "Borrar auditorias";
+            }
           });
         return;
       }

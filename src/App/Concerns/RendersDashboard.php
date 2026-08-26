@@ -348,6 +348,7 @@ trait RendersDashboard
         'canon_insurance_audit_link_mandate' => self::AJAX_CANON_INSURANCE_AUDIT_LINK_MANDATE,
         'canon_insurance_audit_requests' => self::AJAX_CANON_INSURANCE_AUDIT_REQUESTS,
         'canon_insurance_audit_update_request' => self::AJAX_CANON_INSURANCE_AUDIT_UPDATE_REQUEST,
+        'canon_insurance_audit_purge' => self::AJAX_CANON_INSURANCE_AUDIT_PURGE,
         // Guía
         'guide_gcd_read' => self::AJAX_GUIDE_GCD_READ,
         'guide_gcd_save' => self::AJAX_GUIDE_GCD_SAVE,

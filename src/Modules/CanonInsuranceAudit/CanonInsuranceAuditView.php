@@ -37,6 +37,7 @@ final class CanonInsuranceAuditView
     $items = (array) ($payload['items'] ?? []);
     $reports = (array) ($payload['reports'] ?? []);
     $filters = (array) ($payload['filters'] ?? []);
+    $canPurge = !empty($payload['can_purge']);
     ob_start();
     if ($sourceAudits === []) {
       echo '<div class="scm-cia-empty"><strong>A&uacute;n no hay archivos procesados para ' . esc_html($this->periodLabel($period)) . '.</strong><span>Selecciona el periodo y carga SIMI junto con los extractos de las tres aseguradoras.</span></div>';
@@ -50,6 +51,7 @@ final class CanonInsuranceAuditView
     <form class="scm-cia-filters" data-cia-filter-form autocomplete="off"><div class="scm-field"><label for="scm_cia_period_filter">Periodo consolidado</label><select id="scm_cia_period_filter" name="period"><?php if (!in_array($period, $periods, true)): ?><option value="<?php echo esc_attr($period); ?>" selected><?php echo esc_html($this->periodLabel($period)); ?></option><?php endif; ?><?php foreach ($periods as $availablePeriod): ?><option value="<?php echo esc_attr((string) $availablePeriod); ?>" <?php echo $period === (string) $availablePeriod ? 'selected' : ''; ?>><?php echo esc_html($this->periodLabel((string) $availablePeriod)); ?></option><?php endforeach; ?></select></div><div class="scm-field"><label for="scm_cia_status_filter">Resultado</label><select id="scm_cia_status_filter" name="status"><?php foreach ($this->statusOptions() as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php echo (string) ($filters['status'] ?? '') === $value ? 'selected' : ''; ?>><?php echo esc_html($label); ?></option><?php endforeach; ?></select></div><div class="scm-field scm-cia-search-field"><label for="scm_cia_search">Solicitud, contrato o persona</label><input id="scm_cia_search" name="search" type="search" value="<?php echo esc_attr((string) ($filters['search'] ?? '')); ?>" placeholder="Ej. 11827961 o arrendatario"></div><button type="submit" class="scm-btn-secondary btn btn-outline">Aplicar filtros</button></form>
 
     <?php echo $this->renderReportPanel($period, $summary, $reports); ?>
+    <?php echo $canPurge ? $this->renderPurgePanel($period, $audits) : ''; ?>
     <?php echo $this->renderItemsTable($items, $sourceAudits); ?>
     <?php echo $this->renderAuditHistory($audits); ?>
 <?php
@@ -145,6 +147,18 @@ final class CanonInsuranceAuditView
     ob_start();
 ?>
     <section class="scm-cia-report"><div><strong>Informe consolidado por correo</strong><span>Incluye las filas rojas y amarillas con los valores de todas las fuentes y las observaciones guardadas.</span><?php if ($reports !== []): $last = $reports[0]; ?><small>&Uacute;ltimo env&iacute;o: <?php echo esc_html($this->dateTime((string) ($last['sent_at'] ?? ''))); ?> por <?php echo esc_html((string) ($last['sent_by_name'] ?? '')); ?>.</small><?php endif; ?></div><form data-cia-report-form><input type="hidden" name="period" value="<?php echo esc_attr($period); ?>"><label>Correo destino<input name="recipients" type="text" inputmode="email" autocomplete="email" placeholder="correo@empresa.com o varios separados por coma" required></label><button type="submit" class="scm-btn-primary btn btn-primary" <?php echo $pending === 0 ? 'disabled' : ''; ?>>Enviar informe (<?php echo esc_html((string) $pending); ?>)</button></form></section>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<int,array<string,mixed>> $audits */
+  private function renderPurgePanel(string $period, array $audits): string
+  {
+    $auditCount = count(array_filter($audits, static fn(array $audit): bool => (string) ($audit['period'] ?? '') === $period));
+    $confirmation = 'BORRAR ' . $period;
+    ob_start();
+?>
+    <section class="scm-cia-purge"><div><strong>Zona de limpieza de pruebas</strong><span>Borra todas las auditor&iacute;as cargadas para <?php echo esc_html($this->periodLabel($period)); ?>, junto con sus filas comparadas e informes asociados.</span><small><?php echo esc_html((string) $auditCount); ?> carga(s) detectadas para este periodo. Acci&oacute;n disponible solo para administraci&oacute;n/desarrollo.</small></div><form data-cia-purge-form autocomplete="off"><input type="hidden" name="period" value="<?php echo esc_attr($period); ?>"><label>Confirmaci&oacute;n<input name="confirmation" type="text" placeholder="<?php echo esc_attr($confirmation); ?>" aria-label="Escribe <?php echo esc_attr($confirmation); ?> para confirmar"></label><button type="submit" class="scm-cia-danger-btn btn" <?php echo $auditCount === 0 ? 'disabled' : ''; ?>>Borrar auditor&iacute;as</button></form></section>
 <?php
     return (string) ob_get_clean();
   }

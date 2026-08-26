@@ -195,6 +195,55 @@ final class CanonInsuranceAuditService
     ];
   }
 
+  /** @return array<string,mixed> */
+  public function purgePeriod(string $period): array
+  {
+    $this->ensureSchema();
+    $period = $this->validPeriod($period);
+    $audits = $this->db->getResults(
+      "SELECT `id` FROM `{$this->auditsTable()}` WHERE `period` = ? ORDER BY `id` ASC",
+      [$period]
+    );
+    $auditIds = array_values(array_filter(array_map(static fn(array $row): int => (int) ($row['id'] ?? 0), $audits)));
+    if ($auditIds === []) {
+      throw new \RuntimeException('No hay auditorias registradas para el periodo ' . $period . '.');
+    }
+
+    $pdo = $this->db->pdo();
+    $placeholders = implode(',', array_fill(0, count($auditIds), '?'));
+    $deletedItems = 0;
+    $deletedReports = 0;
+    $deletedAudits = 0;
+    try {
+      $pdo->beginTransaction();
+
+      $stmt = $pdo->prepare("DELETE FROM `{$this->reportsTable()}` WHERE `audit_id` IN ({$placeholders})");
+      $stmt->execute($auditIds);
+      $deletedReports = $stmt->rowCount();
+
+      $stmt = $pdo->prepare("DELETE FROM `{$this->itemsTable()}` WHERE `audit_id` IN ({$placeholders})");
+      $stmt->execute($auditIds);
+      $deletedItems = $stmt->rowCount();
+
+      $stmt = $pdo->prepare("DELETE FROM `{$this->auditsTable()}` WHERE `id` IN ({$placeholders})");
+      $stmt->execute($auditIds);
+      $deletedAudits = $stmt->rowCount();
+
+      $pdo->commit();
+    } catch (\Throwable $exception) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      throw $exception;
+    }
+
+    return [
+      'deleted_audits' => $deletedAudits,
+      'deleted_items' => $deletedItems,
+      'deleted_reports' => $deletedReports,
+    ] + $this->dashboard(['period' => $period]);
+  }
+
   /** @param array<string,array<string,mixed>> $sourceAudits @return array<int,array<string,mixed>> */
   private function monthlyComparisonRows(array $sourceAudits): array
   {
