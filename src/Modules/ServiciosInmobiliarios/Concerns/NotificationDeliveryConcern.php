@@ -108,36 +108,105 @@ trait NotificationDeliveryConcern
     return $sent;
   }
 
-  /** @param array<string,mixed> $ticket @param array<string,string> $notice */
-  private function notifyPreventivaNoAccessNotice(array $ticket, string $logicalTicket, array $notice, int $attempt, string $userName): int
+  /** @param array<string,mixed> $ticket @param array<string,string> $notice @return array{email:int,whatsapp:int} */
+  private function notifyPreventivaNoAccessNotice(array $ticket, string $logicalTicket, array $notice, int $attempt, string $userName): array
   {
-    if (!$this->queue instanceof EmailQueue) {
-      return 0;
-    }
-
+    $emailSent = 0;
+    $whatsappSent = 0;
     $tenantEmail = trim((string)($ticket['correo_arrendatario'] ?? $ticket['correo_solicitante'] ?? ''));
-    if ($tenantEmail === '' || !filter_var($tenantEmail, FILTER_VALIDATE_EMAIL)) {
-      return 0;
-    }
-
     $tenantName = trim((string)($ticket['arrendatario'] ?? $ticket['solicitante'] ?? 'arrendatario'));
     $noticeUrl = trim((string)($notice['url'] ?? ''));
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
-    $subject = 'Comunicacion de revision preventiva del ticket #' . $logicalTicket;
+    $subject = 'Acta de revision preventiva del ticket #' . $logicalTicket;
 
     $content = '<p style="font-weight:500;margin:10px 0;">Apreciado(a) ' . EmailTemplate::e($tenantName !== '' ? $tenantName : 'arrendatario(a)') . ',</p>'
-      . '<p style="line-height:1.65;margin:10px 0;">Se ha generado una comunicacion para dejar constancia de la gestion realizada frente a la revision preventiva del inmueble.</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Se ha generado el acta/comunicacion preventiva para dejar constancia de la gestion realizada frente a la revision preventiva del inmueble.</p>'
       . '<p style="line-height:1.65;margin:10px 0;">Esta comunicacion corresponde al intento No. ' . EmailTemplate::e((string)$attempt) . ' y queda anexada al historial del caso.</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Puedes consultarla desde el siguiente boton. No adjuntamos el archivo para evitar bloqueos o marcaciones de spam.</p>'
       . '<p style="line-height:1.65;margin:10px 0;">Cordialmente,<br><b>' . EmailTemplate::e($userName) . '</b></p>';
 
-    $html = EmailTemplate::render('Comunicacion de revision preventiva', $content, [
-      'buttons' => [
-        ['url' => $noticeUrl, 'label' => 'Ver comunicacion'],
-        ['url' => $ticketUrl, 'label' => 'Ver ticket'],
-      ],
-    ]);
+    if ($this->queue instanceof EmailQueue && $tenantEmail !== '' && filter_var($tenantEmail, FILTER_VALIDATE_EMAIL)) {
+      $html = EmailTemplate::render('Acta de revision preventiva', $content, [
+        'buttons' => [
+          ['url' => $noticeUrl, 'label' => 'Ver acta preventiva'],
+          ['url' => $ticketUrl, 'label' => 'Ver ticket'],
+        ],
+      ]);
+      $emailSent = $this->sendMailToUnique($tenantEmail, $subject, $html);
+    }
 
-    return $this->sendMailToUnique($tenantEmail, $subject, $html);
+    $tenantPhone = $this->firstNonEmpty([
+      $ticket['celular_arrendatario'] ?? '',
+      $ticket['celular_solicitante'] ?? '',
+      $ticket['telefono_arrendatario'] ?? '',
+      $ticket['whatsapp_arrendatario'] ?? '',
+    ]);
+    if ($tenantPhone !== '' && $noticeUrl !== '') {
+      try {
+        $buttonSuffix = $this->whatsappUrlButtonSuffix($noticeUrl);
+        $message = "Buen dia, " . ($tenantName !== '' ? $tenantName : 'arrendatario(a)') . ".\n\n";
+        $message .= "Se genero la comunicacion preventiva No. {$attempt} del ticket #{$logicalTicket}, relacionada con la revision preventiva del inmueble.\n\n";
+        $message .= "Puedes consultar el documento en el boton.\n\n";
+        $message .= "Atentamente,\n{$userName}";
+
+        $smsQueue = new \SCM\Support\SmsQueue($this->db);
+        $ok = $smsQueue->enqueue($tenantPhone, $tenantName !== '' ? $tenantName : 'Arrendatario', $message, [
+          'source_module' => 'preventiva_no_access_notice',
+          'campaign_tag' => 'preventiva_no_access_notice',
+          'categoria_mensaje' => 'informacion',
+          'id_ticket' => $logicalTicket,
+          'attempt' => $attempt,
+          'notice_url' => $noticeUrl,
+          'dedupe_key' => 'preventiva_no_access_notice:' . $logicalTicket . ':' . $attempt,
+          'template_name' => 'scm_preventiva_no_acceso_v1',
+          'template_language' => 'es_CO',
+          'template_components' => [
+            [
+              'type' => 'body',
+              'parameters' => [
+                ['type' => 'text', 'text' => $tenantName !== '' ? $tenantName : 'arrendatario(a)'],
+                ['type' => 'text', 'text' => (string) $attempt],
+                ['type' => 'text', 'text' => $logicalTicket],
+                ['type' => 'text', 'text' => $userName],
+              ],
+            ],
+            [
+              'type' => 'button',
+              'sub_type' => 'url',
+              'index' => '0',
+              'parameters' => [
+                ['type' => 'text', 'text' => $buttonSuffix],
+              ],
+            ],
+          ],
+        ]);
+        if ($ok) {
+          $whatsappSent = 1;
+        } else {
+          $detail = trim($smsQueue->lastError());
+          error_log('control-servicios-inmobiliarios: no se pudo encolar WhatsApp de comunicacion preventiva #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : ''));
+        }
+      } catch (\Throwable $exception) {
+        error_log('control-servicios-inmobiliarios: error preparando WhatsApp de comunicacion preventiva #' . $logicalTicket . ': ' . $exception->getMessage());
+      }
+    }
+
+    return ['email' => $emailSent, 'whatsapp' => $whatsappSent];
+  }
+
+  private function whatsappUrlButtonSuffix(string $url): string
+  {
+    $parts = parse_url($url);
+    if (!is_array($parts)) {
+      return $url;
+    }
+    $host = strtolower((string) ($parts['host'] ?? ''));
+    $path = ltrim((string) ($parts['path'] ?? ''), '/');
+    $query = trim((string) ($parts['query'] ?? ''));
+    if ($host === 'sucasainmobiliaria.com.co' && $path !== '') {
+      return $path . ($query !== '' ? '?' . $query : '');
+    }
+    return $url;
   }
 
   /** @param array<string,mixed> $ticket @return string[] */

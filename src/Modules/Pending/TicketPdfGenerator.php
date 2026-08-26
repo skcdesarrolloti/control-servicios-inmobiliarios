@@ -128,6 +128,8 @@ final class TicketPdfGenerator
     $pdf->spacer(5);
     $pdf->line('Senor(a): ' . $tenantName, 10, 'F2');
     $pdf->line('Contrato: ' . $contract . ' | Inmueble SIMI: ' . $property . ' | Comunicacion No. ' . $attempt, 8, 'F2');
+    $pdf->line('Cantidad acumulada de comunicaciones preventivas: ' . $attempt, 8);
+    $pdf->line('Realizada por: ' . trim($creator['name'] . ' - ' . $creator['details'], ' -'), 8);
     if ($address !== '') {
       $pdf->line('Direccion: ' . $address, 8);
     }

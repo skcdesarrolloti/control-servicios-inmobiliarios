@@ -177,8 +177,11 @@ trait WorkflowCommandsConcern
         return ['ok' => '0', 'message' => 'Esta comunicacion solo aplica para tickets de revision preventiva.'];
       }
       $attemptNoAccessNotice = $this->nextPreventivaNoAccessAttempt($ticketPk, (string) ($ticket['archivos'] ?? ''));
+      $ticketForNotice = array_merge($ticket, $this->preventivaNoAccessCreatorData($userName, $userInfo), [
+        '_scm_no_access_attempt' => $attemptNoAccessNotice,
+      ]);
       try {
-        $generatedNoAccessNotice = (new TicketPdfGenerator())->generatePreventivaNoAccessNotice($ticketPk, $ticket, $attemptNoAccessNotice);
+        $generatedNoAccessNotice = (new TicketPdfGenerator())->generatePreventivaNoAccessNotice($ticketPk, $ticketForNotice, $attemptNoAccessNotice);
         $url = trim((string) ($generatedNoAccessNotice['url'] ?? ''));
         if ($url === '') {
           throw new \RuntimeException('El PDF no retorno URL valida.');
@@ -252,10 +255,15 @@ trait WorkflowCommandsConcern
       $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);
     }
 
-    $sent = $this->notifyTicketResponse($ticket, $logicalTicket, $respuesta, $userName, $newEstado, $notifyTargets);
+    $sent = $generatedNoAccessNotice === null
+      ? $this->notifyTicketResponse($ticket, $logicalTicket, $respuesta, $userName, $newEstado, $notifyTargets)
+      : 0;
     $noticeSent = 0;
+    $noticeWhatsappSent = 0;
     if ($generatedNoAccessNotice !== null) {
-      $noticeSent = $this->notifyPreventivaNoAccessNotice($ticket, $logicalTicket, $generatedNoAccessNotice, $attemptNoAccessNotice, $userName);
+      $noticeDelivery = $this->notifyPreventivaNoAccessNotice($ticket, $logicalTicket, $generatedNoAccessNotice, $attemptNoAccessNotice, $userName);
+      $noticeSent = (int) ($noticeDelivery['email'] ?? 0);
+      $noticeWhatsappSent = (int) ($noticeDelivery['whatsapp'] ?? 0);
     }
     $cotRows = '0';
     $extraMessage = '';
@@ -279,8 +287,10 @@ trait WorkflowCommandsConcern
       'message' => 'Respuesta guardada.'
         . ($generatedNoAccessNotice !== null ? ' Comunicacion preventiva #' . $attemptNoAccessNotice . ' generada y anexada.' : '')
         . $extraMessage
-        . (($sent + $noticeSent) > 0 ? ' Correos programados en cola: ' . ($sent + $noticeSent) . '.' : ' Sin correos programados.'),
+        . (($sent + $noticeSent) > 0 ? ' Correos programados en cola: ' . ($sent + $noticeSent) . '.' : ' Sin correos programados.')
+        . ($noticeWhatsappSent > 0 ? ' WhatsApp programados en cola: ' . $noticeWhatsappSent . '.' : ''),
       'emails_sent' => (string)($sent + $noticeSent),
+      'whatsapp_sent' => (string)$noticeWhatsappSent,
       'cot_rows' => $cotRows,
       'no_access_attempt' => (string)$attemptNoAccessNotice,
       'no_access_notice_url' => $generatedNoAccessNotice !== null ? (string)($generatedNoAccessNotice['url'] ?? '') : '',
@@ -299,9 +309,11 @@ trait WorkflowCommandsConcern
   {
     $count = 0;
     foreach ($this->ticketDocumentsFromRaw($rawTicketDocuments) as $doc) {
-      $label = strtolower(trim((string) ($doc['nombre_archivo'] ?? '')));
-      if (strpos($label, 'no autorizacion de acceso') !== false || strpos($label, 'no permitir acceso') !== false) {
+      $label = $this->normalizePreventivaNoAccessText((string) ($doc['nombre_archivo'] ?? ''));
+      $url = $this->normalizePreventivaNoAccessText((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+      if ($this->looksLikePreventivaNoAccessNotice($label . ' ' . $url)) {
         $count++;
+        $count = max($count, $this->preventivaNoAccessAttemptNumber($label));
       }
     }
 
@@ -311,14 +323,123 @@ trait WorkflowCommandsConcern
       && $this->schema->columnExists($histTable, 'id_ticket')
       && $this->schema->columnExists($histTable, 'respuesta')
     ) {
-      $dbCount = (int) ($this->db->getVar(
-        "SELECT COUNT(1) FROM `{$histTable}` WHERE `id_ticket` = ? AND LOWER(COALESCE(`respuesta`, '')) LIKE ?",
-        [$ticketPk, '%comunicacion preventiva%no autorizacion%']
-      ) ?? 0);
-      $count = max($count, $dbCount);
+      $rows = $this->db->getResults("SELECT * FROM `{$histTable}` WHERE `id_ticket` = ?", [$ticketPk]);
+      $historyCount = 0;
+      foreach (is_array($rows) ? $rows : [] as $row) {
+        if (!is_array($row)) {
+          continue;
+        }
+        $text = $this->normalizePreventivaNoAccessText(implode(' ', [
+          (string) ($row['respuesta'] ?? ''),
+          (string) ($row['observacion'] ?? ''),
+          (string) ($row['descripcion'] ?? ''),
+          (string) ($row['nombre'] ?? ''),
+          (string) ($row['estado_administrativo'] ?? ''),
+          (string) ($row['estado_admin_ticket'] ?? ''),
+          (string) ($row['estado_admin'] ?? ''),
+        ]));
+        if ($this->looksLikePreventivaNoAccessNotice($text) || $this->looksLikePreventivaNoAccessLegacyAttempt($text)) {
+          $historyCount++;
+          $historyCount = max($historyCount, $this->preventivaNoAccessAttemptNumber($text));
+        }
+      }
+      $count = max($count, $historyCount);
     }
 
     return $count + 1;
+  }
+
+  /** @param array<string,mixed> $userInfo @return array<string,string> */
+  private function preventivaNoAccessCreatorData(string $userName, array $userInfo): array
+  {
+    $name = $this->firstNonEmpty([
+      $userInfo['nombre'] ?? '',
+      $userInfo['nombre_empleado'] ?? '',
+      $userInfo['empleado'] ?? '',
+      $userInfo['nombre_funcionario'] ?? '',
+      $userName,
+    ]);
+    $phone = $this->firstNonEmpty([
+      $userInfo['celular'] ?? '',
+      $userInfo['celular_empleado'] ?? '',
+      $userInfo['telefono'] ?? '',
+      $userInfo['whatsapp'] ?? '',
+    ]);
+    $email = $this->firstNonEmpty([
+      $userInfo['correo'] ?? '',
+      $userInfo['correo_empleado'] ?? '',
+      $userInfo['email'] ?? '',
+    ]);
+    $cargo = $this->firstNonEmpty([
+      $userInfo['nombre_cargo'] ?? '',
+      $userInfo['cargo'] ?? '',
+      $userInfo['cargo_funcionario'] ?? '',
+      $this->cargoNameById((string) ($userInfo['id_cargo'] ?? '')),
+      'Control Servicios Inmobiliarios',
+    ]);
+
+    return [
+      'nombre_creador_ticket' => $name !== '' ? $name : 'Funcionario',
+      'celular_creador_ticket' => $phone,
+      'correo_creador_ticket' => $email,
+      'cargo_creador_ticket' => $cargo,
+    ];
+  }
+
+  private function cargoNameById(string $cargoId): string
+  {
+    $cargoId = trim($cargoId);
+    if ($cargoId === '') {
+      return '';
+    }
+    $table = $this->db->table('jet_cct_cargos');
+    if (!$this->schema->tableExists($table) || !$this->schema->columnExists($table, '_ID') || !$this->schema->columnExists($table, 'nombre_cargo')) {
+      return '';
+    }
+    return trim((string) ($this->db->getVar("SELECT `nombre_cargo` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cargoId]) ?? ''));
+  }
+
+  private function normalizePreventivaNoAccessText(string $text): string
+  {
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = strtr($text, [
+      'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u', 'Ü' => 'u', 'Ñ' => 'n',
+      'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n',
+    ]);
+    return strtolower($text);
+  }
+
+  private function looksLikePreventivaNoAccessNotice(string $text): bool
+  {
+    return strpos($text, 'preventiva') !== false
+      && (
+        strpos($text, 'no autorizacion') !== false
+        || strpos($text, 'no permitir acceso') !== false
+        || strpos($text, 'no acceso') !== false
+      );
+  }
+
+  private function looksLikePreventivaNoAccessLegacyAttempt(string $text): bool
+  {
+    $hasWaitingState = strpos($text, 'en espera de respuesta') !== false;
+    $hasAccessSignal = strpos($text, 'autorizacion') !== false
+      || strpos($text, 'autoriza') !== false
+      || strpos($text, 'acceso') !== false
+      || strpos($text, 'coordinar') !== false
+      || strpos($text, 'visita') !== false
+      || strpos($text, 'no responde') !== false
+      || strpos($text, 'sin respuesta') !== false;
+
+    return $hasWaitingState || $hasAccessSignal;
+  }
+
+  private function preventivaNoAccessAttemptNumber(string $text): int
+  {
+    if (preg_match('/(?:#|no\\.?|numero)\\s*(\\d{1,3})/i', $text, $match)) {
+      $number = max(0, (int) $match[1]);
+      return $number <= 50 ? $number : 0;
+    }
+    return 0;
   }
 
   /** @param mixed $raw @return array<int,array{nombre_archivo:string,media_archivo:string,archivo:string}> */

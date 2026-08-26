@@ -501,6 +501,7 @@ final class GenericTicketsCardView
         $urlKey = strtolower($url);
         if ($url !== '' && $this->looksLikePreventivaNoAccessNotice($label . ' ' . $urlKey)) {
           $documents[$urlKey !== '' ? $urlKey : md5($label)] = true;
+          $documents['attempt:' . $this->preventivaNoAccessAttemptNumber($label)] = true;
         }
       }
     };
@@ -535,10 +536,17 @@ final class GenericTicketsCardView
       ]));
       if ($this->looksLikePreventivaNoAccessNotice($text) || $this->looksLikePreventivaNoAccessLegacyAttempt($text)) {
         $historyCount++;
+        $historyCount = max($historyCount, $this->preventivaNoAccessAttemptNumber($text));
       }
     }
 
-    return max(count($documents), $historyCount);
+    $documentCount = count(array_filter(array_keys($documents), static fn(string $key): bool => strpos($key, 'attempt:') !== 0));
+    foreach (array_keys($documents) as $key) {
+      if (strpos($key, 'attempt:') === 0) {
+        $documentCount = max($documentCount, (int) substr($key, 8));
+      }
+    }
+    return max($documentCount, $historyCount);
   }
 
   private function looksLikePreventivaNoAccessNotice(string $text): bool
@@ -563,6 +571,15 @@ final class GenericTicketsCardView
       || strpos($text, 'sin respuesta') !== false;
 
     return $hasWaitingState || $hasAccessSignal;
+  }
+
+  private function preventivaNoAccessAttemptNumber(string $text): int
+  {
+    if (preg_match('/(?:#|no\\.?|numero)\\s*(\\d{1,3})/i', $text, $match)) {
+      $number = max(0, (int) $match[1]);
+      return $number <= 50 ? $number : 0;
+    }
+    return 0;
   }
 
   private function normalizePreventivaNoAccessText(string $text): string
