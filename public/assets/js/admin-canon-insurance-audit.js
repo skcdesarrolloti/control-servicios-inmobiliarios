@@ -81,11 +81,12 @@
       mandateStatus.classList.toggle("is-loading", tone === "loading");
     }
 
-    function openMandateModal() {
+    function openMandateModal(searchValue) {
       if (!mandateModal) return;
       mandateModal.hidden = false;
       document.documentElement.classList.add("scm-cia-modal-open");
       var searchInput = mandateModal.querySelector('[name="search"]');
+      if (searchInput && typeof searchValue === "string") searchInput.value = searchValue;
       if (searchInput) window.setTimeout(function () { searchInput.focus(); }, 50);
       loadMandates();
     }
@@ -465,7 +466,8 @@
     module.addEventListener("click", function (event) {
       if (event.target.closest("[data-cia-open-mandates]")) {
         event.preventDefault();
-        openMandateModal();
+        var mandateTrigger = event.target.closest("[data-cia-open-mandates]");
+        openMandateModal(mandateTrigger ? mandateTrigger.dataset.ciaMandateSearchValue || "" : "");
         return;
       }
       if (event.target.closest("[data-cia-close-mandates]")) {

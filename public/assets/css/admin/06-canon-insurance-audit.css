@@ -78,7 +78,7 @@
 #scm-app .scm-cia-tools {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 14px;
   margin-top: 12px;
   border: 1px solid #d5e3f3;
@@ -354,6 +354,43 @@
 #scm-app .scm-cia-table td > small { display: block; }
 #scm-app .scm-cia-table td > span { margin-top: 3px; }
 #scm-app .scm-cia-table td > small { margin-top: 4px; color: var(--cia-muted); }
+
+#scm-app .scm-cia-row-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+#scm-app .scm-cia-inline-repair {
+  display: grid;
+  gap: 7px;
+  border: 1px solid #d8e4f0;
+  border-radius: 10px;
+  padding: 9px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-cia-inline-repair label {
+  display: grid;
+  gap: 5px;
+  color: #243b53;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+#scm-app .scm-cia-inline-repair input {
+  min-height: 38px;
+  padding: 7px 9px;
+  font-size: 11px;
+}
+
+#scm-app .scm-cia-inline-repair button,
+#scm-app .scm-cia-inline-repair-button {
+  min-height: 38px;
+  width: 100%;
+  justify-content: center;
+  white-space: normal;
+}
 
 #scm-app .scm-cia-value-cell {
   min-width: 145px;
