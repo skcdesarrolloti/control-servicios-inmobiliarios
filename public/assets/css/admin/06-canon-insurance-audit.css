@@ -295,7 +295,7 @@
   font-size: 11px;
 }
 
-#scm-app .scm-cia-results-table { min-width: 1680px; }
+#scm-app .scm-cia-results-table { min-width: 1320px; }
 
 #scm-app .scm-cia-table th {
   position: sticky;
@@ -332,21 +332,28 @@
 #scm-app .scm-cia-value-cell.is-different { background: #fff7f7; }
 
 #scm-app .scm-cia-source-values {
-  min-width: 330px;
+  min-width: 150px;
   font-variant-numeric: tabular-nums;
 }
 
 #scm-app .scm-cia-value-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(90px, 1fr));
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 #scm-app .scm-cia-value-grid span {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  padding: 8px 0;
+}
+
+#scm-app .scm-cia-value-grid span:first-child { padding-top: 0; }
+
+#scm-app .scm-cia-value-grid span + span {
+  border-top: 1px solid rgba(188, 204, 220, 0.7);
 }
 
 #scm-app .scm-cia-metric-status {
@@ -377,9 +384,10 @@
 #scm-app .scm-cia-value-grid b {
   color: var(--cia-muted);
   font-size: 10px;
-  letter-spacing: 0.03em;
+  letter-spacing: 0;
   line-height: 1.25;
   text-transform: uppercase;
+  white-space: normal;
 }
 
 #scm-app .scm-cia-value-grid em {
