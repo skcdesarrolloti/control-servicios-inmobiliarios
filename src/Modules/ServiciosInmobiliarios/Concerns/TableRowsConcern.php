@@ -313,11 +313,7 @@ trait TableRowsConcern
       }
     }
 
-    if (!empty($documents)) {
-      return count($documents);
-    }
-
-    $fallback = 0;
+    $historyCount = 0;
     foreach ($historialItems as $item) {
       if (!is_array($item)) {
         continue;
@@ -327,13 +323,16 @@ trait TableRowsConcern
         (string) ($item['observacion'] ?? ''),
         (string) ($item['descripcion'] ?? ''),
         (string) ($item['nombre'] ?? ''),
+        (string) ($item['estado_administrativo'] ?? ''),
+        (string) ($item['estado_admin_ticket'] ?? ''),
+        (string) ($item['estado_admin'] ?? ''),
       ]));
-      if ($this->looksLikePreventivaNoAccessNotice($text)) {
-        $fallback++;
+      if ($this->looksLikePreventivaNoAccessNotice($text) || $this->looksLikePreventivaNoAccessLegacyAttempt($text)) {
+        $historyCount++;
       }
     }
 
-    return $fallback;
+    return max(count($documents), $historyCount);
   }
 
   private function looksLikePreventivaNoAccessNotice(string $text): bool
@@ -344,6 +343,20 @@ trait TableRowsConcern
         || strpos($text, 'no permitir acceso') !== false
         || strpos($text, 'no acceso') !== false
       );
+  }
+
+  private function looksLikePreventivaNoAccessLegacyAttempt(string $text): bool
+  {
+    $hasWaitingState = strpos($text, 'en espera de respuesta') !== false;
+    $hasAccessSignal = strpos($text, 'autorizacion') !== false
+      || strpos($text, 'autoriza') !== false
+      || strpos($text, 'acceso') !== false
+      || strpos($text, 'coordinar') !== false
+      || strpos($text, 'visita') !== false
+      || strpos($text, 'no responde') !== false
+      || strpos($text, 'sin respuesta') !== false;
+
+    return $hasWaitingState || $hasAccessSignal;
   }
 
   private function normalizePreventivaNoAccessText(string $text): string
