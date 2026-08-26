@@ -558,6 +558,13 @@ final class CanonInsuranceAuditService
   {
     $contractsTable = $this->db->table('jet_cct_contratos_arrendamiento');
     $mandatesTable = $this->db->table('jet_cct_contrato_mandato');
+    $contractOwnerEmailColumn = $this->firstExistingColumn($contractsTable, ['correo_propietario', 'email_propietario', 'propietario_correo', 'correo_electronico_propietario', 'correo']);
+    $contractOwnerNameColumn = $this->firstExistingColumn($contractsTable, ['propietario', 'nombre_propietario', 'propietario_nombre']);
+    $contractOwnerIdColumn = $this->firstExistingColumn($contractsTable, ['id_propietario', 'propietario_id']);
+    $mandateOwnerEmailColumn = $this->firstExistingColumn($mandatesTable, ['correo_propietario', 'email_propietario', 'propietario_correo', 'correo_electronico_propietario', 'correo']);
+    $mandateOwnerNameColumn = $this->firstExistingColumn($mandatesTable, ['propietario', 'nombre_propietario', 'propietario_nombre']);
+    $mandateOwnerIdColumn = $this->firstExistingColumn($mandatesTable, ['id_propietario', 'propietario_id']);
+    $mandateAddressColumn = $this->firstExistingColumn($mandatesTable, ['direccion', 'direccion_inmueble', 'inmueble', 'direccion_del_inmueble']);
     $search = trim(preg_replace('/\s+/u', ' ', AuditValueNormalizer::text($search)) ?? '');
     $where = [
       "LOWER(TRIM(COALESCE(`estado`, ''))) = 'entregado'",
@@ -571,14 +578,24 @@ final class CanonInsuranceAuditService
       $search = '';
     } elseif ($search !== '') {
       $like = '%' . $this->db->escapeLike($search) . '%';
-      $where[] = "(COALESCE(`contrato`, '') LIKE ? OR COALESCE(`numero_solicitud`, '') LIKE ? OR COALESCE(`arrendatario`, '') LIKE ? OR COALESCE(`direccion`, '') LIKE ? OR COALESCE(`id_inmueble`, '') LIKE ?)";
+      $searchParts = ["COALESCE(`contrato`, '') LIKE ?", "COALESCE(`numero_solicitud`, '') LIKE ?", "COALESCE(`arrendatario`, '') LIKE ?", "COALESCE(`direccion`, '') LIKE ?", "COALESCE(`id_inmueble`, '') LIKE ?"];
       $args = [$like, $like, $like, $like, $like];
+      foreach ([$contractOwnerEmailColumn, $contractOwnerNameColumn, $contractOwnerIdColumn] as $column) {
+        if ($column !== '') {
+          $searchParts[] = "COALESCE(`{$column}`, '') LIKE ?";
+          $args[] = $like;
+        }
+      }
+      $where[] = '(' . implode(' OR ', $searchParts) . ')';
     }
 
     $contracts = $this->db->getResults(
       "SELECT `_ID` AS contract_id, `contrato` AS contract_number, `numero_solicitud`,
               `arrendatario`, `direccion`, `id_inmueble`, `aseguradora`,
-              `valor_canon`, `valor_administracion`
+              `valor_canon`, `valor_administracion`,
+              " . $this->selectColumnExpression($contractOwnerEmailColumn, 'owner_email') . ",
+              " . $this->selectColumnExpression($contractOwnerNameColumn, 'owner_name') . ",
+              " . $this->selectColumnExpression($contractOwnerIdColumn, 'owner_id') . "
          FROM `{$contractsTable}`
         WHERE " . implode(' AND ', $where) . "
         ORDER BY `_ID` DESC
@@ -587,30 +604,65 @@ final class CanonInsuranceAuditService
     );
 
     $propertyIds = [];
+    $ownerEmails = [];
+    $ownerIds = [];
     foreach ($contracts as $contract) {
       $propertyId = $this->propertyKey($contract['id_inmueble'] ?? '');
       if ($propertyId !== '') {
         $propertyIds[$propertyId] = AuditValueNormalizer::text($contract['id_inmueble'] ?? '');
       }
+      $ownerEmail = $this->emailKey($contract['owner_email'] ?? '');
+      if ($ownerEmail !== '') {
+        $ownerEmails[$ownerEmail] = $ownerEmail;
+      }
+      $ownerId = AuditValueNormalizer::text($contract['owner_id'] ?? '');
+      if ($ownerId !== '' && $ownerId !== '0') {
+        $ownerIds[$ownerId] = $ownerId;
+      }
     }
 
-    $mandatesByProperty = [];
+    $mandates = [];
+    $mandateWhere = [];
+    $mandateArgs = [];
     if ($propertyIds !== []) {
-      $placeholders = implode(',', array_fill(0, count($propertyIds), '?'));
+      $mandateWhere[] = "TRIM(COALESCE(`id_inmueble`, '')) IN (" . implode(',', array_fill(0, count($propertyIds), '?')) . ')';
+      array_push($mandateArgs, ...array_values($propertyIds));
+    }
+    if ($ownerEmails !== [] && $mandateOwnerEmailColumn !== '') {
+      $mandateWhere[] = "LOWER(TRIM(COALESCE(`{$mandateOwnerEmailColumn}`, ''))) IN (" . implode(',', array_fill(0, count($ownerEmails), '?')) . ')';
+      array_push($mandateArgs, ...array_values($ownerEmails));
+    }
+    if ($ownerIds !== [] && $mandateOwnerIdColumn !== '') {
+      $mandateWhere[] = "TRIM(COALESCE(`{$mandateOwnerIdColumn}`, '')) IN (" . implode(',', array_fill(0, count($ownerIds), '?')) . ')';
+      array_push($mandateArgs, ...array_values($ownerIds));
+    }
+    if ($mandateWhere !== []) {
       $mandates = $this->db->getResults(
         "SELECT `_ID` AS mandate_id, `id_inmueble`, `aseguradora`, `precio`,
-                `administracion`, `incluye_iva`, `iva_precio`, `iva_total_precio`
+                `administracion`, `incluye_iva`, `iva_precio`, `iva_total_precio`,
+                " . $this->selectColumnExpression($mandateOwnerEmailColumn, 'owner_email') . ",
+                " . $this->selectColumnExpression($mandateOwnerNameColumn, 'owner_name') . ",
+                " . $this->selectColumnExpression($mandateOwnerIdColumn, 'owner_id') . ",
+                " . $this->selectColumnExpression($mandateAddressColumn, 'mandate_address') . "
            FROM `{$mandatesTable}`
-          WHERE TRIM(COALESCE(`id_inmueble`, '')) IN ({$placeholders})
+          WHERE " . implode(' OR ', $mandateWhere) . "
           ORDER BY `_ID` DESC
-          LIMIT 400",
-        array_values($propertyIds)
+          LIMIT 600",
+        $mandateArgs
       );
+    }
+
+    $rows = [];
+    foreach ($contracts as $contract) {
+      $candidates = [];
+      $candidateIds = [];
       foreach ($mandates as $mandate) {
-        $propertyKey = $this->propertyKey($mandate['id_inmueble'] ?? '');
-        if ($propertyKey === '') {
+        $matchReason = $this->mandateCandidateMatchReason($contract, $mandate);
+        $mandateId = (int) ($mandate['mandate_id'] ?? 0);
+        if ($matchReason === '' || $mandateId <= 0 || isset($candidateIds[$mandateId])) {
           continue;
         }
+        $candidateIds[$mandateId] = true;
         $values = $this->platformValuesFromContract([
           'precio' => $mandate['precio'] ?? null,
           'administracion' => $mandate['administracion'] ?? null,
@@ -618,21 +670,21 @@ final class CanonInsuranceAuditService
           'iva_precio' => $mandate['iva_precio'] ?? null,
           'iva_total_precio' => $mandate['iva_total_precio'] ?? null,
         ]);
-        $mandatesByProperty[$propertyKey][] = [
-          'mandate_id' => (int) ($mandate['mandate_id'] ?? 0),
+        $candidates[] = [
+          'mandate_id' => $mandateId,
           'property_id' => AuditValueNormalizer::text($mandate['id_inmueble'] ?? ''),
           'insurer' => AuditValueNormalizer::text($mandate['aseguradora'] ?? ''),
+          'owner_name' => AuditValueNormalizer::text($mandate['owner_name'] ?? ''),
+          'owner_email' => AuditValueNormalizer::text($mandate['owner_email'] ?? ''),
+          'owner_id' => AuditValueNormalizer::text($mandate['owner_id'] ?? ''),
+          'mandate_address' => AuditValueNormalizer::text($mandate['mandate_address'] ?? ''),
+          'match_reason' => $matchReason,
           'canon' => $values['canon'],
           'administration' => $values['administration'],
           'iva' => $values['iva'],
           'includes_iva' => AuditValueNormalizer::text($mandate['incluye_iva'] ?? ''),
         ];
       }
-    }
-
-    $rows = [];
-    foreach ($contracts as $contract) {
-      $propertyKey = $this->propertyKey($contract['id_inmueble'] ?? '');
       $rows[] = [
         'contract_id' => (int) ($contract['contract_id'] ?? 0),
         'contract_number' => AuditValueNormalizer::text($contract['contract_number'] ?? ''),
@@ -640,10 +692,13 @@ final class CanonInsuranceAuditService
         'tenant' => AuditValueNormalizer::text($contract['arrendatario'] ?? ''),
         'property_address' => AuditValueNormalizer::text($contract['direccion'] ?? ''),
         'property_id' => AuditValueNormalizer::text($contract['id_inmueble'] ?? ''),
+        'owner_name' => AuditValueNormalizer::text($contract['owner_name'] ?? ''),
+        'owner_email' => AuditValueNormalizer::text($contract['owner_email'] ?? ''),
+        'owner_id' => AuditValueNormalizer::text($contract['owner_id'] ?? ''),
         'insurer' => AuditValueNormalizer::text($contract['aseguradora'] ?? ''),
         'canon' => $this->databaseMoney($contract['valor_canon'] ?? null),
         'administration' => $this->databaseMoney($contract['valor_administracion'] ?? null),
-        'candidates' => $mandatesByProperty[$propertyKey] ?? [],
+        'candidates' => $candidates,
       ];
     }
 
@@ -682,8 +737,19 @@ final class CanonInsuranceAuditService
     if ($currentMandate !== '' && $currentMandate !== '0') {
       throw new \RuntimeException('Este contrato ya tiene un mandato vinculado.');
     }
-    if ($this->propertyKey($row['contract_property'] ?? '') === '' || $this->propertyKey($row['contract_property'] ?? '') !== $this->propertyKey($row['mandate_property'] ?? '')) {
-      throw new \RuntimeException('El mandato no corresponde al mismo id_inmueble del contrato.');
+    $candidatePayload = $this->mandateLinkingRows('', $contractId);
+    $candidateRows = (array) ($candidatePayload['rows'] ?? []);
+    $validCandidate = false;
+    foreach ($candidateRows as $candidateRow) {
+      foreach ((array) ($candidateRow['candidates'] ?? []) as $candidate) {
+        if ((int) ($candidate['mandate_id'] ?? 0) === $mandateId) {
+          $validCandidate = true;
+          break 2;
+        }
+      }
+    }
+    if (!$validCandidate) {
+      throw new \RuntimeException('El mandato no aparece como candidato valido para este contrato.');
     }
 
     $this->db->update($contractsTable, [
@@ -795,6 +861,38 @@ final class CanonInsuranceAuditService
   private function propertyKey(mixed $value): string
   {
     return mb_strtolower(trim((string) $value), 'UTF-8');
+  }
+
+  private function emailKey(mixed $value): string
+  {
+    return mb_strtolower(trim(AuditValueNormalizer::text($value)), 'UTF-8');
+  }
+
+  /** @param array<string,mixed> $contract @param array<string,mixed> $mandate */
+  private function mandateCandidateMatchReason(array $contract, array $mandate): string
+  {
+    $contractProperty = $this->propertyKey($contract['id_inmueble'] ?? '');
+    $mandateProperty = $this->propertyKey($mandate['id_inmueble'] ?? '');
+    if ($contractProperty !== '' && $mandateProperty !== '' && $contractProperty === $mandateProperty) {
+      return 'Mismo id_inmueble';
+    }
+    if ($mandateProperty !== '') {
+      return '';
+    }
+
+    $contractEmail = $this->emailKey($contract['owner_email'] ?? '');
+    $mandateEmail = $this->emailKey($mandate['owner_email'] ?? '');
+    if ($contractEmail !== '' && $mandateEmail !== '' && $contractEmail === $mandateEmail) {
+      return 'Mandato sin id_inmueble; coincide correo del propietario';
+    }
+
+    $contractOwnerId = AuditValueNormalizer::text($contract['owner_id'] ?? '');
+    $mandateOwnerId = AuditValueNormalizer::text($mandate['owner_id'] ?? '');
+    if ($contractOwnerId !== '' && $contractOwnerId !== '0' && $mandateOwnerId !== '' && $mandateOwnerId !== '0' && $contractOwnerId === $mandateOwnerId) {
+      return 'Mandato sin id_inmueble; coincide propietario';
+    }
+
+    return '';
   }
 
   /** @param array<int,array<string,mixed>> $rows @return array<int,array<string,mixed>> */
@@ -934,6 +1032,30 @@ final class CanonInsuranceAuditService
       'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1',
       [$table]
     ));
+  }
+
+  private function columnExists(string $table, string $column): bool
+  {
+    return !empty($this->db->getVar(
+      'SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1',
+      [$table, $column]
+    ));
+  }
+
+  /** @param array<int,string> $columns */
+  private function firstExistingColumn(string $table, array $columns): string
+  {
+    foreach ($columns as $column) {
+      if ($this->columnExists($table, $column)) {
+        return $column;
+      }
+    }
+    return '';
+  }
+
+  private function selectColumnExpression(string $column, string $alias): string
+  {
+    return $column !== '' ? "`{$column}` AS `{$alias}`" : "'' AS `{$alias}`";
   }
 
   /** @return array<string,mixed> */
