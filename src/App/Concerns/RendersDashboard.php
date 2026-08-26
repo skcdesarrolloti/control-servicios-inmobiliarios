@@ -35,10 +35,9 @@ trait RendersDashboard
       return trim((string) ($row['id_empleado'] ?? ''));
     }, $calendarAllowedFuncionarios)));
     $params = $module->parseParams($_GET);
-    $result = $module->run($params, $config);
-    $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];
-    $tbodyHtml = (string)($result['tbody'] ?? '');
-    $paginationHtml = (string)($result['pagination_html'] ?? '');
+    $stats = [];
+    $tbodyHtml = '';
+    $paginationHtml = '';
 
     $genericTabDefs = $this->get_generic_tab_definitions();
     $tabRaw = trim((string) ($_GET['scm_tab'] ?? ($_GET['tab'] ?? '')));
@@ -109,6 +108,10 @@ trait RendersDashboard
       'abiertos' => 'scm-panel-abiertos',
       'abierto' => 'scm-panel-abiertos',
       'scm-panel-abiertos' => 'scm-panel-abiertos',
+      'metricas' => 'scm-panel-metricas',
+      'métricas' => 'scm-panel-metricas',
+      'metrics' => 'scm-panel-metricas',
+      'scm-panel-metricas' => 'scm-panel-metricas',
       'postergados' => 'scm-panel-postergados',
       'scm-panel-postergados' => 'scm-panel-postergados',
       'cerrados' => 'scm-panel-cerrados',
@@ -243,7 +246,12 @@ trait RendersDashboard
       }
     }
     if ($initialTab === '') {
-      foreach ($dashboardPanelToTab as $panelId => $permissionKey) {
+      $preferredInitialPanels = array_merge(['scm-panel-metricas'], array_keys($dashboardPanelToTab));
+      foreach ($preferredInitialPanels as $panelId) {
+        $permissionKey = (string)($dashboardPanelToTab[$panelId] ?? '');
+        if ($permissionKey === '') {
+          continue;
+        }
         if ($permissionKey === 'actividades_administrativas') {
           if ($canAccessAdministrativeActivities) {
             $initialTab = $panelId;
@@ -260,6 +268,15 @@ trait RendersDashboard
     if ($initialAdministrativeActivityKey === '' || !in_array($initialAdministrativeActivityKey, $allowedAdministrativeActivityTabs, true)) {
       $initialAdministrativeActivityKey = (string) ($allowedAdministrativeActivityTabs[0] ?? '');
     }
+
+    $activeOpenTopic = isset($openTopicDefs[$initialOpenTopic]) ? $initialOpenTopic : 'mant';
+    $hydrateMaintenanceRows = $initialTab === 'scm-panel-abiertos' && $activeOpenTopic === 'mant';
+    $result = $hydrateMaintenanceRows ? $module->run($params, $config) : $module->summarizeMaintenance($params);
+    $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];
+    $tbodyHtml = $hydrateMaintenanceRows
+      ? (string)($result['tbody'] ?? '')
+      : $this->render_lazy_tickets_placeholder('Abre Mantenimiento para cargar los tickets.');
+    $paginationHtml = $hydrateMaintenanceRows ? (string)($result['pagination_html'] ?? '') : '';
 
     $nonce = \SCM\Core\App::csrf()->token(self::NONCE_KEY);
     $apiUrl = defined('SCM_BASE_URL') ? (SCM_BASE_URL . '/api.php') : '/api.php';
@@ -470,7 +487,6 @@ trait RendersDashboard
         <?php endforeach; ?>
       </div>
 
-      <?php $activeOpenTopic = isset($openTopicDefs[$initialOpenTopic]) ? $initialOpenTopic : 'mant'; ?>
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-abiertos' ? ' active' : ''; ?>" id="scm-panel-abiertos" data-permission-tab="abiertos">
         <div class="scm-status-bucket scm-open-bucket" data-open-bucket="abiertos">
           <div class="scm-status-subtabs scm-open-subtabs" role="tablist" aria-label="Tickets abiertos">
@@ -479,7 +495,7 @@ trait RendersDashboard
             <?php endforeach; ?>
           </div>
 
-      <div class="scm-open-topic-panel<?php echo $activeOpenTopic === 'mant' ? ' active' : ''; ?>" id="scm-panel-mant" data-open-topic="mant" data-scm-loaded="1">
+      <div class="scm-open-topic-panel<?php echo $activeOpenTopic === 'mant' ? ' active' : ''; ?>" id="scm-panel-mant" data-open-topic="mant" data-scm-loaded="<?php echo $hydrateMaintenanceRows ? '1' : '0'; ?>">
         <div class="scm-kpis scm-kpis-daisy">
           <div class="scm-kpi">
             <div class="scm-kpi-label">Total</div>

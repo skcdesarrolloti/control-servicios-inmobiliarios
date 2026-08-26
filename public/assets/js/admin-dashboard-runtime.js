@@ -5934,11 +5934,18 @@
       if (!form || !tbody || !ajaxUrl || !actionMant) {
         return Promise.resolve();
       }
+      var mantPanel = root.querySelector("#scm-panel-mant");
+      if (mantPanel && mantPanel.getAttribute("data-scm-loading") === "1") {
+        return Promise.resolve();
+      }
 
       fd.append("action", actionMant);
       fd.append("nonce", nonce);
       fd.append("config", JSON.stringify(config));
 
+      if (mantPanel) {
+        mantPanel.setAttribute("data-scm-loading", "1");
+      }
       if (spinner) {
         spinner.classList.add("active");
       }
@@ -5983,6 +5990,9 @@
           updateKPI("scm-kpi-magnitud-medio", d.kpi_magnitud_medio || "0");
           updateKPI("scm-kpi-magnitud-bajo", d.kpi_magnitud_bajo || "0");
           updateKPI("scm-kpi-header-count", d.kpi_total || "0");
+          if (mantPanel) {
+            mantPanel.setAttribute("data-scm-loaded", "1");
+          }
           applyRevisionKpiVisibility("scm-", d.kpi_con_prev, d.kpi_sin_prev);
           applyBinaryFilterKpiVisibility(
             "scm-",
@@ -6003,6 +6013,9 @@
           }
           setListLoading(tbody, false);
           form.classList.remove("scm-loading");
+          if (mantPanel) {
+            mantPanel.setAttribute("data-scm-loading", "0");
+          }
         });
     }
 
@@ -7840,7 +7853,16 @@
         return Promise.resolve();
       }
       var key = panel.getAttribute("data-open-topic") || "";
-      if (!key || key === "mant") {
+      if (!key) {
+        return Promise.resolve();
+      }
+      if (key === "mant") {
+        if (panel.getAttribute("data-scm-loaded") === "1") {
+          return Promise.resolve();
+        }
+        if (form) {
+          return doFetch(new FormData(form));
+        }
         return Promise.resolve();
       }
       return loadPanelOnce(panel, key);

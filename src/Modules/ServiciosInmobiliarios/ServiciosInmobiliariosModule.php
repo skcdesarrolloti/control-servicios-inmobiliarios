@@ -67,6 +67,29 @@ final class ServiciosInmobiliariosModule
   }
 
   /**
+   * Resumen liviano para el primer render: conserva KPIs/metricas sin
+   * construir tarjetas del listado hasta que el usuario abra la pestaña.
+   *
+   * @param array<string,string> $params
+   * @return array<string,mixed>
+   */
+  public function summarizeMaintenance(array $params, string $statusBucket = ''): array
+  {
+    $statusBucket = in_array($statusBucket, ['postergados', 'cerrados'], true) ? $statusBucket : '';
+    if ($statusBucket !== '') {
+      $params['_scmStatusBucket'] = $statusBucket;
+    }
+
+    return [
+      'rows' => [],
+      'stats' => $this->ticketsRepository->aggregateMaintenanceStats($params),
+      'pagination' => ['page' => 1, 'per_page' => 20, 'total' => 0, 'total_pages' => 1],
+      'tbody' => '',
+      'pagination_html' => '',
+    ];
+  }
+
+  /**
    * @param array<string,string> $params
    * @param array<string,string> $config
    * @return array<string,mixed>
