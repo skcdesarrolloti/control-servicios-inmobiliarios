@@ -193,6 +193,7 @@ final class CanonInsuranceAuditView
     }
     $request = AuditValueNormalizer::requestNumber($item['request_number'] ?? '');
     $mandateId = (int) ($item['mandate_id'] ?? 0);
+    $tenant = (string) ($item['tenant'] ?? '');
     $out = '';
     if ($request === '') {
       $out .= '<form class="scm-cia-inline-repair scm-cia-inline-request" data-cia-update-request-form>'
@@ -200,10 +201,13 @@ final class CanonInsuranceAuditView
         . '<label>Completar solicitud<input name="request_number" type="text" inputmode="numeric" autocomplete="off" placeholder="N&uacute;mero solicitud" required></label>'
         . '<button type="submit" class="scm-btn-secondary btn btn-outline">Guardar</button>'
         . '</form>';
+      if (trim($tenant) !== '') {
+        $out .= '<button type="button" class="scm-cia-inline-repair-button scm-btn-secondary btn btn-outline" data-cia-open-requests data-cia-request-search-value="' . esc_attr($tenant) . '">Revisar por arrendatario</button>';
+      }
     }
     if ($mandateId <= 0) {
       $search = (string) (($item['contract_number'] ?? '') ?: (($item['tenant'] ?? '') ?: ($item['property_address'] ?? '')));
-      $out .= '<button type="button" class="scm-cia-inline-repair-button scm-btn-secondary btn btn-outline" data-cia-open-mandates data-cia-mandate-search-value="' . esc_attr($search) . '">Vincular mandato</button>';
+      $out .= '<button type="button" class="scm-cia-inline-repair-button scm-btn-secondary btn btn-outline" data-cia-open-mandates data-cia-mandate-contract-id="' . esc_attr((string) $contractId) . '" data-cia-mandate-search-value="' . esc_attr($search) . '">Vincular mandato</button>';
     }
     return $out !== '' ? '<div class="scm-cia-row-actions">' . $out . '</div>' : '';
   }

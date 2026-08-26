@@ -109,7 +109,8 @@ trait HandlesCanonInsuranceAudits
     }
     try {
       $payload = $this->canonInsuranceAuditService()->mandateLinkingRows(
-        trim(sanitize_text_field(wp_unslash((string) ($_POST['search'] ?? ''))))
+        trim(sanitize_text_field(wp_unslash((string) ($_POST['search'] ?? '')))),
+        (int) ($_POST['contract_id'] ?? 0)
       );
       $this->jsonOk([
         'html' => (new CanonInsuranceAuditView())->renderMandateLinking($payload),
@@ -129,7 +130,8 @@ trait HandlesCanonInsuranceAudits
       $payload = $this->canonInsuranceAuditService()->linkMandateToContract(
         (int) ($_POST['contract_id'] ?? 0),
         (int) ($_POST['mandate_id'] ?? 0),
-        trim(sanitize_text_field(wp_unslash((string) ($_POST['search'] ?? ''))))
+        trim(sanitize_text_field(wp_unslash((string) ($_POST['search'] ?? '')))),
+        (int) ($_POST['context_contract_id'] ?? 0)
       );
       $this->jsonOk([
         'html' => (new CanonInsuranceAuditView())->renderMandateLinking($payload),

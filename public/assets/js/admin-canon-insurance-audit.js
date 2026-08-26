@@ -25,6 +25,7 @@
     var requestModal = module.querySelector("[data-cia-request-modal]");
     var requestContent = module.querySelector("[data-cia-request-content]");
     var requestStatus = module.querySelector("[data-cia-request-status]");
+    var currentMandateContractId = "";
     module.dataset.ciaInit = "1";
 
     function updateFilenameGuide(period) {
@@ -81,8 +82,9 @@
       mandateStatus.classList.toggle("is-loading", tone === "loading");
     }
 
-    function openMandateModal(searchValue) {
+    function openMandateModal(searchValue, contractId) {
       if (!mandateModal) return;
+      currentMandateContractId = contractId ? String(contractId) : "";
       mandateModal.hidden = false;
       document.documentElement.classList.add("scm-cia-modal-open");
       var searchInput = mandateModal.querySelector('[name="search"]');
@@ -94,6 +96,7 @@
     function closeMandateModal() {
       if (!mandateModal) return;
       mandateModal.hidden = true;
+      currentMandateContractId = "";
       document.documentElement.classList.remove("scm-cia-modal-open");
     }
 
@@ -110,6 +113,7 @@
       var fd = new FormData();
       fd.append("action", mandatesAction);
       fd.append("search", typeof search === "string" ? search : currentMandateSearch());
+      if (currentMandateContractId) fd.append("contract_id", currentMandateContractId);
       setMandateStatus("Consultando contratos sin mandato...", "loading");
       return request(fd)
         .then(function (data) {
@@ -131,11 +135,12 @@
       requestStatus.classList.toggle("is-loading", tone === "loading");
     }
 
-    function openRequestModal() {
+    function openRequestModal(searchValue) {
       if (!requestModal) return;
       requestModal.hidden = false;
       document.documentElement.classList.add("scm-cia-modal-open");
       var searchInput = requestModal.querySelector('[name="search"]');
+      if (searchInput && typeof searchValue === "string") searchInput.value = searchValue;
       if (searchInput) window.setTimeout(function () { searchInput.focus(); }, 50);
       loadRequests();
     }
@@ -232,6 +237,7 @@
       var mandateSearchForm = event.target.closest("[data-cia-mandate-search]");
       if (mandateSearchForm) {
         event.preventDefault();
+        currentMandateContractId = "";
         loadMandates(new FormData(mandateSearchForm).get("search") || "");
         return;
       }
@@ -247,6 +253,7 @@
         var mandateData = new FormData(mandateLinkForm);
         mandateData.append("action", linkMandateAction);
         mandateData.append("search", currentMandateSearch());
+        if (currentMandateContractId) mandateData.append("context_contract_id", currentMandateContractId);
         var mandateButton = mandateLinkForm.querySelector('button[type="submit"]');
         if (mandateButton) mandateButton.disabled = true;
         setMandateStatus("Vinculando mandato...", "loading");
@@ -467,7 +474,10 @@
       if (event.target.closest("[data-cia-open-mandates]")) {
         event.preventDefault();
         var mandateTrigger = event.target.closest("[data-cia-open-mandates]");
-        openMandateModal(mandateTrigger ? mandateTrigger.dataset.ciaMandateSearchValue || "" : "");
+        openMandateModal(
+          mandateTrigger ? mandateTrigger.dataset.ciaMandateSearchValue || "" : "",
+          mandateTrigger ? mandateTrigger.dataset.ciaMandateContractId || "" : ""
+        );
         return;
       }
       if (event.target.closest("[data-cia-close-mandates]")) {
@@ -477,7 +487,8 @@
       }
       if (event.target.closest("[data-cia-open-requests]")) {
         event.preventDefault();
-        openRequestModal();
+        var requestTrigger = event.target.closest("[data-cia-open-requests]");
+        openRequestModal(requestTrigger ? requestTrigger.dataset.ciaRequestSearchValue || "" : "");
         return;
       }
       if (event.target.closest("[data-cia-close-requests]")) {

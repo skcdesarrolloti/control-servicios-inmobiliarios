@@ -554,7 +554,7 @@ final class CanonInsuranceAuditService
   }
 
   /** @return array<string,mixed> */
-  public function mandateLinkingRows(string $search = ''): array
+  public function mandateLinkingRows(string $search = '', int $contractId = 0): array
   {
     $contractsTable = $this->db->table('jet_cct_contratos_arrendamiento');
     $mandatesTable = $this->db->table('jet_cct_contrato_mandato');
@@ -565,7 +565,11 @@ final class CanonInsuranceAuditService
       "TRIM(COALESCE(`id_inmueble`, '')) <> ''",
     ];
     $args = [];
-    if ($search !== '') {
+    if ($contractId > 0) {
+      $where[] = '`_ID` = ?';
+      $args[] = $contractId;
+      $search = '';
+    } elseif ($search !== '') {
       $like = '%' . $this->db->escapeLike($search) . '%';
       $where[] = "(COALESCE(`contrato`, '') LIKE ? OR COALESCE(`numero_solicitud`, '') LIKE ? OR COALESCE(`arrendatario`, '') LIKE ? OR COALESCE(`direccion`, '') LIKE ? OR COALESCE(`id_inmueble`, '') LIKE ?)";
       $args = [$like, $like, $like, $like, $like];
@@ -647,11 +651,12 @@ final class CanonInsuranceAuditService
       'rows' => $rows,
       'total' => count($rows),
       'search' => $search,
+      'contract_id' => $contractId,
     ];
   }
 
   /** @return array<string,mixed> */
-  public function linkMandateToContract(int $contractId, int $mandateId, string $search = ''): array
+  public function linkMandateToContract(int $contractId, int $mandateId, string $search = '', int $contextContractId = 0): array
   {
     $contractsTable = $this->db->table('jet_cct_contratos_arrendamiento');
     $mandatesTable = $this->db->table('jet_cct_contrato_mandato');
@@ -687,7 +692,7 @@ final class CanonInsuranceAuditService
 
     return [
       'message' => 'Mandato ' . $mandateId . ' vinculado al contrato ' . AuditValueNormalizer::text($row['contrato'] ?? ('#' . $contractId)) . '.',
-    ] + $this->mandateLinkingRows($search);
+    ] + $this->mandateLinkingRows($contextContractId > 0 ? '' : $search, $contextContractId);
   }
 
   /** @return array<string,mixed> */
