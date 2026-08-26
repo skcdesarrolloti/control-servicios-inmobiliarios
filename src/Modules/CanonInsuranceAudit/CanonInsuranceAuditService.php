@@ -13,7 +13,7 @@ final class CanonInsuranceAuditService
 {
   private const MONEY_TOLERANCE = 1.0;
   private const COLOMBIA_IVA_FACTOR = 1.19;
-  private const IMPORT_VERSION = 'canon-admin-iva-consolidado-v6';
+  private const IMPORT_VERSION = 'canon-admin-iva-consolidado-v7';
 
   private Database $db;
   private SpreadsheetReader $reader;
@@ -405,6 +405,7 @@ final class CanonInsuranceAuditService
       "SELECT c.`_ID` AS contract_id, c.`contrato` AS contract_number, c.`numero_solicitud`,
               c.`arrendatario`, c.`direccion`, c.`id_contrato_mandato`, c.`valor_canon`,
               c.`valor_administracion`, c.`aseguradora` AS contract_insurer,
+              c.`id_estudio_aseguradora`,
               m.`_ID` AS mandate_id, m.`aseguradora` AS mandate_insurer,
               m.`precio`, m.`administracion`, m.`incluye_iva`,
               m.`iva_precio`, m.`iva_total_precio`
@@ -415,6 +416,7 @@ final class CanonInsuranceAuditService
         LIMIT 300",
       $args
     );
+    $rows = $this->enrichContractsWithInsuranceStudy($rows);
 
     $items = [];
     foreach ($rows as $row) {
@@ -425,6 +427,7 @@ final class CanonInsuranceAuditService
       $insurer = $this->firstNonEmptyText([
         $row['contract_insurer'] ?? null,
         $row['mandate_insurer'] ?? null,
+        $row['study_insurer'] ?? null,
       ]);
       $expectedInsurer = $this->insurerSourceKey($insurer);
       $request = AuditValueNormalizer::requestNumber($row['numero_solicitud'] ?? '');
@@ -437,6 +440,9 @@ final class CanonInsuranceAuditService
       }
       if ($expectedInsurer === '') {
         $findings[] = 'Plataforma: no se pudo identificar la aseguradora asignada.';
+      }
+      foreach ($this->insuranceStudyFindings($row, $request, $insurer) as $finding) {
+        $findings[] = $finding;
       }
       if ($mandateId === null) {
         $findings[] = 'Plataforma: el contrato no tiene mandato asociado para validar canon, administracion e IVA.';
@@ -687,6 +693,145 @@ final class CanonInsuranceAuditService
   private function propertyKey(mixed $value): string
   {
     return mb_strtolower(trim((string) $value), 'UTF-8');
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @return array<int,array<string,mixed>> */
+  private function enrichContractsWithInsuranceStudy(array $rows): array
+  {
+    if ($rows === []) {
+      return $rows;
+    }
+    $studiesTable = $this->db->table('jet_cct_estudios_aseguradoras');
+    if (!$this->tableExists($studiesTable)) {
+      return $rows;
+    }
+
+    $studyIds = [];
+    $requests = [];
+    foreach ($rows as $row) {
+      $studyId = AuditValueNormalizer::text($row['id_estudio_aseguradora'] ?? '');
+      if ($studyId !== '' && $studyId !== '0') {
+        $studyIds[$studyId] = $studyId;
+      }
+      $request = AuditValueNormalizer::requestNumber($row['numero_solicitud'] ?? '');
+      if ($request !== '') {
+        $requests[$request] = $request;
+      }
+    }
+    if ($studyIds === [] && $requests === []) {
+      return $rows;
+    }
+
+    $where = [];
+    $args = [];
+    if ($studyIds !== []) {
+      $where[] = 'CAST(`_ID` AS CHAR) IN (' . implode(',', array_fill(0, count($studyIds), '?')) . ')';
+      array_push($args, ...array_values($studyIds));
+    }
+    if ($requests !== []) {
+      $where[] = 'TRIM(COALESCE(`num_solicitud`, \'\')) IN (' . implode(',', array_fill(0, count($requests), '?')) . ')';
+      array_push($args, ...array_values($requests));
+    }
+
+    $studies = $this->db->getResults(
+      "SELECT `_ID` AS study_id,
+              TRIM(COALESCE(`num_solicitud`, '')) AS study_request,
+              TRIM(COALESCE(`aseguradora`, '')) AS study_insurer,
+              TRIM(COALESCE(`estado`, '')) AS study_status
+         FROM `{$studiesTable}`
+        WHERE " . implode(' OR ', $where) . "
+        ORDER BY `_ID` DESC
+        LIMIT 500",
+      $args
+    );
+
+    $byId = [];
+    $byRequest = [];
+    foreach ($studies as $study) {
+      $studyId = AuditValueNormalizer::text($study['study_id'] ?? '');
+      if ($studyId !== '') {
+        $byId[$studyId] = $study;
+      }
+      $request = AuditValueNormalizer::requestNumber($study['study_request'] ?? '');
+      if ($request !== '' && !isset($byRequest[$request])) {
+        $byRequest[$request] = $study;
+      }
+    }
+
+    foreach ($rows as $index => $row) {
+      $contractStudyId = AuditValueNormalizer::text($row['id_estudio_aseguradora'] ?? '');
+      $request = AuditValueNormalizer::requestNumber($row['numero_solicitud'] ?? '');
+      if ($contractStudyId !== '' && $contractStudyId !== '0' && !isset($byId[$contractStudyId])) {
+        $rows[$index]['study_missing'] = 1;
+      }
+      $study = ($contractStudyId !== '' && $contractStudyId !== '0' && isset($byId[$contractStudyId]))
+        ? $byId[$contractStudyId]
+        : ($byRequest[$request] ?? null);
+      if (!is_array($study)) {
+        continue;
+      }
+      $rows[$index]['study_id'] = AuditValueNormalizer::text($study['study_id'] ?? '');
+      $rows[$index]['study_request'] = AuditValueNormalizer::requestNumber($study['study_request'] ?? '');
+      $rows[$index]['study_insurer'] = AuditValueNormalizer::text($study['study_insurer'] ?? '');
+      $rows[$index]['study_status'] = AuditValueNormalizer::text($study['study_status'] ?? '');
+      $rows[$index]['study_match_source'] = $contractStudyId !== '' && $contractStudyId !== '0' && (string) ($rows[$index]['study_id'] ?? '') === $contractStudyId
+        ? 'id_estudio_aseguradora'
+        : 'numero_solicitud';
+    }
+
+    return $rows;
+  }
+
+  /** @param array<string,mixed> $contract @return array<int,string> */
+  private function insuranceStudyFindings(array $contract, string $contractRequest, string $insurer): array
+  {
+    $findings = [];
+    $contractInsurer = AuditValueNormalizer::text($contract['contract_insurer'] ?? '');
+    $contractStudyId = AuditValueNormalizer::text($contract['id_estudio_aseguradora'] ?? '');
+    $studyId = AuditValueNormalizer::text($contract['study_id'] ?? '');
+    $studyRequest = AuditValueNormalizer::requestNumber($contract['study_request'] ?? '');
+    $studyInsurer = AuditValueNormalizer::text($contract['study_insurer'] ?? '');
+    $studyStatus = AuditValueNormalizer::text($contract['study_status'] ?? '');
+    $contractRequest = AuditValueNormalizer::requestNumber($contractRequest);
+
+    if ($contractStudyId !== '' && $contractStudyId !== '0' && $studyId === '' && (int) ($contract['study_missing'] ?? 0) === 1) {
+      $findings[] = 'Estudio aseguradora: el contrato tiene id_estudio_aseguradora ' . $contractStudyId . ', pero no se encontro ese estudio.';
+    }
+    if ($studyId !== '' && ($contractStudyId === '' || $contractStudyId === '0') && (string) ($contract['study_match_source'] ?? '') === 'numero_solicitud') {
+      $findings[] = 'Estudio aseguradora: se encontro el estudio ' . $studyId . ' por numero_solicitud; revisar si debe vincularse en id_estudio_aseguradora del contrato.';
+    }
+    if ($contractRequest === '' && $studyRequest !== '') {
+      $findings[] = 'Contrato: falta numero_solicitud; el estudio aseguradora ' . ($studyId !== '' ? $studyId : 'encontrado') . ' registra solicitud ' . $studyRequest . '.';
+    } elseif ($contractRequest !== '' && $studyRequest !== '' && $contractRequest !== $studyRequest) {
+      $findings[] = 'Contrato: numero_solicitud ' . $contractRequest . ' no coincide con el estudio aseguradora ' . ($studyId !== '' ? $studyId : 'encontrado') . ' (' . $studyRequest . ').';
+    }
+    if ($contractInsurer === '' && $studyInsurer !== '') {
+      $suffix = $studyStatus !== '' ? ' Estado del estudio: ' . $studyStatus . '.' : '';
+      $findings[] = 'Estudio aseguradora: figura ' . $studyInsurer . ' en el estudio ' . ($studyId !== '' ? $studyId : 'encontrado') . '; revisar/actualizar la aseguradora del contrato.' . $suffix;
+    } elseif ($this->insurerSourceKey($insurer) === '' && $studyInsurer !== '') {
+      $findings[] = 'Estudio aseguradora: posible aseguradora ' . $studyInsurer . ' en el estudio ' . ($studyId !== '' ? $studyId : 'encontrado') . '.';
+    }
+    if ($contractInsurer === '' && $studyId === '' && $contractRequest !== '') {
+      $findings[] = 'Estudio aseguradora: no se encontro estudio por la solicitud ' . $contractRequest . '; revisar si el numero_solicitud del contrato esta correcto.';
+    }
+
+    return array_values(array_unique($findings));
+  }
+
+  /** @param array<int,string> $messages */
+  private function mergeDifferences(string $json, array $messages): string
+  {
+    $decoded = json_decode($json, true);
+    $existing = is_array($decoded) ? array_values(array_map('strval', $decoded)) : [];
+    return json_encode(array_values(array_unique(array_merge($existing, $messages))), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]';
+  }
+
+  private function tableExists(string $table): bool
+  {
+    return !empty($this->db->getVar(
+      'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1',
+      [$table]
+    ));
   }
 
   /** @return array<string,mixed> */
@@ -1056,6 +1201,7 @@ final class CanonInsuranceAuditService
       "SELECT c.`_ID` AS contract_id, c.`contrato` AS contract_number, c.`numero_solicitud`,
               c.`arrendatario`, c.`direccion`, c.`id_contrato_mandato`, c.`valor_canon`,
               c.`valor_administracion`, c.`aseguradora` AS contract_insurer,
+              c.`id_estudio_aseguradora`,
               m.`_ID` AS mandate_id, m.`aseguradora` AS mandate_insurer,
               m.`precio`, m.`administracion`, m.`incluye_iva`,
               m.`iva_precio`, m.`iva_total_precio`
@@ -1066,6 +1212,7 @@ final class CanonInsuranceAuditService
                  (LOWER(TRIM(COALESCE(c.`contrato`, ''))) <> 'no asignado') DESC,
                  c.`_ID` DESC"
     );
+    $rows = $this->enrichContractsWithInsuranceStudy($rows);
     $map = [];
     foreach ($rows as $row) {
       $key = AuditValueNormalizer::requestNumber($row['numero_solicitud'] ?? '');
@@ -1127,6 +1274,7 @@ final class CanonInsuranceAuditService
     $base['insurer'] = $this->firstNonEmptyText([
       $contract['contract_insurer'] ?? null,
       $contract['mandate_insurer'] ?? null,
+      $contract['study_insurer'] ?? null,
       $sourceLabel,
     ]);
 
@@ -1156,6 +1304,11 @@ final class CanonInsuranceAuditService
     }
 
     [$base['status'], $base['differences_json']] = $this->statusAndDifferencesForComparedItem($base);
+    $studyFindings = $this->insuranceStudyFindings($contract, $request, (string) $base['insurer']);
+    if ($studyFindings !== []) {
+      $base['status'] = $base['status'] === 'incorrecto' ? 'incorrecto' : 'anomalia';
+      $base['differences_json'] = $this->mergeDifferences((string) $base['differences_json'], $studyFindings);
+    }
     return $base;
   }
 
