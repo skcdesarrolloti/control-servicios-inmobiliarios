@@ -12,9 +12,8 @@ use SCM\Support\EmailQueue;
 final class CanonInsuranceAuditService
 {
   private const MONEY_TOLERANCE = 1.0;
-  private const COLOMBIA_IVA_RATE = 0.19;
   private const COLOMBIA_IVA_FACTOR = 1.19;
-  private const IMPORT_VERSION = 'canon-admin-iva-consolidado-v4';
+  private const IMPORT_VERSION = 'canon-admin-iva-consolidado-v5';
 
   private Database $db;
   private SpreadsheetReader $reader;
@@ -493,13 +492,6 @@ final class CanonInsuranceAuditService
     } elseif ($includesVat === 'no') {
       $iva = 0.0;
     }
-    $insurer = $this->firstNonEmptyText([
-      $contract['contract_insurer'] ?? null,
-      $contract['mandate_insurer'] ?? null,
-    ]);
-    if ($iva === null && $this->insurerSourceKey($insurer) === 'libertador' && $canon !== null) {
-      $iva = round((float) $canon * self::COLOMBIA_IVA_RATE, 2);
-    }
     return ['canon' => $canon, 'administration' => $administration, 'iva' => $iva];
   }
 
@@ -528,12 +520,6 @@ final class CanonInsuranceAuditService
     $split = $this->splitIncludedIva((float) $item['excel_canon']);
     $item['excel_canon'] = $split['base'];
     $item['excel_iva'] = $split['iva'];
-    if (($item['system_iva'] ?? null) === null) {
-      $systemCanon = $this->databaseMoney($item['system_canon'] ?? null);
-      if ($systemCanon !== null) {
-        $item['system_iva'] = round($systemCanon * self::COLOMBIA_IVA_RATE, 2);
-      }
-    }
     foreach ([
       'canon' => ['excel_canon', 'system_canon', 'difference_canon'],
       'administration' => ['excel_administration', 'system_administration', 'difference_administration'],
@@ -545,6 +531,150 @@ final class CanonInsuranceAuditService
     }
     [$item['status'], $item['differences_json']] = $this->statusAndDifferencesForComparedItem($item);
     return $item;
+  }
+
+  /** @return array<string,mixed> */
+  public function mandateLinkingRows(string $search = ''): array
+  {
+    $contractsTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    $mandatesTable = $this->db->table('jet_cct_contrato_mandato');
+    $search = trim(preg_replace('/\s+/u', ' ', AuditValueNormalizer::text($search)) ?? '');
+    $where = [
+      "LOWER(TRIM(COALESCE(`estado`, ''))) = 'entregado'",
+      "(TRIM(COALESCE(`id_contrato_mandato`, '')) = '' OR TRIM(COALESCE(`id_contrato_mandato`, '')) = '0')",
+      "TRIM(COALESCE(`id_inmueble`, '')) <> ''",
+    ];
+    $args = [];
+    if ($search !== '') {
+      $like = '%' . $this->db->escapeLike($search) . '%';
+      $where[] = "(COALESCE(`contrato`, '') LIKE ? OR COALESCE(`numero_solicitud`, '') LIKE ? OR COALESCE(`arrendatario`, '') LIKE ? OR COALESCE(`direccion`, '') LIKE ? OR COALESCE(`id_inmueble`, '') LIKE ?)";
+      $args = [$like, $like, $like, $like, $like];
+    }
+
+    $contracts = $this->db->getResults(
+      "SELECT `_ID` AS contract_id, `contrato` AS contract_number, `numero_solicitud`,
+              `arrendatario`, `direccion`, `id_inmueble`, `aseguradora`,
+              `valor_canon`, `valor_administracion`
+         FROM `{$contractsTable}`
+        WHERE " . implode(' AND ', $where) . "
+        ORDER BY `_ID` DESC
+        LIMIT 100",
+      $args
+    );
+
+    $propertyIds = [];
+    foreach ($contracts as $contract) {
+      $propertyId = $this->propertyKey($contract['id_inmueble'] ?? '');
+      if ($propertyId !== '') {
+        $propertyIds[$propertyId] = AuditValueNormalizer::text($contract['id_inmueble'] ?? '');
+      }
+    }
+
+    $mandatesByProperty = [];
+    if ($propertyIds !== []) {
+      $placeholders = implode(',', array_fill(0, count($propertyIds), '?'));
+      $mandates = $this->db->getResults(
+        "SELECT `_ID` AS mandate_id, `id_inmueble`, `aseguradora`, `precio`,
+                `administracion`, `incluye_iva`, `iva_precio`, `iva_total_precio`
+           FROM `{$mandatesTable}`
+          WHERE TRIM(COALESCE(`id_inmueble`, '')) IN ({$placeholders})
+          ORDER BY `_ID` DESC
+          LIMIT 400",
+        array_values($propertyIds)
+      );
+      foreach ($mandates as $mandate) {
+        $propertyKey = $this->propertyKey($mandate['id_inmueble'] ?? '');
+        if ($propertyKey === '') {
+          continue;
+        }
+        $values = $this->platformValuesFromContract([
+          'precio' => $mandate['precio'] ?? null,
+          'administracion' => $mandate['administracion'] ?? null,
+          'incluye_iva' => $mandate['incluye_iva'] ?? null,
+          'iva_precio' => $mandate['iva_precio'] ?? null,
+          'iva_total_precio' => $mandate['iva_total_precio'] ?? null,
+        ]);
+        $mandatesByProperty[$propertyKey][] = [
+          'mandate_id' => (int) ($mandate['mandate_id'] ?? 0),
+          'property_id' => AuditValueNormalizer::text($mandate['id_inmueble'] ?? ''),
+          'insurer' => AuditValueNormalizer::text($mandate['aseguradora'] ?? ''),
+          'canon' => $values['canon'],
+          'administration' => $values['administration'],
+          'iva' => $values['iva'],
+          'includes_iva' => AuditValueNormalizer::text($mandate['incluye_iva'] ?? ''),
+        ];
+      }
+    }
+
+    $rows = [];
+    foreach ($contracts as $contract) {
+      $propertyKey = $this->propertyKey($contract['id_inmueble'] ?? '');
+      $rows[] = [
+        'contract_id' => (int) ($contract['contract_id'] ?? 0),
+        'contract_number' => AuditValueNormalizer::text($contract['contract_number'] ?? ''),
+        'request_number' => AuditValueNormalizer::requestNumber($contract['numero_solicitud'] ?? ''),
+        'tenant' => AuditValueNormalizer::text($contract['arrendatario'] ?? ''),
+        'property_address' => AuditValueNormalizer::text($contract['direccion'] ?? ''),
+        'property_id' => AuditValueNormalizer::text($contract['id_inmueble'] ?? ''),
+        'insurer' => AuditValueNormalizer::text($contract['aseguradora'] ?? ''),
+        'canon' => $this->databaseMoney($contract['valor_canon'] ?? null),
+        'administration' => $this->databaseMoney($contract['valor_administracion'] ?? null),
+        'candidates' => $mandatesByProperty[$propertyKey] ?? [],
+      ];
+    }
+
+    return [
+      'rows' => $rows,
+      'total' => count($rows),
+      'search' => $search,
+    ];
+  }
+
+  /** @return array<string,mixed> */
+  public function linkMandateToContract(int $contractId, int $mandateId, string $search = ''): array
+  {
+    $contractsTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    $mandatesTable = $this->db->table('jet_cct_contrato_mandato');
+    if ($contractId <= 0 || $mandateId <= 0) {
+      throw new \RuntimeException('Selecciona un contrato y un mandato validos.');
+    }
+    $row = $this->db->getRow(
+      "SELECT c.`_ID` AS contract_id, c.`contrato`, c.`estado`, c.`id_inmueble` AS contract_property,
+              c.`id_contrato_mandato`, m.`_ID` AS mandate_id, m.`id_inmueble` AS mandate_property
+         FROM `{$contractsTable}` c
+         INNER JOIN `{$mandatesTable}` m ON m.`_ID` = ?
+        WHERE c.`_ID` = ?
+        LIMIT 1",
+      [$mandateId, $contractId]
+    );
+    if (!is_array($row)) {
+      throw new \RuntimeException('No se encontro el contrato o el mandato seleccionado.');
+    }
+    if (AuditValueNormalizer::key($row['estado'] ?? '') !== 'entregado') {
+      throw new \RuntimeException('Solo se pueden vincular contratos en estado Entregado.');
+    }
+    $currentMandate = AuditValueNormalizer::text($row['id_contrato_mandato'] ?? '');
+    if ($currentMandate !== '' && $currentMandate !== '0') {
+      throw new \RuntimeException('Este contrato ya tiene un mandato vinculado.');
+    }
+    if ($this->propertyKey($row['contract_property'] ?? '') === '' || $this->propertyKey($row['contract_property'] ?? '') !== $this->propertyKey($row['mandate_property'] ?? '')) {
+      throw new \RuntimeException('El mandato no corresponde al mismo id_inmueble del contrato.');
+    }
+
+    $this->db->update($contractsTable, [
+      'id_contrato_mandato' => (string) $mandateId,
+      'cct_author_id' => (string) Auth::userId(),
+      'cct_modified' => date('Y-m-d H:i:s'),
+    ], ['_ID' => $contractId]);
+
+    return [
+      'message' => 'Mandato ' . $mandateId . ' vinculado al contrato ' . AuditValueNormalizer::text($row['contrato'] ?? ('#' . $contractId)) . '.',
+    ] + $this->mandateLinkingRows($search);
+  }
+
+  private function propertyKey(mixed $value): string
+  {
+    return mb_strtolower(trim((string) $value), 'UTF-8');
   }
 
   /** @return array<string,mixed> */
@@ -1005,10 +1135,6 @@ final class CanonInsuranceAuditService
     } elseif ($includesVat === 'no') {
       $base['system_iva'] = 0.0;
     }
-    if ($base['system_iva'] === null && $this->insurerSourceKey($base['insurer']) === 'libertador' && $base['system_canon'] !== null) {
-      $base['system_iva'] = round((float) $base['system_canon'] * self::COLOMBIA_IVA_RATE, 2);
-    }
-
     if ($sourceKey === 'libertador' && $base['excel_canon'] !== null) {
       $split = $this->splitIncludedIva((float) $base['excel_canon']);
       $base['excel_canon'] = $split['base'];
@@ -1028,9 +1154,7 @@ final class CanonInsuranceAuditService
     $hasDifference = false;
     if (($item['mandate_id'] ?? null) === null) {
       $missing = true;
-      $differences[] = $this->insurerSourceKey((string) ($item['insurer'] ?? '')) === 'libertador' && ($item['system_iva'] ?? null) !== null
-        ? 'El contrato no tiene mandato asociado; el IVA de Plataforma se toma como 19% del canon para validar El Libertador.'
-        : 'El contrato no tiene un mandato asociado para validar el IVA.';
+      $differences[] = 'El contrato no tiene un mandato asociado para validar el IVA.';
     }
     foreach ([
       ['Canon', 'excel_canon', 'system_canon', 'difference_canon'],

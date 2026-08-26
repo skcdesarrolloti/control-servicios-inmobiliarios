@@ -15,9 +15,11 @@ final class CanonInsuranceAuditView
     <section class="scm-cia" data-canon-insurance-audit>
       <header class="scm-cia-hero"><div><span class="scm-eyebrow">Conciliaci&oacute;n mensual</span><h2>Auditor&iacute;a de canon y aseguradoras</h2><p>Compara canon, administraci&oacute;n e IVA entre Plataforma, SIMI, El Libertador, Fianza Bogot&aacute; y Unifianza.</p></div><span class="scm-cia-trace">Cada carga y observaci&oacute;n queda registrada</span></header>
       <aside class="scm-cia-guide" aria-labelledby="scm-cia-guide-title"><div><strong id="scm-cia-guide-title">Gu&iacute;a para nombrar los archivos</strong><span>El mes y el a&ntilde;o deben coincidir con el periodo seleccionado.</span></div><ul><li><code data-cia-filename="simi" data-extension="xls">simi_<?php echo esc_html($month . '_' . $year); ?>.xls</code></li><li><code data-cia-filename="libertador" data-extension="xlsx">libertador_<?php echo esc_html($month . '_' . $year); ?>.xlsx</code></li><li><code data-cia-filename="fianza_bogota" data-extension="xlsx">fianza_bogota_<?php echo esc_html($month . '_' . $year); ?>.xlsx</code></li><li><code data-cia-filename="unifianza" data-extension="xls">unifianza_<?php echo esc_html($month . '_' . $year); ?>.xls</code></li></ul></aside>
+      <div class="scm-cia-tools"><button type="button" class="scm-btn-secondary btn btn-outline" data-cia-open-mandates>Vincular mandatos faltantes</button><span>Para contratos Entregado sin mandato, busca candidatos con el mismo <code>id_inmueble</code>.</span></div>
       <form class="scm-cia-upload" data-cia-upload-form enctype="multipart/form-data" autocomplete="off"><div class="scm-field"><label for="scm_cia_period">Periodo auditado</label><input id="scm_cia_period" name="period" type="month" value="<?php echo esc_attr(date('Y-m')); ?>" required></div><div class="scm-field scm-cia-file-field"><label for="scm_cia_file">SIMI y extractos de aseguradoras</label><input id="scm_cia_file" name="files" type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple required><small>Selecciona los cuatro archivos. La conciliaci&oacute;n del mes se actualiza despu&eacute;s de cada carga.</small></div><button type="submit" class="scm-btn-primary btn btn-primary" data-cia-upload-button>Auditar archivos</button></form>
       <div class="scm-cia-status" data-cia-status aria-live="polite">Carga los archivos o consulta una conciliaci&oacute;n registrada.</div>
       <div class="scm-cia-content" data-cia-content><div class="scm-cia-loading" role="status">Cargando conciliaci&oacute;n&hellip;</div></div>
+      <div class="scm-cia-modal" data-cia-mandate-modal hidden><div class="scm-cia-modal-backdrop" data-cia-close-mandates></div><section class="scm-cia-modal-panel" role="dialog" aria-modal="true" aria-labelledby="scm-cia-mandate-title"><header><div><span class="scm-eyebrow">Saneamiento de datos</span><h3 id="scm-cia-mandate-title">Vincular mandatos faltantes</h3><p>Contratos de arrendamiento en estado Entregado sin <code>id_contrato_mandato</code>. Solo se muestran mandatos con el mismo <code>id_inmueble</code>.</p></div><button type="button" class="scm-cia-modal-close" data-cia-close-mandates aria-label="Cerrar">×</button></header><form class="scm-cia-mandate-search" data-cia-mandate-search autocomplete="off"><label for="scm_cia_mandate_search">Buscar contrato, solicitud, inmueble o arrendatario</label><div><input id="scm_cia_mandate_search" name="search" type="search" placeholder="Ej. 11827961, contrato o id_inmueble"><button type="submit" class="scm-btn-secondary btn btn-outline">Buscar</button></div></form><div class="scm-cia-modal-status" data-cia-mandate-status aria-live="polite"></div><div class="scm-cia-mandate-content" data-cia-mandate-content><div class="scm-cia-loading" role="status">Abre el modulo para consultar contratos pendientes.</div></div></section></div>
     </section>
 <?php
     return (string) ob_get_clean();
@@ -49,6 +51,47 @@ final class CanonInsuranceAuditView
     <?php echo $this->renderReportPanel($period, $summary, $reports); ?>
     <?php echo $this->renderItemsTable($items, $sourceAudits); ?>
     <?php echo $this->renderAuditHistory($audits); ?>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<string,mixed> $payload */
+  public function renderMandateLinking(array $payload): string
+  {
+    $rows = (array) ($payload['rows'] ?? []);
+    $search = (string) ($payload['search'] ?? '');
+    ob_start();
+    if ($rows === []) {
+      echo '<div class="scm-cia-empty"><strong>No hay contratos pendientes de mandato' . ($search !== '' ? ' para esta busqueda' : '') . '.</strong><span>Cuando todos los contratos Entregado tengan mandato, la auditoria podra comparar IVA con datos reales de Plataforma.</span></div>';
+      return (string) ob_get_clean();
+    }
+?>
+    <div class="scm-cia-mandate-list">
+      <?php foreach ($rows as $row): $candidates = (array) ($row['candidates'] ?? []); ?>
+        <article class="scm-cia-mandate-card">
+          <div class="scm-cia-mandate-contract">
+            <span>Contrato de arrendamiento</span>
+            <strong><?php echo esc_html((string) (($row['contract_number'] ?? '') ?: 'Sin contrato')); ?></strong>
+            <small>Solicitud <?php echo esc_html((string) (($row['request_number'] ?? '') ?: '—')); ?> · ID contrato <?php echo esc_html((string) ($row['contract_id'] ?? '')); ?></small>
+            <p><?php echo esc_html((string) (($row['tenant'] ?? '') ?: 'Arrendatario sin nombre')); ?></p>
+            <p><?php echo esc_html((string) (($row['property_address'] ?? '') ?: 'Inmueble sin direccion')); ?></p>
+            <dl><div><dt>id_inmueble</dt><dd><?php echo esc_html((string) (($row['property_id'] ?? '') ?: '—')); ?></dd></div><div><dt>Aseguradora</dt><dd><?php echo esc_html((string) (($row['insurer'] ?? '') ?: '—')); ?></dd></div><div><dt>Canon</dt><dd><?php echo esc_html($this->money($row['canon'] ?? null)); ?></dd></div><div><dt>Administraci&oacute;n</dt><dd><?php echo esc_html($this->money($row['administration'] ?? null)); ?></dd></div></dl>
+          </div>
+          <div class="scm-cia-mandate-candidates">
+            <div class="scm-cia-mandate-candidates-head"><strong>Mandatos encontrados</strong><span><?php echo esc_html((string) count($candidates)); ?> candidato(s)</span></div>
+            <?php if ($candidates === []): ?>
+              <div class="scm-cia-mandate-empty">No hay mandatos con este mismo <code>id_inmueble</code>.</div>
+            <?php else: foreach ($candidates as $candidate): ?>
+              <div class="scm-cia-mandate-option">
+                <div><strong>Mandato <?php echo esc_html((string) ($candidate['mandate_id'] ?? '')); ?></strong><span><?php echo esc_html((string) (($candidate['insurer'] ?? '') ?: 'Sin aseguradora')); ?></span><small>IVA: <?php echo esc_html((string) (($candidate['includes_iva'] ?? '') ?: 'Sin dato')); ?></small></div>
+                <dl><div><dt>Canon</dt><dd><?php echo esc_html($this->money($candidate['canon'] ?? null)); ?></dd></div><div><dt>Administraci&oacute;n</dt><dd><?php echo esc_html($this->money($candidate['administration'] ?? null)); ?></dd></div><div><dt>IVA</dt><dd><?php echo esc_html($this->money($candidate['iva'] ?? null)); ?></dd></div></dl>
+                <form data-cia-link-mandate-form><input type="hidden" name="contract_id" value="<?php echo esc_attr((string) ($row['contract_id'] ?? '')); ?>"><input type="hidden" name="mandate_id" value="<?php echo esc_attr((string) ($candidate['mandate_id'] ?? '')); ?>"><button type="submit" class="scm-btn-primary btn btn-primary">Vincular</button></form>
+              </div>
+            <?php endforeach; endif; ?>
+          </div>
+        </article>
+      <?php endforeach; ?>
+    </div>
 <?php
     return (string) ob_get_clean();
   }

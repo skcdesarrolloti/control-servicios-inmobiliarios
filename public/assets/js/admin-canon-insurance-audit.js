@@ -13,8 +13,13 @@
     var importAction = actions.canon_insurance_audit_import || "";
     var observationAction = actions.canon_insurance_audit_observation || "";
     var reportAction = actions.canon_insurance_audit_report || "";
+    var mandatesAction = actions.canon_insurance_audit_mandates || "";
+    var linkMandateAction = actions.canon_insurance_audit_link_mandate || "";
     var content = module.querySelector("[data-cia-content]");
     var status = module.querySelector("[data-cia-status]");
+    var mandateModal = module.querySelector("[data-cia-mandate-modal]");
+    var mandateContent = module.querySelector("[data-cia-mandate-content]");
+    var mandateStatus = module.querySelector("[data-cia-mandate-status]");
     module.dataset.ciaInit = "1";
 
     function updateFilenameGuide(period) {
@@ -63,6 +68,55 @@
       }
     }
 
+    function setMandateStatus(message, tone) {
+      if (!mandateStatus) return;
+      mandateStatus.textContent = message || "";
+      mandateStatus.classList.toggle("is-error", tone === "error");
+      mandateStatus.classList.toggle("is-success", tone === "success");
+      mandateStatus.classList.toggle("is-loading", tone === "loading");
+    }
+
+    function openMandateModal() {
+      if (!mandateModal) return;
+      mandateModal.hidden = false;
+      document.documentElement.classList.add("scm-cia-modal-open");
+      var searchInput = mandateModal.querySelector('[name="search"]');
+      if (searchInput) window.setTimeout(function () { searchInput.focus(); }, 50);
+      loadMandates();
+    }
+
+    function closeMandateModal() {
+      if (!mandateModal) return;
+      mandateModal.hidden = true;
+      document.documentElement.classList.remove("scm-cia-modal-open");
+    }
+
+    function currentMandateSearch() {
+      var searchInput = mandateModal ? mandateModal.querySelector('[name="search"]') : null;
+      return searchInput ? searchInput.value || "" : "";
+    }
+
+    function loadMandates(search) {
+      if (!mandatesAction) {
+        setMandateStatus("La accion de mandatos no esta configurada.", "error");
+        return Promise.resolve();
+      }
+      var fd = new FormData();
+      fd.append("action", mandatesAction);
+      fd.append("search", typeof search === "string" ? search : currentMandateSearch());
+      setMandateStatus("Consultando contratos sin mandato...", "loading");
+      return request(fd)
+        .then(function (data) {
+          if (mandateContent && typeof data.html === "string") {
+            mandateContent.innerHTML = data.html;
+          }
+          setMandateStatus("Contratos pendientes actualizados.", "success");
+        })
+        .catch(function (error) {
+          setMandateStatus(error.message || "No se pudieron consultar los mandatos.", "error");
+        });
+    }
+
     function load(filters) {
       if (!listAction) {
         setStatus("La accion de consulta no esta configurada.", "error");
@@ -82,6 +136,45 @@
     }
 
     module.addEventListener("submit", function (event) {
+      var mandateSearchForm = event.target.closest("[data-cia-mandate-search]");
+      if (mandateSearchForm) {
+        event.preventDefault();
+        loadMandates(new FormData(mandateSearchForm).get("search") || "");
+        return;
+      }
+
+      var mandateLinkForm = event.target.closest("[data-cia-link-mandate-form]");
+      if (mandateLinkForm) {
+        event.preventDefault();
+        if (!linkMandateAction) {
+          setMandateStatus("La accion para vincular mandato no esta configurada.", "error");
+          return;
+        }
+        if (!window.confirm("¿Vincular este mandato al contrato de arrendamiento?")) return;
+        var mandateData = new FormData(mandateLinkForm);
+        mandateData.append("action", linkMandateAction);
+        mandateData.append("search", currentMandateSearch());
+        var mandateButton = mandateLinkForm.querySelector('button[type="submit"]');
+        if (mandateButton) mandateButton.disabled = true;
+        setMandateStatus("Vinculando mandato...", "loading");
+        request(mandateData)
+          .then(function (data) {
+            if (mandateContent && typeof data.html === "string") {
+              mandateContent.innerHTML = data.html;
+            }
+            setMandateStatus(data.message || "Mandato vinculado.", "success");
+            var filterForm = module.querySelector("[data-cia-filter-form]");
+            if (filterForm) load(new FormData(filterForm));
+          })
+          .catch(function (error) {
+            setMandateStatus(error.message || "No se pudo vincular el mandato.", "error");
+          })
+          .finally(function () {
+            if (mandateButton) mandateButton.disabled = false;
+          });
+        return;
+      }
+
       var uploadForm = event.target.closest("[data-cia-upload-form]");
       if (uploadForm) {
         event.preventDefault();
@@ -274,6 +367,24 @@
       ) {
         var form = event.target.closest("[data-cia-filter-form]");
         if (form) load(new FormData(form));
+      }
+    });
+
+    module.addEventListener("click", function (event) {
+      if (event.target.closest("[data-cia-open-mandates]")) {
+        event.preventDefault();
+        openMandateModal();
+        return;
+      }
+      if (event.target.closest("[data-cia-close-mandates]")) {
+        event.preventDefault();
+        closeMandateModal();
+      }
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && mandateModal && !mandateModal.hidden) {
+        closeMandateModal();
       }
     });
 

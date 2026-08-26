@@ -100,4 +100,43 @@ trait HandlesCanonInsuranceAudits
       $this->jsonFail($exception->getMessage());
     }
   }
+
+  public function ajax_handler_canon_insurance_audit_mandates(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
+      $this->jsonFail('No tienes permiso para vincular mandatos.');
+    }
+    try {
+      $payload = $this->canonInsuranceAuditService()->mandateLinkingRows(
+        trim(sanitize_text_field(wp_unslash((string) ($_POST['search'] ?? ''))))
+      );
+      $this->jsonOk([
+        'html' => (new CanonInsuranceAuditView())->renderMandateLinking($payload),
+      ]);
+    } catch (\Throwable $exception) {
+      $this->jsonFail($exception->getMessage());
+    }
+  }
+
+  public function ajax_handler_canon_insurance_audit_link_mandate(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
+      $this->jsonFail('No tienes permiso para vincular mandatos.');
+    }
+    try {
+      $payload = $this->canonInsuranceAuditService()->linkMandateToContract(
+        (int) ($_POST['contract_id'] ?? 0),
+        (int) ($_POST['mandate_id'] ?? 0),
+        trim(sanitize_text_field(wp_unslash((string) ($_POST['search'] ?? ''))))
+      );
+      $this->jsonOk([
+        'html' => (new CanonInsuranceAuditView())->renderMandateLinking($payload),
+        'message' => (string) ($payload['message'] ?? 'Mandato vinculado.'),
+      ]);
+    } catch (\Throwable $exception) {
+      $this->jsonFail($exception->getMessage());
+    }
+  }
 }

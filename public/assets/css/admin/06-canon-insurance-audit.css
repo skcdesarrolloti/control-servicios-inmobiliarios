@@ -75,6 +75,31 @@
 #scm-app .scm-cia-guide ul { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0; list-style: none; }
 #scm-app .scm-cia-guide code { display: inline-block; border-radius: 7px; padding: 6px 8px; background: #e7f0fa; color: #174f87; font-size: 11px; }
 
+#scm-app .scm-cia-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 12px;
+  border: 1px solid #d5e3f3;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(16, 42, 67, 0.04);
+}
+
+#scm-app .scm-cia-tools span {
+  color: var(--cia-muted);
+  font-size: 11px;
+}
+
+#scm-app .scm-cia-tools code {
+  border-radius: 6px;
+  padding: 2px 5px;
+  background: #edf5ff;
+  color: #174f87;
+}
+
 #scm-app .scm-cia-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 2px 0; }
 #scm-app .scm-cia-legend span { border-radius: 999px; padding: 5px 10px; font-size: 10px; font-weight: 800; }
 #scm-app .scm-cia-legend .is-green { background: #e9f8ef; color: #146c43; }
@@ -577,9 +602,247 @@
 #scm-app .scm-cia-history-card dd { margin: 3px 0 0; color: var(--cia-ink); font-weight: 800; }
 #scm-app .scm-cia-history-card > small { color: var(--cia-muted); font-size: 10px; }
 
+.scm-cia-modal-open { overflow: hidden; }
+
+#scm-app .scm-cia-modal[hidden] { display: none; }
+
+#scm-app .scm-cia-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+#scm-app .scm-cia-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(16, 42, 67, 0.58);
+  backdrop-filter: blur(4px);
+}
+
+#scm-app .scm-cia-modal-panel {
+  position: relative;
+  display: flex;
+  width: min(1120px, 96vw);
+  max-height: min(760px, 90vh);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #c8d8ea;
+  border-radius: 22px;
+  background: #f8fbff;
+  box-shadow: 0 24px 70px rgba(16, 42, 67, 0.28);
+}
+
+#scm-app .scm-cia-modal-panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 24px;
+  border-bottom: 1px solid #d9e6f4;
+  background: linear-gradient(135deg, #ffffff 0%, #edf5ff 100%);
+}
+
+#scm-app .scm-cia-modal-panel h3 {
+  margin: 4px 0 6px;
+  color: #123b68;
+  font-size: 22px;
+}
+
+#scm-app .scm-cia-modal-panel p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--cia-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#scm-app .scm-cia-modal-close {
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #c7d6e6;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #123b68;
+  cursor: pointer;
+  font-size: 26px;
+  line-height: 1;
+}
+
+#scm-app .scm-cia-mandate-search {
+  padding: 16px 24px 12px;
+  border-bottom: 1px solid #e3edf7;
+  background: #ffffff;
+}
+
+#scm-app .scm-cia-mandate-search label {
+  display: block;
+  margin-bottom: 7px;
+  color: #243b53;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+#scm-app .scm-cia-mandate-search > div {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 10px;
+}
+
+#scm-app .scm-cia-modal-status {
+  min-height: 22px;
+  padding: 8px 24px 0;
+  color: var(--cia-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#scm-app .scm-cia-modal-status.is-error { color: #a61b1b; }
+#scm-app .scm-cia-modal-status.is-success { color: #176b43; }
+#scm-app .scm-cia-modal-status.is-loading { color: #174f87; }
+
+#scm-app .scm-cia-mandate-content {
+  overflow: auto;
+  padding: 0 24px 24px;
+}
+
+#scm-app .scm-cia-mandate-list {
+  display: grid;
+  gap: 14px;
+  padding-top: 10px;
+}
+
+#scm-app .scm-cia-mandate-card {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.8fr) minmax(320px, 1.2fr);
+  gap: 14px;
+  border: 1px solid #d9e6f4;
+  border-radius: 16px;
+  padding: 14px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(16, 42, 67, 0.07);
+}
+
+#scm-app .scm-cia-mandate-contract,
+#scm-app .scm-cia-mandate-candidates {
+  min-width: 0;
+}
+
+#scm-app .scm-cia-mandate-contract > span,
+#scm-app .scm-cia-mandate-candidates-head span {
+  color: #5c7088;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-cia-mandate-contract > strong {
+  display: block;
+  margin-top: 4px;
+  color: #102a43;
+  font-size: 16px;
+}
+
+#scm-app .scm-cia-mandate-contract small,
+#scm-app .scm-cia-mandate-option small {
+  display: block;
+  margin-top: 3px;
+  color: var(--cia-muted);
+  font-size: 10px;
+}
+
+#scm-app .scm-cia-mandate-contract p {
+  margin: 8px 0 0;
+  color: #334e68;
+  font-size: 12px;
+}
+
+#scm-app .scm-cia-mandate-contract dl,
+#scm-app .scm-cia-mandate-option dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(90px, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+#scm-app .scm-cia-mandate-option dl {
+  grid-template-columns: repeat(3, minmax(82px, 1fr));
+  margin: 0;
+}
+
+#scm-app .scm-cia-mandate-contract dl div,
+#scm-app .scm-cia-mandate-option dl div {
+  border-radius: 10px;
+  padding: 8px;
+  background: #f3f7fb;
+}
+
+#scm-app .scm-cia-mandate-contract dt,
+#scm-app .scm-cia-mandate-option dt {
+  color: #5c7088;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-cia-mandate-contract dd,
+#scm-app .scm-cia-mandate-option dd {
+  margin: 4px 0 0;
+  color: #102a43;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#scm-app .scm-cia-mandate-candidates-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+#scm-app .scm-cia-mandate-empty {
+  border: 1px dashed #d1b46d;
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff8e8;
+  color: #7a4d08;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#scm-app .scm-cia-mandate-option {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(260px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #d8e4f0;
+  border-radius: 14px;
+  padding: 12px;
+  background: linear-gradient(135deg, #ffffff 0%, #f7fbff 100%);
+}
+
+#scm-app .scm-cia-mandate-option + .scm-cia-mandate-option {
+  margin-top: 10px;
+}
+
+#scm-app .scm-cia-mandate-option form {
+  margin: 0;
+}
+
+#scm-app .scm-cia-mandate-option button {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
 @media (max-width: 900px) {
   #scm-app .scm-cia-hero { flex-direction: column; }
   #scm-app .scm-cia-guide,
+  #scm-app .scm-cia-tools,
   #scm-app .scm-cia-report { align-items: stretch; flex-direction: column; }
   #scm-app .scm-cia-trace { white-space: normal; }
   #scm-app .scm-cia-upload,
@@ -588,6 +851,8 @@
   #scm-app .scm-cia-latest { grid-template-columns: 1fr; }
   #scm-app .scm-cia-period-head { grid-template-columns: 1fr; }
   #scm-app .scm-cia-source-state { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+  #scm-app .scm-cia-mandate-card,
+  #scm-app .scm-cia-mandate-option { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
@@ -595,6 +860,14 @@
   #scm-app .scm-cia-section,
   #scm-app .scm-cia-upload,
   #scm-app .scm-cia-filters { padding: 14px; }
+  #scm-app .scm-cia-modal { padding: 10px; }
+  #scm-app .scm-cia-modal-panel { max-height: 94vh; border-radius: 16px; }
+  #scm-app .scm-cia-modal-panel > header,
+  #scm-app .scm-cia-mandate-search,
+  #scm-app .scm-cia-mandate-content { padding-right: 14px; padding-left: 14px; }
+  #scm-app .scm-cia-mandate-search > div,
+  #scm-app .scm-cia-mandate-contract dl,
+  #scm-app .scm-cia-mandate-option dl { grid-template-columns: 1fr; }
   #scm-app .scm-cia-kpis { grid-template-columns: 1fr 1fr; gap: 8px; }
   #scm-app .scm-cia-section-head { flex-direction: column; }
   #scm-app .scm-cia-period-head { padding: 14px; }
