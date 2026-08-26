@@ -297,6 +297,38 @@
 #scm-app .scm-cia-report > div { display: flex; flex-direction: column; gap: 3px; }
 #scm-app .scm-cia-report span,
 #scm-app .scm-cia-report small { color: var(--cia-muted); font-size: 11px; }
+
+#scm-app .scm-cia-report form {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+#scm-app .scm-cia-report label {
+  display: grid;
+  gap: 6px;
+  color: #486581;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-cia-report input {
+  min-height: 44px;
+  border: 1px solid #c7d7e8;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: #fff;
+  color: #102a43;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 #scm-app .scm-cia-report button { min-height: 44px; white-space: nowrap; }
 
 #scm-app .scm-cia-section-head {
@@ -1063,6 +1095,7 @@
   #scm-app .scm-cia-guide,
   #scm-app .scm-cia-tools,
   #scm-app .scm-cia-report { align-items: stretch; flex-direction: column; }
+  #scm-app .scm-cia-report form { grid-template-columns: 1fr; }
   #scm-app .scm-cia-trace { white-space: normal; }
   #scm-app .scm-cia-upload,
   #scm-app .scm-cia-filters { grid-template-columns: 1fr; }

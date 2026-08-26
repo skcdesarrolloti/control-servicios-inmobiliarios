@@ -90,11 +90,12 @@ trait HandlesCanonInsuranceAudits
     }
     try {
       $result = $this->canonInsuranceAuditService()->sendReport(
-        trim(sanitize_text_field(wp_unslash((string) ($_POST['period'] ?? ''))))
+        trim(sanitize_text_field(wp_unslash((string) ($_POST['period'] ?? '')))),
+        trim(sanitize_textarea_field(wp_unslash((string) ($_POST['recipients'] ?? ''))))
       );
       $this->jsonOk([
         'html' => (new CanonInsuranceAuditView())->renderContent($result),
-        'message' => sprintf('Informe encolado para %d destinatario(s) del cargo Coordinador Contractual.', (int) ($result['queued'] ?? 0)),
+        'message' => sprintf('Informe encolado para %d destinatario(s).', (int) ($result['queued'] ?? 0)),
       ]);
     } catch (\Throwable $exception) {
       $this->jsonFail($exception->getMessage());

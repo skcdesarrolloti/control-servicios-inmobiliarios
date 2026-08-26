@@ -502,8 +502,15 @@
           setStatus("La accion del informe no esta configurada.", "error");
           return;
         }
-        if (!window.confirm("¿Enviar las diferencias y anomalias al Coordinador Contractual?")) return;
         var reportData = new FormData(reportForm);
+        var recipients = (reportData.get("recipients") || "").toString().trim();
+        if (!recipients) {
+          setStatus("Escribe el correo destino del informe.", "error");
+          var recipientsInput = reportForm.querySelector('[name="recipients"]');
+          if (recipientsInput) recipientsInput.focus();
+          return;
+        }
+        if (!window.confirm("¿Enviar las diferencias y anomalias al correo indicado?")) return;
         reportData.append("action", reportAction);
         var reportButton = reportForm.querySelector('button[type="submit"]');
         if (reportButton) reportButton.disabled = true;

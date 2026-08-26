@@ -1199,7 +1199,7 @@ final class CanonInsuranceAuditService
   }
 
   /** @return array<string,mixed> */
-  public function sendReport(string $period): array
+  public function sendReport(string $period, string $recipientEmails): array
   {
     $this->ensureSchema();
     $period = $this->validPeriod($period);
@@ -1223,9 +1223,9 @@ final class CanonInsuranceAuditService
     if ($items === []) {
       throw new \RuntimeException('Este periodo no tiene diferencias ni anomalias para informar.');
     }
-    $recipients = $this->contractCoordinatorRecipients();
+    $recipients = $this->manualReportRecipients($recipientEmails);
     if ($recipients === []) {
-      throw new \RuntimeException('No se encontro un correo activo para el cargo Coordinador Contractual.');
+      throw new \RuntimeException('Escribe al menos un correo valido para enviar el informe.');
     }
     $auditId = (int) ($audits[0]['id'] ?? 0);
     if ($auditId <= 0) {
@@ -1266,6 +1266,23 @@ final class CanonInsuranceAuditService
       'report_hash' => $reportHash,
     ]);
     return ['queued' => $queued] + $this->dashboard(['period' => $period]);
+  }
+
+  /**
+   * @return array<int,array{name:string,email:string}>
+   */
+  private function manualReportRecipients(string $recipientEmails): array
+  {
+    $parts = preg_split('/[\\s,;]+/', trim($recipientEmails)) ?: [];
+    $recipients = [];
+    foreach ($parts as $part) {
+      $email = trim((string) $part);
+      if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        continue;
+      }
+      $recipients[strtolower($email)] = ['name' => '', 'email' => $email];
+    }
+    return array_values($recipients);
   }
 
   /** @return array<int,array{name:string,email:string}> */
