@@ -216,14 +216,20 @@ final class CanonInsuranceAuditService
       "SELECT * FROM `{$this->itemsTable()}` WHERE `audit_id` IN ({$placeholders}) ORDER BY `source_row` ASC, `id` ASC",
       array_keys($auditSources)
     );
+    $currentContracts = $this->contractsByIds(array_values(array_unique(array_filter(array_map(
+      static fn(array $item): int => (int) ($item['contract_id'] ?? 0),
+      $items
+    )))));
     $grouped = [];
     foreach ($items as $item) {
       $sourceKey = $auditSources[(int) ($item['audit_id'] ?? 0)] ?? '';
       if ($sourceKey === '') {
         continue;
       }
-      $item = $this->normalizedComparisonItem($item, $sourceKey);
       $contractId = (int) ($item['contract_id'] ?? 0);
+      $item = $contractId > 0 && isset($currentContracts[$contractId])
+        ? $this->syncComparisonItemWithCurrentContract($item, $currentContracts[$contractId], $sourceKey)
+        : $this->normalizedComparisonItem($item, $sourceKey);
       $request = AuditValueNormalizer::requestNumber($item['request_number'] ?? '');
       $groupKey = $contractId > 0 ? 'contract:' . $contractId : 'request:' . $request;
       if (!isset($grouped[$groupKey])) {
@@ -543,6 +549,62 @@ final class CanonInsuranceAuditService
       $item[$differenceKey] = ($excel === null || $system === null) ? null : round((float) $excel - (float) $system, 2);
     }
     [$item['status'], $item['differences_json']] = $this->statusAndDifferencesForComparedItem($item);
+    return $item;
+  }
+
+  /** @param array<string,mixed> $item @param array<string,mixed> $contract @return array<string,mixed> */
+  private function syncComparisonItemWithCurrentContract(array $item, array $contract, string $sourceKey): array
+  {
+    $item['contract_id'] = (int) ($contract['contract_id'] ?? 0) ?: ($item['contract_id'] ?? null);
+    $item['contract_number'] = AuditValueNormalizer::text($contract['contract_number'] ?? '') ?: (string) ($item['contract_number'] ?? '');
+    $item['mandate_id'] = (int) ($contract['mandate_id'] ?? 0) ?: null;
+    $item['tenant'] = AuditValueNormalizer::text($contract['arrendatario'] ?? '') ?: (string) ($item['tenant'] ?? '');
+    $item['property_address'] = AuditValueNormalizer::text($contract['direccion'] ?? '') ?: (string) ($item['property_address'] ?? '');
+    $item['insurer'] = $this->firstNonEmptyText([
+      $contract['contract_insurer'] ?? null,
+      $contract['mandate_insurer'] ?? null,
+      $contract['study_insurer'] ?? null,
+      $item['insurer'] ?? null,
+    ]);
+
+    $platform = $this->platformValuesFromContract($contract);
+    $item['system_canon'] = $platform['canon'];
+    $item['system_administration'] = $platform['administration'];
+    $item['system_iva'] = $platform['iva'];
+
+    if ($sourceKey === 'libertador' && ($item['excel_canon'] ?? null) !== null) {
+      $excelIva = $this->databaseMoney($item['excel_iva'] ?? null);
+      if ($this->shouldSplitLibertadorIncludedIva($item)) {
+        if ($excelIva === null || abs($excelIva) <= self::MONEY_TOLERANCE) {
+          $split = $this->splitIncludedIva((float) $item['excel_canon']);
+          $item['excel_canon'] = $split['base'];
+          $item['excel_iva'] = $split['iva'];
+        }
+      } else {
+        if ($excelIva !== null && abs($excelIva) > self::MONEY_TOLERANCE) {
+          $item['excel_canon'] = round((float) $item['excel_canon'] + $excelIva, 2);
+        }
+        $item['excel_iva'] = 0.0;
+      }
+    }
+
+    foreach ([
+      ['excel_canon', 'system_canon', 'difference_canon'],
+      ['excel_administration', 'system_administration', 'difference_administration'],
+      ['excel_iva', 'system_iva', 'difference_iva'],
+    ] as [$excelKey, $systemKey, $differenceKey]) {
+      $excel = $item[$excelKey] ?? null;
+      $system = $item[$systemKey] ?? null;
+      $item[$differenceKey] = ($excel === null || $system === null) ? null : round((float) $excel - (float) $system, 2);
+    }
+
+    [$item['status'], $item['differences_json']] = $this->statusAndDifferencesForComparedItem($item);
+    $studyFindings = $this->insuranceStudyFindings($contract, AuditValueNormalizer::requestNumber($item['request_number'] ?? ''), (string) ($item['insurer'] ?? ''));
+    if ($studyFindings !== []) {
+      $item['status'] = $item['status'] === 'incorrecto' ? 'incorrecto' : 'anomalia';
+      $item['differences_json'] = $this->mergeDifferences((string) $item['differences_json'], $studyFindings);
+    }
+
     return $item;
   }
 
@@ -1442,6 +1504,39 @@ final class CanonInsuranceAuditService
       $key = AuditValueNormalizer::requestNumber($row['numero_solicitud'] ?? '');
       if ($key !== '' && !isset($map[$key])) {
         $map[$key] = $row;
+      }
+    }
+    return $map;
+  }
+
+  /** @param array<int,int> $contractIds @return array<int,array<string,mixed>> */
+  private function contractsByIds(array $contractIds): array
+  {
+    $contractIds = array_values(array_unique(array_filter(array_map('intval', $contractIds), static fn(int $id): bool => $id > 0)));
+    if ($contractIds === []) {
+      return [];
+    }
+    $contracts = $this->db->table('jet_cct_contratos_arrendamiento');
+    $mandates = $this->db->table('jet_cct_contrato_mandato');
+    $rows = $this->db->getResults(
+      "SELECT c.`_ID` AS contract_id, c.`contrato` AS contract_number, c.`numero_solicitud`,
+              c.`arrendatario`, c.`direccion`, c.`id_contrato_mandato`, c.`valor_canon`,
+              c.`valor_administracion`, c.`aseguradora` AS contract_insurer,
+              c.`id_estudio_aseguradora`,
+              m.`_ID` AS mandate_id, m.`aseguradora` AS mandate_insurer,
+              m.`precio`, m.`administracion`, m.`incluye_iva`,
+              m.`iva_precio`, m.`iva_total_precio`
+         FROM `{$contracts}` c
+         LEFT JOIN `{$mandates}` m ON CAST(m.`_ID` AS CHAR) = TRIM(COALESCE(c.`id_contrato_mandato`, ''))
+        WHERE c.`_ID` IN (" . implode(',', array_fill(0, count($contractIds), '?')) . ")",
+      $contractIds
+    );
+    $rows = $this->enrichContractsWithInsuranceStudy($rows);
+    $map = [];
+    foreach ($rows as $row) {
+      $contractId = (int) ($row['contract_id'] ?? 0);
+      if ($contractId > 0) {
+        $map[$contractId] = $row;
       }
     }
     return $map;
