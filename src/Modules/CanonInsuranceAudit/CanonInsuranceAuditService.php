@@ -663,8 +663,6 @@ final class CanonInsuranceAuditService
 
     $this->db->update($contractsTable, [
       'id_contrato_mandato' => (string) $mandateId,
-      'cct_author_id' => (string) Auth::userId(),
-      'cct_modified' => date('Y-m-d H:i:s'),
     ], ['_ID' => $contractId]);
 
     return [
