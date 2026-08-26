@@ -127,14 +127,22 @@ trait HandlesCanonInsuranceAudits
       $this->jsonFail('No tienes permiso para vincular mandatos.');
     }
     try {
-      $payload = $this->canonInsuranceAuditService()->linkMandateToContract(
+      $service = $this->canonInsuranceAuditService();
+      $payload = $service->linkMandateToContract(
         (int) ($_POST['contract_id'] ?? 0),
         (int) ($_POST['mandate_id'] ?? 0),
         trim(sanitize_text_field(wp_unslash((string) ($_POST['search'] ?? '')))),
         (int) ($_POST['context_contract_id'] ?? 0)
       );
+      $dashboardPayload = $service->dashboard([
+        'period' => trim(sanitize_text_field(wp_unslash((string) ($_POST['active_period'] ?? '')))),
+        'status' => sanitize_key((string) ($_POST['active_status'] ?? '')),
+        'search' => trim(sanitize_text_field(wp_unslash((string) ($_POST['active_search'] ?? '')))),
+      ]);
+      $view = new CanonInsuranceAuditView();
       $this->jsonOk([
-        'html' => (new CanonInsuranceAuditView())->renderMandateLinking($payload),
+        'html' => $view->renderMandateLinking($payload),
+        'dashboard_html' => $view->renderContent($dashboardPayload),
         'message' => (string) ($payload['message'] ?? 'Mandato vinculado.'),
       ]);
     } catch (\Throwable $exception) {

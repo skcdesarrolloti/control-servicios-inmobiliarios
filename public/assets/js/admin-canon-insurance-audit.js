@@ -253,6 +253,13 @@
         var mandateData = new FormData(mandateLinkForm);
         mandateData.append("action", linkMandateAction);
         mandateData.append("search", currentMandateSearch());
+        var activeFilterForm = module.querySelector("[data-cia-filter-form]");
+        if (activeFilterForm) {
+          var activeFilters = new FormData(activeFilterForm);
+          mandateData.append("active_period", activeFilters.get("period") || "");
+          mandateData.append("active_status", activeFilters.get("status") || "");
+          mandateData.append("active_search", activeFilters.get("search") || "");
+        }
         if (currentMandateContractId) mandateData.append("context_contract_id", currentMandateContractId);
         var mandateButton = mandateLinkForm.querySelector('button[type="submit"]');
         if (mandateButton) mandateButton.disabled = true;
@@ -263,8 +270,12 @@
               mandateContent.innerHTML = data.html;
             }
             setMandateStatus(data.message || "Mandato vinculado.", "success");
-            var filterForm = module.querySelector("[data-cia-filter-form]");
-            if (filterForm) load(new FormData(filterForm));
+            if (typeof data.dashboard_html === "string") {
+              replaceContent({ html: data.dashboard_html });
+              setStatus("Auditorias actualizadas.", "success");
+            } else if (activeFilterForm) {
+              load(new FormData(activeFilterForm));
+            }
           })
           .catch(function (error) {
             setMandateStatus(error.message || "No se pudo vincular el mandato.", "error");

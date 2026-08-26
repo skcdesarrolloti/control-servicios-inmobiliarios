@@ -817,10 +817,57 @@ final class CanonInsuranceAuditService
     $this->db->update($contractsTable, [
       'id_contrato_mandato' => (string) $mandateId,
     ], ['_ID' => $contractId]);
+    $this->refreshAuditItemsForContract($contractId);
 
     return [
       'message' => 'Mandato ' . $mandateId . ' vinculado al contrato ' . AuditValueNormalizer::text($row['contrato'] ?? ('#' . $contractId)) . '.',
     ] + $this->mandateLinkingRows($contextContractId > 0 ? '' : $search, $contextContractId);
+  }
+
+  private function refreshAuditItemsForContract(int $contractId): void
+  {
+    if ($contractId <= 0) {
+      return;
+    }
+    $contracts = $this->contractsByIds([$contractId]);
+    $contract = $contracts[$contractId] ?? null;
+    if (!is_array($contract)) {
+      return;
+    }
+    $itemsTable = $this->itemsTable();
+    $auditsTable = $this->auditsTable();
+    $items = $this->db->getResults(
+      "SELECT i.*, a.`format_key`
+         FROM `{$itemsTable}` i
+         INNER JOIN `{$auditsTable}` a ON a.`id` = i.`audit_id`
+        WHERE i.`contract_id` = ?",
+      [$contractId]
+    );
+    foreach ($items as $item) {
+      $sourceKey = (string) ($item['format_key'] ?? '');
+      if ($sourceKey === '') {
+        continue;
+      }
+      $updated = $this->syncComparisonItemWithCurrentContract($item, $contract, $sourceKey);
+      $this->db->update($itemsTable, [
+        'contract_number' => (string) ($updated['contract_number'] ?? ''),
+        'mandate_id' => $updated['mandate_id'] ?? null,
+        'tenant' => (string) ($updated['tenant'] ?? ''),
+        'property_address' => (string) ($updated['property_address'] ?? ''),
+        'insurer' => (string) ($updated['insurer'] ?? ''),
+        'status' => (string) ($updated['status'] ?? 'anomalia'),
+        'excel_canon' => $updated['excel_canon'] ?? null,
+        'system_canon' => $updated['system_canon'] ?? null,
+        'difference_canon' => $updated['difference_canon'] ?? null,
+        'excel_administration' => $updated['excel_administration'] ?? null,
+        'system_administration' => $updated['system_administration'] ?? null,
+        'difference_administration' => $updated['difference_administration'] ?? null,
+        'excel_iva' => $updated['excel_iva'] ?? null,
+        'system_iva' => $updated['system_iva'] ?? null,
+        'difference_iva' => $updated['difference_iva'] ?? null,
+        'differences_json' => (string) ($updated['differences_json'] ?? '[]'),
+      ], ['id' => (int) ($item['id'] ?? 0)]);
+    }
   }
 
   /** @return array<string,mixed> */
