@@ -668,7 +668,7 @@
 #scm-app .scm-cia-modal-panel {
   position: relative;
   display: flex;
-  width: min(1120px, 96vw);
+  width: min(1520px, calc(100vw - 32px));
   max-height: min(760px, 90vh);
   flex-direction: column;
   overflow: hidden;
@@ -761,7 +761,7 @@
 
 #scm-app .scm-cia-mandate-card {
   display: grid;
-  grid-template-columns: minmax(240px, 0.8fr) minmax(320px, 1.2fr);
+  grid-template-columns: minmax(280px, 0.55fr) minmax(680px, 1.45fr);
   gap: 14px;
   border: 1px solid #d9e6f4;
   border-radius: 16px;
@@ -860,7 +860,7 @@
 
 #scm-app .scm-cia-mandate-option {
   display: grid;
-  grid-template-columns: minmax(128px, 0.55fr) minmax(220px, 1fr) minmax(260px, 0.95fr) auto;
+  grid-template-columns: minmax(150px, 0.45fr) minmax(260px, 1fr) minmax(300px, 0.9fr) auto;
   align-items: stretch;
   gap: 12px;
   border: 1px solid #d8e4f0;
@@ -1032,6 +1032,12 @@
 
 #scm-app .scm-cia-request-form button {
   min-height: 42px;
+}
+
+@media (max-width: 1100px) {
+  #scm-app .scm-cia-mandate-card,
+  #scm-app .scm-cia-mandate-option { grid-template-columns: 1fr; }
+  #scm-app .scm-cia-mandate-option form { justify-items: start; }
 }
 
 @media (max-width: 900px) {
