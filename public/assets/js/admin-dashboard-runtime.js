@@ -929,6 +929,7 @@
 
       function estadoAdministrativoOptionsHtml() {
         return [
+          "En espera de respuesta",
           "Por inspeccionar",
           "Inspeccionado",
           "Cotizado",

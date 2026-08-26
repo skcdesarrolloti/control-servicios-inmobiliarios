@@ -459,10 +459,16 @@ final class GuideModalView
         'contenido' => '<strong>Definición:</strong> Estado inicial para notificar asignación de tarea.<br><br><strong>Política:</strong> Atender de forma inmediata (2 h máx.) y coordinar visita.',
       ],
       [
+        'titulo'    => 'En espera de respuesta',
+        'icono'     => 'fa-hourglass-half',
+        'color'     => 'scm-gc-blue',
+        'contenido' => '<strong>Definición:</strong> Se ha contactado al cliente para definir la fecha de visita.<br><br><strong>Política:</strong> Dejar constancia de la actividad realizada.',
+      ],
+      [
         'titulo'    => 'Por inspeccionar',
         'icono'     => 'fa-calendar-check',
         'color'     => 'scm-gc-blue',
-        'contenido' => '<strong>Definición:</strong> Se ha contactado al cliente para establecer fecha de visita.<br><br><strong>Política:</strong> Dejar constancia de fecha y hora de la visita.',
+        'contenido' => '<strong>Definición:</strong> La cita o visita ya fue agendada y el caso queda pendiente de realizar la inspección o revisión correspondiente.<br><br><strong>Política:</strong> Dejar constancia de la fecha y hora de la visita programada y actualizar el caso cuando se realice la inspección o revisión.',
       ],
       [
         'titulo'    => 'Inspeccionado',

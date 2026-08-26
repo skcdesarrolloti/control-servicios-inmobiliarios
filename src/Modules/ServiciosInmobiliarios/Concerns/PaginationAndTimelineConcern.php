@@ -191,6 +191,7 @@ trait PaginationAndTimelineConcern
       'pendiente' => 'badge-warning',
       'en proceso' => 'badge-warning',
       'en_proceso' => 'badge-warning',
+      'en espera de respuesta' => 'badge-info',
       'postergado' => 'badge-info',
       'postergada' => 'badge-info',
       'postergados' => 'badge-info',

@@ -590,7 +590,7 @@ final class SuCasaControlServiciosInmobiliarios
       $cls = 'badge-success';
     } elseif ($low === 'en proceso') {
       $cls = 'badge-warning';
-    } elseif ($low === 'postergado' || $low === 'postergada' || $low === 'postergados') {
+    } elseif ($low === 'en espera de respuesta' || $low === 'postergado' || $low === 'postergada' || $low === 'postergados') {
       $cls = 'badge-info';
     } elseif ($low === 'cerrado' || $low === 'cerrada' || $low === 'cerrados' || $low === 'resuelto' || $low === 'finalizado') {
       $cls = 'badge-error';

@@ -24,6 +24,7 @@ final class SeguimientoFormView
     $html .= '<label class="scm-seg-field"><span>Estado administrativo</span><select name="estado_administrativo">'
       . '<option value="__keep__">Sin cambio</option>'
       . '<option value="Nuevo">Nuevo</option>'
+      . '<option value="En espera de respuesta">En espera de respuesta</option>'
       . '<option value="Por inspeccionar">Por inspeccionar</option>'
       . '<option value="Inspeccionado">Inspeccionado</option>'
       . '<option value="Cotizado">Cotizado</option>'
