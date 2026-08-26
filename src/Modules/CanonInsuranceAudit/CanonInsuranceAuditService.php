@@ -13,7 +13,7 @@ final class CanonInsuranceAuditService
 {
   private const MONEY_TOLERANCE = 1.0;
   private const COLOMBIA_IVA_FACTOR = 1.19;
-  private const IMPORT_VERSION = 'canon-admin-iva-consolidado-v5';
+  private const IMPORT_VERSION = 'canon-admin-iva-consolidado-v6';
 
   private Database $db;
   private SpreadsheetReader $reader;
@@ -513,13 +513,20 @@ final class CanonInsuranceAuditService
       return $item;
     }
     $excelIva = $this->databaseMoney($item['excel_iva'] ?? null);
-    if ($excelIva !== null && abs($excelIva) > self::MONEY_TOLERANCE) {
-      return $item;
+    if ($this->shouldSplitLibertadorIncludedIva($item)) {
+      if ($excelIva !== null && abs($excelIva) > self::MONEY_TOLERANCE) {
+        return $item;
+      }
+      $split = $this->splitIncludedIva((float) $item['excel_canon']);
+      $item['excel_canon'] = $split['base'];
+      $item['excel_iva'] = $split['iva'];
+    } else {
+      if ($excelIva !== null && abs($excelIva) > self::MONEY_TOLERANCE) {
+        $item['excel_canon'] = round((float) $item['excel_canon'] + $excelIva, 2);
+      }
+      $item['excel_iva'] = 0.0;
     }
 
-    $split = $this->splitIncludedIva((float) $item['excel_canon']);
-    $item['excel_canon'] = $split['base'];
-    $item['excel_iva'] = $split['iva'];
     foreach ([
       'canon' => ['excel_canon', 'system_canon', 'difference_canon'],
       'administration' => ['excel_administration', 'system_administration', 'difference_administration'],
@@ -531,6 +538,13 @@ final class CanonInsuranceAuditService
     }
     [$item['status'], $item['differences_json']] = $this->statusAndDifferencesForComparedItem($item);
     return $item;
+  }
+
+  /** @param array<string,mixed> $item */
+  private function shouldSplitLibertadorIncludedIva(array $item): bool
+  {
+    $systemIva = $this->databaseMoney($item['system_iva'] ?? null);
+    return $systemIva !== null && abs($systemIva) > self::MONEY_TOLERANCE;
   }
 
   /** @return array<string,mixed> */
@@ -1133,10 +1147,12 @@ final class CanonInsuranceAuditService
     } elseif ($includesVat === 'no') {
       $base['system_iva'] = 0.0;
     }
-    if ($sourceKey === 'libertador' && $base['excel_canon'] !== null) {
+    if ($sourceKey === 'libertador' && $base['excel_canon'] !== null && $this->shouldSplitLibertadorIncludedIva($base)) {
       $split = $this->splitIncludedIva((float) $base['excel_canon']);
       $base['excel_canon'] = $split['base'];
       $base['excel_iva'] = $split['iva'];
+    } elseif ($sourceKey === 'libertador' && $base['excel_canon'] !== null && $base['excel_iva'] === null) {
+      $base['excel_iva'] = 0.0;
     }
 
     [$base['status'], $base['differences_json']] = $this->statusAndDifferencesForComparedItem($base);
