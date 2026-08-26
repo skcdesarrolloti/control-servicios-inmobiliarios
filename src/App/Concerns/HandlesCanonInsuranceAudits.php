@@ -139,4 +139,43 @@ trait HandlesCanonInsuranceAudits
       $this->jsonFail($exception->getMessage());
     }
   }
+
+  public function ajax_handler_canon_insurance_audit_requests(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
+      $this->jsonFail('No tienes permiso para completar solicitudes.');
+    }
+    try {
+      $payload = $this->canonInsuranceAuditService()->requestNumberRows(
+        trim(sanitize_text_field(wp_unslash((string) ($_POST['search'] ?? ''))))
+      );
+      $this->jsonOk([
+        'html' => (new CanonInsuranceAuditView())->renderRequestNumbers($payload),
+      ]);
+    } catch (\Throwable $exception) {
+      $this->jsonFail($exception->getMessage());
+    }
+  }
+
+  public function ajax_handler_canon_insurance_audit_update_request(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
+      $this->jsonFail('No tienes permiso para completar solicitudes.');
+    }
+    try {
+      $payload = $this->canonInsuranceAuditService()->updateContractRequestNumber(
+        (int) ($_POST['contract_id'] ?? 0),
+        trim(sanitize_text_field(wp_unslash((string) ($_POST['request_number'] ?? '')))),
+        trim(sanitize_text_field(wp_unslash((string) ($_POST['search'] ?? ''))))
+      );
+      $this->jsonOk([
+        'html' => (new CanonInsuranceAuditView())->renderRequestNumbers($payload),
+        'message' => (string) ($payload['message'] ?? 'Solicitud guardada.'),
+      ]);
+    } catch (\Throwable $exception) {
+      $this->jsonFail($exception->getMessage());
+    }
+  }
 }

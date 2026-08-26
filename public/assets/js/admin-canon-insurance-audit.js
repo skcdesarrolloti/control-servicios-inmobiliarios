@@ -15,11 +15,16 @@
     var reportAction = actions.canon_insurance_audit_report || "";
     var mandatesAction = actions.canon_insurance_audit_mandates || "";
     var linkMandateAction = actions.canon_insurance_audit_link_mandate || "";
+    var requestsAction = actions.canon_insurance_audit_requests || "";
+    var updateRequestAction = actions.canon_insurance_audit_update_request || "";
     var content = module.querySelector("[data-cia-content]");
     var status = module.querySelector("[data-cia-status]");
     var mandateModal = module.querySelector("[data-cia-mandate-modal]");
     var mandateContent = module.querySelector("[data-cia-mandate-content]");
     var mandateStatus = module.querySelector("[data-cia-mandate-status]");
+    var requestModal = module.querySelector("[data-cia-request-modal]");
+    var requestContent = module.querySelector("[data-cia-request-content]");
+    var requestStatus = module.querySelector("[data-cia-request-status]");
     module.dataset.ciaInit = "1";
 
     function updateFilenameGuide(period) {
@@ -114,6 +119,55 @@
         })
         .catch(function (error) {
           setMandateStatus(error.message || "No se pudieron consultar los mandatos.", "error");
+      });
+    }
+
+    function setRequestStatus(message, tone) {
+      if (!requestStatus) return;
+      requestStatus.textContent = message || "";
+      requestStatus.classList.toggle("is-error", tone === "error");
+      requestStatus.classList.toggle("is-success", tone === "success");
+      requestStatus.classList.toggle("is-loading", tone === "loading");
+    }
+
+    function openRequestModal() {
+      if (!requestModal) return;
+      requestModal.hidden = false;
+      document.documentElement.classList.add("scm-cia-modal-open");
+      var searchInput = requestModal.querySelector('[name="search"]');
+      if (searchInput) window.setTimeout(function () { searchInput.focus(); }, 50);
+      loadRequests();
+    }
+
+    function closeRequestModal() {
+      if (!requestModal) return;
+      requestModal.hidden = true;
+      document.documentElement.classList.remove("scm-cia-modal-open");
+    }
+
+    function currentRequestSearch() {
+      var searchInput = requestModal ? requestModal.querySelector('[name="search"]') : null;
+      return searchInput ? searchInput.value || "" : "";
+    }
+
+    function loadRequests(search) {
+      if (!requestsAction) {
+        setRequestStatus("La accion de solicitudes no esta configurada.", "error");
+        return Promise.resolve();
+      }
+      var fd = new FormData();
+      fd.append("action", requestsAction);
+      fd.append("search", typeof search === "string" ? search : currentRequestSearch());
+      setRequestStatus("Consultando contratos sin solicitud...", "loading");
+      return request(fd)
+        .then(function (data) {
+          if (requestContent && typeof data.html === "string") {
+            requestContent.innerHTML = data.html;
+          }
+          setRequestStatus("Contratos sin solicitud actualizados.", "success");
+        })
+        .catch(function (error) {
+          setRequestStatus(error.message || "No se pudieron consultar las solicitudes.", "error");
         });
     }
 
@@ -136,6 +190,44 @@
     }
 
     module.addEventListener("submit", function (event) {
+      var requestSearchForm = event.target.closest("[data-cia-request-search]");
+      if (requestSearchForm) {
+        event.preventDefault();
+        loadRequests(new FormData(requestSearchForm).get("search") || "");
+        return;
+      }
+
+      var requestUpdateForm = event.target.closest("[data-cia-update-request-form]");
+      if (requestUpdateForm) {
+        event.preventDefault();
+        if (!updateRequestAction) {
+          setRequestStatus("La accion para guardar solicitud no esta configurada.", "error");
+          return;
+        }
+        var requestData = new FormData(requestUpdateForm);
+        requestData.append("action", updateRequestAction);
+        requestData.append("search", currentRequestSearch());
+        var requestButton = requestUpdateForm.querySelector('button[type="submit"]');
+        if (requestButton) requestButton.disabled = true;
+        setRequestStatus("Guardando numero de solicitud...", "loading");
+        request(requestData)
+          .then(function (data) {
+            if (requestContent && typeof data.html === "string") {
+              requestContent.innerHTML = data.html;
+            }
+            setRequestStatus(data.message || "Solicitud guardada.", "success");
+            var filterForm = module.querySelector("[data-cia-filter-form]");
+            if (filterForm) load(new FormData(filterForm));
+          })
+          .catch(function (error) {
+            setRequestStatus(error.message || "No se pudo guardar la solicitud.", "error");
+          })
+          .finally(function () {
+            if (requestButton) requestButton.disabled = false;
+          });
+        return;
+      }
+
       var mandateSearchForm = event.target.closest("[data-cia-mandate-search]");
       if (mandateSearchForm) {
         event.preventDefault();
@@ -379,12 +471,25 @@
       if (event.target.closest("[data-cia-close-mandates]")) {
         event.preventDefault();
         closeMandateModal();
+        return;
+      }
+      if (event.target.closest("[data-cia-open-requests]")) {
+        event.preventDefault();
+        openRequestModal();
+        return;
+      }
+      if (event.target.closest("[data-cia-close-requests]")) {
+        event.preventDefault();
+        closeRequestModal();
       }
     });
 
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && mandateModal && !mandateModal.hidden) {
         closeMandateModal();
+      }
+      if (event.key === "Escape" && requestModal && !requestModal.hidden) {
+        closeRequestModal();
       }
     });
 

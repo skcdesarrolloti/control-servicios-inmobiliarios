@@ -690,6 +690,103 @@ final class CanonInsuranceAuditService
     ] + $this->mandateLinkingRows($search);
   }
 
+  /** @return array<string,mixed> */
+  public function requestNumberRows(string $search = ''): array
+  {
+    $contractsTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    $search = trim(preg_replace('/\s+/u', ' ', AuditValueNormalizer::text($search)) ?? '');
+    $where = [
+      "LOWER(TRIM(COALESCE(`estado`, ''))) = 'entregado'",
+      "(TRIM(COALESCE(`numero_solicitud`, '')) = '' OR TRIM(COALESCE(`numero_solicitud`, '')) = '0')",
+    ];
+    $args = [];
+    if ($search !== '') {
+      $like = '%' . $this->db->escapeLike($search) . '%';
+      $where[] = "(COALESCE(`contrato`, '') LIKE ? OR COALESCE(`arrendatario`, '') LIKE ? OR COALESCE(`direccion`, '') LIKE ? OR COALESCE(`id_inmueble`, '') LIKE ? OR COALESCE(`id_estudio_aseguradora`, '') LIKE ?)";
+      $args = [$like, $like, $like, $like, $like];
+    }
+
+    $rows = $this->db->getResults(
+      "SELECT `_ID` AS contract_id, `contrato` AS contract_number, `numero_solicitud`,
+              `arrendatario`, `direccion`, `id_inmueble`, `aseguradora`,
+              `id_estudio_aseguradora`
+         FROM `{$contractsTable}`
+        WHERE " . implode(' AND ', $where) . "
+        ORDER BY `_ID` DESC
+        LIMIT 120",
+      $args
+    );
+    $rows = $this->enrichContractsWithInsuranceStudy($rows);
+
+    return [
+      'rows' => array_map(function (array $row): array {
+        return [
+          'contract_id' => (int) ($row['contract_id'] ?? 0),
+          'contract_number' => AuditValueNormalizer::text($row['contract_number'] ?? ''),
+          'tenant' => AuditValueNormalizer::text($row['arrendatario'] ?? ''),
+          'property_address' => AuditValueNormalizer::text($row['direccion'] ?? ''),
+          'property_id' => AuditValueNormalizer::text($row['id_inmueble'] ?? ''),
+          'insurer' => AuditValueNormalizer::text($row['aseguradora'] ?? ''),
+          'study_id' => AuditValueNormalizer::text($row['study_id'] ?? ($row['id_estudio_aseguradora'] ?? '')),
+          'study_request' => AuditValueNormalizer::requestNumber($row['study_request'] ?? ''),
+          'study_insurer' => AuditValueNormalizer::text($row['study_insurer'] ?? ''),
+          'study_status' => AuditValueNormalizer::text($row['study_status'] ?? ''),
+        ];
+      }, $rows),
+      'total' => count($rows),
+      'search' => $search,
+    ];
+  }
+
+  /** @return array<string,mixed> */
+  public function updateContractRequestNumber(int $contractId, string $requestNumber, string $search = ''): array
+  {
+    $contractsTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    $requestNumber = AuditValueNormalizer::requestNumber($requestNumber);
+    if ($contractId <= 0) {
+      throw new \RuntimeException('No se identifico el contrato de arrendamiento.');
+    }
+    if ($requestNumber === '' || preg_match('/^(?:[A-Z]{0,4})?\d{5,}$/', $requestNumber) !== 1) {
+      throw new \RuntimeException('Escribe un numero de solicitud valido.');
+    }
+    $contract = $this->db->getRow(
+      "SELECT `_ID`, `contrato`, `arrendatario`, `numero_solicitud`, `estado`
+         FROM `{$contractsTable}`
+        WHERE `_ID` = ?
+        LIMIT 1",
+      [$contractId]
+    );
+    if (!is_array($contract)) {
+      throw new \RuntimeException('El contrato ya no existe.');
+    }
+    if (AuditValueNormalizer::key($contract['estado'] ?? '') !== 'entregado') {
+      throw new \RuntimeException('Solo se puede actualizar la solicitud en contratos Entregado.');
+    }
+    $current = AuditValueNormalizer::requestNumber($contract['numero_solicitud'] ?? '');
+    if ($current !== '' && $current !== '0') {
+      throw new \RuntimeException('Este contrato ya tiene numero de solicitud.');
+    }
+    $duplicate = $this->db->getRow(
+      "SELECT `_ID`, `contrato`, `arrendatario`
+         FROM `{$contractsTable}`
+        WHERE TRIM(COALESCE(`numero_solicitud`, '')) = ?
+          AND `_ID` <> ?
+        LIMIT 1",
+      [$requestNumber, $contractId]
+    );
+    if (is_array($duplicate)) {
+      throw new \RuntimeException('La solicitud ' . $requestNumber . ' ya esta registrada en el contrato ' . AuditValueNormalizer::text($duplicate['contrato'] ?? ('#' . ($duplicate['_ID'] ?? ''))) . '.');
+    }
+
+    $this->db->update($contractsTable, [
+      'numero_solicitud' => $requestNumber,
+    ], ['_ID' => $contractId]);
+
+    return [
+      'message' => 'Solicitud ' . $requestNumber . ' guardada en el contrato ' . AuditValueNormalizer::text($contract['contrato'] ?? ('#' . $contractId)) . '.',
+    ] + $this->requestNumberRows($search);
+  }
+
   private function propertyKey(mixed $value): string
   {
     return mb_strtolower(trim((string) $value), 'UTF-8');
