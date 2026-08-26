@@ -108,6 +108,38 @@ trait NotificationDeliveryConcern
     return $sent;
   }
 
+  /** @param array<string,mixed> $ticket @param array<string,string> $notice */
+  private function notifyPreventivaNoAccessNotice(array $ticket, string $logicalTicket, array $notice, int $attempt, string $userName): int
+  {
+    if (!$this->queue instanceof EmailQueue) {
+      return 0;
+    }
+
+    $tenantEmail = trim((string)($ticket['correo_arrendatario'] ?? $ticket['correo_solicitante'] ?? ''));
+    if ($tenantEmail === '' || !filter_var($tenantEmail, FILTER_VALIDATE_EMAIL)) {
+      return 0;
+    }
+
+    $tenantName = trim((string)($ticket['arrendatario'] ?? $ticket['solicitante'] ?? 'arrendatario'));
+    $noticeUrl = trim((string)($notice['url'] ?? ''));
+    $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
+    $subject = 'Comunicacion de revision preventiva del ticket #' . $logicalTicket;
+
+    $content = '<p style="font-weight:500;margin:10px 0;">Apreciado(a) ' . EmailTemplate::e($tenantName !== '' ? $tenantName : 'arrendatario(a)') . ',</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Se ha generado una comunicacion para dejar constancia de la gestion realizada frente a la revision preventiva del inmueble.</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Esta comunicacion corresponde al intento No. ' . EmailTemplate::e((string)$attempt) . ' y queda anexada al historial del caso.</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Cordialmente,<br><b>' . EmailTemplate::e($userName) . '</b></p>';
+
+    $html = EmailTemplate::render('Comunicacion de revision preventiva', $content, [
+      'buttons' => [
+        ['url' => $noticeUrl, 'label' => 'Ver comunicacion'],
+        ['url' => $ticketUrl, 'label' => 'Ver ticket'],
+      ],
+    ]);
+
+    return $this->sendMailToUnique($tenantEmail, $subject, $html);
+  }
+
   /** @param array<string,mixed> $ticket @return string[] */
   private function ticketParticipantEmails(array $ticket, bool $includeEmployee = false): array
   {

@@ -1433,6 +1433,43 @@
       });
   }
 
+  function isPreventivaCase(caseBtn) {
+    if (!caseBtn || !caseBtn.dataset) return false;
+    var values = [
+      caseBtn.dataset.tabKey,
+      caseBtn.dataset.ticketMode,
+      caseBtn.dataset.asunto,
+      caseBtn.dataset.tema,
+      caseBtn.dataset.idRevisionPreventiva,
+    ].join(" ");
+    return /preventiva/i.test(values);
+  }
+
+  function syncPreventivaNoAccessBox(scope) {
+    if (!scope) return;
+    var box = scope.querySelector("[data-scm-preventiva-no-access-box]");
+    var select = scope.querySelector('select[name="estado_administrativo"]');
+    var input = scope.querySelector('input[name="generar_acta_no_acceso_preventiva"]');
+    if (!box || !select || !input) return;
+    var show = select.value === "En espera de respuesta";
+    box.hidden = !show;
+    if (!show) {
+      input.checked = false;
+    }
+  }
+
+  function initPreventivaNoAccessBox(scope) {
+    if (!scope) return;
+    var select = scope.querySelector('select[name="estado_administrativo"]');
+    if (select && !select.dataset.scmNoAccessBind) {
+      select.dataset.scmNoAccessBind = "1";
+      select.addEventListener("change", function () {
+        syncPreventivaNoAccessBox(scope);
+      });
+    }
+    syncPreventivaNoAccessBox(scope);
+  }
+
   function openTicketResponseEditor(modal, caseBtn) {
     var sub = ensureCaseSubmodal(modal);
     if (!sub || !caseBtn) return;
@@ -1440,6 +1477,7 @@
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = caseBtn.dataset.ticketPk || "";
     var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
+    var isPreventiva = !isPublicPqr && isPreventivaCase(caseBtn);
     if (title) title.textContent = isPublicPqr ? "Responder solicitud" : "Responder ticket";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
@@ -1452,6 +1490,9 @@
         '<option value="__keep__">Sin cambio</option><option value="Nuevo">Nuevo</option><option value="En espera de respuesta">En espera de respuesta</option><option value="Por inspeccionar">Por inspeccionar</option><option value="Inspeccionado">Inspeccionado</option><option value="Cotizado">Cotizado</option><option value="En ejecucion por inmobiliaria">En ejecucion por inmobiliaria</option><option value="En ejecucion por propietario">En ejecucion por propietario</option><option value="En ejecucion por arrendatario">En ejecucion por arrendatario</option><option value="En ejecucion por copropiedad">En ejecucion por copropiedad</option><option value="Finalizado">Finalizado</option><option value="Trasladado">Trasladado</option><option value="Entregado">Entregado</option><option value="Recibido">Recibido</option><option value="Desistido">Desistido</option>' +
         "</select></label>" +
         '<label class="scm-seg-field"><span>Respuesta</span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
+        (isPreventiva
+          ? '<section class="scm-preventiva-no-access-box" data-scm-preventiva-no-access-box hidden><div><strong>Comunicaci&oacute;n al arrendatario</strong><span>Al marcarla se genera el PDF de constancia, se anexa al caso y se env&iacute;a por correo al arrendatario. El sistema calcula cu&aacute;ntas comunicaciones lleva este ticket.</span></div><label class="scm-seg-check scm-preventiva-no-access-check"><input type="checkbox" name="generar_acta_no_acceso_preventiva" value="1"> Crear y enviar comunicaci&oacute;n de no autorizaci&oacute;n de revisi&oacute;n preventiva</label></section>'
+          : "") +
         renderCotizacionInlineFields(!isPublicPqr && caseCotizacionCanRespond(caseBtn)) +
         '<label class="scm-seg-field"><span>Imagenes (opcional)</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
         renderPasteEvidenceBox("imagen[]") +
@@ -1461,6 +1502,7 @@
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
       initCotizacionResponseFields(body);
+      initPreventivaNoAccessBox(body);
     }
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");

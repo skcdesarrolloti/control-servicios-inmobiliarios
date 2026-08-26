@@ -2184,6 +2184,52 @@ body.scm-modal-open {
   line-height: 1.4;
 }
 
+#scm-app .scm-preventiva-no-access-box {
+  background: linear-gradient(135deg, #fff7ed 0%, #f8fafc 100%);
+  border: 1px solid #fed7aa;
+  border-left: 4px solid #f59120;
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+  margin: 4px 0 10px;
+  padding: 16px 18px;
+}
+
+#scm-app .scm-preventiva-no-access-box[hidden] {
+  display: none !important;
+}
+
+#scm-app .scm-preventiva-no-access-box strong {
+  color: #061d49;
+  display: block;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-preventiva-no-access-box span {
+  color: #64748b;
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 3px;
+}
+
+#scm-app .scm-preventiva-no-access-check {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #fdba74;
+  border-radius: 12px;
+  color: #7c2d12;
+  display: inline-flex;
+  font-weight: 900;
+  gap: 8px;
+  padding: 11px 13px;
+  width: fit-content;
+}
+
 #scm-app .scm-ticket-document-row {
   display: grid;
   gap: 10px;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Modules\ServiciosInmobiliarios\Concerns;
 
 use SCM\Core\Database;
+use SCM\Modules\Pending\TicketPdfGenerator;
 use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
 use SCM\Support\SchemaInspector;
@@ -136,7 +137,7 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = [], string $estadoCotizacion = '__keep__', string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = ''): array
+  public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = [], string $estadoCotizacion = '__keep__', string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', bool $generarActaNoAccesoPreventiva = false): array
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $histTable    = $this->db->table('jet_cct_historial_del_ticket');
@@ -165,6 +166,32 @@ trait WorkflowCommandsConcern
     $documentos = array_values(array_filter($documentos, static function ($doc): bool {
       return is_array($doc) && trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? '')) !== '';
     }));
+
+    $generatedNoAccessNotice = null;
+    $attemptNoAccessNotice = 0;
+    if ($generarActaNoAccesoPreventiva) {
+      if (strcasecmp(trim($estadoAdministrativo), 'En espera de respuesta') !== 0) {
+        return ['ok' => '0', 'message' => 'Para generar esta comunicacion selecciona el estado administrativo "En espera de respuesta".'];
+      }
+      if (!$this->isPreventivaTicket($ticket)) {
+        return ['ok' => '0', 'message' => 'Esta comunicacion solo aplica para tickets de revision preventiva.'];
+      }
+      $attemptNoAccessNotice = $this->nextPreventivaNoAccessAttempt($ticketPk, (string) ($ticket['archivos'] ?? ''));
+      try {
+        $generatedNoAccessNotice = (new TicketPdfGenerator())->generatePreventivaNoAccessNotice($ticketPk, $ticket, $attemptNoAccessNotice);
+        $url = trim((string) ($generatedNoAccessNotice['url'] ?? ''));
+        if ($url === '') {
+          throw new \RuntimeException('El PDF no retorno URL valida.');
+        }
+        $documentos[] = [
+          'nombre_archivo' => (string) ($generatedNoAccessNotice['title'] ?? ('Comunicacion preventiva por no autorizacion de acceso #' . $attemptNoAccessNotice)),
+          'media_archivo' => $url,
+          'archivo' => $url,
+        ];
+      } catch (\Throwable $exception) {
+        return ['ok' => '0', 'message' => 'No se pudo generar la comunicacion preventiva: ' . $exception->getMessage()];
+      }
+    }
 
     $histPayload = [
       'cct_status' => 'publish',
@@ -202,12 +229,34 @@ trait WorkflowCommandsConcern
     if ($estadoAdministrativo !== '' && $estadoAdministrativo !== '__keep__') {
       $ticketUpdate['estado_administrativo'] = $estadoAdministrativo;
     }
+    if ($generatedNoAccessNotice !== null) {
+      $ticketDocs = $this->ticketDocumentsFromRaw($ticket['archivos'] ?? '');
+      foreach ($documentos as $doc) {
+        $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+        if ($url === '') {
+          continue;
+        }
+        $ticketDocs[] = [
+          'nombre_archivo' => trim((string) ($doc['nombre_archivo'] ?? 'Documento')),
+          'media_archivo' => $url,
+          'archivo' => $url,
+        ];
+      }
+      $ticketUpdate['archivos'] = serialize($this->uniqueTicketDocuments($ticketDocs));
+      $noticeUrl = trim((string) ($generatedNoAccessNotice['url'] ?? ''));
+      $ticketUpdate['acta_no_acceso_preventiva'] = $noticeUrl;
+      $ticketUpdate['pdf_no_acceso_preventiva'] = $noticeUrl;
+    }
     $ticketUpdate = $this->schema->filterTableData($ticketsTable, $ticketUpdate);
     if (!empty($ticketUpdate)) {
       $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);
     }
 
     $sent = $this->notifyTicketResponse($ticket, $logicalTicket, $respuesta, $userName, $newEstado, $notifyTargets);
+    $noticeSent = 0;
+    if ($generatedNoAccessNotice !== null) {
+      $noticeSent = $this->notifyPreventivaNoAccessNotice($ticket, $logicalTicket, $generatedNoAccessNotice, $attemptNoAccessNotice, $userName);
+    }
     $cotRows = '0';
     $extraMessage = '';
     if ($this->shouldSaveCotizacionResponse($estadoCotizacion)) {
@@ -227,10 +276,98 @@ trait WorkflowCommandsConcern
     }
     return [
       'ok' => '1',
-      'message' => 'Respuesta guardada.' . $extraMessage . ($sent > 0 ? ' Correos programados en cola: ' . $sent . '.' : ' Sin correos programados.'),
-      'emails_sent' => (string)$sent,
+      'message' => 'Respuesta guardada.'
+        . ($generatedNoAccessNotice !== null ? ' Comunicacion preventiva #' . $attemptNoAccessNotice . ' generada y anexada.' : '')
+        . $extraMessage
+        . (($sent + $noticeSent) > 0 ? ' Correos programados en cola: ' . ($sent + $noticeSent) . '.' : ' Sin correos programados.'),
+      'emails_sent' => (string)($sent + $noticeSent),
       'cot_rows' => $cotRows,
+      'no_access_attempt' => (string)$attemptNoAccessNotice,
+      'no_access_notice_url' => $generatedNoAccessNotice !== null ? (string)($generatedNoAccessNotice['url'] ?? '') : '',
     ];
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function isPreventivaTicket(array $ticket): bool
+  {
+    $hayPreventiva = trim((string) ($ticket['id_revision_preventiva'] ?? '')) !== '';
+    $texto = strtolower(trim((string) (($ticket['tema_ayuda'] ?? '') . ' ' . ($ticket['asunto'] ?? '') . ' ' . ($ticket['descripcion'] ?? ''))));
+    return $hayPreventiva || strpos($texto, 'preventiva') !== false;
+  }
+
+  private function nextPreventivaNoAccessAttempt(int $ticketPk, string $rawTicketDocuments): int
+  {
+    $count = 0;
+    foreach ($this->ticketDocumentsFromRaw($rawTicketDocuments) as $doc) {
+      $label = strtolower(trim((string) ($doc['nombre_archivo'] ?? '')));
+      if (strpos($label, 'no autorizacion de acceso') !== false || strpos($label, 'no permitir acceso') !== false) {
+        $count++;
+      }
+    }
+
+    $histTable = $this->db->table('jet_cct_historial_del_ticket');
+    if (
+      $this->schema->tableExists($histTable)
+      && $this->schema->columnExists($histTable, 'id_ticket')
+      && $this->schema->columnExists($histTable, 'respuesta')
+    ) {
+      $dbCount = (int) ($this->db->getVar(
+        "SELECT COUNT(1) FROM `{$histTable}` WHERE `id_ticket` = ? AND LOWER(COALESCE(`respuesta`, '')) LIKE ?",
+        [$ticketPk, '%comunicacion preventiva%no autorizacion%']
+      ) ?? 0);
+      $count = max($count, $dbCount);
+    }
+
+    return $count + 1;
+  }
+
+  /** @param mixed $raw @return array<int,array{nombre_archivo:string,media_archivo:string,archivo:string}> */
+  private function ticketDocumentsFromRaw($raw): array
+  {
+    if (is_array($raw)) {
+      $items = $raw;
+    } else {
+      $text = trim((string) $raw);
+      if ($text === '') {
+        return [];
+      }
+      $decoded = preg_match('/^[aObis]:/', $text) ? @unserialize($text, ['allowed_classes' => false]) : null;
+      $items = is_array($decoded) ? $decoded : [$text];
+    }
+
+    $out = [];
+    foreach ($items as $item) {
+      $url = is_array($item) ? trim((string) ($item['archivo'] ?? $item['media_archivo'] ?? $item['url'] ?? '')) : trim((string) $item);
+      if ($url === '') {
+        continue;
+      }
+      $label = is_array($item) ? trim((string) ($item['nombre_archivo'] ?? $item['titulo'] ?? '')) : '';
+      if ($label === '') {
+        $label = 'Documento';
+      }
+      $out[] = ['nombre_archivo' => $label, 'media_archivo' => $url, 'archivo' => $url];
+    }
+    return $out;
+  }
+
+  /** @param array<int,array{nombre_archivo:string,media_archivo:string,archivo:string}> $documents */
+  private function uniqueTicketDocuments(array $documents): array
+  {
+    $seen = [];
+    $out = [];
+    foreach ($documents as $doc) {
+      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+      if ($url === '' || isset($seen[$url])) {
+        continue;
+      }
+      $seen[$url] = true;
+      $out[] = [
+        'nombre_archivo' => trim((string) ($doc['nombre_archivo'] ?? 'Documento')),
+        'media_archivo' => $url,
+        'archivo' => $url,
+      ];
+    }
+    return $out;
   }
 
   /**

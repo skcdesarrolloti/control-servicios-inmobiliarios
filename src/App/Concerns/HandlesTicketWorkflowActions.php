@@ -292,6 +292,7 @@ trait HandlesTicketWorkflowActions
     $motivoCotizacion = trim(strip_tags(stripslashes((string) ($_POST['motivo_cotizacion'] ?? ''))));
     $financiacionCotizacion = trim(strip_tags(stripslashes((string) ($_POST['financiacion_cotizacion'] ?? ''))));
     $cerrarTicket = !empty($_POST['cerrar_ticket']) && (string) $_POST['cerrar_ticket'] === '1';
+    $generarActaNoAccesoPreventiva = !empty($_POST['generar_acta_no_acceso_preventiva']) && (string) $_POST['generar_acta_no_acceso_preventiva'] === '1';
     $notifyRecipients = $this->parse_notify_recipients($_POST['notify_recipients'] ?? []);
     if (isset($_POST['notify_recipients_present']) && empty($notifyRecipients)) {
       $notifyRecipients = ['none'];
@@ -308,7 +309,7 @@ trait HandlesTicketWorkflowActions
     $imagenes = $this->handleImageUploads('imagen', 10);
     $documentTitles = isset($_POST['documento_nombre']) && is_array($_POST['documento_nombre']) ? $_POST['documento_nombre'] : [];
     $documentos = $this->handleDocumentUploads('documento', $documentTitles, 10);
-    $result = $service->saveTicketResponse($ticketPk, $respuesta, $estadoAdministrativo, $cerrarTicket, $notifyRecipients, $imagenes, $documentos, $estadoCotizacion, $observacionCotizacion, $motivoCotizacion, $financiacionCotizacion);
+    $result = $service->saveTicketResponse($ticketPk, $respuesta, $estadoAdministrativo, $cerrarTicket, $notifyRecipients, $imagenes, $documentos, $estadoCotizacion, $observacionCotizacion, $motivoCotizacion, $financiacionCotizacion, $generarActaNoAccesoPreventiva);
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta.'));
     }

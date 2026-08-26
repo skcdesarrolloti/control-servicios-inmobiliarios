@@ -43,6 +43,20 @@ final class TicketPdfGenerator
     return $out;
   }
 
+  /**
+   * @param array<string,mixed> $ticket
+   * @return array{key:string,title:string,url:string,path:string}
+   */
+  public function generatePreventivaNoAccessNotice(int $ticketId, array $ticket, int $attempt = 1): array
+  {
+    return $this->save(
+      $this->buildPreventivaNoAccessNotice($ticket, max(1, $attempt)),
+      'comunicacion_no_permitir_acceso_preventiva_' . $ticketId . '_' . max(1, $attempt),
+      'Comunicacion preventiva por no autorizacion de acceso #' . max(1, $attempt),
+      'acta_no_acceso_preventiva'
+    );
+  }
+
   /** @param array<string,mixed> $ticket */
   private function buildPreventiva(array $ticket, string $destinatario): SimplePdf
   {
@@ -87,6 +101,42 @@ final class TicketPdfGenerator
     ]);
 
     $pdf->paragraph('Nuestro proposito es acompanar la gestion del inmueble de manera preventiva, ordenada y transparente, procurando una experiencia de servicio clara, oportuna y memorable.');
+    $pdf->spacer(8);
+    $pdf->signatureBlock('Creado por', $creator['name'], $creator['details']);
+    $pdf->signatureBlock('Verificador asignado', $checker['name'], $checker['details']);
+
+    return $pdf;
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function buildPreventivaNoAccessNotice(array $ticket, int $attempt): SimplePdf
+  {
+    $pdf = new SimplePdf();
+    $pdf->backgroundImage($this->letterheadPath());
+    $pdf->layout(58, 170, 118);
+
+    $tenantName = $this->value($ticket, 'arrendatario', $this->value($ticket, 'solicitante', 'arrendatario(a)'));
+    $contract = $this->value($ticket, 'contrato', '-');
+    $property = $this->value($ticket, 'inmueble', $this->value($ticket, 'id_inmueble', '-'));
+    $address = $this->value($ticket, 'direccion', '');
+    $city = $this->value($ticket, 'ciudad', 'Cartagena de Indias');
+    $creator = $this->contactParts($ticket, 'creador');
+    $checker = $this->contactParts($ticket, 'empleado');
+
+    $pdf->title('Comunicacion por no autorizacion de revision preventiva');
+    $pdf->line($city . ', ' . date('d/m/Y'), 8);
+    $pdf->spacer(5);
+    $pdf->line('Senor(a): ' . $tenantName, 10, 'F2');
+    $pdf->line('Contrato: ' . $contract . ' | Inmueble SIMI: ' . $property . ' | Comunicacion No. ' . $attempt, 8, 'F2');
+    if ($address !== '') {
+      $pdf->line('Direccion: ' . $address, 8);
+    }
+    $pdf->spacer(12);
+    $pdf->paragraph('Cordial saludo,');
+    $pdf->paragraph('Teniendo en cuenta que se le notifico previamente la realizacion de la revision preventiva del inmueble que actualmente ocupa, nos permitimos dejar constancia de que, al momento de coordinar la respectiva cita, usted manifesto no requerir, no necesitar o no autorizar la realizacion de dicha revision.');
+    $pdf->paragraph('La revision preventiva tiene como finalidad verificar el estado general del inmueble, identificar oportunamente posibles necesidades de mantenimiento y prevenir que situaciones menores puedan generar danos de mayor consideracion.');
+    $pdf->paragraph('En consecuencia, al no permitirse la realizacion de la revision previamente informada, cualquier dano, deterioro, agravacion o mayor costo de reparacion que posteriormente se presente y que razonablemente hubiera podido ser identificado, prevenido o atendido oportunamente mediante dicha inspeccion sera imputable a quien impidio su realizacion.');
+    $pdf->paragraph('La presente comunicacion se remite para dejar constancia de lo anterior dentro del historial del caso.');
     $pdf->spacer(8);
     $pdf->signatureBlock('Creado por', $creator['name'], $creator['details']);
     $pdf->signatureBlock('Verificador asignado', $checker['name'], $checker['details']);
