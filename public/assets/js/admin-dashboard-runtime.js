@@ -164,6 +164,8 @@
       actions.admin_notifications_import || "";
     var actionAdminNotificationsCollection =
       actions.admin_notifications_collection || "";
+    var actionAdminNotificationsCollectionQueue =
+      actions.admin_notifications_collection_queue || "";
     var actionMetricsExecution = actions.metrics_execution || "";
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
@@ -2689,6 +2691,66 @@
         showToast("info", "Mensaje preparado: " + detail);
       }
 
+      function openCollectionQueueFromLog(managementId) {
+        managementId = String(managementId || "").replace(/\D+/g, "");
+        if (!managementId) {
+          showToast("error", "Gestion de cobro invalida.");
+          return;
+        }
+        if (!actionAdminNotificationsCollectionQueue) {
+          showToast("error", "La consulta de notificaciones no esta disponible.");
+          return;
+        }
+        var fd = new FormData();
+        fd.set("action", actionAdminNotificationsCollectionQueue);
+        fd.set("nonce", nonce);
+        fd.set("management_id", managementId);
+        showToast("info", "Consultando notificaciones de la gestion...");
+        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (response) {
+            return response.json();
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error(
+                (json && json.data && json.data.message) ||
+                  "No se pudieron consultar las notificaciones.",
+              );
+            }
+            var data = json.data || {};
+            var stats = data.stats || {};
+            var total = Number(stats.total || 0);
+            var html =
+              '<div class="scm-collection-queue-modal">' +
+              '<div class="scm-collection-queue-summary" aria-label="Resumen de notificaciones">' +
+              '<article><span>Total</span><strong>' +
+              escHtml(String(total)) +
+              '</strong></article><article><span>Pendientes</span><strong>' +
+              escHtml(String(Number(stats.pending || 0))) +
+              '</strong></article><article><span>Enviadas</span><strong>' +
+              escHtml(String(Number(stats.sent || 0))) +
+              '</strong></article><article><span>Fallidas</span><strong>' +
+              escHtml(String(Number(stats.failed || 0))) +
+              "</strong></article></div>" +
+              (data.html || "") +
+              "</div>";
+            if (window.Swal && typeof window.Swal.fire === "function") {
+              window.Swal.fire({
+                title: "Notificaciones de la gestión #" + managementId,
+                html: html,
+                width: 980,
+                confirmButtonText: "Cerrar",
+                customClass: { confirmButton: "scm-btn-primary" },
+              });
+              return;
+            }
+            showToast(total > 0 ? "success" : "warning", total + " notificaciones relacionadas.");
+          })
+          .catch(function (err) {
+            showToast("error", err.message || "No se pudieron consultar las notificaciones.");
+          });
+      }
+
       function updateCollectionPreview() {
         if (!collectionPreviewEl) {
           return;
@@ -3712,30 +3774,13 @@
                 }
                 var data = json.data || {};
                 var msg = data.message || "Gestion de cobro registrada.";
-                var queuedChannels = Array.isArray(data.queued_channels)
-                  ? data.queued_channels
-                  : collectionSelectedChannels();
-                var queuedDetail = data.queued_detail || collectionDetailText();
                 if (collectionResultEl) {
-                  collectionResultEl.innerHTML =
-                    escHtml(msg) +
-                    (queuedChannels.length > 0
-                      ? ' <button type="button" class="scm-case-work-btn scm-admin-notif-queued-btn" data-admin-notif-collection-queued-preview>Ver mensaje encolado</button>'
-                      : "");
+                  collectionResultEl.textContent = msg;
                   collectionResultEl.classList.remove("is-error");
-                  var previewBtn = collectionResultEl.querySelector("[data-admin-notif-collection-queued-preview]");
-                  if (previewBtn) {
-                    previewBtn.addEventListener("click", function () {
-                      openCollectionQueuedPreview(queuedChannels, queuedDetail, data.notifications || {});
-                    });
-                  }
                 }
                 showToast((data.created || 0) > 0 ? "success" : "warning", msg);
                 if ((data.created || 0) > 0) {
                   closeCollectionModal();
-                  if (queuedChannels.length > 0) {
-                    openCollectionQueuedPreview(queuedChannels, queuedDetail, data.notifications || {});
-                  }
                 }
                 loadRecipients(currentPage);
               })
@@ -3751,6 +3796,19 @@
               });
           });
         }
+
+        panel.addEventListener("click", function (event) {
+          var queueBtn = event.target && event.target.closest
+            ? event.target.closest("[data-scm-collection-queue]")
+            : null;
+          if (!queueBtn || !panel.contains(queueBtn)) {
+            return;
+          }
+          event.preventDefault();
+          openCollectionQueueFromLog(
+            queueBtn.getAttribute("data-scm-collection-queue") || "",
+          );
+        });
 
         sendForm.addEventListener("submit", function (event) {
           event.preventDefault();

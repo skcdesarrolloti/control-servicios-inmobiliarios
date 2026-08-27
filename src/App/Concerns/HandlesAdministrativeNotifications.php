@@ -149,7 +149,7 @@ trait HandlesAdministrativeNotifications
     $contractStatus = $this->sanitize_admin_notification_contract_status((string) ($_POST['contract_status'] ?? ''));
     $inmuebleSimi = trim(sanitize_text_field(wp_unslash((string) ($_POST['inmueble_simi'] ?? ''))));
     $contractNumber = trim(sanitize_text_field(wp_unslash((string) ($_POST['contract_number'] ?? ''))));
-    $allFiltered = trim((string) ($_POST['all_filtered'] ?? '')) === '1';
+    $allFiltered = false;
     $rawIds = $_POST['ids'] ?? [];
     $ids = $allFiltered
       ? $service->idsForFilter($type, $query, 5000, $contractStatus, $inmuebleSimi, $contractNumber, $fieldFilters)
@@ -181,6 +181,7 @@ trait HandlesAdministrativeNotifications
       if ($created > 0 && $notifyChannels !== []) {
         try {
           $notifyIds = array_map('intval', (array) ($result['recipient_ids'] ?? $ids));
+          $notificationMeta = $this->collection_management_notification_meta((array) ($result['managements'] ?? []));
           $notifyResult = $service->enqueue(
             $type,
             $notifyIds,
@@ -189,7 +190,7 @@ trait HandlesAdministrativeNotifications
             $queuedDetail,
             'scm_arrendatario_gestion_cobro_v1',
             'scm_email_arrendatario_gestion_cobro_v1',
-            [],
+            $notificationMeta,
             AdministrativeNotificationsService::COLLECTION_SMS_MAX
           );
         } catch (\Throwable $notifyException) {
@@ -210,6 +211,101 @@ trait HandlesAdministrativeNotifications
     } catch (\Throwable $e) {
       $this->jsonFail($e->getMessage());
     }
+  }
+
+  public function ajax_handler_admin_notifications_collection_queue(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('gestiones_cobro')) {
+      $this->jsonFail('No tienes permiso para ver las notificaciones de gestiones de cobro.');
+    }
+
+    $managementId = max(0, (int) ($_POST['management_id'] ?? 0));
+    try {
+      $result = $this->get_admin_notifications_service()->collectionManagementQueue($managementId);
+      $this->jsonOk([
+        'html' => $this->render_collection_management_queue_rows((array) ($result['rows'] ?? [])),
+        'stats' => (array) ($result['stats'] ?? []),
+        'management_id' => (int) ($result['management_id'] ?? $managementId),
+      ]);
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
+  /** @param array<int,array<string,mixed>> $managements @return array<int,array<string,mixed>> */
+  private function collection_management_notification_meta(array $managements): array
+  {
+    $out = [];
+    foreach ($managements as $management) {
+      if (!is_array($management)) {
+        continue;
+      }
+      $recipientId = (int) ($management['recipient_id'] ?? 0);
+      $managementId = (int) ($management['id'] ?? 0);
+      if ($recipientId <= 0 || $managementId <= 0) {
+        continue;
+      }
+      if (!isset($out[$recipientId])) {
+        $out[$recipientId] = [
+          '__notification_meta' => [
+            'collection_management' => [
+              'managements' => [],
+            ],
+          ],
+        ];
+      }
+      $out[$recipientId]['__notification_meta']['collection_management']['managements'][] = [
+        'id' => $managementId,
+        'contract_id' => (int) ($management['contract_id'] ?? 0),
+        'contract_number' => (string) ($management['contract_number'] ?? ''),
+        'property' => (string) ($management['property'] ?? ''),
+        'type' => (string) ($management['type'] ?? ''),
+      ];
+    }
+    return $out;
+  }
+
+  /** @param array<int,array<string,mixed>> $rows */
+  private function render_collection_management_queue_rows(array $rows): string
+  {
+    if ($rows === []) {
+      return '<div class="scm-admin-notif-empty"><strong>Sin notificaciones relacionadas</strong><span>Esta gesti&oacute;n no tiene mensajes en cola. Si es una gesti&oacute;n anterior a esta mejora, puede no tener trazabilidad en meta_json.</span></div>';
+    }
+
+    $html = '<div class="scm-collection-queue-list">';
+    foreach ($rows as $row) {
+      $channel = strtolower(trim((string) ($row['channel'] ?? '')));
+      $status = strtolower(trim((string) ($row['status'] ?? '')));
+      $html .= '<article class="scm-collection-queue-item scm-collection-queue-item--' . esc_attr($status !== '' ? $status : 'unknown') . '">';
+      $html .= '<div class="scm-collection-queue-main">';
+      $html .= '<span class="scm-collection-queue-channel scm-collection-queue-channel--' . esc_attr($channel !== '' ? $channel : 'default') . '">' . esc_html((string) ($row['channel_label'] ?? $channel ?: 'Canal')) . '</span>';
+      $html .= '<div>';
+      $html .= '<strong>' . esc_html((string) (($row['destination_name'] ?? '') ?: 'Destinatario')) . '</strong>';
+      $html .= '<small>' . esc_html((string) (($row['destination'] ?? '') ?: 'Sin destino')) . '</small>';
+      $html .= '</div>';
+      $html .= '</div>';
+      $html .= '<div class="scm-collection-queue-meta">';
+      $html .= '<span class="scm-collection-queue-status scm-collection-queue-status--' . esc_attr($status !== '' ? $status : 'unknown') . '">' . esc_html((string) ($row['status_label'] ?? $status ?: 'Sin estado')) . '</span>';
+      $html .= '<small>Intentos: ' . esc_html((string) ((int) ($row['attempts'] ?? 0))) . '</small>';
+      $html .= '<small>Creada: ' . esc_html((string) ($row['created_at'] ?? '')) . '</small>';
+      $html .= '</div>';
+      $subject = trim((string) ($row['subject'] ?? ''));
+      if ($subject !== '') {
+        $html .= '<p class="scm-collection-queue-subject">' . esc_html($subject) . '</p>';
+      }
+      $message = trim((string) ($row['message_text'] ?? ''));
+      if ($message !== '') {
+        $html .= '<pre class="scm-collection-queue-message">' . esc_html($message) . '</pre>';
+      }
+      $error = trim((string) ($row['last_error'] ?? ''));
+      if ($error !== '') {
+        $html .= '<p class="scm-collection-queue-error">' . esc_html($error) . '</p>';
+      }
+      $html .= '</article>';
+    }
+    $html .= '</div>';
+    return $html;
   }
 
   private function sanitize_admin_notification_type(string $type): string

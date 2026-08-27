@@ -333,7 +333,7 @@ final class AdministrativeNotificationsService
    *
    * @param int[] $ids IDs de arrendatarios seleccionados.
    * @param array<string,mixed> $payload
-   * @return array{selected:int,contracts:int,created:int,updated_contracts:int,history:int,properties:int,skipped:int,recipient_ids:int[]}
+   * @return array{selected:int,contracts:int,created:int,updated_contracts:int,history:int,properties:int,skipped:int,recipient_ids:int[],managements:array<int,array<string,mixed>>}
    */
   public function registerCollectionManagement(array $ids, array $payload): array
   {
@@ -354,7 +354,7 @@ final class AdministrativeNotificationsService
     $data = $this->normalizeCollectionPayload($payload);
     $contracts = $this->activeArrendatarioContracts($ids, $data['contract_ids']);
     if ($contracts === []) {
-      return ['selected' => count($ids), 'contracts' => 0, 'created' => 0, 'updated_contracts' => 0, 'history' => 0, 'properties' => 0, 'skipped' => count($ids), 'recipient_ids' => []];
+      return ['selected' => count($ids), 'contracts' => 0, 'created' => 0, 'updated_contracts' => 0, 'history' => 0, 'properties' => 0, 'skipped' => count($ids), 'recipient_ids' => [], 'managements' => []];
     }
 
     $nowTs = time();
@@ -370,6 +370,7 @@ final class AdministrativeNotificationsService
     $skipped = 0;
     $seenContracts = [];
     $recipientIds = [];
+    $managements = [];
 
     foreach ($contracts as $contract) {
       $contractId = (string) ($contract['_ID'] ?? '');
@@ -418,6 +419,14 @@ final class AdministrativeNotificationsService
       $arrendatarioId = (int) preg_replace('/\D+/', '', (string) ($contract['id_arrendatario'] ?? '0'));
       if ($arrendatarioId > 0) {
         $recipientIds[$arrendatarioId] = $arrendatarioId;
+        $managements[] = [
+          'id' => $gestionId,
+          'recipient_id' => $arrendatarioId,
+          'contract_id' => (int) $contractId,
+          'contract_number' => (string) $gestionPayload['contrato'],
+          'property' => (string) $gestionPayload['inmueble'],
+          'type' => (string) $gestionPayload['tipo_gestion'],
+        ];
       }
 
       $contractUpdate = [
@@ -452,6 +461,7 @@ final class AdministrativeNotificationsService
       'properties' => $properties,
       'skipped' => $skipped,
       'recipient_ids' => array_values($recipientIds),
+      'managements' => $managements,
     ];
   }
 
@@ -560,6 +570,48 @@ final class AdministrativeNotificationsService
       'types' => array_values($types),
       'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
       'filters' => ['date_from' => $dateFrom, 'date_to' => $dateTo, 'type' => $type],
+    ];
+  }
+
+  /** @return array{rows:array<int,array<string,mixed>>,stats:array<string,int>,management_id:int} */
+  public function collectionManagementQueue(int $managementId): array
+  {
+    $managementId = max(0, $managementId);
+    if ($managementId <= 0) {
+      throw new \RuntimeException('Gestion de cobro invalida.');
+    }
+    if (!$this->schema->tableExists(self::QUEUE_TABLE)) {
+      throw new \RuntimeException('La tabla skc_notification_queue no esta disponible.');
+    }
+
+    $lookupNeedle = '%"collection_management_lookup":"%' . $this->db->escapeLike('|' . $managementId . '|') . '%';
+    $rows = $this->db->getResults(
+      'SELECT `id`, `channel`, `provider`, `destination`, `destination_name`, `subject`, `template_name`, `status`, `attempts`, `created_at`, `updated_at`, `sent_at`, LEFT(COALESCE(`message_text`, \'\'), 1400) AS `message_text`, LEFT(COALESCE(`last_error`, \'\'), 500) AS `last_error`
+        FROM `' . self::QUEUE_TABLE . '`
+        WHERE `source_module` = ? AND `meta_json` LIKE ?
+        ORDER BY `id` DESC
+        LIMIT 100',
+      [self::SOURCE_MODULE, $lookupNeedle]
+    );
+
+    $stats = ['total' => 0, 'pending' => 0, 'sent' => 0, 'failed' => 0, 'other' => 0];
+    foreach ($rows as &$row) {
+      $status = strtolower(trim((string) ($row['status'] ?? '')));
+      $stats['total']++;
+      if (isset($stats[$status])) {
+        $stats[$status]++;
+      } else {
+        $stats['other']++;
+      }
+      $row['channel_label'] = $this->queueChannelLabel((string) ($row['channel'] ?? ''));
+      $row['status_label'] = $this->queueStatusLabel($status);
+    }
+    unset($row);
+
+    return [
+      'rows' => $rows,
+      'stats' => $stats,
+      'management_id' => $managementId,
     ];
   }
 
@@ -704,6 +756,28 @@ final class AdministrativeNotificationsService
       return 'Administración';
     }
     return $normalized;
+  }
+
+  private function queueChannelLabel(string $channel): string
+  {
+    return match (strtolower(trim($channel))) {
+      'email' => 'Email',
+      'sms' => 'SMS',
+      'whatsapp' => 'WhatsApp',
+      default => ucfirst(trim($channel)) ?: 'Canal',
+    };
+  }
+
+  private function queueStatusLabel(string $status): string
+  {
+    return match (strtolower(trim($status))) {
+      'pending' => 'Pendiente',
+      'processing' => 'Procesando',
+      'sent' => 'Enviada',
+      'failed' => 'Fallida',
+      'cancelled' => 'Cancelada',
+      default => ucfirst(trim($status)) ?: 'Sin estado',
+    };
   }
 
   /**
@@ -1160,6 +1234,7 @@ final class AdministrativeNotificationsService
     if ($channels === []) {
       throw new \RuntimeException('Selecciona al menos un canal.');
     }
+    $notificationMetaMap = $this->sanitizeNotificationMetaMap($recipientMetaMap);
     $recipientMetaMap = $this->sanitizeImportMetaMap($recipientMetaMap);
     $canUseImportDetail = $this->templateCanUseImportDetail($whatsappTemplateConfig, $emailTemplateConfig);
     $hasImportedDetail = $canUseImportDetail && $recipientMetaMap !== [];
@@ -1186,7 +1261,7 @@ final class AdministrativeNotificationsService
       throw new \RuntimeException('La tabla skc_notification_queue no esta disponible.');
     }
 
-    $recipients = $this->recipients($type, $ids, $recipientMetaMap);
+    $recipients = $this->recipients($type, $ids, $recipientMetaMap, $notificationMetaMap);
     $batchId = bin2hex(random_bytes(8));
     $queued = 0;
     $failed = 0;
@@ -1610,6 +1685,9 @@ final class AdministrativeNotificationsService
       foreach (['contrato_excel', 'inmueble_simi_excel', 'canon_excel', 'canon_excel_raw', 'mes_excel', 'direccion_excel', 'detalle_excel'] as $key) {
         $clean[$key] = trim(mb_substr((string) ($meta[$key] ?? ''), 0, 500, 'UTF-8'));
       }
+      if (implode('', $clean) === '') {
+        continue;
+      }
       if (($clean['detalle_excel'] ?? '') === '') {
         $clean['detalle_excel'] = $this->importCanonSummary($clean);
       }
@@ -1618,8 +1696,57 @@ final class AdministrativeNotificationsService
     return $out;
   }
 
-  /** @param array<string,array<string,string>> $metaMap @return array<int,array<string,mixed>> */
-  private function recipients(string $type, array $ids, array $metaMap = []): array
+  /** @param array<mixed> $metaMap @return array<string,array<string,mixed>> */
+  private function sanitizeNotificationMetaMap(array $metaMap): array
+  {
+    $out = [];
+    foreach ($metaMap as $id => $meta) {
+      $id = (string) ((int) $id);
+      if ($id === '0' || !is_array($meta)) {
+        continue;
+      }
+      $notificationMeta = is_array($meta['__notification_meta'] ?? null) ? $meta['__notification_meta'] : [];
+      if ($notificationMeta === []) {
+        continue;
+      }
+      $collection = is_array($notificationMeta['collection_management'] ?? null) ? $notificationMeta['collection_management'] : [];
+      $managements = is_array($collection['managements'] ?? null) ? $collection['managements'] : [];
+      $cleanManagements = [];
+      $ids = [];
+      foreach ($managements as $management) {
+        if (!is_array($management)) {
+          continue;
+        }
+        $managementId = (int) ($management['id'] ?? 0);
+        if ($managementId <= 0) {
+          continue;
+        }
+        $ids[] = $managementId;
+        $cleanManagements[] = [
+          'id' => $managementId,
+          'contract_id' => (int) ($management['contract_id'] ?? 0),
+          'contract_number' => mb_substr(trim((string) ($management['contract_number'] ?? '')), 0, 80, 'UTF-8'),
+          'property' => mb_substr(trim((string) ($management['property'] ?? '')), 0, 80, 'UTF-8'),
+          'type' => mb_substr(trim((string) ($management['type'] ?? '')), 0, 80, 'UTF-8'),
+        ];
+      }
+      if ($cleanManagements === []) {
+        continue;
+      }
+      $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $value): bool => $value > 0)));
+      $out[$id] = [
+        'collection_management' => [
+          'ids' => $ids,
+          'lookup' => '|' . implode('|', $ids) . '|',
+          'managements' => $cleanManagements,
+        ],
+      ];
+    }
+    return $out;
+  }
+
+  /** @param array<string,array<string,string>> $metaMap @param array<string,array<string,mixed>> $notificationMetaMap @return array<int,array<string,mixed>> */
+  private function recipients(string $type, array $ids, array $metaMap = [], array $notificationMetaMap = []): array
   {
     $config = $this->typeConfig($type);
     $table = (string) $config['table'];
@@ -1651,6 +1778,9 @@ final class AdministrativeNotificationsService
       $id = (string) ((int) ($row['_ID'] ?? 0));
       if ($id !== '0' && isset($metaMap[$id])) {
         $row['_scm_import_meta'] = $metaMap[$id];
+      }
+      if ($id !== '0' && isset($notificationMetaMap[$id])) {
+        $row['_scm_notification_meta'] = $notificationMetaMap[$id];
       }
     }
     unset($row);
@@ -2011,6 +2141,14 @@ final class AdministrativeNotificationsService
     return "CONVERT({$expression} USING utf8mb4) COLLATE utf8mb4_unicode_ci";
   }
 
+  private function collectionManagementLookupFromRecipient(array $recipient): string
+  {
+    $meta = is_array($recipient['_scm_notification_meta'] ?? null) ? $recipient['_scm_notification_meta'] : [];
+    $collection = is_array($meta['collection_management'] ?? null) ? $meta['collection_management'] : [];
+    $lookup = trim((string) ($collection['lookup'] ?? ''));
+    return preg_match('/^\|[0-9|]+\|$/', $lookup) ? $lookup : '';
+  }
+
   /** @param array<string,mixed> $whatsappTemplateConfig */
   private function insertQueueRow(string $channel, string $destination, array $recipient, string $subject, string $message, string $batchId, array $whatsappTemplateConfig = [], array $emailTemplateConfig = []): bool
   {
@@ -2057,6 +2195,8 @@ final class AdministrativeNotificationsService
         'whatsapp_template' => $channel === 'whatsapp' ? $templateName : '',
         'email_template' => $channel === 'email' ? $templateName : '',
         'import_meta' => is_array($recipient['_scm_import_meta'] ?? null) ? $recipient['_scm_import_meta'] : [],
+        'context_meta' => is_array($recipient['_scm_notification_meta'] ?? null) ? $recipient['_scm_notification_meta'] : [],
+        'collection_management_lookup' => $this->collectionManagementLookupFromRecipient($recipient),
       ],
     ];
     $data = [

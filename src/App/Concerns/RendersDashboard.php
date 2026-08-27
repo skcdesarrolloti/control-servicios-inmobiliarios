@@ -348,6 +348,7 @@ trait RendersDashboard
         'admin_notifications_send' => self::AJAX_ADMIN_NOTIFICATIONS_SEND,
         'admin_notifications_import' => self::AJAX_ADMIN_NOTIFICATIONS_IMPORT,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
+        'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
         'metrics_execution' => self::AJAX_METRICS_EXECUTION,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
         'canon_insurance_audit_import' => self::AJAX_CANON_INSURANCE_AUDIT_IMPORT,
@@ -2048,6 +2049,7 @@ trait RendersDashboard
                   <th>Gestiones</th>
                   <th>Realizado por</th>
                   <th>Observaci&oacute;n</th>
+                  <th>Notificaciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -2063,6 +2065,7 @@ trait RendersDashboard
                     <td><?php echo esc_html((string) (($row['gestiones_cobro'] ?? '') ?: '-')); ?></td>
                     <td><?php echo esc_html(trim((string) (($row['realizado_por'] ?? '') ?: '-'))); ?><?php if (trim((string) ($row['cargo'] ?? '')) !== ''): ?><small><?php echo esc_html((string) $row['cargo']); ?></small><?php endif; ?></td>
                     <td class="scm-collection-log-note"><?php echo esc_html((string) (($row['observacion'] ?? '') ?: '-')); ?></td>
+                    <td><button type="button" class="scm-case-work-btn scm-collection-log-notify-btn" data-scm-collection-queue="<?php echo esc_attr((string) ((int) ($row['id'] ?? 0))); ?>">Ver notificaciones</button></td>
                   </tr>
                 <?php endforeach; ?>
               </tbody>
