@@ -230,14 +230,14 @@ final class CanonInsuranceAuditView
     ob_start();
 ?>
     <div class="scm-cia-table-wrap"><table class="scm-cia-table scm-cia-results-table"><thead><tr><th>Solicitud / contrato</th><th>Arrendatario e inmueble</th><th>Plataforma</th><th>SIMI</th><th><?php echo esc_html($label); ?></th><th>Hallazgo y observaci&oacute;n</th></tr></thead><tbody>
-      <?php foreach ($groupItems as $item): $status = (string) ($item['status'] ?? 'anomalia'); $sources = (array) ($item['sources'] ?? []); $sourceKey = (string) ($item['expected_insurer'] ?? ''); ?><tr class="scm-cia-row--<?php echo esc_attr($status); ?>" data-cia-contract-row data-cia-contract-id="<?php echo esc_attr((string) ($item['contract_id'] ?? '')); ?>"><td><strong><?php echo esc_html((string) (($item['request_number'] ?? '') ?: '—')); ?></strong><span>Contrato <?php echo esc_html((string) (($item['contract_number'] ?? '') ?: '—')); ?></span><small>Mandato <?php echo esc_html((string) (($item['mandate_id'] ?? '') ?: '—')); ?></small><?php echo $this->rowRepairActions($item); ?></td><td><strong><?php echo esc_html((string) (($item['tenant'] ?? '') ?: '—')); ?></strong><span><?php echo esc_html((string) (($item['property_address'] ?? '') ?: '—')); ?></span><small>Aseguradora: <?php echo esc_html($label); ?></small></td><?php echo $this->sourceValueCell((array) ($item['platform'] ?? []), 'platform', true); ?><?php echo $this->sourceValueCell($sources['simi'] ?? null, 'simi', isset($sourceAudits['simi'])); ?><?php echo $this->sourceValueCell($sourceKey !== '' ? ($sources[$sourceKey] ?? null) : null, $sourceKey, $sourceKey !== '' && isset($sourceAudits[$sourceKey])); ?><td><?php echo $this->differenceList((string) ($item['differences_json'] ?? '[]')); ?><?php if ($status !== 'correcto' && (int) ($item['observation_item_id'] ?? 0) > 0): ?><form class="scm-cia-observation" data-cia-observation-form><input type="hidden" name="item_id" value="<?php echo esc_attr((string) ($item['observation_item_id'] ?? '')); ?>"><label>Observaci&oacute;n del funcionario<textarea name="observation" maxlength="1000" rows="2" placeholder="Explica la anomal&iacute;a o la gesti&oacute;n requerida"><?php echo esc_textarea((string) ($item['observation'] ?? '')); ?></textarea></label><button type="submit" class="scm-btn-secondary btn btn-outline">Guardar</button><?php if (($item['observation_at'] ?? '') !== ''): ?><small>Guardada por <?php echo esc_html((string) ($item['observation_by_name'] ?? '')); ?> · <?php echo esc_html($this->dateTime((string) $item['observation_at'])); ?></small><?php endif; ?></form><?php endif; ?></td></tr><?php endforeach; ?>
+      <?php foreach ($groupItems as $item): $status = (string) ($item['status'] ?? 'anomalia'); $sources = (array) ($item['sources'] ?? []); $sourceKey = (string) ($item['expected_insurer'] ?? ''); ?><tr class="scm-cia-row--<?php echo esc_attr($status); ?>" data-cia-contract-row data-cia-contract-id="<?php echo esc_attr((string) ($item['contract_id'] ?? '')); ?>"><td><strong><?php echo esc_html((string) (($item['request_number'] ?? '') ?: '—')); ?></strong><span>Contrato <?php echo esc_html((string) (($item['contract_number'] ?? '') ?: '—')); ?></span><small>Mandato <?php echo esc_html((string) (($item['mandate_id'] ?? '') ?: '—')); ?></small><?php echo $this->rowRepairActions($item); ?></td><td><strong><?php echo esc_html((string) (($item['tenant'] ?? '') ?: '—')); ?></strong><span><?php echo esc_html((string) (($item['property_address'] ?? '') ?: '—')); ?></span><small>Aseguradora: <?php echo esc_html($label); ?></small></td><?php echo $this->sourceValueCell((array) ($item['platform'] ?? []), 'platform', true, $this->platformCorrectionActions($item)); ?><?php echo $this->sourceValueCell($sources['simi'] ?? null, 'simi', isset($sourceAudits['simi'])); ?><?php echo $this->sourceValueCell($sourceKey !== '' ? ($sources[$sourceKey] ?? null) : null, $sourceKey, $sourceKey !== '' && isset($sourceAudits[$sourceKey])); ?><td><?php echo $this->differenceList((string) ($item['differences_json'] ?? '[]')); ?><?php if ($status !== 'correcto' && (int) ($item['observation_item_id'] ?? 0) > 0): ?><form class="scm-cia-observation" data-cia-observation-form><input type="hidden" name="item_id" value="<?php echo esc_attr((string) ($item['observation_item_id'] ?? '')); ?>"><label>Observaci&oacute;n del funcionario<textarea name="observation" maxlength="1000" rows="2" placeholder="Explica la anomal&iacute;a o la gesti&oacute;n requerida"><?php echo esc_textarea((string) ($item['observation'] ?? '')); ?></textarea></label><button type="submit" class="scm-btn-secondary btn btn-outline">Guardar</button><?php if (($item['observation_at'] ?? '') !== ''): ?><small>Guardada por <?php echo esc_html((string) ($item['observation_by_name'] ?? '')); ?> · <?php echo esc_html($this->dateTime((string) $item['observation_at'])); ?></small><?php endif; ?></form><?php endif; ?></td></tr><?php endforeach; ?>
     </tbody></table></div>
 <?php
     return (string) ob_get_clean();
   }
 
   /** @param array<string,mixed>|null $source */
-  private function sourceValueCell(?array $source, string $sourceKey, bool $fileLoaded): string
+  private function sourceValueCell(?array $source, string $sourceKey, bool $fileLoaded, string $extraHtml = ''): string
   {
     $metrics = ['canon' => 'Canon', 'administration' => 'Administraci&oacute;n', 'iva' => 'IVA'];
     if ($source === null || $source === []) {
@@ -246,7 +246,7 @@ final class CanonInsuranceAuditView
       foreach ($metrics as $label) {
         $values .= '<span class="is-anomalia">' . $this->metricStatusBadge('anomalia') . '<b>' . $label . '</b><em>—</em></span>';
       }
-      return '<td class="scm-cia-source-values is-empty"><small class="scm-cia-source-note">' . esc_html($message) . '</small><div class="scm-cia-value-grid">' . $values . '</div></td>';
+      return '<td class="scm-cia-source-values is-empty"><small class="scm-cia-source-note">' . esc_html($message) . '</small><div class="scm-cia-value-grid">' . $values . '</div>' . $extraHtml . '</td>';
     }
     $status = (string) ($source['status'] ?? '');
     $metricStatuses = (array) ($source['metric_statuses'] ?? []);
@@ -257,7 +257,46 @@ final class CanonInsuranceAuditView
         : (string) ($metricStatuses[$key] ?? 'anomalia');
       $values .= '<span class="is-' . esc_attr($metricStatus) . '">' . $this->metricStatusBadge($metricStatus) . '<b>' . $label . '</b><em>' . esc_html($this->money($source[$key] ?? null)) . '</em></span>';
     }
-    return '<td class="scm-cia-source-values' . ($status !== '' ? ' is-' . esc_attr($status) : '') . '"><div class="scm-cia-value-grid">' . $values . '</div></td>';
+    return '<td class="scm-cia-source-values' . ($status !== '' ? ' is-' . esc_attr($status) : '') . '"><div class="scm-cia-value-grid">' . $values . '</div>' . $extraHtml . '</td>';
+  }
+
+  /** @param array<string,mixed> $item */
+  private function platformCorrectionActions(array $item): string
+  {
+    $contractId = (int) ($item['contract_id'] ?? 0);
+    if ($contractId <= 0) {
+      return '';
+    }
+    $platform = (array) ($item['platform'] ?? []);
+    $simi = (array) (((array) ($item['sources'] ?? []))['simi'] ?? []);
+    $hasSimiValues = $this->hasMoneyValue($simi['canon'] ?? null)
+      && $this->hasMoneyValue($simi['administration'] ?? null)
+      && $this->hasMoneyValue($simi['iva'] ?? null);
+    ob_start();
+?>
+    <div class="scm-cia-platform-tools">
+      <?php if ($hasSimiValues): ?>
+        <form data-cia-platform-values-form>
+          <input type="hidden" name="contract_id" value="<?php echo esc_attr((string) $contractId); ?>">
+          <input type="hidden" name="canon" value="<?php echo esc_attr($this->moneyInputValue($simi['canon'] ?? null)); ?>">
+          <input type="hidden" name="administration" value="<?php echo esc_attr($this->moneyInputValue($simi['administration'] ?? null)); ?>">
+          <input type="hidden" name="iva" value="<?php echo esc_attr($this->moneyInputValue($simi['iva'] ?? null)); ?>">
+          <button type="submit" class="scm-cia-platform-copy">Usar SIMI</button>
+        </form>
+      <?php endif; ?>
+      <details class="scm-cia-platform-edit">
+        <summary>Editar valores</summary>
+        <form data-cia-platform-values-form>
+          <input type="hidden" name="contract_id" value="<?php echo esc_attr((string) $contractId); ?>">
+          <label>Canon<input name="canon" type="text" inputmode="decimal" value="<?php echo esc_attr($this->moneyInputValue($platform['canon'] ?? null)); ?>" placeholder="0"></label>
+          <label>Administraci&oacute;n<input name="administration" type="text" inputmode="decimal" value="<?php echo esc_attr($this->moneyInputValue($platform['administration'] ?? null)); ?>" placeholder="0"></label>
+          <label>IVA<input name="iva" type="text" inputmode="decimal" value="<?php echo esc_attr($this->moneyInputValue($platform['iva'] ?? null)); ?>" placeholder="0"></label>
+          <button type="submit" class="scm-btn-secondary btn btn-outline">Guardar valores</button>
+        </form>
+      </details>
+    </div>
+<?php
+    return (string) ob_get_clean();
   }
 
   /** @param array<string,mixed> $item */
@@ -361,6 +400,8 @@ final class CanonInsuranceAuditView
   private function statusOptions(): array { return ['' => 'Todos', 'incorrecto' => 'Rojo · Incorrecto', 'anomalia' => 'Amarillo · Anomalía', 'correcto' => 'Verde · Correcto']; }
   private function statusLabel(string $status): string { return $this->statusOptions()[$status] ?? 'Amarillo · Anomalía'; }
   private function money(mixed $value): string { return ($value === null || $value === '') ? '—' : '$' . number_format((float) $value, 2, ',', '.'); }
+  private function hasMoneyValue(mixed $value): bool { return $value !== null && $value !== ''; }
+  private function moneyInputValue(mixed $value): string { return $this->hasMoneyValue($value) ? number_format((float) $value, 2, '.', '') : '0.00'; }
   private function periodLabel(string $period): string { if (preg_match('/^(\d{4})-(\d{2})$/', $period, $match) !== 1) return $period; $months = [1 => 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']; return ($months[(int) $match[2]] ?? $match[2]) . ' ' . $match[1]; }
   private function dateTime(string $value): string { $timestamp = strtotime($value); return $timestamp === false ? $value : date('d/m/Y g:i a', $timestamp); }
 }

@@ -557,6 +557,84 @@
   gap: 0;
 }
 
+#scm-app .scm-cia-platform-tools {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #c7d7e8;
+}
+
+#scm-app .scm-cia-platform-tools form {
+  margin: 0;
+}
+
+#scm-app .scm-cia-platform-copy {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #ffb86b;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+  color: #a34700;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+#scm-app .scm-cia-platform-copy:hover {
+  background: #fff2dd;
+}
+
+#scm-app .scm-cia-platform-edit {
+  border: 1px solid #d7e4f2;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+#scm-app .scm-cia-platform-edit summary {
+  padding: 9px 10px;
+  color: #174f87;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+#scm-app .scm-cia-platform-edit form {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+#scm-app .scm-cia-platform-edit label {
+  display: grid;
+  gap: 4px;
+  color: #5c7088;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-cia-platform-edit input {
+  min-height: 32px;
+  border: 1px solid #c7d7e8;
+  border-radius: 9px;
+  padding: 0 9px;
+  background: #f8fbff;
+  color: #102a43;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+#scm-app .scm-cia-platform-edit button {
+  min-height: 34px;
+  font-size: 11px;
+}
+
 #scm-app .scm-cia-value-grid span {
   display: flex;
   min-width: 0;

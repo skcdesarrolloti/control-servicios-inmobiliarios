@@ -227,4 +227,35 @@ trait HandlesCanonInsuranceAudits
       $this->jsonFail($exception->getMessage());
     }
   }
+
+  public function ajax_handler_canon_insurance_audit_update_platform_values(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
+      $this->jsonFail('No tienes permiso para corregir valores de Plataforma.');
+    }
+    try {
+      $service = $this->canonInsuranceAuditService();
+      $result = $service->updateContractPlatformValues(
+        (int) ($_POST['contract_id'] ?? 0),
+        [
+          'canon' => trim(sanitize_text_field(wp_unslash((string) ($_POST['canon'] ?? '')))),
+          'administration' => trim(sanitize_text_field(wp_unslash((string) ($_POST['administration'] ?? '')))),
+          'iva' => trim(sanitize_text_field(wp_unslash((string) ($_POST['iva'] ?? '')))),
+        ]
+      );
+      $dashboardPayload = $service->dashboard([
+        'period' => trim(sanitize_text_field(wp_unslash((string) ($_POST['active_period'] ?? '')))),
+        'status' => sanitize_key((string) ($_POST['active_status'] ?? '')),
+        'search' => trim(sanitize_text_field(wp_unslash((string) ($_POST['active_search'] ?? '')))),
+      ]);
+      $this->jsonOk([
+        'html' => $this->renderCanonInsuranceAuditContent($dashboardPayload),
+        'message' => (string) ($result['message'] ?? 'Valores de Plataforma actualizados.'),
+        'contract_id' => (int) ($_POST['contract_id'] ?? 0),
+      ]);
+    } catch (\Throwable $exception) {
+      $this->jsonFail($exception->getMessage());
+    }
+  }
 }

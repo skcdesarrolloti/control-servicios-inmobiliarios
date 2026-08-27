@@ -68,6 +68,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CANON_INSURANCE_AUDIT_LINK_MANDATE = 'scm_auditoria_canon_aseguradoras_vincular_mandato';
   const AJAX_CANON_INSURANCE_AUDIT_REQUESTS = 'scm_auditoria_canon_aseguradoras_solicitudes';
   const AJAX_CANON_INSURANCE_AUDIT_UPDATE_REQUEST = 'scm_auditoria_canon_aseguradoras_actualizar_solicitud';
+  const AJAX_CANON_INSURANCE_AUDIT_UPDATE_PLATFORM_VALUES = 'scm_auditoria_canon_aseguradoras_actualizar_plataforma';
   const AJAX_CANON_INSURANCE_AUDIT_PURGE = 'scm_auditoria_canon_aseguradoras_borrar_pruebas';
 
   // Guía – Correspondencias de Daños

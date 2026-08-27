@@ -1016,6 +1016,75 @@ final class CanonInsuranceAuditService
     ] + $this->requestNumberRows($search);
   }
 
+  /** @param array{canon?:mixed,administration?:mixed,iva?:mixed} $values @return array<string,mixed> */
+  public function updateContractPlatformValues(int $contractId, array $values): array
+  {
+    $contractsTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    $mandatesTable = $this->db->table('jet_cct_contrato_mandato');
+    if ($contractId <= 0) {
+      throw new \RuntimeException('No se identifico el contrato de arrendamiento.');
+    }
+    $contract = $this->db->getRow(
+      "SELECT `_ID`, `contrato`, `estado`, `id_contrato_mandato`
+         FROM `{$contractsTable}`
+        WHERE `_ID` = ?
+        LIMIT 1",
+      [$contractId]
+    );
+    if (!is_array($contract)) {
+      throw new \RuntimeException('El contrato ya no existe.');
+    }
+    if (AuditValueNormalizer::key($contract['estado'] ?? '') !== 'entregado') {
+      throw new \RuntimeException('Solo se pueden corregir contratos en estado Entregado.');
+    }
+
+    $canon = $this->inputMoney($values['canon'] ?? null, 'canon');
+    $administration = $this->inputMoney($values['administration'] ?? null, 'administracion');
+    $iva = $this->inputMoney($values['iva'] ?? null, 'IVA');
+    $mandateId = (int) AuditValueNormalizer::text($contract['id_contrato_mandato'] ?? '');
+    if ($mandateId <= 0 && abs($iva) > self::MONEY_TOLERANCE) {
+      throw new \RuntimeException('El contrato no tiene mandato vinculado; no se puede guardar IVA hasta vincular el mandato.');
+    }
+
+    $this->db->update($contractsTable, [
+      'valor_canon' => $this->moneyForDatabase($canon),
+      'valor_administracion' => $this->moneyForDatabase($administration),
+    ], ['_ID' => $contractId]);
+
+    if ($mandateId > 0) {
+      $mandateData = [
+        'precio' => $this->moneyForDatabase($canon),
+        'administracion' => $this->moneyForDatabase($administration),
+        'incluye_iva' => abs($iva) > self::MONEY_TOLERANCE ? 'Si' : 'No',
+        'iva_total_precio' => $this->moneyForDatabase($iva),
+      ];
+      if ($this->columnExists($mandatesTable, 'iva_precio')) {
+        $mandateData['iva_precio'] = abs($iva) > self::MONEY_TOLERANCE ? '19' : '0';
+      }
+      $this->db->update($mandatesTable, $mandateData, ['_ID' => $mandateId]);
+    }
+
+    $this->refreshAuditItemsForContract($contractId);
+
+    return [
+      'message' => 'Valores de Plataforma actualizados para el contrato ' . AuditValueNormalizer::text($contract['contrato'] ?? ('#' . $contractId)) . '.',
+    ];
+  }
+
+  private function inputMoney(mixed $value, string $label): float
+  {
+    $money = $this->databaseMoney($value);
+    if ($money === null || $money < 0) {
+      throw new \RuntimeException('Escribe un valor valido para ' . $label . '.');
+    }
+    return round($money, 2);
+  }
+
+  private function moneyForDatabase(float $value): string
+  {
+    return number_format($value, 2, '.', '');
+  }
+
   private function propertyKey(mixed $value): string
   {
     return mb_strtolower(trim((string) $value), 'UTF-8');

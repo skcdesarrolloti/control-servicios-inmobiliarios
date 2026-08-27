@@ -70,6 +70,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_CANON_INSURANCE_AUDIT_LINK_MANDATE => 'ajax_handler_canon_insurance_audit_link_mandate',
       SuCasaControlServiciosInmobiliarios::AJAX_CANON_INSURANCE_AUDIT_REQUESTS => 'ajax_handler_canon_insurance_audit_requests',
       SuCasaControlServiciosInmobiliarios::AJAX_CANON_INSURANCE_AUDIT_UPDATE_REQUEST => 'ajax_handler_canon_insurance_audit_update_request',
+      SuCasaControlServiciosInmobiliarios::AJAX_CANON_INSURANCE_AUDIT_UPDATE_PLATFORM_VALUES => 'ajax_handler_canon_insurance_audit_update_platform_values',
       SuCasaControlServiciosInmobiliarios::AJAX_CANON_INSURANCE_AUDIT_PURGE => 'ajax_handler_canon_insurance_audit_purge',
     ];
 

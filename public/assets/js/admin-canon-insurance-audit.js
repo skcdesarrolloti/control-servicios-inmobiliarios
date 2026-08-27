@@ -17,6 +17,7 @@
     var linkMandateAction = actions.canon_insurance_audit_link_mandate || "";
     var requestsAction = actions.canon_insurance_audit_requests || "";
     var updateRequestAction = actions.canon_insurance_audit_update_request || "";
+    var updatePlatformValuesAction = actions.canon_insurance_audit_update_platform_values || "";
     var purgeAction = actions.canon_insurance_audit_purge || "";
     var content = module.querySelector("[data-cia-content]");
     var status = module.querySelector("[data-cia-status]");
@@ -526,6 +527,46 @@
               button.disabled = false;
               button.removeAttribute("aria-busy");
               button.textContent = "Auditar archivos";
+            }
+          });
+        return;
+      }
+
+      var platformValuesForm = event.target.closest("[data-cia-platform-values-form]");
+      if (platformValuesForm) {
+        event.preventDefault();
+        if (!updatePlatformValuesAction) {
+          setStatus("La accion para corregir Plataforma no esta configurada.", "error");
+          return;
+        }
+        var platformData = new FormData(platformValuesForm);
+        platformData.append("action", updatePlatformValuesAction);
+        var activePlatformFilterForm = module.querySelector("[data-cia-filter-form]");
+        if (activePlatformFilterForm) {
+          var platformFilters = new FormData(activePlatformFilterForm);
+          platformData.append("active_period", platformFilters.get("period") || "");
+          platformData.append("active_status", platformFilters.get("status") || "");
+          platformData.append("active_search", platformFilters.get("search") || "");
+        }
+        var platformButton = platformValuesForm.querySelector('button[type="submit"]');
+        var platformOriginalText = platformButton ? platformButton.textContent : "";
+        if (platformButton) {
+          platformButton.disabled = true;
+          platformButton.textContent = "Guardando...";
+        }
+        setStatus("Corrigiendo valores de Plataforma...", "loading");
+        request(platformData)
+          .then(function (data) {
+            replaceContentKeepingPlace(data, data.contract_id || platformData.get("contract_id") || "");
+            setStatus(data.message || "Valores de Plataforma actualizados.", "success");
+          })
+          .catch(function (error) {
+            setStatus(error.message || "No se pudieron corregir los valores de Plataforma.", "error");
+          })
+          .finally(function () {
+            if (platformButton) {
+              platformButton.disabled = false;
+              platformButton.textContent = platformOriginalText || "Guardar valores";
             }
           });
         return;
