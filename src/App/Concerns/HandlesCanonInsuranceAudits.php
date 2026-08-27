@@ -241,7 +241,6 @@ trait HandlesCanonInsuranceAudits
         [
           'canon' => trim(sanitize_text_field(wp_unslash((string) ($_POST['canon'] ?? '')))),
           'administration' => trim(sanitize_text_field(wp_unslash((string) ($_POST['administration'] ?? '')))),
-          'iva' => trim(sanitize_text_field(wp_unslash((string) ($_POST['iva'] ?? '')))),
         ]
       );
       $dashboardPayload = $service->dashboard([

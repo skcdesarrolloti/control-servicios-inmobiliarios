@@ -270,8 +270,7 @@ final class CanonInsuranceAuditView
     $platform = (array) ($item['platform'] ?? []);
     $simi = (array) (((array) ($item['sources'] ?? []))['simi'] ?? []);
     $hasSimiValues = $this->hasMoneyValue($simi['canon'] ?? null)
-      && $this->hasMoneyValue($simi['administration'] ?? null)
-      && $this->hasMoneyValue($simi['iva'] ?? null);
+      && $this->hasMoneyValue($simi['administration'] ?? null);
     ob_start();
 ?>
     <div class="scm-cia-platform-tools">
@@ -280,7 +279,6 @@ final class CanonInsuranceAuditView
           <input type="hidden" name="contract_id" value="<?php echo esc_attr((string) $contractId); ?>">
           <input type="hidden" name="canon" value="<?php echo esc_attr($this->moneyInputValue($simi['canon'] ?? null)); ?>">
           <input type="hidden" name="administration" value="<?php echo esc_attr($this->moneyInputValue($simi['administration'] ?? null)); ?>">
-          <input type="hidden" name="iva" value="<?php echo esc_attr($this->moneyInputValue($simi['iva'] ?? null)); ?>">
           <button type="submit" class="scm-cia-platform-copy">Usar SIMI</button>
         </form>
       <?php endif; ?>
@@ -290,7 +288,6 @@ final class CanonInsuranceAuditView
           <input type="hidden" name="contract_id" value="<?php echo esc_attr((string) $contractId); ?>">
           <label>Canon<input name="canon" type="text" inputmode="decimal" value="<?php echo esc_attr($this->moneyInputValue($platform['canon'] ?? null)); ?>" placeholder="0"></label>
           <label>Administraci&oacute;n<input name="administration" type="text" inputmode="decimal" value="<?php echo esc_attr($this->moneyInputValue($platform['administration'] ?? null)); ?>" placeholder="0"></label>
-          <label>IVA<input name="iva" type="text" inputmode="decimal" value="<?php echo esc_attr($this->moneyInputValue($platform['iva'] ?? null)); ?>" placeholder="0"></label>
           <button type="submit" class="scm-btn-secondary btn btn-outline">Guardar valores</button>
         </form>
       </details>
