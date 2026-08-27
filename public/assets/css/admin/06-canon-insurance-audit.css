@@ -635,6 +635,120 @@
   font-size: 11px;
 }
 
+#scm-app .scm-cia-platform-edit-trigger {
+  width: 100%;
+  min-height: 36px;
+  margin-top: 10px;
+  border-color: #ffb86b;
+  background: #fff7ed;
+  color: #a34700;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+#scm-app .scm-cia-platform-modal-panel {
+  width: min(760px, calc(100vw - 32px));
+}
+
+#scm-app .scm-cia-platform-modal-body {
+  display: grid;
+  gap: 16px;
+  overflow: auto;
+  padding: 22px 24px 26px;
+  background: #ffffff;
+}
+
+#scm-app .scm-cia-platform-context,
+#scm-app .scm-cia-platform-simi-card,
+#scm-app .scm-cia-platform-modal-form {
+  border: 1px solid #d8e4f0;
+  border-radius: 16px;
+  padding: 16px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-cia-platform-context {
+  display: grid;
+  gap: 4px;
+}
+
+#scm-app .scm-cia-platform-context span,
+#scm-app .scm-cia-platform-simi-card span,
+#scm-app .scm-cia-platform-modal-form label {
+  color: #5c7088;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-cia-platform-context strong {
+  color: #102a43;
+  font-size: 20px;
+}
+
+#scm-app .scm-cia-platform-context small {
+  color: #52677d;
+  font-weight: 700;
+}
+
+#scm-app .scm-cia-platform-simi-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border-color: #ffd19b;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+}
+
+#scm-app .scm-cia-platform-simi-card[hidden] {
+  display: none !important;
+}
+
+#scm-app .scm-cia-platform-simi-card strong {
+  display: block;
+  margin-top: 4px;
+  color: #102a43;
+  font-size: 15px;
+}
+
+#scm-app .scm-cia-platform-simi-card small {
+  display: block;
+  margin-top: 4px;
+  color: #6b7c93;
+  font-size: 11px;
+}
+
+#scm-app .scm-cia-platform-modal-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+#scm-app .scm-cia-platform-modal-form label {
+  display: grid;
+  gap: 7px;
+}
+
+#scm-app .scm-cia-platform-modal-form input {
+  min-height: 44px;
+  border: 1px solid #c7d7e8;
+  border-radius: 12px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: #102a43;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+#scm-app .scm-cia-platform-modal-form button {
+  grid-column: 1 / -1;
+  min-height: 44px;
+}
+
 #scm-app .scm-cia-value-grid span {
   display: flex;
   min-width: 0;

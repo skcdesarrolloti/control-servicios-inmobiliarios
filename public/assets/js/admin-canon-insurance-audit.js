@@ -27,6 +27,7 @@
     var requestModal = module.querySelector("[data-cia-request-modal]");
     var requestContent = module.querySelector("[data-cia-request-content]");
     var requestStatus = module.querySelector("[data-cia-request-status]");
+    var platformModal = module.querySelector("[data-cia-platform-modal]");
     var currentMandateContractId = "";
     module.dataset.ciaInit = "1";
 
@@ -303,6 +304,43 @@
         });
     }
 
+    function closePlatformModal() {
+      if (!platformModal) return;
+      platformModal.hidden = true;
+      document.documentElement.classList.remove("scm-cia-modal-open");
+    }
+
+    function openPlatformModal(trigger) {
+      if (!platformModal || !trigger) return;
+      var form = platformModal.querySelector("[data-cia-platform-values-form]");
+      var contractLabel = platformModal.querySelector("[data-cia-platform-contract]");
+      var tenantLabel = platformModal.querySelector("[data-cia-platform-tenant]");
+      var simiCard = platformModal.querySelector("[data-cia-platform-simi-card]");
+      var simiSummary = platformModal.querySelector("[data-cia-platform-simi-summary]");
+      var canonInput = form ? form.querySelector('[name="canon"]') : null;
+      var administrationInput = form ? form.querySelector('[name="administration"]') : null;
+      var contractInput = form ? form.querySelector('[name="contract_id"]') : null;
+      var simiCanon = trigger.dataset.simiCanon || "";
+      var simiAdministration = trigger.dataset.simiAdministration || "";
+      if (contractInput) contractInput.value = trigger.dataset.contractId || "";
+      if (canonInput) canonInput.value = trigger.dataset.platformCanon || "0.00";
+      if (administrationInput) administrationInput.value = trigger.dataset.platformAdministration || "0.00";
+      if (contractLabel) contractLabel.textContent = "Contrato " + (trigger.dataset.contractNumber || trigger.dataset.contractId || "—");
+      if (tenantLabel) tenantLabel.textContent = trigger.dataset.tenant || "Sin arrendatario";
+      if (simiCard) {
+        var hasSimi = !!(simiCanon && simiAdministration);
+        simiCard.hidden = !hasSimi;
+        simiCard.dataset.simiCanon = simiCanon;
+        simiCard.dataset.simiAdministration = simiAdministration;
+      }
+      if (simiSummary) {
+        simiSummary.textContent = "Canon $" + (simiCanon || "—") + " · Administración $" + (simiAdministration || "—");
+      }
+      platformModal.hidden = false;
+      document.documentElement.classList.add("scm-cia-modal-open");
+      if (canonInput) window.setTimeout(function () { canonInput.focus(); canonInput.select(); }, 50);
+    }
+
     function load(filters) {
       if (!listAction) {
         setStatus("La accion de consulta no esta configurada.", "error");
@@ -558,6 +596,7 @@
         request(platformData)
           .then(function (data) {
             replaceContentKeepingPlace(data, data.contract_id || platformData.get("contract_id") || "");
+            closePlatformModal();
             setStatus(data.message || "Valores de Plataforma actualizados.", "success");
           })
           .catch(function (error) {
@@ -729,6 +768,29 @@
       if (event.target.closest("[data-cia-close-requests]")) {
         event.preventDefault();
         closeRequestModal();
+        return;
+      }
+      if (event.target.closest("[data-cia-open-platform]")) {
+        event.preventDefault();
+        openPlatformModal(event.target.closest("[data-cia-open-platform]"));
+        return;
+      }
+      if (event.target.closest("[data-cia-use-simi]")) {
+        event.preventDefault();
+        var simiCard = platformModal ? platformModal.querySelector("[data-cia-platform-simi-card]") : null;
+        var form = platformModal ? platformModal.querySelector("[data-cia-platform-values-form]") : null;
+        if (form && simiCard) {
+          var canonInput = form.querySelector('[name="canon"]');
+          var administrationInput = form.querySelector('[name="administration"]');
+          if (canonInput) canonInput.value = simiCard.dataset.simiCanon || "0.00";
+          if (administrationInput) administrationInput.value = simiCard.dataset.simiAdministration || "0.00";
+          form.requestSubmit();
+        }
+        return;
+      }
+      if (event.target.closest("[data-cia-close-platform]")) {
+        event.preventDefault();
+        closePlatformModal();
       }
     });
 
@@ -738,6 +800,9 @@
       }
       if (event.key === "Escape" && requestModal && !requestModal.hidden) {
         closeRequestModal();
+      }
+      if (event.key === "Escape" && platformModal && !platformModal.hidden) {
+        closePlatformModal();
       }
     });
 

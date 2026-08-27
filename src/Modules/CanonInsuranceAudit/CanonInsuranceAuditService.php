@@ -269,6 +269,7 @@ final class CanonInsuranceAuditService
       static fn(array $item): int => (int) ($item['contract_id'] ?? 0),
       $items
     )))));
+    $contractLookup = $this->contractsByRequestNumber();
     $grouped = [];
     foreach ($items as $item) {
       $sourceKey = $auditSources[(int) ($item['audit_id'] ?? 0)] ?? '';
@@ -276,9 +277,15 @@ final class CanonInsuranceAuditService
         continue;
       }
       $contractId = (int) ($item['contract_id'] ?? 0);
-      $item = $contractId > 0 && isset($currentContracts[$contractId])
-        ? $this->syncComparisonItemWithCurrentContract($item, $currentContracts[$contractId], $sourceKey)
-        : $this->normalizedComparisonItem($item, $sourceKey);
+      if ($contractId > 0 && isset($currentContracts[$contractId])) {
+        $item = $this->syncComparisonItemWithCurrentContract($item, $currentContracts[$contractId], $sourceKey);
+      } else {
+        $fallbackContract = $this->findContractForAuditRecord($item, $contractLookup);
+        $item = is_array($fallbackContract)
+          ? $this->syncComparisonItemWithCurrentContract($item, $fallbackContract, $sourceKey)
+          : $this->normalizedComparisonItem($item, $sourceKey);
+      }
+      $contractId = (int) ($item['contract_id'] ?? 0);
       $request = AuditValueNormalizer::requestNumber($item['request_number'] ?? '');
       $groupKey = $contractId > 0 ? 'contract:' . $contractId : 'request:' . $request;
       if (!isset($grouped[$groupKey])) {
@@ -487,7 +494,7 @@ final class CanonInsuranceAuditService
       $expectedInsurer = $this->insurerSourceKey($insurer);
       $request = AuditValueNormalizer::requestNumber($row['numero_solicitud'] ?? '');
       $contractNumber = AuditValueNormalizer::text($row['contract_number'] ?? '');
-      $mandateId = (int) ($row['mandate_id'] ?? 0) ?: null;
+      $mandateId = $this->mandateIdFromContractRow($row);
       $platform = $this->platformValuesFromContract($row);
       $findings = [];
       if ($request === '') {
@@ -606,7 +613,7 @@ final class CanonInsuranceAuditService
   {
     $item['contract_id'] = (int) ($contract['contract_id'] ?? 0) ?: ($item['contract_id'] ?? null);
     $item['contract_number'] = AuditValueNormalizer::text($contract['contract_number'] ?? '') ?: (string) ($item['contract_number'] ?? '');
-    $item['mandate_id'] = (int) ($contract['mandate_id'] ?? 0) ?: null;
+    $item['mandate_id'] = $this->mandateIdFromContractRow($contract);
     $item['tenant'] = AuditValueNormalizer::text($contract['arrendatario'] ?? '') ?: (string) ($item['tenant'] ?? '');
     $item['property_address'] = AuditValueNormalizer::text($contract['direccion'] ?? '') ?: (string) ($item['property_address'] ?? '');
     $item['insurer'] = $this->firstNonEmptyText([
@@ -1617,6 +1624,8 @@ final class CanonInsuranceAuditService
         'source_row' => $rowIndex + 1,
         'request_number' => $request,
         'old_request_number' => $oldRequest !== '0' ? $oldRequest : '',
+        'contract_number' => $this->columnText($row, $columns, 'contract_number'),
+        'property_id' => $this->columnText($row, $columns, 'property_id'),
         'tenant' => $this->columnText($row, $columns, 'tenant'),
         'property_address' => $this->columnText($row, $columns, 'property_address'),
         'excel_canon' => $this->columnMoney($row, $columns, 'canon'),
@@ -1633,6 +1642,8 @@ final class CanonInsuranceAuditService
     return [
       'request_number' => ['solicitud', 'nosolicitud', 'numerosolicitud'],
       'old_request_number' => ['numerosolicitudantiguo', 'solicitudantigua'],
+      'contract_number' => ['contrato', 'nocontrato', 'numerocontrato', 'contratoarrendamiento'],
+      'property_id' => ['inmueble', 'inmueblesimi', 'idinmueble', 'id_inmueble', 'codigoinmueble', 'codinmueble'],
       'tenant' => ['arrendatario'],
       'property_address' => ['inmueble', 'direccion'],
       'canon' => ['canon'],
@@ -1648,7 +1659,7 @@ final class CanonInsuranceAuditService
     $mandates = $this->db->table('jet_cct_contrato_mandato');
     $rows = $this->db->getResults(
       "SELECT c.`_ID` AS contract_id, c.`contrato` AS contract_number, c.`numero_solicitud`,
-              c.`arrendatario`, c.`direccion`, c.`id_contrato_mandato`, c.`valor_canon`,
+              c.`arrendatario`, c.`direccion`, c.`id_inmueble`, c.`id_contrato_mandato`, c.`valor_canon`,
               c.`valor_administracion`, c.`aseguradora` AS contract_insurer,
               c.`id_estudio_aseguradora`,
               m.`_ID` AS mandate_id, m.`aseguradora` AS mandate_insurer,
@@ -1656,17 +1667,24 @@ final class CanonInsuranceAuditService
               m.`iva_precio`, m.`iva_total_precio`
          FROM `{$contracts}` c
          LEFT JOIN `{$mandates}` m ON CAST(m.`_ID` AS CHAR) = TRIM(COALESCE(c.`id_contrato_mandato`, ''))
-        WHERE TRIM(COALESCE(c.`numero_solicitud`, '')) <> ''
-        ORDER BY (TRIM(COALESCE(c.`id_contrato_mandato`, '')) <> '') DESC,
+        WHERE LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'entregado'
+        ORDER BY (TRIM(COALESCE(c.`numero_solicitud`, '')) <> '') DESC,
+                 (TRIM(COALESCE(c.`id_contrato_mandato`, '')) <> '') DESC,
                  (LOWER(TRIM(COALESCE(c.`contrato`, ''))) <> 'no asignado') DESC,
                  c.`_ID` DESC"
     );
     $rows = $this->enrichContractsWithInsuranceStudy($rows);
-    $map = [];
+    $groups = [];
     foreach ($rows as $row) {
-      $key = AuditValueNormalizer::requestNumber($row['numero_solicitud'] ?? '');
-      if ($key !== '' && !isset($map[$key])) {
-        $map[$key] = $row;
+      foreach ($this->contractLookupKeys($row) as $key) {
+        $groups[$key] ??= [];
+        $groups[$key][] = $row;
+      }
+    }
+    $map = [];
+    foreach ($groups as $key => $groupRows) {
+      if (str_starts_with($key, 'request:') || str_starts_with($key, 'contract:') || count($groupRows) === 1) {
+        $map[$key] = $groupRows[0];
       }
     }
     return $map;
@@ -1683,7 +1701,7 @@ final class CanonInsuranceAuditService
     $mandates = $this->db->table('jet_cct_contrato_mandato');
     $rows = $this->db->getResults(
       "SELECT c.`_ID` AS contract_id, c.`contrato` AS contract_number, c.`numero_solicitud`,
-              c.`arrendatario`, c.`direccion`, c.`id_contrato_mandato`, c.`valor_canon`,
+              c.`arrendatario`, c.`direccion`, c.`id_inmueble`, c.`id_contrato_mandato`, c.`valor_canon`,
               c.`valor_administracion`, c.`aseguradora` AS contract_insurer,
               c.`id_estudio_aseguradora`,
               m.`_ID` AS mandate_id, m.`aseguradora` AS mandate_insurer,
@@ -1709,13 +1727,13 @@ final class CanonInsuranceAuditService
   private function compareRecord(array $record, array $contracts, string $sourceKey, string $sourceLabel): array
   {
     $request = (string) ($record['request_number'] ?? '');
-    $contract = $contracts[$request] ?? null;
+    $contract = $this->findContractForAuditRecord($record, $contracts);
     if (!is_array($contract) && preg_match('/^[A-Z]+(\d+)$/', $request, $match) === 1) {
-      $contract = $contracts[$match[1]] ?? null;
+      $contract = $contracts['request:' . $match[1]] ?? null;
     }
     if (!is_array($contract)) {
       $oldRequest = (string) ($record['old_request_number'] ?? '');
-      $contract = $oldRequest !== '' ? ($contracts[$oldRequest] ?? null) : null;
+      $contract = $oldRequest !== '' ? ($contracts['request:' . $oldRequest] ?? null) : null;
     }
 
     $base = [
@@ -1725,7 +1743,7 @@ final class CanonInsuranceAuditService
       'tenant' => (string) ($record['tenant'] ?? ''),
       'property_address' => (string) ($record['property_address'] ?? ''),
       'contract_id' => null,
-      'contract_number' => '',
+      'contract_number' => (string) ($record['contract_number'] ?? ''),
       'mandate_id' => null,
       'status' => 'anomalia',
       'canon_includes_iva' => $sourceKey === 'libertador' ? 1 : 0,
@@ -1750,7 +1768,7 @@ final class CanonInsuranceAuditService
 
     $base['contract_id'] = (int) ($contract['contract_id'] ?? 0) ?: null;
     $base['contract_number'] = AuditValueNormalizer::text($contract['contract_number'] ?? '');
-    $base['mandate_id'] = (int) ($contract['mandate_id'] ?? 0) ?: null;
+    $base['mandate_id'] = $this->mandateIdFromContractRow($contract);
     $base['tenant'] = AuditValueNormalizer::text($contract['arrendatario'] ?? '') ?: $base['tenant'];
     $base['property_address'] = AuditValueNormalizer::text($contract['direccion'] ?? '') ?: $base['property_address'];
     $base['insurer'] = $this->firstNonEmptyText([
@@ -1792,6 +1810,55 @@ final class CanonInsuranceAuditService
       $base['differences_json'] = $this->mergeDifferences((string) $base['differences_json'], $studyFindings);
     }
     return $base;
+  }
+
+  /** @param array<string,mixed> $record @param array<string,array<string,mixed>> $contracts */
+  private function findContractForAuditRecord(array $record, array $contracts): ?array
+  {
+    foreach ($this->contractLookupKeys($record) as $key) {
+      if (isset($contracts[$key])) {
+        return $contracts[$key];
+      }
+    }
+    return null;
+  }
+
+  /** @param array<string,mixed> $row @return array<int,string> */
+  private function contractLookupKeys(array $row): array
+  {
+    $keys = [];
+    $request = AuditValueNormalizer::requestNumber($row['request_number'] ?? ($row['numero_solicitud'] ?? ''));
+    if ($request !== '') {
+      $keys[] = 'request:' . $request;
+    }
+    $oldRequest = AuditValueNormalizer::requestNumber($row['old_request_number'] ?? '');
+    if ($oldRequest !== '') {
+      $keys[] = 'request:' . $oldRequest;
+    }
+    $contractNumber = AuditValueNormalizer::key($row['contract_number'] ?? ($row['contrato'] ?? ''));
+    if ($contractNumber !== '' && $contractNumber !== 'noasignado') {
+      $keys[] = 'contract:' . $contractNumber;
+    }
+    $propertyId = AuditValueNormalizer::key($row['property_id'] ?? ($row['id_inmueble'] ?? ''));
+    if ($propertyId !== '' && $propertyId !== '0') {
+      $keys[] = 'property:' . $propertyId;
+    }
+    $address = AuditValueNormalizer::key($row['property_address'] ?? ($row['direccion'] ?? ''));
+    if ($address !== '') {
+      $keys[] = 'address:' . $address;
+    }
+    return array_values(array_unique($keys));
+  }
+
+  /** @param array<string,mixed> $row */
+  private function mandateIdFromContractRow(array $row): ?int
+  {
+    $mandateId = (int) AuditValueNormalizer::text($row['mandate_id'] ?? '');
+    if ($mandateId > 0) {
+      return $mandateId;
+    }
+    $contractMandateId = (int) AuditValueNormalizer::text($row['id_contrato_mandato'] ?? '');
+    return $contractMandateId > 0 ? $contractMandateId : null;
   }
 
   /** @param array<string,mixed> $item @return array{0:string,1:string} */

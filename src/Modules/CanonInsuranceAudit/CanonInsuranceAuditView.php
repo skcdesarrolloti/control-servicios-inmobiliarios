@@ -20,6 +20,7 @@ final class CanonInsuranceAuditView
       <div class="scm-cia-content" data-cia-content><div class="scm-cia-loading" role="status">Cargando conciliaci&oacute;n&hellip;</div></div>
       <div class="scm-cia-modal" data-cia-mandate-modal hidden><div class="scm-cia-modal-backdrop" data-cia-close-mandates></div><section class="scm-cia-modal-panel" role="dialog" aria-modal="true" aria-labelledby="scm-cia-mandate-title"><header><div><span class="scm-eyebrow">Saneamiento de datos</span><h3 id="scm-cia-mandate-title">Vincular mandatos faltantes</h3><p>Contratos de arrendamiento en estado Entregado sin <code>id_contrato_mandato</code>. Se muestran mandatos con el mismo <code>id_inmueble</code> y, cuando al mandato le falte ese dato, candidatos por propietario/correo.</p></div><button type="button" class="scm-cia-modal-close" data-cia-close-mandates aria-label="Cerrar">×</button></header><form class="scm-cia-mandate-search" data-cia-mandate-search autocomplete="off"><label for="scm_cia_mandate_search">Buscar contrato, solicitud, inmueble, arrendatario o propietario</label><div><input id="scm_cia_mandate_search" name="search" type="search" placeholder="Ej. 11827961, contrato, id_inmueble o correo"><button type="submit" class="scm-btn-secondary btn btn-outline">Buscar</button></div></form><div class="scm-cia-modal-status" data-cia-mandate-status aria-live="polite"></div><div class="scm-cia-mandate-content" data-cia-mandate-content><div class="scm-cia-loading" role="status">Abre el modulo para consultar contratos pendientes.</div></div></section></div>
       <div class="scm-cia-modal" data-cia-request-modal hidden><div class="scm-cia-modal-backdrop" data-cia-close-requests></div><section class="scm-cia-modal-panel" role="dialog" aria-modal="true" aria-labelledby="scm-cia-request-title"><header><div><span class="scm-eyebrow">Saneamiento de datos</span><h3 id="scm-cia-request-title">Completar n&uacute;meros de solicitud</h3><p>Contratos de arrendamiento en estado Entregado sin <code>numero_solicitud</code>. Revisa el arrendatario y escribe la solicitud correcta para poder cruzar SIMI y aseguradoras.</p></div><button type="button" class="scm-cia-modal-close" data-cia-close-requests aria-label="Cerrar">×</button></header><form class="scm-cia-mandate-search" data-cia-request-search autocomplete="off"><label for="scm_cia_request_search">Buscar contrato, arrendatario, inmueble o estudio</label><div><input id="scm_cia_request_search" name="search" type="search" placeholder="Ej. nombre del arrendatario o contrato"><button type="submit" class="scm-btn-secondary btn btn-outline">Buscar</button></div></form><div class="scm-cia-modal-status" data-cia-request-status aria-live="polite"></div><div class="scm-cia-mandate-content" data-cia-request-content><div class="scm-cia-loading" role="status">Abre el modulo para consultar contratos sin solicitud.</div></div></section></div>
+      <div class="scm-cia-modal" data-cia-platform-modal hidden><div class="scm-cia-modal-backdrop" data-cia-close-platform></div><section class="scm-cia-modal-panel scm-cia-platform-modal-panel" role="dialog" aria-modal="true" aria-labelledby="scm-cia-platform-title"><header><div><span class="scm-eyebrow">Correcci&oacute;n de datos</span><h3 id="scm-cia-platform-title">Editar datos de Plataforma</h3><p>Corrige solo los valores del contrato de arrendamiento. No se modifica el mandato.</p></div><button type="button" class="scm-cia-modal-close" data-cia-close-platform aria-label="Cerrar">×</button></header><div class="scm-cia-platform-modal-body"><section class="scm-cia-platform-context"><span>Contrato</span><strong data-cia-platform-contract>—</strong><small data-cia-platform-tenant>—</small></section><section class="scm-cia-platform-simi-card" data-cia-platform-simi-card hidden><div><span>Datos SIMI disponibles</span><strong data-cia-platform-simi-summary>—</strong><small>Usa estos valores solo si SIMI es la referencia correcta para este contrato.</small></div><button type="button" class="scm-cia-platform-copy" data-cia-use-simi>Usar datos SIMI</button></section><form class="scm-cia-platform-modal-form" data-cia-platform-values-form autocomplete="off"><input type="hidden" name="contract_id" value=""><label>Canon en Plataforma<input name="canon" type="text" inputmode="decimal" placeholder="0"></label><label>Administraci&oacute;n en Plataforma<input name="administration" type="text" inputmode="decimal" placeholder="0"></label><button type="submit" class="scm-btn-primary btn btn-primary">Guardar datos de Plataforma</button></form></div></section></div>
     </section>
 <?php
     return (string) ob_get_clean();
@@ -271,29 +272,15 @@ final class CanonInsuranceAuditView
     $simi = (array) (((array) ($item['sources'] ?? []))['simi'] ?? []);
     $hasSimiValues = $this->hasMoneyValue($simi['canon'] ?? null)
       && $this->hasMoneyValue($simi['administration'] ?? null);
-    ob_start();
-?>
-    <div class="scm-cia-platform-tools">
-      <?php if ($hasSimiValues): ?>
-        <form data-cia-platform-values-form>
-          <input type="hidden" name="contract_id" value="<?php echo esc_attr((string) $contractId); ?>">
-          <input type="hidden" name="canon" value="<?php echo esc_attr($this->moneyInputValue($simi['canon'] ?? null)); ?>">
-          <input type="hidden" name="administration" value="<?php echo esc_attr($this->moneyInputValue($simi['administration'] ?? null)); ?>">
-          <button type="submit" class="scm-cia-platform-copy">Usar SIMI</button>
-        </form>
-      <?php endif; ?>
-      <details class="scm-cia-platform-edit">
-        <summary>Editar valores</summary>
-        <form data-cia-platform-values-form>
-          <input type="hidden" name="contract_id" value="<?php echo esc_attr((string) $contractId); ?>">
-          <label>Canon<input name="canon" type="text" inputmode="decimal" value="<?php echo esc_attr($this->moneyInputValue($platform['canon'] ?? null)); ?>" placeholder="0"></label>
-          <label>Administraci&oacute;n<input name="administration" type="text" inputmode="decimal" value="<?php echo esc_attr($this->moneyInputValue($platform['administration'] ?? null)); ?>" placeholder="0"></label>
-          <button type="submit" class="scm-btn-secondary btn btn-outline">Guardar valores</button>
-        </form>
-      </details>
-    </div>
-<?php
-    return (string) ob_get_clean();
+    return '<button type="button" class="scm-cia-platform-edit-trigger scm-btn-secondary btn btn-outline" data-cia-open-platform'
+      . ' data-contract-id="' . esc_attr((string) $contractId) . '"'
+      . ' data-contract-number="' . esc_attr((string) (($item['contract_number'] ?? '') ?: ('#' . $contractId))) . '"'
+      . ' data-tenant="' . esc_attr((string) (($item['tenant'] ?? '') ?: 'Sin arrendatario')) . '"'
+      . ' data-platform-canon="' . esc_attr($this->moneyInputValue($platform['canon'] ?? null)) . '"'
+      . ' data-platform-administration="' . esc_attr($this->moneyInputValue($platform['administration'] ?? null)) . '"'
+      . ' data-simi-canon="' . esc_attr($hasSimiValues ? $this->moneyInputValue($simi['canon'] ?? null) : '') . '"'
+      . ' data-simi-administration="' . esc_attr($hasSimiValues ? $this->moneyInputValue($simi['administration'] ?? null) : '') . '">'
+      . 'Corregir Plataforma</button>';
   }
 
   /** @param array<string,mixed> $item */
