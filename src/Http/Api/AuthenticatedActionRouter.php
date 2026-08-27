@@ -42,6 +42,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_REPORTES_ADMINISTRATIVOS_PENDIENTES => 'ajax_handler_reportes_administrativos_pendientes',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRATOS_ARRENDAMIENTO => 'ajax_handler_contratos_arrendamiento',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRATO_RECIBIDO => 'ajax_handler_contrato_recibido',
+      SuCasaControlServiciosInmobiliarios::AJAX_CONTRATO_ULTIMA_PREVENTIVA => 'ajax_handler_contrato_ultima_preventiva',
       SuCasaControlServiciosInmobiliarios::AJAX_CREAR_TICKET_ADMINISTRATIVO => 'ajax_handler_crear_ticket_administrativo',
       SuCasaControlServiciosInmobiliarios::AJAX_APROBAR_REPORTE_ADMINISTRATIVO => 'ajax_handler_aprobar_reporte_administrativo',
       SuCasaControlServiciosInmobiliarios::AJAX_DESAPROBAR_REPORTE_ADMINISTRATIVO => 'ajax_handler_desaprobar_reporte_administrativo',

@@ -40,6 +40,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_REPORTES_ADMINISTRATIVOS_PENDIENTES = 'scm_reportes_administrativos_pendientes';
   const AJAX_CONTRATOS_ARRENDAMIENTO = 'scm_contratos_arrendamiento';
   const AJAX_CONTRATO_RECIBIDO = 'scm_contrato_recibido';
+  const AJAX_CONTRATO_ULTIMA_PREVENTIVA = 'scm_contrato_ultima_preventiva';
   const AJAX_CREAR_TICKET_ADMINISTRATIVO = 'scm_crear_ticket_administrativo';
   const AJAX_APROBAR_REPORTE_ADMINISTRATIVO = 'scm_aprobar_reporte_administrativo';
   const AJAX_DESAPROBAR_REPORTE_ADMINISTRATIVO = 'scm_desaprobar_reporte_administrativo';

@@ -362,12 +362,35 @@ final class PendingRepository
    * keyed by the contract _ID (as string).
    *
    * Matches tickets where id_contrato = _ID of wp_jet_cct_contratos_arrendamiento,
-   * tema_ayuda = 'Revision preventiva', and estado IN ('Nuevo','En proceso').
+   * tema_ayuda contains 'preventiva', and estado IN ('Nuevo','En proceso').
    *
    * @param  array<int,array<string,mixed>> $contractRows  rows from contratos table (each has _ID)
    * @return array<string,array<string,mixed>>             keyed by _ID string
    */
   public function getTicketsRevisionPreventiva(array $contractRows): array
+  {
+    $byContract = $this->getAllTicketsRevisionPreventiva($contractRows);
+    $out = [];
+    foreach ($byContract as $idContrato => $rows) {
+      foreach ($rows as $row) {
+        $estado = strtolower(trim((string) ($row['estado'] ?? '')));
+        if (in_array($estado, ['nuevo', 'en proceso'], true)) {
+          $out[$idContrato] = $row;
+          break;
+        }
+      }
+    }
+
+    return $out;
+  }
+
+  /**
+   * Returns every preventiva ticket per contract, keyed by contract _ID.
+   *
+   * @param  array<int,array<string,mixed>> $contractRows
+   * @return array<string,array<int,array<string,mixed>>>
+   */
+  public function getAllTicketsRevisionPreventiva(array $contractRows): array
   {
     if (empty($contractRows)) {
       return [];
@@ -446,8 +469,7 @@ final class PendingRepository
     $sql = "SELECT " . implode(', ', $select)
       . " FROM `{$table}`"
       . " WHERE TRIM(COALESCE(id_contrato,'')) IN ({$placeholders})"
-      . " AND LOWER(TRIM(COALESCE(estado,''))) IN ('nuevo','en proceso')"
-      . " AND LOWER(TRIM(COALESCE(tema_ayuda,''))) = 'revision preventiva'"
+      . " AND LOWER(TRIM(COALESCE(tema_ayuda,''))) LIKE '%preventiva%'"
       . " ORDER BY _ID DESC";
 
     $rows = $this->db->getResults($sql, $ids);
@@ -460,8 +482,8 @@ final class PendingRepository
     $out = [];
     foreach ($rows as $row) {
       $idContrato = trim((string) ($row['id_contrato'] ?? ''));
-      if ($idContrato !== '' && !isset($out[$idContrato])) {
-        $out[$idContrato] = $row;
+      if ($idContrato !== '') {
+        $out[$idContrato][] = $row;
       }
     }
 

@@ -430,6 +430,23 @@ final class PendingView
       $contractPk = trim((string) ($row['_ID'] ?? ''));
       $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
       $estado = strtolower(trim((string) ($row['estado'] ?? '')));
+      $allTickets = array_values(array_filter((array) ($item['tickets'] ?? []), 'is_array'));
+      if (is_array($ticket)) {
+        $activeTicketPk = trim((string) ($ticket['ticket_id'] ?? $ticket['_ID'] ?? ''));
+        $hasActiveInList = false;
+        foreach ($allTickets as $existingTicket) {
+          $existingPk = trim((string) ($existingTicket['ticket_id'] ?? $existingTicket['_ID'] ?? ''));
+          if ($activeTicketPk !== '' && $existingPk === $activeTicketPk) {
+            $hasActiveInList = true;
+            break;
+          }
+        }
+        if (!$hasActiveInList) {
+          array_unshift($allTickets, (array) $ticket);
+        }
+      }
+      $ticketsCount = count($allTickets);
+      $ticketsListId = 'scm-prev-tickets-' . preg_replace('/[^a-zA-Z0-9_-]/', '', $contractPk ?: uniqid('', false));
       $html .= '<td class="scm-pending-action-cell">';
       if ($contractPk !== '' && $estado !== 'recibido') {
         $html .= '<button type="button" class="scm-pending-action-btn scm-contract-received-btn"'
@@ -451,12 +468,28 @@ final class PendingView
           . '>'
           . 'Crear ticket</button>';
       }
+      if ($ticketsCount > 0) {
+        $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;"'
+          . ' data-scm-toggle-preventiva-tickets data-target="' . esc_attr($ticketsListId) . '">'
+          . 'Ver tickets (' . esc_html((string) $ticketsCount) . ')</button>';
+      }
+      if ($contractPk !== '' && $estado !== 'recibido') {
+        $html .= '<button type="button" class="scm-pending-action-btn"'
+          . ' data-scm-postpone-preventiva data-contract-id="' . esc_attr($contractPk) . '"'
+          . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
+          . 'Pasar a proximo ano</button>';
+      }
       $html .= '</td>';
 
       $html .= '</tr>';
       if ($ticketId !== '') {
         $html .= '<tr class="scm-tl-row" style="display:none;"><td colspan="12">'
           . $this->renderPreventivaTicketCaseSource((array) $ticket, $row)
+          . '</td></tr>';
+      }
+      if ($ticketsCount > 0) {
+        $html .= '<tr id="' . esc_attr($ticketsListId) . '" class="scm-preventiva-ticket-list-row" style="display:none;"><td colspan="12">'
+          . $this->renderPreventivaTicketsList($allTickets, $row, (int) ($item['ultima'] ?? 0), (int) ($item['due'] ?? 0))
           . '</td></tr>';
       }
     }
@@ -611,6 +644,44 @@ final class PendingView
     return $attrs;
   }
 
+  /** @param array<int,array<string,mixed>> $tickets @param array<string,mixed> $contractRow */
+  private function renderPreventivaTicketsList(array $tickets, array $contractRow, int $ultimaTs, int $dueTs): string
+  {
+    if (empty($tickets)) {
+      return '<div class="scm-case-history-empty">Este contrato no tiene tickets preventivos registrados.</div>';
+    }
+
+    $html = '<div class="scm-preventiva-ticket-list">'
+      . '<strong>Tickets preventivos del contrato</strong>'
+      . '<div class="scm-table-wrap"><table class="scm-table scm-table-prev">'
+      . '<thead><tr><th>Ticket</th><th>Estado</th><th>Estado administrativo</th><th>Fecha</th><th>Asunto</th><th>Acciones</th></tr></thead><tbody>';
+
+    foreach ($tickets as $ticket) {
+      $ticket = (array) $ticket;
+      $ticketPk = trim((string) ($ticket['ticket_id'] ?? $ticket['_ID'] ?? ''));
+      if ($ticketPk === '') {
+        continue;
+      }
+      $ticketLabel = trim((string) ($ticket['id_ticket'] ?? $ticketPk));
+      $createdTs = $this->ts($ticket['cct_created'] ?? $ticket['fecha'] ?? null);
+      $html .= '<tr>';
+      $html .= '<td><span class="scm-ticket-badge">' . esc_html($ticketLabel !== '' ? $ticketLabel : $ticketPk) . '</span></td>';
+      $html .= '<td>' . esc_html(trim((string) ($ticket['estado'] ?? '')) ?: '-') . '</td>';
+      $html .= '<td>' . esc_html(trim((string) ($ticket['estado_administrativo'] ?? '')) ?: '-') . '</td>';
+      $html .= '<td class="scm-date-cell">' . esc_html($this->fmt($createdTs)) . '</td>';
+      $html .= '<td>' . esc_html(trim((string) ($ticket['asunto'] ?? 'REVISION PREVENTIVA')) ?: '-') . '</td>';
+      $html .= '<td><button type="button" class="scm-pending-action-btn scm-btn-case"'
+        . $this->preventivaTicketCaseAttrs($ticket, $contractRow, $ultimaTs, $dueTs)
+        . ' onclick="scmOpenCase(this)">Ver ticket</button></td>';
+      $html .= '</tr>';
+      $html .= '<tr class="scm-tl-row" style="display:none;"><td colspan="6">'
+        . $this->renderPreventivaTicketCaseSource($ticket, $contractRow)
+        . '</td></tr>';
+    }
+
+    return $html . '</tbody></table></div></div>';
+  }
+
   private function renderPreventivaTicketCaseSource(array $ticket, array $contractRow = []): string
   {
     $descripcion = trim((string) ($ticket['descripcion'] ?? ''));
@@ -687,6 +758,13 @@ final class PendingView
     $updatedTs = $this->ts($ticket['fecha_actualizacion'] ?? null);
     $total = $createdTs > 0 ? $this->durationSince($createdTs) : '';
     $sinActualizar = ($updatedTs > 0 || $createdTs > 0) ? $this->durationSince($updatedTs > 0 ? $updatedTs : $createdTs) : '';
+    $estadoNorm = strtolower(trim($estado));
+    $statusBucket = 'abiertos';
+    if (in_array($estadoNorm, ['cerrado', 'cerrada', 'finalizado', 'finalizada'], true)) {
+      $statusBucket = 'cerrados';
+    } elseif (in_array($estadoNorm, ['postergado', 'postergada'], true)) {
+      $statusBucket = 'postergados';
+    }
 
     return ' data-ticket="' . esc_attr($ticketLabel !== '' ? $ticketLabel : $ticketPk) . '"'
       . ' data-ticket-pk="' . esc_attr($ticketPk) . '"'
@@ -726,7 +804,7 @@ final class PendingView
       . ' data-ejecucion="' . esc_attr($total) . '"'
       . ' data-sin-actualizar="' . esc_attr($sinActualizar) . '"'
       . ' data-tab-key="preventiva"'
-      . ' data-status-bucket="abiertos"';
+      . ' data-status-bucket="' . esc_attr($statusBucket) . '"';
   }
 
   /** @param array<int,array<string,mixed>> $items */

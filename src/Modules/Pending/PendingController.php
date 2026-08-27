@@ -195,4 +195,10 @@ final class PendingController
   {
     return $this->service->markContratoRecibido($contractId, $fechaRecibo);
   }
+
+  /** @return array<string,mixed> */
+  public function postponePreventivaToNextYear(int $contractId, string $fechaUltimaPreventiva): array
+  {
+    return $this->service->postponePreventivaToNextYear($contractId, $fechaUltimaPreventiva);
+  }
 }

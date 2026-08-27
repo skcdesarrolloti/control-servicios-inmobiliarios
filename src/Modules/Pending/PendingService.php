@@ -54,6 +54,39 @@ final class PendingService
     ];
   }
 
+  /** @return array<string,mixed> */
+  public function postponePreventivaToNextYear(int $contractId, string $fechaUltimaPreventiva): array
+  {
+    if ($contractId <= 0) {
+      return ['ok' => false, 'message' => 'ID de contrato invalido.'];
+    }
+
+    $row = $this->repo->getContratoArrendamientoById((string) $contractId);
+    if (!is_array($row)) {
+      return ['ok' => false, 'message' => 'Contrato no encontrado.'];
+    }
+
+    $fechaTs = $this->normalizeContractReceivedDate($fechaUltimaPreventiva);
+    if ($fechaTs <= 0) {
+      return ['ok' => false, 'message' => 'La fecha de ultima preventiva es obligatoria.'];
+    }
+
+    $this->repo->updateContratoArrendamiento($contractId, [
+      'ultima_revision_preventiva' => $fechaTs,
+      'cct_modified' => date('Y-m-d H:i:s'),
+    ]);
+
+    $nextTs = $this->addMonths($fechaTs, 12);
+    return [
+      'ok' => true,
+      'message' => 'Ultima preventiva actualizada. El contrato quedara para revision el proximo ano.',
+      'ultima_revision_preventiva' => $fechaTs,
+      'ultima_revision_preventiva_date' => $this->formatContractReceivedDate($fechaTs),
+      'siguiente_revision_preventiva' => $nextTs,
+      'siguiente_revision_preventiva_date' => $this->formatContractReceivedDate($nextTs),
+    ];
+  }
+
   private function normalizeContractReceivedDate(string $value): int
   {
     $value = trim($value);

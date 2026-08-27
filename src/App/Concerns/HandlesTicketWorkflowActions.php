@@ -476,6 +476,36 @@ trait HandlesTicketWorkflowActions
     ]);
   }
 
+  public function ajax_handler_contrato_ultima_preventiva(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('preventivas_pendientes')) {
+      $this->jsonFail('No tienes permiso para modificar preventivas pendientes.');
+    }
+
+    $contractId = (int) ($_POST['contract_id'] ?? $_POST['_ID'] ?? $_POST['id'] ?? 0);
+    $fechaUltima = trim(sanitize_text_field(wp_unslash((string) ($_POST['ultima_revision_preventiva'] ?? $_POST['fecha_ultima_preventiva'] ?? ''))));
+    if ($contractId <= 0) {
+      $this->jsonFail('ID de contrato invalido.');
+    }
+    if ($fechaUltima === '') {
+      $this->jsonFail('La fecha de ultima preventiva es obligatoria.');
+    }
+
+    $result = $this->get_pending_controller()->postponePreventivaToNextYear($contractId, $fechaUltima);
+    if (empty($result['ok'])) {
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo actualizar la ultima preventiva.'));
+    }
+
+    $this->jsonOk([
+      'message' => (string) ($result['message'] ?? 'Ultima preventiva actualizada.'),
+      'ultima_revision_preventiva' => (string) ($result['ultima_revision_preventiva'] ?? ''),
+      'ultima_revision_preventiva_date' => (string) ($result['ultima_revision_preventiva_date'] ?? ''),
+      'siguiente_revision_preventiva' => (string) ($result['siguiente_revision_preventiva'] ?? ''),
+      'siguiente_revision_preventiva_date' => (string) ($result['siguiente_revision_preventiva_date'] ?? ''),
+    ]);
+  }
+
   public function ajax_handler_crear_ticket_administrativo(): void
   {
     $this->verifyCsrf();

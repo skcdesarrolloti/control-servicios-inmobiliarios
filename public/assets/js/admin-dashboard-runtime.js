@@ -144,6 +144,11 @@
     var actionTrasladarCaso = actions.trasladar_caso || "";
     var actionContratosArrendamiento = actions.contratos_arrendamiento || "";
     var actionContratoRecibido = actions.contrato_recibido || "";
+    var actionContratoUltimaPreventiva =
+      actions.contrato_ultima_preventiva || "";
+    var actionPreventivasPendientes = actions.preventivas_pendientes || "";
+    var actionServiciosPublicosPendientes =
+      actions.servicios_publicos_pendientes || "";
     var actionContratosArrendamientoFallback =
       actions.preventivas_pendientes || "";
     var actionCrearTicketAdministrativo =
@@ -4580,6 +4585,24 @@
           calendarRefresh.click();
         }
         return Promise.resolve();
+      } else if (activeKey === "preventivas_pendientes") {
+        return reloadPendingPanel(
+          activeAdministrativePanel ||
+            root.querySelector("#scm-panel-preventivas-pendientes"),
+          "spp_",
+          actionPreventivasPendientes,
+          "spp_table",
+          "spp_kpis",
+        );
+      } else if (activeKey === "servicios_publicos_pendientes") {
+        return reloadPendingPanel(
+          activeAdministrativePanel ||
+            root.querySelector("#scm-panel-servicios-publicos-pendientes"),
+          "rsp_",
+          actionServiciosPublicosPendientes,
+          "rsp_table",
+          "rsp_kpis",
+        );
       } else if (tabFetchers[activeKey]) {
         return tabFetchers[activeKey].fetchTab(
           new FormData(tabFetchers[activeKey].form),
@@ -4682,6 +4705,76 @@
       return new Date().toISOString().slice(0, 10);
     }
 
+    function reloadPendingPanel(panel, prefix, action, tableId, kpisId) {
+      if (!panel || !action) {
+        return Promise.resolve(false);
+      }
+      var form = panel.querySelector("#" + prefix + "form");
+      if (!form) {
+        return Promise.resolve(false);
+      }
+      var fd = new FormData(form);
+      fd.append("action", action);
+      fd.append("nonce", nonce);
+      var spinner = panel.querySelector("#" + prefix + "spinner");
+      if (spinner) {
+        spinner.classList.add("active");
+      }
+      panel.setAttribute("data-scm-loading", "1");
+      return fetch(ajaxUrl, {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error(
+              (json && json.data && json.data.message) ||
+                "No se pudo recargar el listado.",
+            );
+          }
+          var data = json.data || {};
+          var table = panel.querySelector("#" + tableId);
+          var kpis = panel.querySelector("#" + kpisId);
+          if (table && typeof data.table_html === "string") {
+            table.innerHTML = data.table_html;
+          }
+          if (kpis && typeof data.kpis_html === "string") {
+            kpis.innerHTML = data.kpis_html;
+          }
+          var headerCountId =
+            prefix === "spp_"
+              ? "spp-kpi-count"
+              : prefix === "rsp_"
+                ? "rsp-kpi-count"
+                : "";
+          var headerCount = headerCountId
+            ? panel.querySelector("#" + headerCountId)
+            : null;
+          if (headerCount && typeof data.count === "string") {
+            headerCount.textContent = data.count;
+          }
+          panel.setAttribute("data-scm-loaded", "1");
+          return true;
+        })
+        .catch(function (err) {
+          showToast(
+            "error",
+            err && err.message ? err.message : "No se pudo recargar el listado.",
+          );
+          return false;
+        })
+        .finally(function () {
+          if (spinner) {
+            spinner.classList.remove("active");
+          }
+          panel.setAttribute("data-scm-loading", "0");
+        });
+    }
+
     function refreshAfterContractReceived(button) {
       var contractPanel = button.closest
         ? button.closest("[data-scm-contracts]")
@@ -4694,25 +4787,25 @@
         ? button.closest("#scm-panel-preventivas-pendientes")
         : null;
       if (preventivePanel) {
-        var sppForm = root.querySelector("#scm-form-preventiva") || root.querySelector("#spp_form");
-        if (sppForm) {
-          sppForm.dispatchEvent(
-            new Event("submit", { bubbles: true, cancelable: true }),
-          );
-          return Promise.resolve();
-        }
+        return reloadPendingPanel(
+          preventivePanel,
+          "spp_",
+          actionPreventivasPendientes,
+          "spp_table",
+          "spp_kpis",
+        );
       }
       var utilitiesPanel = button.closest
         ? button.closest("#scm-panel-servicios-publicos-pendientes")
         : null;
       if (utilitiesPanel) {
-        var rspForm = root.querySelector("#rsp_form");
-        if (rspForm) {
-          rspForm.dispatchEvent(
-            new Event("submit", { bubbles: true, cancelable: true }),
-          );
-          return Promise.resolve();
-        }
+        return reloadPendingPanel(
+          utilitiesPanel,
+          "rsp_",
+          actionServiciosPublicosPendientes,
+          "rsp_table",
+          "rsp_kpis",
+        );
       }
       return refreshActiveTab();
     }
@@ -4809,6 +4902,121 @@
         return;
       }
       submitContractReceived(button, fecha);
+    }
+
+    function refreshAfterPreventivaPostponed(button) {
+      var preventivePanel = button.closest
+        ? button.closest("#scm-panel-preventivas-pendientes")
+        : null;
+      if (preventivePanel) {
+        return reloadPendingPanel(
+          preventivePanel,
+          "spp_",
+          actionPreventivasPendientes,
+          "spp_table",
+          "spp_kpis",
+        );
+      }
+      return refreshActiveTab();
+    }
+
+    function submitPreventivaPostpone(button, fechaUltima) {
+      if (!ajaxUrl || !actionContratoUltimaPreventiva) {
+        showToast("error", "Accion no disponible.");
+        return Promise.resolve();
+      }
+      var contractId = button.getAttribute("data-contract-id") || "";
+      if (!contractId) {
+        showToast("error", "No se encontro el contrato.");
+        return Promise.resolve();
+      }
+      var originalText = button.textContent;
+      button.disabled = true;
+      button.textContent = "Guardando...";
+      var fd = new FormData();
+      fd.append("action", actionContratoUltimaPreventiva);
+      fd.append("nonce", nonce);
+      fd.append("contract_id", contractId);
+      fd.append("ultima_revision_preventiva", fechaUltima);
+      return fetch(ajaxUrl, {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error(
+              (json && json.data && json.data.message) ||
+                "No se pudo actualizar la ultima preventiva.",
+            );
+          }
+          showToast(
+            "success",
+            (json.data && json.data.message) ||
+              "Ultima preventiva actualizada.",
+          );
+          return refreshAfterPreventivaPostponed(button);
+        })
+        .catch(function (err) {
+          showToast(
+            "error",
+            err && err.message
+              ? err.message
+              : "No se pudo actualizar la ultima preventiva.",
+          );
+        })
+        .finally(function () {
+          button.disabled = false;
+          button.textContent = originalText;
+        });
+    }
+
+    function openPreventivaPostponePrompt(button) {
+      var code = button.getAttribute("data-contract-code") || "";
+      if (window.Swal && typeof window.Swal.fire === "function") {
+        window.Swal.fire({
+          title: "Pasar preventiva a proximo ano",
+          text: code
+            ? "Contrato " + code
+            : "Selecciona la fecha base de ultima preventiva.",
+          input: "date",
+          inputLabel: "Fecha para ultima preventiva",
+          inputValue: bogotaTodayDate(),
+          showCancelButton: true,
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          confirmButtonText: "Guardar fecha",
+          cancelButtonText: "Cancelar",
+          confirmButtonColor: "#1f4f99",
+          inputValidator: function (value) {
+            return String(value || "").trim()
+              ? undefined
+              : "La fecha de ultima preventiva es obligatoria.";
+          },
+        }).then(function (result) {
+          if (!result || !result.isConfirmed) {
+            return;
+          }
+          submitPreventivaPostpone(button, String(result.value || "").trim());
+        });
+        return;
+      }
+      var fecha = window.prompt(
+        "Fecha para ultima preventiva (AAAA-MM-DD):",
+        bogotaTodayDate(),
+      );
+      if (fecha === null) {
+        return;
+      }
+      fecha = String(fecha || "").trim();
+      if (!fecha) {
+        showToast("error", "La fecha de ultima preventiva es obligatoria.");
+        return;
+      }
+      submitPreventivaPostpone(button, fecha);
     }
 
     function updateKPI(id, val) {
@@ -6208,6 +6416,40 @@
       if (contractReceivedBtn) {
         e.preventDefault();
         openContractReceivedPrompt(contractReceivedBtn);
+        return;
+      }
+
+      var postponePreventivaBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-postpone-preventiva]")
+          : null;
+      if (postponePreventivaBtn) {
+        e.preventDefault();
+        openPreventivaPostponePrompt(postponePreventivaBtn);
+        return;
+      }
+
+      var togglePreventivaTicketsBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-toggle-preventiva-tickets]")
+          : null;
+      if (togglePreventivaTicketsBtn) {
+        e.preventDefault();
+        var targetId = togglePreventivaTicketsBtn.getAttribute("data-target") || "";
+        var targetRow = targetId ? root.querySelector("#" + cssAttrValue(targetId)) : null;
+        if (!targetRow) {
+          return;
+        }
+        if (!togglePreventivaTicketsBtn.dataset.originalLabel) {
+          togglePreventivaTicketsBtn.dataset.originalLabel =
+            togglePreventivaTicketsBtn.textContent || "Ver tickets";
+        }
+        var isHidden = targetRow.style.display === "none" || targetRow.hidden;
+        targetRow.hidden = false;
+        targetRow.style.display = isHidden ? "" : "none";
+        togglePreventivaTicketsBtn.textContent = isHidden
+          ? "Ocultar tickets"
+          : togglePreventivaTicketsBtn.dataset.originalLabel;
         return;
       }
 

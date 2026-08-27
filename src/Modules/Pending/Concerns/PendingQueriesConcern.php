@@ -114,9 +114,13 @@ trait PendingQueriesConcern
     $tickets = !empty($contractRows)
       ? $this->repo->getTicketsRevisionPreventiva($contractRows)
       : [];
+    $allTickets = !empty($contractRows)
+      ? $this->repo->getAllTicketsRevisionPreventiva($contractRows)
+      : [];
     foreach ($items as &$item) {
       $cid = trim((string) ($item['row']['_ID'] ?? ''));
       $item['ticket'] = $tickets[$cid] ?? null;
+      $item['tickets'] = $allTickets[$cid] ?? [];
     }
     unset($item);
 
