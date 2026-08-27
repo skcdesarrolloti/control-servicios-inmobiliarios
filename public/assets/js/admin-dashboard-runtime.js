@@ -2136,15 +2136,11 @@
       var collectionModal = panel.querySelector("[data-admin-notif-collection-modal]");
       var closeCollectionBtn = panel.querySelector("[data-admin-notif-close-collection]");
       var collectionForm = panel.querySelector("[data-admin-notif-collection]");
-      var collectionAllFiltered = panel.querySelector("[data-admin-notif-collection-all-filtered]");
       var collectionSelectedCountEl = panel.querySelector("[data-admin-notif-collection-selected-count]");
-      var collectionCallSelect = panel.querySelector("[data-admin-notif-collection-call]");
-      var collectionFollowWrap = panel.querySelector("[data-admin-notif-collection-follow]");
+      var collectionContractWrap = panel.querySelector("[data-admin-notif-collection-contract-wrap]");
+      var collectionContractSelect = panel.querySelector("[data-admin-notif-collection-contract]");
       var collectionTypeSelect = panel.querySelector("#scm-admin-notif-collection-type");
       var collectionObservationInput = panel.querySelector("#scm-admin-notif-collection-observation");
-      var collectionDateInput = panel.querySelector("#scm-admin-notif-collection-date");
-      var collectionHourInput = panel.querySelector("#scm-admin-notif-collection-hour");
-      var collectionAltInput = panel.querySelector("#scm-admin-notif-collection-alt");
       var collectionPreviewEl = panel.querySelector("[data-admin-notif-collection-preview]");
       var collectionSpinner = panel.querySelector("[data-admin-notif-collection-spinner]");
       var collectionSubmitBtn = panel.querySelector("[data-admin-notif-collection-submit]");
@@ -2165,6 +2161,7 @@
       var composerChannelMode = "";
       var composerSingleRecipient = false;
       var importedPayload = {};
+      var selectedCollectionContracts = [];
 
       var channelNames = {
         email: "Email",
@@ -2499,13 +2496,60 @@
         openComposer();
       }
 
-      function updateCollectionFollowVisibility() {
-        if (!collectionFollowWrap || !collectionCallSelect) {
+      function parseCollectionContracts(value) {
+        if (!value) {
+          return [];
+        }
+        try {
+          var parsed = JSON.parse(String(value || "[]"));
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (err) {
+          return [];
+        }
+      }
+
+      function contractDataForSelectedRecipient() {
+        if (selected.size !== 1) {
+          return [];
+        }
+        var selectedId = Array.from(selected)[0];
+        var row = Array.prototype.slice.call(recipientsEl.querySelectorAll("[data-admin-notif-recipient-row]")).find(function (candidate) {
+          return String(candidate.getAttribute("data-admin-notif-recipient-id") || "") === String(selectedId || "");
+        });
+        if (!row) {
+          return [];
+        }
+        var btn = row.querySelector("[data-admin-notif-single-collection]");
+        return btn ? parseCollectionContracts(btn.getAttribute("data-admin-notif-single-contracts") || "[]") : [];
+      }
+
+      function syncCollectionContracts(contracts) {
+        selectedCollectionContracts = Array.isArray(contracts) ? contracts : [];
+        if (!collectionContractWrap || !collectionContractSelect) {
           return;
         }
-        var shouldShow = String(collectionCallSelect.value || "").toLowerCase() === "si";
-        collectionFollowWrap.hidden = !shouldShow;
-        collectionFollowWrap.classList.toggle("is-hidden", !shouldShow);
+        collectionContractSelect.innerHTML = "";
+        if (selectedCollectionContracts.length <= 1) {
+          collectionContractWrap.hidden = true;
+          collectionContractWrap.classList.add("is-hidden");
+          if (selectedCollectionContracts.length === 1 && selectedCollectionContracts[0].id) {
+            var option = document.createElement("option");
+            option.value = String(selectedCollectionContracts[0].id || "");
+            option.textContent = selectedCollectionContracts[0].label || ("Contrato #" + option.value);
+            option.selected = true;
+            collectionContractSelect.appendChild(option);
+          }
+          updateCollectionPreview();
+          return;
+        }
+        selectedCollectionContracts.forEach(function (contract) {
+          var option = document.createElement("option");
+          option.value = String(contract.id || "");
+          option.textContent = contract.label || ("Contrato #" + option.value);
+          collectionContractSelect.appendChild(option);
+        });
+        collectionContractWrap.hidden = false;
+        collectionContractWrap.classList.remove("is-hidden");
         updateCollectionPreview();
       }
 
@@ -2526,17 +2570,15 @@
           ? "Administración"
           : type || "Canon";
         var lines = ["Tipo de gestion: " + typeLabel];
-        lines.push("Observacion: " + (observation || "Detalle de la gestion escrito por el funcionario."));
-        if (collectionCallSelect && String(collectionCallSelect.value || "").toLowerCase() === "si") {
-          var date = collectionDateInput ? String(collectionDateInput.value || "").trim() : "";
-          var hour = collectionHourInput ? String(collectionHourInput.value || "").trim() : "";
-          var alt = collectionAltInput ? String(collectionAltInput.value || "").trim() : "";
-          var next = [date, hour].filter(Boolean).join(" ");
-          lines.push("Proxima gestion: " + (next || "pendiente por confirmar"));
-          if (alt) {
-            lines.push("Nota de horario: " + alt);
+        if (collectionContractSelect && collectionContractSelect.value) {
+          var selectedContractOption = collectionContractSelect.options
+            ? collectionContractSelect.options[collectionContractSelect.selectedIndex]
+            : null;
+          if (selectedContractOption && selectedContractOption.textContent) {
+            lines.push("Contrato: " + String(selectedContractOption.textContent || "").trim());
           }
         }
+        lines.push("Observacion: " + (observation || "Detalle de la gestion escrito por el funcionario."));
         return lines.join("\n");
       }
 
@@ -2577,6 +2619,7 @@
         var cleanDetail = detail || collectionDetailText();
         var previewDetail = previewMessage(cleanDetail);
         var smsText = smsPrefix() + previewDetail;
+        var smsLimit = 480;
         return normalizedChannels.map(function (channel) {
           if (channel === "email") {
             return (
@@ -2591,14 +2634,14 @@
           if (channel === "sms") {
             return (
               '<article class="scm-admin-notif-preview-card is-sms' +
-              (smsText.length > 160 ? " is-over" : "") +
+              (smsText.length > smsLimit ? " is-over" : "") +
               '">' +
               "<h5>SMS</h5>" +
               '<p class="scm-admin-notif-preview-text">' +
               escHtml(smsText) +
               "</p><small>" +
               smsText.length +
-              "/160 caracteres incluyendo la marca.</small></article>"
+              "/" + smsLimit + " caracteres incluyendo la marca.</small></article>"
             );
           }
           return (
@@ -2611,17 +2654,30 @@
         }).join("");
       }
 
-      function openCollectionQueuedPreview(channels, detail) {
+      function openCollectionQueuedPreview(channels, detail, stats) {
         var cards = renderCollectionPreviewCards(channels, detail);
+        var info = stats || {};
+        var queued = Number(info.queued || 0);
+        var failed = Number(info.failed || 0);
+        var invalid = Number(info.invalid || 0);
+        var statusTitle = queued > 0 ? "Mensaje encolado" : "Notificación no encolada";
+        var statusCopy = queued > 0
+          ? queued + " notificación(es) quedaron en cola."
+          : "No se creó ninguna notificación en la cola. Revisa canales, correo/celular o plantilla.";
+        if (failed > 0 || invalid > 0) {
+          statusCopy += " Fallidas: " + failed + ". Inválidas: " + invalid + ".";
+        }
         if (!cards) {
           showToast("warning", "No se marco ningun canal para notificar.");
           return;
         }
         if (window.Swal && typeof window.Swal.fire === "function") {
           window.Swal.fire({
-            title: "Mensaje encolado",
+            title: statusTitle,
             html:
-              '<div class="scm-admin-notif-preview scm-admin-notif-queued-preview"><strong>Vista previa por canal</strong><div>' +
+              '<div class="scm-admin-notif-preview scm-admin-notif-queued-preview"><strong>' +
+              escHtml(statusCopy) +
+              '</strong><div>' +
               cards +
               "</div></div>",
             width: 900,
@@ -2659,14 +2715,15 @@
           showToast("error", "La accion de gestion de cobro no esta disponible.");
           return;
         }
-        if (collectionAllFiltered) {
-          collectionAllFiltered.checked = false;
-        }
         if (collectionResultEl) {
           collectionResultEl.textContent = "";
           collectionResultEl.classList.remove("is-error");
         }
-        updateCollectionFollowVisibility();
+        if (selectedCollectionContracts.length === 0) {
+          syncCollectionContracts(contractDataForSelectedRecipient());
+        } else {
+          syncCollectionContracts(selectedCollectionContracts);
+        }
         updateCollectionPreview();
         syncContext();
         collectionModal.hidden = false;
@@ -2690,9 +2747,7 @@
         if (allFiltered) {
           allFiltered.checked = false;
         }
-        if (collectionAllFiltered) {
-          collectionAllFiltered.checked = false;
-        }
+        syncCollectionContracts([]);
         updateVisibleChecks();
         syncContext();
         return true;
@@ -2704,6 +2759,14 @@
         }
         collectionModal.hidden = true;
         collectionModal.classList.remove("is-open");
+        selectedCollectionContracts = [];
+        if (collectionContractWrap) {
+          collectionContractWrap.hidden = true;
+          collectionContractWrap.classList.add("is-hidden");
+        }
+        if (collectionContractSelect) {
+          collectionContractSelect.innerHTML = "";
+        }
         document.body.classList.remove("scm-admin-notif-modal-open");
       }
 
@@ -2764,10 +2827,7 @@
               : String(selected.size);
         }
         if (collectionSelectedCountEl) {
-          collectionSelectedCountEl.textContent =
-            collectionAllFiltered && collectionAllFiltered.checked
-              ? String(totalEl ? totalEl.textContent || "todos" : "todos")
-              : String(selected.size);
+          collectionSelectedCountEl.textContent = String(selected.size);
         }
         if (openCollectionBtn) {
           var canCollection = currentType() === "arrendatarios_activos";
@@ -3266,7 +3326,10 @@
           });
         }
         if (openCollectionBtn) {
-          openCollectionBtn.addEventListener("click", openCollectionModal);
+          openCollectionBtn.addEventListener("click", function () {
+            syncCollectionContracts(contractDataForSelectedRecipient());
+            openCollectionModal();
+          });
         }
         if (closeCollectionBtn) {
           closeCollectionBtn.addEventListener("click", closeCollectionModal);
@@ -3274,7 +3337,7 @@
         if (collectionModal) {
           collectionModal.addEventListener("click", function (event) {
             if (event.target && event.target.classList && event.target.classList.contains("scm-admin-notif-modal-backdrop")) {
-              closeCollectionModal();
+              event.preventDefault();
             }
           });
         }
@@ -3403,6 +3466,7 @@
             if (!selectOnlyRecipient(collectionBtn.getAttribute("data-admin-notif-single-id") || "")) {
               return;
             }
+            syncCollectionContracts(parseCollectionContracts(collectionBtn.getAttribute("data-admin-notif-single-contracts") || "[]"));
             openCollectionModal();
             return;
           }
@@ -3581,24 +3645,10 @@
             syncContext();
           });
         }
-        if (collectionAllFiltered) {
-          collectionAllFiltered.addEventListener("change", function () {
-            if (collectionAllFiltered.checked) {
-              selected.clear();
-              updateVisibleChecks();
-            }
-            syncContext();
-          });
-        }
-        if (collectionCallSelect) {
-          collectionCallSelect.addEventListener("change", updateCollectionFollowVisibility);
-        }
         [
           collectionTypeSelect,
           collectionObservationInput,
-          collectionDateInput,
-          collectionHourInput,
-          collectionAltInput,
+          collectionContractSelect,
         ].forEach(function (input) {
           if (!input) {
             return;
@@ -3618,9 +3668,14 @@
               showToast("warning", "La gestion de cobro solo aplica para Arrendatarios activos.");
               return;
             }
-            var useAll = !!(collectionAllFiltered && collectionAllFiltered.checked);
-            if (!useAll && selected.size === 0) {
-              showToast("error", "Selecciona arrendatarios o activa todos los filtrados.");
+            var useAll = false;
+            if (selected.size === 0) {
+              showToast("error", "Selecciona un arrendatario activo.");
+              return;
+            }
+            if (collectionContractWrap && !collectionContractWrap.hidden && collectionContractSelect && !collectionContractSelect.value) {
+              showToast("error", "Selecciona el contrato de la gestion de cobro.");
+              collectionContractSelect.focus();
               return;
             }
             var fd = new FormData(collectionForm);
@@ -3635,12 +3690,10 @@
             fd.set("contract_status", currentContractStatus());
             fd.set("inmueble_simi", currentInmuebleSimi());
             fd.set("contract_number", currentContractNumber());
-            fd.set("all_filtered", useAll ? "1" : "0");
-            if (!useAll) {
-              selected.forEach(function (id) {
-                fd.append("ids[]", id);
-              });
-            }
+            fd.set("all_filtered", "0");
+            selected.forEach(function (id) {
+              fd.append("ids[]", id);
+            });
             setCollectionLoading(true);
             if (collectionResultEl) {
               collectionResultEl.textContent = "Guardando gestiones de cobro...";
@@ -3673,11 +3726,17 @@
                   var previewBtn = collectionResultEl.querySelector("[data-admin-notif-collection-queued-preview]");
                   if (previewBtn) {
                     previewBtn.addEventListener("click", function () {
-                      openCollectionQueuedPreview(queuedChannels, queuedDetail);
+                      openCollectionQueuedPreview(queuedChannels, queuedDetail, data.notifications || {});
                     });
                   }
                 }
                 showToast((data.created || 0) > 0 ? "success" : "warning", msg);
+                if ((data.created || 0) > 0) {
+                  closeCollectionModal();
+                  if (queuedChannels.length > 0) {
+                    openCollectionQueuedPreview(queuedChannels, queuedDetail, data.notifications || {});
+                  }
+                }
                 loadRecipients(currentPage);
               })
               .catch(function (err) {

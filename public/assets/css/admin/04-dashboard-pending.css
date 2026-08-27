@@ -5319,7 +5319,10 @@
 }
 
 #scm-app .scm-admin-notif-all[hidden],
-#scm-app .scm-admin-notif-all.is-hidden {
+#scm-app .scm-admin-notif-all.is-hidden,
+#scm-app .scm-admin-notif-modal.is-single-recipient .scm-admin-notif-all,
+#scm-app .scm-admin-notif-collection-contract[hidden],
+#scm-app .scm-admin-notif-collection-contract.is-hidden {
   display: none !important;
 }
 

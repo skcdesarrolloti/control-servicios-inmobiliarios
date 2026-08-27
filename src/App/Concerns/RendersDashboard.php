@@ -1886,16 +1886,16 @@ trait RendersDashboard
               <div>
                 <span class="scm-calendar-action-kicker">Destinatarios</span>
                 <h4><strong data-admin-notif-collection-selected-count>0</strong> seleccionados</h4>
-                <p>Se registrar&aacute; una gesti&oacute;n por cada contrato activo encontrado.</p>
+                <p>Selecciona el contrato cuando el arrendatario tenga m&aacute;s de uno activo.</p>
               </div>
             </div>
 
-            <label class="scm-admin-notif-all">
-              <input type="checkbox" name="all_filtered" value="1" data-admin-notif-collection-all-filtered>
-              <span>Usar todos los arrendatarios activos filtrados</span>
-            </label>
-
             <div class="scm-admin-notif-collection-grid">
+              <div class="scm-field scm-admin-notif-collection-contract" data-admin-notif-collection-contract-wrap hidden>
+                <label for="scm-admin-notif-collection-contract">Contrato de la gesti&oacute;n</label>
+                <select id="scm-admin-notif-collection-contract" name="contract_ids[]" class="select select-bordered select-sm scm-select" data-admin-notif-collection-contract></select>
+                <small>Si hay varios contratos activos, escoge exactamente cu&aacute;l vas a gestionar.</small>
+              </div>
               <div class="scm-field">
                 <label for="scm-admin-notif-collection-type">Tipo de gesti&oacute;n</label>
                 <select id="scm-admin-notif-collection-type" name="tipo_gestion_cobro" class="select select-bordered select-sm scm-select">
@@ -1903,29 +1903,6 @@ trait RendersDashboard
                   <option value="Administracion">Administraci&oacute;n</option>
                   <option value="Servicios publicos">Servicios p&uacute;blicos</option>
                 </select>
-              </div>
-              <div class="scm-field">
-                <label for="scm-admin-notif-collection-call">Programar siguiente gesti&oacute;n</label>
-                <select id="scm-admin-notif-collection-call" name="volver_llamar" class="select select-bordered select-sm scm-select" data-admin-notif-collection-call>
-                  <option value="No">No</option>
-                  <option value="Si">S&iacute;</option>
-                </select>
-                <small>Si marcas S&iacute;, se guarda una fecha/hora para volver a contactar al arrendatario.</small>
-              </div>
-            </div>
-
-            <div class="scm-admin-notif-collection-follow" data-admin-notif-collection-follow hidden>
-              <div class="scm-field">
-                <label for="scm-admin-notif-collection-date">Siguiente gesti&oacute;n</label>
-                <input id="scm-admin-notif-collection-date" name="siguiente_fecha" type="date" class="input input-bordered input-sm scm-input">
-              </div>
-              <div class="scm-field">
-                <label for="scm-admin-notif-collection-hour">Hora</label>
-                <input id="scm-admin-notif-collection-hour" name="siguiente_hora" type="time" class="input input-bordered input-sm scm-input">
-              </div>
-              <div class="scm-field">
-                <label for="scm-admin-notif-collection-alt">Otro horario / nota de llamada</label>
-                <input id="scm-admin-notif-collection-alt" name="otro_horario_cobro" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: llamar en horario de almuerzo">
               </div>
             </div>
 

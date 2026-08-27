@@ -57,7 +57,7 @@ trait HandlesAdministrativeNotifications
     $contractStatus = $this->sanitize_admin_notification_contract_status((string) ($_POST['contract_status'] ?? ''));
     $inmuebleSimi = trim(sanitize_text_field(wp_unslash((string) ($_POST['inmueble_simi'] ?? ''))));
     $contractNumber = trim(sanitize_text_field(wp_unslash((string) ($_POST['contract_number'] ?? ''))));
-    $allFiltered = trim((string) ($_POST['all_filtered'] ?? '')) === '1';
+    $allFiltered = false;
     $rawChannels = $_POST['channels'] ?? [];
     $rawIds = $_POST['ids'] ?? [];
 
@@ -162,6 +162,7 @@ trait HandlesAdministrativeNotifications
       'siguiente_fecha' => sanitize_text_field(wp_unslash((string) ($_POST['siguiente_fecha'] ?? ''))),
       'siguiente_hora' => sanitize_text_field(wp_unslash((string) ($_POST['siguiente_hora'] ?? ''))),
       'otro_horario_cobro' => trim(sanitize_text_field(wp_unslash((string) ($_POST['otro_horario_cobro'] ?? '')))),
+      'contract_ids' => array_map('intval', is_array($_POST['contract_ids'] ?? null) ? (array) $_POST['contract_ids'] : [$_POST['contract_ids'] ?? 0]),
     ];
     $rawChannels = $_POST['notify_channels'] ?? [];
     $notifyChannels = array_map(
@@ -187,7 +188,9 @@ trait HandlesAdministrativeNotifications
             'Gestion de cobro de contrato de arrendamiento',
             $queuedDetail,
             'scm_arrendatario_gestion_cobro_v1',
-            'scm_email_arrendatario_gestion_cobro_v1'
+            'scm_email_arrendatario_gestion_cobro_v1',
+            [],
+            AdministrativeNotificationsService::COLLECTION_SMS_MAX
           );
         } catch (\Throwable $notifyException) {
           $notifyError = $notifyException->getMessage();
@@ -266,7 +269,7 @@ trait HandlesAdministrativeNotifications
         default => '',
       };
 
-      $html .= '<div class="scm-admin-notif-recipient" data-admin-notif-recipient-row>';
+      $html .= '<div class="scm-admin-notif-recipient" data-admin-notif-recipient-row data-admin-notif-recipient-id="' . esc_attr((string) $id) . '">';
       $html .= '<input type="checkbox" value="' . esc_attr((string) $id) . '" data-admin-notif-recipient aria-label="Seleccionar ' . esc_attr($name) . '">';
       $html .= '<span class="scm-admin-notif-avatar" aria-hidden="true">' . esc_html(mb_strtoupper(mb_substr($name, 0, 1, 'UTF-8'), 'UTF-8')) . '</span>';
       $html .= '<span class="scm-admin-notif-person">';
@@ -306,7 +309,8 @@ trait HandlesAdministrativeNotifications
       $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--whatsapp" data-admin-notif-single-channel="whatsapp" data-admin-notif-single-id="' . esc_attr((string) $id) . '">WhatsApp</button>';
       $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--all" data-admin-notif-single-all-channels data-admin-notif-single-id="' . esc_attr((string) $id) . '">Todos los canales</button>';
       if ($actorType === 'arrendatarios_activos') {
-        $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--collection" data-admin-notif-single-collection data-admin-notif-single-id="' . esc_attr((string) $id) . '">Gestion de cobro</button>';
+        $collectionContracts = is_array($row['contratos_gestion_cobro'] ?? null) ? $row['contratos_gestion_cobro'] : [];
+        $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--collection" data-admin-notif-single-collection data-admin-notif-single-id="' . esc_attr((string) $id) . '" data-admin-notif-single-contracts="' . esc_attr((string) wp_json_encode($collectionContracts)) . '">Gestion de cobro</button>';
       }
       $html .= '</span>';
       $html .= '</div>';

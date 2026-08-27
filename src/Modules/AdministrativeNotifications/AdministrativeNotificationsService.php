@@ -15,6 +15,7 @@ final class AdministrativeNotificationsService
   public const SOURCE_MODULE = 'admin_notifications';
   public const QUEUE_TABLE = 'skc_notification_queue';
   public const SMS_MAX = 160;
+  public const COLLECTION_SMS_MAX = 480;
   public const SMS_PREFIX = 'SKC SuCasa Inmobiliaria ';
   public const DEFAULT_EMAIL_TEMPLATE = 'scm_email_generica_v1';
   public const DEFAULT_WHATSAPP_TEMPLATE = 'scm_notificacion_general_v1';
@@ -351,7 +352,7 @@ final class AdministrativeNotificationsService
     }
 
     $data = $this->normalizeCollectionPayload($payload);
-    $contracts = $this->activeArrendatarioContracts($ids);
+    $contracts = $this->activeArrendatarioContracts($ids, $data['contract_ids']);
     if ($contracts === []) {
       return ['selected' => count($ids), 'contracts' => 0, 'created' => 0, 'updated_contracts' => 0, 'history' => 0, 'properties' => 0, 'skipped' => count($ids), 'recipient_ids' => []];
     }
@@ -461,15 +462,12 @@ final class AdministrativeNotificationsService
     $lines = [
       'Tipo de gestion: ' . $this->collectionTypeDisplayLabel($data['tipo_gestion_cobro']),
     ];
+    $contractLabels = $this->collectionContractLabels($data['contract_ids']);
+    if ($contractLabels !== []) {
+      $lines[] = 'Contrato: ' . implode(' | ', $contractLabels);
+    }
     if ($data['observacion'] !== '') {
       $lines[] = 'Observacion: ' . $data['observacion'];
-    }
-    if ($data['volver_llamar'] === 'Si') {
-      $next = trim($data['siguiente_fecha'] . ' ' . $data['siguiente_hora']);
-      $lines[] = 'Proxima gestion: ' . ($next !== '' ? $next : 'pendiente por confirmar');
-      if ($data['otro_horario_cobro'] !== '') {
-        $lines[] = 'Nota de horario: ' . $data['otro_horario_cobro'];
-      }
     }
     return implode("\n", $lines);
   }
@@ -565,7 +563,7 @@ final class AdministrativeNotificationsService
     ];
   }
 
-  /** @param array<string,mixed> $payload @return array{tipo_gestion_cobro:string,observacion:string,volver_llamar:string,siguiente_fecha:string,siguiente_hora:string,otro_horario_cobro:string} */
+  /** @param array<string,mixed> $payload @return array{tipo_gestion_cobro:string,observacion:string,volver_llamar:string,siguiente_fecha:string,siguiente_hora:string,otro_horario_cobro:string,contract_ids:array<int,int>} */
   private function normalizeCollectionPayload(array $payload): array
   {
     $type = trim((string) ($payload['tipo_gestion_cobro'] ?? 'Canon'));
@@ -595,6 +593,11 @@ final class AdministrativeNotificationsService
       $date = '';
       $hour = '';
     }
+    $rawContractIds = $payload['contract_ids'] ?? [];
+    if (!is_array($rawContractIds)) {
+      $rawContractIds = [$rawContractIds];
+    }
+    $contractIds = array_values(array_unique(array_filter(array_map('intval', $rawContractIds), static fn(int $id): bool => $id > 0)));
 
     return [
       'tipo_gestion_cobro' => $type,
@@ -603,6 +606,7 @@ final class AdministrativeNotificationsService
       'siguiente_fecha' => $date,
       'siguiente_hora' => $hour,
       'otro_horario_cobro' => mb_substr(trim(wp_strip_all_tags((string) ($payload['otro_horario_cobro'] ?? ''))), 0, 240, 'UTF-8'),
+      'contract_ids' => $contractIds,
     ];
   }
 
@@ -703,16 +707,108 @@ final class AdministrativeNotificationsService
   }
 
   /**
+   * @param array<string,mixed> $recipient
+   * @return array<int,array{id:int,label:string,contrato:string,inmueble:string,direccion:string}>
+   */
+  private function collectionContractOptionsForRecipient(array $recipient): array
+  {
+    $ids = array_values(array_unique(array_filter(array_map(
+      static fn($value): int => (int) preg_replace('/\D+/', '', (string) $value),
+      [$recipient['_ID'] ?? '', $recipient['contrato_actor_ref'] ?? '']
+    ), static fn(int $id): bool => $id > 0)));
+    if ($ids === []) {
+      return [];
+    }
+    $contracts = $this->activeArrendatarioContracts($ids);
+    $options = [];
+    foreach ($contracts as $contract) {
+      $id = (int) ($contract['_ID'] ?? 0);
+      if ($id <= 0) {
+        continue;
+      }
+      $contractNumber = $this->firstNonEmpty([$contract['contrato'] ?? '', $contract['contrato_arrendamiento'] ?? '', $id]);
+      $property = $this->firstNonEmpty([$contract['inmueble'] ?? '', $contract['id_inmueble'] ?? '', $contract['id_inmueble_data'] ?? '']);
+      $address = $this->firstNonEmpty([$contract['direccion'] ?? '', $contract['direccion_inmueble'] ?? '']);
+      $parts = ['Contrato #' . $contractNumber];
+      if ($property !== '') {
+        $parts[] = 'Inmueble ' . $property;
+      }
+      if ($address !== '') {
+        $parts[] = $address;
+      }
+      $options[] = [
+        'id' => $id,
+        'label' => implode(' · ', $parts),
+        'contrato' => (string) $contractNumber,
+        'inmueble' => (string) $property,
+        'direccion' => (string) $address,
+      ];
+    }
+    return $options;
+  }
+
+  /**
+   * @param int[] $contractIds
+   * @return string[]
+   */
+  private function collectionContractLabels(array $contractIds): array
+  {
+    $contractIds = array_values(array_unique(array_filter(array_map('intval', $contractIds), static fn(int $id): bool => $id > 0)));
+    if ($contractIds === []) {
+      return [];
+    }
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+    $placeholders = implode(',', array_fill(0, count($contractIds), '?'));
+    $select = ['_ID'];
+    foreach (['contrato', 'contrato_arrendamiento', 'inmueble', 'id_inmueble', 'id_inmueble_data', 'direccion', 'direccion_inmueble'] as $column) {
+      if ($this->schema->columnExists($table, $column)) {
+        $select[] = $column;
+      }
+    }
+    $rows = $this->db->getResults(
+      'SELECT `' . implode('`, `', array_values(array_unique($select))) . "` FROM `{$table}` WHERE CAST(`_ID` AS UNSIGNED) IN ({$placeholders}) ORDER BY `_ID` DESC",
+      $contractIds
+    );
+    $labels = [];
+    foreach ($rows as $row) {
+      $contract = $this->firstNonEmpty([$row['contrato'] ?? '', $row['contrato_arrendamiento'] ?? '', $row['_ID'] ?? '']);
+      $property = $this->firstNonEmpty([$row['inmueble'] ?? '', $row['id_inmueble'] ?? '', $row['id_inmueble_data'] ?? '']);
+      $address = $this->firstNonEmpty([$row['direccion'] ?? '', $row['direccion_inmueble'] ?? '']);
+      $parts = ['#' . $contract];
+      if ($property !== '') {
+        $parts[] = 'Inmueble ' . $property;
+      }
+      if ($address !== '') {
+        $parts[] = $address;
+      }
+      $labels[] = implode(' · ', $parts);
+    }
+    return $labels;
+  }
+
+  /**
    * @param int[] $ids
    * @return array<int,array<string,mixed>>
    */
-  private function activeArrendatarioContracts(array $ids): array
+  private function activeArrendatarioContracts(array $ids, array $contractIds = []): array
   {
     $table = $this->db->table('jet_cct_contratos_arrendamiento');
     if (!$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'id_arrendatario')) {
       return [];
     }
+    $contractIds = array_values(array_unique(array_filter(array_map('intval', $contractIds), static fn(int $id): bool => $id > 0)));
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $where = "CAST(`id_arrendatario` AS UNSIGNED) IN ({$placeholders})
+          AND LOWER(TRIM(COALESCE(`estado`, ''))) = 'entregado'";
+    $args = $ids;
+    if ($contractIds !== []) {
+      $contractPlaceholders = implode(',', array_fill(0, count($contractIds), '?'));
+      $where .= " AND CAST(`_ID` AS UNSIGNED) IN ({$contractPlaceholders})";
+      array_push($args, ...$contractIds);
+    }
     $select = ['_ID'];
     foreach ([
       'estado',
@@ -740,10 +836,9 @@ final class AdministrativeNotificationsService
 
     return $this->db->getResults(
       'SELECT `' . implode('`, `', array_values(array_unique($select))) . "` FROM `{$table}`
-        WHERE CAST(`id_arrendatario` AS UNSIGNED) IN ({$placeholders})
-          AND LOWER(TRIM(COALESCE(`estado`, ''))) = 'entregado'
+        WHERE {$where}
         ORDER BY `_ID` DESC",
-      $ids
+      $args
     );
   }
 
@@ -921,6 +1016,9 @@ final class AdministrativeNotificationsService
       $contractInfo = $this->contractActivityInfo($type, $config, $row, $contractStatus, $inmuebleSimi, $contractNumber);
       $row['contrato_arrendamiento_estado'] = $contractInfo['label'];
       $row['contratos_arrendamiento_resumen'] = $contractInfo['summary'];
+      $row['contratos_gestion_cobro'] = $type === 'arrendatarios_activos'
+        ? $this->collectionContractOptionsForRecipient($row)
+        : [];
     }
     unset($row);
 
@@ -1045,7 +1143,7 @@ final class AdministrativeNotificationsService
    * @param string[] $channels
    * @return array{queued:int,failed:int,invalid:int,filtered:int,selected:int,channels:array<int,string>,type:string}
    */
-  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = '', array $recipientMetaMap = []): array
+  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = '', array $recipientMetaMap = [], int $smsMax = self::SMS_MAX): array
   {
     $config = $this->typeConfig($type);
     $channels = $this->sanitizeChannels($channels);
@@ -1077,8 +1175,9 @@ final class AdministrativeNotificationsService
     if (in_array('email', $channels, true) && $subject === '') {
       throw new \RuntimeException('El asunto es obligatorio para Email.');
     }
-    if (in_array('sms', $channels, true) && mb_strlen(self::SMS_PREFIX . $messageText) > self::SMS_MAX) {
-      throw new \RuntimeException('El SMS supera ' . self::SMS_MAX . ' caracteres.');
+    $smsMax = max(self::SMS_MAX, $smsMax);
+    if (in_array('sms', $channels, true) && mb_strlen(self::SMS_PREFIX . $messageText) > $smsMax) {
+      throw new \RuntimeException('El SMS supera ' . $smsMax . ' caracteres.');
     }
     if (in_array('whatsapp', $channels, true) && $whatsappTemplateConfig === []) {
       throw new \RuntimeException('Selecciona una plantilla valida para WhatsApp.');
@@ -1119,7 +1218,7 @@ final class AdministrativeNotificationsService
           $resolvedMessage = $this->renderEmailTemplate($emailTemplateConfig, $resolvedMessage, $recipient, $config);
         } elseif ($channel === 'sms') {
           $resolvedMessage = self::SMS_PREFIX . $this->plainText($resolvedMessage);
-          if (mb_strlen($resolvedMessage) > self::SMS_MAX) {
+          if (mb_strlen($resolvedMessage) > $smsMax) {
             $invalid++;
             continue;
           }
