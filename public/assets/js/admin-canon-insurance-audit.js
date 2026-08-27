@@ -75,6 +75,25 @@
       }
     }
 
+    function activateCiaTab(tabRoot, targetId) {
+      if (!tabRoot || !targetId) return;
+      var hasTarget = false;
+      tabRoot.querySelectorAll("[data-cia-tab-panel]").forEach(function (panel) {
+        if (panel.id === targetId) hasTarget = true;
+      });
+      if (!hasTarget) return;
+      tabRoot.querySelectorAll("[data-cia-tab-button]").forEach(function (button) {
+        var active = button.dataset.ciaTabTarget === targetId;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      tabRoot.querySelectorAll("[data-cia-tab-panel]").forEach(function (panel) {
+        var active = panel.id === targetId;
+        panel.classList.toggle("active", active);
+        panel.hidden = !active;
+      });
+    }
+
     function insurerGroupKey(group, index) {
       var title = group ? group.querySelector(".scm-cia-insurer-title b") : null;
       var text = title ? title.textContent.trim() : "";
@@ -84,10 +103,22 @@
     function captureContentContext() {
       var context = {
         windowY: window.pageYOffset || document.documentElement.scrollTop || 0,
+        activeTab: "",
         openGroups: [],
         tableScroll: {},
       };
       if (!content) return context;
+      var activeTab = content.querySelector("[data-cia-tab-button].active");
+      context.activeTab = activeTab ? activeTab.dataset.ciaTabTarget || "" : "";
+      content.querySelectorAll("[data-cia-tab-panel]").forEach(function (panel) {
+        var tableWrap = panel.querySelector(".scm-cia-table-wrap");
+        if (panel.id && tableWrap) {
+          context.tableScroll[panel.id] = {
+            left: tableWrap.scrollLeft || 0,
+            top: tableWrap.scrollTop || 0,
+          };
+        }
+      });
       content.querySelectorAll(".scm-cia-insurer-group").forEach(function (group, index) {
         var key = insurerGroupKey(group, index);
         if (group.open) context.openGroups.push(key);
@@ -107,6 +138,17 @@
       window.requestAnimationFrame(function () {
         var openGroups = context.openGroups || [];
         var tableScroll = context.tableScroll || {};
+        if (context.activeTab) {
+          var tabRoot = content.querySelector("[data-cia-tabs]");
+          activateCiaTab(tabRoot, context.activeTab);
+        }
+        content.querySelectorAll("[data-cia-tab-panel]").forEach(function (panel) {
+          var tableWrap = panel.querySelector(".scm-cia-table-wrap");
+          if (panel.id && tableWrap && tableScroll[panel.id]) {
+            tableWrap.scrollLeft = tableScroll[panel.id].left || 0;
+            tableWrap.scrollTop = tableScroll[panel.id].top || 0;
+          }
+        });
         content.querySelectorAll(".scm-cia-insurer-group").forEach(function (group, index) {
           var key = insurerGroupKey(group, index);
           if (openGroups.indexOf(key) !== -1) group.open = true;
@@ -598,6 +640,12 @@
     });
 
     module.addEventListener("click", function (event) {
+      var ciaTabButton = event.target.closest("[data-cia-tab-button]");
+      if (ciaTabButton) {
+        event.preventDefault();
+        activateCiaTab(ciaTabButton.closest("[data-cia-tabs]"), ciaTabButton.dataset.ciaTabTarget || "");
+        return;
+      }
       if (event.target.closest("[data-cia-open-mandates]")) {
         event.preventDefault();
         var mandateTrigger = event.target.closest("[data-cia-open-mandates]");

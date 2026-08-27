@@ -635,6 +635,103 @@
 }
 #scm-app .scm-cia-libertador-note { color: #7a4d08 !important; font-weight: 700; }
 
+#scm-app .scm-cia-workspace {
+  overflow: hidden;
+  padding-bottom: 14px;
+}
+
+#scm-app .scm-cia-tabbar {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  margin: 0 -4px 16px;
+  padding: 4px 4px 10px;
+  scrollbar-width: thin;
+}
+
+#scm-app .scm-cia-tab {
+  display: grid;
+  min-width: 180px;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px 10px;
+  border: 1px solid #d5e3f3;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #ffffff 0%, #f7fbff 100%);
+  color: #102a43;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(16, 42, 67, 0.05);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+#scm-app .scm-cia-tab:hover {
+  border-color: #ffb86b;
+  transform: translateY(-1px);
+}
+
+#scm-app .scm-cia-tab.active {
+  border-color: #ff8a00;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+  box-shadow: 0 14px 28px rgba(255, 138, 0, 0.14);
+}
+
+#scm-app .scm-cia-tab strong {
+  min-width: 0;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+#scm-app .scm-cia-tab small {
+  justify-self: end;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: #edf5ff;
+  color: #174f87;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+#scm-app .scm-cia-tab-pills {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 6px;
+}
+
+#scm-app .scm-cia-tab-pills i {
+  display: inline-flex;
+  min-width: 28px;
+  min-height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+#scm-app .scm-cia-tab-pills .is-red { background: #fff0f0; color: #a61b1b; }
+#scm-app .scm-cia-tab-pills .is-yellow { background: #fff7df; color: #7a4d08; }
+#scm-app .scm-cia-tab-pills .is-green { background: #e9f8ef; color: #146c43; }
+
+#scm-app .scm-cia-tab--history {
+  min-width: 210px;
+}
+
+#scm-app .scm-cia-tab-panel {
+  display: none;
+}
+
+#scm-app .scm-cia-tab-panel.active {
+  display: block;
+}
+
+#scm-app .scm-cia-tab-panel > .scm-cia-table-wrap {
+  border-radius: 12px;
+}
+
 #scm-app .scm-cia-insurer-accordion {
   display: grid;
   gap: 10px;
