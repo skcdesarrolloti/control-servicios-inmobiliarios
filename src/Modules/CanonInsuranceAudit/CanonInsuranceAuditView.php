@@ -41,6 +41,7 @@ final class CanonInsuranceAuditView
     ob_start();
     if ($sourceAudits === []) {
       echo '<div class="scm-cia-empty"><strong>A&uacute;n no hay archivos procesados para ' . esc_html($this->periodLabel($period)) . '.</strong><span>Selecciona el periodo y carga SIMI junto con los extractos de las tres aseguradoras.</span></div>';
+      echo $canPurge ? $this->renderPurgePanel($period, $audits) : '';
       return (string) ob_get_clean();
     }
 ?>
@@ -50,8 +51,8 @@ final class CanonInsuranceAuditView
 
     <form class="scm-cia-filters" data-cia-filter-form autocomplete="off"><div class="scm-field"><label for="scm_cia_period_filter">Periodo consolidado</label><select id="scm_cia_period_filter" name="period"><?php if (!in_array($period, $periods, true)): ?><option value="<?php echo esc_attr($period); ?>" selected><?php echo esc_html($this->periodLabel($period)); ?></option><?php endif; ?><?php foreach ($periods as $availablePeriod): ?><option value="<?php echo esc_attr((string) $availablePeriod); ?>" <?php echo $period === (string) $availablePeriod ? 'selected' : ''; ?>><?php echo esc_html($this->periodLabel((string) $availablePeriod)); ?></option><?php endforeach; ?></select></div><div class="scm-field"><label for="scm_cia_status_filter">Resultado</label><select id="scm_cia_status_filter" name="status"><?php foreach ($this->statusOptions() as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php echo (string) ($filters['status'] ?? '') === $value ? 'selected' : ''; ?>><?php echo esc_html($label); ?></option><?php endforeach; ?></select></div><div class="scm-field scm-cia-search-field"><label for="scm_cia_search">Solicitud, contrato o persona</label><input id="scm_cia_search" name="search" type="search" value="<?php echo esc_attr((string) ($filters['search'] ?? '')); ?>" placeholder="Ej. 11827961 o arrendatario"></div><button type="submit" class="scm-btn-secondary btn btn-outline">Aplicar filtros</button></form>
 
-    <?php echo $this->renderReportPanel($period, $summary, $reports); ?>
     <?php echo $canPurge ? $this->renderPurgePanel($period, $audits) : ''; ?>
+    <?php echo $this->renderReportPanel($period, $summary, $reports); ?>
     <?php echo $this->renderItemsTable($items, $sourceAudits); ?>
     <?php echo $this->renderAuditHistory($audits); ?>
 <?php
