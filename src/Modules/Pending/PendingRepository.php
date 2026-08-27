@@ -513,7 +513,13 @@ final class PendingRepository
           $contractIds[$id] = true;
         }
       }
-      foreach ([$row['id_inmueble'] ?? '', $row['inmueble'] ?? ''] as $id) {
+      foreach ([
+        $row['id_inmueble'] ?? '',
+        $row['inmueble'] ?? '',
+        $row['codigo'] ?? '',
+        $row['codigo_inmueble_web'] ?? '',
+        $row['id_inmueble_data'] ?? '',
+      ] as $id) {
         $id = trim((string) $id);
         if ($id !== '') {
           $propertyIds[$id] = true;
@@ -535,18 +541,34 @@ final class PendingRepository
     );
     $contractById = $this->fetchPendingSingleRows(
       $this->db->table('jet_cct_contratos_arrendamiento'),
-      ['_ID', 'contrato'],
+      ['_ID', 'contrato', 'id_contrato'],
       array_keys($contractIds)
     );
+
+    foreach ($contractById as $contract) {
+      foreach ([
+        $contract['inmueble'] ?? '',
+        $contract['id_inmueble'] ?? '',
+        $contract['codigo'] ?? '',
+        $contract['codigo_inmueble_web'] ?? '',
+        $contract['id_inmueble_data'] ?? '',
+      ] as $id) {
+        $id = trim((string) $id);
+        if ($id !== '') {
+          $propertyIds[$id] = true;
+        }
+      }
+    }
+
     $propertyById = $this->fetchPendingSingleRows(
       $this->db->table('jet_cct_inmuebles'),
-      ['codigo', '_ID', 'id_inmueble'],
+      ['codigo', '_ID', 'id_inmueble', 'codigo_inmueble_web', 'id_inmueble_data', 'inmueble'],
       array_keys($propertyIds)
     );
     $historyColumns = $this->pendingHistoryColumns();
     $histByProperty = $this->fetchPendingRowsGroupedByColumns(
       $this->db->table('jet_cct_historial_del_inmueble'),
-      ['id_inmueble', 'id_inmueble_data'],
+      ['id_inmueble', 'id_inmueble_data', 'codigo', 'codigo_inmueble_web', 'inmueble'],
       array_keys($propertyIds),
       $historyColumns
     );
@@ -590,13 +612,26 @@ final class PendingRepository
         }
       }
 
-      $contractId = trim((string) ($row['id_contrato'] ?? $row['contrato'] ?? ''));
-      if ($contractId !== '' && isset($contractById[$contractId])) {
-        $row['_scm_contrato_data'] = $contractById[$contractId];
+      foreach ([$row['id_contrato'] ?? '', $row['contrato'] ?? ''] as $contractId) {
+        $contractId = trim((string) $contractId);
+        if ($contractId !== '' && isset($contractById[$contractId])) {
+          $row['_scm_contrato_data'] = $contractById[$contractId];
+          break;
+        }
       }
 
       $propertyId = '';
-      foreach ([$row['inmueble'] ?? '', $row['id_inmueble'] ?? '', $row['_scm_contrato_data']['inmueble'] ?? '', $row['_scm_contrato_data']['id_inmueble'] ?? ''] as $candidate) {
+      foreach ([
+        $row['inmueble'] ?? '',
+        $row['id_inmueble'] ?? '',
+        $row['codigo'] ?? '',
+        $row['codigo_inmueble_web'] ?? '',
+        $row['_scm_contrato_data']['inmueble'] ?? '',
+        $row['_scm_contrato_data']['id_inmueble'] ?? '',
+        $row['_scm_contrato_data']['codigo'] ?? '',
+        $row['_scm_contrato_data']['codigo_inmueble_web'] ?? '',
+        $row['_scm_contrato_data']['id_inmueble_data'] ?? '',
+      ] as $candidate) {
         $candidate = trim((string) $candidate);
         if ($candidate !== '' && isset($propertyById[$candidate])) {
           $propertyId = $candidate;
@@ -609,8 +644,21 @@ final class PendingRepository
       if ($propertyId !== '' && isset($propertyById[$propertyId])) {
         $row['_scm_inmueble_data'] = $propertyById[$propertyId];
       }
-      if ($propertyId !== '' && !empty($histByProperty[$propertyId])) {
-        $row['_scm_historial_inmueble'] = array_merge($row['_scm_historial_inmueble'], $histByProperty[$propertyId]);
+      foreach (array_unique(array_filter([
+        $propertyId,
+        trim((string) ($row['inmueble'] ?? '')),
+        trim((string) ($row['id_inmueble'] ?? '')),
+        trim((string) ($row['_scm_inmueble_data']['codigo'] ?? '')),
+        trim((string) ($row['_scm_inmueble_data']['_ID'] ?? '')),
+        trim((string) ($row['_scm_inmueble_data']['id_inmueble'] ?? '')),
+        trim((string) ($row['_scm_inmueble_data']['codigo_inmueble_web'] ?? '')),
+        trim((string) ($row['_scm_inmueble_data']['id_inmueble_data'] ?? '')),
+        trim((string) ($row['_scm_contrato_data']['inmueble'] ?? '')),
+        trim((string) ($row['_scm_contrato_data']['id_inmueble'] ?? '')),
+      ], static fn($id): bool => $id !== '')) as $histPropertyId) {
+        if (!empty($histByProperty[$histPropertyId])) {
+          $row['_scm_historial_inmueble'] = array_merge($row['_scm_historial_inmueble'], $histByProperty[$histPropertyId]);
+        }
       }
 
       $row['_scm_seguimientos_ticket'] = $this->sortPendingRowsByDate($this->uniquePendingRows($row['_scm_seguimientos_ticket']));

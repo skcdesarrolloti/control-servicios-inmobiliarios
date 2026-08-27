@@ -1006,21 +1006,33 @@ final class PendingView
 
   private function pendingDetailValueHtml(string $text): string
   {
+    $decoded = $this->pendingDecodedText($text);
     if (filter_var($text, FILTER_VALIDATE_URL)) {
       return '<a class="scm-case-action-btn" href="' . esc_url($text) . '" target="_blank" rel="noopener noreferrer">Abrir enlace</a>';
     }
-    return esc_html($this->pendingDecodedText($text));
+    if ($this->pendingLooksLikeHtml($decoded)) {
+      return wp_kses_post($decoded);
+    }
+    return esc_html($decoded);
   }
 
   private function pendingDetailContentHtml(string $text): string
   {
     $decoded = $this->pendingDecodedText($text);
+    if ($this->pendingLooksLikeHtml($decoded)) {
+      return wp_kses_post($decoded);
+    }
     return wp_kses_post(nl2br(esc_html($decoded)));
   }
 
   private function pendingDecodedText(string $text): string
   {
     return html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+  }
+
+  private function pendingLooksLikeHtml(string $text): bool
+  {
+    return preg_match('/<\/?[a-z][^>]*>/i', $text) === 1;
   }
 
   /** @param array<int,array{url:string,label:string}> $buttons */
@@ -1237,7 +1249,70 @@ final class PendingView
 
   private function pendingLabel(string $key): string
   {
-    return ucwords(str_replace('_', ' ', $key));
+    static $labels = [
+      '_ID' => 'ID',
+      'cct_status' => 'Estado de publicación',
+      'cct_created' => 'Creado',
+      'cct_modified' => 'Modificado',
+      'cct_author_id' => 'Autor',
+      'id_ticket' => 'Ticket',
+      'ticket_id' => 'Ticket',
+      'id_tickets' => 'Ticket',
+      'tickets_id' => 'Ticket',
+      'id_ticket_mantenimiento' => 'Ticket mantenimiento',
+      'ticket_pk' => 'Ticket',
+      'id_contrato' => 'Contrato',
+      'contrato' => 'Contrato',
+      'id_inmueble' => 'Inmueble',
+      'id_inmueble_data' => 'Código inmueble web',
+      'codigo' => 'Código SIMI',
+      'codigo_inmueble_web' => 'Código inmueble web',
+      'tipo_reporte' => 'Tipo de reporte',
+      'tipo_de_reporte_his' => 'Tipo de reporte',
+      'observacion' => 'Observación',
+      'observacion_his' => 'Observación',
+      'descripcion' => 'Descripción',
+      'respuesta' => 'Respuesta',
+      'funcionario' => 'Funcionario',
+      'reporte_realizado_por_his' => 'Reportado por',
+      'id_empleado' => 'Funcionario',
+      'id_coordinador' => 'Coordinador',
+      'fecha' => 'Fecha',
+      'nombre' => 'Nombre',
+      'evidencia' => 'Evidencia',
+      'archivos' => 'Archivos',
+      'imagen' => 'Imagen',
+      'id_revision_preventiva' => 'Revisión preventiva',
+      'id_revision_correctiva' => 'Revisión correctiva',
+      'id_revision_entrega' => 'Revisión de entrega',
+      'id_revision_recibo' => 'Revisión de recibo',
+      'id_revision_sp' => 'Revisión servicios públicos',
+      'id_revision_servicios_publicos' => 'Revisión servicios públicos',
+      'id_cotizacion_mantenimiento' => 'Cotización mantenimiento',
+      'id_cotizacion_comercial' => 'Cotización comercial',
+      'id_acta_satisfaccion' => 'Acta de satisfacción',
+      'id_acta_entrega' => 'Acta de entrega',
+      'id_acta_revision' => 'Acta de revisión',
+      'id_acta_revision_notificacion' => 'Notificación acta de revisión',
+      'id_acta_recibo' => 'Acta de recibo',
+      'id_ticket_danos_entrega' => 'Ticket daños entrega',
+      'id_ticket_danos_recibo' => 'Ticket daños recibo',
+      'id_hoja_cierre' => 'Hoja de cierre',
+      'seguimiento_reparaciones' => 'Seguimiento de reparaciones',
+    ];
+    if (isset($labels[$key])) {
+      return $labels[$key];
+    }
+    $label = str_replace('_', ' ', $key);
+    $label = preg_replace('/\s+/', ' ', $label) ?: $label;
+    $label = trim($label);
+    if ($label === '') {
+      return $key;
+    }
+    if (function_exists('mb_convert_case')) {
+      return mb_convert_case($label, MB_CASE_TITLE, 'UTF-8');
+    }
+    return ucwords($label);
   }
 
   private function renderPendingHistoryImages($raw): string
