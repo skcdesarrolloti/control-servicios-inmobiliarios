@@ -4044,6 +4044,14 @@
           e.preventDefault();
         }
       });
+      if (!root.dataset.preventivaTicketsEscapeBound) {
+        root.dataset.preventivaTicketsEscapeBound = "1";
+        document.addEventListener("keydown", function (event) {
+          if (event.key === "Escape") {
+            closePreventivaTicketsModal();
+          }
+        });
+      }
       return modal;
     }
 
@@ -4950,13 +4958,13 @@
           if (!json || !json.success) {
             throw new Error(
               (json && json.data && json.data.message) ||
-                "No se pudo actualizar la ultima preventiva.",
+                "No se pudo actualizar la última preventiva.",
             );
           }
           showToast(
             "success",
             (json.data && json.data.message) ||
-              "Ultima preventiva actualizada.",
+              "Última preventiva actualizada.",
           );
           return refreshAfterPreventivaPostponed(button);
         })
@@ -4965,7 +4973,7 @@
             "error",
             err && err.message
               ? err.message
-              : "No se pudo actualizar la ultima preventiva.",
+              : "No se pudo actualizar la última preventiva.",
           );
         })
         .finally(function () {
@@ -4978,12 +4986,12 @@
       var code = button.getAttribute("data-contract-code") || "";
       if (window.Swal && typeof window.Swal.fire === "function") {
         window.Swal.fire({
-          title: "Pasar preventiva a proximo ano",
+          title: "Pasar preventiva a próximo año",
           text: code
             ? "Contrato " + code
-            : "Selecciona la fecha base de ultima preventiva.",
+            : "Selecciona la fecha base de última preventiva.",
           input: "date",
-          inputLabel: "Fecha para ultima preventiva",
+          inputLabel: "Fecha para última preventiva",
           inputValue: bogotaTodayDate(),
           showCancelButton: true,
           allowOutsideClick: false,
@@ -4994,7 +5002,7 @@
           inputValidator: function (value) {
             return String(value || "").trim()
               ? undefined
-              : "La fecha de ultima preventiva es obligatoria.";
+              : "La fecha de última preventiva es obligatoria.";
           },
         }).then(function (result) {
           if (!result || !result.isConfirmed) {
@@ -5005,7 +5013,7 @@
         return;
       }
       var fecha = window.prompt(
-        "Fecha para ultima preventiva (AAAA-MM-DD):",
+        "Fecha para última preventiva (AAAA-MM-DD):",
         bogotaTodayDate(),
       );
       if (fecha === null) {
@@ -5013,10 +5021,102 @@
       }
       fecha = String(fecha || "").trim();
       if (!fecha) {
-        showToast("error", "La fecha de ultima preventiva es obligatoria.");
+        showToast("error", "La fecha de última preventiva es obligatoria.");
         return;
       }
       submitPreventivaPostpone(button, fecha);
+    }
+
+    function closePreventivaTicketsModal(modal) {
+      modal =
+        modal ||
+        root.querySelector("#scm-preventiva-tickets-modal.open");
+      if (!modal) {
+        return;
+      }
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+      var body = modal.querySelector("[data-preventiva-tickets-body]");
+      if (body) {
+        body.innerHTML = "";
+      }
+    }
+
+    function ensurePreventivaTicketsModal() {
+      var modal = root.querySelector("#scm-preventiva-tickets-modal");
+      if (modal) {
+        return modal;
+      }
+      modal = document.createElement("div");
+      modal.id = "scm-preventiva-tickets-modal";
+      modal.className =
+        "scm-standalone-detail-modal scm-preventiva-tickets-modal";
+      modal.setAttribute("aria-hidden", "true");
+      modal.innerHTML =
+        '<div class="scm-standalone-detail-dialog scm-preventiva-tickets-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-preventiva-tickets-title">' +
+        '<button type="button" class="scm-standalone-detail-close" data-close-preventiva-tickets aria-label="Cerrar">&times;</button>' +
+        '<div class="scm-standalone-detail-head"><h4 class="scm-standalone-detail-title" id="scm-preventiva-tickets-title">Tickets preventivos</h4></div>' +
+        '<div class="scm-standalone-detail-body" data-preventiva-tickets-body></div>' +
+        "</div>";
+      root.appendChild(modal);
+      modal.addEventListener("click", function (event) {
+        if (event.target === modal) {
+          closePreventivaTicketsModal(modal);
+          return;
+        }
+        var closeBtn =
+          event.target && event.target.closest
+            ? event.target.closest("[data-close-preventiva-tickets]")
+            : null;
+        if (closeBtn) {
+          event.preventDefault();
+          closePreventivaTicketsModal(modal);
+        }
+      });
+      return modal;
+    }
+
+    function openPreventivaTicketsPopup(button) {
+      var targetId = button.getAttribute("data-target") || "";
+      var sourceRow = targetId
+        ? root.querySelector("#" + cssAttrValue(targetId))
+        : null;
+      var sourceHtml = "";
+      if (sourceRow) {
+        if (
+          sourceRow.tagName &&
+          sourceRow.tagName.toLowerCase() === "template"
+        ) {
+          sourceHtml = sourceRow.innerHTML || "";
+        } else {
+          var sourceCell = sourceRow.querySelector("td");
+          sourceHtml = sourceCell ? sourceCell.innerHTML || "" : "";
+        }
+      }
+      if (!sourceHtml) {
+        showToast("error", "No se encontraron tickets preventivos.");
+        return;
+      }
+      var modal = ensurePreventivaTicketsModal();
+      var title = modal.querySelector("#scm-preventiva-tickets-title");
+      var body = modal.querySelector("[data-preventiva-tickets-body]");
+      var contractCode = String(button.getAttribute("data-contract-code") || "").trim();
+      if (title) {
+        title.textContent = contractCode
+          ? "Tickets preventivos del contrato " + contractCode
+          : "Tickets preventivos del contrato";
+      }
+      if (body) {
+        body.innerHTML = sourceHtml;
+      }
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+      var firstCaseBtn = body ? body.querySelector(".scm-btn-case") : null;
+      if (firstCaseBtn && firstCaseBtn.focus) {
+        window.setTimeout(function () {
+          firstCaseBtn.focus();
+        }, 30);
+      }
     }
 
     function updateKPI(id, val) {
@@ -6435,21 +6535,7 @@
           : null;
       if (togglePreventivaTicketsBtn) {
         e.preventDefault();
-        var targetId = togglePreventivaTicketsBtn.getAttribute("data-target") || "";
-        var targetRow = targetId ? root.querySelector("#" + cssAttrValue(targetId)) : null;
-        if (!targetRow) {
-          return;
-        }
-        if (!togglePreventivaTicketsBtn.dataset.originalLabel) {
-          togglePreventivaTicketsBtn.dataset.originalLabel =
-            togglePreventivaTicketsBtn.textContent || "Ver tickets";
-        }
-        var isHidden = targetRow.style.display === "none" || targetRow.hidden;
-        targetRow.hidden = false;
-        targetRow.style.display = isHidden ? "" : "none";
-        togglePreventivaTicketsBtn.textContent = isHidden
-          ? "Ocultar tickets"
-          : togglePreventivaTicketsBtn.dataset.originalLabel;
+        openPreventivaTicketsPopup(togglePreventivaTicketsBtn);
         return;
       }
 

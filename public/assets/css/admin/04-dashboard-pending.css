@@ -356,6 +356,21 @@
   overflow: auto;
 }
 
+#scm-app .scm-preventiva-tickets-dialog {
+  width: min(1180px, calc(100% - 8px));
+}
+
+#scm-app .scm-preventiva-tickets-modal .scm-table-wrap {
+  max-height: none;
+}
+
+#scm-app .scm-preventiva-ticket-list > strong {
+  display: block;
+  margin: 0 0 10px;
+  color: #334155;
+  font-size: 13px;
+}
+
 /* Unified spacing scale (8/12/16/24) */
 #scm-app {
   --sp-1: 8px;

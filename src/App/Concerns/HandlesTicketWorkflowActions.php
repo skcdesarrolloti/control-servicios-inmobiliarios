@@ -489,16 +489,16 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail('ID de contrato invalido.');
     }
     if ($fechaUltima === '') {
-      $this->jsonFail('La fecha de ultima preventiva es obligatoria.');
+      $this->jsonFail('La fecha de última preventiva es obligatoria.');
     }
 
     $result = $this->get_pending_controller()->postponePreventivaToNextYear($contractId, $fechaUltima);
     if (empty($result['ok'])) {
-      $this->jsonFail((string) ($result['message'] ?? 'No se pudo actualizar la ultima preventiva.'));
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo actualizar la última preventiva.'));
     }
 
     $this->jsonOk([
-      'message' => (string) ($result['message'] ?? 'Ultima preventiva actualizada.'),
+      'message' => (string) ($result['message'] ?? 'Última preventiva actualizada.'),
       'ultima_revision_preventiva' => (string) ($result['ultima_revision_preventiva'] ?? ''),
       'ultima_revision_preventiva_date' => (string) ($result['ultima_revision_preventiva_date'] ?? ''),
       'siguiente_revision_preventiva' => (string) ($result['siguiente_revision_preventiva'] ?? ''),

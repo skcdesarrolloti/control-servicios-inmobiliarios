@@ -458,7 +458,7 @@ final class PendingView
       if ($ticketId !== '') {
         $html .= '<button type="button" class="scm-pending-action-btn scm-btn-case"'
           . $this->preventivaTicketCaseAttrs((array) $ticket, $row, (int) ($item['ultima'] ?? 0), (int) ($item['due'] ?? 0))
-          . ' onclick="scmOpenCase(this)">'
+          . '>'
           . 'Ver ticket</button>';
       } else {
         $html .= '<button type="button" class="scm-pending-action-btn"'
@@ -470,14 +470,15 @@ final class PendingView
       }
       if ($ticketsCount > 0) {
         $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;"'
-          . ' data-scm-toggle-preventiva-tickets data-target="' . esc_attr($ticketsListId) . '">'
+          . ' data-scm-toggle-preventiva-tickets data-target="' . esc_attr($ticketsListId) . '"'
+          . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
           . 'Ver tickets (' . esc_html((string) $ticketsCount) . ')</button>';
       }
       if ($contractPk !== '' && $estado !== 'recibido') {
         $html .= '<button type="button" class="scm-pending-action-btn"'
           . ' data-scm-postpone-preventiva data-contract-id="' . esc_attr($contractPk) . '"'
           . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
-          . 'Pasar a proximo ano</button>';
+          . 'Pasar a próximo año</button>';
       }
       $html .= '</td>';
 
@@ -488,9 +489,9 @@ final class PendingView
           . '</td></tr>';
       }
       if ($ticketsCount > 0) {
-        $html .= '<tr id="' . esc_attr($ticketsListId) . '" class="scm-preventiva-ticket-list-row" style="display:none;"><td colspan="12">'
+        $html .= '<template id="' . esc_attr($ticketsListId) . '" data-scm-preventiva-tickets-template>'
           . $this->renderPreventivaTicketsList($allTickets, $row, (int) ($item['ultima'] ?? 0), (int) ($item['due'] ?? 0))
-          . '</td></tr>';
+          . '</template>';
       }
     }
 
@@ -672,7 +673,7 @@ final class PendingView
       $html .= '<td>' . esc_html(trim((string) ($ticket['asunto'] ?? 'REVISION PREVENTIVA')) ?: '-') . '</td>';
       $html .= '<td><button type="button" class="scm-pending-action-btn scm-btn-case"'
         . $this->preventivaTicketCaseAttrs($ticket, $contractRow, $ultimaTs, $dueTs)
-        . ' onclick="scmOpenCase(this)">Ver ticket</button></td>';
+        . '>Ver ticket</button></td>';
       $html .= '</tr>';
       $html .= '<tr class="scm-tl-row" style="display:none;"><td colspan="6">'
         . $this->renderPreventivaTicketCaseSource($ticket, $contractRow)

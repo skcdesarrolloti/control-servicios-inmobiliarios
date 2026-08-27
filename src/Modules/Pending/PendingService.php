@@ -68,7 +68,7 @@ final class PendingService
 
     $fechaTs = $this->normalizeContractReceivedDate($fechaUltimaPreventiva);
     if ($fechaTs <= 0) {
-      return ['ok' => false, 'message' => 'La fecha de ultima preventiva es obligatoria.'];
+      return ['ok' => false, 'message' => 'La fecha de última preventiva es obligatoria.'];
     }
 
     $this->repo->updateContratoArrendamiento($contractId, [
@@ -79,7 +79,7 @@ final class PendingService
     $nextTs = $this->addMonths($fechaTs, 12);
     return [
       'ok' => true,
-      'message' => 'Ultima preventiva actualizada. El contrato quedara para revision el proximo ano.',
+      'message' => 'Última preventiva actualizada. El contrato quedará para revisión el próximo año.',
       'ultima_revision_preventiva' => $fechaTs,
       'ultima_revision_preventiva_date' => $this->formatContractReceivedDate($fechaTs),
       'siguiente_revision_preventiva' => $nextTs,
