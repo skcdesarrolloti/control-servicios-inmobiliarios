@@ -556,6 +556,12 @@ final class PendingRepository
       array_keys($ticketKeys),
       $historyColumns
     );
+    $ticketHistByTicket = $this->fetchPendingRowsGroupedByColumns(
+      $this->db->table('jet_cct_historial_del_ticket'),
+      ['id_ticket', 'ticket_id', 'id_tickets', 'tickets_id', 'id_ticket_mantenimiento', 'ticket', 'ticket_pk'],
+      array_keys($ticketKeys),
+      $this->pendingTicketHistoryColumns()
+    );
 
     foreach ($rows as &$row) {
       $row['_scm_seguimientos_ticket'] = [];
@@ -575,6 +581,9 @@ final class PendingRepository
         }
         if (!empty($notesByTicket[$key])) {
           $row['_scm_notas_ticket'] = array_merge($row['_scm_notas_ticket'], $notesByTicket[$key]);
+        }
+        if (!empty($ticketHistByTicket[$key])) {
+          $row['_scm_historial_items'] = array_merge($row['_scm_historial_items'], $ticketHistByTicket[$key]);
         }
         if (!empty($histByTicket[$key])) {
           $row['_scm_historial_inmueble'] = array_merge($row['_scm_historial_inmueble'], $histByTicket[$key]);
@@ -731,6 +740,38 @@ final class PendingRepository
       ],
       array_keys(HistoryLinkMap::idButtons()),
       ['id_hoja_cierre']
+    )));
+  }
+
+  /** @return array<int,string> */
+  private function pendingTicketHistoryColumns(): array
+  {
+    return array_values(array_unique(array_merge(
+      $this->pendingHistoryColumns(),
+      [
+        'nombre',
+        'respuesta',
+        'ticket_id',
+        'id_tickets',
+        'tickets_id',
+        'id_ticket_mantenimiento',
+        'ticket',
+        'ticket_pk',
+        'id_revision_entrega',
+        'id_revision_recibo',
+        'id_revision_sp',
+        'id_revision_servicios_publicos',
+        'id_cotizacion_mantenimiento',
+        'id_cotizacion_comercial',
+        'id_acta_satisfaccion',
+        'id_acta_entrega',
+        'id_acta_revision',
+        'id_acta_revision_notificacion',
+        'id_acta_recibo',
+        'id_ticket_danos_entrega',
+        'id_ticket_danos_recibo',
+        'seguimiento_reparaciones',
+      ]
     )));
   }
 

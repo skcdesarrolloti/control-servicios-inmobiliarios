@@ -362,6 +362,25 @@
 
 #scm-app .scm-preventiva-tickets-modal .scm-table-wrap {
   max-height: none;
+  border-color: #dbe3ef;
+  box-shadow: none;
+}
+
+#scm-app .scm-preventiva-tickets-modal .scm-table {
+  min-width: 820px;
+}
+
+#scm-app .scm-preventiva-tickets-modal .scm-table-prev thead tr {
+  background: linear-gradient(130deg, #0f172a, #1b447d 58%, #404041) !important;
+}
+
+#scm-app .scm-preventiva-tickets-modal .scm-table-prev thead th {
+  color: #ffffff !important;
+  opacity: 1;
+}
+
+#scm-app .scm-preventiva-tickets-modal .scm-table tbody td {
+  color: #334155;
 }
 
 #scm-app .scm-preventiva-ticket-list > strong {
