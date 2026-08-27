@@ -77,17 +77,25 @@
 
     function activateCiaTab(tabRoot, targetId) {
       if (!tabRoot || !targetId) return;
+      function rootOwned(selector) {
+        return Array.prototype.filter.call(
+          tabRoot.querySelectorAll(selector),
+          function (element) {
+            return element.closest("[data-cia-tabs]") === tabRoot;
+          },
+        );
+      }
       var hasTarget = false;
-      tabRoot.querySelectorAll("[data-cia-tab-panel]").forEach(function (panel) {
+      rootOwned("[data-cia-tab-panel]").forEach(function (panel) {
         if (panel.id === targetId) hasTarget = true;
       });
       if (!hasTarget) return;
-      tabRoot.querySelectorAll("[data-cia-tab-button]").forEach(function (button) {
+      rootOwned("[data-cia-tab-button]").forEach(function (button) {
         var active = button.dataset.ciaTabTarget === targetId;
         button.classList.toggle("active", active);
         button.setAttribute("aria-selected", active ? "true" : "false");
       });
-      tabRoot.querySelectorAll("[data-cia-tab-panel]").forEach(function (panel) {
+      rootOwned("[data-cia-tab-panel]").forEach(function (panel) {
         var active = panel.id === targetId;
         panel.classList.toggle("active", active);
         panel.hidden = !active;
@@ -104,12 +112,23 @@
       var context = {
         windowY: window.pageYOffset || document.documentElement.scrollTop || 0,
         activeTab: "",
+        activeTabs: [],
         openGroups: [],
         tableScroll: {},
       };
       if (!content) return context;
-      var activeTab = content.querySelector("[data-cia-tab-button].active");
-      context.activeTab = activeTab ? activeTab.dataset.ciaTabTarget || "" : "";
+      content.querySelectorAll("[data-cia-tabs]").forEach(function (tabRoot) {
+        var activeTab = Array.prototype.find.call(
+          tabRoot.querySelectorAll("[data-cia-tab-button].active"),
+          function (button) {
+            return button.closest("[data-cia-tabs]") === tabRoot;
+          },
+        );
+        if (activeTab && activeTab.dataset.ciaTabTarget) {
+          context.activeTabs.push(activeTab.dataset.ciaTabTarget);
+        }
+      });
+      context.activeTab = context.activeTabs[0] || "";
       content.querySelectorAll("[data-cia-tab-panel]").forEach(function (panel) {
         var tableWrap = panel.querySelector(".scm-cia-table-wrap");
         if (panel.id && tableWrap) {
@@ -138,10 +157,10 @@
       window.requestAnimationFrame(function () {
         var openGroups = context.openGroups || [];
         var tableScroll = context.tableScroll || {};
-        if (context.activeTab) {
-          var tabRoot = content.querySelector("[data-cia-tabs]");
-          activateCiaTab(tabRoot, context.activeTab);
-        }
+        (context.activeTabs || (context.activeTab ? [context.activeTab] : [])).forEach(function (targetId) {
+          var button = content.querySelector('[data-cia-tab-target="' + targetId + '"]');
+          if (button) activateCiaTab(button.closest("[data-cia-tabs]"), targetId);
+        });
         content.querySelectorAll("[data-cia-tab-panel]").forEach(function (panel) {
           var tableWrap = panel.querySelector(".scm-cia-table-wrap");
           if (panel.id && tableWrap && tableScroll[panel.id]) {

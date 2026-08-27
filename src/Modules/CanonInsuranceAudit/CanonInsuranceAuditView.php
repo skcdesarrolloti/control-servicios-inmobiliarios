@@ -51,8 +51,13 @@ final class CanonInsuranceAuditView
 
     <form class="scm-cia-filters" data-cia-filter-form autocomplete="off"><div class="scm-field"><label for="scm_cia_period_filter">Periodo consolidado</label><select id="scm_cia_period_filter" name="period"><?php if (!in_array($period, $periods, true)): ?><option value="<?php echo esc_attr($period); ?>" selected><?php echo esc_html($this->periodLabel($period)); ?></option><?php endif; ?><?php foreach ($periods as $availablePeriod): ?><option value="<?php echo esc_attr((string) $availablePeriod); ?>" <?php echo $period === (string) $availablePeriod ? 'selected' : ''; ?>><?php echo esc_html($this->periodLabel((string) $availablePeriod)); ?></option><?php endforeach; ?></select></div><div class="scm-field"><label for="scm_cia_status_filter">Resultado</label><select id="scm_cia_status_filter" name="status"><?php foreach ($this->statusOptions() as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php echo (string) ($filters['status'] ?? '') === $value ? 'selected' : ''; ?>><?php echo esc_html($label); ?></option><?php endforeach; ?></select></div><div class="scm-field scm-cia-search-field"><label for="scm_cia_search">Solicitud, contrato o persona</label><input id="scm_cia_search" name="search" type="search" value="<?php echo esc_attr((string) ($filters['search'] ?? '')); ?>" placeholder="Ej. 11827961 o arrendatario"></div><button type="submit" class="scm-btn-secondary btn btn-outline">Aplicar filtros</button></form>
 
-    <?php echo $canPurge ? $this->renderPurgePanel($period, $audits) : ''; ?>
-    <?php echo $this->renderReportPanel($period, $summary, $reports); ?>
+    <section class="scm-cia-admin-actions" aria-label="Herramientas administrativas">
+      <div class="scm-cia-section-head"><div><h3>Herramientas administrativas</h3><p>Acciones puntuales para limpiar pruebas o enviar el consolidado. La revisi&oacute;n diaria est&aacute; m&aacute;s abajo.</p></div></div>
+      <div class="scm-cia-admin-actions-grid">
+        <?php echo $canPurge ? $this->renderPurgePanel($period, $audits) : ''; ?>
+        <?php echo $this->renderReportPanel($period, $summary, $reports); ?>
+      </div>
+    </section>
     <?php echo $this->renderItemsTable($items, $sourceAudits, $audits); ?>
 <?php
     return (string) ob_get_clean();
@@ -173,20 +178,46 @@ final class CanonInsuranceAuditView
     $activeKey = array_key_first($groups) ?: 'archivos';
     ob_start();
 ?>
-    <section class="scm-cia-section scm-cia-workspace" data-cia-tabs><div class="scm-cia-section-head"><div><h3>Comparaci&oacute;n por aseguradora</h3><p>Elige una pesta&ntilde;a para revisar solo los contratos de esa aseguradora. El registro de archivos queda separado para no mezclar datos operativos.</p></div><span><?php echo esc_html((string) count($items)); ?> filas visibles</span></div><div class="scm-cia-tabbar" role="tablist" aria-label="Auditor&iacute;a por aseguradora">
-      <?php foreach ($groups as $groupKey => $group): $groupItems = (array) ($group['items'] ?? []); $label = (string) ($group['label'] ?? 'Sin aseguradora'); $counts = $this->statusCounts($groupItems); $tabId = 'scm-cia-panel-' . preg_replace('/[^a-z0-9_-]/', '-', strtolower((string) $groupKey)); ?>
-        <button type="button" class="scm-cia-tab<?php echo $groupKey === $activeKey ? ' active' : ''; ?>" role="tab" aria-selected="<?php echo $groupKey === $activeKey ? 'true' : 'false'; ?>" data-cia-tab-button data-cia-tab-target="<?php echo esc_attr($tabId); ?>"><strong><?php echo esc_html($label); ?></strong><small><?php echo esc_html((string) count($groupItems)); ?></small><?php echo $this->tabStatusPills($counts); ?></button>
-      <?php endforeach; ?>
-      <button type="button" class="scm-cia-tab scm-cia-tab--history" role="tab" aria-selected="false" data-cia-tab-button data-cia-tab-target="scm-cia-panel-archivos"><strong>Archivos procesados</strong><small><?php echo esc_html((string) count($audits)); ?></small></button>
-    </div>
-    <div class="scm-cia-tabpanels">
-      <?php foreach ($groups as $groupKey => $group): $groupItems = (array) ($group['items'] ?? []); $label = (string) ($group['label'] ?? 'Sin aseguradora'); $tabId = 'scm-cia-panel-' . preg_replace('/[^a-z0-9_-]/', '-', strtolower((string) $groupKey)); ?>
-        <div class="scm-cia-tab-panel<?php echo $groupKey === $activeKey ? ' active' : ''; ?>" id="<?php echo esc_attr($tabId); ?>" role="tabpanel" data-cia-tab-panel <?php echo $groupKey === $activeKey ? '' : 'hidden'; ?>>
-          <?php echo $this->renderInsurerTable($label, $groupItems, $sourceAudits); ?>
+    <section class="scm-cia-section scm-cia-workspace" data-cia-tabs>
+      <div class="scm-cia-section-head scm-cia-section-head--work">
+        <div>
+          <h3>Área de revisión</h3>
+          <p>Primero elige si quieres revisar la comparación o el historial de archivos. Luego filtra por aseguradora.</p>
         </div>
-      <?php endforeach; ?>
+        <span><?php echo esc_html((string) count($items)); ?> filas visibles</span>
+      </div>
+
+      <div class="scm-cia-main-tabs" role="tablist" aria-label="Vista de auditoría">
+        <button type="button" class="scm-cia-main-tab active" role="tab" aria-selected="true" data-cia-tab-button data-cia-tab-target="scm-cia-panel-comparacion"><strong>Comparación</strong><small>Contratos por aseguradora</small></button>
+        <button type="button" class="scm-cia-main-tab" role="tab" aria-selected="false" data-cia-tab-button data-cia-tab-target="scm-cia-panel-archivos"><strong>Archivos procesados</strong><small><?php echo esc_html((string) count($audits)); ?> carga(s)</small></button>
+      </div>
+
+      <div class="scm-cia-tab-panel active" id="scm-cia-panel-comparacion" role="tabpanel" data-cia-tab-panel>
+        <div class="scm-cia-comparison-shell" data-cia-tabs>
+          <div class="scm-cia-insurer-head">
+            <div>
+              <h4>Comparación por aseguradora</h4>
+              <p>Los contadores muestran total, rojos, amarillos y verdes para que sepas dónde revisar primero.</p>
+            </div>
+            <div class="scm-cia-legend" aria-label="Significado del semaforo"><span class="is-red">Rojo: valor equivocado</span><span class="is-yellow">Amarillo: falta dato/fuente</span><span class="is-green">Verde: coincide</span></div>
+          </div>
+          <div class="scm-cia-insurer-tabs" role="tablist" aria-label="Aseguradoras auditadas">
+            <?php foreach ($groups as $groupKey => $group): $groupItems = (array) ($group['items'] ?? []); $label = (string) ($group['label'] ?? 'Sin aseguradora'); $counts = $this->statusCounts($groupItems); $tabId = 'scm-cia-panel-insurer-' . preg_replace('/[^a-z0-9_-]/', '-', strtolower((string) $groupKey)); ?>
+              <button type="button" class="scm-cia-insurer-tab<?php echo $groupKey === $activeKey ? ' active' : ''; ?>" role="tab" aria-selected="<?php echo $groupKey === $activeKey ? 'true' : 'false'; ?>" data-cia-tab-button data-cia-tab-target="<?php echo esc_attr($tabId); ?>"><strong><?php echo esc_html($label); ?></strong><?php echo $this->tabStatusPills($counts, count($groupItems)); ?></button>
+            <?php endforeach; ?>
+          </div>
+          <div class="scm-cia-tabpanels">
+            <?php foreach ($groups as $groupKey => $group): $groupItems = (array) ($group['items'] ?? []); $label = (string) ($group['label'] ?? 'Sin aseguradora'); $tabId = 'scm-cia-panel-insurer-' . preg_replace('/[^a-z0-9_-]/', '-', strtolower((string) $groupKey)); ?>
+              <div class="scm-cia-tab-panel<?php echo $groupKey === $activeKey ? ' active' : ''; ?>" id="<?php echo esc_attr($tabId); ?>" role="tabpanel" data-cia-tab-panel <?php echo $groupKey === $activeKey ? '' : 'hidden'; ?>>
+                <?php echo $this->renderInsurerTable($label, $groupItems, $sourceAudits); ?>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      </div>
+
       <div class="scm-cia-tab-panel" id="scm-cia-panel-archivos" role="tabpanel" data-cia-tab-panel hidden><?php echo $this->renderAuditHistory($audits); ?></div>
-    </div><div class="scm-cia-legend" aria-label="Significado del semaforo"><span class="is-green">Verde: el valor coincide</span><span class="is-red">Rojo: el valor est&aacute; equivocado</span><span class="is-yellow">Amarillo: falta la fuente o el dato</span></div></section>
+    </section>
 <?php
     return (string) ob_get_clean();
   }
@@ -316,9 +347,14 @@ final class CanonInsuranceAuditView
   }
 
   /** @param array<string,int> $counts */
-  private function tabStatusPills(array $counts): string
+  private function tabStatusPills(array $counts, int $total): string
   {
-    return '<span class="scm-cia-tab-pills"><i class="is-red">' . esc_html((string) ($counts['incorrecto'] ?? 0)) . '</i><i class="is-yellow">' . esc_html((string) ($counts['anomalia'] ?? 0)) . '</i><i class="is-green">' . esc_html((string) ($counts['correcto'] ?? 0)) . '</i></span>';
+    return '<span class="scm-cia-tab-pills">'
+      . '<i class="is-total"><b>Total</b><em>' . esc_html((string) $total) . '</em></i>'
+      . '<i class="is-red"><b>Rojos</b><em>' . esc_html((string) ($counts['incorrecto'] ?? 0)) . '</em></i>'
+      . '<i class="is-yellow"><b>Amarillos</b><em>' . esc_html((string) ($counts['anomalia'] ?? 0)) . '</em></i>'
+      . '<i class="is-green"><b>Verdes</b><em>' . esc_html((string) ($counts['correcto'] ?? 0)) . '</em></i>'
+      . '</span>';
   }
 
   private function kpi(string $label, int $value, string $tone): string { return '<div class="scm-cia-kpi scm-cia-kpi--' . esc_attr($tone) . '"><span>' . esc_html($label) . '</span><strong>' . esc_html((string) $value) . '</strong></div>'; }

@@ -281,6 +281,28 @@
   background: var(--cia-surface);
 }
 
+#scm-app .scm-cia-admin-actions {
+  margin-top: 22px;
+  border: 1px solid #d8e4f1;
+  border-radius: 16px;
+  padding: 16px;
+  background: #ffffff;
+}
+
+#scm-app .scm-cia-admin-actions .scm-cia-section-head {
+  margin-bottom: 12px;
+}
+
+#scm-app .scm-cia-admin-actions .scm-cia-section-head h3 {
+  margin: 0 0 4px;
+}
+
+#scm-app .scm-cia-admin-actions-grid {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  gap: 12px;
+}
+
 #scm-app .scm-cia-report {
   display: flex;
   align-items: center;
@@ -292,6 +314,19 @@
   border-radius: 12px;
   padding: 16px 18px;
   background: #f6faff;
+}
+
+#scm-app .scm-cia-admin-actions .scm-cia-report,
+#scm-app .scm-cia-admin-actions .scm-cia-purge {
+  align-items: stretch;
+  flex-direction: column;
+  justify-content: flex-start;
+  margin-top: 0;
+}
+
+#scm-app .scm-cia-admin-actions .scm-cia-report form,
+#scm-app .scm-cia-admin-actions .scm-cia-purge form {
+  grid-template-columns: 1fr;
 }
 
 #scm-app .scm-cia-report > div { display: flex; flex-direction: column; gap: 3px; }
@@ -637,28 +672,104 @@
 
 #scm-app .scm-cia-workspace {
   overflow: hidden;
-  padding-bottom: 14px;
+  padding-bottom: 18px;
 }
 
-#scm-app .scm-cia-tabbar {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  margin: 0 -4px 16px;
-  padding: 4px 4px 10px;
-  scrollbar-width: thin;
+#scm-app .scm-cia-section-head--work {
+  margin-bottom: 14px;
 }
 
-#scm-app .scm-cia-tab {
+#scm-app .scm-cia-main-tabs {
   display: grid;
-  min-width: 180px;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 6px 10px;
-  border: 1px solid #d5e3f3;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 8px;
+  border: 1px solid #d8e4f1;
+  border-radius: 18px;
+  background: #f5f9fd;
+}
+
+#scm-app .scm-cia-main-tab {
+  display: flex;
+  min-height: 62px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid transparent;
   border-radius: 14px;
-  padding: 12px 14px;
-  background: linear-gradient(135deg, #ffffff 0%, #f7fbff 100%);
+  padding: 12px 16px;
+  background: transparent;
+  color: #243b53;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+#scm-app .scm-cia-main-tab:hover {
+  border-color: #ffb86b;
+  background: #ffffff;
+}
+
+#scm-app .scm-cia-main-tab.active {
+  border-color: #ff8a00;
+  background: #ffffff;
+  box-shadow: 0 12px 26px rgba(255, 138, 0, 0.14);
+  transform: translateY(-1px);
+}
+
+#scm-app .scm-cia-main-tab strong {
+  color: #0f2745;
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+#scm-app .scm-cia-main-tab small {
+  color: #6b7c93;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#scm-app .scm-cia-comparison-shell {
+  padding: 16px;
+  border: 1px solid #dbe7f3;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+#scm-app .scm-cia-insurer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+#scm-app .scm-cia-insurer-head h4 {
+  margin: 0 0 4px;
+  color: #102a43;
+  font-size: 18px;
+}
+
+#scm-app .scm-cia-insurer-head p {
+  margin: 0;
+  color: #62748a;
+}
+
+#scm-app .scm-cia-insurer-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+#scm-app .scm-cia-insurer-tab {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #d5e3f3;
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
   color: #102a43;
   text-align: left;
   cursor: pointer;
@@ -666,59 +777,60 @@
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
-#scm-app .scm-cia-tab:hover {
+#scm-app .scm-cia-insurer-tab:hover {
   border-color: #ffb86b;
   transform: translateY(-1px);
 }
 
-#scm-app .scm-cia-tab.active {
+#scm-app .scm-cia-insurer-tab.active {
   border-color: #ff8a00;
   background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
   box-shadow: 0 14px 28px rgba(255, 138, 0, 0.14);
 }
 
-#scm-app .scm-cia-tab strong {
+#scm-app .scm-cia-insurer-tab strong {
   min-width: 0;
   color: inherit;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.2;
 }
 
-#scm-app .scm-cia-tab small {
-  justify-self: end;
-  border-radius: 999px;
-  padding: 4px 9px;
-  background: #edf5ff;
-  color: #174f87;
-  font-size: 11px;
-  font-weight: 900;
-}
-
 #scm-app .scm-cia-tab-pills {
-  display: flex;
-  grid-column: 1 / -1;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
 }
 
 #scm-app .scm-cia-tab-pills i {
   display: inline-flex;
-  min-width: 28px;
-  min-height: 22px;
+  min-height: 42px;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  font-size: 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
   font-style: normal;
-  font-weight: 900;
+  line-height: 1.1;
 }
 
+#scm-app .scm-cia-tab-pills b {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-cia-tab-pills em {
+  margin-top: 4px;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 950;
+}
+
+#scm-app .scm-cia-tab-pills .is-total { background: #edf5ff; color: #174f87; border-color: #cfe1f6; }
 #scm-app .scm-cia-tab-pills .is-red { background: #fff0f0; color: #a61b1b; }
 #scm-app .scm-cia-tab-pills .is-yellow { background: #fff7df; color: #7a4d08; }
 #scm-app .scm-cia-tab-pills .is-green { background: #e9f8ef; color: #146c43; }
-
-#scm-app .scm-cia-tab--history {
-  min-width: 210px;
-}
 
 #scm-app .scm-cia-tab-panel {
   display: none;
@@ -1269,6 +1381,9 @@
 
 @media (max-width: 900px) {
   #scm-app .scm-cia-hero { flex-direction: column; }
+  #scm-app .scm-cia-admin-actions-grid,
+  #scm-app .scm-cia-main-tabs,
+  #scm-app .scm-cia-insurer-head { grid-template-columns: 1fr; flex-direction: column; }
   #scm-app .scm-cia-guide,
   #scm-app .scm-cia-tools,
   #scm-app .scm-cia-report,
