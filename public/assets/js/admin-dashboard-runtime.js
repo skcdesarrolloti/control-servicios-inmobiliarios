@@ -2520,7 +2520,12 @@
       function collectionDetailText() {
         var type = collectionTypeSelect ? String(collectionTypeSelect.value || "Canon").trim() : "Canon";
         var observation = collectionObservationInput ? String(collectionObservationInput.value || "").trim() : "";
-        var lines = ["Tipo de gestion: " + (type || "Canon")];
+        var typeLabel = /servicio/i.test(type)
+          ? "Servicios públicos"
+          : /admin/i.test(type)
+          ? "Administración"
+          : type || "Canon";
+        var lines = ["Tipo de gestion: " + typeLabel];
         lines.push("Observacion: " + (observation || "Detalle de la gestion escrito por el funcionario."));
         if (collectionCallSelect && String(collectionCallSelect.value || "").toLowerCase() === "si") {
           var date = collectionDateInput ? String(collectionDateInput.value || "").trim() : "";
@@ -2535,14 +2540,15 @@
         return lines.join("\n");
       }
 
-      function renderCollectionWhatsappPreviewText() {
+      function renderCollectionWhatsappPreviewText(detailOverride) {
         var sender = senderProfile();
         var signature = sender.signatureLine || "Funcionario - Control Servicios Inmobiliarios";
+        var detail = detailOverride || collectionDetailText();
         return (
           "Buen dia, Nombre del destinatario.\n\n" +
           "Le informamos que se registro una gestion de cobro relacionada con su contrato de arrendamiento.\n\n" +
           "Detalle de la gestion:\n\n" +
-          previewMessage(collectionDetailText()) +
+          previewMessage(detail) +
           "\n\nSi ya realizo el pago o tiene alguna novedad, por favor comuniquese con nosotros.\n\n" +
           "Atentamente,\n" +
           signature +
@@ -2550,11 +2556,12 @@
         );
       }
 
-      function renderCollectionEmailPreviewHtml() {
+      function renderCollectionEmailPreviewHtml(detailOverride) {
+        var detail = detailOverride || collectionDetailText();
         var content = (
           "<p><strong>Buen d&iacute;a, Nombre del destinatario</strong>.</p>" +
           "<p>Le informamos que se registr&oacute; una gesti&oacute;n de cobro relacionada con su contrato de arrendamiento.</p>" +
-          "<div>" + escHtml(previewMessage(collectionDetailText())).replace(/\n/g, "<br>") + "</div>" +
+          "<div>" + escHtml(previewMessage(detail)).replace(/\n/g, "<br>") + "</div>" +
           "<p>Si ya realiz&oacute; el pago o tiene alguna novedad, por favor comun&iacute;quese con nosotros.</p>" +
           '<p style="margin-top:24px;">Atentamente,<br><strong>' +
           escHtml(senderProfile().signatureLine || "Funcionario - Control Servicios Inmobiliarios") +
@@ -2563,25 +2570,20 @@
         return wrapEmailPreviewHtml("Gestion de cobro de contrato de arrendamiento", content);
       }
 
-      function updateCollectionPreview() {
-        if (!collectionPreviewEl) {
-          return;
-        }
-        var channels = collectionSelectedChannels();
-        if (channels.length === 0) {
-          collectionPreviewEl.innerHTML =
-            "<strong>Vista previa</strong><p>No se enviara notificacion. Solo se guardara la gestion de cobro y el historial.</p>";
-          return;
-        }
-        var detail = previewMessage(collectionDetailText());
-        var smsText = smsPrefix() + detail;
-        var cards = channels.map(function (channel) {
+      function renderCollectionPreviewCards(channels, detail) {
+        var normalizedChannels = (Array.isArray(channels) ? channels : []).map(function (channel) {
+          return String(channel || "").trim().toLowerCase();
+        }).filter(Boolean);
+        var cleanDetail = detail || collectionDetailText();
+        var previewDetail = previewMessage(cleanDetail);
+        var smsText = smsPrefix() + previewDetail;
+        return normalizedChannels.map(function (channel) {
           if (channel === "email") {
             return (
               '<article class="scm-admin-notif-preview-card is-email">' +
               "<h5>Email / HTML</h5>" +
               '<iframe class="scm-admin-notif-email-frame" sandbox srcdoc="' +
-              escAttr(renderCollectionEmailPreviewHtml()) +
+              escAttr(renderCollectionEmailPreviewHtml(cleanDetail)) +
               '"></iframe>' +
               "</article>"
             );
@@ -2603,10 +2605,45 @@
             '<article class="scm-admin-notif-preview-card is-whatsapp">' +
             "<h5>WhatsApp oficial</h5>" +
             '<p class="scm-admin-notif-preview-text">' +
-            escHtml(renderCollectionWhatsappPreviewText()).replace(/\n/g, "<br>") +
+            escHtml(renderCollectionWhatsappPreviewText(cleanDetail)).replace(/\n/g, "<br>") +
             "</p></article>"
           );
         }).join("");
+      }
+
+      function openCollectionQueuedPreview(channels, detail) {
+        var cards = renderCollectionPreviewCards(channels, detail);
+        if (!cards) {
+          showToast("warning", "No se marco ningun canal para notificar.");
+          return;
+        }
+        if (window.Swal && typeof window.Swal.fire === "function") {
+          window.Swal.fire({
+            title: "Mensaje encolado",
+            html:
+              '<div class="scm-admin-notif-preview scm-admin-notif-queued-preview"><strong>Vista previa por canal</strong><div>' +
+              cards +
+              "</div></div>",
+            width: 900,
+            confirmButtonText: "Cerrar",
+            customClass: { confirmButton: "scm-btn-primary" },
+          });
+          return;
+        }
+        showToast("info", "Mensaje preparado: " + detail);
+      }
+
+      function updateCollectionPreview() {
+        if (!collectionPreviewEl) {
+          return;
+        }
+        var channels = collectionSelectedChannels();
+        if (channels.length === 0) {
+          collectionPreviewEl.innerHTML =
+            "<strong>Vista previa</strong><p>No se enviara notificacion. Solo se guardara la gestion de cobro y el historial.</p>";
+          return;
+        }
+        var cards = renderCollectionPreviewCards(channels, collectionDetailText());
         collectionPreviewEl.innerHTML = '<strong>Vista previa de gestion de cobro</strong><div>' + cards + "</div>";
       }
 
@@ -3622,9 +3659,23 @@
                 }
                 var data = json.data || {};
                 var msg = data.message || "Gestion de cobro registrada.";
+                var queuedChannels = Array.isArray(data.queued_channels)
+                  ? data.queued_channels
+                  : collectionSelectedChannels();
+                var queuedDetail = data.queued_detail || collectionDetailText();
                 if (collectionResultEl) {
-                  collectionResultEl.textContent = msg;
+                  collectionResultEl.innerHTML =
+                    escHtml(msg) +
+                    (queuedChannels.length > 0
+                      ? ' <button type="button" class="scm-case-work-btn scm-admin-notif-queued-btn" data-admin-notif-collection-queued-preview>Ver mensaje encolado</button>'
+                      : "");
                   collectionResultEl.classList.remove("is-error");
+                  var previewBtn = collectionResultEl.querySelector("[data-admin-notif-collection-queued-preview]");
+                  if (previewBtn) {
+                    previewBtn.addEventListener("click", function () {
+                      openCollectionQueuedPreview(queuedChannels, queuedDetail);
+                    });
+                  }
                 }
                 showToast((data.created || 0) > 0 ? "success" : "warning", msg);
                 loadRecipients(currentPage);

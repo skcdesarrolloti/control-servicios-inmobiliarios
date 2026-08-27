@@ -531,6 +531,166 @@
   margin-top: 0 !important;
 }
 
+#scm-app .scm-collection-log {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#scm-app .scm-collection-log-head {
+  margin: 0;
+}
+
+#scm-app .scm-collection-log-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+#scm-app .scm-collection-log-kpi {
+  border: 1px solid #dbe7f4;
+  border-top: 4px solid var(--scm-orange-500);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+  padding: 16px;
+}
+
+#scm-app .scm-collection-log-kpi span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-collection-log-kpi strong {
+  display: block;
+  margin-top: 8px;
+  color: #08234b;
+  font-size: 30px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+#scm-app .scm-collection-log-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+#scm-app .scm-collection-log-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+#scm-app .scm-collection-log-table-card {
+  overflow: hidden;
+}
+
+#scm-app .scm-collection-log-table-wrap {
+  overflow-x: auto;
+}
+
+#scm-app .scm-collection-log-table {
+  width: 100%;
+  min-width: 1180px;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: #10233f;
+  font-size: 12px;
+}
+
+#scm-app .scm-collection-log-table th {
+  background: #08234b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  padding: 13px 12px;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#scm-app .scm-collection-log-table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 14px 12px;
+  vertical-align: top;
+}
+
+#scm-app .scm-collection-log-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+#scm-app .scm-collection-log-pill,
+#scm-app .scm-collection-log-type {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 6px 10px;
+}
+
+#scm-app .scm-collection-log-pill {
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+#scm-app .scm-collection-log-type {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+#scm-app .scm-collection-log-table td small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+#scm-app .scm-collection-log-note {
+  max-width: 360px;
+  line-height: 1.45;
+}
+
+#scm-app .scm-collection-log-pagination {
+  margin-top: 14px;
+}
+
+#scm-app .scm-admin-notif-queued-btn {
+  margin-left: 10px;
+  min-height: 36px;
+}
+
+#scm-app .scm-admin-notif-queued-preview {
+  text-align: left;
+}
+
+@media (max-width: 900px) {
+  #scm-app .scm-collection-log-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-collection-log-actions {
+    justify-content: stretch;
+  }
+
+  #scm-app .scm-collection-log-actions .btn,
+  #scm-app .scm-collection-log-actions a {
+    flex: 1;
+  }
+}
+
 #scm-app .scm-status-subtabs {
   gap: var(--sp-1) !important;
   margin-bottom: var(--sp-3) !important;

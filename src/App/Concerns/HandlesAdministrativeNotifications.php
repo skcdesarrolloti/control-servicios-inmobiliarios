@@ -168,6 +168,8 @@ trait HandlesAdministrativeNotifications
       static fn($value): string => sanitize_key((string) $value),
       is_array($rawChannels) ? $rawChannels : [$rawChannels]
     );
+    $notifyChannels = array_values(array_unique(array_filter($notifyChannels, static fn(string $channel): bool => in_array($channel, ['email', 'sms', 'whatsapp'], true))));
+    $queuedDetail = $service->collectionNotificationMessage($payload);
 
     try {
       $result = $service->registerCollectionManagement($ids, $payload);
@@ -183,7 +185,7 @@ trait HandlesAdministrativeNotifications
             $notifyIds,
             $notifyChannels,
             'Gestion de cobro de contrato de arrendamiento',
-            $service->collectionNotificationMessage($payload),
+            $queuedDetail,
             'scm_arrendatario_gestion_cobro_v1',
             'scm_email_arrendatario_gestion_cobro_v1'
           );
@@ -199,6 +201,8 @@ trait HandlesAdministrativeNotifications
         'message' => $message,
         'notifications' => $notifyResult,
         'notification_error' => $notifyError,
+        'queued_channels' => $notifyChannels,
+        'queued_detail' => $queuedDetail,
       ]);
     } catch (\Throwable $e) {
       $this->jsonFail($e->getMessage());

@@ -133,6 +133,10 @@ trait RendersDashboard
       'notificaciones-administrativas' => 'scm-panel-admin-notificaciones',
       'notificaciones_administrativas' => 'scm-panel-admin-notificaciones',
       'scm-panel-admin-notificaciones' => 'scm-panel-admin-notificaciones',
+      'gestiones_cobro' => 'scm-panel-gestiones-cobro',
+      'gestiones-cobro' => 'scm-panel-gestiones-cobro',
+      'gestiones de cobro' => 'scm-panel-gestiones-cobro',
+      'scm-panel-gestiones-cobro' => 'scm-panel-gestiones-cobro',
       'actividades_administrativas' => 'scm-panel-actividades-administrativas',
       'actividades-administrativas' => 'scm-panel-actividades-administrativas',
       'actividades administrativas' => 'scm-panel-actividades-administrativas',
@@ -165,6 +169,10 @@ trait RendersDashboard
       'notificaciones' => [
         'panel' => 'scm-panel-admin-notificaciones',
         'label' => $dashboardPermissionTabs['notificaciones'] ?? 'Notificaciones',
+      ],
+      'gestiones_cobro' => [
+        'panel' => 'scm-panel-gestiones-cobro',
+        'label' => $dashboardPermissionTabs['gestiones_cobro'] ?? 'Gestiones de cobro',
       ],
       'cotizaciones_mantenimiento' => [
         'panel' => 'scm-panel-cotizaciones-mantenimiento',
@@ -787,6 +795,12 @@ trait RendersDashboard
           <?php if (in_array('notificaciones', $allowedAdministrativeActivityTabs, true)): ?>
             <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'notificaciones' ? ' active' : ''; ?>" id="scm-panel-admin-notificaciones" data-permission-tab="notificaciones" data-admin-activity-panel="notificaciones">
               <?php echo $this->render_admin_notifications_panel(); ?>
+            </div>
+          <?php endif; ?>
+
+          <?php if (in_array('gestiones_cobro', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'gestiones_cobro' ? ' active' : ''; ?>" id="scm-panel-gestiones-cobro" data-permission-tab="gestiones_cobro" data-admin-activity-panel="gestiones_cobro">
+              <?php echo $this->render_collection_management_panel($_GET); ?>
             </div>
           <?php endif; ?>
 
@@ -1887,6 +1901,7 @@ trait RendersDashboard
                 <select id="scm-admin-notif-collection-type" name="tipo_gestion_cobro" class="select select-bordered select-sm scm-select">
                   <option value="Canon">Canon</option>
                   <option value="Administracion">Administraci&oacute;n</option>
+                  <option value="Servicios publicos">Servicios p&uacute;blicos</option>
                 </select>
               </div>
               <div class="scm-field">
@@ -1952,6 +1967,195 @@ trait RendersDashboard
     </div>
 <?php
     return (string) ob_get_clean();
+  }
+
+  private function render_collection_management_panel(array $input): string
+  {
+    $filters = [
+      'date_from' => trim((string) ($input['scmgc_fecha_desde'] ?? '')),
+      'date_to' => trim((string) ($input['scmgc_fecha_hasta'] ?? '')),
+      'type' => trim((string) ($input['scmgc_tipo'] ?? '')),
+    ];
+    $page = max(1, (int) ($input['scmgc_page'] ?? 1));
+    $service = new AdministrativeNotificationsService($this->db);
+    $report = $service->collectionManagementReport($filters, $page, 30);
+    $rows = is_array($report['rows'] ?? null) ? $report['rows'] : [];
+    $stats = is_array($report['stats'] ?? null) ? $report['stats'] : ['total' => 0, 'by_type' => []];
+    $byType = is_array($stats['by_type'] ?? null) ? $stats['by_type'] : [];
+    $types = array_values(array_unique(array_filter(array_map('strval', (array) ($report['types'] ?? [])))));
+    foreach (['Canon', 'Administracion', 'Servicios publicos'] as $fixedType) {
+      if (!in_array($fixedType, $types, true)) {
+        $types[] = $fixedType;
+      }
+    }
+    $pagination = is_array($report['pagination'] ?? null) ? $report['pagination'] : ['page' => 1, 'total_pages' => 1, 'total' => 0];
+    $applied = is_array($report['filters'] ?? null) ? $report['filters'] : ['date_from' => '', 'date_to' => '', 'type' => ''];
+    $currentTotal = (int) ($pagination['total'] ?? 0);
+    $dateFrom = (string) ($applied['date_from'] ?? '');
+    $dateTo = (string) ($applied['date_to'] ?? '');
+    $currentType = (string) ($applied['type'] ?? '');
+
+    ob_start();
+?>
+    <div class="scm-collection-log">
+      <div class="scm-status-topic-head scm-collection-log-head">
+        <div>
+          <span class="scm-calendar-action-kicker">Cobranza</span>
+          <h3>Gestiones de cobro</h3>
+          <p>Consulta las gestiones registradas desde Notificaciones con filtros por fecha y tipo de gesti&oacute;n.</p>
+        </div>
+        <span class="scm-status-count"><strong><?php echo esc_html((string) $currentTotal); ?></strong> gestiones</span>
+      </div>
+
+      <div class="scm-collection-log-kpis" aria-label="Resumen de gestiones de cobro">
+        <article class="scm-collection-log-kpi">
+          <span>Total en rango</span>
+          <strong><?php echo esc_html((string) ((int) ($stats['total'] ?? 0))); ?></strong>
+        </article>
+        <?php foreach ($byType as $typeLabel => $typeTotal): ?>
+          <article class="scm-collection-log-kpi">
+            <span><?php echo esc_html($this->collection_management_type_label((string) $typeLabel)); ?></span>
+            <strong><?php echo esc_html((string) ((int) $typeTotal)); ?></strong>
+          </article>
+        <?php endforeach; ?>
+      </div>
+
+      <section class="scm-admin-notif-card scm-collection-log-filters">
+        <form method="get" autocomplete="off">
+          <input type="hidden" name="scm_tab" value="gestiones_cobro">
+          <input type="hidden" name="scmgc_page" value="1">
+          <div class="scm-collection-log-filter-grid">
+            <div class="scm-field">
+              <label for="scmgc_fecha_desde">Fecha desde</label>
+              <input id="scmgc_fecha_desde" name="scmgc_fecha_desde" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr($dateFrom); ?>">
+            </div>
+            <div class="scm-field">
+              <label for="scmgc_fecha_hasta">Fecha hasta</label>
+              <input id="scmgc_fecha_hasta" name="scmgc_fecha_hasta" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr($dateTo); ?>">
+            </div>
+            <div class="scm-field">
+              <label for="scmgc_tipo">Tipo</label>
+              <select id="scmgc_tipo" name="scmgc_tipo" class="select select-bordered select-sm scm-select">
+                <option value="">Todos</option>
+                <?php foreach ($types as $typeOption): ?>
+                  <option value="<?php echo esc_attr($typeOption); ?>" <?php selected($currentType, $typeOption); ?>><?php echo esc_html($this->collection_management_type_label($typeOption)); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="scm-collection-log-actions">
+              <button type="submit" class="scm-btn-primary btn btn-primary">Filtrar</button>
+              <a class="scm-btn-secondary btn btn-outline" href="?scm_tab=gestiones_cobro">Limpiar</a>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section class="scm-admin-notif-card scm-collection-log-table-card">
+        <?php if ($rows === []): ?>
+          <div class="scm-admin-notif-empty">
+            <strong>Sin gestiones de cobro</strong>
+            <span>No hay registros con los filtros actuales.</span>
+          </div>
+        <?php else: ?>
+          <div class="scm-collection-log-table-wrap">
+            <table class="scm-collection-log-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Contrato</th>
+                  <th>Inmueble</th>
+                  <th>Direcci&oacute;n</th>
+                  <th>Propietario</th>
+                  <th>Arrendatario</th>
+                  <th>Tipo</th>
+                  <th>Gestiones</th>
+                  <th>Realizado por</th>
+                  <th>Observaci&oacute;n</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($rows as $row): ?>
+                  <tr>
+                    <td><?php echo esc_html($this->format_collection_management_date($row['fecha_raw'] ?? '')); ?></td>
+                    <td><span class="scm-collection-log-pill"><?php echo esc_html((string) (($row['contrato'] ?? '') ?: '-')); ?></span></td>
+                    <td><?php echo esc_html((string) (($row['inmueble'] ?? '') ?: '-')); ?></td>
+                    <td><?php echo esc_html((string) (($row['direccion'] ?? '') ?: '-')); ?></td>
+                    <td><?php echo esc_html((string) (($row['propietario'] ?? '') ?: '-')); ?></td>
+                    <td><?php echo esc_html((string) (($row['arrendatario'] ?? '') ?: '-')); ?></td>
+                    <td><span class="scm-collection-log-type"><?php echo esc_html($this->collection_management_type_label((string) ($row['tipo_gestion'] ?? ''))); ?></span></td>
+                    <td><?php echo esc_html((string) (($row['gestiones_cobro'] ?? '') ?: '-')); ?></td>
+                    <td><?php echo esc_html(trim((string) (($row['realizado_por'] ?? '') ?: '-'))); ?><?php if (trim((string) ($row['cargo'] ?? '')) !== ''): ?><small><?php echo esc_html((string) $row['cargo']); ?></small><?php endif; ?></td>
+                    <td class="scm-collection-log-note"><?php echo esc_html((string) (($row['observacion'] ?? '') ?: '-')); ?></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+          <?php echo $this->render_collection_management_pagination($pagination, $applied); ?>
+        <?php endif; ?>
+      </section>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  private function collection_management_type_label(string $type): string
+  {
+    $normalized = strtolower(strtr(trim($type), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U']));
+    if (str_contains($normalized, 'servicio')) {
+      return 'Servicios públicos';
+    }
+    if (str_contains($normalized, 'admin')) {
+      return 'Administración';
+    }
+    if (str_contains($normalized, 'canon')) {
+      return 'Canon';
+    }
+    return trim($type) !== '' ? trim($type) : 'Sin tipo';
+  }
+
+  private function format_collection_management_date($value): string
+  {
+    $raw = trim((string) $value);
+    if ($raw === '') {
+      return '-';
+    }
+    if (ctype_digit($raw)) {
+      $ts = (int) $raw;
+    } else {
+      $ts = strtotime($raw);
+    }
+    return $ts > 0 ? date('d/m/Y H:i', $ts) : $raw;
+  }
+
+  private function render_collection_management_pagination(array $pagination, array $filters): string
+  {
+    $page = max(1, (int) ($pagination['page'] ?? 1));
+    $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
+    $total = max(0, (int) ($pagination['total'] ?? 0));
+    if ($total <= 0 || $totalPages <= 1) {
+      return '';
+    }
+    $base = [
+      'scm_tab' => 'gestiones_cobro',
+      'scmgc_fecha_desde' => (string) ($filters['date_from'] ?? ''),
+      'scmgc_fecha_hasta' => (string) ($filters['date_to'] ?? ''),
+      'scmgc_tipo' => (string) ($filters['type'] ?? ''),
+    ];
+    $link = static function (int $targetPage) use ($base): string {
+      return '?' . http_build_query($base + ['scmgc_page' => $targetPage]);
+    };
+    $html = '<div class="scm-pagination-card card scm-collection-log-pagination"><div class="scm-pagination-summary">P&aacute;gina ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' | Total: ' . esc_html((string) $total) . '</div><div class="scm-pagination-controls">';
+    $prev = max(1, $page - 1);
+    $next = min($totalPages, $page + 1);
+    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page <= 1 ? ' disabled' : '') . '" href="' . esc_url($link(1)) . '">&laquo;</a>';
+    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page <= 1 ? ' disabled' : '') . '" href="' . esc_url($link($prev)) . '">&lsaquo;</a>';
+    for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++) {
+      $html .= '<a class="scm-page-btn btn btn-sm ' . ($i === $page ? 'btn-primary is-active' : 'btn-outline') . '" href="' . esc_url($link($i)) . '">' . esc_html((string) $i) . '</a>';
+    }
+    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page >= $totalPages ? ' disabled' : '') . '" href="' . esc_url($link($next)) . '">&rsaquo;</a>';
+    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page >= $totalPages ? ' disabled' : '') . '" href="' . esc_url($link($totalPages)) . '">&raquo;</a>';
+    return $html . '</div></div>';
   }
 
   /** @return array<string,array{label:string,items:array<int,array{title:string,text:string}>}> */

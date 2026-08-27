@@ -134,6 +134,7 @@ final class SuCasaControlServiciosInmobiliarios
       'cotizaciones_mantenimiento' => 'Cotizaciones de Mantenimiento',
       'calendario_actividades' => 'Calendario',
       'notificaciones' => 'Notificaciones',
+      'gestiones_cobro' => 'Gestiones de cobro',
       'preventivas_pendientes' => 'Preventivas Pendientes',
       'contratos_arrendamiento' => 'Contratos de arrendamiento',
       'servicios_publicos_pendientes' => 'Servicios Publicos Pendientes',

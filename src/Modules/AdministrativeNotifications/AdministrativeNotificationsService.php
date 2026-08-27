@@ -428,6 +428,7 @@ final class AdministrativeNotificationsService
         'otro_horario_cobro' => $data['otro_horario_cobro'],
         'dia_cobro' => $data['siguiente_fecha'],
         'hora_cobro' => $data['siguiente_hora'],
+        'tipo_gestion' => $data['tipo_gestion_cobro'],
         'id_empleado' => $userId,
         'realizado_por' => $sender['name'],
         'tuvo_revision' => 'Si',
@@ -458,7 +459,7 @@ final class AdministrativeNotificationsService
   {
     $data = $this->normalizeCollectionPayload($payload);
     $lines = [
-      'Tipo de gestion: ' . $data['tipo_gestion_cobro'],
+      'Tipo de gestion: ' . $this->collectionTypeDisplayLabel($data['tipo_gestion_cobro']),
     ];
     if ($data['observacion'] !== '') {
       $lines[] = 'Observacion: ' . $data['observacion'];
@@ -473,6 +474,97 @@ final class AdministrativeNotificationsService
     return implode("\n", $lines);
   }
 
+  /**
+   * Consulta el historial de gestiones de cobro para el panel administrativo.
+   *
+   * @param array<string,mixed> $filters
+   * @return array{rows:array<int,array<string,mixed>>,stats:array{total:int,by_type:array<string,int>},types:array<int,string>,pagination:array{page:int,per_page:int,total:int,total_pages:int},filters:array{date_from:string,date_to:string,type:string}}
+   */
+  public function collectionManagementReport(array $filters = [], int $page = 1, int $perPage = 30): array
+  {
+    $table = $this->db->table('jet_cct_gestiones_cobro');
+    if (!$this->schema->tableExists($table)) {
+      return [
+        'rows' => [],
+        'stats' => ['total' => 0, 'by_type' => []],
+        'types' => [],
+        'pagination' => ['page' => 1, 'per_page' => $perPage, 'total' => 0, 'total_pages' => 1],
+        'filters' => ['date_from' => '', 'date_to' => '', 'type' => ''],
+      ];
+    }
+
+    $dateFrom = $this->sanitizeDate((string) ($filters['date_from'] ?? ''));
+    $dateTo = $this->sanitizeDate((string) ($filters['date_to'] ?? ''));
+    if ($dateFrom !== '' && $dateTo !== '' && strcmp($dateFrom, $dateTo) > 0) {
+      [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+    }
+    $type = trim((string) ($filters['type'] ?? ''));
+    $page = max(1, $page);
+    $perPage = max(10, min(100, $perPage));
+
+    [$whereSql, $args] = $this->collectionManagementWhere($table, $dateFrom, $dateTo, $type, true);
+    [$statsWhereSql, $statsArgs] = $this->collectionManagementWhere($table, $dateFrom, $dateTo, '', false);
+    $total = (int) ($this->db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE {$whereSql}", $args) ?? 0);
+    $totalPages = max(1, (int) ceil($total / $perPage));
+    if ($page > $totalPages) {
+      $page = $totalPages;
+    }
+    $offset = ($page - 1) * $perPage;
+
+    $select = [
+      $this->collectionSelect($table, ['_ID', 'id'], 'id'),
+      $this->collectionSelect($table, ['fecha', 'fecha_gestion_cobro', 'cct_created'], 'fecha_raw'),
+      $this->collectionSelect($table, ['contrato', 'id_contrato', 'contrato_arrendamiento'], 'contrato'),
+      $this->collectionSelect($table, ['inmueble', 'id_inmueble', 'id_inmueble_data'], 'inmueble'),
+      $this->collectionSelect($table, ['direccion', 'direccion_inmueble'], 'direccion'),
+      $this->collectionSelect($table, ['propietario', 'nombre_propietario'], 'propietario'),
+      $this->collectionSelect($table, ['arrendatario', 'nombre_arrendatario'], 'arrendatario'),
+      $this->collectionSelect($table, ['tipo_gestion', 'tipo_gestion_cobro'], 'tipo_gestion'),
+      $this->collectionSelect($table, ['gestiones_cobro', 'numero_gestion'], 'gestiones_cobro'),
+      $this->collectionSelect($table, ['observacion', 'observaciones', 'detalle'], 'observacion'),
+      $this->collectionSelect($table, ['realizado_por', 'funcionario', 'empleado'], 'realizado_por'),
+      $this->collectionSelect($table, ['cargo'], 'cargo'),
+    ];
+
+    $orderColumn = $this->collectionDateColumn($table);
+    $orderSql = $orderColumn !== ''
+      ? "`{$orderColumn}` DESC, `{$this->collectionIdColumn($table)}` DESC"
+      : "`{$this->collectionIdColumn($table)}` DESC";
+    $rows = $this->db->getResults(
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE {$whereSql} ORDER BY {$orderSql} LIMIT {$perPage} OFFSET {$offset}",
+      $args
+    );
+
+    $typeColumn = $this->detect($table, ['tipo_gestion', 'tipo_gestion_cobro']);
+    $types = [];
+    $byType = [];
+    if ($typeColumn !== '') {
+      $typeRows = $this->db->getResults(
+        "SELECT TRIM(COALESCE(`{$typeColumn}`, '')) AS tipo, COUNT(*) AS total FROM `{$table}` WHERE {$statsWhereSql} GROUP BY TRIM(COALESCE(`{$typeColumn}`, '')) ORDER BY total DESC, tipo ASC",
+        $statsArgs
+      );
+      foreach ($typeRows as $typeRow) {
+        $label = trim((string) ($typeRow['tipo'] ?? ''));
+        $label = $label !== '' ? $this->collectionTypeLabel($label) : 'Sin tipo';
+        $count = (int) ($typeRow['total'] ?? 0);
+        $byType[$label] = ($byType[$label] ?? 0) + $count;
+        if ($label !== 'Sin tipo') {
+          $types[$label] = $label;
+        }
+      }
+    }
+
+    $statsTotal = (int) ($this->db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE {$statsWhereSql}", $statsArgs) ?? 0);
+
+    return [
+      'rows' => $rows,
+      'stats' => ['total' => $statsTotal, 'by_type' => $byType],
+      'types' => array_values($types),
+      'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
+      'filters' => ['date_from' => $dateFrom, 'date_to' => $dateTo, 'type' => $type],
+    ];
+  }
+
   /** @param array<string,mixed> $payload @return array{tipo_gestion_cobro:string,observacion:string,volver_llamar:string,siguiente_fecha:string,siguiente_hora:string,otro_horario_cobro:string} */
   private function normalizeCollectionPayload(array $payload): array
   {
@@ -481,7 +573,13 @@ final class AdministrativeNotificationsService
       $type = 'Canon';
     }
     $normalizedType = strtolower(strtr($type, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U']));
-    $type = str_contains($normalizedType, 'admin') ? 'Administracion' : 'Canon';
+    if (str_contains($normalizedType, 'servicio')) {
+      $type = 'Servicios publicos';
+    } elseif (str_contains($normalizedType, 'admin')) {
+      $type = 'Administracion';
+    } else {
+      $type = 'Canon';
+    }
 
     $volver = strtolower(trim((string) ($payload['volver_llamar'] ?? 'No')));
     $volver = in_array($volver, ['si', 's', '1', 'true'], true) ? 'Si' : 'No';
@@ -516,6 +614,92 @@ final class AdministrativeNotificationsService
     $time = $hour !== '' ? $hour : '08:00';
     $ts = strtotime($date . ' ' . $time . ':00');
     return is_int($ts) && $ts > 0 ? $ts : 0;
+  }
+
+  private function sanitizeDate(string $value): string
+  {
+    $value = trim($value);
+    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : '';
+  }
+
+  /** @return array{0:string,1:array<int,mixed>} */
+  private function collectionManagementWhere(string $table, string $dateFrom, string $dateTo, string $type, bool $includeType): array
+  {
+    $where = ['1=1'];
+    $args = [];
+    $dateColumn = $this->collectionDateColumn($table);
+    if ($dateColumn !== '' && ($dateFrom !== '' || $dateTo !== '')) {
+      $from = $dateFrom !== '' ? $dateFrom : $dateTo;
+      $to = $dateTo !== '' ? $dateTo : $dateFrom;
+      $fromTs = strtotime($from . ' 00:00:00');
+      $toTs = strtotime($to . ' 23:59:59');
+      if ($fromTs !== false && $toTs !== false) {
+        if (in_array($dateColumn, ['fecha', 'fecha_gestion_cobro'], true)) {
+          $where[] = "CAST(COALESCE(`{$dateColumn}`, 0) AS UNSIGNED) BETWEEN ? AND ?";
+          $args[] = (int) $fromTs;
+          $args[] = (int) $toTs;
+        } else {
+          $where[] = "DATE(`{$dateColumn}`) BETWEEN ? AND ?";
+          $args[] = $from;
+          $args[] = $to;
+        }
+      }
+    }
+
+    $typeColumn = $this->detect($table, ['tipo_gestion', 'tipo_gestion_cobro']);
+    if ($includeType && $typeColumn !== '' && trim($type) !== '') {
+      $where[] = 'LOWER(' . $this->collatedTextSql("TRIM(COALESCE(`{$typeColumn}`, ''))") . ') = LOWER(CONVERT(TRIM(?) USING utf8mb4) COLLATE utf8mb4_unicode_ci)';
+      $args[] = $this->collectionTypeLabel($type);
+    }
+
+    return [implode(' AND ', $where), $args];
+  }
+
+  private function collectionDateColumn(string $table): string
+  {
+    return $this->detect($table, ['fecha', 'fecha_gestion_cobro', 'cct_created', 'created_at']);
+  }
+
+  private function collectionIdColumn(string $table): string
+  {
+    return $this->detect($table, ['_ID', 'id']) ?: '_ID';
+  }
+
+  /** @param string[] $candidates */
+  private function collectionSelect(string $table, array $candidates, string $alias): string
+  {
+    $column = $this->detect($table, $candidates);
+    if ($column === '') {
+      return "'' AS `{$alias}`";
+    }
+    return "COALESCE(`{$column}`, '') AS `{$alias}`";
+  }
+
+  private function collectionTypeLabel(string $type): string
+  {
+    $normalized = strtolower(strtr(trim($type), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U']));
+    if (str_contains($normalized, 'servicio')) {
+      return 'Servicios publicos';
+    }
+    if (str_contains($normalized, 'admin')) {
+      return 'Administracion';
+    }
+    if (str_contains($normalized, 'canon')) {
+      return 'Canon';
+    }
+    return trim($type) !== '' ? trim($type) : 'Sin tipo';
+  }
+
+  private function collectionTypeDisplayLabel(string $type): string
+  {
+    $normalized = $this->collectionTypeLabel($type);
+    if ($normalized === 'Servicios publicos') {
+      return 'Servicios públicos';
+    }
+    if ($normalized === 'Administracion') {
+      return 'Administración';
+    }
+    return $normalized;
   }
 
   /**
