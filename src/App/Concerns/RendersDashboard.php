@@ -1916,6 +1916,13 @@ trait RendersDashboard
             <div class="scm-admin-notif-collection-help scm-admin-notif-collection-notify">
               <strong>Notificar al guardar</strong>
               <span>Usa la plantilla &ldquo;Gesti&oacute;n de cobro&rdquo; y encola la notificaci&oacute;n en el mismo guardado. Si no quieres enviar nada, deja los canales sin marcar.</span>
+              <div class="scm-admin-notif-collection-targets" role="group" aria-label="Destinatarios de cobranza">
+                <span class="scm-admin-notif-collection-target is-fixed">Arrendatario principal</span>
+                <label class="scm-admin-notif-collection-target">
+                  <input type="checkbox" name="notify_codeudores" value="1" data-admin-notif-collection-codeudores checked>
+                  <span>Codeudores del contrato</span>
+                </label>
+              </div>
               <div class="scm-admin-notif-collection-channels" role="group" aria-label="Canales para gestion de cobro">
                 <label class="scm-admin-notif-mini-channel">
                   <input type="checkbox" name="notify_channels[]" value="whatsapp" data-admin-notif-collection-channel checked>

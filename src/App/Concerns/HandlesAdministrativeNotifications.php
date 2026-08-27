@@ -170,6 +170,7 @@ trait HandlesAdministrativeNotifications
       is_array($rawChannels) ? $rawChannels : [$rawChannels]
     );
     $notifyChannels = array_values(array_unique(array_filter($notifyChannels, static fn(string $channel): bool => in_array($channel, ['email', 'sms', 'whatsapp'], true))));
+    $notifyCodeudores = trim((string) ($_POST['notify_codeudores'] ?? '')) === '1';
     $queuedDetail = $service->collectionNotificationMessage($payload);
 
     try {
@@ -177,6 +178,7 @@ trait HandlesAdministrativeNotifications
       $created = (int) ($result['created'] ?? 0);
       $skipped = (int) ($result['skipped'] ?? 0);
       $notifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0];
+      $codeudorNotifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0, 'selected' => 0];
       $notifyError = '';
       if ($created > 0 && $notifyChannels !== []) {
         try {
@@ -193,17 +195,30 @@ trait HandlesAdministrativeNotifications
             $notificationMeta,
             AdministrativeNotificationsService::COLLECTION_SMS_MAX
           );
+          if ($notifyCodeudores) {
+            $codeudorNotifyResult = $service->enqueueCollectionCodeudores(
+              (array) ($result['managements'] ?? []),
+              $notifyChannels,
+              'Gestion de cobro de contrato de arrendamiento',
+              $queuedDetail,
+              'scm_arrendatario_gestion_cobro_v1',
+              'scm_email_arrendatario_gestion_cobro_v1',
+              AdministrativeNotificationsService::COLLECTION_SMS_MAX
+            );
+          }
         } catch (\Throwable $notifyException) {
           $notifyError = $notifyException->getMessage();
         }
       }
-      $queued = (int) ($notifyResult['queued'] ?? 0);
+      $queued = (int) ($notifyResult['queued'] ?? 0) + (int) ($codeudorNotifyResult['queued'] ?? 0);
+      $codeudoresSelected = (int) ($codeudorNotifyResult['selected'] ?? 0);
       $message = $created > 0
-        ? sprintf('Se registraron %d gestiones de cobro.%s%s%s', $created, $skipped > 0 ? " {$skipped} contratos omitidos." : '', $queued > 0 ? " {$queued} notificaciones encoladas." : '', $notifyError !== '' ? ' No se pudo encolar notificacion: ' . $notifyError : '')
+        ? sprintf('Se registraron %d gestiones de cobro.%s%s%s%s', $created, $skipped > 0 ? " {$skipped} contratos omitidos." : '', $queued > 0 ? " {$queued} notificaciones encoladas." : '', $codeudoresSelected > 0 ? " Incluye {$codeudoresSelected} codeudor(es)." : '', $notifyError !== '' ? ' No se pudo encolar notificacion: ' . $notifyError : '')
         : 'No se registro ninguna gestion de cobro. Revisa que los arrendatarios tengan contratos activos.';
       $this->jsonOk($result + [
         'message' => $message,
         'notifications' => $notifyResult,
+        'codeudor_notifications' => $codeudorNotifyResult,
         'notification_error' => $notifyError,
         'queued_channels' => $notifyChannels,
         'queued_detail' => $queuedDetail,
@@ -284,6 +299,10 @@ trait HandlesAdministrativeNotifications
       $html .= '<strong>' . esc_html((string) (($row['destination_name'] ?? '') ?: 'Destinatario')) . '</strong>';
       $html .= '<small>' . esc_html((string) (($row['destination'] ?? '') ?: 'Sin destino')) . '</small>';
       $html .= '</div>';
+      $role = trim((string) ($row['recipient_role_label'] ?? ''));
+      if ($role !== '') {
+        $html .= '<span class="scm-collection-queue-role">' . esc_html($role) . '</span>';
+      }
       $html .= '</div>';
       $html .= '<div class="scm-collection-queue-meta">';
       $html .= '<span class="scm-collection-queue-status scm-collection-queue-status--' . esc_attr($status !== '' ? $status : 'unknown') . '">' . esc_html((string) ($row['status_label'] ?? $status ?: 'Sin estado')) . '</span>';

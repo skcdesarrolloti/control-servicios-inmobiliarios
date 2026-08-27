@@ -2143,6 +2143,7 @@
       var collectionContractSelect = panel.querySelector("[data-admin-notif-collection-contract]");
       var collectionTypeSelect = panel.querySelector("#scm-admin-notif-collection-type");
       var collectionObservationInput = panel.querySelector("#scm-admin-notif-collection-observation");
+      var collectionCodeudoresInput = panel.querySelector("[data-admin-notif-collection-codeudores]");
       var collectionPreviewEl = panel.querySelector("[data-admin-notif-collection-preview]");
       var collectionSpinner = panel.querySelector("[data-admin-notif-collection-spinner]");
       var collectionSubmitBtn = panel.querySelector("[data-admin-notif-collection-submit]");
@@ -2580,6 +2581,12 @@
             lines.push("Contrato: " + String(selectedContractOption.textContent || "").trim());
           }
         }
+        lines.push(
+          "Destinatarios: Arrendatario principal" +
+            (collectionCodeudoresInput && collectionCodeudoresInput.checked
+              ? " y codeudores del contrato"
+              : ""),
+        );
         lines.push("Observacion: " + (observation || "Detalle de la gestion escrito por el funcionario."));
         return lines.join("\n");
       }
@@ -3711,6 +3718,7 @@
           collectionTypeSelect,
           collectionObservationInput,
           collectionContractSelect,
+          collectionCodeudoresInput,
         ].forEach(function (input) {
           if (!input) {
             return;

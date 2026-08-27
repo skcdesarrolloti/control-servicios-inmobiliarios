@@ -775,6 +775,7 @@
 }
 
 .swal2-popup .scm-collection-queue-channel,
+.swal2-popup .scm-collection-queue-role,
 .swal2-popup .scm-collection-queue-status {
   display: inline-flex;
   align-items: center;
@@ -784,6 +785,11 @@
   font-size: 11px;
   font-weight: 950;
   padding: 6px 10px;
+}
+
+.swal2-popup .scm-collection-queue-role {
+  background: #f8fafc;
+  color: #475569;
 }
 
 .swal2-popup .scm-collection-queue-channel--email {
@@ -5395,6 +5401,37 @@
 #scm-app .scm-admin-notif-collection-help span {
   color: #475569;
   font-weight: 750;
+}
+
+#scm-app .scm-admin-notif-collection-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+#scm-app .scm-admin-notif-collection-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 7px 12px;
+}
+
+#scm-app .scm-admin-notif-collection-target.is-fixed {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+#scm-app .scm-admin-notif-collection-target input {
+  accent-color: var(--scm-orange-500);
 }
 
 #scm-app .scm-admin-notif-collection-notify {
