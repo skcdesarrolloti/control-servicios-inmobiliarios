@@ -385,7 +385,7 @@ final class CanonInsuranceAuditView
   private function statusLabel(string $status): string { return $this->statusOptions()[$status] ?? 'Amarillo · Anomalía'; }
   private function money(mixed $value): string { return ($value === null || $value === '') ? '—' : '$' . number_format((float) $value, 2, ',', '.'); }
   private function hasMoneyValue(mixed $value): bool { return $value !== null && $value !== ''; }
-  private function moneyInputValue(mixed $value): string { return $this->hasMoneyValue($value) ? number_format((float) $value, 2, '.', '') : '0.00'; }
+  private function moneyInputValue(mixed $value): string { return $this->hasMoneyValue($value) ? number_format((float) $value, 0, '.', '') : '0'; }
   private function periodLabel(string $period): string { if (preg_match('/^(\d{4})-(\d{2})$/', $period, $match) !== 1) return $period; $months = [1 => 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']; return ($months[(int) $match[2]] ?? $match[2]) . ' ' . $match[1]; }
   private function dateTime(string $value): string { $timestamp = strtotime($value); return $timestamp === false ? $value : date('d/m/Y g:i a', $timestamp); }
 }

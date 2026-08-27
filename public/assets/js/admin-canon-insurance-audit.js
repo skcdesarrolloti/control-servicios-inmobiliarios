@@ -323,8 +323,8 @@
       var simiCanon = trigger.dataset.simiCanon || "";
       var simiAdministration = trigger.dataset.simiAdministration || "";
       if (contractInput) contractInput.value = trigger.dataset.contractId || "";
-      if (canonInput) canonInput.value = trigger.dataset.platformCanon || "0.00";
-      if (administrationInput) administrationInput.value = trigger.dataset.platformAdministration || "0.00";
+      if (canonInput) canonInput.value = trigger.dataset.platformCanon || "0";
+      if (administrationInput) administrationInput.value = trigger.dataset.platformAdministration || "0";
       if (contractLabel) contractLabel.textContent = "Contrato " + (trigger.dataset.contractNumber || trigger.dataset.contractId || "—");
       if (tenantLabel) tenantLabel.textContent = trigger.dataset.tenant || "Sin arrendatario";
       if (simiCard) {
@@ -782,8 +782,8 @@
         if (form && simiCard) {
           var canonInput = form.querySelector('[name="canon"]');
           var administrationInput = form.querySelector('[name="administration"]');
-          if (canonInput) canonInput.value = simiCard.dataset.simiCanon || "0.00";
-          if (administrationInput) administrationInput.value = simiCard.dataset.simiAdministration || "0.00";
+          if (canonInput) canonInput.value = simiCard.dataset.simiCanon || "0";
+          if (administrationInput) administrationInput.value = simiCard.dataset.simiAdministration || "0";
           form.requestSubmit();
         }
         return;
