@@ -189,11 +189,11 @@ final class AdministrativeNotificationsService
         'label' => 'Gestion de cobro',
         'language' => 'es_CO',
         'description' => 'Aviso para arrendatarios cuando se registra una gestion de cobro.',
-        'body' => "Buen dia, {{1}}.\n\nLe informamos que se registro una gestion de cobro relacionada con su contrato de arrendamiento.\n\nDetalle de la gestion:\n\n{{2}}\n\nSi ya realizo el pago o tiene alguna novedad, por favor comuniquese con nosotros.\n\nAtentamente,\n{{3}}\n\nGracias por su atencion.",
-        'variables' => ['Nombre del arrendatario', 'Detalle de la gestion, contrato, canon, observacion o proxima llamada', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'body' => "Buen dia, {{1}}.\n\nLe informamos que se registro una gestion de cobro relacionada con su contrato de arrendamiento.\n\nDetalle de la gestion:\n\n{{2}}\n\nSi ya realizo el pago o tiene alguna novedad, por favor comuniquese con nosotros.\n\nGracias por su atencion.",
+        'variables' => ['Nombre del arrendatario', 'Detalle de la gestion con firma del funcionario'],
         'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_arrendatario_gestion_cobro_v1',
-        'parameter_mode' => 'name_message_signature',
+        'parameter_mode' => 'name_message',
       ],
       'scm_factura_disponible_v1' => [
         'name' => 'scm_factura_disponible_v1',
@@ -469,17 +469,17 @@ final class AdministrativeNotificationsService
   public function collectionNotificationMessage(array $payload): string
   {
     $data = $this->normalizeCollectionPayload($payload);
-    $lines = [
-      'Tipo de gestion: ' . $this->collectionTypeDisplayLabel($data['tipo_gestion_cobro']),
+    $parts = [
+      'Tipo de gestión: ' . $this->collectionTypeDisplayLabel($data['tipo_gestion_cobro']) . '.',
     ];
     $contractLabels = $this->collectionContractLabels($data['contract_ids']);
     if ($contractLabels !== []) {
-      $lines[] = 'Contrato: ' . implode(' | ', $contractLabels);
+      $parts[] = 'Contrato: ' . implode(' | ', $contractLabels) . '.';
     }
     if ($data['observacion'] !== '') {
-      $lines[] = 'Observacion: ' . $data['observacion'];
+      $parts[] = 'Observación: ' . rtrim($this->plainText($data['observacion']), '.') . '.';
     }
-    return implode("\n", $lines);
+    return implode(' ', $parts);
   }
 
   /**
@@ -1327,8 +1327,8 @@ final class AdministrativeNotificationsService
         if ($channel === 'email') {
           $resolvedMessage = $this->renderEmailTemplate($emailTemplateConfig, $resolvedMessage, $recipient, $config);
         } elseif ($channel === 'sms') {
-          $resolvedMessage = self::SMS_PREFIX . $this->plainText($resolvedMessage);
-          if (mb_strlen($resolvedMessage) > $smsMax) {
+          $resolvedMessage = $this->plainText($resolvedMessage);
+          if (mb_strlen(self::SMS_PREFIX . $resolvedMessage) > $smsMax) {
             $invalid++;
             continue;
           }
@@ -1426,8 +1426,8 @@ final class AdministrativeNotificationsService
         if ($channel === 'email') {
           $resolvedMessage = $this->renderEmailTemplate($emailTemplateConfig, $resolvedMessage, $recipient, $config);
         } elseif ($channel === 'sms') {
-          $resolvedMessage = self::SMS_PREFIX . $this->plainText($resolvedMessage);
-          if (mb_strlen($resolvedMessage) > $smsMax) {
+          $resolvedMessage = $this->plainText($resolvedMessage);
+          if (mb_strlen(self::SMS_PREFIX . $resolvedMessage) > $smsMax) {
             $result['invalid']++;
             continue;
           }
@@ -2630,7 +2630,8 @@ final class AdministrativeNotificationsService
   /** @param array<string,mixed> $templateConfig */
   private function whatsappTemplateNeedsMessage(array $templateConfig): bool
   {
-    return (string) ($templateConfig['parameter_mode'] ?? 'name_message_signature') === 'name_message_signature';
+    $mode = (string) ($templateConfig['parameter_mode'] ?? 'name_message_signature');
+    return $mode === 'name_message_signature' || $mode === 'name_message';
   }
 
   /** @param array<string,mixed> $whatsappTemplateConfig @param array<string,mixed> $emailTemplateConfig */
@@ -2664,6 +2665,16 @@ final class AdministrativeNotificationsService
       return [
         ['type' => 'text', 'text' => $name],
         ['type' => 'text', 'text' => $signature],
+      ];
+    }
+    if ($mode === 'name_message') {
+      $messageWithSignature = trim($message);
+      if ($messageWithSignature !== '' && $signature !== '') {
+        $messageWithSignature .= "\n\nAtentamente,\n" . $signature;
+      }
+      return [
+        ['type' => 'text', 'text' => $name],
+        ['type' => 'text', 'text' => $messageWithSignature],
       ];
     }
     return [

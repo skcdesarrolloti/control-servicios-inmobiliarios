@@ -61,6 +61,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_ADMIN_NOTIFICATIONS_IMPORT = 'scm_admin_notifications_import';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION = 'scm_admin_notifications_collection';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE = 'scm_admin_notifications_collection_queue';
+  const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_LOG = 'scm_admin_notifications_collection_log';
   const AJAX_METRICS_EXECUTION = 'scm_metricas_ejecucion_funcionario';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';
   const AJAX_CANON_INSURANCE_AUDIT_IMPORT = 'scm_auditoria_canon_aseguradoras_importar';

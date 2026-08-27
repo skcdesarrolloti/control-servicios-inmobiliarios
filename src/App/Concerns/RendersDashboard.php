@@ -349,6 +349,7 @@ trait RendersDashboard
         'admin_notifications_import' => self::AJAX_ADMIN_NOTIFICATIONS_IMPORT,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
+        'admin_notifications_collection_log' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_LOG,
         'metrics_execution' => self::AJAX_METRICS_EXECUTION,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
         'canon_insurance_audit_import' => self::AJAX_CANON_INSURANCE_AUDIT_IMPORT,
@@ -1982,7 +1983,7 @@ trait RendersDashboard
 
     ob_start();
 ?>
-    <div class="scm-collection-log">
+    <div class="scm-collection-log" data-scm-collection-log>
       <div class="scm-status-topic-head scm-collection-log-head">
         <div>
           <span class="scm-calendar-action-kicker">Cobranza</span>
@@ -2006,7 +2007,7 @@ trait RendersDashboard
       </div>
 
       <section class="scm-admin-notif-card scm-collection-log-filters">
-        <form method="get" autocomplete="off">
+        <form method="get" autocomplete="off" data-scm-collection-log-form>
           <input type="hidden" name="scm_tab" value="gestiones_cobro">
           <input type="hidden" name="scmgc_page" value="1">
           <div class="scm-collection-log-filter-grid">
@@ -2029,7 +2030,7 @@ trait RendersDashboard
             </div>
             <div class="scm-collection-log-actions">
               <button type="submit" class="scm-btn-primary btn btn-primary">Filtrar</button>
-              <a class="scm-btn-secondary btn btn-outline" href="?scm_tab=gestiones_cobro">Limpiar</a>
+              <a class="scm-btn-secondary btn btn-outline" href="?scm_tab=gestiones_cobro" data-scm-collection-log-clear>Limpiar</a>
             </div>
           </div>
         </form>

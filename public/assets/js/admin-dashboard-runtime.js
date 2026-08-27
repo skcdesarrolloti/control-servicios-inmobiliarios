@@ -166,6 +166,8 @@
       actions.admin_notifications_collection || "";
     var actionAdminNotificationsCollectionQueue =
       actions.admin_notifications_collection_queue || "";
+    var actionAdminNotificationsCollectionLog =
+      actions.admin_notifications_collection_log || "";
     var actionMetricsExecution = actions.metrics_execution || "";
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
@@ -206,6 +208,164 @@
         return r.json();
       });
     }
+
+    function openCollectionQueueFromLog(managementId) {
+      managementId = String(managementId || "").replace(/\D+/g, "");
+      if (!managementId) {
+        showToast("error", "Gestión de cobro inválida.");
+        return;
+      }
+      if (!actionAdminNotificationsCollectionQueue) {
+        showToast("error", "La consulta de notificaciones no está disponible.");
+        return;
+      }
+      var fd = new FormData();
+      fd.set("action", actionAdminNotificationsCollectionQueue);
+      fd.set("nonce", nonce);
+      fd.set("management_id", managementId);
+      showToast("info", "Consultando notificaciones de la gestión...");
+      fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error(
+              (json && json.data && json.data.message) ||
+                "No se pudieron consultar las notificaciones.",
+            );
+          }
+          var data = json.data || {};
+          var stats = data.stats || {};
+          var total = Number(stats.total || 0);
+          var html =
+            '<div class="scm-collection-queue-modal">' +
+            '<div class="scm-collection-queue-summary" aria-label="Resumen de notificaciones">' +
+            '<article><span>Total</span><strong>' +
+            escHtml(String(total)) +
+            '</strong></article><article><span>Pendientes</span><strong>' +
+            escHtml(String(Number(stats.pending || 0))) +
+            '</strong></article><article><span>Enviadas</span><strong>' +
+            escHtml(String(Number(stats.sent || 0))) +
+            '</strong></article><article><span>Fallidas</span><strong>' +
+            escHtml(String(Number(stats.failed || 0))) +
+            "</strong></article></div>" +
+            (data.html || "") +
+            "</div>";
+          if (window.Swal && typeof window.Swal.fire === "function") {
+            window.Swal.fire({
+              title: "Notificaciones de la gestión #" + managementId,
+              html: html,
+              width: 980,
+              confirmButtonText: "Cerrar",
+              customClass: { confirmButton: "scm-btn-primary" },
+            });
+            return;
+          }
+          showToast(total > 0 ? "success" : "warning", total + " notificaciones relacionadas.");
+        })
+        .catch(function (err) {
+          showToast("error", err.message || "No se pudieron consultar las notificaciones.");
+        });
+    }
+
+    function collectionLogParamsFromForm(form) {
+      var fd = new FormData(form);
+      fd.set("action", actionAdminNotificationsCollectionLog);
+      fd.set("nonce", nonce);
+      return fd;
+    }
+
+    function collectionLogParamsFromUrl(url) {
+      var parsed = new URL(url, window.location.href);
+      var fd = new FormData();
+      ["scmgc_fecha_desde", "scmgc_fecha_hasta", "scmgc_tipo", "scmgc_page"].forEach(function (key) {
+        fd.set(key, parsed.searchParams.get(key) || "");
+      });
+      fd.set("action", actionAdminNotificationsCollectionLog);
+      fd.set("nonce", nonce);
+      return fd;
+    }
+
+    function replaceCollectionLog(container, html) {
+      var tmp = document.createElement("div");
+      tmp.innerHTML = String(html || "");
+      var next = tmp.querySelector("[data-scm-collection-log]");
+      if (next && container && container.parentNode) {
+        container.parentNode.replaceChild(next, container);
+      }
+    }
+
+    function loadCollectionLog(container, fd) {
+      if (!actionAdminNotificationsCollectionLog || !container) {
+        return Promise.resolve();
+      }
+      container.classList.add("is-loading");
+      container.setAttribute("aria-busy", "true");
+      return fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error(
+              (json && json.data && json.data.message) ||
+                "No se pudieron cargar las gestiones de cobro.",
+            );
+          }
+          replaceCollectionLog(container, (json.data || {}).html || "");
+        })
+        .catch(function (err) {
+          showToast("error", err.message || "No se pudieron cargar las gestiones de cobro.");
+        })
+        .finally(function () {
+          container.classList.remove("is-loading");
+          container.removeAttribute("aria-busy");
+        });
+    }
+
+    root.addEventListener("submit", function (event) {
+      var form = event.target && event.target.closest
+        ? event.target.closest("[data-scm-collection-log-form]")
+        : null;
+      if (!form || !root.contains(form)) {
+        return;
+      }
+      event.preventDefault();
+      var container = form.closest("[data-scm-collection-log]");
+      loadCollectionLog(container, collectionLogParamsFromForm(form));
+    });
+
+    root.addEventListener("click", function (event) {
+      var queueBtn = event.target && event.target.closest
+        ? event.target.closest("[data-scm-collection-queue]")
+        : null;
+      if (queueBtn && root.contains(queueBtn)) {
+        event.preventDefault();
+        openCollectionQueueFromLog(queueBtn.getAttribute("data-scm-collection-queue") || "");
+        return;
+      }
+
+      var clearBtn = event.target && event.target.closest
+        ? event.target.closest("[data-scm-collection-log-clear]")
+        : null;
+      if (clearBtn && root.contains(clearBtn)) {
+        event.preventDefault();
+        var clearContainer = clearBtn.closest("[data-scm-collection-log]");
+        loadCollectionLog(clearContainer, collectionLogParamsFromUrl(clearBtn.getAttribute("href") || ""));
+        return;
+      }
+
+      var pageLink = event.target && event.target.closest
+        ? event.target.closest(".scm-collection-log-pagination a")
+        : null;
+      if (!pageLink || !root.contains(pageLink) || pageLink.classList.contains("disabled")) {
+        return;
+      }
+      event.preventDefault();
+      var container = pageLink.closest("[data-scm-collection-log]");
+      loadCollectionLog(container, collectionLogParamsFromUrl(pageLink.getAttribute("href") || ""));
+    });
 
     function initCalendarPanel() {
       var panel = root.querySelector("[data-scm-calendar-panel]");
@@ -2572,23 +2732,24 @@
           : /admin/i.test(type)
           ? "Administración"
           : type || "Canon";
-        var lines = ["Tipo de gestion: " + typeLabel];
+        var lines = ["Tipo de gestión: " + typeLabel + "."];
         if (collectionContractSelect && collectionContractSelect.value) {
           var selectedContractOption = collectionContractSelect.options
             ? collectionContractSelect.options[collectionContractSelect.selectedIndex]
             : null;
           if (selectedContractOption && selectedContractOption.textContent) {
-            lines.push("Contrato: " + String(selectedContractOption.textContent || "").trim());
+            lines.push("Contrato: " + String(selectedContractOption.textContent || "").trim() + ".");
           }
         }
         lines.push(
           "Destinatarios: Arrendatario principal" +
             (collectionCodeudoresInput && collectionCodeudoresInput.checked
               ? " y codeudores del contrato"
-              : ""),
+              : "") +
+            ".",
         );
-        lines.push("Observacion: " + (observation || "Detalle de la gestion escrito por el funcionario."));
-        return lines.join("\n");
+        lines.push("Observación: " + (observation || "Detalle de la gestión escrito por el funcionario.") + ".");
+        return lines.join(" ");
       }
 
       function renderCollectionWhatsappPreviewText(detailOverride) {
@@ -3068,7 +3229,7 @@
       function selectedWhatsappNeedsMessage() {
         var option = selectedMessageTemplateOption();
         var mode = option ? option.getAttribute("data-template-mode") || "name_message_signature" : "name_message_signature";
-        return mode === "name_message_signature" && !selectedTemplateUsesImportedDetail();
+        return (mode === "name_message_signature" || mode === "name_message") && !selectedTemplateUsesImportedDetail();
       }
 
       function hasImportedRecipients() {

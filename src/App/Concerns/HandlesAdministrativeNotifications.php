@@ -248,6 +248,22 @@ trait HandlesAdministrativeNotifications
     }
   }
 
+  public function ajax_handler_admin_notifications_collection_log(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('gestiones_cobro')) {
+      $this->jsonFail('No tienes permiso para ver las gestiones de cobro.');
+    }
+
+    try {
+      $this->jsonOk([
+        'html' => $this->render_collection_management_panel($_POST),
+      ]);
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
   /** @param array<int,array<string,mixed>> $managements @return array<int,array<string,mixed>> */
   private function collection_management_notification_meta(array $managements): array
   {
