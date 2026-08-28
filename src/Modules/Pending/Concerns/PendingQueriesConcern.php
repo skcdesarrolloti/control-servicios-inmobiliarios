@@ -199,14 +199,10 @@ trait PendingQueriesConcern
         continue;
       }
 
-      $link = '/mi-cuenta/anadir-revision-de-servicios-publicos/?id_contrato=' . rawurlencode($contractId)
-        . '&id_sucursal=' . rawurlencode((string) ($row['sucursal'] ?? ''));
-
       $items[] = [
         'row' => $row,
         'ultima' => $ultTs,
         'due' => $dueTs,
-        'link' => $link,
       ];
     }
 

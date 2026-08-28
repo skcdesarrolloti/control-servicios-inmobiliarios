@@ -3,6 +3,409 @@
   display: none !important;
 }
 
+/* Revision nativa de servicios publicos */
+#scm-app .scm-public-services-review-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 34, 71, 0.64);
+  backdrop-filter: blur(5px);
+}
+
+#scm-app .scm-public-services-review-modal.open {
+  display: flex;
+}
+
+#scm-app .scm-public-services-review-dialog {
+  width: min(1040px, 100%);
+  max-height: min(92vh, 920px);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 24px;
+  background: #f8fafc;
+  box-shadow: 0 32px 86px rgba(8, 34, 71, 0.38);
+}
+
+#scm-app .scm-public-services-review-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 26px;
+  color: #fff;
+  background: linear-gradient(135deg, #082247 0%, #1b447d 72%, #f59120 150%);
+}
+
+#scm-app .scm-public-services-review-head span {
+  display: block;
+  margin-bottom: 4px;
+  color: #fed7aa;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-public-services-review-head h4 {
+  margin: 0;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+#scm-app .scm-public-services-review-head p {
+  margin: 5px 0 0;
+  color: #dbeafe;
+  font-size: 13px;
+}
+
+#scm-app .scm-public-services-review-close {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: 400 30px/1 inherit;
+  cursor: pointer;
+}
+
+#scm-app .scm-public-services-review-close:hover,
+#scm-app .scm-public-services-review-close:focus-visible {
+  background: rgba(255, 255, 255, 0.22);
+  outline: 3px solid rgba(254, 215, 170, 0.65);
+  outline-offset: 2px;
+}
+
+#scm-app .scm-public-services-review-body {
+  max-height: calc(min(92vh, 920px) - 112px);
+  overflow-y: auto;
+  padding: 24px;
+}
+
+#scm-app .scm-public-services-review-loading,
+#scm-app .scm-public-services-review-load-error {
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #334155;
+  text-align: center;
+}
+
+#scm-app .scm-public-services-review-loading i {
+  width: 42px;
+  height: 42px;
+  border: 4px solid #dbe7f5;
+  border-top-color: #f59120;
+  border-radius: 999px;
+  animation: scm-iframe-spin 0.75s linear infinite;
+}
+
+#scm-app .scm-public-services-review-load-error strong {
+  color: #991b1b;
+  font-size: 17px;
+}
+
+#scm-app .scm-public-services-review-form {
+  display: grid;
+  gap: 18px;
+}
+
+#scm-app .scm-public-services-review-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#scm-app .scm-public-services-review-summary > div,
+#scm-app .scm-public-services-review-address {
+  padding: 13px 15px;
+  border: 1px solid #dbe7f5;
+  border-radius: 14px;
+  background: #fff;
+}
+
+#scm-app .scm-public-services-review-summary span,
+#scm-app .scm-public-services-review-address > span {
+  display: block;
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-public-services-review-summary strong,
+#scm-app .scm-public-services-review-address strong {
+  display: block;
+  color: #082247;
+  font-size: 13px;
+}
+
+#scm-app .scm-public-services-review-address small {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+}
+
+#scm-app .scm-public-services-review-services {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+#scm-app .scm-public-services-review-services > legend {
+  padding: 0;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+#scm-app .scm-public-services-review-help {
+  margin: -6px 0 2px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+#scm-app .scm-public-service-card {
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  background: #fff;
+  opacity: 0.68;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+#scm-app .scm-public-service-card.is-selected {
+  border-color: rgba(27, 68, 125, 0.55);
+  box-shadow: 0 12px 28px rgba(8, 34, 71, 0.1);
+  opacity: 1;
+}
+
+#scm-app .scm-public-service-toggle {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f8fafc, #eef5ff);
+  cursor: pointer;
+}
+
+#scm-app .scm-public-service-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+#scm-app .scm-public-service-toggle-mark {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border: 2px solid #94a3b8;
+  border-radius: 7px;
+  background: #fff;
+  position: relative;
+}
+
+#scm-app .scm-public-service-toggle input:checked + .scm-public-service-toggle-mark {
+  border-color: #1b447d;
+  background: #1b447d;
+}
+
+#scm-app .scm-public-service-toggle input:checked + .scm-public-service-toggle-mark::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 3px;
+  width: 6px;
+  height: 11px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+#scm-app .scm-public-service-toggle input:focus-visible + .scm-public-service-toggle-mark {
+  outline: 3px solid rgba(245, 145, 32, 0.45);
+  outline-offset: 3px;
+}
+
+#scm-app .scm-public-service-toggle strong,
+#scm-app .scm-public-service-toggle small {
+  display: block;
+}
+
+#scm-app .scm-public-service-toggle strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+#scm-app .scm-public-service-toggle small {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+#scm-app .scm-public-service-fields {
+  display: none;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+#scm-app .scm-public-service-card.is-selected .scm-public-service-fields {
+  display: grid;
+}
+
+#scm-app .scm-public-service-fields .scm-seg-field > span b {
+  color: #b91c1c;
+}
+
+#scm-app .scm-public-service-fields input,
+#scm-app .scm-public-service-fields select {
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+}
+
+#scm-app .scm-public-service-fields input:focus,
+#scm-app .scm-public-service-fields select:focus {
+  border-color: #1b447d;
+  outline: 3px solid rgba(27, 68, 125, 0.16);
+}
+
+#scm-app .scm-public-services-review-notice {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid #fed7aa;
+  border-left: 4px solid #f59120;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #7c2d12;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+#scm-app .scm-public-services-review-error {
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#scm-app .scm-public-services-review-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+#scm-app .scm-public-services-review-actions button {
+  min-height: 46px;
+}
+
+.scm-public-services-review-success-copy {
+  color: #475569;
+  line-height: 1.6;
+}
+
+.scm-public-services-review-links {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.scm-public-services-review-links a {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1b447d;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  #scm-app .scm-public-services-review-summary,
+  #scm-app .scm-public-service-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  #scm-app .scm-public-services-review-modal {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  #scm-app .scm-public-services-review-dialog {
+    width: 100%;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+
+  #scm-app .scm-public-services-review-head {
+    padding: 18px 16px;
+  }
+
+  #scm-app .scm-public-services-review-head h4 {
+    font-size: 20px;
+  }
+
+  #scm-app .scm-public-services-review-body {
+    max-height: calc(100dvh - 102px);
+    padding: 16px;
+  }
+
+  #scm-app .scm-public-services-review-summary,
+  #scm-app .scm-public-service-fields {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-public-services-review-actions {
+    position: sticky;
+    bottom: -16px;
+    margin: 0 -16px -16px;
+    padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+    background: rgba(248, 250, 252, 0.96);
+    box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  #scm-app .scm-public-services-review-actions button {
+    flex: 1 1 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #scm-app .scm-public-service-card {
+    transition: none;
+  }
+}
+
 /* Popup refinement requested: sidebar closer + more inner padding. */
 #scm-app .scm-case-body {
   padding: 22px !important;

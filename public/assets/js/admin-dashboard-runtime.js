@@ -149,6 +149,8 @@
     var actionPreventivasPendientes = actions.preventivas_pendientes || "";
     var actionServiciosPublicosPendientes =
       actions.servicios_publicos_pendientes || "";
+    var actionRevisionServiciosPublicos =
+      actions.revision_servicios_publicos || "";
     var actionContratosArrendamientoFallback =
       actions.preventivas_pendientes || "";
     var actionCrearTicketAdministrativo =
@@ -4709,6 +4711,255 @@
       document.body.classList.remove("scm-modal-open");
     }
 
+    function ensurePublicServicesReviewModal() {
+      var modal = root.querySelector("#scm-public-services-review-modal");
+      if (modal) return modal;
+      modal = document.createElement("div");
+      modal.id = "scm-public-services-review-modal";
+      modal.className = "scm-public-services-review-modal";
+      modal.setAttribute("aria-hidden", "true");
+      modal.innerHTML =
+        '<div class="scm-public-services-review-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-public-services-review-title">' +
+        '<header class="scm-public-services-review-head"><div><span>Servicios públicos</span><h4 id="scm-public-services-review-title">Agregar revisión</h4><p data-public-services-review-meta>Cargando información del contrato...</p></div>' +
+        '<button type="button" class="scm-public-services-review-close" data-public-services-review-close aria-label="Cerrar">&times;</button></header>' +
+        '<div class="scm-public-services-review-body" data-public-services-review-body><div class="scm-public-services-review-loading" role="status"><i aria-hidden="true"></i><strong>Cargando formulario...</strong></div></div>' +
+        "</div>";
+      root.appendChild(modal);
+      modal.addEventListener("click", function (event) {
+        var closeButton = event.target && event.target.closest
+          ? event.target.closest("[data-public-services-review-close]")
+          : null;
+        if (closeButton) {
+          event.preventDefault();
+          closePublicServicesReviewModal(false);
+        }
+      });
+      modal.addEventListener("change", function (event) {
+        var form = modal.querySelector("[data-public-services-review-form]");
+        if (form) form.dataset.dirty = "1";
+        var serviceToggle = event.target && event.target.matches
+          ? event.target.matches('input[name="servicios[]"]')
+            ? event.target
+            : null
+          : null;
+        if (serviceToggle) {
+          syncPublicServiceCard(serviceToggle.closest("[data-public-service-card]"));
+          return;
+        }
+        if (event.target && event.target.matches && event.target.matches("[data-public-service-status]")) {
+          syncPublicServiceAmount(event.target);
+        }
+      });
+      modal.addEventListener("input", function () {
+        var form = modal.querySelector("[data-public-services-review-form]");
+        if (form) form.dataset.dirty = "1";
+      });
+      document.addEventListener("keydown", function (event) {
+        if (!modal.classList.contains("open")) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closePublicServicesReviewModal(false);
+          return;
+        }
+        if (event.key !== "Tab") return;
+        var focusable = Array.prototype.slice.call(
+          modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), [href]'),
+        ).filter(function (element) {
+          return element.offsetParent !== null;
+        });
+        if (!focusable.length) return;
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      });
+      return modal;
+    }
+
+    function closePublicServicesReviewModal(force) {
+      var modal = root.querySelector("#scm-public-services-review-modal");
+      if (!modal || !modal.classList.contains("open")) return;
+      var form = modal.querySelector("[data-public-services-review-form]");
+      if (!force && form && form.dataset.dirty === "1") {
+        if (!window.confirm("Hay datos sin guardar. ¿Deseas cerrar el formulario?")) {
+          return;
+        }
+      }
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("scm-modal-open");
+      var trigger = modal._scmTrigger;
+      modal._scmTrigger = null;
+      if (trigger && trigger.focus) trigger.focus();
+    }
+
+    function syncPublicServiceCard(card) {
+      if (!card) return;
+      var toggle = card.querySelector('input[name="servicios[]"]');
+      var enabled = !!(toggle && toggle.checked);
+      card.classList.toggle("is-selected", enabled);
+      if (toggle) toggle.setAttribute("aria-expanded", enabled ? "true" : "false");
+      card.querySelectorAll(".scm-public-service-fields input, .scm-public-service-fields select").forEach(function (field) {
+        field.disabled = !enabled;
+      });
+    }
+
+    function syncPublicServiceAmount(statusField) {
+      var card = statusField && statusField.closest
+        ? statusField.closest("[data-public-service-card]")
+        : null;
+      var amount = card ? card.querySelector("[data-public-service-amount]") : null;
+      if (!amount) return;
+      if (statusField.value === "Al dia") {
+        amount.value = "0";
+        amount.readOnly = true;
+      } else {
+        amount.readOnly = false;
+        if (amount.value === "0") amount.value = "";
+      }
+    }
+
+    function openPublicServicesReviewModal(button) {
+      if (!ajaxUrl || !actionRevisionServiciosPublicos) {
+        showToast("error", "La acción de revisión de servicios no está configurada.");
+        return;
+      }
+      var contractId = button.getAttribute("data-contract-id") || "";
+      if (!contractId) {
+        showToast("error", "No se encontro el contrato.");
+        return;
+      }
+      var modal = ensurePublicServicesReviewModal();
+      var body = modal.querySelector("[data-public-services-review-body]");
+      var meta = modal.querySelector("[data-public-services-review-meta]");
+      modal._scmTrigger = button;
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+      document.body.classList.add("scm-modal-open");
+      if (meta) {
+        meta.textContent = "Contrato " + (button.getAttribute("data-contract-code") || contractId);
+      }
+      if (body) {
+        body.innerHTML = '<div class="scm-public-services-review-loading" role="status"><i aria-hidden="true"></i><strong>Cargando formulario...</strong></div>';
+      }
+      var originalText = button.textContent;
+      button.disabled = true;
+      button.textContent = "Cargando...";
+      var fd = new FormData();
+      fd.append("action", actionRevisionServiciosPublicos);
+      fd.append("nonce", nonce);
+      fd.append("operation", "load");
+      fd.append("contract_id", contractId);
+      fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error((json && json.data && json.data.message) || "No se pudo cargar el formulario.");
+          }
+          if (body) {
+            body.innerHTML = (json.data && json.data.form_html) || "";
+            body.querySelectorAll("[data-public-service-card]").forEach(syncPublicServiceCard);
+            var firstField = body.querySelector('input[name="servicios[]"]');
+            if (firstField && firstField.focus) firstField.focus();
+          }
+        })
+        .catch(function (error) {
+          if (body) {
+            body.innerHTML = '<div class="scm-public-services-review-load-error" role="alert"><strong>No fue posible cargar el formulario.</strong><span>' + escHtml(error && error.message ? error.message : "Error desconocido") + "</span></div>";
+          }
+          showToast("error", error && error.message ? error.message : "No se pudo cargar el formulario.");
+        })
+        .finally(function () {
+          button.disabled = false;
+          button.textContent = originalText;
+        });
+    }
+
+    function publicServicesReviewDocumentsHtml(documents) {
+      if (!Array.isArray(documents) || !documents.length) return "";
+      return '<div class="scm-public-services-review-links">' + documents.map(function (document) {
+        return '<a href="' + escHtml(document.url || "#") + '" target="_blank" rel="noopener noreferrer">' + escHtml(document.title || "Ver acta") + "</a>";
+      }).join("") + "</div>";
+    }
+
+    function submitPublicServicesReviewForm(form) {
+      var errorBox = form.querySelector(".scm-public-services-review-error");
+      var selected = form.querySelectorAll('input[name="servicios[]"]:checked');
+      if (!selected.length) {
+        if (errorBox) {
+          errorBox.hidden = false;
+          errorBox.textContent = "Selecciona por lo menos un servicio.";
+        }
+        return;
+      }
+      if (!form.checkValidity()) {
+        if (errorBox) {
+          errorBox.hidden = false;
+          errorBox.textContent = "Completa los campos obligatorios de los servicios seleccionados.";
+        }
+        form.reportValidity();
+        return;
+      }
+      if (errorBox) {
+        errorBox.hidden = true;
+        errorBox.textContent = "";
+      }
+      var submitButton = form.querySelector("[data-public-services-review-submit]");
+      var originalText = submitButton ? submitButton.textContent : "";
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Guardando y generando actas...";
+      }
+      form.setAttribute("aria-busy", "true");
+      var fd = new FormData(form);
+      fd.append("action", actionRevisionServiciosPublicos);
+      fd.append("nonce", nonce);
+      fd.append("operation", "submit");
+      fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error((json && json.data && json.data.message) || "No se pudo registrar la revisión.");
+          }
+          var data = json.data || {};
+          form.dataset.dirty = "0";
+          closePublicServicesReviewModal(true);
+          showToast("success", data.message || "Revisión agregada con éxito.");
+          if (window.Swal && typeof window.Swal.fire === "function") {
+            window.Swal.fire({
+              icon: "success",
+              title: "Revisión registrada",
+              html: '<p class="scm-public-services-review-success-copy">' + escHtml(data.message || "La revisión fue guardada.") + "</p>" + publicServicesReviewDocumentsHtml(data.documents || []),
+              confirmButtonText: "Cerrar",
+              confirmButtonColor: "#1b447d",
+            });
+          }
+          var panel = root.querySelector("#scm-panel-servicios-publicos-pendientes");
+          return reloadPendingPanel(panel, "rsp_", actionServiciosPublicosPendientes, "rsp_table", "rsp_kpis");
+        })
+        .catch(function (error) {
+          var message = error && error.message ? error.message : "No se pudo registrar la revisión.";
+          if (errorBox) {
+            errorBox.hidden = false;
+            errorBox.textContent = message;
+            errorBox.focus && errorBox.focus();
+          }
+          showToast("error", message);
+        })
+        .finally(function () {
+          form.setAttribute("aria-busy", "false");
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = originalText;
+          }
+        });
+    }
+
     function contractDataset(btn, key) {
       return String((btn && btn.dataset && btn.dataset[key]) || "").trim();
     }
@@ -7155,6 +7406,16 @@
         return;
       }
 
+      var publicServicesReviewBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-open-public-services-review]")
+          : null;
+      if (publicServicesReviewBtn) {
+        e.preventDefault();
+        openPublicServicesReviewModal(publicServicesReviewBtn);
+        return;
+      }
+
       var contractReceivedBtn =
         e.target && e.target.closest
           ? e.target.closest("[data-scm-mark-contract-received]")
@@ -9230,6 +9491,16 @@
     });
 
     root.addEventListener("submit", function (e) {
+      var reviewForm = e.target;
+      if (
+        reviewForm &&
+        reviewForm.matches &&
+        reviewForm.matches("[data-public-services-review-form]")
+      ) {
+        e.preventDefault();
+        submitPublicServicesReviewForm(reviewForm);
+        return;
+      }
       var adminForm = e.target;
       if (
         !adminForm ||

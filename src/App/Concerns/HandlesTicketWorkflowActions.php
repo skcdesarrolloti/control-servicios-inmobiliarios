@@ -472,6 +472,72 @@ trait HandlesTicketWorkflowActions
     ]);
   }
 
+  public function ajax_handler_revision_servicios_publicos(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('servicios_publicos_pendientes')) {
+      $this->jsonFail('No tienes permiso para registrar revisiones de servicios públicos.');
+    }
+
+    $operation = sanitize_key((string) ($_POST['operation'] ?? 'load'));
+    $contractId = (int) ($_POST['contract_id'] ?? $_POST['id_contrato'] ?? 0);
+    if ($contractId <= 0) {
+      $this->jsonFail('ID de contrato inválido.');
+    }
+
+    $controller = $this->get_pending_controller();
+    if ($operation === 'load') {
+      $result = $controller->buildServiciosPublicosReviewForm($contractId);
+      if (empty($result['ok'])) {
+        $this->jsonFail((string) ($result['message'] ?? 'No se pudo cargar el formulario.'));
+      }
+      $this->jsonOk([
+        'form_html' => (string) ($result['form_html'] ?? ''),
+        'review_date' => (string) ($result['review_date'] ?? ''),
+      ]);
+    }
+
+    if ($operation !== 'submit') {
+      $this->jsonFail('Operación no válida.');
+    }
+
+    $input = [];
+    $servicesRaw = is_array($_POST['servicios'] ?? null) ? $_POST['servicios'] : [];
+    $input['servicios'] = array_values(array_filter(array_map(
+      static fn($value): string => sanitize_key(wp_unslash((string) $value)),
+      $servicesRaw
+    )));
+    foreach ([
+      'nic',
+      'medidor_luz',
+      'resultado_tiempo_luz',
+      'resultado_valores_luz',
+      'poliza',
+      'medidor_agua',
+      'resultado_tiempo_agua',
+      'resultado_valores_agua',
+      'numero_contrato',
+      'medidor_gas',
+      'resultado_tiempo_gas',
+      'resultado_valores_gas',
+    ] as $field) {
+      $input[$field] = trim(sanitize_text_field(wp_unslash((string) ($_POST[$field] ?? ''))));
+    }
+
+    $result = $controller->createServiciosPublicosReview($contractId, $input);
+    if (empty($result['ok'])) {
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo registrar la revisión.'));
+    }
+    $this->jsonOk([
+      'message' => (string) ($result['message'] ?? 'Revisión agregada con éxito.'),
+      'review_id' => (int) ($result['review_id'] ?? 0),
+      'documents' => (array) ($result['documents'] ?? []),
+      'notifications_queued' => (int) ($result['notifications_queued'] ?? 0),
+      'ultima_revision_servicios' => (int) ($result['ultima_revision_servicios'] ?? 0),
+      'mes_revision_servicios' => (int) ($result['mes_revision_servicios'] ?? 0),
+    ]);
+  }
+
   public function ajax_handler_contrato_recibido(): void
   {
     $this->verifyCsrf();

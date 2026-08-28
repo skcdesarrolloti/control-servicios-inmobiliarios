@@ -959,6 +959,48 @@ final class PendingRepository
     return $this->db->update($table, $data, ['_ID' => $id]);
   }
 
+  /** @param array<string,mixed> $data */
+  public function insertHistorialInmueble(array $data): bool
+  {
+    $table = $this->db->table('jet_cct_historial_del_inmueble');
+    $payload = $this->schema()->filterTableData($table, $data);
+    return !empty($payload) && $this->db->insert($table, $payload);
+  }
+
+  public function updatePropertyRevisionCount(int $propertyPostId, int $count): void
+  {
+    if ($propertyPostId <= 0) {
+      return;
+    }
+
+    $postsTable = $this->db->table('posts');
+    $postMetaTable = $this->db->table('postmeta');
+    if (!$this->schema()->tableExists($postsTable) || !$this->schema()->tableExists($postMetaTable)) {
+      return;
+    }
+    $isProperty = (int) $this->db->getVar(
+      "SELECT COUNT(1) FROM `{$postsTable}` WHERE `ID` = ? AND `post_type` = 'inmuebles'",
+      [$propertyPostId]
+    );
+    if ($isProperty <= 0) {
+      return;
+    }
+
+    $metaId = (int) $this->db->getVar(
+      "SELECT `meta_id` FROM `{$postMetaTable}` WHERE `post_id` = ? AND `meta_key` = 'revisiones-servicios' ORDER BY `meta_id` DESC LIMIT 1",
+      [$propertyPostId]
+    );
+    if ($metaId > 0) {
+      $this->db->update($postMetaTable, ['meta_value' => (string) max(0, $count)], ['meta_id' => $metaId]);
+      return;
+    }
+    $this->db->insert($postMetaTable, [
+      'post_id' => $propertyPostId,
+      'meta_key' => 'revisiones-servicios',
+      'meta_value' => (string) max(0, $count),
+    ]);
+  }
+
   /** @return array<string,mixed>|null */
   public function getTicketByReference(string $ticketRef): ?array
   {

@@ -578,7 +578,6 @@ final class PendingView
 
     foreach ($items as $item) {
       $row  = (array) ($item['row']  ?? []);
-      $link = (string) ($item['link'] ?? '#');
       $estado = strtolower(trim((string) ($row['estado'] ?? '')));
       $contractPk = trim((string) ($row['_ID'] ?? ''));
       $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
@@ -602,12 +601,107 @@ final class PendingView
           . 'Contrato recibido</button>';
       }
       $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;"'
-        . ' data-scm-open-iframe data-iframe-url="' . esc_attr($link) . '" data-iframe-title="Agregar revision">'
-        . 'Agregar revision</button></td>';
+        . ' data-scm-open-public-services-review data-contract-id="' . esc_attr($contractPk) . '"'
+        . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
+        . 'Agregar revisión</button></td>';
       $html .= '</tr>';
     }
 
     return $html . '</tbody></table></div>';
+  }
+
+  /** @param array<string,mixed> $context */
+  public function renderServiciosPublicosReviewForm(array $context): string
+  {
+    $contract = (array) ($context['contract'] ?? []);
+    $services = (array) ($context['services'] ?? []);
+    $employee = (array) ($context['employee'] ?? []);
+    $contractId = (string) ($contract['_ID'] ?? '');
+    $contractCode = (string) ($contract['contrato'] ?? $contractId);
+    $reviewDate = (string) ($context['review_date'] ?? date('Y-m-d'));
+    $currentMonth = (int) ($contract['mes_revision_servicios'] ?? 0);
+    if ($currentMonth < 1 || $currentMonth > 12) {
+      $currentMonth = (int) date('n');
+    }
+    $nextMonth = (($currentMonth + 3 - 1) % 12) + 1;
+
+    ob_start();
+?>
+    <form class="scm-public-services-review-form" data-public-services-review-form autocomplete="off" novalidate>
+      <input type="hidden" name="contract_id" value="<?php echo esc_attr($contractId); ?>">
+      <div class="scm-public-services-review-summary">
+        <div><span>Contrato</span><strong>#<?php echo esc_html($contractCode !== '' ? $contractCode : '-'); ?></strong></div>
+        <div><span>Inmueble SIMI</span><strong>#<?php echo esc_html((string) ($contract['inmueble'] ?? '-')); ?></strong></div>
+        <div><span>Fecha de revisión</span><strong><?php echo esc_html($reviewDate); ?></strong></div>
+        <div><span>Registrada por</span><strong><?php echo esc_html((string) ($employee['nombre'] ?? 'Funcionario actual')); ?></strong></div>
+      </div>
+
+      <div class="scm-public-services-review-address">
+        <span>Dirección del inmueble</span>
+        <strong><?php echo esc_html((string) ($contract['direccion'] ?? '-')); ?></strong>
+        <small>Arrendatario: <?php echo esc_html((string) ($contract['arrendatario'] ?? '-')); ?></small>
+      </div>
+
+      <fieldset class="scm-public-services-review-services">
+        <legend>Servicios incluidos en esta revisión</legend>
+        <p class="scm-public-services-review-help">Desmarca un servicio si no fue posible verificarlo. Cada servicio marcado generará su propia acta PDF.</p>
+        <?php foreach ($services as $key => $service):
+          $key = (string) $key;
+          $service = (array) $service;
+          $accountField = (string) ($service['account_field'] ?? '');
+          $meterField = (string) ($service['meter_field'] ?? '');
+          $statusField = (string) ($service['status_field'] ?? '');
+          $amountField = (string) ($service['amount_field'] ?? '');
+          $panelId = 'scm-public-service-fields-' . preg_replace('/[^a-z0-9_-]/i', '', $key);
+        ?>
+          <section class="scm-public-service-card is-selected" data-public-service-card="<?php echo esc_attr($key); ?>">
+            <label class="scm-public-service-toggle">
+              <input type="checkbox" name="servicios[]" value="<?php echo esc_attr($key); ?>" checked aria-controls="<?php echo esc_attr($panelId); ?>" aria-expanded="true">
+              <span class="scm-public-service-toggle-mark" aria-hidden="true"></span>
+              <span><strong><?php echo esc_html((string) ($service['display_label'] ?? $service['label'] ?? $key)); ?></strong><small>Incluir y generar acta</small></span>
+            </label>
+            <div class="scm-public-service-fields" id="<?php echo esc_attr($panelId); ?>">
+              <label class="scm-seg-field">
+                <span><?php echo esc_html((string) ($service['account_label'] ?? 'Cuenta')); ?> <b aria-hidden="true">*</b></span>
+                <input type="text" name="<?php echo esc_attr($accountField); ?>" value="<?php echo esc_attr((string) ($service['account'] ?? '')); ?>" maxlength="180" required>
+              </label>
+              <label class="scm-seg-field">
+                <span>Número de medidor <b aria-hidden="true">*</b></span>
+                <input type="text" name="<?php echo esc_attr($meterField); ?>" value="<?php echo esc_attr((string) ($service['meter'] ?? '')); ?>" maxlength="180" required>
+              </label>
+              <label class="scm-seg-field">
+                <span>Resultado en tiempo <b aria-hidden="true">*</b></span>
+                <select name="<?php echo esc_attr($statusField); ?>" required data-public-service-status>
+                  <option value="">Selecciona un resultado</option>
+                  <option value="Al dia">Al día</option>
+                  <option value="30 dias">30 días</option>
+                  <option value="60 dias">60 días</option>
+                  <option value="Estado critico">Estado crítico</option>
+                </select>
+              </label>
+              <label class="scm-seg-field">
+                <span>Valor reportado (COP) <b aria-hidden="true">*</b></span>
+                <input type="text" name="<?php echo esc_attr($amountField); ?>" value="0" inputmode="numeric" pattern="[0-9.$, ]+" required data-public-service-amount>
+                <small>Usa 0 si el servicio está al día.</small>
+              </label>
+            </div>
+          </section>
+        <?php endforeach; ?>
+      </fieldset>
+
+      <aside class="scm-public-services-review-notice">
+        <strong>Al guardar</strong>
+        <span>Se creará el registro de revisión, se actualizarán contrato e inmueble, se generarán las actas con membrete y se encolarán los correos. El próximo mes configurado será <?php echo esc_html($this->monthName($nextMonth)); ?>.</span>
+      </aside>
+
+      <div class="scm-public-services-review-error" role="alert" aria-live="assertive" hidden></div>
+      <div class="scm-public-services-review-actions">
+        <button type="button" class="scm-btn-secondary" data-public-services-review-close>Cancelar</button>
+        <button type="submit" class="scm-btn-primary" data-public-services-review-submit>Guardar revisión y generar actas</button>
+      </div>
+    </form>
+<?php
+    return (string) ob_get_clean();
   }
 
   // Helpers --------------------------------------------------------------------

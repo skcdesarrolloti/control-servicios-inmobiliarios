@@ -34,6 +34,7 @@ final class EmailQueue
     $scheduledAt = trim((string) ($options['scheduled_at'] ?? ''));
     $destinationName = trim((string) ($options['destination_name'] ?? ''));
     $dedupeKey = trim((string) ($options['dedupe_key'] ?? ''));
+    $payload = is_array($options['payload'] ?? null) ? $options['payload'] : [];
     $meta = $this->buildMeta($options, [
       'source',
       'source_module',
@@ -43,6 +44,7 @@ final class EmailQueue
       'scheduled_at',
       'destination_name',
       'dedupe_key',
+      'payload',
     ]);
     $queued = 0;
 
@@ -63,6 +65,7 @@ final class EmailQueue
           'subject' => $subject,
           'message_html' => $html,
           'message_text' => trim(html_entity_decode(strip_tags($html), ENT_QUOTES, 'UTF-8')),
+          'payload' => $payload,
           'meta' => $meta,
           'priority' => $priority,
           'max_attempts' => $maxAttempts,

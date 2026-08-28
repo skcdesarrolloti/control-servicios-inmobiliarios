@@ -52,6 +52,24 @@ final class PendingController
     );
   }
 
+  /** @return array<string,mixed> */
+  public function buildServiciosPublicosReviewForm(int $contractId): array
+  {
+    $context = $this->service->buildServiciosPublicosReviewContext($contractId);
+    if (empty($context['ok'])) {
+      return $context;
+    }
+    $context['form_html'] = $this->view->renderServiciosPublicosReviewForm($context);
+    unset($context['contract'], $context['services'], $context['employee'], $context['branch']);
+    return $context;
+  }
+
+  /** @param array<string,mixed> $input @return array<string,mixed> */
+  public function createServiciosPublicosReview(int $contractId, array $input): array
+  {
+    return $this->service->createServiciosPublicosReview($contractId, $input);
+  }
+
   public function renderReportesAdministrativosTab(): string
   {
     $payload = $this->buildReportesAdministrativosPayload($_GET);

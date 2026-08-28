@@ -326,6 +326,7 @@ trait RendersDashboard
         'contractual'     => self::AJAX_CONTRACTUAL,
         'preventivas_pendientes' => self::AJAX_PREVENTIVAS_PENDIENTES,
         'servicios_publicos_pendientes' => self::AJAX_SERVICIOS_PUBLICOS_PENDIENTES,
+        'revision_servicios_publicos' => self::AJAX_REVISION_SERVICIOS_PUBLICOS,
         'reportes_administrativos_pendientes' => self::AJAX_REPORTES_ADMINISTRATIVOS_PENDIENTES,
         'contratos_arrendamiento' => self::AJAX_CONTRATOS_ARRENDAMIENTO,
         'contrato_recibido' => self::AJAX_CONTRATO_RECIBIDO,

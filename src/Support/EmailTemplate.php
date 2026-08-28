@@ -4,7 +4,7 @@ namespace SCM\Support;
 
 final class EmailTemplate
 {
-  /** @param array<string,string> $vars */
+  /** @param array<string,mixed> $vars */
   public static function render(string $title, string $contentHtml, array $vars = []): string
   {
     $ticketUrl = trim((string)($vars['ticket_url'] ?? ''));

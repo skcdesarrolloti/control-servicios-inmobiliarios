@@ -12,6 +12,7 @@ final class PendingService
   use \SCM\Modules\Pending\Concerns\PendingQueriesConcern;
   use \SCM\Modules\Pending\Concerns\AdministrativeTicketCreationConcern;
   use \SCM\Modules\Pending\Concerns\PendingNotificationsAndDatesConcern;
+  use \SCM\Modules\Pending\Concerns\PublicServicesReviewConcern;
 
   private PendingRepository $repo;
 
