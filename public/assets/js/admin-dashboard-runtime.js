@@ -2735,21 +2735,6 @@
           ? "Administración"
           : type || "Canon";
         var lines = ["Tipo de gestión: " + typeLabel + "."];
-        if (collectionContractSelect && collectionContractSelect.value) {
-          var selectedContractOption = collectionContractSelect.options
-            ? collectionContractSelect.options[collectionContractSelect.selectedIndex]
-            : null;
-          if (selectedContractOption && selectedContractOption.textContent) {
-            lines.push("Contrato: " + String(selectedContractOption.textContent || "").trim() + ".");
-          }
-        }
-        lines.push(
-          "Destinatarios: Arrendatario principal" +
-            (collectionCodeudoresInput && collectionCodeudoresInput.checked
-              ? " y codeudores del contrato"
-              : "") +
-            ".",
-        );
         lines.push("Observación: " + (observation || "Detalle de la gestión escrito por el funcionario.") + ".");
         return lines.join(" ");
       }

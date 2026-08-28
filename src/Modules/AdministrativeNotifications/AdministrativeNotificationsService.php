@@ -190,7 +190,7 @@ final class AdministrativeNotificationsService
         'language' => 'es_CO',
         'description' => 'Aviso para arrendatarios cuando se registra una gestion de cobro.',
         'body' => "Buen dia, {{1}}.\n\nLe informamos que se registro una gestion de cobro relacionada con su contrato de arrendamiento.\n\nDetalle de la gestion:\n\n{{2}}\n\nSi ya realizo el pago o tiene alguna novedad, por favor comuniquese con nosotros.\n\nAtentamente,\n{{3}}\n\nGracias por su atencion.",
-        'variables' => ['Nombre del arrendatario', 'Detalle de la gestion, contrato y observacion', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'variables' => ['Nombre del arrendatario', 'Tipo de gestion y observacion', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_arrendatario_gestion_cobro_v1',
         'parameter_mode' => 'name_message_signature',
@@ -472,10 +472,6 @@ final class AdministrativeNotificationsService
     $parts = [
       'Tipo de gestión: ' . $this->collectionTypeDisplayLabel($data['tipo_gestion_cobro']) . '.',
     ];
-    $contractLabels = $this->collectionContractLabels($data['contract_ids']);
-    if ($contractLabels !== []) {
-      $parts[] = 'Contrato: ' . implode(' | ', $contractLabels) . '.';
-    }
     if ($data['observacion'] !== '') {
       $parts[] = 'Observación: ' . rtrim($this->plainText($data['observacion']), '.') . '.';
     }
