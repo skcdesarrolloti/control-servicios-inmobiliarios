@@ -629,15 +629,69 @@
 
 #scm-app .scm-admin-ticket-dialog {
   width: min(1080px, 100%);
+  max-height: calc(100dvh - 64px);
   background: var(--scm-surface);
   border: 1px solid var(--scm-border);
   border-radius: var(--scm-r-md);
   box-shadow: var(--scm-shadow-xl);
   overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  position: relative;
+}
+
+#scm-app .scm-admin-ticket-dialog > .scm-case-submodal-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 64px;
+  padding: 10px 12px 10px 16px;
+  background: var(--scm-surface);
+}
+
+#scm-app .scm-admin-ticket-dialog > .scm-case-submodal-head > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#scm-app .scm-admin-ticket-dialog .scm-case-submodal-close {
+  position: static;
+  flex: 0 0 44px;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--scm-text);
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+#scm-app .scm-admin-ticket-dialog .scm-case-submodal-close:hover {
+  border-color: rgba(246, 143, 0, 0.5);
+  background: #fff8ef;
+  color: #a94f00;
+}
+
+#scm-app .scm-admin-ticket-dialog .scm-case-submodal-close:focus-visible {
+  outline: 3px solid rgba(246, 143, 0, 0.32);
+  outline-offset: 2px;
+}
+
+#scm-app .scm-admin-ticket-dialog .scm-case-submodal-close svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
 #scm-app .scm-admin-ticket-body {
   padding: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 #scm-app .scm-admin-ticket-summary {
@@ -843,6 +897,10 @@
 @media (max-width: 640px) {
   #scm-app .scm-admin-ticket-modal {
     padding: 12px;
+  }
+
+  #scm-app .scm-admin-ticket-dialog {
+    max-height: calc(100dvh - 24px);
   }
 
   #scm-app .scm-admin-ticket-grid {

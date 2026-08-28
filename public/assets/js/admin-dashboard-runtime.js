@@ -115,7 +115,13 @@
         return;
       }
       var openModal = root.querySelector("#scm-case-modal.open");
-      if (openModal || root.querySelector("#scm-admin-ticket-modal.open")) {
+      var openAdminTicketDialog = root.querySelector("#scm-admin-ticket-modal.open");
+      if (openAdminTicketDialog) {
+        e.preventDefault();
+        closeAdminTicketModal();
+        return;
+      }
+      if (openModal) {
         e.preventDefault();
       }
     });
@@ -4994,10 +5000,10 @@
       modal.setAttribute("aria-hidden", "true");
       modal.innerHTML =
         '<div class="scm-admin-ticket-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-admin-ticket-title">' +
-        '<div class="scm-case-submodal-head">' +
+        '<header class="scm-case-submodal-head">' +
         '<div><h4 class="scm-case-submodal-title" id="scm-admin-ticket-title">Crear ticket</h4><p class="scm-case-submodal-meta">Ticket administrativo desde contrato</p></div>' +
-        '<button type="button" class="scm-case-submodal-close" data-admin-ticket-close aria-label="Cerrar">&times;</button>' +
-        "</div>" +
+        '<button type="button" class="scm-case-submodal-close" data-admin-ticket-close aria-label="Cerrar formulario"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>' +
+        "</header>" +
         '<div class="scm-admin-ticket-body"></div>' +
         "</div>";
       root.appendChild(modal);
@@ -5025,6 +5031,11 @@
       modal.classList.remove("open");
       modal.setAttribute("aria-hidden", "true");
       document.body.classList.remove("scm-modal-open");
+      var trigger = modal._scmTrigger;
+      modal._scmTrigger = null;
+      if (trigger && trigger.focus) {
+        trigger.focus();
+      }
     }
 
     function ensurePublicServicesReviewModal() {
@@ -5289,6 +5300,7 @@
       var mode = contractDataset(btn, "ticketMode") || "administrativo";
       var isPreventiva = mode === "preventiva";
       var modal = ensureAdminTicketModal();
+      modal._scmTrigger = btn;
       var title = modal.querySelector(".scm-case-submodal-title");
       var meta = modal.querySelector(".scm-case-submodal-meta");
       var body = modal.querySelector(".scm-admin-ticket-body");
@@ -5578,9 +5590,9 @@
       modal.classList.add("open");
       modal.setAttribute("aria-hidden", "false");
       document.body.classList.add("scm-modal-open");
-      var firstInput = body.querySelector('select[name="id_empleado"]');
-      if (firstInput && firstInput.focus) {
-        firstInput.focus();
+      var closeButton = modal.querySelector("[data-admin-ticket-close]");
+      if (closeButton && closeButton.focus) {
+        closeButton.focus();
       }
     }
 
@@ -7367,6 +7379,9 @@
 
     function populateDashboardFilterOptions(data) {
       var options = data && data.filter_options ? data.filter_options : {};
+      runtime.funcionarios = Array.isArray(options.funcionarios)
+        ? options.funcionarios
+        : [];
       var mappings = [
         ["select[name$='id_empleado'], [data-scm-execution-form] select[name='funcionario']", options.funcionarios || [], "id", "label"],
         ["select[name$='barrio']", options.barrios || [], "value", "label"],
@@ -7428,7 +7443,7 @@
         })
         .catch(function (error) {
           dashboardFilterOptionsPromise = null;
-          dashboardFilterOptionsLoaded = true;
+          dashboardFilterOptionsLoaded = false;
           showToast("error", error.message || "No se pudieron cargar los filtros.");
         });
       return dashboardFilterOptionsPromise;
@@ -7998,7 +8013,32 @@
           : null;
       if (adminTicketBtn) {
         e.preventDefault();
-        openAdminTicketModal(adminTicketBtn);
+        if (
+          runtime &&
+          Array.isArray(runtime.funcionarios) &&
+          runtime.funcionarios.length > 0
+        ) {
+          openAdminTicketModal(adminTicketBtn);
+          return;
+        }
+        withPanelLoader(
+          loadDashboardFilterOptions,
+          "Cargando responsables",
+          "Estamos consultando los funcionarios disponibles.",
+        ).then(function () {
+          if (
+            !runtime ||
+            !Array.isArray(runtime.funcionarios) ||
+            runtime.funcionarios.length === 0
+          ) {
+            showToast(
+              "error",
+              "No fue posible cargar los funcionarios responsables. Intenta nuevamente.",
+            );
+            return;
+          }
+          openAdminTicketModal(adminTicketBtn);
+        });
         return;
       }
 

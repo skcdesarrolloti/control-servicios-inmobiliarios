@@ -389,7 +389,7 @@ trait TableRowsConcern
   private function renderPreventivaNoAccessSummary(int $count): string
   {
     $next = $count + 1;
-    $label = $count === 1 ? '1 comunicaci&oacute;n registrada' : $count . ' comunicaciones registradas';
+    $label = $count === 1 ? '1 comunicación registrada' : $count . ' comunicaciones registradas';
     return '<section class="scm-preventiva-no-access-summary" data-scm-preventiva-no-access-summary>'
       . '<div class="scm-preventiva-no-access-icon" aria-hidden="true">!</div>'
       . '<div class="scm-preventiva-no-access-copy"><span>Constancias preventivas por no autorizaci&oacute;n</span>'
