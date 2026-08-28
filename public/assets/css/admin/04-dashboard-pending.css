@@ -5441,6 +5441,135 @@
   accent-color: var(--scm-orange-500);
 }
 
+#scm-app .scm-admin-notif-codeudores[hidden],
+#scm-app .scm-admin-notif-codeudores.is-hidden {
+  display: none !important;
+}
+
+#scm-app .scm-admin-notif-codeudores {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #dbe7f4;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-admin-notif-codeudores-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#scm-app .scm-admin-notif-codeudores-head strong {
+  display: block;
+  color: #10233f;
+  font-size: 13px;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+#scm-app .scm-admin-notif-codeudores-head span {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+#scm-app .scm-admin-notif-codeudores-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+#scm-app .scm-admin-notif-codeudores-actions button {
+  min-height: 30px;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 6px 10px;
+}
+
+#scm-app .scm-admin-notif-codeudores-list {
+  display: grid;
+  gap: 8px;
+}
+
+#scm-app .scm-admin-notif-codeudor-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #dbe7f4;
+  border-radius: 12px;
+  background: #fff;
+  color: #10233f;
+  cursor: pointer;
+}
+
+#scm-app .scm-admin-notif-codeudor-card:has(input:checked) {
+  border-color: #f59e0b;
+  background: #fffaf3;
+  box-shadow: 0 10px 24px rgba(245, 158, 11, 0.12);
+}
+
+#scm-app .scm-admin-notif-codeudor-card input {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  accent-color: #f59120;
+}
+
+#scm-app .scm-admin-notif-codeudor-info {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+#scm-app .scm-admin-notif-codeudor-info strong {
+  color: #10233f;
+  font-size: 13px;
+  font-weight: 950;
+  text-transform: none;
+}
+
+#scm-app .scm-admin-notif-codeudor-info small {
+  color: #50657f;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+#scm-app .scm-admin-notif-codeudor-info em {
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #075985;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+#scm-app .scm-admin-notif-codeudores-empty {
+  padding: 10px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #fff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 #scm-app .scm-admin-notif-collection-notify {
   border-style: solid;
   background: linear-gradient(180deg, #fffaf3, #ffffff);

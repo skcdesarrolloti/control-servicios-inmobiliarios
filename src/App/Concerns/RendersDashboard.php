@@ -2000,10 +2000,20 @@ trait RendersDashboard
               <span>Usa la plantilla &ldquo;Gesti&oacute;n de cobro&rdquo; y encola la notificaci&oacute;n en el mismo guardado. Si no quieres enviar nada, deja los canales sin marcar.</span>
               <div class="scm-admin-notif-collection-targets" role="group" aria-label="Destinatarios de cobranza">
                 <span class="scm-admin-notif-collection-target is-fixed">Arrendatario principal</span>
-                <label class="scm-admin-notif-collection-target">
-                  <input type="checkbox" name="notify_codeudores" value="1" data-admin-notif-collection-codeudores checked>
-                  <span>Codeudores del contrato</span>
-                </label>
+                <span class="scm-admin-notif-collection-target" data-admin-notif-collection-codeudor-count>Codeudores: 0 seleccionados</span>
+              </div>
+              <div class="scm-admin-notif-codeudores" data-admin-notif-collection-codeudores-wrap hidden>
+                <div class="scm-admin-notif-codeudores-head">
+                  <div>
+                    <strong>Codeudores para notificar</strong>
+                    <span>Escoge exactamente a cu&aacute;les codeudores enviarles la notificaci&oacute;n.</span>
+                  </div>
+                  <div class="scm-admin-notif-codeudores-actions">
+                    <button type="button" data-admin-notif-codeudores-select-all>Seleccionar todos</button>
+                    <button type="button" data-admin-notif-codeudores-clear>Quitar todos</button>
+                  </div>
+                </div>
+                <div class="scm-admin-notif-codeudores-list" data-admin-notif-collection-codeudores-list></div>
               </div>
               <div class="scm-admin-notif-collection-channels" role="group" aria-label="Canales para gestion de cobro">
                 <label class="scm-admin-notif-mini-channel">

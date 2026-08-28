@@ -170,7 +170,12 @@ trait HandlesAdministrativeNotifications
       is_array($rawChannels) ? $rawChannels : [$rawChannels]
     );
     $notifyChannels = array_values(array_unique(array_filter($notifyChannels, static fn(string $channel): bool => in_array($channel, ['email', 'sms', 'whatsapp'], true))));
-    $notifyCodeudores = trim((string) ($_POST['notify_codeudores'] ?? '')) === '1';
+    $rawCodeudorKeys = $_POST['notify_codeudor_keys'] ?? [];
+    $notifyCodeudorKeys = array_values(array_unique(array_filter(array_map(static function ($value): string {
+      $value = trim(sanitize_text_field(wp_unslash((string) $value)));
+      return mb_substr($value, 0, 240, 'UTF-8');
+    }, is_array($rawCodeudorKeys) ? $rawCodeudorKeys : [$rawCodeudorKeys]), static fn(string $value): bool => $value !== '')));
+    $notifyCodeudores = $notifyCodeudorKeys !== [];
     $queuedDetail = $service->collectionNotificationMessage($payload);
 
     try {
@@ -204,7 +209,8 @@ trait HandlesAdministrativeNotifications
               $queuedDetail,
               'scm_arrendatario_gestion_cobro_v1',
               'scm_email_arrendatario_gestion_cobro_v1',
-              AdministrativeNotificationsService::COLLECTION_SMS_MAX
+              AdministrativeNotificationsService::COLLECTION_SMS_MAX,
+              $notifyCodeudorKeys
             );
           }
         } catch (\Throwable $notifyException) {

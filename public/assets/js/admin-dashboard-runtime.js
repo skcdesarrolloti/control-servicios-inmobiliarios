@@ -2305,7 +2305,11 @@
       var collectionContractSelect = panel.querySelector("[data-admin-notif-collection-contract]");
       var collectionTypeSelect = panel.querySelector("#scm-admin-notif-collection-type");
       var collectionObservationInput = panel.querySelector("#scm-admin-notif-collection-observation");
-      var collectionCodeudoresInput = panel.querySelector("[data-admin-notif-collection-codeudores]");
+      var collectionCodeudoresWrap = panel.querySelector("[data-admin-notif-collection-codeudores-wrap]");
+      var collectionCodeudoresList = panel.querySelector("[data-admin-notif-collection-codeudores-list]");
+      var collectionCodeudorCountEl = panel.querySelector("[data-admin-notif-collection-codeudor-count]");
+      var collectionCodeudoresSelectAllBtn = panel.querySelector("[data-admin-notif-codeudores-select-all]");
+      var collectionCodeudoresClearBtn = panel.querySelector("[data-admin-notif-codeudores-clear]");
       var collectionPreviewEl = panel.querySelector("[data-admin-notif-collection-preview]");
       var collectionSpinner = panel.querySelector("[data-admin-notif-collection-spinner]");
       var collectionSubmitBtn = panel.querySelector("[data-admin-notif-collection-submit]");
@@ -2688,9 +2692,98 @@
         return btn ? parseCollectionContracts(btn.getAttribute("data-admin-notif-single-contracts") || "[]") : [];
       }
 
+      function activeCollectionContract() {
+        if (!Array.isArray(selectedCollectionContracts) || selectedCollectionContracts.length === 0) {
+          return null;
+        }
+        var selectedContractId = collectionContractSelect
+          ? String(collectionContractSelect.value || "").trim()
+          : "";
+        if (!selectedContractId && selectedCollectionContracts.length === 1) {
+          selectedContractId = String(selectedCollectionContracts[0].id || "").trim();
+        }
+        if (!selectedContractId) {
+          return null;
+        }
+        return selectedCollectionContracts.find(function (contract) {
+          return String((contract && contract.id) || "").trim() === selectedContractId;
+        }) || null;
+      }
+
+      function selectedCollectionCodeudorInputs() {
+        if (!collectionCodeudoresList) {
+          return [];
+        }
+        return Array.prototype.slice.call(
+          collectionCodeudoresList.querySelectorAll("[data-admin-notif-codeudor-key]:checked"),
+        );
+      }
+
+      function updateCollectionCodeudorCounter() {
+        var total = collectionCodeudoresList
+          ? collectionCodeudoresList.querySelectorAll("[data-admin-notif-codeudor-key]").length
+          : 0;
+        var selectedCount = selectedCollectionCodeudorInputs().length;
+        if (collectionCodeudorCountEl) {
+          collectionCodeudorCountEl.textContent = "Codeudores: " + selectedCount + " de " + total + " seleccionados";
+        }
+      }
+
+      function renderCollectionCodeudores() {
+        if (!collectionCodeudoresWrap || !collectionCodeudoresList) {
+          updateCollectionCodeudorCounter();
+          return;
+        }
+        var contract = activeCollectionContract();
+        var codeudores = contract && Array.isArray(contract.codeudores)
+          ? contract.codeudores
+          : [];
+        collectionCodeudoresList.innerHTML = "";
+        if (!contract) {
+          collectionCodeudoresWrap.hidden = true;
+          collectionCodeudoresWrap.classList.add("is-hidden");
+          updateCollectionCodeudorCounter();
+          return;
+        }
+        collectionCodeudoresWrap.hidden = false;
+        collectionCodeudoresWrap.classList.remove("is-hidden");
+        if (codeudores.length === 0) {
+          collectionCodeudoresList.innerHTML =
+            '<div class="scm-admin-notif-codeudores-empty">Sin codeudores registrados para este contrato.</div>';
+          updateCollectionCodeudorCounter();
+          return;
+        }
+        collectionCodeudoresList.innerHTML = codeudores.map(function (codeudor, index) {
+          var key = String((codeudor && codeudor.key) || "").trim();
+          var name = String((codeudor && codeudor.nombre) || ("Codeudor " + (index + 1))).trim();
+          var email = String((codeudor && codeudor.correo) || "").trim();
+          var phone = String((codeudor && codeudor.celular) || "").trim();
+          var documentValue = String((codeudor && codeudor.documento) || "").trim();
+          var address = String((codeudor && codeudor.direccion) || "").trim();
+          var source = String((codeudor && codeudor.fuente) || "Contrato").trim();
+          var contactBits = [];
+          contactBits.push(email ? "Email: " + email : "Sin correo");
+          contactBits.push(phone ? "Celular: " + phone : "Sin celular");
+          if (documentValue) contactBits.push("Documento: " + documentValue);
+          if (address) contactBits.push("Dirección: " + address);
+          return (
+            '<label class="scm-admin-notif-codeudor-card">' +
+            '<input type="checkbox" name="notify_codeudor_keys[]" value="' + escAttr(key) + '" data-admin-notif-codeudor-key checked>' +
+            '<span class="scm-admin-notif-codeudor-info">' +
+            '<strong>' + escHtml(name) + '</strong>' +
+            '<small>' + escHtml(contactBits.join(" · ")) + '</small>' +
+            '<em>' + escHtml(source) + '</em>' +
+            '</span>' +
+            '</label>'
+          );
+        }).join("");
+        updateCollectionCodeudorCounter();
+      }
+
       function syncCollectionContracts(contracts) {
         selectedCollectionContracts = Array.isArray(contracts) ? contracts : [];
         if (!collectionContractWrap || !collectionContractSelect) {
+          renderCollectionCodeudores();
           return;
         }
         collectionContractSelect.innerHTML = "";
@@ -2704,6 +2797,7 @@
             option.selected = true;
             collectionContractSelect.appendChild(option);
           }
+          renderCollectionCodeudores();
           updateCollectionPreview();
           return;
         }
@@ -2715,6 +2809,7 @@
         });
         collectionContractWrap.hidden = false;
         collectionContractWrap.classList.remove("is-hidden");
+        renderCollectionCodeudores();
         updateCollectionPreview();
       }
 
@@ -2984,6 +3079,14 @@
         if (collectionContractSelect) {
           collectionContractSelect.innerHTML = "";
         }
+        if (collectionCodeudoresList) {
+          collectionCodeudoresList.innerHTML = "";
+        }
+        if (collectionCodeudoresWrap) {
+          collectionCodeudoresWrap.hidden = true;
+          collectionCodeudoresWrap.classList.add("is-hidden");
+        }
+        updateCollectionCodeudorCounter();
         document.body.classList.remove("scm-admin-notif-modal-open");
       }
 
@@ -3866,14 +3969,46 @@
           collectionTypeSelect,
           collectionObservationInput,
           collectionContractSelect,
-          collectionCodeudoresInput,
         ].forEach(function (input) {
           if (!input) {
             return;
           }
-          input.addEventListener("input", updateCollectionPreview);
-          input.addEventListener("change", updateCollectionPreview);
+          input.addEventListener("input", function () {
+            if (input === collectionContractSelect) {
+              renderCollectionCodeudores();
+            }
+            updateCollectionPreview();
+          });
+          input.addEventListener("change", function () {
+            if (input === collectionContractSelect) {
+              renderCollectionCodeudores();
+            }
+            updateCollectionPreview();
+          });
         });
+        if (collectionCodeudoresList) {
+          collectionCodeudoresList.addEventListener("change", function (event) {
+            if (event.target && event.target.matches && event.target.matches("[data-admin-notif-codeudor-key]")) {
+              updateCollectionCodeudorCounter();
+            }
+          });
+        }
+        if (collectionCodeudoresSelectAllBtn && collectionCodeudoresList) {
+          collectionCodeudoresSelectAllBtn.addEventListener("click", function () {
+            collectionCodeudoresList.querySelectorAll("[data-admin-notif-codeudor-key]").forEach(function (input) {
+              input.checked = true;
+            });
+            updateCollectionCodeudorCounter();
+          });
+        }
+        if (collectionCodeudoresClearBtn && collectionCodeudoresList) {
+          collectionCodeudoresClearBtn.addEventListener("click", function () {
+            collectionCodeudoresList.querySelectorAll("[data-admin-notif-codeudor-key]").forEach(function (input) {
+              input.checked = false;
+            });
+            updateCollectionCodeudorCounter();
+          });
+        }
         panel.querySelectorAll("[data-admin-notif-collection-channel]").forEach(function (input) {
           input.addEventListener("change", updateCollectionPreview);
         });

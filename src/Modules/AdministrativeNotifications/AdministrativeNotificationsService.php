@@ -792,7 +792,7 @@ final class AdministrativeNotificationsService
 
   /**
    * @param array<string,mixed> $recipient
-   * @return array<int,array{id:int,label:string,contrato:string,inmueble:string,direccion:string}>
+   * @return array<int,array{id:int,label:string,contrato:string,inmueble:string,direccion:string,codeudores:array<int,array<string,string|bool>>}>
    */
   private function collectionContractOptionsForRecipient(array $recipient): array
   {
@@ -826,9 +826,57 @@ final class AdministrativeNotificationsService
         'contrato' => (string) $contractNumber,
         'inmueble' => (string) $property,
         'direccion' => (string) $address,
+        'codeudores' => $this->collectionCodeudorOptionsForContract($contract),
       ];
     }
     return $options;
+  }
+
+  /**
+   * @param array<string,mixed> $contract
+   * @return array<int,array<string,string|bool>>
+   */
+  private function collectionCodeudorOptionsForContract(array $contract): array
+  {
+    $contractId = (int) ($contract['_ID'] ?? 0);
+    if ($contractId <= 0) {
+      return [];
+    }
+
+    $out = [];
+    $seen = [];
+    foreach (array_merge(
+      $this->collectionCodeudoresFromTable($contract, []),
+      $this->collectionCodeudoresFromContractColumns($contract, [])
+    ) as $recipient) {
+      if (!is_array($recipient)) {
+        continue;
+      }
+      $key = $this->codeudorRecipientKey($recipient, $contractId);
+      if ($key === '' || isset($seen[$key])) {
+        continue;
+      }
+      $seen[$key] = true;
+      $email = trim((string) ($recipient['correo'] ?? ''));
+      $phone = trim((string) ($recipient['celular'] ?? ''));
+      $meta = is_array($recipient['_scm_notification_meta'] ?? null) ? $recipient['_scm_notification_meta'] : [];
+      $codeudorMeta = is_array($meta['codeudor'] ?? null) ? $meta['codeudor'] : [];
+      $source = trim((string) ($codeudorMeta['source'] ?? ''));
+      $out[] = [
+        'key' => $key,
+        'id' => (string) ((int) ($recipient['_ID'] ?? 0)),
+        'nombre' => trim((string) ($recipient['nombre'] ?? '')),
+        'documento' => trim((string) ($recipient['documento'] ?? '')),
+        'correo' => $email,
+        'celular' => $phone,
+        'direccion' => trim((string) ($codeudorMeta['address'] ?? '')),
+        'fuente' => $source === 'tabla' ? 'Tabla de codeudores' : 'Contrato',
+        'has_email' => $email !== '',
+        'has_phone' => $phone !== '',
+      ];
+    }
+
+    return $out;
   }
 
   /**
@@ -913,21 +961,28 @@ final class AdministrativeNotificationsService
       'gestiones_cobro',
       'codigo_inmueble_web',
       'num_codeudores',
+      'id_codeudor',
+      'id_codeudores',
+      'codeudores_ids',
+      'id_codeudor_1',
       'codeudor_1',
       'celular_codeudor_1',
       'correo_codeudor_1',
       'documento_codeudor_1',
       'dir_codeudor_1',
+      'id_codeudor_2',
       'codeudor_2',
       'celular_codeudor_2',
       'correo_codeudor_2',
       'documento_codeudor_2',
       'dir_codeudor_2',
+      'id_codeudor_3',
       'codeudor_3',
       'celular_codeudor_3',
       'correo_codeudor_3',
       'documento_codeudor_3',
       'dir_codeudor_3',
+      'id_codeudor_4',
       'codeudor_4',
       'celular_codeudor_4',
       'correo_codeudor_4',
@@ -1357,10 +1412,29 @@ final class AdministrativeNotificationsService
    * @param string[] $channels
    * @return array{queued:int,failed:int,invalid:int,filtered:int,selected:int,channels:array<int,string>,type:string}
    */
-  public function enqueueCollectionCodeudores(array $managements, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = '', int $smsMax = self::SMS_MAX): array
+  public function enqueueCollectionCodeudores(array $managements, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = '', int $smsMax = self::SMS_MAX, array $selectedCodeudorKeys = []): array
   {
     $channels = $this->sanitizeChannels($channels);
     $recipients = $this->collectionCodeudorRecipients($managements);
+    $selectedMap = [];
+    foreach ($selectedCodeudorKeys as $selectedKey) {
+      $selectedKey = trim((string) $selectedKey);
+      if ($selectedKey !== '') {
+        $selectedMap[$selectedKey] = true;
+      }
+    }
+    if ($selectedMap !== []) {
+      $recipients = array_values(array_filter($recipients, function (array $recipient) use ($selectedMap): bool {
+        $meta = is_array($recipient['_scm_notification_meta'] ?? null) ? $recipient['_scm_notification_meta'] : [];
+        $codeudorMeta = is_array($meta['codeudor'] ?? null) ? $meta['codeudor'] : [];
+        $contractId = (int) ($codeudorMeta['contract_id'] ?? 0);
+        if ($contractId <= 0) {
+          return false;
+        }
+        $key = $this->codeudorRecipientKey($recipient, $contractId);
+        return isset($selectedMap[$key]);
+      }));
+    }
     $result = [
       'queued' => 0,
       'failed' => 0,
@@ -2302,21 +2376,28 @@ final class AdministrativeNotificationsService
       'direccion',
       'arrendatario',
       'num_codeudores',
+      'id_codeudor',
+      'id_codeudores',
+      'codeudores_ids',
+      'id_codeudor_1',
       'codeudor_1',
       'celular_codeudor_1',
       'correo_codeudor_1',
       'documento_codeudor_1',
       'dir_codeudor_1',
+      'id_codeudor_2',
       'codeudor_2',
       'celular_codeudor_2',
       'correo_codeudor_2',
       'documento_codeudor_2',
       'dir_codeudor_2',
+      'id_codeudor_3',
       'codeudor_3',
       'celular_codeudor_3',
       'correo_codeudor_3',
       'documento_codeudor_3',
       'dir_codeudor_3',
+      'id_codeudor_4',
       'codeudor_4',
       'celular_codeudor_4',
       'correo_codeudor_4',
@@ -2369,18 +2450,19 @@ final class AdministrativeNotificationsService
   private function collectionCodeudoresFromTable(array $contract, array $managements): array
   {
     $table = $this->db->table('jet_cct_codeudores');
-    if (!$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'id_contrato')) {
+    if (!$this->schema->tableExists($table)) {
       return [];
     }
     $contractId = (int) ($contract['_ID'] ?? 0);
     $contractNumber = $this->firstNonEmpty([$contract['contrato'] ?? '', $contract['contrato_arrendamiento'] ?? '']);
     $lookupValue = $contractNumber !== '' ? $contractNumber : (string) $contractId;
-    if ($lookupValue === '' || $lookupValue === '0') {
-      return [];
-    }
 
-    $select = ['_ID', 'id_contrato'];
+    $select = ['_ID'];
+    if ($this->schema->columnExists($table, 'id_contrato')) {
+      $select[] = 'id_contrato';
+    }
     foreach ([
+      'id_codeudor',
       'nombre',
       'correo',
       'celular',
@@ -2395,15 +2477,72 @@ final class AdministrativeNotificationsService
         $select[] = $column;
       }
     }
+    $whereParts = [];
+    $args = [];
+    if ($this->schema->columnExists($table, 'id_contrato')) {
+      $lookupValues = [];
+      if ($lookupValue !== '' && $lookupValue !== '0') {
+        $lookupValues[$lookupValue] = $lookupValue;
+      }
+      if ($contractId > 0) {
+        $lookupValues[(string) $contractId] = (string) $contractId;
+      }
+      foreach (array_values($lookupValues) as $value) {
+        $whereParts[] = "TRIM(COALESCE(`id_contrato`, '')) = ?";
+        $args[] = $value;
+      }
+    }
+    $codeudorIds = $this->collectionCodeudorIdsFromContract($contract);
+    if ($codeudorIds !== []) {
+      $idPlaceholders = implode(',', array_fill(0, count($codeudorIds), '?'));
+      $whereParts[] = "CAST(`_ID` AS UNSIGNED) IN ({$idPlaceholders})";
+      array_push($args, ...$codeudorIds);
+      if ($this->schema->columnExists($table, 'id_codeudor')) {
+        $whereParts[] = "CAST(`id_codeudor` AS UNSIGNED) IN ({$idPlaceholders})";
+        array_push($args, ...$codeudorIds);
+      }
+    }
+    if ($whereParts === []) {
+      return [];
+    }
     $rows = $this->db->getResults(
-      'SELECT `' . implode('`, `', array_values(array_unique($select))) . "` FROM `{$table}` WHERE TRIM(COALESCE(`id_contrato`, '')) = ? ORDER BY `_ID` ASC",
-      [$lookupValue]
+      'SELECT `' . implode('`, `', array_values(array_unique($select))) . "` FROM `{$table}` WHERE " . implode(' OR ', array_map(static fn(string $part): string => '(' . $part . ')', $whereParts)) . " ORDER BY `_ID` ASC",
+      $args
     );
     $out = [];
     foreach ($rows as $row) {
       $out[] = $this->collectionCodeudorRecipient($row, $contract, $managements, 'tabla');
     }
     return $out;
+  }
+
+  /** @param array<string,mixed> $contract @return int[] */
+  private function collectionCodeudorIdsFromContract(array $contract): array
+  {
+    $ids = [];
+    foreach ([
+      'id_codeudor',
+      'id_codeudores',
+      'codeudores_ids',
+      'id_codeudor_1',
+      'id_codeudor_2',
+      'id_codeudor_3',
+      'id_codeudor_4',
+    ] as $column) {
+      $raw = trim((string) ($contract[$column] ?? ''));
+      if ($raw === '') {
+        continue;
+      }
+      if (preg_match_all('/\d+/', $raw, $matches)) {
+        foreach (($matches[0] ?? []) as $match) {
+          $id = (int) $match;
+          if ($id > 0) {
+            $ids[$id] = $id;
+          }
+        }
+      }
+    }
+    return array_values($ids);
   }
 
   /**
