@@ -179,6 +179,7 @@ trait HandlesAdministrativeNotifications
       $skipped = (int) ($result['skipped'] ?? 0);
       $notifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0];
       $codeudorNotifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0, 'selected' => 0];
+      $internalNotifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0, 'selected' => 0];
       $notifyError = '';
       if ($created > 0 && $notifyChannels !== []) {
         try {
@@ -210,16 +211,41 @@ trait HandlesAdministrativeNotifications
           $notifyError = $notifyException->getMessage();
         }
       }
+      $internalNotifyError = '';
+      if ($created > 0) {
+        $internalIds = $this->internalNotificationRecipientsForAction('gestion_cobro');
+        if ($internalIds !== []) {
+          try {
+            $internalMessage = $this->collection_management_internal_notification_message((array) ($result['managements'] ?? []), $payload, $queuedDetail, $created, $skipped);
+            $internalNotifyResult = $service->enqueue(
+              'funcionarios',
+              $internalIds,
+              ['email'],
+              'Nueva gestion de cobro registrada',
+              $internalMessage,
+              '',
+              AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE,
+              [],
+              AdministrativeNotificationsService::SMS_MAX
+            );
+          } catch (\Throwable $internalException) {
+            $internalNotifyError = $internalException->getMessage();
+          }
+        }
+      }
       $queued = (int) ($notifyResult['queued'] ?? 0) + (int) ($codeudorNotifyResult['queued'] ?? 0);
+      $internalQueued = (int) ($internalNotifyResult['queued'] ?? 0);
       $codeudoresSelected = (int) ($codeudorNotifyResult['selected'] ?? 0);
       $message = $created > 0
-        ? sprintf('Se registraron %d gestiones de cobro.%s%s%s%s', $created, $skipped > 0 ? " {$skipped} contratos omitidos." : '', $queued > 0 ? " {$queued} notificaciones encoladas." : '', $codeudoresSelected > 0 ? " Incluye {$codeudoresSelected} codeudor(es)." : '', $notifyError !== '' ? ' No se pudo encolar notificacion: ' . $notifyError : '')
+        ? sprintf('Se registraron %d gestiones de cobro.%s%s%s%s%s', $created, $skipped > 0 ? " {$skipped} contratos omitidos." : '', $queued > 0 ? " {$queued} notificaciones encoladas." : '', $codeudoresSelected > 0 ? " Incluye {$codeudoresSelected} codeudor(es)." : '', $internalQueued > 0 ? " {$internalQueued} aviso(s) interno(s)." : '', ($notifyError !== '' || $internalNotifyError !== '') ? ' No se pudo encolar todo: ' . trim($notifyError . ' ' . $internalNotifyError) : '')
         : 'No se registro ninguna gestion de cobro. Revisa que los arrendatarios tengan contratos activos.';
       $this->jsonOk($result + [
         'message' => $message,
         'notifications' => $notifyResult,
         'codeudor_notifications' => $codeudorNotifyResult,
+        'internal_notifications' => $internalNotifyResult,
         'notification_error' => $notifyError,
+        'internal_notification_error' => $internalNotifyError,
         'queued_channels' => $notifyChannels,
         'queued_detail' => $queuedDetail,
       ]);
@@ -262,6 +288,51 @@ trait HandlesAdministrativeNotifications
     } catch (\Throwable $e) {
       $this->jsonFail($e->getMessage());
     }
+  }
+
+  /** @param array<int,array<string,mixed>> $managements @param array<string,mixed> $payload */
+  private function collection_management_internal_notification_message(array $managements, array $payload, string $queuedDetail, int $created, int $skipped): string
+  {
+    $typeLabel = trim((string) ($payload['tipo_gestion_cobro'] ?? ''));
+    $observation = trim(html_entity_decode(strip_tags((string) ($payload['observacion'] ?? '')), ENT_QUOTES, 'UTF-8'));
+    $sender = trim(Auth::user());
+    if ($sender === '') {
+      $sender = 'Funcionario';
+    }
+
+    $lines = [
+      'Se registraron ' . $created . ' gestión(es) de cobro desde el panel de Notificaciones.',
+      'Realizado por: ' . $sender . '.',
+    ];
+    if ($typeLabel !== '') {
+      $lines[] = 'Tipo de gestión: ' . $typeLabel . '.';
+    }
+    if ($queuedDetail !== '') {
+      $lines[] = 'Detalle notificado al cliente: ' . $queuedDetail;
+    } elseif ($observation !== '') {
+      $lines[] = 'Observación: ' . $observation;
+    }
+    if ($skipped > 0) {
+      $lines[] = 'Contratos omitidos: ' . $skipped . '.';
+    }
+
+    $summary = [];
+    foreach (array_slice($managements, 0, 8) as $management) {
+      if (!is_array($management)) {
+        continue;
+      }
+      $contract = trim((string) ($management['contract_number'] ?? ''));
+      $property = trim((string) ($management['property'] ?? ''));
+      $piece = trim(($contract !== '' ? 'Contrato ' . $contract : '') . ($property !== '' ? ' · Inmueble ' . $property : ''));
+      if ($piece !== '') {
+        $summary[] = $piece;
+      }
+    }
+    if ($summary !== []) {
+      $lines[] = 'Registros: ' . implode('; ', $summary) . (count($managements) > count($summary) ? '; y más.' : '.');
+    }
+
+    return implode("\n\n", $lines);
   }
 
   /** @param array<int,array<string,mixed>> $managements @return array<int,array<string,mixed>> */

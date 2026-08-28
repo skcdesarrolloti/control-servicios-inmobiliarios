@@ -62,6 +62,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION = 'scm_admin_notifications_collection';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE = 'scm_admin_notifications_collection_queue';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_LOG = 'scm_admin_notifications_collection_log';
+  const AJAX_INTERNAL_NOTIFICATIONS_SAVE = 'scm_internal_notifications_save';
   const AJAX_METRICS_EXECUTION = 'scm_metricas_ejecucion_funcionario';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';
   const AJAX_CANON_INSURANCE_AUDIT_IMPORT = 'scm_auditoria_canon_aseguradoras_importar';
@@ -154,6 +155,212 @@ final class SuCasaControlServiciosInmobiliarios
   private function canManagePublicPqrSettings(): bool
   {
     return in_array(Auth::userCargo(), $this->dashboardPermissionAdminCargos(), true);
+  }
+
+  private function canManageInternalNotificationSettings(): bool
+  {
+    return in_array(Auth::userCargo(), $this->dashboardPermissionAdminCargos(), true);
+  }
+
+  /** @return array<string,array{label:string,items:array<string,array{label:string,description:string,channel:string}>}> */
+  private function internalNotificationActionCatalog(): array
+  {
+    return [
+      'cobranza' => [
+        'label' => 'Cobranza',
+        'items' => [
+          'gestion_cobro' => [
+            'label' => 'Gestión de cobro',
+            'description' => 'Cuando se registra una gestión de cobro desde Notificaciones.',
+            'channel' => 'Email interno',
+          ],
+        ],
+      ],
+      'gestion_caso' => [
+        'label' => 'Gestión del caso',
+        'items' => [
+          'respuesta_ticket' => [
+            'label' => 'Responder ticket',
+            'description' => 'Cuando un funcionario responde un caso.',
+            'channel' => 'Pendiente de conexión',
+          ],
+          'seguimiento_ticket' => [
+            'label' => 'Agregar seguimiento',
+            'description' => 'Cuando se registra un seguimiento en el caso.',
+            'channel' => 'Pendiente de conexión',
+          ],
+          'nota_ticket' => [
+            'label' => 'Agregar nota',
+            'description' => 'Cuando se deja una nota interna en el caso.',
+            'channel' => 'Pendiente de conexión',
+          ],
+          'trasladar_caso' => [
+            'label' => 'Trasladar caso',
+            'description' => 'Cuando el caso se traslada a otro responsable o área.',
+            'channel' => 'Pendiente de conexión',
+          ],
+          'postergar_ticket' => [
+            'label' => 'Postergar ticket',
+            'description' => 'Cuando el ticket queda postergado.',
+            'channel' => 'Pendiente de conexión',
+          ],
+        ],
+      ],
+      'agenda' => [
+        'label' => 'Citas y calendario',
+        'items' => [
+          'agendar_cita' => [
+            'label' => 'Agendar cita',
+            'description' => 'Cuando se agenda una cita del caso.',
+            'channel' => 'Pendiente de conexión',
+          ],
+          'cita_realizada' => [
+            'label' => 'Cita realizada',
+            'description' => 'Cuando una cita queda marcada como realizada.',
+            'channel' => 'Pendiente de conexión',
+          ],
+        ],
+      ],
+      'preventivas' => [
+        'label' => 'Preventivas',
+        'items' => [
+          'crear_ticket_preventiva' => [
+            'label' => 'Crear ticket preventivo',
+            'description' => 'Cuando se crea un ticket administrativo de revisión preventiva.',
+            'channel' => 'Pendiente de conexión',
+          ],
+          'comunicacion_no_acceso' => [
+            'label' => 'Comunicación por no autorización',
+            'description' => 'Cuando se genera comunicación preventiva por falta de autorización o acceso.',
+            'channel' => 'Pendiente de conexión',
+          ],
+          'acta_preventiva' => [
+            'label' => 'Acta preventiva',
+            'description' => 'Cuando se genera o envía un acta de revisión preventiva.',
+            'channel' => 'Pendiente de conexión',
+          ],
+        ],
+      ],
+    ];
+  }
+
+  /** @return array<string,array<int,string>> */
+  private function internalNotificationSettingsConfig(): array
+  {
+    $raw = \SCM\Core\App::settings()->get('internal_admin_notifications', []);
+    return $this->sanitizeInternalNotificationSettings(is_array($raw) ? $raw : []);
+  }
+
+  /** @param array<mixed> $raw @return array<string,array<int,string>> */
+  private function sanitizeInternalNotificationSettings(array $raw): array
+  {
+    $validActions = [];
+    foreach ($this->internalNotificationActionCatalog() as $group) {
+      foreach ((array) ($group['items'] ?? []) as $actionKey => $_item) {
+        $validActions[(string) $actionKey] = true;
+      }
+    }
+
+    $validFuncionarioIds = [];
+    foreach ($this->internalNotificationFuncionarioOptions() as $funcionario) {
+      $id = trim((string) ($funcionario['id'] ?? ''));
+      if ($id !== '') {
+        $validFuncionarioIds[$id] = true;
+      }
+    }
+
+    $out = [];
+    foreach ($raw as $action => $ids) {
+      $actionKey = preg_replace('/[^a-z0-9_]/', '', strtolower((string) $action)) ?: '';
+      if ($actionKey === '' || !isset($validActions[$actionKey])) {
+        continue;
+      }
+      $selected = [];
+      foreach ((array) $ids as $id) {
+        $idKey = trim((string) ((int) $id));
+        if ($idKey !== '' && $idKey !== '0' && isset($validFuncionarioIds[$idKey])) {
+          $selected[$idKey] = $idKey;
+        }
+      }
+      $out[$actionKey] = array_values($selected);
+    }
+    ksort($out);
+    return $out;
+  }
+
+  /** @return array<int,array{id:string,label:string,name:string,email:string,cargo:string}> */
+  private function internalNotificationFuncionarioOptions(): array
+  {
+    $table = $this->db->table('jet_cct_funcionarios');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+
+    $cargoTable = $this->db->table('jet_cct_cargos');
+    $hasCargoNames = $this->table_exists($cargoTable)
+      && $this->column_exists($cargoTable, '_ID')
+      && $this->column_exists($cargoTable, 'nombre_cargo')
+      && $this->column_exists($table, 'id_cargo');
+
+    $nameColumn = $this->column_exists($table, 'nombre') ? 'nombre' : ($this->column_exists($table, 'empleado') ? 'empleado' : '');
+    $emailColumn = $this->column_exists($table, 'correo') ? 'correo' : ($this->column_exists($table, 'correo_dian') ? 'correo_dian' : '');
+    $employeeColumn = $this->column_exists($table, 'id_empleado') ? 'id_empleado' : '';
+    $cargoColumn = $this->column_exists($table, 'id_cargo') ? 'id_cargo' : '';
+    $activeWhere = $this->column_exists($table, 'activo') ? " AND LOWER(TRIM(COALESCE(f.`activo`, ''))) IN ('si', 'sí', '1', 'true', 'activo')" : '';
+
+    $select = [
+      'f.`_ID`',
+      $nameColumn !== '' ? "TRIM(COALESCE(f.`{$nameColumn}`, '')) AS nombre" : "CAST(f.`_ID` AS CHAR) AS nombre",
+      $emailColumn !== '' ? "TRIM(COALESCE(f.`{$emailColumn}`, '')) AS correo" : "'' AS correo",
+      $employeeColumn !== '' ? "TRIM(COALESCE(f.`{$employeeColumn}`, '')) AS id_empleado" : "'' AS id_empleado",
+      $cargoColumn !== '' ? "TRIM(COALESCE(f.`{$cargoColumn}`, '')) AS id_cargo" : "'' AS id_cargo",
+      $hasCargoNames ? "TRIM(COALESCE(c.`nombre_cargo`, '')) AS nombre_cargo" : "'' AS nombre_cargo",
+    ];
+    $join = $hasCargoNames ? " LEFT JOIN `{$cargoTable}` c ON TRIM(COALESCE(f.`{$cargoColumn}`, '')) = CAST(c.`_ID` AS CHAR)" : '';
+    $rows = $this->db->getResults(
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` f{$join} WHERE TRIM(COALESCE(f.`_ID`, '')) <> ''{$activeWhere} ORDER BY nombre ASC"
+    );
+
+    $out = [];
+    foreach ($rows as $row) {
+      $id = (string) ((int) ($row['_ID'] ?? 0));
+      if ($id === '0') {
+        continue;
+      }
+      $name = trim((string) ($row['nombre'] ?? ''));
+      $email = trim((string) ($row['correo'] ?? ''));
+      $cargoName = trim((string) ($row['nombre_cargo'] ?? ''));
+      $cargoId = trim((string) ($row['id_cargo'] ?? ''));
+      $cargo = $cargoName !== '' ? $cargoName : ($cargoId !== '' ? 'Cargo ' . $cargoId : 'Funcionario');
+      $employee = trim((string) ($row['id_empleado'] ?? ''));
+      $parts = [$name !== '' ? $name : ('Funcionario #' . $id), $cargo];
+      if ($email !== '') {
+        $parts[] = $email;
+      }
+      if ($employee !== '') {
+        $parts[] = 'Empleado ' . $employee;
+      }
+      $out[] = [
+        'id' => $id,
+        'label' => implode(' · ', $parts),
+        'name' => $name !== '' ? $name : ('Funcionario #' . $id),
+        'email' => $email,
+        'cargo' => $cargo,
+      ];
+    }
+
+    return $out;
+  }
+
+  /** @return int[] */
+  private function internalNotificationRecipientsForAction(string $action): array
+  {
+    $actionKey = preg_replace('/[^a-z0-9_]/', '', strtolower($action)) ?: '';
+    if ($actionKey === '') {
+      return [];
+    }
+    $settings = $this->internalNotificationSettingsConfig();
+    return array_values(array_unique(array_filter(array_map('intval', $settings[$actionKey] ?? []), static fn(int $id): bool => $id > 0)));
   }
 
   private function canManageCanonInsuranceAuditCleanup(): bool

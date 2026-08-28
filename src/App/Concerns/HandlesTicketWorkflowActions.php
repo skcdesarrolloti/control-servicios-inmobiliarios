@@ -46,6 +46,36 @@ trait HandlesTicketWorkflowActions
     ]);
   }
 
+  public function ajax_handler_internal_notifications_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canManageInternalNotificationSettings()) {
+      $this->jsonFail('No tienes permiso para configurar notificaciones internas.');
+    }
+
+    $raw = stripslashes((string) ($_POST['settings'] ?? '{}'));
+    try {
+      $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+    } catch (\JsonException $exception) {
+      $this->jsonFail('La configuracion enviada no es valida.');
+      return;
+    }
+
+    $settings = $this->sanitizeInternalNotificationSettings(is_array($decoded) ? $decoded : []);
+    \SCM\Core\App::settings()->set('internal_admin_notifications', $settings, Auth::userId());
+    \SCM\Core\App::settings()->refresh();
+
+    $totalRecipients = 0;
+    foreach ($settings as $ids) {
+      $totalRecipients += count((array) $ids);
+    }
+
+    $this->jsonOk([
+      'message' => sprintf('Notificaciones internas guardadas: %d asignaciones configuradas.', $totalRecipients),
+      'settings' => $settings,
+    ]);
+  }
+
   public function ajax_handler()
   {
     $this->verifyCsrf();

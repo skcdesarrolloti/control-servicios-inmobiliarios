@@ -223,6 +223,7 @@ trait RendersDashboard
     $dashboardPermissionConfig = $this->dashboardPermissionsConfig();
     $canManageDashboardPermissions = $this->canManageDashboardPermissions();
     $canManagePublicPqrSettings = $this->canManagePublicPqrSettings();
+    $canManageInternalNotificationSettings = $this->canManageInternalNotificationSettings();
     $allowedAdministrativeActivityTabs = [];
     foreach (array_keys($administrativeActivityTabs) as $activityTabKey) {
       if (in_array($activityTabKey, $dashboardAllowedTabs, true)) {
@@ -350,6 +351,7 @@ trait RendersDashboard
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
         'admin_notifications_collection_log' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_LOG,
+        'internal_notifications_save' => self::AJAX_INTERNAL_NOTIFICATIONS_SAVE,
         'metrics_execution' => self::AJAX_METRICS_EXECUTION,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
         'canon_insurance_audit_import' => self::AJAX_CANON_INSURANCE_AUDIT_IMPORT,
@@ -482,6 +484,9 @@ trait RendersDashboard
         <?php endif; ?>
         <?php if ($canManagePublicPqrSettings): ?>
           <button class="scm-guide-btn scm-pqr-settings-shortcut" type="button" id="scm-open-pqr-settings">Configurar notificaciones</button>
+        <?php endif; ?>
+        <?php if ($canManageInternalNotificationSettings): ?>
+          <button class="scm-guide-btn scm-internal-notifications-shortcut" type="button" id="scm-open-internal-notifications">Notificaciones internas</button>
         <?php endif; ?>
         <button class="scm-guide-btn" type="button" id="scm-open-guide"><i class="fas fa-book-open"></i> Ver gu&iacute;as</button>
       </div>
@@ -969,6 +974,9 @@ trait RendersDashboard
       <?php if ($canManagePublicPqrSettings): ?>
         <?php echo $this->renderDashboardPublicPqrSettingsModal(); ?>
       <?php endif; ?>
+      <?php if ($canManageInternalNotificationSettings): ?>
+        <?php echo $this->renderDashboardInternalNotificationsModal(); ?>
+      <?php endif; ?>
 
       <div class="scm-case-modal" id="scm-case-modal" aria-hidden="true">
         <div class="scm-case-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-case-title">
@@ -1101,6 +1109,79 @@ trait RendersDashboard
           <p>Puedes seleccionar responsables generales o espec&iacute;ficos por propietario, arrendatario, copropiedad y cliente.</p>
           <div class="scm-pqr-settings-grid"><?php echo $correspGridHtml; ?></div>
         </section>
+      </div>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  private function renderDashboardInternalNotificationsModal(): string
+  {
+    $settings = $this->internalNotificationSettingsConfig();
+    $catalog = $this->internalNotificationActionCatalog();
+    $funcionarios = $this->internalNotificationFuncionarioOptions();
+    $buildOptions = function (array $selectedIds) use ($funcionarios): string {
+      $selected = [];
+      foreach ($selectedIds as $selectedId) {
+        $selected[(string) ((int) $selectedId)] = true;
+      }
+      $html = '';
+      foreach ($funcionarios as $funcionario) {
+        $id = trim((string) ($funcionario['id'] ?? ''));
+        if ($id === '') {
+          continue;
+        }
+        $label = trim((string) ($funcionario['label'] ?? $id));
+        $html .= '<option value="' . esc_attr($id) . '"' . (isset($selected[$id]) ? ' selected' : '') . '>' . esc_html($label) . '</option>';
+      }
+      return $html;
+    };
+
+    $groupsHtml = '';
+    foreach ($catalog as $groupKey => $group) {
+      $groupsHtml .= '<section class="scm-internal-notif-group" data-internal-notif-group="' . esc_attr((string) $groupKey) . '">';
+      $groupsHtml .= '<h4>' . esc_html((string) ($group['label'] ?? $groupKey)) . '</h4>';
+      foreach ((array) ($group['items'] ?? []) as $actionKey => $item) {
+        $action = trim((string) $actionKey);
+        if ($action === '') {
+          continue;
+        }
+        $selectedIds = is_array($settings[$action] ?? null) ? $settings[$action] : [];
+        $groupsHtml .= '<div class="scm-internal-notif-action">';
+        $groupsHtml .= '<div class="scm-internal-notif-action-head">';
+        $groupsHtml .= '<strong>' . esc_html((string) ($item['label'] ?? $action)) . '</strong>';
+        $groupsHtml .= '<span>' . esc_html((string) ($item['channel'] ?? 'Email interno')) . '</span>';
+        $groupsHtml .= '</div>';
+        $groupsHtml .= '<p>' . esc_html((string) ($item['description'] ?? '')) . '</p>';
+        $groupsHtml .= '<select name="settings[' . esc_attr($action) . '][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $buildOptions($selectedIds) . '</select>';
+        $groupsHtml .= '</div>';
+      }
+      $groupsHtml .= '</section>';
+    }
+    if ($funcionarios === []) {
+      $groupsHtml = '<p class="scm-pqr-config-empty">No hay funcionarios activos disponibles para configurar.</p>';
+    }
+
+    ob_start();
+?>
+    <div id="scm-internal-notifications-modal" class="scm-pqr-settings-modal scm-internal-notifications-modal" aria-hidden="true">
+      <div class="scm-pqr-settings-dialog scm-internal-notifications-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-internal-notifications-title">
+        <button type="button" class="scm-pqr-settings-close" id="scm-close-internal-notifications" aria-label="Cerrar">&times;</button>
+        <div class="scm-pqr-settings-head">
+          <h3 id="scm-internal-notifications-title">Notificaciones internas administrativas</h3>
+          <p>Clasifica a qu&eacute; funcionarios se les avisa por cada acci&oacute;n del panel. Hoy Gesti&oacute;n de cobro ya encola Email interno real; las dem&aacute;s acciones quedan listas para conectar al flujo correspondiente.</p>
+        </div>
+        <form id="scm-internal-notifications-form" class="scm-internal-notifications-form" autocomplete="off">
+          <section class="scm-pqr-settings-section">
+            <h4>Acciones y destinatarios internos</h4>
+            <p>Selecciona uno o varios funcionarios por acci&oacute;n. Si una acci&oacute;n queda vac&iacute;a, no se env&iacute;an avisos internos para esa actividad.</p>
+            <div class="scm-internal-notif-grid"><?php echo $groupsHtml; ?></div>
+          </section>
+          <div class="scm-pqr-config-actions scm-internal-notif-actions">
+            <small id="scm-internal-notifications-msg" aria-live="polite"></small>
+            <button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Guardar notificaciones internas</button>
+          </div>
+        </form>
       </div>
     </div>
 <?php

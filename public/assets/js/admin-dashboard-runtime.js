@@ -168,6 +168,8 @@
       actions.admin_notifications_collection_queue || "";
     var actionAdminNotificationsCollectionLog =
       actions.admin_notifications_collection_log || "";
+    var actionInternalNotificationsSave =
+      actions.internal_notifications_save || "";
     var actionMetricsExecution = actions.metrics_execution || "";
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
@@ -4301,6 +4303,118 @@
     }
 
     bindPublicPqrSettingsShortcut();
+
+    function bindInternalNotificationsSettings() {
+      var openBtn = root.querySelector("#scm-open-internal-notifications");
+      var modal = root.querySelector("#scm-internal-notifications-modal");
+      var form = root.querySelector("#scm-internal-notifications-form");
+      if (!openBtn || !modal || !form) {
+        return;
+      }
+      var closeBtn = modal.querySelector("#scm-close-internal-notifications");
+      var msg = modal.querySelector("#scm-internal-notifications-msg");
+
+      function initSelects() {
+        if (!(window.jQuery && window.jQuery.fn && window.jQuery.fn.select2)) {
+          return;
+        }
+        var $ = window.jQuery;
+        modal.querySelectorAll("select.scm-select").forEach(function (selectEl) {
+          var $select = $(selectEl);
+          if ($select.data("select2")) {
+            return;
+          }
+          $select.select2({
+            width: "100%",
+            closeOnSelect: false,
+            dropdownParent: $(modal),
+            placeholder: "Buscar funcionarios...",
+          });
+        });
+      }
+
+      function openModal() {
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+        initSelects();
+      }
+
+      function closeModal() {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+      }
+
+      function setMessage(text, isError) {
+        if (!msg) return;
+        msg.textContent = text || "";
+        msg.classList.toggle("error", !!isError);
+      }
+
+      function collectSettings() {
+        var settings = {};
+        form.querySelectorAll('select[name^="settings["]').forEach(function (select) {
+          var match = select.name.match(/^settings\[([^\]]+)\]/);
+          var action = match ? match[1] : "";
+          if (!action) return;
+          settings[action] = Array.prototype.slice.call(select.selectedOptions || [])
+            .map(function (option) {
+              return option.value;
+            })
+            .filter(Boolean);
+        });
+        return settings;
+      }
+
+      openBtn.addEventListener("click", openModal);
+      if (closeBtn) {
+        closeBtn.addEventListener("click", closeModal);
+      }
+      modal.addEventListener("click", function (event) {
+        if (event.target === modal) {
+          event.preventDefault();
+        }
+      });
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (!ajaxUrl || !actionInternalNotificationsSave) {
+          setMessage("No esta disponible la accion de guardado.", true);
+          return;
+        }
+        var submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+        setMessage("Guardando configuracion...", false);
+        var fd = new FormData();
+        fd.append("action", actionInternalNotificationsSave);
+        fd.append("nonce", nonce);
+        fd.append("settings", JSON.stringify(collectSettings()));
+        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error(
+                (json && json.data && json.data.message) ||
+                  "No se pudieron guardar las notificaciones internas.",
+              );
+            }
+            setMessage(
+              (json.data && json.data.message) || "Notificaciones internas guardadas.",
+              false,
+            );
+            showToast("success", "Notificaciones internas guardadas.");
+          })
+          .catch(function (err) {
+            setMessage(err && err.message ? err.message : "No se pudo guardar.", true);
+            showToast("error", err && err.message ? err.message : "No se pudo guardar.");
+          })
+          .finally(function () {
+            if (submitBtn) submitBtn.disabled = false;
+          });
+      });
+    }
+
+    bindInternalNotificationsSettings();
 
     function ticketAdminDatalist(id, values) {
       return (

@@ -198,6 +198,11 @@
   box-shadow: 0 3px 10px rgba(15, 118, 110, 0.22);
 }
 
+#scm-app .scm-internal-notifications-shortcut {
+  background: linear-gradient(135deg, #f59e0b, #c2410c);
+  box-shadow: 0 3px 10px rgba(245, 158, 11, 0.22);
+}
+
 #scm-app .scm-permissions-modal,
 #scm-app .scm-pqr-settings-modal {
   display: none;
@@ -561,6 +566,81 @@
   margin: 0;
   color: #a95b26;
   font-size: 12px;
+}
+
+#scm-app .scm-internal-notif-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+#scm-app .scm-internal-notif-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dbe6f1;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-internal-notif-group h4 {
+  margin: 0;
+  color: #0f2745;
+}
+
+#scm-app .scm-internal-notif-action {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e3ecf7;
+  border-radius: 12px;
+  background: #fff;
+}
+
+#scm-app .scm-internal-notif-action-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#scm-app .scm-internal-notif-action-head strong {
+  color: #102944;
+  font-size: 13px;
+}
+
+#scm-app .scm-internal-notif-action-head span {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#scm-app .scm-internal-notif-action p {
+  margin: 0;
+  color: #63758a;
+  font-size: 11px;
+}
+
+#scm-app .scm-internal-notif-actions {
+  padding: 0 26px 24px;
+  justify-content: flex-end;
+}
+
+#scm-app #scm-internal-notifications-msg {
+  color: #166534;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#scm-app #scm-internal-notifications-msg.error {
+  color: #b91c1c;
 }
 
 #scm-app .scm-tab-panel {
