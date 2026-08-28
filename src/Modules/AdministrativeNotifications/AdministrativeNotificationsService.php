@@ -2542,12 +2542,9 @@ final class AdministrativeNotificationsService
         continue;
       }
       $contractsById[$contractId] = $contract;
-      foreach ([$contractId, $contract['contrato'] ?? '', $contract['contrato_arrendamiento'] ?? ''] as $lookup) {
-        $lookup = trim((string) $lookup);
-        if ($lookup !== '') {
-          $contractLookup[$lookup][$contractId] = $contractId;
-        }
-      }
+      // jet_cct_codeudores.id_contrato almacena el _ID interno del contrato.
+      // El numero visible de contrato puede coincidir con el _ID de otro registro.
+      $contractLookup[(string) $contractId][$contractId] = $contractId;
       foreach ($this->collectionCodeudorIdsFromContract($contract) as $codeudorId) {
         $codeudorLookup[$codeudorId][$contractId] = $contractId;
       }
@@ -2620,8 +2617,6 @@ final class AdministrativeNotificationsService
       return [];
     }
     $contractId = (int) ($contract['_ID'] ?? 0);
-    $contractNumber = $this->firstNonEmpty([$contract['contrato'] ?? '', $contract['contrato_arrendamiento'] ?? '']);
-    $lookupValue = $contractNumber !== '' ? $contractNumber : (string) $contractId;
 
     $select = ['_ID'];
     if ($this->schema->columnExists($table, 'id_contrato')) {
@@ -2645,18 +2640,9 @@ final class AdministrativeNotificationsService
     }
     $whereParts = [];
     $args = [];
-    if ($this->schema->columnExists($table, 'id_contrato')) {
-      $lookupValues = [];
-      if ($lookupValue !== '' && $lookupValue !== '0') {
-        $lookupValues[$lookupValue] = $lookupValue;
-      }
-      if ($contractId > 0) {
-        $lookupValues[(string) $contractId] = (string) $contractId;
-      }
-      foreach (array_values($lookupValues) as $value) {
-        $whereParts[] = "TRIM(COALESCE(`id_contrato`, '')) = ?";
-        $args[] = $value;
-      }
+    if ($contractId > 0 && $this->schema->columnExists($table, 'id_contrato')) {
+      $whereParts[] = "TRIM(COALESCE(`id_contrato`, '')) = ?";
+      $args[] = (string) $contractId;
     }
     $codeudorIds = $this->collectionCodeudorIdsFromContract($contract);
     if ($codeudorIds !== []) {
@@ -2812,8 +2798,17 @@ final class AdministrativeNotificationsService
     $document = preg_replace('/\D+/', '', (string) ($recipient['documento'] ?? '')) ?: '';
     $email = strtolower(trim((string) ($recipient['correo'] ?? '')));
     $phone = preg_replace('/\D+/', '', (string) ($recipient['celular'] ?? '')) ?: '';
-    $name = strtolower(trim((string) ($recipient['nombre'] ?? '')));
-    return implode('|', [$contractId, $document, $email, $phone, $name]);
+    $name = strtolower(trim((string) preg_replace('/\s+/', ' ', (string) ($recipient['nombre'] ?? ''))));
+    if ($document !== '') {
+      return implode('|', [$contractId, 'documento', $document]);
+    }
+    if ($email !== '') {
+      return implode('|', [$contractId, 'correo', $email]);
+    }
+    if ($phone !== '') {
+      return implode('|', [$contractId, 'celular', $phone, $name]);
+    }
+    return $name !== '' ? implode('|', [$contractId, 'nombre', $name]) : '';
   }
 
   private function collectionManagementLookupFromRecipient(array $recipient): string
