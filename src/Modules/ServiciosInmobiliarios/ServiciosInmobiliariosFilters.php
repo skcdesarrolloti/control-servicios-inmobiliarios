@@ -12,9 +12,9 @@ final class ServiciosInmobiliariosFilters
   public function parse(array $input, string $prefix = 'scm_'): array
   {
     $page = $this->intValue($input, $prefix . 'page', 1);
-    $perPage = $this->intValue($input, $prefix . 'per_page', 24);
-    if ($perPage < 24) {
-      $perPage = 24;
+    $perPage = $this->intValue($input, $prefix . 'per_page', 10);
+    if ($perPage < 10) {
+      $perPage = 10;
     }
     if ($perPage > 100) {
       $perPage = 100;

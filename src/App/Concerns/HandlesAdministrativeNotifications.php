@@ -14,6 +14,20 @@ trait HandlesAdministrativeNotifications
     return new AdministrativeNotificationsService($this->db);
   }
 
+  public function ajax_handler_admin_notifications_panel(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para usar Notificaciones.');
+    }
+
+    try {
+      $this->jsonOk(['html' => $this->render_admin_notifications_panel()]);
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
   public function ajax_handler_admin_notifications_recipients(): void
   {
     $this->verifyCsrf();

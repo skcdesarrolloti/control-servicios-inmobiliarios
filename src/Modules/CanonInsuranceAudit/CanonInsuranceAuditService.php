@@ -112,9 +112,6 @@ final class CanonInsuranceAuditService
   /** @param array<string,string> $filters @return array<string,mixed> */
   public function dashboard(array $filters = []): array
   {
-    $this->ensureSchema();
-    $this->syncIncrementChanges();
-
     $audits = $this->db->getResults(
       "SELECT * FROM `{$this->auditsTable()}`
         WHERE `format_key` IN ('simi', 'libertador', 'fianza_bogota', 'unifianza')
@@ -166,7 +163,12 @@ final class CanonInsuranceAuditService
       ]), 'UTF-8');
       return str_contains($haystack, $search);
     }));
-    $items = array_slice($items, 0, 500);
+    $page = max(1, (int) ($filters['page'] ?? 1));
+    $perPage = max(20, min(100, (int) ($filters['per_page'] ?? 50)));
+    $filteredTotal = count($items);
+    $totalPages = max(1, (int) ceil($filteredTotal / $perPage));
+    $page = min($page, $totalPages);
+    $items = array_slice($items, ($page - 1) * $perPage, $perPage);
 
     $sourceAuditIds = array_values(array_filter(array_map(static fn(array $audit): int => (int) ($audit['id'] ?? 0), $sourceAudits)));
     $reports = [];
@@ -191,8 +193,22 @@ final class CanonInsuranceAuditService
         'period' => $period,
         'status' => $status,
         'search' => AuditValueNormalizer::text($filters['search'] ?? ''),
+        'page' => $page,
+        'per_page' => $perPage,
+      ],
+      'pagination' => [
+        'page' => $page,
+        'per_page' => $perPage,
+        'total' => $filteredTotal,
+        'total_pages' => $totalPages,
       ],
     ];
+  }
+
+  /** Ejecuta exclusivamente la migración idempotente del módulo. */
+  public function migrateSchema(): void
+  {
+    $this->ensureSchema();
   }
 
   /** @return array<string,mixed> */

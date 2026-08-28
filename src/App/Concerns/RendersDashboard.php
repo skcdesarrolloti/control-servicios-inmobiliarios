@@ -27,8 +27,17 @@ trait RendersDashboard
     }
 
     $module = $this->get_servicios_inmobiliarios_module();
-    $filterOptions = $module->getFilterOptions();
-    $calendarAllowedFuncionarios = $this->get_calendar_allowed_funcionarios();
+    $filterOptions = [
+      'tema' => [],
+      'estado' => ['Nuevo', 'En proceso'],
+      'estado_admin' => [],
+      'prioridad' => [],
+      'cotizacion_estado' => [],
+      'revision_estado' => [],
+      'funcionarios' => [],
+      'barrios' => [],
+    ];
+    $calendarAllowedFuncionarios = [];
     $config['calendar_allowed_cargos'] = ['3', '4', '5', '7', '8', '11', '12', '14', '18'];
     $config['calendar_allowed_funcionarios'] = $calendarAllowedFuncionarios;
     $config['calendar_allowed_employee_ids'] = array_values(array_filter(array_map(static function ($row): string {
@@ -67,15 +76,22 @@ trait RendersDashboard
     $genericResults = [];
     foreach ($genericTabDefs as $gTabKey => $gTabDef) {
       $gParams = $this->parse_params_generic($_GET, $gTabDef['prefix']);
-      $hydrateGenericRows = $initialOpenTopic !== '' && $initialOpenTopic === $gTabKey;
-      $gResult = $this->run_query_generic($gTabDef['temas'], $gParams, $config, $hydrateGenericRows);
-      $genericResults[$gTabKey] = ['params' => $gParams, 'result' => $gResult, 'def' => $gTabDef, 'loaded' => $hydrateGenericRows];
+      $genericResults[$gTabKey] = [
+        'params' => $gParams,
+        'result' => [
+          'rows' => [],
+          'stats' => ['total' => 0],
+          'pagination' => ['page' => 1, 'per_page' => 20, 'total' => 0, 'total_pages' => 1],
+        ],
+        'def' => $gTabDef,
+        'loaded' => false,
+      ];
     }
 
     $statusBucketDefs = $this->get_status_bucket_definitions();
     $statusTopicDefs = $this->get_status_topic_definitions();
     $statusResults = $this->build_status_bucket_results($statusBucketDefs, $statusTopicDefs, $config, $filterOptions, false);
-    $currentEmployeeId = $this->current_employee_id();
+    $currentEmployeeId = '';
     $config['calendar_current_employee_id'] = $currentEmployeeId;
     $myTicketsParams = $module->parseParams($_GET, 'scm_my_');
     $myTicketsParams['fEmpleado'] = $currentEmployeeId !== '' ? $currentEmployeeId : '__sin_funcionario__';
@@ -101,10 +117,14 @@ trait RendersDashboard
     $pendingController = $this->get_pending_controller();
     $preventivasPendientesHtml = $this->render_pending_preventivas_shell($_GET);
     $serviciosPublicosPendientesHtml = $this->render_pending_servicios_publicos_shell($_GET);
-    $reportesAdministrativosPendientesHtml = $pendingController->renderReportesAdministrativosTab();
+    $reportesAdministrativosPendientesHtml = $pendingController->renderReportesAdministrativosShell($filterOptions);
     $contratosArrendamientoHtml = $pendingController->renderContratosArrendamientoTab();
     $dashboardPermissionTabs = $this->dashboardPermissionTabs();
     $tabMap = [
+      'inicio' => 'scm-panel-inicio',
+      'home' => 'scm-panel-inicio',
+      'resumen' => 'scm-panel-inicio',
+      'scm-panel-inicio' => 'scm-panel-inicio',
       'abiertos' => 'scm-panel-abiertos',
       'abierto' => 'scm-panel-abiertos',
       'scm-panel-abiertos' => 'scm-panel-abiertos',
@@ -218,9 +238,13 @@ trait RendersDashboard
       'Certificaciones' => (int)($genericResults['certificaciones']['result']['stats']['total'] ?? 0),
       'Contractual' => (int)($genericResults['contractual']['result']['stats']['total'] ?? 0),
     ];
-    $webTicketStats = $this->get_web_ticket_statistics();
+    // Las métricas reales se solicitan por AJAX al abrir la pestaña. El primer
+    // HTML conserva la estructura para evitar saltos visuales, pero no bloquea
+    // la navegación con agregaciones sobre todas las tablas.
+    $webTicketStats = [];
     $dashboardAllowedTabs = $this->currentDashboardAllowedTabs();
     $dashboardPermissionConfig = $this->dashboardPermissionsConfig();
+    $dashboardCargoOptions = $this->getDashboardCargoOptions();
     $canManageDashboardPermissions = $this->canManageDashboardPermissions();
     $canManagePublicPqrSettings = $this->canManagePublicPqrSettings();
     $canManageInternalNotificationSettings = $this->canManageInternalNotificationSettings();
@@ -255,37 +279,46 @@ trait RendersDashboard
       }
     }
     if ($initialTab === '') {
-      $preferredInitialPanels = array_merge(['scm-panel-metricas'], array_keys($dashboardPanelToTab));
-      foreach ($preferredInitialPanels as $panelId) {
-        $permissionKey = (string)($dashboardPanelToTab[$panelId] ?? '');
-        if ($permissionKey === '') {
-          continue;
-        }
-        if ($permissionKey === 'actividades_administrativas') {
-          if ($canAccessAdministrativeActivities) {
-            $initialTab = $panelId;
-            break;
-          }
-          continue;
-        }
-        if (in_array($permissionKey, $dashboardAllowedTabs, true)) {
-          $initialTab = $panelId;
-          break;
-        }
-      }
+      $initialTab = 'scm-panel-inicio';
     }
     if ($initialAdministrativeActivityKey === '' || !in_array($initialAdministrativeActivityKey, $allowedAdministrativeActivityTabs, true)) {
       $initialAdministrativeActivityKey = (string) ($allowedAdministrativeActivityTabs[0] ?? '');
     }
 
     $activeOpenTopic = isset($openTopicDefs[$initialOpenTopic]) ? $initialOpenTopic : 'mant';
-    $hydrateMaintenanceRows = $initialTab === 'scm-panel-abiertos' && $activeOpenTopic === 'mant';
-    $result = $hydrateMaintenanceRows ? $module->run($params, $config) : $module->summarizeMaintenance($params);
+    $hydrateMaintenanceRows = false;
+    $result = [
+      'rows' => [],
+      'stats' => ['total' => 0],
+      'pagination' => ['page' => 1, 'per_page' => 10, 'total' => 0, 'total_pages' => 1],
+      'tbody' => '',
+      'pagination_html' => '',
+    ];
     $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];
     $tbodyHtml = $hydrateMaintenanceRows
       ? (string)($result['tbody'] ?? '')
       : $this->render_lazy_tickets_placeholder('Abre Mantenimiento para cargar los tickets.');
     $paginationHtml = $hydrateMaintenanceRows ? (string)($result['pagination_html'] ?? '') : '';
+
+    $homeDisplayName = trim((string) Auth::user());
+    $homeNameParts = preg_split('/\s+/u', $homeDisplayName, -1, PREG_SPLIT_NO_EMPTY);
+    $homeFirstName = (string)($homeNameParts[0] ?? '');
+    $homeQuickLinks = [];
+    if (in_array('abiertos', $dashboardAllowedTabs, true)) {
+      $homeQuickLinks[] = ['panel' => 'scm-panel-abiertos', 'icon' => 'fa-inbox', 'label' => 'Tickets abiertos'];
+    }
+    if (in_array('mis_tickets', $dashboardAllowedTabs, true)) {
+      $homeQuickLinks[] = ['panel' => 'scm-panel-mis-tickets', 'icon' => 'fa-user-check', 'label' => 'Mis tickets'];
+    }
+    if ($canAccessAdministrativeActivities) {
+      $homeQuickLinks[] = ['panel' => 'scm-panel-actividades-administrativas', 'icon' => 'fa-calendar-check', 'label' => 'Actividades administrativas'];
+    }
+    if (in_array('contratos_arrendamiento', $dashboardAllowedTabs, true)) {
+      $homeQuickLinks[] = ['panel' => 'scm-panel-contratos-arrendamiento', 'icon' => 'fa-file-contract', 'label' => 'Contratos'];
+    }
+    if (in_array('metricas', $dashboardAllowedTabs, true)) {
+      $homeQuickLinks[] = ['panel' => 'scm-panel-metricas', 'icon' => 'fa-chart-line', 'label' => 'Métricas'];
+    }
 
     $nonce = \SCM\Core\App::csrf()->token(self::NONCE_KEY);
     $apiUrl = defined('SCM_BASE_URL') ? (SCM_BASE_URL . '/api.php') : '/api.php';
@@ -298,6 +331,10 @@ trait RendersDashboard
       'initialTab' => $initialTab,
       'initialOpenTopic' => $initialOpenTopic,
       'iframeMode' => $iframeMode,
+      'initialFilters' => array_map(
+        static fn($value): string => is_scalar($value) ? trim((string) $value) : '',
+        $_GET
+      ),
       'guide'   => [
         'enabled' => true,
         'title'   => 'Guia de uso',
@@ -347,13 +384,19 @@ trait RendersDashboard
         'dashboard_permissions_save' => self::AJAX_DASHBOARD_PERMISSIONS_SAVE,
         'calendar_cita_notify' => self::AJAX_CALENDAR_CITA_NOTIFY,
         'admin_notifications_recipients' => self::AJAX_ADMIN_NOTIFICATIONS_RECIPIENTS,
+        'admin_notifications_panel' => self::AJAX_ADMIN_NOTIFICATIONS_PANEL,
         'admin_notifications_send' => self::AJAX_ADMIN_NOTIFICATIONS_SEND,
         'admin_notifications_import' => self::AJAX_ADMIN_NOTIFICATIONS_IMPORT,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
         'admin_notifications_collection_log' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_LOG,
         'internal_notifications_save' => self::AJAX_INTERNAL_NOTIFICATIONS_SAVE,
+        'public_pqr_settings_read' => self::AJAX_PUBLIC_PQR_SETTINGS_READ,
+        'internal_notifications_read' => self::AJAX_INTERNAL_NOTIFICATIONS_READ,
         'metrics_execution' => self::AJAX_METRICS_EXECUTION,
+        'dashboard_home' => self::AJAX_DASHBOARD_HOME,
+        'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
+        'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
         'canon_insurance_audit_import' => self::AJAX_CANON_INSURANCE_AUDIT_IMPORT,
         'canon_insurance_audit_observation' => self::AJAX_CANON_INSURANCE_AUDIT_OBSERVATION,
@@ -381,7 +424,7 @@ trait RendersDashboard
         'cargo' => Auth::userCargo(),
         'allowedTabs' => $dashboardAllowedTabs,
         'tabs' => $dashboardPermissionTabs,
-        'cargos' => $this->getDashboardCargoOptions(),
+        'cargos' => $dashboardCargoOptions,
         'permissions' => $dashboardPermissionConfig,
       ],
     ];
@@ -475,8 +518,8 @@ trait RendersDashboard
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" media="all">
     <link rel="stylesheet" href="<?php echo $cssUrl; ?>" media="all">
     <link rel="stylesheet" href="<?php echo $damageCssUrl; ?>" media="all">
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
     <div id="scm-app" class="scm-wrap scm-daisy" data-theme="scm-daisy" data-scm-runtime="<?php echo self::h((string)$runtimeJson); ?>">
       <div class="scm-guide-bar">
@@ -492,6 +535,7 @@ trait RendersDashboard
         <button class="scm-guide-btn" type="button" id="scm-open-guide"><i class="fas fa-book-open"></i> Ver gu&iacute;as</button>
       </div>
       <div class="scm-tabs scm-main-tabs">
+        <button class="scm-tab<?php echo $initialTab === 'scm-panel-inicio' ? ' active' : ''; ?>" data-tab="scm-panel-inicio" type="button"><i class="fas fa-house" aria-hidden="true"></i> Inicio</button>
         <?php foreach ($dashboardPanelToTab as $panelId => $permissionKey): ?>
           <?php
           if ($permissionKey === 'actividades_administrativas') {
@@ -505,6 +549,123 @@ trait RendersDashboard
           <button class="scm-tab<?php echo $initialTab === $panelId ? ' active' : ''; ?>" data-tab="<?php echo esc_attr($panelId); ?>" data-permission-tab="<?php echo esc_attr($permissionKey); ?>" type="button"><?php echo esc_html($tabLabel); ?></button>
         <?php endforeach; ?>
       </div>
+
+      <section class="scm-tab-panel scm-home-panel<?php echo $initialTab === 'scm-panel-inicio' ? ' active' : ''; ?>" id="scm-panel-inicio" data-scm-loaded="0" aria-busy="true" aria-labelledby="scm-home-title">
+        <div class="scm-home-hero">
+          <div class="scm-home-hero-copy">
+            <span class="scm-home-eyebrow">Resumen operativo</span>
+            <h1 id="scm-home-title"><?php echo $homeFirstName !== '' ? 'Hola, ' . esc_html($homeFirstName) : 'Hola'; ?></h1>
+            <p>Consulta lo más importante del día y entra directamente al proceso que necesitas.</p>
+          </div>
+          <?php if (in_array('abiertos', $dashboardAllowedTabs, true)): ?>
+            <button class="scm-home-primary-action" type="button" data-scm-home-target="scm-panel-abiertos">
+              Ver tickets abiertos <i class="fas fa-arrow-right" aria-hidden="true"></i>
+            </button>
+          <?php elseif (in_array('metricas', $dashboardAllowedTabs, true)): ?>
+            <button class="scm-home-primary-action" type="button" data-scm-home-target="scm-panel-metricas">
+              Ver métricas <i class="fas fa-arrow-right" aria-hidden="true"></i>
+            </button>
+          <?php endif; ?>
+        </div>
+
+        <div class="scm-home-status" data-scm-home-status role="status" aria-live="polite">
+          <span class="scm-home-status-spinner" aria-hidden="true"></span>
+          <span data-scm-home-status-text>Cargando el resumen&hellip;</span>
+          <button type="button" data-scm-home-retry hidden>Reintentar</button>
+        </div>
+
+        <div class="scm-home-kpis" aria-label="Indicadores principales">
+          <article class="scm-home-kpi scm-home-kpi-total">
+            <span class="scm-home-kpi-icon"><i class="fas fa-layer-group" aria-hidden="true"></i></span>
+            <div><span>Total de casos</span><strong data-scm-home-metric="total">&mdash;</strong></div>
+          </article>
+          <article class="scm-home-kpi scm-home-kpi-open">
+            <span class="scm-home-kpi-icon"><i class="fas fa-folder-open" aria-hidden="true"></i></span>
+            <div><span>Abiertos</span><strong data-scm-home-metric="abiertos">&mdash;</strong></div>
+          </article>
+          <article class="scm-home-kpi scm-home-kpi-overdue">
+            <span class="scm-home-kpi-icon"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></span>
+            <div><span>SLA vencido</span><strong data-scm-home-metric="sla_vencido">&mdash;</strong></div>
+          </article>
+          <article class="scm-home-kpi scm-home-kpi-risk">
+            <span class="scm-home-kpi-icon"><i class="fas fa-clock" aria-hidden="true"></i></span>
+            <div><span>En riesgo</span><strong data-scm-home-metric="sla_riesgo">&mdash;</strong></div>
+          </article>
+          <article class="scm-home-kpi scm-home-kpi-closed">
+            <span class="scm-home-kpi-icon"><i class="fas fa-circle-check" aria-hidden="true"></i></span>
+            <div><span>Cerrados</span><strong data-scm-home-metric="cerrados">&mdash;</strong></div>
+          </article>
+        </div>
+
+        <div class="scm-home-content-grid">
+          <section class="scm-home-card" aria-labelledby="scm-home-priorities-title">
+            <div class="scm-home-card-heading">
+              <div>
+                <span class="scm-home-card-kicker">Atención</span>
+                <h2 id="scm-home-priorities-title">Prioridades de hoy</h2>
+              </div>
+              <?php if (in_array('abiertos', $dashboardAllowedTabs, true)): ?>
+                <button class="scm-home-text-action" type="button" data-scm-home-target="scm-panel-abiertos">Revisar casos</button>
+              <?php endif; ?>
+            </div>
+            <div class="scm-home-priority-list">
+              <div class="scm-home-priority scm-home-priority-danger">
+                <span class="scm-home-priority-dot" aria-hidden="true"></span>
+                <div><strong data-scm-home-metric="sla_vencido">&mdash;</strong><span>casos con SLA vencido</span></div>
+              </div>
+              <div class="scm-home-priority scm-home-priority-warning">
+                <span class="scm-home-priority-dot" aria-hidden="true"></span>
+                <div><strong data-scm-home-metric="sin_revision">&mdash;</strong><span>casos sin revisión</span></div>
+              </div>
+              <div class="scm-home-priority scm-home-priority-neutral">
+                <span class="scm-home-priority-dot" aria-hidden="true"></span>
+                <div><strong data-scm-home-metric="sin_cotizacion">&mdash;</strong><span>casos sin cotización</span></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="scm-home-card" aria-labelledby="scm-home-processes-title">
+            <div class="scm-home-card-heading">
+              <div>
+                <span class="scm-home-card-kicker">Volumen</span>
+                <h2 id="scm-home-processes-title">Casos por proceso</h2>
+              </div>
+              <?php if (in_array('metricas', $dashboardAllowedTabs, true)): ?>
+                <button class="scm-home-text-action" type="button" data-scm-home-target="scm-panel-metricas">Ver detalle</button>
+              <?php endif; ?>
+            </div>
+            <div class="scm-home-process-list">
+              <?php foreach (['Mantenimiento', 'Entrega', 'Preventiva', 'Recibo'] as $homeCategory): ?>
+                <div class="scm-home-process">
+                  <span><?php echo esc_html($homeCategory); ?></span>
+                  <strong data-scm-home-category="<?php echo esc_attr($homeCategory); ?>">&mdash;</strong>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          </section>
+        </div>
+
+        <?php if (!empty($homeQuickLinks)): ?>
+          <section class="scm-home-shortcuts" aria-labelledby="scm-home-shortcuts-title">
+            <div class="scm-home-card-heading">
+              <div>
+                <span class="scm-home-card-kicker">Navegación</span>
+                <h2 id="scm-home-shortcuts-title">Accesos rápidos</h2>
+              </div>
+              <span class="scm-home-updated" data-scm-home-updated></span>
+            </div>
+            <div class="scm-home-shortcut-grid">
+              <?php foreach ($homeQuickLinks as $homeQuickLink): ?>
+                <button class="scm-home-shortcut" type="button" data-scm-home-target="<?php echo esc_attr((string)$homeQuickLink['panel']); ?>">
+                  <span><i class="fas <?php echo esc_attr((string)$homeQuickLink['icon']); ?>" aria-hidden="true"></i></span>
+                  <strong><?php echo esc_html((string)$homeQuickLink['label']); ?></strong>
+                  <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                </button>
+              <?php endforeach; ?>
+            </div>
+          </section>
+        <?php endif; ?>
+      </section>
 
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-abiertos' ? ' active' : ''; ?>" id="scm-panel-abiertos" data-permission-tab="abiertos">
         <div class="scm-status-bucket scm-open-bucket" data-open-bucket="abiertos">
@@ -659,7 +820,7 @@ trait RendersDashboard
         $gPagination = is_array($gTabData['result']['pagination'] ?? null) ? $gTabData['result']['pagination'] : ['page' => 1, 'total_pages' => 1, 'total' => 0];
         $gCardsHtml = $gLoaded ? $this->render_generic_cards($gRows, $config, $gTabKey) : $this->render_lazy_tickets_placeholder();
         $showTema = false;
-        $gFilterOptions = $this->get_generic_tickets_module()->get_generic_filter_options($gTabData['def']['temas']);
+        $gFilterOptions = $filterOptions;
         $gFormHtml = $this->render_generic_filter_form($gTabKey, $gTabData['def']['prefix'], $gParams, $showTema, ['Procesos juridicos', 'Solicitud contractual', 'Solicitud de servicios publicos', 'Retencion de contrato', 'Otros servicios'], $gFilterOptions);
         $gPaginationHtml = $gLoaded ? $this->get_generic_tickets_module()->render_generic_pagination($gTabKey, $gPagination) : ''; ?>
         <div class="scm-open-topic-panel<?php echo $activeOpenTopic === $gTabKey ? ' active' : ''; ?>" id="scm-panel-<?php echo esc_attr($gTabKey); ?>" data-open-topic="<?php echo esc_attr($gTabKey); ?>" data-scm-loaded="<?php echo $gLoaded ? '1' : '0'; ?>">
@@ -801,14 +962,14 @@ trait RendersDashboard
           <?php endif; ?>
 
           <?php if (in_array('notificaciones', $allowedAdministrativeActivityTabs, true)): ?>
-            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'notificaciones' ? ' active' : ''; ?>" id="scm-panel-admin-notificaciones" data-permission-tab="notificaciones" data-admin-activity-panel="notificaciones">
-              <?php echo $this->render_admin_notifications_panel(); ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'notificaciones' ? ' active' : ''; ?>" id="scm-panel-admin-notificaciones" data-permission-tab="notificaciones" data-admin-activity-panel="notificaciones" data-scm-loaded="0">
+              <?php echo $this->render_admin_notifications_shell(); ?>
             </div>
           <?php endif; ?>
 
           <?php if (in_array('gestiones_cobro', $allowedAdministrativeActivityTabs, true)): ?>
-            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'gestiones_cobro' ? ' active' : ''; ?>" id="scm-panel-gestiones-cobro" data-permission-tab="gestiones_cobro" data-admin-activity-panel="gestiones_cobro">
-              <?php echo $this->render_collection_management_panel($_GET); ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'gestiones_cobro' ? ' active' : ''; ?>" id="scm-panel-gestiones-cobro" data-permission-tab="gestiones_cobro" data-admin-activity-panel="gestiones_cobro" data-scm-loaded="0">
+              <?php echo $this->render_collection_management_shell(); ?>
             </div>
           <?php endif; ?>
 
@@ -831,13 +992,13 @@ trait RendersDashboard
           <?php endif; ?>
 
           <?php if (in_array('reportes_administrativos_pendientes', $allowedAdministrativeActivityTabs, true)): ?>
-            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'reportes_administrativos_pendientes' ? ' active' : ''; ?>" id="scm-panel-reportes-administrativos-pendientes" data-permission-tab="reportes_administrativos_pendientes" data-admin-activity-panel="reportes_administrativos_pendientes">
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'reportes_administrativos_pendientes' ? ' active' : ''; ?>" id="scm-panel-reportes-administrativos-pendientes" data-permission-tab="reportes_administrativos_pendientes" data-admin-activity-panel="reportes_administrativos_pendientes" data-scm-loaded="0">
               <?php echo $reportesAdministrativosPendientesHtml; ?>
             </div>
           <?php endif; ?>
 
           <?php if (in_array('auditoria_canon_aseguradoras', $allowedAdministrativeActivityTabs, true)): ?>
-            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'auditoria_canon_aseguradoras' ? ' active' : ''; ?>" id="scm-panel-auditoria-canon-aseguradoras" data-permission-tab="auditoria_canon_aseguradoras" data-admin-activity-panel="auditoria_canon_aseguradoras">
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'auditoria_canon_aseguradoras' ? ' active' : ''; ?>" id="scm-panel-auditoria-canon-aseguradoras" data-permission-tab="auditoria_canon_aseguradoras" data-admin-activity-panel="auditoria_canon_aseguradoras" data-scm-loaded="0">
               <?php echo (new \SCM\Modules\CanonInsuranceAudit\CanonInsuranceAuditView())->renderPanel(); ?>
             </div>
           <?php endif; ?>
@@ -846,7 +1007,7 @@ trait RendersDashboard
 
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-dashboard-inline.js?v=' . SCM_VERSION); ?>" defer></script>
 
-      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas' ? ' active' : ''; ?>" id="scm-panel-metricas" data-permission-tab="metricas" data-scm-metrics="<?php echo self::h((string)$metricsJson); ?>">
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas' ? ' active' : ''; ?>" id="scm-panel-metricas" data-permission-tab="metricas" data-scm-metrics="<?php echo self::h((string)$metricsJson); ?>" data-scm-loaded="0">
         <div class="scm-header scm-header-metricas">
           <div>
             <h2>Metricas Operativas</h2>
@@ -854,6 +1015,7 @@ trait RendersDashboard
           </div>
           <div class="scm-header-counter-wrap"><span class="scm-header-counter" id="scm-metrics-total"><?php echo esc_html((string)($stats['total'] ?? 0)); ?></span></div>
         </div>
+        <div class="scm-metrics-loading-state" data-scm-metrics-loading role="status" aria-live="polite">Cargando indicadores&hellip;</div>
         <div class="scm-tabs scm-metric-tabs" id="scm-metric-tabs">
           <button class="scm-tab active" type="button" data-scm-metric-cat="mantenimiento">Mantenimiento</button>
           <button class="scm-tab" type="button" data-scm-metric-cat="entrega">Entrega</button>
@@ -970,13 +1132,13 @@ trait RendersDashboard
 
       <?php echo \SCM\Views\GuideModalView::render(); ?>
       <?php if ($canManageDashboardPermissions): ?>
-        <?php echo $this->renderDashboardPermissionsModal($dashboardPermissionTabs, $this->getDashboardCargoOptions(), $dashboardPermissionConfig); ?>
+        <?php echo $this->renderDashboardPermissionsModal($dashboardPermissionTabs, $dashboardCargoOptions, $dashboardPermissionConfig); ?>
       <?php endif; ?>
       <?php if ($canManagePublicPqrSettings): ?>
-        <?php echo $this->renderDashboardPublicPqrSettingsModal(); ?>
+        <div id="scm-pqr-settings-modal" data-scm-lazy-settings="public-pqr" aria-hidden="true"></div>
       <?php endif; ?>
       <?php if ($canManageInternalNotificationSettings): ?>
-        <?php echo $this->renderDashboardInternalNotificationsModal(); ?>
+        <div id="scm-internal-notifications-modal" data-scm-lazy-settings="internal-notifications" aria-hidden="true"></div>
       <?php endif; ?>
 
       <div class="scm-case-modal" id="scm-case-modal" aria-hidden="true">
@@ -2050,6 +2212,14 @@ trait RendersDashboard
     return (string) ob_get_clean();
   }
 
+  private function render_admin_notifications_shell(): string
+  {
+    return '<div class="scm-admin-notif-empty" data-scm-admin-notifications-shell role="status" aria-live="polite">'
+      . '<strong>Notificaciones listas para consultar</strong>'
+      . '<span>Abre esta sección para cargar destinatarios y plantillas.</span>'
+      . '</div>';
+  }
+
   private function render_collection_management_panel(array $input): string
   {
     $filters = [
@@ -2180,6 +2350,15 @@ trait RendersDashboard
     </div>
 <?php
     return (string) ob_get_clean();
+  }
+
+  private function render_collection_management_shell(): string
+  {
+    return '<div class="scm-collection-log" data-scm-collection-log data-scm-collection-log-loaded="0">'
+      . '<div class="scm-admin-notif-empty" role="status" aria-live="polite">'
+      . '<strong>Gestiones de cobro listas para consultar</strong>'
+      . '<span>Abre esta sección para cargar el reporte.</span>'
+      . '</div></div>';
   }
 
   private function collection_management_type_label(string $type): string
@@ -2367,7 +2546,7 @@ trait RendersDashboard
 
   private function render_cotizaciones_mantenimiento_filter_form(array $p): string
   {
-    $funcionarios = $this->cotizaciones_funcionario_options();
+    $funcionarios = [];
     ob_start();
 ?>
     <div class="scm-filter-card card">
@@ -2384,8 +2563,8 @@ trait RendersDashboard
           <div class="scm-field"><label for="scmqt_inmueble">Inmueble SIMI</label><input id="scmqt_inmueble" name="scmqt_inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fInmueble'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="scmqt_contrato">Contrato</label><input id="scmqt_contrato" name="scmqt_contrato" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fContrato'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="scmqt_enviada">Fue enviada</label><select id="scmqt_enviada" name="scmqt_enviada" class="select select-bordered select-sm scm-select"><option value="">Todas</option><option value="si" <?php selected((string) ($p['fEnviada'] ?? ''), 'si'); ?>>S&iacute;</option><option value="no" <?php selected((string) ($p['fEnviada'] ?? ''), 'no'); ?>>No</option></select></div>
-          <div class="scm-field"><label for="scmqt_tipo_mantenimiento">Tipo mantenimiento</label><select id="scmqt_tipo_mantenimiento" name="scmqt_tipo_mantenimiento" class="select select-bordered select-sm scm-select"><option value="">Todos</option><?php foreach ($this->cotizaciones_distinct_options('tipo_mantenimiento') as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected((string) ($p['fTipoMantenimiento'] ?? ''), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?></select></div>
-          <div class="scm-field"><label for="scmqt_categoria">Categoria</label><select id="scmqt_categoria" name="scmqt_categoria" class="select select-bordered select-sm scm-select"><option value="">Todas</option><?php foreach ($this->cotizaciones_distinct_options('categoria_cotizacion') as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected((string) ($p['fCategoria'] ?? ''), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?></select></div>
+          <div class="scm-field"><label for="scmqt_tipo_mantenimiento">Tipo mantenimiento</label><select id="scmqt_tipo_mantenimiento" name="scmqt_tipo_mantenimiento" class="select select-bordered select-sm scm-select"><option value="">Todos</option></select></div>
+          <div class="scm-field"><label for="scmqt_categoria">Categoria</label><select id="scmqt_categoria" name="scmqt_categoria" class="select select-bordered select-sm scm-select"><option value="">Todas</option></select></div>
         </div>
         <div class="scm-actions"><button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button><button class="scm-btn-secondary btn btn-outline" type="button" id="scm-clear-cotizaciones_mantenimiento">Limpiar</button><span class="scm-spinner" id="scm-spinner-cotizaciones_mantenimiento"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span></div>
       </form>

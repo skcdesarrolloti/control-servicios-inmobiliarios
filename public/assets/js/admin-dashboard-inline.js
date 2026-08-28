@@ -126,6 +126,8 @@
                   var count = document.getElementById('sra-kpi-count');
                   if (table && typeof data.table_html === 'string') table.innerHTML = data.table_html;
                   if (count && typeof data.count === 'string') count.textContent = data.count;
+                  var activityPanel = sraPanel.closest('.scm-admin-activity-panel');
+                  if (activityPanel) activityPanel.setAttribute('data-scm-loaded', '1');
                 })
                 .finally(function() {
                   if (sraSpinner) sraSpinner.classList.remove('active');

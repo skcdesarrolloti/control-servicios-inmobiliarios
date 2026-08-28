@@ -8,6 +8,211 @@ use SCM\Core\Auth;
 
 trait HandlesTicketWorkflowActions
 {
+  /** @return array<string,mixed>|null */
+  private function readDashboardPerformanceCache(string $name, int $ttl): ?array
+  {
+    if (!defined('SCM_STORAGE_PATH')) {
+      return null;
+    }
+    $path = SCM_STORAGE_PATH . '/data/' . preg_replace('/[^a-z0-9_-]/', '', strtolower($name)) . '.json';
+    if (!is_file($path) || (int) @filemtime($path) < time() - max(1, $ttl)) {
+      return null;
+    }
+    $decoded = json_decode((string) @file_get_contents($path), true);
+    return is_array($decoded) ? $decoded : null;
+  }
+
+  /** @param array<string,mixed> $value */
+  private function writeDashboardPerformanceCache(string $name, array $value): void
+  {
+    if (!defined('SCM_STORAGE_PATH')) {
+      return;
+    }
+    $directory = SCM_STORAGE_PATH . '/data';
+    if (!is_dir($directory) || !is_writable($directory)) {
+      return;
+    }
+    $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (is_string($json)) {
+      @file_put_contents($directory . '/' . preg_replace('/[^a-z0-9_-]/', '', strtolower($name)) . '.json', $json, LOCK_EX);
+    }
+  }
+
+  public function ajax_handler_public_pqr_settings_read(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canManagePublicPqrSettings()) {
+      $this->jsonFail('No tienes permiso para configurar Guardian.');
+    }
+    $this->jsonOk(['html' => $this->renderDashboardPublicPqrSettingsModal()]);
+  }
+
+  public function ajax_handler_internal_notifications_read(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canManageInternalNotificationSettings()) {
+      $this->jsonFail('No tienes permiso para configurar notificaciones internas.');
+    }
+    $this->jsonOk(['html' => $this->renderDashboardInternalNotificationsModal()]);
+  }
+
+  public function ajax_handler_dashboard_filter_options(): void
+  {
+    $this->verifyCsrf();
+    $payload = $this->readDashboardPerformanceCache('dashboard-filter-options-v2', 3600);
+    if (!is_array($payload)) {
+      $module = $this->get_servicios_inmobiliarios_module();
+      $calendarFuncionarios = $this->get_calendar_allowed_funcionarios();
+      $payload = [
+        'filter_options' => $module->getFilterOptions(),
+        'cotizacion_options' => [
+          'funcionarios' => $this->cotizaciones_funcionario_options(),
+          'tipos_mantenimiento' => $this->cotizaciones_distinct_options('tipo_mantenimiento'),
+          'categorias' => $this->cotizaciones_distinct_options('categoria_cotizacion'),
+        ],
+        'calendar_allowed_funcionarios' => $calendarFuncionarios,
+        'calendar_allowed_employee_ids' => array_values(array_filter(array_map(
+          static fn(array $row): string => trim((string) ($row['id_empleado'] ?? '')),
+          $calendarFuncionarios
+        ))),
+      ];
+      $this->writeDashboardPerformanceCache('dashboard-filter-options-v2', $payload);
+    }
+    $payload['calendar_current_employee_id'] = $this->current_employee_id();
+    $this->jsonOk($payload);
+  }
+
+  /** @return array<string,mixed> */
+  private function dashboardMetricsSnapshot(): array
+  {
+    $cacheKey = 'scm_dashboard_metrics_v2_' . md5((string) SCM_ROOT);
+    $metrics = null;
+    if (function_exists('apcu_fetch')) {
+      $cached = apcu_fetch($cacheKey, $cacheHit);
+      if ($cacheHit && is_array($cached)) {
+        $metrics = $cached;
+      }
+    }
+    if (!is_array($metrics)) {
+      $metrics = $this->readDashboardPerformanceCache('dashboard-metrics-v2', 900);
+    }
+
+    if (!is_array($metrics)) {
+      $config = [
+        'ticket_url' => self::DEFAULT_TICKET_URL,
+        'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
+        'correctiva_url' => self::DEFAULT_CORRECTIVA_URL,
+        'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
+        'acta_url' => self::DEFAULT_ACTA_URL,
+      ];
+      $module = $this->get_servicios_inmobiliarios_module();
+      $maintenance = $module->summarizeMaintenance($module->parseParams([]));
+      $maintenanceStats = is_array($maintenance['stats'] ?? null) ? $maintenance['stats'] : [];
+
+      $genericStats = [];
+      foreach ($this->get_generic_tab_definitions() as $key => $definition) {
+        $params = $this->parse_params_generic([], (string) ($definition['prefix'] ?? 'scm_'));
+        $result = $this->run_query_generic((array) ($definition['temas'] ?? []), $params, $config, false);
+        $genericStats[$key] = is_array($result['stats'] ?? null) ? $result['stats'] : [];
+      }
+
+      $categoryMetrics = [
+        'Mantenimiento' => (int) ($maintenanceStats['total'] ?? 0),
+        'Entrega' => (int) ($genericStats['entrega']['total'] ?? 0),
+        'Preventiva' => (int) ($genericStats['preventiva']['total'] ?? 0),
+        'Recibo' => (int) ($genericStats['recibo']['total'] ?? 0),
+        'Contable' => (int) ($genericStats['contable']['total'] ?? 0),
+        'Certificaciones' => (int) ($genericStats['certificaciones']['total'] ?? 0),
+        'Contractual' => (int) ($genericStats['contractual']['total'] ?? 0),
+      ];
+
+      $metrics = [
+        'total' => (int) ($maintenanceStats['total'] ?? 0),
+        'abiertos' => (int) ($maintenanceStats['abiertos'] ?? 0),
+        'cerrados' => (int) ($maintenanceStats['cerrados'] ?? 0),
+        'sla_vencido' => (int) ($maintenanceStats['sla_vencido'] ?? 0),
+        'sla_riesgo' => (int) ($maintenanceStats['sla_riesgo'] ?? 0),
+        'con_cotizacion' => (int) ($maintenanceStats['con_cotizacion'] ?? 0),
+        'sin_cotizacion' => (int) ($maintenanceStats['sin_cotizacion'] ?? 0),
+        'con_revision' => (int) ($maintenanceStats['con_revision'] ?? 0),
+        'sin_revision' => (int) ($maintenanceStats['sin_revision'] ?? 0),
+        'avg_first_h' => isset($maintenanceStats['avg_first_h']) && is_numeric($maintenanceStats['avg_first_h']) ? (float) $maintenanceStats['avg_first_h'] : null,
+        'avg_close_h' => isset($maintenanceStats['avg_close_h']) && is_numeric($maintenanceStats['avg_close_h']) ? (float) $maintenanceStats['avg_close_h'] : null,
+        'avg_stale_h' => isset($maintenanceStats['avg_stale_h']) && is_numeric($maintenanceStats['avg_stale_h']) ? (float) $maintenanceStats['avg_stale_h'] : null,
+        'mes_actualizados' => (int) ($maintenanceStats['mes_actualizados'] ?? 0),
+        'mes_cerrados' => (int) ($maintenanceStats['mes_cerrados'] ?? 0),
+        'mes_seguimientos' => (int) ($maintenanceStats['mes_seguimientos'] ?? 0),
+        'web' => $this->get_web_ticket_statistics(),
+        'por_categoria' => $categoryMetrics,
+        'detalle_por_categoria' => [
+          'mantenimiento' => ['label' => 'Mantenimiento'] + $maintenanceStats,
+          'entrega' => ['label' => 'Entrega'] + ($genericStats['entrega'] ?? []),
+          'preventiva' => ['label' => 'Preventiva'] + ($genericStats['preventiva'] ?? []),
+          'recibo' => ['label' => 'Recibo'] + ($genericStats['recibo'] ?? []),
+          'contable' => ['label' => 'Contable'] + ($genericStats['contable'] ?? []),
+          'certificaciones' => ['label' => 'Certificaciones'] + ($genericStats['certificaciones'] ?? []),
+          'contractual' => ['label' => 'Contractual'] + ($genericStats['contractual'] ?? []),
+        ],
+      ];
+
+      if (function_exists('apcu_store')) {
+        apcu_store($cacheKey, $metrics, 60);
+      }
+      $this->writeDashboardPerformanceCache('dashboard-metrics-v2', $metrics);
+    }
+
+    return $metrics;
+  }
+
+  public function ajax_handler_dashboard_home(): void
+  {
+    $this->verifyCsrf();
+    $canViewSummary = $this->canAccessDashboardTab('abiertos') || $this->canAccessDashboardTab('metricas');
+    if (!$canViewSummary) {
+      $this->jsonOk([
+        'summary' => null,
+        'message' => 'Tu perfil no tiene acceso a los indicadores generales.',
+      ]);
+    }
+
+    // Inicio prioriza respuesta inmediata: admite el último snapshot de hasta
+    // seis horas. El comando de calentamiento lo renueva periódicamente y la
+    // pestaña Métricas mantiene su ventana estricta de quince minutos.
+    $metrics = $this->readDashboardPerformanceCache('dashboard-metrics-v2', 21600);
+    if (!is_array($metrics)) {
+      $metrics = $this->dashboardMetricsSnapshot();
+    }
+    $snapshotPath = defined('SCM_STORAGE_PATH')
+      ? SCM_STORAGE_PATH . '/data/dashboard-metrics-v2.json'
+      : '';
+    $generatedAt = $snapshotPath !== '' && is_file($snapshotPath)
+      ? date(DATE_ATOM, (int) filemtime($snapshotPath))
+      : date(DATE_ATOM);
+    $this->jsonOk([
+      'summary' => [
+        'total' => (int) ($metrics['total'] ?? 0),
+        'abiertos' => (int) ($metrics['abiertos'] ?? 0),
+        'cerrados' => (int) ($metrics['cerrados'] ?? 0),
+        'sla_vencido' => (int) ($metrics['sla_vencido'] ?? 0),
+        'sla_riesgo' => (int) ($metrics['sla_riesgo'] ?? 0),
+        'sin_cotizacion' => (int) ($metrics['sin_cotizacion'] ?? 0),
+        'sin_revision' => (int) ($metrics['sin_revision'] ?? 0),
+        'por_categoria' => is_array($metrics['por_categoria'] ?? null) ? $metrics['por_categoria'] : [],
+      ],
+      'generated_at' => $generatedAt,
+    ]);
+  }
+
+  public function ajax_handler_dashboard_metrics(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('metricas')) {
+      $this->jsonFail('No tienes permiso para ver esta pestaña.');
+    }
+
+    $this->jsonOk(['metrics' => $this->dashboardMetricsSnapshot()]);
+  }
+
   public function ajax_handler_dashboard_permissions_read(): void
   {
     $this->verifyCsrf();
@@ -101,10 +306,35 @@ trait HandlesTicketWorkflowActions
     $module = $this->get_servicios_inmobiliarios_module();
     if ($module instanceof \SCM\Modules\ServiciosInmobiliarios\ServiciosInmobiliariosModule) {
       $params = $module->parseParams($_POST);
-      $result = $module->run($params, $config);
+      $statsOverride = null;
+      $statFilterKeys = array_diff(array_keys($params), ['fPage', 'fPerPage']);
+      $hasStatFilters = false;
+      foreach ($statFilterKeys as $filterKey) {
+        if (trim((string) ($params[$filterKey] ?? '')) !== '') {
+          $hasStatFilters = true;
+          break;
+        }
+      }
+      $isDefaultFirstPage = !$hasStatFilters && (int) ($params['fPage'] ?? 1) === 1;
+      $listCacheName = 'dashboard-maintenance-default-v3-'
+        . substr(hash('sha256', json_encode($config)), 0, 16);
+      if ($isDefaultFirstPage) {
+        $cachedList = $this->readDashboardPerformanceCache($listCacheName, 900);
+        if (is_array($cachedList)) {
+          $this->jsonOk($cachedList);
+        }
+      }
+      if (!$hasStatFilters) {
+        $cachedMetrics = $this->readDashboardPerformanceCache('dashboard-metrics-v2', 900);
+        $cachedMaintenance = is_array($cachedMetrics['detalle_por_categoria']['mantenimiento'] ?? null)
+          ? $cachedMetrics['detalle_por_categoria']['mantenimiento']
+          : [];
+        $statsOverride = $cachedMaintenance;
+      }
+      $result = $module->run($params, $config, '', $statsOverride);
       $stats  = is_array($result['stats'] ?? null) ? $result['stats'] : [];
 
-      $this->jsonOk([
+      $payload = [
         'tbody'           => (string)($result['tbody'] ?? ''),
         'pagination'      => (string)($result['pagination_html'] ?? ''),
         'kpi_total'       => (string)($stats['total'] ?? 0),
@@ -129,7 +359,11 @@ trait HandlesTicketWorkflowActions
         'kpi_magnitud_alto' => (string)($stats['magnitud_alto'] ?? 0),
         'kpi_magnitud_medio' => (string)($stats['magnitud_medio'] ?? 0),
         'kpi_magnitud_bajo' => (string)($stats['magnitud_bajo'] ?? 0),
-      ]);
+      ];
+      if ($isDefaultFirstPage) {
+        $this->writeDashboardPerformanceCache($listCacheName, $payload);
+      }
+      $this->jsonOk($payload);
     }
 
     $this->jsonFail('Modulo principal de Control de Servicios Inmobiliarios no disponible.');
@@ -275,6 +509,7 @@ trait HandlesTicketWorkflowActions
 
     $this->jsonOk([
       'cards' => (string) ($data['cards'] ?? ''),
+      'form' => (string) ($data['form'] ?? ''),
       'pagination' => (string) ($data['pagination'] ?? ''),
       'count' => (string) ($stats['total'] ?? ($data['count'] ?? 0)),
       'kpi_total' => (string) ($stats['total'] ?? ($data['count'] ?? 0)),

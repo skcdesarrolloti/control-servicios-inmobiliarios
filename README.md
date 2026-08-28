@@ -1,5 +1,20 @@
 # Control de Servicios Inmobiliarios
 
+## Tareas operativas de auditoría
+
+La lectura del panel de auditoría no ejecuta migraciones ni sincronizaciones.
+Ejecuta estos comandos durante el despliegue y desde cron/cola, respectivamente:
+
+```bash
+php bin/migrate-canon-insurance-audit.php
+php bin/sync-canon-increment-changes.php
+php bin/warm-dashboard-performance.php filters
+php bin/warm-dashboard-performance.php metrics
+php bin/warm-dashboard-performance.php maintenance
+```
+
+Para que la primera visita y la primera apertura de Mantenimiento siempre usen cache caliente, ejecutar estos comandos desde cron cada 5 minutos. Las vistas filtradas y las paginas siguientes continúan consultando los datos en tiempo real.
+
 Aplicación PHP para administrar tickets, mantenimientos, PQR, revisiones preventivas y notificaciones de servicios inmobiliarios.
 
 ## Requisitos

@@ -58,13 +58,19 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_DASHBOARD_PERMISSIONS_SAVE = 'scm_dashboard_permissions_save';
   const AJAX_CALENDAR_CITA_NOTIFY = 'scm_calendar_cita_notificar';
   const AJAX_ADMIN_NOTIFICATIONS_RECIPIENTS = 'scm_admin_notifications_recipients';
+  const AJAX_ADMIN_NOTIFICATIONS_PANEL = 'scm_admin_notifications_panel';
   const AJAX_ADMIN_NOTIFICATIONS_SEND = 'scm_admin_notifications_send';
   const AJAX_ADMIN_NOTIFICATIONS_IMPORT = 'scm_admin_notifications_import';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION = 'scm_admin_notifications_collection';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE = 'scm_admin_notifications_collection_queue';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_LOG = 'scm_admin_notifications_collection_log';
   const AJAX_INTERNAL_NOTIFICATIONS_SAVE = 'scm_internal_notifications_save';
+  const AJAX_PUBLIC_PQR_SETTINGS_READ = 'scm_public_pqr_settings_read';
+  const AJAX_INTERNAL_NOTIFICATIONS_READ = 'scm_internal_notifications_read';
   const AJAX_METRICS_EXECUTION = 'scm_metricas_ejecucion_funcionario';
+  const AJAX_DASHBOARD_HOME = 'scm_dashboard_inicio';
+  const AJAX_DASHBOARD_METRICS = 'scm_dashboard_metricas';
+  const AJAX_DASHBOARD_FILTER_OPTIONS = 'scm_dashboard_filter_options';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';
   const AJAX_CANON_INSURANCE_AUDIT_IMPORT = 'scm_auditoria_canon_aseguradoras_importar';
   const AJAX_CANON_INSURANCE_AUDIT_OBSERVATION = 'scm_auditoria_canon_aseguradoras_observacion';
@@ -940,6 +946,16 @@ final class SuCasaControlServiciosInmobiliarios
     return '<div class="scm-empty scm-lazy-empty"><p>' . esc_html($message) . '</p></div>';
   }
 
+  private function render_lazy_filter_form(string $domKey, string $prefix): string
+  {
+    return '<div class="scm-filter-card card">'
+      . '<form id="scm-form-' . esc_attr($domKey) . '" autocomplete="off">'
+      . '<input type="hidden" name="' . esc_attr($prefix) . 'page" value="1">'
+      . '<div class="scm-empty scm-lazy-empty"><p>Los filtros se cargarán con esta vista.</p></div>'
+      . '<span class="scm-spinner" id="scm-spinner-' . esc_attr($domKey) . '"></span>'
+      . '</form></div>';
+  }
+
   /**
    * @param array<string,string> $config
    * @param array<string,mixed> $input
@@ -972,16 +988,15 @@ final class SuCasaControlServiciosInmobiliarios
       $module = $this->get_servicios_inmobiliarios_module();
       $params = $module->parseParams($input, $prefix);
       if (!$hydrateRows) {
-        $count = $module->countMaintenance($params, $bucketKey);
         return [
           'dom_key' => $domKey,
           'prefix' => $prefix,
           'params' => $params,
-          'count' => $count,
+          'count' => 0,
           'cards' => $this->render_lazy_tickets_placeholder(),
           'pagination' => '',
-          'form' => $this->render_status_maintenance_filter_form($domKey, $prefix, $params, $maintenanceFilterOptions, $lockedStatusLabel),
-          'stats' => ['total' => $count],
+          'form' => $this->render_lazy_filter_form($domKey, $prefix),
+          'stats' => ['total' => 0],
           'loaded' => false,
         ];
       }
@@ -1004,6 +1019,19 @@ final class SuCasaControlServiciosInmobiliarios
     $params['_scmStatusBucket'] = $bucketKey;
     $temas = is_array($def['temas'] ?? null) ? $def['temas'] : [];
     $baseTabKey = (string) ($def['base'] ?? $topicKey);
+    if (!$hydrateRows) {
+      return [
+        'dom_key' => $domKey,
+        'prefix' => $prefix,
+        'params' => $params,
+        'count' => 0,
+        'cards' => $this->render_lazy_tickets_placeholder(),
+        'pagination' => '',
+        'form' => $this->render_lazy_filter_form($domKey, $prefix),
+        'stats' => ['total' => 0],
+        'loaded' => false,
+      ];
+    }
     $result = $this->run_query_generic($temas, $params, $config, $hydrateRows);
     $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
     $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];

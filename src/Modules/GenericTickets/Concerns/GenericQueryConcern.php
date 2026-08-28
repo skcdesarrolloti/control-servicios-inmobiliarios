@@ -62,6 +62,7 @@ trait GenericQueryConcern
       'fTuvoSeguimiento' => $clean($input[$prefix . 'tuvo_seguimiento'] ?? ''),
       'fTema' => $clean($input[$prefix . 'tema'] ?? ''),
       'fPage' => max(1, (int) $clean($input[$prefix . 'page'] ?? '1')),
+      'fPerPage' => max(10, min(100, (int) $clean($input[$prefix . 'per_page'] ?? '10'))),
     ];
   }
 
@@ -70,7 +71,7 @@ trait GenericQueryConcern
     $tabla = $this->db->table('jet_cct_tickets');
 
     if (!$this->table_exists($tabla) || empty($temas)) {
-      return ['rows' => [], 'stats' => ['total' => 0, 'abiertos' => 0, 'cerrados' => 0], 'pagination' => ['page' => 1, 'per_page' => 24, 'total' => 0, 'total_pages' => 1]];
+      return ['rows' => [], 'stats' => ['total' => 0, 'abiertos' => 0, 'cerrados' => 0], 'pagination' => ['page' => 1, 'per_page' => 10, 'total' => 0, 'total_pages' => 1]];
     }
 
     $where = [];
@@ -559,7 +560,7 @@ trait GenericQueryConcern
       FROM `{$tabla}` WHERE {$whereStr}";
     $agg = $this->db->getRow($aggSql, $args);
 
-    $perPage = max(24, min(100, (int) ($p['fPerPage'] ?? 24)));
+    $perPage = max(10, min(100, (int) ($p['fPerPage'] ?? 10)));
     $page = max(1, (int) ($p['fPage'] ?? 1));
     $totalPages = max(1, (int) ceil($total / $perPage));
     if ($page > $totalPages) {

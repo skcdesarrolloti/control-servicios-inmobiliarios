@@ -37,6 +37,7 @@ final class CanonInsuranceAuditView
     $items = (array) ($payload['items'] ?? []);
     $reports = (array) ($payload['reports'] ?? []);
     $filters = (array) ($payload['filters'] ?? []);
+    $pagination = (array) ($payload['pagination'] ?? []);
     $canPurge = !empty($payload['can_purge']);
     ob_start();
     if ($sourceAudits === []) {
@@ -49,7 +50,7 @@ final class CanonInsuranceAuditView
 
     <div class="scm-cia-kpis" aria-label="Resumen de conciliacion"><?php echo $this->kpi('Contratos revisados', (int) ($summary['total'] ?? 0), 'neutral'); ?><?php echo $this->kpi('Verde · correctos', (int) ($summary['compliant'] ?? 0), 'success'); ?><?php echo $this->kpi('Rojo · equivocados', (int) ($summary['differences'] ?? 0), 'danger'); ?><?php echo $this->kpi('Amarillo · anomalías', (int) ($summary['incomplete'] ?? 0), 'warning'); ?></div>
 
-    <form class="scm-cia-filters" data-cia-filter-form autocomplete="off"><div class="scm-field"><label for="scm_cia_period_filter">Periodo consolidado</label><select id="scm_cia_period_filter" name="period"><?php if (!in_array($period, $periods, true)): ?><option value="<?php echo esc_attr($period); ?>" selected><?php echo esc_html($this->periodLabel($period)); ?></option><?php endif; ?><?php foreach ($periods as $availablePeriod): ?><option value="<?php echo esc_attr((string) $availablePeriod); ?>" <?php echo $period === (string) $availablePeriod ? 'selected' : ''; ?>><?php echo esc_html($this->periodLabel((string) $availablePeriod)); ?></option><?php endforeach; ?></select></div><div class="scm-field"><label for="scm_cia_status_filter">Resultado</label><select id="scm_cia_status_filter" name="status"><?php foreach ($this->statusOptions() as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php echo (string) ($filters['status'] ?? '') === $value ? 'selected' : ''; ?>><?php echo esc_html($label); ?></option><?php endforeach; ?></select></div><div class="scm-field scm-cia-search-field"><label for="scm_cia_search">Solicitud, contrato o persona</label><input id="scm_cia_search" name="search" type="search" value="<?php echo esc_attr((string) ($filters['search'] ?? '')); ?>" placeholder="Ej. 11827961 o arrendatario"></div><button type="submit" class="scm-btn-secondary btn btn-outline">Aplicar filtros</button></form>
+    <form class="scm-cia-filters" data-cia-filter-form autocomplete="off"><input type="hidden" name="page" value="<?php echo esc_attr((string) ($filters['page'] ?? 1)); ?>"><div class="scm-field"><label for="scm_cia_period_filter">Periodo consolidado</label><select id="scm_cia_period_filter" name="period"><?php if (!in_array($period, $periods, true)): ?><option value="<?php echo esc_attr($period); ?>" selected><?php echo esc_html($this->periodLabel($period)); ?></option><?php endif; ?><?php foreach ($periods as $availablePeriod): ?><option value="<?php echo esc_attr((string) $availablePeriod); ?>" <?php echo $period === (string) $availablePeriod ? 'selected' : ''; ?>><?php echo esc_html($this->periodLabel((string) $availablePeriod)); ?></option><?php endforeach; ?></select></div><div class="scm-field"><label for="scm_cia_status_filter">Resultado</label><select id="scm_cia_status_filter" name="status"><?php foreach ($this->statusOptions() as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php echo (string) ($filters['status'] ?? '') === $value ? 'selected' : ''; ?>><?php echo esc_html($label); ?></option><?php endforeach; ?></select></div><div class="scm-field scm-cia-search-field"><label for="scm_cia_search">Solicitud, contrato o persona</label><input id="scm_cia_search" name="search" type="search" value="<?php echo esc_attr((string) ($filters['search'] ?? '')); ?>" placeholder="Ej. 11827961 o arrendatario"></div><div class="scm-field"><label for="scm_cia_per_page">Filas</label><select id="scm_cia_per_page" name="per_page"><?php foreach ([20, 50, 100] as $size): ?><option value="<?php echo esc_attr((string) $size); ?>" <?php echo (int) ($filters['per_page'] ?? 50) === $size ? 'selected' : ''; ?>><?php echo esc_html((string) $size); ?></option><?php endforeach; ?></select></div><button type="submit" class="scm-btn-secondary btn btn-outline">Aplicar filtros</button></form>
 
     <section class="scm-cia-admin-actions" aria-label="Herramientas administrativas">
       <div class="scm-cia-section-head"><div><h3>Herramientas administrativas</h3><p>Acciones puntuales para limpiar pruebas o enviar el consolidado. La revisi&oacute;n diaria est&aacute; m&aacute;s abajo.</p></div></div>
@@ -59,8 +60,25 @@ final class CanonInsuranceAuditView
       </div>
     </section>
     <?php echo $this->renderItemsTable($items, $sourceAudits, $audits); ?>
+    <?php echo $this->renderPagination($pagination); ?>
 <?php
     return (string) ob_get_clean();
+  }
+
+  /** @param array<string,mixed> $pagination */
+  private function renderPagination(array $pagination): string
+  {
+    $page = max(1, (int) ($pagination['page'] ?? 1));
+    $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
+    $total = max(0, (int) ($pagination['total'] ?? 0));
+    if ($totalPages <= 1) {
+      return '<div class="scm-pagination"><span>' . esc_html((string) $total) . ' resultados</span></div>';
+    }
+    return '<nav class="scm-pagination" aria-label="Paginación de auditoría">'
+      . '<button type="button" class="scm-page-btn" data-cia-page="' . esc_attr((string) max(1, $page - 1)) . '"' . ($page <= 1 ? ' disabled' : '') . '>Anterior</button>'
+      . '<span>Página ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' · ' . esc_html((string) $total) . ' resultados</span>'
+      . '<button type="button" class="scm-page-btn" data-cia-page="' . esc_attr((string) min($totalPages, $page + 1)) . '"' . ($page >= $totalPages ? ' disabled' : '') . '>Siguiente</button>'
+      . '</nav>';
   }
 
   /** @param array<string,mixed> $payload */

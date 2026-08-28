@@ -353,9 +353,11 @@
         .then(function (data) {
           replaceContent(data);
           setStatus("Auditorias actualizadas.", "success");
+          return true;
         })
         .catch(function (error) {
           setStatus(error.message || "No se pudo cargar la auditoria.", "error");
+          return false;
         });
     }
 
@@ -716,6 +718,8 @@
       var filterForm = event.target.closest("[data-cia-filter-form]");
       if (filterForm) {
         event.preventDefault();
+        var pageInput = filterForm.querySelector('[name="page"]');
+        if (pageInput) pageInput.value = "1";
         load(new FormData(filterForm));
       }
     });
@@ -734,8 +738,23 @@
         event.target.closest("[data-cia-filter-form]")
       ) {
         var form = event.target.closest("[data-cia-filter-form]");
-        if (form) load(new FormData(form));
+        if (form) {
+          var pageInput = form.querySelector('[name="page"]');
+          if (pageInput) pageInput.value = "1";
+          load(new FormData(form));
+        }
       }
+    });
+
+    module.addEventListener("click", function (event) {
+      var pageButton = event.target.closest("[data-cia-page]");
+      if (!pageButton || pageButton.disabled) return;
+      event.preventDefault();
+      var form = module.querySelector("[data-cia-filter-form]");
+      if (!form) return;
+      var pageInput = form.querySelector('[name="page"]');
+      if (pageInput) pageInput.value = pageButton.dataset.ciaPage || "1";
+      load(new FormData(form));
     });
 
     module.addEventListener("click", function (event) {
@@ -808,7 +827,17 @@
 
     var initialPeriod = module.querySelector('[name="period"]');
     if (initialPeriod) updateFilenameGuide(initialPeriod.value);
-    load();
+    module.addEventListener("scm:load-canon-audit", function () {
+      var panel = module.closest(".scm-admin-activity-panel");
+      if (panel && panel.getAttribute("data-scm-loaded") === "1") return;
+      load().then(function (loaded) {
+        if (loaded && panel) panel.setAttribute("data-scm-loaded", "1");
+      });
+    });
+    var initialPanel = module.closest(".scm-admin-activity-panel");
+    if (initialPanel && initialPanel.classList.contains("active")) {
+      module.dispatchEvent(new CustomEvent("scm:load-canon-audit"));
+    }
   }
 
   function boot() {

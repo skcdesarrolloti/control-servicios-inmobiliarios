@@ -161,6 +161,8 @@
       actions.dashboard_permissions_save || "";
     var actionAdminNotificationsRecipients =
       actions.admin_notifications_recipients || "";
+    var actionAdminNotificationsPanel =
+      actions.admin_notifications_panel || "";
     var actionAdminNotificationsSend = actions.admin_notifications_send || "";
     var actionAdminNotificationsImport =
       actions.admin_notifications_import || "";
@@ -172,7 +174,13 @@
       actions.admin_notifications_collection_log || "";
     var actionInternalNotificationsSave =
       actions.internal_notifications_save || "";
+    var actionPublicPqrSettingsRead = actions.public_pqr_settings_read || "";
+    var actionInternalNotificationsRead =
+      actions.internal_notifications_read || "";
     var actionMetricsExecution = actions.metrics_execution || "";
+    var actionDashboardHome = actions.dashboard_home || "";
+    var actionDashboardMetrics = actions.dashboard_metrics || "";
+    var actionDashboardFilterOptions = actions.dashboard_filter_options || "";
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
     ).replace(/\/+$/, "");
@@ -2280,6 +2288,52 @@
 
     function showToast(type, message) {
       scmNotify(type, message);
+    }
+
+    var adminNotificationsPanelPromise = null;
+
+    function loadAdminNotificationsPanel() {
+      var host = root.querySelector("#scm-panel-admin-notificaciones");
+      if (!host || !actionAdminNotificationsPanel || !ajaxUrl) {
+        return Promise.resolve();
+      }
+      if (host.getAttribute("data-scm-loaded") === "1") {
+        return initAdminNotificationsPanel(false);
+      }
+      if (adminNotificationsPanelPromise) {
+        return adminNotificationsPanelPromise;
+      }
+      host.classList.add("is-loading");
+      host.setAttribute("aria-busy", "true");
+      var fd = new FormData();
+      fd.append("action", actionAdminNotificationsPanel);
+      fd.append("nonce", nonce);
+      adminNotificationsPanelPromise = fetch(ajaxUrl, {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+      })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success || !json.data) {
+            throw new Error(
+              (json && json.data && json.data.message) ||
+                "No se pudo cargar el módulo de notificaciones.",
+            );
+          }
+          host.innerHTML = json.data.html || "";
+          host.setAttribute("data-scm-loaded", "1");
+          return initAdminNotificationsPanel(true);
+        })
+        .catch(function (error) {
+          adminNotificationsPanelPromise = null;
+          showToast("error", error.message || "No se pudo cargar Notificaciones.");
+        })
+        .finally(function () {
+          host.classList.remove("is-loading");
+          host.removeAttribute("aria-busy");
+        });
+      return adminNotificationsPanelPromise;
     }
 
     function initAdminNotificationsPanel(forceReload) {
@@ -4398,9 +4452,15 @@
     function bindPublicPqrSettingsShortcut() {
       var openBtn = root.querySelector("#scm-open-pqr-settings");
       var modal = root.querySelector("#scm-pqr-settings-modal");
-      if (!openBtn || !modal) {
+      if (
+        !openBtn ||
+        !modal ||
+        modal.hasAttribute("data-scm-lazy-settings") ||
+        modal.dataset.scmSettingsBound === "1"
+      ) {
         return;
       }
+      modal.dataset.scmSettingsBound = "1";
       var closeBtn = modal.querySelector("#scm-close-pqr-settings");
 
       function initSelects() {
@@ -4505,9 +4565,15 @@
       var openBtn = root.querySelector("#scm-open-internal-notifications");
       var modal = root.querySelector("#scm-internal-notifications-modal");
       var form = root.querySelector("#scm-internal-notifications-form");
-      if (!openBtn || !modal || !form) {
+      if (
+        !openBtn ||
+        !modal ||
+        !form ||
+        modal.dataset.scmSettingsBound === "1"
+      ) {
         return;
       }
+      modal.dataset.scmSettingsBound = "1";
       var closeBtn = modal.querySelector("#scm-close-internal-notifications");
       var msg = modal.querySelector("#scm-internal-notifications-msg");
 
@@ -4612,6 +4678,67 @@
     }
 
     bindInternalNotificationsSettings();
+
+    var settingsModalPromises = {};
+    root.addEventListener("click", function (event) {
+      var button = event.target.closest(
+        "#scm-open-pqr-settings, #scm-open-internal-notifications",
+      );
+      if (!button) return;
+      var isPublicPqr = button.id === "scm-open-pqr-settings";
+      var modalId = isPublicPqr
+        ? "scm-pqr-settings-modal"
+        : "scm-internal-notifications-modal";
+      var action = isPublicPqr
+        ? actionPublicPqrSettingsRead
+        : actionInternalNotificationsRead;
+      var shell = root.querySelector("#" + modalId + "[data-scm-lazy-settings]");
+      if (!shell) return;
+      event.preventDefault();
+      if (!action || !ajaxUrl) {
+        showToast("error", "No está disponible la configuración solicitada.");
+        return;
+      }
+      if (!settingsModalPromises[modalId]) {
+        button.disabled = true;
+        var fd = new FormData();
+        fd.append("action", action);
+        fd.append("nonce", nonce);
+        settingsModalPromises[modalId] = fetch(ajaxUrl, {
+          method: "POST",
+          body: fd,
+          credentials: "same-origin",
+        })
+          .then(function (response) { return response.json(); })
+          .then(function (json) {
+            if (!json || !json.success || !json.data || !json.data.html) {
+              throw new Error(
+                (json && json.data && json.data.message) ||
+                  "No se pudo cargar la configuración.",
+              );
+            }
+            var template = document.createElement("template");
+            template.innerHTML = String(json.data.html).trim();
+            var modal = template.content.firstElementChild;
+            if (!modal) throw new Error("La configuración llegó vacía.");
+            shell.replaceWith(modal);
+            if (isPublicPqr) {
+              bindPublicPqrSettingsShortcut();
+            } else {
+              bindInternalNotificationsSettings();
+            }
+            button.disabled = false;
+            button.click();
+          })
+          .catch(function (error) {
+            settingsModalPromises[modalId] = null;
+            showToast("error", error.message || "No se pudo cargar la configuración.");
+          })
+          .finally(function () {
+            button.disabled = false;
+          });
+      }
+    });
 
     function ticketAdminDatalist(id, values) {
       return (
@@ -6564,9 +6691,6 @@
           if (!show) {
             field.querySelectorAll("select, input").forEach(function (input) {
               input.value = "";
-              if (input.dispatchEvent) {
-                input.dispatchEvent(new Event("change", { bubbles: true }));
-              }
             });
           }
         });
@@ -7022,6 +7146,284 @@
     }
 
     var initialMetrics = readInitialMetrics();
+    var dashboardFilterOptionsLoaded = false;
+    var dashboardFilterOptionsPromise = null;
+
+    function replaceSelectOptions(select, rows, valueKey, labelKey) {
+      if (!select) return;
+      var current = String(
+        ((runtime.initialFilters || {})[select.name] || select.value || ""),
+      );
+      while (select.options.length > 1) {
+        select.remove(1);
+      }
+      (Array.isArray(rows) ? rows : []).forEach(function (row) {
+        var value = typeof row === "object" && row !== null
+          ? String(row[valueKey] || "")
+          : String(row || "");
+        if (!value) return;
+        var label = typeof row === "object" && row !== null
+          ? String(row[labelKey] || value)
+          : value;
+        var option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        option.selected = current === value;
+        select.appendChild(option);
+      });
+    }
+
+    function populateDashboardFilterOptions(data) {
+      var options = data && data.filter_options ? data.filter_options : {};
+      var mappings = [
+        ["select[name$='id_empleado'], [data-scm-execution-form] select[name='funcionario']", options.funcionarios || [], "id", "label"],
+        ["select[name$='barrio']", options.barrios || [], "value", "label"],
+        ["select[name$='estado_admin']", options.estado_admin || [], "value", "label"],
+        ["select[name$='prioridad']", options.prioridad || [], "value", "label"],
+        ["select[name$='cotizacion_estado']", options.cotizacion_estado || [], "value", "label"],
+        ["select[name$='revision_estado']", options.revision_estado || [], "value", "label"],
+        ["#scm_tema", options.tema || [], "value", "label"],
+      ];
+      mappings.forEach(function (mapping) {
+        root.querySelectorAll(mapping[0]).forEach(function (select) {
+          replaceSelectOptions(select, mapping[1], mapping[2], mapping[3]);
+        });
+      });
+      var cotizacionOptions = data.cotizacion_options || {};
+      replaceSelectOptions(
+        root.querySelector("#scmqt_funcionario"),
+        cotizacionOptions.funcionarios || [],
+        "id",
+        "label",
+      );
+      replaceSelectOptions(
+        root.querySelector("#scmqt_tipo_mantenimiento"),
+        cotizacionOptions.tipos_mantenimiento || [],
+        "value",
+        "label",
+      );
+      replaceSelectOptions(
+        root.querySelector("#scmqt_categoria"),
+        cotizacionOptions.categorias || [],
+        "value",
+        "label",
+      );
+      config.calendar_allowed_funcionarios = data.calendar_allowed_funcionarios || [];
+      config.calendar_allowed_employee_ids = data.calendar_allowed_employee_ids || [];
+      config.calendar_current_employee_id = data.calendar_current_employee_id || "";
+    }
+
+    function loadDashboardFilterOptions() {
+      if (dashboardFilterOptionsLoaded || !ajaxUrl || !actionDashboardFilterOptions) {
+        return Promise.resolve();
+      }
+      if (dashboardFilterOptionsPromise) return dashboardFilterOptionsPromise;
+      var fd = new FormData();
+      fd.append("action", actionDashboardFilterOptions);
+      fd.append("nonce", nonce);
+      dashboardFilterOptionsPromise = fetch(ajaxUrl, {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+      })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success || !json.data) {
+            throw new Error("No se pudieron cargar las opciones de filtros.");
+          }
+          populateDashboardFilterOptions(json.data);
+          dashboardFilterOptionsLoaded = true;
+        })
+        .catch(function (error) {
+          dashboardFilterOptionsPromise = null;
+          dashboardFilterOptionsLoaded = true;
+          showToast("error", error.message || "No se pudieron cargar los filtros.");
+        });
+      return dashboardFilterOptionsPromise;
+    }
+
+    var dashboardHomePromise = null;
+    var dashboardMetricsPromise = null;
+
+    function formatDashboardCount(value) {
+      var numericValue = Number(value);
+      if (!Number.isFinite(numericValue)) return "0";
+      return Math.max(0, Math.round(numericValue)).toLocaleString("es-CO");
+    }
+
+    function renderDashboardHome(summary, generatedAt) {
+      var panel = root.querySelector("#scm-panel-inicio");
+      if (!panel) return;
+
+      panel.querySelectorAll("[data-scm-home-metric]").forEach(function (node) {
+        var key = node.getAttribute("data-scm-home-metric") || "";
+        node.textContent = formatDashboardCount(summary && summary[key]);
+      });
+      var categories =
+        summary && summary.por_categoria && typeof summary.por_categoria === "object"
+          ? summary.por_categoria
+          : {};
+      panel.querySelectorAll("[data-scm-home-category]").forEach(function (node) {
+        var category = node.getAttribute("data-scm-home-category") || "";
+        node.textContent = formatDashboardCount(categories[category]);
+      });
+
+      var status = panel.querySelector("[data-scm-home-status]");
+      if (status) status.hidden = true;
+      var updated = panel.querySelector("[data-scm-home-updated]");
+      if (updated && generatedAt) {
+        var timestamp = new Date(generatedAt);
+        if (!Number.isNaN(timestamp.getTime())) {
+          updated.textContent =
+            "Actualizado a las " +
+            timestamp.toLocaleTimeString("es-CO", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+        }
+      }
+      panel.setAttribute("data-scm-loaded", "1");
+    }
+
+    function showDashboardHomeMessage(message, isError) {
+      var panel = root.querySelector("#scm-panel-inicio");
+      if (!panel) return;
+      var status = panel.querySelector("[data-scm-home-status]");
+      var textNode = panel.querySelector("[data-scm-home-status-text]");
+      var retryButton = panel.querySelector("[data-scm-home-retry]");
+      if (status) {
+        status.hidden = false;
+        status.classList.toggle("is-error", Boolean(isError));
+      }
+      if (textNode) textNode.textContent = message;
+      if (retryButton) retryButton.hidden = !isError;
+    }
+
+    function loadDashboardHome() {
+      var panel = root.querySelector("#scm-panel-inicio");
+      if (!panel || !ajaxUrl || !actionDashboardHome) {
+        return Promise.resolve();
+      }
+      if (panel.getAttribute("data-scm-loaded") === "1") {
+        return Promise.resolve();
+      }
+      if (dashboardHomePromise) return dashboardHomePromise;
+
+      panel.setAttribute("aria-busy", "true");
+      showDashboardHomeMessage("Cargando el resumen…", false);
+      var fd = new FormData();
+      fd.append("action", actionDashboardHome);
+      fd.append("nonce", nonce);
+      dashboardHomePromise = fetch(ajaxUrl, {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+      })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success || !json.data) {
+            throw new Error(
+              (json && json.data && json.data.message) ||
+                "No se pudo cargar el resumen.",
+            );
+          }
+          if (!json.data.summary) {
+            panel.setAttribute("data-scm-loaded", "1");
+            showDashboardHomeMessage(
+              json.data.message || "No hay indicadores disponibles para tu perfil.",
+              false,
+            );
+            return;
+          }
+          renderDashboardHome(json.data.summary, json.data.generated_at || "");
+        })
+        .catch(function (error) {
+          dashboardHomePromise = null;
+          showDashboardHomeMessage(
+            error && error.message
+              ? error.message
+              : "No fue posible cargar el resumen. Puedes reintentarlo.",
+            true,
+          );
+        })
+        .finally(function () {
+          panel.removeAttribute("aria-busy");
+        });
+      return dashboardHomePromise;
+    }
+
+    function loadDashboardMetrics() {
+      var panel = root.querySelector("#scm-panel-metricas");
+      if (!panel || !ajaxUrl || !actionDashboardMetrics) {
+        return Promise.resolve();
+      }
+      if (panel.getAttribute("data-scm-loaded") === "1") {
+        return Promise.resolve();
+      }
+      if (dashboardMetricsPromise) {
+        return dashboardMetricsPromise;
+      }
+
+      panel.classList.add("is-loading");
+      panel.setAttribute("aria-busy", "true");
+      var fd = new FormData();
+      fd.append("action", actionDashboardMetrics);
+      fd.append("nonce", nonce);
+      dashboardMetricsPromise = fetch(ajaxUrl, {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+      })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success || !json.data || !json.data.metrics) {
+            throw new Error(
+              (json && json.data && json.data.message) ||
+                "No se pudieron cargar las métricas.",
+            );
+          }
+          initialMetrics = json.data.metrics;
+          panel.setAttribute("data-scm-metrics", JSON.stringify(initialMetrics));
+          panel.setAttribute("data-scm-loaded", "1");
+          var loadingState = panel.querySelector("[data-scm-metrics-loading]");
+          if (loadingState) {
+            loadingState.hidden = true;
+          }
+          var activeCategoryMetrics = getCategoryMetricSet(
+            initialMetrics,
+            activeMetricCategory,
+          );
+          renderMetricsCharts(activeCategoryMetrics, activeMetricCategory);
+          renderGuardianMetrics(initialMetrics.web || {});
+          applyRevisionKpiVisibility(
+            "scm-",
+            activeCategoryMetrics.con_revision,
+            activeCategoryMetrics.sin_revision,
+          );
+        })
+        .catch(function (error) {
+          dashboardMetricsPromise = null;
+          var loadingState = panel.querySelector("[data-scm-metrics-loading]");
+          if (loadingState) {
+            loadingState.hidden = false;
+            loadingState.textContent = "No fue posible cargar los indicadores. Intenta recargar la página.";
+            loadingState.classList.add("is-error");
+          }
+          showToast(
+            "error",
+            error && error.message
+              ? error.message
+              : "No se pudieron cargar las métricas.",
+          );
+        })
+        .finally(function () {
+          panel.classList.remove("is-loading");
+          panel.removeAttribute("aria-busy");
+        });
+
+      return dashboardMetricsPromise;
+    }
+
     if (initialMetrics) {
       var initialCategoryMetrics = getCategoryMetricSet(
         initialMetrics,
@@ -7083,7 +7485,9 @@
               var paneName = btn.getAttribute("data-scm-metric-panel") || "guardian";
               showMetricsPane(paneName);
               if (paneName === "ejecucion") {
-                loadMetricsExecution(false);
+                loadDashboardFilterOptions().then(function () {
+                  loadMetricsExecution(false);
+                });
               } else {
                 renderGuardianMetrics(initialMetrics.web || {});
               }
@@ -8282,6 +8686,17 @@
             }
             var d = json.data || {};
             tabCards.innerHTML = d.cards || "";
+            if (typeof d.form === "string" && d.form) {
+              var formWrap = document.createElement("div");
+              formWrap.innerHTML = d.form;
+              var nextForm = formWrap.querySelector("form");
+              var currentFilterCard = tabForm.closest(".scm-filter-card");
+              var nextFilterCard = nextForm ? nextForm.closest(".scm-filter-card") : null;
+              if (currentFilterCard && nextFilterCard) {
+                currentFilterCard.replaceWith(nextFilterCard);
+                tabFetchers[statusKey] = makeStatusFetcher(statusPanel);
+              }
+            }
             if (tabPagination) {
               tabPagination.innerHTML = d.pagination || "";
             }
@@ -9135,6 +9550,15 @@
       if (!activePanel) {
         return Promise.resolve();
       }
+      if (activePanel.id === "scm-panel-inicio") {
+        return loadDashboardHome();
+      }
+      if (
+        activePanel.id !== "scm-panel-metricas" &&
+        !dashboardFilterOptionsLoaded
+      ) {
+        return loadDashboardFilterOptions().then(loadActiveLazyPanel);
+      }
       if (activePanel.id === "scm-panel-abiertos") {
         return loadOpenTopicPanelIfNeeded(
           activePanel.querySelector(".scm-open-topic-panel.active"),
@@ -9153,6 +9577,9 @@
       }
       if (activePanel.id === "scm-panel-cotizaciones-mantenimiento") {
         return loadPanelOnce(activePanel, "cotizaciones_mantenimiento");
+      }
+      if (activePanel.id === "scm-panel-metricas") {
+        return loadDashboardMetrics();
       }
       if (activePanel.id === "scm-panel-actividades-administrativas") {
         var activeAdministrativePanel = activePanel.querySelector(
@@ -9181,6 +9608,24 @@
         }
         if (
           activeAdministrativePanel &&
+          administrativeKey === "reportes_administrativos_pendientes"
+        ) {
+          return loadPendingFormOnce(activeAdministrativePanel, "#sra_form");
+        }
+        if (
+          activeAdministrativePanel &&
+          administrativeKey === "auditoria_canon_aseguradoras"
+        ) {
+          var auditModule = activeAdministrativePanel.querySelector(
+            "[data-canon-insurance-audit]",
+          );
+          if (auditModule) {
+            auditModule.dispatchEvent(new CustomEvent("scm:load-canon-audit"));
+          }
+          return Promise.resolve();
+        }
+        if (
+          activeAdministrativePanel &&
           administrativeKey === "calendario_actividades"
         ) {
           initCalendarPanel();
@@ -9189,13 +9634,13 @@
           activeAdministrativePanel &&
           administrativeKey === "notificaciones"
         ) {
-          return initAdminNotificationsPanel(false);
+          return loadAdminNotificationsPanel();
         }
         if (
           activeAdministrativePanel &&
           administrativeKey === "gestiones_cobro"
         ) {
-          return refreshCollectionLogPanel(activeAdministrativePanel, true);
+          return refreshCollectionLogPanel(activeAdministrativePanel, false);
         }
       }
       return Promise.resolve();
@@ -9232,6 +9677,31 @@
       tab.addEventListener("click", function () {
         window.setTimeout(loadActiveLazyPanel, 0);
       });
+    });
+
+    root.addEventListener("click", function (event) {
+      var retryButton = event.target.closest("[data-scm-home-retry]");
+      if (retryButton) {
+        dashboardHomePromise = null;
+        var homePanel = root.querySelector("#scm-panel-inicio");
+        if (homePanel) homePanel.setAttribute("data-scm-loaded", "0");
+        loadDashboardHome();
+        return;
+      }
+
+      var shortcut = event.target.closest("[data-scm-home-target]");
+      if (!shortcut) return;
+      var targetPanel = shortcut.getAttribute("data-scm-home-target") || "";
+      var targetTab = Array.prototype.find.call(
+        root.querySelectorAll(".scm-main-tabs .scm-tab[data-tab]"),
+        function (tab) {
+          return tab.getAttribute("data-tab") === targetPanel;
+        },
+      );
+      if (targetTab) {
+        targetTab.click();
+        targetTab.focus({ preventScroll: true });
+      }
     });
 
     loadActiveLazyPanel();

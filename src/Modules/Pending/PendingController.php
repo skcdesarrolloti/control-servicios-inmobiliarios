@@ -81,6 +81,21 @@ final class PendingController
     );
   }
 
+  /** @param array<string,mixed> $filterOptions */
+  public function renderReportesAdministrativosShell(array $filterOptions = []): string
+  {
+    $filters = $this->parseFilters($_GET, 'sra_');
+    $filters['estado'] = trim((string) ($_GET['sra_estado'] ?? 'Pendiente'));
+    $filters['categoria'] = trim((string) ($_GET['sra_categoria'] ?? ''));
+
+    return $this->view->renderReportesAdministrativosPanel(
+      $filters,
+      is_array($filterOptions['funcionarios'] ?? null) ? $filterOptions['funcionarios'] : [],
+      [],
+      0
+    );
+  }
+
   public function renderContratosArrendamientoTab(): string
   {
     return $this->view->renderContratosArrendamientoPanel($this->getContratoBucketDefinitions());

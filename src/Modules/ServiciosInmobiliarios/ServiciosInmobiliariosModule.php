@@ -94,7 +94,7 @@ final class ServiciosInmobiliariosModule
    * @param array<string,string> $config
    * @return array<string,mixed>
    */
-  public function run(array $params, array $config, string $statusBucket = ''): array
+  public function run(array $params, array $config, string $statusBucket = '', ?array $statsOverride = null): array
   {
     $statusBucket = in_array($statusBucket, ['postergados', 'cerrados'], true) ? $statusBucket : '';
     if ($statusBucket !== '') {
@@ -104,7 +104,10 @@ final class ServiciosInmobiliariosModule
     $pagination = $this->ticketsRepository->getLastMaintenancePagination();
     $rows = $this->metrics->enrichRows($rows);
 
-    $stats = $this->ticketsRepository->aggregateMaintenanceStats($params);
+    $stats = $statsOverride ?? $this->ticketsRepository->aggregateMaintenanceStats($params);
+    if ($statsOverride !== null && !isset($stats['total'])) {
+      $stats['total'] = (int) ($pagination['total'] ?? 0);
+    }
 
     return [
       'rows' => $rows,

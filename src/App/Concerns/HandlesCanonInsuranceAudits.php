@@ -33,6 +33,8 @@ trait HandlesCanonInsuranceAudits
         'period' => trim(sanitize_text_field(wp_unslash((string) ($_POST['period'] ?? '')))),
         'status' => sanitize_key((string) ($_POST['status'] ?? '')),
         'search' => trim(sanitize_text_field(wp_unslash((string) ($_POST['search'] ?? '')))),
+        'page' => max(1, (int) ($_POST['page'] ?? 1)),
+        'per_page' => max(20, min(100, (int) ($_POST['per_page'] ?? 50))),
       ]);
       $this->jsonOk(['html' => $this->renderCanonInsuranceAuditContent($payload)]);
     } catch (\Throwable $exception) {
