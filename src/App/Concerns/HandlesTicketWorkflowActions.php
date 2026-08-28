@@ -8,6 +8,19 @@ use SCM\Core\Auth;
 
 trait HandlesTicketWorkflowActions
 {
+  public function ajax_handler_session_heartbeat(): void
+  {
+    $this->verifyCsrf();
+    $idleTimeout = defined('SCM_SESSION_IDLE_TIMEOUT')
+      ? max(900, (int) SCM_SESSION_IDLE_TIMEOUT)
+      : 7200;
+    $this->jsonOk([
+      'authenticated' => true,
+      'idle_timeout_seconds' => $idleTimeout,
+      'checked_at' => date(DATE_ATOM),
+    ]);
+  }
+
   /** @return array<string,mixed>|null */
   private function readDashboardPerformanceCache(string $name, int $ttl): ?array
   {

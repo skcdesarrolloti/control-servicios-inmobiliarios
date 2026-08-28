@@ -306,6 +306,41 @@ trait HandlesAdministrativeNotifications
     }
   }
 
+  public function ajax_handler_admin_notifications_collection_options(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para consultar contratos de gestión de cobro.');
+    }
+
+    $rawIds = $_POST['ids'] ?? [];
+    $ids = array_values(array_unique(array_filter(array_map(
+      'intval',
+      is_array($rawIds) ? $rawIds : [$rawIds]
+    ), static fn(int $id): bool => $id > 0)));
+    if ($ids === []) {
+      $this->jsonFail('Selecciona al menos un arrendatario activo.');
+    }
+    if (count($ids) > 100) {
+      $this->jsonFail('Selecciona máximo 100 arrendatarios por gestión.');
+    }
+
+    try {
+      $contracts = $this->get_admin_notifications_service()
+        ->collectionContractOptionsForRecipientIds($ids);
+      $this->jsonOk([
+        'contracts' => $contracts,
+        'contract_count' => count($contracts),
+        'codeudor_count' => array_sum(array_map(
+          static fn(array $contract): int => count((array) ($contract['codeudores'] ?? [])),
+          $contracts
+        )),
+      ]);
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
   public function ajax_handler_admin_notifications_collection_queue(): void
   {
     $this->verifyCsrf();

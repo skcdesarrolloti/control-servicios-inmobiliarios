@@ -63,6 +63,7 @@ final class Auth
     $_SESSION['scm_user_login'] = $user;
     $_SESSION['scm_user_rol']   = (string) ($row['rol'] ?? '');
     $_SESSION['scm_user_cargo'] = trim((string) ($row['id_cargo'] ?? ''));
+    $_SESSION['scm_last_activity'] = time();
 
     return true;
   }
@@ -86,7 +87,26 @@ final class Auth
 
   public static function isLoggedIn(): bool
   {
-    return !empty($_SESSION['scm_logged_in']);
+    if (empty($_SESSION['scm_logged_in'])) {
+      return false;
+    }
+
+    $now = time();
+    $lastActivity = (int) ($_SESSION['scm_last_activity'] ?? $now);
+    $idleTimeout = defined('SCM_SESSION_IDLE_TIMEOUT')
+      ? max(900, (int) SCM_SESSION_IDLE_TIMEOUT)
+      : 7200;
+    if ($lastActivity > 0 && ($now - $lastActivity) > $idleTimeout) {
+      foreach (array_keys($_SESSION) as $key) {
+        if (str_starts_with((string) $key, 'scm_')) {
+          unset($_SESSION[$key]);
+        }
+      }
+      return false;
+    }
+
+    $_SESSION['scm_last_activity'] = $now;
+    return true;
   }
 
   /** Devuelve el nombre completo del funcionario autenticado. */

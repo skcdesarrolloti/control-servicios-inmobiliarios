@@ -7,7 +7,7 @@ define('SCM_PUBLIC_PATH', SCM_ROOT . '/public');
 define('SCM_STORAGE_PATH', SCM_ROOT . '/storage');
 define('SCM_RESOURCES_PATH', SCM_ROOT . '/resources');
 define('SCM_BASE_PATH', SCM_PUBLIC_PATH);
-define('SCM_VERSION', '3.1.65');
+define('SCM_VERSION', '3.1.67');
 
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');
@@ -67,6 +67,7 @@ if (strlen((string) $scmConfig['app_secret']) < 32) {
 
 define('SCM_APP_SECRET', (string) $scmConfig['app_secret']);
 define('SCM_UPLOAD_MAX_BYTES', max(1024, (int) ($scmConfig['upload_max_bytes'] ?? 10485760)));
+define('SCM_SESSION_IDLE_TIMEOUT', max(900, (int) ($scmConfig['session_idle_timeout'] ?? 7200)));
 
 if (!is_dir($logsDir) && !mkdir($logsDir, 0750, true) && !is_dir($logsDir)) {
   throw new \RuntimeException('No se pudo crear el directorio de logs.');
@@ -81,6 +82,7 @@ date_default_timezone_set((string) ($scmConfig['timezone'] ?? 'America/Bogota'))
 
 if (session_status() === PHP_SESSION_NONE) {
   ini_set('session.use_strict_mode', '1');
+  ini_set('session.gc_maxlifetime', (string) SCM_SESSION_IDLE_TIMEOUT);
   session_name('scm_sess');
   session_start([
     'cookie_httponly' => true,

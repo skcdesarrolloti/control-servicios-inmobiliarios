@@ -19,6 +19,7 @@ return [
   'environment' => $env('APP_ENV', 'production'),
   'debug' => $envBool('APP_DEBUG', false),
   'secure_cookies' => $envBool('APP_SECURE_COOKIES', true),
+  'session_idle_timeout' => max(900, (int) $env('SESSION_IDLE_TIMEOUT', '7200')),
   'timezone' => $env('APP_TIMEZONE', 'America/Bogota'),
   'base_url' => $env('APP_URL', ''),
   'app_secret' => $env('APP_SECRET', ''),

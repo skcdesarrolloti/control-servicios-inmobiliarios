@@ -821,10 +821,41 @@ final class AdministrativeNotificationsService
       static fn($value): int => (int) preg_replace('/\D+/', '', (string) $value),
       [$recipient['_ID'] ?? '', $recipient['contrato_actor_ref'] ?? '']
     ), static fn(int $id): bool => $id > 0)));
+    return $this->collectionContractOptionsForRecipientIds($ids);
+  }
+
+  /**
+   * Carga contratos y codeudores solo cuando se abre la gestión de cobro.
+   *
+   * @param int[] $ids
+   * @return array<int,array{id:int,recipient_id:int,label:string,contrato:string,inmueble:string,direccion:string,codeudores:array<int,array<string,string|bool>>}>
+   */
+  public function collectionContractOptionsForRecipientIds(array $ids): array
+  {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
     if ($ids === []) {
       return [];
     }
-    $contracts = $this->activeArrendatarioContracts($ids);
+    $lookupIds = array_fill_keys($ids, true);
+    $arrendatariosTable = $this->db->table('jet_cct_arrendatarios');
+    if (
+      $this->schema->tableExists($arrendatariosTable)
+      && $this->schema->columnExists($arrendatariosTable, 'id_arrendatario')
+    ) {
+      $placeholders = implode(',', array_fill(0, count($ids), '?'));
+      $rows = $this->db->getResults(
+        "SELECT `_ID`, `id_arrendatario` FROM `{$arrendatariosTable}` WHERE CAST(`_ID` AS UNSIGNED) IN ({$placeholders})",
+        $ids
+      );
+      foreach ($rows as $row) {
+        $actorId = (int) preg_replace('/\D+/', '', (string) ($row['id_arrendatario'] ?? ''));
+        if ($actorId > 0) {
+          $lookupIds[$actorId] = true;
+        }
+      }
+    }
+    $contracts = $this->activeArrendatarioContracts(array_map('intval', array_keys($lookupIds)));
+    $tableCodeudoresByContract = $this->collectionCodeudoresFromTableForContracts($contracts);
     $options = [];
     foreach ($contracts as $contract) {
       $id = (int) ($contract['_ID'] ?? 0);
@@ -843,11 +874,15 @@ final class AdministrativeNotificationsService
       }
       $options[] = [
         'id' => $id,
+        'recipient_id' => (int) ($contract['id_arrendatario'] ?? 0),
         'label' => implode(' · ', $parts),
         'contrato' => (string) $contractNumber,
         'inmueble' => (string) $property,
         'direccion' => (string) $address,
-        'codeudores' => $this->collectionCodeudorOptionsForContract($contract),
+        'codeudores' => $this->collectionCodeudorOptionsFromRecipients($contract, array_merge(
+          $tableCodeudoresByContract[$id] ?? [],
+          $this->collectionCodeudoresFromContractColumns($contract, [])
+        )),
       ];
     }
     return $options;
@@ -859,17 +894,22 @@ final class AdministrativeNotificationsService
    */
   private function collectionCodeudorOptionsForContract(array $contract): array
   {
+    return $this->collectionCodeudorOptionsFromRecipients($contract, array_merge(
+      $this->collectionCodeudoresFromTable($contract, []),
+      $this->collectionCodeudoresFromContractColumns($contract, [])
+    ));
+  }
+
+  /** @param array<string,mixed> $contract @param array<int,array<string,mixed>> $recipients */
+  private function collectionCodeudorOptionsFromRecipients(array $contract, array $recipients): array
+  {
     $contractId = (int) ($contract['_ID'] ?? 0);
     if ($contractId <= 0) {
       return [];
     }
-
     $out = [];
     $seen = [];
-    foreach (array_merge(
-      $this->collectionCodeudoresFromTable($contract, []),
-      $this->collectionCodeudoresFromContractColumns($contract, [])
-    ) as $recipient) {
+    foreach ($recipients as $recipient) {
       if (!is_array($recipient)) {
         continue;
       }
@@ -1197,9 +1237,9 @@ final class AdministrativeNotificationsService
       $contractInfo = $this->contractActivityInfo($type, $config, $row, $contractStatus, $inmuebleSimi, $contractNumber);
       $row['contrato_arrendamiento_estado'] = $contractInfo['label'];
       $row['contratos_arrendamiento_resumen'] = $contractInfo['summary'];
-      $row['contratos_gestion_cobro'] = $type === 'arrendatarios_activos'
-        ? $this->collectionContractOptionsForRecipient($row)
-        : [];
+      // Los contratos y codeudores se consultan al abrir Gestión de cobro.
+      // Evita una consulta por cada fila durante la carga de destinatarios.
+      $row['contratos_gestion_cobro'] = [];
     }
     unset($row);
 
@@ -2464,6 +2504,111 @@ final class AdministrativeNotificationsService
   }
 
   /**
+   * @param array<int,array<string,mixed>> $contracts
+   * @return array<int,array<int,array<string,mixed>>>
+   */
+  private function collectionCodeudoresFromTableForContracts(array $contracts): array
+  {
+    $table = $this->db->table('jet_cct_codeudores');
+    if ($contracts === [] || !$this->schema->tableExists($table)) {
+      return [];
+    }
+
+    $select = ['_ID'];
+    foreach ([
+      'id_contrato',
+      'id_codeudor',
+      'nombre',
+      'correo',
+      'celular',
+      'indicativo',
+      'documento',
+      'direccion',
+      'bloqueo_email',
+      'bloqueo_sms',
+      'bloqueo_whatsapp',
+    ] as $column) {
+      if ($this->schema->columnExists($table, $column)) {
+        $select[] = $column;
+      }
+    }
+
+    $contractsById = [];
+    $contractLookup = [];
+    $codeudorLookup = [];
+    foreach ($contracts as $contract) {
+      $contractId = (int) ($contract['_ID'] ?? 0);
+      if ($contractId <= 0) {
+        continue;
+      }
+      $contractsById[$contractId] = $contract;
+      foreach ([$contractId, $contract['contrato'] ?? '', $contract['contrato_arrendamiento'] ?? ''] as $lookup) {
+        $lookup = trim((string) $lookup);
+        if ($lookup !== '') {
+          $contractLookup[$lookup][$contractId] = $contractId;
+        }
+      }
+      foreach ($this->collectionCodeudorIdsFromContract($contract) as $codeudorId) {
+        $codeudorLookup[$codeudorId][$contractId] = $contractId;
+      }
+    }
+    if ($contractsById === []) {
+      return [];
+    }
+
+    $where = [];
+    $args = [];
+    if ($this->schema->columnExists($table, 'id_contrato') && $contractLookup !== []) {
+      $values = array_keys($contractLookup);
+      $where[] = 'TRIM(COALESCE(`id_contrato`, \'\')) IN (' . implode(',', array_fill(0, count($values), '?')) . ')';
+      array_push($args, ...$values);
+    }
+    if ($codeudorLookup !== []) {
+      $ids = array_map('intval', array_keys($codeudorLookup));
+      $placeholders = implode(',', array_fill(0, count($ids), '?'));
+      $where[] = "CAST(`_ID` AS UNSIGNED) IN ({$placeholders})";
+      array_push($args, ...$ids);
+      if ($this->schema->columnExists($table, 'id_codeudor')) {
+        $where[] = "CAST(`id_codeudor` AS UNSIGNED) IN ({$placeholders})";
+        array_push($args, ...$ids);
+      }
+    }
+    if ($where === []) {
+      return [];
+    }
+
+    $rows = $this->db->getResults(
+      'SELECT `' . implode('`, `', array_values(array_unique($select))) . "` FROM `{$table}` WHERE " . implode(' OR ', array_map(static fn(string $part): string => '(' . $part . ')', $where)) . ' ORDER BY `_ID` ASC',
+      $args
+    );
+    $out = [];
+    foreach ($rows as $row) {
+      $contractIds = [];
+      $contractRef = trim((string) ($row['id_contrato'] ?? ''));
+      foreach (($contractLookup[$contractRef] ?? []) as $contractId) {
+        $contractIds[$contractId] = $contractId;
+      }
+      foreach ([(int) ($row['_ID'] ?? 0), (int) ($row['id_codeudor'] ?? 0)] as $codeudorId) {
+        foreach (($codeudorLookup[$codeudorId] ?? []) as $contractId) {
+          $contractIds[$contractId] = $contractId;
+        }
+      }
+      foreach ($contractIds as $contractId) {
+        if (!isset($contractsById[$contractId])) {
+          continue;
+        }
+        $out[$contractId][] = $this->collectionCodeudorRecipient(
+          $row,
+          $contractsById[$contractId],
+          [],
+          'tabla'
+        );
+      }
+    }
+    return $out;
+  }
+
+  /**
    * @param array<string,mixed> $contract
    * @param array<int,array<string,mixed>> $managements
    * @return array<int,array<string,mixed>>
@@ -2648,7 +2793,7 @@ final class AdministrativeNotificationsService
           'contract_id' => $contractId,
           'contract_number' => (string) $contractNumber,
           'property' => (string) $property,
-          'address' => $this->firstNonEmpty([$contract['direccion'] ?? '', $row['direccion'] ?? '']),
+          'address' => $this->firstNonEmpty([$row['direccion'] ?? '', $contract['direccion'] ?? '']),
           'arrendatario' => trim((string) ($contract['arrendatario'] ?? '')),
         ],
       ],

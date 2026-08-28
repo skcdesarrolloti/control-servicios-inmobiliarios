@@ -97,6 +97,7 @@ Las clases fachada grandes se conservaron para mantener compatibilidad con la ba
 - Los adjuntos nuevos se validan por MIME/tamaño, se guardan fuera de `public/` y se sirven con firma HMAC.
 - La ruta `/uploads/*` existe solo para compatibilidad con enlaces históricos. Los adjuntos nuevos no deben usarla.
 - El login tiene límite de intentos y las operaciones autenticadas usan CSRF.
+- `SESSION_IDLE_TIMEOUT` define la expiración por inactividad en segundos (valor predeterminado: `7200`, equivalente a 2 horas). Mientras el usuario está activo, el panel verifica la sesión cada 4 minutos; al vencer, bloquea la interfaz, conserva borradores de formularios y redirige al login.
 - La configuración funcional vive como JSON en `wp_jet_cct_confi_sistema`; solo las acciones autenticadas del panel escriben en ella. El bot es consumidor de solo lectura.
 - Rota las credenciales y secretos utilizados por cualquier despliegue anterior antes de publicar esta versión.
 

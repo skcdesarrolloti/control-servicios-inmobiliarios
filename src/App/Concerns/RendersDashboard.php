@@ -380,6 +380,7 @@ trait RendersDashboard
         'filtrar_pqr_publico' => self::AJAX_FILTER_PQR_PUBLICO,
         'guardar_corresponsable_pqr_publico' => self::AJAX_GUARDAR_CORRESPONSABLE_PQR_PUBLICO,
         'notif_responsable_pqr' => self::AJAX_GUARDAR_NOTIF_RESPONSABLE_PQR,
+        'session_heartbeat' => self::AJAX_SESSION_HEARTBEAT,
         'dashboard_permissions_read' => self::AJAX_DASHBOARD_PERMISSIONS_READ,
         'dashboard_permissions_save' => self::AJAX_DASHBOARD_PERMISSIONS_SAVE,
         'calendar_cita_notify' => self::AJAX_CALENDAR_CITA_NOTIFY,
@@ -388,6 +389,7 @@ trait RendersDashboard
         'admin_notifications_send' => self::AJAX_ADMIN_NOTIFICATIONS_SEND,
         'admin_notifications_import' => self::AJAX_ADMIN_NOTIFICATIONS_IMPORT,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
+        'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
         'admin_notifications_collection_log' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_LOG,
         'internal_notifications_save' => self::AJAX_INTERNAL_NOTIFICATIONS_SAVE,
@@ -426,6 +428,11 @@ trait RendersDashboard
         'tabs' => $dashboardPermissionTabs,
         'cargos' => $dashboardCargoOptions,
         'permissions' => $dashboardPermissionConfig,
+      ],
+      'session' => [
+        'loginUrl' => rtrim((string) SCM_BASE_URL, '/') . '/login.php',
+        'idleTimeoutSeconds' => defined('SCM_SESSION_IDLE_TIMEOUT') ? (int) SCM_SESSION_IDLE_TIMEOUT : 7200,
+        'heartbeatIntervalMs' => 240000,
       ],
     ];
 
@@ -485,6 +492,7 @@ trait RendersDashboard
 
     $cssRel = 'assets/css/scm-admin.css';
     $jsRel  = 'assets/js/scm-admin.js';
+    $sessionGuardJsRel = 'assets/js/scm-session-guard.js';
     $dashboardRuntimeJsRel = 'assets/js/admin-dashboard-runtime.js';
     $canonInsuranceAuditJsRel = 'assets/js/admin-canon-insurance-audit.js';
     $guideJsRel = 'assets/js/admin-guide.js';
@@ -492,6 +500,7 @@ trait RendersDashboard
     $damageJsRel  = 'assets/js/scm-damage-magnitude.js';
     $cssPath = $assetBasePath . $cssRel;
     $jsPath  = $assetBasePath . $jsRel;
+    $sessionGuardJsPath = $assetBasePath . $sessionGuardJsRel;
     $dashboardRuntimeJsPath = $assetBasePath . $dashboardRuntimeJsRel;
     $canonInsuranceAuditJsPath = $assetBasePath . $canonInsuranceAuditJsRel;
     $guideJsPath = $assetBasePath . $guideJsRel;
@@ -499,6 +508,7 @@ trait RendersDashboard
     $damageJsPath  = $assetBasePath . $damageJsRel;
     $cssVer = file_exists($cssPath) ? (string)filemtime($cssPath) : SCM_VERSION;
     $jsVer  = file_exists($jsPath)  ? (string)filemtime($jsPath)  : SCM_VERSION;
+    $sessionGuardJsVer = file_exists($sessionGuardJsPath) ? (string)filemtime($sessionGuardJsPath) : SCM_VERSION;
     $dashboardRuntimeJsVer = file_exists($dashboardRuntimeJsPath) ? (string)filemtime($dashboardRuntimeJsPath) : SCM_VERSION;
     $canonInsuranceAuditJsVer = file_exists($canonInsuranceAuditJsPath) ? (string)filemtime($canonInsuranceAuditJsPath) : SCM_VERSION;
     $guideJsVer = file_exists($guideJsPath) ? (string)filemtime($guideJsPath) : SCM_VERSION;
@@ -506,6 +516,7 @@ trait RendersDashboard
     $damageJsVer  = file_exists($damageJsPath)  ? (string)filemtime($damageJsPath)  : SCM_VERSION;
     $cssUrl = self::h($assetBaseUrl . $cssRel . '?v=' . rawurlencode($cssVer));
     $jsUrl  = self::h($assetBaseUrl . $jsRel  . '?v=' . rawurlencode($jsVer));
+    $sessionGuardJsUrl = self::h($assetBaseUrl . $sessionGuardJsRel . '?v=' . rawurlencode($sessionGuardJsVer));
     $dashboardRuntimeJsUrl = self::h($assetBaseUrl . $dashboardRuntimeJsRel . '?v=' . rawurlencode($dashboardRuntimeJsVer));
     $canonInsuranceAuditJsUrl = self::h($assetBaseUrl . $canonInsuranceAuditJsRel . '?v=' . rawurlencode($canonInsuranceAuditJsVer));
     $guideJsUrl = self::h($assetBaseUrl . $guideJsRel . '?v=' . rawurlencode($guideJsVer));
@@ -521,7 +532,18 @@ trait RendersDashboard
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
+    <script src="<?php echo $sessionGuardJsUrl; ?>" defer></script>
     <div id="scm-app" class="scm-wrap scm-daisy" data-theme="scm-daisy" data-scm-runtime="<?php echo self::h((string)$runtimeJson); ?>">
+      <div class="scm-panel-loader" data-scm-panel-loader hidden aria-hidden="true">
+        <div class="scm-panel-loader-card" role="status" aria-live="polite" aria-atomic="true">
+          <span class="scm-panel-loader-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M21 12a9 9 0 0 0-9-9"></path></svg>
+          </span>
+          <span class="scm-panel-loader-kicker">Preparando la vista</span>
+          <strong data-scm-panel-loader-title>Cargando informaci&oacute;n</strong>
+          <span data-scm-panel-loader-detail>Espera un momento mientras consultamos los datos.</span>
+        </div>
+      </div>
       <div class="scm-guide-bar">
         <?php if ($canManageDashboardPermissions): ?>
           <button class="scm-guide-btn scm-permissions-btn" type="button" id="scm-open-permissions">Configurar permisos</button>

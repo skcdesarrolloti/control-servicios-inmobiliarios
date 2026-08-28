@@ -168,6 +168,8 @@
       actions.admin_notifications_import || "";
     var actionAdminNotificationsCollection =
       actions.admin_notifications_collection || "";
+    var actionAdminNotificationsCollectionOptions =
+      actions.admin_notifications_collection_options || "";
     var actionAdminNotificationsCollectionQueue =
       actions.admin_notifications_collection_queue || "";
     var actionAdminNotificationsCollectionLog =
@@ -181,6 +183,84 @@
     var actionDashboardHome = actions.dashboard_home || "";
     var actionDashboardMetrics = actions.dashboard_metrics || "";
     var actionDashboardFilterOptions = actions.dashboard_filter_options || "";
+    var panelLoader = root.querySelector("[data-scm-panel-loader]");
+    var panelLoaderTitle = panelLoader
+      ? panelLoader.querySelector("[data-scm-panel-loader-title]")
+      : null;
+    var panelLoaderDetail = panelLoader
+      ? panelLoader.querySelector("[data-scm-panel-loader-detail]")
+      : null;
+    var panelLoaderRequestId = 0;
+
+    function showPanelLoader(title, detail) {
+      panelLoaderRequestId += 1;
+      var requestId = panelLoaderRequestId;
+      if (!panelLoader) {
+        return requestId;
+      }
+      if (panelLoaderTitle) {
+        panelLoaderTitle.textContent = title || "Cargando información";
+      }
+      if (panelLoaderDetail) {
+        panelLoaderDetail.textContent =
+          detail || "Espera un momento mientras consultamos los datos.";
+      }
+      panelLoader.hidden = false;
+      panelLoader.setAttribute("aria-hidden", "false");
+      document.body.classList.add("scm-panel-loading");
+      window.requestAnimationFrame(function () {
+        if (!panelLoader.hidden) panelLoader.classList.add("is-visible");
+      });
+      return requestId;
+    }
+
+    function hidePanelLoader(requestId) {
+      if (!panelLoader || requestId !== panelLoaderRequestId) {
+        return;
+      }
+      panelLoader.classList.remove("is-visible");
+      window.setTimeout(function () {
+        if (requestId !== panelLoaderRequestId) return;
+        panelLoader.hidden = true;
+        panelLoader.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("scm-panel-loading");
+      }, 180);
+    }
+
+    function withPanelLoader(work, title, detail) {
+      var requestId = showPanelLoader(title, detail);
+      var promise;
+      try {
+        promise = typeof work === "function" ? work() : work;
+      } catch (error) {
+        hidePanelLoader(requestId);
+        return Promise.reject(error);
+      }
+      return Promise.resolve(promise).finally(function () {
+        hidePanelLoader(requestId);
+      });
+    }
+
+    function fetchWithTimeout(input, init, timeoutMs) {
+      if (typeof window.AbortController !== "function") {
+        return fetch(input, init);
+      }
+      var controller = new AbortController();
+      var options = Object.assign({}, init || {}, { signal: controller.signal });
+      var timeout = window.setTimeout(function () {
+        controller.abort();
+      }, Math.max(5000, Number(timeoutMs || 30000)));
+      return fetch(input, options)
+        .catch(function (error) {
+          if (error && error.name === "AbortError") {
+            throw new Error("La consulta tardó demasiado. Intenta nuevamente.");
+          }
+          throw error;
+        })
+        .finally(function () {
+          window.clearTimeout(timeout);
+        });
+    }
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
     ).replace(/\/+$/, "");
@@ -356,7 +436,7 @@
       }
       container.classList.add("is-loading");
       container.setAttribute("aria-busy", "true");
-      return fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+      return fetchWithTimeout(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
         .then(function (response) {
           return response.json();
         })
@@ -374,6 +454,13 @@
           }
         })
         .catch(function (err) {
+          container.innerHTML =
+            '<div class="scm-admin-notif-empty is-error" role="alert">' +
+            "<strong>No pudimos cargar las gestiones de cobro.</strong>" +
+            "<span>" + escHtml(err.message || "Error desconocido") + "</span>" +
+            '<button type="button" class="scm-btn-primary btn btn-primary" data-scm-collection-log-retry>Reintentar</button>' +
+            "</div>";
+          container.setAttribute("data-scm-collection-log-loaded", "0");
           showToast("error", err.message || "No se pudieron cargar las gestiones de cobro.");
         })
         .finally(function () {
@@ -395,6 +482,39 @@
     });
 
     root.addEventListener("click", function (event) {
+      var notificationsRetry = event.target && event.target.closest
+        ? event.target.closest("[data-scm-admin-notifications-retry]")
+        : null;
+      if (notificationsRetry && root.contains(notificationsRetry)) {
+        event.preventDefault();
+        adminNotificationsPanelPromise = null;
+        withPanelLoader(
+          loadAdminNotificationsPanel,
+          "Cargando Notificaciones",
+          "Estamos preparando destinatarios y plantillas.",
+        );
+        return;
+      }
+
+      var collectionRetry = event.target && event.target.closest
+        ? event.target.closest("[data-scm-collection-log-retry]")
+        : null;
+      if (collectionRetry && root.contains(collectionRetry)) {
+        event.preventDefault();
+        var retryContainer = collectionRetry.closest("[data-scm-collection-log]");
+        withPanelLoader(
+          function () {
+            return loadCollectionLog(
+              retryContainer,
+              collectionLogParamsFromContainer(retryContainer),
+            );
+          },
+          "Cargando Gestiones de cobro",
+          "Estamos consultando el historial de cobranza.",
+        );
+        return;
+      }
+
       var queueBtn = event.target && event.target.closest
         ? event.target.closest("[data-scm-collection-queue]")
         : null;
@@ -2308,7 +2428,7 @@
       var fd = new FormData();
       fd.append("action", actionAdminNotificationsPanel);
       fd.append("nonce", nonce);
-      adminNotificationsPanelPromise = fetch(ajaxUrl, {
+      adminNotificationsPanelPromise = fetchWithTimeout(ajaxUrl, {
         method: "POST",
         body: fd,
         credentials: "same-origin",
@@ -2327,6 +2447,13 @@
         })
         .catch(function (error) {
           adminNotificationsPanelPromise = null;
+          host.setAttribute("data-scm-loaded", "0");
+          host.innerHTML =
+            '<div class="scm-admin-notif-empty is-error" role="alert">' +
+            "<strong>No pudimos cargar Notificaciones.</strong>" +
+            "<span>" + escHtml(error.message || "Error desconocido") + "</span>" +
+            '<button type="button" class="scm-btn-primary btn btn-primary" data-scm-admin-notifications-retry>Reintentar</button>' +
+            "</div>";
           showToast("error", error.message || "No se pudo cargar Notificaciones.");
         })
         .finally(function () {
@@ -2428,6 +2555,7 @@
 
       var selected = new Set();
       var currentPage = 1;
+      var recipientsRequestId = 0;
       var composerDirty = false;
       var subjectDirty = false;
       var composerChannelMode = "";
@@ -2768,31 +2896,34 @@
         openComposer();
       }
 
-      function parseCollectionContracts(value) {
-        if (!value) {
-          return [];
+      function loadCollectionOptions() {
+        if (!actionAdminNotificationsCollectionOptions) {
+          return Promise.reject(new Error("La consulta de contratos y codeudores no está disponible."));
         }
-        try {
-          var parsed = JSON.parse(String(value || "[]"));
-          return Array.isArray(parsed) ? parsed : [];
-        } catch (err) {
-          return [];
+        if (selected.size === 0) {
+          return Promise.reject(new Error("Selecciona al menos un arrendatario activo."));
         }
-      }
-
-      function contractDataForSelectedRecipient() {
-        if (selected.size !== 1) {
-          return [];
-        }
-        var selectedId = Array.from(selected)[0];
-        var row = Array.prototype.slice.call(recipientsEl.querySelectorAll("[data-admin-notif-recipient-row]")).find(function (candidate) {
-          return String(candidate.getAttribute("data-admin-notif-recipient-id") || "") === String(selectedId || "");
+        var fd = new FormData();
+        fd.set("action", actionAdminNotificationsCollectionOptions);
+        fd.set("nonce", nonce);
+        selected.forEach(function (id) {
+          fd.append("ids[]", id);
         });
-        if (!row) {
-          return [];
-        }
-        var btn = row.querySelector("[data-admin-notif-single-collection]");
-        return btn ? parseCollectionContracts(btn.getAttribute("data-admin-notif-single-contracts") || "[]") : [];
+        return fetchWithTimeout(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (response) {
+            return response.json();
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error(
+                (json && json.data && json.data.message) ||
+                  "No se pudieron cargar los contratos y codeudores.",
+              );
+            }
+            return Array.isArray(json.data && json.data.contracts)
+              ? json.data.contracts
+              : [];
+          });
       }
 
       function activeCollectionContract() {
@@ -2837,12 +2968,27 @@
           updateCollectionCodeudorCounter();
           return;
         }
-        var contract = activeCollectionContract();
-        var codeudores = contract && Array.isArray(contract.codeudores)
-          ? contract.codeudores
+        var activeContract = activeCollectionContract();
+        var contracts = selected.size > 1
+          ? selectedCollectionContracts
+          : activeContract
+          ? [activeContract]
           : [];
+        var seenCodeudores = {};
+        var codeudores = [];
+        contracts.forEach(function (contract) {
+          (contract && Array.isArray(contract.codeudores) ? contract.codeudores : []).forEach(function (codeudor) {
+            var key = String((codeudor && codeudor.key) || "").trim();
+            if (!key || seenCodeudores[key]) return;
+            seenCodeudores[key] = true;
+            codeudores.push({
+              data: codeudor,
+              contractLabel: String((contract && contract.label) || "Contrato").trim(),
+            });
+          });
+        });
         collectionCodeudoresList.innerHTML = "";
-        if (!contract) {
+        if (contracts.length === 0) {
           collectionCodeudoresWrap.hidden = true;
           collectionCodeudoresWrap.classList.add("is-hidden");
           updateCollectionCodeudorCounter();
@@ -2852,11 +2998,12 @@
         collectionCodeudoresWrap.classList.remove("is-hidden");
         if (codeudores.length === 0) {
           collectionCodeudoresList.innerHTML =
-            '<div class="scm-admin-notif-codeudores-empty">Sin codeudores registrados para este contrato.</div>';
+            '<div class="scm-admin-notif-codeudores-empty">Sin codeudores registrados para los contratos seleccionados.</div>';
           updateCollectionCodeudorCounter();
           return;
         }
-        collectionCodeudoresList.innerHTML = codeudores.map(function (codeudor, index) {
+        collectionCodeudoresList.innerHTML = codeudores.map(function (item, index) {
+          var codeudor = item.data || {};
           var key = String((codeudor && codeudor.key) || "").trim();
           var name = String((codeudor && codeudor.nombre) || ("Codeudor " + (index + 1))).trim();
           var email = String((codeudor && codeudor.correo) || "").trim();
@@ -2875,7 +3022,7 @@
             '<span class="scm-admin-notif-codeudor-info">' +
             '<strong>' + escHtml(name) + '</strong>' +
             '<small>' + escHtml(contactBits.join(" · ")) + '</small>' +
-            '<em>' + escHtml(source) + '</em>' +
+            '<em>' + escHtml(item.contractLabel + " · " + source) + '</em>' +
             '</span>' +
             '</label>'
           );
@@ -2890,6 +3037,13 @@
           return;
         }
         collectionContractSelect.innerHTML = "";
+        if (selected.size > 1) {
+          collectionContractWrap.hidden = true;
+          collectionContractWrap.classList.add("is-hidden");
+          renderCollectionCodeudores();
+          updateCollectionPreview();
+          return;
+        }
         if (selectedCollectionContracts.length <= 1) {
           collectionContractWrap.hidden = true;
           collectionContractWrap.classList.add("is-hidden");
@@ -3145,11 +3299,6 @@
           collectionResultEl.textContent = "";
           collectionResultEl.classList.remove("is-error");
         }
-        if (selectedCollectionContracts.length === 0) {
-          syncCollectionContracts(contractDataForSelectedRecipient());
-        } else {
-          syncCollectionContracts(selectedCollectionContracts);
-        }
         updateCollectionPreview();
         syncContext();
         collectionModal.hidden = false;
@@ -3161,6 +3310,29 @@
             field.focus();
           }
         }, 30);
+      }
+
+      function prepareCollectionModal() {
+        return withPanelLoader(
+          function () {
+            return loadCollectionOptions().then(function (contracts) {
+              if (contracts.length === 0) {
+                throw new Error(
+                  "Los arrendatarios seleccionados no tienen contratos activos para gestionar.",
+                );
+              }
+              syncCollectionContracts(contracts);
+              openCollectionModal();
+            });
+          },
+          "Cargando contratos y codeudores",
+          "Estamos verificando los contratos activos y sus datos de contacto.",
+        ).catch(function (error) {
+          showToast(
+            "error",
+            error.message || "No se pudieron cargar los contratos y codeudores.",
+          );
+        });
       }
 
       function selectOnlyRecipient(id) {
@@ -3582,6 +3754,8 @@
 
       function loadRecipients(page) {
         currentPage = page || 1;
+        recipientsRequestId += 1;
+        var requestId = recipientsRequestId;
         var fd = new FormData();
         fd.append("action", actionAdminNotificationsRecipients);
         fd.append("nonce", nonce);
@@ -3598,11 +3772,14 @@
         recipientsEl.innerHTML =
           '<div class="scm-admin-notif-empty"><strong>Cargando destinatarios...</strong><span>Un momento mientras actualizamos la lista.</span></div>';
         setLoading(true);
-        return fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        return fetchWithTimeout(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
           .then(function (response) {
             return response.json();
           })
           .then(function (json) {
+            if (requestId !== recipientsRequestId) {
+              return;
+            }
             if (!json || !json.success) {
               throw new Error(
                 (json && json.data && json.data.message) ||
@@ -3624,14 +3801,19 @@
             syncContext();
           })
           .catch(function (err) {
+            if (requestId !== recipientsRequestId) {
+              return;
+            }
             recipientsEl.innerHTML =
               '<div class="scm-admin-notif-empty is-error"><strong>No se pudo cargar.</strong><span>' +
               escHtml(err.message || "Error desconocido") +
-              "</span></div>";
+              '</span><button type="button" class="scm-btn-primary btn btn-primary" data-admin-notif-recipients-retry>Reintentar</button></div>';
             showToast("error", err.message || "No se pudieron cargar los destinatarios.");
           })
           .finally(function () {
-            setLoading(false);
+            if (requestId === recipientsRequestId) {
+              setLoading(false);
+            }
           });
       }
 
@@ -3761,8 +3943,7 @@
         }
         if (openCollectionBtn) {
           openCollectionBtn.addEventListener("click", function () {
-            syncCollectionContracts(contractDataForSelectedRecipient());
-            openCollectionModal();
+            prepareCollectionModal();
           });
         }
         if (closeCollectionBtn) {
@@ -3861,6 +4042,15 @@
         });
 
         recipientsEl.addEventListener("click", function (event) {
+          var retryBtn = event.target && event.target.closest
+            ? event.target.closest("[data-admin-notif-recipients-retry]")
+            : null;
+          if (retryBtn) {
+            event.preventDefault();
+            loadRecipients(currentPage);
+            return;
+          }
+
           var channelBtn = event.target && event.target.closest
             ? event.target.closest("[data-admin-notif-single-channel]")
             : null;
@@ -3900,8 +4090,7 @@
             if (!selectOnlyRecipient(collectionBtn.getAttribute("data-admin-notif-single-id") || "")) {
               return;
             }
-            syncCollectionContracts(parseCollectionContracts(collectionBtn.getAttribute("data-admin-notif-single-contracts") || "[]"));
-            openCollectionModal();
+            prepareCollectionModal();
             return;
           }
 
@@ -5701,6 +5890,9 @@
       if (panelId === "scm-panel-admin-notificaciones") {
         return "notificaciones";
       }
+      if (panelId === "scm-panel-gestiones-cobro") {
+        return "gestiones_cobro";
+      }
       if (panelId === "scm-panel-preventivas-pendientes") {
         return "preventivas_pendientes";
       }
@@ -7221,7 +7413,7 @@
       var fd = new FormData();
       fd.append("action", actionDashboardFilterOptions);
       fd.append("nonce", nonce);
-      dashboardFilterOptionsPromise = fetch(ajaxUrl, {
+      dashboardFilterOptionsPromise = fetchWithTimeout(ajaxUrl, {
         method: "POST",
         body: fd,
         credentials: "same-origin",
@@ -7314,7 +7506,7 @@
       var fd = new FormData();
       fd.append("action", actionDashboardHome);
       fd.append("nonce", nonce);
-      dashboardHomePromise = fetch(ajaxUrl, {
+      dashboardHomePromise = fetchWithTimeout(ajaxUrl, {
         method: "POST",
         body: fd,
         credentials: "same-origin",
@@ -7369,7 +7561,7 @@
       var fd = new FormData();
       fd.append("action", actionDashboardMetrics);
       fd.append("nonce", nonce);
-      dashboardMetricsPromise = fetch(ajaxUrl, {
+      dashboardMetricsPromise = fetchWithTimeout(ajaxUrl, {
         method: "POST",
         body: fd,
         credentials: "same-origin",
@@ -9646,6 +9838,24 @@
       return Promise.resolve();
     }
 
+    function activeLazyPanelLabel() {
+      var activeMain = root.querySelector(".scm-main-tabs .scm-tab.active[data-tab]");
+      var activeAdministrative = root.querySelector(
+        "#scm-panel-actividades-administrativas.active .scm-admin-activity-tab.active",
+      );
+      var label = activeAdministrative || activeMain;
+      return label ? String(label.textContent || "").trim() : "la sección";
+    }
+
+    function loadActiveLazyPanelWithFeedback() {
+      var label = activeLazyPanelLabel();
+      return withPanelLoader(
+        loadActiveLazyPanel,
+        "Cargando " + label,
+        "Estamos consultando la información más reciente.",
+      );
+    }
+
     root.querySelectorAll(".scm-admin-activity-tab").forEach(function (tab) {
       tab.addEventListener("click", function () {
         var target = tab.getAttribute("data-admin-activity-target") || "";
@@ -9663,19 +9873,19 @@
           .forEach(function (panel) {
             panel.classList.toggle("active", panel.id === target);
           });
-        window.setTimeout(loadActiveLazyPanel, 0);
+        window.setTimeout(loadActiveLazyPanelWithFeedback, 0);
       });
     });
 
     root.querySelectorAll(".scm-open-topic-tab").forEach(function (tab) {
       tab.addEventListener("click", function () {
-        window.setTimeout(loadActiveLazyPanel, 0);
+        window.setTimeout(loadActiveLazyPanelWithFeedback, 0);
       });
     });
 
     root.querySelectorAll(".scm-tab[data-tab]").forEach(function (tab) {
       tab.addEventListener("click", function () {
-        window.setTimeout(loadActiveLazyPanel, 0);
+        window.setTimeout(loadActiveLazyPanelWithFeedback, 0);
       });
     });
 

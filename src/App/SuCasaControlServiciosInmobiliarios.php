@@ -54,6 +54,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_GUARDAR_CORRESPONSABLE_PQR_PUBLICO = 'scm_guardar_corresponsable_pqr_publico';
   const AJAX_GUARDAR_NOTIF_RESPONSABLE_PQR = 'scm_guardar_notif_responsable_pqr';
   const AJAX_FILTER_PQR_PUBLICO = 'scm_filtrar_pqr_publico';
+  const AJAX_SESSION_HEARTBEAT = 'scm_session_heartbeat';
   const AJAX_DASHBOARD_PERMISSIONS_READ = 'scm_dashboard_permissions_read';
   const AJAX_DASHBOARD_PERMISSIONS_SAVE = 'scm_dashboard_permissions_save';
   const AJAX_CALENDAR_CITA_NOTIFY = 'scm_calendar_cita_notificar';
@@ -62,6 +63,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_ADMIN_NOTIFICATIONS_SEND = 'scm_admin_notifications_send';
   const AJAX_ADMIN_NOTIFICATIONS_IMPORT = 'scm_admin_notifications_import';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION = 'scm_admin_notifications_collection';
+  const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS = 'scm_admin_notifications_collection_options';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE = 'scm_admin_notifications_collection_queue';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_LOG = 'scm_admin_notifications_collection_log';
   const AJAX_INTERNAL_NOTIFICATIONS_SAVE = 'scm_internal_notifications_save';
@@ -596,7 +598,14 @@ final class SuCasaControlServiciosInmobiliarios
     if (!\SCM\Core\App::csrf()->verify(self::NONCE_KEY, $nonce, false)) {
       http_response_code(403);
       header('Content-Type: application/json; charset=UTF-8');
-      echo json_encode(['success' => false, 'data' => ['message' => 'Verificacion de seguridad fallida.']]);
+      header('X-SCM-Auth: csrf-expired');
+      echo json_encode([
+        'success' => false,
+        'data' => [
+          'message' => 'La verificación de seguridad venció. Inicia sesión nuevamente.',
+          'code' => 'CSRF_EXPIRED',
+        ],
+      ]);
       exit;
     }
   }

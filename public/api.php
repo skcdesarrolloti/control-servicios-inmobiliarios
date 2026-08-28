@@ -10,17 +10,24 @@ header('Content-Type: application/json; charset=UTF-8');
 set_time_limit(60);
 ini_set('memory_limit', '256M');
 
-$respondError = static function (string $message, int $status): void {
+$respondError = static function (string $message, int $status, string $code = ''): void {
   http_response_code($status);
+  if ($code === 'AUTH_REQUIRED') {
+    header('X-SCM-Auth: required');
+  }
+  $data = ['message' => $message];
+  if ($code !== '') {
+    $data['code'] = $code;
+  }
   echo json_encode(
-    ['success' => false, 'data' => ['message' => $message]],
+    ['success' => false, 'data' => $data],
     JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
   );
   exit;
 };
 
 if (!\SCM\Core\Auth::isLoggedIn()) {
-  $respondError('No autenticado.', 401);
+  $respondError('Tu sesión venció. Inicia sesión nuevamente.', 401, 'AUTH_REQUIRED');
 }
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
   $respondError('Método no permitido.', 405);

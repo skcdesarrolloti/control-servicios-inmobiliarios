@@ -15,6 +15,9 @@ final class SchemaInspector
   /** @var array<string,bool> */
   private array $columnExistsCache = [];
 
+  /** @var array<string,string[]> */
+  private array $tableColumnsCache = [];
+
   public function __construct(Database $db)
   {
     $this->db = $db;
@@ -47,20 +50,7 @@ final class SchemaInspector
       return (bool) $this->columnExistsCache[$key];
     }
 
-    if (!$this->tableExists($table)) {
-      return false;
-    }
-
-    $found = $this->db->getVar(
-      'SELECT 1
-         FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = ?
-          AND COLUMN_NAME = ?
-        LIMIT 1',
-      [$table, $column]
-    );
-    $ok = !empty($found);
+    $ok = in_array($column, $this->getTableColumns($table), true);
 
     $this->columnExistsCache[$key] = $ok;
     return $ok;
@@ -69,11 +59,20 @@ final class SchemaInspector
   /** @return string[] */
   public function getTableColumns(string $table): array
   {
+    if (array_key_exists($table, $this->tableColumnsCache)) {
+      return $this->tableColumnsCache[$table];
+    }
     if (!$this->tableExists($table)) {
+      $this->tableColumnsCache[$table] = [];
       return [];
     }
 
-    return $this->db->getCol("DESCRIBE `{$table}`", [], 0);
+    $columns = array_values(array_filter(array_map(
+      'strval',
+      $this->db->getCol("DESCRIBE `{$table}`", [], 0)
+    ), static fn(string $column): bool => $column !== ''));
+    $this->tableColumnsCache[$table] = $columns;
+    return $columns;
   }
 
   /** @param array<string,mixed> $data
