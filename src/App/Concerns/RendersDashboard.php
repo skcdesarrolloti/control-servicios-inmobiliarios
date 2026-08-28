@@ -2031,6 +2031,9 @@ trait RendersDashboard
               </div>
             </div>
 
+            <div class="scm-admin-notif-message-toolbar scm-admin-notif-collection-toolbar" aria-label="Herramientas de vista previa de gesti&oacute;n de cobro">
+              <button type="button" data-admin-notif-collection-preview-toggle>Ocultar vista previa</button>
+            </div>
             <div class="scm-admin-notif-preview scm-admin-notif-collection-preview" data-admin-notif-collection-preview aria-live="polite"></div>
 
             <div class="scm-admin-notif-submit-row">

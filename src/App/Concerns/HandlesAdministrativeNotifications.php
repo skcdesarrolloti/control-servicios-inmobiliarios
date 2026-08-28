@@ -177,6 +177,7 @@ trait HandlesAdministrativeNotifications
     }, is_array($rawCodeudorKeys) ? $rawCodeudorKeys : [$rawCodeudorKeys]), static fn(string $value): bool => $value !== '')));
     $notifyCodeudores = $notifyCodeudorKeys !== [];
     $queuedDetail = $service->collectionNotificationMessage($payload);
+    $queuedSmsDetail = $service->collectionSmsNotificationMessage($payload);
 
     try {
       $result = $service->registerCollectionManagement($ids, $payload);
@@ -190,28 +191,58 @@ trait HandlesAdministrativeNotifications
         try {
           $notifyIds = array_map('intval', (array) ($result['recipient_ids'] ?? $ids));
           $notificationMeta = $this->collection_management_notification_meta((array) ($result['managements'] ?? []));
-          $notifyResult = $service->enqueue(
-            $type,
-            $notifyIds,
-            $notifyChannels,
-            'Gestion de cobro de contrato de arrendamiento',
-            $queuedDetail,
-            'scm_arrendatario_gestion_cobro_v1',
-            'scm_email_arrendatario_gestion_cobro_v1',
-            $notificationMeta,
-            AdministrativeNotificationsService::COLLECTION_SMS_MAX
-          );
-          if ($notifyCodeudores) {
-            $codeudorNotifyResult = $service->enqueueCollectionCodeudores(
-              (array) ($result['managements'] ?? []),
-              $notifyChannels,
+          $nonSmsChannels = array_values(array_filter($notifyChannels, static fn(string $channel): bool => $channel !== 'sms'));
+          if ($nonSmsChannels !== []) {
+            $notifyResult = $this->merge_admin_notification_results($notifyResult, $service->enqueue(
+              $type,
+              $notifyIds,
+              $nonSmsChannels,
               'Gestion de cobro de contrato de arrendamiento',
               $queuedDetail,
               'scm_arrendatario_gestion_cobro_v1',
               'scm_email_arrendatario_gestion_cobro_v1',
-              AdministrativeNotificationsService::COLLECTION_SMS_MAX,
-              $notifyCodeudorKeys
-            );
+              $notificationMeta,
+              AdministrativeNotificationsService::COLLECTION_SMS_MAX
+            ));
+          }
+          if (in_array('sms', $notifyChannels, true)) {
+            $notifyResult = $this->merge_admin_notification_results($notifyResult, $service->enqueue(
+              $type,
+              $notifyIds,
+              ['sms'],
+              'Gestion de cobro de contrato de arrendamiento',
+              $queuedSmsDetail,
+              '',
+              '',
+              $notificationMeta,
+              AdministrativeNotificationsService::COLLECTION_SMS_MAX
+            ));
+          }
+          if ($notifyCodeudores) {
+            if ($nonSmsChannels !== []) {
+              $codeudorNotifyResult = $this->merge_admin_notification_results($codeudorNotifyResult, $service->enqueueCollectionCodeudores(
+                (array) ($result['managements'] ?? []),
+                $nonSmsChannels,
+                'Gestion de cobro de contrato de arrendamiento',
+                $queuedDetail,
+                'scm_arrendatario_gestion_cobro_v1',
+                'scm_email_arrendatario_gestion_cobro_v1',
+                AdministrativeNotificationsService::COLLECTION_SMS_MAX,
+                $notifyCodeudorKeys
+              ));
+            }
+            if (in_array('sms', $notifyChannels, true)) {
+              $codeudorNotifyResult = $this->merge_admin_notification_results($codeudorNotifyResult, $service->enqueueCollectionCodeudores(
+                (array) ($result['managements'] ?? []),
+                ['sms'],
+                'Gestion de cobro de contrato de arrendamiento',
+                $queuedSmsDetail,
+                '',
+                '',
+                AdministrativeNotificationsService::COLLECTION_SMS_MAX,
+                $notifyCodeudorKeys
+              ));
+            }
           }
         } catch (\Throwable $notifyException) {
           $notifyError = $notifyException->getMessage();
@@ -294,6 +325,27 @@ trait HandlesAdministrativeNotifications
     } catch (\Throwable $e) {
       $this->jsonFail($e->getMessage());
     }
+  }
+
+  /** @param array<string,mixed> $base @param array<string,mixed> $extra @return array<string,mixed> */
+  private function merge_admin_notification_results(array $base, array $extra): array
+  {
+    foreach (['queued', 'failed', 'invalid', 'filtered'] as $key) {
+      $base[$key] = (int) ($base[$key] ?? 0) + (int) ($extra[$key] ?? 0);
+    }
+    $base['selected'] = max((int) ($base['selected'] ?? 0), (int) ($extra['selected'] ?? 0));
+    $channels = [];
+    foreach (array_merge((array) ($base['channels'] ?? []), (array) ($extra['channels'] ?? [])) as $channel) {
+      $channel = trim((string) $channel);
+      if ($channel !== '') {
+        $channels[$channel] = $channel;
+      }
+    }
+    $base['channels'] = array_values($channels);
+    if (!empty($extra['type'])) {
+      $base['type'] = $extra['type'];
+    }
+    return $base;
   }
 
   /** @param array<int,array<string,mixed>> $managements @param array<string,mixed> $payload */

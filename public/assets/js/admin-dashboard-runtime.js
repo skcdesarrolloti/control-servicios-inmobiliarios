@@ -2310,6 +2310,7 @@
       var collectionCodeudorCountEl = panel.querySelector("[data-admin-notif-collection-codeudor-count]");
       var collectionCodeudoresSelectAllBtn = panel.querySelector("[data-admin-notif-codeudores-select-all]");
       var collectionCodeudoresClearBtn = panel.querySelector("[data-admin-notif-codeudores-clear]");
+      var collectionPreviewToggle = panel.querySelector("[data-admin-notif-collection-preview-toggle]");
       var collectionPreviewEl = panel.querySelector("[data-admin-notif-collection-preview]");
       var collectionSpinner = panel.querySelector("[data-admin-notif-collection-spinner]");
       var collectionSubmitBtn = panel.querySelector("[data-admin-notif-collection-submit]");
@@ -2829,9 +2830,20 @@
           : /admin/i.test(type)
           ? "Administración"
           : type || "Canon";
-        var lines = ["Tipo de gestión: " + typeLabel + "."];
+        var concept = typeLabel === "Canon"
+          ? "canon"
+          : typeLabel === "Administración"
+          ? "administración"
+          : typeLabel === "Servicios públicos"
+          ? "servicios públicos"
+          : String(typeLabel || "").toLowerCase();
+        var lines = ["Cobro por deuda de " + concept + "."];
         lines.push("Observación: " + (observation || "Detalle de la gestión escrito por el funcionario.") + ".");
         return lines.join(" ");
+      }
+
+      function collectionSmsText(detail) {
+        return smsPrefix() + "Buen día, Nombre del destinatario. " + previewMessage(detail || collectionDetailText());
       }
 
       function renderCollectionWhatsappPreviewText(detailOverride) {
@@ -2870,7 +2882,7 @@
         }).filter(Boolean);
         var cleanDetail = detail || collectionDetailText();
         var previewDetail = previewMessage(cleanDetail);
-        var smsText = smsPrefix() + previewDetail;
+        var smsText = collectionSmsText(previewDetail);
         var smsLimit = 480;
         return normalizedChannels.map(function (channel) {
           if (channel === "email") {
@@ -3002,7 +3014,7 @@
       }
 
       function updateCollectionPreview() {
-        if (!collectionPreviewEl) {
+        if (!collectionPreviewEl || collectionPreviewEl.hidden) {
           return;
         }
         var channels = collectionSelectedChannels();
@@ -3918,6 +3930,16 @@
           event.target.textContent = previewEl.hidden ? "Ver vista previa" : "Ocultar vista previa";
           updatePreview();
         });
+        if (collectionPreviewToggle) {
+          collectionPreviewToggle.addEventListener("click", function (event) {
+            if (!collectionPreviewEl) {
+              return;
+            }
+            collectionPreviewEl.hidden = !collectionPreviewEl.hidden;
+            event.target.textContent = collectionPreviewEl.hidden ? "Ver vista previa" : "Ocultar vista previa";
+            updateCollectionPreview();
+          });
+        }
         panel.querySelector("[data-admin-notif-copy-message]")?.addEventListener("click", function () {
           var value = messageInput ? String(messageInput.value || "") : "";
           if (value === "") {

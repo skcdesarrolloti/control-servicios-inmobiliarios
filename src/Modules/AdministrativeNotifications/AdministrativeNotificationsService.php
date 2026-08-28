@@ -470,12 +470,18 @@ final class AdministrativeNotificationsService
   {
     $data = $this->normalizeCollectionPayload($payload);
     $parts = [
-      'Tipo de gestión: ' . $this->collectionTypeDisplayLabel($data['tipo_gestion_cobro']) . '.',
+      'Cobro por deuda de ' . $this->collectionDebtConceptLabel($data['tipo_gestion_cobro']) . '.',
     ];
     if ($data['observacion'] !== '') {
       $parts[] = 'Observación: ' . rtrim($this->plainText($data['observacion']), '.') . '.';
     }
     return implode(' ', $parts);
+  }
+
+  /** @param array<string,mixed> $payload */
+  public function collectionSmsNotificationMessage(array $payload): string
+  {
+    return 'Buen día, {{nombre}}. ' . $this->collectionNotificationMessage($payload);
   }
 
   /**
@@ -754,6 +760,21 @@ final class AdministrativeNotificationsService
       return 'Administración';
     }
     return $normalized;
+  }
+
+  private function collectionDebtConceptLabel(string $type): string
+  {
+    $display = $this->collectionTypeDisplayLabel($type);
+    if ($display === 'Canon') {
+      return 'canon';
+    }
+    if ($display === 'Administración') {
+      return 'administración';
+    }
+    if ($display === 'Servicios públicos') {
+      return 'servicios públicos';
+    }
+    return mb_strtolower($display, 'UTF-8');
   }
 
   private function queueChannelLabel(string $channel): string
