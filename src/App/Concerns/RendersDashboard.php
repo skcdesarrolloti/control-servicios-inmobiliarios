@@ -1652,7 +1652,12 @@ trait RendersDashboard
     $idList = array_keys($ids);
     $ph = implode(',', array_fill(0, count($idList), '?'));
     $orderRows = $this->db->getResults(
-      "SELECT `_ID`, `id_cotizacion`, `id_ticket`, `estado`, `proveedor`, `valor`, `actividad`, `fecha`
+      "SELECT `_ID`, `id_cotizacion`, `id_ticket`, `fecha`, `estado`, `proveedor`, `valor`, `actividad`,
+              `categoria`, `concepto`, `direccion`, `creador`, `coordinador`, `autorizador`, `contrato`,
+              `id_contrato`, `inmueble`, `id_inmueble`, `sucursal`, `tipo_identificacion_proveedor`,
+              `identificacion_proveedor`, `correo_proveedor`, `celular_proveedor`, `direccion_proveedor`,
+              `titular_proveedor`, `identificacion_cuenta_proveedor`, `tipo_cuenta_proveedor`,
+              `cuenta_proveedor`, `banco_proveedor`, `correo_pago_proveedor`, `cct_created`, `cct_modified`
        FROM `{$ordersTable}`
        WHERE TRIM(COALESCE(`id_cotizacion`, '')) IN ({$ph})
        ORDER BY `_ID` DESC",
@@ -2706,6 +2711,7 @@ trait RendersDashboard
     $idContrato = trim((string) ($row['id_contrato'] ?? $contrato));
     $sucursal = trim((string) ($row['sucursal'] ?? '1'));
     $estado = trim((string) ($row['estado'] ?? ''));
+    $cotizacionAprobada = strtolower($estado) === 'aprobada';
     $seEnvio = strtolower(trim((string) ($row['se_envio'] ?? '')));
     $enviada = in_array($seEnvio, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true);
     $fechaTs = (int) ($row['fecha'] ?? 0);
@@ -2729,9 +2735,34 @@ trait RendersDashboard
     $orderUrl = 'https://sucasainmobiliaria.com.co/mi-cuenta/anadir-orden-de-mantenimiento/?id_cotizacion=' . rawurlencode($id) . '&id_inmueble=' . rawurlencode($idInmueble);
     $actaUrl = 'https://sucasainmobiliaria.com.co/mi-cuenta/anadir-acta-de-satisfaccion/?id_cotizacion=' . rawurlencode($id) . '&id_rev_correctiva=' . rawurlencode(trim((string) ($row['id_revision'] ?? ''))) . '&id_propietario=' . rawurlencode(trim((string) ($row['id_propietario'] ?? ''))) . '&id_arrendatario=' . rawurlencode(trim((string) ($row['id_arrendatario'] ?? ''))) . '&id_inmueble=' . rawurlencode($idInmueble) . '&id_sucursal=' . rawurlencode($sucursal);
     $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
-    $ordersHtml = empty($orders) ? '<p class="scm-case-history-empty">Sin ordenes registradas para esta cotizacion.</p>' : '';
-    foreach ($orders as $order) {
-      $ordersHtml .= '<article class="scm-case-history-item"><div class="scm-case-history-meta"><strong>Orden #' . esc_html((string) ($order['_ID'] ?? '')) . '</strong><span>' . esc_html((string) ($order['estado'] ?? '-')) . '</span></div><div class="scm-case-history-detail"><p><strong>Proveedor:</strong> ' . esc_html((string) ($order['proveedor'] ?? '-')) . '</p><p><strong>Actividad:</strong> ' . esc_html((string) ($order['actividad'] ?? '-')) . '</p><p><strong>Valor:</strong> ' . esc_html($this->format_cop_currency($order['valor'] ?? 0)) . '</p></div></article>';
+    $ordersHtml = empty($orders)
+      ? '<div class="scm-cotizacion-orders-empty"><span aria-hidden="true">&#128203;</span><strong>Sin &oacute;rdenes registradas</strong><p>Esta cotizaci&oacute;n todav&iacute;a no tiene &oacute;rdenes de mantenimiento asociadas.</p></div>'
+      : '<div class="scm-cotizacion-orders-summary"><span>Cotizaci&oacute;n #' . esc_html($id !== '' ? $id : '-') . '</span><strong>' . esc_html((string) count($orders)) . ' ' . (count($orders) === 1 ? 'orden registrada' : '&oacute;rdenes registradas') . '</strong></div><div class="scm-cotizacion-orders-list">';
+    $orderDetailsHtml = '';
+    $ordersHistoryHtml = empty($orders) ? '<p class="scm-case-history-empty">Sin &oacute;rdenes registradas para esta cotizaci&oacute;n.</p>' : '';
+    foreach ($orders as $orderIndex => $order) {
+      $orderId = trim((string) ($order['_ID'] ?? ''));
+      $orderKey = $orderId !== '' ? $orderId : 'item-' . (string) $orderIndex;
+      $orderState = trim((string) ($order['estado'] ?? ''));
+      $orderProvider = trim((string) ($order['proveedor'] ?? ''));
+      $orderActivity = trim((string) ($order['actividad'] ?? ''));
+      $orderCategory = trim((string) ($order['categoria'] ?? ''));
+      $orderDateTs = (int) ($order['fecha'] ?? 0);
+      if ($orderDateTs <= 0) {
+        $orderDateTs = strtotime((string) ($order['cct_created'] ?? '')) ?: 0;
+      }
+      $orderDate = $orderDateTs > 0 ? date('d/m/Y', $orderDateTs) : '-';
+      $ordersHtml .= '<article class="scm-cotizacion-order-card">'
+        . '<div class="scm-cotizacion-order-card-head"><div><span>Orden de mantenimiento</span><strong>#' . esc_html($orderId !== '' ? $orderId : '-') . '</strong></div><span class="scm-cotizacion-order-state">' . esc_html($orderState !== '' ? $orderState : 'Sin estado') . '</span></div>'
+        . '<div class="scm-cotizacion-order-card-body"><div><span>Proveedor</span><strong>' . esc_html($orderProvider !== '' ? $orderProvider : '-') . '</strong></div><div><span>Categor&iacute;a</span><strong>' . esc_html($orderCategory !== '' ? $orderCategory : '-') . '</strong></div><div><span>Fecha</span><strong>' . esc_html($orderDate) . '</strong></div><div><span>Valor</span><strong>' . esc_html($this->format_cop_currency($order['valor'] ?? 0)) . '</strong></div></div>'
+        . '<p class="scm-cotizacion-order-activity">' . esc_html($orderActivity !== '' ? $orderActivity : 'Sin actividad registrada.') . '</p>'
+        . '<button type="button" class="scm-cotizacion-order-view" data-scm-view-cotizacion-order="' . esc_attr($orderKey) . '" aria-label="Ver detalle de la orden ' . esc_attr($orderId !== '' ? '#' . $orderId : '') . '">Ver orden <span aria-hidden="true">&rarr;</span></button>'
+        . '</article>';
+      $ordersHistoryHtml .= '<article class="scm-case-history-item"><div class="scm-case-history-meta"><strong>Orden #' . esc_html($orderId !== '' ? $orderId : '-') . '</strong><span>' . esc_html($orderState !== '' ? $orderState : '-') . '</span></div><div class="scm-case-history-detail"><p><strong>Proveedor:</strong> ' . esc_html($orderProvider !== '' ? $orderProvider : '-') . '</p><p><strong>Actividad:</strong> ' . esc_html($orderActivity !== '' ? $orderActivity : '-') . '</p><p><strong>Valor:</strong> ' . esc_html($this->format_cop_currency($order['valor'] ?? 0)) . '</p></div></article>';
+      $orderDetailsHtml .= '<template class="scm-cotizacion-order-detail-source" data-scm-cotizacion-order-detail="' . esc_attr($orderKey) . '" data-order-number="' . esc_attr($orderId !== '' ? $orderId : '-') . '">' . $this->render_cotizacion_order_detail($order) . '</template>';
+    }
+    if (!empty($orders)) {
+      $ordersHtml .= '</div>';
     }
 
     $saldoObra = $this->format_cop_currency($this->cotizacion_money_value($row, ['saldo_obra']));
@@ -2762,7 +2793,7 @@ trait RendersDashboard
     $caseSource .= '<p><strong>Destinatario:</strong> ' . esc_html($destinatario !== '' ? $destinatario : '-') . '</p>';
     $caseSource .= '<p><strong>Contacto:</strong> ' . esc_html($contacto !== '' ? $contacto : '-') . '</p>';
     $caseSource .= '</div></article></section>';
-    $caseSource .= '<section class="scm-case-history"><h4>&Oacute;rdenes de mantenimiento</h4>' . $ordersHtml . '</section>';
+    $caseSource .= '<section class="scm-case-history"><h4>&Oacute;rdenes de mantenimiento</h4>' . $ordersHistoryHtml . '</section>';
     $ticketCaseButton = '';
     $linkedTicketCardHtml = $ticket !== '' ? (string) ($linkedTicketCards[$ticket] ?? '') : '';
     $linkedTicketSource = $linkedTicketCardHtml !== ''
@@ -2802,15 +2833,73 @@ trait RendersDashboard
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="saldos" hidden><div class="scm-cotizacion-finance-grid"><div><span>Saldo mano de obra</span><strong>' . esc_html($saldoObra) . '</strong></div><div><span>Saldo materiales</span><strong>' . esc_html($saldoMateriales) . '</strong></div><div><span>Saldo equipos</span><strong>' . esc_html($saldoMaquinarias) . '</strong></div><div><span>Saldo otros costos</span><strong>' . esc_html($saldoOtros) . '</strong></div></div></div>'
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="totales" hidden><div class="scm-cotizacion-finance-grid"><div><span>Total mano de obra</span><strong>' . esc_html($totalObra) . '</strong></div><div><span>Total materiales</span><strong>' . esc_html($totalMateriales) . '</strong></div><div><span>Total equipos</span><strong>' . esc_html($totalMaquinarias) . '</strong></div><div><span>Total otros costos</span><strong>' . esc_html($totalOtros) . '</strong></div><div class="scm-cotizacion-finance-total"><span>Total cotizaci&oacute;n</span><strong>' . esc_html($totalCotizacion) . '</strong></div></div></div>'
       . '<div class="scm-cotizacion-actions">'
-      . ($id !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-native data-cotizacion-id="' . esc_attr($id) . '">Ver cotizacion</button>' : '')
+      . ($id !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-native data-cotizacion-id="' . esc_attr($id) . '">Ver cotizaci&oacute;n</button>' : '')
       . $ticketCaseButton
-      . '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-orders>Ver ordenes</button>'
-      . '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizacion</button>'
-      . '<button type="button" class="scm-case-work-btn scm-danger-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizacion</button>'
-      . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($noteUrl) . '" data-iframe-title="Anadir nota a cotizacion">Anadir nota</button>'
-      . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($orderUrl) . '" data-iframe-title="Anadir orden de mantenimiento">Anadir orden</button>'
-      . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($actaUrl) . '" data-iframe-title="Anadir acta de satisfaccion">Anadir acta</button>'
-      . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div><template class="scm-cotizacion-native-source">' . $nativeCotizacionHtml . '</template>' . $linkedTicketSource . '<div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div></article>';
+      . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-view-cotizacion-orders>Ver &oacute;rdenes <span class="scm-action-count">' . esc_html((string) count($orders)) . '</span></button>' : '')
+      . '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizaci&oacute;n</button>'
+      . '<button type="button" class="scm-case-work-btn scm-danger-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizaci&oacute;n</button>'
+      . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($noteUrl) . '" data-iframe-title="A&ntilde;adir nota a cotizaci&oacute;n">A&ntilde;adir nota</button>'
+      . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($orderUrl) . '" data-iframe-title="A&ntilde;adir orden de mantenimiento">A&ntilde;adir orden</button>' : '')
+      . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($actaUrl) . '" data-iframe-title="A&ntilde;adir acta de satisfacci&oacute;n">A&ntilde;adir acta</button>' : '')
+      . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div>' . $orderDetailsHtml . '<template class="scm-cotizacion-native-source">' . $nativeCotizacionHtml . '</template>' . $linkedTicketSource . '<div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div></article>';
+  }
+
+  /** @param array<string,mixed> $order */
+  private function render_cotizacion_order_detail(array $order): string
+  {
+    $value = static fn(string $key, string $fallback = '-'): string => trim((string) ($order[$key] ?? '')) !== '' ? trim((string) $order[$key]) : $fallback;
+    $dateTs = (int) ($order['fecha'] ?? 0);
+    if ($dateTs <= 0) {
+      $dateTs = strtotime((string) ($order['cct_created'] ?? '')) ?: 0;
+    }
+    $date = $dateTs > 0 ? date('d/m/Y h:i a', $dateTs) : '-';
+    $createdTs = strtotime((string) ($order['cct_created'] ?? '')) ?: 0;
+    $modifiedTs = strtotime((string) ($order['cct_modified'] ?? '')) ?: 0;
+    $detailItem = static function (string $label, string $content, bool $wide = false): string {
+      return '<div class="scm-cotizacion-order-detail-item' . ($wide ? ' is-wide' : '') . '"><span>' . esc_html($label) . '</span><strong>' . esc_html($content !== '' ? $content : '-') . '</strong></div>';
+    };
+
+    $html = '<div class="scm-cotizacion-order-detail">';
+    $html .= '<div class="scm-cotizacion-order-detail-hero"><div><span>Orden de mantenimiento</span><strong>#' . esc_html($value('_ID')) . '</strong></div><span class="scm-cotizacion-order-state">' . esc_html($value('estado', 'Sin estado')) . '</span></div>';
+    $html .= '<section><h3>Informaci&oacute;n de la orden</h3><div class="scm-cotizacion-order-detail-grid">';
+    $html .= $detailItem('Fecha', $date);
+    $html .= $detailItem('Categoría', $value('categoria'));
+    $html .= $detailItem('Concepto', $value('concepto'));
+    $html .= $detailItem('Valor', $this->format_cop_currency($order['valor'] ?? 0));
+    $html .= $detailItem('Actividad', $value('actividad'), true);
+    $html .= '</div></section>';
+    $html .= '<section><h3>Ubicaci&oacute;n y referencias</h3><div class="scm-cotizacion-order-detail-grid">';
+    $html .= $detailItem('Cotización', '#' . $value('id_cotizacion'));
+    $html .= $detailItem('Ticket', '#' . $value('id_ticket'));
+    $html .= $detailItem('Contrato', '#' . $value('contrato', $value('id_contrato')));
+    $html .= $detailItem('Inmueble', $value('inmueble', $value('id_inmueble')));
+    $html .= $detailItem('Sucursal', $value('sucursal'));
+    $html .= $detailItem('Dirección', $value('direccion'), true);
+    $html .= '</div></section>';
+    $html .= '<section><h3>Proveedor</h3><div class="scm-cotizacion-order-detail-grid">';
+    $html .= $detailItem('Nombre', $value('proveedor'));
+    $html .= $detailItem('Identificación', trim($value('tipo_identificacion_proveedor', '')) . ' ' . $value('identificacion_proveedor'));
+    $html .= $detailItem('Correo', $value('correo_proveedor'));
+    $html .= $detailItem('Celular', $value('celular_proveedor'));
+    $html .= $detailItem('Dirección', $value('direccion_proveedor'), true);
+    $html .= '</div></section>';
+    $html .= '<section><h3>Datos para pago</h3><div class="scm-cotizacion-order-detail-grid">';
+    $html .= $detailItem('Titular', $value('titular_proveedor'));
+    $html .= $detailItem('Identificación del titular', $value('identificacion_cuenta_proveedor'));
+    $html .= $detailItem('Banco', $value('banco_proveedor'));
+    $html .= $detailItem('Tipo de cuenta', $value('tipo_cuenta_proveedor'));
+    $html .= $detailItem('Cuenta', $value('cuenta_proveedor'));
+    $html .= $detailItem('Correo de pago', $value('correo_pago_proveedor'));
+    $html .= '</div></section>';
+    $html .= '<section><h3>Responsables y trazabilidad</h3><div class="scm-cotizacion-order-detail-grid">';
+    $html .= $detailItem('Creador', $value('creador'));
+    $html .= $detailItem('Coordinador', $value('coordinador'));
+    $html .= $detailItem('Autorizador', $value('autorizador'));
+    $html .= $detailItem('Creada', $createdTs > 0 ? date('d/m/Y h:i a', $createdTs) : '-');
+    $html .= $detailItem('Última actualización', $modifiedTs > 0 ? date('d/m/Y h:i a', $modifiedTs) : '-');
+    $html .= '</div></section></div>';
+
+    return $html;
   }
 
   /** @param array<int,array<string,mixed>> $rows @return array<string,string> */

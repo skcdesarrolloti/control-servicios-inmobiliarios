@@ -4074,6 +4074,28 @@
   margin-top: 14px;
 }
 
+#scm-app .scm-cotizacion-actions .scm-primary-action {
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, #ff9f0a 0%, #f97316 100%);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.2);
+}
+
+#scm-app .scm-cotizacion-actions .scm-action-count {
+  display: inline-flex;
+  min-width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+  color: inherit;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
 #scm-app .scm-cotizacion-finance-actions {
   display: flex;
   flex-wrap: wrap;
@@ -4158,6 +4180,438 @@
 
   #scm-app .scm-cotizacion-status {
     min-width: 0;
+  }
+}
+
+/* Popups de respuesta y órdenes de cotización */
+.swal2-popup.scm-cotizacion-dialog {
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 22px;
+  background: #fff;
+  color: #0f172a;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  box-shadow: 0 28px 72px rgba(8, 34, 71, 0.28);
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-title {
+  margin: 0;
+  padding: 24px 76px 18px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(135deg, #f8fafc 0%, #fff7ed 100%);
+  color: #0b1f3a;
+  text-align: left;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  border: 1px solid #dbe4ef;
+  border-radius: 50%;
+  background: #fff;
+  color: #475569;
+  font-size: 27px;
+  line-height: 1;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-close:hover,
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-close:focus-visible {
+  border-color: #f59e0b;
+  color: #c2410c;
+  outline: 3px solid rgba(245, 158, 11, 0.2);
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-body {
+  max-height: min(68vh, 720px);
+  margin: 0;
+  padding: 22px 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: #334155;
+  text-align: left;
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-actions {
+  width: 100%;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0;
+  padding: 16px 24px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-confirm,
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-cancel,
+.scm-cotizacion-order-view {
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-confirm,
+.scm-cotizacion-order-view {
+  border-color: #ea8500;
+  background: linear-gradient(135deg, #ff9f0a 0%, #f97316 100%);
+  color: #fff;
+  box-shadow: 0 9px 20px rgba(249, 115, 22, 0.2);
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-cancel {
+  border-color: #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-confirm:hover,
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-cancel:hover,
+.scm-cotizacion-order-view:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.14);
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-confirm:focus-visible,
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-cancel:focus-visible,
+.scm-cotizacion-order-view:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.28);
+  outline-offset: 2px;
+}
+
+.scm-cotizacion-dialog-intro {
+  margin: 0 0 18px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.scm-cotizacion-response-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.scm-cotizacion-dialog-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  margin: 0;
+}
+
+.scm-cotizacion-dialog-field[hidden] {
+  display: none;
+}
+
+.scm-cotizacion-dialog-field.is-wide {
+  grid-column: 1 / -1;
+}
+
+.scm-cotizacion-dialog-field > span {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.scm-cotizacion-dialog-field > span em {
+  color: #dc2626;
+  font-style: normal;
+}
+
+.scm-cotizacion-dialog-field select,
+.scm-cotizacion-dialog-field textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 11px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.scm-cotizacion-dialog-field textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.scm-cotizacion-dialog-field select:focus,
+.scm-cotizacion-dialog-field textarea:focus {
+  border-color: #f59e0b;
+  outline: 3px solid rgba(245, 158, 11, 0.16);
+}
+
+.scm-cotizacion-dialog-field small {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.scm-cotizacion-orders-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border: 1px solid #fed7aa;
+  border-radius: 13px;
+  background: #fff7ed;
+}
+
+.scm-cotizacion-orders-summary span {
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.scm-cotizacion-orders-summary strong {
+  color: #0b1f3a;
+  font-size: 13px;
+}
+
+.scm-cotizacion-orders-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.scm-cotizacion-order-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid #dbe4ef;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+}
+
+.scm-cotizacion-order-card-head,
+.scm-cotizacion-order-detail-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scm-cotizacion-order-card-head > div > span,
+.scm-cotizacion-order-detail-hero > div > span {
+  display: block;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.scm-cotizacion-order-card-head > div > strong,
+.scm-cotizacion-order-detail-hero > div > strong {
+  display: block;
+  margin-top: 3px;
+  color: #0b1f3a;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.scm-cotizacion-order-state {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 5px 10px;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #166534;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.scm-cotizacion-order-card-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.scm-cotizacion-order-card-body > div {
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.scm-cotizacion-order-card-body span,
+.scm-cotizacion-order-detail-item span {
+  display: block;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.scm-cotizacion-order-card-body strong,
+.scm-cotizacion-order-detail-item strong {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  color: #0f172a;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.scm-cotizacion-order-activity {
+  flex: 1;
+  margin: 13px 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.scm-cotizacion-order-view {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  justify-content: center;
+  gap: 8px;
+}
+
+.scm-cotizacion-orders-empty {
+  padding: 34px 20px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.scm-cotizacion-orders-empty > span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 28px;
+}
+
+.scm-cotizacion-orders-empty strong {
+  color: #0f172a;
+}
+
+.scm-cotizacion-orders-empty p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.scm-cotizacion-order-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.scm-cotizacion-order-detail-hero {
+  padding: 16px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #0b1f3a 0%, #173a67 100%);
+}
+
+.scm-cotizacion-order-detail-hero > div > span {
+  color: #fed7aa;
+}
+
+.scm-cotizacion-order-detail-hero > div > strong {
+  color: #fff;
+}
+
+.scm-cotizacion-order-detail section {
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 15px;
+  background: #fff;
+}
+
+.scm-cotizacion-order-detail section h3 {
+  margin: 0 0 12px;
+  color: #0b1f3a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.scm-cotizacion-order-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scm-cotizacion-order-detail-item {
+  min-width: 0;
+  padding: 10px 11px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.scm-cotizacion-order-detail-item.is-wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 680px) {
+  .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-title {
+    padding: 20px 66px 16px 18px;
+    font-size: 18px;
+  }
+
+  .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-body {
+    max-height: 66vh;
+    padding: 18px;
+  }
+
+  .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    padding: 14px 18px;
+  }
+
+  .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-confirm,
+  .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-cancel {
+    width: 100%;
+    margin: 0;
+  }
+
+  .scm-cotizacion-response-grid,
+  .scm-cotizacion-orders-list,
+  .scm-cotizacion-order-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scm-cotizacion-order-detail-item.is-wide {
+    grid-column: auto;
+  }
+
+  .scm-cotizacion-orders-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-confirm,
+  .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-cancel,
+  .scm-cotizacion-order-view {
+    transition: none;
   }
 }
 

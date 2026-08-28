@@ -9464,6 +9464,94 @@
       });
     }
 
+    function findCotizacionOrderDetailSource(card, orderKey) {
+      if (!card || !orderKey) return null;
+      var sources = card.querySelectorAll("[data-scm-cotizacion-order-detail]");
+      for (var i = 0; i < sources.length; i += 1) {
+        if (sources[i].getAttribute("data-scm-cotizacion-order-detail") === orderKey) {
+          return sources[i];
+        }
+      }
+      return null;
+    }
+
+    function openCotizacionOrderDetailModal(card, orderKey) {
+      var source = findCotizacionOrderDetailSource(card, orderKey);
+      if (!source) {
+        showToast("error", "No se encontró el detalle de la orden.");
+        return;
+      }
+      var orderNumber = source.getAttribute("data-order-number") || orderKey;
+      window.Swal.fire({
+        title: "Detalle de la orden #" + orderNumber,
+        html: source.innerHTML,
+        width: "min(920px, 94vw)",
+        showCloseButton: true,
+        showCancelButton: true,
+        confirmButtonText: "Cerrar",
+        cancelButtonText: "Volver a órdenes",
+        buttonsStyling: false,
+        focusConfirm: false,
+        returnFocus: true,
+        customClass: {
+          popup: "scm-cotizacion-dialog scm-cotizacion-order-detail-swal",
+          title: "scm-cotizacion-dialog-title",
+          htmlContainer: "scm-cotizacion-dialog-body",
+          actions: "scm-cotizacion-dialog-actions",
+          confirmButton: "scm-cotizacion-dialog-confirm",
+          cancelButton: "scm-cotizacion-dialog-cancel",
+          closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+        },
+      }).then(function (result) {
+        if (result.dismiss === window.Swal.DismissReason.cancel) {
+          openCotizacionOrdersModal(card);
+        }
+      });
+    }
+
+    function openCotizacionOrdersModal(card) {
+      var source = card ? card.querySelector(".scm-cotizacion-orders-source") : null;
+      var cotizacionId = card ? card.getAttribute("data-cotizacion-id") || "" : "";
+      if (!window.Swal) {
+        showToast("info", source ? source.textContent : "Sin órdenes registradas.");
+        return;
+      }
+      window.Swal.fire({
+        title: "Órdenes de la cotización" + (cotizacionId ? " #" + cotizacionId : ""),
+        html: source ? source.innerHTML : "Sin órdenes registradas.",
+        width: "min(920px, 94vw)",
+        showCloseButton: true,
+        confirmButtonText: "Cerrar",
+        buttonsStyling: false,
+        focusConfirm: false,
+        returnFocus: true,
+        customClass: {
+          popup: "scm-cotizacion-dialog scm-cotizacion-orders-swal",
+          title: "scm-cotizacion-dialog-title",
+          htmlContainer: "scm-cotizacion-dialog-body",
+          actions: "scm-cotizacion-dialog-actions",
+          confirmButton: "scm-cotizacion-dialog-confirm",
+          closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+        },
+        didOpen: function () {
+          var popup = window.Swal.getPopup();
+          if (!popup) return;
+          popup.addEventListener("click", function (event) {
+            var orderButton =
+              event.target && event.target.closest
+                ? event.target.closest("[data-scm-view-cotizacion-order]")
+                : null;
+            if (!orderButton) return;
+            event.preventDefault();
+            openCotizacionOrderDetailModal(
+              card,
+              orderButton.getAttribute("data-scm-view-cotizacion-order") || "",
+            );
+          });
+        },
+      });
+    }
+
     root.addEventListener("click", function (e) {
       var linkedTicketCaseBtn =
         e.target && e.target.closest
@@ -9546,17 +9634,7 @@
       if (ordersBtn) {
         e.preventDefault();
         var card = ordersBtn.closest(".scm-cotizacion-card");
-        var source = card ? card.querySelector(".scm-cotizacion-orders-source") : null;
-        if (window.Swal) {
-          window.Swal.fire({
-            title: "Ordenes de la cotizacion",
-            html: source ? source.innerHTML : "Sin ordenes registradas.",
-            width: 780,
-            confirmButtonText: "Cerrar",
-          });
-        } else {
-          showToast("info", source ? source.textContent : "Sin ordenes registradas.");
-        }
+        openCotizacionOrdersModal(card);
         return;
       }
 
@@ -9576,34 +9654,52 @@
           return;
         }
         window.Swal.fire({
-          title: "Responder cotizacion",
+          title: "Responder cotización",
           html:
-            '<label class="scm-seg-field"><span>Respuesta</span><select id="swal-cot-estado" class="select select-bordered select-sm scm-select"><option value="">Elige una respuesta</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
-            '<label class="scm-seg-field" id="swal-cot-motivo-wrap" style="display:none;"><span>Motivo</span><select id="swal-cot-motivo" class="select select-bordered select-sm scm-select"><option value="">Elige un motivo</option><option value="Por costo">Por costo</option><option value="Ejecucción por cuenta propia">Ejecucción por cuenta propia</option></select></label>' +
-            '<label class="scm-seg-field" id="swal-cot-fin-wrap" style="display:none;"><span>Financiacion</span><select id="swal-cot-fin" class="select select-bordered select-sm scm-select"><option value="">No aplica / sin respuesta</option><option value="Si">Si</option><option value="No">No</option></select></label>' +
-            '<label class="scm-seg-field"><span>Observaciones</span><textarea id="swal-cot-observacion" class="textarea textarea-bordered" rows="5">Ninguna</textarea></label>',
-          width: 620,
+            '<div class="scm-cotizacion-response-form"><p class="scm-cotizacion-dialog-intro">Registra la decisión recibida y la información necesaria para continuar el proceso.</p><div class="scm-cotizacion-response-grid">' +
+            '<label class="scm-cotizacion-dialog-field"><span>Respuesta <em>*</em></span><select id="swal-cot-estado"><option value="">Selecciona una respuesta</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
+            '<label class="scm-cotizacion-dialog-field" id="swal-cot-motivo-wrap" hidden><span>Motivo <em>*</em></span><select id="swal-cot-motivo"><option value="">Selecciona un motivo</option><option value="Por costo">Por costo</option><option value="Ejecución por cuenta propia">Ejecución por cuenta propia</option></select></label>' +
+            '<label class="scm-cotizacion-dialog-field" id="swal-cot-fin-wrap" hidden><span>Financiación</span><select id="swal-cot-fin"><option value="">No aplica / sin respuesta</option><option value="Si">Sí</option><option value="No">No</option></select></label>' +
+            '<label class="scm-cotizacion-dialog-field is-wide"><span>Observaciones</span><textarea id="swal-cot-observacion" rows="5" placeholder="Agrega contexto para el equipo">Ninguna</textarea><small>Este comentario quedará asociado a la respuesta de la cotización.</small></label>' +
+            "</div></div>",
+          width: "min(700px, 94vw)",
+          showCloseButton: true,
           showCancelButton: true,
           allowOutsideClick: false,
-          allowEscapeKey: false,
+          allowEscapeKey: true,
           confirmButtonText: "Guardar y enviar",
           cancelButtonText: "Cancelar",
+          buttonsStyling: false,
+          focusConfirm: false,
+          returnFocus: true,
+          customClass: {
+            popup: "scm-cotizacion-dialog scm-cotizacion-response-swal",
+            title: "scm-cotizacion-dialog-title",
+            htmlContainer: "scm-cotizacion-dialog-body",
+            actions: "scm-cotizacion-dialog-actions",
+            confirmButton: "scm-cotizacion-dialog-confirm",
+            cancelButton: "scm-cotizacion-dialog-cancel",
+            closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+          },
           didOpen: function () {
             var estado = document.getElementById("swal-cot-estado");
             var motivoWrap = document.getElementById("swal-cot-motivo-wrap");
             var finWrap = document.getElementById("swal-cot-fin-wrap");
             if (estado) {
+              estado.focus();
               estado.addEventListener("change", function () {
                 var isNo = estado.value === "Desaprobada";
                 var isYes = estado.value === "Aprobada";
-                if (motivoWrap) motivoWrap.style.display = isNo ? "" : "none";
-                if (finWrap) finWrap.style.display = isYes ? "" : "none";
+                if (motivoWrap) motivoWrap.hidden = !isNo;
+                if (finWrap) finWrap.hidden = !isYes;
               });
             }
           },
           preConfirm: function () {
             var estado = document.getElementById("swal-cot-estado");
             var motivo = document.getElementById("swal-cot-motivo");
+            var financiacion = document.getElementById("swal-cot-fin");
+            var observacion = document.getElementById("swal-cot-observacion");
             if (!estado || !estado.value) {
               window.Swal.showValidationMessage("Elige una respuesta.");
               return false;
@@ -9612,19 +9708,22 @@
               window.Swal.showValidationMessage("Elige el motivo.");
               return false;
             }
-            return true;
+            return {
+              estado: estado.value,
+              motivo: motivo ? motivo.value : "",
+              financiacion: financiacion ? financiacion.value : "",
+              observacion: observacion ? observacion.value : "Ninguna",
+            };
           },
         }).then(function (res) {
           if (!res.isConfirmed) return;
+          var responseData = res.value || {};
           var fd = new FormData();
           fd.append("ticket_pk", ticketPk);
-          fd.append("estado", document.getElementById("swal-cot-estado").value || "");
-          fd.append("motivo", document.getElementById("swal-cot-motivo").value || "");
-          fd.append("financiacion", document.getElementById("swal-cot-fin").value || "");
-          fd.append(
-            "observacion",
-            document.getElementById("swal-cot-observacion").value || "Ninguna",
-          );
+          fd.append("estado", responseData.estado || "");
+          fd.append("motivo", responseData.motivo || "");
+          fd.append("financiacion", responseData.financiacion || "");
+          fd.append("observacion", responseData.observacion || "Ninguna");
           fd.append("notify_recipients_present", "1");
           fd.append("notify_recipients[]", "none");
           submitCotizacionAction(
