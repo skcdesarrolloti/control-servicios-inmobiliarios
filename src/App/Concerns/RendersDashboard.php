@@ -1998,6 +1998,9 @@ trait RendersDashboard
             <div class="scm-admin-notif-collection-help scm-admin-notif-collection-notify">
               <strong>Notificar al guardar</strong>
               <span>Usa la plantilla &ldquo;Gesti&oacute;n de cobro&rdquo; y encola la notificaci&oacute;n en el mismo guardado. Si no quieres enviar nada, deja los canales sin marcar.</span>
+              <div class="scm-admin-notif-message-toolbar scm-admin-notif-collection-toolbar" aria-label="Herramientas de vista previa de gesti&oacute;n de cobro">
+                <button type="button" data-admin-notif-collection-preview-toggle>Ocultar vista previa</button>
+              </div>
               <div class="scm-admin-notif-collection-targets" role="group" aria-label="Destinatarios de cobranza">
                 <span class="scm-admin-notif-collection-target is-fixed">Arrendatario principal</span>
                 <span class="scm-admin-notif-collection-target" data-admin-notif-collection-codeudor-count>Codeudores: 0 seleccionados</span>
@@ -2031,9 +2034,6 @@ trait RendersDashboard
               </div>
             </div>
 
-            <div class="scm-admin-notif-message-toolbar scm-admin-notif-collection-toolbar" aria-label="Herramientas de vista previa de gesti&oacute;n de cobro">
-              <button type="button" data-admin-notif-collection-preview-toggle>Ocultar vista previa</button>
-            </div>
             <div class="scm-admin-notif-preview scm-admin-notif-collection-preview" data-admin-notif-collection-preview aria-live="polite"></div>
 
             <div class="scm-admin-notif-submit-row">

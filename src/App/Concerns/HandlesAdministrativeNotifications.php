@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\App\Concerns;
 
+use SCM\Core\Auth;
 use SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService;
 
 trait HandlesAdministrativeNotifications
