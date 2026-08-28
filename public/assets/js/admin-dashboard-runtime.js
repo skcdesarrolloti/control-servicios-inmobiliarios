@@ -295,7 +295,49 @@
       var next = tmp.querySelector("[data-scm-collection-log]");
       if (next && container && container.parentNode) {
         container.parentNode.replaceChild(next, container);
+        return next;
       }
+      return container;
+    }
+
+    function collectionLogParamsFromContainer(container) {
+      if (container) {
+        var form = container.querySelector("[data-scm-collection-log-form]");
+        if (form) {
+          return collectionLogParamsFromForm(form);
+        }
+      }
+      return collectionLogParamsFromUrl("?scm_tab=gestiones_cobro");
+    }
+
+    function collectionLogContainerFromPanel(panel) {
+      if (panel) {
+        var local = panel.querySelector("[data-scm-collection-log]");
+        if (local) {
+          return local;
+        }
+      }
+      return root.querySelector("#scm-panel-gestiones-cobro [data-scm-collection-log]");
+    }
+
+    function markCollectionLogStale() {
+      var container = collectionLogContainerFromPanel(null);
+      if (container) {
+        container.setAttribute("data-scm-collection-log-stale", "1");
+      }
+    }
+
+    function refreshCollectionLogPanel(panel, force) {
+      var container = collectionLogContainerFromPanel(panel);
+      if (!container) {
+        return Promise.resolve();
+      }
+      var stale = container.getAttribute("data-scm-collection-log-stale") === "1";
+      var loaded = container.getAttribute("data-scm-collection-log-loaded") === "1";
+      if (!force && loaded && !stale) {
+        return Promise.resolve();
+      }
+      return loadCollectionLog(container, collectionLogParamsFromContainer(container));
     }
 
     function loadCollectionLog(container, fd) {
@@ -315,7 +357,11 @@
                 "No se pudieron cargar las gestiones de cobro.",
             );
           }
-          replaceCollectionLog(container, (json.data || {}).html || "");
+          var nextContainer = replaceCollectionLog(container, (json.data || {}).html || "");
+          if (nextContainer) {
+            nextContainer.setAttribute("data-scm-collection-log-loaded", "1");
+            nextContainer.setAttribute("data-scm-collection-log-stale", "0");
+          }
         })
         .catch(function (err) {
           showToast("error", err.message || "No se pudieron cargar las gestiones de cobro.");
@@ -4093,6 +4139,13 @@
                 }
                 showToast((data.created || 0) > 0 ? "success" : "warning", msg);
                 if ((data.created || 0) > 0) {
+                  markCollectionLogStale();
+                  var activeCollectionPanel = root.querySelector(
+                    "#scm-panel-actividades-administrativas.active #scm-panel-gestiones-cobro.active",
+                  );
+                  if (activeCollectionPanel) {
+                    refreshCollectionLogPanel(activeCollectionPanel, true);
+                  }
                   closeCollectionModal();
                 }
                 loadRecipients(currentPage);
@@ -8876,6 +8929,12 @@
           administrativeKey === "notificaciones"
         ) {
           return initAdminNotificationsPanel(false);
+        }
+        if (
+          activeAdministrativePanel &&
+          administrativeKey === "gestiones_cobro"
+        ) {
+          return refreshCollectionLogPanel(activeAdministrativePanel, true);
         }
       }
       return Promise.resolve();
