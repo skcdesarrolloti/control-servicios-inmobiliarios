@@ -115,7 +115,7 @@ final class TicketPdfGenerator
     $pdf->backgroundImage($this->letterheadPath());
     $pdf->layout(58, 170, 118);
 
-    $tenantName = $this->value($ticket, 'arrendatario', $this->value($ticket, 'solicitante', 'arrendatario(a)'));
+    $tenantName = $this->value($ticket, '_scm_arrendatario_nombre_resuelto', $this->value($ticket, 'arrendatario', $this->value($ticket, 'solicitante', 'arrendatario(a)')));
     $contract = $this->value($ticket, 'contrato', '-');
     $property = $this->value($ticket, 'inmueble', $this->value($ticket, 'id_inmueble', '-'));
     $address = $this->value($ticket, 'direccion', '');

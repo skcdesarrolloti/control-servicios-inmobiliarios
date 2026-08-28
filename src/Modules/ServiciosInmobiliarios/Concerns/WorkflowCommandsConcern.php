@@ -168,6 +168,7 @@ trait WorkflowCommandsConcern
     }));
 
     $generatedNoAccessNotice = null;
+    $ticketForNoAccessNotice = $ticket;
     $attemptNoAccessNotice = 0;
     if ($generarActaNoAccesoPreventiva) {
       if (strcasecmp(trim($estadoAdministrativo), 'En espera de respuesta') !== 0) {
@@ -177,11 +178,14 @@ trait WorkflowCommandsConcern
         return ['ok' => '0', 'message' => 'Esta comunicacion solo aplica para tickets de revision preventiva.'];
       }
       $attemptNoAccessNotice = $this->nextPreventivaNoAccessAttempt($ticketPk, (string) ($ticket['archivos'] ?? ''));
-      $ticketForNotice = array_merge($ticket, $this->preventivaNoAccessCreatorData($userName, $userInfo), [
+      $tenantDisplayName = $this->resolveTicketTenantDisplayName($ticket);
+      $ticketForNoAccessNotice = array_merge($ticket, $this->preventivaNoAccessCreatorData($userName, $userInfo), [
+        'arrendatario' => $tenantDisplayName,
+        '_scm_arrendatario_nombre_resuelto' => $tenantDisplayName,
         '_scm_no_access_attempt' => $attemptNoAccessNotice,
       ]);
       try {
-        $generatedNoAccessNotice = (new TicketPdfGenerator())->generatePreventivaNoAccessNotice($ticketPk, $ticketForNotice, $attemptNoAccessNotice);
+        $generatedNoAccessNotice = (new TicketPdfGenerator())->generatePreventivaNoAccessNotice($ticketPk, $ticketForNoAccessNotice, $attemptNoAccessNotice);
         $url = trim((string) ($generatedNoAccessNotice['url'] ?? ''));
         if ($url === '') {
           throw new \RuntimeException('El PDF no retorno URL valida.');
@@ -261,7 +265,7 @@ trait WorkflowCommandsConcern
     $noticeSent = 0;
     $noticeWhatsappSent = 0;
     if ($generatedNoAccessNotice !== null) {
-      $noticeDelivery = $this->notifyPreventivaNoAccessNotice($ticket, $logicalTicket, $generatedNoAccessNotice, $attemptNoAccessNotice, $userName);
+      $noticeDelivery = $this->notifyPreventivaNoAccessNotice($ticketForNoAccessNotice, $logicalTicket, $generatedNoAccessNotice, $attemptNoAccessNotice, $userName);
       $noticeSent = (int) ($noticeDelivery['email'] ?? 0);
       $noticeWhatsappSent = (int) ($noticeDelivery['whatsapp'] ?? 0);
     }

@@ -114,15 +114,15 @@ trait NotificationDeliveryConcern
     $emailSent = 0;
     $whatsappSent = 0;
     $tenantEmail = trim((string)($ticket['correo_arrendatario'] ?? $ticket['correo_solicitante'] ?? ''));
-    $tenantName = trim((string)($ticket['arrendatario'] ?? $ticket['solicitante'] ?? 'arrendatario'));
+    $tenantName = $this->resolveTicketTenantDisplayName($ticket);
     $noticeUrl = trim((string)($notice['url'] ?? ''));
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
     $subject = 'Acta de revision preventiva del ticket #' . $logicalTicket;
 
-    $content = '<p style="font-weight:500;margin:10px 0;">Apreciado(a) ' . EmailTemplate::e($tenantName !== '' ? $tenantName : 'arrendatario(a)') . ',</p>'
-      . '<p style="line-height:1.65;margin:10px 0;">Se ha generado el acta/comunicacion preventiva para dejar constancia de la gestion realizada frente a la revision preventiva del inmueble.</p>'
-      . '<p style="line-height:1.65;margin:10px 0;">Esta comunicacion corresponde al intento No. ' . EmailTemplate::e((string)$attempt) . ' y queda anexada al historial del caso.</p>'
-      . '<p style="line-height:1.65;margin:10px 0;">Puedes consultarla desde el siguiente boton. No adjuntamos el archivo para evitar bloqueos o marcaciones de spam.</p>'
+    $content = '<p style="font-weight:500;margin:10px 0;">Apreciado(a) ' . EmailTemplate::e($tenantName) . ',</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Se ha generado el acta/comunicación preventiva para dejar constancia de la gestión realizada frente a la revisión preventiva del inmueble.</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Esta comunicación corresponde al intento No. ' . EmailTemplate::e((string)$attempt) . ' y queda anexada al historial del caso.</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Puedes consultarla desde el siguiente botón. No adjuntamos el archivo para evitar bloqueos o marcaciones de spam.</p>'
       . '<p style="line-height:1.65;margin:10px 0;">Cordialmente,<br><b>' . EmailTemplate::e($userName) . '</b></p>';
 
     if ($this->queue instanceof EmailQueue && $tenantEmail !== '' && filter_var($tenantEmail, FILTER_VALIDATE_EMAIL)) {
@@ -144,13 +144,13 @@ trait NotificationDeliveryConcern
     if ($tenantPhone !== '' && $noticeUrl !== '') {
       try {
         $buttonSuffix = $this->whatsappUrlButtonSuffix($noticeUrl);
-        $message = "Buen dia, " . ($tenantName !== '' ? $tenantName : 'arrendatario(a)') . ".\n\n";
-        $message .= "Se genero la comunicacion preventiva No. {$attempt} del ticket #{$logicalTicket}, relacionada con la revision preventiva del inmueble.\n\n";
-        $message .= "Puedes consultar el documento en el boton.\n\n";
+        $message = "Buen día, {$tenantName}.\n\n";
+        $message .= "Se generó la comunicación preventiva No. {$attempt} del ticket #{$logicalTicket}, relacionada con la revisión preventiva del inmueble.\n\n";
+        $message .= "Puedes consultar el documento en el botón.\n\n";
         $message .= "Atentamente,\n{$userName}";
 
         $smsQueue = new \SCM\Support\SmsQueue($this->db);
-        $ok = $smsQueue->enqueue($tenantPhone, $tenantName !== '' ? $tenantName : 'Arrendatario', $message, [
+        $ok = $smsQueue->enqueue($tenantPhone, $tenantName, $message, [
           'source_module' => 'preventiva_no_access_notice',
           'campaign_tag' => 'preventiva_no_access_notice',
           'categoria_mensaje' => 'informacion',
@@ -164,7 +164,7 @@ trait NotificationDeliveryConcern
             [
               'type' => 'body',
               'parameters' => [
-                ['type' => 'text', 'text' => $tenantName !== '' ? $tenantName : 'arrendatario(a)'],
+                ['type' => 'text', 'text' => $tenantName],
                 ['type' => 'text', 'text' => (string) $attempt],
                 ['type' => 'text', 'text' => $logicalTicket],
                 ['type' => 'text', 'text' => $userName],
@@ -261,7 +261,7 @@ trait NotificationDeliveryConcern
     };
 
     $add('solicitante', (string)($ticket['solicitante'] ?? ''), (string)($ticket['correo_solicitante'] ?? ''));
-    $add('arrendatario', (string)($ticket['arrendatario'] ?? ''), (string)($ticket['correo_arrendatario'] ?? ''));
+    $add('arrendatario', $this->resolveTicketTenantDisplayName($ticket), (string)($ticket['correo_arrendatario'] ?? ''));
     $add('propietario', (string)($ticket['propietario'] ?? ''), (string)($ticket['correo_propietario'] ?? ''));
 
     $employeeEmail = (string)($ticket['correo_empleado'] ?? '');
@@ -392,6 +392,181 @@ trait NotificationDeliveryConcern
         return $text;
       }
     }
+    return '';
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function resolveTicketTenantDisplayName(array $ticket): string
+  {
+    $directName = $this->firstUsablePersonName([
+      $ticket['_scm_arrendatario_nombre_resuelto'] ?? '',
+      $ticket['nombre_arrendatario'] ?? '',
+      $ticket['arrendatario_nombre'] ?? '',
+      $ticket['arrendatario'] ?? '',
+    ]);
+    if ($directName !== '') {
+      return $directName;
+    }
+
+    $tenantIds = [];
+    foreach ([
+      $ticket['id_arrendatario'] ?? '',
+      $ticket['arrendatario'] ?? '',
+    ] as $value) {
+      $id = trim((string) $value);
+      if ($id !== '' && preg_match('/^\d+$/', $id)) {
+        $tenantIds[$id] = true;
+      }
+    }
+    $tenantName = $this->findTenantNameByIds(array_keys($tenantIds));
+    if ($tenantName !== '') {
+      return $tenantName;
+    }
+
+    $contract = $this->findTicketContractRow($ticket);
+    if (!empty($contract)) {
+      $contractName = $this->firstUsablePersonName([
+        $contract['nombre_arrendatario'] ?? '',
+        $contract['arrendatario'] ?? '',
+      ]);
+      if ($contractName !== '') {
+        return $contractName;
+      }
+      $contractTenantId = trim((string) ($contract['id_arrendatario'] ?? ''));
+      $contractTenantName = $this->findTenantNameByIds($contractTenantId !== '' ? [$contractTenantId] : []);
+      if ($contractTenantName !== '') {
+        return $contractTenantName;
+      }
+    }
+
+    $solicitante = $this->firstUsablePersonName([$ticket['solicitante'] ?? '']);
+    return $solicitante !== '' ? $solicitante : 'arrendatario(a)';
+  }
+
+  /** @param array<int,mixed> $values */
+  private function firstUsablePersonName(array $values): string
+  {
+    foreach ($values as $value) {
+      $name = trim((string) $value);
+      if ($name === '') {
+        continue;
+      }
+      $normalized = strtolower($name);
+      if (preg_match('/^\d+$/', $name) || in_array($normalized, ['0', '-', 'no asignado', 'sin asignar'], true)) {
+        continue;
+      }
+      return $name;
+    }
+    return '';
+  }
+
+  /** @param array<string,mixed> $ticket @return array<string,mixed> */
+  private function findTicketContractRow(array $ticket): array
+  {
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+
+    $where = [];
+    $args = [];
+    $addLookup = function (string $column, string $value) use ($table, &$where, &$args): void {
+      $value = trim($value);
+      if ($value === '' || !$this->schema->columnExists($table, $column)) {
+        return;
+      }
+      $where[] = "TRIM(CAST(`{$column}` AS CHAR)) = ?";
+      $args[] = ltrim($value, '#');
+    };
+
+    foreach (['id_contrato_arrendamiento', 'id_contrato', 'contrato'] as $ticketColumn) {
+      $raw = trim((string) ($ticket[$ticketColumn] ?? ''));
+      if ($raw === '') {
+        continue;
+      }
+      $lookup = ltrim($raw, '#');
+      $addLookup('_ID', $lookup);
+      $addLookup('contrato', $lookup);
+      $addLookup('contrato_arrendamiento', $lookup);
+    }
+
+    if (empty($where)) {
+      return [];
+    }
+
+    $columns = [];
+    foreach (['_ID', 'contrato', 'contrato_arrendamiento', 'arrendatario', 'nombre_arrendatario', 'id_arrendatario'] as $column) {
+      if ($this->schema->columnExists($table, $column)) {
+        $columns[] = $column;
+      }
+    }
+    if (empty($columns)) {
+      return [];
+    }
+
+    $sql = 'SELECT `' . implode('`, `', array_values(array_unique($columns))) . "` FROM `{$table}` WHERE " . implode(' OR ', $where) . ' LIMIT 1';
+    $row = $this->db->getRow($sql, $args);
+    return is_array($row) ? $row : [];
+  }
+
+  /** @param string[] $ids */
+  private function findTenantNameByIds(array $ids): string
+  {
+    $ids = array_values(array_unique(array_filter(array_map(static function ($id): string {
+      return trim((string) $id);
+    }, $ids), static function (string $id): bool {
+      return $id !== '' && preg_match('/^\d+$/', $id) === 1;
+    })));
+    if (empty($ids)) {
+      return '';
+    }
+
+    $table = $this->db->table('jet_cct_arrendatarios');
+    if (!$this->schema->tableExists($table)) {
+      return '';
+    }
+
+    $nameColumns = [];
+    foreach (['nombre', 'nombre_juridico', 'arrendatario'] as $column) {
+      if ($this->schema->columnExists($table, $column)) {
+        $nameColumns[] = $column;
+      }
+    }
+    if (empty($nameColumns)) {
+      return '';
+    }
+
+    $where = [];
+    $args = [];
+    foreach (['_ID', 'id_arrendatario'] as $column) {
+      if (!$this->schema->columnExists($table, $column)) {
+        continue;
+      }
+      $where[] = "`{$column}` IN (" . implode(',', array_fill(0, count($ids), '?')) . ')';
+      array_push($args, ...$ids);
+    }
+    if (empty($where)) {
+      return '';
+    }
+
+    $identityColumns = [];
+    if ($this->schema->columnExists($table, '_ID')) {
+      $identityColumns[] = '_ID';
+    }
+    $columns = array_values(array_unique(array_merge($identityColumns, $nameColumns)));
+    $rows = $this->db->getResults(
+      'SELECT `' . implode('`, `', $columns) . "` FROM `{$table}` WHERE " . implode(' OR ', $where) . ' LIMIT 5',
+      $args
+    );
+    foreach ($rows as $row) {
+      $name = $this->firstUsablePersonName(array_map(static function (string $column) use ($row) {
+        return $row[$column] ?? '';
+      }, $nameColumns));
+      if ($name !== '') {
+        return $name;
+      }
+    }
+
     return '';
   }
 
