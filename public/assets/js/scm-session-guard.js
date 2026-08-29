@@ -1,7 +1,9 @@
 (function () {
   "use strict";
 
-  var nativeFetch = window.fetch.bind(window);
+  var nativeFetch = typeof window.fetch === "function"
+    ? window.fetch.bind(window)
+    : null;
   var draftsKey = "scm_session_drafts_v1";
   var returnUrlKey = "scm_session_return_url_v1";
   var navigationKey = "scm_session_navigation_v1";
@@ -453,21 +455,24 @@
     });
   }
 
-  window.fetch = function (input, init) {
-    return nativeFetch(input, init).then(function (response) {
-      if (isScmApiRequest(input)) {
-        var authState = String(response.headers.get("X-SCM-Auth") || "");
-        if (response.status === 401 || authState === "required") {
-          handleExpiration("expired", true);
-        } else if (authState === "csrf-expired") {
-          handleExpiration("csrf", true);
+  if (nativeFetch) {
+    window.fetch = function (input, init) {
+      return nativeFetch(input, init).then(function (response) {
+        if (isScmApiRequest(input)) {
+          var authState = String(response.headers.get("X-SCM-Auth") || "");
+          if (response.status === 401 || authState === "required") {
+            handleExpiration("expired", true);
+          } else if (authState === "csrf-expired") {
+            handleExpiration("csrf", true);
+          }
         }
-      }
-      return response;
-    });
-  };
+        return response;
+      });
+    };
+  }
 
   function heartbeat(force) {
+    if (!nativeFetch || typeof window.FormData !== "function") return;
     if (handlingExpiration || document.visibilityState !== "visible") return;
     var config = sessionConfig();
     var now = Date.now();
