@@ -2,17 +2,115 @@
   "use strict";
 
   function parseRuntime(root) {
+    if (root && root._scmRuntime && typeof root._scmRuntime === "object") {
+      return root._scmRuntime;
+    }
     var raw = root.getAttribute("data-scm-runtime") || "";
     if (!raw) {
       return null;
     }
 
     try {
-      return JSON.parse(raw);
+      var parsed = JSON.parse(raw);
+      if (root) {
+        root._scmRuntime = parsed;
+      }
+      return parsed;
     } catch (err) {
       console.error("SCM runtime parse error:", err);
       return null;
     }
+  }
+
+  function persistRuntime(root, runtime) {
+    if (!root || !runtime || typeof runtime !== "object") {
+      return runtime || null;
+    }
+    root._scmRuntime = runtime;
+    try {
+      root.setAttribute("data-scm-runtime", JSON.stringify(runtime));
+    } catch (err) {
+      console.warn("SCM runtime persist error:", err);
+    }
+    return runtime;
+  }
+
+  function pickFuncionarioOptions(data) {
+    var filterOptions = data && data.filter_options ? data.filter_options : {};
+    var cotizacionOptions =
+      data && data.cotizacion_options ? data.cotizacion_options : {};
+    if (
+      Array.isArray(filterOptions.funcionarios) &&
+      filterOptions.funcionarios.length
+    ) {
+      return filterOptions.funcionarios;
+    }
+    if (
+      Array.isArray(cotizacionOptions.funcionarios) &&
+      cotizacionOptions.funcionarios.length
+    ) {
+      return cotizacionOptions.funcionarios;
+    }
+    return [];
+  }
+
+  function hasFuncionarioOptions(runtime) {
+    return (
+      runtime &&
+      Array.isArray(runtime.funcionarios) &&
+      runtime.funcionarios.length > 0
+    );
+  }
+
+  function loadFuncionarioOptions(root) {
+    var runtime = root ? parseRuntime(root) || {} : {};
+    if (hasFuncionarioOptions(runtime)) {
+      return Promise.resolve(runtime.funcionarios);
+    }
+    if (root && root._scmFuncionarioOptionsPromise) {
+      return root._scmFuncionarioOptionsPromise;
+    }
+    var action =
+      (runtime.actions && runtime.actions.dashboard_filter_options) ||
+      "scm_dashboard_filter_options";
+    var ajaxUrl = runtime.ajaxUrl || "api.php";
+    var fd = new FormData();
+    fd.set("action", action);
+    fd.set("nonce", runtime.nonce || "");
+    if (root) {
+      root._scmFuncionarioOptionsPromise = fetch(ajaxUrl, {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      })
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (json) {
+          if (!json || !json.success || !json.data) {
+            throw new Error("No se pudieron cargar los funcionarios.");
+          }
+          var funcionarios = pickFuncionarioOptions(json.data);
+          runtime.funcionarios = funcionarios;
+          if (json.data.config && typeof json.data.config === "object") {
+            runtime.config = Object.assign(runtime.config || {}, json.data.config);
+          }
+          persistRuntime(root, runtime);
+          if (!funcionarios.length) {
+            throw new Error("No hay funcionarios activos disponibles.");
+          }
+          return funcionarios;
+        })
+        .catch(function (err) {
+          if (root) {
+            root._scmFuncionarioOptionsPromise = null;
+          }
+          throw err;
+        });
+      return root._scmFuncionarioOptionsPromise;
+    }
+    return Promise.reject(new Error("No se pudo ubicar el panel del sistema."));
   }
 
   function escHtml(value) {
@@ -100,15 +198,35 @@
       return true;
     }
 
+    function preloadFuncionariosForActivePanel() {
+      var activePanel = root.querySelector(".scm-tab-panel.active");
+      if (
+        !activePanel ||
+        activePanel.id === "scm-panel-inicio" ||
+        hasFuncionarioOptions(parseRuntime(root) || {})
+      ) {
+        return;
+      }
+      loadFuncionarioOptions(root).catch(function (err) {
+        console.warn(
+          "SCM funcionarios preload:",
+          (err && err.message) || err,
+        );
+      });
+    }
+
     root.querySelectorAll(".scm-open-topic-tab").forEach(function (tab) {
       tab.addEventListener("click", function () {
         activateOpenTopic(tab.getAttribute("data-open-target") || "");
+        preloadFuncionariosForActivePanel();
       });
     });
 
     tabs.forEach(function (tab) {
       tab.addEventListener("click", function () {
-        activateTab(tab.dataset.tab || "");
+        if (activateTab(tab.dataset.tab || "")) {
+          preloadFuncionariosForActivePanel();
+        }
       });
     });
 
@@ -129,6 +247,7 @@
     }
 
     if (initialTab && activateTab(initialTab)) {
+      preloadFuncionariosForActivePanel();
       if (runtime && typeof runtime.initialOpenTopic === "string") {
         activateOpenTopic(runtime.initialOpenTopic.trim());
       }
@@ -144,6 +263,8 @@
         }
       }
     }
+
+    preloadFuncionariosForActivePanel();
   }
 
   window.scmToggleTL = function (btn) {
@@ -1196,9 +1317,48 @@
       runtime && Array.isArray(runtime.funcionarios)
         ? runtime.funcionarios
         : [];
+    var root =
+      findRootFromNode(modal) ||
+      findRootFromNode(caseBtn) ||
+      document.querySelector("#scm-app.scm-wrap[data-scm-runtime]");
 
     if (title) title.textContent = "Trasladar caso a otro funcionario";
     setCaseSubmodalMeta(sub, caseBtn);
+
+    if (!funcionarios.length) {
+      if (body) {
+        body.innerHTML =
+          '<div class="scm-inline-loader">' +
+          '<strong>Cargando funcionarios...</strong>' +
+          '<p>Estamos consultando los funcionarios activos antes de abrir el traslado.</p>' +
+          "</div>";
+        prependCaseLocationPanel(body, caseBtn, modal);
+      }
+      sub.classList.add("open");
+      sub.setAttribute("aria-hidden", "false");
+
+      loadFuncionarioOptions(root)
+        .then(function (loadedFuncionarios) {
+          var updatedRuntime = root ? parseRuntime(root) || runtime || {} : runtime || {};
+          updatedRuntime.funcionarios = loadedFuncionarios;
+          openTrasladarCasoEditor(modal, caseBtn, updatedRuntime);
+        })
+        .catch(function (err) {
+          if (body) {
+            body.innerHTML =
+              '<p class="scm-error">No se pudieron cargar los funcionarios: ' +
+              escHtml((err && err.message) || "error") +
+              "</p>";
+            prependCaseLocationPanel(body, caseBtn, modal);
+          }
+          scmNotify(
+            "error",
+            (err && err.message) || "No se pudieron cargar los funcionarios.",
+            "Funcionarios",
+          );
+        });
+      return;
+    }
 
     var empOptions = '<option value="">Seleccionar funcionario…</option>';
     funcionarios.forEach(function (func) {
@@ -4023,6 +4183,7 @@
 
   window.SCMAdminCore = {
     parseRuntime: parseRuntime,
+    persistRuntime: persistRuntime,
     escHtml: escHtml,
     scmNotify: scmNotify,
     bindTabs: bindTabs,

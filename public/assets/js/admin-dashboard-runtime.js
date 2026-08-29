@@ -6,6 +6,7 @@
     return;
   }
   var parseRuntime = core.parseRuntime;
+  var persistRuntime = core.persistRuntime || function () {};
   var escHtml = core.escHtml;
   var scmNotify = core.scmNotify;
   var bindTabs = core.bindTabs;
@@ -7478,6 +7479,14 @@
       config.calendar_allowed_funcionarios = data.calendar_allowed_funcionarios || [];
       config.calendar_allowed_employee_ids = data.calendar_allowed_employee_ids || [];
       config.calendar_current_employee_id = data.calendar_current_employee_id || "";
+      persistRuntime(root, runtime);
+      try {
+        root.dispatchEvent(
+          new CustomEvent("scm:dashboard-filter-options-loaded", {
+            detail: data,
+          }),
+        );
+      } catch (err) {}
     }
 
     function loadDashboardFilterOptions() {
