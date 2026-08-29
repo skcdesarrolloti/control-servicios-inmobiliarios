@@ -506,14 +506,18 @@ trait RendersDashboard
     $guideJsPath = $assetBasePath . $guideJsRel;
     $damageCssPath = $assetBasePath . $damageCssRel;
     $damageJsPath  = $assetBasePath . $damageJsRel;
-    $cssVer = file_exists($cssPath) ? (string)filemtime($cssPath) : SCM_VERSION;
-    $jsVer  = file_exists($jsPath)  ? (string)filemtime($jsPath)  : SCM_VERSION;
-    $sessionGuardJsVer = file_exists($sessionGuardJsPath) ? (string)filemtime($sessionGuardJsPath) : SCM_VERSION;
-    $dashboardRuntimeJsVer = file_exists($dashboardRuntimeJsPath) ? (string)filemtime($dashboardRuntimeJsPath) : SCM_VERSION;
-    $canonInsuranceAuditJsVer = file_exists($canonInsuranceAuditJsPath) ? (string)filemtime($canonInsuranceAuditJsPath) : SCM_VERSION;
-    $guideJsVer = file_exists($guideJsPath) ? (string)filemtime($guideJsPath) : SCM_VERSION;
-    $damageCssVer = file_exists($damageCssPath) ? (string)filemtime($damageCssPath) : SCM_VERSION;
-    $damageJsVer  = file_exists($damageJsPath)  ? (string)filemtime($damageJsPath)  : SCM_VERSION;
+    $assetVersion = static function (string $path): string {
+      $baseVersion = defined('SCM_VERSION') ? (string) SCM_VERSION : '1';
+      return $baseVersion . '-' . (file_exists($path) ? (string) filemtime($path) : '0');
+    };
+    $cssVer = $assetVersion($cssPath);
+    $jsVer  = $assetVersion($jsPath);
+    $sessionGuardJsVer = $assetVersion($sessionGuardJsPath);
+    $dashboardRuntimeJsVer = $assetVersion($dashboardRuntimeJsPath);
+    $canonInsuranceAuditJsVer = $assetVersion($canonInsuranceAuditJsPath);
+    $guideJsVer = $assetVersion($guideJsPath);
+    $damageCssVer = $assetVersion($damageCssPath);
+    $damageJsVer  = $assetVersion($damageJsPath);
     $cssUrl = self::h($assetBaseUrl . $cssRel . '?v=' . rawurlencode($cssVer));
     $jsUrl  = self::h($assetBaseUrl . $jsRel  . '?v=' . rawurlencode($jsVer));
     $sessionGuardJsUrl = self::h($assetBaseUrl . $sessionGuardJsRel . '?v=' . rawurlencode($sessionGuardJsVer));
