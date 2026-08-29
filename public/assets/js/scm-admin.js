@@ -62,9 +62,37 @@
     );
   }
 
+  function filterPanelFuncionarios(runtime, rows) {
+    rows = Array.isArray(rows) ? rows : [];
+    var allowedIds =
+      runtime &&
+      runtime.config &&
+      Array.isArray(runtime.config.calendar_allowed_employee_ids)
+        ? runtime.config.calendar_allowed_employee_ids
+        : [];
+    var allowedMap = {};
+    allowedIds.forEach(function (id) {
+      var clean = String(id || "").trim();
+      if (clean) {
+        allowedMap[clean] = true;
+      }
+    });
+    if (!Object.keys(allowedMap).length) {
+      return rows;
+    }
+    return rows.filter(function (row) {
+      var id = String(
+        (row && (row.id || row.id_empleado || row.employee_id)) || "",
+      ).trim();
+      return !!allowedMap[id];
+    });
+  }
+
   function loadFuncionarioOptions(root) {
     var runtime = root ? parseRuntime(root) || {} : {};
     if (hasFuncionarioOptions(runtime)) {
+      runtime.funcionarios = filterPanelFuncionarios(runtime, runtime.funcionarios);
+      persistRuntime(root, runtime);
       return Promise.resolve(runtime.funcionarios);
     }
     if (root && root._scmFuncionarioOptionsPromise) {
@@ -91,7 +119,10 @@
           if (!json || !json.success || !json.data) {
             throw new Error("No se pudieron cargar los funcionarios.");
           }
-          var funcionarios = pickFuncionarioOptions(json.data);
+          var funcionarios = filterPanelFuncionarios(
+            runtime,
+            pickFuncionarioOptions(json.data),
+          );
           runtime.funcionarios = funcionarios;
           if (json.data.config && typeof json.data.config === "object") {
             runtime.config = Object.assign(runtime.config || {}, json.data.config);
@@ -1317,6 +1348,7 @@
       runtime && Array.isArray(runtime.funcionarios)
         ? runtime.funcionarios
         : [];
+    funcionarios = filterPanelFuncionarios(runtime || {}, funcionarios);
     var root =
       findRootFromNode(modal) ||
       findRootFromNode(caseBtn) ||

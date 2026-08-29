@@ -7441,6 +7441,25 @@
         : (Array.isArray(cotizacionOptions.funcionarios)
           ? cotizacionOptions.funcionarios
           : []);
+      var allowedEmployeeIds = (data.calendar_allowed_employee_ids || config.calendar_allowed_employee_ids || [])
+        .map(function (id) { return String(id || "").trim(); })
+        .filter(Boolean);
+      if (allowedEmployeeIds.length) {
+        var allowedEmployeeMap = {};
+        allowedEmployeeIds.forEach(function (id) {
+          allowedEmployeeMap[id] = true;
+        });
+        funcionarioOptions = funcionarioOptions.filter(function (row) {
+          var id = String((row && (row.id || row.id_empleado || row.employee_id)) || "").trim();
+          return !!allowedEmployeeMap[id];
+        });
+        if (Array.isArray(cotizacionOptions.funcionarios)) {
+          cotizacionOptions.funcionarios = cotizacionOptions.funcionarios.filter(function (row) {
+            var id = String((row && (row.id || row.id_empleado || row.employee_id)) || "").trim();
+            return !!allowedEmployeeMap[id];
+          });
+        }
+      }
       runtime.funcionarios = funcionarioOptions;
       var mappings = [
         ["select[name$='id_empleado'], select[name$='_empleado'], select[name='empleado'], [data-scm-execution-form] select[name='funcionario']", funcionarioOptions, "id", "label"],
