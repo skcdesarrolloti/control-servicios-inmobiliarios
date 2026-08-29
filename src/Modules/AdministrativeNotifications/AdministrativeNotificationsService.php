@@ -3231,6 +3231,7 @@ final class AdministrativeNotificationsService
 
     $name = trim(Auth::user());
     $cargo = trim(Auth::userRol());
+    $cargoId = trim(Auth::userCargo());
     $phone = '';
     $userId = Auth::userId();
     $funcTable = $this->db->table('jet_cct_funcionarios');
@@ -3250,13 +3251,19 @@ final class AdministrativeNotificationsService
           $row['telefono'] ?? '',
           $row['whatsapp'] ?? '',
         ]);
-        $cargoId = trim((string) ($row['id_cargo'] ?? Auth::userCargo()));
-        $cargo = trim((string) ($row['rol'] ?? $cargo)) ?: $cargo;
-        $cargoName = $this->cargoName($cargoId);
-        if ($cargoName !== '') {
-          $cargo = $cargoName;
+        $rowCargoId = trim((string) ($row['id_cargo'] ?? ''));
+        if ($rowCargoId !== '') {
+          $cargoId = $rowCargoId;
         }
+        $cargo = trim((string) ($row['rol'] ?? $cargo)) ?: $cargo;
       }
+    }
+
+    // El cargo visible debe provenir del catálogo de cargos. El campo `rol`
+    // queda únicamente como respaldo para instalaciones con datos incompletos.
+    $cargoName = $this->cargoName($cargoId);
+    if ($cargoName !== '') {
+      $cargo = $cargoName;
     }
 
     if ($name === '') {

@@ -2314,7 +2314,7 @@ trait RendersDashboard
 
       <section id="scm-portfolio-panel-principal" class="scm-portfolio-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-principal" data-scm-portfolio-panel="principal"<?php echo $activeView === 'principal' ? '' : ' hidden'; ?>>
         <div class="scm-portfolio-workflow" aria-label="Guía de acciones de cartera">
-          <article><span>1</span><div><strong>Hacer gesti&oacute;n</strong><p>Registra llamada, acuerdo o compromiso; puede programar seguimiento y enviar mensajes. No cambia la etapa de cobro.</p></div></article>
+          <article><span>1</span><div><strong>Hacer gesti&oacute;n</strong><p>Guarda la actuaci&oacute;n y el funcionario en el historial; actualiza la &uacute;ltima acci&oacute;n, el contrato y el contador del inmueble. Tambi&eacute;n puede programar seguimiento y encolar mensajes al arrendatario y codeudores, adem&aacute;s del aviso interno. No cambia la etapa ni genera cartas.</p></div></article>
           <article><span>2</span><div><strong>Preparar carta</strong><p>Abre una vista previa. Descargar o enviar la carta registra la etapa prejur&iacute;dica o de siniestro.</p></div></article>
           <article><span>3</span><div><strong>Marcar siniestro</strong><p>Solo cambia el estado del contrato y deja trazabilidad. No crea ni env&iacute;a una carta por s&iacute; solo.</p></div></article>
         </div>
@@ -2423,7 +2423,7 @@ trait RendersDashboard
                     <td>
                       <?php if ($canManage): ?>
                         <div class="scm-portfolio-actions">
-                          <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar contacto, acuerdo, compromiso o seguimiento sin cambiar la etapa">Hacer gesti&oacute;n</button>
+                          <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar la actuaci&oacute;n, actualizar la trazabilidad y, si se elige, programar seguimiento y notificar">Hacer gesti&oacute;n</button>
                           <?php if ($canCollect): ?>
                             <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="prejuridico" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="Revisar la carta antes de descargarla o enviarla">Preparar prejur&iacute;dico</button>
                             <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="siniestro" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="Revisar el aviso antes de descargarlo o enviarlo">Preparar siniestro</button>
@@ -2497,6 +2497,17 @@ trait RendersDashboard
           <input type="hidden" name="portfolio_id" value="">
           <input type="hidden" name="ids[]" value="">
           <input type="hidden" name="contract_ids[]" value="">
+          <details class="scm-portfolio-management-effects">
+            <summary>¿Qu&eacute; hace exactamente al guardar?</summary>
+            <ul>
+              <li>Crea una gesti&oacute;n con concepto, observaci&oacute;n, fecha, funcionario y cargo; queda visible en el historial.</li>
+              <li>Actualiza la &uacute;ltima acci&oacute;n de cartera, la trazabilidad del contrato, su contador de gestiones y el del inmueble.</li>
+              <li>Si programas seguimiento, guarda la pr&oacute;xima fecha, hora y detalle para la siguiente gesti&oacute;n.</li>
+              <li>Si marcas canales, encola el mensaje al arrendatario y a los codeudores elegidos.</li>
+              <li>Adem&aacute;s, encola un aviso interno por correo a los funcionarios configurados para este evento.</li>
+            </ul>
+            <p>No cambia la etapa de cobro y no genera cartas prejur&iacute;dicas ni de siniestro.</p>
+          </details>
           <div class="scm-portfolio-management-grid">
             <div class="scm-field"><label for="scm-portfolio-management-type">Tipo de gesti&oacute;n</label><select id="scm-portfolio-management-type" name="tipo_gestion_cobro" class="select select-bordered select-sm scm-select"><option value="Canon">Canon</option><option value="Administracion">Administraci&oacute;n</option><option value="Servicios publicos">Servicios p&uacute;blicos</option></select></div>
             <div class="scm-field"><label for="scm-portfolio-management-followup">Pr&oacute;xima gesti&oacute;n</label><select id="scm-portfolio-management-followup" name="volver_llamar" class="select select-bordered select-sm scm-select" data-scm-portfolio-followup><option value="No">No programar</option><option value="Si">Programar seguimiento</option></select></div>

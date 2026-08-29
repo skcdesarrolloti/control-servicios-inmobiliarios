@@ -8,17 +8,28 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $root = dirname(__DIR__);
+$options = getopt('', ['employee-id:']);
+$employeeId = max(0, (int) ($options['employee-id'] ?? 0));
+if ($employeeId <= 0) {
+  throw new RuntimeException('Indica el funcionario con --employee-id=ID para resolver su cargo desde id_cargo.');
+}
+
+require $root . '/bootstrap/app.php';
+
 $output = $root . '/output/pdf';
 if (!is_dir($output) && !mkdir($output, 0755, true) && !is_dir($output)) {
   throw new RuntimeException('No se pudo crear output/pdf.');
 }
 
-define('SCM_UPLOAD_PATH', $output);
-define('SCM_BASE_URL', 'https://ejemplo.sucasainmobiliaria.com.co');
-define('SCM_APP_SECRET', str_repeat('e', 64));
-define('SCM_UPLOAD_MAX_BYTES', 10485760);
+$_SESSION['scm_user_id'] = $employeeId;
+$_SESSION['scm_user'] = '';
+$_SESSION['scm_user_rol'] = '';
+$_SESSION['scm_user_cargo'] = '';
 
-require $root . '/vendor/autoload.php';
+$sender = (new \SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService($scmDb))->senderProfile();
+if ((string) ($sender['name'] ?? '') === 'Funcionario') {
+  throw new RuntimeException('No se encontró el funcionario indicado.');
+}
 
 $item = [
   'tenant_name' => 'ARRENDATARIO DE EJEMPLO S.A.S.',
@@ -35,12 +46,6 @@ $item = [
     ['nombre' => 'GLORIA STELLA CODEUDORA DE EJEMPLO', 'correo' => 'codeudora@example.com'],
   ],
 ];
-$sender = [
-  'name' => 'DILSA ROSA BABILONIA TEJEDOR',
-  'cargo' => 'Servicio al Arrendatario - Cartera',
-  'phone' => '313 5007154',
-];
-
 $generator = new \SCM\Modules\CollectionManagement\CollectionLetterPdfGenerator();
 $targets = [
   'prejuridico' => $output . '/ejemplo-carta-prejuridica.pdf',

@@ -132,7 +132,7 @@ final class CollectionLetterPdfGenerator
     $pdf->signatureBlock(
       'Cordialmente',
       trim((string) ($sender['name'] ?? 'SuCasa Inmobiliaria')),
-      trim((string) ($sender['cargo'] ?? 'Servicio al Arrendatario - Cartera'))
+      trim((string) ($sender['cargo'] ?? 'Control Servicios Inmobiliarios'))
         . (trim((string) ($sender['phone'] ?? '')) !== '' ? ' | Cel. ' . trim((string) $sender['phone']) : '')
     );
   }
