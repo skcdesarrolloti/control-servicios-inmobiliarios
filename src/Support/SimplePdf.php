@@ -315,7 +315,7 @@ final class SimplePdf
       $this->content = "BT /F1 1 Tf 0 0 Td () Tj ET\n";
     }
     $this->fill(100, 116, 139);
-    $this->text($this->margin, self::PAGE_H - $this->bottomMargin + 24, 'SuCasa Inmobiliaria - Cotización de mantenimiento', 7, 'F1');
+    $this->text($this->margin, self::PAGE_H - $this->bottomMargin + 24, 'SKC SuCasa Inmobiliaria - Cotización de mantenimiento', 7, 'F1');
     $pageLabel = 'Página ' . (string) (count($this->pages) + 1);
     $this->textRight($this->margin + $this->contentWidth, self::PAGE_H - $this->bottomMargin + 24, $pageLabel, 7, 'F1');
     $this->pages[] = $this->content;

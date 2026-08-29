@@ -809,6 +809,7 @@ trait HandlesMaintenanceActions
     $pdf->spacer(8);
     $pdf->signatureBlock('Coordinador contractual', $coordinador !== '' ? $coordinador : 'Control Servicios Inmobiliarios', trim(($coordinadorCargo !== '' ? $coordinadorCargo : 'Coordinador contractual') . ' | Email: ' . ($coordinadorEmail !== '' ? $coordinadorEmail : '-') . ' | Cel. ' . ($coordinadorCelular !== '' ? $coordinadorCelular : '-'), ' |'));
     $pdf->signatureBlock('Elaboró la cotización', $creador !== '' ? $creador : 'Control Servicios Inmobiliarios', trim('Email: ' . ($creadorEmail !== '' ? $creadorEmail : '-') . ' | Cel. ' . ($creadorCelular !== '' ? $creadorCelular : '-'), ' |'));
+    $pdf->signatureBlock('Empresa', 'SKC SuCasa Inmobiliaria', 'NIT 900623242-4 | Cartagena de Indias - Colombia');
 
     return $pdf;
   }
