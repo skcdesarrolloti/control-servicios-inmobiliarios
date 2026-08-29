@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
+use SCM\Support\FuncionarioOptions;
 
 trait HandlesTicketWorkflowActions
 {
@@ -48,6 +49,17 @@ trait HandlesTicketWorkflowActions
     $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if (is_string($json)) {
       @file_put_contents($directory . '/' . preg_replace('/[^a-z0-9_-]/', '', strtolower($name)) . '.json', $json, LOCK_EX);
+    }
+  }
+
+  private function clearDashboardPerformanceCache(string $name): void
+  {
+    if (!defined('SCM_STORAGE_PATH')) {
+      return;
+    }
+    $path = SCM_STORAGE_PATH . '/data/' . preg_replace('/[^a-z0-9_-]/', '', strtolower($name)) . '.json';
+    if (is_file($path)) {
+      @unlink($path);
     }
   }
 
@@ -247,6 +259,7 @@ trait HandlesTicketWorkflowActions
       'tabs' => $this->dashboardPermissionTabs(),
       'cargos' => $this->getDashboardCargoOptions(),
       'permissions' => $this->dashboardPermissionsConfig(),
+      'employee_cargo_ids' => FuncionarioOptions::panelCargoIds(),
     ]);
   }
 
@@ -265,12 +278,29 @@ trait HandlesTicketWorkflowActions
       return;
     }
     $permissions = $this->sanitizeDashboardPermissions(is_array($decoded) ? $decoded : []);
+    $rawEmployeeCargoIds = stripslashes((string) ($_POST['employee_cargo_ids'] ?? '[]'));
+    try {
+      $decodedEmployeeCargoIds = json_decode($rawEmployeeCargoIds, true, 512, JSON_THROW_ON_ERROR);
+    } catch (\JsonException $exception) {
+      $this->jsonFail('Los cargos visibles enviados no son validos.');
+      return;
+    }
+    $employeeCargoIds = $this->sanitizeDashboardFuncionarioCargoIds($decodedEmployeeCargoIds);
+
     \SCM\Core\App::settings()->set('dashboard_tab_permissions', $permissions, Auth::userId());
+    \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->refresh();
+    $this->clearDashboardPerformanceCache('dashboard-filter-options-v4');
+    $calendarFuncionarios = $this->get_calendar_allowed_funcionarios();
 
     $this->jsonOk([
-      'message' => 'Permisos de pestañas guardados.',
+      'message' => 'Permisos y funcionarios visibles guardados.',
       'permissions' => $permissions,
+      'employee_cargo_ids' => $employeeCargoIds,
+      'calendar_allowed_employee_ids' => array_values(array_filter(array_map(
+        static fn(array $row): string => trim((string) ($row['id_empleado'] ?? '')),
+        $calendarFuncionarios
+      ))),
     ]);
   }
 

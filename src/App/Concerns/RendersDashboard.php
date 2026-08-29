@@ -246,6 +246,7 @@ trait RendersDashboard
     $dashboardAllowedTabs = $this->currentDashboardAllowedTabs();
     $dashboardPermissionConfig = $this->dashboardPermissionsConfig();
     $dashboardCargoOptions = $this->getDashboardCargoOptions();
+    $dashboardFuncionarioCargoIds = FuncionarioOptions::panelCargoIds();
     $canManageDashboardPermissions = $this->canManageDashboardPermissions();
     $canManagePublicPqrSettings = $this->canManagePublicPqrSettings();
     $canManageInternalNotificationSettings = $this->canManageInternalNotificationSettings();
@@ -429,6 +430,7 @@ trait RendersDashboard
         'tabs' => $dashboardPermissionTabs,
         'cargos' => $dashboardCargoOptions,
         'permissions' => $dashboardPermissionConfig,
+        'employeeCargoIds' => $dashboardFuncionarioCargoIds,
       ],
       'session' => [
         'loginUrl' => rtrim((string) SCM_BASE_URL, '/') . '/login.php',
@@ -1159,7 +1161,7 @@ trait RendersDashboard
 
       <?php echo \SCM\Views\GuideModalView::render(); ?>
       <?php if ($canManageDashboardPermissions): ?>
-        <?php echo $this->renderDashboardPermissionsModal($dashboardPermissionTabs, $dashboardCargoOptions, $dashboardPermissionConfig); ?>
+        <?php echo $this->renderDashboardPermissionsModal($dashboardPermissionTabs, $dashboardCargoOptions, $dashboardPermissionConfig, $dashboardFuncionarioCargoIds); ?>
       <?php endif; ?>
       <?php if ($canManagePublicPqrSettings): ?>
         <div id="scm-pqr-settings-modal" data-scm-lazy-settings="public-pqr" aria-hidden="true"></div>
@@ -1378,8 +1380,8 @@ trait RendersDashboard
     return (string) ob_get_clean();
   }
 
-  /** @param array<string,string> $tabs @param array<int,array<string,string>> $cargos @param array<string,array<int,string>> $permissions */
-  private function renderDashboardPermissionsModal(array $tabs, array $cargos, array $permissions): string
+  /** @param array<string,string> $tabs @param array<int,array<string,string>> $cargos @param array<string,array<int,string>> $permissions @param array<int,string> $employeeCargoIds */
+  private function renderDashboardPermissionsModal(array $tabs, array $cargos, array $permissions, array $employeeCargoIds): string
   {
     $activityPermissionKeys = [
       'cotizaciones_mantenimiento',
@@ -1391,6 +1393,13 @@ trait RendersDashboard
     ];
     $mainPermissionTabs = array_diff_key($tabs, array_flip($activityPermissionKeys));
     $activityPermissionTabs = array_intersect_key($tabs, array_flip($activityPermissionKeys));
+    $selectedEmployeeCargoIds = [];
+    foreach ($employeeCargoIds as $cargoId) {
+      $cargoId = trim((string) $cargoId);
+      if ($cargoId !== '') {
+        $selectedEmployeeCargoIds[$cargoId] = true;
+      }
+    }
     ob_start();
 ?>
     <div class="scm-permissions-modal" id="scm-permissions-modal" aria-hidden="true">
@@ -1441,6 +1450,23 @@ trait RendersDashboard
               </section>
             <?php endforeach; ?>
           </div>
+          <section class="scm-permission-employee-cargos" aria-labelledby="scm-employee-cargos-title">
+            <div class="scm-permission-employee-cargos-head">
+              <div>
+                <h4 id="scm-employee-cargos-title">Funcionarios visibles por cargo</h4>
+                <p>Estos cargos aparecer&aacute;n en filtros de funcionario, traslados, calendario, responsables y notificaciones internas del panel.</p>
+              </div>
+              <small>No cambia permisos de acceso; solo controla qui&eacute;n aparece como funcionario operativo.</small>
+            </div>
+            <div class="scm-permission-employee-cargos-grid">
+              <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); $isSelectedCargo = isset($selectedEmployeeCargoIds[$cargoId]); ?>
+                <label class="scm-permissions-check scm-funcionario-cargo-check<?php echo $isSelectedCargo ? ' is-checked' : ''; ?>">
+                  <input type="checkbox" name="employee_cargo_ids[]" value="<?php echo esc_attr($cargoId); ?>" <?php checked($isSelectedCargo); ?>>
+                  <span><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?><?php if ($cargoTotal !== ''): ?> · <?php echo esc_html($cargoTotal); ?><?php endif; ?></span>
+                </label>
+              <?php endforeach; ?>
+            </div>
+          </section>
           <div class="scm-permissions-actions">
             <p class="scm-permissions-msg" id="scm-permissions-msg" aria-live="polite"></p>
             <button type="submit" class="scm-btn-primary btn btn-primary">Guardar permisos</button>

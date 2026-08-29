@@ -2,28 +2,66 @@
 
 namespace SCM\Support;
 
+use SCM\Core\App;
 use SCM\Core\Database;
+use SCM\Core\Settings;
 
 final class FuncionarioOptions
 {
+  public const PANEL_CARGO_IDS_SETTING_KEY = 'dashboard_funcionario_cargo_ids';
+
   /** @var string[] */
   private const DEFAULT_PANEL_CARGO_IDS = ['3', '4', '5', '7', '8', '11', '13', '14', '18'];
 
   /** @return string[] */
-  public static function panelCargoIds(): array
+  public static function defaultPanelCargoIds(): array
   {
+    return self::DEFAULT_PANEL_CARGO_IDS;
+  }
+
+  /** @param mixed $raw @return string[] */
+  public static function sanitizeCargoIds($raw): array
+  {
+    $ids = [];
+    $values = is_array($raw)
+      ? $raw
+      : (preg_split('/[,\s;|]+/', trim((string) $raw), -1, PREG_SPLIT_NO_EMPTY) ?: []);
+
+    foreach ($values as $id) {
+      $clean = trim((string) $id);
+      if ($clean !== '' && preg_match('/^\d+$/', $clean)) {
+        $ids[$clean] = $clean;
+      }
+    }
+
+    return array_values($ids);
+  }
+
+  /** @return string[] */
+  public static function panelCargoIds(?Settings $settings = null): array
+  {
+    $stored = null;
+    if ($settings instanceof Settings) {
+      $stored = $settings->get(self::PANEL_CARGO_IDS_SETTING_KEY, null);
+    } else {
+      try {
+        $stored = App::settings()->get(self::PANEL_CARGO_IDS_SETTING_KEY, null);
+      } catch (\Throwable $exception) {
+        $stored = null;
+      }
+    }
+
+    $configured = self::sanitizeCargoIds($stored);
+    if ($configured !== []) {
+      return $configured;
+    }
+
     $raw = trim((string) (getenv('SCM_PANEL_FUNCIONARIO_CARGO_IDS') ?: ''));
     if ($raw === '') {
       return self::DEFAULT_PANEL_CARGO_IDS;
     }
 
-    $ids = [];
-    foreach (preg_split('/[,\s;|]+/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $id) {
-      $clean = trim((string) $id);
-      if ($clean !== '') {
-        $ids[$clean] = $clean;
-      }
-    }
+    $ids = self::sanitizeCargoIds($raw);
 
     return $ids !== [] ? array_values($ids) : self::DEFAULT_PANEL_CARGO_IDS;
   }

@@ -4,6 +4,7 @@ namespace SCM\App;
 
 use SCM\Core\Database;
 use SCM\Core\Auth;
+use SCM\Support\FuncionarioOptions;
 
 final class SuCasaControlServiciosInmobiliarios
 {
@@ -355,6 +356,27 @@ final class SuCasaControlServiciosInmobiliarios
   {
     $raw = \SCM\Core\App::settings()->get('dashboard_tab_permissions', []);
     return $this->sanitizeDashboardPermissions(is_array($raw) ? $raw : []);
+  }
+
+  /** @param mixed $raw @return array<int,string> */
+  private function sanitizeDashboardFuncionarioCargoIds($raw): array
+  {
+    $validCargoIds = [];
+    foreach ($this->getDashboardCargoOptions() as $cargo) {
+      $id = trim((string) ($cargo['id'] ?? ''));
+      if ($id !== '') {
+        $validCargoIds[$id] = true;
+      }
+    }
+
+    $selected = [];
+    foreach (FuncionarioOptions::sanitizeCargoIds($raw) as $cargoId) {
+      if (isset($validCargoIds[$cargoId])) {
+        $selected[$cargoId] = $cargoId;
+      }
+    }
+
+    return $selected !== [] ? array_values($selected) : FuncionarioOptions::defaultPanelCargoIds();
   }
 
   /** @param array<mixed> $raw @return array<string,array<int,string>> */

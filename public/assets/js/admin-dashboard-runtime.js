@@ -4557,6 +4557,14 @@
           });
         return permissions;
       }
+      function collectEmployeeCargoIds() {
+        return Array.prototype.slice
+          .call(form.querySelectorAll('input[type="checkbox"][name="employee_cargo_ids[]"]:checked'))
+          .map(function (input) {
+            return String(input.value || "").trim();
+          })
+          .filter(Boolean);
+      }
       function setMessage(text, isError) {
         if (!msg) return;
         msg.textContent = text || "";
@@ -4636,6 +4644,7 @@
         fd.append("action", actionDashboardPermissionsSave);
         fd.append("nonce", nonce);
         fd.append("permissions", JSON.stringify(collectPermissions()));
+        fd.append("employee_cargo_ids", JSON.stringify(collectEmployeeCargoIds()));
         fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
           .then(function (r) {
             return r.json();
@@ -4644,14 +4653,24 @@
             if (!json || !json.success) {
               throw new Error(
                 (json && json.data && json.data.message) ||
-                  "No se pudieron guardar los permisos.",
+                "No se pudieron guardar los permisos.",
               );
+            }
+            if (json.data) {
+              if (Array.isArray(json.data.employee_cargo_ids)) {
+                permConfig.employeeCargoIds = json.data.employee_cargo_ids;
+                runtime.dashboardPermissions = permConfig;
+                config.calendar_allowed_cargos = json.data.employee_cargo_ids;
+              }
+              if (Array.isArray(json.data.calendar_allowed_employee_ids)) {
+                config.calendar_allowed_employee_ids = json.data.calendar_allowed_employee_ids;
+              }
             }
             setMessage(
               (json.data && json.data.message) || "Permisos guardados.",
               false,
             );
-            showToast("success", "Permisos de pestañas guardados.");
+            showToast("success", "Permisos y funcionarios visibles guardados.");
           })
           .catch(function (err) {
             setMessage(err && err.message ? err.message : "Error al guardar.", true);

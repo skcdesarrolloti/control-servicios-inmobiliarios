@@ -434,6 +434,49 @@
   gap: 9px;
 }
 
+#scm-app .scm-permission-employee-cargos {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #fed7aa;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fffaf4, #ffffff);
+}
+
+#scm-app .scm-permission-employee-cargos-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+#scm-app .scm-permission-employee-cargos-head h4 {
+  margin: 0;
+  color: #10233b;
+  font-size: 15px;
+}
+
+#scm-app .scm-permission-employee-cargos-head p,
+#scm-app .scm-permission-employee-cargos-head small {
+  margin: 5px 0 0;
+  color: #667f9b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+#scm-app .scm-permission-employee-cargos-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+#scm-app .scm-funcionario-cargo-check.is-checked {
+  border-color: rgba(249, 115, 22, 0.48);
+  background: #fff3e6;
+  color: #9a3412;
+}
+
 @media (max-width: 720px) {
   #scm-app .scm-permissions-dialog,
   #scm-app .scm-pqr-settings-dialog {
@@ -455,6 +498,7 @@
 
   #scm-app .scm-permissions-toolbar,
   #scm-app .scm-permission-card-head,
+  #scm-app .scm-permission-employee-cargos-head,
   #scm-app .scm-permissions-actions {
     align-items: stretch;
     flex-direction: column;
