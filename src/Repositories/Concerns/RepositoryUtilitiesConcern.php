@@ -342,7 +342,7 @@ trait RepositoryUtilitiesConcern
       }
 
       $activeRaw = strtolower(trim((string) ($row['activo'] ?? '')));
-      if ($activeRaw !== '' && !in_array($activeRaw, ['1', 'si', 'sí', 'true', 'activo', 'active'], true)) {
+      if ($activeRaw !== '' && !in_array($activeRaw, ['1', 'si', 'sí', 'true', 'activo', 'active', 'publish'], true)) {
         continue;
       }
 

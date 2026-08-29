@@ -586,6 +586,7 @@
       var popupAgendaRequestId = 0;
       var ticketCacheByEmployee = {};
       var holidayCache = {};
+      var calendarBootstrapPromise = null;
 
       panel.querySelectorAll("[data-scm-calendar-open-path]").forEach(function (btn) {
         btn.addEventListener("click", function () {
@@ -2300,7 +2301,7 @@
         });
       }
 
-      Promise.all([loadFuncionariosFallback(), calendarApi("listar_categorias")]).then(function (results) {
+      calendarBootstrapPromise = Promise.all([loadFuncionariosFallback(), calendarApi("listar_categorias")]).then(function (results) {
         var funcionarios = Array.isArray(results[0]) ? results[0] : [];
         categories = results[1] && results[1].success && Array.isArray(results[1].data) ? results[1].data : [];
         categoriesById = {};
@@ -2310,6 +2311,8 @@
         });
         fillEmployeeOptions(Array.prototype.slice.call(panel.querySelectorAll("[data-scm-calendar-filter-employees]")), funcionarios, "Selecciona funcionario");
         fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), calendarAdminCategories(), "Todas");
+      }).catch(function (err) {
+        showToast("error", (err && err.message) || "No se pudieron cargar los funcionarios del calendario.");
       }).finally(loadEvents);
 
       if (filterForm) {
@@ -2376,7 +2379,24 @@
       }
       panel.querySelectorAll("[data-scm-calendar-open-create]").forEach(function (btn) {
         btn.addEventListener("click", function () {
-          openCreateEventPopup(btn.getAttribute("data-calendar-mode") || "single");
+          var mode = btn.getAttribute("data-calendar-mode") || "single";
+          if (allowedEmployees.length) {
+            openCreateEventPopup(mode);
+            return;
+          }
+          withPanelLoader(
+            function () {
+              return calendarBootstrapPromise || loadFuncionariosFallback();
+            },
+            "Cargando funcionarios",
+            "Estamos consultando los funcionarios disponibles.",
+          ).then(function () {
+            if (!allowedEmployees.length) {
+              showToast("error", "No fue posible cargar funcionarios para crear el evento.");
+              return;
+            }
+            openCreateEventPopup(mode);
+          });
         });
       });
     }
@@ -7375,15 +7395,54 @@
         option.selected = current === value;
         select.appendChild(option);
       });
+      refreshSelectWidget(select);
+    }
+
+    function refreshSelectWidget(select) {
+      if (
+        !select ||
+        !(window.jQuery && window.jQuery.fn && window.jQuery.fn.select2)
+      ) {
+        return;
+      }
+      var $select = window.jQuery(select);
+      if (
+        select.classList &&
+        select.classList.contains("scm-select2") &&
+        !$select.data("select2")
+      ) {
+        $select.select2({
+          width: "100%",
+          placeholder:
+            select.getAttribute("data-placeholder") || "Buscar y seleccionar...",
+          allowClear: true,
+          language: {
+            noResults: function () {
+              return "Sin resultados";
+            },
+            searching: function () {
+              return "Buscando...";
+            },
+          },
+        });
+      }
+      if ($select.data("select2")) {
+        $select.trigger("change.select2");
+      }
     }
 
     function populateDashboardFilterOptions(data) {
       var options = data && data.filter_options ? data.filter_options : {};
-      runtime.funcionarios = Array.isArray(options.funcionarios)
+      var cotizacionOptions = data.cotizacion_options || {};
+      var funcionarioOptions = Array.isArray(options.funcionarios)
+        && options.funcionarios.length
         ? options.funcionarios
-        : [];
+        : (Array.isArray(cotizacionOptions.funcionarios)
+          ? cotizacionOptions.funcionarios
+          : []);
+      runtime.funcionarios = funcionarioOptions;
       var mappings = [
-        ["select[name$='id_empleado'], [data-scm-execution-form] select[name='funcionario']", options.funcionarios || [], "id", "label"],
+        ["select[name$='id_empleado'], [data-scm-execution-form] select[name='funcionario']", funcionarioOptions, "id", "label"],
         ["select[name$='barrio']", options.barrios || [], "value", "label"],
         ["select[name$='estado_admin']", options.estado_admin || [], "value", "label"],
         ["select[name$='prioridad']", options.prioridad || [], "value", "label"],
@@ -7396,10 +7455,11 @@
           replaceSelectOptions(select, mapping[1], mapping[2], mapping[3]);
         });
       });
-      var cotizacionOptions = data.cotizacion_options || {};
       replaceSelectOptions(
         root.querySelector("#scmqt_funcionario"),
-        cotizacionOptions.funcionarios || [],
+        Array.isArray(cotizacionOptions.funcionarios) && cotizacionOptions.funcionarios.length
+          ? cotizacionOptions.funcionarios
+          : funcionarioOptions,
         "id",
         "label",
       );
@@ -9963,7 +10023,10 @@
         return loadPanelOnce(activePanel, "cotizaciones_mantenimiento");
       }
       if (activePanel.id === "scm-panel-metricas") {
-        return loadDashboardMetrics();
+        return Promise.all([
+          loadDashboardMetrics(),
+          loadDashboardFilterOptions(),
+        ]).then(function () {});
       }
       if (activePanel.id === "scm-panel-actividades-administrativas") {
         var activeAdministrativePanel = activePanel.querySelector(

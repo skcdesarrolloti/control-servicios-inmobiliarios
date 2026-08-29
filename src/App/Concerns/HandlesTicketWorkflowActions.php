@@ -72,7 +72,17 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_dashboard_filter_options(): void
   {
     $this->verifyCsrf();
-    $payload = $this->readDashboardPerformanceCache('dashboard-filter-options-v2', 3600);
+    $cacheName = 'dashboard-filter-options-v3';
+    $payload = $this->readDashboardPerformanceCache($cacheName, 3600);
+    if (
+      is_array($payload)
+      && (
+        empty($payload['filter_options']['funcionarios'])
+        || empty($payload['cotizacion_options']['funcionarios'])
+      )
+    ) {
+      $payload = null;
+    }
     if (!is_array($payload)) {
       $module = $this->get_servicios_inmobiliarios_module();
       $calendarFuncionarios = $this->get_calendar_allowed_funcionarios();
@@ -89,7 +99,7 @@ trait HandlesTicketWorkflowActions
           $calendarFuncionarios
         ))),
       ];
-      $this->writeDashboardPerformanceCache('dashboard-filter-options-v2', $payload);
+      $this->writeDashboardPerformanceCache($cacheName, $payload);
     }
     $payload['calendar_current_employee_id'] = $this->current_employee_id();
     $this->jsonOk($payload);
