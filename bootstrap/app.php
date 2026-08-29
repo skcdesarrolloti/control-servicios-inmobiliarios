@@ -7,7 +7,7 @@ define('SCM_PUBLIC_PATH', SCM_ROOT . '/public');
 define('SCM_STORAGE_PATH', SCM_ROOT . '/storage');
 define('SCM_RESOURCES_PATH', SCM_ROOT . '/resources');
 define('SCM_BASE_PATH', SCM_PUBLIC_PATH);
-define('SCM_VERSION', '3.1.75');
+define('SCM_VERSION', '3.1.76');
 
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');
@@ -17,6 +17,18 @@ error_reporting(E_ALL);
 $logsDir = SCM_STORAGE_PATH . '/logs';
 if ((is_dir($logsDir) || @mkdir($logsDir, 0750, true)) && is_writable($logsDir)) {
   ini_set('error_log', $logsDir . '/php-error.log');
+}
+
+$runtimeDataDir = SCM_STORAGE_PATH . '/data';
+if (PHP_SAPI !== 'cli' && function_exists('opcache_reset') && (is_dir($runtimeDataDir) || @mkdir($runtimeDataDir, 0750, true))) {
+  $opcacheVersionFile = $runtimeDataDir . '/opcache-version.txt';
+  $lastOpcacheVersion = is_readable($opcacheVersionFile) ? trim((string) @file_get_contents($opcacheVersionFile)) : '';
+  if ($lastOpcacheVersion !== (string) SCM_VERSION) {
+    @opcache_reset();
+    if (is_writable($runtimeDataDir)) {
+      @file_put_contents($opcacheVersionFile, (string) SCM_VERSION, LOCK_EX);
+    }
+  }
 }
 
 set_exception_handler(static function (\Throwable $exception): never {
