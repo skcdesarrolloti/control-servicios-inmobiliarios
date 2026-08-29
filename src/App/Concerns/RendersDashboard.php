@@ -6,6 +6,7 @@ namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
 use SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService;
+use SCM\Support\FuncionarioOptions;
 
 trait RendersDashboard
 {
@@ -38,7 +39,7 @@ trait RendersDashboard
       'barrios' => [],
     ];
     $calendarAllowedFuncionarios = [];
-    $config['calendar_allowed_cargos'] = ['3', '4', '5', '7', '8', '11', '12', '14', '18'];
+    $config['calendar_allowed_cargos'] = FuncionarioOptions::panelCargoIds();
     $config['calendar_allowed_funcionarios'] = $calendarAllowedFuncionarios;
     $config['calendar_allowed_employee_ids'] = array_values(array_filter(array_map(static function ($row): string {
       return trim((string) ($row['id_empleado'] ?? ''));
@@ -1753,7 +1754,7 @@ trait RendersDashboard
       $apiUrl = self::DEFAULT_CALENDAR_API_URL;
     }
     $allowedFuncionarios = is_array($config['calendar_allowed_funcionarios'] ?? null) ? $config['calendar_allowed_funcionarios'] : [];
-    $allowedCargos = is_array($config['calendar_allowed_cargos'] ?? null) ? $config['calendar_allowed_cargos'] : ['3', '4', '5', '7', '8', '11', '12', '14', '18'];
+    $allowedCargos = is_array($config['calendar_allowed_cargos'] ?? null) ? $config['calendar_allowed_cargos'] : FuncionarioOptions::panelCargoIds();
     $currentCalendarEmployeeId = trim((string) ($config['calendar_current_employee_id'] ?? ''));
     $allowedFuncionariosJson = json_encode($allowedFuncionarios, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
     $todayLabel = date('Y-m-d');
@@ -1844,37 +1845,17 @@ trait RendersDashboard
   /** @return array<int,array<string,string>> */
   private function get_calendar_allowed_funcionarios(): array
   {
-    $allowedCargos = ['3', '4', '5', '7', '8', '11', '12', '14', '18'];
-    $table = $this->db->table('jet_cct_funcionarios');
-    if (!$this->table_exists($table) || !$this->column_exists($table, 'id_empleado') || !$this->column_exists($table, 'id_cargo')) {
-      return [];
-    }
-    $nameColumn = $this->detect_first_existing_column($table, ['nombre', 'empleado', 'nombre_funcionario']);
-    $roleColumn = $this->column_exists($table, 'rol') ? 'rol' : '';
-    $nameSelect = $nameColumn !== '' ? "TRIM(COALESCE(`{$nameColumn}`, ''))" : "TRIM(COALESCE(`id_empleado`, ''))";
-    $roleSelect = $roleColumn !== '' ? "TRIM(COALESCE(`{$roleColumn}`, ''))" : "''";
-    $placeholders = implode(',', array_fill(0, count($allowedCargos), '?'));
-    $rows = $this->db->getResults(
-      "SELECT TRIM(COALESCE(`id_empleado`, '')) AS id_empleado,
-              {$nameSelect} AS nombre,
-              {$roleSelect} AS rol,
-              TRIM(COALESCE(`id_cargo`, '')) AS id_cargo
-         FROM `{$table}`
-        WHERE TRIM(COALESCE(`id_empleado`, '')) <> ''
-          AND TRIM(COALESCE(`id_cargo`, '')) IN ({$placeholders})
-        ORDER BY {$nameSelect} ASC",
-      $allowedCargos
-    );
+    $rows = FuncionarioOptions::panelFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db));
     $out = [];
     foreach ($rows as $row) {
-      $employeeId = trim((string) ($row['id_empleado'] ?? ''));
+      $employeeId = trim((string) ($row['employee_id'] ?? $row['id'] ?? ''));
       if ($employeeId === '') {
         continue;
       }
       $out[] = [
         'id_empleado' => $employeeId,
-        'nombre' => trim((string) ($row['nombre'] ?? $employeeId)),
-        'rol' => trim((string) ($row['rol'] ?? '')),
+        'nombre' => trim((string) ($row['name'] ?? $employeeId)),
+        'rol' => trim((string) ($row['cargo'] ?? '')),
         'id_cargo' => trim((string) ($row['id_cargo'] ?? '')),
       ];
     }
@@ -2639,33 +2620,7 @@ trait RendersDashboard
   /** @return array<int,array{id:string,label:string}> */
   private function cotizaciones_funcionario_options(): array
   {
-    $table = $this->db->table('jet_cct_funcionarios');
-    if (!$this->table_exists($table) || !$this->column_exists($table, 'id_empleado')) {
-      return [];
-    }
-    $nameCol = $this->detect_first_existing_column($table, ['nombre', 'empleado', 'nombre_empleado', 'nombre_funcionario']);
-    $nameExpr = $nameCol !== '' ? "TRIM(COALESCE(`{$nameCol}`, ''))" : "''";
-    $activeFilter = $this->column_exists($table, 'activo')
-      ? " AND LOWER(TRIM(COALESCE(`activo`, 'si'))) NOT IN ('no', '0', 'false', 'inactivo')"
-      : '';
-    $rows = $this->db->getResults(
-      "SELECT TRIM(COALESCE(`id_empleado`, '')) AS id, {$nameExpr} AS nombre
-       FROM `{$table}`
-       WHERE TRIM(COALESCE(`id_empleado`, '')) <> ''{$activeFilter}
-       ORDER BY nombre ASC, id ASC
-       LIMIT 500"
-    );
-
-    $out = [];
-    foreach ($rows as $row) {
-      $id = trim((string) ($row['id'] ?? ''));
-      if ($id === '') {
-        continue;
-      }
-      $name = trim((string) ($row['nombre'] ?? ''));
-      $out[] = ['id' => $id, 'label' => ($name !== '' ? $name : 'Funcionario') . ' (' . $id . ')'];
-    }
-    return $out;
+    return \SCM\Support\FuncionarioOptions::panelFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db));
   }
 
   /** @return array<int,string> */

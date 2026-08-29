@@ -32,53 +32,7 @@ final class PendingRepository
   /** @return array<int,array{id:string,label:string}> */
   public function getFuncionarios(): array
   {
-    $table = $this->db->table('jet_cct_funcionarios');
-    if (!$this->schema()->tableExists($table)) {
-      return [];
-    }
-
-    $idColumn = $this->schema()->detectFirstExistingColumn($table, ['id_empleado', '_ID']);
-    if ($idColumn === '') {
-      return [];
-    }
-    $nameColumn = $this->schema()->detectFirstExistingColumn($table, ['nombre', 'empleado', 'nombre_empleado', 'nombre_funcionario']);
-    $activeColumn = $this->schema()->detectFirstExistingColumn($table, ['activo', 'cct_status']);
-
-    $select = [
-      "TRIM(CAST(COALESCE(`{$idColumn}`, '') AS CHAR)) AS id",
-      $nameColumn !== ''
-        ? "TRIM(COALESCE(`{$nameColumn}`, CAST(`{$idColumn}` AS CHAR), '')) AS nombre"
-        : "TRIM(CAST(COALESCE(`{$idColumn}`, '') AS CHAR)) AS nombre",
-      $activeColumn !== ''
-        ? "LOWER(TRIM(COALESCE(`{$activeColumn}`, 'si'))) AS activo"
-        : "'si' AS activo",
-    ];
-    $rows = $this->db->getResults(
-      'SELECT ' . implode(', ', $select)
-      . " FROM `{$table}` WHERE TRIM(CAST(COALESCE(`{$idColumn}`, '') AS CHAR)) <> '' ORDER BY nombre ASC"
-    );
-
-    $out = [];
-    $seen = [];
-    foreach ($rows as $row) {
-      $id = trim((string)($row['id'] ?? ''));
-      if ($id === '') {
-        continue;
-      }
-      $activo = trim((string)($row['activo'] ?? ''));
-      if ($activo !== '' && !in_array($activo, ['si', 'sí', '1', 'true', 'activo', 'active', 'publish'], true)) {
-        continue;
-      }
-      $seenKey = strtolower($id);
-      if (isset($seen[$seenKey])) {
-        continue;
-      }
-      $seen[$seenKey] = true;
-      $nombre = trim((string)($row['nombre'] ?? ''));
-      $out[] = ['id' => $id, 'label' => ($nombre !== '' ? $nombre : $id) . ' (' . $id . ')'];
-    }
-
-    return $out;
+    return \SCM\Support\FuncionarioOptions::panelFuncionarios($this->db, $this->schema());
   }
 
   /** @return array<string,mixed>|null */

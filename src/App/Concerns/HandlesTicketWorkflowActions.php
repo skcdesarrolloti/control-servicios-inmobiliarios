@@ -72,7 +72,7 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_dashboard_filter_options(): void
   {
     $this->verifyCsrf();
-    $cacheName = 'dashboard-filter-options-v3';
+    $cacheName = 'dashboard-filter-options-v4';
     $payload = $this->readDashboardPerformanceCache($cacheName, 3600);
     if (
       is_array($payload)

@@ -52,39 +52,7 @@ trait GenericFiltersAndHistoryConcern
       }
     }
 
-    $funcionarios = [];
-    $funcionariosTable = $this->db->table('jet_cct_funcionarios');
-    if ($this->table_exists($funcionariosTable) && $this->column_exists($funcionariosTable, 'id_empleado')) {
-      $nameCol = $this->detect_first_existing_column($funcionariosTable, ['nombre', 'empleado', 'nombre_empleado']);
-      $nameExpr = $nameCol !== ''
-        ? "TRIM(COALESCE(`{$nameCol}`, `id_empleado`, 'Sin nombre'))"
-        : "TRIM(COALESCE(`id_empleado`, 'Sin nombre'))";
-
-      $activeFilter = $this->column_exists($funcionariosTable, 'activo')
-        ? " AND LOWER(TRIM(COALESCE(`activo`, 'si'))) <> 'no'"
-        : '';
-
-      $sql = "
-        SELECT DISTINCT
-          TRIM(COALESCE(`id_empleado`, '')) AS id,
-          {$nameExpr} AS label
-        FROM `{$funcionariosTable}`
-        WHERE TRIM(COALESCE(`id_empleado`, '')) <> ''{$activeFilter}
-        ORDER BY label ASC
-      ";
-      $rows = $this->db->getResults($sql, []);
-      foreach ($rows as $row) {
-        $fid = trim((string) ($row['id'] ?? ''));
-        if ($fid === '') {
-          continue;
-        }
-        $label = trim((string) ($row['label'] ?? ''));
-        if ($label === '') {
-          $label = $fid;
-        }
-        $funcionarios[] = ['id' => $fid, 'label' => $label . ' (' . $fid . ')'];
-      }
-    }
+    $funcionarios = \SCM\Support\FuncionarioOptions::panelFuncionarios($this->db);
 
     $out = ['estado_admin' => $estadoAdmin, 'cotizacion_estado' => $this->get_cotizacion_estado_options(), 'funcionarios' => $funcionarios, 'barrios' => $this->get_barrios_filter_options()];
     $this->genericFilterOptionsCache[$cacheKey] = $out;

@@ -128,39 +128,19 @@ trait RendersPublicPqr
   /** @return array<int,array{id:string,label:string}> */
   private function get_public_pqr_corresponsable_candidates(): array
   {
-    $funcTable = $this->db->table('jet_cct_funcionarios');
-    if (!$this->table_exists($funcTable) || !$this->column_exists($funcTable, 'id_empleado')) {
-      return [];
-    }
-
-    $nameCol = $this->column_exists($funcTable, 'nombre') ? 'nombre' : ($this->column_exists($funcTable, 'empleado') ? 'empleado' : 'id_empleado');
-    $activeFilter = $this->column_exists($funcTable, 'activo')
-      ? " AND LOWER(TRIM(COALESCE(`activo`, 'si'))) <> 'no'"
-      : '';
-
-    $sql = "SELECT
-              TRIM(COALESCE(`id_empleado`, '')) AS id,
-              TRIM(COALESCE(`{$nameCol}`, `id_empleado`, 'Sin nombre')) AS nombre,
-              TRIM(COALESCE(`id_cargo`, '')) AS id_cargo
-            FROM `{$funcTable}`
-            WHERE TRIM(COALESCE(`id_empleado`, '')) <> ''
-              {$activeFilter}
-            ORDER BY nombre ASC";
-
-    $rows = $this->db->getResults($sql, []);
     $out = [];
+    $rows = \SCM\Support\FuncionarioOptions::panelFuncionarios(
+      $this->db,
+      new \SCM\Support\SchemaInspector($this->db)
+    );
     foreach ($rows as $row) {
       $id = trim((string) ($row['id'] ?? ''));
       if ($id === '') {
         continue;
       }
-      $nombre = trim((string) ($row['nombre'] ?? ''));
-      if ($nombre === '') {
-        $nombre = $id;
-      }
       $out[] = [
         'id' => $id,
-        'label' => $nombre . ' (' . $id . ')',
+        'label' => trim((string) ($row['label'] ?? $id)),
       ];
     }
     return $out;

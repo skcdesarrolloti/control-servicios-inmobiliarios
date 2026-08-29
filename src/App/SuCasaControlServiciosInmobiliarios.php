@@ -300,48 +300,21 @@ final class SuCasaControlServiciosInmobiliarios
   /** @return array<int,array{id:string,label:string,name:string,email:string,cargo:string}> */
   private function internalNotificationFuncionarioOptions(): array
   {
-    $table = $this->db->table('jet_cct_funcionarios');
-    if (!$this->table_exists($table)) {
-      return [];
-    }
-
-    $cargoTable = $this->db->table('jet_cct_cargos');
-    $hasCargoNames = $this->table_exists($cargoTable)
-      && $this->column_exists($cargoTable, '_ID')
-      && $this->column_exists($cargoTable, 'nombre_cargo')
-      && $this->column_exists($table, 'id_cargo');
-
-    $nameColumn = $this->column_exists($table, 'nombre') ? 'nombre' : ($this->column_exists($table, 'empleado') ? 'empleado' : '');
-    $emailColumn = $this->column_exists($table, 'correo') ? 'correo' : ($this->column_exists($table, 'correo_dian') ? 'correo_dian' : '');
-    $employeeColumn = $this->column_exists($table, 'id_empleado') ? 'id_empleado' : '';
-    $cargoColumn = $this->column_exists($table, 'id_cargo') ? 'id_cargo' : '';
-    $activeWhere = $this->column_exists($table, 'activo') ? " AND LOWER(TRIM(COALESCE(f.`activo`, ''))) IN ('si', 'sí', '1', 'true', 'activo')" : '';
-
-    $select = [
-      'f.`_ID`',
-      $nameColumn !== '' ? "TRIM(COALESCE(f.`{$nameColumn}`, '')) AS nombre" : "CAST(f.`_ID` AS CHAR) AS nombre",
-      $emailColumn !== '' ? "TRIM(COALESCE(f.`{$emailColumn}`, '')) AS correo" : "'' AS correo",
-      $employeeColumn !== '' ? "TRIM(COALESCE(f.`{$employeeColumn}`, '')) AS id_empleado" : "'' AS id_empleado",
-      $cargoColumn !== '' ? "TRIM(COALESCE(f.`{$cargoColumn}`, '')) AS id_cargo" : "'' AS id_cargo",
-      $hasCargoNames ? "TRIM(COALESCE(c.`nombre_cargo`, '')) AS nombre_cargo" : "'' AS nombre_cargo",
-    ];
-    $join = $hasCargoNames ? " LEFT JOIN `{$cargoTable}` c ON TRIM(COALESCE(f.`{$cargoColumn}`, '')) = CAST(c.`_ID` AS CHAR)" : '';
-    $rows = $this->db->getResults(
-      'SELECT ' . implode(', ', $select) . " FROM `{$table}` f{$join} WHERE TRIM(COALESCE(f.`_ID`, '')) <> ''{$activeWhere} ORDER BY nombre ASC"
-    );
-
     $out = [];
+    $rows = \SCM\Support\FuncionarioOptions::panelFuncionarios(
+      $this->db,
+      new \SCM\Support\SchemaInspector($this->db),
+      'primary'
+    );
     foreach ($rows as $row) {
-      $id = (string) ((int) ($row['_ID'] ?? 0));
+      $id = (string) ((int) ($row['id'] ?? 0));
       if ($id === '0') {
         continue;
       }
-      $name = trim((string) ($row['nombre'] ?? ''));
-      $email = trim((string) ($row['correo'] ?? ''));
-      $cargoName = trim((string) ($row['nombre_cargo'] ?? ''));
-      $cargoId = trim((string) ($row['id_cargo'] ?? ''));
-      $cargo = $cargoName !== '' ? $cargoName : ($cargoId !== '' ? 'Cargo ' . $cargoId : 'Funcionario');
-      $employee = trim((string) ($row['id_empleado'] ?? ''));
+      $name = trim((string) ($row['name'] ?? ''));
+      $email = trim((string) ($row['email'] ?? ''));
+      $cargo = trim((string) ($row['cargo'] ?? ''));
+      $employee = trim((string) ($row['employee_id'] ?? ''));
       $parts = [$name !== '' ? $name : ('Funcionario #' . $id), $cargo];
       if ($email !== '') {
         $parts[] = $email;
