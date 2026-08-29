@@ -353,8 +353,9 @@
   function createExpirationModal(reason) {
     var existing = document.getElementById("scm-session-expired");
     if (existing) return existing;
-    var savedDraftCount = preserveDrafts();
-    rememberNavigation();
+    var savedDraftCount = 0;
+    try { savedDraftCount = preserveDrafts(); } catch (_error) {}
+    try { rememberNavigation(); } catch (_error) {}
 
     var overlay = document.createElement("div");
     overlay.id = "scm-session-expired";
@@ -395,8 +396,11 @@
       }
     });
     Array.prototype.forEach.call(document.body.children, function (child) {
-      if (child !== overlay && child instanceof HTMLElement) {
-        child.inert = true;
+      try {
+        if (child !== overlay && typeof HTMLElement !== "undefined" && child instanceof HTMLElement) {
+          child.inert = true;
+        }
+      } catch (_error) {
       }
     });
     overlay.addEventListener("keydown", function (event) {
@@ -442,9 +446,11 @@
       if (node) node.textContent = String(Math.max(0, remaining));
     }, 1000);
     redirectTimer = window.setTimeout(redirectToLogin, autoRedirectSeconds * 1000);
-    document.dispatchEvent(
-      new CustomEvent("scm:session-expired", { detail: { reason: reason || "expired" } }),
-    );
+    try {
+      document.dispatchEvent(
+        new CustomEvent("scm:session-expired", { detail: { reason: reason || "expired" } }),
+      );
+    } catch (_error) {}
   }
 
   if (broadcast) {
@@ -538,20 +544,22 @@
     restoreDrafts();
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", restoreAfterLogin, { once: true });
-  } else {
-    restoreAfterLogin();
-  }
-
-  window.addEventListener("pagehide", function () {
-    window.clearInterval(heartbeatInterval);
-    if (broadcast) broadcast.close();
-  });
-
   window.SCMSessionGuard = {
     expire: function (reason) { handleExpiration(reason || "expired", true); },
     heartbeat: function () { heartbeat(true); },
     preserveDrafts: preserveDrafts,
   };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      try { restoreAfterLogin(); } catch (_error) {}
+    }, { once: true });
+  } else {
+    try { restoreAfterLogin(); } catch (_error) {}
+  }
+
+  window.addEventListener("pagehide", function () {
+    try { window.clearInterval(heartbeatInterval); } catch (_error) {}
+    try { if (broadcast) broadcast.close(); } catch (_error) {}
+  });
 })();
