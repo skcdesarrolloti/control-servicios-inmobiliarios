@@ -2775,7 +2775,8 @@ trait RendersDashboard
     $totalOtros = $this->format_cop_currency($this->cotizacion_money_value($row, ['total_otros_costos']));
     $totalCotizacion = $this->format_cop_currency($this->cotizacion_money_value($row, ['total']));
     $ordenesTotal = (string) ($row['ordenes_total'] ?? count($orders));
-    $nativeCotizacionHtml = $this->render_native_cotizacion_mantenimiento_view($row, $orders);
+    $nativeCotizacionFuncionarioHtml = $this->render_native_cotizacion_mantenimiento_view($row, $orders, 'funcionario');
+    $nativeCotizacionDestinatarioHtml = $this->render_native_cotizacion_mantenimiento_view($row, $orders, 'destinatario');
     $cotizacionSinResponder = in_array(strtolower($estado), ['', 'esperando respuesta'], true);
     $caseDescription = 'Cotizacion de mantenimiento #' . ($id !== '' ? $id : '-') . ($ticket !== '' ? ' relacionada con el ticket #' . $ticket . '.' : '.');
     if ($direccion !== '' && $direccion !== '-') {
@@ -2841,7 +2842,10 @@ trait RendersDashboard
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($noteUrl) . '" data-iframe-title="A&ntilde;adir nota a cotizaci&oacute;n">A&ntilde;adir nota</button>'
       . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($orderUrl) . '" data-iframe-title="A&ntilde;adir orden de mantenimiento">A&ntilde;adir orden</button>' : '')
       . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($actaUrl) . '" data-iframe-title="A&ntilde;adir acta de satisfacci&oacute;n">A&ntilde;adir acta</button>' : '')
-      . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div>' . $orderDetailsHtml . '<template class="scm-cotizacion-native-source">' . $nativeCotizacionHtml . '</template>' . $linkedTicketSource . '<div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div></article>';
+      . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div>' . $orderDetailsHtml
+      . '<template class="scm-cotizacion-native-source" data-scm-cotizacion-native-audience="funcionario">' . $nativeCotizacionFuncionarioHtml . '</template>'
+      . '<template class="scm-cotizacion-native-source" data-scm-cotizacion-native-audience="destinatario">' . $nativeCotizacionDestinatarioHtml . '</template>'
+      . $linkedTicketSource . '<div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div></article>';
   }
 
   /** @param array<string,mixed> $order */
@@ -3001,8 +3005,10 @@ trait RendersDashboard
   }
 
   /** @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders */
-  private function render_native_cotizacion_mantenimiento_view(array $row, array $orders): string
+  private function render_native_cotizacion_mantenimiento_view(array $row, array $orders, string $audience = 'funcionario'): string
   {
+    $audience = strtolower(trim($audience)) === 'destinatario' ? 'destinatario' : 'funcionario';
+    $isFuncionario = $audience === 'funcionario';
     $id = trim((string) ($row['_ID'] ?? ''));
     $tipo = trim((string) ($row['tipo_mantenimiento'] ?? 'Mantenimiento'));
     $ticket = trim((string) ($row['id_ticket'] ?? ''));
@@ -3030,7 +3036,8 @@ trait RendersDashboard
     $creadorEmail = $this->cotizacion_clean_text($row['email_creador'] ?? '');
     $creadorCelular = $this->cotizacion_clean_text($row['celular_creador'] ?? '');
 
-    $html = '<article class="scm-cotizacion-native-doc" data-cotizacion-print-title="Cotización #' . esc_attr($id) . '">';
+    $html = '<article class="scm-cotizacion-native-doc is-audience-' . esc_attr($audience) . '" data-cotizacion-audience="' . esc_attr($audience) . '" data-cotizacion-print-title="Cotización #' . esc_attr($id) . '">';
+    $html .= '<div class="scm-cotizacion-native-audience"><span>' . esc_html($isFuncionario ? 'Vista interna' : 'Copia para destinatario') . '</span><strong>' . esc_html($isFuncionario ? 'Documento completo para funcionario' : 'Documento comercial para compartir') . '</strong></div>';
     $html .= '<header class="scm-cotizacion-native-hero">';
     $html .= '<div class="scm-cotizacion-native-brand"><div class="scm-cotizacion-native-logo"><img src="' . esc_attr($logo) . '" alt="SuCasa Inmobiliaria"><strong>SuCasa Inmobiliaria</strong><span>Control Servicios Inmobiliarios</span></div><div class="scm-cotizacion-native-number"><span>Cotización de mantenimiento</span><strong>#' . esc_html($id !== '' ? $id : '-') . '</strong></div></div>';
     $html .= '<div class="scm-cotizacion-native-hero-bottom"><div><p class="scm-cotizacion-native-eyebrow">Documento comercial</p><h2>Cotización de mantenimiento para revisión ' . esc_html($tipo !== '' ? strtolower($this->cotizacion_clean_text($tipo)) : 'de mantenimiento') . '</h2></div><div class="scm-cotizacion-native-state"><span class="' . ($enviada ? 'is-sent' : 'is-pending') . '">' . esc_html($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><strong>' . esc_html($estado !== '' ? $this->cotizacion_clean_text($estado) : 'Sin estado') . '</strong><em>Total ' . esc_html($totalCotizacion) . '</em></div></div>';
@@ -3060,11 +3067,11 @@ trait RendersDashboard
     $html .= '<div><h4>Otras ofertas</h4>' . $this->render_cotizacion_media_grid($otrasOfertas, 'No se presentó ninguna otra oferta.') . '</div>';
     $html .= '</div></section>';
 
-    $html .= '<section class="scm-cotizacion-native-section"><h3>Daños encontrados</h3>';
+    $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-damage-report"><div class="scm-cotizacion-native-section-title"><div><span>Informe t&eacute;cnico</span><h3>Da&ntilde;os encontrados</h3></div><strong>' . esc_html((string) count($danos)) . ' ' . (count($danos) === 1 ? 'hallazgo' : 'hallazgos') . '</strong></div>';
     if (empty($danos)) {
       $html .= '<p class="scm-cotizacion-native-empty">Sin daños registrados.</p>';
     }
-    foreach ($danos as $damage) {
+    foreach ($danos as $damageIndex => $damage) {
       $damageMedia = $this->cotizacion_media_items($this->cotizacion_split_ids($damage['registro_foto_dano'] ?? ''));
       $areas = array_filter([
         trim((string) ($damage['area_afectada_1'] ?? '')),
@@ -3073,6 +3080,7 @@ trait RendersDashboard
         trim((string) ($damage['area_afectada_4'] ?? '')),
       ]);
       $html .= '<article class="scm-cotizacion-damage-card">';
+      $html .= '<div class="scm-cotizacion-damage-title"><div><span>Hallazgo</span><strong>#' . esc_html((string) ($damageIndex + 1)) . '</strong></div><p>' . esc_html($this->cotizacion_clean_text($damage['area_afectada_1'] ?? 'Da&ntilde;o evaluado')) . '</p></div>';
       $html .= '<div class="scm-cotizacion-damage-head"><div><span>Índice</span><strong>' . esc_html($this->cotizacion_clean_text($damage['indice'] ?? '-')) . '</strong></div><div><span>Corresponde a</span><strong>' . esc_html($this->cotizacion_clean_text($damage['a_quien_corresponde'] ?? '-')) . '</strong></div><div><span>Nivel</span><strong>' . esc_html($this->cotizacion_clean_text($damage['nivel_dano'] ?? '-')) . '</strong></div><div><span>Tiempo de atención</span><strong>' . esc_html($this->cotizacion_clean_text($damage['tiempo_atencion'] ?? '-')) . '</strong></div></div>';
       $html .= '<div class="scm-cotizacion-native-tags">' . (empty($areas) ? '<span>-</span>' : implode('', array_map(fn($area): string => '<span>' . esc_html($this->cotizacion_clean_text($area)) . '</span>', $areas))) . '</div>';
       $html .= '<div class="scm-cotizacion-native-rich"><h4>Descripción del daño</h4>' . $this->cotizacion_rich_text($damage['descripcion_dano'] ?? '') . '<h4>Consecuencia</h4>' . $this->cotizacion_rich_text($damage['consecuencia'] ?? '') . '</div>';
@@ -3087,18 +3095,28 @@ trait RendersDashboard
     $html .= $this->render_cotizacion_budget_rows('Equipos / maquinarias', $equipos, ['total_maquinarias'], $row);
     $html .= $this->render_cotizacion_budget_rows('Otros costos', $otros, ['total_otros_costos'], $row);
     $html .= '<div class="scm-cotizacion-native-total-box">';
+    $administrationLabel = $isFuncionario
+      ? 'Administración ' . esc_html((string) ($row['porcentaje_admon'] ?? '0')) . '%'
+      : 'Administración';
+    $ivaLabel = $isFuncionario
+      ? 'IVA ' . esc_html((string) ($row['iva'] ?? '0')) . '%'
+      : 'IVA sobre administración';
     foreach ([
       'Subtotal materiales' => $row['total_materiales'] ?? 0,
       'Mano de obra' => $row['total_mano_obra'] ?? 0,
       'Equipos' => $row['total_maquinarias'] ?? 0,
       'Otros costos' => $row['total_otros_costos'] ?? 0,
-      'Administración ' . esc_html((string) ($row['porcentaje_admon'] ?? '0')) . '%' => $row['total_admon'] ?? 0,
-      'IVA ' . esc_html((string) ($row['iva'] ?? '0')) . '%' => $row['iva_admon'] ?? 0,
+      $administrationLabel => $row['total_admon'] ?? 0,
+      $ivaLabel => $row['iva_admon'] ?? 0,
     ] as $label => $value) {
       $html .= '<div><span>' . $label . '</span><strong>' . esc_html($this->format_cop_currency($value)) . '</strong></div>';
     }
     $html .= '<div class="is-grand-total"><span>Total cotización</span><strong>' . esc_html($totalCotizacion) . '</strong></div>';
     $html .= '</div></section>';
+
+    $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-balances"><div class="scm-cotizacion-native-section-title"><div><span>Control financiero</span><h3>Saldos de la cotizaci&oacute;n</h3></div></div>';
+    $html .= $this->render_cotizacion_balance_table($row);
+    $html .= '</section>';
 
     $html .= '<section class="scm-cotizacion-native-section"><h3>Observaciones y perturbación</h3>';
     if (trim((string) ($row['observaciones'] ?? '')) !== '') {
@@ -3306,6 +3324,29 @@ trait RendersDashboard
     }
     $html .= '<div class="scm-cotizacion-budget-subtotal"><span>Total ' . esc_html(strtolower($title)) . '</span><strong>' . esc_html($this->format_cop_currency($this->cotizacion_money_value($row, $totalKeys))) . '</strong></div>';
     return $html . '</div>';
+  }
+
+  /** @param array<string,mixed> $row */
+  private function render_cotizacion_balance_table(array $row): string
+  {
+    $rows = [
+      ['Materiales', ['total_materiales'], ['saldo_materiales']],
+      ['Mano de obra', ['total_mano_obra'], ['saldo_obra']],
+      ['Equipos / maquinarias', ['total_maquinarias'], ['saldo_maquinarias']],
+      ['Otros costos', ['total_otros_costos'], ['saldo_otros_costo']],
+    ];
+    $html = '<div class="scm-cotizacion-table-wrap"><table class="scm-cotizacion-balance-table"><thead><tr><th>Categor&iacute;a</th><th>Presupuesto</th><th>Saldo disponible</th></tr></thead><tbody>';
+    $budgetTotal = 0.0;
+    $balanceTotal = 0.0;
+    foreach ($rows as [$label, $budgetKeys, $balanceKeys]) {
+      $budget = $this->cotizacion_money_value($row, $budgetKeys);
+      $balance = $this->cotizacion_money_value($row, $balanceKeys);
+      $budgetTotal += $budget;
+      $balanceTotal += $balance;
+      $html .= '<tr><th scope="row">' . esc_html($label) . '</th><td>' . esc_html($this->format_cop_currency($budget)) . '</td><td>' . esc_html($this->format_cop_currency($balance)) . '</td></tr>';
+    }
+    $html .= '</tbody><tfoot><tr class="is-total"><th scope="row">Total</th><td>' . esc_html($this->format_cop_currency($budgetTotal)) . '</td><td>' . esc_html($this->format_cop_currency($balanceTotal)) . '</td></tr></tfoot>';
+    return $html . '</table></div>';
   }
 
   /** @param array<string,mixed> $item @param array<int,string> $needles */

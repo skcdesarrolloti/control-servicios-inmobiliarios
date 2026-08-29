@@ -9325,7 +9325,7 @@
         "<title>" + safeTitle + "</title>" +
         '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">' +
         "<style>" +
-        "@page{size:A4;margin:10mm}*{box-sizing:border-box}body{margin:0;background:#fff;color:#0b1f3a;font-family:Poppins,Arial,sans-serif;font-size:11px;line-height:1.45}.scm-cotizacion-native-doc{max-width:980px;margin:0 auto;background:#fff}.scm-cotizacion-native-hero{border-radius:18px;padding:22px 24px;margin-bottom:16px;color:#fff;background:linear-gradient(135deg,#0b1f3a 0%,#1f4f99 68%,#f28c00 170%)}.scm-cotizacion-native-brand{display:flex;align-items:center;justify-content:space-between;gap:18px}.scm-cotizacion-native-brand img{max-width:190px;max-height:58px;object-fit:contain;background:#fff;border-radius:14px;padding:8px}.scm-cotizacion-native-brand span,.scm-cotizacion-native-state span{display:block;text-transform:uppercase;letter-spacing:.08em;font-size:9px;font-weight:800;opacity:.82}.scm-cotizacion-native-brand strong{display:block;font-size:28px;line-height:1.05}.scm-cotizacion-native-state{text-align:right}.scm-cotizacion-native-state strong{display:inline-block;margin-top:7px;padding:7px 11px;border-radius:999px;background:#fff;color:#0b1f3a}.scm-cotizacion-native-state .is-pending{color:#fed7aa}.scm-cotizacion-native-state .is-sent{color:#bfdbfe}.scm-cotizacion-native-hero h2{margin:20px 0 0;font-size:21px;line-height:1.2}.scm-cotizacion-native-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.scm-cotizacion-native-grid>div,.scm-cotizacion-native-section,.scm-cotizacion-damage-card{border:1px solid #d9e4f2;border-radius:14px;background:#f8fafc;padding:12px}.scm-cotizacion-native-grid span,.scm-cotizacion-damage-head span{display:block;text-transform:uppercase;letter-spacing:.07em;color:#64748b;font-size:8.5px;font-weight:800}.scm-cotizacion-native-grid strong,.scm-cotizacion-damage-head strong{display:block;margin-top:3px;color:#0b1f3a;font-weight:800}.scm-cotizacion-native-section{margin-top:12px;background:#fff}.scm-cotizacion-native-section h3{margin:0 0 10px;color:#0b1f3a;font-size:14px}.scm-cotizacion-native-section h4{margin:8px 0 6px;color:#1f4f99;font-size:11px}.scm-cotizacion-native-two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}.scm-cotizacion-media-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.scm-cotizacion-media-item{display:block;border:1px solid #d9e4f2;border-radius:12px;padding:8px;text-decoration:none;color:#0b1f3a;background:#f8fafc}.scm-cotizacion-media-item img{width:100%;height:115px;object-fit:cover;border-radius:9px;border:1px solid #e2e8f0}.scm-cotizacion-media-item strong{display:block;margin-top:6px;font-size:9px}.scm-cotizacion-damage-head{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.scm-cotizacion-native-tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.scm-cotizacion-native-tags span{border:1px solid #fed7aa;border-radius:999px;background:#fff7ed;color:#c2410c;padding:4px 8px;font-size:9px;font-weight:800}.scm-cotizacion-native-rich p{margin:0 0 8px}.scm-cotizacion-budget-block{margin-top:10px}.scm-cotizacion-budget-table{width:100%;border-collapse:collapse;border-radius:12px;overflow:hidden}.scm-cotizacion-budget-table th,.scm-cotizacion-budget-table td{padding:8px;border-bottom:1px solid #e2e8f0;text-align:left}.scm-cotizacion-budget-table th{background:#0b1f3a;color:#fff;font-size:9px;text-transform:uppercase;letter-spacing:.06em}.scm-cotizacion-budget-table td:last-child{text-align:right;font-weight:800}.scm-cotizacion-budget-subtotal,.scm-cotizacion-native-total-box>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-bottom:1px solid #e2e8f0}.scm-cotizacion-native-total-box{margin-top:12px;border:1px solid #fed7aa;border-radius:14px;overflow:hidden;background:#fff7ed}.scm-cotizacion-native-total-box .is-grand-total{background:#0b1f3a;color:#fff}.scm-cotizacion-native-total-box .is-grand-total strong{font-size:16px;color:#fff}.scm-cotizacion-native-note{border-left:4px solid #f28c00;padding:10px 12px;background:#fff7ed;border-radius:10px}.scm-cotizacion-native-criteria{margin:8px 0 0;padding-left:20px}.scm-cotizacion-native-empty{margin:0;color:#64748b;font-weight:600}.scm-cotizacion-native-legal{background:#fff7ed;border-color:#fed7aa}.scm-cotizacion-native-footer{display:flex;justify-content:space-between;gap:18px;margin-top:14px;padding:16px;border-radius:16px;background:#0b1f3a;color:#fff}.scm-cotizacion-native-footer span{display:block;color:#fed7aa;text-transform:uppercase;letter-spacing:.08em;font-size:9px;font-weight:800}.scm-cotizacion-native-footer p{margin:4px 0 0;color:#dbeafe}.scm-cotizacion-native-logo{display:grid;grid-template-columns:auto 1fr;align-items:center;column-gap:12px;min-width:330px;padding:10px 14px;border-radius:15px;background:#fff;color:#061d49}.scm-cotizacion-native-logo img{grid-row:span 2;width:72px!important;max-width:72px!important;max-height:50px!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important}.scm-cotizacion-native-logo strong{color:#061d49;font-size:18px;font-weight:900}.scm-cotizacion-native-logo span{color:#64748b}.scm-cotizacion-native-number{text-align:right}.scm-cotizacion-native-number strong{color:#fff;font-size:36px;font-weight:900}.scm-cotizacion-native-hero-bottom{display:flex;align-items:end;justify-content:space-between;gap:16px}.scm-cotizacion-native-eyebrow{margin:0 0 6px;color:rgba(255,255,255,.78);font-size:9px;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.scm-cotizacion-native-state em{display:block;margin-top:8px;color:#fff;font-style:normal;font-weight:900}.scm-cotizacion-native-summary{grid-template-columns:repeat(4,minmax(0,1fr))}.scm-cotizacion-native-footer{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.scm-cotizacion-native-footer>div{padding:10px;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:rgba(255,255,255,.07)}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.scm-cotizacion-native-section,.scm-cotizacion-damage-card,.scm-cotizacion-budget-block{break-inside:avoid}.scm-cotizacion-media-item img{height:95px}}@media(max-width:760px){.scm-cotizacion-native-grid,.scm-cotizacion-native-two-col,.scm-cotizacion-damage-head,.scm-cotizacion-native-summary,.scm-cotizacion-native-footer{grid-template-columns:1fr}.scm-cotizacion-native-brand,.scm-cotizacion-native-hero-bottom{display:grid}.scm-cotizacion-native-state,.scm-cotizacion-native-number{text-align:left}}" +
+        "@page{size:A4;margin:10mm}*{box-sizing:border-box}body{margin:0;background:#fff;color:#0b1f3a;font-family:Poppins,Arial,sans-serif;font-size:11px;line-height:1.45}.scm-cotizacion-native-doc{max-width:980px;margin:0 auto;background:#fff}.scm-cotizacion-native-audience{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:10px;padding:9px 12px;border:1px solid #cbd5e1;border-radius:11px;background:#eef5ff}.scm-cotizacion-native-audience span{color:#1f4f99;font-size:8.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.scm-cotizacion-native-audience strong{color:#10233f;font-size:10px}.is-audience-destinatario .scm-cotizacion-native-audience{border-color:#fed7aa;background:#fff7ed}.is-audience-destinatario .scm-cotizacion-native-audience span{color:#9a4f00}.scm-cotizacion-native-hero{border-radius:18px;padding:22px 24px;margin-bottom:16px;color:#fff;background:linear-gradient(135deg,#0b1f3a 0%,#1f4f99 68%,#f28c00 170%)}.scm-cotizacion-native-brand{display:flex;align-items:center;justify-content:space-between;gap:18px}.scm-cotizacion-native-brand img{max-width:190px;max-height:58px;object-fit:contain;background:#fff;border-radius:14px;padding:8px}.scm-cotizacion-native-brand span,.scm-cotizacion-native-state span{display:block;text-transform:uppercase;letter-spacing:.08em;font-size:9px;font-weight:800;opacity:.82}.scm-cotizacion-native-brand strong{display:block;font-size:28px;line-height:1.05}.scm-cotizacion-native-state{text-align:right}.scm-cotizacion-native-state strong{display:inline-block;margin-top:7px;padding:7px 11px;border-radius:999px;background:#fff;color:#0b1f3a}.scm-cotizacion-native-state .is-pending{color:#fed7aa}.scm-cotizacion-native-state .is-sent{color:#bfdbfe}.scm-cotizacion-native-hero h2{margin:20px 0 0;font-size:21px;line-height:1.2}.scm-cotizacion-native-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.scm-cotizacion-native-grid>div,.scm-cotizacion-native-section,.scm-cotizacion-damage-card{border:1px solid #cbd5e1;border-radius:14px;background:#f8fafc;padding:12px}.scm-cotizacion-native-grid span,.scm-cotizacion-damage-head span{display:block;text-transform:uppercase;letter-spacing:.07em;color:#475569;font-size:8.5px;font-weight:800}.scm-cotizacion-native-grid strong,.scm-cotizacion-damage-head strong{display:block;margin-top:3px;color:#0b1f3a;font-weight:800}.scm-cotizacion-native-section{margin-top:12px;background:#fff}.scm-cotizacion-native-section h3{margin:0 0 10px;color:#0b1f3a;font-size:14px}.scm-cotizacion-native-section h4{margin:8px 0 6px;color:#173f7a;font-size:11px}.scm-cotizacion-native-section-title{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}.scm-cotizacion-native-section-title>div>span{display:block;color:#475569;font-size:8px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.scm-cotizacion-native-section-title h3{margin-bottom:0}.scm-cotizacion-native-section-title>strong{padding:5px 8px;border-radius:999px;background:#e8f1ff;color:#173f7a;font-size:8.5px}.scm-cotizacion-native-two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}.scm-cotizacion-media-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.scm-cotizacion-media-item{display:block;border:1px solid #d9e4f2;border-radius:12px;padding:8px;text-decoration:none;color:#0b1f3a;background:#f8fafc}.scm-cotizacion-media-item img{width:100%;height:115px;object-fit:cover;border-radius:9px;border:1px solid #e2e8f0}.scm-cotizacion-media-item strong{display:block;margin-top:6px;font-size:9px}.scm-cotizacion-damage-card{overflow:hidden;padding:0}.scm-cotizacion-damage-title{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;background:#0a285a;color:#fff}.scm-cotizacion-damage-title>div{display:flex;align-items:baseline;gap:5px}.scm-cotizacion-damage-title span{color:#ffbd6b;font-size:8px;font-weight:900;text-transform:uppercase}.scm-cotizacion-damage-title strong,.scm-cotizacion-damage-title p{color:#fff}.scm-cotizacion-damage-title p{margin:0;font-weight:700}.scm-cotizacion-damage-head{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:11px 12px 0}.scm-cotizacion-damage-card>.scm-cotizacion-native-tags,.scm-cotizacion-damage-card>.scm-cotizacion-native-rich,.scm-cotizacion-damage-card>.scm-cotizacion-native-evidence{margin-right:12px;margin-left:12px}.scm-cotizacion-native-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;margin-bottom:8px}.scm-cotizacion-native-tags span{border:1px solid #fed7aa;border-radius:999px;background:#fff7ed;color:#9a3412;padding:4px 8px;font-size:9px;font-weight:800}.scm-cotizacion-native-rich p{margin:0 0 8px;color:#1e293b}.scm-cotizacion-budget-block{overflow:hidden;margin-top:10px;border:1px solid #cbd5e1;border-radius:12px}.scm-cotizacion-budget-block h4{margin:0;padding:8px 10px;background:#0b1f3a;color:#fff!important}.scm-cotizacion-budget-block>.scm-cotizacion-native-empty{padding:10px}.scm-cotizacion-budget-table{width:100%;border-collapse:collapse}.scm-cotizacion-budget-table th,.scm-cotizacion-budget-table td{padding:8px;border-bottom:1px solid #e2e8f0;text-align:left}.scm-cotizacion-budget-table th{background:#0b1f3a;color:#fff;font-size:9px;text-transform:uppercase;letter-spacing:.06em}.scm-cotizacion-budget-table td:last-child{text-align:right;font-weight:800}.scm-cotizacion-budget-subtotal,.scm-cotizacion-native-total-box>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-bottom:1px solid #e2e8f0}.scm-cotizacion-native-total-box{margin-top:12px;border:1px solid #fed7aa;border-radius:14px;overflow:hidden;background:#fff7ed}.scm-cotizacion-native-total-box .is-grand-total{background:#0b1f3a;color:#fff}.scm-cotizacion-native-total-box .is-grand-total strong{font-size:16px;color:#fff}.scm-cotizacion-table-wrap{overflow:hidden;border:1px solid #cbd5e1;border-radius:12px}.scm-cotizacion-balance-table{width:100%;border-collapse:collapse}.scm-cotizacion-balance-table th,.scm-cotizacion-balance-table td{padding:8px 10px;border-bottom:1px solid #dbe7f4;text-align:left}.scm-cotizacion-balance-table th{background:#0b1f3a;color:#fff;font-size:8.5px;text-transform:uppercase}.scm-cotizacion-balance-table th:not(:first-child),.scm-cotizacion-balance-table td:not(:first-child){text-align:right}.scm-cotizacion-balance-table tbody tr:nth-child(even) td{background:#f8fbff}.scm-cotizacion-balance-table tfoot td{background:#fff7ed;font-weight:900}.scm-cotizacion-native-note{border-left:4px solid #f28c00;padding:10px 12px;background:#fff7ed;border-radius:10px}.scm-cotizacion-native-criteria{margin:8px 0 0;padding-left:20px}.scm-cotizacion-native-empty{margin:0;color:#475569;font-weight:600}.scm-cotizacion-native-legal{background:#fff7ed;border-color:#fed7aa}.scm-cotizacion-native-footer{display:flex;justify-content:space-between;gap:18px;margin-top:14px;padding:16px;border-radius:16px;background:#0b1f3a;color:#fff}.scm-cotizacion-native-footer span{display:block;color:#fed7aa;text-transform:uppercase;letter-spacing:.08em;font-size:9px;font-weight:800}.scm-cotizacion-native-footer p{margin:4px 0 0;color:#dbeafe}.scm-cotizacion-native-logo{display:grid;grid-template-columns:auto 1fr;align-items:center;column-gap:12px;min-width:330px;padding:10px 14px;border-radius:15px;background:#fff;color:#061d49}.scm-cotizacion-native-logo img{grid-row:span 2;width:72px!important;max-width:72px!important;max-height:50px!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important}.scm-cotizacion-native-logo strong{color:#061d49;font-size:18px;font-weight:900}.scm-cotizacion-native-logo span{color:#64748b}.scm-cotizacion-native-number{text-align:right}.scm-cotizacion-native-number strong{color:#fff;font-size:36px;font-weight:900}.scm-cotizacion-native-hero-bottom{display:flex;align-items:end;justify-content:space-between;gap:16px}.scm-cotizacion-native-eyebrow{margin:0 0 6px;color:rgba(255,255,255,.78);font-size:9px;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.scm-cotizacion-native-state em{display:block;margin-top:8px;color:#fff;font-style:normal;font-weight:900}.scm-cotizacion-native-summary{grid-template-columns:repeat(4,minmax(0,1fr))}.scm-cotizacion-native-footer{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.scm-cotizacion-native-footer>div{padding:10px;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:rgba(255,255,255,.07)}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.scm-cotizacion-native-section,.scm-cotizacion-damage-card,.scm-cotizacion-budget-block,.scm-cotizacion-table-wrap{break-inside:avoid}.scm-cotizacion-media-item img{height:95px}}@media(max-width:760px){.scm-cotizacion-native-grid,.scm-cotizacion-native-two-col,.scm-cotizacion-damage-head,.scm-cotizacion-native-summary,.scm-cotizacion-native-footer{grid-template-columns:1fr}.scm-cotizacion-native-brand,.scm-cotizacion-native-hero-bottom{display:grid}.scm-cotizacion-native-state,.scm-cotizacion-native-number{text-align:left}}" +
         "</style></head><body>" +
         contentHtml +
         (autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){window.focus();window.print();},450);});<\/script>' : "") +
@@ -9344,11 +9344,12 @@
       printWin.document.close();
     }
 
-    function downloadCotizacionPdf(cotizacionId, button) {
+    function downloadCotizacionPdf(cotizacionId, audience, button) {
       if (!ajaxUrl || !actionCotizacionPdf || !cotizacionId) {
         showToast("error", "No se pudo generar el PDF de la cotización.");
         return;
       }
+      audience = audience === "destinatario" ? "destinatario" : "funcionario";
       var originalText = button ? button.textContent : "";
       if (button) {
         button.disabled = true;
@@ -9358,6 +9359,7 @@
       formData.append("action", actionCotizacionPdf);
       formData.append("nonce", nonce);
       formData.append("id_cotizacion", cotizacionId);
+      formData.append("audience", audience);
       fetch(ajaxUrl, {
         method: "POST",
         body: formData,
@@ -9388,14 +9390,18 @@
           var url = URL.createObjectURL(blob);
           var link = document.createElement("a");
           link.href = url;
-          link.download = "cotizacion-mantenimiento-" + cotizacionId + ".pdf";
+          link.download =
+            "cotizacion-mantenimiento-" + cotizacionId + "-" + audience + ".pdf";
           document.body.appendChild(link);
           link.click();
           link.remove();
           setTimeout(function () {
             URL.revokeObjectURL(url);
           }, 1500);
-          showToast("success", "PDF de cotización generado.");
+          showToast(
+            "success",
+            "PDF para " + (audience === "destinatario" ? "destinatario" : "funcionario") + " generado.",
+          );
         })
         .catch(function (err) {
           showToast("error", err.message || "No se pudo generar el PDF.");
@@ -9410,9 +9416,14 @@
 
     function openCotizacionNativeModal(button) {
       var card = button.closest(".scm-cotizacion-card");
-      var source = card ? card.querySelector(".scm-cotizacion-native-source") : null;
       var cotizacionId = button.getAttribute("data-cotizacion-id") || "";
-      var content = source ? source.innerHTML : "";
+      var sourceFuncionario = card
+        ? card.querySelector('[data-scm-cotizacion-native-audience="funcionario"]')
+        : null;
+      var sourceDestinatario = card
+        ? card.querySelector('[data-scm-cotizacion-native-audience="destinatario"]')
+        : null;
+      var content = sourceFuncionario ? sourceFuncionario.innerHTML : "";
       var title = "Cotización #" + (cotizacionId || "");
       if (!content) {
         showToast("error", "No se encontró la información de la cotización.");
@@ -9427,10 +9438,15 @@
         html:
           '<div class="scm-cotizacion-native-modal">' +
           '<div class="scm-cotizacion-native-toolbar">' +
-          '<div><span>Cotización de mantenimiento</span><strong>#' + escHtml(cotizacionId || "-") + "</strong></div>" +
+          '<div class="scm-cotizacion-native-toolbar-heading"><span>Cotización de mantenimiento</span><strong>#' + escHtml(cotizacionId || "-") + "</strong></div>" +
+          '<div class="scm-cotizacion-native-audience-switch" role="group" aria-label="Seleccionar vista de la cotización">' +
+          '<button type="button" class="active" data-scm-cotizacion-audience="funcionario" aria-pressed="true">Vista funcionario</button>' +
+          '<button type="button" data-scm-cotizacion-audience="destinatario" aria-pressed="false">Vista destinatario</button>' +
+          "</div>" +
           '<div class="scm-cotizacion-native-toolbar-actions">' +
           '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-open-large>Ver en grande</button>' +
-          '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-cotizacion-print>Generar PDF</button>' +
+          '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-print="destinatario">PDF destinatario</button>' +
+          '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-cotizacion-print="funcionario">PDF funcionario</button>' +
           "</div></div>" +
           '<div class="scm-cotizacion-native-scroll"><div class="scm-cotizacion-native-print-root">' +
           content +
@@ -9447,19 +9463,56 @@
           var popup = window.Swal.getPopup();
           if (!popup) return;
           var printRoot = popup.querySelector(".scm-cotizacion-native-print-root");
-          var printable = printRoot ? printRoot.innerHTML : content;
           var openLarge = popup.querySelector("[data-scm-cotizacion-open-large]");
-          var printBtn = popup.querySelector("[data-scm-cotizacion-print]");
+          var audienceButtons = popup.querySelectorAll("[data-scm-cotizacion-audience]");
+          var printButtons = popup.querySelectorAll("[data-scm-cotizacion-print]");
+          var currentAudience = "funcionario";
+          var contentByAudience = {
+            funcionario: sourceFuncionario ? sourceFuncionario.innerHTML : content,
+            destinatario: sourceDestinatario ? sourceDestinatario.innerHTML : content,
+          };
+          var setAudience = function (audience) {
+            currentAudience = audience === "destinatario" ? "destinatario" : "funcionario";
+            if (printRoot) {
+              printRoot.innerHTML = contentByAudience[currentAudience] || content;
+            }
+            audienceButtons.forEach(function (audienceButton) {
+              var active =
+                audienceButton.getAttribute("data-scm-cotizacion-audience") === currentAudience;
+              audienceButton.classList.toggle("active", active);
+              audienceButton.setAttribute("aria-pressed", active ? "true" : "false");
+            });
+          };
+          audienceButtons.forEach(function (audienceButton) {
+            audienceButton.addEventListener("click", function () {
+              setAudience(
+                audienceButton.getAttribute("data-scm-cotizacion-audience") || "funcionario",
+              );
+            });
+          });
           if (openLarge) {
             openLarge.addEventListener("click", function () {
-              openCotizacionPrintWindow(title, printable, false);
+              var printable = printRoot ? printRoot.innerHTML : contentByAudience[currentAudience];
+              openCotizacionPrintWindow(
+                title +
+                  (currentAudience === "destinatario"
+                    ? " - Destinatario"
+                    : " - Funcionario"),
+                printable,
+                false,
+              );
             });
           }
-          if (printBtn) {
-            printBtn.addEventListener("click", function () {
-              downloadCotizacionPdf(cotizacionId, printBtn);
+          printButtons.forEach(function (printButton) {
+            printButton.addEventListener("click", function () {
+              downloadCotizacionPdf(
+                cotizacionId,
+                printButton.getAttribute("data-scm-cotizacion-print") || "funcionario",
+                printButton,
+              );
             });
-          }
+          });
+          setAudience("funcionario");
         },
       });
     }

@@ -140,16 +140,75 @@ final class SimplePdf
 
   public function heading(string $text): void
   {
-    $this->ensureSpace(24);
+    $this->ensureSpace(72);
     $this->fill(6, 29, 73);
-    $this->text($this->margin, $this->y, $text, 12, 'F2');
-    $this->fill(0, 0, 0);
-    $this->y += 22;
+    $this->rect($this->margin, $this->y, $this->contentWidth, 28);
+    $this->fill(245, 145, 32);
+    $this->rect($this->margin, $this->y, 5, 28);
+    $this->fill(255, 255, 255);
+    $this->text($this->margin + 14, $this->y + 8, $text, 11, 'F2');
+    $this->fill(13, 33, 58);
+    $this->y += 36;
+  }
+
+  /**
+   * @param string[] $headers
+   * @param array<int,array<int,string|int|float>> $rows
+   * @param float[] $widthRatios
+   * @param int[] $rightAlignColumns
+   */
+  public function table(array $headers, array $rows, array $widthRatios = [], int $fontSize = 8, array $rightAlignColumns = []): void
+  {
+    $columnCount = count($headers);
+    if ($columnCount === 0) {
+      return;
+    }
+
+    if (count($widthRatios) !== $columnCount || array_sum($widthRatios) <= 0) {
+      $widthRatios = array_fill(0, $columnCount, 1.0);
+    }
+    $ratioTotal = (float) array_sum($widthRatios);
+    $widths = array_map(fn(float $ratio): float => $this->contentWidth * ($ratio / $ratioTotal), $widthRatios);
+    $headerCells = array_map(static fn($value): string => (string) $value, $headers);
+    $this->drawTableRow($headerCells, $widths, max(7, $fontSize - 1), true, false, $rightAlignColumns);
+
+    foreach ($rows as $index => $row) {
+      $cells = array_values(array_map(static fn($value): string => (string) $value, $row));
+      $cells = array_pad(array_slice($cells, 0, $columnCount), $columnCount, '');
+      $height = $this->tableRowHeight($cells, $widths, $fontSize);
+      if (!$this->hasSpace($height)) {
+        $this->startNewPage();
+        $this->drawTableRow($headerCells, $widths, max(7, $fontSize - 1), true, false, $rightAlignColumns);
+      }
+      $this->drawTableRow($cells, $widths, $fontSize, false, $index % 2 === 1, $rightAlignColumns);
+    }
+    $this->y += 9;
+  }
+
+  public function callout(string $label, string $text, int $fontSize = 8): void
+  {
+    $label = trim($label);
+    $lines = $this->wrap($text, $this->contentWidth - 24, $fontSize);
+    $height = max(44, 25 + count($lines) * ($fontSize + 5));
+    $this->ensureSpace($height);
+    $this->fill(255, 247, 237);
+    $this->rect($this->margin, $this->y, $this->contentWidth, $height - 6);
+    $this->fill(245, 145, 32);
+    $this->rect($this->margin, $this->y, 5, $height - 6);
+    $this->fill(6, 29, 73);
+    $this->text($this->margin + 14, $this->y + 9, strtoupper($label), 7, 'F2');
+    $lineY = $this->y + 24;
+    $this->fill(25, 43, 69);
+    foreach ($lines as $line) {
+      $this->text($this->margin + 14, $lineY, $line, $fontSize, 'F1');
+      $lineY += $fontSize + 5;
+    }
+    $this->y += $height;
   }
 
   public function line(string $text, int $size = 8, string $font = 'F1'): void
   {
-    $this->ensureSpace($size + 8);
+    $this->ensureSpace(max(72, $size + 8));
     $this->fill(13, 33, 58);
     $this->text($this->margin, $this->y, $text, $size, $font);
     $this->y += $size + 8;
@@ -189,11 +248,15 @@ final class SimplePdf
 
   public function linkText(string $label, string $url): void
   {
-    $this->ensureSpace(20);
+    $lines = $this->wrap($label . ': ' . $url, $this->contentWidth, 8);
+    $this->ensureSpace(max(20, count($lines) * 13));
     $this->fill(0, 87, 164);
-    $this->text($this->margin, $this->y, $label . ': ' . $url, 8, 'F1');
+    foreach ($lines as $line) {
+      $this->text($this->margin, $this->y, $line, 8, 'F1');
+      $this->y += 13;
+    }
     $this->fill(0, 0, 0);
-    $this->y += 18;
+    $this->y += 5;
   }
 
   public function spacer(float $height): void
@@ -225,9 +288,19 @@ final class SimplePdf
 
   private function ensureSpace(float $height): void
   {
-    if ($this->y + $height <= self::PAGE_H - $this->bottomMargin) {
+    if ($this->hasSpace($height)) {
       return;
     }
+    $this->startNewPage();
+  }
+
+  private function hasSpace(float $height): bool
+  {
+    return $this->y + $height <= self::PAGE_H - $this->bottomMargin;
+  }
+
+  private function startNewPage(): void
+  {
     $this->finishPage();
     $this->content = '';
     $this->y = $this->topMargin;
@@ -241,7 +314,54 @@ final class SimplePdf
     if ($this->content === '') {
       $this->content = "BT /F1 1 Tf 0 0 Td () Tj ET\n";
     }
+    $this->fill(100, 116, 139);
+    $this->text($this->margin, self::PAGE_H - $this->bottomMargin + 24, 'SuCasa Inmobiliaria - Cotización de mantenimiento', 7, 'F1');
+    $pageLabel = 'Página ' . (string) (count($this->pages) + 1);
+    $this->textRight($this->margin + $this->contentWidth, self::PAGE_H - $this->bottomMargin + 24, $pageLabel, 7, 'F1');
     $this->pages[] = $this->content;
+  }
+
+  /** @param string[] $cells @param float[] $widths @param int[] $rightAlignColumns */
+  private function drawTableRow(array $cells, array $widths, int $fontSize, bool $header, bool $alternate, array $rightAlignColumns): void
+  {
+    $height = $this->tableRowHeight($cells, $widths, $fontSize);
+    $this->ensureSpace($height);
+    $x = $this->margin;
+    foreach ($cells as $index => $cell) {
+      $width = $widths[$index] ?? 0.0;
+      if ($header) {
+        $this->fill(6, 29, 73);
+      } elseif ($alternate) {
+        $this->fill(241, 245, 249);
+      } else {
+        $this->fill(248, 250, 252);
+      }
+      $this->rect($x, $this->y, max(0, $width - 1), $height - 1);
+      $lines = $this->wrap((string) $cell, max(24, $width - 12), $fontSize);
+      $lineY = $this->y + 8;
+      $this->fill($header ? 255 : 15, $header ? 255 : 23, $header ? 255 : 42);
+      foreach ($lines as $line) {
+        if (in_array($index, $rightAlignColumns, true)) {
+          $this->textRight($x + $width - 6, $lineY, $line, $fontSize, $header ? 'F2' : 'F1');
+        } else {
+          $this->text($x + 6, $lineY, $line, $fontSize, $header ? 'F2' : 'F1');
+        }
+        $lineY += $fontSize + 4;
+      }
+      $x += $width;
+    }
+    $this->fill(13, 33, 58);
+    $this->y += $height;
+  }
+
+  /** @param string[] $cells @param float[] $widths */
+  private function tableRowHeight(array $cells, array $widths, int $fontSize): float
+  {
+    $maxLines = 1;
+    foreach ($cells as $index => $cell) {
+      $maxLines = max($maxLines, count($this->wrap((string) $cell, max(24, ($widths[$index] ?? 0) - 12), $fontSize)));
+    }
+    return max(22, 10 + $maxLines * ($fontSize + 3));
   }
 
   /** @return string[] */
@@ -251,11 +371,29 @@ final class SimplePdf
     if ($text === '') {
       return [''];
     }
-    $maxChars = max(18, (int) floor($width / max(1, $size * 0.48)));
+    $maxChars = max(8, (int) floor($width / max(1, $size * 0.56)));
     $words = explode(' ', $text);
     $lines = [];
     $line = '';
     foreach ($words as $word) {
+      $wordLength = function_exists('mb_strlen') ? mb_strlen($word, 'UTF-8') : strlen($word);
+      if ($wordLength > $maxChars) {
+        if ($line !== '') {
+          $lines[] = $line;
+          $line = '';
+        }
+        while ($wordLength > $maxChars) {
+          $lines[] = function_exists('mb_substr')
+            ? mb_substr($word, 0, $maxChars, 'UTF-8')
+            : substr($word, 0, $maxChars);
+          $word = function_exists('mb_substr')
+            ? mb_substr($word, $maxChars, null, 'UTF-8')
+            : substr($word, $maxChars);
+          $wordLength = function_exists('mb_strlen') ? mb_strlen($word, 'UTF-8') : strlen($word);
+        }
+        $line = $word;
+        continue;
+      }
       $candidate = $line === '' ? $word : ($line . ' ' . $word);
       $length = function_exists('mb_strlen') ? mb_strlen($candidate, 'UTF-8') : strlen($candidate);
       if ($length > $maxChars && $line !== '') {
@@ -275,6 +413,13 @@ final class SimplePdf
   {
     $pdfY = self::PAGE_H - $topY;
     $this->content .= 'BT /' . $font . ' ' . $size . ' Tf ' . $this->n($x) . ' ' . $this->n($pdfY) . ' Td (' . $this->pdfString($text) . ") Tj ET\n";
+  }
+
+  private function textRight(float $rightX, float $topY, string $text, int $size, string $font): void
+  {
+    $length = function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
+    $estimatedWidth = $length * $size * 0.52;
+    $this->text(max($this->margin, $rightX - $estimatedWidth), $topY, $text, $size, $font);
   }
 
   private function rect(float $x, float $topY, float $w, float $h): void

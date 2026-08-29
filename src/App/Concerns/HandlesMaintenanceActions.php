@@ -572,7 +572,11 @@ trait HandlesMaintenanceActions
     $rows = $this->attach_cotizacion_orders([$row]);
     $row = is_array($rows[0] ?? null) ? $rows[0] : $row;
     $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
-    $pdf = $this->build_cotizacion_mantenimiento_pdf($row, $orders);
+    $audience = strtolower(trim(sanitize_text_field((string) ($_POST['audience'] ?? 'funcionario'))));
+    if (!in_array($audience, ['funcionario', 'destinatario'], true)) {
+      $audience = 'funcionario';
+    }
+    $pdf = $this->build_cotizacion_mantenimiento_pdf($row, $orders, $audience);
 
     $basename = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
     $dir = (string) SCM_STORAGE_PATH . '/tmp';
@@ -587,7 +591,7 @@ trait HandlesMaintenanceActions
     }
     header_remove('Content-Type');
     header('Content-Type: application/pdf');
-    header('Content-Disposition: attachment; filename="cotizacion-mantenimiento-' . $cotizacionId . '.pdf"');
+    header('Content-Disposition: attachment; filename="cotizacion-mantenimiento-' . $cotizacionId . '-' . $audience . '.pdf"');
     header('Content-Length: ' . (string) filesize($path));
     header('Cache-Control: private, max-age=0, must-revalidate');
     readfile($path);
@@ -596,8 +600,10 @@ trait HandlesMaintenanceActions
   }
 
   /** @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders */
-  private function build_cotizacion_mantenimiento_pdf(array $row, array $orders): \SCM\Support\SimplePdf
+  private function build_cotizacion_mantenimiento_pdf(array $row, array $orders, string $audience = 'funcionario'): \SCM\Support\SimplePdf
   {
+    $audience = strtolower(trim($audience)) === 'destinatario' ? 'destinatario' : 'funcionario';
+    $isFuncionario = $audience === 'funcionario';
     $pdf = new \SCM\Support\SimplePdf();
     $letterhead = dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg';
     $pdf->backgroundImage($letterhead);
@@ -620,24 +626,63 @@ trait HandlesMaintenanceActions
     $creador = $this->cotizacion_clean_text($row['creador'] ?? '');
     $creadorEmail = $this->cotizacion_clean_text($row['email_creador'] ?? '');
     $creadorCelular = $this->cotizacion_clean_text($row['celular_creador'] ?? '');
+    $porcentajeAdmon = $this->cotizacion_clean_text($row['porcentaje_admon'] ?? '0');
+    $porcentajeIva = $this->cotizacion_clean_text($row['iva'] ?? '0');
 
     $pdf->title('Cotización de mantenimiento #' . ($id !== '' ? $id : '-'));
+    $pdf->line($isFuncionario ? 'VERSIÓN INTERNA PARA FUNCIONARIO' : 'COPIA PARA DESTINATARIO', 9, 'F2');
     $pdf->line('Estado: ' . ($estado !== '' ? $this->cotizacion_clean_text($estado) : 'Sin estado') . ' | Envío: ' . ($enviada ? 'Fue enviada' : 'Sin enviar'), 8, 'F2');
     $pdf->line('Fecha: ' . $fecha . ' | Fecha de envío: ' . $fechaEnvio, 8);
     $pdf->spacer(5);
 
     $pdf->heading('Datos generales');
-    $pdf->line('Ticket: ' . ($ticket !== '' ? '#' . $ticket : '-') . ' | Contrato: ' . trim((string) ($row['contrato'] ?? '-')) . ' | Inmueble SIMI: ' . trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '-')), 8, 'F2');
-    $pdf->line('Destinatario: ' . ($destinatario !== '' ? $destinatario : '-') . ' | Contacto: ' . $this->cotizacion_clean_text($row['celular_destinatario'] ?? '-'), 8);
-    $pdf->paragraph('Dirección: ' . ($direccion !== '' ? $direccion : '-'), 8);
-    $pdf->line('Tipo de mantenimiento: ' . ($tipo !== '' ? $this->cotizacion_clean_text($tipo) : 'Mantenimiento'), 8);
-    $pdf->line('Validez: ' . $this->cotizacion_days_label($row['valides_oferta'] ?? '') . ' | Duración del trabajo: ' . $this->cotizacion_days_label($row['duracion'] ?? ''), 8);
+    $pdf->table(['Campo', 'Información'], [
+      ['Ticket / contrato', ($ticket !== '' ? '#' . $ticket : '-') . ' / ' . trim((string) ($row['contrato'] ?? '-'))],
+      ['Inmueble SIMI', trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '-'))],
+      ['Destinatario', $destinatario !== '' ? $destinatario : '-'],
+      ['Contacto', $this->cotizacion_clean_text($row['celular_destinatario'] ?? '-')],
+      ['Dirección', $direccion !== '' ? $direccion : '-'],
+      ['Tipo de mantenimiento', $tipo !== '' ? $this->cotizacion_clean_text($tipo) : 'Mantenimiento'],
+      ['Validez / duración', $this->cotizacion_days_label($row['valides_oferta'] ?? '') . ' / ' . $this->cotizacion_days_label($row['duracion'] ?? '')],
+    ], [0.30, 0.70], 8);
 
     $pdf->heading('Resumen económico');
-    $pdf->line('Materiales: ' . $this->format_cop_currency($row['total_materiales'] ?? 0) . ' | Mano de obra: ' . $this->format_cop_currency($row['total_mano_obra'] ?? 0) . ' | Equipos: ' . $this->format_cop_currency($row['total_maquinarias'] ?? 0), 8, 'F2');
-    $pdf->line('Otros costos: ' . $this->format_cop_currency($row['total_otros_costos'] ?? 0) . ' | Administración: ' . $this->format_cop_currency($row['total_admon'] ?? 0) . ' | IVA administración: ' . $this->format_cop_currency($row['iva_admon'] ?? 0), 8);
-    $pdf->line('TOTAL COTIZACIÓN: ' . $this->format_cop_currency($row['total'] ?? 0), 12, 'F2');
+    $administrationLabel = $isFuncionario && $porcentajeAdmon !== ''
+      ? 'Administración (' . $porcentajeAdmon . '%)'
+      : 'Administración';
+    $ivaLabel = $isFuncionario && $porcentajeIva !== ''
+      ? 'IVA sobre administración (' . $porcentajeIva . '%)'
+      : 'IVA sobre administración';
+    $pdf->table(['Concepto', 'Valor'], [
+      ['Materiales', $this->format_cop_currency($row['total_materiales'] ?? 0)],
+      ['Mano de obra', $this->format_cop_currency($row['total_mano_obra'] ?? 0)],
+      ['Equipos / maquinarias', $this->format_cop_currency($row['total_maquinarias'] ?? 0)],
+      ['Otros costos', $this->format_cop_currency($row['total_otros_costos'] ?? 0)],
+      [$administrationLabel, $this->format_cop_currency($row['total_admon'] ?? 0)],
+      [$ivaLabel, $this->format_cop_currency($row['iva_admon'] ?? 0)],
+      ['TOTAL COTIZACIÓN', $this->format_cop_currency($row['total'] ?? 0)],
+    ], [0.68, 0.32], 8, [1]);
 
+    $pdf->heading('Control de saldos');
+    $pdf->table(['Categoría', 'Presupuesto', 'Saldo'], [
+      ['Materiales', $this->format_cop_currency($row['total_materiales'] ?? 0), $this->format_cop_currency($row['saldo_materiales'] ?? 0)],
+      ['Mano de obra', $this->format_cop_currency($row['total_mano_obra'] ?? 0), $this->format_cop_currency($row['saldo_obra'] ?? 0)],
+      ['Equipos / maquinarias', $this->format_cop_currency($row['total_maquinarias'] ?? 0), $this->format_cop_currency($row['saldo_maquinarias'] ?? 0)],
+      ['Otros costos', $this->format_cop_currency($row['total_otros_costos'] ?? 0), $this->format_cop_currency($row['saldo_otros_costo'] ?? 0)],
+      ['TOTAL', $this->format_cop_currency(
+        $this->cotizacion_money_value($row, ['total_materiales'])
+          + $this->cotizacion_money_value($row, ['total_mano_obra'])
+          + $this->cotizacion_money_value($row, ['total_maquinarias'])
+          + $this->cotizacion_money_value($row, ['total_otros_costos'])
+      ), $this->format_cop_currency(
+        $this->cotizacion_money_value($row, ['saldo_materiales'])
+          + $this->cotizacion_money_value($row, ['saldo_obra'])
+          + $this->cotizacion_money_value($row, ['saldo_maquinarias'])
+          + $this->cotizacion_money_value($row, ['saldo_otros_costo'])
+      )],
+    ], [0.46, 0.27, 0.27], 8, [1, 2]);
+
+    $pdf->heading('Presupuesto detallado');
     foreach ([
       'Materiales' => ['items' => $this->cotizacion_parse_list($row['items_materiales'] ?? ''), 'total' => $row['total_materiales'] ?? 0],
       'Mano de obra' => ['items' => $this->cotizacion_parse_list($row['items_mano'] ?? ''), 'total' => $row['total_mano_obra'] ?? 0],
@@ -645,40 +690,64 @@ trait HandlesMaintenanceActions
       'Otros costos' => ['items' => $this->cotizacion_parse_list($row['items_otros_costos'] ?? ''), 'total' => $row['total_otros_costos'] ?? 0],
     ] as $section => $data) {
       $items = is_array($data['items'] ?? null) ? $data['items'] : [];
-      if (empty($items)) {
-        continue;
-      }
-      $pdf->heading((string) $section);
+      $budgetRows = [];
       foreach ($items as $item) {
         if (!is_array($item)) {
           continue;
         }
         $label = $this->cotizacion_first_matching_value($item, ['prove', 'descripcion', 'actividad', 'concepto', 'detalle']);
         $value = $this->cotizacion_first_matching_value($item, ['valor', 'total', 'saldo']);
-        $pdf->line('- ' . ($label !== '' ? $this->cotizacion_clean_text($label) : 'Ítem') . ': ' . $this->format_cop_currency($value), 8);
+        $budgetRows[] = [
+          $label !== '' ? $this->cotizacion_clean_text($label) : 'Ítem',
+          $this->format_cop_currency($value),
+        ];
       }
-      $pdf->line('Subtotal ' . strtolower((string) $section) . ': ' . $this->format_cop_currency($data['total'] ?? 0), 8, 'F2');
+      if (empty($budgetRows)) {
+        $budgetRows[] = ['Sin ítems registrados', '$0'];
+      }
+      $budgetRows[] = ['TOTAL ' . strtoupper((string) $section), $this->format_cop_currency($data['total'] ?? 0)];
+      $pdf->line(strtoupper((string) $section), 9, 'F2');
+      $pdf->table(['Descripción / proveedor', 'Valor'], $budgetRows, [0.74, 0.26], 8, [1]);
     }
 
     $revision = $this->cotizacion_revision_row($row);
     $danos = $this->cotizacion_parse_list($revision['evaluacion_de_danos'] ?? '');
-    if (!empty($danos)) {
-      $pdf->heading('Daños evaluados');
-      foreach ($danos as $damage) {
+    $pdf->heading('Informe de daños');
+    if (empty($danos)) {
+      $pdf->callout('Estado del informe', 'Sin daños registrados para esta cotización.', 8);
+    } else {
+      foreach ($danos as $damageIndex => $damage) {
         if (!is_array($damage)) {
           continue;
         }
         $summary = $this->cotizacion_clean_text($damage['descripcion_dano'] ?? '');
+        $consequence = $this->cotizacion_clean_text($damage['consecuencia'] ?? '');
         $responsableDano = $this->cotizacion_clean_text($damage['a_quien_corresponde'] ?? '-');
         $nivel = $this->cotizacion_clean_text($damage['nivel_dano'] ?? '-');
-        $pdf->paragraph('Corresponde a: ' . ($responsableDano !== '' ? $responsableDano : '-') . ' | Nivel: ' . ($nivel !== '' ? $nivel : '-') . '. ' . ($summary !== '' ? $summary : 'Sin descripción registrada.'), 8);
+        $areas = array_values(array_filter(array_map(fn(string $key): string => $this->cotizacion_clean_text($damage[$key] ?? ''), [
+          'area_afectada_1',
+          'area_afectada_2',
+          'area_afectada_3',
+          'area_afectada_4',
+        ])));
+        $pdf->line('DAÑO EVALUADO #' . (string) ($damageIndex + 1), 10, 'F2');
+        $pdf->table(['Campo', 'Detalle'], [
+          ['Índice', $this->cotizacion_clean_text($damage['indice'] ?? '-')],
+          ['Responsable', $responsableDano !== '' ? $responsableDano : '-'],
+          ['Nivel', $nivel !== '' ? $nivel : '-'],
+          ['Tiempo de atención', $this->cotizacion_clean_text($damage['tiempo_atencion'] ?? '-')],
+          ['Áreas afectadas', !empty($areas) ? implode(', ', $areas) : '-'],
+        ], [0.32, 0.68], 8);
+        $pdf->callout('Descripción del daño', $summary !== '' ? $summary : 'Sin descripción registrada.', 8);
+        $pdf->callout('Consecuencia', $consequence !== '' ? $consequence : 'Sin consecuencia registrada.', 8);
+        $damageMedia = $this->cotizacion_media_items($this->cotizacion_split_ids($damage['registro_foto_dano'] ?? ''));
+        foreach ($damageMedia as $mediaIndex => $media) {
+          $url = trim((string) ($media['url'] ?? ''));
+          if ($url !== '') {
+            $pdf->linkText('Evidencia fotográfica ' . (string) ($mediaIndex + 1), $url);
+          }
+        }
       }
-    }
-
-    $observaciones = $this->cotizacion_clean_text($row['observaciones'] ?? '');
-    if ($observaciones !== '') {
-      $pdf->heading('Observaciones');
-      $pdf->paragraph($observaciones, 8);
     }
 
     $mejorOferta = $this->cotizacion_media_items($this->cotizacion_split_ids($row['mejor_oferta'] ?? ''));
@@ -693,14 +762,46 @@ trait HandlesMaintenanceActions
       }
     }
 
+    $resumenPerturbacion = $this->cotizacion_parse_json($row['resumen_calculo_perturbacion'] ?? '');
+    $pdf->heading('Observaciones y perturbación');
+    $pdf->table(['Concepto', 'Resultado'], [
+      ['Perturbación sugerida', trim((string) ($row['perturbacion'] ?? '0')) . '%'],
+      ['Bonificación sugerida', $this->format_cop_currency($row['valor_bonificacion'] ?? 0)],
+      ['Días calculados', (string) ($row['dias_afectacion_calculados'] ?? '-')],
+      ['Área afectada', trim((string) ($row['area_afectada'] ?? '')) !== '' ? trim((string) $row['area_afectada']) . ' m2' : '-'],
+      ['Tipo de inmueble', $this->cotizacion_clean_text($row['tipo_inmueble'] ?? '-')],
+      ['Destinación', $this->cotizacion_clean_text($row['destinacion'] ?? '-')],
+    ], [0.42, 0.58], 8);
+    $observaciones = $this->cotizacion_clean_text($row['observaciones'] ?? '');
+    if ($observaciones !== '') {
+      $pdf->callout('Observaciones', $observaciones, 8);
+    }
+    if (!empty($resumenPerturbacion['criterios']) && is_array($resumenPerturbacion['criterios'])) {
+      $criteria = array_values(array_filter(array_map(fn($criterion): string => $this->cotizacion_clean_text($criterion), $resumenPerturbacion['criterios'])));
+      if (!empty($criteria)) {
+        $pdf->bullets($criteria, 8);
+      }
+    }
+    $justificacion = $this->cotizacion_clean_text($row['justificacion_perturbacion'] ?? '');
+    if ($justificacion !== '') {
+      $pdf->callout('Justificación', $justificacion, 8);
+    }
+
     $pdf->heading('Órdenes de mantenimiento');
     if (empty($orders)) {
-      $pdf->paragraph('Sin órdenes registradas para esta cotización.', 8);
+      $pdf->callout('Órdenes', 'Sin órdenes registradas para esta cotización.', 8);
     } else {
+      $orderRows = [];
       foreach ($orders as $order) {
-        $pdf->line('Orden #' . trim((string) ($order['_ID'] ?? '-')) . ' | Estado: ' . $this->cotizacion_clean_text($order['estado'] ?? '-') . ' | Valor: ' . $this->format_cop_currency($order['valor'] ?? 0), 8, 'F2');
-        $pdf->paragraph('Proveedor: ' . $this->cotizacion_clean_text($order['proveedor'] ?? '-') . '. Actividad: ' . $this->cotizacion_clean_text($order['actividad'] ?? '-'), 8);
+        $orderRows[] = [
+          '#' . trim((string) ($order['_ID'] ?? '-')),
+          $this->cotizacion_clean_text($order['proveedor'] ?? '-'),
+          $this->cotizacion_clean_text($order['actividad'] ?? '-'),
+          $this->format_cop_currency($order['valor'] ?? 0),
+          $this->cotizacion_clean_text($order['estado'] ?? '-'),
+        ];
       }
+      $pdf->table(['Orden', 'Proveedor', 'Actividad', 'Valor', 'Estado'], $orderRows, [0.11, 0.21, 0.36, 0.17, 0.15], 7, [3]);
     }
 
     $pdf->heading('Nota contractual');
