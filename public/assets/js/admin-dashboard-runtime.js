@@ -391,7 +391,13 @@
         "scmgc_etapa",
         "scmgc_movimiento",
         "scmgc_cartera_page",
+        "scmgc_view",
       ].forEach(function (key) {
+        if (key === "scmgc_view") {
+          var activeView = scope ? scope.querySelector("[data-scm-portfolio-tab][aria-selected='true']") : null;
+          fd.set(key, activeView ? String(activeView.getAttribute("data-scm-portfolio-tab") || "principal") : "principal");
+          return;
+        }
         var field = scope ? scope.querySelector("[name='" + key + "']") : null;
         fd.set(key, field ? String(field.value || "") : "");
       });
@@ -411,6 +417,7 @@
         "scmgc_etapa",
         "scmgc_movimiento",
         "scmgc_cartera_page",
+        "scmgc_view",
       ].forEach(function (key) {
         if (parsed.searchParams.has(key)) {
           fd.set(key, parsed.searchParams.get(key) || "");

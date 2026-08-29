@@ -70,8 +70,12 @@ trait HandlesCollectionManagement
     }
     $portfolioId = max(0, (int) ($_POST['portfolio_id'] ?? 0));
     $letterType = sanitize_key((string) ($_POST['letter_type'] ?? ''));
+    $preview = sanitize_key((string) ($_POST['mode'] ?? '')) === 'preview';
     try {
-      $document = $this->get_collection_portfolio_service()->generateLetter($portfolioId, $letterType, false);
+      $portfolioService = $this->get_collection_portfolio_service();
+      $document = $preview
+        ? $portfolioService->previewLetter($portfolioId, $letterType)
+        : $portfolioService->generateLetter($portfolioId, $letterType, false);
       $path = (string) ($document['path'] ?? '');
       if ($path === '' || !is_file($path)) {
         throw new \RuntimeException('No se pudo preparar la carta en PDF.');
@@ -81,10 +85,13 @@ trait HandlesCollectionManagement
       }
       header_remove('Content-Type');
       header('Content-Type: application/pdf');
-      header('Content-Disposition: attachment; filename="' . addslashes((string) ($document['filename'] ?? 'carta-cartera.pdf')) . '"');
+      header('Content-Disposition: ' . ($preview ? 'inline' : 'attachment') . '; filename="' . addslashes((string) ($document['filename'] ?? 'carta-cartera.pdf')) . '"');
       header('Content-Length: ' . (string) filesize($path));
       header('Cache-Control: private, max-age=0, must-revalidate');
       readfile($path);
+      if ($preview) {
+        @unlink($path);
+      }
       exit;
     } catch (\Throwable $exception) {
       $this->jsonFail($exception->getMessage());

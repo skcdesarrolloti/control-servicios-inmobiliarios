@@ -23,6 +23,7 @@
     var actionPanel = actions.admin_notifications_collection_log || "";
     var actionManagement = actions.admin_notifications_collection || "";
     var actionOptions = actions.admin_notifications_collection_options || "";
+    var activePreviewUrl = "";
 
     root.dataset.scmCollectionInit = "1";
 
@@ -75,6 +76,8 @@
         var field = panel ? panel.querySelector("[name='" + name + "']") : null;
         fd.set(name, field ? String(field.value || "") : "");
       });
+      var selectedView = panel ? panel.querySelector("[data-scm-portfolio-tab][aria-selected='true']") : null;
+      fd.set("scmgc_view", selectedView ? String(selectedView.getAttribute("data-scm-portfolio-tab") || "principal") : "principal");
       fd.set("action", actionPanel);
       fd.set("nonce", nonce);
       return fd;
@@ -83,6 +86,8 @@
     function refreshPanel() {
       var current = root.querySelector("#scm-panel-gestiones-cobro [data-scm-collection-log]");
       if (!current || !actionPanel) return Promise.resolve();
+      var activeTab = current.querySelector("[data-scm-portfolio-tab][aria-selected='true']");
+      var activeView = activeTab ? String(activeTab.getAttribute("data-scm-portfolio-tab") || "principal") : "principal";
       current.classList.add("is-loading");
       current.setAttribute("aria-busy", "true");
       return postJson(actionPanel, panelParams()).then(function (data) {
@@ -90,6 +95,7 @@
         holder.innerHTML = String(data.html || "");
         var next = holder.querySelector("[data-scm-collection-log]");
         if (!next) throw new Error("No se pudo actualizar la vista de cartera.");
+        activatePortfolioTab(next, activeView, false);
         current.parentNode.replaceChild(next, current);
       }).catch(function (error) {
         current.classList.remove("is-loading");
@@ -121,9 +127,12 @@
       if (window.Swal && typeof window.Swal.fire === "function") {
         window.Swal.fire({
           title: stage === "siniestro" ? "Marcar contrato como siniestro" : "Normalizar etapa de cobro",
-          text: "Se actualizará la cartera y el estado del contrato.",
-          input: "text",
-          inputLabel: "Observación opcional",
+          text: stage === "siniestro"
+            ? "Esta acción cambia la etapa y deja trazabilidad, pero no genera ni envía la carta de siniestro. Para la carta usa Preparar siniestro."
+            : "El contrato volverá a cobro normal y el cambio quedará registrado en el historial.",
+          input: "textarea",
+          inputLabel: "Motivo u observación (opcional)",
+          inputPlaceholder: "Indica por qué cambia la etapa...",
           showCancelButton: true,
           confirmButtonText: "Sí, " + label,
           cancelButtonText: "Cancelar",
@@ -189,36 +198,84 @@
       }).finally(function () { button.disabled = false; });
     }
 
+    function syncModalBodyState() {
+      var openModal = root.querySelector("[data-scm-portfolio-management-modal]:not([hidden]), [data-scm-portfolio-letter-preview-modal]:not([hidden])");
+      document.body.classList.toggle("scm-modal-open", !!openModal);
+    }
+
+    function closeLetterPreview() {
+      var modal = root.querySelector("[data-scm-portfolio-letter-preview-modal]");
+      if (!modal) return;
+      var frame = modal.querySelector("[data-scm-portfolio-letter-preview-frame]");
+      if (frame) frame.src = "about:blank";
+      if (activePreviewUrl) {
+        URL.revokeObjectURL(activePreviewUrl);
+        activePreviewUrl = "";
+      }
+      modal.hidden = true;
+      modal.removeAttribute("data-portfolio-id");
+      modal.removeAttribute("data-letter-type");
+      syncModalBodyState();
+    }
+
+    function openLetterPreview(portfolioId, type, button) {
+      var modal = root.querySelector("[data-scm-portfolio-letter-preview-modal]");
+      if (!modal) {
+        downloadLetter(portfolioId, type, button);
+        return;
+      }
+      var fd = new FormData();
+      fd.set("action", actionPdf);
+      fd.set("nonce", nonce);
+      fd.set("portfolio_id", portfolioId);
+      fd.set("letter_type", type);
+      fd.set("mode", "preview");
+      button.disabled = true;
+      notify("info", "Preparando vista previa del PDF...", "Cartera");
+      fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        .then(function (response) {
+          var contentType = String(response.headers.get("content-type") || "");
+          if (contentType.indexOf("application/json") !== -1) {
+            return response.json().then(function (json) {
+              throw new Error(errorMessage(json, "No se pudo preparar la vista previa."));
+            });
+          }
+          if (!response.ok) throw new Error("No se pudo preparar la vista previa.");
+          return response.blob();
+        })
+        .then(function (blob) {
+          closeLetterPreview();
+          activePreviewUrl = URL.createObjectURL(blob);
+          var frame = modal.querySelector("[data-scm-portfolio-letter-preview-frame]");
+          var title = modal.querySelector("[data-scm-portfolio-letter-preview-title]");
+          var context = modal.querySelector("[data-scm-portfolio-letter-preview-context]");
+          modal.setAttribute("data-portfolio-id", portfolioId);
+          modal.setAttribute("data-letter-type", type);
+          if (frame) frame.src = activePreviewUrl;
+          if (title) title.textContent = type === "siniestro" ? "Vista previa de carta de siniestro" : "Vista previa de carta prejurídica";
+          if (context) context.textContent = "Revisa nombres, contrato, inmueble, saldo y destinatarios antes de continuar.";
+          modal.hidden = false;
+          syncModalBodyState();
+          var close = modal.querySelector("[data-scm-portfolio-letter-preview-close]");
+          if (close) close.focus();
+        })
+        .catch(function (error) {
+          notify("error", error.message, "Cartera");
+        })
+        .finally(function () { button.disabled = false; });
+    }
+
     function chooseLetterAction(button) {
       var type = String(button.getAttribute("data-scm-portfolio-letter") || "");
       var portfolioId = String(button.getAttribute("data-portfolio-id") || "");
-      var label = type === "siniestro" ? "carta de siniestro" : "carta prejurídica";
-      if (window.Swal && typeof window.Swal.fire === "function") {
-        window.Swal.fire({
-          title: "Preparar " + label,
-          text: "Puedes descargarla para revisión o enviarla por correo desde la cola de notificaciones.",
-          icon: "question",
-          showDenyButton: true,
-          showCancelButton: true,
-          confirmButtonText: "Descargar PDF",
-          denyButtonText: "Generar y enviar",
-          cancelButtonText: "Cancelar",
-          confirmButtonColor: "#1e3a5f",
-          denyButtonColor: "#0f766e"
-        }).then(function (result) {
-          if (result.isConfirmed) downloadLetter(portfolioId, type, button);
-          if (result.isDenied) sendLetter(portfolioId, type, button);
-        });
-        return;
-      }
-      downloadLetter(portfolioId, type, button);
+      openLetterPreview(portfolioId, type, button);
     }
 
     function closeManagementModal() {
       var modal = root.querySelector("[data-scm-portfolio-management-modal]");
       if (!modal) return;
       modal.hidden = true;
-      document.body.classList.remove("scm-modal-open");
+      syncModalBodyState();
     }
 
     function renderCodeudores(modal, contract) {
@@ -279,7 +336,7 @@
         var result = modal.querySelector("[data-scm-portfolio-management-result]");
         if (result) result.textContent = "";
         modal.hidden = false;
-        document.body.classList.add("scm-modal-open");
+        syncModalBodyState();
         window.setTimeout(function () {
           var observation = form.querySelector("[name='observacion']");
           if (observation) observation.focus();
@@ -287,6 +344,22 @@
       }).catch(function (error) {
         notify("error", error.message, "Cartera");
       }).finally(function () { button.disabled = false; });
+    }
+
+    function activatePortfolioTab(container, view, focusTab) {
+      if (!container) return;
+      var allowed = ["principal", "informe", "historial"];
+      if (allowed.indexOf(view) === -1) view = "principal";
+      container.querySelectorAll("[data-scm-portfolio-tab]").forEach(function (tab) {
+        var selected = String(tab.getAttribute("data-scm-portfolio-tab") || "") === view;
+        tab.classList.toggle("is-active", selected);
+        tab.setAttribute("aria-selected", selected ? "true" : "false");
+        tab.setAttribute("tabindex", selected ? "0" : "-1");
+        if (selected && focusTab) tab.focus();
+      });
+      container.querySelectorAll("[data-scm-portfolio-panel]").forEach(function (panel) {
+        panel.hidden = String(panel.getAttribute("data-scm-portfolio-panel") || "") !== view;
+      });
     }
 
     root.addEventListener("submit", function (event) {
@@ -342,6 +415,24 @@
     });
 
     root.addEventListener("click", function (event) {
+      var portfolioTab = event.target.closest && event.target.closest("[data-scm-portfolio-tab]");
+      if (portfolioTab && root.contains(portfolioTab)) {
+        event.preventDefault();
+        activatePortfolioTab(
+          portfolioTab.closest("[data-scm-collection-log]"),
+          String(portfolioTab.getAttribute("data-scm-portfolio-tab") || "principal"),
+          true
+        );
+        return;
+      }
+      var reportPrint = event.target.closest && event.target.closest("[data-scm-portfolio-report-print]");
+      if (reportPrint && root.contains(reportPrint)) {
+        event.preventDefault();
+        document.body.classList.add("scm-print-portfolio-report");
+        window.print();
+        window.setTimeout(function () { document.body.classList.remove("scm-print-portfolio-report"); }, 10000);
+        return;
+      }
       var stageButton = event.target.closest && event.target.closest("[data-scm-portfolio-stage]");
       if (stageButton && root.contains(stageButton)) {
         event.preventDefault();
@@ -364,11 +455,56 @@
       if (closeButton && root.contains(closeButton)) {
         event.preventDefault();
         closeManagementModal();
+        return;
+      }
+      var previewClose = event.target.closest && event.target.closest("[data-scm-portfolio-letter-preview-close]");
+      if (previewClose && root.contains(previewClose)) {
+        event.preventDefault();
+        closeLetterPreview();
+        return;
+      }
+      var previewDownload = event.target.closest && event.target.closest("[data-scm-portfolio-letter-preview-download]");
+      if (previewDownload && root.contains(previewDownload)) {
+        event.preventDefault();
+        var downloadModal = previewDownload.closest("[data-scm-portfolio-letter-preview-modal]");
+        var downloadPortfolioId = downloadModal ? String(downloadModal.getAttribute("data-portfolio-id") || "") : "";
+        var downloadType = downloadModal ? String(downloadModal.getAttribute("data-letter-type") || "") : "";
+        closeLetterPreview();
+        downloadLetter(downloadPortfolioId, downloadType, previewDownload);
+        return;
+      }
+      var previewSend = event.target.closest && event.target.closest("[data-scm-portfolio-letter-preview-send]");
+      if (previewSend && root.contains(previewSend)) {
+        event.preventDefault();
+        var sendModal = previewSend.closest("[data-scm-portfolio-letter-preview-modal]");
+        var sendPortfolioId = sendModal ? String(sendModal.getAttribute("data-portfolio-id") || "") : "";
+        var sendType = sendModal ? String(sendModal.getAttribute("data-letter-type") || "") : "";
+        closeLetterPreview();
+        sendLetter(sendPortfolioId, sendType, previewSend);
       }
     });
 
     document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") closeManagementModal();
+      var currentTab = event.target.closest && event.target.closest("[data-scm-portfolio-tab]");
+      if (currentTab && ["ArrowLeft", "ArrowRight", "Home", "End"].indexOf(event.key) !== -1) {
+        var tabs = Array.prototype.slice.call(currentTab.closest("[role='tablist']").querySelectorAll("[data-scm-portfolio-tab]"));
+        var index = tabs.indexOf(currentTab);
+        if (event.key === "Home") index = 0;
+        else if (event.key === "End") index = tabs.length - 1;
+        else index = (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+        event.preventDefault();
+        tabs[index].click();
+        return;
+      }
+      if (event.key === "Escape") {
+        var preview = root.querySelector("[data-scm-portfolio-letter-preview-modal]:not([hidden])");
+        if (preview) closeLetterPreview();
+        else closeManagementModal();
+      }
+    });
+
+    window.addEventListener("afterprint", function () {
+      document.body.classList.remove("scm-print-portfolio-report");
     });
   }
 

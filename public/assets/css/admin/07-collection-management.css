@@ -8,6 +8,169 @@
   gap: 18px;
 }
 
+#scm-app .scm-portfolio-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid #dce6ef;
+  border-radius: 16px;
+  background: rgba(247, 250, 252, 0.96);
+  padding: 7px;
+  box-shadow: 0 8px 24px rgba(23, 52, 84, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+#scm-app .scm-portfolio-tab {
+  min-height: 58px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  padding: 9px 14px;
+  color: #496078;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
+}
+
+#scm-app .scm-portfolio-tab strong,
+#scm-app .scm-portfolio-tab span { display: block; }
+#scm-app .scm-portfolio-tab strong { color: inherit; font-size: 13px; }
+#scm-app .scm-portfolio-tab span { margin-top: 2px; color: #708397; font-size: 11px; }
+
+#scm-app .scm-portfolio-tab:hover {
+  border-color: #cbd8e5;
+  background: #fff;
+  color: var(--portfolio-navy);
+}
+
+#scm-app .scm-portfolio-tab:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.22);
+  outline-offset: 2px;
+}
+
+#scm-app .scm-portfolio-tab.is-active {
+  border-color: #b9cce0;
+  background: #fff;
+  color: var(--portfolio-navy);
+  box-shadow: 0 6px 16px rgba(23, 52, 84, 0.1), inset 0 -3px 0 #f59120;
+}
+
+#scm-app .scm-portfolio-tab.is-active span { color: #526b83; }
+
+#scm-app .scm-portfolio-view {
+  display: grid;
+  gap: 18px;
+  animation: scm-portfolio-view-in 180ms ease-out both;
+}
+
+@keyframes scm-portfolio-view-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#scm-app .scm-portfolio-workflow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#scm-app .scm-portfolio-workflow article {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  border: 1px solid #dce6ef;
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px;
+  box-shadow: 0 6px 18px rgba(23, 52, 84, 0.05);
+}
+
+#scm-app .scm-portfolio-workflow article > span {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: #edf3f8;
+  color: var(--portfolio-navy);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+#scm-app .scm-portfolio-workflow strong { display: block; color: var(--portfolio-navy); font-size: 13px; }
+#scm-app .scm-portfolio-workflow p { margin: 3px 0 0; color: #60758b; font-size: 11px; line-height: 1.5; }
+
+#scm-app .scm-portfolio-report {
+  border: 1px solid #dce6ef;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f8fbfe 0%, #fff 44%);
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(23, 52, 84, 0.06);
+}
+
+#scm-app .scm-portfolio-report-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+#scm-app .scm-portfolio-report-head h4 { margin: 4px 0 5px; color: var(--portfolio-navy); font-size: 22px; }
+#scm-app .scm-portfolio-report-head p { max-width: 760px; margin: 0; color: #5f7185; line-height: 1.55; }
+#scm-app .scm-portfolio-report-head button { min-height: 44px; white-space: nowrap; }
+
+#scm-app .scm-portfolio-report-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: 14px;
+}
+
+#scm-app .scm-portfolio-report-grid--lower { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+#scm-app .scm-portfolio-report-card {
+  border: 1px solid #dce6ef;
+  border-radius: 16px;
+  background: #fff;
+  padding: 18px;
+}
+
+#scm-app .scm-portfolio-report-card h5 { margin: 4px 0 12px; color: var(--portfolio-navy); font-size: 16px; }
+#scm-app .scm-portfolio-report-card p { margin: 0; color: #40566d; font-size: 13px; line-height: 1.7; }
+#scm-app .scm-portfolio-report-card ul { margin: 13px 0 0; padding-left: 19px; color: #40566d; font-size: 12px; line-height: 1.7; }
+
+#scm-app .scm-portfolio-report-metric {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  padding: 11px 0;
+  border-top: 1px solid #e4ebf2;
+}
+
+#scm-app .scm-portfolio-report-metric:first-of-type { border-top: 0; }
+#scm-app .scm-portfolio-report-metric span { color: #40566d; font-size: 12px; font-weight: 700; }
+#scm-app .scm-portfolio-report-metric strong { grid-row: span 2; color: var(--portfolio-navy); font-size: 20px; font-variant-numeric: tabular-nums; }
+#scm-app .scm-portfolio-report-metric small { color: #718296; font-size: 10px; }
+
+#scm-app .scm-portfolio-report-bar-row { margin-top: 13px; }
+#scm-app .scm-portfolio-report-bar-row > div:first-child { display: flex; justify-content: space-between; gap: 10px; color: #40566d; font-size: 12px; }
+#scm-app .scm-portfolio-report-bar-row strong { color: var(--portfolio-navy); font-variant-numeric: tabular-nums; }
+#scm-app .scm-portfolio-report-bar { height: 10px; margin-top: 6px; overflow: hidden; border-radius: 999px; background: #e9eff5; }
+#scm-app .scm-portfolio-report-bar-fill { display: block; width: var(--scm-portfolio-bar); height: 100%; border-radius: inherit; background: var(--portfolio-blue); }
+#scm-app .scm-portfolio-report-bar-fill--prelegal { background: #d97706; }
+#scm-app .scm-portfolio-report-bar-fill--claim { background: var(--portfolio-red); }
+
+#scm-app .scm-portfolio-report-types { margin: 0; }
+#scm-app .scm-portfolio-report-types div { display: flex; justify-content: space-between; gap: 14px; padding: 10px 0; border-top: 1px solid #e4ebf2; }
+#scm-app .scm-portfolio-report-types div:first-child { border-top: 0; }
+#scm-app .scm-portfolio-report-types dt { color: #40566d; font-size: 12px; }
+#scm-app .scm-portfolio-report-types dd { margin: 0; color: var(--portfolio-navy); font-weight: 900; font-variant-numeric: tabular-nums; }
+#scm-app .scm-portfolio-report-empty { color: #718296 !important; }
+
 #scm-app .scm-portfolio-kpis {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -260,6 +423,12 @@
   text-align: left;
 }
 
+#scm-app .scm-portfolio-management-btn {
+  border-color: #9bb8d4;
+  background: #f2f7fb;
+  color: var(--portfolio-navy);
+}
+
 #scm-app .scm-portfolio-stage-btn {
   border-color: #e2a4a0;
   color: #982018;
@@ -295,6 +464,81 @@
   gap: 12px;
 }
 
+#scm-app .scm-portfolio-management-observation .scm-textarea {
+  display: block;
+  width: 100% !important;
+  min-width: 100% !important;
+  min-height: 142px;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1.5px solid #c7d5e3;
+  border-radius: 12px;
+  background: #f8fbfe;
+  padding: 13px 14px;
+  color: #20364d;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+#scm-app .scm-portfolio-management-observation .scm-textarea:focus {
+  border-color: #f59120;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(245, 145, 32, 0.14);
+}
+
+#scm-app .scm-portfolio-management-observation .scm-textarea::placeholder { color: #8191a3; }
+#scm-app .scm-portfolio-management-observation small { display: block; margin-top: 6px; color: #687d91; font-size: 11px; line-height: 1.45; }
+
+#scm-app .scm-portfolio-letter-preview-panel {
+  width: min(1180px, calc(100vw - 38px));
+  overflow: hidden;
+}
+
+#scm-app .scm-portfolio-letter-preview-help {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  border-bottom: 1px solid #dce6ef;
+  background: #fff8e8;
+  padding: 11px 18px;
+  color: #6f4a16;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+#scm-app .scm-portfolio-letter-preview-help strong { color: #7c4207; }
+
+#scm-app .scm-portfolio-letter-preview-frame {
+  height: min(68vh, 760px);
+  min-height: 420px;
+  background: #dfe6ed;
+  padding: 12px;
+}
+
+#scm-app .scm-portfolio-letter-preview-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+#scm-app .scm-portfolio-letter-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 9px;
+  border-top: 1px solid #dce6ef;
+  background: #fff;
+  padding: 14px 18px;
+}
+
+#scm-app .scm-portfolio-letter-preview-actions button { min-height: 44px; }
+
 #scm-app .scm-portfolio-management-notify {
   display: grid;
   gap: 10px;
@@ -315,6 +559,9 @@
 @media (max-width: 1180px) {
   #scm-app .scm-portfolio-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   #scm-app .scm-portfolio-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #scm-app .scm-portfolio-workflow,
+  #scm-app .scm-portfolio-report-grid,
+  #scm-app .scm-portfolio-report-grid--lower { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
@@ -327,8 +574,35 @@
   #scm-app .scm-portfolio-filter-form .scm-collection-log-actions,
   #scm-app .scm-portfolio-filter-form .scm-collection-log-actions .btn { width: 100%; }
   #scm-app .scm-portfolio-actions { min-width: 220px; }
+  #scm-app .scm-portfolio-tabs { position: static; grid-template-columns: 1fr; }
+  #scm-app .scm-portfolio-tab { min-height: 52px; }
+  #scm-app .scm-portfolio-report { padding: 14px; }
+  #scm-app .scm-portfolio-report-head { display: grid; }
+  #scm-app .scm-portfolio-report-head button,
+  #scm-app .scm-portfolio-letter-preview-actions button { width: 100%; }
+  #scm-app .scm-portfolio-letter-preview-frame { min-height: 340px; height: 58vh; padding: 7px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   #scm-app .scm-portfolio * { scroll-behavior: auto !important; transition: none !important; }
+  #scm-app .scm-portfolio-view { animation: none !important; }
+}
+
+@media print {
+  body.scm-print-portfolio-report * { visibility: hidden !important; }
+  body.scm-print-portfolio-report #scm-app [data-scm-portfolio-panel="informe"],
+  body.scm-print-portfolio-report #scm-app [data-scm-portfolio-panel="informe"] * { visibility: visible !important; }
+  body.scm-print-portfolio-report #scm-app [data-scm-portfolio-panel="informe"] {
+    position: absolute;
+    inset: 0 auto auto 0;
+    display: grid !important;
+    width: 100%;
+    border: 0;
+    box-shadow: none;
+  }
+  body.scm-print-portfolio-report .scm-portfolio-report-head button { display: none !important; }
+  body.scm-print-portfolio-report .scm-portfolio-kpis { grid-template-columns: repeat(5, 1fr); }
+  body.scm-print-portfolio-report .scm-portfolio-kpi { min-height: 92px; box-shadow: none; }
+  body.scm-print-portfolio-report .scm-portfolio-report-grid,
+  body.scm-print-portfolio-report .scm-portfolio-report-grid--lower { grid-template-columns: repeat(2, 1fr); }
 }

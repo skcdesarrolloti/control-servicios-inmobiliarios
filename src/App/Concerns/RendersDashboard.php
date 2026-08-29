@@ -2215,6 +2215,29 @@ trait RendersDashboard
     $dateFrom = (string) ($applied['date_from'] ?? '');
     $dateTo = (string) ($applied['date_to'] ?? '');
     $currentType = (string) ($applied['type'] ?? '');
+    $activeView = sanitize_key((string) ($input['scmgc_view'] ?? 'principal'));
+    if (!in_array($activeView, ['principal', 'informe', 'historial'], true)) {
+      $activeView = 'principal';
+    }
+    $totalAccounts = (int) ($portfolioSummary['total'] ?? 0);
+    $debtorAccounts = (int) ($portfolioSummary['debtors'] ?? 0);
+    $currentAccounts = (int) ($portfolioSummary['current'] ?? 0);
+    $creditAccounts = (int) ($portfolioSummary['credits'] ?? 0);
+    $reviewAccounts = (int) ($portfolioSummary['without_data'] ?? 0) + (int) ($portfolioSummary['unmatched'] ?? 0);
+    $prelegalAccounts = (int) ($portfolioSummary['prejuridical'] ?? 0);
+    $claimAccounts = (int) ($portfolioSummary['claims'] ?? 0);
+    $normalDebtAccounts = max(0, $debtorAccounts - $prelegalAccounts - $claimAccounts);
+    $portfolioBalance = (float) ($portfolioSummary['balance'] ?? 0);
+    $averageDebt = $debtorAccounts > 0 ? $portfolioBalance / $debtorAccounts : 0.0;
+    $debtRate = $totalAccounts > 0 ? (int) round(($debtorAccounts / $totalAccounts) * 100) : 0;
+    $matchedRate = $totalAccounts > 0 ? (int) round(((max(0, $totalAccounts - $reviewAccounts)) / $totalAccounts) * 100) : 0;
+    $stageTotal = $normalDebtAccounts + $prelegalAccounts + $claimAccounts;
+    $normalStageRate = $stageTotal > 0 ? (int) round(($normalDebtAccounts / $stageTotal) * 100) : 0;
+    $prelegalStageRate = $stageTotal > 0 ? (int) round(($prelegalAccounts / $stageTotal) * 100) : 0;
+    $claimStageRate = $stageTotal > 0 ? max(0, 100 - $normalStageRate - $prelegalStageRate) : 0;
+    $reportCutoff = is_array($latestImport)
+      ? $this->collection_date((string) ($latestImport['source_date'] ?? ''))
+      : 'Sin auxiliar cargado';
 
     ob_start();
 ?>
@@ -2228,6 +2251,20 @@ trait RendersDashboard
         <span class="scm-status-count"><strong><?php echo esc_html((string) $currentTotal); ?></strong> cuentas visibles</span>
       </div>
 
+      <div class="scm-portfolio-tabs" role="tablist" aria-label="Vistas de control de cartera">
+        <?php foreach (['principal' => ['Cartera principal', 'Operación diaria'], 'informe' => ['Informe gerencial', 'Resumen para dirección'], 'historial' => ['Historial', 'Trazabilidad completa']] as $viewKey => $viewMeta): ?>
+          <button type="button" id="scm-portfolio-tab-<?php echo esc_attr($viewKey); ?>" class="scm-portfolio-tab<?php echo $activeView === $viewKey ? ' is-active' : ''; ?>" role="tab" aria-selected="<?php echo $activeView === $viewKey ? 'true' : 'false'; ?>" aria-controls="scm-portfolio-panel-<?php echo esc_attr($viewKey); ?>" tabindex="<?php echo $activeView === $viewKey ? '0' : '-1'; ?>" data-scm-portfolio-tab="<?php echo esc_attr($viewKey); ?>">
+            <strong><?php echo esc_html($viewMeta[0]); ?></strong><span><?php echo esc_html($viewMeta[1]); ?></span>
+          </button>
+        <?php endforeach; ?>
+      </div>
+
+      <section id="scm-portfolio-panel-informe" class="scm-portfolio-view scm-portfolio-report" role="tabpanel" aria-labelledby="scm-portfolio-tab-informe" data-scm-portfolio-panel="informe"<?php echo $activeView === 'informe' ? '' : ' hidden'; ?>>
+        <div class="scm-portfolio-report-head">
+          <div><span class="scm-calendar-action-kicker">Informe para gerencia administrativa</span><h4>Estado ejecutivo de la cartera</h4><p>Cifras consolidadas del &uacute;ltimo auxiliar y de las gestiones registradas. Corte contable: <strong><?php echo esc_html($reportCutoff); ?></strong>.</p></div>
+          <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-report-print>Imprimir / guardar PDF</button>
+        </div>
+
       <div class="scm-portfolio-kpis" aria-label="Resumen ejecutivo de cartera">
         <article class="scm-portfolio-kpi scm-portfolio-kpi--money"><span>Cartera pendiente</span><strong><?php echo esc_html($this->collection_money($portfolioSummary['balance'] ?? 0)); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['debtors'] ?? 0))); ?> contratos con saldo</small></article>
         <article class="scm-portfolio-kpi scm-portfolio-kpi--success"><span>Sin deuda</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['current'] ?? 0) + (int) ($portfolioSummary['credits'] ?? 0))); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['credits'] ?? 0))); ?> con saldo a favor</small></article>
@@ -2235,6 +2272,52 @@ trait RendersDashboard
         <article class="scm-portfolio-kpi scm-portfolio-kpi--warning"><span>Sin cruce</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['without_data'] ?? 0) + (int) ($portfolioSummary['unmatched'] ?? 0))); ?></strong><small>Requieren verificaci&oacute;n</small></article>
         <article class="scm-portfolio-kpi scm-portfolio-kpi--claim"><span>Siniestrados</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['claims'] ?? 0))); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['prejuridical'] ?? 0))); ?> en prejur&iacute;dico</small></article>
       </div>
+
+        <div class="scm-portfolio-report-grid">
+          <article class="scm-portfolio-report-card scm-portfolio-report-card--summary">
+            <span class="scm-calendar-action-kicker">Lectura ejecutiva</span>
+            <h5>Resumen del corte</h5>
+            <p>La cartera pendiente es de <strong><?php echo esc_html($this->collection_money($portfolioBalance)); ?></strong>, distribuida en <strong><?php echo esc_html((string) $debtorAccounts); ?> contratos</strong>. El saldo promedio por contrato moroso es de <strong><?php echo esc_html($this->collection_money($averageDebt)); ?></strong>.</p>
+            <ul>
+              <li><strong><?php echo esc_html((string) ((int) ($portfolioSummary['paid'] ?? 0))); ?></strong> contratos pagaron desde el cargue anterior.</li>
+              <li><strong><?php echo esc_html((string) $prelegalAccounts); ?></strong> est&aacute;n en etapa prejur&iacute;dica y <strong><?php echo esc_html((string) $claimAccounts); ?></strong> marcados como siniestro.</li>
+              <li><strong><?php echo esc_html((string) $reviewAccounts); ?></strong> registros requieren verificaci&oacute;n de cruce con contratos.</li>
+              <li>Se han registrado <strong><?php echo esc_html((string) ((int) ($stats['total'] ?? 0))); ?></strong> gestiones de cobro en el historial.</li>
+            </ul>
+          </article>
+          <article class="scm-portfolio-report-card">
+            <span class="scm-calendar-action-kicker">Indicadores de control</span>
+            <h5>Calidad y exposici&oacute;n</h5>
+            <div class="scm-portfolio-report-metric"><span>Contratos con deuda</span><strong><?php echo esc_html((string) $debtRate); ?>%</strong><small><?php echo esc_html((string) $debtorAccounts); ?> de <?php echo esc_html((string) $totalAccounts); ?> cuentas</small></div>
+            <div class="scm-portfolio-report-metric"><span>Cuentas cruzadas</span><strong><?php echo esc_html((string) $matchedRate); ?>%</strong><small><?php echo esc_html((string) max(0, $totalAccounts - $reviewAccounts)); ?> cuentas identificadas</small></div>
+            <div class="scm-portfolio-report-metric"><span>Al d&iacute;a o a favor</span><strong><?php echo esc_html((string) ($currentAccounts + $creditAccounts)); ?></strong><small><?php echo esc_html((string) $creditAccounts); ?> presentan saldo a favor</small></div>
+          </article>
+        </div>
+
+        <div class="scm-portfolio-report-grid scm-portfolio-report-grid--lower">
+          <article class="scm-portfolio-report-card">
+            <span class="scm-calendar-action-kicker">Etapas de cobro</span>
+            <h5>Distribuci&oacute;n de contratos con deuda</h5>
+            <?php foreach ([['Cobro normal', $normalDebtAccounts, $normalStageRate, 'normal'], ['Prejurídico', $prelegalAccounts, $prelegalStageRate, 'prelegal'], ['Siniestro', $claimAccounts, $claimStageRate, 'claim']] as $stageMetric): ?>
+              <div class="scm-portfolio-report-bar-row"><div><span><?php echo esc_html($stageMetric[0]); ?></span><strong><?php echo esc_html((string) $stageMetric[1]); ?></strong></div><div class="scm-portfolio-report-bar" role="img" aria-label="<?php echo esc_attr($stageMetric[0] . ': ' . $stageMetric[1] . ' contratos'); ?>"><i class="scm-portfolio-report-bar-fill scm-portfolio-report-bar-fill--<?php echo esc_attr($stageMetric[3]); ?>" style="--scm-portfolio-bar: <?php echo esc_attr((string) max(0, min(100, (int) $stageMetric[2]))); ?>%"></i></div></div>
+            <?php endforeach; ?>
+          </article>
+          <article class="scm-portfolio-report-card">
+            <span class="scm-calendar-action-kicker">Actividad del equipo</span>
+            <h5>Gestiones por concepto</h5>
+            <?php if ($byType === []): ?><p class="scm-portfolio-report-empty">A&uacute;n no hay gestiones clasificadas para resumir.</p><?php else: ?>
+              <dl class="scm-portfolio-report-types"><?php foreach ($byType as $typeLabel => $typeTotal): ?><div><dt><?php echo esc_html((string) $typeLabel); ?></dt><dd><?php echo esc_html((string) ((int) $typeTotal)); ?></dd></div><?php endforeach; ?></dl>
+            <?php endif; ?>
+          </article>
+        </div>
+      </section>
+
+      <section id="scm-portfolio-panel-principal" class="scm-portfolio-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-principal" data-scm-portfolio-panel="principal"<?php echo $activeView === 'principal' ? '' : ' hidden'; ?>>
+        <div class="scm-portfolio-workflow" aria-label="Guía de acciones de cartera">
+          <article><span>1</span><div><strong>Hacer gesti&oacute;n</strong><p>Registra llamada, acuerdo o compromiso; puede programar seguimiento y enviar mensajes. No cambia la etapa de cobro.</p></div></article>
+          <article><span>2</span><div><strong>Preparar carta</strong><p>Abre una vista previa. Descargar o enviar la carta registra la etapa prejur&iacute;dica o de siniestro.</p></div></article>
+          <article><span>3</span><div><strong>Marcar siniestro</strong><p>Solo cambia el estado del contrato y deja trazabilidad. No crea ni env&iacute;a una carta por s&iacute; solo.</p></div></article>
+        </div>
 
       <section class="scm-admin-notif-card scm-portfolio-import-card">
         <form data-scm-portfolio-import enctype="multipart/form-data">
@@ -2262,6 +2345,7 @@ trait RendersDashboard
         </div>
         <form method="get" autocomplete="off" data-scm-collection-log-form class="scm-portfolio-filter-form">
           <input type="hidden" name="scm_tab" value="gestiones_cobro">
+          <input type="hidden" name="scmgc_view" value="principal">
           <input type="hidden" name="scmgc_cartera_page" value="1">
           <div class="scm-portfolio-filter-grid">
             <div class="scm-field">
@@ -2339,11 +2423,11 @@ trait RendersDashboard
                     <td>
                       <?php if ($canManage): ?>
                         <div class="scm-portfolio-actions">
-                          <button type="button" class="scm-case-work-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>">Nueva gesti&oacute;n</button>
+                          <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar contacto, acuerdo, compromiso o seguimiento sin cambiar la etapa">Hacer gesti&oacute;n</button>
                           <?php if ($canCollect): ?>
-                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="prejuridico" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>">Carta prejur&iacute;dica</button>
-                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="siniestro" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>">Carta siniestro</button>
-                            <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="<?php echo $rowStage === 'siniestro' ? 'normal' : 'siniestro'; ?>" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>"><?php echo $rowStage === 'siniestro' ? 'Quitar siniestro' : 'Marcar siniestro'; ?></button>
+                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="prejuridico" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="Revisar la carta antes de descargarla o enviarla">Preparar prejur&iacute;dico</button>
+                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="siniestro" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="Revisar el aviso antes de descargarlo o enviarlo">Preparar siniestro</button>
+                            <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="<?php echo $rowStage === 'siniestro' ? 'normal' : 'siniestro'; ?>" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="<?php echo $rowStage === 'siniestro' ? 'Devuelve el contrato a cobro normal' : 'Cambia la etapa sin generar ni enviar una carta'; ?>"><?php echo $rowStage === 'siniestro' ? 'Quitar siniestro' : 'Marcar siniestro'; ?></button>
                           <?php elseif ($rowStage !== 'normal'): ?>
                             <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="normal" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>">Normalizar etapa</button>
                           <?php else: ?><span class="scm-portfolio-no-action">Sin saldo para escalar</span><?php endif; ?>
@@ -2359,10 +2443,13 @@ trait RendersDashboard
         <?php endif; ?>
       </section>
 
+      </section>
+
+      <section id="scm-portfolio-panel-historial" class="scm-portfolio-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-historial" data-scm-portfolio-panel="historial"<?php echo $activeView === 'historial' ? '' : ' hidden'; ?>>
       <section class="scm-admin-notif-card scm-collection-history-card">
         <div class="scm-portfolio-section-head"><div><span class="scm-calendar-action-kicker">Trazabilidad</span><h4>Historial de gestiones de cobro</h4><p>Todos los registros operativos y sus notificaciones, ya centralizados en este m&oacute;dulo.</p></div><span class="scm-status-count"><strong><?php echo esc_html((string) ((int) ($stats['total'] ?? 0))); ?></strong> gestiones</span></div>
         <form method="get" autocomplete="off" data-scm-collection-log-form class="scm-collection-log-filters">
-          <input type="hidden" name="scm_tab" value="gestiones_cobro"><input type="hidden" name="scmgc_page" value="1">
+          <input type="hidden" name="scm_tab" value="gestiones_cobro"><input type="hidden" name="scmgc_view" value="historial"><input type="hidden" name="scmgc_page" value="1">
           <div class="scm-collection-log-filter-grid">
             <div class="scm-field"><label for="scmgc_fecha_desde">Fecha desde</label><input id="scmgc_fecha_desde" name="scmgc_fecha_desde" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr($dateFrom); ?>"></div>
             <div class="scm-field"><label for="scmgc_fecha_hasta">Fecha hasta</label><input id="scmgc_fecha_hasta" name="scmgc_fecha_hasta" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr($dateTo); ?>"></div>
@@ -2376,8 +2463,10 @@ trait RendersDashboard
           </tbody></table></div><?php echo $this->render_collection_management_pagination($pagination, $applied); ?>
         <?php endif; ?>
       </section>
+      </section>
 
       <?php echo $this->render_collection_management_modal(); ?>
+      <?php echo $this->render_collection_letter_preview_modal(); ?>
     </div>
 <?php
     return (string) ob_get_clean();
@@ -2414,7 +2503,7 @@ trait RendersDashboard
             <div class="scm-field" data-scm-portfolio-followup-field hidden><label for="scm-portfolio-management-date">Fecha</label><input id="scm-portfolio-management-date" name="siguiente_fecha" type="date" class="input input-bordered input-sm scm-input"></div>
             <div class="scm-field" data-scm-portfolio-followup-field hidden><label for="scm-portfolio-management-time">Hora</label><input id="scm-portfolio-management-time" name="siguiente_hora" type="time" class="input input-bordered input-sm scm-input"></div>
           </div>
-          <div class="scm-field"><label for="scm-portfolio-management-observation">Observaci&oacute;n</label><textarea id="scm-portfolio-management-observation" name="observacion" class="textarea textarea-bordered scm-textarea" rows="5" required placeholder="Llamada realizada, acuerdo, compromiso, novedad o siguiente paso..."></textarea></div>
+          <div class="scm-field scm-portfolio-management-observation"><label for="scm-portfolio-management-observation">Observaci&oacute;n <span aria-hidden="true">*</span></label><textarea id="scm-portfolio-management-observation" name="observacion" class="textarea textarea-bordered scm-textarea" rows="5" maxlength="2000" required aria-describedby="scm-portfolio-management-observation-help" placeholder="Ejemplo: Se llam&oacute; al arrendatario. Se comprometi&oacute; a pagar el 30/08 y enviar el soporte por WhatsApp."></textarea><small id="scm-portfolio-management-observation-help">Describe el contacto, el compromiso y el siguiente paso. Esta nota quedar&aacute; en el historial.</small></div>
           <div class="scm-field" data-scm-portfolio-followup-field hidden><label for="scm-portfolio-management-schedule-note">Detalle del horario</label><input id="scm-portfolio-management-schedule-note" name="otro_horario_cobro" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: llamar después de las 3:00 p. m."></div>
           <div class="scm-portfolio-management-notify">
             <div><strong>Notificar al guardar</strong><span>Opcional. Usa la plantilla de gesti&oacute;n de cobro para el arrendatario y los codeudores seleccionados.</span></div>
@@ -2424,6 +2513,30 @@ trait RendersDashboard
           <div class="scm-admin-notif-submit-row"><span class="scm-spinner" data-scm-portfolio-management-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span><button type="submit" class="scm-btn-primary btn btn-primary">Guardar gesti&oacute;n</button></div>
           <p class="scm-admin-notif-result" data-scm-portfolio-management-result aria-live="polite"></p>
         </form>
+      </section>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  private function render_collection_letter_preview_modal(): string
+  {
+    ob_start();
+?>
+    <div class="scm-admin-notif-modal scm-portfolio-letter-preview-modal" data-scm-portfolio-letter-preview-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-portfolio-letter-preview-title">
+      <div class="scm-admin-notif-modal-backdrop" data-scm-portfolio-letter-preview-close aria-hidden="true"></div>
+      <section class="scm-admin-notif-card scm-admin-notif-modal-panel scm-portfolio-letter-preview-panel">
+        <div class="scm-admin-notif-modal-head">
+          <div class="scm-admin-notif-modal-titleblock"><span class="scm-calendar-action-kicker">Vista previa</span><h4 id="scm-portfolio-letter-preview-title" data-scm-portfolio-letter-preview-title>Carta de cartera</h4><p data-scm-portfolio-letter-preview-context>Revisa el documento antes de registrarlo o enviarlo.</p></div>
+          <button type="button" class="scm-modal-close" data-scm-portfolio-letter-preview-close aria-label="Cerrar vista previa"><span aria-hidden="true">&times;</span></button>
+        </div>
+        <div class="scm-portfolio-letter-preview-help"><strong>La vista previa no cambia la etapa ni env&iacute;a mensajes.</strong><span>Al descargar se registra la carta y su etapa. Al enviar tambi&eacute;n se encola el correo para los destinatarios correspondientes.</span></div>
+        <div class="scm-portfolio-letter-preview-frame"><iframe src="about:blank" title="Vista previa de la carta en PDF" data-scm-portfolio-letter-preview-frame></iframe></div>
+        <div class="scm-portfolio-letter-preview-actions">
+          <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-letter-preview-close>Cerrar</button>
+          <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter-preview-download>Descargar y registrar</button>
+          <button type="button" class="scm-btn-primary btn btn-primary" data-scm-portfolio-letter-preview-send>Enviar y registrar</button>
+        </div>
       </section>
     </div>
 <?php
@@ -2490,6 +2603,7 @@ trait RendersDashboard
     }
     $base = [
       'scm_tab' => 'gestiones_cobro',
+      'scmgc_view' => 'principal',
       'scmgc_buscar' => (string) ($filters['search'] ?? ''),
       'scmgc_estado' => (string) ($filters['status'] ?? ''),
       'scmgc_etapa' => (string) ($filters['stage'] ?? ''),
@@ -2548,6 +2662,7 @@ trait RendersDashboard
     }
     $base = [
       'scm_tab' => 'gestiones_cobro',
+      'scmgc_view' => 'historial',
       'scmgc_fecha_desde' => (string) ($filters['date_from'] ?? ''),
       'scmgc_fecha_hasta' => (string) ($filters['date_to'] ?? ''),
       'scmgc_tipo' => (string) ($filters['type'] ?? ''),

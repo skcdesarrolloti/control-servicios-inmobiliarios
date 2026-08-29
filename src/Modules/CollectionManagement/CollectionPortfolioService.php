@@ -429,19 +429,18 @@ final class CollectionPortfolioService
     $this->addEvent($portfolioId, null, 'collection_management', null, null, trim($observation));
   }
 
+  /** @return array{url:string,path:string,filename:string,title:string} */
+  public function previewLetter(int $portfolioId, string $letterType): array
+  {
+    $item = $this->letterItem($portfolioId, $letterType);
+    $sender = (new AdministrativeNotificationsService($this->db))->senderProfile();
+    return (new CollectionLetterPdfGenerator())->generate($item, $letterType, $sender);
+  }
+
   /** @return array<string,mixed> */
   public function generateLetter(int $portfolioId, string $letterType, bool $sendEmail): array
   {
-    if (!in_array($letterType, ['prejuridico', 'siniestro'], true)) {
-      throw new \RuntimeException('Tipo de carta no válido.');
-    }
-    $item = $this->item($portfolioId);
-    if ((int) ($item['contract_id'] ?? 0) <= 0) {
-      throw new \RuntimeException('Primero debes vincular esta cuenta con un contrato de arrendamiento.');
-    }
-    if ((string) ($item['status'] ?? '') !== 'deuda') {
-      throw new \RuntimeException('El contrato no registra saldo pendiente en el último auxiliar.');
-    }
+    $item = $this->letterItem($portfolioId, $letterType);
     $sender = (new AdministrativeNotificationsService($this->db))->senderProfile();
     $generator = new CollectionLetterPdfGenerator();
     $document = $generator->generate($item, $letterType, $sender);
@@ -498,6 +497,22 @@ final class CollectionPortfolioService
       (string) $document['url']
     );
     return $document + ['queued' => $queued, 'recipients' => count($recipients), 'stage' => $stage];
+  }
+
+  /** @return array<string,mixed> */
+  private function letterItem(int $portfolioId, string $letterType): array
+  {
+    if (!in_array($letterType, ['prejuridico', 'siniestro'], true)) {
+      throw new \RuntimeException('Tipo de carta no válido.');
+    }
+    $item = $this->item($portfolioId);
+    if ((int) ($item['contract_id'] ?? 0) <= 0) {
+      throw new \RuntimeException('Primero debes vincular esta cuenta con un contrato de arrendamiento.');
+    }
+    if ((string) ($item['status'] ?? '') !== 'deuda') {
+      throw new \RuntimeException('El contrato no registra saldo pendiente en el último auxiliar.');
+    }
+    return $item;
   }
 
   /** @param array<int,array<int,mixed>> $rows @return array{accounts:array<string,array<string,mixed>>,source_date:string} */
