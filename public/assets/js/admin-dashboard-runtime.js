@@ -7443,7 +7443,7 @@
           : []);
       runtime.funcionarios = funcionarioOptions;
       var mappings = [
-        ["select[name$='id_empleado'], [data-scm-execution-form] select[name='funcionario']", funcionarioOptions, "id", "label"],
+        ["select[name$='id_empleado'], select[name$='_empleado'], select[name='empleado'], [data-scm-execution-form] select[name='funcionario']", funcionarioOptions, "id", "label"],
         ["select[name$='barrio']", options.barrios || [], "value", "label"],
         ["select[name$='estado_admin']", options.estado_admin || [], "value", "label"],
         ["select[name$='prioridad']", options.prioridad || [], "value", "label"],
