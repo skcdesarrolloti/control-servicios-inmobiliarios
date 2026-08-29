@@ -305,15 +305,47 @@
     } catch (_error) {}
   }
 
-  function redirectToLogin() {
-    if (redirectTimer) window.clearTimeout(redirectTimer);
-    if (countdownTimer) window.clearInterval(countdownTimer);
-    preserveDrafts();
-    rememberNavigation();
+  function loginTargetUrl() {
+    var raw = "";
+    try {
+      raw = sessionConfig().loginUrl || "login.php";
+    } catch (_error) {
+      raw = "login.php";
+    }
+    try {
+      return new URL(raw, window.location.href).href;
+    } catch (_error) {
+      return "login.php";
+    }
+  }
+
+  function redirectToLogin(event) {
+    if (event && typeof event.preventDefault === "function") event.preventDefault();
+    if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+    try { if (redirectTimer) window.clearTimeout(redirectTimer); } catch (_error) {}
+    try { if (countdownTimer) window.clearInterval(countdownTimer); } catch (_error) {}
+    try { preserveDrafts(); } catch (_error) {}
+    try { rememberNavigation(); } catch (_error) {}
     try {
       window.sessionStorage.setItem(returnUrlKey, window.location.href);
     } catch (_error) {}
-    window.location.assign(sessionConfig().loginUrl);
+    var target = loginTargetUrl();
+    try {
+      window.location.assign(target);
+    } catch (_error) {
+      try {
+        window.location.href = target;
+      } catch (_fallbackError) {}
+    }
+    window.setTimeout(function () {
+      if (window.location.href !== target) {
+        try {
+          window.location.replace(target);
+        } catch (_error) {
+          window.location.href = target;
+        }
+      }
+    }, 250);
   }
 
   function createExpirationModal(reason) {
@@ -352,6 +384,14 @@
       button.addEventListener("click", redirectToLogin);
       window.setTimeout(function () { button.focus(); }, 30);
     }
+    overlay.addEventListener("click", function (event) {
+      var target = event.target && event.target.closest
+        ? event.target.closest("[data-scm-session-login]")
+        : null;
+      if (target) {
+        redirectToLogin(event);
+      }
+    });
     Array.prototype.forEach.call(document.body.children, function (child) {
       if (child !== overlay && child instanceof HTMLElement) {
         child.inert = true;
