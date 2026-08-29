@@ -7,6 +7,7 @@ Ejecuta estos comandos durante el despliegue y desde cron/cola, respectivamente:
 
 ```bash
 php bin/migrate-canon-insurance-audit.php
+php bin/migrate-collection-management.php
 php bin/sync-canon-increment-changes.php
 php bin/warm-dashboard-performance.php filters
 php bin/warm-dashboard-performance.php metrics
@@ -64,6 +65,14 @@ Aplicación PHP para administrar tickets, mantenimientos, PQR, revisiones preven
    ```bash
    php bin/queue-worker.php 40
    ```
+
+8. Verifica las tablas del control de cartera antes de habilitar la pestaña Gestiones de cobro:
+
+   ```bash
+   php bin/migrate-collection-management.php
+   ```
+
+   El comando es idempotente. El auxiliar 1380 se carga después desde el panel; no se importa ningún saldo durante el despliegue.
 
 La integración de notificaciones compartidas se localiza mediante `SHARED_NOTIFICATIONS_PATH`. Si está vacía, se intenta usar el proyecto hermano histórico.
 

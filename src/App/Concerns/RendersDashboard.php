@@ -6,6 +6,7 @@ namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
 use SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService;
+use SCM\Modules\CollectionManagement\CollectionPortfolioService;
 use SCM\Support\FuncionarioOptions;
 
 trait RendersDashboard
@@ -394,6 +395,9 @@ trait RendersDashboard
         'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
         'admin_notifications_collection_log' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_LOG,
+        'collection_portfolio_import' => self::AJAX_COLLECTION_PORTFOLIO_IMPORT,
+        'collection_portfolio_action' => self::AJAX_COLLECTION_PORTFOLIO_ACTION,
+        'collection_portfolio_pdf' => self::AJAX_COLLECTION_PORTFOLIO_PDF,
         'internal_notifications_save' => self::AJAX_INTERNAL_NOTIFICATIONS_SAVE,
         'public_pqr_settings_read' => self::AJAX_PUBLIC_PQR_SETTINGS_READ,
         'internal_notifications_read' => self::AJAX_INTERNAL_NOTIFICATIONS_READ,
@@ -497,6 +501,7 @@ trait RendersDashboard
     $jsRel  = 'assets/js/scm-admin.js';
     $sessionGuardJsRel = 'assets/js/scm-session-guard.js';
     $dashboardRuntimeJsRel = 'assets/js/admin-dashboard-runtime.js';
+    $collectionManagementJsRel = 'assets/js/admin-collection-management.js';
     $canonInsuranceAuditJsRel = 'assets/js/admin-canon-insurance-audit.js';
     $guideJsRel = 'assets/js/admin-guide.js';
     $damageCssRel = 'assets/css/scm-damage-magnitude.css';
@@ -505,6 +510,7 @@ trait RendersDashboard
     $jsPath  = $assetBasePath . $jsRel;
     $sessionGuardJsPath = $assetBasePath . $sessionGuardJsRel;
     $dashboardRuntimeJsPath = $assetBasePath . $dashboardRuntimeJsRel;
+    $collectionManagementJsPath = $assetBasePath . $collectionManagementJsRel;
     $canonInsuranceAuditJsPath = $assetBasePath . $canonInsuranceAuditJsRel;
     $guideJsPath = $assetBasePath . $guideJsRel;
     $damageCssPath = $assetBasePath . $damageCssRel;
@@ -517,6 +523,7 @@ trait RendersDashboard
     $jsVer  = $assetVersion($jsPath);
     $sessionGuardJsVer = $assetVersion($sessionGuardJsPath);
     $dashboardRuntimeJsVer = $assetVersion($dashboardRuntimeJsPath);
+    $collectionManagementJsVer = $assetVersion($collectionManagementJsPath);
     $canonInsuranceAuditJsVer = $assetVersion($canonInsuranceAuditJsPath);
     $guideJsVer = $assetVersion($guideJsPath);
     $damageCssVer = $assetVersion($damageCssPath);
@@ -525,6 +532,7 @@ trait RendersDashboard
     $jsUrl  = self::h($assetBaseUrl . $jsRel  . '?v=' . rawurlencode($jsVer));
     $sessionGuardJsUrl = self::h($assetBaseUrl . $sessionGuardJsRel . '?v=' . rawurlencode($sessionGuardJsVer));
     $dashboardRuntimeJsUrl = self::h($assetBaseUrl . $dashboardRuntimeJsRel . '?v=' . rawurlencode($dashboardRuntimeJsVer));
+    $collectionManagementJsUrl = self::h($assetBaseUrl . $collectionManagementJsRel . '?v=' . rawurlencode($collectionManagementJsVer));
     $canonInsuranceAuditJsUrl = self::h($assetBaseUrl . $canonInsuranceAuditJsRel . '?v=' . rawurlencode($canonInsuranceAuditJsVer));
     $guideJsUrl = self::h($assetBaseUrl . $guideJsRel . '?v=' . rawurlencode($guideJsVer));
     $damageCssUrl = self::h($assetBaseUrl . $damageCssRel . '?v=' . rawurlencode($damageCssVer));
@@ -1187,6 +1195,7 @@ trait RendersDashboard
     </div>
     <script src="<?php echo $jsUrl; ?>" defer></script>
     <script src="<?php echo $dashboardRuntimeJsUrl; ?>" defer></script>
+    <script src="<?php echo $collectionManagementJsUrl; ?>" defer></script>
     <script src="<?php echo $canonInsuranceAuditJsUrl; ?>" defer></script>
     <script src="<?php echo $guideJsUrl; ?>" defer></script>
     <script src="<?php echo $damageJsUrl; ?>" defer></script>
@@ -2002,7 +2011,6 @@ trait RendersDashboard
               <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--sms" data-admin-notif-open-channel="sms">Notificaci&oacute;n SMS</button>
               <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--whatsapp" data-admin-notif-open-channel="whatsapp">Notificaci&oacute;n WhatsApp</button>
               <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--all" data-admin-notif-open-all-channels>Todos los canales</button>
-              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--collection" data-admin-notif-open-collection hidden>Gesti&oacute;n de cobro</button>
             </div>
           </div>
           <div class="scm-admin-notif-recipients" data-admin-notif-recipients>
@@ -2154,97 +2162,6 @@ trait RendersDashboard
         </div>
       </div>
 
-      <div class="scm-admin-notif-modal scm-admin-notif-collection-modal" data-admin-notif-collection-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-collection-title">
-        <div class="scm-admin-notif-modal-backdrop" aria-hidden="true"></div>
-        <section class="scm-admin-notif-card scm-admin-notif-composer scm-admin-notif-modal-panel">
-          <div class="scm-admin-notif-modal-head">
-            <div class="scm-admin-notif-modal-titleblock">
-              <span class="scm-calendar-action-kicker">Cobranza</span>
-              <h4 id="scm-admin-notif-collection-title">Registrar gesti&oacute;n de cobro</h4>
-              <p>Aplica para arrendatarios activos. Crea la gesti&oacute;n, actualiza el contrato y deja registro en el historial del inmueble.</p>
-            </div>
-            <button type="button" class="scm-modal-close" data-admin-notif-close-collection aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
-          </div>
-          <form data-admin-notif-collection autocomplete="off">
-            <div class="scm-admin-notif-section-head scm-admin-notif-selected-head">
-              <div>
-                <span class="scm-calendar-action-kicker">Destinatarios</span>
-                <h4><strong data-admin-notif-collection-selected-count>0</strong> seleccionados</h4>
-                <p>Selecciona el contrato cuando el arrendatario tenga m&aacute;s de uno activo.</p>
-              </div>
-            </div>
-
-            <div class="scm-admin-notif-collection-grid">
-              <div class="scm-field scm-admin-notif-collection-contract" data-admin-notif-collection-contract-wrap hidden>
-                <label for="scm-admin-notif-collection-contract">Contrato de la gesti&oacute;n</label>
-                <select id="scm-admin-notif-collection-contract" name="contract_ids[]" class="select select-bordered select-sm scm-select" data-admin-notif-collection-contract></select>
-                <small>Si hay varios contratos activos, escoge exactamente cu&aacute;l vas a gestionar.</small>
-              </div>
-              <div class="scm-field">
-                <label for="scm-admin-notif-collection-type">Tipo de gesti&oacute;n</label>
-                <select id="scm-admin-notif-collection-type" name="tipo_gestion_cobro" class="select select-bordered select-sm scm-select">
-                  <option value="Canon">Canon</option>
-                  <option value="Administracion">Administraci&oacute;n</option>
-                  <option value="Servicios publicos">Servicios p&uacute;blicos</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="scm-field scm-admin-notif-message-field">
-              <label for="scm-admin-notif-collection-observation">Observaci&oacute;n de la gesti&oacute;n</label>
-              <textarea id="scm-admin-notif-collection-observation" name="observacion" class="textarea textarea-bordered scm-textarea" rows="6" placeholder="Describe la gesti&oacute;n realizada, acuerdo de pago, novedad o detalle relevante..."></textarea>
-              <small>Este texto queda en la gesti&oacute;n, en el historial del inmueble y se usa como detalle si marcas canales de notificaci&oacute;n.</small>
-            </div>
-
-            <div class="scm-admin-notif-collection-help scm-admin-notif-collection-notify">
-              <strong>Notificar al guardar</strong>
-              <span>Usa la plantilla &ldquo;Gesti&oacute;n de cobro&rdquo; y encola la notificaci&oacute;n en el mismo guardado. Si no quieres enviar nada, deja los canales sin marcar.</span>
-              <div class="scm-admin-notif-message-toolbar scm-admin-notif-collection-toolbar" aria-label="Herramientas de vista previa de gesti&oacute;n de cobro">
-                <button type="button" data-admin-notif-collection-preview-toggle>Ocultar vista previa</button>
-              </div>
-              <div class="scm-admin-notif-collection-targets" role="group" aria-label="Destinatarios de cobranza">
-                <span class="scm-admin-notif-collection-target is-fixed">Arrendatario principal</span>
-                <span class="scm-admin-notif-collection-target" data-admin-notif-collection-codeudor-count>Codeudores: 0 seleccionados</span>
-              </div>
-              <div class="scm-admin-notif-codeudores" data-admin-notif-collection-codeudores-wrap hidden>
-                <div class="scm-admin-notif-codeudores-head">
-                  <div>
-                    <strong>Codeudores para notificar</strong>
-                    <span>Escoge exactamente a cu&aacute;les codeudores enviarles la notificaci&oacute;n.</span>
-                  </div>
-                  <div class="scm-admin-notif-codeudores-actions">
-                    <button type="button" data-admin-notif-codeudores-select-all>Seleccionar todos</button>
-                    <button type="button" data-admin-notif-codeudores-clear>Quitar todos</button>
-                  </div>
-                </div>
-                <div class="scm-admin-notif-codeudores-list" data-admin-notif-collection-codeudores-list></div>
-              </div>
-              <div class="scm-admin-notif-collection-channels" role="group" aria-label="Canales para gestion de cobro">
-                <label class="scm-admin-notif-mini-channel">
-                  <input type="checkbox" name="notify_channels[]" value="whatsapp" data-admin-notif-collection-channel checked>
-                  <span>WhatsApp</span>
-                </label>
-                <label class="scm-admin-notif-mini-channel">
-                  <input type="checkbox" name="notify_channels[]" value="email" data-admin-notif-collection-channel>
-                  <span>Email</span>
-                </label>
-                <label class="scm-admin-notif-mini-channel">
-                  <input type="checkbox" name="notify_channels[]" value="sms" data-admin-notif-collection-channel>
-                  <span>SMS</span>
-                </label>
-              </div>
-            </div>
-
-            <div class="scm-admin-notif-preview scm-admin-notif-collection-preview" data-admin-notif-collection-preview aria-live="polite"></div>
-
-            <div class="scm-admin-notif-submit-row">
-              <span class="scm-spinner" data-admin-notif-collection-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
-              <button type="submit" class="scm-btn-primary btn btn-primary" data-admin-notif-collection-submit>Guardar gesti&oacute;n y notificar</button>
-            </div>
-            <p class="scm-admin-notif-result" data-admin-notif-collection-result aria-live="polite"></p>
-          </form>
-        </section>
-      </div>
     </div>
 <?php
     return (string) ob_get_clean();
@@ -2260,14 +2177,29 @@ trait RendersDashboard
 
   private function render_collection_management_panel(array $input): string
   {
-    $filters = [
+    $portfolioFilters = [
+      'status' => trim((string) ($input['scmgc_estado'] ?? '')),
+      'stage' => trim((string) ($input['scmgc_etapa'] ?? '')),
+      'movement' => trim((string) ($input['scmgc_movimiento'] ?? '')),
+      'search' => trim((string) ($input['scmgc_buscar'] ?? '')),
+      'page' => max(1, (int) ($input['scmgc_cartera_page'] ?? 1)),
+      'per_page' => 40,
+    ];
+    $portfolio = (new CollectionPortfolioService($this->db))->dashboard($portfolioFilters);
+    $portfolioRows = is_array($portfolio['rows'] ?? null) ? $portfolio['rows'] : [];
+    $portfolioSummary = is_array($portfolio['summary'] ?? null) ? $portfolio['summary'] : [];
+    $portfolioApplied = is_array($portfolio['filters'] ?? null) ? $portfolio['filters'] : [];
+    $portfolioPagination = is_array($portfolio['pagination'] ?? null) ? $portfolio['pagination'] : [];
+    $latestImport = is_array($portfolio['latest_import'] ?? null) ? $portfolio['latest_import'] : null;
+
+    $managementFilters = [
       'date_from' => trim((string) ($input['scmgc_fecha_desde'] ?? '')),
       'date_to' => trim((string) ($input['scmgc_fecha_hasta'] ?? '')),
       'type' => trim((string) ($input['scmgc_tipo'] ?? '')),
     ];
     $page = max(1, (int) ($input['scmgc_page'] ?? 1));
     $service = new AdministrativeNotificationsService($this->db);
-    $report = $service->collectionManagementReport($filters, $page, 30);
+    $report = $service->collectionManagementReport($managementFilters, $page, 20);
     $rows = is_array($report['rows'] ?? null) ? $report['rows'] : [];
     $stats = is_array($report['stats'] ?? null) ? $report['stats'] : ['total' => 0, 'by_type' => []];
     $byType = is_array($stats['by_type'] ?? null) ? $stats['by_type'] : [];
@@ -2279,56 +2211,80 @@ trait RendersDashboard
     }
     $pagination = is_array($report['pagination'] ?? null) ? $report['pagination'] : ['page' => 1, 'total_pages' => 1, 'total' => 0];
     $applied = is_array($report['filters'] ?? null) ? $report['filters'] : ['date_from' => '', 'date_to' => '', 'type' => ''];
-    $currentTotal = (int) ($pagination['total'] ?? 0);
+    $currentTotal = (int) ($portfolioPagination['total'] ?? 0);
     $dateFrom = (string) ($applied['date_from'] ?? '');
     $dateTo = (string) ($applied['date_to'] ?? '');
     $currentType = (string) ($applied['type'] ?? '');
 
     ob_start();
 ?>
-    <div class="scm-collection-log" data-scm-collection-log>
+    <div class="scm-collection-log scm-portfolio" data-scm-collection-log data-scm-collection-log-loaded="1" data-scm-portfolio>
       <div class="scm-status-topic-head scm-collection-log-head">
         <div>
-          <span class="scm-calendar-action-kicker">Cobranza</span>
-          <h3>Gestiones de cobro</h3>
-          <p>Consulta las gestiones registradas desde Notificaciones con filtros por fecha y tipo de gesti&oacute;n.</p>
+          <span class="scm-calendar-action-kicker">Cartera y cobranza</span>
+          <h3>Control de cartera y gestiones de cobro</h3>
+          <p>Actualiza saldos con el auxiliar 1380, identifica pagos, registra gestiones y prepara cartas prejur&iacute;dicas o de siniestro desde un solo lugar.</p>
         </div>
-        <span class="scm-status-count"><strong><?php echo esc_html((string) $currentTotal); ?></strong> gestiones</span>
+        <span class="scm-status-count"><strong><?php echo esc_html((string) $currentTotal); ?></strong> cuentas visibles</span>
       </div>
 
-      <div class="scm-collection-log-kpis" aria-label="Resumen de gestiones de cobro">
-        <article class="scm-collection-log-kpi">
-          <span>Total en rango</span>
-          <strong><?php echo esc_html((string) ((int) ($stats['total'] ?? 0))); ?></strong>
-        </article>
-        <?php foreach ($byType as $typeLabel => $typeTotal): ?>
-          <article class="scm-collection-log-kpi">
-            <span><?php echo esc_html($this->collection_management_type_label((string) $typeLabel)); ?></span>
-            <strong><?php echo esc_html((string) ((int) $typeTotal)); ?></strong>
-          </article>
-        <?php endforeach; ?>
+      <div class="scm-portfolio-kpis" aria-label="Resumen ejecutivo de cartera">
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--money"><span>Cartera pendiente</span><strong><?php echo esc_html($this->collection_money($portfolioSummary['balance'] ?? 0)); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['debtors'] ?? 0))); ?> contratos con saldo</small></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--success"><span>Sin deuda</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['current'] ?? 0) + (int) ($portfolioSummary['credits'] ?? 0))); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['credits'] ?? 0))); ?> con saldo a favor</small></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--paid"><span>Pagaron en el &uacute;ltimo cargue</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['paid'] ?? 0))); ?></strong><small>Dejaron de tener saldo positivo</small></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--warning"><span>Sin cruce</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['without_data'] ?? 0) + (int) ($portfolioSummary['unmatched'] ?? 0))); ?></strong><small>Requieren verificaci&oacute;n</small></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--claim"><span>Siniestrados</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['claims'] ?? 0))); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['prejuridical'] ?? 0))); ?> en prejur&iacute;dico</small></article>
       </div>
 
-      <section class="scm-admin-notif-card scm-collection-log-filters">
-        <form method="get" autocomplete="off" data-scm-collection-log-form>
+      <section class="scm-admin-notif-card scm-portfolio-import-card">
+        <form data-scm-portfolio-import enctype="multipart/form-data">
+          <div>
+            <span class="scm-calendar-action-kicker">Fuente de saldos</span>
+            <h4>Actualizar con auxiliar 1380</h4>
+            <p>El saldo final de cada inmueble y NIT define el estado: <strong>positivo = con deuda</strong>, <strong>0 = al d&iacute;a</strong> y <strong>negativo = saldo a favor</strong>. Cada cargue reemplaza la foto vigente y conserva el historial.</p>
+            <?php if (is_array($latestImport)): ?>
+              <small>&Uacute;ltimo cargue: <?php echo esc_html((string) ($latestImport['source_filename'] ?? '')); ?> &middot; corte <?php echo esc_html($this->collection_date((string) ($latestImport['source_date'] ?? ''))); ?> &middot; <?php echo esc_html($this->format_collection_management_date($latestImport['uploaded_at'] ?? '')); ?> por <?php echo esc_html((string) ($latestImport['uploaded_by_name'] ?? '')); ?></small>
+            <?php else: ?>
+              <small>A&uacute;n no se ha cargado un auxiliar de cartera.</small>
+            <?php endif; ?>
+          </div>
+          <div class="scm-portfolio-import-actions">
+            <label class="scm-portfolio-file"><span>Archivo .xls o .xlsx</span><input type="file" name="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></label>
+            <button type="submit" class="scm-btn-primary btn btn-primary">Procesar cartera</button>
+          </div>
+          <p data-scm-portfolio-import-result class="scm-admin-notif-result" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="scm-admin-notif-card scm-portfolio-control">
+        <div class="scm-portfolio-section-head">
+          <div><span class="scm-calendar-action-kicker">Cartera actual</span><h4>Contratos, saldos y etapa de cobranza</h4><p>Busca, filtra y ejecuta la siguiente acci&oacute;n sin salir del m&oacute;dulo.</p></div>
+        </div>
+        <form method="get" autocomplete="off" data-scm-collection-log-form class="scm-portfolio-filter-form">
           <input type="hidden" name="scm_tab" value="gestiones_cobro">
-          <input type="hidden" name="scmgc_page" value="1">
-          <div class="scm-collection-log-filter-grid">
+          <input type="hidden" name="scmgc_cartera_page" value="1">
+          <div class="scm-portfolio-filter-grid">
             <div class="scm-field">
-              <label for="scmgc_fecha_desde">Fecha desde</label>
-              <input id="scmgc_fecha_desde" name="scmgc_fecha_desde" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr($dateFrom); ?>">
+              <label for="scmgc_buscar">Buscar</label>
+              <input id="scmgc_buscar" name="scmgc_buscar" type="search" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr((string) ($portfolioApplied['search'] ?? '')); ?>" placeholder="Arrendatario, documento, contrato o inmueble">
             </div>
             <div class="scm-field">
-              <label for="scmgc_fecha_hasta">Fecha hasta</label>
-              <input id="scmgc_fecha_hasta" name="scmgc_fecha_hasta" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr($dateTo); ?>">
+              <label for="scmgc_estado">Estado de saldo</label>
+              <select id="scmgc_estado" name="scmgc_estado" class="select select-bordered select-sm scm-select">
+                <?php foreach (['' => 'Todos', 'deuda' => 'Con deuda', 'al_dia' => 'Al día', 'saldo_favor' => 'Saldo a favor', 'sin_dato' => 'Contrato sin dato', 'sin_contrato' => 'Cuenta sin contrato'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($portfolioApplied['status'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+              </select>
             </div>
             <div class="scm-field">
-              <label for="scmgc_tipo">Tipo</label>
-              <select id="scmgc_tipo" name="scmgc_tipo" class="select select-bordered select-sm scm-select">
+              <label for="scmgc_etapa">Etapa</label>
+              <select id="scmgc_etapa" name="scmgc_etapa" class="select select-bordered select-sm scm-select">
+                <?php foreach (['' => 'Todas', 'normal' => 'Cobro normal', 'prejuridico' => 'Prejurídico', 'siniestro' => 'Siniestro'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($portfolioApplied['stage'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+              </select>
+            </div>
+            <div class="scm-field">
+              <label for="scmgc_movimiento">Movimiento</label>
+              <select id="scmgc_movimiento" name="scmgc_movimiento" class="select select-bordered select-sm scm-select">
                 <option value="">Todos</option>
-                <?php foreach ($types as $typeOption): ?>
-                  <option value="<?php echo esc_attr($typeOption); ?>" <?php selected($currentType, $typeOption); ?>><?php echo esc_html($this->collection_management_type_label($typeOption)); ?></option>
-                <?php endforeach; ?>
+                <option value="paid_latest" <?php selected((string) ($portfolioApplied['movement'] ?? ''), 'paid_latest'); ?>>Pagaron en el &uacute;ltimo cargue</option>
               </select>
             </div>
             <div class="scm-collection-log-actions">
@@ -2339,52 +2295,89 @@ trait RendersDashboard
         </form>
       </section>
 
-      <section class="scm-admin-notif-card scm-collection-log-table-card">
-        <?php if ($rows === []): ?>
+      <section class="scm-admin-notif-card scm-collection-log-table-card scm-portfolio-table-card">
+        <?php if ($portfolioRows === []): ?>
           <div class="scm-admin-notif-empty">
-            <strong>Sin gestiones de cobro</strong>
-            <span>No hay registros con los filtros actuales.</span>
+            <strong>Sin registros de cartera</strong>
+            <span>Carga el auxiliar 1380 o cambia los filtros actuales.</span>
           </div>
         <?php else: ?>
-          <div class="scm-collection-log-table-wrap">
-            <table class="scm-collection-log-table">
+          <div class="scm-collection-log-table-wrap scm-portfolio-table-wrap">
+            <table class="scm-collection-log-table scm-portfolio-table">
               <thead>
                 <tr>
-                  <th>Fecha</th>
+                  <th>Estado</th>
+                  <th>Arrendatario</th>
                   <th>Contrato</th>
                   <th>Inmueble</th>
-                  <th>Direcci&oacute;n</th>
-                  <th>Propietario</th>
-                  <th>Arrendatario</th>
-                  <th>Tipo</th>
-                  <th>Gestiones</th>
-                  <th>Realizado por</th>
-                  <th>Observaci&oacute;n</th>
-                  <th>Notificaciones</th>
+                  <th>Saldo actual</th>
+                  <th>Variaci&oacute;n</th>
+                  <th>Etapa</th>
+                  <th>&Uacute;ltima acci&oacute;n</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                <?php foreach ($rows as $row): ?>
+                <?php foreach ($portfolioRows as $row):
+                  $rowStatus = (string) ($row['status'] ?? 'sin_dato');
+                  $rowStage = (string) ($row['collection_stage'] ?? 'normal');
+                  $balance = $row['balance'] !== null ? (float) $row['balance'] : null;
+                  $previous = $row['previous_balance'] !== null ? (float) $row['previous_balance'] : null;
+                  $variation = $balance !== null && $previous !== null ? $balance - $previous : null;
+                  $canManage = (int) ($row['contract_id'] ?? 0) > 0;
+                  $canCollect = $canManage && $rowStatus === 'deuda';
+                ?>
                   <tr>
-                    <td><?php echo esc_html($this->format_collection_management_date($row['fecha_raw'] ?? '')); ?></td>
-                    <td><span class="scm-collection-log-pill"><?php echo esc_html((string) (($row['contrato'] ?? '') ?: '-')); ?></span></td>
-                    <td><?php echo esc_html((string) (($row['inmueble'] ?? '') ?: '-')); ?></td>
-                    <td><?php echo esc_html((string) (($row['direccion'] ?? '') ?: '-')); ?></td>
-                    <td><?php echo esc_html((string) (($row['propietario'] ?? '') ?: '-')); ?></td>
-                    <td><?php echo esc_html((string) (($row['arrendatario'] ?? '') ?: '-')); ?></td>
-                    <td><span class="scm-collection-log-type"><?php echo esc_html($this->collection_management_type_label((string) ($row['tipo_gestion'] ?? ''))); ?></span></td>
-                    <td><?php echo esc_html((string) (($row['gestiones_cobro'] ?? '') ?: '-')); ?></td>
-                    <td><?php echo esc_html(trim((string) (($row['realizado_por'] ?? '') ?: '-'))); ?><?php if (trim((string) ($row['cargo'] ?? '')) !== ''): ?><small><?php echo esc_html((string) $row['cargo']); ?></small><?php endif; ?></td>
-                    <td class="scm-collection-log-note"><?php echo esc_html((string) (($row['observacion'] ?? '') ?: '-')); ?></td>
-                    <td><button type="button" class="scm-case-work-btn scm-collection-log-notify-btn" data-scm-collection-queue="<?php echo esc_attr((string) ((int) ($row['id'] ?? 0))); ?>">Ver notificaciones</button></td>
+                    <td><span class="scm-portfolio-status scm-portfolio-status--<?php echo esc_attr($rowStatus); ?>"><?php echo esc_html($this->collection_portfolio_status_label($rowStatus)); ?></span></td>
+                    <td><strong><?php echo esc_html((string) (($row['tenant_name'] ?? '') ?: 'Sin nombre en plataforma')); ?></strong><small><?php echo esc_html((string) (($row['tenant_document'] ?? '') ?: '-')); ?></small></td>
+                    <td><span class="scm-collection-log-pill"><?php echo esc_html((string) (($row['contract_number'] ?? '') ?: '-')); ?></span></td>
+                    <td><strong><?php echo esc_html((string) (($row['property_code'] ?? '') ?: '-')); ?></strong><small><?php echo esc_html((string) (($row['property_address'] ?? '') ?: 'Sin dirección')); ?></small></td>
+                    <td class="scm-portfolio-money"><?php echo $balance === null ? '&mdash;' : esc_html($this->collection_money($balance)); ?></td>
+                    <td class="scm-portfolio-variation<?php echo $variation !== null && $variation < 0 ? ' is-down' : ($variation !== null && $variation > 0 ? ' is-up' : ''); ?>"><?php echo $variation === null ? '&mdash;' : esc_html(($variation > 0 ? '+' : '') . $this->collection_money($variation)); ?></td>
+                    <td><span class="scm-portfolio-stage scm-portfolio-stage--<?php echo esc_attr($rowStage); ?>"><?php echo esc_html($this->collection_portfolio_stage_label($rowStage)); ?></span></td>
+                    <td><?php echo esc_html($this->collection_portfolio_action_label((string) ($row['last_action_type'] ?? ''))); ?><small><?php echo esc_html($this->format_collection_management_date($row['last_action_at'] ?? '')); ?></small></td>
+                    <td>
+                      <?php if ($canManage): ?>
+                        <div class="scm-portfolio-actions">
+                          <button type="button" class="scm-case-work-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>">Nueva gesti&oacute;n</button>
+                          <?php if ($canCollect): ?>
+                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="prejuridico" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>">Carta prejur&iacute;dica</button>
+                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="siniestro" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>">Carta siniestro</button>
+                            <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="<?php echo $rowStage === 'siniestro' ? 'normal' : 'siniestro'; ?>" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>"><?php echo $rowStage === 'siniestro' ? 'Quitar siniestro' : 'Marcar siniestro'; ?></button>
+                          <?php elseif ($rowStage !== 'normal'): ?>
+                            <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="normal" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>">Normalizar etapa</button>
+                          <?php else: ?><span class="scm-portfolio-no-action">Sin saldo para escalar</span><?php endif; ?>
+                        </div>
+                      <?php else: ?><span class="scm-portfolio-no-action">Cruce pendiente</span><?php endif; ?>
+                    </td>
                   </tr>
                 <?php endforeach; ?>
               </tbody>
             </table>
           </div>
-          <?php echo $this->render_collection_management_pagination($pagination, $applied); ?>
+          <?php echo $this->render_collection_portfolio_pagination($portfolioPagination, $portfolioApplied); ?>
         <?php endif; ?>
       </section>
+
+      <section class="scm-admin-notif-card scm-collection-history-card">
+        <div class="scm-portfolio-section-head"><div><span class="scm-calendar-action-kicker">Trazabilidad</span><h4>Historial de gestiones de cobro</h4><p>Todos los registros operativos y sus notificaciones, ya centralizados en este m&oacute;dulo.</p></div><span class="scm-status-count"><strong><?php echo esc_html((string) ((int) ($stats['total'] ?? 0))); ?></strong> gestiones</span></div>
+        <form method="get" autocomplete="off" data-scm-collection-log-form class="scm-collection-log-filters">
+          <input type="hidden" name="scm_tab" value="gestiones_cobro"><input type="hidden" name="scmgc_page" value="1">
+          <div class="scm-collection-log-filter-grid">
+            <div class="scm-field"><label for="scmgc_fecha_desde">Fecha desde</label><input id="scmgc_fecha_desde" name="scmgc_fecha_desde" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr($dateFrom); ?>"></div>
+            <div class="scm-field"><label for="scmgc_fecha_hasta">Fecha hasta</label><input id="scmgc_fecha_hasta" name="scmgc_fecha_hasta" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr($dateTo); ?>"></div>
+            <div class="scm-field"><label for="scmgc_tipo">Tipo</label><select id="scmgc_tipo" name="scmgc_tipo" class="select select-bordered select-sm scm-select"><option value="">Todos</option><?php foreach ($types as $typeOption): ?><option value="<?php echo esc_attr($typeOption); ?>" <?php selected($currentType, $typeOption); ?>><?php echo esc_html($this->collection_management_type_label($typeOption)); ?></option><?php endforeach; ?></select></div>
+            <div class="scm-collection-log-actions"><button type="submit" class="scm-btn-primary btn btn-primary">Filtrar historial</button></div>
+          </div>
+        </form>
+        <?php if ($rows === []): ?><div class="scm-admin-notif-empty"><strong>Sin gestiones registradas</strong><span>No hay registros con los filtros actuales.</span></div><?php else: ?>
+          <div class="scm-collection-log-table-wrap"><table class="scm-collection-log-table"><thead><tr><th>Fecha</th><th>Contrato</th><th>Inmueble</th><th>Arrendatario</th><th>Tipo</th><th>Realizado por</th><th>Observaci&oacute;n</th><th>Mensajes</th></tr></thead><tbody>
+          <?php foreach ($rows as $row): ?><tr><td><?php echo esc_html($this->format_collection_management_date($row['fecha_raw'] ?? '')); ?></td><td><span class="scm-collection-log-pill"><?php echo esc_html((string) (($row['contrato'] ?? '') ?: '-')); ?></span></td><td><?php echo esc_html((string) (($row['inmueble'] ?? '') ?: '-')); ?></td><td><?php echo esc_html((string) (($row['arrendatario'] ?? '') ?: '-')); ?></td><td><span class="scm-collection-log-type"><?php echo esc_html($this->collection_management_type_label((string) ($row['tipo_gestion'] ?? ''))); ?></span></td><td><?php echo esc_html((string) (($row['realizado_por'] ?? '') ?: '-')); ?></td><td class="scm-collection-log-note"><?php echo esc_html((string) (($row['observacion'] ?? '') ?: '-')); ?></td><td><button type="button" class="scm-case-work-btn scm-collection-log-notify-btn" data-scm-collection-queue="<?php echo esc_attr((string) ((int) ($row['id'] ?? 0))); ?>">Ver</button></td></tr><?php endforeach; ?>
+          </tbody></table></div><?php echo $this->render_collection_management_pagination($pagination, $applied); ?>
+        <?php endif; ?>
+      </section>
+
+      <?php echo $this->render_collection_management_modal(); ?>
     </div>
 <?php
     return (string) ob_get_clean();
@@ -2397,6 +2390,123 @@ trait RendersDashboard
       . '<strong>Gestiones de cobro listas para consultar</strong>'
       . '<span>Abre esta sección para cargar el reporte.</span>'
       . '</div></div>';
+  }
+
+  private function render_collection_management_modal(): string
+  {
+    ob_start();
+?>
+    <div class="scm-admin-notif-modal scm-portfolio-management-modal" data-scm-portfolio-management-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-portfolio-management-title">
+      <div class="scm-admin-notif-modal-backdrop" data-scm-portfolio-management-close aria-hidden="true"></div>
+      <section class="scm-admin-notif-card scm-admin-notif-composer scm-admin-notif-modal-panel">
+        <div class="scm-admin-notif-modal-head">
+          <div class="scm-admin-notif-modal-titleblock"><span class="scm-calendar-action-kicker">Cobranza</span><h4 id="scm-portfolio-management-title">Registrar gesti&oacute;n de cobro</h4><p data-scm-portfolio-management-context>Selecciona un contrato de la cartera.</p></div>
+          <button type="button" class="scm-modal-close" data-scm-portfolio-management-close aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
+        </div>
+        <form data-scm-portfolio-management-form autocomplete="off">
+          <input type="hidden" name="type" value="arrendatarios_activos">
+          <input type="hidden" name="portfolio_id" value="">
+          <input type="hidden" name="ids[]" value="">
+          <input type="hidden" name="contract_ids[]" value="">
+          <div class="scm-portfolio-management-grid">
+            <div class="scm-field"><label for="scm-portfolio-management-type">Tipo de gesti&oacute;n</label><select id="scm-portfolio-management-type" name="tipo_gestion_cobro" class="select select-bordered select-sm scm-select"><option value="Canon">Canon</option><option value="Administracion">Administraci&oacute;n</option><option value="Servicios publicos">Servicios p&uacute;blicos</option></select></div>
+            <div class="scm-field"><label for="scm-portfolio-management-followup">Pr&oacute;xima gesti&oacute;n</label><select id="scm-portfolio-management-followup" name="volver_llamar" class="select select-bordered select-sm scm-select" data-scm-portfolio-followup><option value="No">No programar</option><option value="Si">Programar seguimiento</option></select></div>
+            <div class="scm-field" data-scm-portfolio-followup-field hidden><label for="scm-portfolio-management-date">Fecha</label><input id="scm-portfolio-management-date" name="siguiente_fecha" type="date" class="input input-bordered input-sm scm-input"></div>
+            <div class="scm-field" data-scm-portfolio-followup-field hidden><label for="scm-portfolio-management-time">Hora</label><input id="scm-portfolio-management-time" name="siguiente_hora" type="time" class="input input-bordered input-sm scm-input"></div>
+          </div>
+          <div class="scm-field"><label for="scm-portfolio-management-observation">Observaci&oacute;n</label><textarea id="scm-portfolio-management-observation" name="observacion" class="textarea textarea-bordered scm-textarea" rows="5" required placeholder="Llamada realizada, acuerdo, compromiso, novedad o siguiente paso..."></textarea></div>
+          <div class="scm-field" data-scm-portfolio-followup-field hidden><label for="scm-portfolio-management-schedule-note">Detalle del horario</label><input id="scm-portfolio-management-schedule-note" name="otro_horario_cobro" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: llamar después de las 3:00 p. m."></div>
+          <div class="scm-portfolio-management-notify">
+            <div><strong>Notificar al guardar</strong><span>Opcional. Usa la plantilla de gesti&oacute;n de cobro para el arrendatario y los codeudores seleccionados.</span></div>
+            <div class="scm-admin-notif-collection-channels" role="group" aria-label="Canales de notificaci&oacute;n"><label class="scm-admin-notif-mini-channel"><input type="checkbox" name="notify_channels[]" value="whatsapp" checked><span>WhatsApp</span></label><label class="scm-admin-notif-mini-channel"><input type="checkbox" name="notify_channels[]" value="email"><span>Email</span></label><label class="scm-admin-notif-mini-channel"><input type="checkbox" name="notify_channels[]" value="sms"><span>SMS</span></label></div>
+          </div>
+          <div class="scm-admin-notif-codeudores" data-scm-portfolio-codeudores hidden><div class="scm-admin-notif-codeudores-head"><div><strong>Codeudores</strong><span>Selecciona qui&eacute;nes tambi&eacute;n recibir&aacute;n la notificaci&oacute;n.</span></div></div><div class="scm-admin-notif-codeudores-list" data-scm-portfolio-codeudores-list></div></div>
+          <div class="scm-admin-notif-submit-row"><span class="scm-spinner" data-scm-portfolio-management-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span><button type="submit" class="scm-btn-primary btn btn-primary">Guardar gesti&oacute;n</button></div>
+          <p class="scm-admin-notif-result" data-scm-portfolio-management-result aria-live="polite"></p>
+        </form>
+      </section>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  private function collection_money(mixed $value): string
+  {
+    return '$' . number_format((float) $value, 0, ',', '.');
+  }
+
+  private function collection_date(string $value): string
+  {
+    $timestamp = strtotime($value);
+    return $timestamp === false ? '-' : date('d/m/Y', $timestamp);
+  }
+
+  private function collection_portfolio_status_label(string $status): string
+  {
+    return [
+      'deuda' => 'Con deuda',
+      'al_dia' => 'Al día',
+      'saldo_favor' => 'Saldo a favor',
+      'sin_dato' => 'Sin dato',
+      'sin_contrato' => 'Sin contrato',
+    ][$status] ?? 'Por revisar';
+  }
+
+  private function collection_portfolio_stage_label(string $stage): string
+  {
+    return [
+      'normal' => 'Cobro normal',
+      'prejuridico' => 'Prejurídico',
+      'siniestro' => 'Siniestro',
+    ][$stage] ?? 'Cobro normal';
+  }
+
+  private function collection_portfolio_action_label(string $action): string
+  {
+    if ($action === '') {
+      return 'Sin acciones';
+    }
+    $labels = [
+      'gestion_cobro' => 'Gestión registrada',
+      'pago_detectado' => 'Pago detectado',
+      'estado_normal' => 'Etapa normalizada',
+      'estado_prejuridico' => 'Marcado prejurídico',
+      'estado_siniestro' => 'Marcado siniestro',
+      'carta_prejuridico_generada' => 'Carta prejurídica generada',
+      'carta_prejuridico_enviada' => 'Carta prejurídica enviada',
+      'carta_siniestro_generada' => 'Carta de siniestro generada',
+      'carta_siniestro_enviada' => 'Carta de siniestro enviada',
+    ];
+    return $labels[$action] ?? ucfirst(str_replace('_', ' ', $action));
+  }
+
+  private function render_collection_portfolio_pagination(array $pagination, array $filters): string
+  {
+    $page = max(1, (int) ($pagination['page'] ?? 1));
+    $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
+    $total = max(0, (int) ($pagination['total'] ?? 0));
+    if ($total <= 0 || $totalPages <= 1) {
+      return '';
+    }
+    $base = [
+      'scm_tab' => 'gestiones_cobro',
+      'scmgc_buscar' => (string) ($filters['search'] ?? ''),
+      'scmgc_estado' => (string) ($filters['status'] ?? ''),
+      'scmgc_etapa' => (string) ($filters['stage'] ?? ''),
+      'scmgc_movimiento' => (string) ($filters['movement'] ?? ''),
+    ];
+    $link = static fn(int $target): string => '?' . http_build_query($base + ['scmgc_cartera_page' => $target]);
+    $html = '<div class="scm-pagination-card card scm-collection-log-pagination"><div class="scm-pagination-summary">Página ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' | Total: ' . esc_html((string) $total) . '</div><div class="scm-pagination-controls">';
+    foreach ([[1, '&laquo;'], [max(1, $page - 1), '&lsaquo;']] as [$target, $label]) {
+      $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page <= 1 ? ' disabled' : '') . '" href="' . esc_url($link((int) $target)) . '">' . $label . '</a>';
+    }
+    for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++) {
+      $html .= '<a class="scm-page-btn btn btn-sm ' . ($i === $page ? 'btn-primary is-active' : 'btn-outline') . '" href="' . esc_url($link($i)) . '">' . esc_html((string) $i) . '</a>';
+    }
+    foreach ([[min($totalPages, $page + 1), '&rsaquo;'], [$totalPages, '&raquo;']] as [$target, $label]) {
+      $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page >= $totalPages ? ' disabled' : '') . '" href="' . esc_url($link((int) $target)) . '">' . $label . '</a>';
+    }
+    return $html . '</div></div>';
   }
 
   private function collection_management_type_label(string $type): string

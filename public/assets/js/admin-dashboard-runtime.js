@@ -369,17 +369,52 @@
     }
 
     function collectionLogParamsFromForm(form) {
-      var fd = new FormData(form);
+      var fd = collectionLogCurrentParams(form.closest("[data-scm-collection-log]"));
+      new FormData(form).forEach(function (value, key) {
+        fd.set(key, value);
+      });
       fd.set("action", actionAdminNotificationsCollectionLog);
       fd.set("nonce", nonce);
       return fd;
     }
 
+    function collectionLogCurrentParams(container) {
+      var fd = new FormData();
+      var scope = container || collectionLogContainerFromPanel(null);
+      [
+        "scmgc_fecha_desde",
+        "scmgc_fecha_hasta",
+        "scmgc_tipo",
+        "scmgc_page",
+        "scmgc_buscar",
+        "scmgc_estado",
+        "scmgc_etapa",
+        "scmgc_movimiento",
+        "scmgc_cartera_page",
+      ].forEach(function (key) {
+        var field = scope ? scope.querySelector("[name='" + key + "']") : null;
+        fd.set(key, field ? String(field.value || "") : "");
+      });
+      return fd;
+    }
+
     function collectionLogParamsFromUrl(url) {
       var parsed = new URL(url, window.location.href);
-      var fd = new FormData();
-      ["scmgc_fecha_desde", "scmgc_fecha_hasta", "scmgc_tipo", "scmgc_page"].forEach(function (key) {
-        fd.set(key, parsed.searchParams.get(key) || "");
+      var fd = collectionLogCurrentParams(null);
+      [
+        "scmgc_fecha_desde",
+        "scmgc_fecha_hasta",
+        "scmgc_tipo",
+        "scmgc_page",
+        "scmgc_buscar",
+        "scmgc_estado",
+        "scmgc_etapa",
+        "scmgc_movimiento",
+        "scmgc_cartera_page",
+      ].forEach(function (key) {
+        if (parsed.searchParams.has(key)) {
+          fd.set(key, parsed.searchParams.get(key) || "");
+        }
       });
       fd.set("action", actionAdminNotificationsCollectionLog);
       fd.set("nonce", nonce);

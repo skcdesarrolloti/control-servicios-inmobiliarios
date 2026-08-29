@@ -12,6 +12,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   use \SCM\App\Concerns\HandlesPublicPqrActions;
   use \SCM\App\Concerns\HandlesAdministrativeNotifications;
+  use \SCM\App\Concerns\HandlesCollectionManagement;
   use \SCM\App\Concerns\HandlesCanonInsuranceAudits;
   use \SCM\App\Concerns\RendersPublicPqr;
   use \SCM\App\Concerns\RendersDashboard;
@@ -67,6 +68,9 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS = 'scm_admin_notifications_collection_options';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE = 'scm_admin_notifications_collection_queue';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_LOG = 'scm_admin_notifications_collection_log';
+  const AJAX_COLLECTION_PORTFOLIO_IMPORT = 'scm_collection_portfolio_import';
+  const AJAX_COLLECTION_PORTFOLIO_ACTION = 'scm_collection_portfolio_action';
+  const AJAX_COLLECTION_PORTFOLIO_PDF = 'scm_collection_portfolio_pdf';
   const AJAX_INTERNAL_NOTIFICATIONS_SAVE = 'scm_internal_notifications_save';
   const AJAX_PUBLIC_PQR_SETTINGS_READ = 'scm_public_pqr_settings_read';
   const AJAX_INTERNAL_NOTIFICATIONS_READ = 'scm_internal_notifications_read';
@@ -181,7 +185,7 @@ final class SuCasaControlServiciosInmobiliarios
         'items' => [
           'gestion_cobro' => [
             'label' => 'Gestión de cobro',
-            'description' => 'Cuando se registra una gestión de cobro desde Notificaciones.',
+            'description' => 'Cuando se registra una gestión desde el módulo de Gestiones de cobro.',
             'channel' => 'Email interno',
           ],
         ],

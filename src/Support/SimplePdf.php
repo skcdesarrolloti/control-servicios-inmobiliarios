@@ -16,6 +16,7 @@ final class SimplePdf
   private float $contentWidth = 505.0;
   private float $y = 46.0;
   private ?string $backgroundImagePath = null;
+  private string $footerLabel = 'SKC SuCasa Inmobiliaria - Cotización de mantenimiento';
 
   public function __construct()
   {
@@ -35,6 +36,11 @@ final class SimplePdf
   public function backgroundImage(string $path): void
   {
     $this->backgroundImagePath = is_file($path) ? $path : null;
+  }
+
+  public function footerLabel(string $label): void
+  {
+    $this->footerLabel = trim($label);
   }
 
   public function save(string $path): void
@@ -57,8 +63,8 @@ final class SimplePdf
       $imageInfo = @getimagesize($this->backgroundImagePath);
       $imageData = @file_get_contents($this->backgroundImagePath);
       if (is_array($imageInfo) && is_string($imageData) && $imageData !== '') {
-        $imageWidth = max(1, (int) ($imageInfo[0] ?? 1));
-        $imageHeight = max(1, (int) ($imageInfo[1] ?? 1));
+        $imageWidth = max(1, (int) $imageInfo[0]);
+        $imageHeight = max(1, (int) $imageInfo[1]);
         $channels = (int) ($imageInfo['channels'] ?? 3);
         $colorSpace = $channels === 4 ? '/DeviceCMYK' : '/DeviceRGB';
         $backgroundObjectId = $next++;
@@ -80,7 +86,7 @@ final class SimplePdf
     foreach ($this->pages as $pageContent) {
       $contentId = $next++;
       $pageId = $next++;
-      if ($backgroundObjectId !== null && is_array($backgroundDraw)) {
+      if ($backgroundObjectId !== null) {
         [$drawW, $drawH, $drawX, $drawY] = $backgroundDraw;
         $pageContent = 'q ' . $this->n($drawW) . ' 0 0 ' . $this->n($drawH) . ' ' . $this->n($drawX) . ' ' . $this->n($drawY) . " cm /ImBg Do Q\n" . $pageContent;
       }
@@ -264,6 +270,11 @@ final class SimplePdf
     $this->y += $height;
   }
 
+  public function pageBreak(): void
+  {
+    $this->startNewPage();
+  }
+
   public function signatureBlock(string $label, string $name, string $details): void
   {
     $this->ensureSpace(54);
@@ -315,7 +326,9 @@ final class SimplePdf
       $this->content = "BT /F1 1 Tf 0 0 Td () Tj ET\n";
     }
     $this->fill(100, 116, 139);
-    $this->text($this->margin, self::PAGE_H - $this->bottomMargin + 24, 'SKC SuCasa Inmobiliaria - Cotización de mantenimiento', 7, 'F1');
+    if ($this->footerLabel !== '') {
+      $this->text($this->margin, self::PAGE_H - $this->bottomMargin + 24, $this->footerLabel, 7, 'F1');
+    }
     $pageLabel = 'Página ' . (string) (count($this->pages) + 1);
     $this->textRight($this->margin + $this->contentWidth, self::PAGE_H - $this->bottomMargin + 24, $pageLabel, 7, 'F1');
     $this->pages[] = $this->content;

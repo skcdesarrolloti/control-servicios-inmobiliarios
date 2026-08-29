@@ -149,7 +149,7 @@ trait HandlesAdministrativeNotifications
   public function ajax_handler_admin_notifications_collection(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('notificaciones')) {
+    if (!$this->canAccessDashboardTab('gestiones_cobro')) {
       $this->jsonFail('No tienes permiso para registrar gestiones de cobro.');
     }
 
@@ -198,6 +198,11 @@ trait HandlesAdministrativeNotifications
       $result = $service->registerCollectionManagement($ids, $payload);
       $created = (int) ($result['created'] ?? 0);
       $skipped = (int) ($result['skipped'] ?? 0);
+      $portfolioId = max(0, (int) ($_POST['portfolio_id'] ?? 0));
+      if ($portfolioId > 0 && $created > 0) {
+        (new \SCM\Modules\CollectionManagement\CollectionPortfolioService($this->db))
+          ->recordManagement($portfolioId, $created, (string) ($payload['observacion'] ?? ''));
+      }
       $notifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0];
       $codeudorNotifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0, 'selected' => 0];
       $internalNotifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0, 'selected' => 0];
@@ -309,7 +314,7 @@ trait HandlesAdministrativeNotifications
   public function ajax_handler_admin_notifications_collection_options(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('notificaciones')) {
+    if (!$this->canAccessDashboardTab('gestiones_cobro')) {
       $this->jsonFail('No tienes permiso para consultar contratos de gestión de cobro.');
     }
 
@@ -409,7 +414,7 @@ trait HandlesAdministrativeNotifications
     }
 
     $lines = [
-      'Se registraron ' . $created . ' gestión(es) de cobro desde el panel de Notificaciones.',
+      'Se registraron ' . $created . ' gestión(es) de cobro desde el módulo Gestiones de cobro.',
       'Realizado por: ' . $sender . '.',
     ];
     if ($typeLabel !== '') {
@@ -618,10 +623,6 @@ trait HandlesAdministrativeNotifications
       $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--sms" data-admin-notif-single-channel="sms" data-admin-notif-single-id="' . esc_attr((string) $id) . '">SMS</button>';
       $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--whatsapp" data-admin-notif-single-channel="whatsapp" data-admin-notif-single-id="' . esc_attr((string) $id) . '">WhatsApp</button>';
       $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--all" data-admin-notif-single-all-channels data-admin-notif-single-id="' . esc_attr((string) $id) . '">Todos los canales</button>';
-      if ($actorType === 'arrendatarios_activos') {
-        $collectionContracts = is_array($row['contratos_gestion_cobro'] ?? null) ? $row['contratos_gestion_cobro'] : [];
-        $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--collection" data-admin-notif-single-collection data-admin-notif-single-id="' . esc_attr((string) $id) . '" data-admin-notif-single-contracts="' . esc_attr((string) wp_json_encode($collectionContracts)) . '">Gestion de cobro</button>';
-      }
       $html .= '</span>';
       $html .= '</div>';
     }

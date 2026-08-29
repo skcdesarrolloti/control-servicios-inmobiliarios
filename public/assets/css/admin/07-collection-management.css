@@ -1,0 +1,334 @@
+#scm-app .scm-portfolio {
+  --portfolio-navy: #173454;
+  --portfolio-blue: #2563eb;
+  --portfolio-teal: #0f766e;
+  --portfolio-red: #b42318;
+  --portfolio-amber: #b54708;
+  display: grid;
+  gap: 18px;
+}
+
+#scm-app .scm-portfolio-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+#scm-app .scm-portfolio-kpi {
+  position: relative;
+  min-height: 124px;
+  overflow: hidden;
+  border: 1px solid #dce6ef;
+  border-radius: 16px;
+  background: #fff;
+  padding: 18px;
+  box-shadow: 0 8px 24px rgba(23, 52, 84, 0.06);
+}
+
+#scm-app .scm-portfolio-kpi::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--portfolio-blue);
+  content: "";
+}
+
+#scm-app .scm-portfolio-kpi--money::before,
+#scm-app .scm-portfolio-kpi--claim::before { background: var(--portfolio-red); }
+#scm-app .scm-portfolio-kpi--success::before,
+#scm-app .scm-portfolio-kpi--paid::before { background: var(--portfolio-teal); }
+#scm-app .scm-portfolio-kpi--warning::before { background: var(--portfolio-amber); }
+
+#scm-app .scm-portfolio-kpi span,
+#scm-app .scm-portfolio-kpi small {
+  display: block;
+  color: #60758b;
+  font-size: 12px;
+}
+
+#scm-app .scm-portfolio-kpi span {
+  min-height: 34px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+#scm-app .scm-portfolio-kpi strong {
+  display: block;
+  margin: 5px 0 3px;
+  color: var(--portfolio-navy);
+  font-size: clamp(24px, 2.1vw, 34px);
+  line-height: 1;
+}
+
+#scm-app .scm-portfolio-import-card,
+#scm-app .scm-portfolio-control,
+#scm-app .scm-portfolio-table-card,
+#scm-app .scm-collection-history-card {
+  border: 1px solid #dce6ef;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(23, 52, 84, 0.06);
+}
+
+#scm-app .scm-portfolio-import-card form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.75fr);
+  align-items: center;
+  gap: 24px;
+}
+
+#scm-app .scm-portfolio-import-card h4,
+#scm-app .scm-portfolio-section-head h4 {
+  margin: 4px 0 5px;
+  color: var(--portfolio-navy);
+  font-size: 19px;
+}
+
+#scm-app .scm-portfolio-import-card p,
+#scm-app .scm-portfolio-section-head p {
+  margin: 0;
+  color: #5f7185;
+  line-height: 1.55;
+}
+
+#scm-app .scm-portfolio-import-card small {
+  display: block;
+  margin-top: 10px;
+  color: #52677c;
+}
+
+#scm-app .scm-portfolio-import-actions {
+  display: grid;
+  gap: 10px;
+}
+
+#scm-app .scm-portfolio-file {
+  display: grid;
+  gap: 6px;
+  color: #344c64;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#scm-app .scm-portfolio-file input {
+  min-height: 46px;
+  width: 100%;
+  border: 1px dashed #9fb3c8;
+  border-radius: 12px;
+  background: #f8fbfe;
+  padding: 9px 10px;
+  color: #3f566d;
+}
+
+#scm-app .scm-portfolio-file input::file-selector-button {
+  min-height: 30px;
+  margin-right: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #e7eef6;
+  padding: 6px 11px;
+  color: var(--portfolio-navy);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#scm-app .scm-portfolio-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+#scm-app .scm-portfolio-filter-grid {
+  display: grid;
+  grid-template-columns: minmax(250px, 1.45fr) repeat(3, minmax(155px, 0.65fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+#scm-app .scm-portfolio-filter-form .scm-collection-log-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#scm-app .scm-portfolio-table-wrap {
+  max-height: 720px;
+  overflow: auto;
+  border: 1px solid #e2eaf2;
+  border-radius: 13px;
+}
+
+#scm-app .scm-portfolio-table {
+  min-width: 1280px;
+}
+
+#scm-app .scm-portfolio-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #edf3f8;
+  box-shadow: inset 0 -1px 0 #d7e2ec;
+}
+
+#scm-app .scm-portfolio-table td {
+  vertical-align: top;
+}
+
+#scm-app .scm-portfolio-status,
+#scm-app .scm-portfolio-stage {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+#scm-app .scm-portfolio-status--deuda {
+  border-color: #f5b7b1;
+  background: #fff0ef;
+  color: #9f2017;
+}
+
+#scm-app .scm-portfolio-status--al_dia {
+  border-color: #a7dfd1;
+  background: #ecfdf8;
+  color: #087164;
+}
+
+#scm-app .scm-portfolio-status--saldo_favor {
+  border-color: #b8d3ee;
+  background: #eef7ff;
+  color: #1e5f91;
+}
+
+#scm-app .scm-portfolio-status--sin_dato,
+#scm-app .scm-portfolio-status--sin_contrato {
+  border-color: #f4d59b;
+  background: #fff8e8;
+  color: #8a4c08;
+}
+
+#scm-app .scm-portfolio-stage--normal {
+  border-color: #cbd8e5;
+  background: #f5f8fb;
+  color: #405b74;
+}
+
+#scm-app .scm-portfolio-stage--prejuridico {
+  border-color: #f4c77a;
+  background: #fff6dd;
+  color: #8a4c08;
+}
+
+#scm-app .scm-portfolio-stage--siniestro {
+  border-color: #ecaaa5;
+  background: #fff0ef;
+  color: #9f2017;
+}
+
+#scm-app .scm-portfolio-money {
+  color: var(--portfolio-red);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+#scm-app .scm-portfolio-variation {
+  color: #4e647a;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#scm-app .scm-portfolio-variation.is-down { color: var(--portfolio-teal); }
+#scm-app .scm-portfolio-variation.is-up { color: var(--portfolio-red); }
+
+#scm-app .scm-portfolio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 260px;
+}
+
+#scm-app .scm-portfolio-actions button {
+  min-height: 38px;
+  border-radius: 9px;
+  padding: 7px 10px;
+  text-align: left;
+}
+
+#scm-app .scm-portfolio-stage-btn {
+  border-color: #e2a4a0;
+  color: #982018;
+}
+
+#scm-app .scm-portfolio-no-action {
+  display: block;
+  margin-top: 5px;
+  color: #718296;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+#scm-app .scm-portfolio-empty {
+  border: 1px dashed #b9c9d8;
+  border-radius: 14px;
+  background: #f8fbfe;
+  padding: 30px;
+  text-align: center;
+}
+
+#scm-app .scm-portfolio-empty strong,
+#scm-app .scm-portfolio-empty span {
+  display: block;
+}
+
+#scm-app .scm-portfolio-empty strong { color: var(--portfolio-navy); font-size: 16px; }
+#scm-app .scm-portfolio-empty span { margin-top: 6px; color: #64778b; }
+
+#scm-app .scm-portfolio-management-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+#scm-app .scm-portfolio-management-notify {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #dce6ef;
+  border-radius: 13px;
+  background: #f7fafc;
+  padding: 14px;
+}
+
+#scm-app .scm-portfolio-management-notify strong,
+#scm-app .scm-portfolio-management-notify span { display: block; }
+#scm-app .scm-portfolio-management-notify span { margin-top: 3px; color: #62758a; font-size: 12px; }
+
+#scm-app .scm-portfolio [hidden] { display: none !important; }
+#scm-app .scm-portfolio form.is-busy { opacity: 0.72; pointer-events: none; }
+#scm-app .scm-portfolio form.is-busy .scm-spinner { display: inline-flex; }
+
+@media (max-width: 1180px) {
+  #scm-app .scm-portfolio-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #scm-app .scm-portfolio-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  #scm-app .scm-portfolio-kpis,
+  #scm-app .scm-portfolio-import-card form,
+  #scm-app .scm-portfolio-filter-grid,
+  #scm-app .scm-portfolio-management-grid { grid-template-columns: 1fr; }
+  #scm-app .scm-portfolio-kpi { min-height: 108px; }
+  #scm-app .scm-portfolio-import-card form { gap: 16px; }
+  #scm-app .scm-portfolio-filter-form .scm-collection-log-actions,
+  #scm-app .scm-portfolio-filter-form .scm-collection-log-actions .btn { width: 100%; }
+  #scm-app .scm-portfolio-actions { min-width: 220px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #scm-app .scm-portfolio * { scroll-behavior: auto !important; transition: none !important; }
+}
