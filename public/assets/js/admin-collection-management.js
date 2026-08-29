@@ -299,9 +299,12 @@
           if (result) result.textContent = "Selecciona el auxiliar 1380.";
           return;
         }
+        // Capture the file before disabling the input. Disabled controls are
+        // omitted from FormData, so creating it afterwards sent no file.
+        var uploadData = new FormData(importForm);
         setBusy(importForm, true);
         if (result) result.textContent = "Procesando saldos y cruzando contratos...";
-        postJson(actionImport, new FormData(importForm)).then(function (data) {
+        postJson(actionImport, uploadData).then(function (data) {
           notify(data.duplicate ? "warning" : "success", data.message || "Cartera actualizada.", "Cartera");
           return refreshPanel();
         }).catch(function (error) {

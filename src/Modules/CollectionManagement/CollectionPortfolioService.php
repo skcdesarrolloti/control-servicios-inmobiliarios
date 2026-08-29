@@ -38,7 +38,7 @@ final class CollectionPortfolioService
     $this->ensureSchema();
     $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
     if ($error !== UPLOAD_ERR_OK) {
-      throw new \RuntimeException('No se pudo subir el auxiliar de cartera.');
+      throw new \RuntimeException($this->uploadErrorMessage($error));
     }
     $path = (string) ($file['tmp_name'] ?? '');
     $name = basename(trim((string) ($file['name'] ?? 'auxiliar-1380.xls')));
@@ -809,6 +809,19 @@ final class CollectionPortfolioService
       KEY `idx_portfolio_created` (`portfolio_id`, `created_at`),
       KEY `idx_import_event` (`import_id`, `event_type`)
     ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation}");
+  }
+
+  private function uploadErrorMessage(int $error): string
+  {
+    return match ($error) {
+      UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'El auxiliar de cartera supera el tamaño máximo permitido.',
+      UPLOAD_ERR_PARTIAL => 'El auxiliar de cartera se subió parcialmente. Intenta cargarlo de nuevo.',
+      UPLOAD_ERR_NO_FILE => 'No se recibió el archivo del auxiliar de cartera.',
+      UPLOAD_ERR_NO_TMP_DIR => 'El servidor no tiene disponible la carpeta temporal para recibir el archivo.',
+      UPLOAD_ERR_CANT_WRITE => 'El servidor no pudo guardar temporalmente el auxiliar de cartera.',
+      UPLOAD_ERR_EXTENSION => 'Una extensión del servidor detuvo la carga del auxiliar de cartera.',
+      default => 'No se pudo subir el auxiliar de cartera.',
+    };
   }
 
   private function importsTable(): string { return $this->db->table('scm_collection_imports'); }
