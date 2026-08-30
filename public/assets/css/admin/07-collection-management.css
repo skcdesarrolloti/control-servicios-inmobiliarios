@@ -464,35 +464,6 @@
   gap: 12px;
 }
 
-#scm-app .scm-portfolio-management-effects {
-  margin: 0 0 14px;
-  border: 1px solid #d8e4ee;
-  border-radius: 12px;
-  background: #f7fafc;
-  color: #516a81;
-  font-size: 12px;
-  line-height: 1.55;
-}
-
-#scm-app .scm-portfolio-management-effects summary {
-  cursor: pointer;
-  padding: 12px 14px;
-  color: var(--portfolio-navy);
-  font-weight: 800;
-}
-
-#scm-app .scm-portfolio-management-effects[open] summary {
-  border-bottom: 1px solid #d8e4ee;
-}
-
-#scm-app .scm-portfolio-management-effects ul {
-  margin: 12px 18px 6px 34px;
-  padding: 0;
-}
-
-#scm-app .scm-portfolio-management-effects li + li { margin-top: 5px; }
-#scm-app .scm-portfolio-management-effects p { margin: 9px 14px 13px; color: #7a4c12; font-weight: 700; }
-
 #scm-app .scm-portfolio-management-observation .scm-textarea {
   display: block;
   width: 100% !important;

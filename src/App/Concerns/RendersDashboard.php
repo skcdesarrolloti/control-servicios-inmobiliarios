@@ -2314,7 +2314,7 @@ trait RendersDashboard
 
       <section id="scm-portfolio-panel-principal" class="scm-portfolio-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-principal" data-scm-portfolio-panel="principal"<?php echo $activeView === 'principal' ? '' : ' hidden'; ?>>
         <div class="scm-portfolio-workflow" aria-label="Guía de acciones de cartera">
-          <article><span>1</span><div><strong>Hacer gesti&oacute;n</strong><p>Guarda la actuaci&oacute;n y el funcionario en el historial; actualiza la &uacute;ltima acci&oacute;n, el contrato y el contador del inmueble. Tambi&eacute;n puede programar seguimiento y encolar mensajes al arrendatario y codeudores, adem&aacute;s del aviso interno. No cambia la etapa ni genera cartas.</p></div></article>
+          <article><span>1</span><div><strong>Hacer gesti&oacute;n</strong><p>Registra llamada, acuerdo o compromiso; puede programar seguimiento y enviar mensajes. No cambia la etapa de cobro.</p></div></article>
           <article><span>2</span><div><strong>Preparar carta</strong><p>Abre una vista previa. Descargar o enviar la carta registra la etapa prejur&iacute;dica o de siniestro.</p></div></article>
           <article><span>3</span><div><strong>Marcar siniestro</strong><p>Solo cambia el estado del contrato y deja trazabilidad. No crea ni env&iacute;a una carta por s&iacute; solo.</p></div></article>
         </div>
@@ -2423,7 +2423,7 @@ trait RendersDashboard
                     <td>
                       <?php if ($canManage): ?>
                         <div class="scm-portfolio-actions">
-                          <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar la actuaci&oacute;n, actualizar la trazabilidad y, si se elige, programar seguimiento y notificar">Hacer gesti&oacute;n</button>
+                          <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar contacto, acuerdo, compromiso o seguimiento sin cambiar la etapa">Hacer gesti&oacute;n</button>
                           <?php if ($canCollect): ?>
                             <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="prejuridico" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="Revisar la carta antes de descargarla o enviarla">Preparar prejur&iacute;dico</button>
                             <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="siniestro" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="Revisar el aviso antes de descargarlo o enviarlo">Preparar siniestro</button>
@@ -2453,12 +2453,12 @@ trait RendersDashboard
           <div class="scm-collection-log-filter-grid">
             <div class="scm-field"><label for="scmgc_fecha_desde">Fecha desde</label><input id="scmgc_fecha_desde" name="scmgc_fecha_desde" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr($dateFrom); ?>"></div>
             <div class="scm-field"><label for="scmgc_fecha_hasta">Fecha hasta</label><input id="scmgc_fecha_hasta" name="scmgc_fecha_hasta" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr($dateTo); ?>"></div>
-            <div class="scm-field"><label for="scmgc_tipo">Tipo</label><select id="scmgc_tipo" name="scmgc_tipo" class="select select-bordered select-sm scm-select"><option value="">Todos</option><?php foreach ($types as $typeOption): ?><option value="<?php echo esc_attr($typeOption); ?>" <?php selected($currentType, $typeOption); ?>><?php echo esc_html($this->collection_management_type_label($typeOption)); ?></option><?php endforeach; ?></select></div>
+            <div class="scm-field"><label for="scmgc_tipo">Concepto</label><select id="scmgc_tipo" name="scmgc_tipo" class="select select-bordered select-sm scm-select"><option value="">Todos</option><?php foreach ($types as $typeOption): ?><option value="<?php echo esc_attr($typeOption); ?>" <?php selected($currentType, $typeOption); ?>><?php echo esc_html($this->collection_management_type_label($typeOption)); ?></option><?php endforeach; ?></select></div>
             <div class="scm-collection-log-actions"><button type="submit" class="scm-btn-primary btn btn-primary">Filtrar historial</button></div>
           </div>
         </form>
         <?php if ($rows === []): ?><div class="scm-admin-notif-empty"><strong>Sin gestiones registradas</strong><span>No hay registros con los filtros actuales.</span></div><?php else: ?>
-          <div class="scm-collection-log-table-wrap"><table class="scm-collection-log-table"><thead><tr><th>Fecha</th><th>Contrato</th><th>Inmueble</th><th>Arrendatario</th><th>Tipo</th><th>Realizado por</th><th>Observaci&oacute;n</th><th>Mensajes</th></tr></thead><tbody>
+          <div class="scm-collection-log-table-wrap"><table class="scm-collection-log-table"><thead><tr><th>Fecha</th><th>Contrato</th><th>Inmueble</th><th>Arrendatario</th><th>Concepto</th><th>Realizado por</th><th>Observaci&oacute;n</th><th>Mensajes</th></tr></thead><tbody>
           <?php foreach ($rows as $row): ?><tr><td><?php echo esc_html($this->format_collection_management_date($row['fecha_raw'] ?? '')); ?></td><td><span class="scm-collection-log-pill"><?php echo esc_html((string) (($row['contrato'] ?? '') ?: '-')); ?></span></td><td><?php echo esc_html((string) (($row['inmueble'] ?? '') ?: '-')); ?></td><td><?php echo esc_html((string) (($row['arrendatario'] ?? '') ?: '-')); ?></td><td><span class="scm-collection-log-type"><?php echo esc_html($this->collection_management_type_label((string) ($row['tipo_gestion'] ?? ''))); ?></span></td><td><?php echo esc_html((string) (($row['realizado_por'] ?? '') ?: '-')); ?></td><td class="scm-collection-log-note"><?php echo esc_html((string) (($row['observacion'] ?? '') ?: '-')); ?></td><td><button type="button" class="scm-case-work-btn scm-collection-log-notify-btn" data-scm-collection-queue="<?php echo esc_attr((string) ((int) ($row['id'] ?? 0))); ?>">Ver</button></td></tr><?php endforeach; ?>
           </tbody></table></div><?php echo $this->render_collection_management_pagination($pagination, $applied); ?>
         <?php endif; ?>
@@ -2497,19 +2497,8 @@ trait RendersDashboard
           <input type="hidden" name="portfolio_id" value="">
           <input type="hidden" name="ids[]" value="">
           <input type="hidden" name="contract_ids[]" value="">
-          <details class="scm-portfolio-management-effects">
-            <summary>¿Qu&eacute; hace exactamente al guardar?</summary>
-            <ul>
-              <li>Crea una gesti&oacute;n con concepto, observaci&oacute;n, fecha, funcionario y cargo; queda visible en el historial.</li>
-              <li>Actualiza la &uacute;ltima acci&oacute;n de cartera, la trazabilidad del contrato, su contador de gestiones y el del inmueble.</li>
-              <li>Si programas seguimiento, guarda la pr&oacute;xima fecha, hora y detalle para la siguiente gesti&oacute;n.</li>
-              <li>Si marcas canales, encola el mensaje al arrendatario y a los codeudores elegidos.</li>
-              <li>Adem&aacute;s, encola un aviso interno por correo a los funcionarios configurados para este evento.</li>
-            </ul>
-            <p>No cambia la etapa de cobro y no genera cartas prejur&iacute;dicas ni de siniestro.</p>
-          </details>
           <div class="scm-portfolio-management-grid">
-            <div class="scm-field"><label for="scm-portfolio-management-type">Tipo de gesti&oacute;n</label><select id="scm-portfolio-management-type" name="tipo_gestion_cobro" class="select select-bordered select-sm scm-select"><option value="Canon">Canon</option><option value="Administracion">Administraci&oacute;n</option><option value="Servicios publicos">Servicios p&uacute;blicos</option></select></div>
+            <div class="scm-field"><label for="scm-portfolio-management-type">Concepto</label><select id="scm-portfolio-management-type" name="tipo_gestion_cobro" class="select select-bordered select-sm scm-select"><option value="Canon">Canon</option><option value="Administracion">Administraci&oacute;n</option><option value="Servicios publicos">Servicios p&uacute;blicos</option></select></div>
             <div class="scm-field"><label for="scm-portfolio-management-followup">Pr&oacute;xima gesti&oacute;n</label><select id="scm-portfolio-management-followup" name="volver_llamar" class="select select-bordered select-sm scm-select" data-scm-portfolio-followup><option value="No">No programar</option><option value="Si">Programar seguimiento</option></select></div>
             <div class="scm-field" data-scm-portfolio-followup-field hidden><label for="scm-portfolio-management-date">Fecha</label><input id="scm-portfolio-management-date" name="siguiente_fecha" type="date" class="input input-bordered input-sm scm-input"></div>
             <div class="scm-field" data-scm-portfolio-followup-field hidden><label for="scm-portfolio-management-time">Hora</label><input id="scm-portfolio-management-time" name="siguiente_hora" type="time" class="input input-bordered input-sm scm-input"></div>
