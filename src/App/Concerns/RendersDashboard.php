@@ -1945,7 +1945,8 @@ trait RendersDashboard
           <div class="scm-admin-notif-import-copy">
             <span class="scm-calendar-action-kicker">Cruce por Excel SIMI</span>
             <h4>Importar y seleccionar destinatarios</h4>
-            <p>Sube un .xls, .xlsx o .csv con columnas como <strong>contrato</strong>, <strong>inmueble_simi</strong>, <strong>NoInm</strong> y <strong>canon</strong>. El sistema cruza el archivo con propietarios, arrendatarios o copropiedades.</p>
+            <p>Sube un .xls, .xlsx o .csv con columnas como <strong>contrato</strong>, <strong>inmueble_simi</strong>, <strong>NoInm</strong> y <strong>canon</strong>. El sistema cruza el archivo solo con la pesta&ntilde;a activa.</p>
+            <p class="scm-admin-notif-import-scope" data-admin-notif-import-scope>Se cruzar&aacute; solo en la pesta&ntilde;a activa.</p>
             <p class="scm-admin-notif-import-examples">
               <a href="assets/examples/notificaciones-importacion-simi.xlsx" download>Descargar ejemplo XLSX</a>
               <a href="assets/examples/notificaciones-importacion-simi.csv" download>Descargar ejemplo CSV</a>

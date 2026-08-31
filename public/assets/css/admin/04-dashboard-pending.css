@@ -6209,6 +6209,19 @@
   line-height: 1.45;
 }
 
+#scm-app .scm-admin-notif-import-scope {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 8px !important;
+  padding: 6px 10px;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412 !important;
+  font-size: 12px !important;
+  font-weight: 900;
+}
+
 #scm-app .scm-admin-notif-import-examples {
   display: flex;
   flex-wrap: wrap;

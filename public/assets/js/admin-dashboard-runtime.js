@@ -2570,6 +2570,7 @@
       var importFileInput = panel.querySelector("[data-admin-notif-import-file]");
       var importClearBtn = panel.querySelector("[data-admin-notif-import-clear]");
       var importResultEl = panel.querySelector("[data-admin-notif-import-result]");
+      var importScopeEl = panel.querySelector("[data-admin-notif-import-scope]");
       var sendForm = panel.querySelector("[data-admin-notif-send]");
       var typeSelect = panel.querySelector("[data-admin-notif-type]");
       var queryInput = panel.querySelector("[data-admin-notif-query]");
@@ -2702,6 +2703,14 @@
           return String(typeSelect.options[typeSelect.selectedIndex].text || "").trim();
         }
         return "";
+      }
+
+      function updateImportScope() {
+        if (!importScopeEl) {
+          return;
+        }
+        var label = currentTypeLabel() || "la pestaña activa";
+        importScopeEl.textContent = "Se cruzara solo en: " + label + ".";
       }
 
       function supportsContractStatus(type) {
@@ -3523,6 +3532,7 @@
           var canImport = supportsContractStatus(currentType());
           importWrap.hidden = !canImport;
           importWrap.classList.toggle("is-hidden", !canImport);
+          updateImportScope();
         }
         if (sendImportPayload) {
           sendImportPayload.value = JSON.stringify(importedPayload || {});
@@ -3936,12 +3946,17 @@
         fd.set("nonce", nonce);
         fd.set("type", currentType());
         recipientsEl.innerHTML =
-          '<div class="scm-admin-notif-empty"><strong>Importando archivo...</strong><span>Estamos cruzando contrato e inmueble SIMI.</span></div>';
+          '<div class="scm-admin-notif-empty"><strong>Importando archivo...</strong><span>Estamos cruzando contrato e inmueble SIMI solo en ' +
+          escHtml(currentTypeLabel() || "la pestaña activa") +
+          ".</span></div>";
         if (paginationEl) {
           paginationEl.innerHTML = "";
         }
         if (importResultEl) {
-          importResultEl.textContent = "Importando y cruzando datos...";
+          importResultEl.textContent =
+            "Importando y cruzando datos solo en " +
+            (currentTypeLabel() || "la pestaña activa") +
+            "...";
           importResultEl.classList.remove("is-error", "is-success");
         }
         setLoading(true);
