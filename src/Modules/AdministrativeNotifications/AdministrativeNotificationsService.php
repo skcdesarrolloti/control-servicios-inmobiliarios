@@ -7,6 +7,7 @@ namespace SCM\Modules\AdministrativeNotifications;
 use SCM\Core\Auth;
 use SCM\Core\Database;
 use SCM\Support\EmailTemplate;
+use SCM\Support\LegacyXlsReader;
 use SCM\Support\SchemaInspector;
 
 final class AdministrativeNotificationsService
@@ -1595,10 +1596,13 @@ final class AdministrativeNotificationsService
     if (in_array($ext, ['csv', 'txt'], true)) {
       return $this->parseCsvImportFile($tmp);
     }
+    if ($ext === 'xls') {
+      return $this->parseXlsImportFile($tmp);
+    }
     if ($ext === 'xlsx') {
       return $this->parseXlsxImportFile($tmp);
     }
-    throw new \RuntimeException('Formato no soportado. Sube un archivo .xlsx o .csv.');
+    throw new \RuntimeException('Formato no soportado. Sube un archivo .xls, .xlsx o .csv.');
   }
 
   /** @return array<int,array<int,string>> */
@@ -1625,6 +1629,22 @@ final class AdministrativeNotificationsService
     }
     fclose($handle);
     return $rows;
+  }
+
+  /** @return array<int,array<int,string>> */
+  private function parseXlsImportFile(string $path): array
+  {
+    $book = new LegacyXlsReader($path);
+    if (!$book->success()) {
+      throw new \RuntimeException('No se pudo leer el archivo XLS: ' . (string) $book->error());
+    }
+
+    $rows = $book->rows(0, 3001);
+    return array_map(static function (array $row): array {
+      return array_values(array_map(static function ($value): string {
+        return trim((string) $value);
+      }, $row));
+    }, $rows);
   }
 
   /** @return array<int,array<int,string>> */
