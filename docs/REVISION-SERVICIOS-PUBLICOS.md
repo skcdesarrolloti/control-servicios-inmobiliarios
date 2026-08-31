@@ -11,7 +11,8 @@ Ahora se consulta exclusivamente `funcionarios._ID = Auth::userId()` y de esa mi
 - Los contratos entregados con servicios configurados conservan su programación trimestral y los filtros existentes.
 - Los contratos sin servicios aparecen en un grupo separado, **Sin servicios configurados / por verificar**, fuera del contador de revisiones pendientes. Se puede abrir el grupo para corregirlos. Este grupo respeta los filtros de contrato, inmueble y personas, pero no el mes, pues no tiene una revisión programada fiable.
 - Una lista explícita vacía (`serialize([])`) significa que no hay servicios; los identificadores históricos no la vuelven a activar. Solo cuando el campo legado está vacío se infieren servicios de `luz`, `agua` o `gas`.
-- El formulario siempre ofrece energía, agua y gas. **El inmueble tiene este servicio** modifica la configuración. **Revisar ahora** es independiente: desmarcarlo no elimina el servicio.
+- El formulario siempre ofrece energía, agua y gas. **El inmueble tiene este servicio** modifica la configuración. **Revisar ahora** aparece en el encabezado de cada servicio y es independiente: desmarcarlo no elimina el servicio.
+- No existe un selector de modo. Al guardar siempre se actualizan los servicios y sus datos. Si hay al menos un servicio marcado para revisar también se registra la revisión y se generan sus actas; si no hay ninguno, se guarda únicamente la configuración.
 - NIC, póliza, contrato de gas y medidores son editables. Se guardan en las columnas históricas del contrato. La lista se serializa con los valores compatibles `Energia`, `Agua`, `Gas`.
 - Al retirar un servicio se conserva su información histórica. No se borran revisiones, actas ni cuentas anteriores. Volver a activarlo permite recuperar/corregir sus identificadores.
 
@@ -72,7 +73,7 @@ Este cambio reutiliza el esquema existente: **no requiere migración SQL**. La c
 
 3. Verificar permisos de escritura de **PHP web y del worker** sobre `storage/uploads`, `storage/logs` y `storage/data`; el worker debe poder leer los PDF. Mantener el document root en `public/` y `BASE_URL` HTTPS apuntando al panel.
 4. Mantener un solo worker global de shared-notifications. No añadir otro cron si ya procesa esta cola. `bin/queue-worker.php` es el adaptador de compatibilidad disponible si la instalación lo utiliza; no ejecutarlo como una prueba inocua, porque envía trabajos reales.
-5. Invalidar caché de assets/OPcache del servidor si aplica. La versión de assets de este cambio es `3.3.6`.
+5. Invalidar caché de assets/OPcache del servidor si aplica. La versión de assets de este cambio es `3.3.7`.
 6. Abrir el formulario con el funcionario real y comprobar nombre + ID empleado. Probar una corrección de configuración primero: debe guardar sin actas ni correos. La prueba integral del repositorio es optativa en staging (requiere privilegio `CREATE TEMPORARY TABLES`):
 
    ```bash

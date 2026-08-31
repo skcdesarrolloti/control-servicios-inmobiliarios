@@ -24,33 +24,50 @@
 }
 
 #scm-app .scm-public-service-review-toggle {
-  grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-height: 44px;
+  padding: 7px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #fff;
+  color: #1e3a5f;
   cursor: pointer;
 }
 
 #scm-app .scm-public-service-review-toggle input {
-  width: 20px;
-  min-height: 20px;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
   accent-color: #1b447d;
 }
 
-#scm-app [data-public-services-review-mode] {
-  width: 100%;
-  min-height: 44px;
-  padding: 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  color: #0f172a;
-  background: #fff;
-  font: inherit;
+#scm-app .scm-public-service-review-toggle strong,
+#scm-app .scm-public-service-review-toggle small {
+  display: block;
 }
 
-#scm-app [data-public-services-review-mode]:focus-visible {
+#scm-app .scm-public-service-review-toggle strong {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+#scm-app .scm-public-service-review-toggle small {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 10px;
+}
+
+#scm-app .scm-public-service-review-toggle:has(input:focus-visible) {
   outline: 3px solid rgba(27, 68, 125, 0.3);
+  outline-offset: 2px;
+}
+
+#scm-app .scm-public-service-review-toggle:has(input:disabled) {
+  opacity: 0.48;
+  cursor: not-allowed;
 }
 
 #scm-app .scm-public-services-review-modal {
@@ -246,13 +263,23 @@
   opacity: 1;
 }
 
-#scm-app .scm-public-service-toggle {
+#scm-app .scm-public-service-head {
   min-height: 58px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px 10px 16px;
   background: linear-gradient(135deg, #f8fafc, #eef5ff);
+}
+
+#scm-app .scm-public-service-toggle {
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
   cursor: pointer;
 }
 
@@ -314,7 +341,7 @@
 
 #scm-app .scm-public-service-fields {
   display: none;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   padding: 16px;
   border-top: 1px solid #e2e8f0;
@@ -324,8 +351,8 @@
   display: grid;
 }
 
-#scm-app .is-configuration-only .scm-public-service-fields {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+#scm-app .scm-public-service-card.is-reviewing .scm-public-service-fields {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 #scm-app .scm-public-service-fields .scm-seg-field > span b {
@@ -443,8 +470,20 @@
 
   #scm-app .scm-public-services-review-summary,
   #scm-app .scm-public-service-fields,
-  #scm-app .is-configuration-only .scm-public-service-fields {
+  #scm-app .scm-public-service-card.is-reviewing .scm-public-service-fields {
     grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-public-service-head {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  #scm-app .scm-public-service-review-toggle {
+    justify-content: flex-start;
+    width: 100%;
   }
 
   #scm-app .scm-public-services-review-actions {

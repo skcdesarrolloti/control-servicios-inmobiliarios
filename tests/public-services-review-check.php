@@ -49,7 +49,7 @@ $assert(!empty($context['ok']) && $context['contract']['contrato'] === '2000', '
 $assert($context['employee']['id_empleado'] === '94001' && $context['employee']['nombre'] === 'Funcionario autenticado QA', 'actor resolves session _ID to its own id_empleado, not Gloria decoy');
 $assert(count($context['services']) === 3 && !$context['has_services'], 'empty contract can configure all three services');
 $html = $view->renderServiciosPublicosReviewForm($context);
-$assert(str_contains($html, '94001') && !str_contains($html, 'Gloria QA') && str_contains($html, 'value="configure" selected'), 'form shows authenticated employee and defaults empty contract to configuration');
+$assert(str_contains($html, '94001') && !str_contains($html, 'Gloria QA') && !str_contains($html, '¿Qué deseas guardar?') && !str_contains($html, 'name="servicios[]" value="energia" checked'), 'form shows authenticated employee and infers configuration-only when no review is selected');
 $listing = $controller->buildServiciosPublicosPayload([]);
 $assert($listing['count'] === 0 && count($listing['configuration_items']) === 2, 'unconfigured and explicitly empty services are separate from pending KPI');
 $assert(str_contains($view->renderServiciosPublicosTable($listing['items'], $listing['configuration_items']), 'Configurar servicios'), 'unconfigured contracts remain editable');

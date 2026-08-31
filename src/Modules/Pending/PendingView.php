@@ -647,13 +647,6 @@ final class PendingView
         <small>Arrendatario: <?php echo esc_html((string) ($contract['arrendatario'] ?? '-')); ?></small>
       </div>
 
-      <label class="scm-seg-field">
-        <span>¿Qué deseas guardar?</span>
-        <select name="review_mode" data-public-services-review-mode>
-          <option value="submit"<?php echo !empty($context['has_services']) ? ' selected' : ''; ?>>Registrar revisión y generar actas</option>
-          <option value="configure"<?php echo empty($context['has_services']) ? ' selected' : ''; ?>>Solo corregir servicios y datos del contrato</option>
-        </select>
-      </label>
       <fieldset class="scm-public-services-review-services">
         <legend>Servicios del contrato</legend>
         <p class="scm-public-services-review-help">Activa los servicios que realmente tiene el inmueble y corrige sus identificadores o medidores. Desmarcar «Revisar ahora» conserva el servicio, pero no genera su acta. Desactivar el servicio lo retira de la configuración, sin borrar el historial.</p>
@@ -668,13 +661,18 @@ final class PendingView
           $configured = !empty($service['configured']);
         ?>
           <section class="scm-public-service-card<?php echo $configured ? ' is-selected' : ''; ?>" data-public-service-card="<?php echo esc_attr($key); ?>">
-            <label class="scm-public-service-toggle">
-              <input type="checkbox" name="servicios_configurados[]" value="<?php echo esc_attr($key); ?>"<?php echo $configured ? ' checked' : ''; ?> aria-controls="<?php echo esc_attr($panelId); ?>" aria-expanded="<?php echo $configured ? 'true' : 'false'; ?>">
-              <span class="scm-public-service-toggle-mark" aria-hidden="true"></span>
-              <span><strong><?php echo esc_html((string) ($service['display_label'] ?? $service['label'] ?? $key)); ?></strong><small>El inmueble tiene este servicio</small></span>
-            </label>
+            <div class="scm-public-service-head">
+              <label class="scm-public-service-toggle">
+                <input type="checkbox" name="servicios_configurados[]" value="<?php echo esc_attr($key); ?>"<?php echo $configured ? ' checked' : ''; ?> aria-controls="<?php echo esc_attr($panelId); ?>" aria-expanded="<?php echo $configured ? 'true' : 'false'; ?>">
+                <span class="scm-public-service-toggle-mark" aria-hidden="true"></span>
+                <span><strong><?php echo esc_html((string) ($service['display_label'] ?? $service['label'] ?? $key)); ?></strong><small>El inmueble tiene este servicio</small></span>
+              </label>
+              <label class="scm-public-service-review-toggle">
+                <input type="checkbox" name="servicios[]" value="<?php echo esc_attr($key); ?>"<?php echo $configured ? ' checked' : ''; ?>>
+                <span><strong>Revisar ahora</strong><small>Generar su acta</small></span>
+              </label>
+            </div>
             <div class="scm-public-service-fields" id="<?php echo esc_attr($panelId); ?>">
-              <label class="scm-public-service-review-toggle" data-public-service-review-only><input type="checkbox" name="servicios[]" value="<?php echo esc_attr($key); ?>"<?php echo $configured ? ' checked' : ''; ?>> Revisar ahora y generar su acta</label>
               <label class="scm-seg-field">
                 <span><?php echo esc_html((string) ($service['account_label'] ?? 'Cuenta')); ?> <b aria-hidden="true" data-public-service-required>*</b></span>
                 <input type="text" name="<?php echo esc_attr($accountField); ?>" value="<?php echo esc_attr((string) ($service['account'] ?? '')); ?>" maxlength="180" data-public-service-account>
@@ -705,7 +703,7 @@ final class PendingView
 
       <aside class="scm-public-services-review-notice">
         <strong>Al guardar</strong>
-        <span data-public-services-review-notice>Se creará el registro de revisión, se actualizarán contrato e inmueble, se generarán las actas con membrete y se encolarán los correos. El próximo mes configurado será <?php echo esc_html($this->monthName($nextMonth)); ?>.</span>
+        <span data-public-services-review-notice data-review-text="Se actualizarán siempre los servicios y sus datos. Además, se creará la revisión, se generarán las actas marcadas y se encolarán los correos. El próximo mes será <?php echo esc_attr($this->monthName($nextMonth)); ?>." data-config-text="Se actualizarán los servicios y sus datos, con historial del funcionario. Como no hay servicios marcados para revisar, no se crearán actas ni correos y no cambiará el próximo mes.">Se actualizarán siempre los servicios y sus datos. Además, se creará la revisión, se generarán las actas marcadas y se encolarán los correos. El próximo mes será <?php echo esc_html($this->monthName($nextMonth)); ?>.</span>
       </aside>
 
       <div class="scm-public-services-review-error" role="alert" aria-live="assertive" hidden></div>
