@@ -1308,7 +1308,7 @@ final class AdministrativeNotificationsService
 
     [$headers, $dataRows] = $this->normalizeImportRows($rows);
     if ($headers === [] || $dataRows === []) {
-      throw new \RuntimeException('No se encontraron encabezados validos. Usa columnas como contrato, inmueble_simi y canon.');
+      throw new \RuntimeException('No se encontraron encabezados validos. Usa columnas como contrato, inmueble_simi, NoInm y canon.');
     }
 
     $outRows = [];
@@ -1641,14 +1641,25 @@ final class AdministrativeNotificationsService
       throw new \RuntimeException('No se pudo leer la primera hoja del XLSX.');
     }
     $mainNs = $this->xlsxMainNamespace($sheet);
-    $sheetRoot = $mainNs !== '' ? $sheet->children($mainNs) : $sheet;
-    $sheetData = $sheetRoot->sheetData ?? null;
+    $sheetData = $sheet->sheetData ?? null;
+    if (!$sheetData && $mainNs !== '') {
+      $sheetRoot = $sheet->children($mainNs);
+      $sheetData = $sheetRoot->sheetData ?? null;
+    }
 
     $rows = [];
-    foreach (($sheetData ? ($mainNs !== '' ? $sheetData->children($mainNs)->row : $sheetData->row) : []) as $xmlRow) {
+    $xmlRows = $sheetData ? $sheetData->row : [];
+    if ($sheetData && count($xmlRows) === 0 && $mainNs !== '') {
+      $xmlRows = $sheetData->children($mainNs)->row;
+    }
+    foreach ($xmlRows as $xmlRow) {
       $cells = [];
       $max = -1;
-      foreach (($mainNs !== '' ? $xmlRow->children($mainNs)->c : $xmlRow->c) ?? [] as $cell) {
+      $xmlCells = $xmlRow->c;
+      if (count($xmlCells) === 0 && $mainNs !== '') {
+        $xmlCells = $xmlRow->children($mainNs)->c;
+      }
+      foreach ($xmlCells ?? [] as $cell) {
         $ref = (string) ($cell['r'] ?? '');
         $index = $this->xlsxColumnIndex($ref);
         if ($index < 0) {
@@ -1759,11 +1770,22 @@ final class AdministrativeNotificationsService
       return trim((string) ($shared[$index] ?? ''));
     }
     if ($type === 'inlineStr') {
-      $inline = $children->is ?? null;
-      $inlineChildren = $inline instanceof \SimpleXMLElement && $mainNs !== '' ? $inline->children($mainNs) : $inline;
-      return trim((string) ($inlineChildren->t ?? ''));
+      $inline = $cell->is ?? ($children->is ?? null);
+      if ($inline instanceof \SimpleXMLElement) {
+        $text = (string) ($inline->t ?? '');
+        if ($text === '' && $mainNs !== '') {
+          $inlineChildren = $inline->children($mainNs);
+          $text = (string) ($inlineChildren->t ?? '');
+        }
+        return trim($text);
+      }
+      return '';
     }
-    return trim((string) ($children->v ?? ''));
+    $value = (string) ($cell->v ?? '');
+    if ($value === '') {
+      $value = (string) ($children->v ?? '');
+    }
+    return trim($value);
   }
 
   private function xlsxMainNamespace(\SimpleXMLElement $xml): string
@@ -1797,13 +1819,13 @@ final class AdministrativeNotificationsService
       $normalized = array_map(fn($value): string => $this->normalizeImportHeader((string) $value), $row);
       $score = 0;
       foreach ($normalized as $header) {
-        if ($this->isImportAlias($header, ['contrato', 'contrato_arrendamiento', 'numero_contrato', 'nro_contrato'])) {
+        if ($this->isImportAlias($header, $this->importContractAliases())) {
           $score += 2;
         }
-        if ($this->isImportAlias($header, ['inmueble', 'inmueble_simi', 'codigo_inmueble', 'id_inmueble', 'simi'])) {
+        if ($this->isImportAlias($header, $this->importPropertyAliases())) {
           $score += 2;
         }
-        if ($this->isImportAlias($header, ['canon', 'valor_canon', 'canon_arrendamiento', 'valor_arriendo', 'renta'])) {
+        if ($this->isImportAlias($header, $this->importCanonAliases())) {
           $score++;
         }
       }
@@ -1840,6 +1862,39 @@ final class AdministrativeNotificationsService
     return trim($value, '_');
   }
 
+  /** @return string[] */
+  private function importContractAliases(): array
+  {
+    return ['contrato', 'contrato_arrendamiento', 'numero_contrato', 'nro_contrato', 'no_contrato', 'num_contrato'];
+  }
+
+  /** @return string[] */
+  private function importPropertyAliases(): array
+  {
+    return [
+      'inmueble',
+      'inmueble_simi',
+      'codigo_inmueble',
+      'id_inmueble',
+      'numero_inmueble',
+      'nro_inmueble',
+      'no_inmueble',
+      'num_inmueble',
+      'simi',
+      'noinm',
+      'no_inm',
+      'nro_inm',
+      'num_inm',
+      'cod_inm',
+    ];
+  }
+
+  /** @return string[] */
+  private function importCanonAliases(): array
+  {
+    return ['canon', 'valor_canon', 'canon_arrendamiento', 'valor_arriendo', 'renta'];
+  }
+
   /** @param string[] $aliases */
   private function isImportAlias(string $header, array $aliases): bool
   {
@@ -1860,9 +1915,9 @@ final class AdministrativeNotificationsService
   /** @param array<int,string> $headers @param array<int,string> $row @return array<string,string> */
   private function importMetaForRow(array $headers, array $row): array
   {
-    $contract = $this->normalizeImportIdentifier($this->importValue($headers, $row, ['contrato', 'contrato_arrendamiento', 'numero_contrato', 'nro_contrato']));
-    $property = $this->normalizeImportIdentifier($this->importValue($headers, $row, ['inmueble', 'inmueble_simi', 'codigo_inmueble', 'id_inmueble', 'simi']));
-    $canonRaw = $this->importValue($headers, $row, ['canon', 'valor_canon', 'canon_arrendamiento', 'valor_arriendo', 'renta']);
+    $contract = $this->normalizeImportIdentifier($this->importValue($headers, $row, $this->importContractAliases()));
+    $property = $this->normalizeImportIdentifier($this->importValue($headers, $row, $this->importPropertyAliases()));
+    $canonRaw = $this->importValue($headers, $row, $this->importCanonAliases());
     $meta = [
       'contrato_excel' => $contract,
       'inmueble_simi_excel' => $property,

@@ -1,5 +1,5 @@
-﻿contrato,inmueble_simi,canon,mes,direccion,nota
+contrato,NoInm,canon,mes,direccion,nota
 700,10578,1850000,Agosto 2026,DG 49 #51-66 Apto 1,Ejemplo propietario con canon
 593,88569,1320000,Agosto 2026,CL 29D 3 29B - 44 APTO 2B,Ejemplo para cruce por contrato
 806,10642,2150000,Agosto 2026,Diagonal 38 La Carolina,Ejemplo para cruce por inmueble
-,10628,1980000,Agosto 2026,BLAS DE LEZO K 64 21F 05,Ejemplo si solo viene inmueble SIMI
+,10628,1980000,Agosto 2026,BLAS DE LEZO K 64 21F 05,Ejemplo si solo viene NoInm
