@@ -1014,6 +1014,10 @@ trait HandlesMaintenanceActions
     $this->verifyCsrf();
 
     $ticketPk    = (int) ($_POST['ticket_pk'] ?? 0);
+    $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, new \SCM\Support\SchemaInspector($this->db), $ticketPk, false, 'Trasladado');
+    if ($actError !== '') {
+      $this->jsonFail($actError);
+    }
     $newEmpId    = trim(sanitize_text_field(wp_unslash((string) ($_POST['new_empleado_id'] ?? ''))));
     $notifyTargets = $this->parse_notify_recipients($_POST['notify_recipients'] ?? []);
     $notifyOldEmp  = false;

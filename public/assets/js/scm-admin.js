@@ -331,6 +331,7 @@
   }
 
   function injectIframePrintStyles(frameDocument) {
+    if (frameDocument && frameDocument.querySelector(".scm-acta-document")) return;
     if (!frameDocument || !frameDocument.head || frameDocument.getElementById("scm-iframe-print-style")) {
       return;
     }
@@ -1660,6 +1661,145 @@
       });
     }
     syncPreventivaNoAccessBox(scope);
+  }
+
+  function openTicketCompletionEditor(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    var root = findRootFromNode(caseBtn);
+    if (!sub || !root) return;
+    var runtime = parseRuntime(root) || {};
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var actaRun = (sub._scmActaRun || 0) + 1;
+    sub._scmActaRun = actaRun;
+    sub.querySelector(".scm-case-submodal-title").textContent = "Acta de solución y satisfacción";
+    setCaseSubmodalMeta(sub, caseBtn);
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+    body.innerHTML = '<div class="scm-acta"><p role="status">Cargando actas, firmantes y tarifa administrativa…</p></div>';
+    var sequence = 1;
+    var busy = false;
+    sub._scmActaReturnFocus = modal.querySelector("[data-scm-open-ticket-acta]");
+    if (!sub._scmActaFocusBound) {
+      sub._scmActaFocusBound = true;
+      sub.addEventListener("keydown", function (event) {
+        if (!sub.classList.contains("open") || !sub.querySelector(".scm-acta")) return;
+        if (event.key === "Escape") {
+          event.preventDefault(); event.stopPropagation();
+          sub.querySelector(".scm-case-submodal-close").click();
+        } else if (event.key === "Tab") {
+          var controls = Array.from(sub.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary')).filter(function (el) { return el.getClientRects().length > 0; });
+          var first = controls[0], last = controls[controls.length - 1];
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }
+      });
+      sub.querySelector(".scm-case-submodal-close").addEventListener("click", function () {
+        if (sub.querySelector(".scm-acta") && sub._scmActaReturnFocus) sub._scmActaReturnFocus.focus();
+      });
+    }
+
+    function message(text, error) {
+      var target = body.querySelector("[data-acta-message]");
+      if (!target) return;
+      target.textContent = text;
+      target.classList.toggle("is-error", !!error);
+      target.setAttribute("role", error ? "alert" : "status");
+      target.scrollIntoView({ block: "nearest" });
+    }
+
+    function request(operation, data) {
+      if (busy) return Promise.resolve();
+      busy = true;
+      var controller = new AbortController();
+      var timeout = window.setTimeout(function () { controller.abort(); }, 30000);
+      data = data || new FormData();
+      data.set("action", "scm_ticket_acta");
+      data.set("nonce", runtime.nonce || "");
+      data.set("ticket_pk", caseBtn.dataset.ticketPk || "");
+      data.set("operation", operation);
+      body.querySelectorAll("button").forEach(function (button) { button.disabled = true; });
+      message(operation === "read" ? "Cargando…" : "Guardando, espera por favor…", false);
+      return fetch(runtime.ajaxUrl || "api.php", { method: "POST", body: data, credentials: "same-origin", signal: controller.signal, headers: { Accept: "application/json" } })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (sub._scmActaRun !== actaRun) return;
+          if (!json || !json.success || !json.data) throw new Error(json && json.data && json.data.message || "No se pudo completar la operación.");
+          body.innerHTML = json.data.html;
+          bind();
+          if (json.data.message) message(json.data.message, json.data.queued === false);
+          if (operation !== "read") root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+          if (operation === "read") {
+            var first = body.querySelector("select, a, button");
+            if (first) first.focus();
+          }
+        })
+        .catch(function (error) {
+          if (sub._scmActaRun !== actaRun) return;
+          if (!body.querySelector("[data-acta-message]")) {
+            body.innerHTML = '<div class="scm-acta"><p data-acta-message></p><button type="button" class="scm-acta-button" data-acta-retry>Reintentar carga</button></div>';
+            body.querySelector("[data-acta-retry]").addEventListener("click", function () { request("read"); });
+          }
+          message(error.name === "AbortError" ? "La solicitud tardó demasiado. Cierra y vuelve a consultar las actas antes de repetir la operación." : (error.message || "No se pudo conectar. Consulta el acta antes de volver a generar."), true);
+        })
+        .finally(function () {
+          window.clearTimeout(timeout);
+          busy = false;
+          if (sub._scmActaRun !== actaRun) return;
+          body.querySelectorAll("button").forEach(function (button) { button.disabled = false; });
+        });
+    }
+
+    function bind() {
+      var form = body.querySelector("[data-acta-create]");
+      if (form) {
+        var signer = form.querySelector("[data-acta-signer]");
+        signer.addEventListener("change", function () {
+          var option = signer.selectedOptions[0];
+          form.querySelector("[data-acta-signer-name]").value = option.dataset.name || "";
+          form.querySelector("[data-acta-signer-email]").value = option.dataset.email || "";
+        });
+        function total() {
+          var fee = Number(form.querySelector("[data-acta-fee]").value) || 0;
+          var transport = Number(form.querySelector("[data-acta-transport]").value) || 0;
+          form.querySelector("[data-acta-total]").textContent = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(fee + transport);
+        }
+        form.querySelector("[data-acta-fee]").addEventListener("input", total);
+        form.querySelector("[data-acta-transport]").addEventListener("input", total);
+        form.querySelector("[data-acta-add-item]").addEventListener("click", function () {
+          var items = form.querySelector("[data-acta-items]");
+          if (items.children.length >= 30) { message("El acta admite hasta 30 daños y soluciones.", true); return; }
+          var item = items.firstElementChild.cloneNode(true);
+          item.querySelectorAll("textarea").forEach(function (field) {
+            field.name = field.name.replace(/items\[\d+\]/, "items[" + sequence + "]");
+            field.value = "";
+          });
+          sequence++;
+          items.appendChild(item);
+          item.querySelector("textarea").focus();
+        });
+        form.addEventListener("click", function (event) {
+          var button = event.target.closest("[data-acta-remove-item]");
+          if (!button) return;
+          if (form.querySelectorAll("[data-acta-item]").length === 1) { message("Debes conservar al menos un daño y su solución.", true); return; }
+          button.closest("[data-acta-item]").remove();
+        });
+        form.addEventListener("submit", function (event) { event.preventDefault(); request("create", new FormData(form)); });
+      }
+      body.querySelectorAll("[data-acta-preview]").forEach(function (link) {
+        link.addEventListener("click", function (event) { event.preventDefault(); openIframeModal(link.href, "Acta de satisfacción"); });
+      });
+      body.querySelectorAll("[data-acta-resend]").forEach(function (button) {
+        button.addEventListener("click", function () { var fd = new FormData(); fd.set("act_id", button.dataset.actaResend); request("resend", fd); });
+      });
+      body.querySelectorAll("[data-acta-cancel]").forEach(function (cancelForm) {
+        cancelForm.addEventListener("submit", function (event) {
+          event.preventDefault();
+          if (!window.confirm("¿Anular esta acta? Su enlace dejará de permitir la firma y podrás generar una nueva versión.")) return;
+          var fd = new FormData(cancelForm); fd.set("act_id", cancelForm.dataset.actaCancel); request("cancel", fd);
+        });
+      });
+    }
+    request("read");
   }
 
   function openTicketResponseEditor(modal, caseBtn) {
@@ -3675,6 +3815,8 @@
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder ticket</button>';
           caseActionsHtml +=
+            '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-acta>Acta de solución y firma</button>';
+          caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>';
         }
         if (!isPublicPqr && (cotizacionUrl || cotizacionId) && cotizacionSinResponder) {
@@ -4012,6 +4154,12 @@
               "",
             );
           });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-ticket-acta]")
+        .forEach(function (actaBtn) {
+          actaBtn.addEventListener("click", function () { openTicketCompletionEditor(modal, btn); });
         });
 
       modal

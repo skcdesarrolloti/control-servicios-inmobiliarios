@@ -513,6 +513,12 @@ final class GuideModalView
         'contenido' => '<strong>Definición:</strong> Reparación terminada y acta firmada.<br><br><strong>Política:</strong> Solo cerrar ticket con Acta de Satisfacción firmada. <em>Encuesta se envía con el acta.</em>',
       ],
       [
+        'titulo'    => 'En espera de firma',
+        'icono'     => 'fa-file-signature',
+        'color'     => 'scm-gc-blue',
+        'contenido' => '<strong>Definición:</strong> Acta de solución generada y pendiente de aceptación del firmante seleccionado.<br><br><strong>Política:</strong> Registrar daños, soluciones y observaciones. El ticket permanece abierto; la firma registra el cierre y un único reporte administrativo. Para corregir el documento, anular la versión pendiente y generar otra.',
+      ],
+      [
         'titulo'    => 'Entregado',
         'icono'     => 'fa-key',
         'color'     => 'scm-gc-teal',

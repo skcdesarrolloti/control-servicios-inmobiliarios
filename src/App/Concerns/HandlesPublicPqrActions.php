@@ -139,6 +139,10 @@ trait HandlesPublicPqrActions
     }
 
     $schema = new \SCM\Support\SchemaInspector($this->db);
+    $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, $schema, $ticketPk, false, (string) ($updatePayload['estado_administrativo'] ?? '__keep__'));
+    if ($actError !== '') {
+      throw new \DomainException($actError);
+    }
     $update = $schema->filterTableData($ticketsTable, $updatePayload);
     if (empty($update)) {
       throw new \RuntimeException('No se pudo actualizar el PQR.');

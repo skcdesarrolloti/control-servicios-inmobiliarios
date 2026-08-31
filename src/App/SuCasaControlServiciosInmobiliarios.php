@@ -9,6 +9,7 @@ use SCM\Support\FuncionarioOptions;
 final class SuCasaControlServiciosInmobiliarios
 {
   use \SCM\App\Concerns\HandlesTicketWorkflowActions;
+  use \SCM\App\Concerns\HandlesTicketCompletion;
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   use \SCM\App\Concerns\HandlesPublicPqrActions;
   use \SCM\App\Concerns\HandlesAdministrativeNotifications;
@@ -30,6 +31,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_ACTIVATE_TICKET = 'scm_activar_ticket';
   const AJAX_COTIZACION_RESPONSE = 'scm_responder_cotizacion';
   const AJAX_CLOSE_TICKET = 'scm_cerrar_ticket';
+  const AJAX_TICKET_COMPLETION = 'scm_ticket_acta';
   const AJAX_CONTACTS_UPDATE = 'scm_actualizar_contactos';
   const AJAX_ENTREGA         = 'scm_entrega';
   const AJAX_PREVENTIVA      = 'scm_preventiva';

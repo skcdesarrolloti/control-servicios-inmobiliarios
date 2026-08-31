@@ -14,6 +14,10 @@ trait WorkflowCommandsConcern
 {
   public function save(int $ticketPk, string $observacion, string $estadoTicket, string $estadoCotizacion, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $evidencias = '', array $documentos = [], string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = ''): array
   {
+    $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, $this->schema, $ticketPk, $cerrarTicket, $estadoAdministrativo);
+    if ($actError !== '') {
+      return ['ok' => '0', 'message' => $actError];
+    }
     $ticketsTable      = $this->db->table('jet_cct_tickets');
     $seguimientoTable  = $this->db->table('jet_cct_seguimiento_ticket');
     $histFallbackTable = $this->db->table('jet_cct_historial_del_ticket');
@@ -139,6 +143,10 @@ trait WorkflowCommandsConcern
    */
   public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = [], string $estadoCotizacion = '__keep__', string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', bool $generarActaNoAccesoPreventiva = false): array
   {
+    $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, $this->schema, $ticketPk, $cerrarTicket, $estadoAdministrativo);
+    if ($actError !== '') {
+      return ['ok' => '0', 'message' => $actError];
+    }
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $histTable    = $this->db->table('jet_cct_historial_del_ticket');
     if ($ticketPk <= 0 || !$this->schema->tableExists($ticketsTable) || !$this->schema->tableExists($histTable)) {
@@ -500,6 +508,10 @@ trait WorkflowCommandsConcern
    */
   public function postponeTicket(int $ticketPk, string $observacion, array $notifyTargets = [], $evidencias = '', array $documentos = []): array
   {
+    $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, $this->schema, $ticketPk, true);
+    if ($actError !== '') {
+      return ['ok' => '0', 'message' => $actError];
+    }
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $seguimientoTable = $this->db->table('jet_cct_seguimiento_ticket');
     $histTable = $this->db->table('jet_cct_historial_del_ticket');
@@ -592,6 +604,10 @@ trait WorkflowCommandsConcern
    */
   public function activateTicket(int $ticketPk, string $motivo): array
   {
+    $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, $this->schema, $ticketPk, false, 'Nuevo', true);
+    if ($actError !== '') {
+      return ['ok' => '0', 'message' => $actError];
+    }
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $seguimientoTable = $this->db->table('jet_cct_seguimiento_ticket');
     $histTable = $this->db->table('jet_cct_historial_del_ticket');
@@ -806,6 +822,10 @@ trait WorkflowCommandsConcern
    */
   public function closeTicket(int $ticketPk, string $motivo = ''): array
   {
+    $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, $this->schema, $ticketPk, true);
+    if ($actError !== '') {
+      return ['ok' => '0', 'message' => $actError];
+    }
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $seguimientoTable = $this->db->table('jet_cct_seguimiento_ticket');
     $histTable = $this->db->table('jet_cct_historial_del_ticket');

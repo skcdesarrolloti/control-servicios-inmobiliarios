@@ -304,6 +304,18 @@ trait PendingQueriesConcern
         $pdo->beginTransaction();
       }
 
+      if ($shouldCloseTicket) {
+        $closeCandidate = $this->repo->getTicketByReference(trim((string) ($row['id_ticket'] ?? '')));
+        if (is_array($closeCandidate) && isset($closeCandidate['_ID'])) {
+          // Serialize with signing/creation before approving a report that requests closure.
+          $db->getRow('SELECT _ID FROM `' . $db->table('jet_cct_tickets') . '` WHERE _ID = ? FOR UPDATE', [(int) $closeCandidate['_ID']]);
+          $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($db, $schema, (int) $closeCandidate['_ID'], true);
+          if ($actError !== '') {
+            throw new \DomainException($actError);
+          }
+        }
+      }
+
       $this->repo->insertReporteAdministrativo($payload);
 
       $preUpdate = $schema->filterTableData($preTable, [

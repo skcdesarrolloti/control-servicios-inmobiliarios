@@ -1,0 +1,70 @@
+.scm-acta {
+  --acta-ink: #10264a; --acta-muted: #485971; --acta-border: #cbd5e1; --acta-surface: #f3f6fa;
+  color: var(--acta-ink); font: 400 15px/1.6 system-ui, sans-serif; text-align: left;
+}
+#scm-app .scm-case-submodal:has(.scm-acta) .scm-case-submodal-close { width: 44px; height: 44px; top: 8px; right: 8px; }
+#scm-app .scm-case-submodal:has(.scm-acta) .scm-case-submodal-head { min-height: 60px; padding-right: 64px; display: flex; flex-direction: column; justify-content: center; }
+.scm-acta *, .scm-acta *::before, .scm-acta *::after { box-sizing: border-box; }
+.scm-acta h1, .scm-acta h2, .scm-acta h3 { color: var(--acta-ink); line-height: 1.3; margin: 0 0 16px; }
+.scm-acta h1 { font-size: clamp(24px, 4vw, 34px); }
+.scm-acta h2 { font-size: 20px; }
+.scm-acta h3 { font-size: 17px; margin-top: 24px; }
+.scm-acta p { margin: 12px 0; overflow-wrap: anywhere; }
+.scm-acta .scm-acta-notice { padding: 16px; background: #fff8eb; color: #674000; border: 1px solid #efc276; border-radius: 10px; }
+.scm-acta-meta, .scm-acta-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: space-between; }
+.scm-acta-actions { justify-content: flex-start; }
+.scm-acta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.scm-acta label { display: grid; gap: 6px; font-weight: 600; margin: 12px 0; min-width: 0; }
+.scm-acta input:not([type=checkbox]), .scm-acta select, .scm-acta textarea {
+  display: block; width: 100%; min-height: 44px; padding: 10px 12px; font: inherit;
+  color: var(--acta-ink); background: #fff; border: 1px solid #94a3b8; border-radius: 8px;
+}
+.scm-acta textarea { resize: vertical; }
+.scm-acta input[readonly] { background: var(--acta-surface); color: var(--acta-muted); }
+.scm-acta :is(button, input, select, textarea, a, summary):focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.scm-acta .scm-acta-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 18px; border-radius: 8px; background: var(--acta-ink); color: #fff; border: 1px solid var(--acta-ink); font: 600 14px/1.4 system-ui, sans-serif; text-decoration: none; cursor: pointer; }
+.scm-acta .scm-acta-secondary { background: #fff; color: var(--acta-ink); border-color: #94a3b8; }
+.scm-acta .scm-acta-danger { color: #9f1239; background: #fff1f2; border-color: #e2a1b2; }
+.scm-acta button:hover { filter: brightness(.94); }
+.scm-acta button:disabled { opacity: .6; cursor: wait; }
+.scm-acta .scm-acta-check { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; font-weight: 400; }
+.scm-acta .scm-acta-check input { width: 20px; height: 20px; margin-top: 3px; flex: 0 0 auto; }
+.scm-acta-record, .scm-acta-item { border: 1px solid var(--acta-border); background: #fff; padding: 16px; margin: 16px 0; border-radius: 10px; min-width: 0; }
+.scm-acta-item legend { padding: 0 8px; font-weight: 700; }
+.scm-acta .scm-acta-remove { background: transparent; color: #9f1239; border: 0; min-height: 44px; padding: 8px; cursor: pointer; text-decoration: underline; }
+.scm-acta .scm-acta-help, .scm-acta dt { color: var(--acta-muted); font-size: 14px; }
+.scm-acta-status { color: #173d70; background: #e5eefb; padding: 6px 12px; border-radius: 20px; font-size: 13px; }
+.scm-acta .scm-acta-total { padding: 16px; background: var(--acta-surface); font-size: 18px; font-weight: 700; border-radius: 10px; }
+.scm-acta summary { cursor: pointer; padding: 12px 0; min-height: 44px; font-weight: 600; }
+.scm-acta [data-acta-message]:not(:empty) { padding: 14px; border: 1px solid var(--acta-border); background: var(--acta-surface); border-radius: 8px; margin-top: 16px; }
+.scm-acta [data-acta-message].is-error { background: #fff1f2; color: #9f1239; border-color: #e2a1b2; }
+.scm-acta-page { margin: 0; background: #eef2f7; padding: 24px 16px; }
+.scm-acta-document { max-width: 960px; margin: 0 auto; padding: clamp(20px, 5vw, 48px); background: #fff; border: 1px solid #cbd5e1; border-radius: 16px; }
+.scm-acta-document header { border-bottom: 3px solid #e79815; padding-bottom: 24px; }
+.scm-acta-document section { margin: 28px 0; }
+.scm-acta-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .04em; }
+.scm-acta dd { margin: 4px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.scm-acta table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 15px; }
+.scm-acta th, .scm-acta td { text-align: left; padding: 12px; border: 1px solid var(--acta-border); vertical-align: top; overflow-wrap: anywhere; color: var(--acta-ink); }
+.scm-acta thead th { background: var(--acta-ink); color: #fff; }
+.scm-acta thead th:first-child { width: 44px; }
+.scm-acta tbody tr:nth-child(even) { background: var(--acta-surface); }
+.scm-acta .scm-acta-signature-name { font-family: Georgia, serif; font-style: italic; font-size: 28px; }
+.scm-acta footer { margin-top: 32px; border-top: 1px solid var(--acta-border); color: var(--acta-muted); }
+.scm-acta-fingerprint { font-size: 11px; word-break: break-all; }
+.scm-acta-print { max-width: 960px; margin: 0 auto 16px; }
+@media (max-width: 600px) {
+  .scm-acta-grid { grid-template-columns: 1fr; gap: 0; }
+  .scm-acta { font-size: 16px; }
+  .scm-acta th, .scm-acta td { padding: 8px; font-size: 13px; }
+  .scm-acta-document { padding: 18px; border-radius: 10px; }
+  .scm-acta-page { padding: 12px 8px; }
+}
+@media print {
+  .scm-acta-page { padding: 0; background: #fff; }
+  .scm-acta-document { max-width: none; border: 0; padding: 0; }
+  .scm-acta-print, .scm-acta-document form, .scm-acta-no-print { display: none !important; }
+  .scm-acta h2, .scm-acta h3 { break-after: avoid; }
+  .scm-acta tr, .scm-acta-signature { break-inside: avoid; }
+  .scm-acta thead { display: table-header-group; }
+}

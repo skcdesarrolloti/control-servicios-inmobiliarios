@@ -36,6 +36,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_ACTIVATE_TICKET => 'ajax_handler_activate_ticket',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_RESPONSE => 'ajax_handler_cotizacion_response',
       SuCasaControlServiciosInmobiliarios::AJAX_CLOSE_TICKET => 'ajax_handler_close_ticket',
+      SuCasaControlServiciosInmobiliarios::AJAX_TICKET_COMPLETION => 'ajax_handler_ticket_completion',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTACTS_UPDATE => 'ajax_handler_contacts_update',
       SuCasaControlServiciosInmobiliarios::AJAX_PREVENTIVAS_PENDIENTES => 'ajax_handler_preventivas_pendientes',
       SuCasaControlServiciosInmobiliarios::AJAX_SERVICIOS_PUBLICOS_PENDIENTES => 'ajax_handler_servicios_publicos_pendientes',
@@ -127,7 +128,14 @@ final class AuthenticatedActionRouter
       return false;
     }
 
-    $this->application->{$method}();
+    $ticketId = (int) ($_POST['ticket_pk'] ?? 0);
+    if ($ticketId > 0) {
+      \SCM\Modules\TicketCompletion\CompletionRepository::locked(App::db(), $ticketId, function () use ($method): void {
+        $this->application->{$method}();
+      });
+    } else {
+      $this->application->{$method}();
+    }
     return true;
   }
 }
