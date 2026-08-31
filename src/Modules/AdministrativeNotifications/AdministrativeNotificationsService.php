@@ -1312,19 +1312,27 @@ final class AdministrativeNotificationsService
       throw new \RuntimeException('No se encontraron encabezados validos. Usa columnas como contrato, inmueble_simi, NoInm y canon.');
     }
 
-    $outRows = [];
-    $payload = [];
-    $seen = [];
-    $usable = 0;
-    $unmatched = 0;
-    $duplicates = 0;
+    $metas = [];
 
     foreach ($dataRows as $row) {
       $meta = $this->importMetaForRow($headers, $row);
       if (($meta['contrato_excel'] ?? '') === '' && ($meta['inmueble_simi_excel'] ?? '') === '') {
         continue;
       }
-      $usable++;
+      $metas[] = $meta;
+    }
+
+    if ($this->canUseBulkContractImport($config)) {
+      return $this->importRecipientsFromContractMetas($type, $config, $metas, count($dataRows));
+    }
+
+    $outRows = [];
+    $payload = [];
+    $seen = [];
+    $unmatched = 0;
+    $duplicates = 0;
+
+    foreach ($metas as $meta) {
       $result = $this->search($type, '', 1, 100, '', (string) ($meta['inmueble_simi_excel'] ?? ''), (string) ($meta['contrato_excel'] ?? ''));
       $matches = (array) ($result['rows'] ?? []);
       if ($matches === []) {
@@ -1351,13 +1359,306 @@ final class AdministrativeNotificationsService
       'rows' => $outRows,
       'payload' => $payload,
       'total_rows' => count($dataRows),
-      'usable_rows' => $usable,
+      'usable_rows' => count($metas),
       'matched' => count($outRows),
       'unmatched' => $unmatched,
       'duplicates' => $duplicates,
       'type' => $type,
       'type_label' => (string) ($config['label'] ?? $type),
     ];
+  }
+
+  /** @param array<string,mixed> $config */
+  private function canUseBulkContractImport(array $config): bool
+  {
+    if (!empty($config['contract_match_columns'])) {
+      return false;
+    }
+    $table = (string) ($config['table'] ?? '');
+    $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    $contractActorColumn = (string) ($config['contract_actor_column'] ?? '');
+    return $table !== ''
+      && $contractActorColumn !== ''
+      && $this->schema->tableExists($table)
+      && $this->schema->tableExists($contractTable)
+      && $this->schema->columnExists($contractTable, $contractActorColumn)
+      && $this->schema->columnExists($contractTable, 'estado');
+  }
+
+  /**
+   * Cruce masivo para importaciones por Excel. Evita llamar search() por cada
+   * fila, que dispara COUNT + SELECT + resumen de contratos cientos de veces.
+   *
+   * @param array<string,mixed> $config
+   * @param array<int,array<string,string>> $metas
+   * @return array{rows:array<int,array<string,mixed>>,payload:array<string,array<string,string>>,total_rows:int,usable_rows:int,matched:int,unmatched:int,duplicates:int,type:string,type_label:string}
+   */
+  private function importRecipientsFromContractMetas(string $type, array $config, array $metas, int $totalRows): array
+  {
+    $contractsByMeta = $this->importContractsByMeta($config, $metas, $this->effectiveContractStatus($config, ''));
+    $actorIds = [];
+    $contractActorColumn = (string) ($config['contract_actor_column'] ?? '');
+    foreach ($contractsByMeta as $contracts) {
+      foreach ($contracts as $contract) {
+        $actorId = (int) preg_replace('/\D+/', '', (string) ($contract[$contractActorColumn] ?? ''));
+        if ($actorId > 0) {
+          $actorIds[$actorId] = $actorId;
+        }
+      }
+    }
+    $recipientsByActor = $this->importRecipientsByActorIds($type, $config, array_values($actorIds));
+
+    $outRows = [];
+    $payload = [];
+    $seen = [];
+    $unmatched = 0;
+    $duplicates = 0;
+
+    foreach ($metas as $index => $meta) {
+      $contracts = $contractsByMeta[$index] ?? [];
+      if ($contracts === []) {
+        $unmatched++;
+        continue;
+      }
+
+      $contractInfo = $this->contractInfoFromRows($contracts);
+      $matchedThisMeta = false;
+      $recipientIdsForMeta = [];
+      foreach ($contracts as $contract) {
+        $actorId = (int) preg_replace('/\D+/', '', (string) ($contract[$contractActorColumn] ?? ''));
+        if ($actorId <= 0 || empty($recipientsByActor[$actorId])) {
+          continue;
+        }
+        foreach ($recipientsByActor[$actorId] as $recipient) {
+          $id = (int) ($recipient['_ID'] ?? 0);
+          if ($id <= 0 || isset($recipientIdsForMeta[$id])) {
+            continue;
+          }
+          $recipientIdsForMeta[$id] = true;
+          $matchedThisMeta = true;
+          if (isset($seen[$id])) {
+            $duplicates++;
+            continue;
+          }
+          $seen[$id] = true;
+          $recipient['contrato_arrendamiento_estado'] = $contractInfo['label'];
+          $recipient['contratos_arrendamiento_resumen'] = $contractInfo['summary'];
+          $recipient['_scm_import_meta'] = $meta;
+          $outRows[] = $recipient;
+          $payload[(string) $id] = $meta;
+        }
+      }
+      if (!$matchedThisMeta) {
+        $unmatched++;
+      }
+    }
+
+    return [
+      'rows' => $outRows,
+      'payload' => $payload,
+      'total_rows' => $totalRows,
+      'usable_rows' => count($metas),
+      'matched' => count($outRows),
+      'unmatched' => $unmatched,
+      'duplicates' => $duplicates,
+      'type' => $type,
+      'type_label' => (string) ($config['label'] ?? $type),
+    ];
+  }
+
+  /**
+   * @param array<string,mixed> $config
+   * @param array<int,array<string,string>> $metas
+   * @return array<int,array<int,array<string,mixed>>>
+   */
+  private function importContractsByMeta(array $config, array $metas, string $contractStatus): array
+  {
+    if ($metas === []) {
+      return [];
+    }
+
+    $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    $contractActorColumn = (string) ($config['contract_actor_column'] ?? '');
+    $contractColumns = array_values(array_filter(['contrato', 'contrato_arrendamiento', '_ID'], fn(string $column): bool => $this->schema->columnExists($contractTable, $column)));
+    $propertyColumns = array_values(array_filter(['inmueble', 'id_inmueble', 'id_inmueble_data'], fn(string $column): bool => $this->schema->columnExists($contractTable, $column)));
+    if ($contractColumns === [] && $propertyColumns === []) {
+      return [];
+    }
+
+    $contractIndexes = [];
+    $propertyIndexes = [];
+    foreach ($metas as $index => $meta) {
+      $contract = trim((string) ($meta['contrato_excel'] ?? ''));
+      if ($contract !== '') {
+        $contractIndexes[$contract][] = $index;
+      }
+      $property = trim((string) ($meta['inmueble_simi_excel'] ?? ''));
+      if ($property !== '') {
+        $propertyIndexes[$property][] = $index;
+      }
+    }
+
+    $selectColumns = array_values(array_unique(array_merge(['_ID', $contractActorColumn, 'estado'], $contractColumns, $propertyColumns)));
+    $select = array_map(static fn(string $column): string => "`{$column}`", $selectColumns);
+    $matched = [];
+    $queries = [
+      ['indexes' => $contractIndexes, 'columns' => $contractColumns],
+      ['indexes' => $propertyIndexes, 'columns' => $propertyColumns],
+    ];
+
+    foreach ($queries as $query) {
+      /** @var array<string,array<int,int>> $indexes */
+      $indexes = $query['indexes'];
+      /** @var string[] $columns */
+      $columns = $query['columns'];
+      $values = array_keys($indexes);
+      if ($values === [] || $columns === []) {
+        continue;
+      }
+      foreach (array_chunk($values, 250) as $chunk) {
+        $parts = [];
+        $args = [];
+        $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+        $numericChunk = array_values(array_unique(array_filter(array_map(
+          static fn($value): int => preg_match('/^\d+$/', (string) $value) === 1 ? (int) $value : 0,
+          $chunk
+        ), static fn(int $value): bool => $value > 0)));
+        $numericPlaceholders = $numericChunk !== [] ? implode(',', array_fill(0, count($numericChunk), '?')) : '';
+        foreach ($columns as $column) {
+          $expr = $column === '_ID' ? "CAST(`_ID` AS CHAR)" : "TRIM(COALESCE(`{$column}`, ''))";
+          $parts[] = "{$expr} IN ({$placeholders})";
+          array_push($args, ...$chunk);
+          if ($numericChunk !== []) {
+            $parts[] = "CAST(`{$column}` AS UNSIGNED) IN ({$numericPlaceholders})";
+            array_push($args, ...$numericChunk);
+          }
+        }
+        $where = '(' . implode(' OR ', $parts) . ')';
+        if ($contractStatus !== '') {
+          $where .= " AND LOWER(TRIM(COALESCE(`estado`, ''))) = ?";
+          $args[] = $contractStatus === 'activos' ? 'entregado' : 'recibido';
+        }
+        $rows = $this->db->getResults('SELECT ' . implode(', ', $select) . " FROM `{$contractTable}` WHERE {$where}", $args);
+        foreach ($rows as $row) {
+          $contractId = (int) ($row['_ID'] ?? 0);
+          if ($contractId <= 0) {
+            continue;
+          }
+          foreach ($columns as $column) {
+            $key = $this->normalizeImportIdentifier((string) ($row[$column] ?? ''));
+            if ($key === '' || empty($indexes[$key])) {
+              continue;
+            }
+            foreach ($indexes[$key] as $metaIndex) {
+              $matched[$metaIndex][$contractId] = $row;
+            }
+          }
+        }
+      }
+    }
+
+    foreach ($matched as $index => $contracts) {
+      $matched[$index] = array_values($contracts);
+    }
+    ksort($matched);
+    return $matched;
+  }
+
+  /**
+   * @param array<string,mixed> $config
+   * @param int[] $actorIds
+   * @return array<int,array<int,array<string,mixed>>>
+   */
+  private function importRecipientsByActorIds(string $type, array $config, array $actorIds): array
+  {
+    $actorIds = array_values(array_unique(array_filter(array_map('intval', $actorIds), static fn(int $id): bool => $id > 0)));
+    if ($actorIds === []) {
+      return [];
+    }
+
+    $table = (string) $config['table'];
+    $columns = $this->resolveColumns($config);
+    $select = [
+      '`_ID`',
+      $columns['name'] !== '' ? "`{$columns['name']}` AS nombre" : "CAST(`_ID` AS CHAR) AS nombre",
+      $columns['email'] !== '' ? "`{$columns['email']}` AS correo" : "'' AS correo",
+      $columns['phone'] !== '' ? "`{$columns['phone']}` AS celular" : "'' AS celular",
+      $columns['indicator'] !== '' ? "`{$columns['indicator']}` AS indicativo" : "'' AS indicativo",
+    ];
+    $contractActorColumn = (string) ($config['contract_actor_column'] ?? '');
+    $hasActorColumn = $contractActorColumn !== '' && $this->schema->columnExists($table, $contractActorColumn);
+    $select[] = $hasActorColumn ? "`{$contractActorColumn}` AS contrato_actor_ref" : "'' AS contrato_actor_ref";
+
+    $recipientsByActor = [];
+    foreach (array_chunk($actorIds, 500) as $chunk) {
+      $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+      $parts = ["CAST(`_ID` AS UNSIGNED) IN ({$placeholders})"];
+      $args = $chunk;
+      if ($hasActorColumn) {
+        $parts[] = "CAST(`{$contractActorColumn}` AS UNSIGNED) IN ({$placeholders})";
+        array_push($args, ...$chunk);
+      }
+      $where = $this->baseWhere($config) . ' AND (' . implode(' OR ', $parts) . ')';
+      $rows = $this->db->getResults('SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE {$where}", $args);
+      foreach ($rows as $row) {
+        $row['tipo_actor'] = $type;
+        $row['tipo_label'] = (string) $config['label'];
+        $row['rol_persona'] = (string) $config['role'];
+        $row['celular_normalizado'] = $this->normalizePhone((string) ($row['celular'] ?? ''), (string) ($row['indicativo'] ?? ''), true);
+        $row['contrato_arrendamiento_estado'] = '';
+        $row['contratos_arrendamiento_resumen'] = '';
+        $row['contratos_gestion_cobro'] = [];
+
+        $keys = [(int) ($row['_ID'] ?? 0), (int) preg_replace('/\D+/', '', (string) ($row['contrato_actor_ref'] ?? ''))];
+        foreach (array_unique($keys) as $key) {
+          if ($key > 0) {
+            $recipientsByActor[$key][] = $row;
+          }
+        }
+      }
+    }
+
+    return $recipientsByActor;
+  }
+
+  /** @param array<int,array<string,mixed>> $contracts @return array{label:string,summary:string} */
+  private function contractInfoFromRows(array $contracts): array
+  {
+    $hasDelivered = false;
+    $hasReceived = false;
+    $contractNumbers = [];
+    $properties = [];
+
+    foreach ($contracts as $contract) {
+      $state = strtolower(trim((string) ($contract['estado'] ?? '')));
+      $hasDelivered = $hasDelivered || $state === 'entregado';
+      $hasReceived = $hasReceived || $state === 'recibido';
+      $contractNumber = $this->firstNonEmpty([
+        $contract['contrato'] ?? '',
+        $contract['contrato_arrendamiento'] ?? '',
+        $contract['_ID'] ?? '',
+      ]);
+      if ($contractNumber !== '') {
+        $contractNumbers[$contractNumber] = $contractNumber;
+      }
+      $property = $this->firstNonEmpty([
+        $contract['inmueble'] ?? '',
+        $contract['id_inmueble'] ?? '',
+        $contract['id_inmueble_data'] ?? '',
+      ]);
+      if ($property !== '') {
+        $properties[$property] = $property;
+      }
+    }
+
+    $summary = $this->contractSummary(array_values($contractNumbers), array_values($properties));
+    if ($hasDelivered) {
+      return ['label' => 'Activo', 'summary' => $summary];
+    }
+    if ($hasReceived) {
+      return ['label' => 'No activo', 'summary' => $summary];
+    }
+    return ['label' => 'Sin contrato', 'summary' => $summary];
   }
 
   /**

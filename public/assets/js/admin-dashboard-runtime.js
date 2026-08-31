@@ -268,6 +268,33 @@
           window.clearTimeout(timeout);
         });
     }
+
+    function responseJson(response) {
+      return response.text().then(function (text) {
+        var trimmed = String(text || "").trim();
+        if (trimmed === "") {
+          throw new Error("El servidor no devolvio respuesta.");
+        }
+        try {
+          return JSON.parse(trimmed);
+        } catch (error) {
+          if (/^<!doctype|^<html[\s>]/i.test(trimmed)) {
+            var looksLikeLogin =
+              response.status === 401 ||
+              response.status === 403 ||
+              /iniciar sesi[oó]n|tu sesi[oó]n termin[oó]|seguridad de la cuenta|login/i.test(trimmed);
+            if (looksLikeLogin && window.SCMSessionGuard && typeof window.SCMSessionGuard.expire === "function") {
+              window.SCMSessionGuard.expire(
+                response.status === 401 || response.status === 403 ? "expired" : "csrf",
+              );
+              throw new Error("Tu sesion vencio. Inicia sesion nuevamente y repite la accion.");
+            }
+            throw new Error("El servidor devolvio una pagina HTML en vez de JSON. Recarga la pagina e intenta nuevamente.");
+          }
+          throw new Error("El servidor devolvio una respuesta no valida. Revisa la sesion e intenta nuevamente.");
+        }
+      });
+    }
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
     ).replace(/\/+$/, "");
@@ -3293,9 +3320,14 @@
         fd.set("nonce", nonce);
         fd.set("management_id", managementId);
         showToast("info", "Consultando notificaciones de la gestion...");
-        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        fetch(ajaxUrl, {
+          method: "POST",
+          body: fd,
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        })
           .then(function (response) {
-            return response.json();
+            return responseJson(response);
           })
           .then(function (json) {
             if (!json || !json.success) {
@@ -4434,9 +4466,14 @@
               collectionResultEl.textContent = "Guardando gestiones de cobro...";
               collectionResultEl.classList.remove("is-error");
             }
-            fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+            fetch(ajaxUrl, {
+              method: "POST",
+              body: fd,
+              credentials: "same-origin",
+              headers: { Accept: "application/json" },
+            })
               .then(function (response) {
-                return response.json();
+                return responseJson(response);
               })
               .then(function (json) {
                 if (!json || !json.success) {
