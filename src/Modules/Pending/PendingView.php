@@ -88,7 +88,7 @@ final class PendingView
 
   // Servicios Publicos ---------------------------------------------------------
 
-  public function renderServiciosPublicosPanel(array $filters, array $items, int $count, string $corte): string
+  public function renderServiciosPublicosPanel(array $filters, array $items, int $count, string $corte, array $configurationItems = []): string
   {
     ob_start();
   ?>
@@ -156,7 +156,7 @@ final class PendingView
 
       <!-- Tabla -->
       <div id="rsp_table">
-        <?php echo $this->renderServiciosPublicosTable($items); ?>
+        <?php echo $this->renderServiciosPublicosTable($items, $configurationItems); ?>
       </div>
 
     </div>
@@ -561,10 +561,13 @@ final class PendingView
     return $html . '</div>';
   }
 
-  public function renderServiciosPublicosTable(array $items): string
+  public function renderServiciosPublicosTable(array $items, array $configurationItems = []): string
   {
+    $configurationHtml = empty($configurationItems) ? '' : '<details class="scm-public-services-unconfigured"><summary>Sin servicios configurados / por verificar (' . count($configurationItems) . ')</summary>'
+      . '<p>Estos contratos no cuentan como revisiones pendientes. Puedes completar o corregir sus servicios. Este grupo no depende del filtro de mes.</p>'
+      . $this->renderServiciosPublicosTable($configurationItems) . '</details>';
     if (empty($items)) {
-      return '<div class="scm-table-wrap"><p style="padding:32px;text-align:center;color:var(--scm-text-muted);">No hay contratos pendientes con los filtros actuales.</p></div>';
+      return '<div class="scm-table-wrap"><p style="padding:32px;text-align:center;color:var(--scm-text-muted);">No hay contratos pendientes con los filtros actuales.</p></div>' . $configurationHtml;
     }
 
     $html = '<div class="scm-table-wrap">'
@@ -578,6 +581,7 @@ final class PendingView
 
     foreach ($items as $item) {
       $row  = (array) ($item['row']  ?? []);
+      $needsConfiguration = !empty($item['needs_service_configuration']);
       $estado = strtolower(trim((string) ($row['estado'] ?? '')));
       $contractPk = trim((string) ($row['_ID'] ?? ''));
       $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
@@ -591,7 +595,7 @@ final class PendingView
       $html .= '<td class="scm-date-cell">'            . esc_html($this->fmt($this->ts($row['fin_contrato']    ?? null))) . '</td>';
       $html .= '<td class="scm-date-cell">'            . esc_html($this->fmt($this->ts($row['fecha_entrega']   ?? null))) . '</td>';
       $html .= '<td class="scm-date-cell">'            . esc_html($this->fmt((int) ($item['ultima'] ?? 0))) . '</td>';
-      $html .= '<td class="scm-date-cell scm-date-warn">' . esc_html($this->fmt((int) ($item['due'] ?? 0))) . '</td>';
+      $html .= '<td class="scm-date-cell scm-date-warn">' . ($needsConfiguration ? 'Sin configurar' : esc_html($this->fmt((int) ($item['due'] ?? 0)))) . '</td>';
       $html .= '<td class="scm-pending-action-cell">';
       if ($contractPk !== '' && $estado !== 'recibido') {
         $html .= '<button type="button" class="scm-pending-action-btn scm-contract-received-btn"'
@@ -603,11 +607,11 @@ final class PendingView
       $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;"'
         . ' data-scm-open-public-services-review data-contract-id="' . esc_attr($contractPk) . '"'
         . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
-        . 'Agregar revisión</button></td>';
+        . ($needsConfiguration ? 'Configurar servicios' : 'Agregar revisión / editar servicios') . '</button></td>';
       $html .= '</tr>';
     }
 
-    return $html . '</tbody></table></div>';
+    return $html . '</tbody></table></div>' . $configurationHtml;
   }
 
   /** @param array<string,mixed> $context */
@@ -629,11 +633,12 @@ final class PendingView
 ?>
     <form class="scm-public-services-review-form" data-public-services-review-form autocomplete="off" novalidate>
       <input type="hidden" name="contract_id" value="<?php echo esc_attr($contractId); ?>">
+      <input type="hidden" name="configuration_present" value="1">
       <div class="scm-public-services-review-summary">
         <div><span>Contrato</span><strong>#<?php echo esc_html($contractCode !== '' ? $contractCode : '-'); ?></strong></div>
         <div><span>Inmueble SIMI</span><strong>#<?php echo esc_html((string) ($contract['inmueble'] ?? '-')); ?></strong></div>
         <div><span>Fecha de revisión</span><strong><?php echo esc_html($reviewDate); ?></strong></div>
-        <div><span>Registrada por</span><strong><?php echo esc_html((string) ($employee['nombre'] ?? 'Funcionario actual')); ?></strong></div>
+        <div><span>Funcionario autenticado</span><strong><?php echo esc_html((string) ($employee['nombre'] ?? '')); ?></strong><small>ID empleado: <?php echo esc_html((string) ($employee['id_empleado'] ?? '')); ?></small></div>
       </div>
 
       <div class="scm-public-services-review-address">
@@ -642,9 +647,16 @@ final class PendingView
         <small>Arrendatario: <?php echo esc_html((string) ($contract['arrendatario'] ?? '-')); ?></small>
       </div>
 
+      <label class="scm-seg-field">
+        <span>¿Qué deseas guardar?</span>
+        <select name="review_mode" data-public-services-review-mode>
+          <option value="submit"<?php echo !empty($context['has_services']) ? ' selected' : ''; ?>>Registrar revisión y generar actas</option>
+          <option value="configure"<?php echo empty($context['has_services']) ? ' selected' : ''; ?>>Solo corregir servicios y datos del contrato</option>
+        </select>
+      </label>
       <fieldset class="scm-public-services-review-services">
-        <legend>Servicios incluidos en esta revisión</legend>
-        <p class="scm-public-services-review-help">Desmarca un servicio si no fue posible verificarlo. Cada servicio marcado generará su propia acta PDF.</p>
+        <legend>Servicios del contrato</legend>
+        <p class="scm-public-services-review-help">Activa los servicios que realmente tiene el inmueble y corrige sus identificadores o medidores. Desmarcar «Revisar ahora» conserva el servicio, pero no genera su acta. Desactivar el servicio lo retira de la configuración, sin borrar el historial.</p>
         <?php foreach ($services as $key => $service):
           $key = (string) $key;
           $service = (array) $service;
@@ -653,23 +665,25 @@ final class PendingView
           $statusField = (string) ($service['status_field'] ?? '');
           $amountField = (string) ($service['amount_field'] ?? '');
           $panelId = 'scm-public-service-fields-' . preg_replace('/[^a-z0-9_-]/i', '', $key);
+          $configured = !empty($service['configured']);
         ?>
-          <section class="scm-public-service-card is-selected" data-public-service-card="<?php echo esc_attr($key); ?>">
+          <section class="scm-public-service-card<?php echo $configured ? ' is-selected' : ''; ?>" data-public-service-card="<?php echo esc_attr($key); ?>">
             <label class="scm-public-service-toggle">
-              <input type="checkbox" name="servicios[]" value="<?php echo esc_attr($key); ?>" checked aria-controls="<?php echo esc_attr($panelId); ?>" aria-expanded="true">
+              <input type="checkbox" name="servicios_configurados[]" value="<?php echo esc_attr($key); ?>"<?php echo $configured ? ' checked' : ''; ?> aria-controls="<?php echo esc_attr($panelId); ?>" aria-expanded="<?php echo $configured ? 'true' : 'false'; ?>">
               <span class="scm-public-service-toggle-mark" aria-hidden="true"></span>
-              <span><strong><?php echo esc_html((string) ($service['display_label'] ?? $service['label'] ?? $key)); ?></strong><small>Incluir y generar acta</small></span>
+              <span><strong><?php echo esc_html((string) ($service['display_label'] ?? $service['label'] ?? $key)); ?></strong><small>El inmueble tiene este servicio</small></span>
             </label>
             <div class="scm-public-service-fields" id="<?php echo esc_attr($panelId); ?>">
+              <label class="scm-public-service-review-toggle" data-public-service-review-only><input type="checkbox" name="servicios[]" value="<?php echo esc_attr($key); ?>"<?php echo $configured ? ' checked' : ''; ?>> Revisar ahora y generar su acta</label>
               <label class="scm-seg-field">
-                <span><?php echo esc_html((string) ($service['account_label'] ?? 'Cuenta')); ?> <b aria-hidden="true">*</b></span>
-                <input type="text" name="<?php echo esc_attr($accountField); ?>" value="<?php echo esc_attr((string) ($service['account'] ?? '')); ?>" maxlength="180" required>
+                <span><?php echo esc_html((string) ($service['account_label'] ?? 'Cuenta')); ?> <b aria-hidden="true" data-public-service-required>*</b></span>
+                <input type="text" name="<?php echo esc_attr($accountField); ?>" value="<?php echo esc_attr((string) ($service['account'] ?? '')); ?>" maxlength="180" data-public-service-account>
               </label>
               <label class="scm-seg-field">
-                <span>Número de medidor <b aria-hidden="true">*</b></span>
-                <input type="text" name="<?php echo esc_attr($meterField); ?>" value="<?php echo esc_attr((string) ($service['meter'] ?? '')); ?>" maxlength="180" required>
+                <span>Número de medidor <b aria-hidden="true" data-public-service-required>*</b></span>
+                <input type="text" name="<?php echo esc_attr($meterField); ?>" value="<?php echo esc_attr((string) ($service['meter'] ?? '')); ?>" maxlength="180" data-public-service-meter>
               </label>
-              <label class="scm-seg-field">
+              <label class="scm-seg-field" data-public-service-review-only>
                 <span>Resultado en tiempo <b aria-hidden="true">*</b></span>
                 <select name="<?php echo esc_attr($statusField); ?>" required data-public-service-status>
                   <option value="">Selecciona un resultado</option>
@@ -679,7 +693,7 @@ final class PendingView
                   <option value="Estado critico">Estado crítico</option>
                 </select>
               </label>
-              <label class="scm-seg-field">
+              <label class="scm-seg-field" data-public-service-review-only>
                 <span>Valor reportado (COP) <b aria-hidden="true">*</b></span>
                 <input type="text" name="<?php echo esc_attr($amountField); ?>" value="0" inputmode="numeric" pattern="[0-9.$, ]+" required data-public-service-amount>
                 <small>Usa 0 si el servicio está al día.</small>
@@ -691,7 +705,7 @@ final class PendingView
 
       <aside class="scm-public-services-review-notice">
         <strong>Al guardar</strong>
-        <span>Se creará el registro de revisión, se actualizarán contrato e inmueble, se generarán las actas con membrete y se encolarán los correos. El próximo mes configurado será <?php echo esc_html($this->monthName($nextMonth)); ?>.</span>
+        <span data-public-services-review-notice>Se creará el registro de revisión, se actualizarán contrato e inmueble, se generarán las actas con membrete y se encolarán los correos. El próximo mes configurado será <?php echo esc_html($this->monthName($nextMonth)); ?>.</span>
       </aside>
 
       <div class="scm-public-services-review-error" role="alert" aria-live="assertive" hidden></div>

@@ -48,7 +48,8 @@ final class PendingController
       (array) ($payload['filters'] ?? []),
       (array) ($payload['items'] ?? []),
       (int) ($payload['count'] ?? 0),
-      (string) ($payload['corte'] ?? '')
+      (string) ($payload['corte'] ?? ''),
+      (array) ($payload['configuration_items'] ?? [])
     );
   }
 
@@ -68,6 +69,12 @@ final class PendingController
   public function createServiciosPublicosReview(int $contractId, array $input): array
   {
     return $this->service->createServiciosPublicosReview($contractId, $input);
+  }
+
+  /** @param array<string,mixed> $input @return array<string,mixed> */
+  public function saveServiciosPublicosConfiguration(int $contractId, array $input): array
+  {
+    return $this->service->saveServiciosPublicosConfiguration($contractId, $input);
   }
 
   public function renderReportesAdministrativosTab(): string
@@ -151,6 +158,7 @@ final class PendingController
     return [
       'filters' => $filters,
       'items' => (array) ($data['items'] ?? []),
+      'configuration_items' => (array) ($data['configuration_items'] ?? []),
       'funcionarios' => (array) ($data['funcionarios'] ?? []),
       'count' => count((array) ($data['items'] ?? [])),
       'corte' => (string) ($data['corte'] ?? ''),

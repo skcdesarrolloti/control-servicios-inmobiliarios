@@ -5147,12 +5147,12 @@
         var form = modal.querySelector("[data-public-services-review-form]");
         if (form) form.dataset.dirty = "1";
         var serviceToggle = event.target && event.target.matches
-          ? event.target.matches('input[name="servicios[]"]')
+          ? event.target.matches('input[name="servicios[]"], input[name="servicios_configurados[]"], [data-public-services-review-mode]')
             ? event.target
             : null
           : null;
         if (serviceToggle) {
-          syncPublicServiceCard(serviceToggle.closest("[data-public-service-card]"));
+          syncPublicServicesReviewMode(form);
           return;
         }
         if (event.target && event.target.matches && event.target.matches("[data-public-service-status]")) {
@@ -5194,6 +5194,7 @@
       var modal = root.querySelector("#scm-public-services-review-modal");
       if (!modal || !modal.classList.contains("open")) return;
       var form = modal.querySelector("[data-public-services-review-form]");
+      if (!force && form && form.getAttribute("aria-busy") === "true") return;
       if (!force && form && form.dataset.dirty === "1") {
         if (!window.confirm("Hay datos sin guardar. ¿Deseas cerrar el formulario?")) {
           return;
@@ -5209,13 +5210,42 @@
 
     function syncPublicServiceCard(card) {
       if (!card) return;
-      var toggle = card.querySelector('input[name="servicios[]"]');
+      var toggle = card.querySelector('input[name="servicios_configurados[]"]');
       var enabled = !!(toggle && toggle.checked);
+      var form = card.closest("form");
+      var mode = form.querySelector("[data-public-services-review-mode]");
+      var reviewing = !mode || mode.value === "submit";
+      var reviewToggle = card.querySelector('input[name="servicios[]"]');
+      var reviewEnabled = enabled && reviewing && reviewToggle.checked;
       card.classList.toggle("is-selected", enabled);
       if (toggle) toggle.setAttribute("aria-expanded", enabled ? "true" : "false");
-      card.querySelectorAll(".scm-public-service-fields input, .scm-public-service-fields select").forEach(function (field) {
+      card.querySelectorAll("[data-public-service-account], [data-public-service-meter]").forEach(function (field) {
         field.disabled = !enabled;
+        field.required = reviewEnabled;
       });
+      reviewToggle.disabled = !enabled || !reviewing;
+      card.querySelectorAll("[data-public-service-status], [data-public-service-amount]").forEach(function (field) {
+        field.disabled = !reviewEnabled;
+        field.required = reviewEnabled;
+      });
+      card.querySelectorAll("[data-public-service-review-only]").forEach(function (field) { field.hidden = !reviewing; });
+      card.querySelectorAll("[data-public-service-required]").forEach(function (field) { field.hidden = !reviewEnabled; });
+    }
+
+    function syncPublicServicesReviewMode(form) {
+      if (!form) return;
+      form.querySelectorAll("[data-public-service-card]").forEach(syncPublicServiceCard);
+      var reviewing = form.querySelector("[data-public-services-review-mode]").value === "submit";
+      form.classList.toggle("is-configuration-only", !reviewing);
+      var title = root.querySelector("#scm-public-services-review-title");
+      if (title) title.textContent = reviewing ? "Agregar revisión" : "Configurar servicios del contrato";
+      var notice = form.querySelector("[data-public-services-review-notice]");
+      if (notice) {
+        if (!notice.dataset.reviewText) notice.dataset.reviewText = notice.textContent;
+        notice.textContent = reviewing ? notice.dataset.reviewText : "Solo se guardarán los servicios, identificadores y medidores del contrato, con historial del funcionario. No se crearán revisiones ni actas, no se enviarán correos y no cambiará el próximo mes de revisión.";
+      }
+      var button = form.querySelector("[data-public-services-review-submit]");
+      if (button) button.textContent = reviewing ? "Guardar revisión y generar actas" : "Guardar configuración de servicios";
     }
 
     function syncPublicServiceAmount(statusField) {
@@ -5272,8 +5302,8 @@
           }
           if (body) {
             body.innerHTML = (json.data && json.data.form_html) || "";
-            body.querySelectorAll("[data-public-service-card]").forEach(syncPublicServiceCard);
-            var firstField = body.querySelector('input[name="servicios[]"]');
+            syncPublicServicesReviewMode(body.querySelector("form"));
+            var firstField = body.querySelector('[data-public-services-review-mode]');
             if (firstField && firstField.focus) firstField.focus();
           }
         })
@@ -5297,15 +5327,18 @@
     }
 
     function submitPublicServicesReviewForm(form) {
+      if (form.getAttribute("aria-busy") === "true") return;
+      var operation = form.querySelector("[data-public-services-review-mode]").value;
       var errorBox = form.querySelector(".scm-public-services-review-error");
-      var selected = form.querySelectorAll('input[name="servicios[]"]:checked');
-      if (!selected.length) {
+      var selected = form.querySelectorAll('input[name="servicios[]"]:checked:not([disabled])');
+      if (operation === "submit" && !selected.length) {
         if (errorBox) {
           errorBox.hidden = false;
           errorBox.textContent = "Selecciona por lo menos un servicio.";
         }
         return;
       }
+      if (operation === "configure" && !form.querySelector('input[name="servicios_configurados[]"]:checked') && !window.confirm("El contrato quedará sin servicios configurados y no contará como revisión pendiente. ¿Confirmas que no tiene servicios?")) return;
       if (!form.checkValidity()) {
         if (errorBox) {
           errorBox.hidden = false;
@@ -5322,13 +5355,13 @@
       var originalText = submitButton ? submitButton.textContent : "";
       if (submitButton) {
         submitButton.disabled = true;
-        submitButton.textContent = "Guardando y generando actas...";
+        submitButton.textContent = operation === "submit" ? "Guardando y generando actas..." : "Guardando configuración...";
       }
       form.setAttribute("aria-busy", "true");
       var fd = new FormData(form);
       fd.append("action", actionRevisionServiciosPublicos);
       fd.append("nonce", nonce);
-      fd.append("operation", "submit");
+      fd.append("operation", operation);
       fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
         .then(function (response) { return response.json(); })
         .then(function (json) {
@@ -5342,7 +5375,7 @@
           if (window.Swal && typeof window.Swal.fire === "function") {
             window.Swal.fire({
               icon: "success",
-              title: "Revisión registrada",
+              title: operation === "submit" ? "Revisión registrada" : "Configuración guardada",
               html: '<p class="scm-public-services-review-success-copy">' + escHtml(data.message || "La revisión fue guardada.") + "</p>" + publicServicesReviewDocumentsHtml(data.documents || []),
               confirmButtonText: "Cerrar",
               confirmButtonColor: "#1b447d",

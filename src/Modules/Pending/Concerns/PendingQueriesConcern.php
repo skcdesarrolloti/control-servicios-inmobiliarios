@@ -164,7 +164,12 @@ trait PendingQueriesConcern
     $fMes = max(0, min(12, (int) ($filters['mes'] ?? 0)));
 
     $items = [];
+    $configurationItems = [];
     foreach ($rows as $row) {
+      if (empty($this->availablePublicServices($row))) {
+        $configurationItems[] = ['row' => $row, 'ultima' => 0, 'due' => 0, 'needs_service_configuration' => true];
+        continue;
+      }
       $contractId = trim((string) ($row['_ID'] ?? ''));
       if ($contractId === '') {
         $contractId = trim((string) ($row['contrato'] ?? ''));
@@ -220,6 +225,7 @@ trait PendingQueriesConcern
 
     return [
       'items' => $items,
+      'configuration_items' => $configurationItems,
       'funcionarios' => $funcionarios,
       'corte' => $corte,
     ];

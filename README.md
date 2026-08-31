@@ -126,6 +126,8 @@ Los assets JavaScript también pueden validarse con `node --check public/assets/
 
 ## Despliegue
 
+Para el formulario nativo de revisión y configuración de servicios públicos, consultar [flujo y checklist de producción](docs/REVISION-SERVICIOS-PUBLICOS.md) y ejecutar `php bin/check-public-services-review.php` (solo lectura, no envía correos).
+
 No copies `.env` desde otro entorno sin revisar sus valores. Conserva `storage/` entre versiones y despliega el código de forma atómica. La migración de configuración debe ejecutarse antes de dirigir tráfico al panel nuevo. Después del despliegue ejecuta `composer install --no-dev --optimize-autoloader` y verifica que el worker CLI pueda iniciar.
 
 El inventario completo de cambios y deuda restante está en [docs/REFACTORIZACION.md](docs/REFACTORIZACION.md).

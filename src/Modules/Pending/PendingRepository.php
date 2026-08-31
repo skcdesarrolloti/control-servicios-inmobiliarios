@@ -87,6 +87,32 @@ final class PendingRepository
     );
   }
 
+  /**
+   * Auth::userId() is the funcionario row _ID, never its id_empleado.
+   * @return array<string,mixed>|null
+   */
+  public function getFuncionarioByUserId(int $userId): ?array
+  {
+    if ($userId <= 0) {
+      return null;
+    }
+    $table = $this->db->table('jet_cct_funcionarios');
+    return $this->db->getRow(
+      "SELECT `_ID`, `id_empleado`, `nombre`, `correo` FROM `{$table}` WHERE `_ID` = ? AND `activo` = 'Si' LIMIT 1",
+      [$userId]
+    );
+  }
+
+  /**
+   * Exact primary-key lookup for writes; contract codes are not interchangeable with _ID.
+   * @return array<string,mixed>|null
+   */
+  public function getPublicServicesContract(int $id): ?array
+  {
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    return $id > 0 ? $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$id]) : null;
+  }
+
   /** @param array<string,mixed> $data */
   public function updateContratoArrendamiento(int $id, array $data): int
   {
@@ -324,6 +350,10 @@ final class PendingRepository
       'tuvo_preventiva',
       'ultima_revision_servicios',
       'mes_revision_servicios',
+      'servicios_publicos',
+      'luz',
+      'agua',
+      'gas',
     ];
     $selectable = [];
     foreach ($columns as $column) {

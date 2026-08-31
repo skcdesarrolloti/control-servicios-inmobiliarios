@@ -19,24 +19,32 @@ trait PublicServicesReviewConcern
       return ['ok' => false, 'message' => 'ID de contrato inválido.'];
     }
 
-    $contract = $this->repo->getContratoArrendamientoById((string) $contractId);
+    $contract = $this->repo->getPublicServicesContract($contractId);
     if (!is_array($contract)) {
       return ['ok' => false, 'message' => 'Contrato no encontrado.'];
     }
 
-    $available = $this->availablePublicServices($contract);
-    if (empty($available)) {
-      return ['ok' => false, 'message' => 'El contrato no tiene servicios públicos configurados.'];
+    $employee = $this->repo->getFuncionarioByUserId(Auth::userId());
+    if (!$employee || in_array(trim((string) ($employee['id_empleado'] ?? '')), ['', '0'], true) || trim((string) ($employee['nombre'] ?? '')) === '') {
+      return ['ok' => false, 'message' => 'No se pudo identificar el id_empleado del funcionario autenticado. Revisa su ficha antes de guardar.'];
     }
-
-    $employee = $this->repo->getFuncionarioById((string) Auth::userId()) ?? [];
+    $available = $this->availablePublicServices($contract);
+    $formServices = [];
+    foreach ($this->publicServiceDefinitions() as $key => $definition) {
+      $formServices[$key] = $definition + [
+        'configured' => isset($available[$key]),
+        'account' => (string) ($contract[$definition['contract_account_field']] ?? ''),
+        'meter' => (string) ($contract[$definition['contract_meter_field']] ?? ''),
+      ];
+    }
     $branchId = trim((string) ($contract['id_sucursal'] ?? $contract['sucursal'] ?? ''));
     $branch = $this->repo->getSucursalById($branchId) ?? [];
 
     return [
       'ok' => true,
       'contract' => $contract,
-      'services' => $available,
+      'services' => $formServices,
+      'has_services' => !empty($available),
       'employee' => $employee,
       'branch' => $branch,
       'review_date' => date('Y-m-d'),
@@ -53,7 +61,10 @@ trait PublicServicesReviewConcern
 
     $contract = (array) ($context['contract'] ?? []);
     $contractPk = (int) ($contract['_ID'] ?? $contractId);
-    $available = (array) ($context['services'] ?? []);
+    $configuration = $this->validatePublicServicesConfiguration($input);
+    if (empty($configuration['ok'])) {
+      return $configuration;
+    }
     $selectedKeys = array_values(array_unique(array_filter(array_map(
       fn($value): string => $this->normalizePublicServiceKey((string) $value),
       is_array($input['servicios'] ?? null) ? $input['servicios'] : []
@@ -64,8 +75,8 @@ trait PublicServicesReviewConcern
 
     $services = [];
     foreach ($selectedKeys as $serviceKey) {
-      if (!isset($available[$serviceKey])) {
-        return ['ok' => false, 'message' => 'Uno de los servicios seleccionados no pertenece al contrato.'];
+      if (!in_array($serviceKey, $configuration['keys'], true)) {
+        return ['ok' => false, 'message' => 'Activa el servicio en el contrato antes de incluirlo en la revisión.'];
       }
       $definition = $this->publicServiceDefinitions()[$serviceKey];
       $account = $this->cleanReviewText((string) ($input[$definition['account_field']] ?? ''));
@@ -101,8 +112,8 @@ trait PublicServicesReviewConcern
     $nextReviewMonth = (($baseMonth + 3 - 1) % 12) + 1;
     $employee = (array) ($context['employee'] ?? []);
     $branch = (array) ($context['branch'] ?? []);
-    $employeeId = (string) Auth::userId();
-    $employeeName = trim((string) ($employee['nombre'] ?? Auth::user())) ?: 'Funcionario';
+    $employeeId = (string) $employee['id_empleado'];
+    $employeeName = (string) $employee['nombre'];
 
     $pdfContext = [
       'fecha' => $nowTs,
@@ -119,6 +130,9 @@ trait PublicServicesReviewConcern
     ];
 
     $documents = [];
+    if ($this->repo->getDb()->pdo()->inTransaction()) {
+      return ['ok' => false, 'message' => 'Ya existe una operación en curso. Intenta nuevamente.'];
+    }
     try {
       $documents = (new PublicServicesReviewPdfGenerator())->generate($pdfContext, $services);
       if (count($documents) !== count($services)) {
@@ -151,7 +165,7 @@ trait PublicServicesReviewConcern
         'direccion' => (string) ($contract['direccion'] ?? ''),
         'arrendatario' => (string) ($contract['arrendatario'] ?? ''),
         'propietario' => (string) ($contract['propietario'] ?? ''),
-        'cct_author_id' => Auth::userId(),
+        'cct_author_id' => $employeeId,
         'cct_created' => $nowMysql,
         'cct_modified' => $nowMysql,
         'sucursal' => (string) ($contract['id_sucursal'] ?? $contract['sucursal'] ?? ''),
@@ -166,7 +180,7 @@ trait PublicServicesReviewConcern
         'destinacion' => (string) ($contract['destinacion_inmueble'] ?? ''),
         'tipo' => 'Durante la ocupacion',
       ];
-      $contractPayload = [
+      $contractPayload = $configuration['payload'] + [
         'id_empleado' => $employeeId,
         'realizado_por' => $employeeName,
         'revisiones_servicios' => (string) $reviewCount,
@@ -227,14 +241,14 @@ trait PublicServicesReviewConcern
       }
       $historyInserted = $this->repo->insertHistorialInmueble([
         'cct_status' => 'publish',
-        'cct_author_id' => Auth::userId(),
+        'cct_author_id' => $employeeId,
         'cct_created' => $nowMysql,
         'cct_modified' => $nowMysql,
         'id_empleado' => $employeeId,
         'id_inmueble' => (string) ($contract['id_inmueble'] ?? ''),
         'fecha' => $nowTs,
         'tipo_reporte' => 'Contractual',
-        'observacion' => 'Se ha realizado revisión de servicios públicos en su inmueble.',
+        'observacion' => 'Se ha realizado revisión de servicios públicos en su inmueble. Servicios configurados: ' . $configuration['summary'] . '.',
         'funcionario' => $employeeName,
       ]);
       if (!$historyInserted) {
@@ -268,6 +282,86 @@ trait PublicServicesReviewConcern
     ];
   }
 
+  /**
+   * Save only contract configuration: no review, PDFs, scheduling change or notification.
+   * @param array<string,mixed> $input
+   * @return array<string,mixed>
+   */
+  public function saveServiciosPublicosConfiguration(int $contractId, array $input): array
+  {
+    $context = $this->buildServiciosPublicosReviewContext($contractId);
+    if (empty($context['ok'])) {
+      return $context;
+    }
+    $configuration = $this->validatePublicServicesConfiguration($input);
+    if (empty($configuration['ok'])) {
+      return $configuration;
+    }
+    $contract = $context['contract'];
+    $employee = $context['employee'];
+    $changes = array_filter($configuration['payload'], static fn($value, $key): bool => (string) ($contract[$key] ?? '') !== (string) $value, ARRAY_FILTER_USE_BOTH);
+    if (empty($changes)) {
+      return ['ok' => true, 'message' => 'No hay cambios en la configuración de servicios.'];
+    }
+    $pdo = $this->repo->getDb()->pdo();
+    if ($pdo->inTransaction()) {
+      return ['ok' => false, 'message' => 'Ya existe una operación en curso. Intenta nuevamente.'];
+    }
+    try {
+      $pdo->beginTransaction();
+      $now = date('Y-m-d H:i:s');
+      $changedFields = array_keys($changes);
+      $changes['cct_modified'] = $now;
+      if ($this->repo->updateContratoArrendamiento($contractId, $changes) <= 0) {
+        throw new \RuntimeException('No fue posible actualizar los servicios del contrato.');
+      }
+      if (!$this->repo->insertHistorialInmueble([
+        'cct_status' => 'publish', 'cct_author_id' => (string) $employee['id_empleado'],
+        'cct_created' => $now, 'cct_modified' => $now,
+        'id_empleado' => (string) $employee['id_empleado'], 'funcionario' => (string) $employee['nombre'],
+        'id_inmueble' => (string) ($contract['id_inmueble'] ?? ''), 'fecha' => time(), 'tipo_reporte' => 'Contractual',
+        'observacion' => 'Configuración de servicios públicos del contrato #' . ($contract['contrato'] ?? $contractId)
+          . ': ' . $configuration['summary'] . '. Campos corregidos: ' . implode(', ', $changedFields)
+          . '. No se registró revisión ni se generaron actas.',
+      ])) {
+        throw new \RuntimeException('No fue posible guardar el historial de la configuración.');
+      }
+      $pdo->commit();
+    } catch (\Throwable $exception) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      return ['ok' => false, 'message' => 'No se pudo guardar la configuración: ' . $exception->getMessage()];
+    }
+    return ['ok' => true, 'message' => 'Servicios del contrato actualizados. No se generaron actas ni se enviaron correos.'];
+  }
+
+  /** @param array<string,mixed> $input @return array<string,mixed> */
+  private function validatePublicServicesConfiguration(array $input): array
+  {
+    if (($input['configuration_present'] ?? '') !== '1') {
+      return ['ok' => false, 'message' => 'Recarga el formulario para confirmar la configuración de servicios.'];
+    }
+    $keys = [];
+    $labels = [];
+    $payload = [];
+    $legacyLabels = ['energia' => 'Energia', 'agua' => 'Agua', 'gas' => 'Gas'];
+    foreach ((array) ($input['servicios_configurados'] ?? []) as $value) {
+      $key = is_scalar($value) ? $this->normalizePublicServiceKey((string) $value) : '';
+      if ($key === '') {
+        return ['ok' => false, 'message' => 'La configuración contiene un servicio no válido.'];
+      }
+      $keys[$key] = $key;
+      $definition = $this->publicServiceDefinitions()[$key];
+      $labels[$key] = $legacyLabels[$key];
+      $payload[$definition['contract_account_field']] = $this->cleanReviewText((string) ($input[$definition['account_field']] ?? ''));
+      $payload[$definition['contract_meter_field']] = $this->cleanReviewText((string) ($input[$definition['meter_field']] ?? ''));
+    }
+    // An explicit empty list means no services, even if historical account fields remain.
+    $payload['servicios_publicos'] = serialize(array_values($labels));
+    return ['ok' => true, 'keys' => array_values($keys), 'payload' => $payload, 'summary' => $labels ? implode(', ', $labels) : 'ninguno'];
+  }
+
   /** @param array<string,mixed> $contract @return array<string,array<string,string>> */
   private function availablePublicServices(array $contract): array
   {
@@ -292,7 +386,7 @@ trait PublicServicesReviewConcern
         $keys[$key] = true;
       }
     }
-    if (empty($keys)) {
+    if (empty($keys) && (!is_array($raw) && trim((string) $raw) === '')) {
       foreach ($this->publicServiceDefinitions() as $key => $definition) {
         if (trim((string) ($contract[$definition['contract_account_field']] ?? '')) !== '') {
           $keys[$key] = true;

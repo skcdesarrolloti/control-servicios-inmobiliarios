@@ -4,6 +4,55 @@
 }
 
 /* Revision nativa de servicios publicos */
+#scm-app .scm-public-services-unconfigured {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  background: #fff7ed;
+  color: #7c2d12;
+}
+
+#scm-app .scm-public-services-unconfigured summary {
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+#scm-app .scm-public-services-review-form [hidden] {
+  display: none !important;
+}
+
+#scm-app .scm-public-service-review-toggle {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+#scm-app .scm-public-service-review-toggle input {
+  width: 20px;
+  min-height: 20px;
+  accent-color: #1b447d;
+}
+
+#scm-app [data-public-services-review-mode] {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  color: #0f172a;
+  background: #fff;
+  font: inherit;
+}
+
+#scm-app [data-public-services-review-mode]:focus-visible {
+  outline: 3px solid rgba(27, 68, 125, 0.3);
+}
+
 #scm-app .scm-public-services-review-modal {
   position: fixed;
   inset: 0;
@@ -21,6 +70,8 @@
 }
 
 #scm-app .scm-public-services-review-dialog {
+  display: flex;
+  flex-direction: column;
   width: min(1040px, 100%);
   max-height: min(92vh, 920px);
   overflow: hidden;
@@ -31,6 +82,7 @@
 }
 
 #scm-app .scm-public-services-review-head {
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -83,7 +135,8 @@
 }
 
 #scm-app .scm-public-services-review-body {
-  max-height: calc(min(92vh, 920px) - 112px);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 24px;
 }
@@ -271,6 +324,10 @@
   display: grid;
 }
 
+#scm-app .is-configuration-only .scm-public-service-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 #scm-app .scm-public-service-fields .scm-seg-field > span b {
   color: #b91c1c;
 }
@@ -357,6 +414,10 @@
 }
 
 @media (max-width: 600px) {
+  #scm-app .scm-public-services-review-form input,
+  #scm-app .scm-public-services-review-form select {
+    font-size: 16px;
+  }
   #scm-app .scm-public-services-review-modal {
     align-items: stretch;
     padding: 0;
@@ -377,12 +438,12 @@
   }
 
   #scm-app .scm-public-services-review-body {
-    max-height: calc(100dvh - 102px);
     padding: 16px;
   }
 
   #scm-app .scm-public-services-review-summary,
-  #scm-app .scm-public-service-fields {
+  #scm-app .scm-public-service-fields,
+  #scm-app .is-configuration-only .scm-public-service-fields {
     grid-template-columns: 1fr;
   }
 

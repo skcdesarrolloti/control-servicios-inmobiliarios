@@ -711,7 +711,7 @@ trait HandlesTicketWorkflowActions
     $payload = $controller->buildServiciosPublicosPayload($_POST);
     $view = new \SCM\Modules\Pending\PendingView();
     $kpis = $view->renderServiciosPublicosKpis((int)($payload['count'] ?? 0), (string)($payload['corte'] ?? ''));
-    $table = $view->renderServiciosPublicosTable((array)($payload['items'] ?? []));
+    $table = $view->renderServiciosPublicosTable((array)($payload['items'] ?? []), (array) ($payload['configuration_items'] ?? []));
     $this->jsonOk([
       'kpis_html' => $kpis,
       'table_html' => $table,
@@ -785,14 +785,17 @@ trait HandlesTicketWorkflowActions
       ]);
     }
 
-    if ($operation !== 'submit') {
+    if (!in_array($operation, ['submit', 'configure'], true)) {
       $this->jsonFail('Operación no válida.');
     }
 
     $input = [];
+    $input['configuration_present'] = (string) ($_POST['configuration_present'] ?? '');
+    $configuredRaw = is_array($_POST['servicios_configurados'] ?? null) ? $_POST['servicios_configurados'] : [];
+    $input['servicios_configurados'] = array_map(static fn($value): string => is_scalar($value) ? sanitize_key(wp_unslash((string) $value)) : '', $configuredRaw);
     $servicesRaw = is_array($_POST['servicios'] ?? null) ? $_POST['servicios'] : [];
     $input['servicios'] = array_values(array_filter(array_map(
-      static fn($value): string => sanitize_key(wp_unslash((string) $value)),
+      static fn($value): string => is_scalar($value) ? sanitize_key(wp_unslash((string) $value)) : '',
       $servicesRaw
     )));
     foreach ([
@@ -812,7 +815,9 @@ trait HandlesTicketWorkflowActions
       $input[$field] = trim(sanitize_text_field(wp_unslash((string) ($_POST[$field] ?? ''))));
     }
 
-    $result = $controller->createServiciosPublicosReview($contractId, $input);
+    $result = $operation === 'configure'
+      ? $controller->saveServiciosPublicosConfiguration($contractId, $input)
+      : $controller->createServiciosPublicosReview($contractId, $input);
     if (empty($result['ok'])) {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo registrar la revisión.'));
     }
