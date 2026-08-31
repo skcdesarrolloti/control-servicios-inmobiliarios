@@ -226,7 +226,7 @@ final class CompletionService
     $results = [];
     foreach ($channels as $channel) {
       if (!empty($delivery[$event][$channel]['queued'])) { $results[$channel] = true; continue; }
-      $results[$channel] = $this->send($act, $payload, $channel, $event, $generation . ':' . $act['token_nonce'], $title, $body, $description . ' ' . $linkLabel . ': ' . $target);
+      $results[$channel] = $this->send($act, $payload, $channel, $event, $generation . ':' . $act['token_nonce'], $title, $body, $description . ' ' . $linkLabel . ': ' . $target, '', $target);
       $delivery[$event][$channel] = ['queued' => $results[$channel], 'attempted_at' => time()];
       // Save each channel independently; a retry cannot duplicate a successful sibling channel.
       $this->repo->db->update($this->repo->table(), ['delivery_json' => json_encode($delivery, JSON_THROW_ON_ERROR)], ['id' => (int) $act['id']]);
@@ -260,12 +260,13 @@ final class CompletionService
     });
   }
 
-  private function send(array $act, array $payload, string $channel, string $event, string $key, string $subject, string $body, string $text, string $code = ''): bool
+  private function send(array $act, array $payload, string $channel, string $event, string $key, string $subject, string $body, string $text, string $code = '', string $actUrl = ''): bool
   {
     try {
       return ($this->enqueue)($channel === 'email' ? $payload['signer']['email'] : $payload['signer']['phone'], $subject, EmailTemplate::render($subject, $body), [
         'channel' => $channel, 'source_module' => 'ticket-completion', 'provider' => $channel === 'email' ? 'email_smtp' : 'whatsapp_official',
         'destination_name' => $payload['signer']['name'], 'message_text' => $text, 'otp_code' => $code,
+        'ticket_number' => $payload['ticket_number'], 'act_url' => $actUrl,
         'priority' => $event === 'signature_otp' ? 200 : 100,
         'dedupe_key' => 'ticket-acta:' . $act['id'] . ':' . $event . ':' . $channel . ':' . $key,
         'meta' => ['ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id'], 'event' => $event],

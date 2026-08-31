@@ -1,0 +1,14 @@
+{
+  "name": "scm_acta_firmada_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}.\n\nConfirmamos que el acta de solución del ticket #{{2}} quedó firmada y el ticket fue cerrado.\n\nPuedes descargar tu copia del acta firmada aquí: {{3}}\n\nConserva el documento para tu registro. Este enlace es personal; no lo compartas.\n\nSKC SuCasa Inmobiliaria.",
+      "example": {
+        "body_text": [["María Pérez", "10368", "https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/ticket-acta.php?id=123&token=EJEMPLO_NO_VALIDO&format=pdf"]]
+      }
+    }
+  ]
+}

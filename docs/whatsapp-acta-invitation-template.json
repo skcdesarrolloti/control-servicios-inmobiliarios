@@ -1,0 +1,14 @@
+{
+  "name": "scm_acta_solicitud_firma_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}.\n\nSKC SuCasa Inmobiliaria te solicita revisar el acta de solución del ticket #{{2}}, con los daños registrados, las soluciones realizadas y las observaciones.\n\nRevisa el documento y firma únicamente si estás conforme. Al completar la firma, se cerrará el ticket.\n\nRevisar y firmar: {{3}}\n\nEste enlace es personal. No lo compartas.",
+      "example": {
+        "body_text": [["María Pérez", "10368", "https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/ticket-acta.php?id=123&token=EJEMPLO_NO_VALIDO"]]
+      }
+    }
+  ]
+}

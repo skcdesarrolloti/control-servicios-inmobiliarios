@@ -120,30 +120,114 @@ Ejecutarla antes de activar el nuevo código. Requiere desplegar los archivos y
 mantener disponible el worker de shared-notifications. Los códigos tienen prioridad
 200 (el worker procesa prioridad descendente), frente a 100 de las invitaciones.
 
-### WhatsApp
+### WhatsApp: tres plantillas separadas
 
-- Invitación/copia: reutiliza `scm_notificacion_general_v1`, `es_CO`, con los tres
-  parámetros existentes: destinatario, mensaje/enlace, firma de la inmobiliaria.
-  Debe estar aprobada y disponible en la cuenta configurada.
-- OTP: requiere una plantilla de categoría **AUTHENTICATION**, botón **COPY_CODE**,
-  recomendación de seguridad y vencimiento de 10 minutos. Una plantilla general
-  no se usa para códigos de autenticación.
-- Configurar en el entorno, **solo después de verificar su aprobación**:
+Crear las siguientes plantillas en la misma cuenta de WhatsApp Business utilizada
+por shared-notifications. Son definiciones para solicitar aprobación, **no plantillas
+ya creadas o aprobadas en Meta**. No se crean automáticamente al desplegar.
+
+#### 1. Solicitud de firma
+
+- Nombre: `scm_acta_solicitud_firma_v1`.
+- Categoría solicitada: **Utilidad / UTILITY**; Meta determina su aprobación.
+- Idioma del ejemplo: **Español (Colombia), `es_CO`**.
+- Solo cuerpo de texto, variables **numéricas/posicionales**. Sin encabezado,
+  pie de página ni botones; el enlace va dentro del cuerpo.
+
+```text
+Hola {{1}}.
+
+SKC SuCasa Inmobiliaria te solicita revisar el acta de solución del ticket #{{2}}, con los daños registrados, las soluciones realizadas y las observaciones.
+
+Revisa el documento y firma únicamente si estás conforme. Al completar la firma, se cerrará el ticket.
+
+Revisar y firmar: {{3}}
+
+Este enlace es personal. No lo compartas.
+```
+
+Variables, en orden: `{{1}}` nombre del firmante, `{{2}}` número visible del ticket,
+`{{3}}` enlace personal para revisar y firmar. Ejemplos ficticios para el formulario
+de Meta: **María Pérez**, **10368** y el enlace de muestra en
+[`whatsapp-acta-invitation-template.json`](whatsapp-acta-invitation-template.json).
+Nunca usar un token real como muestra pública.
+
+#### 2. Entrega del acta firmada
+
+- Nombre: `scm_acta_firmada_v1`.
+- Categoría solicitada: **Utilidad / UTILITY**.
+- Mismo idioma que la solicitud; solo cuerpo, variables numéricas/posicionales.
+- Sin encabezado de documento, pie de página ni botones: se entrega un **enlace
+  para descargar el PDF firmado**, no un archivo adjunto al mensaje.
+
+```text
+Hola {{1}}.
+
+Confirmamos que el acta de solución del ticket #{{2}} quedó firmada y el ticket fue cerrado.
+
+Puedes descargar tu copia del acta firmada aquí: {{3}}
+
+Conserva el documento para tu registro. Este enlace es personal; no lo compartas.
+
+SKC SuCasa Inmobiliaria.
+```
+
+Variables, en orden: `{{1}}` nombre del firmante, `{{2}}` número visible del ticket,
+`{{3}}` enlace personal al PDF (`format=pdf`). Definición y muestras:
+[`whatsapp-acta-receipt-template.json`](whatsapp-acta-receipt-template.json).
+Se encola únicamente después de confirmar la firma y el cierre en base de datos.
+
+#### 3. Autenticación para firmar
+
+- Nombre: `scm_acta_firma_otp_v1`.
+- Categoría: **Autenticación / AUTHENTICATION** (no Utilidad ni Marketing).
+- Idioma del ejemplo: `es_CO`; registrar el código exacto aprobado.
+- Tipo de código: **Copiar código / COPY_CODE**; no autocompletar ni zero-tap.
+- Activar recomendación de seguridad y vencimiento de **10 minutos**.
+- El cuerpo utiliza el formato predefinido de autenticación de Meta: no pegar
+  un texto libre con datos del ticket, enlaces o instrucciones de firma.
+- Única variable de cuerpo: el código de **6 dígitos**. El sistema envía el mismo
+  código también al botón «Copiar código»; no hay una segunda variable del usuario.
+
+Definición: [`whatsapp-acta-otp-template.json`](whatsapp-acta-otp-template.json).
+Una plantilla general nunca se usa para enviar códigos de autenticación.
+
+#### Activación después de la aprobación
+
+Configurar estos valores en el entorno de **la aplicación PHP que encola**,
+solo después de confirmar aprobación, nombre, idioma y componentes de cada plantilla:
 
 ```dotenv
-SCM_ACTA_WHATSAPP_OTP_TEMPLATE=nombre_real_de_la_plantilla_aprobada
+SCM_ACTA_WHATSAPP_INVITATION_TEMPLATE=scm_acta_solicitud_firma_v1
+SCM_ACTA_WHATSAPP_RECEIPT_TEMPLATE=scm_acta_firmada_v1
+SCM_ACTA_WHATSAPP_LANGUAGE=es_CO
+SCM_ACTA_WHATSAPP_OTP_TEMPLATE=scm_acta_firma_otp_v1
 SCM_ACTA_WHATSAPP_OTP_LANGUAGE=es_CO
 ```
 
-El nombre no incluye credenciales. La cuenta y sus secretos siguen configurados
-en shared-notifications; no se duplican en este módulo. Se adjunta un ejemplo de
-solicitud en `docs/whatsapp-acta-otp-template.json`; crearla/aprobarla es un paso
-externo en Meta, no se realiza automáticamente al desplegar.
+Los idiomas deben coincidir exactamente con los aprobados. Si el administrador
+ofrece solo «Español», comprobar el código antes de activar; no asumir que es
+`es_CO`. Las dos plantillas de Utilidad comparten `SCM_ACTA_WHATSAPP_LANGUAGE`;
+OTP tiene idioma independiente. No añadir botones ni cambiar el orden de variables
+sin adaptar también el envío. Los nombres se pueden configurar si Meta aprueba
+otros, pero deben respetar el mismo contrato de componentes.
 
-Si no está configurada, la interfaz informa que el enlace puede ir por WhatsApp
-pero **la verificación será por correo**. Un contacto sin correo no podrá ser
-elegido hasta disponer de WhatsApp OTP configurado. No existe bypass por ausencia
-de plantilla, fallo de cola, firma vacía o código vencido.
+Mientras una plantilla de Utilidad no tenga nombre configurado, ese evento conserva
+`scm_notificacion_general_v1`, `es_CO`, con destinatario, mensaje/enlace y firma de
+la inmobiliaria; esa plantilla existente debe estar aprobada en la cuenta. Se puede
+activar solicitud y entrega por separado. Una plantilla dedicada configurada que
+Meta rechace no dispara un segundo envío automático usando la general.
+
+Sin plantilla OTP configurada, la interfaz informa que el enlace puede ir por
+WhatsApp pero **la verificación será por correo**. Un contacto sin correo no podrá
+ser elegido hasta disponer de WhatsApp OTP configurado. No existe bypass por
+ausencia de plantilla, fallo de cola, firma vacía o código vencido.
+
+La cuenta y sus secretos siguen configurados en shared-notifications; no se
+duplican en este módulo. El correo no necesita plantillas de Meta. Esta configuración
+afecta mensajes nuevos: no reescribe mensajes que ya están en cola. Verificar una
+entrega con un contacto de prueba autorizado antes de dar por habilitado el canal;
+encolar no confirma entrega ni aprobación de la plantilla.
 
 Referencia de contrato de plantilla: [colección oficial de Meta](https://www.postman.com/meta/whatsapp-business-platform/request/6vkv46u/create-authentication-template-w-otp-copy-code-button).
 

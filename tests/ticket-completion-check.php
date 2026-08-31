@@ -94,6 +94,7 @@ $assert($repo->ticket(1)['estado'] === 'En proceso' && $repo->ticket(1)['estado_
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_actas_de_satisfaccion') . '`') === 0, 'no premature legacy timeline completion');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 0, 'no charge before signature');
 $assert($notifications[0]['to'] === 'ana@example.invalid' && $notifications[0]['options']['source_module'] === 'ticket-completion', 'invitation uses selected contact and existing queue contract');
+$assert($notifications[0]['options']['ticket_number'] === '9001' && $notifications[0]['options']['act_url'] === $service->viewUrl((int) $act['id']) . '&token=' . $token, 'invitation supplies exact structured ticket number and signing link');
 $rejects(static fn() => $service->create(1, $input, $actor), 'double create rejected');
 $assert(Repository::workflowError($db, $repo->schema, 1, true) !== '', 'manual close blocked while pending');
 $assert(Repository::workflowError($db, $repo->schema, 1, false, 'Finalizado') !== '', 'administrative completion bypass blocked');
@@ -213,6 +214,8 @@ $signed4 = $noQueue->sign((int) $bothAct['id'], $noQueue->token($bothAct), $sign
 $assert($signed4['status'] === 'signed' && !$signed4['receipt']['queued'], 'receipt failure cannot undo a valid signed closure');
 $db->update($repo->table(), ['invitation_queued_at' => null], ['id' => $bothAct['id']]);
 $assert($service->resend((int) $bothAct['id'])['queued'], 'staff can resend signed receipt without another charge');
+$receiptOptions = end($notifications)['options'];
+$assert($receiptOptions['meta']['event'] === 'signed_receipt' && $receiptOptions['ticket_number'] === '9004' && $receiptOptions['act_url'] === $service->viewUrl((int) $bothAct['id']) . '&token=' . $service->token($repo->act((int) $bothAct['id'])) . '&format=pdf', 'signed receipt supplies its current personal PDF link');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '` WHERE id_ticket = 4') === 1, 'receipt retry creates no duplicate report');
 
 $seedTicket(5);
