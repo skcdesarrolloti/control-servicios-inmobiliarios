@@ -2223,6 +2223,8 @@ trait RendersDashboard
     $debtorAccounts = (int) ($portfolioSummary['debtors'] ?? 0);
     $currentAccounts = (int) ($portfolioSummary['current'] ?? 0);
     $creditAccounts = (int) ($portfolioSummary['credits'] ?? 0);
+    $upToDateAccounts = $currentAccounts;
+    $notUpToDateAccounts = $debtorAccounts;
     $reviewAccounts = (int) ($portfolioSummary['without_data'] ?? 0) + (int) ($portfolioSummary['unmatched'] ?? 0);
     $prelegalAccounts = (int) ($portfolioSummary['prejuridical'] ?? 0);
     $claimAccounts = (int) ($portfolioSummary['claims'] ?? 0);
@@ -2267,7 +2269,9 @@ trait RendersDashboard
 
       <div class="scm-portfolio-kpis" aria-label="Resumen ejecutivo de cartera">
         <article class="scm-portfolio-kpi scm-portfolio-kpi--money"><span>Cartera pendiente</span><strong><?php echo esc_html($this->collection_money($portfolioSummary['balance'] ?? 0)); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['debtors'] ?? 0))); ?> contratos con saldo</small></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--success"><span>Sin deuda</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['current'] ?? 0) + (int) ($portfolioSummary['credits'] ?? 0))); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['credits'] ?? 0))); ?> con saldo a favor</small></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--danger"><span>Contratos no al d&iacute;a</span><strong><?php echo esc_html((string) $notUpToDateAccounts); ?></strong><small>Saldo positivo pendiente</small></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--success"><span>Contratos al d&iacute;a</span><strong><?php echo esc_html((string) $upToDateAccounts); ?></strong><small>Saldo exacto en 0</small></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--credit"><span>Saldo a favor</span><strong><?php echo esc_html((string) $creditAccounts); ?></strong><small>No registran deuda</small></article>
         <article class="scm-portfolio-kpi scm-portfolio-kpi--paid"><span>Pagaron en el &uacute;ltimo cargue</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['paid'] ?? 0))); ?></strong><small>Dejaron de tener saldo positivo</small></article>
         <article class="scm-portfolio-kpi scm-portfolio-kpi--warning"><span>Sin cruce</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['without_data'] ?? 0) + (int) ($portfolioSummary['unmatched'] ?? 0))); ?></strong><small>Requieren verificaci&oacute;n</small></article>
         <article class="scm-portfolio-kpi scm-portfolio-kpi--claim"><span>Siniestrados</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['claims'] ?? 0))); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['prejuridical'] ?? 0))); ?> en prejur&iacute;dico</small></article>
@@ -2279,6 +2283,7 @@ trait RendersDashboard
             <h5>Resumen del corte</h5>
             <p>La cartera pendiente es de <strong><?php echo esc_html($this->collection_money($portfolioBalance)); ?></strong>, distribuida en <strong><?php echo esc_html((string) $debtorAccounts); ?> contratos</strong>. El saldo promedio por contrato moroso es de <strong><?php echo esc_html($this->collection_money($averageDebt)); ?></strong>.</p>
             <ul>
+              <li><strong><?php echo esc_html((string) $upToDateAccounts); ?></strong> contratos est&aacute;n al d&iacute;a y <strong><?php echo esc_html((string) $notUpToDateAccounts); ?></strong> no est&aacute;n al d&iacute;a por saldo positivo.</li>
               <li><strong><?php echo esc_html((string) ((int) ($portfolioSummary['paid'] ?? 0))); ?></strong> contratos pagaron desde el cargue anterior.</li>
               <li><strong><?php echo esc_html((string) $prelegalAccounts); ?></strong> est&aacute;n en etapa prejur&iacute;dica y <strong><?php echo esc_html((string) $claimAccounts); ?></strong> marcados como siniestro.</li>
               <li><strong><?php echo esc_html((string) $reviewAccounts); ?></strong> registros requieren verificaci&oacute;n de cruce con contratos.</li>
@@ -2288,7 +2293,8 @@ trait RendersDashboard
           <article class="scm-portfolio-report-card">
             <span class="scm-calendar-action-kicker">Indicadores de control</span>
             <h5>Calidad y exposici&oacute;n</h5>
-            <div class="scm-portfolio-report-metric"><span>Contratos con deuda</span><strong><?php echo esc_html((string) $debtRate); ?>%</strong><small><?php echo esc_html((string) $debtorAccounts); ?> de <?php echo esc_html((string) $totalAccounts); ?> cuentas</small></div>
+            <div class="scm-portfolio-report-metric"><span>Contratos no al d&iacute;a</span><strong><?php echo esc_html((string) $notUpToDateAccounts); ?></strong><small><?php echo esc_html((string) $debtRate); ?>% de la cartera vigente</small></div>
+            <div class="scm-portfolio-report-metric"><span>Contratos al d&iacute;a</span><strong><?php echo esc_html((string) $upToDateAccounts); ?></strong><small>Saldo exacto en 0</small></div>
             <div class="scm-portfolio-report-metric"><span>Cuentas cruzadas</span><strong><?php echo esc_html((string) $matchedRate); ?>%</strong><small><?php echo esc_html((string) max(0, $totalAccounts - $reviewAccounts)); ?> cuentas identificadas</small></div>
             <div class="scm-portfolio-report-metric"><span>Al d&iacute;a o a favor</span><strong><?php echo esc_html((string) ($currentAccounts + $creditAccounts)); ?></strong><small><?php echo esc_html((string) $creditAccounts); ?> presentan saldo a favor</small></div>
           </article>
