@@ -1,0 +1,10 @@
+{
+  "name": "scm_acta_firma_otp_v1",
+  "language": "es_CO",
+  "category": "AUTHENTICATION",
+  "components": [
+    { "type": "BODY", "add_security_recommendation": true },
+    { "type": "FOOTER", "code_expiration_minutes": 10 },
+    { "type": "BUTTONS", "buttons": [{ "type": "OTP", "otp_type": "COPY_CODE", "text": "Copiar código" }] }
+  ]
+}

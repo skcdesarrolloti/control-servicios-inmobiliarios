@@ -45,11 +45,18 @@ final class SimplePdf
 
   public function save(string $path): void
   {
-    $this->finishPage();
     $dir = dirname($path);
     if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
       throw new \RuntimeException('No se pudo crear el directorio del PDF.');
     }
+    if (file_put_contents($path, $this->bytes()) === false) {
+      throw new \RuntimeException('No se pudo guardar el PDF.');
+    }
+  }
+
+  public function bytes(): string
+  {
+    $this->finishPage();
 
     $objects = [];
     $objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
@@ -115,9 +122,22 @@ final class SimplePdf
     }
     $pdf .= "trailer\n<< /Size " . ($maxId + 1) . " /Root 1 0 R >>\nstartxref\n" . $xrefOffset . "\n%%EOF";
 
-    if (file_put_contents($path, $pdf) === false) {
-      throw new \RuntimeException('No se pudo guardar el PDF.');
+    return $pdf;
+  }
+
+  /** Validated normalized strokes, 1000 x 350; no image decoder or remote resource. */
+  public function drawnSignature(array $strokes): void
+  {
+    $this->ensureSpace(126);
+    $this->content .= "q 0.06 0.15 0.29 RG 1.4 w 1 J 1 j\n";
+    foreach ($strokes as $stroke) {
+      foreach ($stroke as $index => $point) {
+        $this->content .= $this->n($this->margin + (float) $point[0] * .30) . ' ' . $this->n(self::PAGE_H - $this->y - (float) $point[1] * .30) . ($index === 0 ? " m\n" : " l\n");
+      }
+      $this->content .= "S\n";
     }
+    $this->content .= "Q\n";
+    $this->y += 116;
   }
 
   public function logo(): void
@@ -152,7 +172,7 @@ final class SimplePdf
     $this->fill(245, 145, 32);
     $this->rect($this->margin, $this->y, 5, 28);
     $this->fill(255, 255, 255);
-    $this->text($this->margin + 14, $this->y + 8, $text, 11, 'F2');
+    $this->text($this->margin + 14, $this->y + 18, $text, 11, 'F2');
     $this->fill(13, 33, 58);
     $this->y += 36;
   }
@@ -275,6 +295,11 @@ final class SimplePdf
     $this->startNewPage();
   }
 
+  public function reserveSpace(float $height): void
+  {
+    $this->ensureSpace($height);
+  }
+
   public function signatureBlock(string $label, string $name, string $details): void
   {
     $this->ensureSpace(54);
@@ -351,7 +376,7 @@ final class SimplePdf
       }
       $this->rect($x, $this->y, max(0, $width - 1), $height - 1);
       $lines = $this->wrap((string) $cell, max(24, $width - 12), $fontSize);
-      $lineY = $this->y + 8;
+      $lineY = $this->y + $fontSize + 5;
       $this->fill($header ? 255 : 15, $header ? 255 : 23, $header ? 255 : 42);
       foreach ($lines as $line) {
         if (in_array($index, $rightAlignColumns, true)) {
@@ -374,7 +399,7 @@ final class SimplePdf
     foreach ($cells as $index => $cell) {
       $maxLines = max($maxLines, count($this->wrap((string) $cell, max(24, ($widths[$index] ?? 0) - 12), $fontSize)));
     }
-    return max(22, 10 + $maxLines * ($fontSize + 3));
+    return max(22, 12 + $maxLines * ($fontSize + 4));
   }
 
   /** @return string[] */

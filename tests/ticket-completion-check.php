@@ -36,6 +36,13 @@ $rejects(static fn() => Policy::number('-100'), 'negative fee rejected');
 $rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => '']]), 'solution required for every damage');
 $rejects(static fn() => Policy::signature(['signature_name' => 'Ana Pérez', 'document' => '123456'], 'Ana Pérez'), 'opening a link never constitutes consent');
 $rejects(static fn() => Policy::signature(['signature_name' => 'Otra persona', 'document' => '123456', 'accepted' => '1'], 'Ana Pérez'), 'signature must match selected name');
+$drawing = json_encode([[[120, 200], [160, 90], [190, 190], [130, 170], [230, 140], [240, 210], [280, 140], [310, 200], [360, 160]]]);
+$assert(count(Policy::strokes($drawing)[0]) === 9, 'numeric signature strokes accepted');
+$rejects(static fn() => Policy::strokes('[]'), 'blank signature rejected');
+$rejects(static fn() => Policy::strokes('[[[0,0],[99999,2]]]'), 'out of bounds signature rejected');
+$rejects(static fn() => Policy::strokes('<svg onload=alert(1)>'), 'executable drawing data rejected');
+$assert(Policy::phone('300 123 4567') === '+573001234567', 'Colombian phone normalized');
+$assert(Policy::phone('120363@g.us') === '', 'group WhatsApp recipients prohibited for personal signature');
 
 if (!in_array('--database', $argv, true)) { echo "$checks domain checks passed. Use --database for isolated SQL integration checks.\n"; exit; }
 require dirname(__DIR__) . '/bootstrap/app.php';
@@ -72,7 +79,13 @@ $service = new Service($repo, str_repeat('test-secret-', 4), 'http://127.0.0.1:8
 });
 $actor = ['user_id' => 1, 'employee_id' => '200', 'name' => 'Funcionario Prueba'];
 $input = ['signer_role' => 'propietario', 'signer_name' => 'Ana Pérez', 'executor' => 'propietario', 'items' => [['damage' => 'Fuga en tubería de cocina', 'solution' => 'Se reemplazó el tramo y se verificó presión.']], 'observations' => 'Sin filtración en la prueba final.', 'transport' => '12000', 'confirm' => '1'];
-$signInput = static fn(array $act): array => ['document' => '123456789', 'signature_name' => 'Ana Pérez', 'accepted' => '1', 'document_hash' => $act['payload_hash']];
+$codes = [];
+$signInput = static function (array $act) use ($drawing, &$codes): array { return ['document' => '123456789', 'signature_name' => 'Ana Pérez', 'accepted' => '1', 'consent_version' => '2', 'signature_strokes' => $drawing, 'otp_code' => $codes[$act['id']] ?? '', 'document_hash' => $act['payload_hash']]; };
+$requestCode = static function (array $act, string $channel = 'email') use ($service, &$notifications, &$codes): array {
+  $result = $service->requestCode((int) $act['id'], $service->token($act), $channel);
+  $codes[$act['id']] = end($notifications)['options']['otp_code'];
+  return $result;
+};
 $seedTicket(1);
 $created = $service->create(1, $input, $actor);
 $act = $repo->act($created['act_id']);
@@ -88,6 +101,14 @@ $assert(Repository::workflowError($db, $repo->schema, 1, false) === '', 'ordinar
 $rejects(static fn() => $service->publicAct((int) $act['id'], str_repeat('0', 64)), 'invalid bearer token rejected');
 $rejects(static fn() => $service->sign((int) $act['id'], $token, array_replace($signInput($act), ['accepted' => '0']), '', ''), 'missing consent rejected without changing ticket');
 $rejects(static fn() => $service->sign((int) $act['id'], $token, array_replace($signInput($act), ['document_hash' => str_repeat('0', 64)]), '', ''), 'wrong document version rejected');
+$rejects(static fn() => $service->sign((int) $act['id'], $token, $signInput($act), '', ''), 'possession of invitation alone cannot sign');
+$assert($requestCode($act)['queued'], 'verification code queued to registered contact');
+$otpState = json_decode($repo->act((int) $act['id'])['otp_json'], true);
+$assert(!str_contains(json_encode($otpState), $codes[$act['id']]) && strlen($otpState['hash']) === 64, 'only keyed code hash persisted in act');
+$rejects(static fn() => $requestCode($act), 'OTP resend throttled');
+$rejects(static fn() => $service->requestCode((int) $act['id'], $token, 'sms'), 'arbitrary verification channel rejected');
+$rejects(static fn() => $service->sign((int) $act['id'], $token, array_replace($signInput($act), ['otp_code' => '000000']), '', ''), 'incorrect code rejected');
+$assert(json_decode($repo->act((int) $act['id'])['otp_json'], true)['failures'] === 1, 'failed attempt survives signature rollback');
 $historyBefore = (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_ticket') . '`');
 // Force an SQL failure only in the test connection's temporary report table.
 $db->pdo()->exec('ALTER TABLE `' . $db->table('jet_cct_reportes_administrativos') . '` CHANGE COLUMN descripcion unavailable_description TEXT');
@@ -104,15 +125,26 @@ try {
   $assert(false, 'late history failure must throw');
 } catch (PDOException) { $assert(true, 'failure after signature and charge writes is reported'); }
 $assert($repo->act((int) $act['id'])['status'] === 'pending' && $repo->ticket(1)['estado'] === 'En proceso', 'late failure rolls back ticket and signature');
+$assert($repo->act((int) $act['id'])['signed_pdf'] === null, 'late failure also rolls back the signed PDF');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 0, 'late failure rolls back administrative charge');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_actas_de_satisfaccion') . '`') === 0, 'late failure rolls back legacy completion milestone');
 $db->pdo()->exec('ALTER TABLE `' . $db->table('jet_cct_historial_del_ticket') . '` CHANGE COLUMN unavailable_response respuesta TEXT');
 $signed = $service->sign((int) $act['id'], $token, $signInput($act), '127.0.0.1', 'QA');
 $assert($signed['status'] === 'signed' && $repo->ticket(1)['estado'] === 'Cerrado' && $repo->ticket(1)['estado_administrativo'] === 'Finalizado', 'signature closes ticket and finalizes workflow');
+$assert(str_starts_with($signed['signed_pdf'], '%PDF-1.4') && hash('sha256', $signed['signed_pdf']) === $signed['pdf_hash'], 'immutable signed PDF saved with closure');
+$assert($signed['otp_json'] === null && !empty(json_decode($signed['signed_json'], true)['verification']), 'code consumed and verification evidence recorded');
+$assert($service->pdf($signed) === $signed['signed_pdf'], 'recipient receives exact persisted PDF');
+$badPdf = $signed; $badPdf['signed_pdf'] .= 'tamper';
+$rejects(static fn() => $service->pdf($badPdf), 'tampered PDF cannot be downloaded');
+$missingPdf = $signed; $missingPdf['signed_pdf'] = null;
+$rejects(static fn() => $service->pdf($missingPdf), 'missing signed original is not silently regenerated');
+$assert(!str_contains($signed['signed_pdf'], 'Reporte administrativo') && str_contains($service->pdf($signed, true), 'Reporte administrativo'), 'PDF audiences separate internal charges');
+$receiptCount = count($notifications);
 $report = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_reportes_administrativos') . '` WHERE _ID = ?', [$signed['report_id']]);
 $assert((int) $report['valor'] === 16333 && $report['exportado'] === 'No' && $report['fue_pagado'] === 'No', 'administrative report contains configured fee plus transport, unpaid and unexported');
 $assert((int) $report['id_ticket'] === 1, 'report links to exact internal ticket ID, not a coinciding display number');
 $service->sign((int) $act['id'], $token, $signInput($act), '127.0.0.1', 'QA');
+$assert(count($notifications) === $receiptCount, 'duplicate signature does not duplicate receipt');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 1, 'repeated signature cannot duplicate charge');
 $rejects(static fn() => $service->cancel((int) $act['id'], 'corrección', $actor), 'signed document cannot be cancelled');
 $publicHtml = (new View())->document($signed, $service->payload($signed), false);
@@ -145,7 +177,73 @@ $assert($service->context(3)['contacts']['copropiedad']['available'] === true, '
 $noQueue = new Service($repo, str_repeat('test-secret-', 4), 'http://127.0.0.1:8097', static fn() => 0);
 $notQueued = $noQueue->create(3, array_replace($input, ['signer_role' => 'copropiedad', 'signer_name' => 'Administrador Prueba']), $actor);
 $assert($notQueued['queued'] === false && $repo->ticket(3)['estado'] === 'En proceso', 'queue failure preserves pending act and reports retryable warning');
+$pending3 = $repo->act($notQueued['act_id']);
+$failedCode = $noQueue->requestCode((int) $pending3['id'], $noQueue->token($pending3), 'email');
+$assert(!$failedCode['queued'] && empty(json_decode($repo->act((int) $pending3['id'])['otp_json'], true)['queued']), 'queue failure cannot activate a verification code');
 $tampered = $repo->act($notQueued['act_id']);
 $db->update($repo->table(), ['payload_json' => '{}'], ['id' => $tampered['id']]);
 $rejects(static fn() => $service->publicAct((int) $tampered['id'], $service->token($tampered)), 'document tampering prevents signature');
+
+$seedTicket(4);
+$db->update($db->table('jet_cct_tickets'), ['celular_propietario' => '3001234567'], ['_ID' => 4]);
+$both = $service->create(4, array_replace($input, ['channels' => ['both']]), $actor);
+$bothAct = $repo->act($both['act_id']);
+$assert($both['channels'] === ['email' => true, 'whatsapp' => true], 'both channels queue independently');
+$assert(end($notifications)['to'] === '+573001234567' && end($notifications)['options']['channel'] === 'whatsapp', 'WhatsApp uses selected registered personal phone');
+$requestCode($bothAct);
+for ($i = 0; $i < 5; $i++) {
+  $rejects(static fn() => $service->sign((int) $bothAct['id'], $service->token($bothAct), array_replace($signInput($bothAct), ['otp_code' => '000000']), '', ''), 'wrong OTP attempt ' . ($i + 1));
+}
+$rejects(static fn() => $service->sign((int) $bothAct['id'], $service->token($bothAct), $signInput($bothAct), '', ''), 'correct code blocked after five wrong attempts');
+$lockedState = json_decode($repo->act((int) $bothAct['id'])['otp_json'], true);
+$lockedState['last_request'] = time() - 61;
+$db->update($repo->table(), ['otp_json' => json_encode($lockedState)], ['id' => $bothAct['id']]);
+$rejects(static fn() => $requestCode($bothAct), 'resend cannot reset brute force attempt budget');
+$lockedState['window_start'] = time() - 3601;
+$db->update($repo->table(), ['otp_json' => json_encode($lockedState)], ['id' => $bothAct['id']]);
+$oldCode = $codes[$bothAct['id']];
+$requestCode($bothAct);
+$expiredState = json_decode($repo->act((int) $bothAct['id'])['otp_json'], true);
+$expiredState['expires_at'] = time() - 1;
+$db->update($repo->table(), ['otp_json' => json_encode($expiredState)], ['id' => $bothAct['id']]);
+$rejects(static fn() => $service->sign((int) $bothAct['id'], $service->token($bothAct), $signInput($bothAct), '', ''), 'expired OTP rejected');
+$expiredState['expires_at'] = time() + 600;
+$db->update($repo->table(), ['otp_json' => json_encode($expiredState)], ['id' => $bothAct['id']]);
+$signed4 = $noQueue->sign((int) $bothAct['id'], $noQueue->token($bothAct), $signInput($bothAct), '', 'QA');
+$assert($signed4['status'] === 'signed' && !$signed4['receipt']['queued'], 'receipt failure cannot undo a valid signed closure');
+$db->update($repo->table(), ['invitation_queued_at' => null], ['id' => $bothAct['id']]);
+$assert($service->resend((int) $bothAct['id'])['queued'], 'staff can resend signed receipt without another charge');
+$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '` WHERE id_ticket = 4') === 1, 'receipt retry creates no duplicate report');
+
+$seedTicket(5);
+$db->update($db->table('jet_cct_tickets'), ['celular_propietario' => '3001234567'], ['_ID' => 5]);
+$partialService = new Service($repo, str_repeat('test-secret-', 4), 'http://127.0.0.1:8097', static fn($to, $subject, $html, $options): int => $options['channel'] === 'email' ? 1 : 0);
+$partial = $partialService->create(5, array_replace($input, ['channels' => ['both']]), $actor);
+$assert($partial['channels'] === ['email' => true, 'whatsapp' => false] && !$partial['queued'], 'partial delivery failure is reported per channel');
+$db->update($repo->table(), ['invitation_queued_at' => null], ['id' => $partial['act_id']]);
+$beforeRetry = count($notifications);
+$assert($service->resend($partial['act_id'])['queued'], 'partial invitation retry succeeds');
+$assert(count($notifications) === $beforeRetry + 1 && end($notifications)['options']['channel'] === 'whatsapp', 'partial retry skips the already queued email');
+$oldEvidence = json_decode($signed['signed_json'], true);
+unset($oldEvidence['strokes'], $oldEvidence['verification'], $oldEvidence['evidence_hmac']);
+$oldEvidence['method'] = 'typed-name-and-explicit-consent'; $oldEvidence['consent_version'] = '1'; $oldEvidence['consent_text'] = Policy::CONSENT;
+$oldEvidence['evidence_hmac'] = hash_hmac('sha256', json_encode($oldEvidence, JSON_THROW_ON_ERROR), str_repeat('test-secret-', 4));
+$historical = array_replace($signed, ['signed_json' => json_encode($oldEvidence), 'signed_pdf' => null]);
+$assert(str_starts_with($service->pdf($historical), '%PDF-1.4') && !str_contains((new View())->document($historical, $service->payload($historical), false), '<svg'), 'historical signatures remain readable without inventing drawing or OTP');
+
+$oldTemplate = getenv('SCM_ACTA_WHATSAPP_OTP_TEMPLATE');
+putenv('SCM_ACTA_WHATSAPP_OTP_TEMPLATE=qa_authentication');
+$requestCode($repo->act($partial['act_id']), 'whatsapp');
+$assert(end($notifications)['options']['meta']['event'] === 'signature_otp' && end($notifications)['to'] === '+573001234567', 'configured WhatsApp OTP targets registered phone');
+putenv($oldTemplate === false ? 'SCM_ACTA_WHATSAPP_OTP_TEMPLATE' : 'SCM_ACTA_WHATSAPP_OTP_TEMPLATE=' . $oldTemplate);
+
+if (in_array('--pdf-fixture', $argv, true)) {
+  $dir = dirname(__DIR__) . '/tmp/pdfs';
+  if (!is_dir($dir)) { mkdir($dir, 0750, true); }
+  file_put_contents($dir . '/acta-firmada-qa.pdf', $signed['signed_pdf']);
+  $longPayload = $service->payload($signed);
+  $longPayload['items'] = array_fill(0, 3, ['damage' => str_repeat('Daño largo de prueba: humedad y filtración. ', 65), 'solution' => str_repeat('Reparación verificada, sellado y prueba de presión. ', 60)]);
+  $longPayload['observations'] = str_repeat('Observaciones de prueba para validar paginación y márgenes. ', 90);
+  file_put_contents($dir . '/acta-larga-qa.pdf', (new \SCM\Modules\TicketCompletion\CompletionPdf())->render($signed, $longPayload));
+}
 echo "$checks checks passed. All SQL test rows were in connection-scoped temporary tables; no real notifications were sent.\n";

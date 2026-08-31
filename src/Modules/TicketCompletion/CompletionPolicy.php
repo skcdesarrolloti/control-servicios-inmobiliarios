@@ -9,6 +9,43 @@ final class CompletionPolicy
   public const WAITING = 'En espera de firma';
   public const ROLES = ['propietario' => 'Propietario', 'arrendatario' => 'Arrendatario', 'copropiedad' => 'Copropiedad'];
   public const CONSENT = 'Confirmo que soy la persona designada para firmar, revisé el acta y recibí a satisfacción las soluciones descritas. Acepto firmarla electrónicamente con mi nombre y cerrar este ticket.';
+  public const DRAWN_CONSENT = 'Confirmo que soy la persona designada, revisé los daños, soluciones y observaciones del acta y los recibo a satisfacción. Acepto firmar electrónicamente con mi trazo, nombre, documento y código de verificación, y autorizar el cierre de este ticket.';
+
+  public static function phone(string $phone, string $indicator = ''): string
+  {
+    if (!preg_match('/^\+?[\d\s().-]+$/D', trim($phone))) { return ''; }
+    $digits = preg_replace('/\D/', '', $phone) ?? '';
+    $country = preg_replace('/\D/', '', $indicator) ?? '';
+    if (strlen($digits) === 10 && !str_starts_with(trim($phone), '+')) {
+      $digits = ($country ?: '57') . $digits;
+    }
+    return preg_match('/^[1-9]\d{9,14}$/D', $digits) ? '+' . $digits : '';
+  }
+
+  /** Numeric strokes only: no uploaded SVG, image URL or executable content. */
+  public static function strokes(mixed $raw): array
+  {
+    if (!is_string($raw) || strlen($raw) > 45000) { throw new \DomainException('La firma excede el tamaño permitido. Bórrala e inténtalo de nuevo.'); }
+    try { $strokes = json_decode($raw, true, 8, JSON_THROW_ON_ERROR); }
+    catch (\JsonException) { throw new \DomainException('Dibuja tu firma en el recuadro.'); }
+    if (!is_array($strokes) || !array_is_list($strokes) || count($strokes) < 1 || count($strokes) > 80) { throw new \DomainException('Dibuja tu firma en el recuadro.'); }
+    $count = 0; $length = 0.0; $clean = [];
+    foreach ($strokes as $stroke) {
+      if (!is_array($stroke) || !array_is_list($stroke) || count($stroke) < 2) { throw new \DomainException('La firma debe contener trazos, no solo puntos.'); }
+      $line = []; $previous = null;
+      foreach ($stroke as $point) {
+        if (!is_array($point) || array_keys($point) !== [0, 1] || !is_numeric($point[0]) || !is_numeric($point[1])) { throw new \DomainException('Trazo de firma no válido.'); }
+        $x = (float) $point[0]; $y = (float) $point[1];
+        if (!is_finite($x) || !is_finite($y) || $x < 0 || $x > 1000 || $y < 0 || $y > 350 || ++$count > 1500) { throw new \DomainException('Trazo de firma fuera de rango.'); }
+        $point = [round($x, 1), round($y, 1)];
+        if ($previous) { $length += hypot($point[0] - $previous[0], $point[1] - $previous[1]); }
+        $line[] = $point; $previous = $point;
+      }
+      $clean[] = $line;
+    }
+    if ($count < 8 || $length < 80) { throw new \DomainException('La firma está vacía o es demasiado corta. Dibuja tu firma completa.'); }
+    return $clean;
+  }
 
   public static function text(mixed $value, string $label, int $max = 6000, bool $required = true): string
   {

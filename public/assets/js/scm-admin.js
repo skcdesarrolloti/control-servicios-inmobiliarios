@@ -1757,6 +1757,7 @@
           var option = signer.selectedOptions[0];
           form.querySelector("[data-acta-signer-name]").value = option.dataset.name || "";
           form.querySelector("[data-acta-signer-email]").value = option.dataset.email || "";
+          form.querySelector("[data-acta-signer-phone]").value = option.dataset.phone || "";
         });
         function total() {
           var fee = Number(form.querySelector("[data-acta-fee]").value) || 0;

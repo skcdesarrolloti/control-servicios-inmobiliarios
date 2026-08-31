@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SCM\Modules\TicketCompletion;
 
-use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
 
 final class CompletionService
@@ -17,7 +16,7 @@ final class CompletionService
       throw new \RuntimeException('No hay una clave segura para las actas.');
     }
     $this->enqueue = $enqueue ?? static function (string $to, string $subject, string $html, array $options) use ($repo): int {
-      return (new EmailQueue($repo->db))->enqueue($to, $subject, $html, $options);
+      return CompletionDelivery::enqueue($repo->db, $to, $subject, $html, $options);
     };
   }
 
@@ -44,7 +43,8 @@ final class CompletionService
           }
         }
       }
-      $contacts[$role]['available'] = $contacts[$role]['name'] !== '' && (bool) filter_var($contacts[$role]['email'], FILTER_VALIDATE_EMAIL);
+      $contacts[$role]['phone'] = CompletionPolicy::phone($contacts[$role]['phone'], (string) ($ticket['indicativo_' . $role] ?? ''));
+      $contacts[$role]['available'] = $contacts[$role]['name'] !== '' && $this->verificationChannels($contacts[$role]) !== [];
     }
     $config = [];
     $table = $this->repo->db->table('jet_cct_confi_sistema');
@@ -119,7 +119,16 @@ final class CompletionService
       }
       $contact = $context['contacts'][$role];
       if (!$contact['available']) {
-        throw new \DomainException('El firmante no tiene nombre y correo válidos en el ticket. Actualiza sus contactos primero.');
+        throw new \DomainException('El firmante necesita nombre y un contacto válido para verificación: correo o WhatsApp con plantilla de autenticación configurada.');
+      }
+      $channels = $input['channels'] ?? ['email'];
+      if ($channels === ['both']) { $channels = ['email', 'whatsapp']; }
+      if (!is_array($channels) || !$channels || array_diff($channels, ['email', 'whatsapp'])) { throw new \DomainException('Selecciona correo, WhatsApp o ambos.'); }
+      $channels = array_values(array_unique($channels));
+      foreach ($channels as $channel) {
+        if (($channel === 'email' && !filter_var($contact['email'], FILTER_VALIDATE_EMAIL)) || ($channel === 'whatsapp' && $contact['phone'] === '')) {
+          throw new \DomainException('Falta el contacto registrado para el canal seleccionado: ' . $channel . '.');
+        }
       }
       $signerName = CompletionPolicy::text($input['signer_name'] ?? '', 'nombre de quien firma', 160);
       $items = CompletionPolicy::items($input['items'] ?? null);
@@ -140,7 +149,7 @@ final class CompletionService
       }
       $now = time();
       $payload = [
-        'version' => 1, 'ticket_pk' => $ticketId, 'ticket_number' => (string) ($ticket['id_ticket'] ?: $ticketId),
+        'version' => 2, 'channels' => $channels, 'ticket_pk' => $ticketId, 'ticket_number' => (string) ($ticket['id_ticket'] ?: $ticketId),
         'property' => (string) ($ticket['inmueble'] ?? ''), 'address' => (string) ($ticket['direccion'] ?? ''),
         'contract' => (string) ($ticket['contrato'] ?? ''), 'executor' => $executor,
         'items' => $items, 'observations' => $observations, 'created_at' => $now,
@@ -168,7 +177,8 @@ final class CompletionService
       $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' generada. Solución por ' . CompletionPolicy::ROLES[$executor] . '. Pendiente de firma de ' . htmlspecialchars($signerName, ENT_QUOTES, 'UTF-8') . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta</a>. El ticket permanece abierto y el reporte aún no se cobra.', $actor['name'], $actor['employee_id']);
       return $this->repo->act($id);
     });
-    return $this->notify($act);
+    try { return $this->notify($act); }
+    catch (\Throwable) { return ['act_id' => (int) $act['id'], 'queued' => false, 'message' => 'Acta guardada. No se pudo confirmar el envío; recarga y usa Reenviar invitación. El ticket sigue abierto.']; }
   }
 
   public function resend(int $id): array
@@ -176,44 +186,94 @@ final class CompletionService
     $act = $this->repo->act($id);
     $act = $this->repo->transaction((int) $act['ticket_pk'], function () use ($id): array {
       $act = $this->repo->act($id);
-      if ($act['status'] !== 'pending') {
-        throw new \DomainException('Solo se pueden reenviar actas pendientes de firma.');
+      if (!in_array($act['status'], ['pending', 'signed'], true)) {
+        throw new \DomainException('No se puede reenviar un acta anulada.');
       }
       if ((int) $act['invitation_queued_at'] > time() - 60) {
-        throw new \DomainException('El correo ya se encoló. Espera un minuto antes de reenviarlo.');
+        throw new \DomainException('Espera un minuto antes de reenviar el acta.');
       }
       // Rotate only expired links, so a delayed email or a retry does not invalidate a valid invitation.
       if ((int) $act['expires_at'] < time()) {
-        $this->repo->db->update($this->repo->table(), ['token_nonce' => bin2hex(random_bytes(32)), 'expires_at' => time() + 30 * 86400, 'invitation_queued_at' => null], ['id' => $id]);
+        $this->repo->db->update($this->repo->table(), ['token_nonce' => bin2hex(random_bytes(32)), 'expires_at' => time() + 30 * 86400, 'invitation_queued_at' => null, 'otp_json' => null], ['id' => $id]);
       }
       return $this->repo->act($id);
     });
-    return $this->notify($act);
+    return $this->notify($act, $act['status'] === 'signed', true);
   }
 
-  private function notify(array $act): array
+  private function notify(array $act, bool $receipt = false, bool $resend = false): array
   {
+    return CompletionRepository::locked($this->repo->db, (int) $act['ticket_pk'], function () use ($act, $receipt, $resend): array {
+    $act = $this->repo->act((int) $act['id']);
+    if ($act['status'] !== ($receipt ? 'signed' : 'pending')) { return ['queued' => false, 'message' => 'El estado del acta cambió. Recarga el caso.']; }
     $payload = $this->payload($act);
     $url = $this->viewUrl((int) $act['id']) . '&token=' . $this->token($act);
-    $title = 'Acta de satisfacción del ticket #' . $payload['ticket_number'];
-    $body = '<p>Hola ' . EmailTemplate::e($payload['signer']['name']) . '.</p><p>La solución realizada por ' . EmailTemplate::e(CompletionPolicy::ROLES[$payload['executor']]) . ' está documentada. Revisa los daños, las soluciones y las observaciones antes de firmar.</p><p>El ticket solo se cerrará si aceptas y firmas el acta. Si no estás conforme, no firmes y contacta a la inmobiliaria.</p><p><a href="' . EmailTemplate::e($url) . '">Revisar y firmar acta</a></p><p>Este enlace personal vence el ' . date('d/m/Y', (int) $act['expires_at']) . '. No lo compartas.</p>';
-    $queued = 0;
+    $title = ($receipt ? 'Acta firmada' : 'Acta de satisfacción') . ' del ticket #' . $payload['ticket_number'];
+    $description = $receipt ? 'Tu firma quedó registrada y el ticket se cerró. Puedes consultar y descargar tu PDF firmado.' : 'Revisa los daños, soluciones y observaciones. Solo firma si estás conforme: tu firma cerrará el ticket. Necesitarás un código enviado a tu contacto registrado.';
+    $linkLabel = $receipt ? 'Descargar PDF firmado' : 'Revisar y firmar acta';
+    $target = $receipt ? $url . '&format=pdf' : $url;
+    $body = '<p>Hola ' . EmailTemplate::e($payload['signer']['name']) . '.</p><p>' . $description . '</p><p><a href="' . EmailTemplate::e($target) . '">' . $linkLabel . '</a></p><p>Enlace personal válido hasta ' . date('d/m/Y', (int) $act['expires_at']) . '. No lo compartas.</p>';
+    $delivery = json_decode((string) ($act['delivery_json'] ?? ''), true) ?: [];
+    $event = $receipt ? 'signed_receipt' : 'signature_invitation';
+    $channels = $payload['channels'] ?? ['email'];
+    $previousComplete = true;
+    foreach ($channels as $channel) { $previousComplete = $previousComplete && !empty($delivery[$event][$channel]['queued']); }
+    $freshSend = $resend && ($previousComplete || ($delivery[$event]['token_nonce'] ?? '') !== $act['token_nonce']);
+    $generation = (int) ($delivery[$event]['generation'] ?? 0) + ($freshSend ? 1 : 0);
+    if ($freshSend) { $delivery[$event] = []; }
+    $delivery[$event]['generation'] = $generation;
+    $delivery[$event]['token_nonce'] = $act['token_nonce'];
+    $results = [];
+    foreach ($channels as $channel) {
+      if (!empty($delivery[$event][$channel]['queued'])) { $results[$channel] = true; continue; }
+      $results[$channel] = $this->send($act, $payload, $channel, $event, $generation . ':' . $act['token_nonce'], $title, $body, $description . ' ' . $linkLabel . ': ' . $target);
+      $delivery[$event][$channel] = ['queued' => $results[$channel], 'attempted_at' => time()];
+      // Save each channel independently; a retry cannot duplicate a successful sibling channel.
+      $this->repo->db->update($this->repo->table(), ['delivery_json' => json_encode($delivery, JSON_THROW_ON_ERROR)], ['id' => (int) $act['id']]);
+    }
+    $this->repo->db->update($this->repo->table(), ['invitation_queued_at' => time()], ['id' => (int) $act['id']]);
+    $all = !in_array(false, $results, true);
+    return ['act_id' => (int) $act['id'], 'queued' => $all, 'channels' => $results, 'message' => ($receipt ? 'Acta firmada y ticket cerrado. ' : 'Acta guardada; el ticket sigue abierto hasta la firma. ') . ($all ? 'Mensajes en cola (no confirma entrega).' : 'No se pudieron encolar todos los canales. Revisa el detalle y reintenta.')];
+    });
+  }
+
+  public function verificationChannels(array $signer): array
+  {
+    $out = [];
+    if (filter_var($signer['email'] ?? '', FILTER_VALIDATE_EMAIL)) { $out['email'] = 'Correo: ' . preg_replace('/^(.).+(@.*)$/u', '$1***$2', $signer['email']); }
+    if (CompletionDelivery::otpTemplate() !== '' && CompletionPolicy::phone((string) ($signer['phone'] ?? '')) !== '') { $out['whatsapp'] = 'WhatsApp: ***' . substr($signer['phone'], -4); }
+    return $out;
+  }
+
+  public function requestCode(int $id, string $token, string $channel): array
+  {
+    $act = $this->publicAct($id, $token);
+    return CompletionRepository::locked($this->repo->db, (int) $act['ticket_pk'], function () use ($id, $token, $channel): array {
+      $act = $this->publicAct($id, $token);
+      if ($act['status'] !== 'pending') { throw new \DomainException('Esta acta ya no está pendiente de firma.'); }
+      $payload = $this->payload($act);
+      if (!isset($this->verificationChannels($payload['signer'])[$channel])) { throw new \DomainException('Canal de verificación no disponible. Usa el correo registrado o contacta a la inmobiliaria.'); }
+      return (new CompletionVerification($this->repo, $this->secret))->request($act, $channel, function (string $code, string $nonce) use ($act, $payload, $channel): bool {
+        $text = 'Tu código para firmar el acta #' . $act['id'] . ' del ticket #' . $payload['ticket_number'] . ' es ' . $code . '. Vence en 10 minutos. No lo compartas. Si no lo solicitaste, ignora este mensaje.';
+        return $this->send($act, $payload, $channel, 'signature_otp', $nonce, 'Código de firma del acta #' . $act['id'], '<p>' . EmailTemplate::e($text) . '</p>', $text, $code);
+      });
+    });
+  }
+
+  private function send(array $act, array $payload, string $channel, string $event, string $key, string $subject, string $body, string $text, string $code = ''): bool
+  {
     try {
-      $queued = ($this->enqueue)($payload['signer']['email'], $title, EmailTemplate::render($title, $body), [
-        'source_module' => 'ticket-completion', 'provider' => 'email_smtp',
-        'destination_name' => $payload['signer']['name'],
-        'dedupe_key' => 'ticket-acta:' . $act['id'] . ':' . $act['token_nonce'] . ':' . ((int) ($act['invitation_queued_at'] ?? 0)),
-        'meta' => ['ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id'], 'event' => 'signature_invitation'],
-      ]);
-    } catch (\Throwable $error) {
-      error_log('[ticket-completion] No se pudo encolar invitación del acta #' . $act['id']);
+      return ($this->enqueue)($channel === 'email' ? $payload['signer']['email'] : $payload['signer']['phone'], $subject, EmailTemplate::render($subject, $body), [
+        'channel' => $channel, 'source_module' => 'ticket-completion', 'provider' => $channel === 'email' ? 'email_smtp' : 'whatsapp_official',
+        'destination_name' => $payload['signer']['name'], 'message_text' => $text, 'otp_code' => $code,
+        'priority' => $event === 'signature_otp' ? 200 : 100,
+        'dedupe_key' => 'ticket-acta:' . $act['id'] . ':' . $event . ':' . $channel . ':' . $key,
+        'meta' => ['ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id'], 'event' => $event],
+      ]) > 0;
+    } catch (\Throwable) {
+      error_log('[ticket-completion] No se pudo encolar ' . $event . ' por ' . $channel . ' del acta #' . $act['id']);
+      return false;
     }
-    if ($queued > 0) {
-      $this->repo->db->update($this->repo->table(), ['invitation_queued_at' => time()], ['id' => (int) $act['id']]);
-    }
-    return ['act_id' => (int) $act['id'], 'queued' => $queued > 0, 'message' => $queued > 0
-      ? 'Acta guardada. Correo de firma en cola; el ticket queda abierto hasta la firma.'
-      : 'Acta guardada, pero NO se pudo encolar el correo. Usa Reenviar invitación cuando la cola esté disponible. El ticket sigue abierto.'];
   }
 
   public function cancel(int $id, string $reason, array $actor): void
@@ -235,7 +295,15 @@ final class CompletionService
   public function sign(int $id, string $token, array $input, string $ip, string $userAgent): array
   {
     $act = $this->publicAct($id, $token);
-    return $this->repo->transaction((int) $act['ticket_pk'], function (array $ticket) use ($id, $token, $input, $ip, $userAgent): array {
+    $signed = CompletionRepository::locked($this->repo->db, (int) $act['ticket_pk'], function () use ($id, $token, $input, $ip, $userAgent): array {
+      $act = $this->publicAct($id, $token);
+      if ($act['status'] === 'signed') { return $act; }
+      $payload = $this->payload($act);
+      CompletionPolicy::signature($input, $payload['signer']['name']);
+      if (($input['consent_version'] ?? '') !== '2') { throw new \DomainException('Recarga y acepta la versión actual del formulario de firma.'); }
+      $strokes = CompletionPolicy::strokes($input['signature_strokes'] ?? '');
+      $verification = (new CompletionVerification($this->repo, $this->secret))->verify($act, $input['otp_code'] ?? '');
+      return $this->repo->transaction((int) $act['ticket_pk'], function (array $ticket) use ($id, $token, $input, $ip, $userAgent, $strokes, $verification): array {
       $act = $this->repo->act($id);
       $this->assertPublicAccess($act, $token);
       $payload = $this->payload($act);
@@ -249,6 +317,11 @@ final class CompletionService
         throw new \DomainException('La versión del acta no coincide. Recarga y revisa nuevamente el documento.');
       }
       $signature = CompletionPolicy::signature($input, $payload['signer']['name']);
+      $signature['method'] = 'drawn-signature-otp-and-explicit-consent';
+      $signature['consent_version'] = '2';
+      $signature['consent_text'] = CompletionPolicy::DRAWN_CONSENT;
+      $signature['strokes'] = $strokes;
+      $signature['verification'] = $verification;
       $signature['signed_at'] = time();
       $signature['ip'] = substr($ip, 0, 45);
       $signature['user_agent'] = substr($userAgent, 0, 512);
@@ -282,15 +355,37 @@ final class CompletionService
         'observaciones' => self::legacyText($payload) . "\n\nActa firmada por " . $signature['name'] . ' el ' . date('d/m/Y H:i:s') . '. Registro verificable: ' . $this->viewUrl($id),
       ]);
       $this->repo->db->update($this->repo->table(), [
-        'status' => 'signed', 'signed_at' => $now, 'signed_json' => json_encode($signature, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), 'report_id' => $reportId, 'legacy_act_id' => $legacyId,
+        'status' => 'signed', 'signed_at' => $now, 'signed_json' => json_encode($signature, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), 'report_id' => $reportId, 'legacy_act_id' => $legacyId, 'otp_json' => null, 'expires_at' => $now + 30 * 86400,
       ], ['id' => $id]);
+      $pdf = (new CompletionPdf())->render($this->repo->act($id), $payload);
+      $pdfHash = hash('sha256', $pdf);
+      $this->repo->db->update($this->repo->table(), ['signed_pdf' => $pdf, 'pdf_hash' => $pdfHash, 'pdf_hmac' => hash_hmac('sha256', $id . '|' . $act['payload_hash'] . '|' . $pdfHash, $this->secret)], ['id' => $id]);
       $this->repo->updateTicket((int) $act['ticket_pk'], [
         'estado' => 'Cerrado', 'estado_administrativo' => 'Finalizado', 'estado_acta_satisfaccion' => 'Si',
         'id_acta_satisfaccion' => $legacyId, 'final_trabajo' => $now,
       ]);
       $this->repo->audit((int) $act['ticket_pk'], 'Acta #' . $id . ' firmada por ' . htmlspecialchars($signature['name'], ENT_QUOTES, 'UTF-8') . '. Ticket cerrado. Reporte administrativo #' . $reportId . ' registrado (no pagado, no exportado). <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta firmada</a>.', $payload['actor']['name'], $payload['actor']['employee_id']);
       return $this->repo->act($id);
+      });
     });
+    // Delivery failure cannot undo a valid signature. Staff can retry the receipt without a second charge.
+    try { $signed['receipt'] = $this->notify($signed, true); }
+    catch (\Throwable) { $signed['receipt'] = ['queued' => false, 'message' => 'Acta firmada y ticket cerrado; no se pudo encolar la copia. Solicita su reenvío a la inmobiliaria.']; }
+    return $signed;
+  }
+
+  public function pdf(array $act, bool $staff = false): string
+  {
+    $payload = $this->payload($act);
+    if ($act['status'] === 'signed' && empty($act['signed_pdf']) && (json_decode($act['signed_json'], true)['consent_version'] ?? '') === '2') {
+      throw new \DomainException('No se encuentra el PDF original firmado. Solicita revisión al administrador.');
+    }
+    if ($act['status'] === 'signed' && !empty($act['signed_pdf'])) {
+      $hash = hash('sha256', $act['signed_pdf']);
+      if (!hash_equals((string) $act['pdf_hash'], $hash) || !hash_equals((string) $act['pdf_hmac'], hash_hmac('sha256', $act['id'] . '|' . $act['payload_hash'] . '|' . $hash, $this->secret))) { throw new \DomainException('El PDF no coincide con su registro. Solicita revisión al administrador.'); }
+      if (!$staff) { return $act['signed_pdf']; }
+    }
+    return (new CompletionPdf())->render($act, $payload, $staff);
   }
 
   private static function legacyText(array $payload): string

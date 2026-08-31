@@ -14,7 +14,7 @@ header('Cache-Control: no-store, private');
 header('Referrer-Policy: no-referrer');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
-header("Content-Security-Policy: default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'self'; base-uri 'none'");
+header("Content-Security-Policy: default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'self'; base-uri 'none'");
 header('X-Robots-Tag: noindex, nofollow');
 
 $escape = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -25,6 +25,8 @@ $staff = $token === '';
 $repo = new CompletionRepository(App::db());
 $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
 $view = new CompletionView();
+$jsonRequest = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+$jsonResult = null;
 
 try {
   if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'POST'], true)) {
@@ -53,38 +55,70 @@ try {
   $formError = '';
   $csrfAction = 'ticket-acta-sign-' . $id;
   if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
-    if ($staff || (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 16384 || !App::csrf()->verify($csrfAction, (string) ($_POST['_csrf_token'] ?? ''), false)) {
+    if ($staff || (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 196608 || !is_string($_POST['_csrf_token'] ?? null) || !App::csrf()->verify($csrfAction, $_POST['_csrf_token'], false)) {
       http_response_code(403);
       throw new DomainException('No se pudo validar la firma. Abre nuevamente el enlace de tu correo e inténtalo otra vez.');
     }
     try {
-      $act = $service->sign($id, $token, $_POST, (string) ($_SERVER['REMOTE_ADDR'] ?? ''), (string) ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+      if (($_POST['operation'] ?? '') === 'request_code') {
+        $jsonResult = $service->requestCode($id, $token, is_string($_POST['channel'] ?? null) ? $_POST['channel'] : '');
+        $jsonResult['ok'] = $jsonResult['queued'];
+      } else {
+        $act = $service->sign($id, $token, $_POST, (string) ($_SERVER['REMOTE_ADDR'] ?? ''), (string) ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+        $jsonResult = ['ok' => true, 'signed' => true, 'message' => $act['receipt']['message'] ?? 'Acta firmada. Cierre registrado.'];
+      }
     } catch (DomainException $error) {
       $formError = $error->getMessage();
+      $jsonResult = ['ok' => false, 'message' => $formError];
     }
   }
   $payload = $service->payload($act);
+  if (($_GET['format'] ?? '') === 'pdf' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+    if (!$staff && ($_GET['audience'] ?? '') === 'staff') { throw new DomainException('La copia interna requiere sesión de funcionario.'); }
+    $pdf = $service->pdf($act, $staff && ($_GET['audience'] ?? '') === 'staff');
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="acta-' . $id . ($act['status'] === 'signed' ? '-firmada' : '-pendiente') . '.pdf"');
+    header('Content-Length: ' . strlen($pdf));
+    session_write_close();
+    echo $pdf;
+    exit;
+  }
   $form = '';
   if (!$staff && $act['status'] === 'pending') {
     $csrf = (string) ($_SESSION['scm_csrf'][$csrfAction] ?? '');
     if ($csrf === '') {
       $csrf = App::csrf()->token($csrfAction);
     }
-    $form = $view->signingForm($act, $payload, $csrf, $formError, $_POST);
+    $form = $view->signingForm($act, $payload, $csrf, $formError, $_POST, $service->verificationChannels($payload['signer']));
   } elseif ($staff && $act['status'] === 'pending') {
-    $form = '<p class="scm-acta-notice">Vista interna de consulta. La firma debe realizarla el destinatario desde el enlace personal enviado a su correo.</p>';
+    $form = '<p class="scm-acta-notice">Vista interna de consulta. La firma debe realizarla el destinatario desde su enlace personal, dibujando la firma y verificando el código.</p>';
   }
   $content = $view->document($act, $payload, $staff, $form);
+  $pdfUrl = 'ticket-acta.php?id=' . $id . ($staff ? '' : '&token=' . rawurlencode($token)) . '&format=pdf';
+  $content = '<div class="scm-acta scm-acta-print"><a class="scm-acta-button" href="' . $escape($pdfUrl) . '">Descargar PDF' . ($act['status'] === 'signed' ? ' firmado' : ' pendiente') . '</a></div>' . $content;
+  if ($act['status'] === 'signed') {
+    $delivery = json_decode((string) ($repo->act($id)['delivery_json'] ?? ''), true) ?: [];
+    $pendingCopy = false;
+    foreach ($payload['channels'] ?? ['email'] as $channel) { $pendingCopy = $pendingCopy || empty($delivery['signed_receipt'][$channel]['queued']); }
+    $content = '<div class="scm-acta scm-acta-print"><p class="scm-acta-notice">Firma registrada. El cierre ya se guardó. ' . ($pendingCopy ? 'No se confirmó el encolado de todas las copias; puedes descargar el PDF aquí y solicitar reenvío a la inmobiliaria.' : 'Copia solicitada por los canales elegidos. En cola no significa entregada.') . '</p></div>' . $content;
+  }
 } catch (DomainException $error) {
   if (http_response_code() < 400) {
     http_response_code(400);
   }
   $content = '<main class="scm-acta scm-acta-document"><h1>Acta no disponible</h1><p role="alert">' . $escape($error->getMessage()) . '</p></main>';
+  $jsonResult = ['ok' => false, 'message' => $error->getMessage()];
 } catch (Throwable $error) {
   http_response_code(500);
   error_log('[ticket-acta] Error al procesar acta #' . $id . ': ' . $error->getMessage());
   $content = '<main class="scm-acta scm-acta-document"><h1>No se pudo completar la operación</h1><p>Recarga para consultar el estado del acta antes de intentar nuevamente. No es necesario crear otro documento.</p></main>';
+  $jsonResult = ['ok' => false, 'message' => 'No se pudo confirmar la operación. Recarga para consultar el estado antes de reintentar; no crees otra acta.'];
 }
 session_write_close();
+if ($jsonRequest) {
+  header('Content-Type: application/json; charset=UTF-8');
+  echo json_encode($jsonResult, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+  exit;
+}
 ?>
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acta de satisfacción · SuCasa</title><link rel="stylesheet" href="assets/css/ticket-completion.css?v=<?= $escape(SCM_VERSION) ?>"><script defer src="assets/js/ticket-completion-public.js?v=<?= $escape(SCM_VERSION) ?>"></script></head><body class="scm-acta-page"><div class="scm-acta scm-acta-print"><button type="button" class="scm-acta-button scm-acta-secondary" data-acta-print>Imprimir acta</button></div><?= $content ?></body></html>

@@ -36,6 +36,11 @@ final class CompletionRepository
       created_at BIGINT NOT NULL,
       signed_at BIGINT NULL,
       signed_json TEXT NULL,
+      otp_json TEXT NULL,
+      delivery_json TEXT NULL,
+      signed_pdf MEDIUMBLOB NULL,
+      pdf_hash CHAR(64) NULL,
+      pdf_hmac CHAR(64) NULL,
       report_id BIGINT UNSIGNED NULL,
       invitation_queued_at BIGINT NULL,
       cancelled_at BIGINT NULL,
@@ -48,7 +53,7 @@ final class CompletionRepository
   public function requireSchema(): void
   {
     $required = [
-      $this->table() => ['payload_json', 'payload_hash', 'token_nonce', 'active_slot', 'report_id'],
+      $this->table() => ['payload_json', 'payload_hash', 'token_nonce', 'active_slot', 'report_id', 'otp_json', 'delivery_json', 'signed_pdf', 'pdf_hash', 'pdf_hmac'],
       $this->db->table('jet_cct_tickets') => ['_ID', 'estado', 'estado_administrativo', 'id_acta_satisfaccion', 'estado_acta_satisfaccion'],
       $this->db->table('jet_cct_actas_de_satisfaccion') => ['_ID', 'id_ticket', 'observaciones'],
       $this->db->table('jet_cct_reportes_administrativos') => ['_ID', 'id_ticket', 'descripcion', 'valor', 'exportado', 'fue_pagado'],
@@ -63,6 +68,18 @@ final class CompletionRepository
     foreach ($engines as $engine) {
       if (strcasecmp((string) $engine, 'InnoDB') !== 0) {
         throw new \DomainException('Las tablas del acta deben usar InnoDB para guardar firma, cierre y reporte de forma atómica.');
+      }
+    }
+  }
+
+  /** CLI-only additive migration; never alter historical payloads or signatures. */
+  public function migrate(): void
+  {
+    $this->db->pdo()->exec($this->schemaSql());
+    $columns = $this->db->getCol('DESCRIBE `' . $this->table() . '`');
+    foreach (['otp_json' => 'TEXT', 'delivery_json' => 'TEXT', 'signed_pdf' => 'MEDIUMBLOB', 'pdf_hash' => 'CHAR(64)', 'pdf_hmac' => 'CHAR(64)'] as $name => $type) {
+      if (!in_array($name, $columns, true)) {
+        $this->db->pdo()->exec('ALTER TABLE `' . $this->table() . '` ADD COLUMN `' . $name . '` ' . $type . ' NULL');
       }
     }
   }
