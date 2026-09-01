@@ -53,6 +53,8 @@ $assert(Policy::executionState('inmobiliaria') === 'En ejecucion por inmobiliari
 $adminJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/scm-admin.js');
 $assert(str_contains($adminJs, 'data-acta-remove-photo') && str_contains($adminJs, 'form.addEventListener("paste"'), 'act photo UI supports individual removal and pasted clipboard images');
 $assert(str_contains($adminJs, 'MAX_PHOTOS_PER_DAMAGE = 4') && str_contains($adminJs, 'MAX_PHOTOS_PER_ACT = 12'), 'act photo UI enforces visible client limits');
+$actCss = (string) file_get_contents(dirname(__DIR__) . '/public/assets/css/ticket-completion.css');
+$assert(str_contains($actCss, '.scm-acta-logo') && str_contains($actCss, '#10264a') && str_contains($actCss, 'drop-shadow'), 'act logo renders on a high-contrast brand surface');
 $publicActJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/ticket-completion-public.js');
 $assert(str_contains($publicActJs, 'data-acta-gallery-item') && str_contains($publicActJs, 'ArrowRight') && str_contains($publicActJs, 'Cerrar galería'), 'act public view supports large photo gallery navigation');
 
