@@ -27,12 +27,12 @@ final class CompletionView
     $executor = str_replace('En ejecucion por ', '', (string) ($ticket['estado_administrativo'] ?? ''));
     ob_start(); ?>
     <section class="scm-acta">
-      <p class="scm-acta-notice">Documenta la solución, elige el firmante y revisa el valor administrativo. Al generar, el ticket pasará a <strong><?= self::e(CompletionPolicy::PENDING_SIGNATURE_STATE) ?></strong> y la gestión continuará en la pestaña <strong>Actas de satisfacción</strong>. Solo la firma registrará el cierre y el reporte de cobro.</p>
+      <p class="scm-acta-notice">Documenta la solución, elige el firmante y revisa el valor administrativo. El ticket conservará el <strong>estado de ejecución seleccionado</strong> mientras el acta queda pendiente. Puedes hacer seguimiento desde <strong>Actividades administrativas → Actas de satisfacción</strong>. Solo la firma registrará el cierre y el reporte de cobro.</p>
       <div class="scm-acta-meta"><span>Ticket <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Inmueble <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>
       <?php foreach ($context['acts'] as $act): $payload = $service->payload($act); ?>
         <article class="scm-acta-record">
           <div class="scm-acta-meta"><h3><?= $act['status'] === 'pending' ? 'Acta enviada a bandeja' : 'Registro interno #' . self::e($act['id']) ?></h3><strong class="scm-acta-status"><?= self::e(['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'cancelled' => 'Anulada'][$act['status']] ?? $act['status']) ?></strong></div>
-          <?php if ($act['status'] === 'pending'): ?><p class="scm-acta-help">Esta acta ya no queda como tarea operativa del ticket; consúltala y adminístrala desde <strong>Actividades administrativas → Actas de satisfacción</strong>.</p><?php endif; ?>
+          <?php if ($act['status'] === 'pending'): ?><p class="scm-acta-help">También puedes consultarla y administrarla desde <strong>Actividades administrativas → Actas de satisfacción</strong>.</p><?php endif; ?>
           <p>Firmante: <strong><?= self::e($payload['signer']['name']) ?></strong> · <?= self::e(CompletionPolicy::ROLES[$payload['signer']['role']]) ?><br><?= self::e($payload['signer']['email']) ?> · <?= self::e($payload['signer']['phone']) ?></p>
           <p>Reporte administrativo: <strong><?= self::money((int) $payload['report']['total']) ?></strong> <?= !empty($act['report_id']) ? '· Registrado #' . self::e($act['report_id']) : '· Se registrará al firmar' ?></p>
           <?php if ($act['status'] === 'cancelled'): ?><p>Motivo: <?= self::e($act['cancellation_reason']) ?></p><?php endif; ?>

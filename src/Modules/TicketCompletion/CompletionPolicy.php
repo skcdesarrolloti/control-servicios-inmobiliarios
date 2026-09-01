@@ -7,7 +7,6 @@ namespace SCM\Modules\TicketCompletion;
 final class CompletionPolicy
 {
   public const WAITING = 'En espera de firma';
-  public const PENDING_SIGNATURE_STATE = 'Acta sin firmar';
   public const ROLES = ['propietario' => 'Propietario', 'arrendatario' => 'Arrendatario', 'copropiedad' => 'Copropiedad'];
   public const EXECUTORS = ['inmobiliaria' => 'Inmobiliaria'] + self::ROLES;
   public const EXECUTION_STATES = [

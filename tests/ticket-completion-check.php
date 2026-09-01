@@ -119,9 +119,9 @@ $notifications = [];
 $created = $service->create(1, $input, $actor);
 $act = $repo->act($created['act_id']);
 $token = $service->token($act);
-$assert($repo->ticket(1)['estado'] === 'En proceso' && $repo->ticket(1)['estado_administrativo'] === 'Acta sin firmar', 'creating an act moves the ticket to unsigned acts instead of the operative queue');
+$assert($repo->ticket(1)['estado'] === 'En proceso' && $repo->ticket(1)['estado_administrativo'] === 'En ejecucion por inmobiliaria', 'creating an act keeps the selected administrative execution state');
 $dashboardList = $service->dashboardList(['sacta_estado' => 'pending', 'sacta_caso' => '9001']);
-$assert($dashboardList['count'] === 1 && ($dashboardList['items'][0]['_payload']['ticket_number'] ?? '') === '9001', 'unsigned acts dashboard lists the pending act by ticket');
+$assert($dashboardList['count'] === 1 && ($dashboardList['items'][0]['_payload']['ticket_number'] ?? '') === '9001', 'unsigned acts dashboard lists the pending act by ticket without changing the administrative state');
 $assert($db->getVar('SELECT estado FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7001') === 'Pendiente', 'creating or sending an act does not disapprove its maintenance quote');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_actas_de_satisfaccion') . '`') === 0, 'no premature legacy timeline completion');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 0, 'no charge before signature');
@@ -144,7 +144,7 @@ $rejects(static fn() => $service->sign((int) $act['id'], $token, array_replace($
 $assert(json_decode($repo->act((int) $act['id'])['otp_json'], true)['failures'] === 1, 'failed attempt survives signature rollback');
 $db->update($db->table('jet_cct_tickets'), ['estado_administrativo' => 'En ejecucion por propietario'], ['_ID' => 1]);
 $rejects(static fn() => $service->sign((int) $act['id'], $token, $signInput($act), '', ''), 'signature is blocked if execution responsibility changed after creating the act');
-$db->update($db->table('jet_cct_tickets'), ['estado_administrativo' => 'Acta sin firmar'], ['_ID' => 1]);
+$db->update($db->table('jet_cct_tickets'), ['estado_administrativo' => 'En ejecucion por inmobiliaria'], ['_ID' => 1]);
 $historyBefore = (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_ticket') . '`');
 // Force an SQL failure only in the test connection's temporary report table.
 $db->pdo()->exec('ALTER TABLE `' . $db->table('jet_cct_reportes_administrativos') . '` CHANGE COLUMN descripcion unavailable_description TEXT');

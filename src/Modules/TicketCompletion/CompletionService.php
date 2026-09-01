@@ -128,8 +128,7 @@ final class CompletionService
       if (!isset(CompletionPolicy::EXECUTORS[$executor])) {
         throw new \DomainException('Selecciona quién realizó la solución.');
       }
-      CompletionPolicy::executionState($executor);
-      $pendingAdminState = CompletionPolicy::PENDING_SIGNATURE_STATE;
+      $pendingAdminState = CompletionPolicy::executionState($executor);
       $contact = $context['contacts'][$role];
       if (!$contact['available']) {
         throw new \DomainException('El firmante necesita nombre y un contacto válido para verificación: correo o WhatsApp con plantilla de autenticación configurada.');
