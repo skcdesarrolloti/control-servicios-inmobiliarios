@@ -84,10 +84,10 @@ Se aplica la fórmula del código de referencia entregado por el usuario:
 `salario / dias_trabajo * porcentaje_smlmv_co_pre`, con respaldo en
 `porcentaje_smlmv`, más transporte. Se soportan porcentajes `10` y `0.10`
 sin convertir accidentalmente `0.10` en `10`. No se duplica por amoblado.
-El transporte toma `valor_transporte`, propone por defecto el doble para cubrir
-ida y regreso y usa ese mismo doble como máximo; por ejemplo, una configuración
-de `$4.000` deja `$8.000` como valor inicial y tope. El servidor valida el límite
-aunque se manipule el formulario.
+El transporte toma `valor_transporte` y fija automáticamente el doble para cubrir
+ida y regreso; por ejemplo, una configuración de `$4.000` deja `$8.000` como
+valor fijo. El formulario no permite editarlo y el servidor lo recalcula desde
+configuración aunque se manipule el navegador.
 Si falta una configuración válida, el funcionario debe ingresar explícitamente
 la tarifa. El total se confirma antes de generar. Es el servicio administrativo,
 no el presupuesto ni el costo de los trabajos de reparación.

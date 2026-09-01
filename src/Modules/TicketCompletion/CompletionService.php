@@ -146,12 +146,7 @@ final class CompletionService
       $items = CompletionPolicy::items($input['items'] ?? null);
       $observations = CompletionPolicy::text($input['observations'] ?? '', 'observaciones');
       $transportMax = $context['transport_max'];
-      $transport = (int) round(CompletionPolicy::number($input['transport'] ?? (string) ($transportMax ?? 0)));
-      if (($transportMax === null && $transport > 0) || ($transportMax !== null && $transport > $transportMax)) {
-        throw new \DomainException($transportMax === null
-          ? 'No hay un valor de transporte válido en la configuración. Solo puedes registrar $0 hasta corregirla.'
-          : 'El transporte no puede superar ' . CompletionView::money($transportMax) . ' (dos veces el valor configurado).');
-      }
+      $transport = $transportMax ?? 0;
       $fee = $context['fee'];
       if ($fee === null) {
         $fee = (int) round(CompletionPolicy::number($input['service_fee'] ?? ''));

@@ -110,8 +110,12 @@ $db->insert($db->table('jet_cct_cotizacion_mantenimiento'), $repo->schema->filte
 $db->update($db->table('jet_cct_tickets'), ['id_cotizacion_mantenimiento' => '7001'], ['_ID' => 1]);
 $createPanel = (new View())->panel($service->context(1), $service);
 $assert(str_contains($createPanel, 'data-acta-photo-paste') && str_contains($createPanel, 'Máximo 4 fotos por daño y 12 en toda el acta'), 'act form explains limits and exposes the clipboard paste target');
-$assert(str_contains($createPanel, 'name="transport" min="0" max="8000"') && str_contains($createPanel, 'value="8000"'), 'act form defaults and caps transport at configured value times two');
-$rejects(static fn() => $service->create(1, array_replace($input, ['transport' => '8001']), $actor), 'transport above configured double is rejected by backend');
+$assert(str_contains($createPanel, 'type="hidden" name="transport" value="8000" data-acta-transport') && str_contains($createPanel, 'class="scm-acta-readonly-value"'), 'act form shows fixed configured transport without an editable number control');
+$createdWithTamperedTransport = $service->create(1, array_replace($input, ['transport' => '1']), $actor);
+$tamperedPayload = $service->payload($repo->act($createdWithTamperedTransport['act_id']));
+$assert((int) $tamperedPayload['report']['transport'] === 8000, 'backend ignores tampered transport and uses configured fixed value');
+$service->cancel($createdWithTamperedTransport['act_id'], 'QA vuelve a generar el acta principal', $actor);
+$notifications = [];
 $created = $service->create(1, $input, $actor);
 $act = $repo->act($created['act_id']);
 $token = $service->token($act);
