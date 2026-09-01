@@ -132,7 +132,7 @@ final class AdministrativeNotificationsService
     return $out;
   }
 
-  /** @return array<string,array{name:string,label:string,language:string,description:string,body:string,variables:array<int,string>}> */
+  /** @return array<string,array<string,mixed>> */
   public function whatsappTemplates(): array
   {
     $propietarios = ['propietarios_activos', 'propietarios_no_activos'];
@@ -143,10 +143,10 @@ final class AdministrativeNotificationsService
     return [
       self::DEFAULT_WHATSAPP_TEMPLATE => [
         'name' => self::DEFAULT_WHATSAPP_TEMPLATE,
-        'label' => 'Notificacion general',
+        'label' => 'Notificación general',
         'language' => 'es_CO',
-        'description' => 'Plantilla oficial para avisos generales. Incluye la firma del funcionario.',
-        'body' => "Buen dia, {{1}}.\n\nLe compartimos la siguiente informacion desde Su Casa Inmobiliaria:\n\n{{2}}\n\nAtentamente,\n{{3}}\n\nGracias por elegirnos y confiar en nuestro equipo.",
+        'description' => 'Plantilla oficial para avisos generales. Incluye mensaje editable y firma del funcionario.',
+        'body' => "Buen día, {{1}}.\n\nLe compartimos la siguiente información desde Su Casa Inmobiliaria:\n\n{{2}}\n\nAtentamente,\n{{3}}\n\nGracias por elegirnos y confiar en nuestro equipo.",
         'variables' => ['Nombre del destinatario', 'Mensaje escrito en esta pantalla', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => [],
         'email_template' => self::DEFAULT_EMAIL_TEMPLATE,
@@ -157,7 +157,7 @@ final class AdministrativeNotificationsService
         'label' => 'Arriendo consignado',
         'language' => 'es_CO',
         'description' => 'Aviso para propietarios cuando el arriendo fue consignado a la cuenta registrada.',
-        'body' => "Buen dia, {{1}}.\n\nLe informamos que el pago del arriendo correspondiente a su inmueble en administracion fue consignado a la cuenta registrada.\n\nDetalle del abono:\n\n{{2}}\n\nAtentamente,\n{{3}}\n\nGracias por elegirnos y confiar en nuestro equipo.",
+        'body' => "Hola, {{1}}.\n\nLe informamos que el pago del arriendo correspondiente a su inmueble en administración fue abonado a la cuenta registrada.\n\nDetalle del abono:\n\n{{2}}\n\nAtentamente,\n{{3}}",
         'variables' => ['Nombre del propietario', 'Detalle del pago, inmueble, mes o valor', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($propietarios, $funcionarios),
         'email_template' => 'scm_email_propietario_arriendo_consignado_v1',
@@ -167,8 +167,8 @@ final class AdministrativeNotificationsService
         'name' => 'scm_copropiedad_soportes_pago_v1',
         'label' => 'Soportes de pago',
         'language' => 'es_CO',
-        'description' => 'Envio de soportes de pago a copropiedades para verificacion y recibo de caja.',
-        'body' => "Buen dia, {{1}}.\n\nAdjuntamos los soportes de pago correspondientes para su respectiva verificacion.\n\nDetalle de los soportes:\n\n{{2}}\n\nAgradecemos su colaboracion con el envio del recibo de caja correspondiente a estos pagos.\n\nAtentamente,\n{{3}}\n\nGracias por su atencion.",
+        'description' => 'Envío de soportes de pago a copropiedades para verificación y recibo de caja.',
+        'body' => "Hola, {{1}}.\n\nAdjuntamos los soportes de pago correspondientes para su respectiva verificación.\n\nDetalle de los soportes:\n\n{{2}}\n\nAgradecemos su colaboración con el envío del recibo de caja correspondiente a estos pagos.\n\nAtentamente,\n{{3}}",
         'variables' => ['Nombre de la copropiedad o contacto', 'Mes, inmueble y detalle de los soportes', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($copropiedades, $funcionarios),
         'email_template' => 'scm_email_copropiedad_soportes_pago_v1',
@@ -179,7 +179,7 @@ final class AdministrativeNotificationsService
         'label' => 'Aviso pago canon',
         'language' => 'es_CO',
         'description' => 'Aviso formal para arrendatarios por incumplimiento en el pago del canon.',
-        'body' => "Estimado(a) {{1}}, reciba un cordial saludo.\n\nLe recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.\n\nUna vez activado el proceso con la aseguradora, se puede generar un recargo adicional del 50% sobre el valor del canon adeudado, ademas de los costos y gestiones asociados al tramite.\n\nPara evitar mayores consecuencias economicas y administrativas, le solicitamos realizar el pago de manera inmediata.\n\nAtentamente,\n{{2}}\n\nGracias por su atencion.",
+        'body' => "Estimado(a) {{1}}, reciba un cordial saludo.\n\nLe recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.\n\nUna vez activado el proceso con la aseguradora, se puede generar un recargo adicional del 50% sobre el valor del canon adeudado, además de los costos y gestiones asociados al trámite.\n\nPara evitar mayores consecuencias económicas y administrativas, le solicitamos realizar el pago de manera inmediata.\n\nAtentamente,\n{{2}}",
         'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_arrendatario_aviso_pago_canon_v1',
@@ -187,11 +187,11 @@ final class AdministrativeNotificationsService
       ],
       'scm_arrendatario_gestion_cobro_v1' => [
         'name' => 'scm_arrendatario_gestion_cobro_v1',
-        'label' => 'Gestion de cobro',
+        'label' => 'Gestión registrada',
         'language' => 'es_CO',
-        'description' => 'Aviso para arrendatarios cuando se registra una gestion de cobro.',
-        'body' => "Buen dia, {{1}}.\n\nLe informamos que se registro una gestion de cobro relacionada con su contrato de arrendamiento.\n\nDetalle de la gestion:\n\n{{2}}\n\nSi ya realizo el pago o tiene alguna novedad, por favor comuniquese con nosotros.\n\nAtentamente,\n{{3}}\n\nGracias por su atencion.",
-        'variables' => ['Nombre del arrendatario', 'Tipo de gestion y observacion', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'description' => 'Aviso para arrendatarios cuando se registra una gestión operativa relacionada con su contrato.',
+        'body' => "Buen día, {{1}}.\n\nLe informamos que se registró una gestión relacionada con su contrato de arrendamiento.\n\nDetalle de la gestión:\n\n{{2}}\n\nSi ya realizó el pago o tiene alguna novedad, por favor comuníquese con nosotros.\n\nAtentamente,\n{{3}}",
+        'variables' => ['Nombre del arrendatario', 'Tipo de gestión y observación', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_arrendatario_gestion_cobro_v1',
         'parameter_mode' => 'name_message_signature',
@@ -211,19 +211,23 @@ final class AdministrativeNotificationsService
         'name' => 'scm_factura_disponible_v1',
         'label' => 'Factura disponible',
         'language' => 'es_CO',
-        'description' => 'Aviso para arrendatarios cuando tienen una factura nueva disponible.',
-        'body' => "Estimado(a) {{1}}, tienes una nueva factura disponible.\n\nTu factura ya se encuentra lista para revision. Te invitamos a consultarla y realizar el pago oportunamente para mantenerte al dia.\n\nSi ya realizaste el pago, puedes hacer caso omiso a este mensaje.\n\nAtentamente,\n{{2}}\n\nGracias por elegirnos y confiar en nuestro equipo.",
+        'description' => 'Aviso para arrendatarios cuando se generó el cupón o factura disponible.',
+        'body' => "Estimado(a) {{1}}, hemos generado tu cupón de pago, el cual cuenta con 4 fechas establecidas cada mes.\n\n🗓️ 12 de cada mes\n🗓️ 22 de cada mes\n🗓️ 26 de cada mes\n🗓️ 31 de cada mes\n\nEn el cupón encontrarás el valor específico correspondiente a cada fecha de pago.\n\nTe agradecemos revisar tu cupón mensual y realizar el pago en la fecha y por el valor allí establecidos.\n\nAtentamente,\n{{2}}",
         'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_factura_disponible_v1',
         'parameter_mode' => 'name_signature',
+        'header_type' => 'image',
+        'header_media_key' => 'whatsapp_factura_disponible_header_url',
+        'header_media_env' => 'SCM_WHATSAPP_FACTURA_DISPONIBLE_IMAGE_URL',
+        'header_required' => true,
       ],
       'scm_mes_generado_pago_v1' => [
         'name' => 'scm_mes_generado_pago_v1',
         'label' => 'Mes generado para pago',
         'language' => 'es_CO',
         'description' => 'Aviso para arrendatarios cuando el mes fue generado y queda disponible para pago.',
-        'body' => "Hola {{1}}, tu mes ha sido generado exitosamente.\n\nPuedes realizar el pago a traves del boton de pago disponible o por ventanilla en Banco Caja Social, ingresando tu cedula o NIT sin digito de verificacion.\n\nCuando realices el pago, por favor envianos el soporte para validarlo en el sistema.\n\nEstoy para servirte.\n\nAtentamente,\n{{2}}",
+        'body' => "Hola {{1}}, tu mes ha sido generado exitosamente.\n\nPuedes realizar el pago a través del botón de pago disponible o por ventanilla en Banco Caja Social, ingresando tu cédula o NIT sin dígito de verificación.\n\nCuando realices el pago, por favor envíanos el soporte para validarlo en el sistema.\n\nEstoy para servirte.\n\nAtentamente,\n{{2}}",
         'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_mes_generado_pago_v1',
@@ -3297,18 +3301,26 @@ final class AdministrativeNotificationsService
     if ($channel === 'whatsapp') {
       $templateName = trim((string) ($whatsappTemplateConfig['name'] ?? ''));
       $templateLanguage = trim((string) ($whatsappTemplateConfig['language'] ?? 'es_CO')) ?: 'es_CO';
-      $components = [
-        [
+      $components = [];
+      $headerComponent = $this->whatsappTemplateHeaderComponent($whatsappTemplateConfig);
+      if ($headerComponent !== []) {
+        $components[] = $headerComponent;
+      }
+      $parameters = $this->whatsappTemplateParameters($whatsappTemplateConfig, $name, $message, $recipient);
+      if ($parameters !== []) {
+        $components[] = [
           'type' => 'body',
-          'parameters' => $this->whatsappTemplateParameters($whatsappTemplateConfig, $name, $message, $recipient),
-        ],
-      ];
+          'parameters' => $parameters,
+        ];
+      }
       $payload = [
         'type' => 'template',
         'template_name' => $templateName,
         'template_language' => $templateLanguage,
-        'components' => $components,
       ];
+      if ($components !== []) {
+        $payload['components'] = $components;
+      }
     } elseif ($channel === 'email') {
       $templateName = trim((string) ($emailTemplateConfig['name'] ?? ''));
     }
@@ -3365,6 +3377,14 @@ final class AdministrativeNotificationsService
   private function whatsappTemplateConfig(string $templateName): array
   {
     $templateName = trim($templateName);
+    $templateAliases = [
+      'nueva_factura' => 'scm_factura_disponible_v1',
+      'cupones' => 'scm_arrendatario_fecha_pago_v1',
+      'scm_arrendatario_fecha_cobro_v1' => 'scm_arrendatario_fecha_pago_v1',
+    ];
+    if (isset($templateAliases[$templateName])) {
+      $templateName = $templateAliases[$templateName];
+    }
     if ($templateName === '') {
       $templateName = self::DEFAULT_WHATSAPP_TEMPLATE;
     }
@@ -3390,6 +3410,73 @@ final class AdministrativeNotificationsService
     return $mode === 'name_message_signature' || $mode === 'name_message';
   }
 
+  /** @param array<string,mixed> $templateConfig @return array<string,mixed> */
+  private function whatsappTemplateHeaderComponent(array $templateConfig): array
+  {
+    $headerType = strtolower(trim((string) ($templateConfig['header_type'] ?? '')));
+    if ($headerType === '') {
+      return [];
+    }
+
+    $mediaUrl = $this->whatsappTemplateHeaderUrl($templateConfig);
+    if ($mediaUrl === '') {
+      if (!empty($templateConfig['header_required'])) {
+        $templateName = trim((string) ($templateConfig['name'] ?? ''));
+        throw new \RuntimeException("La plantilla WhatsApp {$templateName} requiere imagen de encabezado. Configura SCM_WHATSAPP_FACTURA_DISPONIBLE_IMAGE_URL o la imagen del sistema whatsapp_factura_disponible_header_url.");
+      }
+      return [];
+    }
+
+    if ($headerType === 'image') {
+      return [
+        'type' => 'header',
+        'parameters' => [
+          [
+            'type' => 'image',
+            'image' => ['link' => $mediaUrl],
+          ],
+        ],
+      ];
+    }
+
+    if ($headerType === 'document') {
+      return [
+        'type' => 'header',
+        'parameters' => [
+          [
+            'type' => 'document',
+            'document' => ['link' => $mediaUrl],
+          ],
+        ],
+      ];
+    }
+
+    return [];
+  }
+
+  /** @param array<string,mixed> $templateConfig */
+  private function whatsappTemplateHeaderUrl(array $templateConfig): string
+  {
+    $envName = trim((string) ($templateConfig['header_media_env'] ?? ''));
+    if ($envName !== '') {
+      $envValue = trim((string) getenv($envName));
+      if ($envValue !== '' && filter_var($envValue, FILTER_VALIDATE_URL)) {
+        return $envValue;
+      }
+    }
+
+    $systemKey = trim((string) ($templateConfig['header_media_key'] ?? ''));
+    if ($systemKey !== '' && function_exists('system_image')) {
+      $systemValue = trim((string) \system_image($systemKey, ''));
+      if ($systemValue !== '' && filter_var($systemValue, FILTER_VALIDATE_URL)) {
+        return $systemValue;
+      }
+    }
+
+    $directValue = trim((string) ($templateConfig['header_media_url'] ?? ''));
+    return $directValue !== '' && filter_var($directValue, FILTER_VALIDATE_URL) ? $directValue : '';
+  }
+
   /** @param array<string,mixed> $whatsappTemplateConfig @param array<string,mixed> $emailTemplateConfig */
   private function templateCanUseImportDetail(array $whatsappTemplateConfig, array $emailTemplateConfig): bool
   {
@@ -3400,6 +3487,9 @@ final class AdministrativeNotificationsService
   /** @param array<string,mixed> $recipient @param array<string,mixed> $whatsappTemplateConfig @param array<string,mixed> $emailTemplateConfig */
   private function messageForRecipient(string $message, array $recipient, array $whatsappTemplateConfig, array $emailTemplateConfig): string
   {
+    if ((string) ($whatsappTemplateConfig['parameter_mode'] ?? '') === 'static' && $this->plainText($message) === '') {
+      return trim((string) ($whatsappTemplateConfig['body'] ?? ''));
+    }
     if (!$this->templateCanUseImportDetail($whatsappTemplateConfig, $emailTemplateConfig)) {
       return $message;
     }
@@ -3417,6 +3507,9 @@ final class AdministrativeNotificationsService
     $name = trim($recipientName) !== '' ? trim($recipientName) : 'Cliente';
     $signature = (string) ($this->senderProfile()['signature_line'] ?? 'Control Servicios Inmobiliarios');
     $mode = (string) ($templateConfig['parameter_mode'] ?? 'name_message_signature');
+    if ($mode === 'static') {
+      return [];
+    }
     if ($mode === 'name_signature') {
       return [
         ['type' => 'text', 'text' => $name],

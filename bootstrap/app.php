@@ -7,7 +7,7 @@ define('SCM_PUBLIC_PATH', SCM_ROOT . '/public');
 define('SCM_STORAGE_PATH', SCM_ROOT . '/storage');
 define('SCM_RESOURCES_PATH', SCM_ROOT . '/resources');
 define('SCM_BASE_PATH', SCM_PUBLIC_PATH);
-define('SCM_VERSION', '3.3.31');
+define('SCM_VERSION', '3.3.32');
 
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');

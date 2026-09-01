@@ -3867,6 +3867,16 @@
             .replace(/\{\{2\}\}/g, signature)
             .replace(/\{\{3\}\}/g, previewMessage(rawMessage || "Mensaje escrito por el funcionario."));
         }
+        if (mode === "collection_due_date") {
+          return template
+            .replace(/\{\{1\}\}/g, name)
+            .replace(/\{\{2\}\}/g, "12")
+            .replace(/\{\{3\}\}/g, "primera")
+            .replace(/\{\{4\}\}/g, signature);
+        }
+        if (mode === "static") {
+          return template;
+        }
         var messagePreview = selectedTemplateUsesImportedDetail()
           ? importedDetailPreview()
           : previewMessage(rawMessage || "Mensaje escrito por el funcionario.");
