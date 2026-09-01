@@ -26,6 +26,12 @@ trait HandlesTicketCompletion
       && trim((string) $ticket['id_empleado']) === trim((string) $employee['id_empleado']);
   }
 
+  public function ticketCompletionDashboardTab(int $ticketId): string
+  {
+    if (!$this->canAccessTicketCompletion($ticketId)) { return ''; }
+    return $this->canAccessDashboardTab('abiertos') ? 'abiertos' : 'mis_tickets';
+  }
+
   public function ajax_handler_ticket_completion(): void
   {
     $this->verifyCsrf();

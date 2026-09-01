@@ -5,9 +5,13 @@
  */
 require_once dirname(__DIR__) . '/bootstrap/app.php';
 
+$nextRaw = trim((string) ($_POST['next'] ?? $_GET['next'] ?? ''));
+$next = preg_match('/^crear-acta\.php\?ticket_pk=[1-9][0-9]{0,18}$/D', $nextRaw) ? $nextRaw : '';
+$afterLogin = $next !== '' ? rtrim((string) SCM_BASE_URL, '/') . '/' . $next : SCM_BASE_URL . '/index.php';
+
 // Ya autenticado → panel
 if (\SCM\Core\Auth::isLoggedIn()) {
-  header('Location: ' . SCM_BASE_URL . '/index.php');
+  header('Location: ' . $afterLogin);
   exit;
 }
 
@@ -46,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($scmAuth->attempt($user, $pass)) {
       $rateLimiter->clear($ipKey);
       $rateLimiter->clear($userKey);
-      header('Location: ' . SCM_BASE_URL . '/index.php');
+      header('Location: ' . $afterLogin);
       exit;
     }
 
@@ -86,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <form method="post" action="">
       <?php echo $scmCsrf->field('login'); ?>
+      <?php if ($next !== ''): ?><input type="hidden" name="next" value="<?php echo htmlspecialchars($next, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
       <div class="form-group">
         <label for="username">Usuario</label>
         <input type="text" id="username" name="username" autocomplete="username" required>

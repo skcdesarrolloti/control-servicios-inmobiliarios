@@ -121,6 +121,25 @@ Agregar `audience=staff` a un enlace público no concede acceso a la copia inter
 
 ## Instalación
 
+### Enlace profundo desde un Listing de JetEngine
+
+Para abrir la creación desde un ticket mostrado en WordPress, usar un Dynamic Link
+con URL personalizada:
+
+```text
+https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/crear-acta.php?ticket_pk=%current_field|_ID%
+```
+
+El Listing debe tener como objeto actual la CCT de tickets. `%current_field|_ID%`
+representa el `_ID` interno de la fila; no se debe sustituir por `id_ticket`, que es
+el número visible. El endpoint no crea ni modifica nada por GET: si falta sesión
+redirige al login conservando solamente este destino interno; después comprueba los
+permisos de Abiertos/Mis tickets, filtra el panel al caso y abre el formulario. Un
+ticket cerrado o con acta activa muestra su estado y no permite crear un duplicado.
+
+No publicar enlaces con el token personal del destinatario ni reutilizar el token de
+Solicitudes Web. Esos contratos tienen otra identidad y otros permisos.
+
 Antes de habilitar la versión en cada entorno:
 
 ```powershell

@@ -4281,6 +4281,36 @@
     }
   };
 
+  function openActaFromDeepLink() {
+    var params;
+    try { params = new URL(window.location.href).searchParams; } catch (_error) { return; }
+    var ticketPk = String(params.get("scm_acta_ticket_pk") || "").trim();
+    if (!/^[1-9][0-9]*$/.test(ticketPk)) return;
+    var attempts = 0;
+    var timer = window.setInterval(function () {
+      attempts++;
+      var caseBtn = Array.from(document.querySelectorAll(".scm-btn-case[data-ticket-pk]")).find(function (button) {
+        return String(button.dataset.ticketPk || "") === ticketPk;
+      });
+      if (!caseBtn && attempts < 40) return;
+      window.clearInterval(timer);
+      params.delete("scm_acta_ticket_pk");
+      try { window.history.replaceState({}, "", window.location.pathname + (params.toString() ? "?" + params.toString() : "") + window.location.hash); } catch (_error) {}
+      if (!caseBtn) {
+        if (typeof window.scmNotify === "function") window.scmNotify("error", "No se encontró el ticket autorizado para abrir su acta.");
+        return;
+      }
+      window.scmOpenCase(caseBtn);
+      window.setTimeout(function () {
+        var button = document.querySelector("#scm-app #scm-case-modal.open [data-scm-open-ticket-acta]");
+        if (button) button.click();
+      }, 50);
+    }, 250);
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", openActaFromDeepLink, { once: true });
+  else openActaFromDeepLink();
+
   document.addEventListener("paste", function (event) {
     var zone =
       event.target && event.target.closest
