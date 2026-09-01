@@ -19,6 +19,8 @@ final class CompletionView
   public function panel(array $context, CompletionService $service): string
   {
     $ticket = $context['ticket'];
+    $transportBase = (int) ($context['transport_base'] ?? 0);
+    $transportMax = (int) ($context['transport_max'] ?? 0);
     $active = false;
     foreach ($context['acts'] as $act) {
       $active = $active || $act['status'] !== 'cancelled';
@@ -69,13 +71,13 @@ final class CompletionView
           <button type="button" class="scm-acta-button scm-acta-secondary" data-acta-add-item>Agregar otro daño y solución</button>
           <label>Observaciones finales *<textarea name="observations" required maxlength="6000" rows="3" placeholder="Describe verificaciones, alcance de la solución y observaciones para el firmante."></textarea></label>
           <h3>3. Reporte administrativo de cobro</h3>
-          <p class="scm-acta-help">Tarifa administrativa según configuración de mantenimiento: salario ÷ días de trabajo × porcentaje. No es el presupuesto de reparación. Revisa este valor antes de continuar.</p>
+          <p class="scm-acta-help">Servicio administrativo: salario ÷ días de trabajo × porcentaje configurado. Transporte: valor configurado × 2 para cubrir ida y regreso; este valor se propone por defecto y también es el máximo permitido.</p>
           <div class="scm-acta-grid">
             <label>Servicio administrativo (COP) *<input type="number" name="service_fee" min="1" max="999999999" step="1" required value="<?= self::e($context['fee'] ?? '') ?>" <?= $context['fee'] !== null ? 'readonly' : '' ?> data-acta-fee></label>
-            <label>Transporte (COP) *<input type="number" name="transport" min="0" max="999999999" step="1" required value="0" data-acta-transport></label>
+            <label>Transporte (COP) *<input type="number" name="transport" min="0" max="<?= self::e($transportMax) ?>" step="1" required value="<?= self::e($transportMax) ?>" data-acta-transport><small class="scm-acta-help"><?= $transportBase > 0 ? 'Configurado: ' . self::money($transportBase) . ' por trayecto. Máximo ida y regreso: ' . self::money($transportMax) . '.' : 'No hay valor_transporte válido: el máximo temporal es $0.' ?></small></label>
           </div>
           <?php if ($context['fee'] === null): ?><p class="scm-acta-notice">Falta una configuración válida. Ingresa expresamente el valor administrativo; no se generarán cobros con una tarifa vacía.</p><?php endif; ?>
-          <p class="scm-acta-total">Total del reporte: <output data-acta-total><?= self::money((int) ($context['fee'] ?? 0)) ?></output></p>
+          <p class="scm-acta-total">Total del reporte: <output data-acta-total><?= self::money((int) ($context['fee'] ?? 0) + $transportMax) ?></output></p>
           <label class="scm-acta-check"><input type="checkbox" name="confirm" value="1" required><span>Revisé los daños, las soluciones, el firmante y el valor. Entiendo que al firmar se cerrará el ticket y se registrará un único reporte como no pagado y no exportado.</span></label>
           <button type="submit" class="scm-acta-button">Generar acta y solicitar firma</button>
         </form>

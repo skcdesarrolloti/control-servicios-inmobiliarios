@@ -1912,6 +1912,7 @@
         }
         form.querySelector("[data-acta-fee]").addEventListener("input", total);
         form.querySelector("[data-acta-transport]").addEventListener("input", total);
+        total();
         form.querySelector("[data-acta-add-item]").addEventListener("click", function () {
           var items = form.querySelector("[data-acta-items]");
           if (items.children.length >= 30) { message("El acta admite hasta 30 daños y soluciones.", true); return; }

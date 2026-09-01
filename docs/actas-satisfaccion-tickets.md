@@ -3,7 +3,7 @@
 ## Flujo
 
 Desde **Ver caso → Acta de solución y firma**, el funcionario indica quién realizó
-la solución (propietario, arrendatario o copropiedad), registra uno o varios pares
+la solución (inmobiliaria, propietario, arrendatario o copropiedad), registra uno o varios pares
 daño/solución y las observaciones, y selecciona quién firma. Ejecutor y firmante
 pueden ser diferentes. Los contactos se obtienen del ticket; para copropiedad se usa
 también su registro relacionado por `_ID`. No se acepta un correo arbitrario
@@ -17,8 +17,9 @@ evidencia que no termine como JPEG de máximo 1600 px y 1,5 MB. La interfaz mues
 vistas previas y el PDF incluye las fotografías junto al daño correspondiente. El
 conjunto comprimido no puede superar 8 MB, para mantener el PDF dentro del BLOB.
 
-Generar el acta deja `estado = En proceso` y
-`estado_administrativo = En espera de firma`. Se guarda una copia inmutable de
+Generar el acta deja `estado = En proceso` y conserva uno de los estados
+`En ejecucion por inmobiliaria/propietario/arrendatario/copropiedad`, según quién
+realizó la solución. Se guarda una copia inmutable de
 los datos en `wp_scm_ticket_completion_acts` (prefijo configurable), y se encola
 la invitación en **shared-notifications**. Una falla de la cola conserva el acta
 y muestra la opción de reintentar; “encolado” no significa “entregado”.
@@ -83,6 +84,10 @@ Se aplica la fórmula del código de referencia entregado por el usuario:
 `salario / dias_trabajo * porcentaje_smlmv_co_pre`, con respaldo en
 `porcentaje_smlmv`, más transporte. Se soportan porcentajes `10` y `0.10`
 sin convertir accidentalmente `0.10` en `10`. No se duplica por amoblado.
+El transporte toma `valor_transporte`, propone por defecto el doble para cubrir
+ida y regreso y usa ese mismo doble como máximo; por ejemplo, una configuración
+de `$4.000` deja `$8.000` como valor inicial y tope. El servidor valida el límite
+aunque se manipule el formulario.
 Si falta una configuración válida, el funcionario debe ingresar explícitamente
 la tarifa. El total se confirma antes de generar. Es el servicio administrativo,
 no el presupuesto ni el costo de los trabajos de reparación.

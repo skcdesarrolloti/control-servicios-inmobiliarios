@@ -112,6 +112,22 @@ final class CompletionPolicy
     }
   }
 
+  public static function transportBase(array $config): ?int
+  {
+    try {
+      $base = (int) round(self::number($config['valor_transporte'] ?? '0'));
+      return $base > 0 && $base <= 499999999 ? $base : null;
+    } catch (\DomainException) {
+      return null;
+    }
+  }
+
+  public static function transportMaximum(array $config): ?int
+  {
+    $base = self::transportBase($config);
+    return $base === null ? null : $base * 2;
+  }
+
   public static function items(mixed $raw): array
   {
     if (!is_array($raw) || count($raw) < 1 || count($raw) > 30) {

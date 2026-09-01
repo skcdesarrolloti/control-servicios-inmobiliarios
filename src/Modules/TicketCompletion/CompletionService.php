@@ -49,11 +49,19 @@ final class CompletionService
     $config = [];
     $table = $this->repo->db->table('jet_cct_confi_sistema');
     if ($this->repo->schema->tableExists($table)) {
-      foreach ($this->repo->db->getResults("SELECT funcion, valor FROM `{$table}` WHERE funcion IN ('salario','dias_trabajo','porcentaje_smlmv_co_pre','porcentaje_smlmv') ORDER BY _ID") as $row) {
+      foreach ($this->repo->db->getResults("SELECT funcion, valor FROM `{$table}` WHERE funcion IN ('salario','dias_trabajo','porcentaje_smlmv_co_pre','porcentaje_smlmv','valor_transporte') ORDER BY _ID") as $row) {
         $config[(string) $row['funcion']] = $row['valor'];
       }
     }
-    return ['ticket' => $ticket, 'contacts' => $contacts, 'fee' => CompletionPolicy::fee($config), 'fee_config' => $config, 'acts' => $this->repo->history($ticketId)];
+    return [
+      'ticket' => $ticket,
+      'contacts' => $contacts,
+      'fee' => CompletionPolicy::fee($config),
+      'fee_config' => $config,
+      'transport_base' => CompletionPolicy::transportBase($config),
+      'transport_max' => CompletionPolicy::transportMaximum($config),
+      'acts' => $this->repo->history($ticketId),
+    ];
   }
 
   public function payload(array $act): array
@@ -137,7 +145,13 @@ final class CompletionService
       $signerName = CompletionPolicy::text($input['signer_name'] ?? '', 'nombre de quien firma', 160);
       $items = CompletionPolicy::items($input['items'] ?? null);
       $observations = CompletionPolicy::text($input['observations'] ?? '', 'observaciones');
-      $transport = (int) round(CompletionPolicy::number($input['transport'] ?? '0'));
+      $transportMax = $context['transport_max'];
+      $transport = (int) round(CompletionPolicy::number($input['transport'] ?? (string) ($transportMax ?? 0)));
+      if (($transportMax === null && $transport > 0) || ($transportMax !== null && $transport > $transportMax)) {
+        throw new \DomainException($transportMax === null
+          ? 'No hay un valor de transporte válido en la configuración. Solo puedes registrar $0 hasta corregirla.'
+          : 'El transporte no puede superar ' . CompletionView::money($transportMax) . ' (dos veces el valor configurado).');
+      }
       $fee = $context['fee'];
       if ($fee === null) {
         $fee = (int) round(CompletionPolicy::number($input['service_fee'] ?? ''));
@@ -163,6 +177,7 @@ final class CompletionService
         'previous' => ['estado_administrativo' => (string) ($ticket['estado_administrativo'] ?? ''), 'id_acta_satisfaccion' => (string) ($ticket['id_acta_satisfaccion'] ?? ''), 'estado_acta_satisfaccion' => (string) ($ticket['estado_acta_satisfaccion'] ?? 'No')],
         'report' => [
           'service_fee' => $fee, 'transport' => $transport, 'total' => $fee + $transport,
+          'transport_base' => $context['transport_base'], 'transport_max' => $transportMax,
           'fee_source' => $context['fee'] === null ? 'manual' : 'configuracion', 'fee_config' => $context['fee_config'],
           'id_inmueble' => (string) ($ticket['id_inmueble'] ?? ''), 'id_contrato' => (string) ($ticket['id_contrato'] ?? ''),
           'sucursal' => (string) ($ticket['sucursal'] ?? '1'), 'arrendatario' => (string) ($ticket['arrendatario'] ?? ''),

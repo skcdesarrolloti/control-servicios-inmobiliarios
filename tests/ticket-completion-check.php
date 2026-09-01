@@ -32,6 +32,8 @@ $assert(Policy::number('1.300.000,50') === 1300000.5, 'Colombian amount normaliz
 $assert(Policy::fee(['salario' => '1300000', 'dias_trabajo' => '30', 'porcentaje_smlmv_co_pre' => '0.10']) === 4333, 'configured fee uses decimal percentage');
 $assert(Policy::fee(['salario' => '1300000', 'dias_trabajo' => '30', 'porcentaje_smlmv_co_pre' => '10']) === 4333, 'percentage points supported');
 $assert(Policy::fee(['salario' => '1300000', 'dias_trabajo' => '0']) === null, 'missing configuration requires explicit value');
+$assert(Policy::transportBase(['valor_transporte' => '4.000']) === 4000 && Policy::transportMaximum(['valor_transporte' => '4.000']) === 8000, 'transport defaults and caps at twice configured value');
+$assert(Policy::transportMaximum(['valor_transporte' => '']) === null, 'missing transport configuration has no chargeable maximum');
 $rejects(static fn() => Policy::number('-100'), 'negative fee rejected');
 $rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => '']]), 'solution required for every damage');
 $photoDescriptor = ['name' => str_repeat('a', 24) . '_123.jpg', 'mime' => 'image/jpeg', 'width' => 1200, 'height' => 900, 'bytes' => 350000, 'sha256' => str_repeat('b', 64)];
@@ -75,7 +77,7 @@ foreach ($tables as $name) {
 foreach (['tableExistsCache' => $exists, 'tableColumnsCache' => $columns] as $property => $value) {
   (new ReflectionProperty(SchemaInspector::class, $property))->setValue($repo->schema, $value);
 }
-foreach (['salario' => '1300000', 'dias_trabajo' => '30', 'porcentaje_smlmv_co_pre' => '0.10'] as $key => $value) {
+foreach (['salario' => '1300000', 'dias_trabajo' => '30', 'porcentaje_smlmv_co_pre' => '0.10', 'valor_transporte' => '4000'] as $key => $value) {
   $db->insert($db->table('jet_cct_confi_sistema'), ['funcion' => $key, 'valor' => $value]);
 }
 $seedTicket = static function (int $id) use ($db): void {
@@ -86,7 +88,7 @@ $service = new Service($repo, str_repeat('test-secret-', 4), 'http://127.0.0.1:8
   $notifications[] = compact('to', 'subject', 'html', 'options'); return 1;
 });
 $actor = ['user_id' => 1, 'employee_id' => '200', 'name' => 'Funcionario Prueba'];
-$input = ['signer_role' => 'propietario', 'signer_name' => 'Ana Pérez', 'executor' => 'inmobiliaria', 'items' => [['damage' => 'Fuga en tubería de cocina', 'solution' => 'Se reemplazó el tramo y se verificó presión.']], 'observations' => 'Sin filtración en la prueba final.', 'transport' => '12000', 'confirm' => '1'];
+$input = ['signer_role' => 'propietario', 'signer_name' => 'Ana Pérez', 'executor' => 'inmobiliaria', 'items' => [['damage' => 'Fuga en tubería de cocina', 'solution' => 'Se reemplazó el tramo y se verificó presión.']], 'observations' => 'Sin filtración en la prueba final.', 'transport' => '8000', 'confirm' => '1'];
 $photoName = bin2hex(random_bytes(12)) . '_' . time() . '.jpg';
 $photoPath = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . $photoName;
 if (!is_dir((string) SCM_UPLOAD_PATH)) { mkdir((string) SCM_UPLOAD_PATH, 0750, true); }
@@ -108,6 +110,8 @@ $db->insert($db->table('jet_cct_cotizacion_mantenimiento'), $repo->schema->filte
 $db->update($db->table('jet_cct_tickets'), ['id_cotizacion_mantenimiento' => '7001'], ['_ID' => 1]);
 $createPanel = (new View())->panel($service->context(1), $service);
 $assert(str_contains($createPanel, 'data-acta-photo-paste') && str_contains($createPanel, 'Máximo 4 fotos por daño y 12 en toda el acta'), 'act form explains limits and exposes the clipboard paste target');
+$assert(str_contains($createPanel, 'name="transport" min="0" max="8000"') && str_contains($createPanel, 'value="8000"'), 'act form defaults and caps transport at configured value times two');
+$rejects(static fn() => $service->create(1, array_replace($input, ['transport' => '8001']), $actor), 'transport above configured double is rejected by backend');
 $created = $service->create(1, $input, $actor);
 $act = $repo->act($created['act_id']);
 $token = $service->token($act);
@@ -173,7 +177,7 @@ $rejects(static fn() => $service->pdf($missingPdf), 'missing signed original is 
 $assert(!str_contains($signed['signed_pdf'], 'Reporte administrativo') && str_contains($service->pdf($signed, true), 'Reporte administrativo'), 'PDF audiences separate internal charges');
 $receiptCount = count($notifications);
 $report = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_reportes_administrativos') . '` WHERE _ID = ?', [$signed['report_id']]);
-$assert((int) $report['valor'] === 16333 && $report['exportado'] === 'No' && $report['fue_pagado'] === 'No', 'administrative report contains configured fee plus transport, unpaid and unexported');
+$assert((int) $report['valor'] === 12333 && (int) $report['transporte'] === 8000 && $report['exportado'] === 'No' && $report['fue_pagado'] === 'No', 'administrative report contains configured fee plus capped transport, unpaid and unexported');
 $assert((int) $report['id_ticket'] === 1, 'report links to exact internal ticket ID, not a coinciding display number');
 $service->sign((int) $act['id'], $token, $signInput($act), '127.0.0.1', 'QA');
 $assert(count($notifications) === $receiptCount, 'duplicate signature does not duplicate receipt');
