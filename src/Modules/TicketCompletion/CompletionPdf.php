@@ -45,14 +45,6 @@ final class CompletionPdf
     }
     $pdf->heading('Observaciones');
     foreach ($this->chunks($payload['observations'], 900) as $chunk) { $pdf->paragraph($chunk, 9); }
-    if ($staff) {
-      $pdf->heading('Reporte administrativo - Uso interno');
-      $pdf->table(['Concepto', 'Valor'], [
-        ['Servicio administrativo', CompletionView::money((int) $payload['report']['service_fee'])],
-        ['Transporte', CompletionView::money((int) $payload['report']['transport'])],
-        ['Total', CompletionView::money((int) $payload['report']['total'])],
-      ], [3, 1], 9, [1]);
-    }
     if ($act['status'] === 'signed') {
       $evidence = json_decode((string) $act['signed_json'], true, 16, JSON_THROW_ON_ERROR);
       $pdf->reserveSpace(370);

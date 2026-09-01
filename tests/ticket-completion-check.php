@@ -189,7 +189,7 @@ $badPdf = $signed; $badPdf['signed_pdf'] .= 'tamper';
 $rejects(static fn() => $service->pdf($badPdf), 'tampered PDF cannot be downloaded');
 $missingPdf = $signed; $missingPdf['signed_pdf'] = null;
 $rejects(static fn() => $service->pdf($missingPdf), 'missing signed original is not silently regenerated');
-$assert(!str_contains($signed['signed_pdf'], 'Reporte administrativo') && str_contains($service->pdf($signed, true), 'Reporte administrativo'), 'PDF audiences separate internal charges');
+$assert(!str_contains($signed['signed_pdf'], 'Reporte administrativo') && !str_contains($service->pdf($signed, true), 'Reporte administrativo'), 'PDF acta never exposes internal administrative charge');
 $receiptCount = count($notifications);
 $report = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_reportes_administrativos') . '` WHERE _ID = ?', [$signed['report_id']]);
 $assert((int) $report['valor'] === 12333 && (int) $report['transporte'] === 8000 && $report['exportado'] === 'No' && $report['fue_pagado'] === 'No', 'administrative report contains configured fee plus capped transport, unpaid and unexported');
@@ -200,7 +200,7 @@ $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reporte
 $rejects(static fn() => $service->cancel((int) $act['id'], 'corrección', $actor), 'signed document cannot be cancelled');
 $publicHtml = (new View())->document($signed, $service->payload($signed), false);
 $staffHtml = (new View())->document($signed, $service->payload($signed), true);
-$assert(!str_contains($publicHtml, 'Reporte administrativo') && str_contains($staffHtml, 'Reporte administrativo'), 'public document excludes internal charge');
+$assert(!str_contains($publicHtml, 'Reporte administrativo') && !str_contains($staffHtml, 'Reporte administrativo'), 'act document excludes internal charge for every audience');
 $assert(str_contains($publicHtml, 'Fuga en tubería') && str_contains($publicHtml, 'reemplazó') && str_contains($publicHtml, 'Firma electrónica registrada'), 'document includes damage, solution and signature');
 $assert(str_contains($publicHtml, 'Evidencias del daño #1') && str_contains($publicHtml, rawurlencode($photoName)), 'recipient document displays lazy photographic evidence');
 $badSignature = $signed;
