@@ -237,6 +237,16 @@ final class SuCasaControlServiciosInmobiliarios
           ],
         ],
       ],
+      'servicios_publicos' => [
+        'label' => 'Servicios públicos',
+        'items' => [
+          'acta_servicios_publicos' => [
+            'label' => 'Acta de servicios públicos',
+            'description' => 'Cuando se genera una revisión nativa de servicios públicos y sus actas.',
+            'channel' => 'Email interno',
+          ],
+        ],
+      ],
       'preventivas' => [
         'label' => 'Preventivas',
         'items' => [

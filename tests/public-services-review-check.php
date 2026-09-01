@@ -13,7 +13,7 @@ require_once $package . '/autoload.php';
 $queueConfig = require $package . '/config.php';
 $queueTable = (string) ($queueConfig['queue']['queue_table'] ?? 'skc_notification_queue');
 $attemptsTable = (string) ($queueConfig['queue']['attempts_table'] ?? 'skc_notification_attempts');
-$tables = array_map([$db, 'table'], ['jet_cct_contratos_arrendamiento', 'jet_cct_funcionarios', 'jet_cct_sucursales', 'jet_cct_revisiones_servicios', 'jet_cct_historial_del_inmueble', 'posts', 'postmeta']);
+$tables = array_map([$db, 'table'], ['jet_cct_contratos_arrendamiento', 'jet_cct_funcionarios', 'jet_cct_sucursales', 'jet_cct_revisiones_servicios', 'jet_cct_historial_del_inmueble', 'jet_cct_confi_sistema', 'posts', 'postmeta']);
 $tables[] = $queueTable;
 $tables[] = $attemptsTable;
 foreach ($tables as $table) {
@@ -35,6 +35,9 @@ $historyTable = $db->table('jet_cct_historial_del_inmueble');
 $db->insert($employeeTable, ['_ID' => 70001, 'id_empleado' => '94001', 'nombre' => 'Funcionario autenticado QA', 'correo' => 'actor@example.invalid', 'activo' => 'Si']);
 $db->insert($employeeTable, ['_ID' => 70002, 'id_empleado' => '70001', 'nombre' => 'Gloria QA - señuelo', 'correo' => 'decoy@example.invalid', 'activo' => 'Si']);
 $db->insert($employeeTable, ['_ID' => 70003, 'id_empleado' => '', 'nombre' => 'Funcionario incompleto QA', 'activo' => 'Si']);
+$db->insert($employeeTable, ['_ID' => 70004, 'id_empleado' => '94004', 'nombre' => 'Administracion configurada QA', 'correo' => 'admin-config@example.invalid', 'id_cargo' => '3', 'activo' => 'Si']);
+\SCM\Core\App::settings()->set('internal_admin_notifications', ['acta_servicios_publicos' => ['70004']], 70001);
+\SCM\Core\App::settings()->refresh();
 $base = ['_ID' => 90001, 'contrato' => '2000', 'estado' => 'Entregado', 'id_inmueble' => '80001', 'inmueble' => '204578', 'direccion' => 'Dirección de prueba', 'arrendatario' => 'Arrendatario QA', 'propietario' => 'Propietario QA', 'correo_propietario' => 'owner@example.invalid', 'correo_arrendatario' => 'tenant@example.invalid', 'servicios_publicos' => '', 'mes_revision_servicios' => '11', 'revisiones_servicios' => '4', 'ultima_revision_servicios' => 1700000000];
 $db->insert($contractTable, $base);
 $db->insert($contractTable, array_replace($base, ['_ID' => 90002, 'contrato' => '90001', 'servicios_publicos' => serialize([]), 'gas' => 'OLD-ACCOUNT']));
@@ -94,7 +97,9 @@ try {
   $assert((int) $contract['mes_revision_servicios'] === 2 && (int) $contract['revisiones_servicios'] === 5 && (int) $contract['ultima_revision_servicios'] > 1700000000, 'review applies November-to-February formula and updates count/date');
   $assert($contract['id_empleado'] === '94001' && $contract['realizado_por'] === 'Funcionario autenticado QA', 'contract stores authenticated employee');
   $rows = $db->getResults("SELECT * FROM `{$queueTable}` ORDER BY id");
-  $assert(count($rows) === 6 && count(array_filter($rows, static fn(array $r): bool => $r['status'] === 'pending')) === 6, 'emails enqueue only into temporary queue after review');
+  $assert(count($rows) === 3 && count(array_filter($rows, static fn(array $r): bool => $r['status'] === 'pending')) === 3, 'emails enqueue owner, tenant and configured internal recipient only');
+  $queuedDestinations = array_map(static fn(array $row): string => strtolower((string) ($row['destination'] ?? '')), $rows);
+  $assert(in_array('admin-config@example.invalid', $queuedDestinations, true) && !in_array('gcorrearivera@gmail.com', $queuedDestinations, true), 'internal review email uses configuration instead of fixed legacy addresses');
   $payload = json_decode($rows[0]['payload_json'], true);
   $assert($payload['reply_to'] === 'actor@example.invalid' && $payload['attachments'][0]['path'] === $generatedPaths[0], 'reply-to and attachment belong to correct actor/review');
   $registry = new \SharedNotifications\Providers\ProviderRegistry();
@@ -104,7 +109,7 @@ try {
   });
   $worker = new \SharedNotifications\NotificationWorker(new \SharedNotifications\Storage\PdoStorageAdapter($db->pdo()), $registry, new \SharedNotifications\Config\QueueConfig($queueTable, $attemptsTable), 'public-services-isolated-qa');
   $stats = $worker->run(6);
-  $assert($stats['sent'] === 6 && (int) $db->getVar("SELECT COUNT(*) FROM `{$attemptsTable}`") === 6, 'inert worker records successful attempts without sending messages');
+  $assert($stats['sent'] === 3 && (int) $db->getVar("SELECT COUNT(*) FROM `{$attemptsTable}`") === 3, 'inert worker records successful attempts without sending messages');
   $saved = $service->saveServiciosPublicosConfiguration(90001, ['configuration_present' => '1', 'servicios_configurados' => []]);
   $context = $service->buildServiciosPublicosReviewContext(90001);
   $assert(!empty($saved['ok']) && !$context['has_services'] && $context['services']['energia']['account'] === 'NIC-QA', 'removing all services excludes pending but preserves historical identifiers');

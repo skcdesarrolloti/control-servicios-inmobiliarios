@@ -104,6 +104,54 @@ final class PendingRepository
   }
 
   /**
+   * @return array<int,array{id:string,name:string,email:string}>
+   */
+  public function getInternalNotificationRecipientsForAction(string $action): array
+  {
+    $actionKey = preg_replace('/[^a-z0-9_]/', '', strtolower($action)) ?: '';
+    if ($actionKey === '') {
+      return [];
+    }
+
+    try {
+      $rawSettings = \SCM\Core\App::settings()->get('internal_admin_notifications', []);
+    } catch (\Throwable $exception) {
+      return [];
+    }
+
+    if (!is_array($rawSettings[$actionKey] ?? null)) {
+      return [];
+    }
+
+    $selectedIds = [];
+    foreach ((array) $rawSettings[$actionKey] as $id) {
+      $idKey = trim((string) ((int) $id));
+      if ($idKey !== '' && $idKey !== '0') {
+        $selectedIds[$idKey] = true;
+      }
+    }
+    if ($selectedIds === []) {
+      return [];
+    }
+
+    $recipients = [];
+    foreach (\SCM\Support\FuncionarioOptions::panelFuncionarios($this->db, $this->schema(), 'primary') as $funcionario) {
+      $id = trim((string) ($funcionario['id'] ?? ''));
+      $email = trim((string) ($funcionario['email'] ?? ''));
+      if ($id === '' || !isset($selectedIds[$id]) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        continue;
+      }
+      $recipients[] = [
+        'id' => $id,
+        'name' => trim((string) ($funcionario['name'] ?? '')) ?: ('Funcionario #' . $id),
+        'email' => $email,
+      ];
+    }
+
+    return $recipients;
+  }
+
+  /**
    * Exact primary-key lookup for writes; contract codes are not interchangeable with _ID.
    * @return array<string,mixed>|null
    */

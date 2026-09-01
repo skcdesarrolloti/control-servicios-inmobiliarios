@@ -522,11 +522,15 @@ trait PublicServicesReviewConcern
     $recipients = [
       ['email' => (string) ($contract['correo_propietario'] ?? ''), 'name' => (string) ($contract['propietario'] ?? ''), 'role' => 'propietario'],
       ['email' => (string) ($contract['correo_arrendatario'] ?? ''), 'name' => (string) ($contract['arrendatario'] ?? ''), 'role' => 'arrendatario'],
-      ['email' => 'sucasa.inmobiliaria@hotmail.com', 'name' => 'Administracion SuCasa', 'role' => 'administracion'],
-      ['email' => 'nabuita1@gmail.com', 'name' => 'Administracion SuCasa', 'role' => 'administracion'],
-      ['email' => 'gcorrearivera@gmail.com', 'name' => 'Administracion SuCasa', 'role' => 'administracion'],
-      ['email' => 'sucasacorreos@gmail.com', 'name' => 'Administracion SuCasa', 'role' => 'administracion'],
     ];
+    foreach ($this->repo->getInternalNotificationRecipientsForAction('acta_servicios_publicos') as $recipient) {
+      $recipients[] = [
+        'email' => (string) ($recipient['email'] ?? ''),
+        'name' => (string) ($recipient['name'] ?? 'Administracion SuCasa'),
+        'role' => 'administracion',
+      ];
+    }
+    $recipients = $this->uniquePublicServicesEmailRecipients($recipients);
 
     foreach ($recipients as $recipient) {
       $email = trim($recipient['email']);
@@ -560,5 +564,29 @@ trait PublicServicesReviewConcern
     }
 
     return $queued;
+  }
+
+  /**
+   * @param array<int,array{email:string,name:string,role:string}> $recipients
+   * @return array<int,array{email:string,name:string,role:string}>
+   */
+  private function uniquePublicServicesEmailRecipients(array $recipients): array
+  {
+    $out = [];
+    $seen = [];
+    foreach ($recipients as $recipient) {
+      $email = strtolower(trim((string) ($recipient['email'] ?? '')));
+      if ($email === '' || isset($seen[$email]) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        continue;
+      }
+      $seen[$email] = true;
+      $out[] = [
+        'email' => $email,
+        'name' => trim((string) ($recipient['name'] ?? '')),
+        'role' => trim((string) ($recipient['role'] ?? '')),
+      ];
+    }
+
+    return $out;
   }
 }
