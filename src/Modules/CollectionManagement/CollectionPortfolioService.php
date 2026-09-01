@@ -500,7 +500,7 @@ final class CollectionPortfolioService
     if ($portfolioId <= 0 || $created <= 0) {
       return;
     }
-    $actionType = in_array($actionType, ['gestion_cobro', 'recordatorio_fecha_cobro'], true) ? $actionType : 'gestion_cobro';
+    $actionType = in_array($actionType, ['gestion_cobro', 'recordatorio_fecha_cobro', 'notificacion_fecha_pago'], true) ? $actionType : 'gestion_cobro';
     $now = date('Y-m-d H:i:s');
     $this->db->update($this->portfolioTable(), [
       'last_action_type' => $actionType,

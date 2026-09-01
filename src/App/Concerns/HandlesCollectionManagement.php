@@ -76,7 +76,7 @@ trait HandlesCollectionManagement
         );
         $notifyChannels = array_values(array_unique(array_filter($notifyChannels, static fn(string $channel): bool => in_array($channel, ['email', 'sms', 'whatsapp'], true))));
         if ($notifyChannels === []) {
-          $this->jsonFail('Selecciona al menos un canal para enviar el recordatorio.');
+          $this->jsonFail('Selecciona al menos un canal para enviar la notificación.');
         }
 
         $observation = $adminService->collectionDueDateReminderObservation($dueDay, $notifyChannels);
@@ -92,7 +92,7 @@ trait HandlesCollectionManagement
         $result = $adminService->registerCollectionManagement([$tenantId], $payload);
         $created = (int) ($result['created'] ?? 0);
         if ($created > 0) {
-          $service->recordManagement($portfolioId, $created, $observation, 'recordatorio_fecha_cobro');
+          $service->recordManagement($portfolioId, $created, $observation, 'notificacion_fecha_pago');
         }
 
         $notifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0];
@@ -119,10 +119,10 @@ trait HandlesCollectionManagement
                 'arrendatarios_activos',
                 $notifyIds,
                 $nonSmsChannels,
-                'Recordatorio de fecha de pago',
+                'Notificación de fecha de pago',
                 $adminService->collectionDueDateReminderMessage($dueDay),
-                'scm_arrendatario_fecha_cobro_v1',
-                'scm_email_arrendatario_fecha_cobro_v1',
+                'scm_arrendatario_fecha_pago_v1',
+                'scm_email_arrendatario_fecha_pago_v1',
                 $notificationMeta,
                 AdministrativeNotificationsService::COLLECTION_SMS_MAX
               ));
@@ -132,7 +132,7 @@ trait HandlesCollectionManagement
                 'arrendatarios_activos',
                 $notifyIds,
                 ['sms'],
-                'Recordatorio de fecha de pago',
+                'Notificación de fecha de pago',
                 $adminService->collectionDueDateReminderSmsMessage($dueDay),
                 '',
                 '',
@@ -147,7 +147,7 @@ trait HandlesCollectionManagement
 
         $queued = (int) ($notifyResult['queued'] ?? 0);
         $message = $created > 0
-          ? 'Recordatorio de fecha de cobro registrado.' . ($queued > 0 ? " {$queued} notificación(es) encolada(s)." : '') . ($notifyError !== '' ? ' No se pudo encolar todo: ' . $notifyError : '')
+          ? 'Notificación de fecha de pago registrada.' . ($queued > 0 ? " {$queued} notificación(es) encolada(s)." : '') . ($notifyError !== '' ? ' No se pudo encolar todo: ' . $notifyError : '')
           : 'No se registró la gestión. Revisa que el contrato siga activo.';
         $this->jsonOk($result + ['message' => $message, 'notifications' => $notifyResult, 'notification_error' => $notifyError]);
       }

@@ -2432,7 +2432,7 @@ trait RendersDashboard
                       <?php if ($canManage): ?>
                         <div class="scm-portfolio-actions">
                           <button type="button" class="scm-case-work-btn scm-portfolio-balance-btn" data-scm-portfolio-balance data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-current-balance="<?php echo esc_attr($balance === null ? '' : (string) $balance); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Anexar o corregir saldo manual para pruebas o ajustes de cartera">Anexar saldo</button>
-                          <button type="button" class="scm-case-work-btn scm-portfolio-due-btn" data-scm-portfolio-due-date data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar gestión Canon y enviar recordatorio de fecha de pago">Fecha cobro</button>
+                          <button type="button" class="scm-case-work-btn scm-portfolio-due-btn" data-scm-portfolio-due-date data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar gestión Canon y enviar notificación informativa de fecha de pago">Notificar pago</button>
                           <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar contacto, acuerdo, compromiso o seguimiento sin cambiar la etapa">Hacer gesti&oacute;n</button>
                           <?php if ($canCollect): ?>
                             <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="prejuridico" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="Revisar la carta antes de descargarla o enviarla">Preparar prejur&iacute;dico</button>
@@ -2591,7 +2591,8 @@ trait RendersDashboard
     }
     $labels = [
       'gestion_cobro' => 'Gestión registrada',
-      'recordatorio_fecha_cobro' => 'Fecha de cobro enviada',
+      'notificacion_fecha_pago' => 'Notificación de fecha de pago',
+      'recordatorio_fecha_cobro' => 'Notificación de fecha de pago',
       'saldo_manual' => 'Saldo anexado',
       'pago_detectado' => 'Pago detectado',
       'estado_normal' => 'Etapa normalizada',

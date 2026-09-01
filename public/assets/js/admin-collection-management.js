@@ -280,12 +280,12 @@
         fd.set("operation", "send_due_date");
         fd.set("due_day", day);
         channels.forEach(function (channel) { fd.append("notify_channels[]", channel); });
-        return runPortfolioOperation(button, fd, "Registrando y encolando recordatorio...", "success");
+        return runPortfolioOperation(button, fd, "Registrando y encolando notificación...", "success");
       };
 
       if (window.Swal && typeof window.Swal.fire === "function") {
         window.Swal.fire({
-          title: "Fecha de cobro",
+          title: "Notificación de fecha de pago",
           html: '<div class="scm-portfolio-swal-form">'
             + '<p><strong>' + escapeHtml(tenantName) + '</strong>' + (contractNumber ? ' · Contrato ' + escapeHtml(contractNumber) : '') + '</p>'
             + '<label for="scm-due-day">Fecha de pago</label>'
@@ -307,7 +307,7 @@
             if (select) select.value = defaultDueDay();
           },
           showCancelButton: true,
-          confirmButtonText: "Enviar recordatorio",
+          confirmButtonText: "Enviar notificación",
           cancelButtonText: "Cancelar",
           confirmButtonColor: "#1e3a5f",
           preConfirm: function () {
@@ -328,7 +328,7 @@
         return;
       }
 
-      var day = window.prompt("Día de cobro: 12, 22, 26 o 31", defaultDueDay());
+      var day = window.prompt("Día de pago: 12, 22, 26 o 31", defaultDueDay());
       if (["12", "22", "26", "31"].indexOf(String(day || "")) === -1) return;
       submit(String(day), ["whatsapp"]);
     }

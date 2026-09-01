@@ -196,15 +196,15 @@ final class AdministrativeNotificationsService
         'email_template' => 'scm_email_arrendatario_gestion_cobro_v1',
         'parameter_mode' => 'name_message_signature',
       ],
-      'scm_arrendatario_fecha_cobro_v1' => [
-        'name' => 'scm_arrendatario_fecha_cobro_v1',
-        'label' => 'Fecha de cobro',
+      'scm_arrendatario_fecha_pago_v1' => [
+        'name' => 'scm_arrendatario_fecha_pago_v1',
+        'label' => 'Notificación fecha de pago',
         'language' => 'es_CO',
-        'description' => 'Recordatorio para arrendatarios en las fechas de pago 12, 22, 26 y 31.',
-        'body' => "Buen dia, {{1}}.\n\nLe recordamos que hoy, dia {{2}}, vence su {{3}} fecha de pago del mes. 📅\n\n💰 Recuerde que el valor correspondiente a pagar se encuentra indicado en su cupon de pago.\n\nAgradecemos realizar su pago oportunamente y por el valor establecido en el cupon. 🙏\n\nAtentamente,\n{{4}}",
-        'variables' => ['Nombre del arrendatario', 'Dia de cobro: 12, 22, 26 o 31', 'Fecha ordinal: primera, segunda, tercera o ultima', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'description' => 'Notificación informativa para arrendatarios en las fechas de pago 12, 22, 26 y 31.',
+        'body' => "Buen día, {{1}}.\n\nLe recordamos que hoy, día {{2}}, corresponde su {{3}} fecha de pago del mes. 📅\n\n💰 Recuerde que el valor correspondiente a pagar se encuentra indicado en su cupón de pago.\n\nAgradecemos realizar su pago oportunamente y por el valor establecido en el cupón. 🙏\n\nAtentamente,\n{{4}}",
+        'variables' => ['Nombre del arrendatario', 'Día de pago: 12, 22, 26 o 31', 'Fecha ordinal: primera, segunda, tercera o última', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($arrendatarios, $funcionarios),
-        'email_template' => 'scm_email_arrendatario_fecha_cobro_v1',
+        'email_template' => 'scm_email_arrendatario_fecha_pago_v1',
         'parameter_mode' => 'collection_due_date',
       ],
       'scm_factura_disponible_v1' => [
@@ -279,11 +279,11 @@ final class AdministrativeNotificationsService
         'requires_message' => true,
         'preview_excerpt' => 'Gestion de cobro con detalle editable y firma del funcionario.',
       ],
-      'scm_email_arrendatario_fecha_cobro_v1' => [
-        'name' => 'scm_email_arrendatario_fecha_cobro_v1',
-        'label' => 'Fecha de cobro',
-        'subject' => 'Recordatorio de fecha de pago',
-        'description' => 'Email HTML para recordar las fechas de pago del canon.',
+      'scm_email_arrendatario_fecha_pago_v1' => [
+        'name' => 'scm_email_arrendatario_fecha_pago_v1',
+        'label' => 'Notificación fecha de pago',
+        'subject' => 'Notificación de fecha de pago',
+        'description' => 'Email HTML informativo para recordar las fechas de pago del canon.',
         'body' => '<p><strong>Buen d&iacute;a, {{nombre}}</strong>.</p><div>{{mensaje}}</div><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
         'source' => 'sistema',
         'message_only' => true,
@@ -291,7 +291,7 @@ final class AdministrativeNotificationsService
         'is_html' => true,
         'is_full_document' => false,
         'requires_message' => true,
-        'preview_excerpt' => 'Recordatorio de fecha de pago con botones automaticos de Guardian y menu personal.',
+        'preview_excerpt' => 'Notificación de fecha de pago con botones automáticos de Guardian y menú personal.',
       ],
       'scm_email_factura_disponible_v1' => [
         'name' => 'scm_email_factura_disponible_v1',
@@ -524,7 +524,7 @@ final class AdministrativeNotificationsService
   {
     $day = (int) preg_replace('/\D+/', '', (string) $day);
     if (!in_array($day, [12, 22, 26, 31], true)) {
-      throw new \RuntimeException('Selecciona una fecha de cobro válida: 12, 22, 26 o 31.');
+      throw new \RuntimeException('Selecciona una fecha de pago válida: 12, 22, 26 o 31.');
     }
     return $day;
   }
@@ -532,7 +532,7 @@ final class AdministrativeNotificationsService
   public function collectionDueDateReminderMessage(int|string $day): string
   {
     $day = $this->normalizeCollectionDueDateDay($day);
-    return '<p>Le recordamos que <strong>hoy, día ' . $day . ', vence su ' . htmlspecialchars($this->collectionDueDateOrdinal($day), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ' fecha de pago del mes</strong>. 📅</p>'
+    return '<p>Le recordamos que <strong>hoy, día ' . $day . ', corresponde su ' . htmlspecialchars($this->collectionDueDateOrdinal($day), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ' fecha de pago del mes</strong>. 📅</p>'
       . '<p>💰 Recuerde que el <strong>valor correspondiente a pagar se encuentra indicado en su cupón de pago</strong>.</p>'
       . '<p>Agradecemos realizar su pago oportunamente y por el valor establecido en el cupón. 🙏</p>';
   }
@@ -540,7 +540,7 @@ final class AdministrativeNotificationsService
   public function collectionDueDateReminderSmsMessage(int|string $day): string
   {
     $day = $this->normalizeCollectionDueDateDay($day);
-    return 'Buen día, {{nombre}}. Le recordamos que hoy, día ' . $day . ', vence su '
+    return 'Buen día, {{nombre}}. Le recordamos que hoy, día ' . $day . ', corresponde su '
       . $this->collectionDueDateOrdinal($day)
       . ' fecha de pago del mes. El valor a pagar está indicado en su cupón. Agradecemos realizar su pago oportunamente.';
   }
@@ -556,7 +556,7 @@ final class AdministrativeNotificationsService
       'sms' => 'SMS',
       default => $channel,
     }, $channels)) . '.' : '';
-    return 'Recordatorio automático de fecha de cobro día ' . $day . ' (' . $this->collectionDueDateOrdinal($day) . ' fecha de pago).' . $channelText;
+    return 'Notificación informativa de fecha de pago día ' . $day . ' (' . $this->collectionDueDateOrdinal($day) . ' fecha de pago).' . $channelText;
   }
 
   /**
