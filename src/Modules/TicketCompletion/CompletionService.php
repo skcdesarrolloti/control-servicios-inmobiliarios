@@ -104,7 +104,7 @@ final class CompletionService
   private function assertPublicAccess(array $act, string $token): void
   {
     if (!preg_match('/^[a-f0-9]{64}$/D', $token) || !hash_equals($this->token($act), $token)
-      || (int) $act['expires_at'] < time() || $act['status'] === 'cancelled') {
+      || (int) $act['expires_at'] < time() || !in_array($act['status'], ['pending', 'signed'], true)) {
       throw new \DomainException('El enlace no es válido, fue anulado o venció. Solicita un nuevo enlace a la inmobiliaria.');
     }
   }
@@ -293,17 +293,27 @@ final class CompletionService
 
   public function cancel(int $id, string $reason, array $actor): void
   {
-    $reason = CompletionPolicy::text($reason, 'motivo de anulación', 1000);
+    $this->retirePending($id, $reason, $actor, 'cancelled', 'anulación', 'anulada');
+  }
+
+  public function archive(int $id, string $reason, array $actor): void
+  {
+    $this->retirePending($id, $reason, $actor, 'archived', 'archivo', 'archivada');
+  }
+
+  private function retirePending(int $id, string $reason, array $actor, string $status, string $actionName, string $statusLabel): void
+  {
+    $reason = CompletionPolicy::text($reason, 'motivo de ' . $actionName, 1000);
     $act = $this->repo->act($id);
-    $this->repo->transaction((int) $act['ticket_pk'], function (array $ticket) use ($id, $reason, $actor): void {
+    $this->repo->transaction((int) $act['ticket_pk'], function (array $ticket) use ($id, $reason, $actor, $status, $statusLabel): void {
       $act = $this->repo->act($id);
       if ($act['status'] !== 'pending') {
-        throw new \DomainException('No se puede anular un acta firmada o ya anulada.');
+        throw new \DomainException('Solo se puede archivar o anular un acta pendiente de firma.');
       }
       $payload = $this->payload($act);
-      $this->repo->db->update($this->repo->table(), ['status' => 'cancelled', 'active_slot' => null, 'cancelled_at' => time(), 'cancellation_reason' => $reason], ['id' => $id]);
+      $this->repo->db->update($this->repo->table(), ['status' => $status, 'active_slot' => null, 'cancelled_at' => time(), 'cancellation_reason' => $reason], ['id' => $id]);
       $this->repo->updateTicket((int) $ticket['_ID'], ['estado' => 'En proceso', 'estado_administrativo' => $payload['previous']['estado_administrativo']]);
-      $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' anulada sin cerrar el ticket ni generar cobro. Motivo: ' . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8'), $actor['name'], $actor['employee_id']);
+      $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' ' . $statusLabel . ' sin cerrar el ticket ni generar cobro. Motivo: ' . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8'), $actor['name'], $actor['employee_id']);
     });
   }
 
@@ -417,7 +427,7 @@ final class CompletionService
     $this->repo->requireSchema();
     $clean = static fn(mixed $value): string => trim(strip_tags((string) (is_scalar($value) ? $value : '')));
     $status = strtolower($clean($input['sacta_estado'] ?? 'pending'));
-    $statusMap = ['pending' => 'pending', 'pendiente' => 'pending', 'sin_firmar' => 'pending', 'firmada' => 'signed', 'signed' => 'signed', 'anulada' => 'cancelled', 'cancelled' => 'cancelled', 'todos' => 'all', 'all' => 'all'];
+    $statusMap = ['pending' => 'pending', 'pendiente' => 'pending', 'sin_firmar' => 'pending', 'firmada' => 'signed', 'signed' => 'signed', 'archivada' => 'archived', 'archived' => 'archived', 'anulada' => 'cancelled', 'cancelled' => 'cancelled', 'todos' => 'all', 'all' => 'all'];
     $status = $statusMap[$status] ?? 'pending';
     $page = max(1, (int) ($input['sacta_page'] ?? 1));
     $perPage = min(100, max(10, (int) ($input['sacta_per_page'] ?? 30)));
@@ -465,7 +475,7 @@ final class CompletionService
       "SELECT a.*, t.id_ticket AS ticket_display, t.inmueble AS ticket_inmueble, t.contrato AS ticket_contrato, t.direccion AS ticket_address, t.estado AS ticket_estado, t.estado_administrativo AS ticket_estado_admin
        FROM `{$table}` a
        LEFT JOIN `{$tickets}` t ON t._ID = a.ticket_pk{$whereSql}
-       ORDER BY CASE a.status WHEN 'pending' THEN 0 WHEN 'signed' THEN 1 ELSE 2 END, COALESCE(a.signed_at, a.created_at) DESC, a.id DESC
+       ORDER BY CASE a.status WHEN 'pending' THEN 0 WHEN 'signed' THEN 1 WHEN 'archived' THEN 2 ELSE 3 END, COALESCE(a.signed_at, a.created_at) DESC, a.id DESC
        LIMIT ? OFFSET ?",
       array_merge($args, [$perPage, $offset])
     );
@@ -481,7 +491,7 @@ final class CompletionService
       }
     }
     $statsRows = $this->repo->db->getResults("SELECT status, COUNT(*) AS total FROM `{$table}` GROUP BY status");
-    $stats = ['pending' => 0, 'signed' => 0, 'cancelled' => 0, 'all' => 0];
+    $stats = ['pending' => 0, 'signed' => 0, 'archived' => 0, 'cancelled' => 0, 'all' => 0];
     foreach ($statsRows as $row) {
       $key = (string) ($row['status'] ?? '');
       if (isset($stats[$key])) {

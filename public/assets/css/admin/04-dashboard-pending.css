@@ -3973,24 +3973,65 @@
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
+#scm-app .scm-actas-dashboard {
+  color: #0f274a;
+}
+
+#scm-app .scm-actas-dashboard .scm-pending-header {
+  border-top: 4px solid #173d70;
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(15, 39, 74, 0.08);
+}
+
+#scm-app .scm-actas-dashboard .scm-pending-header h2,
+#scm-app .scm-actas-dashboard .scm-filter-card h3 {
+  color: #061b37;
+}
+
+#scm-app .scm-actas-dashboard .scm-pending-header p,
+#scm-app .scm-actas-dashboard .scm-pending-count-label {
+  color: #334155;
+}
+
+#scm-app .scm-actas-dashboard .scm-filter-card {
+  border-color: #b9cbe2;
+  box-shadow: 0 16px 38px rgba(15, 39, 74, 0.08);
+}
+
+#scm-app .scm-actas-dashboard .scm-field label {
+  color: #213b5f;
+  font-weight: 900;
+}
+
+#scm-app .scm-actas-dashboard .scm-field input,
+#scm-app .scm-actas-dashboard .scm-field select {
+  border-color: #a7b8cf;
+  color: #0f274a;
+  background: #fff;
+}
+
+#scm-app .scm-actas-dashboard .scm-field input::placeholder {
+  color: #5b6f88;
+}
+
 #scm-app .scm-actas-kpis {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin: 0 0 18px;
 }
 
 #scm-app .scm-actas-kpis > div {
   padding: 16px;
-  border: 1px solid #dbe7f5;
+  border: 1px solid #b9cbe2;
   border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, #fff, #f8fbff);
+  box-shadow: 0 12px 28px rgba(15, 39, 74, 0.08);
 }
 
 #scm-app .scm-actas-kpis span {
   display: block;
-  color: #64748b;
+  color: #334155;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.05em;
@@ -4000,9 +4041,21 @@
 #scm-app .scm-actas-kpis strong {
   display: block;
   margin-top: 6px;
-  color: #082247;
+  color: #061b37;
   font-size: 26px;
   line-height: 1;
+}
+
+#scm-app .scm-actas-table {
+  color: #0f274a;
+}
+
+#scm-app .scm-actas-table tbody td {
+  color: #10264a;
+}
+
+#scm-app .scm-actas-table tbody td strong {
+  color: #061b37;
 }
 
 #scm-app .scm-acta-dashboard-status {
@@ -4026,6 +4079,12 @@
   color: #166534;
 }
 
+#scm-app .scm-acta-dashboard-status--archived {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #334155;
+}
+
 #scm-app .scm-acta-dashboard-status--cancelled {
   border-color: #fecaca;
   background: #fff1f2;
@@ -4033,8 +4092,53 @@
 }
 
 #scm-app .scm-actas-table small {
-  color: #64748b;
-  font-size: 11px;
+  color: #42526a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#scm-app .scm-actas-dashboard .scm-ticket-badge,
+#scm-app .scm-actas-dashboard .scm-inmueble-badge {
+  border-color: #8fb5df;
+  color: #0f3c70;
+  background: #eef6ff;
+}
+
+#scm-app .scm-actas-dashboard .scm-pending-action-btn {
+  min-height: 42px;
+  border: 1px solid #a34a00;
+  background: #c45100;
+  color: #fff !important;
+  box-shadow: none;
+  text-decoration: none !important;
+}
+
+#scm-app .scm-actas-dashboard .scm-pending-action-btn:hover,
+#scm-app .scm-actas-dashboard .scm-pending-action-btn:focus-visible {
+  background: #993f00;
+  color: #fff !important;
+  opacity: 1;
+  text-decoration: none !important;
+}
+
+#scm-app .scm-actas-dashboard .scm-pending-action-btn--blue {
+  border-color: #173d70;
+  background: #173d70;
+}
+
+#scm-app .scm-actas-dashboard .scm-pending-action-btn--blue:hover,
+#scm-app .scm-actas-dashboard .scm-pending-action-btn--blue:focus-visible {
+  background: #0f274a;
+}
+
+#scm-app .scm-actas-dashboard .scm-pending-action-btn--danger {
+  border-color: #b42318;
+  background: #b42318;
+}
+
+#scm-app .scm-actas-dashboard .scm-pending-action-btn--danger:hover,
+#scm-app .scm-actas-dashboard .scm-pending-action-btn--danger:focus-visible {
+  background: #8f1d14;
 }
 
 #scm-app .scm-actas-empty,

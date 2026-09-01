@@ -125,12 +125,18 @@ trait HandlesTicketCompletion
       }
       $repo = new CompletionRepository($this->db);
       $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
+      if (($_POST['operation'] ?? '') === 'archive') {
+        $id = (int) ($_POST['act_id'] ?? 0);
+        $employee = $this->db->getRow('SELECT id_empleado FROM `' . $this->db->table('jet_cct_funcionarios') . '` WHERE _ID = ?', [Auth::userId()]);
+        $service->archive($id, (string) ($_POST['reason'] ?? 'Acta de prueba archivada desde la bandeja.'), ['user_id' => Auth::userId(), 'employee_id' => (string) ($employee['id_empleado'] ?? Auth::userId()), 'name' => Auth::user()]);
+      }
       $data = $service->dashboardList($_POST);
       $view = new CompletionView();
       $this->jsonOk([
         'table_html' => $view->dashboardTable($data['items'], $service, $data['pagination']),
         'kpis_html' => $view->dashboardKpis($data['stats']),
         'count' => (string) $data['count'],
+        'message' => ($_POST['operation'] ?? '') === 'archive' ? 'Acta archivada. Salió de pendientes, el ticket sigue abierto y no se generó cobro.' : '',
       ]);
     } catch (\DomainException $error) {
       $this->jsonFail($error->getMessage());

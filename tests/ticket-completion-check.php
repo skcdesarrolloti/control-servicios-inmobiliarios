@@ -115,6 +115,15 @@ $createdWithTamperedTransport = $service->create(1, array_replace($input, ['tran
 $tamperedPayload = $service->payload($repo->act($createdWithTamperedTransport['act_id']));
 $assert((int) $tamperedPayload['report']['transport'] === 8000, 'backend ignores tampered transport and uses configured fixed value');
 $service->cancel($createdWithTamperedTransport['act_id'], 'QA vuelve a generar el acta principal', $actor);
+$seedTicket(8);
+$archived = $service->create(8, $input, $actor);
+$archivedAct = $repo->act($archived['act_id']);
+$service->archive((int) $archivedAct['id'], 'Acta creada durante pruebas', $actor);
+$archivedAct = $repo->act((int) $archivedAct['id']);
+$assert($archivedAct['status'] === 'archived' && (string) $archivedAct['active_slot'] === '' && $repo->ticket(8)['estado'] === 'En proceso', 'archiving a test act removes it from pending without closing the ticket');
+$rejects(static fn() => $service->publicAct((int) $archivedAct['id'], $service->token($archivedAct)), 'archived act public link cannot be signed');
+$dashboardArchived = $service->dashboardList(['sacta_estado' => 'archived', 'sacta_caso' => '9008']);
+$assert($dashboardArchived['count'] === 1 && ($dashboardArchived['stats']['archived'] ?? 0) === 1, 'archived acts dashboard filter and KPI include the archived test act');
 $notifications = [];
 $created = $service->create(1, $input, $actor);
 $act = $repo->act($created['act_id']);

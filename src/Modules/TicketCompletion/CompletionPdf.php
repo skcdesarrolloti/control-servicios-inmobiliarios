@@ -14,7 +14,7 @@ final class CompletionPdf
     $pdf->footerLabel('SKC SuCasa Inmobiliaria - NIT 900623242-4');
     $pdf->line('SKC SuCasa Inmobiliaria | NIT 900623242-4', 10, 'F2');
     $pdf->title('Acta de satisfacción - Ticket #' . $payload['ticket_number']);
-    $pdf->callout('Ticket #' . $payload['ticket_number'], $act['status'] === 'signed' ? 'FIRMADA - Cierre registrado al firmar' : ($act['status'] === 'cancelled' ? 'ANULADA - No válida para firma' : 'PENDIENTE DE FIRMA - Este documento no cierra el ticket'));
+    $pdf->callout('Ticket #' . $payload['ticket_number'], $act['status'] === 'signed' ? 'FIRMADA - Cierre registrado al firmar' : ($act['status'] === 'archived' ? 'ARCHIVADA - No válida para firma' : ($act['status'] === 'cancelled' ? 'ANULADA - No válida para firma' : 'PENDIENTE DE FIRMA - Este documento no cierra el ticket')));
     $pdf->heading('Datos del servicio');
     $pdf->table(['Dato', 'Detalle'], [
       ['Inmueble / contrato', $payload['property'] . ' / ' . $payload['contract']],

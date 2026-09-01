@@ -76,6 +76,20 @@
                 });
             }
 
+            function notifyResult(type, message) {
+              if (!message) return;
+              if (window.Swal && typeof window.Swal.fire === 'function') {
+                window.Swal.fire({
+                  icon: type === 'error' ? 'error' : 'success',
+                  title: type === 'error' ? 'No se pudo completar' : 'Listo',
+                  text: message,
+                  confirmButtonText: 'Entendido'
+                });
+                return;
+              }
+              window.alert(message);
+            }
+
             form.addEventListener('submit', function(e) {
               e.preventDefault();
               var pageInput = form.querySelector('input[name="' + prefix + 'page"]');
@@ -90,6 +104,89 @@
               if (pageInput) pageInput.value = pageBtn.getAttribute('data-page') || '1';
               submitForm();
             });
+            if (prefix === 'sacta_') {
+              document.addEventListener('click', function(e) {
+                var archiveBtn = e.target && e.target.closest ? e.target.closest('[data-acta-archive]') : null;
+                if (!archiveBtn) return;
+                e.preventDefault();
+                var actId = archiveBtn.getAttribute('data-acta-archive') || '';
+                if (!actId) return;
+
+                function archiveAct(reason) {
+                  reason = String(reason || '').trim();
+                  if (!reason) {
+                    notifyResult('error', 'Escribe un motivo para archivar el acta.');
+                    return;
+                  }
+                  var fd = new FormData(form);
+                  fd.append('action', action);
+                  fd.append('nonce', nonce);
+                  fd.append('operation', 'archive');
+                  fd.append('act_id', actId);
+                  fd.append('reason', reason);
+                  archiveBtn.disabled = true;
+                  if (spinner) spinner.classList.add('active');
+                  if (pendingPanel) pendingPanel.setAttribute('data-scm-loading', '1');
+                  setInlineListLoading(pendingPanel || form.closest('.scm-tab-panel') || document, true, 'Archivando acta...');
+                  fetch(ajaxUrl, {
+                      method: 'POST',
+                      body: fd,
+                      credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                      return r.json();
+                    })
+                    .then(function(json) {
+                      if (!json || !json.success) {
+                        var err = json && json.data && json.data.message ? json.data.message : 'No se pudo archivar el acta.';
+                        throw new Error(err);
+                      }
+                      var d = json.data || {};
+                      var t = document.getElementById(tableId);
+                      var k = document.getElementById(kpisId);
+                      if (t && typeof d.table_html === 'string') t.innerHTML = d.table_html;
+                      if (k && typeof d.kpis_html === 'string') k.innerHTML = d.kpis_html;
+                      var actaHeaderCount = document.getElementById('sacta-kpi-count');
+                      if (actaHeaderCount && typeof d.count === 'string') actaHeaderCount.textContent = d.count;
+                      notifyResult('success', d.message || 'Acta archivada.');
+                    })
+                    .catch(function(err) {
+                      notifyResult('error', err.message || 'No se pudo archivar el acta.');
+                    })
+                    .finally(function() {
+                      archiveBtn.disabled = false;
+                      if (spinner) spinner.classList.remove('active');
+                      if (pendingPanel) pendingPanel.setAttribute('data-scm-loading', '0');
+                      setInlineListLoading(pendingPanel || form.closest('.scm-tab-panel') || document, false);
+                    });
+                }
+
+                if (window.Swal && typeof window.Swal.fire === 'function') {
+                  window.Swal.fire({
+                    icon: 'warning',
+                    title: 'Archivar acta #' + actId + '?',
+                    text: 'La acta saldrá de pendientes. No se cerrará el ticket ni se generará cobro.',
+                    input: 'textarea',
+                    inputLabel: 'Motivo',
+                    inputValue: 'Acta de prueba archivada.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Archivar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#b42318',
+                    inputValidator: function(value) {
+                      return String(value || '').trim() ? undefined : 'Escribe el motivo del archivo.';
+                    }
+                  }).then(function(result) {
+                    if (result && result.isConfirmed) archiveAct(result.value);
+                  });
+                  return;
+                }
+
+                if (window.confirm('Archivar acta #' + actId + '? No se cerrará el ticket ni se generará cobro.')) {
+                  archiveAct(window.prompt('Motivo para archivar:', 'Acta de prueba archivada.') || '');
+                }
+              });
+            }
             var clearBtn = document.querySelector('[data-pending-clear="' + prefix + '"]');
             if (clearBtn) {
               clearBtn.addEventListener('click', function() {
