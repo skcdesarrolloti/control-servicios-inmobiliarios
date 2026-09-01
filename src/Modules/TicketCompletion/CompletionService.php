@@ -117,7 +117,7 @@ final class CompletionService
         throw new \DomainException('Este ticket ya tiene un acta activa. Consúltala o anúlala antes de generar otra.');
       }
       if (in_array(mb_strtolower(trim((string) $ticket['estado'])), ['cerrado', 'finalizado', 'resuelto'], true)) {
-        throw new \DomainException('No se puede crear un acta en un ticket cerrado.');
+        throw new \DomainException('No se puede crear un acta en un caso cerrado.');
       }
       $context = $this->context($ticketId);
       $role = CompletionPolicy::text($input['signer_role'] ?? '', 'quién firma', 25);
@@ -188,7 +188,7 @@ final class CompletionService
       $id = (int) $this->repo->db->lastInsertId();
       // Legacy timelines treat any act row as completion; publish the CCT record only on signature.
       $this->repo->updateTicket($ticketId, ['estado' => 'En proceso', 'estado_administrativo' => $pendingAdminState]);
-      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' generada. Solución por ' . CompletionPolicy::EXECUTORS[$executor] . '. Pendiente de firma de ' . htmlspecialchars($signerName, ENT_QUOTES, 'UTF-8') . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta</a>. El ticket permanece abierto en “' . $pendingAdminState . '” y el reporte aún no se cobra.', $actor['name'], $actor['employee_id']);
+      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' generada. Solución por ' . CompletionPolicy::EXECUTORS[$executor] . '. Pendiente de firma de ' . htmlspecialchars($signerName, ENT_QUOTES, 'UTF-8') . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta</a>. El caso permanece abierto en “' . $pendingAdminState . '” y el reporte aún no se cobra.', $actor['name'], $actor['employee_id']);
       return $this->repo->act($id);
     });
     try { return $this->notify($act); }
@@ -222,8 +222,8 @@ final class CompletionService
     if ($act['status'] !== ($receipt ? 'signed' : 'pending')) { return ['queued' => false, 'message' => 'El estado del acta cambió. Recarga el caso.']; }
     $payload = $this->payload($act);
     $url = $this->viewUrl((int) $act['id']) . '&token=' . $this->token($act);
-    $title = ($receipt ? 'Acta firmada' : 'Acta de satisfacción') . ' del ticket #' . $payload['ticket_number'];
-    $description = $receipt ? 'Tu firma quedó registrada y el ticket se cerró. Puedes consultar y descargar tu PDF firmado.' : 'Revisa los daños, soluciones, observaciones y evidencias. Solo firma si estás conforme: tu firma cerrará el ticket. Necesitarás un código enviado a tu contacto registrado.';
+    $title = ($receipt ? 'Acta firmada' : 'Acta de satisfacción') . ' del caso #' . $payload['ticket_number'];
+    $description = $receipt ? 'Tu firma quedó registrada y el caso se cerró. Puedes consultar y descargar tu PDF firmado.' : 'Revisa los daños, soluciones, observaciones y evidencias. Solo firma si estás conforme: tu firma cerrará el caso. Necesitarás un código enviado a tu contacto registrado.';
     $linkLabel = $receipt ? 'Descargar PDF firmado' : 'Revisar y firmar acta';
     $target = $receipt ? $url . '&format=pdf' : $url;
     $body = '<p>Hola ' . EmailTemplate::e($payload['signer']['name']) . '.</p><p>' . $description . '</p><p><a href="' . EmailTemplate::e($target) . '">' . $linkLabel . '</a></p><p>Enlace personal válido hasta ' . date('d/m/Y', (int) $act['expires_at']) . '. No lo compartas.</p>';
@@ -247,7 +247,7 @@ final class CompletionService
     }
     $this->repo->db->update($this->repo->table(), ['invitation_queued_at' => time()], ['id' => (int) $act['id']]);
     $all = !in_array(false, $results, true);
-    return ['act_id' => (int) $act['id'], 'queued' => $all, 'channels' => $results, 'message' => ($receipt ? 'Acta firmada y ticket cerrado. ' : 'Acta guardada; el ticket sigue abierto hasta la firma. ') . ($all ? 'Mensajes en cola (no confirma entrega).' : 'No se pudieron encolar todos los canales. Revisa el detalle y reintenta.')];
+    return ['act_id' => (int) $act['id'], 'queued' => $all, 'channels' => $results, 'message' => ($receipt ? 'Acta firmada y caso cerrado. ' : 'Acta guardada; el caso sigue abierto hasta la firma. ') . ($all ? 'Mensajes en cola (no confirma entrega).' : 'No se pudieron encolar todos los canales. Revisa el detalle y reintenta.')];
     });
   }
 
@@ -268,7 +268,7 @@ final class CompletionService
       $payload = $this->payload($act);
       if (!isset($this->verificationChannels($payload['signer'])[$channel])) { throw new \DomainException('Canal de verificación no disponible. Usa el correo registrado o contacta a la inmobiliaria.'); }
       return (new CompletionVerification($this->repo, $this->secret))->request($act, $channel, function (string $code, string $nonce) use ($act, $payload, $channel): bool {
-        $text = 'Tu código para firmar el acta #' . $act['id'] . ' del ticket #' . $payload['ticket_number'] . ' es ' . $code . '. Vence en 10 minutos. No lo compartas. Si no lo solicitaste, ignora este mensaje.';
+        $text = 'Tu código para firmar el acta #' . $act['id'] . ' del caso #' . $payload['ticket_number'] . ' es ' . $code . '. Vence en 10 minutos. No lo compartas. Si no lo solicitaste, ignora este mensaje.';
         return $this->send($act, $payload, $channel, 'signature_otp', $nonce, 'Código de firma del acta #' . $act['id'], '<p>' . EmailTemplate::e($text) . '</p>', $text, $code);
       });
     });
@@ -338,7 +338,7 @@ final class CompletionService
       // their ticket still carries the former waiting value.
       $expectedAdminState = (string) ($payload['pending_admin_state'] ?? CompletionPolicy::WAITING);
       if ($act['status'] !== 'pending' || (int) $act['active_slot'] !== 1 || ($ticket['estado_administrativo'] ?? '') !== $expectedAdminState || strcasecmp((string) $ticket['estado'], 'Cerrado') === 0) {
-        throw new \DomainException('El estado del ticket cambió. Contacta a la inmobiliaria antes de firmar.');
+        throw new \DomainException('El estado del caso cambió. Contacta a la inmobiliaria antes de firmar.');
       }
       if (!hash_equals((string) $act['payload_hash'], (string) ($input['document_hash'] ?? ''))) {
         throw new \DomainException('La versión del acta no coincide. Recarga y revisa nuevamente el documento.');
@@ -359,7 +359,7 @@ final class CompletionService
         'fecha' => $now, 'fecha_revision' => $payload['created_at'], 'fecha_ticket' => $report['fecha_ticket'],
         'id_ticket' => (int) $act['ticket_pk'], 'id_empleado' => $payload['actor']['employee_id'], 'creador' => $payload['actor']['name'],
         'categoria' => 'Acta de satisfaccion',
-        'descripcion' => 'Acta de satisfacción #' . $id . ' firmada del ticket #' . htmlspecialchars($payload['ticket_number'], ENT_QUOTES, 'UTF-8') . '. Solución por ' . CompletionPolicy::EXECUTORS[$payload['executor']] . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta y detalle de daños/soluciones</a>.',
+        'descripcion' => 'Acta de satisfacción #' . $id . ' firmada del caso #' . htmlspecialchars($payload['ticket_number'], ENT_QUOTES, 'UTF-8') . '. Solución por ' . CompletionPolicy::EXECUTORS[$payload['executor']] . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta y detalle de daños/soluciones</a>.',
         'fue_pagado' => 'No', 'exportado' => 'No', 'valor' => $report['total'], 'transporte' => $report['transport'],
         'valor_revision' => $report['service_fee'], 'valor_mantenimiento' => $report['service_fee'],
         'id_inmueble' => $report['id_inmueble'], 'inmueble' => $payload['property'], 'arrendatario' => $report['arrendatario'],
@@ -397,13 +397,13 @@ final class CompletionService
       $quoteAudit = $disapprovedQuoteIds === []
         ? ''
         : ' Cotizacion(es) de mantenimiento #' . implode(', #', $disapprovedQuoteIds) . ' marcadas como Desaprobada por ejecucion sin aprobacion.';
-      $this->repo->audit((int) $act['ticket_pk'], 'Acta #' . $id . ' firmada por ' . htmlspecialchars($signature['name'], ENT_QUOTES, 'UTF-8') . '. Ticket cerrado.' . $quoteAudit . ' Reporte administrativo #' . $reportId . ' registrado (no pagado, no exportado). <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta firmada</a>.', $payload['actor']['name'], $payload['actor']['employee_id']);
+      $this->repo->audit((int) $act['ticket_pk'], 'Acta #' . $id . ' firmada por ' . htmlspecialchars($signature['name'], ENT_QUOTES, 'UTF-8') . '. Caso cerrado.' . $quoteAudit . ' Reporte administrativo #' . $reportId . ' registrado (no pagado, no exportado). <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta firmada</a>.', $payload['actor']['name'], $payload['actor']['employee_id']);
       return $this->repo->act($id);
       });
     });
     // Delivery failure cannot undo a valid signature. Staff can retry the receipt without a second charge.
     try { $signed['receipt'] = $this->notify($signed, true); }
-    catch (\Throwable) { $signed['receipt'] = ['queued' => false, 'message' => 'Acta firmada y ticket cerrado; no se pudo encolar la copia. Solicita su reenvío a la inmobiliaria.']; }
+    catch (\Throwable) { $signed['receipt'] = ['queued' => false, 'message' => 'Acta firmada y caso cerrado; no se pudo encolar la copia. Solicita su reenvío a la inmobiliaria.']; }
     return $signed;
   }
 

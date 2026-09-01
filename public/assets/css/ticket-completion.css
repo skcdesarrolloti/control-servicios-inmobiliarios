@@ -73,6 +73,10 @@
 .scm-acta tbody tr:nth-child(even) { background: var(--acta-surface); }
 .scm-acta .scm-acta-signature-name { font-family: Georgia, serif; font-style: italic; font-size: 28px; }
 .scm-acta footer { margin-top: 32px; border-top: 1px solid var(--acta-border); color: var(--acta-muted); }
+.scm-acta .scm-acta-prepared { padding-top: 20px; }
+.scm-acta .scm-acta-prepared .scm-acta-eyebrow { margin-bottom: 8px; color: var(--acta-muted); font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.scm-acta .scm-acta-prepared-signature { margin: 0; color: var(--acta-ink); font: italic clamp(26px, 5vw, 38px)/1.2 Georgia, serif; }
+.scm-acta .scm-acta-prepared-details { margin-top: 6px; color: #31435f; font-size: 14px; font-weight: 600; }
 .scm-acta-fingerprint { font-size: 11px; word-break: break-all; }
 .scm-acta-print { max-width: 960px; margin: 0 auto 16px; }
 .scm-acta-canvas { display: block; width: 100%; aspect-ratio: 1000 / 350; height: auto; border: 2px solid #64748b; background: #fff; border-radius: 10px; touch-action: none; margin: 12px 0; }

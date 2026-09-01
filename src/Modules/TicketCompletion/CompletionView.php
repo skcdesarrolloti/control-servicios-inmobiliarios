@@ -78,7 +78,7 @@ final class CompletionView
           </div>
           <?php if ($context['fee'] === null): ?><p class="scm-acta-notice">Falta una configuración válida. Ingresa expresamente el valor administrativo; no se generarán cobros con una tarifa vacía.</p><?php endif; ?>
           <p class="scm-acta-total">Total del reporte: <output data-acta-total><?= self::money((int) ($context['fee'] ?? 0) + $transportMax) ?></output></p>
-          <label class="scm-acta-check"><input type="checkbox" name="confirm" value="1" required><span>Revisé los daños, las soluciones, el firmante y el valor. Entiendo que al firmar se cerrará el ticket y se registrará un único reporte como no pagado y no exportado.</span></label>
+          <label class="scm-acta-check"><input type="checkbox" name="confirm" value="1" required><span>Revisé los daños, las soluciones, el firmante y el valor. Entiendo que al firmar se cerrará el caso y se registrará un único reporte como no pagado y no exportado.</span></label>
           <button type="submit" class="scm-acta-button">Generar acta y solicitar firma</button>
         </form>
       <?php elseif (!$active): ?><p>El ticket está cerrado. No se pueden generar nuevas actas.</p><?php endif; ?>
@@ -147,7 +147,7 @@ final class CompletionView
       return '<div class="scm-table-wrap"><p class="scm-actas-empty">No hay actas para los filtros actuales.</p></div>';
     }
     $labels = ['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada'];
-    $html = '<div class="scm-table-wrap"><table class="scm-table scm-table-prev scm-actas-table"><thead><tr><th>Acta</th><th>Estado</th><th>Ticket</th><th>Inmueble</th><th>Firmante</th><th>Reporte</th><th>Fechas</th><th>Acciones</th></tr></thead><tbody>';
+    $html = '<div class="scm-table-wrap"><table class="scm-table scm-table-prev scm-actas-table"><thead><tr><th>Acta</th><th>Estado</th><th>Caso</th><th>Inmueble</th><th>Firmante</th><th>Reporte</th><th>Fechas</th><th>Acciones</th></tr></thead><tbody>';
     foreach ($items as $act) {
       $payload = (array) ($act['_payload'] ?? []);
       $ticket = (string) ($payload['ticket_number'] ?? $act['ticket_display'] ?? $act['ticket_pk'] ?? '-');
@@ -188,25 +188,48 @@ final class CompletionView
   {
     $signed = $act['status'] === 'signed';
     $signature = $signed ? json_decode((string) $act['signed_json'], true, 16, JSON_THROW_ON_ERROR) : [];
+    $actor = self::actor($payload);
     ob_start(); ?>
     <article class="scm-acta scm-acta-document">
-      <header><p class="scm-acta-eyebrow">SKC SuCasa Inmobiliaria · NIT 900623242-4</p><h1>Acta de satisfacción del ticket #<?= self::e($payload['ticket_number']) ?></h1><p>Registro interno #<?= self::e($act['id']) ?> · Solución de daños</p><strong class="scm-acta-status"><?= $signed ? 'Firmada · Ticket cerrado' : ($act['status'] === 'archived' ? 'Archivada · No válida para firma' : ($act['status'] === 'cancelled' ? 'Anulada · No válida para firma' : 'Acta sin firmar · Ticket abierto')) ?></strong></header>
+      <header><p class="scm-acta-eyebrow">SKC SuCasa Inmobiliaria · NIT 900623242-4</p><h1>Acta de satisfacción del caso #<?= self::e($payload['ticket_number']) ?></h1><p>Registro interno #<?= self::e($act['id']) ?> · Solución de daños</p><strong class="scm-acta-status"><?= $signed ? 'Firmada · Caso cerrado' : ($act['status'] === 'archived' ? 'Archivada · No válida para firma' : ($act['status'] === 'cancelled' ? 'Anulada · No válida para firma' : 'Acta sin firmar · Caso abierto')) ?></strong></header>
       <section><h2>Datos del servicio</h2><dl class="scm-acta-grid"><div><dt>Inmueble / contrato</dt><dd><?= self::e($payload['property']) ?> / <?= self::e($payload['contract']) ?></dd></div><div><dt>Dirección</dt><dd><?= self::e($payload['address']) ?></dd></div><div><dt>Solución realizada por</dt><dd><?= self::e(CompletionPolicy::EXECUTORS[$payload['executor']]) ?></dd></div><div><dt>Fecha del acta</dt><dd><?= self::e(date('d/m/Y H:i', (int) $payload['created_at'])) ?></dd></div></dl></section>
       <section><h2>Daños encontrados y soluciones realizadas</h2><div class="scm-acta-service-list"><?php foreach ($payload['items'] as $index => $item): ?><article class="scm-acta-service-item"><h3>Daño y solución #<?= $index + 1 ?></h3><dl class="scm-acta-service-detail"><div><dt>Daño encontrado</dt><dd><?= nl2br(self::e($item['damage'])) ?></dd></div><div><dt>Solución realizada</dt><dd><?= nl2br(self::e($item['solution'])) ?></dd></div></dl><?php if (!empty($item['photos'])): ?><div class="scm-acta-evidence"><h4>Evidencias del daño #<?= $index + 1 ?></h4><div class="scm-acta-photo-grid"><?php foreach ($item['photos'] as $photoIndex => $photo): ?><figure><img src="<?= self::e(\SCM\Support\StoredFileService::fromRuntime()->urlFor((string) $photo['name'])) ?>" alt="Evidencia <?= $photoIndex + 1 ?> del daño <?= $index + 1 ?>" width="<?= (int) $photo['width'] ?>" height="<?= (int) $photo['height'] ?>" loading="lazy"><figcaption>Foto <?= $photoIndex + 1 ?> del daño #<?= $index + 1 ?></figcaption></figure><?php endforeach; ?></div></div><?php endif; ?></article><?php endforeach; ?></div></section>
       <section><h2>Observaciones</h2><p class="scm-acta-long-text"><?= nl2br(self::e($payload['observations'])) ?></p></section>
       <section><h2>Firmante seleccionado</h2><p><strong><?= self::e($payload['signer']['name']) ?></strong><br><?= self::e(CompletionPolicy::ROLES[$payload['signer']['role']]) ?> · <?= self::e($payload['signer']['email']) ?></p></section>
       <?php if ($signed): ?><section class="scm-acta-signature"><h2>Firma electrónica registrada</h2><?= !empty($signature['strokes']) ? self::signatureSvg($signature['strokes']) : '' ?><p class="scm-acta-signature-name"><?= self::e($signature['name']) ?></p><p><?= !empty($signature['document']) ? 'Documento: ' . self::e($signature['document']) . '<br>' : '' ?>Fecha: <?= self::e(date('d/m/Y H:i:s', (int) $act['signed_at'])) ?> (Colombia)</p><p><?= !empty($signature['verification']) ? 'Nombre confirmado y contacto verificado por código vía ' . self::e($signature['verification']['channel']) . '. No certifica la identidad documental.' : 'Firma histórica mediante nombre escrito y aceptación expresa.' ?></p><p><?= self::e($signature['consent_text']) ?></p></section><?php endif; ?>
       <?= $form ?>
-      <footer><p>Preparada por <?= self::e($payload['actor']['name']) ?> · SKC SuCasa Inmobiliaria</p><p class="scm-acta-fingerprint">Identificador de contenido (SHA-256): <?= self::e($act['payload_hash']) ?></p></footer>
+      <footer class="scm-acta-prepared"><p class="scm-acta-eyebrow">Elaborada por</p><p class="scm-acta-prepared-signature"><?= self::e($actor['name']) ?></p><p class="scm-acta-prepared-details"><?= self::e(self::actorDetails($actor)) ?></p><p class="scm-acta-fingerprint">Identificador de contenido (SHA-256): <?= self::e($act['payload_hash']) ?></p></footer>
     </article>
     <?php return (string) ob_get_clean();
+  }
+
+  /** @return array{name:string,cargo:string,email:string,phone:string} */
+  public static function actor(array $payload): array
+  {
+    $actor = is_array($payload['actor'] ?? null) ? $payload['actor'] : [];
+    return [
+      'name' => trim((string) ($actor['name'] ?? '')) ?: 'Funcionario',
+      'cargo' => trim((string) ($actor['cargo'] ?? $actor['role'] ?? '')) ?: 'Funcionario',
+      'email' => trim((string) ($actor['email'] ?? $actor['correo'] ?? '')),
+      'phone' => trim((string) ($actor['phone'] ?? $actor['celular'] ?? '')),
+    ];
+  }
+
+  public static function actorDetails(array $actor): string
+  {
+    $parts = array_values(array_filter([
+      trim((string) ($actor['cargo'] ?? '')),
+      trim((string) ($actor['email'] ?? '')),
+      trim((string) ($actor['phone'] ?? '')) !== '' ? 'Celular: ' . trim((string) $actor['phone']) : '',
+    ], static fn(string $value): bool => $value !== ''));
+    return implode(' · ', $parts);
   }
 
   public function signingForm(array $act, array $payload, string $csrf, string $error = '', array $submitted = [], array $channels = []): string
   {
     $options = '';
     foreach ($channels as $channel => $label) { $options .= '<option value="' . self::e($channel) . '">' . self::e($label) . '</option>'; }
-    return '<section><h2>Revisar y firmar</h2><p class="scm-acta-notice">Firma únicamente si estás conforme con los daños, las soluciones y las observaciones descritas. Si algo no corresponde, no firmes y contacta a la inmobiliaria. Esta firma cerrará el ticket.</p>'
+    return '<section><h2>Revisar y firmar</h2><p class="scm-acta-notice">Firma únicamente si estás conforme con los daños, las soluciones y las observaciones descritas. Si algo no corresponde, no firmes y contacta a la inmobiliaria. Esta firma cerrará el caso.</p>'
       . ($error !== '' ? '<p role="alert" class="scm-acta-notice">' . self::e($error) . '</p>' : '')
       . '<noscript><p class="scm-acta-notice">Activa JavaScript para solicitar el código y registrar la firma.</p></noscript>'
       . '<div class="scm-acta-record"><h3>1. Solicita tu código de verificación</h3><label>Recibir código por<select data-acta-otp-channel>' . $options . '</select></label><button type="button" class="scm-acta-button scm-acta-secondary" data-acta-request-code' . (!$channels ? ' disabled' : '') . '>Solicitar código</button><p role="status" aria-live="polite" data-acta-otp-status></p><p class="scm-acta-help">Vence en 10 minutos. Máximo 5 solicitudes y 5 intentos incorrectos por hora. El código verifica acceso a tu contacto, no tu documento de identidad.</p></div>'

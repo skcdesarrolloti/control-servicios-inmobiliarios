@@ -87,7 +87,7 @@ $notifications = [];
 $service = new Service($repo, str_repeat('test-secret-', 4), 'http://127.0.0.1:8097', static function ($to, $subject, $html, $options) use (&$notifications): int {
   $notifications[] = compact('to', 'subject', 'html', 'options'); return 1;
 });
-$actor = ['user_id' => 1, 'employee_id' => '200', 'name' => 'Funcionario Prueba'];
+$actor = ['user_id' => 1, 'employee_id' => '200', 'name' => 'Funcionario Prueba', 'cargo' => 'Coordinador QA', 'email' => 'actor@example.invalid', 'phone' => '3001234567'];
 $input = ['signer_role' => 'propietario', 'signer_name' => 'Ana Pérez', 'executor' => 'inmobiliaria', 'items' => [['damage' => 'Fuga en tubería de cocina', 'solution' => 'Se reemplazó el tramo y se verificó presión.']], 'observations' => 'Sin filtración en la prueba final.', 'transport' => '8000', 'confirm' => '1'];
 $photoName = bin2hex(random_bytes(12)) . '_' . time() . '.jpg';
 $photoPath = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . $photoName;
@@ -201,6 +201,8 @@ $rejects(static fn() => $service->cancel((int) $act['id'], 'corrección', $actor
 $publicHtml = (new View())->document($signed, $service->payload($signed), false);
 $staffHtml = (new View())->document($signed, $service->payload($signed), true);
 $assert(!str_contains($publicHtml, 'Reporte administrativo') && !str_contains($staffHtml, 'Reporte administrativo'), 'act document excludes internal charge for every audience');
+$assert(str_contains($publicHtml, 'Acta de satisfacción del caso #9001') && !str_contains($publicHtml, 'Acta de satisfacción del ticket'), 'act document names the public number as case, not ticket');
+$assert(str_contains($publicHtml, 'Elaborada por') && str_contains($publicHtml, 'Funcionario Prueba') && str_contains($publicHtml, 'Coordinador QA') && str_contains($publicHtml, 'actor@example.invalid') && str_contains($publicHtml, 'Celular: 3001234567'), 'act document includes prepared-by signature block with role email and phone');
 $assert(str_contains($publicHtml, 'Fuga en tubería') && str_contains($publicHtml, 'reemplazó') && str_contains($publicHtml, 'Firma electrónica registrada'), 'document includes damage, solution and signature');
 $assert(str_contains($publicHtml, 'Evidencias del daño #1') && str_contains($publicHtml, rawurlencode($photoName)), 'recipient document displays lazy photographic evidence');
 $badSignature = $signed;

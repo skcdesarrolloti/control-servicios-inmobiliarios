@@ -8,6 +8,7 @@ use SCM\Core\Auth;
 use SCM\Modules\TicketCompletion\CompletionRepository;
 use SCM\Modules\TicketCompletion\CompletionService;
 use SCM\Modules\TicketCompletion\CompletionView;
+use SCM\Support\SchemaInspector;
 
 trait HandlesTicketCompletion
 {
@@ -45,8 +46,7 @@ trait HandlesTicketCompletion
       $repo->requireSchema();
       $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
       $operation = (string) ($_POST['operation'] ?? 'read');
-      $employee = $this->db->getRow('SELECT id_empleado FROM `' . $this->db->table('jet_cct_funcionarios') . '` WHERE _ID = ?', [Auth::userId()]);
-      $actor = ['user_id' => Auth::userId(), 'employee_id' => (string) ($employee['id_empleado'] ?? Auth::userId()), 'name' => Auth::user()];
+      $actor = $this->ticketCompletionActor();
       $result = [];
       if ($operation === 'create') {
         $input = $_POST;
@@ -127,8 +127,7 @@ trait HandlesTicketCompletion
       $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
       if (($_POST['operation'] ?? '') === 'archive') {
         $id = (int) ($_POST['act_id'] ?? 0);
-        $employee = $this->db->getRow('SELECT id_empleado FROM `' . $this->db->table('jet_cct_funcionarios') . '` WHERE _ID = ?', [Auth::userId()]);
-        $service->archive($id, (string) ($_POST['reason'] ?? ''), ['user_id' => Auth::userId(), 'employee_id' => (string) ($employee['id_empleado'] ?? Auth::userId()), 'name' => Auth::user()]);
+        $service->archive($id, (string) ($_POST['reason'] ?? ''), $this->ticketCompletionActor());
       }
       $data = $service->dashboardList($_POST);
       $view = new CompletionView();
@@ -141,5 +140,51 @@ trait HandlesTicketCompletion
     } catch (\DomainException $error) {
       $this->jsonFail($error->getMessage());
     }
+  }
+
+  /** @return array{user_id:int,employee_id:string,name:string,cargo:string,email:string,phone:string} */
+  private function ticketCompletionActor(): array
+  {
+    $userId = Auth::userId();
+    $actor = ['user_id' => $userId, 'employee_id' => (string) $userId, 'name' => Auth::user(), 'cargo' => 'Funcionario', 'email' => '', 'phone' => ''];
+    if ($userId <= 0) {
+      return $actor;
+    }
+
+    $schema = new SchemaInspector($this->db);
+    $table = $this->db->table('jet_cct_funcionarios');
+    if (!$schema->tableExists($table)) {
+      return $actor;
+    }
+
+    $nameColumn = $schema->detectFirstExistingColumn($table, ['nombre', 'name', 'display_name']);
+    $emailColumn = $schema->detectFirstExistingColumn($table, ['correo', 'correo_dian', 'email']);
+    $phoneColumn = $schema->detectFirstExistingColumn($table, ['celular', 'celular_empleado', 'telefono', 'whatsapp']);
+    $roleColumn = $schema->detectFirstExistingColumn($table, ['rol', 'gestion', 'cargo']);
+    $employeeColumn = $schema->detectFirstExistingColumn($table, ['id_empleado']);
+    $cargoColumn = $schema->detectFirstExistingColumn($table, ['id_cargo']);
+    $cargoTable = $this->db->table('jet_cct_cargos');
+    $hasCargoNames = $cargoColumn !== '' && $schema->tableExists($cargoTable) && $schema->columnExists($cargoTable, 'nombre_cargo');
+
+    $select = [
+      $employeeColumn !== '' ? "TRIM(COALESCE(f.`{$employeeColumn}`, '')) AS employee_id" : "'' AS employee_id",
+      $nameColumn !== '' ? "TRIM(COALESCE(f.`{$nameColumn}`, '')) AS name" : "'' AS name",
+      $emailColumn !== '' ? "TRIM(COALESCE(f.`{$emailColumn}`, '')) AS email" : "'' AS email",
+      $phoneColumn !== '' ? "TRIM(COALESCE(f.`{$phoneColumn}`, '')) AS phone" : "'' AS phone",
+      $roleColumn !== '' ? "TRIM(COALESCE(f.`{$roleColumn}`, '')) AS role_name" : "'' AS role_name",
+      $hasCargoNames ? "TRIM(COALESCE(c.`nombre_cargo`, '')) AS cargo_name" : "'' AS cargo_name",
+    ];
+    $join = $hasCargoNames ? " LEFT JOIN `{$cargoTable}` c ON TRIM(COALESCE(f.`{$cargoColumn}`, '')) = CAST(c.`_ID` AS CHAR)" : '';
+    $row = $this->db->getRow('SELECT ' . implode(', ', $select) . " FROM `{$table}` f{$join} WHERE f.`_ID` = ? LIMIT 1", [$userId]);
+    if (!is_array($row)) {
+      return $actor;
+    }
+
+    $actor['employee_id'] = trim((string) ($row['employee_id'] ?? '')) ?: $actor['employee_id'];
+    $actor['name'] = trim((string) ($row['name'] ?? '')) ?: $actor['name'];
+    $actor['email'] = trim((string) ($row['email'] ?? ''));
+    $actor['phone'] = trim((string) ($row['phone'] ?? ''));
+    $actor['cargo'] = trim((string) ($row['cargo_name'] ?? '')) ?: (trim((string) ($row['role_name'] ?? '')) ?: $actor['cargo']);
+    return $actor;
   }
 }

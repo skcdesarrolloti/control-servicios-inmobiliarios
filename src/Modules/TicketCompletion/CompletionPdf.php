@@ -11,10 +11,11 @@ final class CompletionPdf
   public function render(array $act, array $payload, bool $staff = false): string
   {
     $pdf = new SimplePdf();
+    $actor = CompletionView::actor($payload);
     $pdf->footerLabel('SKC SuCasa Inmobiliaria - NIT 900623242-4');
     $pdf->line('SKC SuCasa Inmobiliaria | NIT 900623242-4', 10, 'F2');
-    $pdf->title('Acta de satisfacción - Ticket #' . $payload['ticket_number']);
-    $pdf->callout('Ticket #' . $payload['ticket_number'], $act['status'] === 'signed' ? 'FIRMADA - Cierre registrado al firmar' : ($act['status'] === 'archived' ? 'ARCHIVADA - No válida para firma' : ($act['status'] === 'cancelled' ? 'ANULADA - No válida para firma' : 'PENDIENTE DE FIRMA - Este documento no cierra el ticket')));
+    $pdf->title('Acta de satisfacción del caso #' . $payload['ticket_number']);
+    $pdf->callout('Caso #' . $payload['ticket_number'], $act['status'] === 'signed' ? 'FIRMADA - Cierre registrado al firmar' : ($act['status'] === 'archived' ? 'ARCHIVADA - No válida para firma' : ($act['status'] === 'cancelled' ? 'ANULADA - No válida para firma' : 'PENDIENTE DE FIRMA - Este documento no cierra el caso')));
     $pdf->heading('Datos del servicio');
     $pdf->table(['Dato', 'Detalle'], [
       ['Inmueble / contrato', $payload['property'] . ' / ' . $payload['contract']],
@@ -57,7 +58,7 @@ final class CompletionPdf
       $pdf->paragraph('Firma electrónica; no corresponde a una firma digital certificada. El código verifica acceso al contacto registrado.', 8);
     }
     $pdf->heading('Trazabilidad del documento');
-    $pdf->paragraph('Preparada por ' . $payload['actor']['name'], 9);
+    $pdf->signatureBlock('Elaborada por', $actor['name'], CompletionView::actorDetails($actor));
     $pdf->paragraph('Identificador de contenido SHA-256: ' . $act['payload_hash'], 8);
     return $pdf->bytes();
   }
