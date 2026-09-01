@@ -55,8 +55,10 @@ $assert(str_contains($adminJs, 'data-acta-remove-photo') && str_contains($adminJ
 $assert(str_contains($adminJs, 'MAX_PHOTOS_PER_DAMAGE = 4') && str_contains($adminJs, 'MAX_PHOTOS_PER_ACT = 12'), 'act photo UI enforces visible client limits');
 $actCss = (string) file_get_contents(dirname(__DIR__) . '/public/assets/css/ticket-completion.css');
 $assert(str_contains($actCss, '.scm-acta-logo') && str_contains($actCss, '#10264a') && str_contains($actCss, 'drop-shadow'), 'act logo renders on a high-contrast brand surface');
+$assert(str_contains($actCss, '.scm-acta-thanks') && str_contains($actCss, '.scm-acta-thanks-actions'), 'act thanks page has a dedicated responsive layout');
 $publicActJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/ticket-completion-public.js');
 $assert(str_contains($publicActJs, 'data-acta-gallery-item') && str_contains($publicActJs, 'ArrowRight') && str_contains($publicActJs, 'Cerrar galería'), 'act public view supports large photo gallery navigation');
+$assert(str_contains($publicActJs, 'redirect_url') && str_contains($publicActJs, 'window.location.assign'), 'act signer is redirected to the thank-you page after signing');
 
 if (!in_array('--database', $argv, true)) { echo "$checks domain checks passed. Use --database for isolated SQL integration checks.\n"; exit; }
 require dirname(__DIR__) . '/bootstrap/app.php';
@@ -205,10 +207,13 @@ $rejects(static fn() => $service->cancel((int) $act['id'], 'corrección', $actor
 $publicHtml = (new View())->document($signed, $service->payload($signed), false);
 $staffHtml = (new View())->document($signed, $service->payload($signed), true);
 $assert(!str_contains($publicHtml, 'Reporte administrativo') && !str_contains($staffHtml, 'Reporte administrativo'), 'act document excludes internal charge for every audience');
+$assert(!str_contains($signed['signed_pdf'], 'Firma electrónica; no corresponde') && !str_contains($publicHtml, 'No certifica la identidad documental'), 'act signature output omits the internal legal disclaimer');
 $assert(str_contains($publicHtml, 'Acta de satisfacción del caso #9001') && !str_contains($publicHtml, 'Acta de satisfacción del ticket'), 'act document names the public number as case, not ticket');
 $assert(str_contains($publicHtml, 'Elaborada por') && str_contains($publicHtml, 'Funcionario Prueba') && str_contains($publicHtml, 'Coordinador QA') && str_contains($publicHtml, 'actor@example.invalid') && str_contains($publicHtml, 'Celular: 3001234567'), 'act document includes prepared-by signature block with role email and phone');
 $assert(str_contains($publicHtml, 'class="scm-acta-logo"') && str_contains($publicHtml, 'alt="SKC SuCasa Inmobiliaria"'), 'act document header includes the company logo');
 $assert(str_contains($publicHtml, 'data-acta-gallery-item') && str_contains($publicHtml, 'data-full-src') && str_contains($publicHtml, 'clic para ampliar'), 'act document evidence photos open in the gallery');
+$thanksHtml = (new View())->thankYou($signed, $service->payload($signed), $token);
+$assert(str_contains($thanksHtml, 'Gracias por tu firma') && str_contains($thanksHtml, 'Conocer más productos SuCasa') && str_contains($thanksHtml, 'https://sucasainmobiliaria.com.co/'), 'act thank-you page confirms signing and links to SuCasa website');
 $assert(str_contains($publicHtml, 'Fuga en tubería') && str_contains($publicHtml, 'reemplazó') && str_contains($publicHtml, 'Firma electrónica registrada'), 'document includes damage, solution and signature');
 $assert(str_contains($publicHtml, 'Evidencias del daño #1') && str_contains($publicHtml, rawurlencode($photoName)), 'recipient document displays lazy photographic evidence');
 $badSignature = $signed;

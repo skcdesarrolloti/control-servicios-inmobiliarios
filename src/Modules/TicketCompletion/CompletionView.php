@@ -197,7 +197,7 @@ final class CompletionView
       <section><h2>Daños encontrados y soluciones realizadas</h2><div class="scm-acta-service-list"><?php foreach ($payload['items'] as $index => $item): ?><article class="scm-acta-service-item"><h3>Daño y solución #<?= $index + 1 ?></h3><dl class="scm-acta-service-detail"><div><dt>Daño encontrado</dt><dd><?= nl2br(self::e($item['damage'])) ?></dd></div><div><dt>Solución realizada</dt><dd><?= nl2br(self::e($item['solution'])) ?></dd></div></dl><?php if (!empty($item['photos'])): ?><div class="scm-acta-evidence"><h4>Evidencias del daño #<?= $index + 1 ?></h4><div class="scm-acta-photo-grid"><?php foreach ($item['photos'] as $photoIndex => $photo): $photoUrl = \SCM\Support\StoredFileService::fromRuntime()->urlFor((string) $photo['name']); $caption = 'Foto ' . ($photoIndex + 1) . ' del daño #' . ($index + 1); ?><figure><button type="button" class="scm-acta-photo-thumb" data-acta-gallery-item data-full-src="<?= self::e($photoUrl) ?>" data-caption="<?= self::e($caption) ?>"><img src="<?= self::e($photoUrl) ?>" alt="Evidencia <?= $photoIndex + 1 ?> del daño <?= $index + 1 ?>" width="<?= (int) $photo['width'] ?>" height="<?= (int) $photo['height'] ?>" loading="lazy"></button><figcaption><?= self::e($caption) ?> · clic para ampliar</figcaption></figure><?php endforeach; ?></div></div><?php endif; ?></article><?php endforeach; ?></div></section>
       <section><h2>Observaciones</h2><p class="scm-acta-long-text"><?= nl2br(self::e($payload['observations'])) ?></p></section>
       <section><h2>Firmante seleccionado</h2><p><strong><?= self::e($payload['signer']['name']) ?></strong><br><?= self::e(CompletionPolicy::ROLES[$payload['signer']['role']]) ?> · <?= self::e($payload['signer']['email']) ?></p></section>
-      <?php if ($signed): ?><section class="scm-acta-signature"><h2>Firma electrónica registrada</h2><?= !empty($signature['strokes']) ? self::signatureSvg($signature['strokes']) : '' ?><p class="scm-acta-signature-name"><?= self::e($signature['name']) ?></p><p><?= !empty($signature['document']) ? 'Documento: ' . self::e($signature['document']) . '<br>' : '' ?>Fecha: <?= self::e(date('d/m/Y H:i:s', (int) $act['signed_at'])) ?> (Colombia)</p><p><?= !empty($signature['verification']) ? 'Nombre confirmado y contacto verificado por código vía ' . self::e($signature['verification']['channel']) . '. No certifica la identidad documental.' : 'Firma histórica mediante nombre escrito y aceptación expresa.' ?></p><p><?= self::e($signature['consent_text']) ?></p></section><?php endif; ?>
+      <?php if ($signed): ?><section class="scm-acta-signature"><h2>Firma electrónica registrada</h2><?= !empty($signature['strokes']) ? self::signatureSvg($signature['strokes']) : '' ?><p class="scm-acta-signature-name"><?= self::e($signature['name']) ?></p><p><?= !empty($signature['document']) ? 'Documento: ' . self::e($signature['document']) . '<br>' : '' ?>Fecha: <?= self::e(date('d/m/Y H:i:s', (int) $act['signed_at'])) ?> (Colombia)</p><p><?= self::e($signature['consent_text']) ?></p></section><?php endif; ?>
       <?= $form ?>
       <footer class="scm-acta-prepared"><p class="scm-acta-eyebrow">Elaborada por</p><p class="scm-acta-prepared-signature"><?= self::e($actor['name']) ?></p><p class="scm-acta-prepared-details"><?= self::e(self::actorDetails($actor)) ?></p><p class="scm-acta-fingerprint">Identificador de contenido (SHA-256): <?= self::e($act['payload_hash']) ?></p></footer>
     </article>
@@ -234,6 +234,23 @@ final class CompletionView
     return defined('SCM_DEFAULT_PORTAL_LOGO_URL') ? (string) SCM_DEFAULT_PORTAL_LOGO_URL : '';
   }
 
+  public function thankYou(array $act, array $payload, string $token): string
+  {
+    $logoUrl = self::logoUrl();
+    ob_start(); ?>
+    <main class="scm-acta scm-acta-document scm-acta-thanks">
+      <?php if ($logoUrl !== ''): ?><span class="scm-acta-logo"><img src="<?= self::e($logoUrl) ?>" alt="SKC SuCasa Inmobiliaria" loading="eager" decoding="async"></span><?php endif; ?>
+      <p class="scm-acta-thanks-kicker">Acta firmada</p>
+      <h1>Gracias por tu firma</h1>
+      <p>Hemos registrado correctamente la firma del acta del caso #<?= self::e($payload['ticket_number']) ?>. El cierre del caso quedó guardado y puedes descargar la copia firmada cuando la necesites.</p>
+      <div class="scm-acta-thanks-actions">
+        <a class="scm-acta-button" href="ticket-acta.php?id=<?= (int) $act['id'] ?>&token=<?= self::e(rawurlencode($token)) ?>&format=pdf">Descargar acta firmada</a>
+        <a class="scm-acta-button scm-acta-secondary" href="https://sucasainmobiliaria.com.co/" target="_blank" rel="noopener noreferrer">Conocer más productos SuCasa</a>
+      </div>
+    </main>
+    <?php return (string) ob_get_clean();
+  }
+
   public function signingForm(array $act, array $payload, string $csrf, string $error = '', array $submitted = [], array $channels = []): string
   {
     $options = '';
@@ -241,14 +258,14 @@ final class CompletionView
     return '<section><h2>Revisar y firmar</h2><p class="scm-acta-notice">Firma únicamente si estás conforme con los daños, las soluciones y las observaciones descritas. Si algo no corresponde, no firmes y contacta a la inmobiliaria. Esta firma cerrará el caso.</p>'
       . ($error !== '' ? '<p role="alert" class="scm-acta-notice">' . self::e($error) . '</p>' : '')
       . '<noscript><p class="scm-acta-notice">Activa JavaScript para solicitar el código y registrar la firma.</p></noscript>'
-      . '<div class="scm-acta-record"><h3>1. Solicita tu código de verificación</h3><label>Recibir código por<select data-acta-otp-channel>' . $options . '</select></label><button type="button" class="scm-acta-button scm-acta-secondary" data-acta-request-code' . (!$channels ? ' disabled' : '') . '>Solicitar código</button><p role="status" aria-live="polite" data-acta-otp-status></p><p class="scm-acta-help">Vence en 10 minutos. Máximo 5 solicitudes y 5 intentos incorrectos por hora. El código verifica acceso a tu contacto, no tu documento de identidad.</p></div>'
+      . '<div class="scm-acta-record"><h3>1. Solicita tu código de verificación</h3><label>Recibir código por<select data-acta-otp-channel>' . $options . '</select></label><button type="button" class="scm-acta-button scm-acta-secondary" data-acta-request-code' . (!$channels ? ' disabled' : '') . '>Solicitar código</button><p role="status" aria-live="polite" data-acta-otp-status></p><p class="scm-acta-help">Vence en 10 minutos. Máximo 5 solicitudes y 5 intentos incorrectos por hora.</p></div>'
       . '<form method="post" data-acta-sign-form>'
       . '<h3>2. Confirma tu nombre y firma</h3>'
       . '<input type="hidden" name="_csrf_token" value="' . self::e($csrf) . '">'
       . '<input type="hidden" name="document_hash" value="' . self::e($act['payload_hash']) . '">'
       . '<input type="hidden" name="consent_version" value="3">'
       . '<label>Nombre completo *<input name="signature_name" required maxlength="160" autocomplete="name" placeholder="' . self::e($payload['signer']['name']) . '" value="' . self::e(is_string($submitted['signature_name'] ?? null) ? $submitted['signature_name'] : '') . '"></label>'
-      . '<p class="scm-acta-help">Escribe exactamente: <strong>' . self::e($payload['signer']['name']) . '</strong>. Ese nombre será tu firma electrónica, junto con el código enviado a tu contacto registrado.</p>'
+      . '<p class="scm-acta-help">Escribe exactamente: <strong>' . self::e($payload['signer']['name']) . '</strong>. Ese nombre será tu firma electrónica.</p>'
       . '<label>Código de 6 dígitos *<input name="otp_code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></label>'
       . '<label class="scm-acta-check"><input type="checkbox" name="accepted" value="1" required><span>' . self::e(CompletionPolicy::TYPED_OTP_CONSENT) . '</span></label>'
       . '<button type="submit" class="scm-acta-button">Firmar acta y cerrar ticket</button><p role="status" data-acta-sign-status></p></form></section>';

@@ -53,9 +53,8 @@ final class CompletionPdf
       if (!empty($evidence['strokes'])) { $pdf->drawnSignature($evidence['strokes']); }
       $identityLine = (string) $evidence['name'] . (!empty($evidence['document']) ? ' | Documento: ' . $evidence['document'] : '');
       $pdf->paragraph($identityLine, 10);
-      $pdf->paragraph('Firmada el ' . date('d/m/Y H:i:s', (int) $act['signed_at']) . ' (Colombia). ' . (!empty($evidence['verification']) ? 'Nombre confirmado y contacto verificado por código vía ' . $evidence['verification']['channel'] . '.' : 'Firma histórica mediante nombre escrito y aceptación.'), 9);
+      $pdf->paragraph('Firmada el ' . date('d/m/Y H:i:s', (int) $act['signed_at']) . ' (Colombia).', 9);
       $pdf->paragraph($evidence['consent_text'], 9);
-      $pdf->paragraph('Firma electrónica; no corresponde a una firma digital certificada. El código verifica acceso al contacto registrado.', 8);
     }
     $pdf->heading('Trazabilidad del documento');
     $pdf->signatureBlock('Elaborada por', $actor['name'], CompletionView::actorDetails($actor));

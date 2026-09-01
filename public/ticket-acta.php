@@ -27,6 +27,7 @@ $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
 $view = new CompletionView();
 $jsonRequest = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
 $jsonResult = null;
+$showPrint = true;
 
 try {
   if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'POST'], true)) {
@@ -65,7 +66,12 @@ try {
         $jsonResult['ok'] = $jsonResult['queued'];
       } else {
         $act = $service->sign($id, $token, $_POST, (string) ($_SERVER['REMOTE_ADDR'] ?? ''), (string) ($_SERVER['HTTP_USER_AGENT'] ?? ''));
-        $jsonResult = ['ok' => true, 'signed' => true, 'message' => $act['receipt']['message'] ?? 'Acta firmada. Cierre registrado.'];
+        $thanksUrl = 'ticket-acta.php?id=' . $id . '&token=' . rawurlencode($token) . '&gracias=1';
+        $jsonResult = ['ok' => true, 'signed' => true, 'redirect_url' => $thanksUrl, 'message' => $act['receipt']['message'] ?? 'Acta firmada. Cierre registrado.'];
+        if (!$jsonRequest) {
+          header('Location: ' . $thanksUrl, true, 303);
+          exit;
+        }
       }
     } catch (DomainException $error) {
       $formError = $error->getMessage();
@@ -84,7 +90,10 @@ try {
     exit;
   }
   $form = '';
-  if (!$staff && $act['status'] === 'pending') {
+  if (!$staff && $act['status'] === 'signed' && ($_GET['gracias'] ?? '') === '1') {
+    $showPrint = false;
+    $content = $view->thankYou($act, $payload, $token);
+  } elseif (!$staff && $act['status'] === 'pending') {
     $csrf = (string) ($_SESSION['scm_csrf'][$csrfAction] ?? '');
     if ($csrf === '') {
       $csrf = App::csrf()->token($csrfAction);
@@ -93,14 +102,16 @@ try {
   } elseif ($staff && $act['status'] === 'pending') {
     $form = '<p class="scm-acta-notice">Vista interna de consulta. La firma debe realizarla el destinatario desde su enlace personal, confirmando su nombre y el código enviado a su contacto registrado.</p>';
   }
-  $content = $view->document($act, $payload, $staff, $form);
-  $pdfUrl = 'ticket-acta.php?id=' . $id . ($staff ? '' : '&token=' . rawurlencode($token)) . '&format=pdf';
-  $content = '<div class="scm-acta scm-acta-print"><a class="scm-acta-button" href="' . $escape($pdfUrl) . '">Descargar PDF' . ($act['status'] === 'signed' ? ' firmado' : ' pendiente') . '</a></div>' . $content;
-  if ($act['status'] === 'signed') {
-    $delivery = json_decode((string) ($repo->act($id)['delivery_json'] ?? ''), true) ?: [];
-    $pendingCopy = false;
-    foreach ($payload['channels'] ?? ['email'] as $channel) { $pendingCopy = $pendingCopy || empty($delivery['signed_receipt'][$channel]['queued']); }
-    $content = '<div class="scm-acta scm-acta-print"><p class="scm-acta-notice">Firma registrada. El cierre ya se guardó. ' . ($pendingCopy ? 'No se confirmó el encolado de todas las copias; puedes descargar el PDF aquí y solicitar reenvío a la inmobiliaria.' : 'Copia solicitada por los canales elegidos. En cola no significa entregada.') . '</p></div>' . $content;
+  if ($content === '') {
+    $content = $view->document($act, $payload, $staff, $form);
+    $pdfUrl = 'ticket-acta.php?id=' . $id . ($staff ? '' : '&token=' . rawurlencode($token)) . '&format=pdf';
+    $content = '<div class="scm-acta scm-acta-print"><a class="scm-acta-button" href="' . $escape($pdfUrl) . '">Descargar PDF' . ($act['status'] === 'signed' ? ' firmado' : ' pendiente') . '</a></div>' . $content;
+    if ($act['status'] === 'signed') {
+      $delivery = json_decode((string) ($repo->act($id)['delivery_json'] ?? ''), true) ?: [];
+      $pendingCopy = false;
+      foreach ($payload['channels'] ?? ['email'] as $channel) { $pendingCopy = $pendingCopy || empty($delivery['signed_receipt'][$channel]['queued']); }
+      $content = '<div class="scm-acta scm-acta-print"><p class="scm-acta-notice">Firma registrada. El cierre ya se guardó. ' . ($pendingCopy ? 'No se confirmó el encolado de todas las copias; puedes descargar el PDF aquí y solicitar reenvío a la inmobiliaria.' : 'Copia solicitada por los canales elegidos. En cola no significa entregada.') . '</p></div>' . $content;
+    }
   }
 } catch (DomainException $error) {
   if (http_response_code() < 400) {
@@ -121,4 +132,4 @@ if ($jsonRequest) {
   exit;
 }
 ?>
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acta de satisfacción · SuCasa</title><link rel="stylesheet" href="assets/css/ticket-completion.css?v=<?= $escape(SCM_VERSION) ?>"><script defer src="assets/js/ticket-completion-public.js?v=<?= $escape(SCM_VERSION) ?>"></script></head><body class="scm-acta-page"><div class="scm-acta scm-acta-print"><button type="button" class="scm-acta-button scm-acta-secondary" data-acta-print>Imprimir acta</button></div><?= $content ?></body></html>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acta de satisfacción · SuCasa</title><link rel="stylesheet" href="assets/css/ticket-completion.css?v=<?= $escape(SCM_VERSION) ?>"><script defer src="assets/js/ticket-completion-public.js?v=<?= $escape(SCM_VERSION) ?>"></script></head><body class="scm-acta-page"><?php if ($showPrint): ?><div class="scm-acta scm-acta-print"><button type="button" class="scm-acta-button scm-acta-secondary" data-acta-print>Imprimir acta</button></div><?php endif; ?><?= $content ?></body></html>

@@ -131,12 +131,12 @@
         body: data,
         credentials: "same-origin",
         headers: { Accept: "application/json" },
-        signal: controller.signal,
+        signal: controller.signal
       });
       var result = await response.json();
       if (!result || !result.ok) {
         throw new Error(
-          (result && result.message) || "No se pudo completar la operación.",
+          (result && result.message) || "No se pudo completar la operación."
         );
       }
       return result;
@@ -194,8 +194,12 @@
     document.body.appendChild(overlay);
     form.setAttribute("aria-busy", "true");
     try {
-      await request(data);
-      window.location.reload();
+      var result = await request(data);
+      if (result.redirect_url) {
+        window.location.assign(result.redirect_url);
+      } else {
+        window.location.reload();
+      }
     } catch (error) {
       if (signStatus) {
         signStatus.textContent =
