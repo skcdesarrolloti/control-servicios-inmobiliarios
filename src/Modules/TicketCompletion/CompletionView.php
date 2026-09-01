@@ -19,7 +19,6 @@ final class CompletionView
   public function panel(array $context, CompletionService $service): string
   {
     $ticket = $context['ticket'];
-    $transportBase = (int) ($context['transport_base'] ?? 0);
     $transportMax = (int) ($context['transport_max'] ?? 0);
     $active = false;
     foreach ($context['acts'] as $act) {
@@ -71,10 +70,10 @@ final class CompletionView
           <button type="button" class="scm-acta-button scm-acta-secondary" data-acta-add-item>Agregar otro daño y solución</button>
           <label>Observaciones finales *<textarea name="observations" required maxlength="6000" rows="3" placeholder="Describe verificaciones, alcance de la solución y observaciones para el firmante."></textarea></label>
           <h3>3. Reporte administrativo de cobro</h3>
-          <p class="scm-acta-help">Servicio administrativo: salario ÷ días de trabajo × porcentaje configurado. Transporte: valor configurado × 2 para cubrir ida y regreso. Ambos valores quedan fijos desde configuración antes de generar el acta.</p>
+          <p class="scm-acta-help">Valores fijos tomados de la configuración de mantenimiento.</p>
           <div class="scm-acta-grid">
             <label>Servicio administrativo (COP) *<input type="number" name="service_fee" min="1" max="999999999" step="1" required value="<?= self::e($context['fee'] ?? '') ?>" <?= $context['fee'] !== null ? 'readonly' : '' ?> data-acta-fee></label>
-            <label>Transporte (COP) *<input type="hidden" name="transport" value="<?= self::e($transportMax) ?>" data-acta-transport><span class="scm-acta-readonly-value" aria-live="polite"><?= self::money($transportMax) ?></span><small class="scm-acta-help"><?= $transportBase > 0 ? 'Configurado: ' . self::money($transportBase) . ' por trayecto. Ida y regreso: ' . self::money($transportMax) . '.' : 'No hay valor_transporte válido: el valor fijo temporal es $0.' ?></small></label>
+            <label>Transporte (COP) *<input type="hidden" name="transport" value="<?= self::e($transportMax) ?>" data-acta-transport><span class="scm-acta-readonly-value" aria-live="polite"><?= self::money($transportMax) ?></span></label>
           </div>
           <?php if ($context['fee'] === null): ?><p class="scm-acta-notice">Falta una configuración válida. Ingresa expresamente el valor administrativo; no se generarán cobros con una tarifa vacía.</p><?php endif; ?>
           <p class="scm-acta-total">Total del reporte: <output data-acta-total><?= self::money((int) ($context['fee'] ?? 0) + $transportMax) ?></output></p>
