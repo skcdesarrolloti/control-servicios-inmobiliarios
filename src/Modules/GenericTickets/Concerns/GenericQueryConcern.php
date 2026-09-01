@@ -123,6 +123,11 @@ trait GenericQueryConcern
       $where[] = 'LOWER(TRIM(COALESCE(`estado`, \'\'))) IN (?, ?)';
       $args[] = 'nuevo';
       $args[] = 'en proceso';
+      $activeAdminCol = $this->detect_first_existing_column($tabla, ['estado_admin_ticket', 'estado_administrativo', 'estado_admin']);
+      if ($activeAdminCol !== '') {
+        $where[] = "LOWER(TRIM(COALESCE(`{$activeAdminCol}`, ''))) <> ?";
+        $args[] = 'acta sin firmar';
+      }
 
       if (!empty($p['fEstado'])) {
         $estadoFilter = strtolower(trim((string) $p['fEstado']));

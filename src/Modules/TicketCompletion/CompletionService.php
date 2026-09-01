@@ -128,7 +128,8 @@ final class CompletionService
       if (!isset(CompletionPolicy::EXECUTORS[$executor])) {
         throw new \DomainException('Selecciona quién realizó la solución.');
       }
-      $pendingAdminState = CompletionPolicy::executionState($executor);
+      CompletionPolicy::executionState($executor);
+      $pendingAdminState = CompletionPolicy::PENDING_SIGNATURE_STATE;
       $contact = $context['contacts'][$role];
       if (!$contact['available']) {
         throw new \DomainException('El firmante necesita nombre y un contacto válido para verificación: correo o WhatsApp con plantilla de autenticación configurada.');
@@ -223,7 +224,7 @@ final class CompletionService
     $payload = $this->payload($act);
     $url = $this->viewUrl((int) $act['id']) . '&token=' . $this->token($act);
     $title = ($receipt ? 'Acta firmada' : 'Acta de satisfacción') . ' del ticket #' . $payload['ticket_number'];
-    $description = $receipt ? 'Tu firma quedó registrada y el ticket se cerró. Puedes consultar y descargar tu PDF firmado.' : 'Revisa los daños, soluciones y observaciones. Solo firma si estás conforme: tu firma cerrará el ticket. Necesitarás un código enviado a tu contacto registrado.';
+    $description = $receipt ? 'Tu firma quedó registrada y el ticket se cerró. Puedes consultar y descargar tu PDF firmado.' : 'Revisa los daños, soluciones, observaciones y evidencias. Solo firma si estás conforme: tu firma cerrará el ticket. Necesitarás un código enviado a tu contacto registrado.';
     $linkLabel = $receipt ? 'Descargar PDF firmado' : 'Revisar y firmar acta';
     $target = $receipt ? $url . '&format=pdf' : $url;
     $body = '<p>Hola ' . EmailTemplate::e($payload['signer']['name']) . '.</p><p>' . $description . '</p><p><a href="' . EmailTemplate::e($target) . '">' . $linkLabel . '</a></p><p>Enlace personal válido hasta ' . date('d/m/Y', (int) $act['expires_at']) . '. No lo compartas.</p>';
@@ -315,10 +316,9 @@ final class CompletionService
       if ($act['status'] === 'signed') { return $act; }
       $payload = $this->payload($act);
       CompletionPolicy::signature($input, $payload['signer']['name']);
-      if (($input['consent_version'] ?? '') !== '2') { throw new \DomainException('Recarga y acepta la versión actual del formulario de firma.'); }
-      $strokes = CompletionPolicy::strokes($input['signature_strokes'] ?? '');
+      if (($input['consent_version'] ?? '') !== '3') { throw new \DomainException('Recarga y acepta la versión actual del formulario de firma.'); }
       $verification = (new CompletionVerification($this->repo, $this->secret))->verify($act, $input['otp_code'] ?? '');
-      return $this->repo->transaction((int) $act['ticket_pk'], function (array $ticket) use ($id, $token, $input, $ip, $userAgent, $strokes, $verification): array {
+      return $this->repo->transaction((int) $act['ticket_pk'], function (array $ticket) use ($id, $token, $input, $ip, $userAgent, $verification): array {
       $act = $this->repo->act($id);
       $this->assertPublicAccess($act, $token);
       $payload = $this->payload($act);
@@ -335,10 +335,6 @@ final class CompletionService
         throw new \DomainException('La versión del acta no coincide. Recarga y revisa nuevamente el documento.');
       }
       $signature = CompletionPolicy::signature($input, $payload['signer']['name']);
-      $signature['method'] = 'drawn-signature-otp-and-explicit-consent';
-      $signature['consent_version'] = '2';
-      $signature['consent_text'] = CompletionPolicy::DRAWN_CONSENT;
-      $signature['strokes'] = $strokes;
       $signature['verification'] = $verification;
       $signature['signed_at'] = time();
       $signature['ip'] = substr($ip, 0, 45);
@@ -405,7 +401,7 @@ final class CompletionService
   public function pdf(array $act, bool $staff = false): string
   {
     $payload = $this->payload($act);
-    if ($act['status'] === 'signed' && empty($act['signed_pdf']) && (json_decode($act['signed_json'], true)['consent_version'] ?? '') === '2') {
+    if ($act['status'] === 'signed' && empty($act['signed_pdf']) && in_array((string) (json_decode($act['signed_json'], true)['consent_version'] ?? ''), ['2', '3'], true)) {
       throw new \DomainException('No se encuentra el PDF original firmado. Solicita revisión al administrador.');
     }
     if ($act['status'] === 'signed' && !empty($act['signed_pdf'])) {
@@ -414,6 +410,89 @@ final class CompletionService
       if (!$staff) { return $act['signed_pdf']; }
     }
     return (new CompletionPdf())->render($act, $payload, $staff);
+  }
+
+  /** @return array{filters:array<string,string|int>,items:array<int,array<string,mixed>>,stats:array<string,int>,count:int,pagination:array<string,int>} */
+  public function dashboardList(array $input): array
+  {
+    $this->repo->requireSchema();
+    $clean = static fn(mixed $value): string => trim(strip_tags((string) (is_scalar($value) ? $value : '')));
+    $status = strtolower($clean($input['sacta_estado'] ?? 'pending'));
+    $statusMap = ['pending' => 'pending', 'pendiente' => 'pending', 'sin_firmar' => 'pending', 'firmada' => 'signed', 'signed' => 'signed', 'anulada' => 'cancelled', 'cancelled' => 'cancelled', 'todos' => 'all', 'all' => 'all'];
+    $status = $statusMap[$status] ?? 'pending';
+    $page = max(1, (int) ($input['sacta_page'] ?? 1));
+    $perPage = min(100, max(10, (int) ($input['sacta_per_page'] ?? 30)));
+    $filters = [
+      'estado' => $status,
+      'caso' => $clean($input['sacta_caso'] ?? ''),
+      'inmueble' => $clean($input['sacta_inmueble'] ?? ''),
+      'contrato' => $clean($input['sacta_contrato'] ?? ''),
+      'firmante' => $clean($input['sacta_firmante'] ?? ''),
+      'page' => $page,
+      'per_page' => $perPage,
+    ];
+
+    $where = [];
+    $args = [];
+    if ($status !== 'all') {
+      $where[] = 'a.status = ?';
+      $args[] = $status;
+    }
+    $likeJson = static fn(string $path): string => "LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.payload_json, '{$path}')), '')))";
+    foreach ([
+      'caso' => ["LOWER(TRIM(COALESCE(t.id_ticket, '')))", $likeJson('$.ticket_number'), "CAST(a.ticket_pk AS CHAR)"],
+      'inmueble' => ["LOWER(TRIM(COALESCE(t.inmueble, '')))", $likeJson('$.property')],
+      'contrato' => ["LOWER(TRIM(COALESCE(t.contrato, '')))", $likeJson('$.contract')],
+      'firmante' => [$likeJson('$.signer.name'), $likeJson('$.signer.email'), $likeJson('$.signer.phone')],
+    ] as $key => $columns) {
+      if ($filters[$key] === '') {
+        continue;
+      }
+      $needle = '%' . mb_strtolower($this->repo->db->escapeLike((string) $filters[$key]), 'UTF-8') . '%';
+      $where[] = '(' . implode(' OR ', array_map(static fn(string $expr): string => $expr . ' LIKE ?', $columns)) . ')';
+      foreach ($columns as $_) {
+        $args[] = $needle;
+      }
+    }
+
+    $table = $this->repo->table();
+    $tickets = $this->repo->db->table('jet_cct_tickets');
+    $whereSql = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+    $count = (int) $this->repo->db->getVar("SELECT COUNT(*) FROM `{$table}` a LEFT JOIN `{$tickets}` t ON t._ID = a.ticket_pk{$whereSql}", $args);
+    $totalPages = max(1, (int) ceil($count / $perPage));
+    $page = min($page, $totalPages);
+    $offset = ($page - 1) * $perPage;
+    $rows = $this->repo->db->getResults(
+      "SELECT a.*, t.id_ticket AS ticket_display, t.inmueble AS ticket_inmueble, t.contrato AS ticket_contrato, t.direccion AS ticket_address, t.estado AS ticket_estado, t.estado_administrativo AS ticket_estado_admin
+       FROM `{$table}` a
+       LEFT JOIN `{$tickets}` t ON t._ID = a.ticket_pk{$whereSql}
+       ORDER BY CASE a.status WHEN 'pending' THEN 0 WHEN 'signed' THEN 1 ELSE 2 END, COALESCE(a.signed_at, a.created_at) DESC, a.id DESC
+       LIMIT ? OFFSET ?",
+      array_merge($args, [$perPage, $offset])
+    );
+    $items = [];
+    foreach ($rows as $row) {
+      try {
+        $row['_payload'] = $this->payload($row);
+        $items[] = $row;
+      } catch (\Throwable) {
+        $row['_payload'] = [];
+        $row['_invalid_payload'] = true;
+        $items[] = $row;
+      }
+    }
+    $statsRows = $this->repo->db->getResults("SELECT status, COUNT(*) AS total FROM `{$table}` GROUP BY status");
+    $stats = ['pending' => 0, 'signed' => 0, 'cancelled' => 0, 'all' => 0];
+    foreach ($statsRows as $row) {
+      $key = (string) ($row['status'] ?? '');
+      if (isset($stats[$key])) {
+        $stats[$key] = (int) ($row['total'] ?? 0);
+        $stats['all'] += $stats[$key];
+      }
+    }
+
+    $filters['page'] = $page;
+    return ['filters' => $filters, 'items' => $items, 'stats' => $stats, 'count' => $count, 'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $count, 'total_pages' => $totalPages]];
   }
 
   private static function legacyText(array $payload): string

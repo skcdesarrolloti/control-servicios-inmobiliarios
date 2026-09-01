@@ -32,6 +32,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_COTIZACION_RESPONSE = 'scm_responder_cotizacion';
   const AJAX_CLOSE_TICKET = 'scm_cerrar_ticket';
   const AJAX_TICKET_COMPLETION = 'scm_ticket_acta';
+  const AJAX_TICKET_COMPLETION_LIST = 'scm_ticket_actas_satisfaccion';
   const AJAX_CONTACTS_UPDATE = 'scm_actualizar_contactos';
   const AJAX_ENTREGA         = 'scm_entrega';
   const AJAX_PREVENTIVA      = 'scm_preventiva';
@@ -151,6 +152,7 @@ final class SuCasaControlServiciosInmobiliarios
       'cerrados' => 'Cerrados',
       'mis_tickets' => 'Mis tickets',
       'cotizaciones_mantenimiento' => 'Cotizaciones de Mantenimiento',
+      'actas_satisfaccion' => 'Actas de satisfacción',
       'calendario_actividades' => 'Calendario',
       'notificaciones' => 'Notificaciones',
       'gestiones_cobro' => 'Gestiones de cobro',

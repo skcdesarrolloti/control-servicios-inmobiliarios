@@ -17,7 +17,7 @@ trait HandlesTicketCompletion
       return false;
     }
     $ticket = (new CompletionRepository($this->db))->ticket($ticketId);
-    if ($this->canAccessDashboardTab('abiertos')) {
+    if ($this->canAccessDashboardTab('abiertos') || $this->canAccessDashboardTab('actas_satisfaccion')) {
       return true;
     }
     $employee = $this->db->getRow('SELECT id_empleado FROM `' . $this->db->table('jet_cct_funcionarios') . '` WHERE _ID = ?', [Auth::userId()]);
@@ -110,6 +110,28 @@ trait HandlesTicketCompletion
         throw new \DomainException('Operación de acta no válida.');
       }
       $this->jsonOk($result + ['html' => (new CompletionView())->panel($service->context($ticketId), $service)]);
+    } catch (\DomainException $error) {
+      $this->jsonFail($error->getMessage());
+    }
+  }
+
+  public function ajax_handler_ticket_completion_list(): void
+  {
+    $this->verifyCsrf();
+    try {
+      if (!$this->canAccessDashboardTab('actas_satisfaccion')) {
+        http_response_code(403);
+        $this->jsonFail('No tienes permiso para consultar actas de satisfacción.');
+      }
+      $repo = new CompletionRepository($this->db);
+      $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
+      $data = $service->dashboardList($_POST);
+      $view = new CompletionView();
+      $this->jsonOk([
+        'table_html' => $view->dashboardTable($data['items'], $service, $data['pagination']),
+        'kpis_html' => $view->dashboardKpis($data['stats']),
+        'count' => (string) $data['count'],
+      ]);
     } catch (\DomainException $error) {
       $this->jsonFail($error->getMessage());
     }

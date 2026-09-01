@@ -63,6 +63,10 @@
                     var rspHeaderCount = document.getElementById('rsp-kpi-count');
                     if (rspHeaderCount && typeof d.count === 'string') rspHeaderCount.textContent = d.count;
                   }
+                  if (prefix === 'sacta_') {
+                    var actaHeaderCount = document.getElementById('sacta-kpi-count');
+                    if (actaHeaderCount && typeof d.count === 'string') actaHeaderCount.textContent = d.count;
+                  }
                   if (pendingPanel) pendingPanel.setAttribute('data-scm-loaded', '1');
                 })
                 .finally(function() {
@@ -74,6 +78,16 @@
 
             form.addEventListener('submit', function(e) {
               e.preventDefault();
+              var pageInput = form.querySelector('input[name="' + prefix + 'page"]');
+              if (pageInput) pageInput.value = '1';
+              submitForm();
+            });
+            document.addEventListener('click', function(e) {
+              var pageBtn = e.target && e.target.closest ? e.target.closest('[data-pending-page="' + prefix + '"]') : null;
+              if (!pageBtn) return;
+              e.preventDefault();
+              var pageInput = form.querySelector('input[name="' + prefix + 'page"]');
+              if (pageInput) pageInput.value = pageBtn.getAttribute('data-page') || '1';
               submitForm();
             });
             var clearBtn = document.querySelector('[data-pending-clear="' + prefix + '"]');
@@ -85,11 +99,14 @@
                 form.querySelectorAll('select').forEach(function(s) {
                   s.selectedIndex = 0;
                 });
+                var pageInput = form.querySelector('input[name="' + prefix + 'page"]');
+                if (pageInput) pageInput.value = '1';
                 submitForm();
               });
             }
           }
           setup('spp_', 'scm_preventivas_pendientes', 'spp_table', 'spp_kpis');
+          setup('sacta_', 'scm_ticket_actas_satisfaccion', 'sacta_table', 'sacta_kpis');
           setup('rsp_', 'scm_servicios_publicos_pendientes', 'rsp_table', 'rsp_kpis');
 
           var sraPanel = document.getElementById('sra_panel');

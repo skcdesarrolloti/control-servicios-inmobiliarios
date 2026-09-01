@@ -7,6 +7,7 @@ namespace SCM\Modules\TicketCompletion;
 final class CompletionPolicy
 {
   public const WAITING = 'En espera de firma';
+  public const PENDING_SIGNATURE_STATE = 'Acta sin firmar';
   public const ROLES = ['propietario' => 'Propietario', 'arrendatario' => 'Arrendatario', 'copropiedad' => 'Copropiedad'];
   public const EXECUTORS = ['inmobiliaria' => 'Inmobiliaria'] + self::ROLES;
   public const EXECUTION_STATES = [
@@ -17,6 +18,7 @@ final class CompletionPolicy
   ];
   public const CONSENT = 'Confirmo que soy la persona designada para firmar, revisé el acta y recibí a satisfacción las soluciones descritas. Acepto firmarla electrónicamente con mi nombre y cerrar este ticket.';
   public const DRAWN_CONSENT = 'Confirmo que soy la persona designada, revisé los daños, soluciones y observaciones del acta y los recibo a satisfacción. Acepto firmar electrónicamente con mi trazo, nombre, documento y código de verificación, y autorizar el cierre de este ticket.';
+  public const TYPED_OTP_CONSENT = 'Confirmo que soy la persona designada, revisé el acta y recibí a satisfacción las soluciones descritas. Acepto firmarla electrónicamente con mi nombre y código de verificación, y cerrar este ticket.';
 
   public static function phone(string $phone, string $indicator = ''): string
   {
@@ -175,15 +177,18 @@ final class CompletionPolicy
     if (($input['accepted'] ?? '') !== '1') {
       throw new \DomainException('Debes leer y aceptar expresamente el acta para firmarla.');
     }
-    $document = self::text($input['document'] ?? '', 'documento de identidad', 40);
-    if (!preg_match('/^[\p{L}\p{N} .-]{4,40}$/uD', $document)) {
-      throw new \DomainException('Revisa el documento de identidad.');
+    $document = '';
+    if (trim((string) ($input['document'] ?? '')) !== '') {
+      $document = self::text($input['document'] ?? '', 'documento de identidad', 40);
+      if (!preg_match('/^[\p{L}\p{N} .-]{4,40}$/uD', $document)) {
+        throw new \DomainException('Revisa el documento de identidad.');
+      }
     }
     $name = self::text($input['signature_name'] ?? '', 'nombre de la firma', 160);
     if (mb_strtolower($name) !== mb_strtolower($expectedName)) {
       throw new \DomainException('Escribe el nombre del firmante exactamente como aparece en el acta.');
     }
     // Explicit typed electronic signature; never infer consent from opening the link.
-    return ['name' => $name, 'document' => $document, 'method' => 'typed-name-and-explicit-consent', 'consent_version' => '1', 'consent_text' => self::CONSENT];
+    return ['name' => $name, 'document' => $document, 'method' => 'typed-name-otp-and-explicit-consent', 'consent_version' => '3', 'consent_text' => self::TYPED_OTP_CONSENT];
   }
 }

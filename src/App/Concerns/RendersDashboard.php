@@ -120,6 +120,7 @@ trait RendersDashboard
     $preventivasPendientesHtml = $this->render_pending_preventivas_shell($_GET);
     $serviciosPublicosPendientesHtml = $this->render_pending_servicios_publicos_shell($_GET);
     $reportesAdministrativosPendientesHtml = $pendingController->renderReportesAdministrativosShell($filterOptions);
+    $actasSatisfaccionHtml = $this->render_ticket_completion_acts_shell($_GET);
     $contratosArrendamientoHtml = $pendingController->renderContratosArrendamientoTab();
     $dashboardPermissionTabs = $this->dashboardPermissionTabs();
     $tabMap = [
@@ -146,6 +147,11 @@ trait RendersDashboard
       'cotizaciones-mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
       'cotizaciones' => 'scm-panel-cotizaciones-mantenimiento',
       'scm-panel-cotizaciones-mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
+      'actas_satisfaccion' => 'scm-panel-actas-satisfaccion',
+      'actas-satisfaccion' => 'scm-panel-actas-satisfaccion',
+      'actas sin firmar' => 'scm-panel-actas-satisfaccion',
+      'actas firmadas' => 'scm-panel-actas-satisfaccion',
+      'scm-panel-actas-satisfaccion' => 'scm-panel-actas-satisfaccion',
       'calendario_actividades' => 'scm-panel-calendario-actividades',
       'calendario-actividades' => 'scm-panel-calendario-actividades',
       'calendario' => 'scm-panel-calendario-actividades',
@@ -199,6 +205,10 @@ trait RendersDashboard
       'cotizaciones_mantenimiento' => [
         'panel' => 'scm-panel-cotizaciones-mantenimiento',
         'label' => $dashboardPermissionTabs['cotizaciones_mantenimiento'] ?? 'Cotizaciones de Mantenimiento',
+      ],
+      'actas_satisfaccion' => [
+        'panel' => 'scm-panel-actas-satisfaccion',
+        'label' => $dashboardPermissionTabs['actas_satisfaccion'] ?? 'Actas de satisfacción',
       ],
       'preventivas_pendientes' => [
         'panel' => 'scm-panel-preventivas-pendientes',
@@ -352,6 +362,7 @@ trait RendersDashboard
         'status_tickets'  => self::AJAX_STATUS_TICKETS,
         'my_tickets'      => self::AJAX_MY_TICKETS,
         'cotizaciones_mantenimiento' => self::AJAX_COTIZACIONES_MANTENIMIENTO,
+        'actas_satisfaccion' => self::AJAX_TICKET_COMPLETION_LIST,
         'delete_cotizacion' => self::AJAX_DELETE_COTIZACION,
         'cotizacion_pdf' => self::AJAX_COTIZACION_MANTENIMIENTO_PDF,
         'activate_ticket' => self::AJAX_ACTIVATE_TICKET,
@@ -1016,6 +1027,12 @@ trait RendersDashboard
             </div>
           <?php endif; ?>
 
+          <?php if (in_array('actas_satisfaccion', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'actas_satisfaccion' ? ' active' : ''; ?>" id="scm-panel-actas-satisfaccion" data-permission-tab="actas_satisfaccion" data-admin-activity-panel="actas_satisfaccion" data-scm-loaded="0">
+              <?php echo $actasSatisfaccionHtml; ?>
+            </div>
+          <?php endif; ?>
+
           <?php if (in_array('preventivas_pendientes', $allowedAdministrativeActivityTabs, true)): ?>
             <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'preventivas_pendientes' ? ' active' : ''; ?>" id="scm-panel-preventivas-pendientes" data-permission-tab="preventivas_pendientes" data-admin-activity-panel="preventivas_pendientes" data-scm-loaded="0">
               <?php echo $preventivasPendientesHtml; ?>
@@ -1394,6 +1411,7 @@ trait RendersDashboard
   {
     $activityPermissionKeys = [
       'cotizaciones_mantenimiento',
+      'actas_satisfaccion',
       'calendario_actividades',
       'notificaciones',
       'preventivas_pendientes',
@@ -3720,6 +3738,32 @@ trait RendersDashboard
       'No hay contratos pendientes con los filtros actuales.',
       'Abre esta pestaña para cargar servicios publicos pendientes.',
       $html
+    );
+  }
+
+  private function render_ticket_completion_acts_shell(array $input): string
+  {
+    $view = new \SCM\Modules\TicketCompletion\CompletionView();
+    $filters = [
+      'estado' => 'pending',
+      'caso' => trim((string) ($input['sacta_caso'] ?? '')),
+      'inmueble' => trim((string) ($input['sacta_inmueble'] ?? '')),
+      'contrato' => trim((string) ($input['sacta_contrato'] ?? '')),
+      'firmante' => trim((string) ($input['sacta_firmante'] ?? '')),
+      'page' => 1,
+      'per_page' => 30,
+    ];
+    if (isset($input['sacta_estado']) && is_scalar($input['sacta_estado'])) {
+      $filters['estado'] = trim((string) $input['sacta_estado']) ?: 'pending';
+    }
+
+    return $view->dashboardPanel(
+      $filters,
+      [],
+      ['pending' => 0, 'signed' => 0, 'cancelled' => 0, 'all' => 0],
+      0,
+      ['page' => 1, 'per_page' => 30, 'total' => 0, 'total_pages' => 1],
+      new \SCM\Modules\TicketCompletion\CompletionService(new \SCM\Modules\TicketCompletion\CompletionRepository($this->db), SCM_APP_SECRET, SCM_BASE_URL)
     );
   }
 

@@ -91,7 +91,7 @@ try {
     }
     $form = $view->signingForm($act, $payload, $csrf, $formError, $_POST, $service->verificationChannels($payload['signer']));
   } elseif ($staff && $act['status'] === 'pending') {
-    $form = '<p class="scm-acta-notice">Vista interna de consulta. La firma debe realizarla el destinatario desde su enlace personal, dibujando la firma y verificando el código.</p>';
+    $form = '<p class="scm-acta-notice">Vista interna de consulta. La firma debe realizarla el destinatario desde su enlace personal, confirmando su nombre y el código enviado a su contacto registrado.</p>';
   }
   $content = $view->document($act, $payload, $staff, $form);
   $pdfUrl = 'ticket-acta.php?id=' . $id . ($staff ? '' : '&token=' . rawurlencode($token)) . '&format=pdf';

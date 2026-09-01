@@ -154,6 +154,7 @@
     var actionContratoUltimaPreventiva =
       actions.contrato_ultima_preventiva || "";
     var actionPreventivasPendientes = actions.preventivas_pendientes || "";
+    var actionActasSatisfaccion = actions.actas_satisfaccion || "";
     var actionServiciosPublicosPendientes =
       actions.servicios_publicos_pendientes || "";
     var actionRevisionServiciosPublicos =
@@ -6067,6 +6068,15 @@
           "spp_table",
           "spp_kpis",
         );
+      } else if (activeKey === "actas_satisfaccion") {
+        return reloadPendingPanel(
+          activeAdministrativePanel ||
+            root.querySelector("#scm-panel-actas-satisfaccion"),
+          "sacta_",
+          actionActasSatisfaccion,
+          "sacta_table",
+          "sacta_kpis",
+        );
       } else if (activeKey === "servicios_publicos_pendientes") {
         return reloadPendingPanel(
           activeAdministrativePanel ||
@@ -6148,6 +6158,9 @@
       if (panelId === "scm-panel-preventivas-pendientes") {
         return "preventivas_pendientes";
       }
+      if (panelId === "scm-panel-actas-satisfaccion") {
+        return "actas_satisfaccion";
+      }
       if (panelId === "scm-panel-servicios-publicos-pendientes") {
         return "servicios_publicos_pendientes";
       }
@@ -6226,7 +6239,9 @@
               ? "spp-kpi-count"
               : prefix === "rsp_"
                 ? "rsp-kpi-count"
-                : "";
+                : prefix === "sacta_"
+                  ? "sacta-kpi-count"
+                  : "";
           var headerCount = headerCountId
             ? panel.querySelector("#" + headerCountId)
             : null;
@@ -10296,6 +10311,12 @@
           administrativeKey === "preventivas_pendientes"
         ) {
           return loadPendingFormOnce(activeAdministrativePanel, "#spp_form");
+        }
+        if (
+          activeAdministrativePanel &&
+          administrativeKey === "actas_satisfaccion"
+        ) {
+          return loadPendingFormOnce(activeAdministrativePanel, "#sacta_form");
         }
         if (
           activeAdministrativePanel &&

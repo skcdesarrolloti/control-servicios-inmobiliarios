@@ -40,8 +40,8 @@ $photoDescriptor = ['name' => str_repeat('a', 24) . '_123.jpg', 'mime' => 'image
 $assert(Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [$photoDescriptor]]])[0]['photos'][0]['width'] === 1200, 'compressed photo metadata accepted');
 $rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [array_replace($photoDescriptor, ['bytes' => 1500001])]]]), 'oversized photo evidence rejected');
 $rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [array_replace($photoDescriptor, ['name' => '../otro.jpg'])]]]), 'unsafe photo path rejected');
-$rejects(static fn() => Policy::signature(['signature_name' => 'Ana Pérez', 'document' => '123456'], 'Ana Pérez'), 'opening a link never constitutes consent');
-$rejects(static fn() => Policy::signature(['signature_name' => 'Otra persona', 'document' => '123456', 'accepted' => '1'], 'Ana Pérez'), 'signature must match selected name');
+$rejects(static fn() => Policy::signature(['signature_name' => 'Ana Pérez'], 'Ana Pérez'), 'opening a link never constitutes consent');
+$rejects(static fn() => Policy::signature(['signature_name' => 'Otra persona', 'accepted' => '1'], 'Ana Pérez'), 'signature must match selected name');
 $drawing = json_encode([[[120, 200], [160, 90], [190, 190], [130, 170], [230, 140], [240, 210], [280, 140], [310, 200], [360, 160]]]);
 $assert(count(Policy::strokes($drawing)[0]) === 9, 'numeric signature strokes accepted');
 $rejects(static fn() => Policy::strokes('[]'), 'blank signature rejected');
@@ -97,7 +97,7 @@ register_shutdown_function(static function () use ($photoPath): void { if (is_fi
 $photoInfo = getimagesize($photoPath);
 $input['items'][0]['photos'] = [['name' => $photoName, 'mime' => 'image/jpeg', 'width' => $photoInfo[0], 'height' => $photoInfo[1], 'bytes' => filesize($photoPath), 'sha256' => hash_file('sha256', $photoPath)]];
 $codes = [];
-$signInput = static function (array $act) use ($drawing, &$codes): array { return ['document' => '123456789', 'signature_name' => 'Ana Pérez', 'accepted' => '1', 'consent_version' => '2', 'signature_strokes' => $drawing, 'otp_code' => $codes[$act['id']] ?? '', 'document_hash' => $act['payload_hash']]; };
+$signInput = static function (array $act) use (&$codes): array { return ['signature_name' => 'Ana Pérez', 'accepted' => '1', 'consent_version' => '3', 'otp_code' => $codes[$act['id']] ?? '', 'document_hash' => $act['payload_hash']]; };
 $requestCode = static function (array $act, string $channel = 'email') use ($service, &$notifications, &$codes): array {
   $result = $service->requestCode((int) $act['id'], $service->token($act), $channel);
   $codes[$act['id']] = end($notifications)['options']['otp_code'];
@@ -119,7 +119,9 @@ $notifications = [];
 $created = $service->create(1, $input, $actor);
 $act = $repo->act($created['act_id']);
 $token = $service->token($act);
-$assert($repo->ticket(1)['estado'] === 'En proceso' && $repo->ticket(1)['estado_administrativo'] === 'En ejecucion por inmobiliaria', 'creating an act keeps the allowed execution state derived from executor');
+$assert($repo->ticket(1)['estado'] === 'En proceso' && $repo->ticket(1)['estado_administrativo'] === 'Acta sin firmar', 'creating an act moves the ticket to unsigned acts instead of the operative queue');
+$dashboardList = $service->dashboardList(['sacta_estado' => 'pending', 'sacta_caso' => '9001']);
+$assert($dashboardList['count'] === 1 && ($dashboardList['items'][0]['_payload']['ticket_number'] ?? '') === '9001', 'unsigned acts dashboard lists the pending act by ticket');
 $assert($db->getVar('SELECT estado FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7001') === 'Pendiente', 'creating or sending an act does not disapprove its maintenance quote');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_actas_de_satisfaccion') . '`') === 0, 'no premature legacy timeline completion');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 0, 'no charge before signature');
@@ -142,7 +144,7 @@ $rejects(static fn() => $service->sign((int) $act['id'], $token, array_replace($
 $assert(json_decode($repo->act((int) $act['id'])['otp_json'], true)['failures'] === 1, 'failed attempt survives signature rollback');
 $db->update($db->table('jet_cct_tickets'), ['estado_administrativo' => 'En ejecucion por propietario'], ['_ID' => 1]);
 $rejects(static fn() => $service->sign((int) $act['id'], $token, $signInput($act), '', ''), 'signature is blocked if execution responsibility changed after creating the act');
-$db->update($db->table('jet_cct_tickets'), ['estado_administrativo' => 'En ejecucion por inmobiliaria'], ['_ID' => 1]);
+$db->update($db->table('jet_cct_tickets'), ['estado_administrativo' => 'Acta sin firmar'], ['_ID' => 1]);
 $historyBefore = (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_ticket') . '`');
 // Force an SQL failure only in the test connection's temporary report table.
 $db->pdo()->exec('ALTER TABLE `' . $db->table('jet_cct_reportes_administrativos') . '` CHANGE COLUMN descripcion unavailable_description TEXT');
