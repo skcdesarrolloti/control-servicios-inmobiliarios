@@ -333,24 +333,30 @@ final class SimplePdf
 
   public function signatureBlock(string $label, string $name, string $details): void
   {
-    $this->ensureSpace(54);
+    $detailLines = trim($details) !== '' ? $this->wrap($details, $this->contentWidth, 8) : [];
+    $this->ensureSpace(56 + count($detailLines) * 12);
     $this->fill(245, 145, 32);
-    $this->rect($this->margin, $this->y + 1, 52, 2);
-    $this->y += 12;
-    $this->fill(100, 116, 139);
-    $this->text($this->margin, $this->y, strtoupper($label), 7, 'F2');
-    $this->y += 13;
-    $this->fill(6, 29, 73);
-    $this->text($this->margin, $this->y, $name, 10, 'F2');
+    $this->rect($this->margin, $this->y, 70, 3);
     $this->y += 15;
-    if (trim($details) !== '') {
-      $this->fill(71, 85, 105);
-      foreach ($this->wrap($details, $this->contentWidth, 7) as $line) {
-        $this->text($this->margin, $this->y, $line, 7, 'F1');
-        $this->y += 11;
+    $this->fill(61, 76, 105);
+    foreach ($this->wrap($label, $this->contentWidth, 8) as $line) {
+      $this->text($this->margin, $this->y, $line, 8, 'F2');
+      $this->y += 11;
+    }
+    $this->y += 2;
+    $this->fill(6, 29, 73);
+    foreach ($this->wrap($name, $this->contentWidth, 11) as $line) {
+      $this->text($this->margin, $this->y, $line, 11, 'F2');
+      $this->y += 14;
+    }
+    if ($detailLines !== []) {
+      $this->fill(55, 70, 95);
+      foreach ($detailLines as $line) {
+        $this->text($this->margin, $this->y, $line, 8, 'F1');
+        $this->y += 12;
       }
     }
-    $this->y += 8;
+    $this->y += 10;
   }
 
   private function ensureSpace(float $height): void

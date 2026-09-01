@@ -58,6 +58,7 @@ final class PublicServicesReviewPdfGenerator
   {
     $pdf = new SimplePdf();
     $pdf->backgroundImage($this->letterheadPath());
+    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Revisión de servicios públicos');
     $pdf->layout(58, 168, 118);
 
     $serviceLabel = (string) ($service['label'] ?? 'servicio publico');
@@ -76,6 +77,14 @@ final class PublicServicesReviewPdfGenerator
     $representative = $this->value($context, 'representante_legal', 'Representante legal');
     $representativePhone = $this->value($context, 'celular_legal', '');
     $reviewer = $this->value($context, 'realizado_por', 'Control Servicios Inmobiliarios');
+    $reviewerDetails = $this->signatureDetails([
+      $this->value($context, 'realizado_por_cargo', 'Control Servicios Inmobiliarios'),
+      $this->phoneLabel($this->value($context, 'realizado_por_telefono', '')),
+    ]);
+    $representativeDetails = $this->signatureDetails([
+      'Representante legal',
+      $this->phoneLabel($representativePhone),
+    ]);
 
     $pdf->title($isCurrent ? 'Acta de reconocimiento por pago oportuno' : 'Acta de revisión con saldo pendiente');
     $pdf->line($city . ', ' . $this->longDate($timestamp), 8);
@@ -102,10 +111,30 @@ final class PublicServicesReviewPdfGenerator
     }
 
     $pdf->spacer(6);
-    $pdf->signatureBlock('Revisión registrada por', $reviewer, 'Control Servicios Inmobiliarios');
-    $pdf->signatureBlock('Firma institucional', $representative, trim('Representante legal' . ($representativePhone !== '' ? ' | Cel. ' . $representativePhone : '')));
+    $pdf->signatureBlock('Revisión registrada por', $reviewer, $reviewerDetails);
+    $pdf->signatureBlock('Firma institucional', $representative, $representativeDetails);
 
     return $pdf;
+  }
+
+  /** @param string[] $parts */
+  private function signatureDetails(array $parts): string
+  {
+    $clean = [];
+    foreach ($parts as $part) {
+      $part = trim($part);
+      if ($part !== '') {
+        $clean[] = $part;
+      }
+    }
+
+    return implode(' | ', array_values(array_unique($clean)));
+  }
+
+  private function phoneLabel(string $phone): string
+  {
+    $phone = trim($phone);
+    return $phone !== '' ? 'Cel. ' . $phone : '';
   }
 
   /** @return string[] */

@@ -97,8 +97,45 @@ final class PendingRepository
       return null;
     }
     $table = $this->db->table('jet_cct_funcionarios');
+    if (!$this->schema()->tableExists($table) || !$this->schema()->columnExists($table, '_ID')) {
+      return null;
+    }
+
+    $employeeColumn = $this->schema()->detectFirstExistingColumn($table, ['id_empleado']);
+    $nameColumn = $this->schema()->detectFirstExistingColumn($table, ['nombre', 'empleado', 'nombre_empleado', 'nombre_funcionario']);
+    $emailColumn = $this->schema()->detectFirstExistingColumn($table, ['correo', 'correo_dian', 'email']);
+    $phoneColumn = $this->schema()->detectFirstExistingColumn($table, ['celular', 'celular_empleado', 'telefono', 'whatsapp', 'phone']);
+    $roleColumn = $this->schema()->detectFirstExistingColumn($table, ['rol', 'cargo']);
+    $cargoColumn = $this->schema()->columnExists($table, 'id_cargo') ? 'id_cargo' : '';
+    $cargoTable = $this->db->table('jet_cct_cargos');
+    $hasCargoNames = $cargoColumn !== ''
+      && $this->schema()->tableExists($cargoTable)
+      && $this->schema()->columnExists($cargoTable, '_ID')
+      && $this->schema()->columnExists($cargoTable, 'nombre_cargo');
+    $activeColumn = $this->schema()->detectFirstExistingColumn($table, ['activo', 'cct_status']);
+
+    $select = [
+      'f.`_ID`',
+      $employeeColumn !== '' ? "TRIM(COALESCE(f.`{$employeeColumn}`, '')) AS id_empleado" : "'' AS id_empleado",
+      $nameColumn !== '' ? "TRIM(COALESCE(f.`{$nameColumn}`, '')) AS nombre" : "'' AS nombre",
+      $emailColumn !== '' ? "TRIM(COALESCE(f.`{$emailColumn}`, '')) AS correo" : "'' AS correo",
+      $phoneColumn !== '' ? "TRIM(COALESCE(f.`{$phoneColumn}`, '')) AS telefono" : "'' AS telefono",
+      $cargoColumn !== '' ? "TRIM(COALESCE(f.`{$cargoColumn}`, '')) AS id_cargo" : "'' AS id_cargo",
+      $roleColumn !== '' ? "TRIM(COALESCE(f.`{$roleColumn}`, '')) AS rol" : "'' AS rol",
+      $hasCargoNames ? "TRIM(COALESCE(c.`nombre_cargo`, '')) AS nombre_cargo" : "'' AS nombre_cargo",
+    ];
+    $join = $hasCargoNames
+      ? " LEFT JOIN `{$cargoTable}` c ON TRIM(COALESCE(f.`{$cargoColumn}`, '')) = CAST(c.`_ID` AS CHAR)"
+      : '';
+    $where = ['f.`_ID` = ?'];
+    if ($activeColumn !== '') {
+      $where[] = $activeColumn === 'cct_status'
+        ? "LOWER(TRIM(COALESCE(f.`{$activeColumn}`, 'publish'))) IN ('publish', 'published', 'si', 'sí', '1', 'true', 'activo', 'active')"
+        : "LOWER(TRIM(COALESCE(f.`{$activeColumn}`, 'si'))) IN ('si', 'sí', '1', 'true', 'activo', 'active', 'publish', 'published')";
+    }
+
     return $this->db->getRow(
-      "SELECT `_ID`, `id_empleado`, `nombre`, `correo` FROM `{$table}` WHERE `_ID` = ? AND `activo` = 'Si' LIMIT 1",
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` f{$join} WHERE " . implode(' AND ', $where) . ' LIMIT 1',
       [$userId]
     );
   }

@@ -13,7 +13,7 @@ require_once $package . '/autoload.php';
 $queueConfig = require $package . '/config.php';
 $queueTable = (string) ($queueConfig['queue']['queue_table'] ?? 'skc_notification_queue');
 $attemptsTable = (string) ($queueConfig['queue']['attempts_table'] ?? 'skc_notification_attempts');
-$tables = array_map([$db, 'table'], ['jet_cct_contratos_arrendamiento', 'jet_cct_funcionarios', 'jet_cct_sucursales', 'jet_cct_revisiones_servicios', 'jet_cct_historial_del_inmueble', 'jet_cct_confi_sistema', 'posts', 'postmeta']);
+$tables = array_map([$db, 'table'], ['jet_cct_contratos_arrendamiento', 'jet_cct_funcionarios', 'jet_cct_cargos', 'jet_cct_sucursales', 'jet_cct_revisiones_servicios', 'jet_cct_historial_del_inmueble', 'jet_cct_confi_sistema', 'posts', 'postmeta']);
 $tables[] = $queueTable;
 $tables[] = $attemptsTable;
 foreach ($tables as $table) {
@@ -30,9 +30,11 @@ $assert = static function (bool $ok, string $label) use (&$checks): void {
 };
 $contractTable = $db->table('jet_cct_contratos_arrendamiento');
 $employeeTable = $db->table('jet_cct_funcionarios');
+$cargoTable = $db->table('jet_cct_cargos');
 $reviewTable = $db->table('jet_cct_revisiones_servicios');
 $historyTable = $db->table('jet_cct_historial_del_inmueble');
-$db->insert($employeeTable, ['_ID' => 70001, 'id_empleado' => '94001', 'nombre' => 'Funcionario autenticado QA', 'correo' => 'actor@example.invalid', 'activo' => 'Si']);
+$db->insert($cargoTable, ['_ID' => 3, 'nombre_cargo' => 'Coordinador QA']);
+$db->insert($employeeTable, ['_ID' => 70001, 'id_empleado' => '94001', 'nombre' => 'Funcionario autenticado QA', 'correo' => 'actor@example.invalid', 'celular' => '3001234567', 'id_cargo' => '3', 'activo' => 'Si']);
 $db->insert($employeeTable, ['_ID' => 70002, 'id_empleado' => '70001', 'nombre' => 'Gloria QA - señuelo', 'correo' => 'decoy@example.invalid', 'activo' => 'Si']);
 $db->insert($employeeTable, ['_ID' => 70003, 'id_empleado' => '', 'nombre' => 'Funcionario incompleto QA', 'activo' => 'Si']);
 $db->insert($employeeTable, ['_ID' => 70004, 'id_empleado' => '94004', 'nombre' => 'Administracion configurada QA', 'correo' => 'admin-config@example.invalid', 'id_cargo' => '3', 'activo' => 'Si']);
@@ -90,6 +92,8 @@ try {
     if ($path !== null) { $generatedPaths[] = $path; }
   }
   $assert(!empty($result['ok']) && count($generatedPaths) === 1, 'review generates only the selected service PDF');
+  $pdfBytes = (string) file_get_contents($generatedPaths[0]);
+  $assert(str_contains($pdfBytes, 'Coordinador QA') && str_contains($pdfBytes, 'Cel. 3001234567'), 'review PDF includes reviewer cargo and phone');
   $review = $db->getRow("SELECT * FROM `{$reviewTable}` WHERE `_ID` = ?", [$result['review_id']]);
   $assert($review['id_empleado'] === '94001' && $review['realizado_por'] === 'Funcionario autenticado QA' && (string) $review['cct_author_id'] === '94001', 'review stores correct employee identity and CCT author');
   $assert($review['resultado_tiempo_agua'] === '' && $review['acta_felicitaciones_agua'] === '', 'unreviewed configured service gets no fake result or PDF');

@@ -125,6 +125,8 @@ trait PublicServicesReviewConcern
       'arrendatario' => (string) ($contract['arrendatario'] ?? ''),
       'propietario' => (string) ($contract['propietario'] ?? ''),
       'realizado_por' => $employeeName,
+      'realizado_por_cargo' => $this->cleanReviewText((string) (($employee['nombre_cargo'] ?? '') ?: ($employee['rol'] ?? ''))),
+      'realizado_por_telefono' => $this->cleanReviewText((string) (($employee['telefono'] ?? '') ?: ($employee['celular'] ?? ''))),
       'representante_legal' => (string) ($branch['representante_legal'] ?? ''),
       'celular_legal' => (string) ($branch['celular_legal'] ?? ''),
     ];
