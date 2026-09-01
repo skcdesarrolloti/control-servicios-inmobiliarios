@@ -3685,6 +3685,57 @@
         return panel.getAttribute("data-admin-notif-email-banner") || "https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png";
       }
 
+      function personalMenuUrl() {
+        var type = currentType();
+        if (type.indexOf("propietarios") === 0) {
+          return "https://sucasainmobiliaria.com.co/propietario/";
+        }
+        if (type.indexOf("arrendatarios") === 0) {
+          return "https://sucasainmobiliaria.com.co/arrendatario";
+        }
+        if (type.indexOf("copropiedades") === 0) {
+          return "https://sucasainmobiliaria.com.co/copropiedad";
+        }
+        if (type.indexOf("clientes") === 0) {
+          return "https://sucasainmobiliaria.com.co/cliente/";
+        }
+        return "";
+      }
+
+      function guardianMenuBlockHtml() {
+        var menuUrl = personalMenuUrl();
+        if (!menuUrl) {
+          return "";
+        }
+        var buttonStyle = "display:inline-block;background:#404041;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:5px;margin:6px;";
+        return (
+          '<div style="margin-top:24px;padding:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">' +
+          '<p style="margin:0 0 10px;">&#129302; &iquest;Dudas, quejas o inconvenientes? Escr&iacute;bele a nuestro <strong>Bot Guardi&aacute;n</strong> desde el bot&oacute;n de abajo.</p>' +
+          '<p style="margin:0 0 14px;">&#127760; Recuerda que puedes ingresar a tu <strong>men&uacute; personal en nuestra p&aacute;gina web</strong> para consultar informaci&oacute;n y gestionar tus servicios.</p>' +
+          '<div style="text-align:center;">' +
+          '<a href="https://sucasainmobiliaria.com.co/guardian/" style="' +
+          escAttr(buttonStyle) +
+          '">Hablar con Guardi&aacute;n</a>' +
+          '<a href="' +
+          escAttr(menuUrl) +
+          '" style="' +
+          escAttr(buttonStyle) +
+          '">Ir a mi men&uacute;</a>' +
+          "</div></div>"
+        );
+      }
+
+      function appendGuardianMenuBlock(html) {
+        var block = guardianMenuBlockHtml();
+        if (!block) {
+          return html;
+        }
+        if (isFullEmailHtml(html)) {
+          return /<\/body\s*>/i.test(html) ? html.replace(/<\/body\s*>/i, block + "</body>") : html + block;
+        }
+        return html + block;
+      }
+
       function wrapEmailPreviewHtml(title, contentHtml) {
         return (
           '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>' +
@@ -3731,6 +3782,7 @@
           body = escHtml(body).replace(/\n/g, "<br>");
         }
         body = safePreviewHtml(body);
+        body = appendGuardianMenuBlock(body);
         return isFullEmailHtml(body)
           ? body
           : wrapEmailPreviewHtml(subjectInput ? subjectInput.value : "Notificacion", body);

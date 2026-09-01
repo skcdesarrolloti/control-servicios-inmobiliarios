@@ -3446,18 +3446,79 @@ final class AdministrativeNotificationsService
     if ($body === '') {
       $body = "{{mensaje}}";
     }
+    $rendered = '';
     if (!empty($templateConfig['fixed_body'])) {
-      return $this->resolveVariables($body, $recipient, $config);
-    }
-    if (!str_contains($body, '{{mensaje}}') && !str_contains($body, '{{custom_message}}')) {
+      $rendered = $this->resolveVariables($body, $recipient, $config);
+    } elseif (!str_contains($body, '{{mensaje}}') && !str_contains($body, '{{custom_message}}')) {
       if (!empty($templateConfig['is_full_document']) || $this->isFullEmailHtml($body)) {
-        return $this->resolveVariables($body, $recipient, $config);
+        $rendered = $this->resolveVariables($body, $recipient, $config);
+      } else {
+        $rendered = $this->resolveVariables($message !== '' ? $message : $body, $recipient, $config);
       }
-      return $this->resolveVariables($message !== '' ? $message : $body, $recipient, $config);
+    } else {
+      $messageForEmail = $body !== strip_tags($body) ? $this->emailContentHtml($message) : $message;
+      $body = str_replace(['{{mensaje}}', '{{custom_message}}'], $messageForEmail, $body);
+      $rendered = $this->resolveVariables($body, $recipient, $config);
     }
-    $messageForEmail = $body !== strip_tags($body) ? $this->emailContentHtml($message) : $message;
-    $body = str_replace(['{{mensaje}}', '{{custom_message}}'], $messageForEmail, $body);
-    return $this->resolveVariables($body, $recipient, $config);
+
+    return $this->appendGuardianMenuBlock($rendered, $recipient);
+  }
+
+  /** @param array<string,mixed> $recipient */
+  private function appendGuardianMenuBlock(string $html, array $recipient): string
+  {
+    $menuUrl = $this->personalMenuUrl($recipient);
+    if ($menuUrl === '') {
+      return $html;
+    }
+
+    $block = $this->guardianMenuBlockHtml($menuUrl);
+    if ($this->isFullEmailHtml($html)) {
+      $count = 0;
+      $htmlWithBlock = preg_replace('/<\/body\s*>/i', $block . '</body>', $html, 1, $count);
+      if ($htmlWithBlock !== null && $count > 0) {
+        return $htmlWithBlock;
+      }
+    }
+
+    return $html . $block;
+  }
+
+  /** @param array<string,mixed> $recipient */
+  private function personalMenuUrl(array $recipient): string
+  {
+    $type = strtolower(trim((string) ($recipient['tipo_actor'] ?? '')));
+    $role = strtolower(trim((string) ($recipient['rol_persona'] ?? '')));
+    $value = $type . ' ' . $role;
+
+    if (str_contains($value, 'propietario')) {
+      return 'https://sucasainmobiliaria.com.co/propietario/';
+    }
+    if (str_contains($value, 'arrendatario')) {
+      return 'https://sucasainmobiliaria.com.co/arrendatario';
+    }
+    if (str_contains($value, 'copropiedad')) {
+      return 'https://sucasainmobiliaria.com.co/copropiedad';
+    }
+    if (str_contains($value, 'cliente')) {
+      return 'https://sucasainmobiliaria.com.co/cliente/';
+    }
+
+    return '';
+  }
+
+  private function guardianMenuBlockHtml(string $menuUrl): string
+  {
+    $guardianUrl = 'https://sucasainmobiliaria.com.co/guardian/';
+    $buttonStyle = 'display:inline-block;background:#404041;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:5px;margin:6px;';
+
+    return '<div style="margin-top:24px;padding:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">'
+      . '<p style="margin:0 0 10px;">&#129302; &iquest;Dudas, quejas o inconvenientes? Escr&iacute;bele a nuestro <strong>Bot Guardi&aacute;n</strong> desde el bot&oacute;n de abajo.</p>'
+      . '<p style="margin:0 0 14px;">&#127760; Recuerda que puedes ingresar a tu <strong>men&uacute; personal en nuestra p&aacute;gina web</strong> para consultar informaci&oacute;n y gestionar tus servicios.</p>'
+      . '<div style="text-align:center;">'
+      . '<a href="' . htmlspecialchars($guardianUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" style="' . $buttonStyle . '">Hablar con Guardi&aacute;n</a>'
+      . '<a href="' . htmlspecialchars($menuUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" style="' . $buttonStyle . '">Ir a mi men&uacute;</a>'
+      . '</div></div>';
   }
 
   /** @param array<string,mixed> $templateConfig */
