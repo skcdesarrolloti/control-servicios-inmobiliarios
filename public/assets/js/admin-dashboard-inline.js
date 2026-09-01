@@ -168,7 +168,6 @@
                     text: 'La acta saldrá de pendientes. No se cerrará el ticket ni se generará cobro.',
                     input: 'textarea',
                     inputLabel: 'Motivo',
-                    inputValue: 'Acta de prueba archivada.',
                     showCancelButton: true,
                     confirmButtonText: 'Archivar',
                     cancelButtonText: 'Cancelar',
@@ -183,7 +182,7 @@
                 }
 
                 if (window.confirm('Archivar acta #' + actId + '? No se cerrará el ticket ni se generará cobro.')) {
-                  archiveAct(window.prompt('Motivo para archivar:', 'Acta de prueba archivada.') || '');
+                  archiveAct(window.prompt('Motivo para archivar:', '') || '');
                 }
               });
             }

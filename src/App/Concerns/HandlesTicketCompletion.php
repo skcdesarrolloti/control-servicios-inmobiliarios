@@ -128,7 +128,7 @@ trait HandlesTicketCompletion
       if (($_POST['operation'] ?? '') === 'archive') {
         $id = (int) ($_POST['act_id'] ?? 0);
         $employee = $this->db->getRow('SELECT id_empleado FROM `' . $this->db->table('jet_cct_funcionarios') . '` WHERE _ID = ?', [Auth::userId()]);
-        $service->archive($id, (string) ($_POST['reason'] ?? 'Acta de prueba archivada desde la bandeja.'), ['user_id' => Auth::userId(), 'employee_id' => (string) ($employee['id_empleado'] ?? Auth::userId()), 'name' => Auth::user()]);
+        $service->archive($id, (string) ($_POST['reason'] ?? ''), ['user_id' => Auth::userId(), 'employee_id' => (string) ($employee['id_empleado'] ?? Auth::userId()), 'name' => Auth::user()]);
       }
       $data = $service->dashboardList($_POST);
       $view = new CompletionView();
