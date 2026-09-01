@@ -647,6 +647,12 @@
       var allowedCargos = String(panel.getAttribute("data-calendar-allowed-cargos") || "").split(",").map(function (v) { return v.trim(); }).filter(Boolean);
       var allowedEmployees = parseCalendarEmployees(panel.getAttribute("data-calendar-employees-json") || "[]");
       var currentCalendarEmployeeId = String(panel.getAttribute("data-calendar-current-employee-id") || "").trim();
+      if (!allowedEmployees.length && Array.isArray(config.calendar_allowed_funcionarios)) {
+        allowedEmployees = config.calendar_allowed_funcionarios;
+      }
+      if (!currentCalendarEmployeeId && config.calendar_current_employee_id) {
+        currentCalendarEmployeeId = String(config.calendar_current_employee_id || "").trim();
+      }
       var allowedEmployeeIds = {};
       var categories = [];
       var categoriesById = {};
@@ -727,6 +733,23 @@
           });
           if (current) select.value = current;
         });
+      }
+
+      function applyCalendarEmployeeOptions(rows, currentEmployeeId) {
+        rows = Array.isArray(rows) ? rows : [];
+        if (!rows.length) {
+          return;
+        }
+        allowedEmployees = rows;
+        if (currentEmployeeId) {
+          currentCalendarEmployeeId = String(currentEmployeeId || "").trim();
+        }
+        rebuildAllowedEmployeeMap();
+        fillEmployeeOptions(
+          Array.prototype.slice.call(panel.querySelectorAll("[data-scm-calendar-filter-employees]")),
+          allowedEmployees,
+          "Selecciona funcionario",
+        );
       }
 
       function fillCategoryOptions(select, rows, firstLabel) {
@@ -2360,13 +2383,16 @@
 
       function loadFuncionariosFallback() {
         if (allowedEmployees.length) return Promise.resolve(allowedEmployees);
+        if (Array.isArray(config.calendar_allowed_funcionarios) && config.calendar_allowed_funcionarios.length) {
+          applyCalendarEmployeeOptions(config.calendar_allowed_funcionarios, config.calendar_current_employee_id || "");
+          return Promise.resolve(allowedEmployees);
+        }
         return calendarApi("listar_funcionarios").then(function (json) {
           var rows = json && json.success && Array.isArray(json.data) ? json.data : [];
           if (allowedCargos.length) {
             rows = rows.filter(function (row) { return allowedCargos.indexOf(String(row.id_cargo || "").trim()) !== -1; });
           }
-          allowedEmployees = rows;
-          rebuildAllowedEmployeeMap();
+          applyCalendarEmployeeOptions(rows, currentCalendarEmployeeId);
           return allowedEmployees;
         });
       }
@@ -2379,7 +2405,7 @@
           var id = String(row.id || row._ID || row.id_categoria || "").trim();
           if (id) categoriesById[id] = row;
         });
-        fillEmployeeOptions(Array.prototype.slice.call(panel.querySelectorAll("[data-scm-calendar-filter-employees]")), funcionarios, "Selecciona funcionario");
+        applyCalendarEmployeeOptions(funcionarios, currentCalendarEmployeeId);
         fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), calendarAdminCategories(), "Todas");
       }).catch(function (err) {
         showToast("error", (err && err.message) || "No se pudieron cargar los funcionarios del calendario.");
@@ -2409,6 +2435,16 @@
       if (reportBtn) reportBtn.addEventListener("click", openCalendarReport);
       var pendingEventsBtn = panel.querySelector("[data-scm-calendar-open-pending]");
       if (pendingEventsBtn) pendingEventsBtn.addEventListener("click", openPendingEventsPopup);
+
+      root.addEventListener("scm:dashboard-filter-options-loaded", function (event) {
+        var detail = (event && event.detail) || {};
+        if (Array.isArray(detail.calendar_allowed_funcionarios) && detail.calendar_allowed_funcionarios.length) {
+          applyCalendarEmployeeOptions(
+            detail.calendar_allowed_funcionarios,
+            detail.calendar_current_employee_id || "",
+          );
+        }
+      });
 
       panel.addEventListener("click", function (e) {
         var completeBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-complete-event]") : null;
@@ -7629,6 +7665,9 @@
       config.calendar_allowed_funcionarios = data.calendar_allowed_funcionarios || [];
       config.calendar_allowed_employee_ids = data.calendar_allowed_employee_ids || [];
       config.calendar_current_employee_id = data.calendar_current_employee_id || "";
+      runtime.calendar_allowed_funcionarios = config.calendar_allowed_funcionarios;
+      runtime.calendar_allowed_employee_ids = config.calendar_allowed_employee_ids;
+      runtime.calendar_current_employee_id = config.calendar_current_employee_id;
       persistRuntime(root, runtime);
       try {
         root.dispatchEvent(
