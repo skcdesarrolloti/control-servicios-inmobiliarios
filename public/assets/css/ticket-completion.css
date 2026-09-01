@@ -44,6 +44,9 @@
 .scm-acta-photo-preview figure, .scm-acta-photo-grid figure { position: relative; min-width: 0; margin: 0; padding: 8px; border: 1px solid var(--acta-border); border-radius: 10px; background: #fff; }
 .scm-acta-photo-preview img, .scm-acta-photo-grid img { display: block; width: 100%; height: 160px; object-fit: cover; border-radius: 6px; background: #e2e8f0; }
 .scm-acta-photo-preview figcaption, .scm-acta-photo-grid figcaption { margin-top: 6px; color: var(--acta-muted); font-size: 12px; overflow-wrap: anywhere; }
+.scm-acta-photo-thumb { display: block; width: 100%; margin: 0; padding: 0; border: 0; border-radius: 8px; background: transparent; cursor: zoom-in; overflow: hidden; }
+.scm-acta-photo-thumb:hover img, .scm-acta-photo-thumb:focus-visible img { transform: scale(1.035); }
+.scm-acta-photo-thumb img { transition: transform .18s ease, filter .18s ease; }
 .scm-acta .scm-acta-photo-remove { position: absolute; top: 12px; right: 12px; display: inline-flex; align-items: center; justify-content: center; width: 44px; min-width: 44px; height: 44px; padding: 0; border: 2px solid #fff; border-radius: 999px; background: #9f1239; color: #fff; font: 700 22px/1 system-ui, sans-serif; cursor: pointer; box-shadow: 0 2px 8px #10264a40; }
 .scm-acta .scm-acta-photo-remove:hover { background: #881337; filter: none; }
 .scm-acta-evidence { margin-top: 20px; padding: 14px; border: 1px solid var(--acta-border); border-radius: 10px; background: var(--acta-surface); }
@@ -63,6 +66,10 @@
 .scm-acta-page { margin: 0; background: #eef2f7; padding: 24px 16px; }
 .scm-acta-document { max-width: 960px; margin: 0 auto; padding: clamp(20px, 5vw, 48px); background: #fff; border: 1px solid #cbd5e1; border-radius: 16px; }
 .scm-acta-document header { border-bottom: 3px solid #e79815; padding-bottom: 24px; }
+.scm-acta-document-head { display: grid; gap: 12px; }
+.scm-acta-brand { display: flex; align-items: center; gap: 18px; }
+.scm-acta-logo { display: inline-flex; align-items: center; justify-content: center; width: 132px; min-height: 74px; flex: 0 0 132px; padding: 10px; border: 1px solid #dbe7f5; border-radius: 16px; background: #fff; box-shadow: 0 12px 30px rgba(16, 38, 74, .08); }
+.scm-acta-logo img { display: block; max-width: 100%; max-height: 54px; object-fit: contain; }
 .scm-acta-document section { margin: 28px 0; }
 .scm-acta-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .04em; }
 .scm-acta dd { margin: 4px 0 0; font-weight: 600; overflow-wrap: anywhere; }
@@ -85,9 +92,24 @@
 .scm-acta-busy { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; background: #10264abf; padding: 20px; color: #10264a; font: 16px/1.6 system-ui, sans-serif; }
 .scm-acta-busy > div { background: #fff; border-radius: 16px; padding: 28px; max-width: 420px; text-align: center; }
 .scm-acta-spinner { display: block; width: 40px; height: 40px; margin: 0 auto 16px; border: 4px solid #cbd5e1; border-top-color: #10264a; border-radius: 50%; animation: acta-spin 1s linear infinite; }
+.scm-acta-gallery { position: fixed; inset: 0; z-index: 10050; display: none; place-items: center; padding: 22px; background: rgba(8, 20, 43, .84); backdrop-filter: blur(4px); }
+.scm-acta-gallery.is-open { display: grid; }
+.scm-acta-gallery-dialog { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: min(1100px, 100%); max-height: min(92vh, 860px); padding: 16px; border: 1px solid rgba(255,255,255,.18); border-radius: 22px; background: #071a34; color: #fff; box-shadow: 0 30px 90px rgba(0,0,0,.45); }
+.scm-acta-gallery-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 2px 12px; }
+.scm-acta-gallery-title { margin: 0; color: #fff; font-size: 15px; font-weight: 800; }
+.scm-acta-gallery-close, .scm-acta-gallery-nav { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border: 1px solid rgba(255,255,255,.28); border-radius: 999px; background: rgba(255,255,255,.12); color: #fff; font: 800 24px/1 system-ui, sans-serif; cursor: pointer; }
+.scm-acta-gallery-close:hover, .scm-acta-gallery-close:focus-visible, .scm-acta-gallery-nav:hover, .scm-acta-gallery-nav:focus-visible { background: rgba(255,255,255,.22); outline: 3px solid rgba(245,145,32,.65); outline-offset: 2px; }
+.scm-acta-gallery-stage { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; min-height: 0; }
+.scm-acta-gallery-image-wrap { min-width: 0; min-height: 260px; display: grid; place-items: center; overflow: hidden; border-radius: 16px; background: rgba(255,255,255,.06); }
+.scm-acta-gallery-image { display: block; max-width: 100%; max-height: calc(92vh - 170px); width: auto; height: auto; object-fit: contain; border-radius: 12px; }
+.scm-acta-gallery-caption { margin: 12px 0 0; color: #dbeafe; font-size: 14px; text-align: center; }
+.scm-acta-gallery-count { margin-left: 8px; color: #fed7aa; font-weight: 800; white-space: nowrap; }
 @keyframes acta-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .scm-acta-spinner { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .scm-acta-spinner { animation: none; } .scm-acta-photo-thumb img { transition: none; } }
 @media (max-width: 600px) {
+  .scm-acta-brand { align-items: flex-start; gap: 12px; }
+  .scm-acta-logo { width: 96px; min-height: 58px; flex-basis: 96px; }
+  .scm-acta-logo img { max-height: 40px; }
   .scm-acta-grid { grid-template-columns: 1fr; gap: 0; }
   .scm-acta-service-detail { grid-template-columns: 1fr; }
   .scm-acta { font-size: 16px; }
@@ -96,11 +118,19 @@
   .scm-acta-page { padding: 12px 8px; }
   .scm-acta-photo-preview, .scm-acta-photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .scm-acta-photo-preview img, .scm-acta-photo-grid img { height: 128px; }
+  .scm-acta-gallery { padding: 10px; }
+  .scm-acta-gallery-dialog { max-height: 94vh; padding: 12px; border-radius: 16px; }
+  .scm-acta-gallery-stage { grid-template-columns: 1fr; }
+  .scm-acta-gallery-nav { position: absolute; top: 50%; z-index: 1; background: rgba(7,26,52,.72); }
+  .scm-acta-gallery-prev { left: 8px; }
+  .scm-acta-gallery-next { right: 8px; }
+  .scm-acta-gallery-image { max-height: calc(94vh - 168px); }
 }
 @media print {
   .scm-acta-page { padding: 0; background: #fff; }
   .scm-acta-document { max-width: none; border: 0; padding: 0; }
   .scm-acta-print, .scm-acta-document form, .scm-acta-no-print { display: none !important; }
+  .scm-acta-gallery { display: none !important; }
   .scm-acta h2, .scm-acta h3 { break-after: avoid; }
   .scm-acta tr, .scm-acta-signature { break-inside: avoid; }
   .scm-acta-evidence, .scm-acta-photo-grid figure, .scm-acta-service-item { break-inside: avoid; }
