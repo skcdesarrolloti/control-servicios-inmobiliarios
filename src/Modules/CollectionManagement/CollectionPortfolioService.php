@@ -414,14 +414,96 @@ final class CollectionPortfolioService
     return $this->item($portfolioId);
   }
 
-  public function recordManagement(int $portfolioId, int $created, string $observation): void
+  /** @return array<string,mixed> */
+  public function setManualBalance(int $portfolioId, mixed $rawBalance, string $note = ''): array
+  {
+    $item = $this->item($portfolioId);
+    $contractId = (int) ($item['contract_id'] ?? 0);
+    if ($contractId <= 0) {
+      throw new \RuntimeException('Solo puedes anexar saldo a registros vinculados a un contrato de arrendamiento.');
+    }
+
+    $oldBalance = $item['balance'] !== null ? (float) $item['balance'] : null;
+    $oldStatus = (string) ($item['status'] ?? '');
+    $balance = round($this->money($rawBalance), 2);
+    $status = $this->statusFromBalance($balance);
+    $now = date('Y-m-d H:i:s');
+    $note = trim($note);
+
+    $payload = [
+      'previous_balance' => $oldBalance,
+      'balance' => $balance,
+      'status' => $status,
+      'match_status' => 'manual',
+      'source_detail' => 'Saldo anexado manualmente',
+      'source_date' => date('Y-m-d'),
+      'last_imported_at' => $now,
+      'is_current' => 1,
+      'last_action_type' => 'saldo_manual',
+      'last_action_at' => $now,
+      'notes' => mb_substr($note !== '' ? $note : 'Saldo anexado manualmente para control de cartera.', 0, 2000, 'UTF-8'),
+      'updated_at' => $now,
+    ];
+
+    if ($oldStatus === 'deuda' && in_array($status, ['al_dia', 'saldo_favor'], true)) {
+      $payload['paid_at'] = $now;
+      $payload['collection_stage'] = 'normal';
+      if ($this->schema->columnExists($this->contractsTable(), 'esta_sinestrado')) {
+        $this->db->update($this->contractsTable(), ['esta_sinestrado' => 'No', 'cct_modified' => $now], ['_ID' => $contractId]);
+      }
+    } elseif ($status === 'deuda' && $oldStatus !== 'deuda') {
+      $payload['paid_at'] = null;
+    }
+
+    $this->db->update($this->portfolioTable(), $payload, ['id' => $portfolioId]);
+    $this->addEvent(
+      $portfolioId,
+      null,
+      'manual_balance',
+      $oldBalance,
+      $balance,
+      $note !== '' ? $note : 'Saldo anexado manualmente.'
+    );
+
+    return $this->item($portfolioId);
+  }
+
+  /** @return array{imports:int,portfolio:int,events:int} */
+  public function resetImportedData(): array
+  {
+    $this->ensureSchema();
+    $counts = [
+      'imports' => (int) ($this->db->getVar("SELECT COUNT(*) FROM `{$this->importsTable()}`") ?? 0),
+      'portfolio' => (int) ($this->db->getVar("SELECT COUNT(*) FROM `{$this->portfolioTable()}`") ?? 0),
+      'events' => (int) ($this->db->getVar("SELECT COUNT(*) FROM `{$this->eventsTable()}`") ?? 0),
+    ];
+
+    $pdo = $this->db->pdo();
+    $pdo->beginTransaction();
+    try {
+      $pdo->exec("DELETE FROM `{$this->eventsTable()}`");
+      $pdo->exec("DELETE FROM `{$this->portfolioTable()}`");
+      $pdo->exec("DELETE FROM `{$this->importsTable()}`");
+      $pdo->commit();
+    } catch (\Throwable $exception) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      throw $exception;
+    }
+
+    return $counts;
+  }
+
+  public function recordManagement(int $portfolioId, int $created, string $observation, string $actionType = 'gestion_cobro'): void
   {
     if ($portfolioId <= 0 || $created <= 0) {
       return;
     }
+    $actionType = in_array($actionType, ['gestion_cobro', 'recordatorio_fecha_cobro'], true) ? $actionType : 'gestion_cobro';
     $now = date('Y-m-d H:i:s');
     $this->db->update($this->portfolioTable(), [
-      'last_action_type' => 'gestion_cobro',
+      'last_action_type' => $actionType,
       'last_action_at' => $now,
       'notes' => mb_substr(trim($observation), 0, 2000, 'UTF-8'),
       'updated_at' => $now,
@@ -723,6 +805,17 @@ final class CollectionPortfolioService
     }
     $number = is_numeric($text) ? (float) $text : 0.0;
     return $negative ? -abs($number) : $number;
+  }
+
+  private function statusFromBalance(float $balance): string
+  {
+    if ($balance > self::MONEY_TOLERANCE) {
+      return 'deuda';
+    }
+    if ($balance < -self::MONEY_TOLERANCE) {
+      return 'saldo_favor';
+    }
+    return 'al_dia';
   }
 
   private function spreadsheetDate(string $value): string

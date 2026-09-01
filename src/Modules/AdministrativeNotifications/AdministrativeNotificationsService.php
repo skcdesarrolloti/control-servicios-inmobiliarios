@@ -196,6 +196,17 @@ final class AdministrativeNotificationsService
         'email_template' => 'scm_email_arrendatario_gestion_cobro_v1',
         'parameter_mode' => 'name_message_signature',
       ],
+      'scm_arrendatario_fecha_cobro_v1' => [
+        'name' => 'scm_arrendatario_fecha_cobro_v1',
+        'label' => 'Fecha de cobro',
+        'language' => 'es_CO',
+        'description' => 'Recordatorio para arrendatarios en las fechas de pago 12, 22, 26 y 31.',
+        'body' => "Buen dia, {{1}}.\n\nLe recordamos que hoy, dia {{2}}, vence su {{3}} fecha de pago del mes. 📅\n\n💰 Recuerde que el valor correspondiente a pagar se encuentra indicado en su cupon de pago.\n\nAgradecemos realizar su pago oportunamente y por el valor establecido en el cupon. 🙏\n\nAtentamente,\n{{4}}",
+        'variables' => ['Nombre del arrendatario', 'Dia de cobro: 12, 22, 26 o 31', 'Fecha ordinal: primera, segunda, tercera o ultima', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'actors' => array_merge($arrendatarios, $funcionarios),
+        'email_template' => 'scm_email_arrendatario_fecha_cobro_v1',
+        'parameter_mode' => 'collection_due_date',
+      ],
       'scm_factura_disponible_v1' => [
         'name' => 'scm_factura_disponible_v1',
         'label' => 'Factura disponible',
@@ -267,6 +278,20 @@ final class AdministrativeNotificationsService
         'is_full_document' => false,
         'requires_message' => true,
         'preview_excerpt' => 'Gestion de cobro con detalle editable y firma del funcionario.',
+      ],
+      'scm_email_arrendatario_fecha_cobro_v1' => [
+        'name' => 'scm_email_arrendatario_fecha_cobro_v1',
+        'label' => 'Fecha de cobro',
+        'subject' => 'Recordatorio de fecha de pago',
+        'description' => 'Email HTML para recordar las fechas de pago del canon.',
+        'body' => '<p><strong>Buen d&iacute;a, {{nombre}}</strong>.</p><div>{{mensaje}}</div><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
+        'source' => 'sistema',
+        'message_only' => true,
+        'editable_message' => '',
+        'is_html' => true,
+        'is_full_document' => false,
+        'requires_message' => true,
+        'preview_excerpt' => 'Recordatorio de fecha de pago con botones automaticos de Guardian y menu personal.',
       ],
       'scm_email_factura_disponible_v1' => [
         'name' => 'scm_email_factura_disponible_v1',
@@ -483,6 +508,55 @@ final class AdministrativeNotificationsService
   public function collectionSmsNotificationMessage(array $payload): string
   {
     return 'Buen día, {{nombre}}. ' . $this->collectionNotificationMessage($payload);
+  }
+
+  public function collectionDueDateOrdinal(int $day): string
+  {
+    return match ($day) {
+      22 => 'segunda',
+      26 => 'tercera',
+      31 => 'última',
+      default => 'primera',
+    };
+  }
+
+  public function normalizeCollectionDueDateDay(int|string $day): int
+  {
+    $day = (int) preg_replace('/\D+/', '', (string) $day);
+    if (!in_array($day, [12, 22, 26, 31], true)) {
+      throw new \RuntimeException('Selecciona una fecha de cobro válida: 12, 22, 26 o 31.');
+    }
+    return $day;
+  }
+
+  public function collectionDueDateReminderMessage(int|string $day): string
+  {
+    $day = $this->normalizeCollectionDueDateDay($day);
+    return '<p>Le recordamos que <strong>hoy, día ' . $day . ', vence su ' . htmlspecialchars($this->collectionDueDateOrdinal($day), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ' fecha de pago del mes</strong>. 📅</p>'
+      . '<p>💰 Recuerde que el <strong>valor correspondiente a pagar se encuentra indicado en su cupón de pago</strong>.</p>'
+      . '<p>Agradecemos realizar su pago oportunamente y por el valor establecido en el cupón. 🙏</p>';
+  }
+
+  public function collectionDueDateReminderSmsMessage(int|string $day): string
+  {
+    $day = $this->normalizeCollectionDueDateDay($day);
+    return 'Buen día, {{nombre}}. Le recordamos que hoy, día ' . $day . ', vence su '
+      . $this->collectionDueDateOrdinal($day)
+      . ' fecha de pago del mes. El valor a pagar está indicado en su cupón. Agradecemos realizar su pago oportunamente.';
+  }
+
+  /** @param string[] $channels */
+  public function collectionDueDateReminderObservation(int|string $day, array $channels = []): string
+  {
+    $day = $this->normalizeCollectionDueDateDay($day);
+    $channels = array_values(array_unique(array_filter(array_map(static fn($value): string => strtolower(trim((string) $value)), $channels))));
+    $channelText = $channels !== [] ? ' Canales: ' . implode(', ', array_map(static fn(string $channel): string => match ($channel) {
+      'whatsapp' => 'WhatsApp',
+      'email' => 'Email',
+      'sms' => 'SMS',
+      default => $channel,
+    }, $channels)) . '.' : '';
+    return 'Recordatorio automático de fecha de cobro día ' . $day . ' (' . $this->collectionDueDateOrdinal($day) . ' fecha de pago).' . $channelText;
   }
 
   /**
@@ -2342,6 +2416,7 @@ final class AdministrativeNotificationsService
       if ($notificationMeta === []) {
         continue;
       }
+      $cleanMeta = [];
       $collection = is_array($notificationMeta['collection_management'] ?? null) ? $notificationMeta['collection_management'] : [];
       $managements = is_array($collection['managements'] ?? null) ? $collection['managements'] : [];
       $cleanManagements = [];
@@ -2363,17 +2438,26 @@ final class AdministrativeNotificationsService
           'type' => mb_substr(trim((string) ($management['type'] ?? '')), 0, 80, 'UTF-8'),
         ];
       }
-      if ($cleanManagements === []) {
-        continue;
-      }
-      $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $value): bool => $value > 0)));
-      $out[$id] = [
-        'collection_management' => [
+      if ($cleanManagements !== []) {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $value): bool => $value > 0)));
+        $cleanMeta['collection_management'] = [
           'ids' => $ids,
           'lookup' => '|' . implode('|', $ids) . '|',
           'managements' => $cleanManagements,
-        ],
-      ];
+        ];
+      }
+      $dueDate = is_array($notificationMeta['collection_due_date'] ?? null) ? $notificationMeta['collection_due_date'] : [];
+      $dueDay = (int) ($dueDate['day'] ?? 0);
+      if (in_array($dueDay, [12, 22, 26, 31], true)) {
+        $cleanMeta['collection_due_date'] = [
+          'day' => $dueDay,
+          'ordinal' => $this->collectionDueDateOrdinal($dueDay),
+        ];
+      }
+      if ($cleanMeta === []) {
+        continue;
+      }
+      $out[$id] = $cleanMeta;
     }
     return $out;
   }
@@ -3347,6 +3431,24 @@ final class AdministrativeNotificationsService
       return [
         ['type' => 'text', 'text' => $name],
         ['type' => 'text', 'text' => $messageWithSignature],
+      ];
+    }
+    if ($mode === 'collection_due_date') {
+      $meta = is_array($recipient['_scm_notification_meta'] ?? null) ? $recipient['_scm_notification_meta'] : [];
+      $due = is_array($meta['collection_due_date'] ?? null) ? $meta['collection_due_date'] : [];
+      $day = (int) ($due['day'] ?? 12);
+      if (!in_array($day, [12, 22, 26, 31], true)) {
+        $day = 12;
+      }
+      $ordinal = trim((string) ($due['ordinal'] ?? ''));
+      if ($ordinal === '') {
+        $ordinal = $this->collectionDueDateOrdinal($day);
+      }
+      return [
+        ['type' => 'text', 'text' => $name],
+        ['type' => 'text', 'text' => (string) $day],
+        ['type' => 'text', 'text' => $ordinal],
+        ['type' => 'text', 'text' => $signature],
       ];
     }
     return [

@@ -454,9 +454,26 @@
   color: var(--portfolio-navy);
 }
 
+#scm-app .scm-portfolio-balance-btn {
+  border-color: #b8d3ee;
+  background: #eef7ff;
+  color: #1e5f91;
+}
+
+#scm-app .scm-portfolio-due-btn {
+  border-color: #a7dfd1;
+  background: #ecfdf8;
+  color: #087164;
+}
+
 #scm-app .scm-portfolio-stage-btn {
   border-color: #e2a4a0;
   color: #982018;
+}
+
+#scm-app .scm-portfolio-reset-btn {
+  border-color: #f5b7b1;
+  color: #9f2017;
 }
 
 #scm-app .scm-portfolio-no-action {
@@ -516,6 +533,58 @@
 
 #scm-app .scm-portfolio-management-observation .scm-textarea::placeholder { color: #8191a3; }
 #scm-app .scm-portfolio-management-observation small { display: block; margin-top: 6px; color: #52687e; font-size: 11px; line-height: 1.45; }
+
+.swal2-popup .scm-portfolio-swal-form {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.swal2-popup .scm-portfolio-swal-form p {
+  margin: 0 0 2px;
+  color: #20364d;
+  line-height: 1.45;
+}
+
+.swal2-popup .scm-portfolio-swal-form label {
+  margin: 2px 0 0;
+  color: #465f78;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-portfolio-swal-form .swal2-input,
+.swal2-popup .scm-portfolio-swal-form .swal2-select,
+.swal2-popup .scm-portfolio-swal-form .swal2-textarea {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  border-color: #c7d5e3;
+  border-radius: 12px;
+  color: #20364d;
+  box-shadow: none;
+}
+
+.swal2-popup .scm-portfolio-swal-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.swal2-popup .scm-portfolio-swal-checks label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  gap: 7px;
+  border: 1px solid #cbd8e5;
+  border-radius: 999px;
+  background: #f8fbfe;
+  padding: 8px 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
 
 #scm-app .scm-portfolio-letter-preview-panel {
   width: min(1180px, calc(100vw - 38px));

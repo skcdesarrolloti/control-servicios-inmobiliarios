@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\App\Concerns;
 
+use SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService;
 use SCM\Modules\CollectionManagement\CollectionPortfolioService;
 
 trait HandlesCollectionManagement
@@ -36,11 +37,120 @@ trait HandlesCollectionManagement
     $portfolioId = max(0, (int) ($_POST['portfolio_id'] ?? 0));
     $operation = sanitize_key((string) ($_POST['operation'] ?? ''));
     $note = trim(wp_strip_all_tags((string) ($_POST['note'] ?? '')));
-    if ($portfolioId <= 0) {
-      $this->jsonFail('Selecciona un registro de cartera válido.');
-    }
     try {
       $service = $this->get_collection_portfolio_service();
+      if ($operation === 'reset_imports') {
+        $confirm = strtoupper(trim(sanitize_text_field(wp_unslash((string) ($_POST['confirm'] ?? '')))));
+        if ($confirm !== 'RESET') {
+          $this->jsonFail('Confirma el reinicio de pruebas de cartera.');
+        }
+        $counts = $service->resetImportedData();
+        $this->jsonOk($counts + [
+          'message' => 'Datos de prueba de la 1380 limpiados. No se tocaron contratos, gestiones históricas ni notificaciones.',
+        ]);
+      }
+      if ($portfolioId <= 0) {
+        $this->jsonFail('Selecciona un registro de cartera válido.');
+      }
+      if ($operation === 'manual_balance') {
+        $balance = trim(sanitize_text_field(wp_unslash((string) ($_POST['balance'] ?? ''))));
+        if ($balance === '') {
+          $this->jsonFail('Indica el saldo que quieres anexar.');
+        }
+        $item = $service->setManualBalance($portfolioId, $balance, $note);
+        $this->jsonOk(['item' => $item, 'message' => 'Saldo manual anexado a la cartera.']);
+      }
+      if ($operation === 'send_due_date') {
+        $adminService = $this->get_admin_notifications_service();
+        $item = $service->item($portfolioId);
+        $tenantId = (int) ($item['tenant_id'] ?? 0);
+        $contractId = (int) ($item['contract_id'] ?? 0);
+        if ($tenantId <= 0 || $contractId <= 0) {
+          $this->jsonFail('Este registro no tiene arrendatario y contrato vinculados para notificar.');
+        }
+        $dueDay = $adminService->normalizeCollectionDueDateDay((string) ($_POST['due_day'] ?? date('j')));
+        $rawChannels = $_POST['notify_channels'] ?? [];
+        $notifyChannels = array_map(
+          static fn($value): string => sanitize_key((string) $value),
+          is_array($rawChannels) ? $rawChannels : [$rawChannels]
+        );
+        $notifyChannels = array_values(array_unique(array_filter($notifyChannels, static fn(string $channel): bool => in_array($channel, ['email', 'sms', 'whatsapp'], true))));
+        if ($notifyChannels === []) {
+          $this->jsonFail('Selecciona al menos un canal para enviar el recordatorio.');
+        }
+
+        $observation = $adminService->collectionDueDateReminderObservation($dueDay, $notifyChannels);
+        $payload = [
+          'tipo_gestion_cobro' => 'Canon',
+          'observacion' => $observation,
+          'volver_llamar' => 'No',
+          'siguiente_fecha' => '',
+          'siguiente_hora' => '',
+          'otro_horario_cobro' => '',
+          'contract_ids' => [$contractId],
+        ];
+        $result = $adminService->registerCollectionManagement([$tenantId], $payload);
+        $created = (int) ($result['created'] ?? 0);
+        if ($created > 0) {
+          $service->recordManagement($portfolioId, $created, $observation, 'recordatorio_fecha_cobro');
+        }
+
+        $notifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0];
+        $notifyError = '';
+        if ($created > 0) {
+          try {
+            $notifyIds = array_map('intval', (array) ($result['recipient_ids'] ?? [$tenantId]));
+            $notificationMeta = $this->collection_management_notification_meta((array) ($result['managements'] ?? []));
+            foreach ($notifyIds as $notifyId) {
+              if ($notifyId <= 0) {
+                continue;
+              }
+              if (!isset($notificationMeta[$notifyId])) {
+                $notificationMeta[$notifyId] = ['__notification_meta' => []];
+              }
+              $notificationMeta[$notifyId]['__notification_meta']['collection_due_date'] = [
+                'day' => $dueDay,
+                'ordinal' => $adminService->collectionDueDateOrdinal($dueDay),
+              ];
+            }
+            $nonSmsChannels = array_values(array_filter($notifyChannels, static fn(string $channel): bool => $channel !== 'sms'));
+            if ($nonSmsChannels !== []) {
+              $notifyResult = $this->merge_admin_notification_results($notifyResult, $adminService->enqueue(
+                'arrendatarios_activos',
+                $notifyIds,
+                $nonSmsChannels,
+                'Recordatorio de fecha de pago',
+                $adminService->collectionDueDateReminderMessage($dueDay),
+                'scm_arrendatario_fecha_cobro_v1',
+                'scm_email_arrendatario_fecha_cobro_v1',
+                $notificationMeta,
+                AdministrativeNotificationsService::COLLECTION_SMS_MAX
+              ));
+            }
+            if (in_array('sms', $notifyChannels, true)) {
+              $notifyResult = $this->merge_admin_notification_results($notifyResult, $adminService->enqueue(
+                'arrendatarios_activos',
+                $notifyIds,
+                ['sms'],
+                'Recordatorio de fecha de pago',
+                $adminService->collectionDueDateReminderSmsMessage($dueDay),
+                '',
+                '',
+                $notificationMeta,
+                AdministrativeNotificationsService::COLLECTION_SMS_MAX
+              ));
+            }
+          } catch (\Throwable $notifyException) {
+            $notifyError = $notifyException->getMessage();
+          }
+        }
+
+        $queued = (int) ($notifyResult['queued'] ?? 0);
+        $message = $created > 0
+          ? 'Recordatorio de fecha de cobro registrado.' . ($queued > 0 ? " {$queued} notificación(es) encolada(s)." : '') . ($notifyError !== '' ? ' No se pudo encolar todo: ' . $notifyError : '')
+          : 'No se registró la gestión. Revisa que el contrato siga activo.';
+        $this->jsonOk($result + ['message' => $message, 'notifications' => $notifyResult, 'notification_error' => $notifyError]);
+      }
       if (in_array($operation, ['mark_normal', 'mark_prejuridico', 'mark_siniestro'], true)) {
         $stage = str_replace('mark_', '', $operation);
         $item = $service->updateStage($portfolioId, $stage, $note);

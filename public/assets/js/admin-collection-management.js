@@ -198,6 +198,175 @@
       }).finally(function () { button.disabled = false; });
     }
 
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>"']/g, function (char) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[char] || char;
+      });
+    }
+
+    function defaultDueDay() {
+      var day = String(new Date().getDate());
+      return ["12", "22", "26", "31"].indexOf(day) !== -1 ? day : "12";
+    }
+
+    function runPortfolioOperation(button, payload, workingMessage, successType) {
+      button.disabled = true;
+      if (workingMessage) notify("info", workingMessage, "Cartera");
+      return postJson(actionPortfolio, payload).then(function (data) {
+        notify(successType || "success", data.message || "Cartera actualizada.", "Cartera");
+        return refreshPanel();
+      }).catch(function (error) {
+        notify("error", error.message, "Cartera");
+      }).finally(function () {
+        button.disabled = false;
+      });
+    }
+
+    function annexManualBalance(button) {
+      var portfolioId = String(button.getAttribute("data-portfolio-id") || "");
+      var tenantName = String(button.getAttribute("data-tenant-name") || "Arrendatario");
+      var contractNumber = String(button.getAttribute("data-contract-number") || "");
+      var currentBalance = String(button.getAttribute("data-current-balance") || "");
+      var submit = function (balance, note) {
+        var fd = new FormData();
+        fd.set("portfolio_id", portfolioId);
+        fd.set("operation", "manual_balance");
+        fd.set("balance", balance);
+        fd.set("note", note || "");
+        return runPortfolioOperation(button, fd, "Anexando saldo manual...", "success");
+      };
+
+      if (window.Swal && typeof window.Swal.fire === "function") {
+        window.Swal.fire({
+          title: "Anexar saldo",
+          html: '<div class="scm-portfolio-swal-form">'
+            + '<p><strong>' + escapeHtml(tenantName) + '</strong>' + (contractNumber ? ' · Contrato ' + escapeHtml(contractNumber) : '') + '</p>'
+            + '<label for="scm-manual-balance">Saldo actual</label>'
+            + '<input id="scm-manual-balance" class="swal2-input" inputmode="decimal" placeholder="Ej: 450000 o 0" value="' + escapeHtml(currentBalance) + '">'
+            + '<label for="scm-manual-note">Observación</label>'
+            + '<textarea id="scm-manual-note" class="swal2-textarea" placeholder="Motivo del saldo manual, prueba o ajuste"></textarea>'
+            + '</div>',
+          showCancelButton: true,
+          confirmButtonText: "Guardar saldo",
+          cancelButtonText: "Cancelar",
+          confirmButtonColor: "#1e3a5f",
+          preConfirm: function () {
+            var balance = document.getElementById("scm-manual-balance");
+            var note = document.getElementById("scm-manual-note");
+            var value = balance ? String(balance.value || "").trim() : "";
+            if (!value || !/\d/.test(value)) {
+              window.Swal.showValidationMessage("Indica un saldo válido.");
+              return false;
+            }
+            return { balance: value, note: note ? String(note.value || "").trim() : "" };
+          }
+        }).then(function (result) {
+          if (result.isConfirmed && result.value) submit(result.value.balance, result.value.note);
+        });
+        return;
+      }
+
+      var balance = window.prompt("Saldo a anexar. Positivo = deuda, 0 = al día, negativo = saldo a favor.", currentBalance || "");
+      if (balance !== null && /\d/.test(String(balance))) submit(String(balance), "");
+    }
+
+    function sendDueDateReminder(button) {
+      var portfolioId = String(button.getAttribute("data-portfolio-id") || "");
+      var tenantName = String(button.getAttribute("data-tenant-name") || "Arrendatario");
+      var contractNumber = String(button.getAttribute("data-contract-number") || "");
+      var submit = function (day, channels) {
+        var fd = new FormData();
+        fd.set("portfolio_id", portfolioId);
+        fd.set("operation", "send_due_date");
+        fd.set("due_day", day);
+        channels.forEach(function (channel) { fd.append("notify_channels[]", channel); });
+        return runPortfolioOperation(button, fd, "Registrando y encolando recordatorio...", "success");
+      };
+
+      if (window.Swal && typeof window.Swal.fire === "function") {
+        window.Swal.fire({
+          title: "Fecha de cobro",
+          html: '<div class="scm-portfolio-swal-form">'
+            + '<p><strong>' + escapeHtml(tenantName) + '</strong>' + (contractNumber ? ' · Contrato ' + escapeHtml(contractNumber) : '') + '</p>'
+            + '<label for="scm-due-day">Fecha de pago</label>'
+            + '<select id="scm-due-day" class="swal2-select">'
+            + '<option value="12">Día 12 · primera fecha</option>'
+            + '<option value="22">Día 22 · segunda fecha</option>'
+            + '<option value="26">Día 26 · tercera fecha</option>'
+            + '<option value="31">Día 31 · última fecha</option>'
+            + '</select>'
+            + '<label>Canales</label>'
+            + '<div class="scm-portfolio-swal-checks">'
+            + '<label><input type="checkbox" value="whatsapp" checked> WhatsApp</label>'
+            + '<label><input type="checkbox" value="email"> Email</label>'
+            + '<label><input type="checkbox" value="sms"> SMS</label>'
+            + '</div>'
+            + '</div>',
+          didOpen: function () {
+            var select = document.getElementById("scm-due-day");
+            if (select) select.value = defaultDueDay();
+          },
+          showCancelButton: true,
+          confirmButtonText: "Enviar recordatorio",
+          cancelButtonText: "Cancelar",
+          confirmButtonColor: "#1e3a5f",
+          preConfirm: function () {
+            var popup = window.Swal.getPopup();
+            var select = document.getElementById("scm-due-day");
+            var channels = Array.prototype.slice.call(popup.querySelectorAll(".scm-portfolio-swal-checks input:checked")).map(function (input) {
+              return String(input.value || "");
+            });
+            if (channels.length === 0) {
+              window.Swal.showValidationMessage("Selecciona al menos un canal.");
+              return false;
+            }
+            return { day: select ? String(select.value || "12") : "12", channels: channels };
+          }
+        }).then(function (result) {
+          if (result.isConfirmed && result.value) submit(result.value.day, result.value.channels);
+        });
+        return;
+      }
+
+      var day = window.prompt("Día de cobro: 12, 22, 26 o 31", defaultDueDay());
+      if (["12", "22", "26", "31"].indexOf(String(day || "")) === -1) return;
+      submit(String(day), ["whatsapp"]);
+    }
+
+    function resetPortfolioImports(button) {
+      var submit = function (confirmText) {
+        var fd = new FormData();
+        fd.set("operation", "reset_imports");
+        fd.set("confirm", confirmText);
+        return runPortfolioOperation(button, fd, "Limpiando pruebas de cartera...", "warning");
+      };
+
+      if (window.Swal && typeof window.Swal.fire === "function") {
+        window.Swal.fire({
+          title: "Limpiar pruebas 1380",
+          text: "Se borran únicamente los cargues 1380, la foto actual de cartera y eventos técnicos de esa foto. No toca contratos, gestiones históricas ni notificaciones.",
+          input: "text",
+          inputPlaceholder: "Escribe RESET",
+          showCancelButton: true,
+          confirmButtonText: "Limpiar",
+          cancelButtonText: "Cancelar",
+          confirmButtonColor: "#b42318",
+          preConfirm: function (value) {
+            if (String(value || "").trim().toUpperCase() !== "RESET") {
+              window.Swal.showValidationMessage("Escribe RESET para confirmar.");
+              return false;
+            }
+            return "RESET";
+          }
+        }).then(function (result) {
+          if (result.isConfirmed) submit("RESET");
+        });
+        return;
+      }
+
+      if (window.prompt("Para limpiar pruebas de la 1380 escribe RESET.") === "RESET") submit("RESET");
+    }
+
     function syncModalBodyState() {
       var openModal = root.querySelector("[data-scm-portfolio-management-modal]:not([hidden]), [data-scm-portfolio-letter-preview-modal]:not([hidden])");
       document.body.classList.toggle("scm-modal-open", !!openModal);
@@ -431,6 +600,24 @@
         document.body.classList.add("scm-print-portfolio-report");
         window.print();
         window.setTimeout(function () { document.body.classList.remove("scm-print-portfolio-report"); }, 10000);
+        return;
+      }
+      var resetButton = event.target.closest && event.target.closest("[data-scm-portfolio-reset]");
+      if (resetButton && root.contains(resetButton)) {
+        event.preventDefault();
+        resetPortfolioImports(resetButton);
+        return;
+      }
+      var balanceButton = event.target.closest && event.target.closest("[data-scm-portfolio-balance]");
+      if (balanceButton && root.contains(balanceButton)) {
+        event.preventDefault();
+        annexManualBalance(balanceButton);
+        return;
+      }
+      var dueDateButton = event.target.closest && event.target.closest("[data-scm-portfolio-due-date]");
+      if (dueDateButton && root.contains(dueDateButton)) {
+        event.preventDefault();
+        sendDueDateReminder(dueDateButton);
         return;
       }
       var stageButton = event.target.closest && event.target.closest("[data-scm-portfolio-stage]");
