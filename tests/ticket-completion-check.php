@@ -34,6 +34,10 @@ $assert(Policy::fee(['salario' => '1300000', 'dias_trabajo' => '30', 'porcentaje
 $assert(Policy::fee(['salario' => '1300000', 'dias_trabajo' => '0']) === null, 'missing configuration requires explicit value');
 $rejects(static fn() => Policy::number('-100'), 'negative fee rejected');
 $rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => '']]), 'solution required for every damage');
+$photoDescriptor = ['name' => str_repeat('a', 24) . '_123.jpg', 'mime' => 'image/jpeg', 'width' => 1200, 'height' => 900, 'bytes' => 350000, 'sha256' => str_repeat('b', 64)];
+$assert(Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [$photoDescriptor]]])[0]['photos'][0]['width'] === 1200, 'compressed photo metadata accepted');
+$rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [array_replace($photoDescriptor, ['bytes' => 1500001])]]]), 'oversized photo evidence rejected');
+$rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [array_replace($photoDescriptor, ['name' => '../otro.jpg'])]]]), 'unsafe photo path rejected');
 $rejects(static fn() => Policy::signature(['signature_name' => 'Ana Pérez', 'document' => '123456'], 'Ana Pérez'), 'opening a link never constitutes consent');
 $rejects(static fn() => Policy::signature(['signature_name' => 'Otra persona', 'document' => '123456', 'accepted' => '1'], 'Ana Pérez'), 'signature must match selected name');
 $drawing = json_encode([[[120, 200], [160, 90], [190, 190], [130, 170], [230, 140], [240, 210], [280, 140], [310, 200], [360, 160]]]);
@@ -79,6 +83,13 @@ $service = new Service($repo, str_repeat('test-secret-', 4), 'http://127.0.0.1:8
 });
 $actor = ['user_id' => 1, 'employee_id' => '200', 'name' => 'Funcionario Prueba'];
 $input = ['signer_role' => 'propietario', 'signer_name' => 'Ana Pérez', 'executor' => 'propietario', 'items' => [['damage' => 'Fuga en tubería de cocina', 'solution' => 'Se reemplazó el tramo y se verificó presión.']], 'observations' => 'Sin filtración en la prueba final.', 'transport' => '12000', 'confirm' => '1'];
+$photoName = bin2hex(random_bytes(12)) . '_' . time() . '.jpg';
+$photoPath = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . $photoName;
+if (!is_dir((string) SCM_UPLOAD_PATH)) { mkdir((string) SCM_UPLOAD_PATH, 0750, true); }
+if (!copy(dirname(__DIR__) . '/resources/assets/membrete-sucasa.jpg', $photoPath)) { throw new RuntimeException('Unable to create isolated photo fixture.'); }
+register_shutdown_function(static function () use ($photoPath): void { if (is_file($photoPath)) { unlink($photoPath); } });
+$photoInfo = getimagesize($photoPath);
+$input['items'][0]['photos'] = [['name' => $photoName, 'mime' => 'image/jpeg', 'width' => $photoInfo[0], 'height' => $photoInfo[1], 'bytes' => filesize($photoPath), 'sha256' => hash_file('sha256', $photoPath)]];
 $codes = [];
 $signInput = static function (array $act) use ($drawing, &$codes): array { return ['document' => '123456789', 'signature_name' => 'Ana Pérez', 'accepted' => '1', 'consent_version' => '2', 'signature_strokes' => $drawing, 'otp_code' => $codes[$act['id']] ?? '', 'document_hash' => $act['payload_hash']]; };
 $requestCode = static function (array $act, string $channel = 'email') use ($service, &$notifications, &$codes): array {
@@ -133,6 +144,8 @@ $db->pdo()->exec('ALTER TABLE `' . $db->table('jet_cct_historial_del_ticket') . 
 $signed = $service->sign((int) $act['id'], $token, $signInput($act), '127.0.0.1', 'QA');
 $assert($signed['status'] === 'signed' && $repo->ticket(1)['estado'] === 'Cerrado' && $repo->ticket(1)['estado_administrativo'] === 'Finalizado', 'signature closes ticket and finalizes workflow');
 $assert(str_starts_with($signed['signed_pdf'], '%PDF-1.4') && hash('sha256', $signed['signed_pdf']) === $signed['pdf_hash'], 'immutable signed PDF saved with closure');
+$assert(str_contains($signed['signed_pdf'], '/Subtype /Image'), 'signed PDF embeds immutable photographic evidence');
+$assert(str_contains($signed['signed_pdf'], 'Evidencias del da'), 'signed PDF labels photographic evidence by damage');
 $assert($signed['otp_json'] === null && !empty(json_decode($signed['signed_json'], true)['verification']), 'code consumed and verification evidence recorded');
 $assert($service->pdf($signed) === $signed['signed_pdf'], 'recipient receives exact persisted PDF');
 $badPdf = $signed; $badPdf['signed_pdf'] .= 'tamper';
@@ -152,6 +165,7 @@ $publicHtml = (new View())->document($signed, $service->payload($signed), false)
 $staffHtml = (new View())->document($signed, $service->payload($signed), true);
 $assert(!str_contains($publicHtml, 'Reporte administrativo') && str_contains($staffHtml, 'Reporte administrativo'), 'public document excludes internal charge');
 $assert(str_contains($publicHtml, 'Fuga en tubería') && str_contains($publicHtml, 'reemplazó') && str_contains($publicHtml, 'Firma electrónica registrada'), 'document includes damage, solution and signature');
+$assert(str_contains($publicHtml, 'Evidencias del daño #1') && str_contains($publicHtml, rawurlencode($photoName)), 'recipient document displays lazy photographic evidence');
 $badSignature = $signed;
 $badSignature['signed_json'] = str_replace('Ana Pérez', 'Otra persona', (string) $signed['signed_json']);
 $rejects(static fn() => $service->payload($badSignature), 'altered signature evidence fails integrity check');

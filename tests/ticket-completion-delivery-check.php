@@ -30,18 +30,16 @@ $base = ['destination_name' => 'QA', 'source_module' => 'ticket-completion', 'de
 $assert(\SCM\Modules\TicketCompletion\CompletionDelivery::enqueue($db, 'qa@example.invalid', 'QA', '<p>Código ficticio 123456</p>', $base) === 1, 'real email bridge queues into temporary table');
 $whatsapp = array_replace($base, ['channel' => 'whatsapp', 'dedupe_key' => 'acta-qa-whatsapp']);
 putenv('SCM_ACTA_WHATSAPP_OTP_TEMPLATE');
-$assert(\SCM\Modules\TicketCompletion\CompletionDelivery::enqueue($db, '+573000000000', 'QA', '', $whatsapp) === 0, 'OTP never falls back to general template');
-putenv('SCM_ACTA_WHATSAPP_OTP_TEMPLATE=scm_acta_firma_otp_v1');
 putenv('SCM_ACTA_WHATSAPP_OTP_LANGUAGE=es_CO');
-$assert(\SCM\Modules\TicketCompletion\CompletionDelivery::enqueue($db, '+573000000000', 'QA', '', $whatsapp) === 1, 'real WhatsApp bridge queues authentication template');
+$assert(\SCM\Modules\TicketCompletion\CompletionDelivery::enqueue($db, '+573000000000', 'QA', '', $whatsapp) === 1, 'default exact authentication template enqueued');
 putenv('SCM_ACTA_WHATSAPP_INVITATION_TEMPLATE');
 putenv('SCM_ACTA_WHATSAPP_RECEIPT_TEMPLATE');
 putenv('SCM_ACTA_WHATSAPP_LANGUAGE=es_MX');
 $invite = array_replace($whatsapp, ['dedupe_key' => 'acta-qa-invite', 'meta' => ['event' => 'signature_invitation', 'act_id' => 999], 'otp_code' => '', 'message_text' => 'Enlace de prueba https://example.invalid/acta', 'ticket_number' => '10368', 'act_url' => 'https://example.invalid/acta?id=999&token=FICTICIO']);
-$assert(\SCM\Modules\TicketCompletion\CompletionDelivery::enqueue($db, '+573000000000', 'QA', '', $invite) === 1, 'invitation preserves general template until approval/configuration');
+$assert(\SCM\Modules\TicketCompletion\CompletionDelivery::enqueue($db, '+573000000000', 'QA', '', $invite) === 1, 'default exact invitation template enqueued');
 putenv('SCM_ACTA_WHATSAPP_INVITATION_TEMPLATE=scm_acta_solicitud_firma_v1');
 $receipt = array_replace($invite, ['dedupe_key' => 'acta-qa-receipt', 'meta' => ['event' => 'signed_receipt', 'act_id' => 999], 'act_url' => $invite['act_url'] . '&format=pdf']);
-$assert(\SCM\Modules\TicketCompletion\CompletionDelivery::enqueue($db, '+573000000000', 'QA', '', $receipt) === 1, 'receipt keeps fallback when only invitation is activated');
+$assert(\SCM\Modules\TicketCompletion\CompletionDelivery::enqueue($db, '+573000000000', 'QA', '', $receipt) === 1, 'default exact signed PDF receipt template enqueued');
 $invite['dedupe_key'] .= '-dedicated';
 $assert(\SCM\Modules\TicketCompletion\CompletionDelivery::enqueue($db, '+573000000000', 'QA', '', $invite) === 1, 'dedicated invitation enqueued');
 putenv('SCM_ACTA_WHATSAPP_RECEIPT_TEMPLATE=scm_acta_firmada_v1');
@@ -55,9 +53,10 @@ $assert(count($rows) === 6 && count(array_filter($rows, static fn(array $row): b
 $otp = json_decode($rows[1]['payload_json'], true);
 $assert($otp['template_name'] === 'scm_acta_firma_otp_v1' && $otp['components'][0]['parameters'][0]['text'] === '123456' && $otp['components'][1]['sub_type'] === 'url' && $otp['components'][1]['parameters'][0]['text'] === '123456', 'authentication body and copy-code button agree');
 $assert($otp['template_language'] === 'es_CO', 'OTP keeps its independently configured language');
-foreach ([2, 3] as $index) {
-  $legacy = json_decode($rows[$index]['payload_json'], true);
-  $assert($legacy['template_name'] === 'scm_notificacion_general_v1' && $legacy['template_language'] === 'es_CO' && array_column($legacy['components'][0]['parameters'], 'text') === ['QA', $invite['message_text'], 'SKC SuCasa Inmobiliaria'], 'fallback preserves existing name, language and parameter order');
+foreach ([2 => ['invitation', $invite], 3 => ['receipt', $receipt]] as $index => [$kind, $options]) {
+  $payload = json_decode($rows[$index]['payload_json'], true);
+  $definition = json_decode(file_get_contents(dirname(__DIR__) . '/docs/whatsapp-acta-' . $kind . '-template.json'), true, 512, JSON_THROW_ON_ERROR);
+  $assert($payload['template_name'] === $definition['name'] && $payload['template_language'] === 'es_MX' && array_column($payload['components'][0]['parameters'], 'text') === ['QA', '10368', $options['act_url']], 'default ' . $kind . ' uses exact documented contract');
 }
 foreach ([4 => ['invitation', $invite], 5 => ['receipt', $receipt]] as $index => [$kind, $options]) {
   $payload = json_decode($rows[$index]['payload_json'], true);

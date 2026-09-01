@@ -32,6 +32,16 @@
 .scm-acta-record, .scm-acta-item { border: 1px solid var(--acta-border); background: #fff; padding: 16px; margin: 16px 0; border-radius: 10px; min-width: 0; }
 .scm-acta-item legend { padding: 0 8px; font-weight: 700; }
 .scm-acta .scm-acta-remove { background: transparent; color: #9f1239; border: 0; min-height: 44px; padding: 8px; cursor: pointer; text-decoration: underline; }
+.scm-acta .scm-acta-photo-field { padding: 14px; border: 1px dashed #94a3b8; border-radius: 10px; background: var(--acta-surface); }
+.scm-acta .scm-acta-photo-field input { padding: 8px; background: #fff; cursor: pointer; }
+.scm-acta .scm-acta-photo-field small { color: var(--acta-muted); font-weight: 400; }
+.scm-acta-photo-preview, .scm-acta-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 12px; margin: 12px 0; }
+.scm-acta-photo-preview:empty { display: none; }
+.scm-acta-photo-preview figure, .scm-acta-photo-grid figure { min-width: 0; margin: 0; padding: 8px; border: 1px solid var(--acta-border); border-radius: 10px; background: #fff; }
+.scm-acta-photo-preview img, .scm-acta-photo-grid img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; background: #e2e8f0; }
+.scm-acta-photo-preview figcaption, .scm-acta-photo-grid figcaption { margin-top: 6px; color: var(--acta-muted); font-size: 12px; overflow-wrap: anywhere; }
+.scm-acta-evidence { margin-top: 20px; padding: 14px; border: 1px solid var(--acta-border); border-radius: 10px; background: var(--acta-surface); }
+.scm-acta-evidence h3 { margin-top: 0; }
 .scm-acta .scm-acta-help, .scm-acta dt { color: var(--acta-muted); font-size: 14px; }
 .scm-acta-status { color: #173d70; background: #e5eefb; padding: 6px 12px; border-radius: 20px; font-size: 13px; }
 .scm-acta .scm-acta-total { padding: 16px; background: var(--acta-surface); font-size: 18px; font-weight: 700; border-radius: 10px; }
@@ -67,6 +77,7 @@
   .scm-acta th, .scm-acta td { padding: 8px; font-size: 13px; }
   .scm-acta-document { padding: 18px; border-radius: 10px; }
   .scm-acta-page { padding: 12px 8px; }
+  .scm-acta-photo-preview, .scm-acta-photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media print {
   .scm-acta-page { padding: 0; background: #fff; }
@@ -74,5 +85,6 @@
   .scm-acta-print, .scm-acta-document form, .scm-acta-no-print { display: none !important; }
   .scm-acta h2, .scm-acta h3 { break-after: avoid; }
   .scm-acta tr, .scm-acta-signature { break-inside: avoid; }
+  .scm-acta-evidence, .scm-acta-photo-grid figure { break-inside: avoid; }
   .scm-acta thead { display: table-header-group; }
 }

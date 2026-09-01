@@ -1750,6 +1750,58 @@
     }
 
     function bind() {
+      function photoPreview(input) {
+        (input._actaPreviewUrls || []).forEach(function (url) { URL.revokeObjectURL(url); });
+        input._actaPreviewUrls = [];
+        var preview = input.closest("[data-acta-item]").querySelector("[data-acta-photo-preview]");
+        var files = Array.from(input.files || []);
+        if (files.length > 4) { input.value = ""; preview.innerHTML = ""; message("Cada daño admite máximo 4 fotos.", true); return; }
+        preview.innerHTML = "";
+        files.forEach(function (file, index) {
+          var url = URL.createObjectURL(file); input._actaPreviewUrls.push(url);
+          var figure = document.createElement("figure");
+          var image = document.createElement("img"); image.src = url; image.alt = "Vista previa de evidencia " + (index + 1);
+          var caption = document.createElement("figcaption"); caption.textContent = file.name + " · " + Math.max(1, Math.round(file.size / 1024)) + " KB";
+          figure.appendChild(image); figure.appendChild(caption); preview.appendChild(figure);
+        });
+      }
+      function decodePhoto(file) {
+        if (window.createImageBitmap) {
+          return createImageBitmap(file, { imageOrientation: "from-image" }).catch(function () { return createImageBitmap(file); });
+        }
+        return new Promise(function (resolve, reject) {
+          var url = URL.createObjectURL(file), image = new Image();
+          image.onload = function () { URL.revokeObjectURL(url); resolve(image); };
+          image.onerror = function () { URL.revokeObjectURL(url); reject(new Error("No se pudo leer " + file.name + ".")); };
+          image.src = url;
+        });
+      }
+      function compressPhoto(file) {
+        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 25 * 1024 * 1024) {
+          return Promise.reject(new Error("Usa fotos JPG, PNG o WebP de máximo 25 MB antes de comprimir."));
+        }
+        return decodePhoto(file).then(function (image) {
+          var width = image.width || image.naturalWidth, height = image.height || image.naturalHeight;
+          var ratio = Math.min(1, 1600 / width, 1600 / height);
+          var canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round(width * ratio)); canvas.height = Math.max(1, Math.round(height * ratio));
+          var context = canvas.getContext("2d", { alpha: false }); context.fillStyle = "#fff"; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          if (typeof image.close === "function") image.close();
+          return new Promise(function (resolve, reject) { canvas.toBlob(function (blob) { blob ? resolve(new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg", lastModified: Date.now() })) : reject(new Error("No se pudo comprimir " + file.name + ".")); }, "image/jpeg", .78); });
+        });
+      }
+      function compressedFormData(form) {
+        var data = new FormData(form), inputs = Array.from(form.querySelectorAll("[data-acta-photos]"));
+        var total = inputs.reduce(function (sum, input) { return sum + (input.files ? input.files.length : 0); }, 0);
+        if (total > 12) return Promise.reject(new Error("El acta admite máximo 12 fotos en total."));
+        return Promise.all(inputs.map(function (input) {
+          var name = input.name; data.delete(name);
+          return Promise.all(Array.from(input.files || []).map(compressPhoto)).then(function (files) { files.forEach(function (file) { data.append(name, file, file.name); }); });
+        })).then(function () {
+          var bytes = Array.from(data.entries()).reduce(function (sum, entry) { return sum + (entry[1] instanceof File ? entry[1].size : 0); }, 0);
+          if (bytes > 8 * 1000 * 1000) throw new Error("Las fotos superan 8 MB después de comprimir. Retira algunas evidencias.");
+          return data;
+        });
+      }
       var form = body.querySelector("[data-acta-create]");
       if (form) {
         var signer = form.querySelector("[data-acta-signer]");
@@ -1774,6 +1826,10 @@
             field.name = field.name.replace(/items\[\d+\]/, "items[" + sequence + "]");
             field.value = "";
           });
+          var photoInput = item.querySelector("[data-acta-photos]");
+          photoInput.name = "acta_item_photos_" + sequence + "[]";
+          photoInput.value = "";
+          item.querySelector("[data-acta-photo-preview]").innerHTML = "";
           sequence++;
           items.appendChild(item);
           item.querySelector("textarea").focus();
@@ -1782,9 +1838,17 @@
           var button = event.target.closest("[data-acta-remove-item]");
           if (!button) return;
           if (form.querySelectorAll("[data-acta-item]").length === 1) { message("Debes conservar al menos un daño y su solución.", true); return; }
-          button.closest("[data-acta-item]").remove();
+          var item = button.closest("[data-acta-item]");
+          var input = item.querySelector("[data-acta-photos]");
+          (input._actaPreviewUrls || []).forEach(function (url) { URL.revokeObjectURL(url); });
+          item.remove();
         });
-        form.addEventListener("submit", function (event) { event.preventDefault(); request("create", new FormData(form)); });
+        form.addEventListener("change", function (event) { if (event.target.matches("[data-acta-photos]")) photoPreview(event.target); });
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          message("Comprimiendo las fotos antes de guardar…", false);
+          compressedFormData(form).then(function (data) { return request("create", data); }).catch(function (error) { message(error.message || "No se pudieron preparar las fotos.", true); });
+        });
       }
       body.querySelectorAll("[data-acta-preview]").forEach(function (link) {
         link.addEventListener("click", function (event) { event.preventDefault(); openIframeModal(link.href, "Acta de satisfacción"); });

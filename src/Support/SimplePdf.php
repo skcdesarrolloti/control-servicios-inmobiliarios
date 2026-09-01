@@ -16,6 +16,8 @@ final class SimplePdf
   private float $contentWidth = 505.0;
   private float $y = 46.0;
   private ?string $backgroundImagePath = null;
+  /** @var array<string,array{path:string,width:int,height:int}> */
+  private array $images = [];
   private string $footerLabel = 'SKC SuCasa Inmobiliaria - Cotización de mantenimiento';
 
   public function __construct()
@@ -89,6 +91,16 @@ final class SimplePdf
       }
     }
 
+    $imageObjectIds = [];
+    foreach ($this->images as $resource => $image) {
+      $data = @file_get_contents($image['path']);
+      if (!is_string($data) || $data === '') { continue; }
+      $imageObjectIds[$resource] = $next;
+      $objects[$next++] = '<< /Type /XObject /Subtype /Image /Width ' . $image['width']
+        . ' /Height ' . $image['height'] . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '
+        . strlen($data) . ">>\nstream\n" . $data . "\nendstream";
+    }
+
     $kids = [];
     foreach ($this->pages as $pageContent) {
       $contentId = $next++;
@@ -98,7 +110,10 @@ final class SimplePdf
         $pageContent = 'q ' . $this->n($drawW) . ' 0 0 ' . $this->n($drawH) . ' ' . $this->n($drawX) . ' ' . $this->n($drawY) . " cm /ImBg Do Q\n" . $pageContent;
       }
       $objects[$contentId] = "<< /Length " . strlen($pageContent) . " >>\nstream\n" . $pageContent . "\nendstream";
-      $xObject = $backgroundObjectId !== null ? ' /XObject << /ImBg ' . $backgroundObjectId . ' 0 R >>' : '';
+      $resources = [];
+      if ($backgroundObjectId !== null) { $resources[] = '/ImBg ' . $backgroundObjectId . ' 0 R'; }
+      foreach ($imageObjectIds as $resource => $objectId) { $resources[] = '/' . $resource . ' ' . $objectId . ' 0 R'; }
+      $xObject = $resources ? ' /XObject << ' . implode(' ', $resources) . ' >>' : '';
       $objects[$pageId] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' . self::PAGE_W . ' ' . self::PAGE_H . '] '
         . '/Resources << /Font << /F1 3 0 R /F2 4 0 R >>' . $xObject . ' >> /Contents ' . $contentId . ' 0 R >>';
       $kids[] = $pageId . ' 0 R';
@@ -123,6 +138,22 @@ final class SimplePdf
     $pdf .= "trailer\n<< /Size " . ($maxId + 1) . " /Root 1 0 R >>\nstartxref\n" . $xrefOffset . "\n%%EOF";
 
     return $pdf;
+  }
+
+  /** Embed a local, already validated JPEG without a remote fetch or image decoder. */
+  public function image(string $path, float $maximumWidth = 320, float $maximumHeight = 220): bool
+  {
+    $info = @getimagesize($path);
+    if (!is_array($info) || $info['mime'] !== 'image/jpeg' || (int) $info[0] < 1 || (int) $info[1] < 1) { return false; }
+    $ratio = min($maximumWidth / (int) $info[0], $maximumHeight / (int) $info[1], 1.0);
+    $width = max(1.0, (int) $info[0] * $ratio); $height = max(1.0, (int) $info[1] * $ratio);
+    $this->ensureSpace($height + 14);
+    $resource = 'Im' . (count($this->images) + 1);
+    $this->images[$resource] = ['path' => $path, 'width' => (int) $info[0], 'height' => (int) $info[1]];
+    $this->content .= 'q ' . $this->n($width) . ' 0 0 ' . $this->n($height) . ' ' . $this->n($this->margin)
+      . ' ' . $this->n(self::PAGE_H - $this->y - $height) . ' cm /' . $resource . " Do Q\n";
+    $this->y += $height + 14;
+    return true;
   }
 
   /** Validated normalized strokes, 1000 x 350; no image decoder or remote resource. */

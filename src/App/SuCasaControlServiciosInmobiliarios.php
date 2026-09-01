@@ -651,6 +651,12 @@ final class SuCasaControlServiciosInmobiliarios
     return $this->storedFiles()->storeImages($fieldName, $maxFiles);
   }
 
+  /** @return array<int,array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}> */
+  private function handleImageUploadsDetailed(string $fieldName, int $maxFiles = 10): array
+  {
+    return $this->storedFiles()->storeImagesDetailed($fieldName, $maxFiles);
+  }
+
   /** @param string[] $titles @return array<int,array{nombre_archivo:string,archivo:string,media_archivo:string}> */
   private function handleDocumentUploads(string $fieldName, array $titles = [], int $maxFiles = 10): array
   {

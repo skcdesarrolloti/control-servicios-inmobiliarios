@@ -43,7 +43,52 @@ trait HandlesTicketCompletion
       $actor = ['user_id' => Auth::userId(), 'employee_id' => (string) ($employee['id_empleado'] ?? Auth::userId()), 'name' => Auth::user()];
       $result = [];
       if ($operation === 'create') {
-        $result = $service->create($ticketId, $_POST, $actor);
+        $input = $_POST;
+        $items = is_array($input['items'] ?? null) ? $input['items'] : [];
+        $storedPhotos = [];
+        $storedBytes = 0;
+        $requestedTotal = 0;
+        foreach (array_keys($items) as $index) {
+          $names = $_FILES['acta_item_photos_' . $index]['name'] ?? [];
+          $names = is_array($names) ? array_values(array_filter($names, static fn($name): bool => trim((string) $name) !== '')) : [];
+          if (count($names) > 4) { throw new \DomainException('Cada daño admite máximo 4 fotos.'); }
+          $requestedTotal += count($names);
+        }
+        if ($requestedTotal > 12) { throw new \DomainException('El acta admite máximo 12 fotos en total.'); }
+        foreach ($items as $index => &$item) {
+          if (!is_array($item)) { continue; }
+          unset($item['photos']);
+          if (!preg_match('/^\d+$/D', (string) $index)) { continue; }
+          $field = 'acta_item_photos_' . $index;
+          $names = $_FILES[$field]['name'] ?? [];
+          $names = is_array($names) ? array_values(array_filter($names, static fn($name): bool => trim((string) $name) !== '')) : [];
+          if (!$names) { continue; }
+          $photos = $this->handleImageUploadsDetailed($field, 4);
+          if (count($photos) !== count($names)) {
+            $this->storedFiles()->deleteStoredImages(array_merge($storedPhotos, $photos));
+            throw new \DomainException('No se pudieron procesar todas las fotos. Usa imágenes JPG, PNG o WebP de máximo ' . (int) floor(SCM_UPLOAD_MAX_BYTES / 1048576) . ' MB cada una.');
+          }
+          foreach ($photos as $photo) {
+            if ($photo['mime'] !== 'image/jpeg' || $photo['width'] > 1600 || $photo['height'] > 1600 || $photo['bytes'] > 1500000) {
+              $this->storedFiles()->deleteStoredImages(array_merge($storedPhotos, $photos));
+              throw new \DomainException('Una foto no pudo comprimirse por debajo de 1,5 MB y 1600 px. Prueba con otra imagen.');
+            }
+            $storedBytes += (int) $photo['bytes'];
+            if ($storedBytes > 8000000) {
+              $this->storedFiles()->deleteStoredImages(array_merge($storedPhotos, $photos));
+              throw new \DomainException('Las fotos del acta superan 8 MB después de comprimir. Retira algunas evidencias.');
+            }
+          }
+          $storedPhotos = array_merge($storedPhotos, $photos);
+          $item['photos'] = array_map(static fn(array $photo): array => [
+            'name' => $photo['name'], 'mime' => $photo['mime'], 'width' => $photo['width'], 'height' => $photo['height'],
+            'bytes' => $photo['bytes'], 'sha256' => $photo['sha256'],
+          ], $photos);
+        }
+        unset($item);
+        $input['items'] = $items;
+        try { $result = $service->create($ticketId, $input, $actor); }
+        catch (\Throwable $error) { $this->storedFiles()->deleteStoredImages($storedPhotos); throw $error; }
       } elseif (in_array($operation, ['resend', 'cancel'], true)) {
         $id = (int) ($_POST['act_id'] ?? 0);
         if ((int) $repo->act($id)['ticket_pk'] !== $ticketId) {

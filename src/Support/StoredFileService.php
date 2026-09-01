@@ -32,6 +32,12 @@ final class StoredFileService
   /** @return string[] */
   public function storeImages(string $fieldName, int $maximumFiles = 10): array
   {
+    return array_values(array_map(static fn(array $file): string => $file['url'], $this->storeImagesDetailed($fieldName, $maximumFiles)));
+  }
+
+  /** @return array<int,array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}> */
+  public function storeImagesDetailed(string $fieldName, int $maximumFiles = 10): array
+  {
     $stored = [];
     foreach ($this->normalizeUploadedFiles($fieldName) as $file) {
       if (count($stored) >= max(1, $maximumFiles)) {
@@ -39,10 +45,33 @@ final class StoredFileService
       }
       $name = $this->storeImage($file);
       if ($name !== '') {
-        $stored[] = $this->urlFor($name);
+        $path = $this->directory . '/' . $name;
+        $info = @getimagesize($path);
+        $hash = @hash_file('sha256', $path);
+        if (!is_array($info) || !is_string($hash)) {
+          @unlink($path);
+          continue;
+        }
+        $stored[] = [
+          'name' => $name, 'url' => $this->urlFor($name),
+          'mime' => (string) $info['mime'], 'width' => (int) $info[0], 'height' => (int) $info[1],
+          'bytes' => (int) filesize($path), 'sha256' => $hash,
+        ];
       }
     }
     return $stored;
+  }
+
+  /** @param array<int,array{name?:string,url?:string}> $files */
+  public function deleteStoredImages(array $files): void
+  {
+    foreach ($files as $file) {
+      $name = basename((string) ($file['name'] ?? ''));
+      if (preg_match('/^[a-f0-9]{24}_[0-9]+\.[a-z0-9]{1,8}$/D', $name)) {
+        $path = $this->directory . '/' . $name;
+        if (is_file($path)) { @unlink($path); }
+      }
+    }
   }
 
   /** @param string[] $titles @return array<int,array{nombre_archivo:string,archivo:string,media_archivo:string}> */

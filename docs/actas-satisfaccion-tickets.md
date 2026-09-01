@@ -10,11 +10,25 @@ también su registro relacionado por `_ID`. No se acepta un correo arbitrario
 desde el formulario. Para personas jurídicas se indica el nombre del representante
 que firmará en el correo registrado.
 
+Cada daño admite hasta **4 fotos** y el acta hasta **12**. El navegador reduce cada
+imagen JPG, PNG o WebP a JPEG, máximo 1600 px y calidad 78 % antes de enviarla; el
+servidor vuelve a normalizarla cuando GD está disponible y siempre rechaza una
+evidencia que no termine como JPEG de máximo 1600 px y 1,5 MB. La interfaz muestra
+vistas previas y el PDF incluye las fotografías junto al daño correspondiente. El
+conjunto comprimido no puede superar 8 MB, para mantener el PDF dentro del BLOB.
+
 Generar el acta deja `estado = En proceso` y
 `estado_administrativo = En espera de firma`. Se guarda una copia inmutable de
 los datos en `wp_scm_ticket_completion_acts` (prefijo configurable), y se encola
 la invitación en **shared-notifications**. Una falla de la cola conserva el acta
 y muestra la opción de reintentar; “encolado” no significa “entregado”.
+
+Las fotos no se guardan como Base64 ni BLOB en MySQL. Los archivos comprimidos se
+guardan con nombre aleatorio en `SCM_UPLOAD_PATH`; `payload_json` conserva por cada
+daño el nombre, MIME, dimensiones, bytes y SHA-256. El hash del payload protege esa
+relación y el PDF vuelve a comprobar el archivo antes de firmar. No se agregan campos
+a `jet_cct_actas_de_satisfaccion`: esa CCT continúa siendo el hito final creado solo
+al firmar. Tampoco se requiere una tabla adicional para fotos ni una migración nueva.
 
 El funcionario selecciona **Correo, WhatsApp o ambos** para la invitación y la
 copia firmada. No se aceptan contactos arbitrarios desde el formulario.
@@ -212,16 +226,14 @@ OTP tiene idioma independiente. No añadir botones ni cambiar el orden de variab
 sin adaptar también el envío. Los nombres se pueden configurar si Meta aprueba
 otros, pero deben respetar el mismo contrato de componentes.
 
-Mientras una plantilla de Utilidad no tenga nombre configurado, ese evento conserva
-`scm_notificacion_general_v1`, `es_CO`, con destinatario, mensaje/enlace y firma de
-la inmobiliaria; esa plantilla existente debe estar aprobada en la cuenta. Se puede
-activar solicitud y entrega por separado. Una plantilla dedicada configurada que
-Meta rechace no dispara un segundo envío automático usando la general.
+Los tres nombres anteriores son los valores predeterminados del código. Las variables
+de entorno permiten reemplazarlos, pero no son obligatorias. Si Meta rechaza o pausa
+una plantilla no se dispara un segundo envío automático usando una plantilla general:
+el intento queda trazable en la cola y el funcionario puede usar correo o reintentar.
 
-Sin plantilla OTP configurada, la interfaz informa que el enlace puede ir por
-WhatsApp pero **la verificación será por correo**. Un contacto sin correo no podrá
-ser elegido hasta disponer de WhatsApp OTP configurado. No existe bypass por
-ausencia de plantilla, fallo de cola, firma vacía o código vencido.
+No existe bypass por fallo de plantilla o cola, firma vacía o código vencido. Antes
+de habilitar WhatsApp en producción se debe confirmar que `scm_acta_firma_otp_v1`
+esté aprobada; el código tratará ese nombre exacto como la plantilla disponible.
 
 La cuenta y sus secretos siguen configurados en shared-notifications; no se
 duplican en este módulo. El correo no necesita plantillas de Meta. Esta configuración

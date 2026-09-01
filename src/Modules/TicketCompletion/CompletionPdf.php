@@ -32,6 +32,18 @@ final class CompletionPdf
       }
     }
     $pdf->table(['#', 'Daño encontrado', 'Solución realizada'], $rows, [.45, 2.7, 2.7], 9);
+    foreach ($payload['items'] as $index => $item) {
+      if (empty($item['photos'])) { continue; }
+      $pdf->heading('Evidencias del daño #' . ($index + 1));
+      foreach ($item['photos'] as $photoIndex => $photo) {
+        $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . basename((string) $photo['name']);
+        $hash = is_file($path) ? @hash_file('sha256', $path) : false;
+        if (!is_string($hash) || !hash_equals((string) $photo['sha256'], $hash) || !$pdf->image($path, 360, 250)) {
+          throw new \DomainException('Una evidencia fotográfica del acta no está disponible o cambió.');
+        }
+        $pdf->paragraph('Foto ' . ($photoIndex + 1) . ' del daño #' . ($index + 1), 8);
+      }
+    }
     $pdf->heading('Observaciones');
     foreach ($this->chunks($payload['observations'], 900) as $chunk) { $pdf->paragraph($chunk, 9); }
     if ($staff) {
