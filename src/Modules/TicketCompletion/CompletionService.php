@@ -361,11 +361,21 @@ final class CompletionService
       $pdf = (new CompletionPdf())->render($this->repo->act($id), $payload);
       $pdfHash = hash('sha256', $pdf);
       $this->repo->db->update($this->repo->table(), ['signed_pdf' => $pdf, 'pdf_hash' => $pdfHash, 'pdf_hmac' => hash_hmac('sha256', $id . '|' . $act['payload_hash'] . '|' . $pdfHash, $this->secret)], ['id' => $id]);
-      $this->repo->updateTicket((int) $act['ticket_pk'], [
+      $disapprovedQuoteIds = $this->repo->disapproveMaintenanceQuotes($ticket, $id, $now);
+      $ticketUpdate = [
         'estado' => 'Cerrado', 'estado_administrativo' => 'Finalizado', 'estado_acta_satisfaccion' => 'Si',
         'id_acta_satisfaccion' => $legacyId, 'final_trabajo' => $now,
-      ]);
-      $this->repo->audit((int) $act['ticket_pk'], 'Acta #' . $id . ' firmada por ' . htmlspecialchars($signature['name'], ENT_QUOTES, 'UTF-8') . '. Ticket cerrado. Reporte administrativo #' . $reportId . ' registrado (no pagado, no exportado). <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta firmada</a>.', $payload['actor']['name'], $payload['actor']['employee_id']);
+      ];
+      if ($disapprovedQuoteIds !== []) {
+        $ticketUpdate['estado_cotizacion_mantenimiento'] = 'Desaprobada';
+        $ticketUpdate['estado_respuesta_cotizacion_mantenimiento'] = 'Desaprobada';
+        $ticketUpdate['fecha_respuesta_cotizacion_mantenimiento'] = $now;
+      }
+      $this->repo->updateTicket((int) $act['ticket_pk'], $ticketUpdate);
+      $quoteAudit = $disapprovedQuoteIds === []
+        ? ''
+        : ' Cotizacion(es) de mantenimiento #' . implode(', #', $disapprovedQuoteIds) . ' marcadas como Desaprobada por ejecucion sin aprobacion.';
+      $this->repo->audit((int) $act['ticket_pk'], 'Acta #' . $id . ' firmada por ' . htmlspecialchars($signature['name'], ENT_QUOTES, 'UTF-8') . '. Ticket cerrado.' . $quoteAudit . ' Reporte administrativo #' . $reportId . ' registrado (no pagado, no exportado). <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta firmada</a>.', $payload['actor']['name'], $payload['actor']['employee_id']);
       return $this->repo->act($id);
       });
     });

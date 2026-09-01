@@ -53,7 +53,7 @@ require dirname(__DIR__) . '/bootstrap/app.php';
 set_exception_handler(static function (Throwable $error): void { fwrite(STDERR, $error->getMessage() . "\n" . $error->getTraceAsString() . "\n"); exit(1); });
 $prefix = 'scmqa_' . bin2hex(random_bytes(5)) . '_';
 $db = new Database(\SCM\Core\App::db()->pdo(), $prefix);
-$tables = ['jet_cct_tickets', 'jet_cct_actas_de_satisfaccion', 'jet_cct_reportes_administrativos', 'jet_cct_historial_del_ticket', 'jet_cct_confi_sistema', 'jet_cct_copropiedades'];
+$tables = ['jet_cct_tickets', 'jet_cct_actas_de_satisfaccion', 'jet_cct_reportes_administrativos', 'jet_cct_historial_del_ticket', 'jet_cct_confi_sistema', 'jet_cct_copropiedades', 'jet_cct_cotizacion_mantenimiento'];
 foreach ($tables as $name) {
   $source = \SCM\Core\App::db()->table($name);
   $db->pdo()->exec('CREATE TEMPORARY TABLE `' . $db->table($name) . '` LIKE `' . $source . '`');
@@ -98,10 +98,15 @@ $requestCode = static function (array $act, string $channel = 'email') use ($ser
   return $result;
 };
 $seedTicket(1);
+$db->insert($db->table('jet_cct_cotizacion_mantenimiento'), $repo->schema->filterTableData($db->table('jet_cct_cotizacion_mantenimiento'), [
+  '_ID' => 7001, 'id_ticket' => '9001', 'estado' => 'Pendiente', 'motivo' => '',
+]));
+$db->update($db->table('jet_cct_tickets'), ['id_cotizacion_mantenimiento' => '7001'], ['_ID' => 1]);
 $created = $service->create(1, $input, $actor);
 $act = $repo->act($created['act_id']);
 $token = $service->token($act);
 $assert($repo->ticket(1)['estado'] === 'En proceso' && $repo->ticket(1)['estado_administrativo'] === Policy::WAITING, 'creating an act does not close ticket');
+$assert($db->getVar('SELECT estado FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7001') === 'Pendiente', 'creating or sending an act does not disapprove its maintenance quote');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_actas_de_satisfaccion') . '`') === 0, 'no premature legacy timeline completion');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 0, 'no charge before signature');
 $assert($notifications[0]['to'] === 'ana@example.invalid' && $notifications[0]['options']['source_module'] === 'ticket-completion', 'invitation uses selected contact and existing queue contract');
@@ -137,12 +142,16 @@ try {
   $assert(false, 'late history failure must throw');
 } catch (PDOException) { $assert(true, 'failure after signature and charge writes is reported'); }
 $assert($repo->act((int) $act['id'])['status'] === 'pending' && $repo->ticket(1)['estado'] === 'En proceso', 'late failure rolls back ticket and signature');
+$assert($db->getVar('SELECT estado FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7001') === 'Pendiente', 'late failure also rolls back quote disapproval');
 $assert($repo->act((int) $act['id'])['signed_pdf'] === null, 'late failure also rolls back the signed PDF');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 0, 'late failure rolls back administrative charge');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_actas_de_satisfaccion') . '`') === 0, 'late failure rolls back legacy completion milestone');
 $db->pdo()->exec('ALTER TABLE `' . $db->table('jet_cct_historial_del_ticket') . '` CHANGE COLUMN unavailable_response respuesta TEXT');
 $signed = $service->sign((int) $act['id'], $token, $signInput($act), '127.0.0.1', 'QA');
 $assert($signed['status'] === 'signed' && $repo->ticket(1)['estado'] === 'Cerrado' && $repo->ticket(1)['estado_administrativo'] === 'Finalizado', 'signature closes ticket and finalizes workflow');
+$signedQuote = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7001');
+$assert($signedQuote['estado'] === 'Desaprobada' && $signedQuote['motivo'] === 'Ejecucción por cuenta propia', 'signature disapproves linked maintenance quote as work executed without approval');
+$assert($repo->ticket(1)['estado_cotizacion_mantenimiento'] === 'Desaprobada' && $repo->ticket(1)['estado_respuesta_cotizacion_mantenimiento'] === 'Desaprobada', 'signature synchronizes maintenance quote state on ticket');
 $assert(str_starts_with($signed['signed_pdf'], '%PDF-1.4') && hash('sha256', $signed['signed_pdf']) === $signed['pdf_hash'], 'immutable signed PDF saved with closure');
 $assert(str_contains($signed['signed_pdf'], '/Subtype /Image'), 'signed PDF embeds immutable photographic evidence');
 $assert(str_contains($signed['signed_pdf'], 'Evidencias del da'), 'signed PDF labels photographic evidence by damage');

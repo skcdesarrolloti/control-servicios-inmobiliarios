@@ -131,6 +131,89 @@ final class CompletionRepository
     $this->db->update($table, $this->schema->filterTableData($table, $data), ['_ID' => $id]);
   }
 
+  /**
+   * La firma de esta acta confirma que la solucion se ejecuto sin aprobar la
+   * cotizacion de mantenimiento. Actualiza todas las cotizaciones vinculadas
+   * dentro de la misma transaccion que cierra el ticket.
+   *
+   * @return string[] Identificadores de las cotizaciones encontradas.
+   */
+  public function disapproveMaintenanceQuotes(array $ticket, int $actId, int $signedAt): array
+  {
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+
+    $idColumn = $this->schema->detectFirstExistingColumn($table, ['_ID', 'id_cotizacion_mantenimiento', 'id_cotizacion', 'id']);
+    if ($idColumn === '') {
+      return [];
+    }
+
+    $quoteIds = $this->numericIds((string) ($ticket['id_cotizacion_mantenimiento'] ?? $ticket['id_cotizacion'] ?? ''));
+    $rows = $quoteIds === [] ? [] : $this->lockedQuotesByIds($table, $idColumn, $quoteIds);
+
+    // Some historical tickets did not persist the quote ID on the ticket. In
+    // that case use the quote's ticket relation, preferring the public ticket
+    // number because that is the convention used by the maintenance module.
+    if ($rows === [] && $this->schema->columnExists($table, 'id_ticket')) {
+      $logicalTicket = trim((string) ($ticket['id_ticket'] ?? ''));
+      if ($logicalTicket !== '') {
+        $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE `id_ticket` = ? FOR UPDATE", [$logicalTicket]);
+      }
+      if ($rows === [] && (int) ($ticket['_ID'] ?? 0) > 0 && $logicalTicket !== (string) $ticket['_ID']) {
+        $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE `id_ticket` = ? FOR UPDATE", [(int) $ticket['_ID']]);
+      }
+    }
+
+    if ($rows === []) {
+      return [];
+    }
+
+    $update = $this->schema->filterTableData($table, [
+      'estado' => 'Desaprobada',
+      'estado_cotizacion_mantenimiento' => 'Desaprobada',
+      'estado_respuesta_cotizacion_mantenimiento' => 'Desaprobada',
+      'estado_respuesta' => 'Desaprobada',
+      'respuesta' => 'Desaprobada',
+      // Preserve the existing business value (including its historical spelling)
+      // because filters and notification templates already depend on it.
+      'motivo' => 'Ejecucción por cuenta propia',
+      'observacion_respuesta' => 'Cotización desaprobada automáticamente al firmarse el acta de satisfacción #' . $actId . '. La solución se realizó sin aprobar esta cotización.',
+      'fecha_respuesta' => $signedAt,
+      'fecha_respuesta_cotizacion_mantenimiento' => $signedAt,
+      'tuvo_seguimiento' => 'Si',
+      'fecha_seguimiento' => $signedAt,
+      'fecha_actualizacion' => $signedAt,
+      'cct_modified' => date('Y-m-d H:i:s', $signedAt),
+    ]);
+
+    $updatedIds = [];
+    foreach ($rows as $row) {
+      $quoteId = trim((string) ($row[$idColumn] ?? ''));
+      if ($quoteId === '' || isset($updatedIds[$quoteId])) {
+        continue;
+      }
+      $this->db->update($table, $update, [$idColumn => $quoteId]);
+      $updatedIds[$quoteId] = true;
+    }
+    return array_keys($updatedIds);
+  }
+
+  /** @return string[] */
+  private function numericIds(string $value): array
+  {
+    preg_match_all('/\d+/', $value, $matches);
+    return array_values(array_unique(array_filter($matches[0] ?? [], static fn(string $id): bool => (int) $id > 0)));
+  }
+
+  /** @param string[] $ids */
+  private function lockedQuotesByIds(string $table, string $idColumn, array $ids): array
+  {
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    return $this->db->getResults("SELECT * FROM `{$table}` WHERE `{$idColumn}` IN ({$placeholders}) FOR UPDATE", $ids);
+  }
+
   public function audit(int $ticketId, string $message, string $name, string $employeeId): void
   {
     $this->insertLegacy('jet_cct_historial_del_ticket', [
