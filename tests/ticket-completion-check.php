@@ -47,6 +47,7 @@ $rejects(static fn() => Policy::strokes('[[[0,0],[99999,2]]]'), 'out of bounds s
 $rejects(static fn() => Policy::strokes('<svg onload=alert(1)>'), 'executable drawing data rejected');
 $assert(Policy::phone('300 123 4567') === '+573001234567', 'Colombian phone normalized');
 $assert(Policy::phone('120363@g.us') === '', 'group WhatsApp recipients prohibited for personal signature');
+$assert(Policy::executionState('inmobiliaria') === 'En ejecucion por inmobiliaria', 'executor maps to an allowed administrative execution state');
 
 if (!in_array('--database', $argv, true)) { echo "$checks domain checks passed. Use --database for isolated SQL integration checks.\n"; exit; }
 require dirname(__DIR__) . '/bootstrap/app.php';
@@ -82,7 +83,7 @@ $service = new Service($repo, str_repeat('test-secret-', 4), 'http://127.0.0.1:8
   $notifications[] = compact('to', 'subject', 'html', 'options'); return 1;
 });
 $actor = ['user_id' => 1, 'employee_id' => '200', 'name' => 'Funcionario Prueba'];
-$input = ['signer_role' => 'propietario', 'signer_name' => 'Ana Pérez', 'executor' => 'propietario', 'items' => [['damage' => 'Fuga en tubería de cocina', 'solution' => 'Se reemplazó el tramo y se verificó presión.']], 'observations' => 'Sin filtración en la prueba final.', 'transport' => '12000', 'confirm' => '1'];
+$input = ['signer_role' => 'propietario', 'signer_name' => 'Ana Pérez', 'executor' => 'inmobiliaria', 'items' => [['damage' => 'Fuga en tubería de cocina', 'solution' => 'Se reemplazó el tramo y se verificó presión.']], 'observations' => 'Sin filtración en la prueba final.', 'transport' => '12000', 'confirm' => '1'];
 $photoName = bin2hex(random_bytes(12)) . '_' . time() . '.jpg';
 $photoPath = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . $photoName;
 if (!is_dir((string) SCM_UPLOAD_PATH)) { mkdir((string) SCM_UPLOAD_PATH, 0750, true); }
@@ -105,7 +106,7 @@ $db->update($db->table('jet_cct_tickets'), ['id_cotizacion_mantenimiento' => '70
 $created = $service->create(1, $input, $actor);
 $act = $repo->act($created['act_id']);
 $token = $service->token($act);
-$assert($repo->ticket(1)['estado'] === 'En proceso' && $repo->ticket(1)['estado_administrativo'] === Policy::WAITING, 'creating an act does not close ticket');
+$assert($repo->ticket(1)['estado'] === 'En proceso' && $repo->ticket(1)['estado_administrativo'] === 'En ejecucion por inmobiliaria', 'creating an act keeps the allowed execution state derived from executor');
 $assert($db->getVar('SELECT estado FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7001') === 'Pendiente', 'creating or sending an act does not disapprove its maintenance quote');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_actas_de_satisfaccion') . '`') === 0, 'no premature legacy timeline completion');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 0, 'no charge before signature');
@@ -126,6 +127,9 @@ $rejects(static fn() => $requestCode($act), 'OTP resend throttled');
 $rejects(static fn() => $service->requestCode((int) $act['id'], $token, 'sms'), 'arbitrary verification channel rejected');
 $rejects(static fn() => $service->sign((int) $act['id'], $token, array_replace($signInput($act), ['otp_code' => '000000']), '', ''), 'incorrect code rejected');
 $assert(json_decode($repo->act((int) $act['id'])['otp_json'], true)['failures'] === 1, 'failed attempt survives signature rollback');
+$db->update($db->table('jet_cct_tickets'), ['estado_administrativo' => 'En ejecucion por propietario'], ['_ID' => 1]);
+$rejects(static fn() => $service->sign((int) $act['id'], $token, $signInput($act), '', ''), 'signature is blocked if execution responsibility changed after creating the act');
+$db->update($db->table('jet_cct_tickets'), ['estado_administrativo' => 'En ejecucion por inmobiliaria'], ['_ID' => 1]);
 $historyBefore = (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_ticket') . '`');
 // Force an SQL failure only in the test connection's temporary report table.
 $db->pdo()->exec('ALTER TABLE `' . $db->table('jet_cct_reportes_administrativos') . '` CHANGE COLUMN descripcion unavailable_description TEXT');

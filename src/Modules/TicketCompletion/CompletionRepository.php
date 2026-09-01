@@ -267,7 +267,8 @@ final class CompletionRepository
     if (!$act) {
       return '';
     }
-    if ($act['status'] === 'pending' && ($close || !in_array($adminState, ['', '__keep__', CompletionPolicy::WAITING], true))) {
+    $currentAdminState = (string) ($repo->ticket($ticketId)['estado_administrativo'] ?? '');
+    if ($act['status'] === 'pending' && ($close || !in_array($adminState, ['', '__keep__', $currentAdminState], true))) {
       return 'Este ticket tiene un acta pendiente de firma. Solo se cerrará cuando firme el destinatario. Para cambiar el proceso, anula primero el acta.';
     }
     if (!$allowReopen && $act['status'] === 'signed' && strcasecmp((string) $repo->ticket($ticketId)['estado'], 'Cerrado') === 0) {

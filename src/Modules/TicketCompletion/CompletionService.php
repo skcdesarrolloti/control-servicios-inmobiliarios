@@ -114,9 +114,13 @@ final class CompletionService
       $context = $this->context($ticketId);
       $role = CompletionPolicy::text($input['signer_role'] ?? '', 'quién firma', 25);
       $executor = CompletionPolicy::text($input['executor'] ?? '', 'quién realizó la solución', 25);
-      if (!isset(CompletionPolicy::ROLES[$role], CompletionPolicy::ROLES[$executor])) {
+      if (!isset(CompletionPolicy::ROLES[$role])) {
         throw new \DomainException('Selecciona propietario, arrendatario o copropiedad.');
       }
+      if (!isset(CompletionPolicy::EXECUTORS[$executor])) {
+        throw new \DomainException('Selecciona quién realizó la solución.');
+      }
+      $pendingAdminState = CompletionPolicy::executionState($executor);
       $contact = $context['contacts'][$role];
       if (!$contact['available']) {
         throw new \DomainException('El firmante necesita nombre y un contacto válido para verificación: correo o WhatsApp con plantilla de autenticación configurada.');
@@ -151,7 +155,7 @@ final class CompletionService
       $payload = [
         'version' => 2, 'channels' => $channels, 'ticket_pk' => $ticketId, 'ticket_number' => (string) ($ticket['id_ticket'] ?: $ticketId),
         'property' => (string) ($ticket['inmueble'] ?? ''), 'address' => (string) ($ticket['direccion'] ?? ''),
-        'contract' => (string) ($ticket['contrato'] ?? ''), 'executor' => $executor,
+        'contract' => (string) ($ticket['contrato'] ?? ''), 'executor' => $executor, 'pending_admin_state' => $pendingAdminState,
         'items' => $items, 'observations' => $observations, 'created_at' => $now,
         'signer' => ['role' => $role, 'name' => $signerName, 'contact_name' => $contact['name'], 'email' => $contact['email'], 'phone' => $contact['phone']],
         'actor' => $actor,
@@ -173,8 +177,8 @@ final class CompletionService
       ]);
       $id = (int) $this->repo->db->lastInsertId();
       // Legacy timelines treat any act row as completion; publish the CCT record only on signature.
-      $this->repo->updateTicket($ticketId, ['estado' => 'En proceso', 'estado_administrativo' => CompletionPolicy::WAITING]);
-      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' generada. Solución por ' . CompletionPolicy::ROLES[$executor] . '. Pendiente de firma de ' . htmlspecialchars($signerName, ENT_QUOTES, 'UTF-8') . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta</a>. El ticket permanece abierto y el reporte aún no se cobra.', $actor['name'], $actor['employee_id']);
+      $this->repo->updateTicket($ticketId, ['estado' => 'En proceso', 'estado_administrativo' => $pendingAdminState]);
+      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' generada. Solución por ' . CompletionPolicy::EXECUTORS[$executor] . '. Pendiente de firma de ' . htmlspecialchars($signerName, ENT_QUOTES, 'UTF-8') . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta</a>. El ticket permanece abierto en “' . $pendingAdminState . '” y el reporte aún no se cobra.', $actor['name'], $actor['employee_id']);
       return $this->repo->act($id);
     });
     try { return $this->notify($act); }
@@ -311,7 +315,10 @@ final class CompletionService
       if ($act['status'] === 'signed') {
         return $act; // Repeated submits cannot duplicate the report or audit trail.
       }
-      if ($act['status'] !== 'pending' || (int) $act['active_slot'] !== 1 || ($ticket['estado_administrativo'] ?? '') !== CompletionPolicy::WAITING || strcasecmp((string) $ticket['estado'], 'Cerrado') === 0) {
+      // Acts created before execution states were adopted remain signable while
+      // their ticket still carries the former waiting value.
+      $expectedAdminState = (string) ($payload['pending_admin_state'] ?? CompletionPolicy::WAITING);
+      if ($act['status'] !== 'pending' || (int) $act['active_slot'] !== 1 || ($ticket['estado_administrativo'] ?? '') !== $expectedAdminState || strcasecmp((string) $ticket['estado'], 'Cerrado') === 0) {
         throw new \DomainException('El estado del ticket cambió. Contacta a la inmobiliaria antes de firmar.');
       }
       if (!hash_equals((string) $act['payload_hash'], (string) ($input['document_hash'] ?? ''))) {
@@ -337,7 +344,7 @@ final class CompletionService
         'fecha' => $now, 'fecha_revision' => $payload['created_at'], 'fecha_ticket' => $report['fecha_ticket'],
         'id_ticket' => (int) $act['ticket_pk'], 'id_empleado' => $payload['actor']['employee_id'], 'creador' => $payload['actor']['name'],
         'categoria' => 'Acta de satisfaccion',
-        'descripcion' => 'Acta de satisfacción #' . $id . ' firmada del ticket #' . htmlspecialchars($payload['ticket_number'], ENT_QUOTES, 'UTF-8') . '. Solución por ' . CompletionPolicy::ROLES[$payload['executor']] . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta y detalle de daños/soluciones</a>.',
+        'descripcion' => 'Acta de satisfacción #' . $id . ' firmada del ticket #' . htmlspecialchars($payload['ticket_number'], ENT_QUOTES, 'UTF-8') . '. Solución por ' . CompletionPolicy::EXECUTORS[$payload['executor']] . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta y detalle de daños/soluciones</a>.',
         'fue_pagado' => 'No', 'exportado' => 'No', 'valor' => $report['total'], 'transporte' => $report['transport'],
         'valor_revision' => $report['service_fee'], 'valor_mantenimiento' => $report['service_fee'],
         'id_inmueble' => $report['id_inmueble'], 'inmueble' => $payload['property'], 'arrendatario' => $report['arrendatario'],
@@ -401,7 +408,7 @@ final class CompletionService
 
   private static function legacyText(array $payload): string
   {
-    $lines = ['Solución realizada por: ' . CompletionPolicy::ROLES[$payload['executor']]];
+    $lines = ['Solución realizada por: ' . CompletionPolicy::EXECUTORS[$payload['executor']]];
     foreach ($payload['items'] as $index => $item) {
       $lines[] = ($index + 1) . '. Daño: ' . $item['damage'] . "\nSolución: " . $item['solution'];
     }

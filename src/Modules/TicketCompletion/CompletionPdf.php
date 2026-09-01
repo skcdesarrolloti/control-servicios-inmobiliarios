@@ -18,7 +18,7 @@ final class CompletionPdf
     $pdf->heading('Datos del servicio');
     $pdf->table(['Dato', 'Detalle'], [
       ['Inmueble / contrato', $payload['property'] . ' / ' . $payload['contract']],
-      ['Dirección', $payload['address']], ['Solución realizada por', CompletionPolicy::ROLES[$payload['executor']]],
+      ['Dirección', $payload['address']], ['Solución realizada por', CompletionPolicy::EXECUTORS[$payload['executor']]],
       ['Fecha del acta', date('d/m/Y H:i', (int) $payload['created_at']) . ' (Colombia)'],
       ['Firmante', $payload['signer']['name'] . ' - ' . CompletionPolicy::ROLES[$payload['signer']['role']]],
     ], [1, 3], 9);
