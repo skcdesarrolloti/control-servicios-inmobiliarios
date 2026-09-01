@@ -1698,13 +1698,13 @@
       });
     }
 
-    function message(text, error) {
+    function message(text, error, scroll) {
       var target = body.querySelector("[data-acta-message]");
       if (!target) return;
       target.textContent = text;
       target.classList.toggle("is-error", !!error);
       target.setAttribute("role", error ? "alert" : "status");
-      target.scrollIntoView({ block: "nearest" });
+      if (scroll !== false) target.scrollIntoView({ block: "nearest" });
     }
 
     function request(operation, data) {
@@ -1750,20 +1750,114 @@
     }
 
     function bind() {
+      var MAX_PHOTOS_PER_DAMAGE = 4;
+      var MAX_PHOTOS_PER_ACT = 12;
+      var MAX_SOURCE_PHOTO_BYTES = 25 * 1024 * 1024;
+
+      function photoError(text, input) {
+        if (input) input.focus();
+        message(text, true, false);
+        scmNotify("error", text, "Fotos del acta");
+      }
+
+      function selectedPhotos(input) {
+        return Array.isArray(input._actaFiles)
+          ? input._actaFiles.slice()
+          : Array.from(input.files || []);
+      }
+
+      function syncPhotoInput(input, files) {
+        if (typeof DataTransfer === "undefined") return false;
+        var transfer = new DataTransfer();
+        files.forEach(function (file) { transfer.items.add(file); });
+        input.files = transfer.files;
+        input._actaFiles = files.slice();
+        return true;
+      }
+
+      function totalSelectedPhotos(form, exceptInput) {
+        return Array.from(form.querySelectorAll("[data-acta-photos]")).reduce(function (sum, input) {
+          return sum + (input === exceptInput ? 0 : selectedPhotos(input).length);
+        }, 0);
+      }
+
+      function photoKey(file) {
+        return [file.name, file.size, file.type, file.lastModified].join("|");
+      }
+
       function photoPreview(input) {
         (input._actaPreviewUrls || []).forEach(function (url) { URL.revokeObjectURL(url); });
         input._actaPreviewUrls = [];
         var preview = input.closest("[data-acta-item]").querySelector("[data-acta-photo-preview]");
-        var files = Array.from(input.files || []);
-        if (files.length > 4) { input.value = ""; preview.innerHTML = ""; message("Cada daño admite máximo 4 fotos.", true); return; }
+        var files = selectedPhotos(input);
         preview.innerHTML = "";
         files.forEach(function (file, index) {
           var url = URL.createObjectURL(file); input._actaPreviewUrls.push(url);
           var figure = document.createElement("figure");
           var image = document.createElement("img"); image.src = url; image.alt = "Vista previa de evidencia " + (index + 1);
           var caption = document.createElement("figcaption"); caption.textContent = file.name + " · " + Math.max(1, Math.round(file.size / 1024)) + " KB";
-          figure.appendChild(image); figure.appendChild(caption); preview.appendChild(figure);
+          var remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "scm-acta-photo-remove";
+          remove.dataset.actaRemovePhoto = String(index);
+          remove.setAttribute("aria-label", "Quitar foto " + (index + 1) + ": " + file.name);
+          remove.innerHTML = '<span aria-hidden="true">×</span>';
+          figure.appendChild(image); figure.appendChild(caption); figure.appendChild(remove); preview.appendChild(figure);
         });
+        preview.setAttribute("aria-label", files.length ? files.length + " fotos seleccionadas" : "Sin fotos seleccionadas");
+      }
+
+      function addPhotos(input, incoming) {
+        var form = input.closest("form");
+        var current = Array.isArray(input._actaFiles) ? input._actaFiles.slice() : [];
+        var known = new Set(current.map(photoKey));
+        var additions = [];
+        for (var index = 0; index < incoming.length; index++) {
+          var file = incoming[index];
+          if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > MAX_SOURCE_PHOTO_BYTES) {
+            syncPhotoInput(input, current);
+            photoError("Usa únicamente fotos JPG, PNG o WebP de máximo 25 MB cada una.", input);
+            return false;
+          }
+          var key = photoKey(file);
+          if (!known.has(key)) { known.add(key); additions.push(file); }
+        }
+        var next = current.concat(additions);
+        if (next.length > MAX_PHOTOS_PER_DAMAGE) {
+          syncPhotoInput(input, current);
+          photoError("Este daño admite máximo 4 fotos. Ya tienes " + current.length + " y estás intentando agregar " + additions.length + ".", input);
+          return false;
+        }
+        if (totalSelectedPhotos(form, input) + next.length > MAX_PHOTOS_PER_ACT) {
+          syncPhotoInput(input, current);
+          photoError("El acta admite máximo 12 fotos en total. Quita alguna foto antes de agregar otra.", input);
+          return false;
+        }
+        if (!syncPhotoInput(input, next)) {
+          input.value = "";
+          input._actaFiles = [];
+          photoPreview(input);
+          photoError("Tu navegador no permite combinar o quitar fotos. Actualiza Chrome e inténtalo nuevamente.", input);
+          return false;
+        }
+        photoPreview(input);
+        return true;
+      }
+
+      function pastedPhotos(event) {
+        var clipboard = event.clipboardData || window.clipboardData;
+        var items = clipboard && clipboard.items ? Array.from(clipboard.items) : [];
+        return items.reduce(function (files, item, index) {
+          if (!item || !/^image\//i.test(item.type || "")) return files;
+          var blob = item.getAsFile();
+          if (!blob) return files;
+          var subtype = (blob.type.split("/")[1] || "png").replace("jpeg", "jpg");
+          files.push(new File([blob], "captura-" + Date.now() + "-" + (index + 1) + "." + subtype, {
+            type: blob.type || "image/png",
+            lastModified: Date.now(),
+          }));
+          return files;
+        }, []);
       }
       function decodePhoto(file) {
         if (window.createImageBitmap) {
@@ -1829,12 +1923,33 @@
           var photoInput = item.querySelector("[data-acta-photos]");
           photoInput.name = "acta_item_photos_" + sequence + "[]";
           photoInput.value = "";
+          photoInput._actaFiles = [];
+          var photoHelp = item.querySelector("[data-acta-photo-help]");
+          var helpId = "acta-photo-help-" + sequence;
+          if (photoHelp) photoHelp.id = helpId;
+          photoInput.setAttribute("aria-describedby", helpId);
           item.querySelector("[data-acta-photo-preview]").innerHTML = "";
           sequence++;
           items.appendChild(item);
           item.querySelector("textarea").focus();
         });
         form.addEventListener("click", function (event) {
+          var photoButton = event.target.closest("[data-acta-remove-photo]");
+          if (photoButton) {
+            var photoItem = photoButton.closest("[data-acta-item]");
+            var photoInput = photoItem.querySelector("[data-acta-photos]");
+            var files = selectedPhotos(photoInput);
+            var removedIndex = Number(photoButton.dataset.actaRemovePhoto);
+            if (Number.isInteger(removedIndex) && removedIndex >= 0 && removedIndex < files.length) {
+              files.splice(removedIndex, 1);
+              if (syncPhotoInput(photoInput, files)) {
+                photoPreview(photoInput);
+              } else {
+                photoError("No se pudo quitar la foto en este navegador. Actualiza Chrome e inténtalo nuevamente.", photoInput);
+              }
+            }
+            return;
+          }
           var button = event.target.closest("[data-acta-remove-item]");
           if (!button) return;
           if (form.querySelectorAll("[data-acta-item]").length === 1) { message("Debes conservar al menos un daño y su solución.", true); return; }
@@ -1843,11 +1958,25 @@
           (input._actaPreviewUrls || []).forEach(function (url) { URL.revokeObjectURL(url); });
           item.remove();
         });
-        form.addEventListener("change", function (event) { if (event.target.matches("[data-acta-photos]")) photoPreview(event.target); });
+        form.addEventListener("change", function (event) {
+          if (event.target.matches("[data-acta-photos]")) addPhotos(event.target, Array.from(event.target.files || []));
+        });
+        form.addEventListener("paste", function (event) {
+          var pasteButton = event.target.closest && event.target.closest("[data-acta-photo-paste]");
+          if (!pasteButton) return;
+          var input = pasteButton.closest("[data-acta-item]").querySelector("[data-acta-photos]");
+          var files = pastedPhotos(event);
+          event.preventDefault();
+          if (!files.length) {
+            photoError("No se encontró una imagen en el portapapeles. Copia una captura y vuelve a presionar Ctrl+V.", input);
+            return;
+          }
+          addPhotos(input, files);
+        });
         form.addEventListener("submit", function (event) {
           event.preventDefault();
           message("Comprimiendo las fotos antes de guardar…", false);
-          compressedFormData(form).then(function (data) { return request("create", data); }).catch(function (error) { message(error.message || "No se pudieron preparar las fotos.", true); });
+          compressedFormData(form).then(function (data) { return request("create", data); }).catch(function (error) { photoError(error.message || "No se pudieron preparar las fotos."); });
         });
       }
       body.querySelectorAll("[data-acta-preview]").forEach(function (link) {

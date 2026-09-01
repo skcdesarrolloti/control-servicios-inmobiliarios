@@ -26,7 +26,7 @@ final class CompletionView
     $executor = str_replace('En ejecucion por ', '', (string) ($ticket['estado_administrativo'] ?? ''));
     ob_start(); ?>
     <section class="scm-acta">
-      <p class="scm-acta-notice">Documenta la solución, elige el firmante y revisa el valor administrativo. El ticket permanecerá <strong>en espera de firma</strong>. Solo la firma registrará el cierre y el reporte de cobro.</p>
+      <p class="scm-acta-notice">Documenta la solución, elige el firmante y revisa el valor administrativo. El ticket permanecerá abierto en el <strong>estado de ejecución seleccionado</strong> mientras el acta queda pendiente de firma. Solo la firma registrará el cierre y el reporte de cobro.</p>
       <div class="scm-acta-meta"><span>Ticket <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Inmueble <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>
       <?php foreach ($context['acts'] as $act): $payload = $service->payload($act); ?>
         <article class="scm-acta-record">
@@ -87,7 +87,8 @@ final class CompletionView
 
   public function item(int $index): string
   {
-    return '<fieldset class="scm-acta-item" data-acta-item><legend>Daño y solución</legend><div class="scm-acta-grid"><label>Daño encontrado *<textarea name="items[' . $index . '][damage]" required maxlength="3000" rows="3"></textarea></label><label>Solución realizada *<textarea name="items[' . $index . '][solution]" required maxlength="3000" rows="3"></textarea></label></div><label class="scm-acta-photo-field">Fotos de evidencia (opcional)<input type="file" name="acta_item_photos_' . $index . '[]" accept="image/jpeg,image/png,image/webp" multiple data-acta-photos><small>Hasta 4 fotos por daño. Se comprimen automáticamente antes de guardarlas.</small></label><div class="scm-acta-photo-preview" data-acta-photo-preview aria-live="polite"></div><button type="button" class="scm-acta-remove" data-acta-remove-item>Quitar este detalle</button></fieldset>';
+    $helpId = 'acta-photo-help-' . $index;
+    return '<fieldset class="scm-acta-item" data-acta-item><legend>Daño y solución</legend><div class="scm-acta-grid"><label>Daño encontrado *<textarea name="items[' . $index . '][damage]" required maxlength="3000" rows="3"></textarea></label><label>Solución realizada *<textarea name="items[' . $index . '][solution]" required maxlength="3000" rows="3"></textarea></label></div><div class="scm-acta-photo-field"><label>Fotos de evidencia (opcional)<input type="file" name="acta_item_photos_' . $index . '[]" accept="image/jpeg,image/png,image/webp" multiple data-acta-photos aria-describedby="' . $helpId . '"></label><button type="button" class="scm-acta-photo-paste" data-acta-photo-paste><strong>Pegar captura</strong><span>Haz clic aquí y presiona Ctrl+V</span></button><small id="' . $helpId . '" data-acta-photo-help>Máximo 4 fotos por daño y 12 en toda el acta. JPG, PNG o WebP; hasta 25 MB por archivo. Se comprimen automáticamente.</small></div><div class="scm-acta-photo-preview" data-acta-photo-preview aria-live="polite" aria-label="Fotos seleccionadas"></div><button type="button" class="scm-acta-remove" data-acta-remove-item>Quitar este detalle</button></fieldset>';
   }
 
   public function document(array $act, array $payload, bool $staff, string $form = ''): string

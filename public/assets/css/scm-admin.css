@@ -5,7 +5,7 @@
 @import url("./admin/05-guide-contracts.css?v=3.1.69");
 @import url("./admin/06-canon-insurance-audit.css?v=3.1.46");
 @import url("./admin/07-collection-management.css?v=3.2.0");
-@import url('./ticket-completion.css?v=3.3.14');
+@import url('./ticket-completion.css?v=3.3.20');
 
 #scm-app .scm-origin-badge {
   display: inline-flex;

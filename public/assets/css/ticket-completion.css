@@ -32,14 +32,19 @@
 .scm-acta-record, .scm-acta-item { border: 1px solid var(--acta-border); background: #fff; padding: 16px; margin: 16px 0; border-radius: 10px; min-width: 0; }
 .scm-acta-item legend { padding: 0 8px; font-weight: 700; }
 .scm-acta .scm-acta-remove { background: transparent; color: #9f1239; border: 0; min-height: 44px; padding: 8px; cursor: pointer; text-decoration: underline; }
-.scm-acta .scm-acta-photo-field { padding: 14px; border: 1px dashed #94a3b8; border-radius: 10px; background: var(--acta-surface); }
+.scm-acta .scm-acta-photo-field { display: grid; gap: 10px; padding: 14px; border: 1px dashed #94a3b8; border-radius: 10px; background: var(--acta-surface); }
+.scm-acta .scm-acta-photo-field label { margin: 0; }
 .scm-acta .scm-acta-photo-field input { padding: 8px; background: #fff; cursor: pointer; }
 .scm-acta .scm-acta-photo-field small { color: var(--acta-muted); font-weight: 400; }
+.scm-acta .scm-acta-photo-paste { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; min-height: 48px; width: 100%; padding: 10px 14px; color: #173d70; background: #fff; border: 1px dashed #5681b7; border-radius: 8px; cursor: pointer; text-align: left; }
+.scm-acta .scm-acta-photo-paste span { color: var(--acta-muted); font-size: 13px; font-weight: 400; }
 .scm-acta-photo-preview, .scm-acta-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 12px; margin: 12px 0; }
 .scm-acta-photo-preview:empty { display: none; }
-.scm-acta-photo-preview figure, .scm-acta-photo-grid figure { min-width: 0; margin: 0; padding: 8px; border: 1px solid var(--acta-border); border-radius: 10px; background: #fff; }
+.scm-acta-photo-preview figure, .scm-acta-photo-grid figure { position: relative; min-width: 0; margin: 0; padding: 8px; border: 1px solid var(--acta-border); border-radius: 10px; background: #fff; }
 .scm-acta-photo-preview img, .scm-acta-photo-grid img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; background: #e2e8f0; }
 .scm-acta-photo-preview figcaption, .scm-acta-photo-grid figcaption { margin-top: 6px; color: var(--acta-muted); font-size: 12px; overflow-wrap: anywhere; }
+.scm-acta .scm-acta-photo-remove { position: absolute; top: 12px; right: 12px; display: inline-flex; align-items: center; justify-content: center; width: 44px; min-width: 44px; height: 44px; padding: 0; border: 2px solid #fff; border-radius: 999px; background: #9f1239; color: #fff; font: 700 22px/1 system-ui, sans-serif; cursor: pointer; box-shadow: 0 2px 8px #10264a40; }
+.scm-acta .scm-acta-photo-remove:hover { background: #881337; filter: none; }
 .scm-acta-evidence { margin-top: 20px; padding: 14px; border: 1px solid var(--acta-border); border-radius: 10px; background: var(--acta-surface); }
 .scm-acta-evidence h3 { margin-top: 0; }
 .scm-acta .scm-acta-help, .scm-acta dt { color: var(--acta-muted); font-size: 14px; }

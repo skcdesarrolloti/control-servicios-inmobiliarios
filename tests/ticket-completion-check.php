@@ -48,6 +48,9 @@ $rejects(static fn() => Policy::strokes('<svg onload=alert(1)>'), 'executable dr
 $assert(Policy::phone('300 123 4567') === '+573001234567', 'Colombian phone normalized');
 $assert(Policy::phone('120363@g.us') === '', 'group WhatsApp recipients prohibited for personal signature');
 $assert(Policy::executionState('inmobiliaria') === 'En ejecucion por inmobiliaria', 'executor maps to an allowed administrative execution state');
+$adminJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/scm-admin.js');
+$assert(str_contains($adminJs, 'data-acta-remove-photo') && str_contains($adminJs, 'form.addEventListener("paste"'), 'act photo UI supports individual removal and pasted clipboard images');
+$assert(str_contains($adminJs, 'MAX_PHOTOS_PER_DAMAGE = 4') && str_contains($adminJs, 'MAX_PHOTOS_PER_ACT = 12'), 'act photo UI enforces visible client limits');
 
 if (!in_array('--database', $argv, true)) { echo "$checks domain checks passed. Use --database for isolated SQL integration checks.\n"; exit; }
 require dirname(__DIR__) . '/bootstrap/app.php';
@@ -103,6 +106,8 @@ $db->insert($db->table('jet_cct_cotizacion_mantenimiento'), $repo->schema->filte
   '_ID' => 7001, 'id_ticket' => '9001', 'estado' => 'Pendiente', 'motivo' => '',
 ]));
 $db->update($db->table('jet_cct_tickets'), ['id_cotizacion_mantenimiento' => '7001'], ['_ID' => 1]);
+$createPanel = (new View())->panel($service->context(1), $service);
+$assert(str_contains($createPanel, 'data-acta-photo-paste') && str_contains($createPanel, 'Máximo 4 fotos por daño y 12 en toda el acta'), 'act form explains limits and exposes the clipboard paste target');
 $created = $service->create(1, $input, $actor);
 $act = $repo->act($created['act_id']);
 $token = $service->token($act);
