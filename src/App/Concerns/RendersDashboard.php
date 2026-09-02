@@ -2113,14 +2113,15 @@ trait RendersDashboard
               <div class="scm-field">
                 <label for="scm-admin-notif-whatsapp-template">Tipo de mensaje</label>
                 <select id="scm-admin-notif-whatsapp-template" name="whatsapp_template" class="select select-bordered select-sm scm-select" data-admin-notif-whatsapp-template>
-                  <?php foreach ($whatsappTemplates as $template):
+                  <?php foreach ($whatsappTemplates as $templateKey => $template):
                     $linkedEmailTemplateName = (string) ($template['email_template'] ?? \SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE);
                     $linkedEmailTemplate = is_array($emailTemplates[$linkedEmailTemplateName] ?? null)
                       ? $emailTemplates[$linkedEmailTemplateName]
                       : ($emailTemplates[\SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE] ?? $firstEmailTemplate);
                     $templateActors = implode(',', array_map('strval', (array) ($template['actors'] ?? [])));
                     ?>
-                    <option value="<?php echo esc_attr((string) ($template['name'] ?? '')); ?>"
+                    <option value="<?php echo esc_attr((string) $templateKey); ?>"
+                      data-template-name="<?php echo esc_attr((string) ($template['name'] ?? $templateKey)); ?>"
                       data-actors="<?php echo esc_attr($templateActors); ?>"
                       data-template-mode="<?php echo esc_attr((string) ($template['parameter_mode'] ?? 'name_message_signature')); ?>"
                       data-template-body="<?php echo esc_attr((string) ($template['body'] ?? '')); ?>"
@@ -2210,7 +2211,7 @@ trait RendersDashboard
       <summary>
         <span>
           <strong>Editor de nombres de plantillas</strong>
-          <small>Ajusta el texto visible del select, ayudas y ejemplos sin cambiar el nombre t&eacute;cnico de WhatsApp.</small>
+          <small>Ajusta el texto visible del select, ayudas y el nombre t&eacute;cnico aprobado en WhatsApp/Meta.</small>
         </span>
       </summary>
       <form data-admin-notif-template-editor>
@@ -2221,22 +2222,24 @@ trait RendersDashboard
               <table class="scm-admin-notif-template-editor-table">
                 <thead>
                   <tr>
-                    <th>Nombre t&eacute;cnico</th>
+                    <th>ID interno</th>
+                    <th>Name t&eacute;cnico Meta</th>
                     <th>Label del select</th>
                     <th>Descripci&oacute;n</th>
                     <th>Ayuda de variables</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <?php foreach ($whatsappTemplates as $name => $template):
-                    $templateName = (string) ($template['name'] ?? $name);
+                  <?php foreach ($whatsappTemplates as $templateKey => $template):
+                    $templateName = (string) ($template['name'] ?? $templateKey);
                     $variables = implode("\n", array_map('strval', (array) ($template['variables'] ?? [])));
                   ?>
                     <tr>
-                      <td><code><?php echo esc_html($templateName); ?></code></td>
-                      <td><input type="text" name="templates[whatsapp][<?php echo esc_attr($templateName); ?>][label]" value="<?php echo esc_attr((string) ($template['label'] ?? '')); ?>"></td>
-                      <td><textarea rows="3" name="templates[whatsapp][<?php echo esc_attr($templateName); ?>][description]"><?php echo esc_textarea((string) ($template['description'] ?? '')); ?></textarea></td>
-                      <td><textarea rows="4" name="templates[whatsapp][<?php echo esc_attr($templateName); ?>][variables]"><?php echo esc_textarea($variables); ?></textarea></td>
+                      <td><code><?php echo esc_html((string) $templateKey); ?></code></td>
+                      <td><input type="text" name="templates[whatsapp][<?php echo esc_attr((string) $templateKey); ?>][name]" value="<?php echo esc_attr($templateName); ?>" spellcheck="false"></td>
+                      <td><input type="text" name="templates[whatsapp][<?php echo esc_attr((string) $templateKey); ?>][label]" value="<?php echo esc_attr((string) ($template['label'] ?? '')); ?>"></td>
+                      <td><textarea rows="3" name="templates[whatsapp][<?php echo esc_attr((string) $templateKey); ?>][description]"><?php echo esc_textarea((string) ($template['description'] ?? '')); ?></textarea></td>
+                      <td><textarea rows="4" name="templates[whatsapp][<?php echo esc_attr((string) $templateKey); ?>][variables]"><?php echo esc_textarea($variables); ?></textarea></td>
                     </tr>
                   <?php endforeach; ?>
                 </tbody>

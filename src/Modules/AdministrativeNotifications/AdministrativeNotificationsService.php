@@ -400,6 +400,10 @@ final class AdministrativeNotificationsService
         }
 
         if ($channel === 'whatsapp') {
+          $technicalName = $this->sanitizeWhatsappTemplateName($values['name'] ?? $values['technical_name'] ?? '');
+          if ($technicalName !== '') {
+            $override['name'] = $technicalName;
+          }
           $variablesRaw = (string) ($values['variables'] ?? '');
           $variables = array_values(array_filter(array_map(
             fn(string $value): string => $this->sanitizeTemplateOverrideText($value, 180, false),
@@ -441,7 +445,10 @@ final class AdministrativeNotificationsService
       if ($name === '' || !isset($templates[$name]) || !is_array($override)) {
         continue;
       }
-      foreach (['label', 'description', 'subject', 'preview_excerpt'] as $field) {
+      $textFields = $channel === 'whatsapp'
+        ? ['name', 'label', 'description']
+        : ['label', 'description', 'subject', 'preview_excerpt'];
+      foreach ($textFields as $field) {
         $value = trim((string) ($override[$field] ?? ''));
         if ($value !== '') {
           $templates[$name][$field] = $value;
@@ -476,6 +483,14 @@ final class AdministrativeNotificationsService
     $text = preg_replace($multiline ? '/[ \t]+/' : '/\s+/', ' ', $text) ?? '';
     $text = trim($text);
     return mb_substr($text, 0, max(1, $maxLength), 'UTF-8');
+  }
+
+  private function sanitizeWhatsappTemplateName($value): string
+  {
+    $name = strtolower(trim((string) $value));
+    $name = preg_replace('/[^a-z0-9_]+/', '_', $name) ?? '';
+    $name = trim($name, '_');
+    return mb_substr($name, 0, 120, 'UTF-8');
   }
 
   /**
@@ -3509,7 +3524,15 @@ final class AdministrativeNotificationsService
       $templateName = self::DEFAULT_WHATSAPP_TEMPLATE;
     }
     $templates = $this->whatsappTemplates();
-    return is_array($templates[$templateName] ?? null) ? $templates[$templateName] : [];
+    if (is_array($templates[$templateName] ?? null)) {
+      return $templates[$templateName] + ['template_id' => $templateName];
+    }
+    foreach ($templates as $templateId => $template) {
+      if (trim((string) ($template['name'] ?? '')) === $templateName) {
+        return $template + ['template_id' => $templateId];
+      }
+    }
+    return [];
   }
 
   /** @return array<string,mixed> */
@@ -3600,7 +3623,8 @@ final class AdministrativeNotificationsService
   /** @param array<string,mixed> $whatsappTemplateConfig @param array<string,mixed> $emailTemplateConfig */
   private function templateCanUseImportDetail(array $whatsappTemplateConfig, array $emailTemplateConfig): bool
   {
-    return (string) ($whatsappTemplateConfig['name'] ?? '') === 'scm_propietario_arriendo_consignado_v1'
+    return (string) ($whatsappTemplateConfig['template_id'] ?? '') === 'scm_propietario_arriendo_consignado_v1'
+      || (string) ($whatsappTemplateConfig['name'] ?? '') === 'scm_propietario_arriendo_consignado_v1'
       || (string) ($emailTemplateConfig['name'] ?? '') === 'scm_email_propietario_arriendo_consignado_v1';
   }
 
