@@ -197,7 +197,7 @@ final class AdministrativeNotificationsService
         'body' => "Estimado(a) {{1}}, tu mes ha sido generado exitosamente.\n\nHemos generado tu cupón de pago, el cual cuenta con 4 fechas establecidas cada mes:\n📅 12 de cada mes\n📅 22 de cada mes\n📅 26 de cada mes\n📅 31 de cada mes\n\nEn el cupón encontrarás el valor específico correspondiente a cada fecha. Te agradecemos revisar tu cupón mensual y realizar el pago en la fecha y por el valor allí establecidos.\n\nPuedes realizar el pago a través del botón de pago disponible o por ventanilla en Banco Caja Social, ingresando tu cédula o NIT sin dígito de verificación.\n\nCuando realices tu pago, por favor envíanos el soporte para validarlo en el sistema.\n\nEstoy para servirte.\n\nAtentamente,\n{{2}}\n\n🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro Bot Guardián desde el botón de abajo.",
         'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($arrendatarios, $funcionarios),
-        'email_template' => 'scm_email_mes_generado_pago_v1',
+        'email_template' => 'scm_email_cupon_disponible_v1',
         'parameter_mode' => 'name_signature',
       ],
       'scm_aviso_siniestro_v1' => [
@@ -208,7 +208,7 @@ final class AdministrativeNotificationsService
         'body' => "Estimado(a) *{{1}}*, reciba un cordial saludo.\n\nLe recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.\n\nUna vez activado el proceso con la aseguradora, se puede generar un recargo adicional del 50% sobre el valor del canon adeudado, además de los costos y gestiones asociados al trámite.\n\n*Para evitar mayores consecuencias económicas y administrativas, le solicitamos realizar el pago de manera inmediata.*\n\nAtentamente,\n*{{2}}*\n\n🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro *Bot Guardián* desde el botón de abajo.\n🌐 Recuerda que puedes ingresar a tu *menú personal en nuestra página web* para consultar información y gestionar tus servicios.",
         'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($arrendatarios, $funcionarios),
-        'email_template' => 'scm_email_arrendatario_aviso_pago_canon_v1',
+        'email_template' => 'scm_email_aviso_siniestro_v1',
         'parameter_mode' => 'name_signature',
       ],
     ];
@@ -234,55 +234,12 @@ final class AdministrativeNotificationsService
         'preview_excerpt' => 'Base corporativa con banner, saludo en negrita, mensaje editable y firma en formato Nombre - Cargo - Celular.',
         'requires_message' => true,
       ],
-      'scm_email_arrendatario_aviso_pago_canon_v1' => [
-        'name' => 'scm_email_arrendatario_aviso_pago_canon_v1',
-        'label' => 'Aviso pago canon',
-        'subject' => 'Aviso importante sobre canon de arrendamiento',
-        'description' => 'Email formal para arrendatarios por incumplimiento en el pago del canon.',
-        'body' => '<p><strong>Estimado(a) {{nombre}}</strong>,</p><p>Reciba un cordial saludo.</p><p>Le recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.</p><p>Una vez activado el proceso con la aseguradora, se puede generar un recargo adicional del <strong>50%</strong> sobre el valor del canon adeudado, adem&aacute;s de los costos y gestiones asociados al tr&aacute;mite.</p><p>Para evitar mayores consecuencias econ&oacute;micas y administrativas, le solicitamos realizar el pago de manera inmediata.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
-        'source' => 'sistema',
-        'message_only' => false,
-        'editable_message' => '',
-        'is_html' => true,
-        'is_full_document' => false,
-        'fixed_body' => true,
-        'requires_message' => false,
-        'preview_excerpt' => 'Aviso formal de canon vencido con firma del funcionario.',
-      ],
-      'scm_email_arrendatario_gestion_cobro_v1' => [
-        'name' => 'scm_email_arrendatario_gestion_cobro_v1',
-        'label' => 'Gestion de cobro',
-        'subject' => 'Gestion de cobro de contrato de arrendamiento',
-        'description' => 'Email para arrendatarios cuando se registra una gestion de cobro.',
-        'body' => '<p><strong>Buen d&iacute;a, {{nombre}}</strong>.</p><p>Le informamos que se registr&oacute; una gesti&oacute;n de cobro relacionada con su contrato de arrendamiento.</p><div>{{mensaje}}</div><p>Si ya realiz&oacute; el pago o tiene alguna novedad, por favor comun&iacute;quese con nosotros.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
-        'source' => 'sistema',
-        'message_only' => true,
-        'editable_message' => '',
-        'is_html' => true,
-        'is_full_document' => false,
-        'requires_message' => true,
-        'preview_excerpt' => 'Gestion de cobro con detalle editable y firma del funcionario.',
-      ],
-      'scm_email_arrendatario_fecha_pago_v1' => [
-        'name' => 'scm_email_arrendatario_fecha_pago_v1',
-        'label' => 'Notificación fecha de pago',
-        'subject' => 'Notificación de fecha de pago',
-        'description' => 'Email HTML informativo para recordar las fechas de pago del canon.',
-        'body' => '<p><strong>Buen d&iacute;a, {{nombre}}</strong>.</p><div>{{mensaje}}</div><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
-        'source' => 'sistema',
-        'message_only' => true,
-        'editable_message' => '',
-        'is_html' => true,
-        'is_full_document' => false,
-        'requires_message' => true,
-        'preview_excerpt' => 'Notificación de fecha de pago con botones automáticos de Guardian y menú personal.',
-      ],
       'scm_email_factura_disponible_v1' => [
         'name' => 'scm_email_factura_disponible_v1',
         'label' => 'Factura disponible',
         'subject' => 'Tienes una nueva factura disponible',
         'description' => 'Email para arrendatarios con factura nueva disponible.',
-        'body' => '<p><strong>Estimado(a) {{nombre}}</strong>,</p><p>Tienes una nueva factura disponible.</p><p>Tu factura ya se encuentra lista para revisi&oacute;n. Te invitamos a consultarla y realizar el pago oportunamente para mantenerte al d&iacute;a.</p><p>Si ya realizaste el pago, puedes hacer caso omiso a este mensaje.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
+        'body' => '<p><strong>Estimado(a) {{nombre}}</strong>,</p><p>&iexcl;Tienes una nueva factura disponible! Ya puedes consultarla y en los pr&oacute;ximos d&iacute;as estar&aacute; habilitada para que puedas realizar tu pago.</p><p>Estoy para servirte.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
         'source' => 'sistema',
         'message_only' => false,
         'editable_message' => '',
@@ -290,14 +247,14 @@ final class AdministrativeNotificationsService
         'is_full_document' => false,
         'fixed_body' => true,
         'requires_message' => false,
-        'preview_excerpt' => 'Aviso de factura disponible con banner corporativo y firma.',
+        'preview_excerpt' => 'Aviso de nueva factura disponible con firma y accesos automaticos a Guardian y menu personal.',
       ],
-      'scm_email_mes_generado_pago_v1' => [
-        'name' => 'scm_email_mes_generado_pago_v1',
-        'label' => 'Mes generado para pago',
+      'scm_email_cupon_disponible_v1' => [
+        'name' => 'scm_email_cupon_disponible_v1',
+        'label' => 'Cupón disponible',
         'subject' => 'Tu mes ha sido generado exitosamente',
-        'description' => 'Email para arrendatarios con mes generado y opciones de pago.',
-        'body' => '<p><strong>Hola {{nombre}}</strong>,</p><p>Tu mes ha sido generado exitosamente.</p><p>Puedes realizar el pago a trav&eacute;s del enlace de pago disponible o por ventanilla en Banco Caja Social, ingresando tu c&eacute;dula o NIT sin d&iacute;gito de verificaci&oacute;n.</p><p><a href="https://www.mipagoamigo.com/MPA_WebSite/ServicePayments/StartPayment?id=6329&amp;searchedCategoryId=&amp;searchedAgreementName=SOLUCIONES%20COMERCIALES%20Y%20CONSTRUCTIVAS%20SAS" style="display:inline-block;background:#f59120;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:8px;">Pagar ahora</a></p><p>Cuando realices el pago, por favor env&iacute;anos el soporte para validarlo en el sistema.</p><p>Estoy para servirte.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
+        'description' => 'Email para arrendatarios con cupón de pago generado y opciones de pago.',
+        'body' => '<p><strong>Estimado(a) {{nombre}}</strong>, tu mes ha sido generado exitosamente.</p><p>Hemos generado tu cup&oacute;n de pago, el cual cuenta con 4 fechas establecidas cada mes:</p><ul><li>12 de cada mes</li><li>22 de cada mes</li><li>26 de cada mes</li><li>31 de cada mes</li></ul><p>En el cup&oacute;n encontrar&aacute;s el valor espec&iacute;fico correspondiente a cada fecha. Te agradecemos revisar tu cup&oacute;n mensual y realizar el pago en la fecha y por el valor all&iacute; establecidos.</p><p>Puedes realizar el pago a trav&eacute;s del bot&oacute;n de pago disponible o por ventanilla en Banco Caja Social, ingresando tu c&eacute;dula o NIT sin d&iacute;gito de verificaci&oacute;n.</p><p><a href="https://www.mipagoamigo.com/MPA_WebSite/ServicePayments/StartPayment?id=6329&amp;searchedCategoryId=&amp;searchedAgreementName=SOLUCIONES%20COMERCIALES%20Y%20CONSTRUCTIVAS%20SAS" style="display:inline-block;background:#f59120;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:8px;">Pagar ahora</a></p><p>Cuando realices tu pago, por favor env&iacute;anos el soporte para validarlo en el sistema.</p><p>Estoy para servirte.</p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
         'source' => 'sistema',
         'message_only' => false,
         'editable_message' => '',
@@ -305,7 +262,22 @@ final class AdministrativeNotificationsService
         'is_full_document' => false,
         'fixed_body' => true,
         'requires_message' => false,
-        'preview_excerpt' => 'Aviso de mes generado con boton de pago y firma.',
+        'preview_excerpt' => 'Aviso de cupon disponible con fechas de pago, boton de pago, firma y acceso Guardian.',
+      ],
+      'scm_email_aviso_siniestro_v1' => [
+        'name' => 'scm_email_aviso_siniestro_v1',
+        'label' => 'Aviso siniestro',
+        'subject' => 'Aviso importante sobre canon de arrendamiento',
+        'description' => 'Email formal para arrendatarios por incumplimiento y posible reporte ante aseguradora.',
+        'body' => '<p><strong>Estimado(a) {{nombre}}</strong>, reciba un cordial saludo.</p><p>Le recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.</p><p>Una vez activado el proceso con la aseguradora, se puede generar un recargo adicional del <strong>50%</strong> sobre el valor del canon adeudado, adem&aacute;s de los costos y gestiones asociados al tr&aacute;mite.</p><p><strong>Para evitar mayores consecuencias econ&oacute;micas y administrativas, le solicitamos realizar el pago de manera inmediata.</strong></p><p style="margin-top:24px;">Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
+        'source' => 'sistema',
+        'message_only' => false,
+        'editable_message' => '',
+        'is_html' => true,
+        'is_full_document' => false,
+        'fixed_body' => true,
+        'requires_message' => false,
+        'preview_excerpt' => 'Aviso formal de siniestro/canon vencido con firma y accesos automaticos a Guardian y menu personal.',
       ],
       'scm_email_propietario_arriendo_consignado_v1' => [
         'name' => 'scm_email_propietario_arriendo_consignado_v1',
@@ -3396,6 +3368,15 @@ final class AdministrativeNotificationsService
   private function emailTemplateConfig(string $templateName): array
   {
     $templateName = trim($templateName);
+    $templateAliases = [
+      'scm_email_arrendatario_aviso_pago_canon_v1' => 'scm_email_aviso_siniestro_v1',
+      'scm_email_arrendatario_gestion_cobro_v1' => 'scm_email_aviso_siniestro_v1',
+      'scm_email_arrendatario_fecha_pago_v1' => 'scm_email_cupon_disponible_v1',
+      'scm_email_mes_generado_pago_v1' => 'scm_email_cupon_disponible_v1',
+    ];
+    if (isset($templateAliases[$templateName])) {
+      $templateName = $templateAliases[$templateName];
+    }
     if ($templateName === '') {
       $templateName = self::DEFAULT_EMAIL_TEMPLATE;
     }
