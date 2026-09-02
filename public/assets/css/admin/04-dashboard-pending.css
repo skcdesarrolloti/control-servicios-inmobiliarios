@@ -7321,77 +7321,175 @@
 }
 
 #scm-app .scm-admin-notif-template-editor-panel {
-  width: min(1360px, calc(100vw - 38px));
+  width: min(1760px, calc(100vw - 18px));
 }
 
 #scm-app .scm-admin-notif-template-editor-panel form {
-  max-height: calc(100vh - 190px);
+  max-height: calc(100vh - 170px);
   overflow: auto;
   padding-bottom: 0;
 }
 
+#scm-app .scm-admin-notif-template-editor-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  padding: 12px 14px !important;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+#scm-app .scm-admin-notif-template-editor-note strong {
+  color: #10233f;
+  font-weight: 950;
+}
+
 #scm-app .scm-admin-notif-template-editor-grid {
   display: grid;
-  gap: 18px;
+  gap: 12px;
 }
 
-#scm-app .scm-admin-notif-template-editor-grid h5 {
-  margin: 0 0 10px;
-  color: #061d49;
-  font-size: 14px;
-  font-weight: 950;
-}
-
-#scm-app .scm-admin-notif-template-editor-table-wrap {
-  overflow-x: auto;
+#scm-app .scm-admin-notif-template-accordion {
   border: 1px solid #dbe7f4;
   border-radius: 12px;
-}
-
-#scm-app .scm-admin-notif-template-editor-table {
-  width: 100%;
-  min-width: 980px;
-  border-collapse: collapse;
   background: #fff;
+  overflow: hidden;
 }
 
-#scm-app .scm-admin-notif-template-editor-table th,
-#scm-app .scm-admin-notif-template-editor-table td {
-  padding: 10px;
-  border-bottom: 1px solid #e2e8f0;
-  vertical-align: top;
-  text-align: left;
-}
-
-#scm-app .scm-admin-notif-template-editor-table th {
+#scm-app .scm-admin-notif-template-accordion summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 14px 16px !important;
   background: #f8fafc;
-  color: #334155;
-  font-size: 11px;
+  color: #061d49;
+  cursor: pointer;
+  font-size: 15px;
   font-weight: 950;
+  list-style: none;
+}
+
+#scm-app .scm-admin-notif-template-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+#scm-app .scm-admin-notif-template-accordion summary::after {
+  content: "+";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #1e3a8a;
+  font-size: 18px;
+  line-height: 1;
+}
+
+#scm-app .scm-admin-notif-template-accordion[open] summary::after {
+  content: "-";
+}
+
+#scm-app .scm-admin-notif-template-accordion summary small {
+  margin-left: auto;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+#scm-app .scm-admin-notif-template-editor-list {
+  display: grid;
+  gap: 10px;
+  max-height: min(58vh, 620px);
+  overflow: auto;
+  padding: 12px !important;
+  background: #f8fbff;
+}
+
+#scm-app .scm-admin-notif-template-editor-item {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.8fr) minmax(230px, 1fr) minmax(240px, 1fr) minmax(320px, 1.35fr) minmax(260px, 1.15fr);
+  gap: 10px;
+  align-items: start;
+  padding: 12px !important;
+  border: 1px solid #dbe7f4;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+}
+
+#scm-app .scm-admin-notif-template-editor-item--email {
+  grid-template-columns: minmax(220px, 0.95fr) minmax(260px, 1fr) minmax(320px, 1.25fr) minmax(360px, 1.35fr);
+}
+
+#scm-app .scm-admin-notif-template-editor-id,
+#scm-app .scm-admin-notif-template-editor-item label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+#scm-app .scm-admin-notif-template-editor-id span,
+#scm-app .scm-admin-notif-template-editor-item label span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
-#scm-app .scm-admin-notif-template-editor-table code {
+#scm-app .scm-admin-notif-template-editor-id code {
+  display: block;
+  min-height: 36px;
+  overflow: hidden;
+  padding: 9px 10px !important;
+  border: 1px solid #dbe7f4;
+  border-radius: 8px;
+  background: #f8fafc;
   color: #475569;
   font-size: 11px;
-  white-space: normal;
-  word-break: break-word;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-#scm-app .scm-admin-notif-template-editor-table input,
-#scm-app .scm-admin-notif-template-editor-table textarea {
+#scm-app .scm-admin-notif-template-editor-item input,
+#scm-app .scm-admin-notif-template-editor-item textarea {
   width: 100%;
-  min-width: 180px;
+  min-width: 0;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  padding: 8px 10px;
+  background: #fff;
   color: #172033;
   font-size: 12px;
+  line-height: 1.35;
+  padding: 8px 10px !important;
 }
 
-#scm-app .scm-admin-notif-template-editor-table textarea {
-  min-height: 74px;
+#scm-app .scm-admin-notif-template-editor-item input {
+  min-height: 38px;
+}
+
+#scm-app .scm-admin-notif-template-editor-item textarea {
+  min-height: 58px;
   resize: vertical;
+}
+
+#scm-app .scm-admin-notif-template-editor-item input:focus,
+#scm-app .scm-admin-notif-template-editor-item textarea:focus,
+#scm-app .scm-admin-notif-template-accordion summary:focus-visible {
+  border-color: #f59e0b;
+  outline: 3px solid rgba(245, 158, 11, 0.18);
 }
 
 #scm-app .scm-admin-notif-template-editor-actions {
@@ -7702,6 +7800,15 @@
 
   #scm-app .scm-admin-notif-template-editor-panel form {
     max-height: calc(100vh - 166px);
+  }
+
+  #scm-app .scm-admin-notif-template-editor-note {
+    display: block;
+  }
+
+  #scm-app .scm-admin-notif-template-editor-item,
+  #scm-app .scm-admin-notif-template-editor-item--email {
+    grid-template-columns: 1fr;
   }
 
   #scm-app .scm-admin-notif-modal-head {

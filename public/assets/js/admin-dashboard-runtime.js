@@ -3992,6 +3992,9 @@
         }
         templateEditorModal.hidden = false;
         templateEditorModal.classList.add("is-open");
+        if (templateEditorOpenBtn) {
+          templateEditorOpenBtn.setAttribute("aria-expanded", "true");
+        }
         document.body.classList.add("scm-admin-notif-modal-open");
         setTimeout(function () {
           var field = templateEditorForm
@@ -4009,6 +4012,10 @@
         }
         templateEditorModal.hidden = true;
         templateEditorModal.classList.remove("is-open");
+        if (templateEditorOpenBtn) {
+          templateEditorOpenBtn.setAttribute("aria-expanded", "false");
+          templateEditorOpenBtn.focus();
+        }
         document.body.classList.remove("scm-admin-notif-modal-open");
       }
 

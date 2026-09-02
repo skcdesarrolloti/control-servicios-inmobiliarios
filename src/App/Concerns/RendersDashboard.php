@@ -2213,10 +2213,10 @@ trait RendersDashboard
         <h4>Editor de nombres de plantillas</h4>
         <p>Ajusta labels, ayudas y el nombre t&eacute;cnico de WhatsApp en una ventana aparte.</p>
       </div>
-      <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-template-editor-open>Editar plantillas</button>
+      <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-template-editor-open aria-haspopup="dialog" aria-expanded="false" aria-controls="scm-admin-notif-template-editor-modal">Editar plantillas</button>
     </section>
 
-    <div class="scm-admin-notif-modal scm-admin-notif-template-editor-modal" data-admin-notif-template-editor-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-template-editor-title">
+    <div id="scm-admin-notif-template-editor-modal" class="scm-admin-notif-modal scm-admin-notif-template-editor-modal" data-admin-notif-template-editor-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-template-editor-title">
       <div class="scm-admin-notif-modal-backdrop" data-admin-notif-template-editor-close aria-hidden="true"></div>
       <section class="scm-admin-notif-card scm-admin-notif-modal-panel scm-admin-notif-template-editor-panel">
         <div class="scm-admin-notif-modal-head">
@@ -2228,68 +2228,78 @@ trait RendersDashboard
           <button type="button" class="scm-modal-close" data-admin-notif-template-editor-close aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
         </div>
         <form data-admin-notif-template-editor>
+          <div class="scm-admin-notif-template-editor-note">
+            <strong>ID interno:</strong>
+            <span>Es la llave estable del sistema y no se edita desde aqu&iacute;. Cambia el <strong>Name t&eacute;cnico Meta</strong> cuando el nombre aprobado en WhatsApp sea diferente.</span>
+          </div>
           <div class="scm-admin-notif-template-editor-grid">
-            <section>
-              <h5>WhatsApp</h5>
-              <div class="scm-admin-notif-template-editor-table-wrap">
-                <table class="scm-admin-notif-template-editor-table">
-                  <thead>
-                    <tr>
-                      <th>ID interno</th>
-                      <th>Name t&eacute;cnico Meta</th>
-                      <th>Label del select</th>
-                      <th>Descripci&oacute;n</th>
-                      <th>Ayuda de variables</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <?php foreach ($whatsappTemplates as $templateKey => $template):
-                      $templateName = (string) ($template['name'] ?? $templateKey);
-                      $variables = implode("\n", array_map('strval', (array) ($template['variables'] ?? [])));
-                    ?>
-                      <tr>
-                        <td><code><?php echo esc_html((string) $templateKey); ?></code></td>
-                        <td><input type="text" name="templates[whatsapp][<?php echo esc_attr((string) $templateKey); ?>][name]" value="<?php echo esc_attr($templateName); ?>" spellcheck="false"></td>
-                        <td><input type="text" name="templates[whatsapp][<?php echo esc_attr((string) $templateKey); ?>][label]" value="<?php echo esc_attr((string) ($template['label'] ?? '')); ?>"></td>
-                        <td><textarea rows="3" name="templates[whatsapp][<?php echo esc_attr((string) $templateKey); ?>][description]"><?php echo esc_textarea((string) ($template['description'] ?? '')); ?></textarea></td>
-                        <td><textarea rows="4" name="templates[whatsapp][<?php echo esc_attr((string) $templateKey); ?>][variables]"><?php echo esc_textarea($variables); ?></textarea></td>
-                      </tr>
-                    <?php endforeach; ?>
-                  </tbody>
-                </table>
+            <details class="scm-admin-notif-template-accordion" open>
+              <summary>
+                <span>WhatsApp</span>
+                <small><?php echo esc_html((string) count($whatsappTemplates)); ?> plantillas</small>
+              </summary>
+              <div class="scm-admin-notif-template-editor-list">
+                <?php foreach ($whatsappTemplates as $templateKey => $template):
+                  $templateName = (string) ($template['name'] ?? $templateKey);
+                  $variables = implode("\n", array_map('strval', (array) ($template['variables'] ?? [])));
+                ?>
+                  <article class="scm-admin-notif-template-editor-item">
+                    <div class="scm-admin-notif-template-editor-id">
+                      <span>ID interno</span>
+                      <code title="<?php echo esc_attr((string) $templateKey); ?>"><?php echo esc_html((string) $templateKey); ?></code>
+                    </div>
+                    <label>
+                      <span>Name t&eacute;cnico Meta</span>
+                      <input type="text" name="templates[whatsapp][<?php echo esc_attr((string) $templateKey); ?>][name]" value="<?php echo esc_attr($templateName); ?>" spellcheck="false">
+                    </label>
+                    <label>
+                      <span>Label del select</span>
+                      <input type="text" name="templates[whatsapp][<?php echo esc_attr((string) $templateKey); ?>][label]" value="<?php echo esc_attr((string) ($template['label'] ?? '')); ?>">
+                    </label>
+                    <label class="is-wide">
+                      <span>Descripci&oacute;n</span>
+                      <textarea rows="2" name="templates[whatsapp][<?php echo esc_attr((string) $templateKey); ?>][description]"><?php echo esc_textarea((string) ($template['description'] ?? '')); ?></textarea>
+                    </label>
+                    <label>
+                      <span>Ayuda de variables</span>
+                      <textarea rows="2" name="templates[whatsapp][<?php echo esc_attr((string) $templateKey); ?>][variables]"><?php echo esc_textarea($variables); ?></textarea>
+                    </label>
+                  </article>
+                <?php endforeach; ?>
               </div>
-            </section>
+            </details>
 
-            <section>
-              <h5>Email</h5>
-              <div class="scm-admin-notif-template-editor-table-wrap">
-                <table class="scm-admin-notif-template-editor-table">
-                  <thead>
-                    <tr>
-                      <th>ID / nombre</th>
-                      <th>Label del select</th>
-                      <th>Asunto</th>
-                      <th>Descripci&oacute;n / preview</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <?php foreach ($emailTemplates as $name => $template):
-                      $templateName = (string) ($template['name'] ?? $name);
-                      $description = trim((string) ($template['description'] ?? $template['preview_excerpt'] ?? ''));
-                    ?>
-                      <tr>
-                        <td><code><?php echo esc_html($templateName); ?></code></td>
-                        <td><input type="text" name="templates[email][<?php echo esc_attr($templateName); ?>][label]" value="<?php echo esc_attr((string) ($template['label'] ?? '')); ?>"></td>
-                        <td><input type="text" name="templates[email][<?php echo esc_attr($templateName); ?>][subject]" value="<?php echo esc_attr((string) ($template['subject'] ?? '')); ?>"></td>
-                        <td>
-                          <textarea rows="3" name="templates[email][<?php echo esc_attr($templateName); ?>][description]"><?php echo esc_textarea($description); ?></textarea>
-                        </td>
-                      </tr>
-                    <?php endforeach; ?>
-                  </tbody>
-                </table>
+            <details class="scm-admin-notif-template-accordion">
+              <summary>
+                <span>Email</span>
+                <small><?php echo esc_html((string) count($emailTemplates)); ?> plantillas</small>
+              </summary>
+              <div class="scm-admin-notif-template-editor-list">
+                <?php foreach ($emailTemplates as $name => $template):
+                  $templateName = (string) ($template['name'] ?? $name);
+                  $description = trim((string) ($template['description'] ?? $template['preview_excerpt'] ?? ''));
+                ?>
+                  <article class="scm-admin-notif-template-editor-item scm-admin-notif-template-editor-item--email">
+                    <div class="scm-admin-notif-template-editor-id">
+                      <span>ID / nombre</span>
+                      <code title="<?php echo esc_attr($templateName); ?>"><?php echo esc_html($templateName); ?></code>
+                    </div>
+                    <label>
+                      <span>Label del select</span>
+                      <input type="text" name="templates[email][<?php echo esc_attr($templateName); ?>][label]" value="<?php echo esc_attr((string) ($template['label'] ?? '')); ?>">
+                    </label>
+                    <label>
+                      <span>Asunto</span>
+                      <input type="text" name="templates[email][<?php echo esc_attr($templateName); ?>][subject]" value="<?php echo esc_attr((string) ($template['subject'] ?? '')); ?>">
+                    </label>
+                    <label class="is-wide">
+                      <span>Descripci&oacute;n / preview</span>
+                      <textarea rows="2" name="templates[email][<?php echo esc_attr($templateName); ?>][description]"><?php echo esc_textarea($description); ?></textarea>
+                    </label>
+                  </article>
+                <?php endforeach; ?>
               </div>
-            </section>
+            </details>
           </div>
           <div class="scm-admin-notif-template-editor-actions">
             <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-template-editor-close>Cerrar</button>
