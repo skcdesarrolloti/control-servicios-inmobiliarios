@@ -174,8 +174,8 @@ final class AdministrativeNotificationsService
         'email_template' => 'scm_email_copropiedad_soportes_pago_v1',
         'parameter_mode' => 'name_message_signature',
       ],
-      'scm_factura_disponible_v1' => [
-        'name' => 'scm_factura_disponible_v1',
+      'scm_factura_disponible_v2' => [
+        'name' => 'scm_factura_disponible_v2',
         'label' => 'Factura disponible',
         'language' => 'es_CO',
         'description' => 'Aviso para arrendatarios cuando tienen una nueva factura disponible.',
@@ -189,8 +189,8 @@ final class AdministrativeNotificationsService
         'header_media_env' => 'SCM_WHATSAPP_FACTURA_DISPONIBLE_IMAGE_URL',
         'header_required' => true,
       ],
-      'scm_cupon_disponible_v1' => [
-        'name' => 'scm_cupon_disponible_v1',
+      'scm_cupon_disponible_v2' => [
+        'name' => 'scm_cupon_disponible_v2',
         'label' => 'Cupón disponible',
         'language' => 'es_CO',
         'description' => 'Aviso para arrendatarios cuando el cupón de pago del mes fue generado.',
@@ -200,8 +200,8 @@ final class AdministrativeNotificationsService
         'email_template' => 'scm_email_cupon_disponible_v1',
         'parameter_mode' => 'name_signature',
       ],
-      'scm_aviso_siniestro_v1' => [
-        'name' => 'scm_aviso_siniestro_v1',
+      'scm_aviso_siniestro_v2' => [
+        'name' => 'scm_aviso_siniestro_v2',
         'label' => 'Aviso siniestro',
         'language' => 'es_CO',
         'description' => 'Aviso formal para arrendatarios por incumplimiento y posible reporte ante aseguradora.',
@@ -3338,13 +3338,16 @@ final class AdministrativeNotificationsService
   {
     $templateName = trim($templateName);
     $templateAliases = [
-      'nueva_factura' => 'scm_factura_disponible_v1',
-      'cupones' => 'scm_cupon_disponible_v1',
-      'scm_arrendatario_fecha_pago_v1' => 'scm_cupon_disponible_v1',
-      'scm_arrendatario_fecha_cobro_v1' => 'scm_cupon_disponible_v1',
-      'scm_mes_generado_pago_v1' => 'scm_cupon_disponible_v1',
-      'scm_arrendatario_aviso_pago_canon_v1' => 'scm_aviso_siniestro_v1',
-      'scm_arrendatario_gestion_cobro_v1' => 'scm_aviso_siniestro_v1',
+      'nueva_factura' => 'scm_factura_disponible_v2',
+      'scm_factura_disponible_v1' => 'scm_factura_disponible_v2',
+      'cupones' => 'scm_cupon_disponible_v2',
+      'scm_cupon_disponible_v1' => 'scm_cupon_disponible_v2',
+      'scm_arrendatario_fecha_pago_v1' => 'scm_cupon_disponible_v2',
+      'scm_arrendatario_fecha_cobro_v1' => 'scm_cupon_disponible_v2',
+      'scm_mes_generado_pago_v1' => 'scm_cupon_disponible_v2',
+      'scm_aviso_siniestro_v1' => 'scm_aviso_siniestro_v2',
+      'scm_arrendatario_aviso_pago_canon_v1' => 'scm_aviso_siniestro_v2',
+      'scm_arrendatario_gestion_cobro_v1' => 'scm_aviso_siniestro_v2',
     ];
     if (isset($templateAliases[$templateName])) {
       $templateName = $templateAliases[$templateName];

@@ -121,7 +121,7 @@ trait HandlesCollectionManagement
                 $nonSmsChannels,
                 'Cupón disponible',
                 $adminService->collectionDueDateReminderMessage($dueDay),
-                'scm_cupon_disponible_v1',
+                'scm_cupon_disponible_v2',
                 'scm_email_cupon_disponible_v1',
                 $notificationMeta,
                 AdministrativeNotificationsService::COLLECTION_SMS_MAX

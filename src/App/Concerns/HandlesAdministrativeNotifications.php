@@ -219,7 +219,7 @@ trait HandlesAdministrativeNotifications
               $nonSmsChannels,
               'Aviso importante sobre canon de arrendamiento',
               $queuedDetail,
-              'scm_aviso_siniestro_v1',
+              'scm_aviso_siniestro_v2',
               'scm_email_aviso_siniestro_v1',
               $notificationMeta,
               AdministrativeNotificationsService::COLLECTION_SMS_MAX
@@ -245,7 +245,7 @@ trait HandlesAdministrativeNotifications
                 $nonSmsChannels,
                 'Aviso importante sobre canon de arrendamiento',
                 $queuedDetail,
-                'scm_aviso_siniestro_v1',
+                'scm_aviso_siniestro_v2',
                 'scm_email_aviso_siniestro_v1',
                 AdministrativeNotificationsService::COLLECTION_SMS_MAX,
                 $notifyCodeudorKeys

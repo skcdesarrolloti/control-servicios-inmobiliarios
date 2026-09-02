@@ -2815,8 +2815,11 @@
         }
         return [
           "scm_factura_disponible_v1",
+          "scm_factura_disponible_v2",
           "scm_cupon_disponible_v1",
+          "scm_cupon_disponible_v2",
           "scm_aviso_siniestro_v1",
+          "scm_aviso_siniestro_v2",
         ].indexOf(String(option.value || "")) !== -1;
       }
 
