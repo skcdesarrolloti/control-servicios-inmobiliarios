@@ -6857,6 +6857,78 @@
   gap: 14px;
 }
 
+#scm-app .scm-admin-notif-selected-tools {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 24px 0;
+}
+
+#scm-app .scm-admin-notif-selected-list {
+  display: grid;
+  gap: 10px;
+  max-height: min(58vh, 560px);
+  overflow: auto;
+  padding: 14px 24px 24px;
+}
+
+#scm-app .scm-admin-notif-selected-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid #dbe7f4;
+  border-radius: 10px;
+  background: #fff;
+}
+
+#scm-app .scm-admin-notif-selected-info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+#scm-app .scm-admin-notif-selected-info strong,
+#scm-app .scm-admin-notif-selected-info small,
+#scm-app .scm-admin-notif-selected-info span,
+#scm-app .scm-admin-notif-selected-info em {
+  overflow-wrap: anywhere;
+}
+
+#scm-app .scm-admin-notif-selected-info strong {
+  color: #10233f;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+#scm-app .scm-admin-notif-selected-info small,
+#scm-app .scm-admin-notif-selected-info span,
+#scm-app .scm-admin-notif-selected-info em {
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+#scm-app .scm-admin-notif-selected-item button {
+  min-height: 32px;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  background: #fff5f5;
+  color: #b91c1c;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 7px 12px;
+}
+
+#scm-app .scm-admin-notif-selected-item button:hover,
+#scm-app .scm-admin-notif-selected-item button:focus-visible {
+  border-color: #f87171;
+  background: #fee2e2;
+  outline: none;
+}
+
 #scm-app .scm-admin-notif-collection-grid,
 #scm-app .scm-admin-notif-collection-follow {
   display: grid;
@@ -7602,6 +7674,15 @@
 
   #scm-app .scm-admin-notif-row-action {
     flex: 1 1 130px;
+  }
+
+  #scm-app .scm-admin-notif-selected-item {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  #scm-app .scm-admin-notif-selected-item button {
+    width: 100%;
   }
 
   #scm-app .scm-admin-notif-channel-group {

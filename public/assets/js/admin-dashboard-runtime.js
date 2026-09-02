@@ -2606,6 +2606,7 @@
       var importWrap = panel.querySelector("[data-admin-notif-import-wrap]");
       var importFileInput = panel.querySelector("[data-admin-notif-import-file]");
       var importClearBtn = panel.querySelector("[data-admin-notif-import-clear]");
+      var importReportBtn = panel.querySelector("[data-admin-notif-import-report]");
       var importResultEl = panel.querySelector("[data-admin-notif-import-result]");
       var importScopeEl = panel.querySelector("[data-admin-notif-import-scope]");
       var sendForm = panel.querySelector("[data-admin-notif-send]");
@@ -2659,6 +2660,12 @@
       var closeConfirmModal = panel.querySelector("[data-admin-notif-confirm]");
       var closeConfirmAcceptBtn = panel.querySelector("[data-admin-notif-confirm-accept]");
       var closeConfirmCancelBtn = panel.querySelector("[data-admin-notif-confirm-cancel]");
+      var openSelectedBtn = panel.querySelector("[data-admin-notif-open-selected]");
+      var selectedModal = panel.querySelector("[data-admin-notif-selected-modal]");
+      var selectedModalSummary = panel.querySelector("[data-admin-notif-selected-modal-summary]");
+      var selectedListEl = panel.querySelector("[data-admin-notif-selected-list]");
+      var closeSelectedBtn = panel.querySelector("[data-admin-notif-close-selected]");
+      var selectedClearBtn = panel.querySelector("[data-admin-notif-selected-clear]");
       var openCollectionBtn = panel.querySelector("[data-admin-notif-open-collection]");
       var collectionModal = panel.querySelector("[data-admin-notif-collection-modal]");
       var closeCollectionBtn = panel.querySelector("[data-admin-notif-close-collection]");
@@ -2695,6 +2702,8 @@
       var composerChannelMode = "";
       var composerSingleRecipient = false;
       var importedPayload = {};
+      var importReportRows = [];
+      var selectedDetails = new Map();
       var selectedCollectionContracts = [];
 
       var channelNames = {
@@ -2756,8 +2765,12 @@
 
       function resetImportState(clearFile) {
         importedPayload = {};
+        importReportRows = [];
         if (sendImportPayload) {
           sendImportPayload.value = "";
+        }
+        if (importReportBtn) {
+          importReportBtn.hidden = true;
         }
         if (importResultEl) {
           importResultEl.textContent = "";
@@ -2766,6 +2779,208 @@
         if (clearFile && importFileInput) {
           importFileInput.value = "";
         }
+      }
+
+      function recipientDetailsFromRow(row) {
+        if (!row) {
+          return null;
+        }
+        var id = String(row.getAttribute("data-admin-notif-recipient-id") || "").trim();
+        if (!id) {
+          return null;
+        }
+        return {
+          id: id,
+          name: String(row.getAttribute("data-admin-notif-recipient-name") || "Destinatario " + id),
+          type: String(row.getAttribute("data-admin-notif-recipient-type") || ""),
+          email: String(row.getAttribute("data-admin-notif-recipient-email") || ""),
+          phone: String(row.getAttribute("data-admin-notif-recipient-phone") || ""),
+          contract: String(row.getAttribute("data-admin-notif-recipient-contract") || ""),
+        };
+      }
+
+      function cacheRecipientDetailsFromRow(row) {
+        var detail = recipientDetailsFromRow(row);
+        if (detail) {
+          selectedDetails.set(detail.id, detail);
+        }
+        return detail;
+      }
+
+      function cacheVisibleRecipientDetails() {
+        recipientsEl.querySelectorAll("[data-admin-notif-recipient-row]").forEach(function (row) {
+          cacheRecipientDetailsFromRow(row);
+        });
+      }
+
+      function selectedDetail(id) {
+        var key = String(id || "").trim();
+        return selectedDetails.get(key) || {
+          id: key,
+          name: "Destinatario " + key,
+          type: "",
+          email: "",
+          phone: "",
+          contract: "",
+        };
+      }
+
+      function renderSelectedModal() {
+        if (!selectedListEl) {
+          return;
+        }
+        var usingAllFiltered = !!(allFiltered && allFiltered.checked);
+        if (selectedModalSummary) {
+          selectedModalSummary.textContent = usingAllFiltered
+            ? "Estas usando todos los resultados filtrados. Desactiva esa opcion para quitar destinatarios puntuales."
+            : "Revisa los destinatarios marcados y quita los que no deban recibir la notificacion.";
+        }
+        if (selectedClearBtn) {
+          selectedClearBtn.hidden = usingAllFiltered || selected.size === 0;
+        }
+        if (usingAllFiltered) {
+          selectedListEl.innerHTML =
+            '<div class="scm-admin-notif-empty"><strong>Todos los filtrados activos</strong><span>No hay una lista individual porque el envio tomara todos los resultados del filtro actual.</span></div>';
+          return;
+        }
+        if (selected.size === 0) {
+          selectedListEl.innerHTML =
+            '<div class="scm-admin-notif-empty"><strong>No hay destinatarios seleccionados.</strong><span>Marca contactos en la lista para revisarlos aqui.</span></div>';
+          return;
+        }
+        selectedListEl.innerHTML = Array.from(selected).map(function (id) {
+          var detail = selectedDetail(id);
+          var contactBits = [];
+          if (detail.email) {
+            contactBits.push("Email: " + detail.email);
+          }
+          if (detail.phone) {
+            contactBits.push("Celular: " + detail.phone);
+          }
+          return (
+            '<article class="scm-admin-notif-selected-item">' +
+            '<div class="scm-admin-notif-selected-info">' +
+            "<strong>" + escHtml(detail.name || ("Destinatario " + id)) + "</strong>" +
+            "<small>" + escHtml([detail.type, "ID " + id].filter(Boolean).join(" · ")) + "</small>" +
+            (contactBits.length ? "<span>" + escHtml(contactBits.join(" · ")) + "</span>" : "") +
+            (detail.contract ? "<em>" + escHtml(detail.contract) + "</em>" : "") +
+            "</div>" +
+            '<button type="button" data-admin-notif-selected-remove="' + escHtml(id) + '">Quitar</button>' +
+            "</article>"
+          );
+        }).join("");
+      }
+
+      function openSelectedModal() {
+        if (!selectedModal) {
+          return;
+        }
+        renderSelectedModal();
+        selectedModal.hidden = false;
+        selectedModal.classList.add("is-open");
+        document.body.classList.add("scm-admin-notif-modal-open");
+      }
+
+      function closeSelectedModal() {
+        if (!selectedModal) {
+          return;
+        }
+        selectedModal.hidden = true;
+        selectedModal.classList.remove("is-open");
+        if (!composerModal || composerModal.hidden) {
+          document.body.classList.remove("scm-admin-notif-modal-open");
+        }
+      }
+
+      function removeSelectedRecipient(id) {
+        var key = String(id || "").trim();
+        if (!key) {
+          return;
+        }
+        selected.delete(key);
+        recipientsEl.querySelectorAll("[data-admin-notif-recipient]").forEach(function (input) {
+          if (String(input.value || "") === key) {
+            input.checked = false;
+          }
+        });
+        if (allFiltered) {
+          allFiltered.checked = false;
+        }
+        syncContext();
+        renderSelectedModal();
+      }
+
+      function excelCell(value) {
+        return "<td>" + escHtml(String(value == null ? "" : value)) + "</td>";
+      }
+
+      function importReportFileName() {
+        var now = new Date();
+        var stamp = [
+          now.getFullYear(),
+          String(now.getMonth() + 1).padStart(2, "0"),
+          String(now.getDate()).padStart(2, "0"),
+          String(now.getHours()).padStart(2, "0"),
+          String(now.getMinutes()).padStart(2, "0"),
+        ].join("");
+        return "cruce-notificaciones-" + currentType() + "-" + stamp + ".xls";
+      }
+
+      function downloadImportReport() {
+        if (!Array.isArray(importReportRows) || importReportRows.length === 0) {
+          showToast("warning", "Primero importa un Excel para generar el reporte.");
+          return;
+        }
+        var columns = [
+          ["fila_util", "Fila util"],
+          ["estado_cruce", "Estado cruce"],
+          ["marcado_en_pagina", "Marcado en pagina"],
+          ["contrato_excel", "Contrato Excel"],
+          ["inmueble_simi_excel", "Inmueble SIMI Excel"],
+          ["canon_excel", "Canon Excel"],
+          ["periodo_excel", "Periodo Excel"],
+          ["direccion_excel", "Direccion Excel"],
+          ["destinatario_id", "ID destinatario"],
+          ["destinatario_nombre", "Nombre destinatario"],
+          ["destinatario_tipo", "Tipo destinatario"],
+          ["correo", "Correo"],
+          ["celular", "Celular"],
+          ["contrato_sistema", "Contrato en sistema"],
+          ["observacion", "Observacion"],
+        ];
+        var rows = importReportRows.map(function (row) {
+          var copy = Object.assign({}, row || {});
+          var id = String(copy.destinatario_id || "").trim();
+          if (id) {
+            copy.marcado_en_pagina = selected.has(id) ? "Si" : "No";
+            if (!selected.has(id) && copy.estado_cruce === "Encontrado") {
+              copy.observacion = "Encontrado, pero desmarcado en la pagina.";
+            }
+          }
+          return "<tr>" + columns.map(function (column) {
+            return excelCell(copy[column[0]]);
+          }).join("") + "</tr>";
+        }).join("");
+        var header = "<tr>" + columns.map(function (column) {
+          return "<th>" + escHtml(column[1]) + "</th>";
+        }).join("") + "</tr>";
+        var html =
+          '<html><head><meta charset="UTF-8"></head><body>' +
+          '<table border="1">' +
+          header +
+          rows +
+          "</table></body></html>";
+        var blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+        link.href = url;
+        link.download = importReportFileName();
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(function () {
+          URL.revokeObjectURL(url);
+        }, 1000);
       }
 
       function currentContractStatus() {
@@ -3538,6 +3753,11 @@
         if (!value) {
           return false;
         }
+        recipientsEl.querySelectorAll("[data-admin-notif-recipient-row]").forEach(function (row) {
+          if (String(row.getAttribute("data-admin-notif-recipient-id") || "") === value) {
+            cacheRecipientDetailsFromRow(row);
+          }
+        });
         selected.clear();
         selected.add(value);
         if (allFiltered) {
@@ -3633,6 +3853,12 @@
         }
         if (collectionSelectedCountEl) {
           collectionSelectedCountEl.textContent = String(selected.size);
+        }
+        if (openSelectedBtn) {
+          openSelectedBtn.disabled = selected.size === 0 && !(allFiltered && allFiltered.checked);
+        }
+        if (selectedModal && !selectedModal.hidden) {
+          renderSelectedModal();
         }
         if (openCollectionBtn) {
           var canCollection = currentType() === "arrendatarios_activos";
@@ -4055,6 +4281,7 @@
             }
             var data = json.data || {};
             recipientsEl.innerHTML = data.html || "";
+            cacheVisibleRecipientDetails();
             if (paginationEl) {
               paginationEl.innerHTML = data.pagination || "";
             }
@@ -4108,6 +4335,9 @@
         if (paginationEl) {
           paginationEl.innerHTML = "";
         }
+        if (importReportBtn) {
+          importReportBtn.hidden = true;
+        }
         if (importResultEl) {
           importResultEl.textContent =
             "Importando y cruzando datos solo en " +
@@ -4129,6 +4359,7 @@
             }
             var data = json.data || {};
             importedPayload = data.payload || {};
+            importReportRows = Array.isArray(data.report_rows) ? data.report_rows : [];
             selected.clear();
             Object.keys(importedPayload).forEach(function (id) {
               selected.add(String(id));
@@ -4137,6 +4368,10 @@
               allFiltered.checked = false;
             }
             recipientsEl.innerHTML = data.html || "";
+            cacheVisibleRecipientDetails();
+            if (importReportBtn) {
+              importReportBtn.hidden = importReportRows.length === 0;
+            }
             if (paginationEl) {
               paginationEl.innerHTML =
                 '<span class="scm-admin-notif-page-info">Importados seleccionados: ' +
@@ -4159,6 +4394,10 @@
           })
           .catch(function (err) {
             importedPayload = {};
+            importReportRows = [];
+            if (importReportBtn) {
+              importReportBtn.hidden = true;
+            }
             recipientsEl.innerHTML =
               '<div class="scm-admin-notif-empty is-error"><strong>No se pudo importar.</strong><span>' +
               escHtml(err.message || "Error desconocido") +
@@ -4211,6 +4450,39 @@
             if (shouldCancel) {
               hideCloseConfirm();
             }
+          });
+        }
+        if (openSelectedBtn) {
+          openSelectedBtn.addEventListener("click", openSelectedModal);
+        }
+        if (closeSelectedBtn) {
+          closeSelectedBtn.addEventListener("click", closeSelectedModal);
+        }
+        if (selectedModal) {
+          selectedModal.addEventListener("click", function (event) {
+            var removeBtn = event.target && event.target.closest
+              ? event.target.closest("[data-admin-notif-selected-remove]")
+              : null;
+            if (removeBtn) {
+              event.preventDefault();
+              removeSelectedRecipient(removeBtn.getAttribute("data-admin-notif-selected-remove") || "");
+              return;
+            }
+            if (event.target && event.target.classList && event.target.classList.contains("scm-admin-notif-modal-backdrop")) {
+              event.preventDefault();
+              closeSelectedModal();
+            }
+          });
+        }
+        if (selectedClearBtn) {
+          selectedClearBtn.addEventListener("click", function () {
+            selected.clear();
+            if (allFiltered) {
+              allFiltered.checked = false;
+            }
+            updateVisibleChecks();
+            syncContext();
+            renderSelectedModal();
           });
         }
         if (openCollectionBtn) {
@@ -4391,6 +4663,8 @@
           }
           var value = String(input.value || "");
           if (input.checked) {
+            var row = input.closest ? input.closest("[data-admin-notif-recipient-row]") : null;
+            cacheRecipientDetailsFromRow(row);
             selected.add(value);
           } else {
             selected.delete(value);
@@ -4413,6 +4687,8 @@
               input.checked = shouldSelect;
               var value = String(input.value || "");
               if (shouldSelect) {
+                var row = input.closest ? input.closest("[data-admin-notif-recipient-row]") : null;
+                cacheRecipientDetailsFromRow(row);
                 selected.add(value);
               } else {
                 selected.delete(value);
@@ -4441,6 +4717,9 @@
             syncContext();
             loadRecipients(1);
           });
+        }
+        if (importReportBtn) {
+          importReportBtn.addEventListener("click", downloadImportReport);
         }
 
         if (paginationEl) {

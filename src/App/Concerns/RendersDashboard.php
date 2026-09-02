@@ -1973,6 +1973,7 @@ trait RendersDashboard
           <div class="scm-admin-notif-import-controls">
             <input type="file" name="file" accept=".xls,.xlsx,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-admin-notif-import-file>
             <button type="submit" class="scm-btn-primary btn btn-primary">Importar Excel</button>
+            <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-import-report hidden>Descargar cruce</button>
             <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-import-clear>Quitar importaci&oacute;n</button>
           </div>
           <p class="scm-admin-notif-import-result" data-admin-notif-import-result aria-live="polite"></p>
@@ -2068,6 +2069,7 @@ trait RendersDashboard
                 <h4><strong data-admin-notif-selected-count>0</strong> seleccionados</h4>
                 <p>Escoge canales, plantilla y revisa la vista previa antes de encolar.</p>
               </div>
+              <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-open-selected>Ver seleccionados</button>
             </div>
 
             <div class="scm-admin-notif-channel-group" role="group" aria-label="Canales">
@@ -2181,6 +2183,24 @@ trait RendersDashboard
             </div>
           </section>
         </div>
+      </div>
+
+      <div class="scm-admin-notif-modal scm-admin-notif-selected-modal" data-admin-notif-selected-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-selected-modal-title">
+        <div class="scm-admin-notif-modal-backdrop" aria-hidden="true"></div>
+        <section class="scm-admin-notif-card scm-admin-notif-modal-panel">
+          <div class="scm-admin-notif-modal-head">
+            <div class="scm-admin-notif-modal-titleblock">
+              <span class="scm-calendar-action-kicker">Destinatarios</span>
+              <h4 id="scm-admin-notif-selected-modal-title">Seleccionados para enviar</h4>
+              <p data-admin-notif-selected-modal-summary>Revisa los destinatarios marcados y quita los que no deban recibir la notificaci&oacute;n.</p>
+            </div>
+            <button type="button" class="scm-modal-close" data-admin-notif-close-selected aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
+          </div>
+          <div class="scm-admin-notif-selected-tools">
+            <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-selected-clear>Deseleccionar todos</button>
+          </div>
+          <div class="scm-admin-notif-selected-list" data-admin-notif-selected-list></div>
+        </section>
       </div>
 
     </div>
