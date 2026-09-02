@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SCM\Modules\AdministrativeNotifications;
 
-use SCM\Core\App;
 use SCM\Core\Auth;
 use SCM\Core\Database;
 use SCM\Support\EmailTemplate;
@@ -21,7 +20,6 @@ final class AdministrativeNotificationsService
   public const SMS_PREFIX = 'SKC SuCasa Inmobiliaria ';
   public const DEFAULT_EMAIL_TEMPLATE = 'scm_email_generica_v1';
   public const DEFAULT_WHATSAPP_TEMPLATE = 'scm_notificacion_general_v1';
-  public const TEMPLATE_OVERRIDES_SETTING = 'admin_notification_template_overrides';
 
   private Database $db;
   private SchemaInspector $schema;
@@ -176,45 +174,12 @@ final class AdministrativeNotificationsService
         'email_template' => 'scm_email_copropiedad_soportes_pago_v1',
         'parameter_mode' => 'name_message_signature',
       ],
-      'scm_arrendatario_aviso_pago_canon_v1' => [
-        'name' => 'scm_arrendatario_aviso_pago_canon_v1',
-        'label' => 'Aviso pago canon',
-        'language' => 'es_CO',
-        'description' => 'Aviso formal para arrendatarios por incumplimiento en el pago del canon.',
-        'body' => "Estimado(a) {{1}}, reciba un cordial saludo.\n\nLe recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.\n\nUna vez activado el proceso con la aseguradora, se puede generar un recargo adicional del 50% sobre el valor del canon adeudado, además de los costos y gestiones asociados al trámite.\n\nPara evitar mayores consecuencias económicas y administrativas, le solicitamos realizar el pago de manera inmediata.\n\nAtentamente,\n{{2}}",
-        'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
-        'actors' => array_merge($arrendatarios, $funcionarios),
-        'email_template' => 'scm_email_arrendatario_aviso_pago_canon_v1',
-        'parameter_mode' => 'name_signature',
-      ],
-      'scm_arrendatario_gestion_cobro_v1' => [
-        'name' => 'scm_arrendatario_gestion_cobro_v1',
-        'label' => 'Gestión registrada',
-        'language' => 'es_CO',
-        'description' => 'Aviso para arrendatarios cuando se registra una gestión operativa relacionada con su contrato.',
-        'body' => "Buen día, {{1}}.\n\nLe informamos que se registró una gestión relacionada con su contrato de arrendamiento.\n\nDetalle de la gestión:\n\n{{2}}\n\nSi ya realizó el pago o tiene alguna novedad, por favor comuníquese con nosotros.\n\nAtentamente,\n{{3}}",
-        'variables' => ['Nombre del arrendatario', 'Tipo de gestión y observación', 'Firma del funcionario: Nombre - Cargo - Celular'],
-        'actors' => array_merge($arrendatarios, $funcionarios),
-        'email_template' => 'scm_email_arrendatario_gestion_cobro_v1',
-        'parameter_mode' => 'name_message_signature',
-      ],
-      'scm_arrendatario_fecha_pago_v1' => [
-        'name' => 'scm_arrendatario_fecha_pago_v1',
-        'label' => 'Notificación fecha de pago',
-        'language' => 'es_CO',
-        'description' => 'Notificación informativa para arrendatarios en las fechas de pago 12, 22, 26 y 31.',
-        'body' => "Buen día, {{1}}.\n\nLe recordamos que hoy, día {{2}}, corresponde su {{3}} fecha de pago del mes. 📅\n\n💰 Recuerde que el valor correspondiente a pagar se encuentra indicado en su cupón de pago.\n\nAgradecemos realizar su pago oportunamente y por el valor establecido en el cupón. 🙏\n\nAtentamente,\n{{4}}",
-        'variables' => ['Nombre del arrendatario', 'Día de pago: 12, 22, 26 o 31', 'Fecha ordinal: primera, segunda, tercera o última', 'Firma del funcionario: Nombre - Cargo - Celular'],
-        'actors' => array_merge($arrendatarios, $funcionarios),
-        'email_template' => 'scm_email_arrendatario_fecha_pago_v1',
-        'parameter_mode' => 'collection_due_date',
-      ],
       'scm_factura_disponible_v1' => [
         'name' => 'scm_factura_disponible_v1',
         'label' => 'Factura disponible',
         'language' => 'es_CO',
-        'description' => 'Aviso para arrendatarios cuando se generó el cupón o factura disponible.',
-        'body' => "Estimado(a) {{1}}, hemos generado tu cupón de pago, el cual cuenta con 4 fechas establecidas cada mes.\n\n🗓️ 12 de cada mes\n🗓️ 22 de cada mes\n🗓️ 26 de cada mes\n🗓️ 31 de cada mes\n\nEn el cupón encontrarás el valor específico correspondiente a cada fecha de pago.\n\nTe agradecemos revisar tu cupón mensual y realizar el pago en la fecha y por el valor allí establecidos.\n\nAtentamente,\n{{2}}",
+        'description' => 'Aviso para arrendatarios cuando tienen una nueva factura disponible.',
+        'body' => "Estimado(a) {{1}},\n\n¡Tienes una nueva factura disponible! Ya puedes consultarla y en los próximos días estará habilitada para que puedas realizar tu pago.\n\nEstoy para servirte.\n\nAtentamente,\n{{2}}\n\n🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro Bot Guardián desde el botón de abajo.\n🌐 Recuerda que puedes ingresar a tu menú personal en nuestra página web para consultar información y gestionar tus servicios.",
         'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_factura_disponible_v1',
@@ -224,20 +189,31 @@ final class AdministrativeNotificationsService
         'header_media_env' => 'SCM_WHATSAPP_FACTURA_DISPONIBLE_IMAGE_URL',
         'header_required' => true,
       ],
-      'scm_mes_generado_pago_v1' => [
-        'name' => 'scm_mes_generado_pago_v1',
-        'label' => 'Mes generado para pago',
+      'scm_cupon_disponible_v1' => [
+        'name' => 'scm_cupon_disponible_v1',
+        'label' => 'Cupón disponible',
         'language' => 'es_CO',
-        'description' => 'Aviso para arrendatarios cuando el mes fue generado y queda disponible para pago.',
-        'body' => "Hola {{1}}, tu mes ha sido generado exitosamente.\n\nPuedes realizar el pago a través del botón de pago disponible o por ventanilla en Banco Caja Social, ingresando tu cédula o NIT sin dígito de verificación.\n\nCuando realices el pago, por favor envíanos el soporte para validarlo en el sistema.\n\nEstoy para servirte.\n\nAtentamente,\n{{2}}",
+        'description' => 'Aviso para arrendatarios cuando el cupón de pago del mes fue generado.',
+        'body' => "Estimado(a) {{1}}, tu mes ha sido generado exitosamente.\n\nHemos generado tu cupón de pago, el cual cuenta con 4 fechas establecidas cada mes:\n📅 12 de cada mes\n📅 22 de cada mes\n📅 26 de cada mes\n📅 31 de cada mes\n\nEn el cupón encontrarás el valor específico correspondiente a cada fecha. Te agradecemos revisar tu cupón mensual y realizar el pago en la fecha y por el valor allí establecidos.\n\nPuedes realizar el pago a través del botón de pago disponible o por ventanilla en Banco Caja Social, ingresando tu cédula o NIT sin dígito de verificación.\n\nCuando realices tu pago, por favor envíanos el soporte para validarlo en el sistema.\n\nEstoy para servirte.\n\nAtentamente,\n{{2}}\n\n🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro Bot Guardián desde el botón de abajo.",
         'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_mes_generado_pago_v1',
         'parameter_mode' => 'name_signature',
       ],
+      'scm_aviso_siniestro_v1' => [
+        'name' => 'scm_aviso_siniestro_v1',
+        'label' => 'Aviso siniestro',
+        'language' => 'es_CO',
+        'description' => 'Aviso formal para arrendatarios por incumplimiento y posible reporte ante aseguradora.',
+        'body' => "Estimado(a) *{{1}}*, reciba un cordial saludo.\n\nLe recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.\n\nUna vez activado el proceso con la aseguradora, se puede generar un recargo adicional del 50% sobre el valor del canon adeudado, además de los costos y gestiones asociados al trámite.\n\n*Para evitar mayores consecuencias económicas y administrativas, le solicitamos realizar el pago de manera inmediata.*\n\nAtentamente,\n*{{2}}*\n\n🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro *Bot Guardián* desde el botón de abajo.\n🌐 Recuerda que puedes ingresar a tu *menú personal en nuestra página web* para consultar información y gestionar tus servicios.",
+        'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'actors' => array_merge($arrendatarios, $funcionarios),
+        'email_template' => 'scm_email_arrendatario_aviso_pago_canon_v1',
+        'parameter_mode' => 'name_signature',
+      ],
     ];
 
-    return $this->applyTemplateOverrides('whatsapp', $templates);
+    return $templates;
   }
 
   /** @return array<string,array{name:string,label:string,subject:string,body:string,description:string,source:string,message_only:bool,editable_message:string}> */
@@ -367,130 +343,7 @@ final class AdministrativeNotificationsService
       // En entornos de prueba o sin JetEngine se mantienen las plantillas de sistema.
     }
 
-    return $this->applyTemplateOverrides('email', $templates);
-  }
-
-  /**
-   * @param array<string,mixed> $input
-   */
-  public function saveTemplateOverrides(array $input): void
-  {
-    $allowed = [
-      'whatsapp' => array_fill_keys(array_keys($this->whatsappTemplates()), true),
-      'email' => array_fill_keys(array_keys($this->emailTemplates()), true),
-    ];
-    $next = [];
-
-    foreach (['whatsapp', 'email'] as $channel) {
-      $rows = is_array($input[$channel] ?? null) ? $input[$channel] : [];
-      foreach ($rows as $name => $values) {
-        $name = trim((string) $name);
-        if ($name === '' || empty($allowed[$channel][$name]) || !is_array($values)) {
-          continue;
-        }
-
-        $override = [];
-        $label = $this->sanitizeTemplateOverrideText($values['label'] ?? '', 120, false);
-        $description = $this->sanitizeTemplateOverrideText($values['description'] ?? '', 700, true);
-        if ($label !== '') {
-          $override['label'] = $label;
-        }
-        if ($description !== '') {
-          $override['description'] = $description;
-        }
-
-        if ($channel === 'whatsapp') {
-          $technicalName = $this->sanitizeWhatsappTemplateName($values['name'] ?? $values['technical_name'] ?? '');
-          if ($technicalName !== '') {
-            $override['name'] = $technicalName;
-          }
-          $variablesRaw = (string) ($values['variables'] ?? '');
-          $variables = array_values(array_filter(array_map(
-            fn(string $value): string => $this->sanitizeTemplateOverrideText($value, 180, false),
-            preg_split('/\r\n|\r|\n/', $variablesRaw) ?: []
-          ), static fn(string $value): bool => $value !== ''));
-          if ($variables !== []) {
-            $override['variables'] = array_slice($variables, 0, 10);
-          }
-        } else {
-          $subject = $this->sanitizeTemplateOverrideText($values['subject'] ?? '', 180, false);
-          $preview = $this->sanitizeTemplateOverrideText($values['preview_excerpt'] ?? '', 700, true);
-          if ($subject !== '') {
-            $override['subject'] = $subject;
-          }
-          if ($preview !== '') {
-            $override['preview_excerpt'] = $preview;
-          }
-        }
-
-        if ($override !== []) {
-          $next[$channel][$name] = $override;
-        }
-      }
-    }
-
-    App::settings()->set(self::TEMPLATE_OVERRIDES_SETTING, $next, Auth::userId());
-  }
-
-  /**
-   * @param array<string,array<string,mixed>> $templates
-   * @return array<string,array<string,mixed>>
-   */
-  private function applyTemplateOverrides(string $channel, array $templates): array
-  {
-    $overrides = $this->templateOverrides();
-    $channelOverrides = is_array($overrides[$channel] ?? null) ? $overrides[$channel] : [];
-    foreach ($channelOverrides as $name => $override) {
-      $name = trim((string) $name);
-      if ($name === '' || !isset($templates[$name]) || !is_array($override)) {
-        continue;
-      }
-      $textFields = $channel === 'whatsapp'
-        ? ['name', 'label', 'description']
-        : ['label', 'description', 'subject', 'preview_excerpt'];
-      foreach ($textFields as $field) {
-        $value = trim((string) ($override[$field] ?? ''));
-        if ($value !== '') {
-          $templates[$name][$field] = $value;
-        }
-      }
-      if (is_array($override['variables'] ?? null)) {
-        $variables = array_values(array_filter(array_map('strval', $override['variables']), static fn(string $value): bool => trim($value) !== ''));
-        if ($variables !== []) {
-          $templates[$name]['variables'] = $variables;
-        }
-      }
-    }
-
     return $templates;
-  }
-
-  /** @return array<string,mixed> */
-  private function templateOverrides(): array
-  {
-    try {
-      $raw = App::settings()->get(self::TEMPLATE_OVERRIDES_SETTING, []);
-    } catch (\Throwable) {
-      return [];
-    }
-
-    return is_array($raw) ? $raw : [];
-  }
-
-  private function sanitizeTemplateOverrideText($value, int $maxLength, bool $multiline): string
-  {
-    $text = html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    $text = preg_replace($multiline ? '/[ \t]+/' : '/\s+/', ' ', $text) ?? '';
-    $text = trim($text);
-    return mb_substr($text, 0, max(1, $maxLength), 'UTF-8');
-  }
-
-  private function sanitizeWhatsappTemplateName($value): string
-  {
-    $name = strtolower(trim((string) $value));
-    $name = preg_replace('/[^a-z0-9_]+/', '_', $name) ?? '';
-    $name = trim($name, '_');
-    return mb_substr($name, 0, 120, 'UTF-8');
   }
 
   /**
@@ -3514,8 +3367,12 @@ final class AdministrativeNotificationsService
     $templateName = trim($templateName);
     $templateAliases = [
       'nueva_factura' => 'scm_factura_disponible_v1',
-      'cupones' => 'scm_arrendatario_fecha_pago_v1',
-      'scm_arrendatario_fecha_cobro_v1' => 'scm_arrendatario_fecha_pago_v1',
+      'cupones' => 'scm_cupon_disponible_v1',
+      'scm_arrendatario_fecha_pago_v1' => 'scm_cupon_disponible_v1',
+      'scm_arrendatario_fecha_cobro_v1' => 'scm_cupon_disponible_v1',
+      'scm_mes_generado_pago_v1' => 'scm_cupon_disponible_v1',
+      'scm_arrendatario_aviso_pago_canon_v1' => 'scm_aviso_siniestro_v1',
+      'scm_arrendatario_gestion_cobro_v1' => 'scm_aviso_siniestro_v1',
     ];
     if (isset($templateAliases[$templateName])) {
       $templateName = $templateAliases[$templateName];

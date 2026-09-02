@@ -119,10 +119,10 @@ trait HandlesCollectionManagement
                 'arrendatarios_activos',
                 $notifyIds,
                 $nonSmsChannels,
-                'Notificación de fecha de pago',
+                'Cupón disponible',
                 $adminService->collectionDueDateReminderMessage($dueDay),
-                'scm_arrendatario_fecha_pago_v1',
-                'scm_email_arrendatario_fecha_pago_v1',
+                'scm_cupon_disponible_v1',
+                'scm_email_mes_generado_pago_v1',
                 $notificationMeta,
                 AdministrativeNotificationsService::COLLECTION_SMS_MAX
               ));

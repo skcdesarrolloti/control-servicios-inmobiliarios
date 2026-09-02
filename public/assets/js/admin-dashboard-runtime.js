@@ -174,8 +174,6 @@
     var actionAdminNotificationsSend = actions.admin_notifications_send || "";
     var actionAdminNotificationsImport =
       actions.admin_notifications_import || "";
-    var actionAdminNotificationsTemplatesSave =
-      actions.admin_notifications_templates_save || "";
     var actionAdminNotificationsCollection =
       actions.admin_notifications_collection || "";
     var actionAdminNotificationsCollectionOptions =
@@ -2610,10 +2608,6 @@
       var importClearBtn = panel.querySelector("[data-admin-notif-import-clear]");
       var importResultEl = panel.querySelector("[data-admin-notif-import-result]");
       var importScopeEl = panel.querySelector("[data-admin-notif-import-scope]");
-      var templateEditorOpenBtn = panel.querySelector("[data-admin-notif-template-editor-open]");
-      var templateEditorModal = panel.querySelector("[data-admin-notif-template-editor-modal]");
-      var templateEditorForm = panel.querySelector("[data-admin-notif-template-editor]");
-      var templateEditorResultEl = panel.querySelector("[data-admin-notif-template-editor-result]");
       var sendForm = panel.querySelector("[data-admin-notif-send]");
       var typeSelect = panel.querySelector("[data-admin-notif-type]");
       var queryInput = panel.querySelector("[data-admin-notif-query]");
@@ -3986,78 +3980,6 @@
         smsCounter.classList.toggle("is-over", smsChecked && smsText.length > 160);
       }
 
-      function openTemplateEditor() {
-        if (!templateEditorModal) {
-          return;
-        }
-        templateEditorModal.hidden = false;
-        templateEditorModal.classList.add("is-open");
-        if (templateEditorOpenBtn) {
-          templateEditorOpenBtn.setAttribute("aria-expanded", "true");
-        }
-        document.body.classList.add("scm-admin-notif-modal-open");
-        setTimeout(function () {
-          var field = templateEditorForm
-            ? templateEditorForm.querySelector("input, textarea")
-            : templateEditorModal.querySelector("button");
-          if (field) {
-            field.focus();
-          }
-        }, 30);
-      }
-
-      function closeTemplateEditor() {
-        if (!templateEditorModal) {
-          return;
-        }
-        templateEditorModal.hidden = true;
-        templateEditorModal.classList.remove("is-open");
-        if (templateEditorOpenBtn) {
-          templateEditorOpenBtn.setAttribute("aria-expanded", "false");
-          templateEditorOpenBtn.focus();
-        }
-        document.body.classList.remove("scm-admin-notif-modal-open");
-      }
-
-      function saveTemplateEditor() {
-        if (!templateEditorForm || !actionAdminNotificationsTemplatesSave) {
-          showToast("error", "El editor de plantillas no esta disponible.");
-          return;
-        }
-        var fd = new FormData(templateEditorForm);
-        fd.set("action", actionAdminNotificationsTemplatesSave);
-        fd.set("nonce", nonce);
-        if (templateEditorResultEl) {
-          templateEditorResultEl.textContent = "Guardando...";
-        }
-        fetchWithTimeout(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
-          .then(function (response) {
-            return response.json();
-          })
-          .then(function (json) {
-            if (!json || !json.success) {
-              throw new Error(
-                (json && json.data && json.data.message) ||
-                  "No se pudieron guardar las plantillas.",
-              );
-            }
-            showToast("success", (json.data && json.data.message) || "Plantillas actualizadas.");
-            var host = root.querySelector("#scm-panel-admin-notificaciones");
-            if (host) {
-              host.setAttribute("data-scm-loaded", "0");
-            }
-            closeTemplateEditor();
-            adminNotificationsPanelPromise = null;
-            loadAdminNotificationsPanel();
-          })
-          .catch(function (error) {
-            if (templateEditorResultEl) {
-              templateEditorResultEl.textContent = error.message || "No se pudo guardar.";
-            }
-            showToast("error", error.message || "No se pudieron guardar las plantillas.");
-          });
-      }
-
       function loadRecipients(page) {
         currentPage = page || 1;
         recipientsRequestId += 1;
@@ -4470,21 +4392,6 @@
             importRecipientsFromFile();
           });
         }
-        if (templateEditorForm) {
-          templateEditorForm.addEventListener("submit", function (event) {
-            event.preventDefault();
-            saveTemplateEditor();
-          });
-        }
-        if (templateEditorOpenBtn) {
-          templateEditorOpenBtn.addEventListener("click", openTemplateEditor);
-        }
-        panel.querySelectorAll("[data-admin-notif-template-editor-close]").forEach(function (btn) {
-          btn.addEventListener("click", function (event) {
-            event.preventDefault();
-            closeTemplateEditor();
-          });
-        });
         if (importClearBtn) {
           importClearBtn.addEventListener("click", function () {
             resetImportState(true);
