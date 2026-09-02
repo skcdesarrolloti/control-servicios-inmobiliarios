@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\Modules\AdministrativeNotifications;
 
+use SCM\Core\App;
 use SCM\Core\Auth;
 use SCM\Core\Database;
 use SCM\Support\EmailTemplate;
@@ -20,6 +21,7 @@ final class AdministrativeNotificationsService
   public const SMS_PREFIX = 'SKC SuCasa Inmobiliaria ';
   public const DEFAULT_EMAIL_TEMPLATE = 'scm_email_generica_v1';
   public const DEFAULT_WHATSAPP_TEMPLATE = 'scm_notificacion_general_v1';
+  public const TEMPLATE_OVERRIDES_SETTING = 'admin_notification_template_overrides';
 
   private Database $db;
   private SchemaInspector $schema;
@@ -140,7 +142,7 @@ final class AdministrativeNotificationsService
     $copropiedades = ['copropiedades_activas', 'copropiedades_no_activas'];
     $funcionarios = ['funcionarios'];
 
-    return [
+    $templates = [
       self::DEFAULT_WHATSAPP_TEMPLATE => [
         'name' => self::DEFAULT_WHATSAPP_TEMPLATE,
         'label' => 'Notificación general',
@@ -234,12 +236,14 @@ final class AdministrativeNotificationsService
         'parameter_mode' => 'name_signature',
       ],
     ];
+
+    return $this->applyTemplateOverrides('whatsapp', $templates);
   }
 
   /** @return array<string,array{name:string,label:string,subject:string,body:string,description:string,source:string,message_only:bool,editable_message:string}> */
   public function emailTemplates(): array
   {
-    return [
+    $templates = [
       self::DEFAULT_EMAIL_TEMPLATE => [
         'name' => self::DEFAULT_EMAIL_TEMPLATE,
         'label' => 'Generica',
@@ -356,6 +360,122 @@ final class AdministrativeNotificationsService
         'preview_excerpt' => 'Envio de soportes de pago con detalle editable.',
       ],
     ];
+
+    try {
+      $templates += $this->storedEmailTemplates();
+    } catch (\Throwable) {
+      // En entornos de prueba o sin JetEngine se mantienen las plantillas de sistema.
+    }
+
+    return $this->applyTemplateOverrides('email', $templates);
+  }
+
+  /**
+   * @param array<string,mixed> $input
+   */
+  public function saveTemplateOverrides(array $input): void
+  {
+    $allowed = [
+      'whatsapp' => array_fill_keys(array_keys($this->whatsappTemplates()), true),
+      'email' => array_fill_keys(array_keys($this->emailTemplates()), true),
+    ];
+    $next = [];
+
+    foreach (['whatsapp', 'email'] as $channel) {
+      $rows = is_array($input[$channel] ?? null) ? $input[$channel] : [];
+      foreach ($rows as $name => $values) {
+        $name = trim((string) $name);
+        if ($name === '' || empty($allowed[$channel][$name]) || !is_array($values)) {
+          continue;
+        }
+
+        $override = [];
+        $label = $this->sanitizeTemplateOverrideText($values['label'] ?? '', 120, false);
+        $description = $this->sanitizeTemplateOverrideText($values['description'] ?? '', 700, true);
+        if ($label !== '') {
+          $override['label'] = $label;
+        }
+        if ($description !== '') {
+          $override['description'] = $description;
+        }
+
+        if ($channel === 'whatsapp') {
+          $variablesRaw = (string) ($values['variables'] ?? '');
+          $variables = array_values(array_filter(array_map(
+            fn(string $value): string => $this->sanitizeTemplateOverrideText($value, 180, false),
+            preg_split('/\r\n|\r|\n/', $variablesRaw) ?: []
+          ), static fn(string $value): bool => $value !== ''));
+          if ($variables !== []) {
+            $override['variables'] = array_slice($variables, 0, 10);
+          }
+        } else {
+          $subject = $this->sanitizeTemplateOverrideText($values['subject'] ?? '', 180, false);
+          $preview = $this->sanitizeTemplateOverrideText($values['preview_excerpt'] ?? '', 700, true);
+          if ($subject !== '') {
+            $override['subject'] = $subject;
+          }
+          if ($preview !== '') {
+            $override['preview_excerpt'] = $preview;
+          }
+        }
+
+        if ($override !== []) {
+          $next[$channel][$name] = $override;
+        }
+      }
+    }
+
+    App::settings()->set(self::TEMPLATE_OVERRIDES_SETTING, $next, Auth::userId());
+  }
+
+  /**
+   * @param array<string,array<string,mixed>> $templates
+   * @return array<string,array<string,mixed>>
+   */
+  private function applyTemplateOverrides(string $channel, array $templates): array
+  {
+    $overrides = $this->templateOverrides();
+    $channelOverrides = is_array($overrides[$channel] ?? null) ? $overrides[$channel] : [];
+    foreach ($channelOverrides as $name => $override) {
+      $name = trim((string) $name);
+      if ($name === '' || !isset($templates[$name]) || !is_array($override)) {
+        continue;
+      }
+      foreach (['label', 'description', 'subject', 'preview_excerpt'] as $field) {
+        $value = trim((string) ($override[$field] ?? ''));
+        if ($value !== '') {
+          $templates[$name][$field] = $value;
+        }
+      }
+      if (is_array($override['variables'] ?? null)) {
+        $variables = array_values(array_filter(array_map('strval', $override['variables']), static fn(string $value): bool => trim($value) !== ''));
+        if ($variables !== []) {
+          $templates[$name]['variables'] = $variables;
+        }
+      }
+    }
+
+    return $templates;
+  }
+
+  /** @return array<string,mixed> */
+  private function templateOverrides(): array
+  {
+    try {
+      $raw = App::settings()->get(self::TEMPLATE_OVERRIDES_SETTING, []);
+    } catch (\Throwable) {
+      return [];
+    }
+
+    return is_array($raw) ? $raw : [];
+  }
+
+  private function sanitizeTemplateOverrideText($value, int $maxLength, bool $multiline): string
+  {
+    $text = html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = preg_replace($multiline ? '/[ \t]+/' : '/\s+/', ' ', $text) ?? '';
+    $text = trim($text);
+    return mb_substr($text, 0, max(1, $maxLength), 'UTF-8');
   }
 
   /**

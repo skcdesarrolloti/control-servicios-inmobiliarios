@@ -402,6 +402,7 @@ trait RendersDashboard
         'admin_notifications_panel' => self::AJAX_ADMIN_NOTIFICATIONS_PANEL,
         'admin_notifications_send' => self::AJAX_ADMIN_NOTIFICATIONS_SEND,
         'admin_notifications_import' => self::AJAX_ADMIN_NOTIFICATIONS_IMPORT,
+        'admin_notifications_templates_save' => self::AJAX_ADMIN_NOTIFICATIONS_TEMPLATES_SAVE,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
@@ -1979,6 +1980,8 @@ trait RendersDashboard
         </form>
       </section>
 
+      <?php echo $this->render_admin_notification_template_editor($whatsappTemplates, $emailTemplates); ?>
+
       <section class="scm-admin-notif-card scm-admin-notif-filter-card">
         <form data-admin-notif-search autocomplete="off">
           <input type="hidden" id="scm-admin-notif-type" name="type" value="<?php echo esc_attr($firstType); ?>" data-admin-notif-type>
@@ -2121,6 +2124,7 @@ trait RendersDashboard
                       data-actors="<?php echo esc_attr($templateActors); ?>"
                       data-template-mode="<?php echo esc_attr((string) ($template['parameter_mode'] ?? 'name_message_signature')); ?>"
                       data-template-body="<?php echo esc_attr((string) ($template['body'] ?? '')); ?>"
+                      data-template-variables="<?php echo esc_attr((string) json_encode(array_values((array) ($template['variables'] ?? [])), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); ?>"
                       data-email-template="<?php echo esc_attr((string) ($linkedEmailTemplate['name'] ?? $linkedEmailTemplateName)); ?>"
                       data-email-subject="<?php echo esc_attr((string) ($linkedEmailTemplate['subject'] ?? '')); ?>"
                       data-email-message="<?php echo esc_attr((string) ($linkedEmailTemplate['editable_message'] ?? $linkedEmailTemplate['body'] ?? '')); ?>"
@@ -2192,6 +2196,93 @@ trait RendersDashboard
       . '<strong>Notificaciones listas para consultar</strong>'
       . '<span>Abre esta sección para cargar destinatarios y plantillas.</span>'
       . '</div>';
+  }
+
+  /**
+   * @param array<string,array<string,mixed>> $whatsappTemplates
+   * @param array<string,array<string,mixed>> $emailTemplates
+   */
+  private function render_admin_notification_template_editor(array $whatsappTemplates, array $emailTemplates): string
+  {
+    ob_start();
+?>
+    <details class="scm-admin-notif-card scm-admin-notif-template-editor" data-admin-notif-template-editor-wrap>
+      <summary>
+        <span>
+          <strong>Editor de nombres de plantillas</strong>
+          <small>Ajusta el texto visible del select, ayudas y ejemplos sin cambiar el nombre t&eacute;cnico de WhatsApp.</small>
+        </span>
+      </summary>
+      <form data-admin-notif-template-editor>
+        <div class="scm-admin-notif-template-editor-grid">
+          <section>
+            <h5>WhatsApp</h5>
+            <div class="scm-admin-notif-template-editor-table-wrap">
+              <table class="scm-admin-notif-template-editor-table">
+                <thead>
+                  <tr>
+                    <th>Nombre t&eacute;cnico</th>
+                    <th>Label del select</th>
+                    <th>Descripci&oacute;n</th>
+                    <th>Ayuda de variables</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($whatsappTemplates as $name => $template):
+                    $templateName = (string) ($template['name'] ?? $name);
+                    $variables = implode("\n", array_map('strval', (array) ($template['variables'] ?? [])));
+                  ?>
+                    <tr>
+                      <td><code><?php echo esc_html($templateName); ?></code></td>
+                      <td><input type="text" name="templates[whatsapp][<?php echo esc_attr($templateName); ?>][label]" value="<?php echo esc_attr((string) ($template['label'] ?? '')); ?>"></td>
+                      <td><textarea rows="3" name="templates[whatsapp][<?php echo esc_attr($templateName); ?>][description]"><?php echo esc_textarea((string) ($template['description'] ?? '')); ?></textarea></td>
+                      <td><textarea rows="4" name="templates[whatsapp][<?php echo esc_attr($templateName); ?>][variables]"><?php echo esc_textarea($variables); ?></textarea></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section>
+            <h5>Email</h5>
+            <div class="scm-admin-notif-template-editor-table-wrap">
+              <table class="scm-admin-notif-template-editor-table">
+                <thead>
+                  <tr>
+                    <th>ID / nombre</th>
+                    <th>Label del select</th>
+                    <th>Asunto</th>
+                    <th>Descripci&oacute;n / preview</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($emailTemplates as $name => $template):
+                    $templateName = (string) ($template['name'] ?? $name);
+                    $description = trim((string) ($template['description'] ?? $template['preview_excerpt'] ?? ''));
+                  ?>
+                    <tr>
+                      <td><code><?php echo esc_html($templateName); ?></code></td>
+                      <td><input type="text" name="templates[email][<?php echo esc_attr($templateName); ?>][label]" value="<?php echo esc_attr((string) ($template['label'] ?? '')); ?>"></td>
+                      <td><input type="text" name="templates[email][<?php echo esc_attr($templateName); ?>][subject]" value="<?php echo esc_attr((string) ($template['subject'] ?? '')); ?>"></td>
+                      <td>
+                        <textarea rows="3" name="templates[email][<?php echo esc_attr($templateName); ?>][description]"><?php echo esc_textarea($description); ?></textarea>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+        <div class="scm-admin-notif-template-editor-actions">
+          <button type="submit" class="scm-btn-primary btn btn-primary">Guardar nombres y ayudas</button>
+          <span data-admin-notif-template-editor-result aria-live="polite"></span>
+        </div>
+      </form>
+    </details>
+<?php
+    return (string) ob_get_clean();
   }
 
   private function render_collection_management_panel(array $input): string

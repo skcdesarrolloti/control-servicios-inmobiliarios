@@ -7292,6 +7292,106 @@
   line-height: 1.45;
 }
 
+#scm-app .scm-admin-notif-template-editor {
+  display: block;
+}
+
+#scm-app .scm-admin-notif-template-editor summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  color: #10233f;
+  font-weight: 900;
+}
+
+#scm-app .scm-admin-notif-template-editor summary small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#scm-app .scm-admin-notif-template-editor-grid {
+  display: grid;
+  gap: 18px;
+  margin-top: 16px;
+}
+
+#scm-app .scm-admin-notif-template-editor-grid h5 {
+  margin: 0 0 10px;
+  color: #061d49;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+#scm-app .scm-admin-notif-template-editor-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #dbe7f4;
+  border-radius: 12px;
+}
+
+#scm-app .scm-admin-notif-template-editor-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+#scm-app .scm-admin-notif-template-editor-table th,
+#scm-app .scm-admin-notif-template-editor-table td {
+  padding: 10px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+  text-align: left;
+}
+
+#scm-app .scm-admin-notif-template-editor-table th {
+  background: #f8fafc;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-admin-notif-template-editor-table code {
+  color: #475569;
+  font-size: 11px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+#scm-app .scm-admin-notif-template-editor-table input,
+#scm-app .scm-admin-notif-template-editor-table textarea {
+  width: 100%;
+  min-width: 180px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #172033;
+  font-size: 12px;
+}
+
+#scm-app .scm-admin-notif-template-editor-table textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+#scm-app .scm-admin-notif-template-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+#scm-app .scm-admin-notif-template-editor-actions span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 #scm-app .scm-admin-notif-message-field {
   display: grid;
   gap: 8px;

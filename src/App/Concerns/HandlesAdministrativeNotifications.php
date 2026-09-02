@@ -146,6 +146,26 @@ trait HandlesAdministrativeNotifications
     }
   }
 
+  public function ajax_handler_admin_notifications_templates_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para editar plantillas de Notificaciones.');
+    }
+
+    $templates = is_array($_POST['templates'] ?? null) ? (array) $_POST['templates'] : [];
+
+    try {
+      $this->get_admin_notifications_service()->saveTemplateOverrides($templates);
+      $this->jsonOk([
+        'message' => 'Plantillas actualizadas. Se recargara el panel para aplicar los nombres y ayudas.',
+        'html' => $this->render_admin_notifications_panel(),
+      ]);
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
   public function ajax_handler_admin_notifications_collection(): void
   {
     $this->verifyCsrf();
