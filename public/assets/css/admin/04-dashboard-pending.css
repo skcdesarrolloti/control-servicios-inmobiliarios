@@ -7292,31 +7292,47 @@
   line-height: 1.45;
 }
 
-#scm-app .scm-admin-notif-template-editor {
-  display: block;
-}
-
-#scm-app .scm-admin-notif-template-editor summary {
+#scm-app .scm-admin-notif-template-launcher {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  cursor: pointer;
-  color: #10233f;
-  font-weight: 900;
+  gap: 16px;
+  padding: 16px 18px !important;
 }
 
-#scm-app .scm-admin-notif-template-editor summary small {
-  display: block;
-  margin-top: 4px;
+#scm-app .scm-admin-notif-template-launcher h4 {
+  margin: 4px 0 6px;
+  color: #10233f;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+#scm-app .scm-admin-notif-template-launcher p {
+  margin: 0;
   color: #64748b;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+#scm-app .scm-admin-notif-template-launcher button {
+  flex: 0 0 auto;
+  min-height: 42px;
+}
+
+#scm-app .scm-admin-notif-template-editor-panel {
+  width: min(1360px, calc(100vw - 38px));
+}
+
+#scm-app .scm-admin-notif-template-editor-panel form {
+  max-height: calc(100vh - 190px);
+  overflow: auto;
+  padding-bottom: 0;
 }
 
 #scm-app .scm-admin-notif-template-editor-grid {
   display: grid;
   gap: 18px;
-  margin-top: 16px;
 }
 
 #scm-app .scm-admin-notif-template-editor-grid h5 {
@@ -7379,11 +7395,18 @@
 }
 
 #scm-app .scm-admin-notif-template-editor-actions {
+  position: sticky;
+  bottom: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
-  margin-top: 14px;
+  justify-content: flex-end;
+  margin: 18px -24px 0;
+  padding: 14px 24px !important;
+  border-top: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
 }
 
 #scm-app .scm-admin-notif-template-editor-actions span {
@@ -7666,6 +7689,19 @@
   #scm-app .scm-admin-notif-modal-panel {
     width: min(100%, calc(100vw - 16px));
     max-height: calc(100vh - 24px);
+  }
+
+  #scm-app .scm-admin-notif-template-launcher {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #scm-app .scm-admin-notif-template-launcher button {
+    width: 100%;
+  }
+
+  #scm-app .scm-admin-notif-template-editor-panel form {
+    max-height: calc(100vh - 166px);
   }
 
   #scm-app .scm-admin-notif-modal-head {
