@@ -127,16 +127,22 @@ trait HandlesAdministrativeNotifications
       $matched = (int) ($result['matched'] ?? 0);
       $unmatched = (int) ($result['unmatched'] ?? 0);
       $duplicates = (int) ($result['duplicates'] ?? 0);
+      $ambiguous = (int) ($result['ambiguous'] ?? 0);
       $usable = (int) ($result['usable_rows'] ?? 0);
-      $message = $matched > 0
-        ? sprintf('Excel importado: %d destinatarios encontrados de %d filas utiles.%s%s', $matched, $usable, $unmatched > 0 ? " {$unmatched} filas sin coincidencia." : '', $duplicates > 0 ? " {$duplicates} duplicados omitidos." : '')
-        : 'No se encontraron destinatarios con ese Excel. Revisa columnas contrato o inmueble_simi.';
+      if ($matched > 0) {
+        $message = sprintf('Excel importado: %d destinatarios encontrados de %d filas utiles.%s%s%s', $matched, $usable, $unmatched > 0 ? " {$unmatched} filas sin coincidencia." : '', $ambiguous > 0 ? " {$ambiguous} filas con coincidencia multiple sin marcar." : '', $duplicates > 0 ? " {$duplicates} duplicados omitidos." : '');
+      } elseif ($ambiguous > 0) {
+        $message = sprintf('Excel importado: no se marco ningun destinatario porque %d filas tienen coincidencia multiple. Descarga el cruce y revisalas.', $ambiguous);
+      } else {
+        $message = 'No se encontraron destinatarios con ese Excel. Revisa columnas contrato o inmueble_simi.';
+      }
       $this->jsonOk([
         'html' => $this->render_admin_notification_recipient_rows((array) ($result['rows'] ?? [])),
         'payload' => (array) ($result['payload'] ?? []),
         'report_rows' => (array) ($result['report_rows'] ?? []),
         'matched' => $matched,
         'unmatched' => $unmatched,
+        'ambiguous' => $ambiguous,
         'duplicates' => $duplicates,
         'usable_rows' => $usable,
         'type_label' => (string) ($result['type_label'] ?? ''),

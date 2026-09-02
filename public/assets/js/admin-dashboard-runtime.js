@@ -2951,7 +2951,7 @@
         var rows = importReportRows.map(function (row) {
           var copy = Object.assign({}, row || {});
           var id = String(copy.destinatario_id || "").trim();
-          if (id) {
+          if (id && copy.estado_cruce === "Encontrado") {
             copy.marcado_en_pagina = selected.has(id) ? "Si" : "No";
             if (!selected.has(id) && copy.estado_cruce === "Encontrado") {
               copy.observacion = "Encontrado, pero desmarcado en la pagina.";

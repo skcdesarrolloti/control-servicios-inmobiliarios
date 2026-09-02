@@ -1331,7 +1331,7 @@ final class AdministrativeNotificationsService
 
   /**
    * @param array<string,mixed> $file
-   * @return array{rows:array<int,array<string,mixed>>,payload:array<string,array<string,string>>,report_rows:array<int,array<string,string>>,total_rows:int,usable_rows:int,matched:int,unmatched:int,duplicates:int,type:string,type_label:string}
+   * @return array{rows:array<int,array<string,mixed>>,payload:array<string,array<string,string>>,report_rows:array<int,array<string,string>>,total_rows:int,usable_rows:int,matched:int,unmatched:int,ambiguous:int,duplicates:int,type:string,type_label:string}
    */
   public function importRecipientsFromFile(string $type, array $file): array
   {
@@ -1369,6 +1369,7 @@ final class AdministrativeNotificationsService
     $reportRows = [];
     $seen = [];
     $unmatched = 0;
+    $ambiguous = 0;
     $duplicates = 0;
 
     foreach ($metas as $index => $meta) {
@@ -1379,22 +1380,37 @@ final class AdministrativeNotificationsService
         $reportRows[] = $this->importReportRow($index, $meta, null, 'Sin coincidencia', 'No', 'No se encontro destinatario para contrato/inmueble.');
         continue;
       }
+      $matchesById = [];
       foreach ($matches as $recipient) {
         $id = (int) ($recipient['_ID'] ?? 0);
-        if ($id <= 0) {
-          continue;
+        if ($id > 0) {
+          $matchesById[$id] = $recipient;
         }
-        if (isset($seen[$id])) {
-          $duplicates++;
-          $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Duplicado omitido', 'No', 'Ya habia sido marcado por otra fila del Excel.');
-          continue;
-        }
-        $seen[$id] = true;
-        $recipient['_scm_import_meta'] = $meta;
-        $outRows[] = $recipient;
-        $payload[(string) $id] = $meta;
-        $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Encontrado', 'Si', 'Marcado automaticamente en la pagina.');
       }
+      if (count($matchesById) > 1) {
+        $ambiguous++;
+        foreach ($matchesById as $recipient) {
+          $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Coincidencia multiple', 'No', 'La fila coincide con varios destinatarios; no se marco automaticamente.');
+        }
+        continue;
+      }
+      $recipient = reset($matchesById);
+      if (!is_array($recipient)) {
+        $unmatched++;
+        $reportRows[] = $this->importReportRow($index, $meta, null, 'Sin coincidencia', 'No', 'No se encontro destinatario valido para contrato/inmueble.');
+        continue;
+      }
+      $id = (int) ($recipient['_ID'] ?? 0);
+      if (isset($seen[$id])) {
+        $duplicates++;
+        $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Duplicado omitido', 'No', 'Ya habia sido marcado por otra fila del Excel.');
+        continue;
+      }
+      $seen[$id] = true;
+      $recipient['_scm_import_meta'] = $meta;
+      $outRows[] = $recipient;
+      $payload[(string) $id] = $meta;
+      $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Encontrado', 'Si', 'Marcado automaticamente en la pagina.');
     }
 
     return [
@@ -1405,6 +1421,7 @@ final class AdministrativeNotificationsService
       'usable_rows' => count($metas),
       'matched' => count($outRows),
       'unmatched' => $unmatched,
+      'ambiguous' => $ambiguous,
       'duplicates' => $duplicates,
       'type' => $type,
       'type_label' => (string) ($config['label'] ?? $type),
@@ -1438,6 +1455,49 @@ final class AdministrativeNotificationsService
     ];
   }
 
+  /** @param array<int,array<string,mixed>> $contracts @param array<string,string> $meta @return array<int,array<string,mixed>> */
+  private function filterImportContractsForMeta(array $contracts, array $meta): array
+  {
+    $contract = trim((string) ($meta['contrato_excel'] ?? ''));
+    $property = trim((string) ($meta['inmueble_simi_excel'] ?? ''));
+    $filtered = [];
+
+    foreach ($contracts as $row) {
+      $matchesContract = $contract !== '' && $this->importContractRowMatchesValue($row, ['contrato', 'contrato_arrendamiento', '_ID'], $contract);
+      $matchesProperty = $property !== '' && $this->importContractRowMatchesValue($row, ['inmueble', 'id_inmueble', 'id_inmueble_data'], $property);
+      if ($contract !== '' && $property !== '') {
+        $matches = $matchesContract && $matchesProperty;
+      } elseif ($contract !== '') {
+        $matches = $matchesContract;
+      } else {
+        $matches = $matchesProperty;
+      }
+      if (!$matches) {
+        continue;
+      }
+      $id = (int) ($row['_ID'] ?? 0);
+      $filtered[$id > 0 ? $id : count($filtered) + 1] = $row;
+    }
+
+    return array_values($filtered);
+  }
+
+  /** @param array<string,mixed> $row @param string[] $columns */
+  private function importContractRowMatchesValue(array $row, array $columns, string $expected): bool
+  {
+    $expected = $this->normalizeImportIdentifier($expected);
+    if ($expected === '') {
+      return false;
+    }
+    foreach ($columns as $column) {
+      $value = $this->normalizeImportIdentifier((string) ($row[$column] ?? ''));
+      if ($value !== '' && $value === $expected) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** @param array<string,mixed> $config */
   private function canUseBulkContractImport(array $config): bool
   {
@@ -1461,7 +1521,7 @@ final class AdministrativeNotificationsService
    *
    * @param array<string,mixed> $config
    * @param array<int,array<string,string>> $metas
-   * @return array{rows:array<int,array<string,mixed>>,payload:array<string,array<string,string>>,report_rows:array<int,array<string,string>>,total_rows:int,usable_rows:int,matched:int,unmatched:int,duplicates:int,type:string,type_label:string}
+   * @return array{rows:array<int,array<string,mixed>>,payload:array<string,array<string,string>>,report_rows:array<int,array<string,string>>,total_rows:int,usable_rows:int,matched:int,unmatched:int,ambiguous:int,duplicates:int,type:string,type_label:string}
    */
   private function importRecipientsFromContractMetas(string $type, array $config, array $metas, int $totalRows): array
   {
@@ -1483,49 +1543,92 @@ final class AdministrativeNotificationsService
     $reportRows = [];
     $seen = [];
     $unmatched = 0;
+    $ambiguous = 0;
     $duplicates = 0;
 
     foreach ($metas as $index => $meta) {
-      $contracts = $contractsByMeta[$index] ?? [];
+      $contracts = $this->filterImportContractsForMeta($contractsByMeta[$index] ?? [], $meta);
       if ($contracts === []) {
         $unmatched++;
         $reportRows[] = $this->importReportRow($index, $meta, null, 'Sin coincidencia', 'No', 'No se encontro contrato para contrato/inmueble.');
         continue;
       }
 
-      $contractInfo = $this->contractInfoFromRows($contracts);
-      $matchedThisMeta = false;
-      $recipientIdsForMeta = [];
+      $candidates = [];
       foreach ($contracts as $contract) {
+        $contractId = (int) ($contract['_ID'] ?? 0);
         $actorId = (int) preg_replace('/\D+/', '', (string) ($contract[$contractActorColumn] ?? ''));
         if ($actorId <= 0 || empty($recipientsByActor[$actorId])) {
           continue;
         }
         foreach ($recipientsByActor[$actorId] as $recipient) {
           $id = (int) ($recipient['_ID'] ?? 0);
-          if ($id <= 0 || isset($recipientIdsForMeta[$id])) {
+          if ($id <= 0) {
             continue;
           }
-          $recipientIdsForMeta[$id] = true;
-          $matchedThisMeta = true;
-          if (isset($seen[$id])) {
-            $duplicates++;
-            $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Duplicado omitido', 'No', 'Ya habia sido marcado por otra fila del Excel.');
-            continue;
+          if (!isset($candidates[$id])) {
+            $candidates[$id] = [
+              'recipient' => $recipient,
+              'contracts' => [],
+            ];
           }
-          $seen[$id] = true;
-          $recipient['contrato_arrendamiento_estado'] = $contractInfo['label'];
-          $recipient['contratos_arrendamiento_resumen'] = $contractInfo['summary'];
-          $recipient['_scm_import_meta'] = $meta;
-          $outRows[] = $recipient;
-          $payload[(string) $id] = $meta;
-          $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Encontrado', 'Si', 'Marcado automaticamente en la pagina.');
+          $candidateKey = $contractId > 0 ? $contractId : count($candidates[$id]['contracts']) + 1;
+          $candidates[$id]['contracts'][$candidateKey] = $contract;
         }
       }
-      if (!$matchedThisMeta) {
+      if ($candidates === []) {
         $unmatched++;
         $reportRows[] = $this->importReportRow($index, $meta, null, 'Contrato encontrado sin destinatario', 'No', 'El contrato existe, pero no se encontro el actor en esta pestana.');
+        continue;
       }
+      if (count($contracts) > 1) {
+        $ambiguous++;
+        foreach ($candidates as $candidate) {
+          $recipient = is_array($candidate['recipient'] ?? null) ? $candidate['recipient'] : null;
+          if ($recipient !== null) {
+            $contractInfo = $this->contractInfoFromRows(array_values((array) ($candidate['contracts'] ?? [])));
+            $recipient['contrato_arrendamiento_estado'] = $contractInfo['label'];
+            $recipient['contratos_arrendamiento_resumen'] = $contractInfo['summary'];
+          }
+          $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Coincidencia multiple', 'No', 'La fila coincide con varios contratos; no se marco automaticamente.');
+        }
+        continue;
+      }
+      if (count($candidates) > 1) {
+        $ambiguous++;
+        foreach ($candidates as $candidate) {
+          $recipient = is_array($candidate['recipient'] ?? null) ? $candidate['recipient'] : null;
+          if ($recipient !== null) {
+            $contractInfo = $this->contractInfoFromRows(array_values((array) ($candidate['contracts'] ?? [])));
+            $recipient['contrato_arrendamiento_estado'] = $contractInfo['label'];
+            $recipient['contratos_arrendamiento_resumen'] = $contractInfo['summary'];
+          }
+          $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Coincidencia multiple', 'No', 'La fila coincide con varios destinatarios; no se marco automaticamente.');
+        }
+        continue;
+      }
+
+      $candidate = reset($candidates);
+      $recipient = is_array($candidate['recipient'] ?? null) ? $candidate['recipient'] : null;
+      if ($recipient === null) {
+        $unmatched++;
+        $reportRows[] = $this->importReportRow($index, $meta, null, 'Contrato encontrado sin destinatario', 'No', 'El contrato existe, pero no se encontro el actor en esta pestana.');
+        continue;
+      }
+      $id = (int) ($recipient['_ID'] ?? 0);
+      $contractInfo = $this->contractInfoFromRows(array_values((array) ($candidate['contracts'] ?? [])));
+      $recipient['contrato_arrendamiento_estado'] = $contractInfo['label'];
+      $recipient['contratos_arrendamiento_resumen'] = $contractInfo['summary'];
+      if (isset($seen[$id])) {
+        $duplicates++;
+        $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Duplicado omitido', 'No', 'Ya habia sido marcado por otra fila del Excel.');
+        continue;
+      }
+      $seen[$id] = true;
+      $recipient['_scm_import_meta'] = $meta;
+      $outRows[] = $recipient;
+      $payload[(string) $id] = $meta;
+      $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Encontrado', 'Si', 'Marcado automaticamente en la pagina.');
     }
 
     return [
@@ -1536,6 +1639,7 @@ final class AdministrativeNotificationsService
       'usable_rows' => count($metas),
       'matched' => count($outRows),
       'unmatched' => $unmatched,
+      'ambiguous' => $ambiguous,
       'duplicates' => $duplicates,
       'type' => $type,
       'type_label' => (string) ($config['label'] ?? $type),
