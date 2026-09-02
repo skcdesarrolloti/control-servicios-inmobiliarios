@@ -7192,6 +7192,16 @@
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
 }
 
+#scm-app .scm-admin-notif-channel-pill.is-disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+  transform: none;
+}
+
+#scm-app .scm-admin-notif-channel-pill.is-disabled input {
+  cursor: not-allowed;
+}
+
 #scm-app .scm-admin-notif-channel-pill:has(input:checked) {
   border-color: #f59120;
   background: linear-gradient(180deg, #fffaf3, #fff7ed);

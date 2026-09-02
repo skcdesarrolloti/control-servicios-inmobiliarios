@@ -2640,7 +2640,7 @@
       var allFilteredWrap = allFiltered ? allFiltered.closest(".scm-admin-notif-all") : null;
       var subjectWrap = panel.querySelector("[data-admin-notif-subject-wrap]");
       var subjectInput = panel.querySelector("[data-admin-notif-subject]");
-      var messageFieldWrap = panel.querySelector(".scm-admin-notif-message-field");
+      var messageFieldWrap = panel.querySelector("[data-admin-notif-message-field]");
       var noMessageNote = panel.querySelector("[data-admin-notif-no-message-note]");
       var messageInput = panel.querySelector("[data-admin-notif-message]");
       var emailTemplateSelect = panel.querySelector("[data-admin-notif-email-template]");
@@ -2805,6 +2805,41 @@
           return Array.isArray(parsed) ? parsed.map(String) : [];
         } catch (_err) {
           return [];
+        }
+      }
+
+      function selectedTemplateIsFixedNoMessage() {
+        var option = selectedMessageTemplateOption();
+        if (!option) {
+          return false;
+        }
+        return [
+          "scm_factura_disponible_v1",
+          "scm_cupon_disponible_v1",
+          "scm_aviso_siniestro_v1",
+        ].indexOf(String(option.value || "")) !== -1;
+      }
+
+      function syncFixedTemplateChannels() {
+        var smsInput = panel.querySelector('[data-admin-notif-channel][value="sms"]');
+        if (!smsInput) {
+          return;
+        }
+        var emailChecked = !!panel.querySelector(
+          '[data-admin-notif-channel][value="email"]:checked',
+        );
+        var whatsappChecked = !!panel.querySelector(
+          '[data-admin-notif-channel][value="whatsapp"]:checked',
+        );
+        var usesFixedTemplate = (emailChecked || whatsappChecked) && selectedTemplateIsFixedNoMessage();
+        var lockSms = usesFixedTemplate && String(composerChannelMode || "").toLowerCase() !== "sms";
+        if (lockSms) {
+          smsInput.checked = false;
+        }
+        smsInput.disabled = lockSms;
+        var smsPill = smsInput.closest ? smsInput.closest(".scm-admin-notif-channel-pill") : null;
+        if (smsPill) {
+          smsPill.classList.toggle("is-disabled", lockSms);
         }
       }
 
@@ -3616,6 +3651,7 @@
         var templateVisible = emailChecked || whatsappChecked;
         filterMessageTemplateOptions();
         syncEmailTemplateFromMessageTemplate();
+        syncFixedTemplateChannels();
         if (subjectWrap) {
           subjectWrap.style.display = emailChecked ? "" : "none";
         }

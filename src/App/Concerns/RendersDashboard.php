@@ -2144,7 +2144,7 @@ trait RendersDashboard
               <input id="scm-admin-notif-subject" name="subject" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: Informaci&oacute;n importante" value="<?php echo esc_attr($defaultEmailSubject); ?>" data-admin-notif-subject>
             </div>
 
-            <div class="scm-field scm-admin-notif-message-field">
+            <div class="scm-field scm-admin-notif-message-field" data-admin-notif-message-field>
               <label for="scm-admin-notif-message">Mensaje</label>
               <div class="scm-admin-notif-message-toolbar" aria-label="Herramientas del mensaje">
                 <button type="button" data-admin-notif-preview-toggle>Ocultar vista previa</button>
