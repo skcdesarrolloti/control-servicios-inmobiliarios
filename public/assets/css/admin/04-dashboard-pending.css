@@ -6477,11 +6477,20 @@
 }
 
 #scm-app .scm-admin-notif-import-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   grid-column: 1 / -1;
   margin: 0;
   color: #64748b;
   font-size: 12px;
   font-weight: 800;
+}
+
+#scm-app .scm-admin-notif-import-result button {
+  min-height: 32px;
+  padding: 6px 12px;
 }
 
 #scm-app .scm-admin-notif-import-result.is-success {

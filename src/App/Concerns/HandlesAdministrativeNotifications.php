@@ -129,12 +129,20 @@ trait HandlesAdministrativeNotifications
       $duplicates = (int) ($result['duplicates'] ?? 0);
       $ambiguous = (int) ($result['ambiguous'] ?? 0);
       $usable = (int) ($result['usable_rows'] ?? 0);
+      $suggestion = $matched === 0 ? $this->admin_notification_import_type_suggestion($service, $type, $file) : [];
       if ($matched > 0) {
         $message = sprintf('Excel importado: %d destinatarios encontrados de %d filas utiles.%s%s%s', $matched, $usable, $unmatched > 0 ? " {$unmatched} filas sin coincidencia." : '', $ambiguous > 0 ? " {$ambiguous} filas con coincidencia multiple sin marcar." : '', $duplicates > 0 ? " {$duplicates} duplicados omitidos." : '');
+      } elseif ($suggestion !== []) {
+        $message = sprintf(
+          'No se marcaron destinatarios en %s. Este Excel coincide con %s (%d destinatarios). Cambia a esa pestana y vuelve a importar.',
+          (string) ($result['type_label'] ?? $type),
+          (string) ($suggestion['type_label'] ?? $suggestion['type'] ?? ''),
+          (int) ($suggestion['matched'] ?? 0)
+        );
       } elseif ($ambiguous > 0) {
         $message = sprintf('Excel importado: no se marco ningun destinatario porque %d filas tienen coincidencia multiple. Descarga el cruce y revisalas.', $ambiguous);
       } else {
-        $message = 'No se encontraron destinatarios con ese Excel. Revisa columnas contrato o inmueble_simi.';
+        $message = 'No se encontraron destinatarios con ese Excel. Revisa columnas contrato, inmueble_simi o cedula.';
       }
       $this->jsonOk([
         'html' => $this->render_admin_notification_recipient_rows((array) ($result['rows'] ?? [])),
@@ -146,11 +154,38 @@ trait HandlesAdministrativeNotifications
         'duplicates' => $duplicates,
         'usable_rows' => $usable,
         'type_label' => (string) ($result['type_label'] ?? ''),
+        'suggested_type' => (string) ($suggestion['type'] ?? ''),
+        'suggested_type_label' => (string) ($suggestion['type_label'] ?? ''),
+        'suggested_matched' => (int) ($suggestion['matched'] ?? 0),
         'message' => $message,
       ]);
     } catch (\Throwable $e) {
       $this->jsonFail($e->getMessage());
     }
+  }
+
+  /** @param array<string,mixed> $file @return array{type:string,type_label:string,matched:int}|array{} */
+  private function admin_notification_import_type_suggestion(AdministrativeNotificationsService $service, string $currentType, array $file): array
+  {
+    foreach (['arrendatarios_activos', 'propietarios_activos', 'copropiedades_activas'] as $candidateType) {
+      if ($candidateType === $currentType) {
+        continue;
+      }
+      try {
+        $candidate = $service->importRecipientsFromFile($candidateType, $file);
+      } catch (\Throwable $e) {
+        continue;
+      }
+      $matched = (int) ($candidate['matched'] ?? 0);
+      if ($matched > 0) {
+        return [
+          'type' => $candidateType,
+          'type_label' => (string) ($candidate['type_label'] ?? $candidateType),
+          'matched' => $matched,
+        ];
+      }
+    }
+    return [];
   }
 
   public function ajax_handler_admin_notifications_collection(): void

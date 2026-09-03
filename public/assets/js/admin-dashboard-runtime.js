@@ -4392,7 +4392,17 @@
               listTitle.textContent = data.type_label + " importados";
             }
             if (importResultEl) {
-              importResultEl.textContent = data.message || "Archivo importado.";
+              importResultEl.textContent = "";
+              importResultEl.appendChild(document.createTextNode(data.message || "Archivo importado."));
+              if (data.suggested_type && data.suggested_type_label) {
+                var suggestionBtn = document.createElement("button");
+                suggestionBtn.type = "button";
+                suggestionBtn.className = "scm-btn-secondary btn btn-outline";
+                suggestionBtn.setAttribute("data-admin-notif-import-suggest-type", String(data.suggested_type || ""));
+                suggestionBtn.textContent = "Cambiar a " + String(data.suggested_type_label || "");
+                importResultEl.appendChild(document.createTextNode(" "));
+                importResultEl.appendChild(suggestionBtn);
+              }
               importResultEl.classList.add((data.matched || 0) > 0 ? "is-success" : "is-error");
             }
             updateVisibleChecks();
@@ -4727,6 +4737,24 @@
         }
         if (importReportBtn) {
           importReportBtn.addEventListener("click", downloadImportReport);
+        }
+        if (importResultEl) {
+          importResultEl.addEventListener("click", function (event) {
+            var btn = event.target && event.target.closest
+              ? event.target.closest("[data-admin-notif-import-suggest-type]")
+              : null;
+            if (!btn || !typeSelect) {
+              return;
+            }
+            event.preventDefault();
+            typeSelect.value = btn.getAttribute("data-admin-notif-import-suggest-type") || typeSelect.value;
+            selected.clear();
+            if (allFiltered) {
+              allFiltered.checked = false;
+            }
+            syncContext();
+            importRecipientsFromFile();
+          });
         }
 
         if (paginationEl) {

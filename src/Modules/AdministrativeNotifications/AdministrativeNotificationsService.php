@@ -2367,6 +2367,9 @@ final class AdministrativeNotificationsService
         if ($this->isImportAlias($header, $this->importPropertyAliases())) {
           $score += 2;
         }
+        if ($this->isImportAlias($header, $this->importDocumentAliases())) {
+          $score += 2;
+        }
         if ($this->isImportAlias($header, $this->importCanonAliases())) {
           $score++;
         }
@@ -2434,7 +2437,7 @@ final class AdministrativeNotificationsService
   /** @return string[] */
   private function importCanonAliases(): array
   {
-    return ['canon', 'valor_canon', 'canon_arrendamiento', 'valor_arriendo', 'renta'];
+    return ['canon', 'valor', 'total', 'valor_total', 'valor_canon', 'canon_arrendamiento', 'valor_arriendo', 'renta'];
   }
 
   /** @return string[] */
@@ -2543,6 +2546,10 @@ final class AdministrativeNotificationsService
     $property = trim((string) ($meta['inmueble_simi_excel'] ?? ''));
     if ($property !== '') {
       $parts[] = 'Inmueble SIMI: ' . $property;
+    }
+    $document = trim((string) ($meta['documento_excel'] ?? ''));
+    if ($document !== '') {
+      $parts[] = 'Documento: ' . $document;
     }
     $month = trim((string) ($meta['mes_excel'] ?? ''));
     if ($month !== '') {
@@ -3039,7 +3046,7 @@ final class AdministrativeNotificationsService
   private function normalizedDocumentSql(string $expression): string
   {
     $sql = "UPPER({$this->collatedTextSql($expression)})";
-    foreach (['.', ',', '-', ' ', '/', '\\'] as $needle) {
+    foreach (['.', ',', '-', ' ', '/'] as $needle) {
       $escaped = str_replace("'", "''", $needle);
       $sql = "REPLACE({$sql}, '{$escaped}', '')";
     }
