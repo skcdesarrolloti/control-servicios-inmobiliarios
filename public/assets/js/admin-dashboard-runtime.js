@@ -2793,6 +2793,7 @@
           id: id,
           name: String(row.getAttribute("data-admin-notif-recipient-name") || "Destinatario " + id),
           type: String(row.getAttribute("data-admin-notif-recipient-type") || ""),
+          document: String(row.getAttribute("data-admin-notif-recipient-document") || ""),
           email: String(row.getAttribute("data-admin-notif-recipient-email") || ""),
           phone: String(row.getAttribute("data-admin-notif-recipient-phone") || ""),
           contract: String(row.getAttribute("data-admin-notif-recipient-contract") || ""),
@@ -2819,6 +2820,7 @@
           id: key,
           name: "Destinatario " + key,
           type: "",
+          document: "",
           email: "",
           phone: "",
           contract: "",
@@ -2856,6 +2858,9 @@
           }
           if (detail.phone) {
             contactBits.push("Celular: " + detail.phone);
+          }
+          if (detail.document) {
+            contactBits.push("Doc: " + detail.document);
           }
           return (
             '<article class="scm-admin-notif-selected-item">' +
@@ -2937,12 +2942,14 @@
           ["marcado_en_pagina", "Marcado en pagina"],
           ["contrato_excel", "Contrato Excel"],
           ["inmueble_simi_excel", "Inmueble SIMI Excel"],
+          ["documento_excel", "Documento Excel"],
           ["canon_excel", "Canon Excel"],
           ["periodo_excel", "Periodo Excel"],
           ["direccion_excel", "Direccion Excel"],
           ["destinatario_id", "ID destinatario"],
           ["destinatario_nombre", "Nombre destinatario"],
           ["destinatario_tipo", "Tipo destinatario"],
+          ["destinatario_documento", "Documento sistema"],
           ["correo", "Correo"],
           ["celular", "Celular"],
           ["contrato_sistema", "Contrato en sistema"],

@@ -579,6 +579,7 @@ trait HandlesAdministrativeNotifications
       $typeLabel = trim((string) ($row['tipo_label'] ?? 'Destinatario'));
       $actorType = trim((string) ($row['tipo_actor'] ?? ''));
       $email = trim((string) ($row['correo'] ?? ''));
+      $document = trim((string) ($row['documento'] ?? ''));
       $phone = trim((string) ($row['celular_normalizado'] ?? ($row['celular'] ?? '')));
       $rawPhone = trim((string) ($row['celular'] ?? ''));
       $contractLabel = trim((string) ($row['contrato_arrendamiento_estado'] ?? ''));
@@ -591,7 +592,7 @@ trait HandlesAdministrativeNotifications
         default => '',
       };
 
-      $html .= '<div class="scm-admin-notif-recipient" data-admin-notif-recipient-row data-admin-notif-recipient-id="' . esc_attr((string) $id) . '" data-admin-notif-recipient-name="' . esc_attr($name) . '" data-admin-notif-recipient-type="' . esc_attr($typeLabel) . '" data-admin-notif-recipient-email="' . esc_attr($email) . '" data-admin-notif-recipient-phone="' . esc_attr($phone !== '' ? $phone : $rawPhone) . '" data-admin-notif-recipient-contract="' . esc_attr($contractSummary) . '">';
+      $html .= '<div class="scm-admin-notif-recipient" data-admin-notif-recipient-row data-admin-notif-recipient-id="' . esc_attr((string) $id) . '" data-admin-notif-recipient-name="' . esc_attr($name) . '" data-admin-notif-recipient-type="' . esc_attr($typeLabel) . '" data-admin-notif-recipient-document="' . esc_attr($document) . '" data-admin-notif-recipient-email="' . esc_attr($email) . '" data-admin-notif-recipient-phone="' . esc_attr($phone !== '' ? $phone : $rawPhone) . '" data-admin-notif-recipient-contract="' . esc_attr($contractSummary) . '">';
       $html .= '<input type="checkbox" value="' . esc_attr((string) $id) . '" data-admin-notif-recipient aria-label="Seleccionar ' . esc_attr($name) . '">';
       $html .= '<span class="scm-admin-notif-avatar" aria-hidden="true">' . esc_html(mb_strtoupper(mb_substr($name, 0, 1, 'UTF-8'), 'UTF-8')) . '</span>';
       $html .= '<span class="scm-admin-notif-person">';

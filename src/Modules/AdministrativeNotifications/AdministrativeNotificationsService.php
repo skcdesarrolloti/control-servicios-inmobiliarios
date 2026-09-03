@@ -1248,6 +1248,7 @@ final class AdministrativeNotificationsService
       $columns['name'] !== '' ? "`{$columns['name']}` AS nombre" : "CAST(`_ID` AS CHAR) AS nombre",
       $columns['email'] !== '' ? "`{$columns['email']}` AS correo" : "'' AS correo",
       $columns['phone'] !== '' ? "`{$columns['phone']}` AS celular" : "'' AS celular",
+      $columns['document'] !== '' ? "`{$columns['document']}` AS documento" : "'' AS documento",
       $columns['indicator'] !== '' ? "`{$columns['indicator']}` AS indicativo" : "'' AS indicativo",
     ];
     $contractActorColumn = (string) ($config['contract_actor_column'] ?? '');
@@ -1354,13 +1355,13 @@ final class AdministrativeNotificationsService
 
     foreach ($dataRows as $row) {
       $meta = $this->importMetaForRow($headers, $row);
-      if (($meta['contrato_excel'] ?? '') === '' && ($meta['inmueble_simi_excel'] ?? '') === '') {
+      if (($meta['contrato_excel'] ?? '') === '' && ($meta['inmueble_simi_excel'] ?? '') === '' && ($meta['documento_excel'] ?? '') === '') {
         continue;
       }
       $metas[] = $meta;
     }
 
-    if ($this->canUseBulkContractImport($config)) {
+    if ($this->canUseBulkContractImport($config, $metas)) {
       return $this->importRecipientsFromContractMetas($type, $config, $metas, count($dataRows));
     }
 
@@ -1373,7 +1374,16 @@ final class AdministrativeNotificationsService
     $duplicates = 0;
 
     foreach ($metas as $index => $meta) {
-      $result = $this->search($type, '', 1, 100, '', (string) ($meta['inmueble_simi_excel'] ?? ''), (string) ($meta['contrato_excel'] ?? ''));
+      $result = $this->search(
+        $type,
+        '',
+        1,
+        100,
+        '',
+        (string) ($meta['inmueble_simi_excel'] ?? ''),
+        (string) ($meta['contrato_excel'] ?? ''),
+        ['document' => (string) ($meta['documento_excel'] ?? '')]
+      );
       $matches = (array) ($result['rows'] ?? []);
       if ($matches === []) {
         $unmatched++;
@@ -1442,12 +1452,14 @@ final class AdministrativeNotificationsService
       'marcado_en_pagina' => $marked,
       'contrato_excel' => trim((string) ($meta['contrato_excel'] ?? '')),
       'inmueble_simi_excel' => trim((string) ($meta['inmueble_simi_excel'] ?? '')),
+      'documento_excel' => trim((string) ($meta['documento_excel'] ?? '')),
       'canon_excel' => trim((string) ($meta['canon_excel'] ?? '')),
       'periodo_excel' => trim((string) ($meta['mes_excel'] ?? '')),
       'direccion_excel' => trim((string) ($meta['direccion_excel'] ?? '')),
       'destinatario_id' => $id > 0 ? (string) $id : '',
       'destinatario_nombre' => $recipient !== null ? trim((string) ($recipient['nombre'] ?? '')) : '',
       'destinatario_tipo' => $recipient !== null ? trim((string) ($recipient['tipo_label'] ?? '')) : '',
+      'destinatario_documento' => $recipient !== null ? trim((string) ($recipient['documento'] ?? '')) : '',
       'correo' => $recipient !== null ? trim((string) ($recipient['correo'] ?? '')) : '',
       'celular' => $phone,
       'contrato_sistema' => $recipient !== null ? trim((string) ($recipient['contratos_arrendamiento_resumen'] ?? '')) : '',
@@ -1498,11 +1510,34 @@ final class AdministrativeNotificationsService
     return false;
   }
 
-  /** @param array<string,mixed> $config */
-  private function canUseBulkContractImport(array $config): bool
+  /** @param array<string,mixed> $recipient */
+  private function recipientMatchesImportDocument(array $recipient, string $expected): bool
+  {
+    $expected = $this->normalizeImportDocument($expected);
+    if ($expected === '') {
+      return true;
+    }
+    $document = (string) ($recipient['documento_normalizado'] ?? '');
+    if ($document === '') {
+      $document = $this->normalizeImportDocument((string) ($recipient['documento'] ?? ''));
+    }
+    return $document !== '' && $document === $expected;
+  }
+
+  /** @param array<string,mixed> $config @param array<int,array<string,string>> $metas */
+  private function canUseBulkContractImport(array $config, array $metas = []): bool
   {
     if (!empty($config['contract_match_columns'])) {
       return false;
+    }
+    foreach ($metas as $meta) {
+      if (
+        trim((string) ($meta['documento_excel'] ?? '')) !== ''
+        && trim((string) ($meta['contrato_excel'] ?? '')) === ''
+        && trim((string) ($meta['inmueble_simi_excel'] ?? '')) === ''
+      ) {
+        return false;
+      }
     }
     $table = (string) ($config['table'] ?? '');
     $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
@@ -1548,6 +1583,7 @@ final class AdministrativeNotificationsService
 
     foreach ($metas as $index => $meta) {
       $contracts = $this->filterImportContractsForMeta($contractsByMeta[$index] ?? [], $meta);
+      $document = trim((string) ($meta['documento_excel'] ?? ''));
       if ($contracts === []) {
         $unmatched++;
         $reportRows[] = $this->importReportRow($index, $meta, null, 'Sin coincidencia', 'No', 'No se encontro contrato para contrato/inmueble.');
@@ -1566,6 +1602,9 @@ final class AdministrativeNotificationsService
           if ($id <= 0) {
             continue;
           }
+          if ($document !== '' && !$this->recipientMatchesImportDocument($recipient, $document)) {
+            continue;
+          }
           if (!isset($candidates[$id])) {
             $candidates[$id] = [
               'recipient' => $recipient,
@@ -1581,7 +1620,7 @@ final class AdministrativeNotificationsService
         $reportRows[] = $this->importReportRow($index, $meta, null, 'Contrato encontrado sin destinatario', 'No', 'El contrato existe, pero no se encontro el actor en esta pestana.');
         continue;
       }
-      if (count($contracts) > 1) {
+      if ($document === '' && count($contracts) > 1) {
         $ambiguous++;
         foreach ($candidates as $candidate) {
           $recipient = is_array($candidate['recipient'] ?? null) ? $candidate['recipient'] : null;
@@ -1763,6 +1802,7 @@ final class AdministrativeNotificationsService
       $columns['name'] !== '' ? "`{$columns['name']}` AS nombre" : "CAST(`_ID` AS CHAR) AS nombre",
       $columns['email'] !== '' ? "`{$columns['email']}` AS correo" : "'' AS correo",
       $columns['phone'] !== '' ? "`{$columns['phone']}` AS celular" : "'' AS celular",
+      $columns['document'] !== '' ? "`{$columns['document']}` AS documento" : "'' AS documento",
       $columns['indicator'] !== '' ? "`{$columns['indicator']}` AS indicativo" : "'' AS indicativo",
     ];
     $contractActorColumn = (string) ($config['contract_actor_column'] ?? '');
@@ -1785,6 +1825,7 @@ final class AdministrativeNotificationsService
         $row['tipo_label'] = (string) $config['label'];
         $row['rol_persona'] = (string) $config['role'];
         $row['celular_normalizado'] = $this->normalizePhone((string) ($row['celular'] ?? ''), (string) ($row['indicativo'] ?? ''), true);
+        $row['documento_normalizado'] = $this->normalizeImportDocument((string) ($row['documento'] ?? ''));
         $row['contrato_arrendamiento_estado'] = '';
         $row['contratos_arrendamiento_resumen'] = '';
         $row['contratos_gestion_cobro'] = [];
@@ -2396,6 +2437,12 @@ final class AdministrativeNotificationsService
     return ['canon', 'valor_canon', 'canon_arrendamiento', 'valor_arriendo', 'renta'];
   }
 
+  /** @return string[] */
+  private function importDocumentAliases(): array
+  {
+    return ['documento', 'cedula', 'cedula_arrendatario', 'identificacion', 'identificacion_arrendatario', 'nit', 'cc'];
+  }
+
   /** @param string[] $aliases */
   private function isImportAlias(string $header, array $aliases): bool
   {
@@ -2418,10 +2465,12 @@ final class AdministrativeNotificationsService
   {
     $contract = $this->normalizeImportIdentifier($this->importValue($headers, $row, $this->importContractAliases()));
     $property = $this->normalizeImportIdentifier($this->importValue($headers, $row, $this->importPropertyAliases()));
+    $document = $this->normalizeImportDocument($this->importValue($headers, $row, $this->importDocumentAliases()));
     $canonRaw = $this->importValue($headers, $row, $this->importCanonAliases());
     $meta = [
       'contrato_excel' => $contract,
       'inmueble_simi_excel' => $property,
+      'documento_excel' => $document,
       'canon_excel' => $this->formatImportMoney($canonRaw),
       'canon_excel_raw' => trim($canonRaw),
       'mes_excel' => trim($this->importValue($headers, $row, ['mes', 'periodo', 'mes_canon', 'periodo_canon'])),
@@ -2429,6 +2478,23 @@ final class AdministrativeNotificationsService
     ];
     $meta['detalle_excel'] = $this->importCanonSummary($meta);
     return $meta;
+  }
+
+  private function normalizeImportDocument(string $value): string
+  {
+    $value = trim(mb_strtoupper($value, 'UTF-8'));
+    if ($value === '') {
+      return '';
+    }
+    if (preg_match('/^\d+(?:[.,]0+)?$/', $value) === 1) {
+      return (string) ((int) ((float) str_replace(',', '.', $value)));
+    }
+    $digits = preg_replace('/\D+/', '', $value) ?? '';
+    if ($digits !== '') {
+      return $digits;
+    }
+    $value = preg_replace('/[^A-Z0-9]/u', '', $value) ?? $value;
+    return trim($value);
   }
 
   private function normalizeImportIdentifier(string $value): string
@@ -2495,7 +2561,7 @@ final class AdministrativeNotificationsService
         continue;
       }
       $clean = [];
-      foreach (['contrato_excel', 'inmueble_simi_excel', 'canon_excel', 'canon_excel_raw', 'mes_excel', 'direccion_excel', 'detalle_excel'] as $key) {
+      foreach (['contrato_excel', 'inmueble_simi_excel', 'documento_excel', 'canon_excel', 'canon_excel_raw', 'mes_excel', 'direccion_excel', 'detalle_excel'] as $key) {
         $clean[$key] = trim(mb_substr((string) ($meta[$key] ?? ''), 0, 500, 'UTF-8'));
       }
       if (implode('', $clean) === '') {
@@ -2672,9 +2738,15 @@ final class AdministrativeNotificationsService
       }
       $parts = [];
       $like = '%' . $this->db->escapeLike($value) . '%';
+      $documentValue = $filterKey === 'document' ? $this->normalizeImportDocument($value) : '';
       foreach ($columns as $column) {
-        $parts[] = $this->collatedTextSql("COALESCE(`{$column}`, '')") . ' LIKE ?';
-        $args[] = $like;
+        if ($documentValue !== '') {
+          $parts[] = $this->normalizedDocumentSql("COALESCE(`{$column}`, '')") . ' = ?';
+          $args[] = $documentValue;
+        } else {
+          $parts[] = $this->collatedTextSql("COALESCE(`{$column}`, '')") . ' LIKE ?';
+          $args[] = $like;
+        }
       }
       $where .= ' AND (' . implode(' OR ', $parts) . ')';
     }
@@ -2962,6 +3034,16 @@ final class AdministrativeNotificationsService
   private function collatedTextSql(string $expression): string
   {
     return "CONVERT({$expression} USING utf8mb4) COLLATE utf8mb4_unicode_ci";
+  }
+
+  private function normalizedDocumentSql(string $expression): string
+  {
+    $sql = "UPPER({$this->collatedTextSql($expression)})";
+    foreach (['.', ',', '-', ' ', '/', '\\'] as $needle) {
+      $escaped = str_replace("'", "''", $needle);
+      $sql = "REPLACE({$sql}, '{$escaped}', '')";
+    }
+    return $sql;
   }
 
   /**
@@ -4095,7 +4177,7 @@ final class AdministrativeNotificationsService
     return '1=1';
   }
 
-  /** @param array<string,mixed> $config @return array{name:string,email:string,phone:string,indicator:string} */
+  /** @param array<string,mixed> $config @return array{name:string,email:string,phone:string,document:string,indicator:string} */
   private function resolveColumns(array $config): array
   {
     $table = (string) $config['table'];
@@ -4103,6 +4185,7 @@ final class AdministrativeNotificationsService
       'name' => $this->detect($table, (array) $config['name']),
       'email' => $this->detect($table, (array) $config['email']),
       'phone' => $this->detect($table, (array) $config['phone']),
+      'document' => $this->detect($table, (array) ($config['document'] ?? [])),
       'indicator' => $this->detect($table, (array) $config['indicator']),
     ];
   }
