@@ -1501,13 +1501,45 @@ final class AdministrativeNotificationsService
     if ($expected === '') {
       return false;
     }
+    $numericExpected = preg_match('/^\d+$/', $expected) === 1 ? $expected : '';
     foreach ($columns as $column) {
-      $value = $this->normalizeImportIdentifier((string) ($row[$column] ?? ''));
+      $rawValue = (string) ($row[$column] ?? '');
+      $value = $this->normalizeImportIdentifier($rawValue);
       if ($value !== '' && $value === $expected) {
+        return true;
+      }
+      if ($numericExpected !== '' && $this->stringContainsImportNumericToken($rawValue, $numericExpected)) {
         return true;
       }
     }
     return false;
+  }
+
+  private function stringContainsImportNumericToken(string $value, string $expected): bool
+  {
+    if ($expected === '') {
+      return false;
+    }
+    return preg_match('/(?<!\d)' . preg_quote($expected, '/') . '(?!\d)/', $value) === 1;
+  }
+
+  /**
+   * @param array<string,mixed> $row
+   * @param array<string,array<int,int>> $indexes
+   * @return int[]
+   */
+  private function importMetaIndexesForContractValue(array $row, string $column, array $indexes): array
+  {
+    $matchedIndexes = [];
+    foreach ($indexes as $expected => $metaIndexes) {
+      if (!$this->importContractRowMatchesValue($row, [$column], (string) $expected)) {
+        continue;
+      }
+      foreach ($metaIndexes as $metaIndex) {
+        $matchedIndexes[$metaIndex] = $metaIndex;
+      }
+    }
+    return array_values($matchedIndexes);
   }
 
   /** @param array<string,mixed> $recipient */
@@ -1750,6 +1782,10 @@ final class AdministrativeNotificationsService
           if ($numericChunk !== []) {
             $parts[] = "CAST(`{$column}` AS UNSIGNED) IN ({$numericPlaceholders})";
             array_push($args, ...$numericChunk);
+            foreach ($numericChunk as $numericValue) {
+              $parts[] = "COALESCE(`{$column}`, '') LIKE ?";
+              $args[] = '%' . $this->db->escapeLike((string) $numericValue) . '%';
+            }
           }
         }
         $where = '(' . implode(' OR ', $parts) . ')';
@@ -1764,11 +1800,7 @@ final class AdministrativeNotificationsService
             continue;
           }
           foreach ($columns as $column) {
-            $key = $this->normalizeImportIdentifier((string) ($row[$column] ?? ''));
-            if ($key === '' || empty($indexes[$key])) {
-              continue;
-            }
-            foreach ($indexes[$key] as $metaIndex) {
+            foreach ($this->importMetaIndexesForContractValue($row, $column, $indexes) as $metaIndex) {
               $matched[$metaIndex][$contractId] = $row;
             }
           }
