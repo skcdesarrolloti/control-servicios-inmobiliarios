@@ -2915,8 +2915,13 @@
         renderSelectedModal();
       }
 
-      function excelCell(value) {
-        return "<td>" + escHtml(String(value == null ? "" : value)) + "</td>";
+      function excelXml(value) {
+        return String(value == null ? "" : value)
+          .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
       }
 
       function importReportFileName() {
@@ -2955,7 +2960,7 @@
           ["contrato_sistema", "Contrato en sistema"],
           ["observacion", "Observacion"],
         ];
-        var rows = importReportRows.map(function (row) {
+        var normalizedRows = importReportRows.map(function (row) {
           var copy = Object.assign({}, row || {});
           var id = String(copy.destinatario_id || "").trim();
           if (id && copy.estado_cruce === "Encontrado") {
@@ -2964,20 +2969,52 @@
               copy.observacion = "Encontrado, pero desmarcado en la pagina.";
             }
           }
-          return "<tr>" + columns.map(function (column) {
-            return excelCell(copy[column[0]]);
-          }).join("") + "</tr>";
-        }).join("");
-        var header = "<tr>" + columns.map(function (column) {
-          return "<th>" + escHtml(column[1]) + "</th>";
-        }).join("") + "</tr>";
-        var html =
-          '<html><head><meta charset="UTF-8"></head><body>' +
-          '<table border="1">' +
-          header +
-          rows +
-          "</table></body></html>";
-        var blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+          return copy;
+        });
+        var sheets = [
+          {
+            name: "Coincidieron",
+            rows: normalizedRows.filter(function (row) {
+              return row.estado_cruce === "Encontrado";
+            }),
+          },
+          {
+            name: "Sin coincidencia",
+            rows: normalizedRows.filter(function (row) {
+              return row.estado_cruce !== "Encontrado" && row.estado_cruce !== "Duplicado omitido";
+            }),
+          },
+          {
+            name: "Duplicados",
+            rows: normalizedRows.filter(function (row) {
+              return row.estado_cruce === "Duplicado omitido";
+            }),
+          },
+        ];
+        var workbook =
+          '<?xml version="1.0" encoding="UTF-8"?>' +
+          '<?mso-application progid="Excel.Sheet"?>' +
+          '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ' +
+          'xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+          'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
+          'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" ' +
+          'xmlns:html="http://www.w3.org/TR/REC-html40">' +
+          '<Styles><Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#EAF2FF" ss:Pattern="Solid"/></Style></Styles>' +
+          sheets.map(function (sheet) {
+            var header = "<Row>" + columns.map(function (column) {
+              return '<Cell ss:StyleID="Header"><Data ss:Type="String">' + excelXml(column[1]) + "</Data></Cell>";
+            }).join("") + "</Row>";
+            var body = sheet.rows.length
+              ? sheet.rows.map(function (row) {
+                  return "<Row>" + columns.map(function (column) {
+                    return '<Cell><Data ss:Type="String">' + excelXml(row[column[0]]) + "</Data></Cell>";
+                  }).join("") + "</Row>";
+                }).join("")
+              : '<Row><Cell><Data ss:Type="String">Sin registros</Data></Cell></Row>';
+            return '<Worksheet ss:Name="' + excelXml(sheet.name) + '"><Table>' + header + body + "</Table></Worksheet>";
+          }).join("") +
+          "</Workbook>";
+        var blob = new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8" });
         var url = URL.createObjectURL(blob);
         var link = document.createElement("a");
         link.href = url;
