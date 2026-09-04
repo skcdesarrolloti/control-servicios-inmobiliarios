@@ -389,6 +389,61 @@ trait MaintenanceQueriesConcern
       $where[] = '1=1';
     }
 
+    $countSql  = "SELECT COUNT(1) FROM `{$table}` t WHERE " . implode(' AND ', $where);
+    $totalRows = (int) $this->db->getVar($this->convertSql($countSql), $args);
+
+    [$page, $perPage] = $this->resolveMaintenancePagination($filters);
+    $totalPages = max(1, (int) ceil($totalRows / max(1, $perPage)));
+    if ($page > $totalPages) {
+      $page = $totalPages;
+    }
+    $offset = max(0, ($page - 1) * $perPage);
+
+    $this->lastMaintenanceTotal = max(0, $totalRows);
+    $this->lastMaintenancePage = $page;
+    $this->lastMaintenancePerPage = $perPage;
+    $this->lastMaintenanceTotalPages = $totalPages;
+
+    $selectableColumns = $this->maintenanceSelectableColumns($table);
+
+    $select = implode(', ', array_map(static fn(string $col): string => "t.`{$col}`", $selectableColumns));
+    $sql  = "SELECT {$select} FROM `{$table}` t WHERE " . implode(' AND ', $where) . ' ORDER BY t.fecha DESC LIMIT ? OFFSET ?';
+    $rows = $this->db->getResults($this->convertSql($sql), array_merge($args, [$perPage, $offset]));
+    if (empty($rows)) {
+      return [];
+    }
+
+    /** @var array<int,array<string,mixed>> $rows */
+    return $this->enrichRowsWithRelatedTables($rows);
+  }
+
+  /**
+   * @param array<string,string> $filters
+   * @return array<int,array<string,mixed>>
+   */
+  public function queryMaintenanceExportRows(array $filters): array
+  {
+    $table = $this->ticketsTable();
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+
+    [$where, $args] = $this->buildMaintenanceWhereParts($filters);
+    $selectableColumns = $this->maintenanceSelectableColumns($table);
+    $select = implode(', ', array_map(static fn(string $col): string => "t.`{$col}`", $selectableColumns));
+    $orderColumn = $this->schema->columnExists($table, 'fecha') ? 't.`fecha`' : 't.`_ID`';
+    $rows = $this->db->getResults(
+      $this->convertSql("SELECT {$select} FROM `{$table}` t WHERE " . implode(' AND ', $where) . " ORDER BY {$orderColumn} DESC"),
+      $args
+    );
+
+    /** @var array<int,array<string,mixed>> $rows */
+    return $rows;
+  }
+
+  /** @return array<int,string> */
+  private function maintenanceSelectableColumns(string $table): array
+  {
     $columns = [
       '_ID',
       'id_ticket',
@@ -450,40 +505,14 @@ trait MaintenanceQueriesConcern
       'cct_modified',
     ];
 
-    $countSql  = "SELECT COUNT(1) FROM `{$table}` t WHERE " . implode(' AND ', $where);
-    $totalRows = (int) $this->db->getVar($this->convertSql($countSql), $args);
-
-    [$page, $perPage] = $this->resolveMaintenancePagination($filters);
-    $totalPages = max(1, (int) ceil($totalRows / max(1, $perPage)));
-    if ($page > $totalPages) {
-      $page = $totalPages;
-    }
-    $offset = max(0, ($page - 1) * $perPage);
-
-    $this->lastMaintenanceTotal = max(0, $totalRows);
-    $this->lastMaintenancePage = $page;
-    $this->lastMaintenancePerPage = $perPage;
-    $this->lastMaintenanceTotalPages = $totalPages;
-
     $selectableColumns = [];
     foreach ($columns as $column) {
       if ($this->schema->columnExists($table, $column)) {
         $selectableColumns[] = $column;
       }
     }
-    if (empty($selectableColumns)) {
-      $selectableColumns = ['_ID'];
-    }
 
-    $select = implode(', ', array_map(static fn(string $col): string => "t.`{$col}`", $selectableColumns));
-    $sql  = "SELECT {$select} FROM `{$table}` t WHERE " . implode(' AND ', $where) . ' ORDER BY t.fecha DESC LIMIT ? OFFSET ?';
-    $rows = $this->db->getResults($this->convertSql($sql), array_merge($args, [$perPage, $offset]));
-    if (empty($rows)) {
-      return [];
-    }
-
-    /** @var array<int,array<string,mixed>> $rows */
-    return $this->enrichRowsWithRelatedTables($rows);
+    return !empty($selectableColumns) ? $selectableColumns : ['_ID'];
   }
 
   /** @return array<int,string> */

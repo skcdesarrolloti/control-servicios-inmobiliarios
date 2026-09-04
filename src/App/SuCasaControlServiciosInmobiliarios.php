@@ -26,6 +26,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_POSTPONE_TICKET = 'scm_postergar_ticket';
   const AJAX_STATUS_TICKETS = 'scm_filtrar_tickets_estado';
   const AJAX_MY_TICKETS = 'scm_mis_tickets';
+  const AJAX_EXPORT_CASES_EXCEL = 'scm_exportar_casos_excel';
   const AJAX_COTIZACIONES_MANTENIMIENTO = 'scm_cotizaciones_mantenimiento';
   const AJAX_DELETE_COTIZACION = 'scm_eliminar_cotizacion_mantenimiento';
   const AJAX_COTIZACION_MANTENIMIENTO_PDF = 'scm_cotizacion_mantenimiento_pdf';
@@ -1039,7 +1040,7 @@ final class SuCasaControlServiciosInmobiliarios
         'count' => (int) ($stats['total'] ?? 0),
         'cards' => (string) ($result['tbody'] ?? ''),
         'pagination' => (string) ($result['pagination_html'] ?? ''),
-        'form' => $this->render_status_maintenance_filter_form($domKey, $prefix, $params, $maintenanceFilterOptions, $lockedStatusLabel),
+        'form' => $this->render_status_maintenance_filter_form($domKey, $prefix, $params, $maintenanceFilterOptions, $lockedStatusLabel, true, $bucketKey),
         'stats' => $stats,
         'loaded' => true,
       ];
@@ -1081,7 +1082,7 @@ final class SuCasaControlServiciosInmobiliarios
     ];
   }
 
-  private function render_status_maintenance_filter_form(string $domKey, string $prefix, array $p, array $filterOptions, string $lockedStatusLabel): string
+  private function render_status_maintenance_filter_form(string $domKey, string $prefix, array $p, array $filterOptions, string $lockedStatusLabel, bool $allowExport = false, string $statusBucket = ''): string
   {
     ob_start();
 ?>
@@ -1162,6 +1163,9 @@ final class SuCasaControlServiciosInmobiliarios
         </div>
         <div class="scm-actions">
           <button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button>
+          <?php if ($allowExport && $this->canManageDashboardPermissions()): ?>
+            <button class="scm-btn-secondary btn btn-outline" type="button" data-scm-export-cases data-scm-export-topic="mantenimiento" data-scm-export-bucket="<?php echo esc_attr($statusBucket); ?>"><i class="fas fa-file-excel" aria-hidden="true"></i> Exportar Excel</button>
+          <?php endif; ?>
           <button class="scm-btn-secondary btn btn-outline" type="button" id="scm-clear-<?php echo esc_attr($domKey); ?>">Limpiar</button>
           <span class="scm-spinner" id="scm-spinner-<?php echo esc_attr($domKey); ?>"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
         </div>

@@ -361,6 +361,7 @@ trait RendersDashboard
         'postpone_ticket' => self::AJAX_POSTPONE_TICKET,
         'status_tickets'  => self::AJAX_STATUS_TICKETS,
         'my_tickets'      => self::AJAX_MY_TICKETS,
+        'export_cases_excel' => self::AJAX_EXPORT_CASES_EXCEL,
         'cotizaciones_mantenimiento' => self::AJAX_COTIZACIONES_MANTENIMIENTO,
         'actas_satisfaccion' => self::AJAX_TICKET_COMPLETION_LIST,
         'revision_correctiva' => self::AJAX_CORRECTIVE_REVIEW,
@@ -848,6 +849,9 @@ trait RendersDashboard
             </div>
             <div class="scm-actions">
               <button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button>
+              <?php if ($canManageDashboardPermissions): ?>
+                <button class="scm-btn-secondary btn btn-outline" type="button" data-scm-export-cases data-scm-export-topic="mantenimiento"><i class="fas fa-file-excel" aria-hidden="true"></i> Exportar Excel</button>
+              <?php endif; ?>
               <button class="scm-btn-secondary btn btn-outline scm-classify-magnitude" type="button" data-revision-type="correctiva">Calcular magnitud da&ntilde;o</button>
               <button class="scm-btn-secondary btn btn-outline" type="button" id="scm-clear">Limpiar</button>
               <span class="scm-spinner" id="scm-spinner"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>

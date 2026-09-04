@@ -30,6 +30,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_POSTPONE_TICKET => 'ajax_handler_postpone_ticket',
       SuCasaControlServiciosInmobiliarios::AJAX_STATUS_TICKETS => 'ajax_handler_status_tickets',
       SuCasaControlServiciosInmobiliarios::AJAX_MY_TICKETS => 'ajax_handler_my_tickets',
+      SuCasaControlServiciosInmobiliarios::AJAX_EXPORT_CASES_EXCEL => 'ajax_handler_export_cases_excel',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACIONES_MANTENIMIENTO => 'ajax_handler_cotizaciones_mantenimiento',
       SuCasaControlServiciosInmobiliarios::AJAX_DELETE_COTIZACION => 'ajax_handler_delete_cotizacion_mantenimiento',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_MANTENIMIENTO_PDF => 'ajax_handler_cotizacion_mantenimiento_pdf',

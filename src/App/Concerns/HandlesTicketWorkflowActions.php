@@ -574,6 +574,83 @@ trait HandlesTicketWorkflowActions
     ]);
   }
 
+  public function ajax_handler_export_cases_excel(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canManageDashboardPermissions()) {
+      $this->jsonFail('No tienes permiso para exportar casos.');
+    }
+
+    $topicKey = $this->normalize_status_topic((string) ($_POST['topic'] ?? 'mantenimiento'));
+    if ($topicKey === '') {
+      $topicKey = 'mantenimiento';
+    }
+    if ($topicKey !== 'mantenimiento') {
+      $this->jsonFail('La exportacion de Excel esta disponible para casos de mantenimiento.');
+    }
+
+    $bucketKey = $this->normalize_status_bucket((string) ($_POST['bucket'] ?? ''));
+    $module = $this->get_servicios_inmobiliarios_module();
+    $prefix = $bucketKey !== ''
+      ? $this->status_prefix($bucketKey, $topicKey)
+      : 'scm_';
+    $params = $module->parseParams($_POST, $prefix);
+    $rows = $module->exportRows($params, $bucketKey);
+
+    $filename = 'casos-servicios-inmobiliarios-' . date('Ymd-His') . '.xls';
+    if (ob_get_level() > 0) {
+      ob_end_clean();
+    }
+    header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+
+    echo "\xEF\xBB\xBF";
+    echo '<!DOCTYPE html><html><head><meta charset="UTF-8">';
+    echo '<style>table{border-collapse:collapse}th,td{border:1px solid #b7b7b7;padding:6px;mso-number-format:"\@";}.text{mso-number-format:"\@";}</style>';
+    echo '</head><body><table><thead><tr>';
+    foreach (['Apro', 'Arre', 'Contrato', 'Inmueble', '# caso', 'Direccion', 'Observacion'] as $heading) {
+      echo '<th>' . $this->excelExportCell($heading) . '</th>';
+    }
+    echo '</tr></thead><tbody>';
+    foreach ($rows as $row) {
+      $ticket = trim((string) ($row['id_ticket'] ?? ''));
+      if ($ticket === '') {
+        $ticket = trim((string) ($row['_ID'] ?? ''));
+      }
+      $cells = [
+        $row['propietario'] ?? '',
+        $row['arrendatario'] ?? '',
+        $row['contrato'] ?? '',
+        $row['inmueble'] ?? ($row['id_inmueble'] ?? ''),
+        $ticket,
+        $row['direccion'] ?? '',
+        '',
+      ];
+      echo '<tr>';
+      foreach ($cells as $cell) {
+        echo '<td class="text">' . $this->excelExportCell((string) $cell) . '</td>';
+      }
+      echo '</tr>';
+    }
+    echo '</tbody></table></body></html>';
+    exit;
+  }
+
+  private function excelExportCell(string $value): string
+  {
+    $value = html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $value = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/u', ' ', $value) ?? $value;
+    $normalized = preg_replace('/\s+/u', ' ', $value);
+    $value = trim(is_string($normalized) ? $normalized : $value);
+    if ($value !== '' && preg_match('/^[=+\-@]/', $value) === 1) {
+      $value = "'" . $value;
+    }
+
+    return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+  }
+
   public function ajax_handler_activate_ticket(): void
   {
     $this->verifyCsrf();

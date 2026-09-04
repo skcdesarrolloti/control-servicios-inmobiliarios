@@ -140,6 +140,7 @@
     var actionPostponeTicket = actions.postpone_ticket || "";
     var actionStatusTickets = actions.status_tickets || "";
     var actionMyTickets = actions.my_tickets || "";
+    var actionExportCasesExcel = actions.export_cases_excel || "";
     var actionCotizacionesMantenimiento =
       actions.cotizaciones_mantenimiento || "";
     var actionDeleteCotizacion = actions.delete_cotizacion || "";
@@ -269,6 +270,56 @@
           window.clearTimeout(timeout);
         });
     }
+
+    function submitCasesExport(button) {
+      if (!button || !ajaxUrl || !actionExportCasesExcel) {
+        showToast("error", "No se pudo preparar el export de casos.");
+        return;
+      }
+
+      var sourceForm = button.closest("form");
+      var exportForm = document.createElement("form");
+      exportForm.method = "POST";
+      exportForm.action = ajaxUrl;
+      exportForm.target = "_blank";
+      exportForm.style.display = "none";
+
+      function append(name, value) {
+        var input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value == null ? "" : String(value);
+        exportForm.appendChild(input);
+      }
+
+      if (sourceForm) {
+        new FormData(sourceForm).forEach(function (value, key) {
+          append(key, value);
+        });
+      }
+      append("action", actionExportCasesExcel);
+      append("nonce", nonce);
+      append("topic", button.getAttribute("data-scm-export-topic") || "mantenimiento");
+      append("bucket", button.getAttribute("data-scm-export-bucket") || "");
+
+      document.body.appendChild(exportForm);
+      exportForm.submit();
+      window.setTimeout(function () {
+        exportForm.remove();
+      }, 1000);
+    }
+
+    root.addEventListener("click", function (event) {
+      var exportButton =
+        event.target && event.target.closest
+          ? event.target.closest("[data-scm-export-cases]")
+          : null;
+      if (!exportButton) {
+        return;
+      }
+      event.preventDefault();
+      submitCasesExport(exportButton);
+    });
 
     function responseJson(response) {
       return response.text().then(function (text) {

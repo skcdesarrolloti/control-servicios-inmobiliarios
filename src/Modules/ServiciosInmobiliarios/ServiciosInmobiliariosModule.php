@@ -119,6 +119,20 @@ final class ServiciosInmobiliariosModule
   }
 
   /**
+   * @param array<string,string> $params
+   * @return array<int,array<string,mixed>>
+   */
+  public function exportRows(array $params, string $statusBucket = ''): array
+  {
+    $statusBucket = in_array($statusBucket, ['postergados', 'cerrados'], true) ? $statusBucket : '';
+    if ($statusBucket !== '') {
+      $params['_scmStatusBucket'] = $statusBucket;
+    }
+
+    return $this->ticketsRepository->queryMaintenanceExportRows($params);
+  }
+
+  /**
    * Renderiza tarjetas completas para tickets concretos usando el mismo presentador del listado normal.
    *
    * @param array<int,int|string> $ticketIds
