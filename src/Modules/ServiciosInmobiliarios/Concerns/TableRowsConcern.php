@@ -268,6 +268,7 @@ trait TableRowsConcern
         . ' data-id-revision-correctiva="' . esc_attr($idCorrUrl) . '"'
         . ' data-id-revision-preventiva="' . esc_attr($idPrevUrl) . '"'
         . ' data-preventiva-no-access-count="' . esc_attr((string) $preventivaNoAccessCount) . '"'
+        . ' data-tab-key="mantenimiento"'
         . ($statusBucket !== '' ? ' data-status-bucket="' . esc_attr($statusBucket) . '"' : '')
         . ' onclick="scmOpenCase(this)" type="button">Ver caso</button>';
       $html .= '</div>';

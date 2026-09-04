@@ -7,6 +7,7 @@ $trait = file_get_contents($root . '/src/App/Concerns/HandlesCorrectiveReviewAct
 $app = file_get_contents($root . '/src/App/SuCasaControlServiciosInmobiliarios.php');
 $router = file_get_contents($root . '/src/Http/Api/AuthenticatedActionRouter.php');
 $dashboard = file_get_contents($root . '/src/App/Concerns/RendersDashboard.php');
+$maintenanceRows = file_get_contents($root . '/src/Modules/ServiciosInmobiliarios/Concerns/TableRowsConcern.php');
 $js = file_get_contents($root . '/public/assets/js/scm-admin.js');
 
 $checks = [
@@ -21,7 +22,8 @@ $checks = [
   'dashboard exposes runtime action' => is_string($dashboard) && str_contains($dashboard, "'revision_correctiva' => self::AJAX_CORRECTIVE_REVIEW"),
   'dashboard supports direct media refs for compressed uploads' => is_string($dashboard) && str_contains($dashboard, 'cotizacion_split_media_refs'),
   'case modal has corrective review button' => is_string($js) && str_contains($js, 'data-scm-open-corrective-review'),
-  'case modal hides corrective review for preventive tickets' => is_string($js) && str_contains($js, 'isPreventiveForActions') && str_contains($js, '&& !isPreventiveForActions'),
+  'maintenance rows mark their source tab' => is_string($maintenanceRows) && str_contains($maintenanceRows, 'data-tab-key="mantenimiento"'),
+  'case modal limits corrective review to maintenance tab' => is_string($js) && str_contains($js, 'function isMaintenanceCase') && str_contains($js, '&& isMaintenanceForActions'),
   'case actions are separated into groups' => is_string($js) && str_contains($js, 'renderActionGroup("Complementarias"') && str_contains($js, 'renderActionGroup("Cotización"'),
   'JS compresses corrective photos' => is_string($js) && str_contains($js, 'function compressPhoto(file)'),
 ];

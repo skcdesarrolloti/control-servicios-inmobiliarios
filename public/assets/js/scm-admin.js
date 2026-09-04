@@ -1638,6 +1638,12 @@
     return /preventiva/i.test(values);
   }
 
+  function isMaintenanceCase(caseBtn) {
+    if (!caseBtn || !caseBtn.dataset) return false;
+    var tabKey = String(caseBtn.dataset.tabKey || "").trim().toLowerCase();
+    return tabKey === "mantenimiento";
+  }
+
   function syncPreventivaNoAccessBox(scope) {
     if (!scope) return;
     var box = scope.querySelector("[data-scm-preventiva-no-access-box]");
@@ -4198,7 +4204,7 @@
           seguimientoWrap.setAttribute("id", "scm-sec-seguimiento");
           seguimientoWrap.style.display = "none";
         }
-        var isPreventiveForActions = !isPublicPqr && isPreventivaCase(btn);
+        var isMaintenanceForActions = !isPublicPqr && isMaintenanceCase(btn);
         var mainActionButtons = [];
         var complementaryActionButtons = [];
         var quoteActionButtons = [];
@@ -4273,7 +4279,7 @@
             '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>',
             '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar ticket</button>',
           );
-          if (statusBucket !== "cerrados" && !isPreventiveForActions) {
+          if (statusBucket !== "cerrados" && isMaintenanceForActions) {
             complementaryActionButtons.push(
               '<button type="button" class="scm-case-work-btn" data-scm-open-corrective-review>Crear revisi&oacute;n correctiva</button>',
             );
