@@ -125,17 +125,26 @@ trait HandlesTicketCompletion
       }
       $repo = new CompletionRepository($this->db);
       $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
-      if (($_POST['operation'] ?? '') === 'archive') {
+      $operation = (string) ($_POST['operation'] ?? '');
+      if ($operation === 'archive') {
         $id = (int) ($_POST['act_id'] ?? 0);
         $service->archive($id, (string) ($_POST['reason'] ?? ''), $this->ticketCompletionActor());
+      } elseif ($operation === 'delete') {
+        $id = (int) ($_POST['act_id'] ?? 0);
+        $service->deleteRetired($id, $this->ticketCompletionActor());
+      } elseif ($operation !== '') {
+        throw new \DomainException('Operación de acta no válida.');
       }
       $data = $service->dashboardList($_POST);
       $view = new CompletionView();
+      $message = $operation === 'archive'
+        ? 'Acta archivada. Salió de pendientes, el ticket sigue abierto y no se generó cobro.'
+        : ($operation === 'delete' ? 'Acta eliminada permanentemente. No se cerró el ticket ni se generó cobro.' : '');
       $this->jsonOk([
         'table_html' => $view->dashboardTable($data['items'], $service, $data['pagination']),
         'kpis_html' => $view->dashboardKpis($data['stats']),
         'count' => (string) $data['count'],
-        'message' => ($_POST['operation'] ?? '') === 'archive' ? 'Acta archivada. Salió de pendientes, el ticket sigue abierto y no se generó cobro.' : '',
+        'message' => $message,
       ]);
     } catch (\DomainException $error) {
       $this->jsonFail($error->getMessage());

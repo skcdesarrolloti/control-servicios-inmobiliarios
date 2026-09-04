@@ -185,6 +185,81 @@
                   archiveAct(window.prompt('Motivo para archivar:', '') || '');
                 }
               });
+              document.addEventListener('click', function(e) {
+                var deleteBtn = e.target && e.target.closest ? e.target.closest('[data-acta-delete]') : null;
+                if (!deleteBtn) return;
+                e.preventDefault();
+                var actId = deleteBtn.getAttribute('data-acta-delete') || '';
+                if (!actId) return;
+
+                function deleteAct() {
+                  var fd = new FormData(form);
+                  fd.append('action', action);
+                  fd.append('nonce', nonce);
+                  fd.append('operation', 'delete');
+                  fd.append('act_id', actId);
+                  deleteBtn.disabled = true;
+                  if (spinner) spinner.classList.add('active');
+                  if (pendingPanel) pendingPanel.setAttribute('data-scm-loading', '1');
+                  setInlineListLoading(pendingPanel || form.closest('.scm-tab-panel') || document, true, 'Eliminando acta...');
+                  fetch(ajaxUrl, {
+                      method: 'POST',
+                      body: fd,
+                      credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                      return r.json();
+                    })
+                    .then(function(json) {
+                      if (!json || !json.success) {
+                        var err = json && json.data && json.data.message ? json.data.message : 'No se pudo eliminar el acta.';
+                        throw new Error(err);
+                      }
+                      var d = json.data || {};
+                      var t = document.getElementById(tableId);
+                      var k = document.getElementById(kpisId);
+                      if (t && typeof d.table_html === 'string') t.innerHTML = d.table_html;
+                      if (k && typeof d.kpis_html === 'string') k.innerHTML = d.kpis_html;
+                      var actaHeaderCount = document.getElementById('sacta-kpi-count');
+                      if (actaHeaderCount && typeof d.count === 'string') actaHeaderCount.textContent = d.count;
+                      notifyResult('success', d.message || 'Acta eliminada.');
+                    })
+                    .catch(function(err) {
+                      notifyResult('error', err.message || 'No se pudo eliminar el acta.');
+                    })
+                    .finally(function() {
+                      deleteBtn.disabled = false;
+                      if (spinner) spinner.classList.remove('active');
+                      if (pendingPanel) pendingPanel.setAttribute('data-scm-loading', '0');
+                      setInlineListLoading(pendingPanel || form.closest('.scm-tab-panel') || document, false);
+                    });
+                }
+
+                if (window.Swal && typeof window.Swal.fire === 'function') {
+                  window.Swal.fire({
+                    icon: 'warning',
+                    title: 'Eliminar acta #' + actId + '?',
+                    text: 'Esta acción borra permanentemente el registro archivado/anulado. No se puede eliminar un acta firmada.',
+                    input: 'text',
+                    inputLabel: 'Escribe ELIMINAR para confirmar',
+                    showCancelButton: true,
+                    confirmButtonText: 'Eliminar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#b42318',
+                    inputValidator: function(value) {
+                      return String(value || '').trim().toUpperCase() === 'ELIMINAR' ? undefined : 'Escribe ELIMINAR para confirmar.';
+                    }
+                  }).then(function(result) {
+                    if (result && result.isConfirmed) deleteAct();
+                  });
+                  return;
+                }
+
+                if (window.confirm('Eliminar acta #' + actId + '? Esta acción no se puede deshacer.')) {
+                  var typed = window.prompt('Escribe ELIMINAR para confirmar:', '') || '';
+                  if (typed.trim().toUpperCase() === 'ELIMINAR') deleteAct();
+                }
+              });
             }
             var clearBtn = document.querySelector('[data-pending-clear="' + prefix + '"]');
             if (clearBtn) {

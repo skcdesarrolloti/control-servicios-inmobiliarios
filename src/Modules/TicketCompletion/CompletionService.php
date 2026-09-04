@@ -301,6 +301,40 @@ final class CompletionService
     $this->retirePending($id, $reason, $actor, 'archived', 'archivo', 'archivada');
   }
 
+  public function deleteRetired(int $id, array $actor): void
+  {
+    $photos = [];
+    $act = $this->repo->act($id);
+    $this->repo->transaction((int) $act['ticket_pk'], function (array $ticket) use ($id, $actor, &$photos): void {
+      $act = $this->repo->act($id);
+      if (!in_array((string) $act['status'], ['archived', 'cancelled'], true)) {
+        throw new \DomainException('Solo se pueden eliminar actas archivadas o anuladas. Las actas firmadas se conservan como soporte de cierre y cobro.');
+      }
+      if (!empty($act['legacy_act_id']) || !empty($act['report_id']) || !empty($act['signed_pdf'])) {
+        throw new \DomainException('Esta acta ya tiene soportes de cierre o cobro y no se puede eliminar.');
+      }
+      try {
+        $payload = $this->payload($act);
+        foreach ($payload['items'] ?? [] as $item) {
+          foreach (($item['photos'] ?? []) as $photo) {
+            if (is_array($photo)) {
+              $photos[] = $photo;
+            }
+          }
+        }
+      } catch (\Throwable) {
+        $photos = [];
+      }
+      if ($this->repo->db->delete($this->repo->table(), ['id' => $id]) !== 1) {
+        throw new \RuntimeException('No se pudo eliminar el acta.');
+      }
+      $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' eliminada permanentemente del tablero de actas. No cerró el ticket ni generó cobro.', $actor['name'], $actor['employee_id']);
+    });
+    if ($photos !== []) {
+      \SCM\Support\StoredFileService::fromRuntime()->deleteStoredImages($photos);
+    }
+  }
+
   private function retirePending(int $id, string $reason, array $actor, string $status, string $actionName, string $statusLabel): void
   {
     $reason = CompletionPolicy::text($reason, 'motivo de ' . $actionName, 1000);
