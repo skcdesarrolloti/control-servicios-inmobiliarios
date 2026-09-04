@@ -64,6 +64,18 @@
 .scm-acta [data-acta-message]:not(:empty) { padding: 14px; border: 1px solid var(--acta-border); background: var(--acta-surface); border-radius: 8px; margin-top: 16px; }
 .scm-acta [data-acta-message].is-error { background: #fff1f2; color: #9f1239; border-color: #e2a1b2; }
 .scm-acta-page { margin: 0; background: #eef2f7; padding: 24px 16px; }
+.scm-acta-create-body { min-height: 100vh; padding-top: 0; font-family: Poppins, system-ui, sans-serif; }
+.scm-acta-create-top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px clamp(14px, 4vw, 34px); background: #10264a; color: #fff; box-shadow: 0 10px 28px rgba(16, 38, 74, .22); }
+.scm-acta-create-brand { display: flex; align-items: center; gap: 12px; color: #fff; font-weight: 800; text-decoration: none; }
+.scm-acta-create-brand .scm-acta-logo { width: 132px; min-height: 62px; flex-basis: 132px; padding: 8px 12px; border-color: rgba(255,255,255,.18); box-shadow: none; }
+.scm-acta-create-brand .scm-acta-logo img { max-height: 44px; }
+.scm-acta-create-session { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 14px; font-size: 13px; }
+.scm-acta-create-session a { color: #fff; border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 8px 12px; text-decoration: none; }
+.scm-acta-create-session a:hover, .scm-acta-create-session a:focus-visible { background: rgba(255,255,255,.12); }
+.scm-acta-create-shell { width: min(1040px, calc(100% - 24px)); margin: 28px auto; }
+.scm-acta-create-hero { margin-bottom: 18px; padding: 24px; border: 1px solid var(--acta-border); border-radius: 16px; background: #fff; box-shadow: 0 18px 44px rgba(16, 38, 74, .08); }
+.scm-acta-create-hero h1 { margin-bottom: 10px; }
+.scm-acta-create-hero p:last-child { margin-bottom: 0; }
 .scm-acta-document { max-width: 960px; margin: 0 auto; padding: clamp(20px, 5vw, 48px); background: #fff; border: 1px solid #cbd5e1; border-radius: 16px; }
 .scm-acta-document header { border-bottom: 3px solid #e79815; padding-bottom: 24px; }
 .scm-acta-document-head { display: grid; gap: 12px; }
@@ -113,6 +125,9 @@
 @keyframes acta-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .scm-acta-spinner { animation: none; } .scm-acta-photo-thumb img { transition: none; } }
 @media (max-width: 600px) {
+  .scm-acta-create-top { position: static; align-items: flex-start; flex-direction: column; }
+  .scm-acta-create-session { justify-content: flex-start; }
+  .scm-acta-create-shell { width: calc(100% - 16px); margin: 14px auto; }
   .scm-acta-brand { align-items: flex-start; gap: 12px; }
   .scm-acta-logo { width: 124px; min-height: 70px; flex-basis: 124px; padding: 10px; border-radius: 14px; }
   .scm-acta-logo img { max-height: 48px; }

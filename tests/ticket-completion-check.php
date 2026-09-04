@@ -36,6 +36,8 @@ $assert(Policy::transportBase(['valor_transporte' => '4.000']) === 4000 && Polic
 $assert(Policy::transportMaximum(['valor_transporte' => '']) === null, 'missing transport configuration has no chargeable maximum');
 $rejects(static fn() => Policy::number('-100'), 'negative fee rejected');
 $rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => '']]), 'solution required for every damage');
+$signingForm = (new View())->signingForm(['payload_hash' => str_repeat('a', 64)], ['signer' => ['name' => 'ROYNÉR PROPIETARIO']], 'csrf-token');
+$assert(str_contains($signingForm, 'name="signature_name"') && str_contains($signingForm, 'value="ROYNÉR PROPIETARIO"'), 'signature form pre-fills the selected signer name as the actual input value');
 $photoDescriptor = ['name' => str_repeat('a', 24) . '_123.jpg', 'mime' => 'image/jpeg', 'width' => 1200, 'height' => 900, 'bytes' => 350000, 'sha256' => str_repeat('b', 64)];
 $assert(Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [$photoDescriptor]]])[0]['photos'][0]['width'] === 1200, 'compressed photo metadata accepted');
 $rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [array_replace($photoDescriptor, ['bytes' => 1500001])]]]), 'oversized photo evidence rejected');
@@ -63,6 +65,10 @@ $assert(str_contains($actCss, '.scm-acta-thanks') && str_contains($actCss, '.scm
 $publicActJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/ticket-completion-public.js');
 $assert(str_contains($publicActJs, 'data-acta-gallery-item') && str_contains($publicActJs, 'ArrowRight') && str_contains($publicActJs, 'Cerrar galería'), 'act public view supports large photo gallery navigation');
 $assert(str_contains($publicActJs, 'redirect_url') && str_contains($publicActJs, 'window.location.assign'), 'act signer is redirected to the thank-you page after signing');
+$directCreatePhp = (string) file_get_contents(dirname(__DIR__) . '/public/crear-acta.php');
+$directCreateJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/ticket-completion-create.js');
+$assert(str_contains($directCreatePhp, 'crear-acta.php?ticket_pk=_ID') && str_contains($directCreatePhp, 'data-acta-create-page') && str_contains($directCreatePhp, 'Elaborando como'), 'authenticated direct act creation route uses the internal ticket id and current session actor');
+$assert(str_contains($directCreateJs, 'operation", "create"') && str_contains($directCreateJs, 'redirect_url') && str_contains($directCreateJs, 'MAX_PHOTOS_PER_ACT = 12'), 'direct act creation page submits through the secure endpoint and redirects to the act dashboard');
 
 if (!in_array('--database', $argv, true)) { echo "$checks domain checks passed. Use --database for isolated SQL integration checks.\n"; exit; }
 require dirname(__DIR__) . '/bootstrap/app.php';
@@ -97,6 +103,7 @@ $notifications = [];
 $service = new Service($repo, str_repeat('test-secret-', 4), 'http://127.0.0.1:8097', static function ($to, $subject, $html, $options) use (&$notifications): int {
   $notifications[] = compact('to', 'subject', 'html', 'options'); return 1;
 });
+$assert($service->dashboardUrlForTicket(['id_ticket' => '9001', '_ID' => 1]) === 'http://127.0.0.1:8097/index.php?tab=actas_satisfaccion&sacta_estado=pending&sacta_caso=9001', 'act service builds a direct dashboard redirect to the satisfaction acts tab');
 $actor = ['user_id' => 1, 'employee_id' => '200', 'name' => 'Funcionario Prueba', 'cargo' => 'Coordinador QA', 'email' => 'actor@example.invalid', 'phone' => '3001234567'];
 $input = ['signer_role' => 'propietario', 'signer_name' => 'Ana Pérez', 'executor' => 'inmobiliaria', 'items' => [['damage' => 'Fuga en tubería de cocina', 'solution' => 'Se reemplazó el tramo y se verificó presión.']], 'observations' => 'Sin filtración en la prueba final.', 'transport' => '8000', 'confirm' => '1'];
 $photoName = bin2hex(random_bytes(12)) . '_' . time() . '.jpg';

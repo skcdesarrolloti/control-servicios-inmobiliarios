@@ -93,7 +93,10 @@ trait HandlesTicketCompletion
         }
         unset($item);
         $input['items'] = $items;
-        try { $result = $service->create($ticketId, $input, $actor); }
+        try {
+          $result = $service->create($ticketId, $input, $actor);
+          $result['redirect_url'] = $service->dashboardUrlForTicket($repo->ticket($ticketId), 'pending');
+        }
         catch (\Throwable $error) { $this->storedFiles()->deleteStoredImages($storedPhotos); throw $error; }
       } elseif (in_array($operation, ['resend', 'cancel'], true)) {
         $id = (int) ($_POST['act_id'] ?? 0);

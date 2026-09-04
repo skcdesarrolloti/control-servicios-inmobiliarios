@@ -87,6 +87,19 @@ final class CompletionService
     return rtrim($this->baseUrl, '/') . '/ticket-acta.php?id=' . $id;
   }
 
+  public function dashboardUrlForTicket(array $ticket, string $status = 'pending'): string
+  {
+    $case = trim((string) ($ticket['id_ticket'] ?? '')) ?: trim((string) ($ticket['_ID'] ?? ''));
+    $query = [
+      'tab' => 'actas_satisfaccion',
+      'sacta_estado' => $status,
+    ];
+    if ($case !== '') {
+      $query['sacta_caso'] = $case;
+    }
+    return rtrim($this->baseUrl, '/') . '/index.php?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+  }
+
   public function token(array $act): string
   {
     return hash_hmac('sha256', 'ticket-completion|' . $act['id'] . '|' . $act['token_nonce'], $this->secret);

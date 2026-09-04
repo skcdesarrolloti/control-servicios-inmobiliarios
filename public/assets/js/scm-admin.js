@@ -1724,6 +1724,11 @@
         .then(function (json) {
           if (sub._scmActaRun !== actaRun) return;
           if (!json || !json.success || !json.data) throw new Error(json && json.data && json.data.message || "No se pudo completar la operación.");
+          if (operation === "create" && json.data.redirect_url) {
+            if (json.data.message) scmNotify(json.data.queued === false ? "error" : "success", json.data.message, "Acta de satisfacción");
+            window.location.assign(json.data.redirect_url);
+            return;
+          }
           body.innerHTML = json.data.html;
           bind();
           if (json.data.message) message(json.data.message, json.data.queued === false);

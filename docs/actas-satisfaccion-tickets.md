@@ -139,7 +139,8 @@ El Listing debe tener como objeto actual la CCT de tickets. `%current_field|_ID%
 representa el `_ID` interno de la fila; no se debe sustituir por `id_ticket`, que es
 el número visible. El endpoint no crea ni modifica nada por GET: si falta sesión
 redirige al login conservando solamente este destino interno; después comprueba los
-permisos de Abiertos/Mis tickets, filtra el panel al caso y abre el formulario. Un
+permisos y muestra una pantalla autenticada de creación. Al guardar, redirige a
+`Actividades administrativas → Actas de satisfacción`, filtrada por el caso. Un
 ticket cerrado o con acta activa muestra su estado y no permite crear un duplicado.
 
 No publicar enlaces con el token personal del destinatario ni reutilizar el token de
