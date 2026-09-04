@@ -195,6 +195,161 @@ final class SimplePdf
     $this->y += 24;
   }
 
+  public function actaHeader(string $title, string $recordLine, string $status): void
+  {
+    $this->ensureSpace(124);
+    $startY = $this->y;
+    $logoW = 92.0;
+    $logoH = 42.0;
+    $this->fill(16, 38, 74);
+    $this->rect($this->margin, $startY, $logoW, $logoH);
+    $this->fill(245, 145, 32);
+    $this->rect($this->margin + 12, $startY + 18, 8, 12);
+    $this->rect($this->margin + 22, $startY + 12, 6, 18);
+    $this->rect($this->margin + 30, $startY + 22, 7, 8);
+    $this->fill(255, 255, 255);
+    $this->text($this->margin + 42, $startY + 17, 'SuCasa', 10, 'F2');
+    $this->text($this->margin + 42, $startY + 29, 'INMOBILIARIA', 5, 'F2');
+
+    $textX = $this->margin + $logoW + 14;
+    $textWidth = $this->contentWidth - $logoW - 14;
+    $this->fill(6, 29, 73);
+    foreach ($this->wrap('SKC SuCasa Inmobiliaria - NIT 900623242-4', $textWidth, 7) as $line) {
+      $this->text($textX, $this->y + 8, $line, 7, 'F2');
+      $this->y += 10;
+    }
+    foreach ($this->wrap($title, $textWidth, 16) as $line) {
+      $this->text($textX, $this->y + 14, $line, 16, 'F2');
+      $this->y += 21;
+    }
+    $this->y = max($startY + $logoH + 16, $this->y + 8);
+    $this->fill(25, 43, 69);
+    foreach ($this->wrap($recordLine, $this->contentWidth, 8) as $line) {
+      $this->text($this->margin, $this->y, $line, 8, 'F1');
+      $this->y += 12;
+    }
+    $this->y += 7;
+    $this->statusPill($status);
+    $this->fill(245, 145, 32);
+    $this->rect($this->margin, $this->y + 4, $this->contentWidth, 2);
+    $this->y += 22;
+  }
+
+  public function sectionTitle(string $text): void
+  {
+    $this->ensureSpace(34);
+    $this->fill(245, 145, 32);
+    $this->rect($this->margin, $this->y + 2, 4, 16);
+    $this->fill(6, 29, 73);
+    $this->text($this->margin + 10, $this->y + 13, $text, 12, 'F2');
+    $this->y += 30;
+  }
+
+  /** @param array<int,array{0:string,1:string}> $items */
+  public function detailGrid(array $items): void
+  {
+    $gap = 10.0;
+    $cardW = ($this->contentWidth - $gap) / 2;
+    for ($i = 0; $i < count($items); $i += 2) {
+      $left = $items[$i] ?? ['', ''];
+      $right = $items[$i + 1] ?? ['', ''];
+      $height = max($this->detailCardHeight($left, $cardW), $right[0] !== '' ? $this->detailCardHeight($right, $cardW) : 0);
+      $height = max(46.0, $height);
+      $this->ensureSpace($height + 10);
+      $this->detailCard($this->margin, $this->y, $cardW, $height, $left[0], $left[1]);
+      if ($right[0] !== '') {
+        $this->detailCard($this->margin + $cardW + $gap, $this->y, $cardW, $height, $right[0], $right[1]);
+      }
+      $this->y += $height + 10;
+    }
+  }
+
+  public function serviceCard(int $index, string $damage, string $solution): void
+  {
+    $this->ensureSpace(112);
+    $this->fill(255, 255, 255);
+    $this->rect($this->margin, $this->y, $this->contentWidth, 30);
+    $this->fill(23, 61, 112);
+    $this->text($this->margin + 8, $this->y + 19, 'Daño y solución #' . $index, 10, 'F2');
+    $this->y += 36;
+    $this->detailGrid([
+      ['Daño encontrado', $damage],
+      ['Solución realizada', $solution],
+    ]);
+  }
+
+  public function imageEvidence(string $path, string $caption): bool
+  {
+    $info = @getimagesize($path);
+    if (!is_array($info) || $info['mime'] !== 'image/jpeg' || (int) $info[0] < 1 || (int) $info[1] < 1) { return false; }
+    $cardH = 136.0;
+    $imageBoxW = 178.0;
+    $imageBoxH = 104.0;
+    $this->ensureSpace($cardH + 10);
+    $this->fill(248, 250, 252);
+    $this->rect($this->margin, $this->y, $this->contentWidth, $cardH);
+    $this->fill(255, 255, 255);
+    $this->rect($this->margin + 12, $this->y + 12, $imageBoxW, $imageBoxH);
+    $ratio = min($imageBoxW / (int) $info[0], $imageBoxH / (int) $info[1], 1.0);
+    $width = max(1.0, (int) $info[0] * $ratio);
+    $height = max(1.0, (int) $info[1] * $ratio);
+    $drawX = $this->margin + 12 + (($imageBoxW - $width) / 2);
+    $drawTopY = $this->y + 12 + (($imageBoxH - $height) / 2);
+    $resource = 'Im' . (count($this->images) + 1);
+    $this->images[$resource] = ['path' => $path, 'width' => (int) $info[0], 'height' => (int) $info[1]];
+    $this->content .= 'q ' . $this->n($width) . ' 0 0 ' . $this->n($height) . ' ' . $this->n($drawX)
+      . ' ' . $this->n(self::PAGE_H - $drawTopY - $height) . ' cm /' . $resource . " Do Q\n";
+    $captionX = $this->margin + 206;
+    $captionW = $this->contentWidth - 220;
+    $this->fill(6, 29, 73);
+    $this->text($captionX, $this->y + 26, $caption, 9, 'F2');
+    $this->fill(72, 89, 113);
+    foreach ($this->wrap('Evidencia fotográfica registrada en el acta. La imagen se conserva con el contenido firmado.', $captionW, 8) as $idx => $line) {
+      $this->text($captionX, $this->y + 44 + ($idx * 12), $line, 8, 'F1');
+    }
+    $this->y += $cardH + 10;
+    return true;
+  }
+
+  private function statusPill(string $text): void
+  {
+    $lines = $this->wrap($text, $this->contentWidth - 20, 8);
+    $height = max(22.0, 12 + count($lines) * 12);
+    $this->fill(229, 238, 251);
+    $this->rect($this->margin, $this->y, $this->contentWidth, $height);
+    $this->fill(23, 61, 112);
+    foreach ($lines as $idx => $line) {
+      $this->text($this->margin + 10, $this->y + 14 + ($idx * 12), $line, 8, 'F2');
+    }
+    $this->y += $height + 10;
+  }
+
+  /** @param array{0:string,1:string} $item */
+  private function detailCardHeight(array $item, float $width): float
+  {
+    $labelLines = $this->wrap((string) $item[0], $width - 16, 7);
+    $valueLines = $this->wrap((string) $item[1], $width - 16, 9);
+    return 22 + count($labelLines) * 9 + count($valueLines) * 13;
+  }
+
+  private function detailCard(float $x, float $y, float $width, float $height, string $label, string $value): void
+  {
+    $this->fill(248, 250, 252);
+    $this->rect($x, $y, $width, $height);
+    $this->fill(72, 89, 113);
+    $cursor = $y + 12;
+    foreach ($this->wrap($label, $width - 16, 7) as $line) {
+      $this->text($x + 8, $cursor, $line, 7, 'F1');
+      $cursor += 9;
+    }
+    $cursor += 4;
+    $this->fill(6, 29, 73);
+    foreach ($this->wrap($value, $width - 16, 9) as $line) {
+      $this->text($x + 8, $cursor, $line, 9, 'F2');
+      $cursor += 13;
+    }
+  }
+
   public function heading(string $text): void
   {
     $this->ensureSpace(72);

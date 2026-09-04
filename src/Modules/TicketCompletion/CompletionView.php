@@ -37,8 +37,10 @@ final class CompletionView
           <p>Reporte administrativo: <strong><?= self::money((int) $payload['report']['total']) ?></strong> <?= !empty($act['report_id']) ? '· Registrado #' . self::e($act['report_id']) : '· Se registrará al firmar' ?></p>
           <?php if (in_array($act['status'], ['archived', 'cancelled'], true)): ?><p>Motivo: <?= self::e($act['cancellation_reason']) ?></p><?php endif; ?>
           <div class="scm-acta-actions"><a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id'])) ?>" target="_blank" rel="noopener" data-acta-preview>Ver acta</a>
+          <?php if ($act['status'] === 'signed'): ?>
           <a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id']) . '&format=pdf') ?>" target="_blank" rel="noopener">PDF destinatario</a>
           <a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id']) . '&format=pdf&audience=staff') ?>" target="_blank" rel="noopener">PDF interno</a>
+          <?php endif; ?>
           <?php if (in_array($act['status'], ['pending', 'signed'], true)): ?>
             <button type="button" class="scm-acta-button scm-acta-secondary" data-acta-resend="<?= self::e($act['id']) ?>"><?= $act['status'] === 'signed' ? 'Reenviar copia firmada' : 'Reenviar invitación' ?></button>
           <?php endif; ?></div>
@@ -166,7 +168,10 @@ final class CompletionView
       $html .= '<td>' . self::money((int) ($report['total'] ?? 0)) . '<br><small>' . (!empty($act['report_id']) ? 'Cobro #' . self::e($act['report_id']) : 'Se genera al firmar') . '</small></td>';
       $html .= '<td class="scm-date-cell">Creada ' . self::e(date('d/m/Y H:i', (int) ($act['created_at'] ?? 0))) . (!empty($act['signed_at']) ? '<br>Firmada ' . self::e(date('d/m/Y H:i', (int) $act['signed_at'])) : '') . '</td>';
       $canDelete = in_array($status, ['archived', 'cancelled'], true) || $canDeleteAny;
-      $html .= '<td class="scm-pending-action-cell"><button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" data-scm-open-iframe data-iframe-url="' . self::e($url) . '" data-iframe-title="Acta de satisfacción #' . self::e($act['id']) . '" data-scm-compact-iframe>Ver acta</button><a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf') . '" target="_blank" rel="noopener">PDF destinatario</a><a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf&audience=staff') . '" target="_blank" rel="noopener">PDF interno</a>' . ($status === 'pending' ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-archive="' . self::e($act['id']) . '" data-ticket-pk="' . self::e($act['ticket_pk']) . '">Archivar</button>' : '') . ($canDelete ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-delete="' . self::e($act['id']) . '">Eliminar</button>' : '') . '</td>';
+      $pdfButtons = $status === 'signed'
+        ? '<a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf') . '" target="_blank" rel="noopener">PDF destinatario</a><a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf&audience=staff') . '" target="_blank" rel="noopener">PDF interno</a>'
+        : '';
+      $html .= '<td class="scm-pending-action-cell"><button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" data-scm-open-iframe data-iframe-url="' . self::e($url) . '" data-iframe-title="Acta de satisfacción #' . self::e($act['id']) . '" data-scm-compact-iframe>Ver acta</button>' . $pdfButtons . ($status === 'pending' ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-archive="' . self::e($act['id']) . '" data-ticket-pk="' . self::e($act['ticket_pk']) . '">Archivar</button>' : '') . ($canDelete ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-delete="' . self::e($act['id']) . '">Eliminar</button>' : '') . '</td>';
       $html .= '</tr>';
     }
     $html .= '</tbody></table></div>';

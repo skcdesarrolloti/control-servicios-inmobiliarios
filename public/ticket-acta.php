@@ -27,7 +27,7 @@ $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
 $view = new CompletionView();
 $jsonRequest = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
 $jsonResult = null;
-$showPrint = true;
+$showPrint = false;
 
 try {
   if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'POST'], true)) {
@@ -81,9 +81,10 @@ try {
   $payload = $service->payload($act);
   if (($_GET['format'] ?? '') === 'pdf' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     if (!$staff && ($_GET['audience'] ?? '') === 'staff') { throw new DomainException('La copia interna requiere sesión de funcionario.'); }
+    if ($act['status'] !== 'signed') { throw new DomainException('El PDF solo se puede descargar cuando el acta esté firmada.'); }
     $pdf = $service->pdf($act, $staff && ($_GET['audience'] ?? '') === 'staff');
     header('Content-Type: application/pdf');
-    header('Content-Disposition: attachment; filename="acta-' . $id . ($act['status'] === 'signed' ? '-firmada' : '-pendiente') . '.pdf"');
+    header('Content-Disposition: attachment; filename="acta-' . $id . '-firmada.pdf"');
     header('Content-Length: ' . strlen($pdf));
     session_write_close();
     echo $pdf;
@@ -104,9 +105,10 @@ try {
   }
   if ($content === '') {
     $content = $view->document($act, $payload, $staff, $form);
-    $pdfUrl = 'ticket-acta.php?id=' . $id . ($staff ? '' : '&token=' . rawurlencode($token)) . '&format=pdf';
-    $content = '<div class="scm-acta scm-acta-print"><a class="scm-acta-button" href="' . $escape($pdfUrl) . '">Descargar PDF' . ($act['status'] === 'signed' ? ' firmado' : ' pendiente') . '</a></div>' . $content;
     if ($act['status'] === 'signed') {
+      $showPrint = true;
+      $pdfUrl = 'ticket-acta.php?id=' . $id . ($staff ? '' : '&token=' . rawurlencode($token)) . '&format=pdf';
+      $content = '<div class="scm-acta scm-acta-print"><a class="scm-acta-button" href="' . $escape($pdfUrl) . '">Descargar PDF firmado</a></div>' . $content;
       $delivery = json_decode((string) ($repo->act($id)['delivery_json'] ?? ''), true) ?: [];
       $pendingCopy = false;
       foreach ($payload['channels'] ?? ['email'] as $channel) { $pendingCopy = $pendingCopy || empty($delivery['signed_receipt'][$channel]['queued']); }
@@ -131,5 +133,7 @@ if ($jsonRequest) {
   echo json_encode($jsonResult, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
   exit;
 }
+$actStatus = isset($act) && is_array($act) ? (string) ($act['status'] ?? '') : '';
+$printLocked = $actStatus !== '' && $actStatus !== 'signed';
 ?>
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acta de satisfacción · SuCasa</title><link rel="stylesheet" href="assets/css/ticket-completion.css?v=<?= $escape(SCM_VERSION) ?>"><script defer src="assets/js/ticket-completion-public.js?v=<?= $escape(SCM_VERSION) ?>"></script></head><body class="scm-acta-page"><?php if ($showPrint): ?><div class="scm-acta scm-acta-print"><button type="button" class="scm-acta-button scm-acta-secondary" data-acta-print>Imprimir acta</button></div><?php endif; ?><?= $content ?></body></html>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acta de satisfacción · SuCasa</title><link rel="stylesheet" href="assets/css/ticket-completion.css?v=<?= $escape(SCM_VERSION) ?>"><script defer src="assets/js/ticket-completion-public.js?v=<?= $escape(SCM_VERSION) ?>"></script></head><body class="scm-acta-page<?= $printLocked ? ' scm-acta-page--print-locked' : '' ?>"><?php if ($showPrint): ?><div class="scm-acta scm-acta-print"><button type="button" class="scm-acta-button scm-acta-secondary" data-acta-print>Imprimir acta</button></div><?php endif; ?><?php if ($printLocked): ?><div class="scm-acta scm-acta-print-lock"><p>El acta solo se puede imprimir cuando esté firmada.</p></div><?php endif; ?><?= $content ?></body></html>

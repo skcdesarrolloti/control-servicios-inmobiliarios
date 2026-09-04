@@ -12,51 +12,50 @@ final class CompletionPdf
   {
     $pdf = new SimplePdf();
     $actor = CompletionView::actor($payload);
+    $status = $act['status'] === 'signed'
+      ? 'Firmada - Caso cerrado'
+      : ($act['status'] === 'archived' ? 'Archivada - No válida para firma' : ($act['status'] === 'cancelled' ? 'Anulada - No válida para firma' : 'Acta sin firmar - Caso abierto'));
     $pdf->footerLabel('SKC SuCasa Inmobiliaria - NIT 900623242-4');
-    $pdf->line('SKC SuCasa Inmobiliaria | NIT 900623242-4', 10, 'F2');
-    $pdf->title('Acta de satisfacción del caso #' . $payload['ticket_number']);
-    $pdf->callout('Caso #' . $payload['ticket_number'], $act['status'] === 'signed' ? 'FIRMADA - Cierre registrado al firmar' : ($act['status'] === 'archived' ? 'ARCHIVADA - No válida para firma' : ($act['status'] === 'cancelled' ? 'ANULADA - No válida para firma' : 'PENDIENTE DE FIRMA - Este documento no cierra el caso')));
-    $pdf->heading('Datos del servicio');
-    $pdf->table(['Dato', 'Detalle'], [
+    $pdf->actaHeader(
+      'Acta de satisfacción del caso #' . $payload['ticket_number'],
+      'Registro interno #' . $act['id'] . ' - Solución de daños',
+      $status
+    );
+    $pdf->sectionTitle('Datos del servicio');
+    $pdf->detailGrid([
       ['Inmueble / contrato', $payload['property'] . ' / ' . $payload['contract']],
-      ['Dirección', $payload['address']], ['Solución realizada por', CompletionPolicy::EXECUTORS[$payload['executor']]],
+      ['Dirección', $payload['address']],
+      ['Solución realizada por', CompletionPolicy::EXECUTORS[$payload['executor']]],
       ['Fecha del acta', date('d/m/Y H:i', (int) $payload['created_at']) . ' (Colombia)'],
-      ['Firmante', $payload['signer']['name'] . ' - ' . CompletionPolicy::ROLES[$payload['signer']['role']]],
-    ], [1, 3], 9);
-    $pdf->heading('Daños encontrados y soluciones realizadas');
+      ['Firmante seleccionado', $payload['signer']['name'] . ' - ' . CompletionPolicy::ROLES[$payload['signer']['role']]],
+    ]);
+    $pdf->sectionTitle('Daños encontrados y soluciones realizadas');
     foreach ($payload['items'] as $index => $item) {
-      $pdf->heading('Daño y solución #' . ($index + 1));
       $damage = $this->chunks($item['damage'], 500); $solution = $this->chunks($item['solution'], 500);
-      $rows = [];
-      for ($i = 0; $i < max(count($damage), count($solution)); $i++) {
-        $rows[] = [$i === 0 ? 'Daño encontrado' : 'Daño encontrado cont.', $damage[$i] ?? ''];
-        $rows[] = [$i === 0 ? 'Solución realizada' : 'Solución realizada cont.', $solution[$i] ?? ''];
-      }
-      $pdf->table(['Detalle', 'Descripción'], $rows, [1.25, 4.75], 9);
+      $pdf->serviceCard($index + 1, implode(' ', $damage), implode(' ', $solution));
       if (empty($item['photos'])) { continue; }
-      $pdf->paragraph('Evidencias del daño #' . ($index + 1), 9);
+      $pdf->sectionTitle('Evidencias del daño #' . ($index + 1));
       foreach ($item['photos'] as $photoIndex => $photo) {
         $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . basename((string) $photo['name']);
         $hash = is_file($path) ? @hash_file('sha256', $path) : false;
-        if (!is_string($hash) || !hash_equals((string) $photo['sha256'], $hash) || !$pdf->image($path, 420, 260)) {
+        if (!is_string($hash) || !hash_equals((string) $photo['sha256'], $hash) || !$pdf->imageEvidence($path, 'Foto ' . ($photoIndex + 1) . ' del daño #' . ($index + 1))) {
           throw new \DomainException('Una evidencia fotográfica del acta no está disponible o cambió.');
         }
-        $pdf->paragraph('Foto ' . ($photoIndex + 1) . ' del daño #' . ($index + 1), 8);
       }
     }
-    $pdf->heading('Observaciones');
+    $pdf->sectionTitle('Observaciones');
     foreach ($this->chunks($payload['observations'], 900) as $chunk) { $pdf->paragraph($chunk, 9); }
     if ($act['status'] === 'signed') {
       $evidence = json_decode((string) $act['signed_json'], true, 16, JSON_THROW_ON_ERROR);
       $pdf->reserveSpace(370);
-      $pdf->heading('Firma electrónica registrada');
+      $pdf->sectionTitle('Firma electrónica registrada');
       if (!empty($evidence['strokes'])) { $pdf->drawnSignature($evidence['strokes']); }
       $identityLine = (string) $evidence['name'] . (!empty($evidence['document']) ? ' | Documento: ' . $evidence['document'] : '');
       $pdf->paragraph($identityLine, 10);
       $pdf->paragraph('Firmada el ' . date('d/m/Y H:i:s', (int) $act['signed_at']) . ' (Colombia).', 9);
       $pdf->paragraph($evidence['consent_text'], 9);
     }
-    $pdf->heading('Trazabilidad del documento');
+    $pdf->sectionTitle('Trazabilidad del documento');
     $pdf->signatureBlock('Elaborada por', $actor['name'], CompletionView::actorDetails($actor));
     $pdf->paragraph('Identificador de contenido SHA-256: ' . $act['payload_hash'], 8);
     return $pdf->bytes();

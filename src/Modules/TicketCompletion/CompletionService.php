@@ -466,6 +466,9 @@ final class CompletionService
   public function pdf(array $act, bool $staff = false): string
   {
     $payload = $this->payload($act);
+    if ($act['status'] !== 'signed') {
+      throw new \DomainException('El PDF solo se puede descargar cuando el acta esté firmada.');
+    }
     if ($act['status'] === 'signed' && empty($act['signed_pdf']) && in_array((string) (json_decode($act['signed_json'], true)['consent_version'] ?? ''), ['2', '3'], true)) {
       throw new \DomainException('No se encuentra el PDF original firmado. Solicita revisión al administrador.');
     }
