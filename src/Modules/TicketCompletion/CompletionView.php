@@ -94,7 +94,7 @@ final class CompletionView
   }
 
   /** @param array<string,string|int> $filters @param array<int,array<string,mixed>> $items @param array<string,int> $stats @param array<string,int> $pagination */
-  public function dashboardPanel(array $filters, array $items, array $stats, int $count, array $pagination, CompletionService $service): string
+  public function dashboardPanel(array $filters, array $items, array $stats, int $count, array $pagination, CompletionService $service, bool $canDeleteActive = false): string
   {
     $status = (string) ($filters['estado'] ?? 'pending');
     ob_start(); ?>
@@ -129,7 +129,7 @@ final class CompletionView
           </div>
         </form>
       </div>
-      <div id="sacta_table"><?= $this->dashboardTable($items, $service, $pagination) ?></div>
+      <div id="sacta_table"><?= $this->dashboardTable($items, $service, $pagination, $canDeleteActive) ?></div>
     </div>
     <?php return (string) ob_get_clean();
   }
@@ -141,7 +141,7 @@ final class CompletionView
   }
 
   /** @param array<int,array<string,mixed>> $items @param array<string,int> $pagination */
-  public function dashboardTable(array $items, CompletionService $service, array $pagination = []): string
+  public function dashboardTable(array $items, CompletionService $service, array $pagination = [], bool $canDeleteActive = false): string
   {
     if (!$items) {
       return '<div class="scm-table-wrap"><p class="scm-actas-empty">No hay actas para los filtros actuales.</p></div>';
@@ -165,7 +165,8 @@ final class CompletionView
       $html .= '<td><strong>' . self::e($signer['name'] ?? '-') . '</strong><br><small>' . self::e($signer['email'] ?? '') . ($signer['phone'] ?? '' ? ' · ' . self::e($signer['phone']) : '') . '</small></td>';
       $html .= '<td>' . self::money((int) ($report['total'] ?? 0)) . '<br><small>' . (!empty($act['report_id']) ? 'Cobro #' . self::e($act['report_id']) : 'Se genera al firmar') . '</small></td>';
       $html .= '<td class="scm-date-cell">Creada ' . self::e(date('d/m/Y H:i', (int) ($act['created_at'] ?? 0))) . (!empty($act['signed_at']) ? '<br>Firmada ' . self::e(date('d/m/Y H:i', (int) $act['signed_at'])) : '') . '</td>';
-      $html .= '<td class="scm-pending-action-cell"><button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" data-scm-open-iframe data-iframe-url="' . self::e($url) . '" data-iframe-title="Acta de satisfacción #' . self::e($act['id']) . '" data-scm-compact-iframe>Ver acta</button><a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf') . '" target="_blank" rel="noopener">PDF destinatario</a><a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf&audience=staff') . '" target="_blank" rel="noopener">PDF interno</a>' . ($status === 'pending' ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-archive="' . self::e($act['id']) . '" data-ticket-pk="' . self::e($act['ticket_pk']) . '">Archivar</button>' : '') . (in_array($status, ['archived', 'cancelled'], true) ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-delete="' . self::e($act['id']) . '">Eliminar</button>' : '') . '</td>';
+      $canDelete = in_array($status, ['archived', 'cancelled'], true) || ($status === 'pending' && $canDeleteActive);
+      $html .= '<td class="scm-pending-action-cell"><button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" data-scm-open-iframe data-iframe-url="' . self::e($url) . '" data-iframe-title="Acta de satisfacción #' . self::e($act['id']) . '" data-scm-compact-iframe>Ver acta</button><a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf') . '" target="_blank" rel="noopener">PDF destinatario</a><a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf&audience=staff') . '" target="_blank" rel="noopener">PDF interno</a>' . ($status === 'pending' ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-archive="' . self::e($act['id']) . '" data-ticket-pk="' . self::e($act['ticket_pk']) . '">Archivar</button>' : '') . ($canDelete ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-delete="' . self::e($act['id']) . '">Eliminar</button>' : '') . '</td>';
       $html .= '</tr>';
     }
     $html .= '</tbody></table></div>';

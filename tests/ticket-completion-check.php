@@ -142,6 +142,16 @@ $assert(str_contains($deleteTable, 'data-acta-delete="' . $deletable['act_id'] .
 $service->deleteRetired((int) $deletable['act_id'], $actor);
 $rejects(static fn() => $repo->act((int) $deletable['act_id']), 'deleted archived act is removed from the act table');
 $assert($repo->ticket(9)['estado'] === 'En proceso' && (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '` WHERE id_ticket = 9') === 0, 'deleting archived act does not close ticket or create charge');
+$seedTicket(10);
+$pendingDeletable = $service->create(10, $deleteInput, $actor);
+$pendingDeletableAct = $repo->act((int) $pendingDeletable['act_id']);
+$pendingDeleteTableRegular = (new View())->dashboardTable([$pendingDeletableAct + ['_payload' => $service->payload($pendingDeletableAct)]], $service);
+$pendingDeleteTableAdmin = (new View())->dashboardTable([$pendingDeletableAct + ['_payload' => $service->payload($pendingDeletableAct)]], $service, [], true);
+$assert(!str_contains($pendingDeleteTableRegular, 'data-acta-delete="' . $pendingDeletable['act_id'] . '"') && str_contains($pendingDeleteTableAdmin, 'data-acta-delete="' . $pendingDeletable['act_id'] . '"'), 'pending acts expose delete action only for administrative deletion scope');
+$rejects(static fn() => $service->deleteRetired((int) $pendingDeletable['act_id'], $actor), 'pending act delete without administrative scope is rejected');
+$service->deleteRetired((int) $pendingDeletable['act_id'], $actor, true);
+$rejects(static fn() => $repo->act((int) $pendingDeletable['act_id']), 'administrative deletion removes pending act from act table');
+$assert($repo->ticket(10)['estado'] === 'En proceso' && $repo->ticket(10)['estado_administrativo'] === 'En ejecucion por propietario' && (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '` WHERE id_ticket = 10') === 0, 'deleting pending act restores previous stage without closing ticket or creating charge');
 $notifications = [];
 $created = $service->create(1, $input, $actor);
 $act = $repo->act($created['act_id']);
@@ -217,6 +227,7 @@ $assert(count($notifications) === $receiptCount, 'duplicate signature does not d
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 1, 'repeated signature cannot duplicate charge');
 $rejects(static fn() => $service->cancel((int) $act['id'], 'corrección', $actor), 'signed document cannot be cancelled');
 $rejects(static fn() => $service->deleteRetired((int) $act['id'], $actor), 'signed act cannot be deleted');
+$rejects(static fn() => $service->deleteRetired((int) $act['id'], $actor, true), 'signed act cannot be deleted even with administrative scope');
 $publicHtml = (new View())->document($signed, $service->payload($signed), false);
 $staffHtml = (new View())->document($signed, $service->payload($signed), true);
 $assert(!str_contains($publicHtml, 'Reporte administrativo') && !str_contains($staffHtml, 'Reporte administrativo'), 'act document excludes internal charge for every audience');
