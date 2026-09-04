@@ -55,8 +55,13 @@ $assert(Policy::executionState('inmobiliaria') === 'En ejecucion por inmobiliari
 $adminJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/scm-admin.js');
 $assert(str_contains($adminJs, 'data-acta-remove-photo') && str_contains($adminJs, 'form.addEventListener("paste"'), 'act photo UI supports individual removal and pasted clipboard images');
 $assert(str_contains($adminJs, 'MAX_PHOTOS_PER_DAMAGE = 4') && str_contains($adminJs, 'MAX_PHOTOS_PER_ACT = 12'), 'act photo UI enforces visible client limits');
+$assert(str_contains($adminJs, 'request("archive", fd)') && str_contains($adminJs, 'request("delete", fd)') && str_contains($adminJs, 'event.stopPropagation()'), 'case act popup handles archive and delete without bubbling to dashboard listeners');
 $inlineJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/admin-dashboard-inline.js');
 $assert(str_contains($inlineJs, 'data-acta-delete') && str_contains($inlineJs, 'Escribe ELIMINAR para confirmar'), 'act dashboard supports explicit permanent delete confirmation');
+$viewPhp = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/TicketCompletion/CompletionView.php');
+$handlerPhp = (string) file_get_contents(dirname(__DIR__) . '/src/App/Concerns/HandlesTicketCompletion.php');
+$assert(str_contains($viewPhp, 'data-acta-archive') && str_contains($viewPhp, 'data-acta-delete') && str_contains($viewPhp, 'bool $canDeleteAny = false'), 'case act popup exposes archive and permission-aware delete buttons');
+$assert(str_contains($handlerPhp, "['resend', 'cancel', 'archive', 'delete']") && str_contains($handlerPhp, '$service->deleteRetired($id, $actor, $this->canDeleteAnyTicketCompletionActs())'), 'case act endpoint accepts archive and administrative delete operations');
 $publicActPhp = (string) file_get_contents(dirname(__DIR__) . '/public/ticket-acta.php');
 $assert(str_contains($publicActPhp, "El PDF solo se puede descargar cuando el acta esté firmada") && str_contains($publicActPhp, 'scm-acta-page--print-locked'), 'act public route blocks download and print output until signature');
 $assert(str_contains($publicActPhp, "OTP_REQUIRED") && str_contains($publicActPhp, "OTP_INVALID") && str_contains($publicActPhp, "OTP_LIMIT"), 'act public signing route returns specific verification error codes');
@@ -167,6 +172,8 @@ $assert($repo->ticket(9)['estado'] === 'En proceso' && (int) $db->getVar('SELECT
 $seedTicket(10);
 $pendingDeletable = $service->create(10, $deleteInput, $actor);
 $pendingDeletableAct = $repo->act((int) $pendingDeletable['act_id']);
+$pendingCasePanelAdmin = (new View())->panel($service->context(10), $service, 0, true, true);
+$assert(str_contains($pendingCasePanelAdmin, 'data-acta-archive="' . $pendingDeletable['act_id'] . '"') && str_contains($pendingCasePanelAdmin, 'data-acta-delete="' . $pendingDeletable['act_id'] . '"'), 'case act popup exposes archive and administrative delete actions');
 $pendingDeleteTableRegular = (new View())->dashboardTable([$pendingDeletableAct + ['_payload' => $service->payload($pendingDeletableAct)]], $service);
 $pendingDeleteTableAdmin = (new View())->dashboardTable([$pendingDeletableAct + ['_payload' => $service->payload($pendingDeletableAct)]], $service, [], true);
 $assert(str_contains($pendingDeleteTableAdmin, '>Editar</a>') && str_contains($pendingDeleteTableAdmin, 'act_id=' . $pendingDeletable['act_id']), 'pending acts expose edit action from dashboard');
@@ -269,6 +276,8 @@ $rejects(static fn() => $service->deleteRetired((int) $act['id'], $actor), 'sign
 $signedDeleteTableRegular = (new View())->dashboardTable([$signed + ['_payload' => $service->payload($signed)]], $service);
 $signedDeleteTableAdmin = (new View())->dashboardTable([$signed + ['_payload' => $service->payload($signed)]], $service, [], true);
 $assert(!str_contains($signedDeleteTableRegular, 'data-acta-delete="' . $act['id'] . '"') && str_contains($signedDeleteTableAdmin, 'data-acta-delete="' . $act['id'] . '"'), 'signed acts expose delete action only for administrative deletion scope');
+$signedCasePanelAdmin = (new View())->panel($service->context(1), $service, 0, true, true);
+$assert(str_contains($signedCasePanelAdmin, 'data-acta-delete="' . $act['id'] . '"') && !str_contains($signedCasePanelAdmin, 'data-acta-archive="' . $act['id'] . '"'), 'case act popup exposes admin delete for signed acts without offering archive');
 $publicHtml = (new View())->document($signed, $service->payload($signed), false);
 $staffHtml = (new View())->document($signed, $service->payload($signed), true);
 $assert(!str_contains($publicHtml, 'Reporte administrativo') && !str_contains($staffHtml, 'Reporte administrativo'), 'act document excludes internal charge for every audience');

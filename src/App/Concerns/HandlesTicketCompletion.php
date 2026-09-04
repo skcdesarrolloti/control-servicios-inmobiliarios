@@ -155,21 +155,27 @@ trait HandlesTicketCompletion
           $result['redirect_url'] = $service->dashboardUrlForTicket($repo->ticket($ticketId), 'pending');
         }
         catch (\Throwable $error) { $this->storedFiles()->deleteStoredImages($storedPhotos); throw $error; }
-      } elseif (in_array($operation, ['resend', 'cancel'], true)) {
+      } elseif (in_array($operation, ['resend', 'cancel', 'archive', 'delete'], true)) {
         $id = (int) ($_POST['act_id'] ?? 0);
         if ((int) $repo->act($id)['ticket_pk'] !== $ticketId) {
           throw new \DomainException('El acta no pertenece al ticket seleccionado.');
         }
         if ($operation === 'resend') {
           $result = $service->resend($id);
-        } else {
+        } elseif ($operation === 'cancel') {
           $service->cancel($id, (string) ($_POST['reason'] ?? ''), $actor);
           $result = ['message' => 'Acta anulada. Puedes generar una nueva versión; el ticket sigue abierto.'];
+        } elseif ($operation === 'archive') {
+          $service->archive($id, (string) ($_POST['reason'] ?? ''), $actor);
+          $result = ['message' => 'Acta archivada. Salió de pendientes, el ticket sigue abierto y no se generó cobro.'];
+        } else {
+          $service->deleteRetired($id, $actor, $this->canDeleteAnyTicketCompletionActs());
+          $result = ['message' => 'Acta eliminada permanentemente. No se cerró el ticket ni se generó cobro.'];
         }
       } elseif ($operation !== 'read') {
         throw new \DomainException('Operación de acta no válida.');
       }
-      $this->jsonOk($result + ['html' => (new CompletionView())->panel($service->context($ticketId, $sourceFlow), $service)]);
+      $this->jsonOk($result + ['html' => (new CompletionView())->panel($service->context($ticketId, $sourceFlow), $service, 0, true, $this->canDeleteAnyTicketCompletionActs())]);
     } catch (\DomainException $error) {
       $this->jsonFail($error->getMessage());
     }

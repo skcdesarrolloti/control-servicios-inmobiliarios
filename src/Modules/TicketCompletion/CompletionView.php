@@ -16,7 +16,7 @@ final class CompletionView
     return '$' . number_format($value, 0, ',', '.');
   }
 
-  public function panel(array $context, CompletionService $service, int $editActId = 0, bool $showHistory = true): string
+  public function panel(array $context, CompletionService $service, int $editActId = 0, bool $showHistory = true, bool $canDeleteAny = false): string
   {
     $ticket = $context['ticket'];
     $transportMax = (int) ($context['transport_max'] ?? 0);
@@ -56,7 +56,7 @@ final class CompletionView
       <?php if ($sourceNotice !== ''): ?><p class="scm-acta-notice"><?= self::e($sourceNotice) ?></p><?php endif; ?>
       <?php if ($editAct): ?><p class="scm-acta-notice">Estás editando el acta sin firmar #<?= self::e($editAct['id']) ?>. Al guardar se invalidan los códigos anteriores y se envía una nueva invitación.</p><?php endif; ?>
       <div class="scm-acta-meta"><span>Ticket <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Inmueble <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>
-      <?php if ($showHistory): foreach ($context['acts'] as $act): $payload = $service->payload($act); ?>
+      <?php if ($showHistory): foreach ($context['acts'] as $act): $payload = $service->payload($act); $canDeleteAct = in_array($act['status'], ['archived', 'cancelled'], true) || $canDeleteAny; ?>
         <article class="scm-acta-record">
           <div class="scm-acta-meta"><h3><?= $act['status'] === 'pending' ? 'Acta enviada a bandeja' : 'Registro interno #' . self::e($act['id']) ?></h3><strong class="scm-acta-status"><?= self::e(['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada'][$act['status']] ?? $act['status']) ?></strong></div>
           <?php if ($act['status'] === 'pending'): ?><p class="scm-acta-help">También puedes consultarla y administrarla desde <strong>Actividades administrativas → Actas de satisfacción</strong>.</p><?php endif; ?>
@@ -71,7 +71,9 @@ final class CompletionView
           <?php if ($act['status'] === 'pending'): ?><a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->editUrl($act)) ?>">Editar acta</a><?php endif; ?>
           <?php if (in_array($act['status'], ['pending', 'signed'], true)): ?>
             <button type="button" class="scm-acta-button scm-acta-secondary" data-acta-resend="<?= self::e($act['id']) ?>"><?= $act['status'] === 'signed' ? 'Reenviar copia firmada' : 'Reenviar invitación' ?></button>
-          <?php endif; ?></div>
+          <?php endif; ?>
+          <?php if ($act['status'] === 'pending'): ?><button type="button" class="scm-acta-button scm-acta-danger" data-acta-archive="<?= self::e($act['id']) ?>">Archivar</button><?php endif; ?>
+          <?php if ($canDeleteAct): ?><button type="button" class="scm-acta-button scm-acta-danger" data-acta-delete="<?= self::e($act['id']) ?>">Eliminar</button><?php endif; ?></div>
           <?php $delivery = json_decode((string) ($act['delivery_json'] ?? ''), true) ?: []; $event = $act['status'] === 'signed' ? 'signed_receipt' : 'signature_invitation'; ?>
           <?php if (!in_array($act['status'], ['archived', 'cancelled'], true)): ?><ul class="scm-acta-help"><?php foreach ($payload['channels'] ?? ['email'] as $channel): ?><li><?= $channel === 'email' ? 'Correo' : 'WhatsApp' ?>: <?= !empty($delivery[$event][$channel]['queued']) ? 'en cola; no confirma entrega' : 'sin confirmación de encolado; reintenta el envío' ?></li><?php endforeach; ?></ul><?php endif; ?>
           <?php if ($act['status'] === 'pending'): ?>

@@ -2006,6 +2006,81 @@
       body.querySelectorAll("[data-acta-resend]").forEach(function (button) {
         button.addEventListener("click", function () { var fd = new FormData(); fd.set("act_id", button.dataset.actaResend); request("resend", fd); });
       });
+      body.querySelectorAll("[data-acta-archive]").forEach(function (button) {
+        button.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          var actId = button.dataset.actaArchive || "";
+          function archiveAct(reason) {
+            reason = String(reason || "").trim();
+            if (!reason) {
+              scmNotify("error", "Escribe un motivo para archivar el acta.", "Acta de satisfacción");
+              return;
+            }
+            var fd = new FormData();
+            fd.set("act_id", actId);
+            fd.set("reason", reason);
+            request("archive", fd);
+          }
+          if (window.Swal && typeof window.Swal.fire === "function") {
+            window.Swal.fire({
+              icon: "warning",
+              title: "Archivar acta #" + actId + "?",
+              text: "El acta saldrá de pendientes. No se cerrará el ticket ni se generará cobro.",
+              input: "textarea",
+              inputLabel: "Motivo",
+              showCancelButton: true,
+              confirmButtonText: "Archivar",
+              cancelButtonText: "Cancelar",
+              confirmButtonColor: "#b42318",
+              inputValidator: function (value) {
+                return String(value || "").trim() ? undefined : "Escribe el motivo del archivo.";
+              },
+            }).then(function (result) {
+              if (result && result.isConfirmed) archiveAct(result.value);
+            });
+            return;
+          }
+          if (window.confirm("¿Archivar acta #" + actId + "? No se cerrará el ticket ni se generará cobro.")) {
+            archiveAct(window.prompt("Motivo para archivar:", "") || "");
+          }
+        });
+      });
+      body.querySelectorAll("[data-acta-delete]").forEach(function (button) {
+        button.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          var actId = button.dataset.actaDelete || "";
+          function deleteAct() {
+            var fd = new FormData();
+            fd.set("act_id", actId);
+            request("delete", fd);
+          }
+          if (window.Swal && typeof window.Swal.fire === "function") {
+            window.Swal.fire({
+              icon: "warning",
+              title: "Eliminar acta #" + actId + "?",
+              text: "Esta acción borra permanentemente el acta y retira sus soportes internos asociados.",
+              input: "text",
+              inputLabel: "Escribe ELIMINAR para confirmar",
+              showCancelButton: true,
+              confirmButtonText: "Eliminar",
+              cancelButtonText: "Cancelar",
+              confirmButtonColor: "#b42318",
+              inputValidator: function (value) {
+                return String(value || "").trim().toUpperCase() === "ELIMINAR" ? undefined : "Escribe ELIMINAR para confirmar.";
+              },
+            }).then(function (result) {
+              if (result && result.isConfirmed) deleteAct();
+            });
+            return;
+          }
+          if (window.confirm("¿Eliminar acta #" + actId + "? Esta acción no se puede deshacer.")) {
+            var typed = window.prompt("Escribe ELIMINAR para confirmar:", "") || "";
+            if (typed.trim().toUpperCase() === "ELIMINAR") deleteAct();
+          }
+        });
+      });
       body.querySelectorAll("[data-acta-cancel]").forEach(function (cancelForm) {
         cancelForm.addEventListener("submit", function (event) {
           event.preventDefault();
