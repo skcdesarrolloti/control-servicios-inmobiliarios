@@ -16,15 +16,19 @@ final class CompletionView
     return '$' . number_format($value, 0, ',', '.');
   }
 
-  public function panel(array $context, CompletionService $service, int $editActId = 0): string
+  public function panel(array $context, CompletionService $service, int $editActId = 0, bool $showHistory = true): string
   {
     $ticket = $context['ticket'];
     $transportMax = (int) ($context['transport_max'] ?? 0);
     $active = false;
+    $activeAct = null;
     $editAct = null;
     $editPayload = null;
     foreach ($context['acts'] as $act) {
       $active = $active || in_array($act['status'], ['pending', 'signed'], true);
+      if ($activeAct === null && in_array($act['status'], ['pending', 'signed'], true)) {
+        $activeAct = $act;
+      }
       if ($editActId > 0 && (int) $act['id'] === $editActId && $act['status'] === 'pending') {
         $editAct = $act;
         $editPayload = $service->payload($act);
@@ -44,7 +48,7 @@ final class CompletionView
       <p class="scm-acta-notice">Documenta la solución, elige el firmante y revisa el valor administrativo. El ticket conservará el <strong>estado de ejecución seleccionado</strong> mientras el acta queda pendiente. Puedes hacer seguimiento desde <strong>Actividades administrativas → Actas de satisfacción</strong>. Solo la firma registrará el cierre y el reporte de cobro.</p>
       <?php if ($editAct): ?><p class="scm-acta-notice">Estás editando el acta sin firmar #<?= self::e($editAct['id']) ?>. Al guardar se invalidan los códigos anteriores y se envía una nueva invitación.</p><?php endif; ?>
       <div class="scm-acta-meta"><span>Ticket <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Inmueble <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>
-      <?php foreach ($context['acts'] as $act): $payload = $service->payload($act); ?>
+      <?php if ($showHistory): foreach ($context['acts'] as $act): $payload = $service->payload($act); ?>
         <article class="scm-acta-record">
           <div class="scm-acta-meta"><h3><?= $act['status'] === 'pending' ? 'Acta enviada a bandeja' : 'Registro interno #' . self::e($act['id']) ?></h3><strong class="scm-acta-status"><?= self::e(['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada'][$act['status']] ?? $act['status']) ?></strong></div>
           <?php if ($act['status'] === 'pending'): ?><p class="scm-acta-help">También puedes consultarla y administrarla desde <strong>Actividades administrativas → Actas de satisfacción</strong>.</p><?php endif; ?>
@@ -70,7 +74,7 @@ final class CompletionView
             </details>
           <?php endif; ?>
         </article>
-      <?php endforeach; ?>
+      <?php endforeach; endif; ?>
       <?php if ((!$active || $editAct) && !in_array(mb_strtolower((string) $ticket['estado']), ['cerrado', 'finalizado', 'resuelto'], true)): ?>
         <form data-acta-create data-acta-operation="<?= $editAct ? 'update' : 'create' ?>"<?= $editAct ? ' data-acta-id="' . self::e($editAct['id']) . '"' : '' ?>>
           <h3>1. <?= $editAct ? 'Editar solución y firmante' : 'Solución y firmante' ?></h3>
@@ -99,6 +103,9 @@ final class CompletionView
           <label class="scm-acta-check"><input type="checkbox" name="confirm" value="1" required><span>Revisé los daños, las soluciones, el firmante y el valor. Entiendo que al firmar se cerrará el caso y se registrará un único reporte como no pagado y no exportado.</span></label>
           <button type="submit" class="scm-acta-button"><?= $editAct ? 'Guardar cambios y reenviar firma' : 'Generar acta y solicitar firma' ?></button>
         </form>
+      <?php elseif (!$showHistory && $activeAct): ?>
+        <p class="scm-acta-notice">Este caso ya tiene un acta <?= self::e($activeAct['status'] === 'pending' ? 'sin firmar' : 'firmada') ?>. Adminístrala desde <strong>Actividades administrativas → Actas de satisfacción</strong>.</p>
+        <p><a class="scm-acta-button" href="<?= self::e($service->dashboardUrlForTicket($ticket, $activeAct['status'] === 'signed' ? 'signed' : 'pending')) ?>">Ir a Actas de satisfacción</a></p>
       <?php elseif (!$active): ?><p>El ticket está cerrado. No se pueden generar nuevas actas.</p><?php endif; ?>
       <div data-acta-message role="status" aria-live="polite"></div>
     </section>

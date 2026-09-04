@@ -72,7 +72,7 @@ try {
   $property = trim((string) ($ticket['inmueble'] ?? ''));
   $redirectUrl = $service->dashboardUrlForTicket($ticket, 'pending');
   $csrf = App::csrf()->token(SuCasaControlServiciosInmobiliarios::NONCE_KEY);
-  $panel = (new CompletionView())->panel($context, $service, $editActId);
+  $panel = (new CompletionView())->panel($context, $service, $editActId, false);
 } catch (DomainException $error) {
   http_response_code(404);
   exit($escape($error->getMessage()));
