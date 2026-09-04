@@ -48,12 +48,37 @@ trait HandlesTicketCompletion
       $operation = (string) ($_POST['operation'] ?? 'read');
       $actor = $this->ticketCompletionActor();
       $result = [];
-      if ($operation === 'create') {
+      if (in_array($operation, ['create', 'update'], true)) {
         $input = $_POST;
         $items = is_array($input['items'] ?? null) ? $input['items'] : [];
         $storedPhotos = [];
         $storedBytes = 0;
         $requestedTotal = 0;
+        $actId = (int) ($_POST['act_id'] ?? 0);
+        $oldPhotoNames = [];
+        $allowedPhotos = [];
+        if ($operation === 'update') {
+          $existingAct = $repo->act($actId);
+          if ((int) $existingAct['ticket_pk'] !== $ticketId || $existingAct['status'] !== 'pending') {
+            throw new \DomainException('Solo se puede editar el acta pendiente activa de este caso.');
+          }
+          $oldPayload = $service->payload($existingAct);
+          foreach ((array) ($oldPayload['items'] ?? []) as $oldItem) {
+            foreach ((array) ($oldItem['photos'] ?? []) as $oldPhoto) {
+              if (!is_array($oldPhoto)) { continue; }
+              $photoKey = implode('|', [
+                (string) ($oldPhoto['name'] ?? ''),
+                (string) ($oldPhoto['mime'] ?? ''),
+                (string) ($oldPhoto['width'] ?? ''),
+                (string) ($oldPhoto['height'] ?? ''),
+                (string) ($oldPhoto['bytes'] ?? ''),
+                (string) ($oldPhoto['sha256'] ?? ''),
+              ]);
+              $allowedPhotos[$photoKey] = $oldPhoto;
+              if (trim((string) ($oldPhoto['name'] ?? '')) !== '') { $oldPhotoNames[] = (string) $oldPhoto['name']; }
+            }
+          }
+        }
         foreach (array_keys($items) as $index) {
           $names = $_FILES['acta_item_photos_' . $index]['name'] ?? [];
           $names = is_array($names) ? array_values(array_filter($names, static fn($name): bool => trim((string) $name) !== '')) : [];
@@ -63,8 +88,24 @@ trait HandlesTicketCompletion
         if ($requestedTotal > 12) { throw new \DomainException('El acta admite máximo 12 fotos en total.'); }
         foreach ($items as $index => &$item) {
           if (!is_array($item)) { continue; }
+          $keptPhotos = [];
+          if ($operation === 'update' && is_array($item['photos'] ?? null)) {
+            foreach ($item['photos'] as $postedPhoto) {
+              if (!is_array($postedPhoto)) { continue; }
+              $photoKey = implode('|', [
+                (string) ($postedPhoto['name'] ?? ''),
+                (string) ($postedPhoto['mime'] ?? ''),
+                (string) ($postedPhoto['width'] ?? ''),
+                (string) ($postedPhoto['height'] ?? ''),
+                (string) ($postedPhoto['bytes'] ?? ''),
+                (string) ($postedPhoto['sha256'] ?? ''),
+              ]);
+              if (isset($allowedPhotos[$photoKey])) { $keptPhotos[] = $allowedPhotos[$photoKey]; }
+            }
+          }
           unset($item['photos']);
           if (!preg_match('/^\d+$/D', (string) $index)) { continue; }
+          $item['photos'] = $keptPhotos;
           $field = 'acta_item_photos_' . $index;
           $names = $_FILES[$field]['name'] ?? [];
           $names = is_array($names) ? array_values(array_filter($names, static fn($name): bool => trim((string) $name) !== '')) : [];
@@ -86,15 +127,28 @@ trait HandlesTicketCompletion
             }
           }
           $storedPhotos = array_merge($storedPhotos, $photos);
-          $item['photos'] = array_map(static fn(array $photo): array => [
+          $item['photos'] = array_merge($item['photos'], array_map(static fn(array $photo): array => [
             'name' => $photo['name'], 'mime' => $photo['mime'], 'width' => $photo['width'], 'height' => $photo['height'],
             'bytes' => $photo['bytes'], 'sha256' => $photo['sha256'],
-          ], $photos);
+          ], $photos));
         }
         unset($item);
         $input['items'] = $items;
         try {
-          $result = $service->create($ticketId, $input, $actor);
+          $result = $operation === 'update'
+            ? $service->update($actId, $ticketId, $input, $actor)
+            : $service->create($ticketId, $input, $actor);
+          if ($operation === 'update' && $oldPhotoNames) {
+            $newPayload = $service->payload($repo->act((int) $result['act_id']));
+            $keptNames = [];
+            foreach ((array) ($newPayload['items'] ?? []) as $newItem) {
+              foreach ((array) ($newItem['photos'] ?? []) as $photo) {
+                if (is_array($photo) && trim((string) ($photo['name'] ?? '')) !== '') { $keptNames[(string) $photo['name']] = true; }
+              }
+            }
+            $removedPhotos = array_map(static fn(string $name): array => ['name' => $name], array_values(array_diff($oldPhotoNames, array_keys($keptNames))));
+            if ($removedPhotos) { $this->storedFiles()->deleteStoredImages($removedPhotos); }
+          }
           $result['redirect_url'] = $service->dashboardUrlForTicket($repo->ticket($ticketId), 'pending');
         }
         catch (\Throwable $error) { $this->storedFiles()->deleteStoredImages($storedPhotos); throw $error; }

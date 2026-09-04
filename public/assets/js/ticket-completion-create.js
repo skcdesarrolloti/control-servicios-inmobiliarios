@@ -214,11 +214,14 @@
     });
   }
 
-  function syncSigner() {
+  function syncSigner(overwriteName) {
     var signer = form.querySelector("[data-acta-signer]");
     if (!signer) return;
     var option = signer.selectedOptions[0];
-    form.querySelector("[data-acta-signer-name]").value = option && option.dataset.name ? option.dataset.name : "";
+    var nameField = form.querySelector("[data-acta-signer-name]");
+    if (overwriteName || !nameField.value) {
+      nameField.value = option && option.dataset.name ? option.dataset.name : "";
+    }
     form.querySelector("[data-acta-signer-email]").value = option && option.dataset.email ? option.dataset.email : "";
     form.querySelector("[data-acta-signer-phone]").value = option && option.dataset.phone ? option.dataset.phone : "";
   }
@@ -243,7 +246,11 @@
       data.set("action", root.dataset.action || "scm_ticket_acta");
       data.set("nonce", root.dataset.nonce || "");
       data.set("ticket_pk", root.dataset.ticketPk || "");
-      data.set("operation", "create");
+      var operation = form.dataset.actaOperation || "create";
+      data.set("operation", operation);
+      if (operation === "update" && form.dataset.actaId) {
+        data.set("act_id", form.dataset.actaId);
+      }
       form.querySelectorAll("button").forEach(function (button) { button.disabled = true; });
       return fetch(root.dataset.apiUrl || "api.php", {
         method: "POST",
@@ -262,7 +269,7 @@
         }
         throw new Error(json && json.data && json.data.message || "No se pudo crear el acta.");
       }
-      message(json.data.message || "Acta creada. Te llevamos a Actas de satisfacción…", json.data.queued === false);
+      message(json.data.message || "Acta guardada. Te llevamos a Actas de satisfacción…", json.data.queued === false);
       window.location.assign(json.data.redirect_url || root.dataset.redirectUrl || "index.php?tab=actas_satisfaccion");
     }).catch(function (error) {
       notifyError(error.message || "No se pudo crear el acta. Revisa los datos e inténtalo nuevamente.");
@@ -280,10 +287,10 @@
   }
 
   var signer = form.querySelector("[data-acta-signer]");
-  if (signer) signer.addEventListener("change", syncSigner);
+  if (signer) signer.addEventListener("change", function () { syncSigner(true); });
   var fee = form.querySelector("[data-acta-fee]");
   if (fee) fee.addEventListener("input", syncTotal);
-  syncSigner();
+  syncSigner(false);
   syncTotal();
 
   form.addEventListener("click", function (event) {
@@ -296,6 +303,12 @@
         files.splice(removeIndex, 1);
         syncPhotoInput(photoInput, files) ? photoPreview(photoInput) : notifyError("No se pudo quitar la foto en este navegador.");
       }
+      return;
+    }
+    var removeExistingPhoto = event.target.closest("[data-acta-remove-existing-photo]");
+    if (removeExistingPhoto) {
+      var existingPhoto = removeExistingPhoto.closest("[data-acta-existing-photo]");
+      if (existingPhoto) existingPhoto.remove();
       return;
     }
     var removeItem = event.target.closest("[data-acta-remove-item]");

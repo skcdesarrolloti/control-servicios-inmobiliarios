@@ -20,6 +20,7 @@ if ($ticketPk <= 0) {
   http_response_code(400);
   exit('Falta el identificador interno del caso. Usa crear-acta.php?ticket_pk=_ID');
 }
+$editActId = (int) ($_GET['act_id'] ?? 0);
 
 $tryEmployeeTokenLogin = static function (): bool {
   if (Auth::isLoggedIn()) {
@@ -61,11 +62,17 @@ try {
     http_response_code(403);
     exit('No tienes permiso para crear o consultar el acta de este caso.');
   }
+  if ($editActId > 0) {
+    $editAct = $repo->act($editActId);
+    if ((int) $editAct['ticket_pk'] !== $ticketPk || $editAct['status'] !== 'pending') {
+      throw new DomainException('Solo se puede editar un acta pendiente de este caso.');
+    }
+  }
   $caseNumber = trim((string) ($ticket['id_ticket'] ?? '')) ?: (string) $ticketPk;
   $property = trim((string) ($ticket['inmueble'] ?? ''));
   $redirectUrl = $service->dashboardUrlForTicket($ticket, 'pending');
   $csrf = App::csrf()->token(SuCasaControlServiciosInmobiliarios::NONCE_KEY);
-  $panel = (new CompletionView())->panel($context, $service);
+  $panel = (new CompletionView())->panel($context, $service, $editActId);
 } catch (DomainException $error) {
   http_response_code(404);
   exit($escape($error->getMessage()));
@@ -108,8 +115,8 @@ try {
   >
     <header class="scm-acta scm-acta-create-hero">
       <p class="scm-acta-eyebrow">Creación directa autenticada</p>
-      <h1>Crear acta de solución y satisfacción</h1>
-      <p>Caso <strong>#<?= $escape($caseNumber) ?></strong><?= $property !== '' ? ' · Inmueble <strong>' . $escape($property) . '</strong>' : '' ?>. Al generar el acta se enviará a la bandeja de <strong>Actas de satisfacción</strong> para seguimiento y firma.</p>
+      <h1><?= $editActId > 0 ? 'Editar acta de solución y satisfacción' : 'Crear acta de solución y satisfacción' ?></h1>
+      <p>Caso <strong>#<?= $escape($caseNumber) ?></strong><?= $property !== '' ? ' · Inmueble <strong>' . $escape($property) . '</strong>' : '' ?>. <?= $editActId > 0 ? 'Al guardar los cambios, se invalidan códigos anteriores y se envía una nueva invitación.' : 'Al generar el acta se enviará a la bandeja de <strong>Actas de satisfacción</strong> para seguimiento y firma.' ?></p>
     </header>
     <?= $panel ?>
   </main>

@@ -16,18 +16,33 @@ final class CompletionView
     return '$' . number_format($value, 0, ',', '.');
   }
 
-  public function panel(array $context, CompletionService $service): string
+  public function panel(array $context, CompletionService $service, int $editActId = 0): string
   {
     $ticket = $context['ticket'];
     $transportMax = (int) ($context['transport_max'] ?? 0);
     $active = false;
+    $editAct = null;
+    $editPayload = null;
     foreach ($context['acts'] as $act) {
       $active = $active || in_array($act['status'], ['pending', 'signed'], true);
+      if ($editActId > 0 && (int) $act['id'] === $editActId && $act['status'] === 'pending') {
+        $editAct = $act;
+        $editPayload = $service->payload($act);
+      }
     }
     $executor = str_replace('En ejecucion por ', '', (string) ($ticket['estado_administrativo'] ?? ''));
+    $formPayload = is_array($editPayload) ? $editPayload : [];
+    $selectedExecutor = (string) ($formPayload['executor'] ?? $executor);
+    $selectedSigner = (string) ($formPayload['signer']['role'] ?? '');
+    $signerName = (string) ($formPayload['signer']['name'] ?? '');
+    $selectedChannels = (array) ($formPayload['channels'] ?? []);
+    $selectedChannel = count($selectedChannels) > 1 ? 'both' : (string) ($selectedChannels[0] ?? 'email');
+    $formItems = is_array($formPayload['items'] ?? null) && $formPayload['items'] ? $formPayload['items'] : [[]];
+    $formObservations = (string) ($formPayload['observations'] ?? '');
     ob_start(); ?>
     <section class="scm-acta">
       <p class="scm-acta-notice">Documenta la solución, elige el firmante y revisa el valor administrativo. El ticket conservará el <strong>estado de ejecución seleccionado</strong> mientras el acta queda pendiente. Puedes hacer seguimiento desde <strong>Actividades administrativas → Actas de satisfacción</strong>. Solo la firma registrará el cierre y el reporte de cobro.</p>
+      <?php if ($editAct): ?><p class="scm-acta-notice">Estás editando el acta sin firmar #<?= self::e($editAct['id']) ?>. Al guardar se invalidan los códigos anteriores y se envía una nueva invitación.</p><?php endif; ?>
       <div class="scm-acta-meta"><span>Ticket <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Inmueble <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>
       <?php foreach ($context['acts'] as $act): $payload = $service->payload($act); ?>
         <article class="scm-acta-record">
@@ -41,6 +56,7 @@ final class CompletionView
           <a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id']) . '&format=pdf') ?>" target="_blank" rel="noopener">PDF destinatario</a>
           <a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id']) . '&format=pdf&audience=staff') ?>" target="_blank" rel="noopener">PDF interno</a>
           <?php endif; ?>
+          <?php if ($act['status'] === 'pending'): ?><a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->editUrl($act)) ?>">Editar acta</a><?php endif; ?>
           <?php if (in_array($act['status'], ['pending', 'signed'], true)): ?>
             <button type="button" class="scm-acta-button scm-acta-secondary" data-acta-resend="<?= self::e($act['id']) ?>"><?= $act['status'] === 'signed' ? 'Reenviar copia firmada' : 'Reenviar invitación' ?></button>
           <?php endif; ?></div>
@@ -55,23 +71,23 @@ final class CompletionView
           <?php endif; ?>
         </article>
       <?php endforeach; ?>
-      <?php if (!$active && !in_array(mb_strtolower((string) $ticket['estado']), ['cerrado', 'finalizado', 'resuelto'], true)): ?>
-        <form data-acta-create>
-          <h3>1. Solución y firmante</h3>
+      <?php if ((!$active || $editAct) && !in_array(mb_strtolower((string) $ticket['estado']), ['cerrado', 'finalizado', 'resuelto'], true)): ?>
+        <form data-acta-create data-acta-operation="<?= $editAct ? 'update' : 'create' ?>"<?= $editAct ? ' data-acta-id="' . self::e($editAct['id']) . '"' : '' ?>>
+          <h3>1. <?= $editAct ? 'Editar solución y firmante' : 'Solución y firmante' ?></h3>
           <div class="scm-acta-grid">
-            <label>¿Quién realizó la solución? *<select name="executor" required><option value="">Seleccionar responsable</option><?php foreach (CompletionPolicy::EXECUTORS as $role => $label): ?><option value="<?= self::e($role) ?>" <?= $executor === $role ? 'selected' : '' ?>><?= self::e($label) ?></option><?php endforeach; ?></select></label>
-            <label>¿A quién se solicita la firma? *<select name="signer_role" required data-acta-signer><option value="">Seleccionar firmante</option><?php foreach ($context['contacts'] as $role => $contact): ?><option value="<?= self::e($role) ?>" data-name="<?= self::e($contact['name']) ?>" data-email="<?= self::e($contact['email']) ?>" data-phone="<?= self::e($contact['phone']) ?>" <?= !$contact['available'] ? 'disabled' : '' ?>><?= self::e($contact['label']) ?><?= !$contact['available'] ? ' — falta contacto para verificación' : ' · ' . self::e($contact['name']) ?></option><?php endforeach; ?></select></label>
-            <label>Nombre completo de la persona que firma *<input name="signer_name" maxlength="160" required autocomplete="off" data-acta-signer-name></label>
-            <label>Correo registrado para recibir la firma<input type="email" readonly data-acta-signer-email></label>
-            <label>WhatsApp registrado<input type="tel" readonly data-acta-signer-phone></label>
-            <label>Enviar invitación y copia firmada por *<select name="channels[]" required><option value="email">Correo</option><option value="whatsapp">WhatsApp</option><option value="both">Correo y WhatsApp</option></select></label>
+            <label>¿Quién realizó la solución? *<select name="executor" required><option value="">Seleccionar responsable</option><?php foreach (CompletionPolicy::EXECUTORS as $role => $label): ?><option value="<?= self::e($role) ?>" <?= $selectedExecutor === $role ? 'selected' : '' ?>><?= self::e($label) ?></option><?php endforeach; ?></select></label>
+            <label>¿A quién se solicita la firma? *<select name="signer_role" required data-acta-signer><option value="">Seleccionar firmante</option><?php foreach ($context['contacts'] as $role => $contact): ?><option value="<?= self::e($role) ?>" data-name="<?= self::e($contact['name']) ?>" data-email="<?= self::e($contact['email']) ?>" data-phone="<?= self::e($contact['phone']) ?>" <?= $selectedSigner === $role ? 'selected' : '' ?> <?= !$contact['available'] ? 'disabled' : '' ?>><?= self::e($contact['label']) ?><?= !$contact['available'] ? ' — falta contacto para verificación' : ' · ' . self::e($contact['name']) ?></option><?php endforeach; ?></select></label>
+            <label>Nombre completo de la persona que firma *<input name="signer_name" maxlength="160" required autocomplete="off" data-acta-signer-name value="<?= self::e($signerName) ?>"></label>
+            <label>Correo registrado para recibir la firma<input type="email" readonly data-acta-signer-email value="<?= self::e($formPayload['signer']['email'] ?? '') ?>"></label>
+            <label>WhatsApp registrado<input type="tel" readonly data-acta-signer-phone value="<?= self::e($formPayload['signer']['phone'] ?? '') ?>"></label>
+            <label>Enviar invitación y copia firmada por *<select name="channels[]" required><option value="email" <?= $selectedChannel === 'email' ? 'selected' : '' ?>>Correo</option><option value="whatsapp" <?= $selectedChannel === 'whatsapp' ? 'selected' : '' ?>>WhatsApp</option><option value="both" <?= $selectedChannel === 'both' ? 'selected' : '' ?>>Correo y WhatsApp</option></select></label>
           </div>
           <p class="scm-acta-help">Solo se usan los contactos registrados. Para empresas o copropiedades, indica el nombre de quien firma en su representación. El destinatario confirma su nombre y verifica un código antes del cierre.</p>
           <?php if (CompletionDelivery::otpTemplate() === ''): ?><p class="scm-acta-notice">El enlace puede enviarse por WhatsApp, pero el código se enviará por correo hasta configurar la plantilla de autenticación de WhatsApp. El firmante necesita correo válido.</p><?php endif; ?>
           <h3>2. Daños encontrados y soluciones realizadas</h3>
-          <div data-acta-items><?= $this->item(0) ?></div>
+          <div data-acta-items><?php foreach ($formItems as $index => $item): ?><?= $this->item((int) $index, is_array($item) ? $item : []) ?><?php endforeach; ?></div>
           <button type="button" class="scm-acta-button scm-acta-secondary" data-acta-add-item>Agregar otro daño y solución</button>
-          <label>Observaciones finales *<textarea name="observations" required maxlength="6000" rows="3" placeholder="Describe verificaciones, alcance de la solución y observaciones para el firmante."></textarea></label>
+          <label>Observaciones finales *<textarea name="observations" required maxlength="6000" rows="3" placeholder="Describe verificaciones, alcance de la solución y observaciones para el firmante."><?= self::e($formObservations) ?></textarea></label>
           <h3>3. Reporte administrativo de cobro</h3>
           <p class="scm-acta-help">Valores fijos tomados de la configuración de mantenimiento.</p>
           <div class="scm-acta-grid">
@@ -81,7 +97,7 @@ final class CompletionView
           <?php if ($context['fee'] === null): ?><p class="scm-acta-notice">Falta una configuración válida. Ingresa expresamente el valor administrativo; no se generarán cobros con una tarifa vacía.</p><?php endif; ?>
           <p class="scm-acta-total">Total del reporte: <output data-acta-total><?= self::money((int) ($context['fee'] ?? 0) + $transportMax) ?></output></p>
           <label class="scm-acta-check"><input type="checkbox" name="confirm" value="1" required><span>Revisé los daños, las soluciones, el firmante y el valor. Entiendo que al firmar se cerrará el caso y se registrará un único reporte como no pagado y no exportado.</span></label>
-          <button type="submit" class="scm-acta-button">Generar acta y solicitar firma</button>
+          <button type="submit" class="scm-acta-button"><?= $editAct ? 'Guardar cambios y reenviar firma' : 'Generar acta y solicitar firma' ?></button>
         </form>
       <?php elseif (!$active): ?><p>El ticket está cerrado. No se pueden generar nuevas actas.</p><?php endif; ?>
       <div data-acta-message role="status" aria-live="polite"></div>
@@ -89,10 +105,20 @@ final class CompletionView
     <?php return (string) ob_get_clean();
   }
 
-  public function item(int $index): string
+  public function item(int $index, array $values = []): string
   {
     $helpId = 'acta-photo-help-' . $index;
-    return '<fieldset class="scm-acta-item" data-acta-item><legend>Daño y solución</legend><div class="scm-acta-grid"><label>Daño encontrado *<textarea name="items[' . $index . '][damage]" required maxlength="3000" rows="3"></textarea></label><label>Solución realizada *<textarea name="items[' . $index . '][solution]" required maxlength="3000" rows="3"></textarea></label></div><div class="scm-acta-photo-field"><label>Fotos de evidencia (opcional)<input type="file" name="acta_item_photos_' . $index . '[]" accept="image/jpeg,image/png,image/webp" multiple data-acta-photos aria-describedby="' . $helpId . '"></label><button type="button" class="scm-acta-photo-paste" data-acta-photo-paste><strong>Pegar captura</strong><span>Haz clic aquí y presiona Ctrl+V</span></button><small id="' . $helpId . '" data-acta-photo-help>Máximo 4 fotos por daño y 12 en toda el acta. JPG, PNG o WebP; hasta 25 MB por archivo. Se comprimen automáticamente.</small></div><div class="scm-acta-photo-preview" data-acta-photo-preview aria-live="polite" aria-label="Fotos seleccionadas"></div><button type="button" class="scm-acta-remove" data-acta-remove-item>Quitar este detalle</button></fieldset>';
+    $photosHtml = '';
+    foreach ((array) ($values['photos'] ?? []) as $photoIndex => $photo) {
+      if (!is_array($photo)) { continue; }
+      $photoUrl = \SCM\Support\StoredFileService::fromRuntime()->urlFor((string) ($photo['name'] ?? ''));
+      $photosHtml .= '<figure data-acta-existing-photo><img src="' . self::e($photoUrl) . '" alt="Evidencia actual ' . ((int) $photoIndex + 1) . '" loading="lazy"><figcaption>Foto actual ' . ((int) $photoIndex + 1) . '</figcaption><button type="button" class="scm-acta-photo-remove" data-acta-remove-existing-photo aria-label="Quitar foto actual ' . ((int) $photoIndex + 1) . '"><span aria-hidden="true">×</span></button>';
+      foreach (['name', 'mime', 'width', 'height', 'bytes', 'sha256'] as $key) {
+        $photosHtml .= '<input type="hidden" name="items[' . $index . '][photos][' . (int) $photoIndex . '][' . $key . ']" value="' . self::e($photo[$key] ?? '') . '">';
+      }
+      $photosHtml .= '</figure>';
+    }
+    return '<fieldset class="scm-acta-item" data-acta-item><legend>Daño y solución</legend><div class="scm-acta-grid"><label>Daño encontrado *<textarea name="items[' . $index . '][damage]" required maxlength="3000" rows="3">' . self::e($values['damage'] ?? '') . '</textarea></label><label>Solución realizada *<textarea name="items[' . $index . '][solution]" required maxlength="3000" rows="3">' . self::e($values['solution'] ?? '') . '</textarea></label></div><div class="scm-acta-photo-field"><label>Fotos de evidencia (opcional)<input type="file" name="acta_item_photos_' . $index . '[]" accept="image/jpeg,image/png,image/webp" multiple data-acta-photos aria-describedby="' . $helpId . '"></label><button type="button" class="scm-acta-photo-paste" data-acta-photo-paste><strong>Pegar captura</strong><span>Haz clic aquí y presiona Ctrl+V</span></button><small id="' . $helpId . '" data-acta-photo-help>Máximo 4 fotos por daño y 12 en toda el acta. JPG, PNG o WebP; hasta 25 MB por archivo. Se comprimen automáticamente.</small></div><div class="scm-acta-photo-preview" data-acta-photo-preview aria-live="polite" aria-label="Fotos seleccionadas">' . $photosHtml . '</div><button type="button" class="scm-acta-remove" data-acta-remove-item>Quitar este detalle</button></fieldset>';
   }
 
   /** @param array<string,string|int> $filters @param array<int,array<string,mixed>> $items @param array<string,int> $stats @param array<string,int> $pagination */
@@ -171,7 +197,7 @@ final class CompletionView
       $pdfButtons = $status === 'signed'
         ? '<a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf') . '" target="_blank" rel="noopener">PDF destinatario</a><a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf&audience=staff') . '" target="_blank" rel="noopener">PDF interno</a>'
         : '';
-      $html .= '<td class="scm-pending-action-cell"><button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" data-scm-open-iframe data-iframe-url="' . self::e($url) . '" data-iframe-title="Acta de satisfacción #' . self::e($act['id']) . '" data-scm-compact-iframe>Ver acta</button>' . $pdfButtons . ($status === 'pending' ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-archive="' . self::e($act['id']) . '" data-ticket-pk="' . self::e($act['ticket_pk']) . '">Archivar</button>' : '') . ($canDelete ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-delete="' . self::e($act['id']) . '">Eliminar</button>' : '') . '</td>';
+      $html .= '<td class="scm-pending-action-cell"><button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" data-scm-open-iframe data-iframe-url="' . self::e($url) . '" data-iframe-title="Acta de satisfacción #' . self::e($act['id']) . '" data-scm-compact-iframe>Ver acta</button>' . ($status === 'pending' ? '<a class="scm-pending-action-btn scm-pending-action-btn--blue" href="' . self::e($service->editUrl($act)) . '">Editar</a>' : '') . $pdfButtons . ($status === 'pending' ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-archive="' . self::e($act['id']) . '" data-ticket-pk="' . self::e($act['ticket_pk']) . '">Archivar</button>' : '') . ($canDelete ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-delete="' . self::e($act['id']) . '">Eliminar</button>' : '') . '</td>';
       $html .= '</tr>';
     }
     $html .= '</tbody></table></div>';

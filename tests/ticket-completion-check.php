@@ -80,7 +80,8 @@ $assert(str_contains($configPhp, "SESSION_IDLE_TIMEOUT', '28800") && str_contain
 $assert(str_contains($directCreatePhp, '$_GET[\'token\']') && str_contains($directCreatePhp, 'hash_equals($secret, $token)') && str_contains($directCreatePhp, 'loginByEmployeeId($employeeId)'), 'direct act creation autologin requires the environment token and employee id');
 $assert(str_contains($authPhp, 'function loginByEmployeeId') && str_contains($authPhp, 'startSessionFromFuncionario') && !str_contains($directCreatePhp, 'pass_others_apss'), 'employee autologin starts a session without reading or transporting passwords');
 $assert(str_contains($directNoncePhp, 'App::csrf()->token') && str_contains($directCreatePhp, 'data-nonce-url') && str_contains($directCreateJs, 'refreshNonce') && str_contains($directCreateJs, '240000'), 'direct act creation page refreshes CSRF before save and keeps a visible heartbeat');
-$assert(str_contains($directCreateJs, 'operation", "create"') && str_contains($directCreateJs, 'redirect_url') && str_contains($directCreateJs, 'MAX_PHOTOS_PER_ACT = 12'), 'direct act creation page submits through the secure endpoint and redirects to the act dashboard');
+$assert(str_contains($directCreateJs, 'dataset.actaOperation') && str_contains($directCreateJs, 'data-acta-remove-existing-photo'), 'direct act creation page can update pending acts and remove existing photos');
+$assert(str_contains($directCreateJs, 'data.set("operation", operation)') && str_contains($directCreateJs, 'redirect_url') && str_contains($directCreateJs, 'MAX_PHOTOS_PER_ACT = 12'), 'direct act creation page submits through the secure endpoint and redirects to the act dashboard');
 
 if (!in_array('--database', $argv, true)) { echo "$checks domain checks passed. Use --database for isolated SQL integration checks.\n"; exit; }
 require dirname(__DIR__) . '/bootstrap/app.php';
@@ -168,11 +169,24 @@ $pendingDeletable = $service->create(10, $deleteInput, $actor);
 $pendingDeletableAct = $repo->act((int) $pendingDeletable['act_id']);
 $pendingDeleteTableRegular = (new View())->dashboardTable([$pendingDeletableAct + ['_payload' => $service->payload($pendingDeletableAct)]], $service);
 $pendingDeleteTableAdmin = (new View())->dashboardTable([$pendingDeletableAct + ['_payload' => $service->payload($pendingDeletableAct)]], $service, [], true);
+$assert(str_contains($pendingDeleteTableAdmin, '>Editar</a>') && str_contains($pendingDeleteTableAdmin, 'act_id=' . $pendingDeletable['act_id']), 'pending acts expose edit action from dashboard');
 $assert(!str_contains($pendingDeleteTableRegular, 'data-acta-delete="' . $pendingDeletable['act_id'] . '"') && str_contains($pendingDeleteTableAdmin, 'data-acta-delete="' . $pendingDeletable['act_id'] . '"'), 'pending acts expose delete action only for administrative deletion scope');
 $rejects(static fn() => $service->deleteRetired((int) $pendingDeletable['act_id'], $actor), 'pending act delete without administrative scope is rejected');
 $service->deleteRetired((int) $pendingDeletable['act_id'], $actor, true);
 $rejects(static fn() => $repo->act((int) $pendingDeletable['act_id']), 'administrative deletion removes pending act from act table');
 $assert($repo->ticket(10)['estado'] === 'En proceso' && $repo->ticket(10)['estado_administrativo'] === 'En ejecucion por propietario' && (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '` WHERE id_ticket = 10') === 0, 'deleting pending act restores previous stage without closing ticket or creating charge');
+$seedTicket(12);
+$editable = $service->create(12, $deleteInput, $actor);
+$editableAct = $repo->act((int) $editable['act_id']);
+$oldNonce = (string) $editableAct['token_nonce'];
+$db->update($repo->table(), ['otp_json' => json_encode(['queued' => true, 'expires_at' => time() + 600, 'hash' => str_repeat('a', 64)], JSON_THROW_ON_ERROR)], ['id' => $editableAct['id']]);
+$updated = $service->update((int) $editableAct['id'], 12, array_replace($deleteInput, ['executor' => 'arrendatario', 'items' => [['damage' => 'Daño corregido', 'solution' => 'Solución corregida']], 'observations' => 'Observación corregida']), $actor);
+$updatedAct = $repo->act((int) $updated['act_id']);
+$updatedPayload = $service->payload($updatedAct);
+$assert($updatedAct['status'] === 'pending' && $updatedPayload['items'][0]['damage'] === 'Daño corregido' && $updatedPayload['pending_admin_state'] === 'En ejecucion por arrendatario', 'pending act edit updates document content and selected execution state');
+$assert((string) $updatedAct['token_nonce'] !== $oldNonce && $updatedAct['otp_json'] === null, 'pending act edit rotates signing link and invalidates previous verification codes');
+$editPanel = (new View())->panel($service->context(12), $service, (int) $updatedAct['id']);
+$assert(str_contains($editPanel, 'data-acta-operation="update"') && str_contains($editPanel, 'Daño corregido') && str_contains($editPanel, 'Guardar cambios y reenviar firma'), 'pending act edit form is prefilled and submitted as an update');
 $notifications = [];
 $created = $service->create(1, $input, $actor);
 $act = $repo->act($created['act_id']);

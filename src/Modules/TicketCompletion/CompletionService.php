@@ -100,6 +100,14 @@ final class CompletionService
     return rtrim($this->baseUrl, '/') . '/index.php?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
   }
 
+  public function editUrl(array $act): string
+  {
+    return rtrim($this->baseUrl, '/') . '/crear-acta.php?' . http_build_query([
+      'ticket_pk' => (int) $act['ticket_pk'],
+      'act_id' => (int) $act['id'],
+    ], '', '&', PHP_QUERY_RFC3986);
+  }
+
   public function token(array $act): string
   {
     return hash_hmac('sha256', 'ticket-completion|' . $act['id'] . '|' . $act['token_nonce'], $this->secret);
@@ -132,66 +140,9 @@ final class CompletionService
       if (in_array(mb_strtolower(trim((string) $ticket['estado'])), ['cerrado', 'finalizado', 'resuelto'], true)) {
         throw new \DomainException('No se puede crear un acta en un caso cerrado.');
       }
-      $context = $this->context($ticketId);
-      $role = CompletionPolicy::text($input['signer_role'] ?? '', 'quién firma', 25);
-      $executor = CompletionPolicy::text($input['executor'] ?? '', 'quién realizó la solución', 25);
-      if (!isset(CompletionPolicy::ROLES[$role])) {
-        throw new \DomainException('Selecciona propietario, arrendatario o copropiedad.');
-      }
-      if (!isset(CompletionPolicy::EXECUTORS[$executor])) {
-        throw new \DomainException('Selecciona quién realizó la solución.');
-      }
-      $pendingAdminState = CompletionPolicy::executionState($executor);
-      $contact = $context['contacts'][$role];
-      if (!$contact['available']) {
-        throw new \DomainException('El firmante necesita nombre y un contacto válido para verificación: correo o WhatsApp con plantilla de autenticación configurada.');
-      }
-      $channels = $input['channels'] ?? ['email'];
-      if ($channels === ['both']) { $channels = ['email', 'whatsapp']; }
-      if (!is_array($channels) || !$channels || array_diff($channels, ['email', 'whatsapp'])) { throw new \DomainException('Selecciona correo, WhatsApp o ambos.'); }
-      $channels = array_values(array_unique($channels));
-      foreach ($channels as $channel) {
-        if (($channel === 'email' && !filter_var($contact['email'], FILTER_VALIDATE_EMAIL)) || ($channel === 'whatsapp' && $contact['phone'] === '')) {
-          throw new \DomainException('Falta el contacto registrado para el canal seleccionado: ' . $channel . '.');
-        }
-      }
-      $signerName = CompletionPolicy::text($input['signer_name'] ?? '', 'nombre de quien firma', 160);
-      $items = CompletionPolicy::items($input['items'] ?? null);
-      $observations = CompletionPolicy::text($input['observations'] ?? '', 'observaciones');
-      $transportMax = $context['transport_max'];
-      $transport = $transportMax ?? 0;
-      $fee = $context['fee'];
-      if ($fee === null) {
-        $fee = (int) round(CompletionPolicy::number($input['service_fee'] ?? ''));
-      }
-      if ($fee <= 0) {
-        throw new \DomainException('No hay una tarifa de servicio válida. Revisa la configuración o ingresa el valor administrativo.');
-      }
-      if ($fee + $transport > 999999999) {
-        throw new \DomainException('El total administrativo supera el máximo permitido.');
-      }
-      if (($input['confirm'] ?? '') !== '1') {
-        throw new \DomainException('Confirma que revisaste el acta y el valor del reporte administrativo.');
-      }
       $now = time();
-      $payload = [
-        'version' => 2, 'channels' => $channels, 'ticket_pk' => $ticketId, 'ticket_number' => (string) ($ticket['id_ticket'] ?: $ticketId),
-        'property' => (string) ($ticket['inmueble'] ?? ''), 'address' => (string) ($ticket['direccion'] ?? ''),
-        'contract' => (string) ($ticket['contrato'] ?? ''), 'executor' => $executor, 'pending_admin_state' => $pendingAdminState,
-        'items' => $items, 'observations' => $observations, 'created_at' => $now,
-        'signer' => ['role' => $role, 'name' => $signerName, 'contact_name' => $contact['name'], 'email' => $contact['email'], 'phone' => $contact['phone']],
-        'actor' => $actor,
-        'owner_id' => (string) ($ticket['id_propietario'] ?? ''), 'tenant_id' => (string) ($ticket['id_arrendatario'] ?? ''),
-        'previous' => ['estado_administrativo' => (string) ($ticket['estado_administrativo'] ?? ''), 'id_acta_satisfaccion' => (string) ($ticket['id_acta_satisfaccion'] ?? ''), 'estado_acta_satisfaccion' => (string) ($ticket['estado_acta_satisfaccion'] ?? 'No')],
-        'report' => [
-          'service_fee' => $fee, 'transport' => $transport, 'total' => $fee + $transport,
-          'transport_base' => $context['transport_base'], 'transport_max' => $transportMax,
-          'fee_source' => $context['fee'] === null ? 'manual' : 'configuracion', 'fee_config' => $context['fee_config'],
-          'id_inmueble' => (string) ($ticket['id_inmueble'] ?? ''), 'id_contrato' => (string) ($ticket['id_contrato'] ?? ''),
-          'sucursal' => (string) ($ticket['sucursal'] ?? '1'), 'arrendatario' => (string) ($ticket['arrendatario'] ?? ''),
-          'fecha_ticket' => (string) ($ticket['fecha'] ?? ''),
-        ],
-      ];
+      $context = $this->context($ticketId);
+      $payload = $this->payloadFromInput($ticketId, $ticket, $context, $input, $actor, null, $now);
       $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
       $this->repo->db->insert($this->repo->table(), [
         'ticket_pk' => $ticketId, 'payload_json' => $json,
@@ -200,12 +151,116 @@ final class CompletionService
       ]);
       $id = (int) $this->repo->db->lastInsertId();
       // Legacy timelines treat any act row as completion; publish the CCT record only on signature.
-      $this->repo->updateTicket($ticketId, ['estado' => 'En proceso', 'estado_administrativo' => $pendingAdminState]);
-      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' generada. Solución por ' . CompletionPolicy::EXECUTORS[$executor] . '. Pendiente de firma de ' . htmlspecialchars($signerName, ENT_QUOTES, 'UTF-8') . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta</a>. El caso permanece abierto en “' . $pendingAdminState . '” y el reporte aún no se cobra.', $actor['name'], $actor['employee_id']);
+      $this->repo->updateTicket($ticketId, ['estado' => 'En proceso', 'estado_administrativo' => $payload['pending_admin_state']]);
+      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' generada. Solución por ' . CompletionPolicy::EXECUTORS[$payload['executor']] . '. Pendiente de firma de ' . htmlspecialchars($payload['signer']['name'], ENT_QUOTES, 'UTF-8') . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta</a>. El caso permanece abierto en “' . $payload['pending_admin_state'] . '” y el reporte aún no se cobra.', $actor['name'], $actor['employee_id']);
       return $this->repo->act($id);
     });
     try { return $this->notify($act); }
     catch (\Throwable) { return ['act_id' => (int) $act['id'], 'queued' => false, 'message' => 'Acta guardada. No se pudo confirmar el envío; recarga y usa Reenviar invitación. El ticket sigue abierto.']; }
+  }
+
+  public function update(int $id, int $ticketId, array $input, array $actor): array
+  {
+    $this->repo->requireSchema();
+    $act = $this->repo->transaction($ticketId, function (array $ticket) use ($id, $ticketId, $input, $actor): array {
+      $active = $this->repo->active($ticketId);
+      if (!$active || (int) $active['id'] !== $id || $active['status'] !== 'pending') {
+        throw new \DomainException('Solo se puede editar el acta pendiente activa de este caso.');
+      }
+      if (in_array(mb_strtolower(trim((string) $ticket['estado'])), ['cerrado', 'finalizado', 'resuelto'], true)) {
+        throw new \DomainException('No se puede editar un acta en un caso cerrado.');
+      }
+      $oldPayload = $this->payload($active);
+      $now = time();
+      $payload = $this->payloadFromInput(
+        $ticketId,
+        $ticket,
+        $this->context($ticketId),
+        $input,
+        $actor,
+        is_array($oldPayload['previous'] ?? null) ? $oldPayload['previous'] : null,
+        (int) ($oldPayload['created_at'] ?? $now)
+      );
+      $payload['updated_at'] = $now;
+      $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+      $this->repo->db->update($this->repo->table(), [
+        'payload_json' => $json,
+        'payload_hash' => hash('sha256', $json),
+        'token_nonce' => bin2hex(random_bytes(32)),
+        'expires_at' => $now + 30 * 86400,
+        'otp_json' => null,
+        'delivery_json' => null,
+        'invitation_queued_at' => null,
+      ], ['id' => $id]);
+      $this->repo->updateTicket($ticketId, ['estado' => 'En proceso', 'estado_administrativo' => $payload['pending_admin_state']]);
+      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' editada. Se invalidaron códigos anteriores y se solicitó nueva firma de ' . htmlspecialchars($payload['signer']['name'], ENT_QUOTES, 'UTF-8') . '. El caso permanece abierto en “' . $payload['pending_admin_state'] . '”.', $actor['name'], $actor['employee_id']);
+      return $this->repo->act($id);
+    });
+    try { return $this->notify($act, false, true); }
+    catch (\Throwable) { return ['act_id' => (int) $act['id'], 'queued' => false, 'message' => 'Acta actualizada. No se pudo confirmar el envío; usa Reenviar invitación desde Actas de satisfacción.']; }
+  }
+
+  private function payloadFromInput(int $ticketId, array $ticket, array $context, array $input, array $actor, ?array $previous, int $createdAt): array
+  {
+    $role = CompletionPolicy::text($input['signer_role'] ?? '', 'quién firma', 25);
+    $executor = CompletionPolicy::text($input['executor'] ?? '', 'quién realizó la solución', 25);
+    if (!isset(CompletionPolicy::ROLES[$role])) {
+      throw new \DomainException('Selecciona propietario, arrendatario o copropiedad.');
+    }
+    if (!isset(CompletionPolicy::EXECUTORS[$executor])) {
+      throw new \DomainException('Selecciona quién realizó la solución.');
+    }
+    $pendingAdminState = CompletionPolicy::executionState($executor);
+    $contact = $context['contacts'][$role];
+    if (!$contact['available']) {
+      throw new \DomainException('El firmante necesita nombre y un contacto válido para verificación: correo o WhatsApp con plantilla de autenticación configurada.');
+    }
+    $channels = $input['channels'] ?? ['email'];
+    if ($channels === ['both']) { $channels = ['email', 'whatsapp']; }
+    if (!is_array($channels) || !$channels || array_diff($channels, ['email', 'whatsapp'])) { throw new \DomainException('Selecciona correo, WhatsApp o ambos.'); }
+    $channels = array_values(array_unique($channels));
+    foreach ($channels as $channel) {
+      if (($channel === 'email' && !filter_var($contact['email'], FILTER_VALIDATE_EMAIL)) || ($channel === 'whatsapp' && $contact['phone'] === '')) {
+        throw new \DomainException('Falta el contacto registrado para el canal seleccionado: ' . $channel . '.');
+      }
+    }
+    $signerName = CompletionPolicy::text($input['signer_name'] ?? '', 'nombre de quien firma', 160);
+    $items = CompletionPolicy::items($input['items'] ?? null);
+    $observations = CompletionPolicy::text($input['observations'] ?? '', 'observaciones');
+    $transportMax = $context['transport_max'];
+    $transport = $transportMax ?? 0;
+    $fee = $context['fee'];
+    if ($fee === null) {
+      $fee = (int) round(CompletionPolicy::number($input['service_fee'] ?? ''));
+    }
+    if ($fee <= 0) {
+      throw new \DomainException('No hay una tarifa de servicio válida. Revisa la configuración o ingresa el valor administrativo.');
+    }
+    if ($fee + $transport > 999999999) {
+      throw new \DomainException('El total administrativo supera el máximo permitido.');
+    }
+    if (($input['confirm'] ?? '') !== '1') {
+      throw new \DomainException('Confirma que revisaste el acta y el valor del reporte administrativo.');
+    }
+
+    return [
+      'version' => 2, 'channels' => $channels, 'ticket_pk' => $ticketId, 'ticket_number' => (string) ($ticket['id_ticket'] ?: $ticketId),
+      'property' => (string) ($ticket['inmueble'] ?? ''), 'address' => (string) ($ticket['direccion'] ?? ''),
+      'contract' => (string) ($ticket['contrato'] ?? ''), 'executor' => $executor, 'pending_admin_state' => $pendingAdminState,
+      'items' => $items, 'observations' => $observations, 'created_at' => $createdAt,
+      'signer' => ['role' => $role, 'name' => $signerName, 'contact_name' => $contact['name'], 'email' => $contact['email'], 'phone' => $contact['phone']],
+      'actor' => $actor,
+      'owner_id' => (string) ($ticket['id_propietario'] ?? ''), 'tenant_id' => (string) ($ticket['id_arrendatario'] ?? ''),
+      'previous' => $previous ?: ['estado_administrativo' => (string) ($ticket['estado_administrativo'] ?? ''), 'id_acta_satisfaccion' => (string) ($ticket['id_acta_satisfaccion'] ?? ''), 'estado_acta_satisfaccion' => (string) ($ticket['estado_acta_satisfaccion'] ?? 'No')],
+      'report' => [
+        'service_fee' => $fee, 'transport' => $transport, 'total' => $fee + $transport,
+        'transport_base' => $context['transport_base'], 'transport_max' => $transportMax,
+        'fee_source' => $context['fee'] === null ? 'manual' : 'configuracion', 'fee_config' => $context['fee_config'],
+        'id_inmueble' => (string) ($ticket['id_inmueble'] ?? ''), 'id_contrato' => (string) ($ticket['id_contrato'] ?? ''),
+        'sucursal' => (string) ($ticket['sucursal'] ?? '1'), 'arrendatario' => (string) ($ticket['arrendatario'] ?? ''),
+        'fecha_ticket' => (string) ($ticket['fecha'] ?? ''),
+      ],
+    ];
   }
 
   public function resend(int $id): array

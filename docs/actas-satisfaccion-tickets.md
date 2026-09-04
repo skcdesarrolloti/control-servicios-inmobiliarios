@@ -176,6 +176,11 @@ un heartbeat cada 4 minutos mientras está visible. La sesión del panel queda p
 defecto en 8 horas de inactividad, con mínimo técnico de 4 horas aunque
 `SESSION_IDLE_TIMEOUT` se configure por debajo.
 
+Las actas pendientes pueden editarse desde `Actas de satisfacción → Editar`. Al
+guardar cambios se actualiza el contenido del acta, se rota el enlace personal, se
+borra cualquier código OTP anterior y se envía una nueva invitación. Las actas
+firmadas no son editables porque ya cerraron el caso y registraron evidencia/cobro.
+
 No publicar enlaces con el token personal del destinatario ni reutilizar el token de
 Solicitudes Web. Esos contratos tienen otra identidad y otros permisos.
 
