@@ -22,7 +22,31 @@
 
   function notifyError(text) {
     message(text, true);
-    if (typeof window.alert === "function") window.alert(text);
+    if (window.console && console.warn) console.warn("[acta]", text);
+  }
+
+  function goLogin() {
+    window.location.assign(root.dataset.loginUrl || "login.php");
+  }
+
+  function refreshNonce(silent) {
+    return fetch(root.dataset.nonceUrl || "acta-nonce.php", {
+      method: "GET",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    }).then(function (response) {
+      if (response.status === 401) {
+        throw new Error("Tu sesión venció. Inicia sesión nuevamente.");
+      }
+      return response.json();
+    }).then(function (json) {
+      if (!json || !json.success || !json.data || !json.data.nonce) {
+        throw new Error(json && json.data && json.data.message || "No se pudo renovar la verificación de seguridad.");
+      }
+      root.dataset.nonce = json.data.nonce;
+      if (!silent) message("Verificación de seguridad renovada. Guardando…", false);
+      return json.data.nonce;
+    });
   }
 
   function selectedPhotos(input) {
@@ -209,11 +233,13 @@
     }).format(fee + transport);
   }
 
-  function submit() {
+  function submit(retried) {
     if (busy) return;
     busy = true;
     message("Comprimiendo fotos y generando acta…", false);
-    compressedFormData().then(function (data) {
+    refreshNonce(false).then(function () {
+      return compressedFormData();
+    }).then(function (data) {
       data.set("action", root.dataset.action || "scm_ticket_acta");
       data.set("nonce", root.dataset.nonce || "");
       data.set("ticket_pk", root.dataset.ticketPk || "");
@@ -228,11 +254,21 @@
     }).then(function (response) {
       return response.json();
     }).then(function (json) {
-      if (!json || !json.success || !json.data) throw new Error(json && json.data && json.data.message || "No se pudo crear el acta.");
+      if (!json || !json.success || !json.data) {
+        var code = json && json.data && json.data.code ? json.data.code : "";
+        if (code === "CSRF_EXPIRED" && !retried) {
+          busy = false;
+          return refreshNonce(false).then(function () { submit(true); });
+        }
+        throw new Error(json && json.data && json.data.message || "No se pudo crear el acta.");
+      }
       message(json.data.message || "Acta creada. Te llevamos a Actas de satisfacción…", json.data.queued === false);
       window.location.assign(json.data.redirect_url || root.dataset.redirectUrl || "index.php?tab=actas_satisfaccion");
     }).catch(function (error) {
       notifyError(error.message || "No se pudo crear el acta. Revisa los datos e inténtalo nuevamente.");
+      if (/sesión venció/i.test(error.message || "")) {
+        window.setTimeout(goLogin, 900);
+      }
     }).finally(function () {
       busy = false;
       form.querySelectorAll("button").forEach(function (button) { button.disabled = false; });
@@ -313,6 +349,11 @@
 
   form.addEventListener("submit", function (event) {
     event.preventDefault();
-    submit();
+    submit(false);
   });
+
+  window.setInterval(function () {
+    if (document.visibilityState === "hidden" || busy) return;
+    refreshNonce(true).catch(function () {});
+  }, 240000);
 })();

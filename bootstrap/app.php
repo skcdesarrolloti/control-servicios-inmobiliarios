@@ -7,7 +7,7 @@ define('SCM_PUBLIC_PATH', SCM_ROOT . '/public');
 define('SCM_STORAGE_PATH', SCM_ROOT . '/storage');
 define('SCM_RESOURCES_PATH', SCM_ROOT . '/resources');
 define('SCM_BASE_PATH', SCM_PUBLIC_PATH);
-define('SCM_VERSION', '3.3.39');
+define('SCM_VERSION', '3.3.40');
 
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');
@@ -84,7 +84,7 @@ if ($actaAutologinSecret !== '' && strlen($actaAutologinSecret) < 32) {
 define('SCM_APP_SECRET', (string) $scmConfig['app_secret']);
 define('SCM_ACTA_AUTOLOGIN_SECRET', $actaAutologinSecret);
 define('SCM_UPLOAD_MAX_BYTES', max(1024, (int) ($scmConfig['upload_max_bytes'] ?? 10485760)));
-define('SCM_SESSION_IDLE_TIMEOUT', max(900, (int) ($scmConfig['session_idle_timeout'] ?? 7200)));
+define('SCM_SESSION_IDLE_TIMEOUT', max(14400, (int) ($scmConfig['session_idle_timeout'] ?? 28800)));
 
 if (!is_dir($logsDir) && !mkdir($logsDir, 0750, true) && !is_dir($logsDir)) {
   throw new \RuntimeException('No se pudo crear el directorio de logs.');

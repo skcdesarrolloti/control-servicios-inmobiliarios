@@ -171,6 +171,11 @@ viajar por enlace; el autologin por token crea la sesión directamente con la
 identidad del funcionario activo. Trata este token como una contraseña maestra de
 este flujo y rótalo si se filtra.
 
+La pantalla directa renueva la verificación de seguridad antes de guardar y mantiene
+un heartbeat cada 4 minutos mientras está visible. La sesión del panel queda por
+defecto en 8 horas de inactividad, con mínimo técnico de 4 horas aunque
+`SESSION_IDLE_TIMEOUT` se configure por debajo.
+
 No publicar enlaces con el token personal del destinatario ni reutilizar el token de
 Solicitudes Web. Esos contratos tienen otra identidad y otros permisos.
 

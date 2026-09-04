@@ -126,8 +126,8 @@ final class Auth
     $now = time();
     $lastActivity = (int) ($_SESSION['scm_last_activity'] ?? $now);
     $idleTimeout = defined('SCM_SESSION_IDLE_TIMEOUT')
-      ? max(900, (int) SCM_SESSION_IDLE_TIMEOUT)
-      : 7200;
+      ? max(14400, (int) SCM_SESSION_IDLE_TIMEOUT)
+      : 28800;
     if ($lastActivity > 0 && ($now - $lastActivity) > $idleTimeout) {
       foreach (array_keys($_SESSION) as $key) {
         if (str_starts_with((string) $key, 'scm_')) {

@@ -70,10 +70,13 @@ $directCreateJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/
 $authPhp = (string) file_get_contents(dirname(__DIR__) . '/src/Core/Auth.php');
 $configPhp = (string) file_get_contents(dirname(__DIR__) . '/config/app.php');
 $bootstrapPhp = (string) file_get_contents(dirname(__DIR__) . '/bootstrap/app.php');
+$directNoncePhp = (string) file_get_contents(dirname(__DIR__) . '/public/acta-nonce.php');
 $assert(str_contains($directCreatePhp, 'crear-acta.php?ticket_pk=_ID') && str_contains($directCreatePhp, 'data-acta-create-page') && str_contains($directCreatePhp, 'Elaborando como'), 'authenticated direct act creation route uses the internal ticket id and current session actor');
 $assert(str_contains($configPhp, 'ACTA_AUTOLOGIN_SECRET') && str_contains($bootstrapPhp, 'SCM_ACTA_AUTOLOGIN_SECRET') && str_contains($bootstrapPhp, 'al menos 32 caracteres'), 'act autologin secret is configured separately from the main application secret');
+$assert(str_contains($configPhp, "SESSION_IDLE_TIMEOUT', '28800") && str_contains($bootstrapPhp, 'max(14400') && str_contains($authPhp, 'max(14400'), 'authenticated session timeout defaults to eight hours and never drops below four hours');
 $assert(str_contains($directCreatePhp, '$_GET[\'token\']') && str_contains($directCreatePhp, 'hash_equals($secret, $token)') && str_contains($directCreatePhp, 'loginByEmployeeId($employeeId)'), 'direct act creation autologin requires the environment token and employee id');
 $assert(str_contains($authPhp, 'function loginByEmployeeId') && str_contains($authPhp, 'startSessionFromFuncionario') && !str_contains($directCreatePhp, 'pass_others_apss'), 'employee autologin starts a session without reading or transporting passwords');
+$assert(str_contains($directNoncePhp, 'App::csrf()->token') && str_contains($directCreatePhp, 'data-nonce-url') && str_contains($directCreateJs, 'refreshNonce') && str_contains($directCreateJs, '240000'), 'direct act creation page refreshes CSRF before save and keeps a visible heartbeat');
 $assert(str_contains($directCreateJs, 'operation", "create"') && str_contains($directCreateJs, 'redirect_url') && str_contains($directCreateJs, 'MAX_PHOTOS_PER_ACT = 12'), 'direct act creation page submits through the secure endpoint and redirects to the act dashboard');
 
 if (!in_array('--database', $argv, true)) { echo "$checks domain checks passed. Use --database for isolated SQL integration checks.\n"; exit; }

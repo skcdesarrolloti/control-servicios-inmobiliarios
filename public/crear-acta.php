@@ -102,6 +102,8 @@ try {
     data-action="<?= $escape(SuCasaControlServiciosInmobiliarios::AJAX_TICKET_COMPLETION) ?>"
     data-nonce="<?= $escape($csrf) ?>"
     data-api-url="<?= $escape(rtrim((string) SCM_BASE_URL, '/') . '/api.php') ?>"
+    data-nonce-url="<?= $escape(rtrim((string) SCM_BASE_URL, '/') . '/acta-nonce.php') ?>"
+    data-login-url="<?= $escape(rtrim((string) SCM_BASE_URL, '/') . '/login.php?next=' . rawurlencode('crear-acta.php?ticket_pk=' . $ticketPk)) ?>"
     data-redirect-url="<?= $escape($redirectUrl) ?>"
   >
     <header class="scm-acta scm-acta-create-hero">
