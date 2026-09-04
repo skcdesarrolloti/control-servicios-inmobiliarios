@@ -10,6 +10,7 @@ final class SuCasaControlServiciosInmobiliarios
 {
   use \SCM\App\Concerns\HandlesTicketWorkflowActions;
   use \SCM\App\Concerns\HandlesTicketCompletion;
+  use \SCM\App\Concerns\HandlesCorrectiveReviewActions;
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   use \SCM\App\Concerns\HandlesPublicPqrActions;
   use \SCM\App\Concerns\HandlesAdministrativeNotifications;
@@ -33,6 +34,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CLOSE_TICKET = 'scm_cerrar_ticket';
   const AJAX_TICKET_COMPLETION = 'scm_ticket_acta';
   const AJAX_TICKET_COMPLETION_LIST = 'scm_ticket_actas_satisfaccion';
+  const AJAX_CORRECTIVE_REVIEW = 'scm_revision_correctiva';
   const AJAX_CONTACTS_UPDATE = 'scm_actualizar_contactos';
   const AJAX_ENTREGA         = 'scm_entrega';
   const AJAX_PREVENTIVA      = 'scm_preventiva';

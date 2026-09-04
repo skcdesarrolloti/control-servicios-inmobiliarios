@@ -363,6 +363,7 @@ trait RendersDashboard
         'my_tickets'      => self::AJAX_MY_TICKETS,
         'cotizaciones_mantenimiento' => self::AJAX_COTIZACIONES_MANTENIMIENTO,
         'actas_satisfaccion' => self::AJAX_TICKET_COMPLETION_LIST,
+        'revision_correctiva' => self::AJAX_CORRECTIVE_REVIEW,
         'delete_cotizacion' => self::AJAX_DELETE_COTIZACION,
         'cotizacion_pdf' => self::AJAX_COTIZACION_MANTENIMIENTO_PDF,
         'activate_ticket' => self::AJAX_ACTIVATE_TICKET,
@@ -3389,7 +3390,7 @@ trait RendersDashboard
       $html .= '<p class="scm-cotizacion-native-empty">Sin daños registrados.</p>';
     }
     foreach ($danos as $damageIndex => $damage) {
-      $damageMedia = $this->cotizacion_media_items($this->cotizacion_split_ids($damage['registro_foto_dano'] ?? ''));
+      $damageMedia = $this->cotizacion_media_items($this->cotizacion_split_media_refs($damage['registro_foto_dano'] ?? ''));
       $areas = array_filter([
         trim((string) ($damage['area_afectada_1'] ?? '')),
         trim((string) ($damage['area_afectada_2'] ?? '')),
@@ -3575,19 +3576,63 @@ trait RendersDashboard
     return array_values($out);
   }
 
+  /** @return array<int,string> */
+  private function cotizacion_split_media_refs($raw): array
+  {
+    $parts = preg_split('/[\s,]+/', trim((string) $raw)) ?: [];
+    $out = [];
+    foreach ($parts as $part) {
+      $part = trim((string) $part);
+      if ($part === '') {
+        continue;
+      }
+      if (preg_match('/^https?:\/\//i', $part) || preg_match('/^[a-f0-9]{24}_[0-9]+\.[a-z0-9]{1,8}$/D', basename($part))) {
+        $out[$part] = $part;
+        continue;
+      }
+      $id = preg_replace('/\D+/', '', $part) ?: '';
+      if ($id !== '') {
+        $out[$id] = $id;
+      }
+    }
+    return array_values($out);
+  }
+
   /** @param array<int,string> $ids @return array<int,array<string,string>> */
   private function cotizacion_media_items(array $ids): array
   {
     if (empty($ids)) {
       return [];
     }
-    $posts = $this->db->table('posts');
-    if (!$this->table_exists($posts)) {
-      return [];
+    $directItems = [];
+    $numericIds = [];
+    foreach ($ids as $ref) {
+      $ref = trim((string) $ref);
+      if ($ref === '') {
+        continue;
+      }
+      if (ctype_digit($ref)) {
+        $numericIds[] = $ref;
+        continue;
+      }
+      $url = preg_match('/^https?:\/\//i', $ref)
+        ? $ref
+        : (\SCM\Support\StoredFileService::fromRuntime()->urlFor($ref));
+      $path = (string) parse_url($url, PHP_URL_PATH);
+      $directItems[] = [
+        'id' => '',
+        'title' => basename($path) ?: 'Imagen adjunta',
+        'url' => $url,
+        'mime' => 'image/jpeg',
+      ];
     }
-    $placeholders = implode(',', array_fill(0, count($ids), '?'));
-    $rows = $this->db->getResults("SELECT ID, post_title, guid, post_mime_type FROM `{$posts}` WHERE ID IN ({$placeholders})", $ids);
-    $out = [];
+    $posts = $this->db->table('posts');
+    if (!$numericIds || !$this->table_exists($posts)) {
+      return $directItems;
+    }
+    $placeholders = implode(',', array_fill(0, count($numericIds), '?'));
+    $rows = $this->db->getResults("SELECT ID, post_title, guid, post_mime_type FROM `{$posts}` WHERE ID IN ({$placeholders})", $numericIds);
+    $out = $directItems;
     foreach ($rows as $row) {
       $url = trim((string) ($row['guid'] ?? ''));
       if ($url === '') {

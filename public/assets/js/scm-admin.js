@@ -2011,6 +2011,244 @@
     request("read");
   }
 
+  function openCorrectiveReviewEditor(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    var root = findRootFromNode(caseBtn);
+    if (!sub || !root || !caseBtn) return;
+    var runtime = parseRuntime(root) || {};
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var busy = false;
+    var sequence = 1;
+    if (title) title.textContent = "Crear revisión correctiva";
+    setCaseSubmodalMeta(sub, caseBtn);
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+    body.innerHTML = '<div class="scm-acta scm-corrective-review"><p role="status">Cargando datos del caso…</p></div>';
+
+    function message(text, error) {
+      var target = body.querySelector("[data-corrective-review-message]");
+      if (!target) return;
+      target.textContent = text || "";
+      target.classList.toggle("is-error", !!error);
+      target.setAttribute("role", error ? "alert" : "status");
+    }
+
+    function request(operation, data) {
+      if (busy) return Promise.resolve();
+      busy = true;
+      data = data || new FormData();
+      data.set("action", (runtime.actions && runtime.actions.revision_correctiva) || "scm_revision_correctiva");
+      data.set("nonce", runtime.nonce || "");
+      data.set("ticket_pk", caseBtn.dataset.ticketPk || "");
+      data.set("operation", operation);
+      body.querySelectorAll("button").forEach(function (button) { button.disabled = true; });
+      if (operation !== "read") message("Guardando revisión correctiva…", false);
+      return fetch(runtime.ajaxUrl || "api.php", { method: "POST", body: data, credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success || !json.data) throw new Error((json && json.data && json.data.message) || "No se pudo completar la operación.");
+          body.innerHTML = json.data.html;
+          bind();
+          if (json.data.message) {
+            message(json.data.message, false);
+            scmNotify("success", json.data.message, "Revisión correctiva");
+          }
+          if (operation !== "read") {
+            root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+          }
+        })
+        .catch(function (error) {
+          if (!body.querySelector("[data-corrective-review-message]")) {
+            body.innerHTML = '<div class="scm-acta scm-corrective-review"><p data-corrective-review-message></p><button type="button" class="scm-acta-button" data-corrective-retry>Reintentar</button></div>';
+            var retry = body.querySelector("[data-corrective-retry]");
+            if (retry) retry.addEventListener("click", function () { request("read"); });
+          }
+          message(error.message || "No se pudo guardar la revisión correctiva.", true);
+          scmNotify("error", error.message || "No se pudo guardar la revisión correctiva.", "Revisión correctiva");
+        })
+        .finally(function () {
+          busy = false;
+          body.querySelectorAll("button").forEach(function (button) { button.disabled = false; });
+        });
+    }
+
+    function bind() {
+      var form = body.querySelector("[data-corrective-review-create]");
+      if (!form) return;
+      var MAX_PER_DAMAGE = 10;
+      var MAX_TOTAL = 30;
+      var MAX_SOURCE_BYTES = 25 * 1024 * 1024;
+
+      function filesOf(input) {
+        return Array.isArray(input._scmFiles) ? input._scmFiles.slice() : Array.from(input.files || []);
+      }
+      function syncInput(input, files) {
+        if (typeof DataTransfer === "undefined") return false;
+        var transfer = new DataTransfer();
+        files.forEach(function (file) { transfer.items.add(file); });
+        input.files = transfer.files;
+        input._scmFiles = files.slice();
+        return true;
+      }
+      function totalFiles(except) {
+        return Array.from(form.querySelectorAll("[data-corrective-photos]")).reduce(function (sum, input) {
+          return sum + (input === except ? 0 : filesOf(input).length);
+        }, 0);
+      }
+      function preview(input) {
+        (input._scmPreviewUrls || []).forEach(function (url) { URL.revokeObjectURL(url); });
+        input._scmPreviewUrls = [];
+        var box = input.closest("[data-corrective-item]").querySelector("[data-corrective-photo-preview]");
+        box.innerHTML = "";
+        filesOf(input).forEach(function (file, index) {
+          var url = URL.createObjectURL(file);
+          input._scmPreviewUrls.push(url);
+          var fig = document.createElement("figure");
+          fig.innerHTML = '<img alt="Evidencia ' + (index + 1) + '"><figcaption></figcaption><button type="button" class="scm-acta-photo-remove" data-corrective-remove-photo="' + index + '" aria-label="Quitar foto">×</button>';
+          fig.querySelector("img").src = url;
+          fig.querySelector("figcaption").textContent = file.name + " · " + Math.max(1, Math.round(file.size / 1024)) + " KB";
+          box.appendChild(fig);
+        });
+      }
+      function addFiles(input, incoming) {
+        var current = filesOf(input);
+        var existing = new Set(current.map(function (file) { return [file.name, file.size, file.type, file.lastModified].join("|"); }));
+        var additions = [];
+        for (var i = 0; i < incoming.length; i++) {
+          var file = incoming[i];
+          if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > MAX_SOURCE_BYTES) {
+            syncInput(input, current);
+            message("Usa fotos JPG, PNG o WebP de máximo 25 MB cada una.", true);
+            scmNotify("error", "Usa fotos JPG, PNG o WebP de máximo 25 MB cada una.", "Fotos");
+            return false;
+          }
+          var key = [file.name, file.size, file.type, file.lastModified].join("|");
+          if (!existing.has(key)) {
+            existing.add(key);
+            additions.push(file);
+          }
+        }
+        var next = current.concat(additions);
+        if (next.length > MAX_PER_DAMAGE) {
+          message("Cada daño admite máximo 10 fotos.", true);
+          scmNotify("error", "Cada daño admite máximo 10 fotos.", "Fotos");
+          syncInput(input, current);
+          return false;
+        }
+        if (totalFiles(input) + next.length > MAX_TOTAL) {
+          message("La revisión admite máximo 30 fotos en total.", true);
+          scmNotify("error", "La revisión admite máximo 30 fotos en total.", "Fotos");
+          syncInput(input, current);
+          return false;
+        }
+        if (!syncInput(input, next)) {
+          message("Tu navegador no permite administrar las fotos seleccionadas. Actualiza Chrome e inténtalo de nuevo.", true);
+          return false;
+        }
+        preview(input);
+        return true;
+      }
+      function decodePhoto(file) {
+        if (window.createImageBitmap) {
+          return createImageBitmap(file, { imageOrientation: "from-image" }).catch(function () { return createImageBitmap(file); });
+        }
+        return new Promise(function (resolve, reject) {
+          var url = URL.createObjectURL(file);
+          var image = new Image();
+          image.onload = function () { URL.revokeObjectURL(url); resolve(image); };
+          image.onerror = function () { URL.revokeObjectURL(url); reject(new Error("No se pudo leer " + file.name + ".")); };
+          image.src = url;
+        });
+      }
+      function compressPhoto(file) {
+        return decodePhoto(file).then(function (image) {
+          var width = image.width || image.naturalWidth;
+          var height = image.height || image.naturalHeight;
+          var ratio = Math.min(1, 1600 / width, 1600 / height);
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(width * ratio));
+          canvas.height = Math.max(1, Math.round(height * ratio));
+          var context = canvas.getContext("2d", { alpha: false });
+          context.fillStyle = "#fff";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          if (typeof image.close === "function") image.close();
+          return new Promise(function (resolve, reject) {
+            canvas.toBlob(function (blob) {
+              blob ? resolve(new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg", lastModified: Date.now() })) : reject(new Error("No se pudo comprimir " + file.name + "."));
+            }, "image/jpeg", .78);
+          });
+        });
+      }
+      function compressedFormData() {
+        var data = new FormData(form);
+        var inputs = Array.from(form.querySelectorAll("[data-corrective-photos]"));
+        var total = inputs.reduce(function (sum, input) { return sum + filesOf(input).length; }, 0);
+        if (total > MAX_TOTAL) return Promise.reject(new Error("La revisión admite máximo 30 fotos en total."));
+        return Promise.all(inputs.map(function (input) {
+          var name = input.name;
+          data.delete(name);
+          return Promise.all(filesOf(input).map(compressPhoto)).then(function (files) {
+            files.forEach(function (file) { data.append(name, file, file.name); });
+          });
+        })).then(function () { return data; });
+      }
+      form.addEventListener("click", function (event) {
+        var removePhoto = event.target.closest("[data-corrective-remove-photo]");
+        if (removePhoto) {
+          var item = removePhoto.closest("[data-corrective-item]");
+          var input = item.querySelector("[data-corrective-photos]");
+          var files = filesOf(input);
+          files.splice(Number(removePhoto.dataset.correctiveRemovePhoto), 1);
+          if (syncInput(input, files)) preview(input);
+          return;
+        }
+        var removeItem = event.target.closest("[data-corrective-remove-item]");
+        if (removeItem) {
+          if (form.querySelectorAll("[data-corrective-item]").length <= 1) {
+            message("Debes conservar al menos un daño.", true);
+            return;
+          }
+          removeItem.closest("[data-corrective-item]").remove();
+        }
+      });
+      form.querySelector("[data-corrective-add-item]").addEventListener("click", function () {
+        var list = form.querySelector("[data-corrective-review-items]");
+        if (list.children.length >= 30) {
+          message("La revisión admite máximo 30 daños.", true);
+          return;
+        }
+        var item = list.firstElementChild.cloneNode(true);
+        item.querySelector("legend").textContent = "Daño #" + (list.children.length + 1);
+        item.querySelectorAll("input, select, textarea").forEach(function (field) {
+          field.name = field.name.replace(/items\[\d+\]/, "items[" + sequence + "]").replace(/corrective_review_photos_\d+\[\]/, "corrective_review_photos_" + sequence + "[]");
+          if (field.type === "file") {
+            field.value = "";
+            field._scmFiles = [];
+          } else {
+            field.value = "";
+          }
+        });
+        item.querySelector("[data-corrective-photo-preview]").innerHTML = "";
+        sequence++;
+        list.appendChild(item);
+      });
+      form.addEventListener("change", function (event) {
+        if (event.target.matches("[data-corrective-photos]")) addFiles(event.target, Array.from(event.target.files || []));
+      });
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        message("Comprimiendo fotos antes de guardar…", false);
+        compressedFormData().then(function (data) { request("create", data); }).catch(function (error) {
+          message(error.message || "No se pudieron preparar las fotos.", true);
+          scmNotify("error", error.message || "No se pudieron preparar las fotos.", "Fotos");
+        });
+      });
+    }
+    request("read");
+  }
+
   function openTicketResponseEditor(modal, caseBtn) {
     var sub = ensureCaseSubmodal(modal);
     if (!sub || !caseBtn) return;
@@ -4015,6 +4253,10 @@
             '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>';
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar ticket</button>';
+          if (statusBucket !== "cerrados") {
+            caseActionsHtml +=
+              '<button type="button" class="scm-case-work-btn" data-scm-open-corrective-review>Crear revisi&oacute;n correctiva</button>';
+          }
         }
         if (!isPublicPqr && (statusBucket === "postergados" || statusBucket === "cerrados")) {
           caseActionsHtml +=
@@ -4369,6 +4611,14 @@
         .querySelectorAll("[data-scm-open-ticket-acta]")
         .forEach(function (actaBtn) {
           actaBtn.addEventListener("click", function () { openTicketCompletionEditor(modal, btn); });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-corrective-review]")
+        .forEach(function (reviewBtn) {
+          reviewBtn.addEventListener("click", function () {
+            openCorrectiveReviewEditor(modal, btn);
+          });
         });
 
       modal

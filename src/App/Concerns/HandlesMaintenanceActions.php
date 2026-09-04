@@ -740,7 +740,7 @@ trait HandlesMaintenanceActions
         ], [0.32, 0.68], 8);
         $pdf->callout('Descripción del daño', $summary !== '' ? $summary : 'Sin descripción registrada.', 8);
         $pdf->callout('Consecuencia', $consequence !== '' ? $consequence : 'Sin consecuencia registrada.', 8);
-        $damageMedia = $this->cotizacion_media_items($this->cotizacion_split_ids($damage['registro_foto_dano'] ?? ''));
+        $damageMedia = $this->cotizacion_media_items($this->cotizacion_split_media_refs($damage['registro_foto_dano'] ?? ''));
         foreach ($damageMedia as $mediaIndex => $media) {
           $url = trim((string) ($media['url'] ?? ''));
           if ($url !== '') {
