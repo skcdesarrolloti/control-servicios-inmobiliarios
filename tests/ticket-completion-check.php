@@ -281,9 +281,25 @@ $thanksHtml = (new View())->thankYou($signed, $service->payload($signed), $token
 $assert(str_contains($thanksHtml, 'Gracias por tu firma') && str_contains($thanksHtml, 'Conocer más productos SuCasa') && str_contains($thanksHtml, 'https://sucasainmobiliaria.com.co/'), 'act thank-you page confirms signing and links to SuCasa website');
 $assert(str_contains($publicHtml, 'Fuga en tubería') && str_contains($publicHtml, 'reemplazó') && str_contains($publicHtml, 'Firma electrónica registrada'), 'document includes damage, solution and signature');
 $assert(str_contains($publicHtml, 'Evidencias del daño #1') && str_contains($publicHtml, rawurlencode($photoName)), 'recipient document displays lazy photographic evidence');
+$legacySigned = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_actas_de_satisfaccion') . '` WHERE _ID = ?', [$signed['legacy_act_id']]);
+$assert(is_array($legacySigned) && (string) ($legacySigned['email_creador'] ?? '') === 'actor@example.invalid' && (string) ($legacySigned['celular_creador'] ?? '') === '3001234567', 'legacy satisfaction act stores creator email and phone');
+$assert((string) ($legacySigned['fecha_satisfaccion'] ?? '') !== '' && str_contains((string) ($legacySigned['registro_fotografico'] ?? ''), rawurlencode($photoName)), 'legacy satisfaction act stores satisfaction date and compressed photo URLs when columns exist');
 $badSignature = $signed;
 $badSignature['signed_json'] = str_replace('Ana Pérez', 'Otra persona', (string) $signed['signed_json']);
 $rejects(static fn() => $service->payload($badSignature), 'altered signature evidence fails integrity check');
+$seedTicket(13);
+$db->insert($db->table('jet_cct_cotizacion_mantenimiento'), $repo->schema->filterTableData($db->table('jet_cct_cotizacion_mantenimiento'), [
+  '_ID' => 7013, 'id_ticket' => '9013', 'estado' => 'Aprobada', 'id_acta_satisfaccion' => '',
+]));
+$approvedQuoteAct = $service->create(13, array_replace($deleteInput, ['source_flow' => 'approved_quote', 'source_cotizacion_id' => '7013']), $actor);
+$approvedQuoteActRow = $repo->act((int) $approvedQuoteAct['act_id']);
+$assert(($service->payload($approvedQuoteActRow)['source']['flow'] ?? '') === 'approved_quote', 'approved quote act stores its source flow');
+$requestCode($approvedQuoteActRow);
+$approvedQuoteSigned = $service->sign((int) $approvedQuoteActRow['id'], $service->token($approvedQuoteActRow), $signInput($approvedQuoteActRow), '127.0.0.1', 'QA');
+$approvedQuoteRow = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7013');
+$assert($approvedQuoteRow['estado'] === 'Finalizado' && (int) $approvedQuoteRow['id_acta_satisfaccion'] === (int) $approvedQuoteSigned['legacy_act_id'], 'approved quote act finalizes quote and links the signed satisfaction act');
+$approvedTicket = $repo->ticket(13);
+$assert($approvedTicket['estado'] === 'Cerrado' && $approvedTicket['estado_administrativo'] === 'Finalizado' && ($approvedTicket['estado_cotizacion_mantenimiento'] ?? '') !== 'Desaprobada', 'approved quote act closes ticket without disapproving the approved quote');
 $seedTicket(11);
 $signedDeletable = $service->create(11, $deleteInput, $actor);
 $signedDeletableAct = $repo->act((int) $signedDeletable['act_id']);

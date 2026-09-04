@@ -43,9 +43,16 @@ final class CompletionView
     $selectedChannel = count($selectedChannels) > 1 ? 'both' : (string) ($selectedChannels[0] ?? 'email');
     $formItems = is_array($formPayload['items'] ?? null) && $formPayload['items'] ? $formPayload['items'] : [[]];
     $formObservations = (string) ($formPayload['observations'] ?? '');
+    $sourceFlow = is_array($formPayload['source'] ?? null) ? $formPayload['source'] : (is_array($context['source_flow'] ?? null) ? $context['source_flow'] : []);
+    $sourceName = (string) ($sourceFlow['flow'] ?? 'ticket_solution');
+    $sourceQuoteId = (string) ($sourceFlow['quote_id'] ?? '');
+    $sourceNotice = $sourceName === 'approved_quote' && trim($sourceQuoteId) !== ''
+      ? 'Esta acta quedará asociada a la cotización aprobada #' . trim($sourceQuoteId) . '. Al firmarse cerrará el caso, generará el reporte administrativo y marcará la cotización como trabajo finalizado.'
+      : '';
     ob_start(); ?>
     <section class="scm-acta">
       <p class="scm-acta-notice">Documenta la solución, elige el firmante y revisa el valor administrativo. El ticket conservará el <strong>estado de ejecución seleccionado</strong> mientras el acta queda pendiente. Puedes hacer seguimiento desde <strong>Actividades administrativas → Actas de satisfacción</strong>. Solo la firma registrará el cierre y el reporte de cobro.</p>
+      <?php if ($sourceNotice !== ''): ?><p class="scm-acta-notice"><?= self::e($sourceNotice) ?></p><?php endif; ?>
       <?php if ($editAct): ?><p class="scm-acta-notice">Estás editando el acta sin firmar #<?= self::e($editAct['id']) ?>. Al guardar se invalidan los códigos anteriores y se envía una nueva invitación.</p><?php endif; ?>
       <div class="scm-acta-meta"><span>Ticket <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Inmueble <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>
       <?php if ($showHistory): foreach ($context['acts'] as $act): $payload = $service->payload($act); ?>
@@ -77,6 +84,8 @@ final class CompletionView
       <?php endforeach; endif; ?>
       <?php if ((!$active || $editAct) && !in_array(mb_strtolower((string) $ticket['estado']), ['cerrado', 'finalizado', 'resuelto'], true)): ?>
         <form data-acta-create data-acta-operation="<?= $editAct ? 'update' : 'create' ?>"<?= $editAct ? ' data-acta-id="' . self::e($editAct['id']) . '"' : '' ?>>
+          <input type="hidden" name="source_flow" value="<?= self::e($sourceName) ?>">
+          <input type="hidden" name="source_cotizacion_id" value="<?= self::e($sourceQuoteId) ?>">
           <h3>1. <?= $editAct ? 'Editar solución y firmante' : 'Solución y firmante' ?></h3>
           <div class="scm-acta-grid">
             <label>¿Quién realizó la solución? *<select name="executor" required><option value="">Seleccionar responsable</option><?php foreach (CompletionPolicy::EXECUTORS as $role => $label): ?><option value="<?= self::e($role) ?>" <?= $selectedExecutor === $role ? 'selected' : '' ?>><?= self::e($label) ?></option><?php endforeach; ?></select></label>
@@ -190,15 +199,19 @@ final class CompletionView
       $contract = (string) ($payload['contract'] ?? $act['ticket_contrato'] ?? '-');
       $signer = (array) ($payload['signer'] ?? []);
       $report = (array) ($payload['report'] ?? []);
+      $source = (array) ($payload['source'] ?? []);
+      $sourceLabel = ((string) ($source['flow'] ?? '') === 'approved_quote' && trim((string) ($source['quote_id'] ?? '')) !== '')
+        ? 'Cotización aprobada #' . trim((string) $source['quote_id'])
+        : 'Solución sin aprobación de cotización';
       $status = (string) ($act['status'] ?? '');
       $url = $service->viewUrl((int) $act['id']);
       $html .= '<tr>';
       $html .= '<td><span class="scm-ticket-badge">#' . self::e($act['id']) . '</span></td>';
       $html .= '<td><span class="scm-acta-dashboard-status scm-acta-dashboard-status--' . self::e($status) . '">' . self::e($labels[$status] ?? $status) . '</span></td>';
-      $html .= '<td><strong>#' . self::e($ticket) . '</strong><br><small>' . self::e((string) ($act['ticket_estado_admin'] ?? '')) . '</small></td>';
+      $html .= '<td><strong>#' . self::e($ticket) . '</strong><br><small>' . self::e((string) ($act['ticket_estado_admin'] ?? '')) . '</small><br><small>' . self::e($sourceLabel) . '</small></td>';
       $html .= '<td><span class="scm-inmueble-badge">' . self::e($property ?: '-') . '</span><br><small>Contrato ' . self::e($contract ?: '-') . '</small></td>';
       $html .= '<td><strong>' . self::e($signer['name'] ?? '-') . '</strong><br><small>' . self::e($signer['email'] ?? '') . ($signer['phone'] ?? '' ? ' · ' . self::e($signer['phone']) : '') . '</small></td>';
-      $html .= '<td>' . self::money((int) ($report['total'] ?? 0)) . '<br><small>' . (!empty($act['report_id']) ? 'Cobro #' . self::e($act['report_id']) : 'Se genera al firmar') . '</small></td>';
+      $html .= '<td>' . self::money((int) ($report['total'] ?? 0)) . '<br><small>' . (!empty($act['report_id']) ? 'Cobro #' . self::e($act['report_id']) : 'Se genera al firmar') . '</small>' . (!empty($act['legacy_act_id']) ? '<br><small>CCT acta #' . self::e($act['legacy_act_id']) . '</small>' : '') . '</td>';
       $html .= '<td class="scm-date-cell">Creada ' . self::e(date('d/m/Y H:i', (int) ($act['created_at'] ?? 0))) . (!empty($act['signed_at']) ? '<br>Firmada ' . self::e(date('d/m/Y H:i', (int) $act['signed_at'])) : '') . '</td>';
       $canDelete = in_array($status, ['archived', 'cancelled'], true) || $canDeleteAny;
       $pdfButtons = $status === 'signed'

@@ -1717,6 +1717,14 @@
       data.set("nonce", runtime.nonce || "");
       data.set("ticket_pk", caseBtn.dataset.ticketPk || "");
       data.set("operation", operation);
+      if (
+        operation === "create" &&
+        String(caseBtn.dataset.cotizacionId || "").trim() &&
+        String(caseBtn.dataset.cotEstado || "").trim().toLowerCase() === "aprobada"
+      ) {
+        data.set("source_flow", "approved_quote");
+        data.set("source_cotizacion_id", String(caseBtn.dataset.cotizacionId || "").trim());
+      }
       body.querySelectorAll("button").forEach(function (button) { button.disabled = true; });
       message(operation === "read" ? "Cargando…" : "Guardando, espera por favor…", false);
       return fetch(runtime.ajaxUrl || "api.php", { method: "POST", body: data, credentials: "same-origin", signal: controller.signal, headers: { Accept: "application/json" } })

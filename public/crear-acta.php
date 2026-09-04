@@ -10,15 +10,30 @@ use SCM\Core\Auth;
 use SCM\Modules\TicketCompletion\CompletionRepository;
 use SCM\Modules\TicketCompletion\CompletionService;
 use SCM\Modules\TicketCompletion\CompletionView;
+use SCM\Support\SchemaInspector;
 
 header('Cache-Control: no-store, private');
 header('X-Robots-Tag: noindex, nofollow');
 header('Referrer-Policy: no-referrer');
 
 $ticketPk = (int) ($_GET['ticket_pk'] ?? $_GET['_ID'] ?? $_GET['id'] ?? 0);
+$quotePk = (int) ($_GET['id_cotizacion'] ?? $_GET['cotizacion_id'] ?? 0);
+if ($ticketPk <= 0 && $quotePk > 0) {
+  try {
+    $dbForQuote = App::db();
+    $schemaForQuote = new SchemaInspector($dbForQuote);
+    $quoteTable = $dbForQuote->table('jet_cct_cotizacion_mantenimiento');
+    if ($schemaForQuote->tableExists($quoteTable) && $schemaForQuote->columnExists($quoteTable, 'id_ticket')) {
+      $quoteRow = $dbForQuote->getRow("SELECT `id_ticket` FROM `{$quoteTable}` WHERE `_ID` = ? LIMIT 1", [$quotePk]);
+      $ticketPk = (int) ($quoteRow['id_ticket'] ?? 0);
+    }
+  } catch (Throwable) {
+    $ticketPk = 0;
+  }
+}
 if ($ticketPk <= 0) {
   http_response_code(400);
-  exit('Falta el identificador interno del caso. Usa crear-acta.php?ticket_pk=_ID');
+  exit('Falta el identificador interno del caso. Usa crear-acta.php?ticket_pk=_ID o crear-acta.php?id_cotizacion=_ID');
 }
 $editActId = (int) ($_GET['act_id'] ?? 0);
 
@@ -38,7 +53,19 @@ $tryEmployeeTokenLogin = static function (): bool {
   return (new Auth(App::db()))->loginByEmployeeId($employeeId);
 };
 
-$relativeTarget = 'crear-acta.php?ticket_pk=' . $ticketPk;
+$targetQuery = ['ticket_pk' => $ticketPk];
+if ($quotePk > 0) {
+  $targetQuery['id_cotizacion'] = $quotePk;
+  $targetQuery['source_flow'] = 'approved_quote';
+}
+if ($editActId > 0) {
+  $targetQuery['act_id'] = $editActId;
+}
+$relativeTarget = 'crear-acta.php?' . http_build_query($targetQuery, '', '&', PHP_QUERY_RFC3986);
+if (Auth::isLoggedIn() && (isset($_GET['token']) || isset($_GET['id_empleado']))) {
+  header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/' . $relativeTarget, true, 302);
+  exit;
+}
 if (!Auth::isLoggedIn() && $tryEmployeeTokenLogin()) {
   header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/' . $relativeTarget, true, 302);
   exit;
@@ -55,7 +82,8 @@ try {
   $repo = new CompletionRepository($db);
   $repo->requireSchema();
   $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
-  $context = $service->context($ticketPk);
+  $sourceFlow = $quotePk > 0 ? ['flow' => 'approved_quote', 'quote_id' => (string) $quotePk] : [];
+  $context = $service->context($ticketPk, $sourceFlow);
   $ticket = $context['ticket'];
   $app = new SuCasaControlServiciosInmobiliarios($db);
   if (!$app->canAccessTicketCompletion($ticketPk)) {
@@ -110,7 +138,7 @@ try {
     data-nonce="<?= $escape($csrf) ?>"
     data-api-url="<?= $escape(rtrim((string) SCM_BASE_URL, '/') . '/api.php') ?>"
     data-nonce-url="<?= $escape(rtrim((string) SCM_BASE_URL, '/') . '/acta-nonce.php') ?>"
-    data-login-url="<?= $escape(rtrim((string) SCM_BASE_URL, '/') . '/login.php?next=' . rawurlencode('crear-acta.php?ticket_pk=' . $ticketPk)) ?>"
+    data-login-url="<?= $escape(rtrim((string) SCM_BASE_URL, '/') . '/login.php?next=' . rawurlencode($relativeTarget)) ?>"
     data-redirect-url="<?= $escape($redirectUrl) ?>"
   >
     <header class="scm-acta scm-acta-create-hero">

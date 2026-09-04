@@ -20,7 +20,7 @@ final class CompletionService
     };
   }
 
-  public function context(int $ticketId): array
+  public function context(int $ticketId, array $sourceFlow = []): array
   {
     $this->repo->requireSchema();
     $ticket = $this->repo->ticket($ticketId);
@@ -61,6 +61,8 @@ final class CompletionService
       'transport_base' => CompletionPolicy::transportBase($config),
       'transport_max' => CompletionPolicy::transportMaximum($config),
       'acts' => $this->repo->history($ticketId),
+      'branch_contact' => $this->branchContact($ticket),
+      'source_flow' => $sourceFlow,
     ];
   }
 
@@ -152,7 +154,10 @@ final class CompletionService
       $id = (int) $this->repo->db->lastInsertId();
       // Legacy timelines treat any act row as completion; publish the CCT record only on signature.
       $this->repo->updateTicket($ticketId, ['estado' => 'En proceso', 'estado_administrativo' => $payload['pending_admin_state']]);
-      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' generada. Solución por ' . CompletionPolicy::EXECUTORS[$payload['executor']] . '. Pendiente de firma de ' . htmlspecialchars($payload['signer']['name'], ENT_QUOTES, 'UTF-8') . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta</a>. El caso permanece abierto en “' . $payload['pending_admin_state'] . '” y el reporte aún no se cobra.', $actor['name'], $actor['employee_id']);
+      $sourceText = (($payload['source']['flow'] ?? '') === 'approved_quote' && trim((string) ($payload['source']['quote_id'] ?? '')) !== '')
+        ? ' Asociada a la cotización aprobada #' . trim((string) $payload['source']['quote_id']) . '.'
+        : '';
+      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' generada.' . $sourceText . ' Solución por ' . CompletionPolicy::EXECUTORS[$payload['executor']] . '. Pendiente de firma de ' . htmlspecialchars($payload['signer']['name'], ENT_QUOTES, 'UTF-8') . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta</a>. El caso permanece abierto en “' . $payload['pending_admin_state'] . '” y el reporte aún no se cobra.', $actor['name'], $actor['employee_id']);
       return $this->repo->act($id);
     });
     try { return $this->notify($act); }
@@ -242,6 +247,12 @@ final class CompletionService
     if (($input['confirm'] ?? '') !== '1') {
       throw new \DomainException('Confirma que revisaste el acta y el valor del reporte administrativo.');
     }
+    $source = $this->sourceFromInput($input, $ticket, $context);
+    if ($source['flow'] === 'approved_quote' && !$this->repo->isApprovedMaintenanceQuoteForTicket($ticket, $source['quote_id'])) {
+      throw new \DomainException('Solo se puede crear esta acta desde una cotización aprobada asociada al caso.');
+    }
+    $propertyMeta = $this->propertyMeta($ticket);
+    $branchContact = is_array($context['branch_contact'] ?? null) ? $context['branch_contact'] : [];
 
     return [
       'version' => 2, 'channels' => $channels, 'ticket_pk' => $ticketId, 'ticket_number' => (string) ($ticket['id_ticket'] ?: $ticketId),
@@ -250,6 +261,13 @@ final class CompletionService
       'items' => $items, 'observations' => $observations, 'created_at' => $createdAt,
       'signer' => ['role' => $role, 'name' => $signerName, 'contact_name' => $contact['name'], 'email' => $contact['email'], 'phone' => $contact['phone']],
       'actor' => $actor,
+      'source' => $source,
+      'property_meta' => $propertyMeta,
+      'coordinator' => [
+        'name' => trim((string) ($branchContact['name'] ?? '')),
+        'email' => trim((string) ($branchContact['email'] ?? '')),
+        'phone' => trim((string) ($branchContact['phone'] ?? '')),
+      ],
       'owner_id' => (string) ($ticket['id_propietario'] ?? ''), 'tenant_id' => (string) ($ticket['id_arrendatario'] ?? ''),
       'previous' => $previous ?: ['estado_administrativo' => (string) ($ticket['estado_administrativo'] ?? ''), 'id_acta_satisfaccion' => (string) ($ticket['id_acta_satisfaccion'] ?? ''), 'estado_acta_satisfaccion' => (string) ($ticket['estado_acta_satisfaccion'] ?? 'No')],
       'report' => [
@@ -261,6 +279,70 @@ final class CompletionService
         'fecha_ticket' => (string) ($ticket['fecha'] ?? ''),
       ],
     ];
+  }
+
+  /** @return array{flow:string,quote_id:string} */
+  private function sourceFromInput(array $input, array $ticket, array $context): array
+  {
+    $configured = is_array($context['source_flow'] ?? null) ? $context['source_flow'] : [];
+    $flow = trim((string) ($input['source_flow'] ?? $configured['flow'] ?? ''));
+    $quoteId = trim((string) ($input['source_cotizacion_id'] ?? $input['id_cotizacion'] ?? $configured['quote_id'] ?? ''));
+    $flow = in_array($flow, ['approved_quote', 'ticket_solution'], true) ? $flow : '';
+    if ($flow === '' && $quoteId !== '') {
+      $flow = 'approved_quote';
+    }
+    if ($flow === '') {
+      $flow = 'ticket_solution';
+    }
+    if ($quoteId === '') {
+      $quoteId = trim((string) ($ticket['id_cotizacion_mantenimiento'] ?? $ticket['id_cotizacion'] ?? ''));
+    }
+    return ['flow' => $flow, 'quote_id' => $quoteId];
+  }
+
+  /** @return array{tipo_inmueble:string,tipo_negocio:string,destinacion:string} */
+  private function propertyMeta(array $ticket): array
+  {
+    return [
+      'tipo_inmueble' => self::firstText($ticket, ['tipo_inmueble', 'tipo_de_inmueble', 'tipo_de_inmueble_texto']),
+      'tipo_negocio' => self::firstText($ticket, ['tipo_negocio']),
+      'destinacion' => self::firstText($ticket, ['destinacion']),
+    ];
+  }
+
+  /** @return array{name:string,email:string,phone:string} */
+  private function branchContact(array $ticket): array
+  {
+    $out = ['name' => '', 'email' => '', 'phone' => ''];
+    $branchId = trim((string) ($ticket['sucursal'] ?? $ticket['id_sucursal'] ?? ''));
+    if ($branchId === '') {
+      return $out;
+    }
+    $table = $this->repo->db->table('jet_cct_sucursales');
+    if (!$this->repo->schema->tableExists($table)) {
+      return $out;
+    }
+    $row = $this->repo->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$branchId]);
+    if (!is_array($row)) {
+      return $out;
+    }
+    return [
+      'name' => self::firstText($row, ['nombre_contractual', 'coordinador', 'nombre', 'nombre_sucursal']),
+      'email' => self::firstText($row, ['correo_contractual', 'email_coordinador', 'correo', 'email']),
+      'phone' => self::firstText($row, ['celular_contractual', 'celular_coordinador', 'celular', 'telefono']),
+    ];
+  }
+
+  /** @param string[] $keys */
+  private static function firstText(array $row, array $keys): string
+  {
+    foreach ($keys as $key) {
+      $value = trim((string) ($row[$key] ?? ''));
+      if ($value !== '') {
+        return $value;
+      }
+    }
+    return '';
   }
 
   public function resend(int $id): array
@@ -489,15 +571,27 @@ final class CompletionService
         'id_inmueble' => $report['id_inmueble'], 'inmueble' => $payload['property'], 'arrendatario' => $report['arrendatario'],
         'id_contrato' => $report['id_contrato'], 'contrato' => $payload['contract'], 'sucursal' => $report['sucursal'],
       ]);
+      $legacyPhotoUrls = self::legacyPhotoUrls($payload);
       $legacyId = $this->repo->insertLegacy('jet_cct_actas_de_satisfaccion', [
         'cct_status' => 'publish', 'id_ticket' => (int) $act['ticket_pk'], 'fecha' => $payload['created_at'],
         'id_empleado' => $payload['actor']['employee_id'], 'cct_author_id' => $payload['actor']['employee_id'], 'creador' => $payload['actor']['name'],
+        'email_creador' => $payload['actor']['email'] ?? '', 'celular_creador' => $payload['actor']['phone'] ?? '',
         'cct_created' => date('Y-m-d H:i:s'), 'direccion' => $payload['address'],
         'id_inmueble' => $report['id_inmueble'], 'inmueble' => $payload['property'],
         'id_contrato' => $report['id_contrato'], 'contrato' => $payload['contract'], 'sucursal' => $report['sucursal'],
         'id_propietario' => $payload['owner_id'], 'id_arrendatario' => $payload['tenant_id'],
+        'id_cotizacion' => $payload['source']['quote_id'] ?? '',
+        'tipo_inmueble' => $payload['property_meta']['tipo_inmueble'] ?? '',
+        'tipo_de_inmueble' => $payload['property_meta']['tipo_inmueble'] ?? '',
+        'tipo_negocio' => $payload['property_meta']['tipo_negocio'] ?? '',
+        'destinacion' => $payload['property_meta']['destinacion'] ?? '',
+        'coordinador' => $payload['coordinator']['name'] ?? '',
+        'email_coordinador' => $payload['coordinator']['email'] ?? '',
+        'celular_coordinador' => $payload['coordinator']['phone'] ?? '',
         'quien_firma' => CompletionPolicy::ROLES[$payload['signer']['role']], 'destinatario' => $payload['signer']['name'],
         'email_destinatario' => $payload['signer']['email'], 'celular_destinatario' => $payload['signer']['phone'],
+        'destinatario_email' => $payload['signer']['email'], 'destinatario_celular' => $payload['signer']['phone'],
+        'registro_fotografico' => $legacyPhotoUrls !== [] ? implode("\n", $legacyPhotoUrls) : '',
         'fecha_satisfaccion' => $now, 'cct_modified' => date('Y-m-d H:i:s'),
         'observaciones' => self::legacyText($payload) . "\n\nActa firmada por " . $signature['name'] . ' el ' . date('d/m/Y H:i:s') . '. Registro verificable: ' . $this->viewUrl($id),
       ]);
@@ -507,20 +601,25 @@ final class CompletionService
       $pdf = (new CompletionPdf())->render($this->repo->act($id), $payload);
       $pdfHash = hash('sha256', $pdf);
       $this->repo->db->update($this->repo->table(), ['signed_pdf' => $pdf, 'pdf_hash' => $pdfHash, 'pdf_hmac' => hash_hmac('sha256', $id . '|' . $act['payload_hash'] . '|' . $pdfHash, $this->secret)], ['id' => $id]);
-      $disapprovedQuoteIds = $this->repo->disapproveMaintenanceQuotes($ticket, $id, $now);
+      $isApprovedQuoteFlow = ($payload['source']['flow'] ?? '') === 'approved_quote';
+      $quoteIds = $isApprovedQuoteFlow
+        ? $this->repo->finalizeApprovedMaintenanceQuotes($ticket, (string) ($payload['source']['quote_id'] ?? ''), $legacyId, $now)
+        : $this->repo->disapproveMaintenanceQuotes($ticket, $id, $now);
       $ticketUpdate = [
         'estado' => 'Cerrado', 'estado_administrativo' => 'Finalizado', 'estado_acta_satisfaccion' => 'Si',
         'id_acta_satisfaccion' => $legacyId, 'final_trabajo' => $now,
       ];
-      if ($disapprovedQuoteIds !== []) {
+      if (!$isApprovedQuoteFlow && $quoteIds !== []) {
         $ticketUpdate['estado_cotizacion_mantenimiento'] = 'Desaprobada';
         $ticketUpdate['estado_respuesta_cotizacion_mantenimiento'] = 'Desaprobada';
         $ticketUpdate['fecha_respuesta_cotizacion_mantenimiento'] = $now;
       }
       $this->repo->updateTicket((int) $act['ticket_pk'], $ticketUpdate);
-      $quoteAudit = $disapprovedQuoteIds === []
+      $quoteAudit = $quoteIds === []
         ? ''
-        : ' Cotizacion(es) de mantenimiento #' . implode(', #', $disapprovedQuoteIds) . ' marcadas como Desaprobada por ejecucion sin aprobacion.';
+        : ($isApprovedQuoteFlow
+          ? ' Cotizacion(es) de mantenimiento #' . implode(', #', $quoteIds) . ' marcadas como trabajo finalizado con esta acta.'
+          : ' Cotizacion(es) de mantenimiento #' . implode(', #', $quoteIds) . ' marcadas como Desaprobada por ejecucion sin aprobacion.');
       $this->repo->audit((int) $act['ticket_pk'], 'Acta #' . $id . ' firmada por ' . htmlspecialchars($signature['name'], ENT_QUOTES, 'UTF-8') . '. Caso cerrado.' . $quoteAudit . ' Reporte administrativo #' . $reportId . ' registrado (no pagado, no exportado). <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta firmada</a>.', $payload['actor']['name'], $payload['actor']['employee_id']);
       return $this->repo->act($id);
       });
@@ -639,5 +738,21 @@ final class CompletionService
     }
     $lines[] = 'Observaciones: ' . $payload['observations'];
     return implode("\n\n", $lines);
+  }
+
+  /** @return string[] */
+  private static function legacyPhotoUrls(array $payload): array
+  {
+    $urls = [];
+    $storage = \SCM\Support\StoredFileService::fromRuntime();
+    foreach ((array) ($payload['items'] ?? []) as $item) {
+      foreach ((array) ($item['photos'] ?? []) as $photo) {
+        if (!is_array($photo) || trim((string) ($photo['name'] ?? '')) === '') {
+          continue;
+        }
+        $urls[] = $storage->urlFor((string) $photo['name']);
+      }
+    }
+    return array_values(array_unique($urls));
   }
 }

@@ -200,6 +200,106 @@ final class CompletionRepository
     return array_keys($updatedIds);
   }
 
+  /**
+   * La firma de un acta originada en una cotización ya aprobada confirma el
+   * trabajo realizado. No cambia la aprobación de la cotización: solo la deja
+   * cerrada como trabajo finalizado y vinculada al acta legacy firmada.
+   *
+   * @return string[] Identificadores de las cotizaciones encontradas.
+   */
+  public function finalizeApprovedMaintenanceQuotes(array $ticket, string $quoteId, int $legacyActId, int $signedAt): array
+  {
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+
+    $idColumn = $this->schema->detectFirstExistingColumn($table, ['_ID', 'id_cotizacion_mantenimiento', 'id_cotizacion', 'id']);
+    if ($idColumn === '') {
+      return [];
+    }
+
+    $quoteIds = $this->numericIds($quoteId);
+    if ($quoteIds === []) {
+      $quoteIds = $this->numericIds((string) ($ticket['id_cotizacion_mantenimiento'] ?? $ticket['id_cotizacion'] ?? ''));
+    }
+    $rows = $quoteIds === [] ? [] : $this->lockedQuotesByIds($table, $idColumn, $quoteIds);
+
+    if ($rows === [] && $this->schema->columnExists($table, 'id_ticket')) {
+      $logicalTicket = trim((string) ($ticket['id_ticket'] ?? ''));
+      if ($logicalTicket !== '') {
+        $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE `id_ticket` = ? FOR UPDATE", [$logicalTicket]);
+      }
+      if ($rows === [] && (int) ($ticket['_ID'] ?? 0) > 0 && $logicalTicket !== (string) $ticket['_ID']) {
+        $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE `id_ticket` = ? FOR UPDATE", [(int) $ticket['_ID']]);
+      }
+    }
+
+    if ($rows === []) {
+      return [];
+    }
+
+    $update = $this->schema->filterTableData($table, [
+      'estado_trabajo' => 'Trabajo finalizado',
+      'estado' => 'Finalizado',
+      'id_acta_satisfaccion' => $legacyActId,
+      'final_trabajo' => $signedAt,
+      'fecha_actualizacion' => $signedAt,
+      'cct_modified' => date('Y-m-d H:i:s', $signedAt),
+    ]);
+
+    $updatedIds = [];
+    foreach ($rows as $row) {
+      $rowId = trim((string) ($row[$idColumn] ?? ''));
+      if ($rowId === '' || isset($updatedIds[$rowId])) {
+        continue;
+      }
+      $this->db->update($table, $update, [$idColumn => $rowId]);
+      $updatedIds[$rowId] = true;
+    }
+    return array_keys($updatedIds);
+  }
+
+  public function isApprovedMaintenanceQuoteForTicket(array $ticket, string $quoteId): bool
+  {
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->schema->tableExists($table)) {
+      return false;
+    }
+
+    $idColumn = $this->schema->detectFirstExistingColumn($table, ['_ID', 'id_cotizacion_mantenimiento', 'id_cotizacion', 'id']);
+    if ($idColumn === '') {
+      return false;
+    }
+
+    $ids = $this->numericIds($quoteId);
+    if ($ids === []) {
+      return false;
+    }
+    $rows = $this->lockedQuotesByIds($table, $idColumn, $ids);
+    if ($rows === []) {
+      return false;
+    }
+
+    $ticketKeys = array_values(array_unique(array_filter([
+      trim((string) ($ticket['_ID'] ?? '')),
+      trim((string) ($ticket['id_ticket'] ?? '')),
+    ], static fn(string $value): bool => $value !== '')));
+    foreach ($rows as $row) {
+      $rowTicket = trim((string) ($row['id_ticket'] ?? ''));
+      if ($rowTicket !== '' && $ticketKeys !== [] && !in_array($rowTicket, $ticketKeys, true)) {
+        continue;
+      }
+      foreach (['estado', 'estado_cotizacion_mantenimiento', 'estado_respuesta_cotizacion_mantenimiento', 'estado_respuesta', 'respuesta'] as $column) {
+        $value = mb_strtolower(trim((string) ($row[$column] ?? '')), 'UTF-8');
+        if (in_array($value, ['aprobada', 'aprobado', 'finalizado'], true)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /** @return string[] */
   private function numericIds(string $value): array
   {
