@@ -59,12 +59,15 @@ $inlineJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/adm
 $assert(str_contains($inlineJs, 'data-acta-delete') && str_contains($inlineJs, 'Escribe ELIMINAR para confirmar'), 'act dashboard supports explicit permanent delete confirmation');
 $publicActPhp = (string) file_get_contents(dirname(__DIR__) . '/public/ticket-acta.php');
 $assert(str_contains($publicActPhp, "El PDF solo se puede descargar cuando el acta esté firmada") && str_contains($publicActPhp, 'scm-acta-page--print-locked'), 'act public route blocks download and print output until signature');
+$assert(str_contains($publicActPhp, "OTP_REQUIRED") && str_contains($publicActPhp, "OTP_INVALID") && str_contains($publicActPhp, "OTP_LIMIT"), 'act public signing route returns specific verification error codes');
 $actCss = (string) file_get_contents(dirname(__DIR__) . '/public/assets/css/ticket-completion.css');
 $assert(str_contains($actCss, '.scm-acta-logo') && str_contains($actCss, '#10264a') && str_contains($actCss, 'drop-shadow') && str_contains($actCss, '.scm-acta-page--print-locked'), 'act logo renders on a high-contrast brand surface and pending print is blocked');
+$assert(str_contains($actCss, '.scm-acta-feedback') && str_contains($actCss, '.scm-acta-feedback-card') && str_contains($actCss, 'z-index: 10060'), 'act signing errors use a high-contrast modal feedback layer');
 $assert(str_contains($actCss, '.scm-acta-thanks') && str_contains($actCss, '.scm-acta-thanks-actions'), 'act thanks page has a dedicated responsive layout');
 $publicActJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/ticket-completion-public.js');
 $assert(str_contains($publicActJs, 'data-acta-gallery-item') && str_contains($publicActJs, 'ArrowRight') && str_contains($publicActJs, 'Cerrar galería'), 'act public view supports large photo gallery navigation');
 $assert(str_contains($publicActJs, 'redirect_url') && str_contains($publicActJs, 'window.location.assign'), 'act signer is redirected to the thank-you page after signing');
+$assert(str_contains($publicActJs, 'showFeedback') && str_contains($publicActJs, 'Solicitar nuevo código') && str_contains($publicActJs, 'OTP_REQUIRED'), 'act public signing shows a recovery modal when the verification code is expired or missing');
 $directCreatePhp = (string) file_get_contents(dirname(__DIR__) . '/public/crear-acta.php');
 $directCreateJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/ticket-completion-create.js');
 $authPhp = (string) file_get_contents(dirname(__DIR__) . '/src/Core/Auth.php');

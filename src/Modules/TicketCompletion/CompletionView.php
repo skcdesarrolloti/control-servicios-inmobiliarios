@@ -274,7 +274,7 @@ final class CompletionView
       . '<p class="scm-acta-help">Escribe exactamente: <strong>' . self::e($payload['signer']['name']) . '</strong>. Ese nombre será tu firma electrónica.</p>'
       . '<label>Código de 6 dígitos *<input name="otp_code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></label>'
       . '<label class="scm-acta-check"><input type="checkbox" name="accepted" value="1" required><span>' . self::e(CompletionPolicy::TYPED_OTP_CONSENT) . '</span></label>'
-      . '<button type="submit" class="scm-acta-button">Firmar acta y cerrar ticket</button><p role="status" data-acta-sign-status></p></form></section>';
+      . '<button type="submit" class="scm-acta-button">Firmar acta y cerrar ticket</button><p role="alert" aria-live="assertive" data-acta-sign-status></p></form></section>';
   }
 
   public static function signatureSvg(array $strokes): string

@@ -119,6 +119,65 @@
   var codeStatus = document.querySelector("[data-acta-otp-status]");
   var channelSelect = document.querySelector("[data-acta-otp-channel]");
   var signStatus = form.querySelector("[data-acta-sign-status]");
+  var feedbackDialog = null;
+  var feedbackTitle = null;
+  var feedbackMessage = null;
+  var feedbackPrimary = null;
+  var feedbackClose = null;
+  var lastFeedbackFocus = null;
+
+  function ensureFeedbackDialog() {
+    if (feedbackDialog) return;
+    feedbackDialog = document.createElement("div");
+    feedbackDialog.className = "scm-acta-feedback";
+    feedbackDialog.setAttribute("role", "dialog");
+    feedbackDialog.setAttribute("aria-modal", "true");
+    feedbackDialog.setAttribute("aria-labelledby", "scm-acta-feedback-title");
+    feedbackDialog.innerHTML =
+      '<div class="scm-acta-feedback-card">' +
+      '<span class="scm-acta-feedback-icon" aria-hidden="true">!</span>' +
+      '<h2 id="scm-acta-feedback-title">No se pudo firmar</h2>' +
+      '<p data-acta-feedback-message></p>' +
+      '<div class="scm-acta-feedback-actions">' +
+      '<button type="button" class="scm-acta-button" data-acta-feedback-primary>Solicitar nuevo código</button>' +
+      '<button type="button" class="scm-acta-button scm-acta-secondary" data-acta-feedback-close>Cerrar</button>' +
+      '</div>' +
+      '</div>';
+    document.body.appendChild(feedbackDialog);
+    feedbackTitle = feedbackDialog.querySelector("#scm-acta-feedback-title");
+    feedbackMessage = feedbackDialog.querySelector("[data-acta-feedback-message]");
+    feedbackPrimary = feedbackDialog.querySelector("[data-acta-feedback-primary]");
+    feedbackClose = feedbackDialog.querySelector("[data-acta-feedback-close]");
+    feedbackClose.addEventListener("click", closeFeedback);
+    feedbackDialog.addEventListener("click", function (event) {
+      if (event.target === feedbackDialog) closeFeedback();
+    });
+  }
+
+  function closeFeedback() {
+    if (!feedbackDialog) return;
+    feedbackDialog.classList.remove("is-open");
+    document.body.style.overflow = gallery && gallery.classList.contains("is-open") ? "hidden" : "";
+    if (lastFeedbackFocus && typeof lastFeedbackFocus.focus === "function") {
+      lastFeedbackFocus.focus();
+    }
+  }
+
+  function showFeedback(options) {
+    ensureFeedbackDialog();
+    lastFeedbackFocus = document.activeElement;
+    feedbackTitle.textContent = options.title || "No se pudo firmar";
+    feedbackMessage.textContent = options.message || "Revisa los datos e inténtalo nuevamente.";
+    feedbackPrimary.textContent = options.primaryLabel || "Entendido";
+    feedbackPrimary.onclick = function () {
+      closeFeedback();
+      if (typeof options.onPrimary === "function") options.onPrimary();
+    };
+    feedbackPrimary.hidden = options.primaryLabel === "";
+    feedbackDialog.classList.add("is-open");
+    document.body.style.overflow = "hidden";
+    feedbackPrimary.hidden ? feedbackClose.focus() : feedbackPrimary.focus();
+  }
 
   async function request(data) {
     var controller = new AbortController();
@@ -135,9 +194,9 @@
       });
       var result = await response.json();
       if (!result || !result.ok) {
-        throw new Error(
-          (result && result.message) || "No se pudo completar la operación."
-        );
+        var error = new Error((result && result.message) || "No se pudo completar la operación.");
+        error.code = (result && result.code) || "";
+        throw error;
       }
       return result;
     } finally {
@@ -145,8 +204,8 @@
     }
   }
 
-  if (codeButton) {
-    codeButton.addEventListener("click", async function () {
+  async function requestVerificationCode() {
+    if (!codeButton || busy) return;
       if (busy) return;
       codeButton.disabled = true;
       if (codeStatus) codeStatus.textContent = "Solicitando código…";
@@ -159,15 +218,32 @@
         if (codeStatus) codeStatus.textContent = result.message;
         if (form.elements.otp_code) form.elements.otp_code.focus();
       } catch (error) {
+        var text = error.name === "AbortError"
+          ? "No se confirmó el envío. Revisa tu correo o WhatsApp antes de solicitar otro código."
+          : error.message;
         if (codeStatus) {
-          codeStatus.textContent =
-            error.name === "AbortError"
-              ? "No se confirmó el envío. Revisa tu correo o WhatsApp antes de solicitar otro código."
-              : error.message;
+          codeStatus.textContent = text;
         }
+        showFeedback({
+          title: "No se pudo enviar el código",
+          message: text,
+          primaryLabel: "Cerrar",
+          onPrimary: function () { if (codeButton) codeButton.focus(); },
+        });
       } finally {
         codeButton.disabled = false;
       }
+  }
+
+  if (codeButton) {
+    codeButton.addEventListener("click", function () {
+      requestVerificationCode();
+    });
+  }
+  if (form.elements.otp_code) {
+    form.elements.otp_code.addEventListener("input", function () {
+      form.elements.otp_code.removeAttribute("aria-invalid");
+      if (signStatus) signStatus.textContent = "";
     });
   }
 
@@ -201,11 +277,51 @@
         window.location.reload();
       }
     } catch (error) {
+      var text =
+        error.name === "AbortError"
+          ? "No se confirmó la respuesta. Recarga para consultar si la firma quedó registrada antes de reintentar. No se duplicará el cobro."
+          : error.message;
       if (signStatus) {
-        signStatus.textContent =
-          error.name === "AbortError"
-            ? "No se confirmó la respuesta. Recarga para consultar si la firma quedó registrada antes de reintentar. No se duplicará el cobro."
-            : error.message;
+        signStatus.textContent = text;
+      }
+      if (form.elements.otp_code) {
+        form.elements.otp_code.setAttribute("aria-invalid", "true");
+      }
+      var code = error.code || "";
+      if (code === "OTP_REQUIRED") {
+        showFeedback({
+          title: "El código venció o no está vigente",
+          message: "Solicita un nuevo código de verificación y usa el último recibido antes de firmar.",
+          primaryLabel: "Solicitar nuevo código",
+          onPrimary: requestVerificationCode,
+        });
+      } else if (code === "OTP_INVALID") {
+        showFeedback({
+          title: "Código incorrecto",
+          message: "Revisa el último código recibido. Después de 5 intentos se bloquea la verificación durante una hora.",
+          primaryLabel: "Corregir código",
+          onPrimary: function () {
+            if (form.elements.otp_code) form.elements.otp_code.focus();
+          },
+        });
+      } else if (code === "OTP_LIMIT") {
+        showFeedback({
+          title: "Límite de verificación alcanzado",
+          message: "Por seguridad, espera una hora antes de solicitar o intentar otro código.",
+          primaryLabel: "Cerrar",
+          onPrimary: function () {
+            if (form.elements.otp_code) form.elements.otp_code.focus();
+          },
+        });
+      } else {
+        showFeedback({
+          title: "No se pudo firmar",
+          message: text,
+          primaryLabel: "Revisar datos",
+          onPrimary: function () {
+            if (form.elements.otp_code) form.elements.otp_code.focus();
+          },
+        });
       }
     } finally {
       overlay.remove();
@@ -216,6 +332,14 @@
       }
       if (codeButton) codeButton.disabled = false;
       form.removeAttribute("aria-busy");
+    }
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (!feedbackDialog || !feedbackDialog.classList.contains("is-open")) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeFeedback();
     }
   });
 })();

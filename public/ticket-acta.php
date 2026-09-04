@@ -75,7 +75,16 @@ try {
       }
     } catch (DomainException $error) {
       $formError = $error->getMessage();
-      $jsonResult = ['ok' => false, 'message' => $formError];
+      $lowerError = mb_strtolower($formError);
+      $errorCode = 'SIGN_ERROR';
+      if (str_contains($lowerError, 'código de verificación vigente') || str_contains($lowerError, 'vigente antes de firmar')) {
+        $errorCode = 'OTP_REQUIRED';
+      } elseif (str_contains($lowerError, 'código incorrecto')) {
+        $errorCode = 'OTP_INVALID';
+      } elseif (str_contains($lowerError, 'límite')) {
+        $errorCode = 'OTP_LIMIT';
+      }
+      $jsonResult = ['ok' => false, 'message' => $formError, 'code' => $errorCode];
     }
   }
   $payload = $service->payload($act);
