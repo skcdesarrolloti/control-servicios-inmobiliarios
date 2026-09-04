@@ -229,7 +229,9 @@
   function syncTotal() {
     var fee = Number(form.querySelector("[data-acta-fee]").value) || 0;
     var transport = Number(form.querySelector("[data-acta-transport]").value) || 0;
-    form.querySelector("[data-acta-total]").textContent = new Intl.NumberFormat("es-CO", {
+    var total = form.querySelector("[data-acta-total]");
+    if (!total) return;
+    total.textContent = new Intl.NumberFormat("es-CO", {
       style: "currency",
       currency: "COP",
       maximumFractionDigits: 0,

@@ -2949,6 +2949,54 @@ trait RendersDashboard
     return array_values($out);
   }
 
+  /** @return array{url:string,status:string,id:int} */
+  private function cotizacion_satisfaction_act_info(string $cotizacionId, string $legacyActId = ''): array
+  {
+    $empty = ['url' => '', 'status' => '', 'id' => 0];
+    $cotizacionId = trim($cotizacionId);
+    $legacyActId = trim($legacyActId);
+    if ($cotizacionId === '' && $legacyActId === '') {
+      return $empty;
+    }
+
+    $table = $this->db->table('scm_ticket_completion_acts');
+    if (!$this->table_exists($table)) {
+      return $legacyActId !== ''
+        ? ['url' => self::DEFAULT_ACTA_URL . rawurlencode($legacyActId), 'status' => 'legacy', 'id' => (int) $legacyActId]
+        : $empty;
+    }
+
+    $conditions = [];
+    $params = [];
+    if ($legacyActId !== '') {
+      $conditions[] = 'legacy_act_id = ?';
+      $params[] = (int) $legacyActId;
+    }
+    if ($cotizacionId !== '') {
+      $conditions[] = "JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.source.quote_id')) = ?";
+      $params[] = $cotizacionId;
+    }
+    if ($conditions === []) {
+      return $empty;
+    }
+
+    $row = $this->db->getRow(
+      "SELECT id, status FROM `{$table}` WHERE (" . implode(' OR ', $conditions) . ") ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'signed' THEN 1 ELSE 2 END, COALESCE(signed_at, created_at) DESC, id DESC LIMIT 1",
+      $params
+    );
+    if (is_array($row) && (int) ($row['id'] ?? 0) > 0) {
+      return [
+        'url' => rtrim((string) SCM_BASE_URL, '/') . '/ticket-acta.php?id=' . (int) $row['id'],
+        'status' => (string) ($row['status'] ?? ''),
+        'id' => (int) $row['id'],
+      ];
+    }
+
+    return $legacyActId !== ''
+      ? ['url' => self::DEFAULT_ACTA_URL . rawurlencode($legacyActId), 'status' => 'legacy', 'id' => (int) $legacyActId]
+      : $empty;
+  }
+
   /** @param array<int,array<string,mixed>> $rows */
   private function render_cotizaciones_mantenimiento_cards(array $rows): string
   {
@@ -3001,6 +3049,7 @@ trait RendersDashboard
       'id_cotizacion' => $id,
       'source_flow' => 'approved_quote',
     ], '', '&', PHP_QUERY_RFC3986);
+    $actaInfo = $this->cotizacion_satisfaction_act_info($id, trim((string) ($row['id_acta_satisfaccion'] ?? '')));
     $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
     $ordersHtml = empty($orders)
       ? '<div class="scm-cotizacion-orders-empty"><span aria-hidden="true">&#128203;</span><strong>Sin &oacute;rdenes registradas</strong><p>Esta cotizaci&oacute;n todav&iacute;a no tiene &oacute;rdenes de mantenimiento asociadas.</p></div>'
@@ -3108,7 +3157,8 @@ trait RendersDashboard
       . '<button type="button" class="scm-case-work-btn scm-danger-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizaci&oacute;n</button>'
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($noteUrl) . '" data-iframe-title="A&ntilde;adir nota a cotizaci&oacute;n">A&ntilde;adir nota</button>'
       . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($orderUrl) . '" data-iframe-title="A&ntilde;adir orden de mantenimiento">A&ntilde;adir orden</button>' : '')
-      . ($cotizacionAprobada ? '<a class="scm-case-work-btn" href="' . esc_attr($actaUrl) . '">A&ntilde;adir acta</a>' : '')
+      . ($actaInfo['url'] !== '' ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-iframe data-iframe-url="' . esc_attr($actaInfo['url']) . '" data-iframe-title="Acta de satisfacci&oacute;n">Ver acta' . ($actaInfo['status'] === 'pending' ? ' pendiente' : '') . '</button>' : '')
+      . ($cotizacionAprobada && $actaInfo['url'] === '' ? '<a class="scm-case-work-btn" href="' . esc_attr($actaUrl) . '">A&ntilde;adir acta</a>' : '')
       . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div>' . $orderDetailsHtml
       . '<template class="scm-cotizacion-native-source" data-scm-cotizacion-native-audience="funcionario">' . $nativeCotizacionFuncionarioHtml . '</template>'
       . '<template class="scm-cotizacion-native-source" data-scm-cotizacion-native-audience="destinatario">' . $nativeCotizacionDestinatarioHtml . '</template>'

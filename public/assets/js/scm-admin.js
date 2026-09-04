@@ -1718,7 +1718,7 @@
       data.set("ticket_pk", caseBtn.dataset.ticketPk || "");
       data.set("operation", operation);
       if (
-        operation === "create" &&
+        ["read", "create"].includes(operation) &&
         String(caseBtn.dataset.cotizacionId || "").trim() &&
         String(caseBtn.dataset.cotEstado || "").trim().toLowerCase() === "aprobada"
       ) {
@@ -1921,7 +1921,9 @@
         function total() {
           var fee = Number(form.querySelector("[data-acta-fee]").value) || 0;
           var transport = Number(form.querySelector("[data-acta-transport]").value) || 0;
-          form.querySelector("[data-acta-total]").textContent = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(fee + transport);
+          var totalField = form.querySelector("[data-acta-total]");
+          if (!totalField) return;
+          totalField.textContent = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(fee + transport);
         }
         form.querySelector("[data-acta-fee]").addEventListener("input", total);
         total();

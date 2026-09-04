@@ -47,6 +47,9 @@ trait HandlesTicketCompletion
       $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
       $operation = (string) ($_POST['operation'] ?? 'read');
       $actor = $this->ticketCompletionActor();
+      $sourceFlow = trim((string) ($_POST['source_flow'] ?? '')) === 'approved_quote'
+        ? ['flow' => 'approved_quote', 'quote_id' => trim((string) ($_POST['source_cotizacion_id'] ?? $_POST['id_cotizacion'] ?? ''))]
+        : [];
       $result = [];
       if (in_array($operation, ['create', 'update'], true)) {
         $input = $_POST;
@@ -166,7 +169,7 @@ trait HandlesTicketCompletion
       } elseif ($operation !== 'read') {
         throw new \DomainException('Operación de acta no válida.');
       }
-      $this->jsonOk($result + ['html' => (new CompletionView())->panel($service->context($ticketId), $service)]);
+      $this->jsonOk($result + ['html' => (new CompletionView())->panel($service->context($ticketId, $sourceFlow), $service)]);
     } catch (\DomainException $error) {
       $this->jsonFail($error->getMessage());
     }

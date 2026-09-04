@@ -296,6 +296,7 @@ $approvedQuoteActRow = $repo->act((int) $approvedQuoteAct['act_id']);
 $assert(($service->payload($approvedQuoteActRow)['source']['flow'] ?? '') === 'approved_quote', 'approved quote act stores its source flow');
 $requestCode($approvedQuoteActRow);
 $approvedQuoteSigned = $service->sign((int) $approvedQuoteActRow['id'], $service->token($approvedQuoteActRow), $signInput($approvedQuoteActRow), '127.0.0.1', 'QA');
+$assert(empty($approvedQuoteSigned['report_id']) && (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 1, 'approved quote act does not create a new administrative report');
 $approvedQuoteRow = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7013');
 $assert($approvedQuoteRow['estado'] === 'Finalizado' && (int) $approvedQuoteRow['id_acta_satisfaccion'] === (int) $approvedQuoteSigned['legacy_act_id'], 'approved quote act finalizes quote and links the signed satisfaction act');
 $approvedTicket = $repo->ticket(13);

@@ -46,12 +46,13 @@ final class CompletionView
     $sourceFlow = is_array($formPayload['source'] ?? null) ? $formPayload['source'] : (is_array($context['source_flow'] ?? null) ? $context['source_flow'] : []);
     $sourceName = (string) ($sourceFlow['flow'] ?? 'ticket_solution');
     $sourceQuoteId = (string) ($sourceFlow['quote_id'] ?? '');
+    $hasAdministrativeReport = $sourceName !== 'approved_quote';
     $sourceNotice = $sourceName === 'approved_quote' && trim($sourceQuoteId) !== ''
-      ? 'Esta acta quedará asociada a la cotización aprobada #' . trim($sourceQuoteId) . '. Al firmarse cerrará el caso, generará el reporte administrativo y marcará la cotización como trabajo finalizado.'
+      ? 'Esta acta quedará asociada a la cotización aprobada #' . trim($sourceQuoteId) . '. Al firmarse cerrará el caso y marcará la cotización como trabajo finalizado, sin generar reporte administrativo nuevo.'
       : '';
     ob_start(); ?>
     <section class="scm-acta">
-      <p class="scm-acta-notice">Documenta la solución, elige el firmante y revisa el valor administrativo. El ticket conservará el <strong>estado de ejecución seleccionado</strong> mientras el acta queda pendiente. Puedes hacer seguimiento desde <strong>Actividades administrativas → Actas de satisfacción</strong>. Solo la firma registrará el cierre y el reporte de cobro.</p>
+      <p class="scm-acta-notice">Documenta la solución y elige el firmante. El ticket conservará el <strong>estado de ejecución seleccionado</strong> mientras el acta queda pendiente. Puedes hacer seguimiento desde <strong>Actividades administrativas → Actas de satisfacción</strong>. <?= $hasAdministrativeReport ? 'Solo la firma registrará el cierre y el reporte de cobro.' : 'Solo la firma registrará el cierre; no se creará reporte administrativo nuevo porque el cobro corresponde a la cotización aprobada.' ?></p>
       <?php if ($sourceNotice !== ''): ?><p class="scm-acta-notice"><?= self::e($sourceNotice) ?></p><?php endif; ?>
       <?php if ($editAct): ?><p class="scm-acta-notice">Estás editando el acta sin firmar #<?= self::e($editAct['id']) ?>. Al guardar se invalidan los códigos anteriores y se envía una nueva invitación.</p><?php endif; ?>
       <div class="scm-acta-meta"><span>Ticket <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Inmueble <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>
@@ -101,15 +102,22 @@ final class CompletionView
           <div data-acta-items><?php foreach ($formItems as $index => $item): ?><?= $this->item((int) $index, is_array($item) ? $item : []) ?><?php endforeach; ?></div>
           <button type="button" class="scm-acta-button scm-acta-secondary" data-acta-add-item>Agregar otro daño y solución</button>
           <label>Observaciones finales *<textarea name="observations" required maxlength="6000" rows="3" placeholder="Describe verificaciones, alcance de la solución y observaciones para el firmante."><?= self::e($formObservations) ?></textarea></label>
-          <h3>3. Reporte administrativo de cobro</h3>
-          <p class="scm-acta-help">Valores fijos tomados de la configuración de mantenimiento.</p>
-          <div class="scm-acta-grid">
-            <label>Servicio administrativo (COP) *<input type="number" name="service_fee" min="1" max="999999999" step="1" required value="<?= self::e($context['fee'] ?? '') ?>" <?= $context['fee'] !== null ? 'readonly' : '' ?> data-acta-fee></label>
-            <label>Transporte (COP) *<input type="hidden" name="transport" value="<?= self::e($transportMax) ?>" data-acta-transport><span class="scm-acta-readonly-value" aria-live="polite"><?= self::money($transportMax) ?></span></label>
-          </div>
-          <?php if ($context['fee'] === null): ?><p class="scm-acta-notice">Falta una configuración válida. Ingresa expresamente el valor administrativo; no se generarán cobros con una tarifa vacía.</p><?php endif; ?>
-          <p class="scm-acta-total">Total del reporte: <output data-acta-total><?= self::money((int) ($context['fee'] ?? 0) + $transportMax) ?></output></p>
-          <label class="scm-acta-check"><input type="checkbox" name="confirm" value="1" required><span>Revisé los daños, las soluciones, el firmante y el valor. Entiendo que al firmar se cerrará el caso y se registrará un único reporte como no pagado y no exportado.</span></label>
+          <?php if ($hasAdministrativeReport): ?>
+            <h3>3. Reporte administrativo de cobro</h3>
+            <p class="scm-acta-help">Valores fijos tomados de la configuración de mantenimiento.</p>
+            <div class="scm-acta-grid">
+              <label>Servicio administrativo (COP) *<input type="number" name="service_fee" min="1" max="999999999" step="1" required value="<?= self::e($context['fee'] ?? '') ?>" <?= $context['fee'] !== null ? 'readonly' : '' ?> data-acta-fee></label>
+              <label>Transporte (COP) *<input type="hidden" name="transport" value="<?= self::e($transportMax) ?>" data-acta-transport><span class="scm-acta-readonly-value" aria-live="polite"><?= self::money($transportMax) ?></span></label>
+            </div>
+            <?php if ($context['fee'] === null): ?><p class="scm-acta-notice">Falta una configuración válida. Ingresa expresamente el valor administrativo; no se generarán cobros con una tarifa vacía.</p><?php endif; ?>
+            <p class="scm-acta-total">Total del reporte: <output data-acta-total><?= self::money((int) ($context['fee'] ?? 0) + $transportMax) ?></output></p>
+            <label class="scm-acta-check"><input type="checkbox" name="confirm" value="1" required><span>Revisé los daños, las soluciones, el firmante y el valor. Entiendo que al firmar se cerrará el caso y se registrará un único reporte como no pagado y no exportado.</span></label>
+          <?php else: ?>
+            <input type="hidden" name="service_fee" value="0" data-acta-fee>
+            <input type="hidden" name="transport" value="0" data-acta-transport>
+            <p class="scm-acta-notice">Esta acta pertenece a una cotización aprobada. No se generará reporte administrativo nuevo desde esta firma.</p>
+            <label class="scm-acta-check"><input type="checkbox" name="confirm" value="1" required><span>Revisé los daños, las soluciones, el firmante y la cotización asociada. Entiendo que al firmar se cerrará el caso sin crear un reporte administrativo nuevo.</span></label>
+          <?php endif; ?>
           <button type="submit" class="scm-acta-button"><?= $editAct ? 'Guardar cambios y reenviar firma' : 'Generar acta y solicitar firma' ?></button>
         </form>
       <?php elseif (!$showHistory && $activeAct): ?>
@@ -211,7 +219,8 @@ final class CompletionView
       $html .= '<td><strong>#' . self::e($ticket) . '</strong><br><small>' . self::e((string) ($act['ticket_estado_admin'] ?? '')) . '</small><br><small>' . self::e($sourceLabel) . '</small></td>';
       $html .= '<td><span class="scm-inmueble-badge">' . self::e($property ?: '-') . '</span><br><small>Contrato ' . self::e($contract ?: '-') . '</small></td>';
       $html .= '<td><strong>' . self::e($signer['name'] ?? '-') . '</strong><br><small>' . self::e($signer['email'] ?? '') . ($signer['phone'] ?? '' ? ' · ' . self::e($signer['phone']) : '') . '</small></td>';
-      $html .= '<td>' . self::money((int) ($report['total'] ?? 0)) . '<br><small>' . (!empty($act['report_id']) ? 'Cobro #' . self::e($act['report_id']) : 'Se genera al firmar') . '</small>' . (!empty($act['legacy_act_id']) ? '<br><small>CCT acta #' . self::e($act['legacy_act_id']) . '</small>' : '') . '</td>';
+      $reportApplies = array_key_exists('applies', $report) ? (bool) $report['applies'] : ((string) ($source['flow'] ?? '') !== 'approved_quote');
+      $html .= '<td>' . ($reportApplies ? self::money((int) ($report['total'] ?? 0)) : 'No aplica') . '<br><small>' . ($reportApplies ? (!empty($act['report_id']) ? 'Cobro #' . self::e($act['report_id']) : 'Se genera al firmar') : 'Cobro en cotización') . '</small>' . (!empty($act['legacy_act_id']) ? '<br><small>CCT acta #' . self::e($act['legacy_act_id']) . '</small>' : '') . '</td>';
       $html .= '<td class="scm-date-cell">Creada ' . self::e(date('d/m/Y H:i', (int) ($act['created_at'] ?? 0))) . (!empty($act['signed_at']) ? '<br>Firmada ' . self::e(date('d/m/Y H:i', (int) $act['signed_at'])) : '') . '</td>';
       $canDelete = in_array($status, ['archived', 'cancelled'], true) || $canDeleteAny;
       $pdfButtons = $status === 'signed'

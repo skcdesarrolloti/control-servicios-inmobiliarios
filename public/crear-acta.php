@@ -25,7 +25,12 @@ if ($ticketPk <= 0 && $quotePk > 0) {
     $quoteTable = $dbForQuote->table('jet_cct_cotizacion_mantenimiento');
     if ($schemaForQuote->tableExists($quoteTable) && $schemaForQuote->columnExists($quoteTable, 'id_ticket')) {
       $quoteRow = $dbForQuote->getRow("SELECT `id_ticket` FROM `{$quoteTable}` WHERE `_ID` = ? LIMIT 1", [$quotePk]);
-      $ticketPk = (int) ($quoteRow['id_ticket'] ?? 0);
+      $quoteTicket = trim((string) ($quoteRow['id_ticket'] ?? ''));
+      if ($quoteTicket !== '') {
+        $ticketTable = $dbForQuote->table('jet_cct_tickets');
+        $ticketRow = $dbForQuote->getRow("SELECT `_ID` FROM `{$ticketTable}` WHERE `_ID` = ? OR `id_ticket` = ? ORDER BY `_ID` = ? DESC LIMIT 1", [(int) $quoteTicket, $quoteTicket, (int) $quoteTicket]);
+        $ticketPk = (int) ($ticketRow['_ID'] ?? 0);
+      }
     }
   } catch (Throwable) {
     $ticketPk = 0;

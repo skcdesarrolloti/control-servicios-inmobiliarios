@@ -232,24 +232,25 @@ final class CompletionService
     $signerName = CompletionPolicy::text($input['signer_name'] ?? '', 'nombre de quien firma', 160);
     $items = CompletionPolicy::items($input['items'] ?? null);
     $observations = CompletionPolicy::text($input['observations'] ?? '', 'observaciones');
-    $transportMax = $context['transport_max'];
-    $transport = $transportMax ?? 0;
-    $fee = $context['fee'];
-    if ($fee === null) {
-      $fee = (int) round(CompletionPolicy::number($input['service_fee'] ?? ''));
-    }
-    if ($fee <= 0) {
-      throw new \DomainException('No hay una tarifa de servicio válida. Revisa la configuración o ingresa el valor administrativo.');
-    }
-    if ($fee + $transport > 999999999) {
-      throw new \DomainException('El total administrativo supera el máximo permitido.');
-    }
-    if (($input['confirm'] ?? '') !== '1') {
-      throw new \DomainException('Confirma que revisaste el acta y el valor del reporte administrativo.');
-    }
     $source = $this->sourceFromInput($input, $ticket, $context);
     if ($source['flow'] === 'approved_quote' && !$this->repo->isApprovedMaintenanceQuoteForTicket($ticket, $source['quote_id'])) {
       throw new \DomainException('Solo se puede crear esta acta desde una cotización aprobada asociada al caso.');
+    }
+    $hasAdministrativeReport = $source['flow'] !== 'approved_quote';
+    $transportMax = $context['transport_max'];
+    $transport = $hasAdministrativeReport ? ($transportMax ?? 0) : 0;
+    $fee = $hasAdministrativeReport ? $context['fee'] : 0;
+    if ($hasAdministrativeReport && $fee === null) {
+      $fee = (int) round(CompletionPolicy::number($input['service_fee'] ?? ''));
+    }
+    if ($hasAdministrativeReport && $fee <= 0) {
+      throw new \DomainException('No hay una tarifa de servicio válida. Revisa la configuración o ingresa el valor administrativo.');
+    }
+    if ($hasAdministrativeReport && $fee + $transport > 999999999) {
+      throw new \DomainException('El total administrativo supera el máximo permitido.');
+    }
+    if (($input['confirm'] ?? '') !== '1') {
+      throw new \DomainException($hasAdministrativeReport ? 'Confirma que revisaste el acta y el valor del reporte administrativo.' : 'Confirma que revisaste el acta, la cotización asociada y el firmante.');
     }
     $propertyMeta = $this->propertyMeta($ticket);
     $branchContact = is_array($context['branch_contact'] ?? null) ? $context['branch_contact'] : [];
@@ -273,7 +274,8 @@ final class CompletionService
       'report' => [
         'service_fee' => $fee, 'transport' => $transport, 'total' => $fee + $transport,
         'transport_base' => $context['transport_base'], 'transport_max' => $transportMax,
-        'fee_source' => $context['fee'] === null ? 'manual' : 'configuracion', 'fee_config' => $context['fee_config'],
+        'applies' => $hasAdministrativeReport,
+        'fee_source' => !$hasAdministrativeReport ? 'cotizacion_previa' : ($context['fee'] === null ? 'manual' : 'configuracion'), 'fee_config' => $context['fee_config'],
         'id_inmueble' => (string) ($ticket['id_inmueble'] ?? ''), 'id_contrato' => (string) ($ticket['id_contrato'] ?? ''),
         'sucursal' => (string) ($ticket['sucursal'] ?? '1'), 'arrendatario' => (string) ($ticket['arrendatario'] ?? ''),
         'fecha_ticket' => (string) ($ticket['fecha'] ?? ''),
@@ -285,12 +287,9 @@ final class CompletionService
   private function sourceFromInput(array $input, array $ticket, array $context): array
   {
     $configured = is_array($context['source_flow'] ?? null) ? $context['source_flow'] : [];
-    $flow = trim((string) ($input['source_flow'] ?? $configured['flow'] ?? ''));
+    $flow = trim((string) ($input['source_flow'] ?? $configured['flow'] ?? 'ticket_solution'));
     $quoteId = trim((string) ($input['source_cotizacion_id'] ?? $input['id_cotizacion'] ?? $configured['quote_id'] ?? ''));
     $flow = in_array($flow, ['approved_quote', 'ticket_solution'], true) ? $flow : '';
-    if ($flow === '' && $quoteId !== '') {
-      $flow = 'approved_quote';
-    }
     if ($flow === '') {
       $flow = 'ticket_solution';
     }
@@ -559,18 +558,22 @@ final class CompletionService
       $signature['evidence_hmac'] = hash_hmac('sha256', json_encode($signature, JSON_THROW_ON_ERROR), $this->secret);
       $report = $payload['report'];
       $now = $signature['signed_at'];
-      $reportId = $this->repo->insertLegacy('jet_cct_reportes_administrativos', [
-        'cct_status' => 'publish', 'cct_author_id' => $payload['actor']['employee_id'],
-        'cct_created' => date('Y-m-d H:i:s'), 'cct_modified' => date('Y-m-d H:i:s'),
-        'fecha' => $now, 'fecha_revision' => $payload['created_at'], 'fecha_ticket' => $report['fecha_ticket'],
-        'id_ticket' => (int) $act['ticket_pk'], 'id_empleado' => $payload['actor']['employee_id'], 'creador' => $payload['actor']['name'],
-        'categoria' => 'Acta de satisfaccion',
-        'descripcion' => 'Acta de satisfacción #' . $id . ' firmada del caso #' . htmlspecialchars($payload['ticket_number'], ENT_QUOTES, 'UTF-8') . '. Solución por ' . CompletionPolicy::EXECUTORS[$payload['executor']] . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta y detalle de daños/soluciones</a>.',
-        'fue_pagado' => 'No', 'exportado' => 'No', 'valor' => $report['total'], 'transporte' => $report['transport'],
-        'valor_revision' => $report['service_fee'], 'valor_mantenimiento' => $report['service_fee'],
-        'id_inmueble' => $report['id_inmueble'], 'inmueble' => $payload['property'], 'arrendatario' => $report['arrendatario'],
-        'id_contrato' => $report['id_contrato'], 'contrato' => $payload['contract'], 'sucursal' => $report['sucursal'],
-      ]);
+      $isApprovedQuoteFlow = ($payload['source']['flow'] ?? '') === 'approved_quote';
+      $reportId = null;
+      if (!$isApprovedQuoteFlow) {
+        $reportId = $this->repo->insertLegacy('jet_cct_reportes_administrativos', [
+          'cct_status' => 'publish', 'cct_author_id' => $payload['actor']['employee_id'],
+          'cct_created' => date('Y-m-d H:i:s'), 'cct_modified' => date('Y-m-d H:i:s'),
+          'fecha' => $now, 'fecha_revision' => $payload['created_at'], 'fecha_ticket' => $report['fecha_ticket'],
+          'id_ticket' => (int) $act['ticket_pk'], 'id_empleado' => $payload['actor']['employee_id'], 'creador' => $payload['actor']['name'],
+          'categoria' => 'Acta de satisfaccion',
+          'descripcion' => 'Acta de satisfacción #' . $id . ' firmada del caso #' . htmlspecialchars($payload['ticket_number'], ENT_QUOTES, 'UTF-8') . '. Solución por ' . CompletionPolicy::EXECUTORS[$payload['executor']] . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta y detalle de daños/soluciones</a>.',
+          'fue_pagado' => 'No', 'exportado' => 'No', 'valor' => $report['total'], 'transporte' => $report['transport'],
+          'valor_revision' => $report['service_fee'], 'valor_mantenimiento' => $report['service_fee'],
+          'id_inmueble' => $report['id_inmueble'], 'inmueble' => $payload['property'], 'arrendatario' => $report['arrendatario'],
+          'id_contrato' => $report['id_contrato'], 'contrato' => $payload['contract'], 'sucursal' => $report['sucursal'],
+        ]);
+      }
       $legacyPhotoUrls = self::legacyPhotoUrls($payload);
       $legacyId = $this->repo->insertLegacy('jet_cct_actas_de_satisfaccion', [
         'cct_status' => 'publish', 'id_ticket' => (int) $act['ticket_pk'], 'fecha' => $payload['created_at'],
@@ -601,7 +604,6 @@ final class CompletionService
       $pdf = (new CompletionPdf())->render($this->repo->act($id), $payload);
       $pdfHash = hash('sha256', $pdf);
       $this->repo->db->update($this->repo->table(), ['signed_pdf' => $pdf, 'pdf_hash' => $pdfHash, 'pdf_hmac' => hash_hmac('sha256', $id . '|' . $act['payload_hash'] . '|' . $pdfHash, $this->secret)], ['id' => $id]);
-      $isApprovedQuoteFlow = ($payload['source']['flow'] ?? '') === 'approved_quote';
       $quoteIds = $isApprovedQuoteFlow
         ? $this->repo->finalizeApprovedMaintenanceQuotes($ticket, (string) ($payload['source']['quote_id'] ?? ''), $legacyId, $now)
         : $this->repo->disapproveMaintenanceQuotes($ticket, $id, $now);
@@ -620,7 +622,10 @@ final class CompletionService
         : ($isApprovedQuoteFlow
           ? ' Cotizacion(es) de mantenimiento #' . implode(', #', $quoteIds) . ' marcadas como trabajo finalizado con esta acta.'
           : ' Cotizacion(es) de mantenimiento #' . implode(', #', $quoteIds) . ' marcadas como Desaprobada por ejecucion sin aprobacion.');
-      $this->repo->audit((int) $act['ticket_pk'], 'Acta #' . $id . ' firmada por ' . htmlspecialchars($signature['name'], ENT_QUOTES, 'UTF-8') . '. Caso cerrado.' . $quoteAudit . ' Reporte administrativo #' . $reportId . ' registrado (no pagado, no exportado). <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta firmada</a>.', $payload['actor']['name'], $payload['actor']['employee_id']);
+      $reportAudit = $reportId
+        ? ' Reporte administrativo #' . $reportId . ' registrado (no pagado, no exportado).'
+        : ' Sin reporte administrativo nuevo; el cobro corresponde a la cotización aprobada.';
+      $this->repo->audit((int) $act['ticket_pk'], 'Acta #' . $id . ' firmada por ' . htmlspecialchars($signature['name'], ENT_QUOTES, 'UTF-8') . '. Caso cerrado.' . $quoteAudit . $reportAudit . ' <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta firmada</a>.', $payload['actor']['name'], $payload['actor']['employee_id']);
       return $this->repo->act($id);
       });
     });
