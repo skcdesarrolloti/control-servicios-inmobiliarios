@@ -67,7 +67,13 @@ $assert(str_contains($publicActJs, 'data-acta-gallery-item') && str_contains($pu
 $assert(str_contains($publicActJs, 'redirect_url') && str_contains($publicActJs, 'window.location.assign'), 'act signer is redirected to the thank-you page after signing');
 $directCreatePhp = (string) file_get_contents(dirname(__DIR__) . '/public/crear-acta.php');
 $directCreateJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/ticket-completion-create.js');
+$authPhp = (string) file_get_contents(dirname(__DIR__) . '/src/Core/Auth.php');
+$configPhp = (string) file_get_contents(dirname(__DIR__) . '/config/app.php');
+$bootstrapPhp = (string) file_get_contents(dirname(__DIR__) . '/bootstrap/app.php');
 $assert(str_contains($directCreatePhp, 'crear-acta.php?ticket_pk=_ID') && str_contains($directCreatePhp, 'data-acta-create-page') && str_contains($directCreatePhp, 'Elaborando como'), 'authenticated direct act creation route uses the internal ticket id and current session actor');
+$assert(str_contains($configPhp, 'ACTA_AUTOLOGIN_SECRET') && str_contains($bootstrapPhp, 'SCM_ACTA_AUTOLOGIN_SECRET') && str_contains($bootstrapPhp, 'al menos 32 caracteres'), 'act autologin secret is configured separately from the main application secret');
+$assert(str_contains($directCreatePhp, 'hash_hmac(\'sha256\', $payload, $secret)') && str_contains($directCreatePhp, 'loginByEmployeeId($employeeId)') && str_contains($directCreatePhp, '$expires > $now + 86400'), 'direct act creation autologin requires a signed short-lived employee link');
+$assert(str_contains($authPhp, 'function loginByEmployeeId') && str_contains($authPhp, 'startSessionFromFuncionario') && !str_contains($directCreatePhp, 'pass_others_apss'), 'employee autologin starts a session without reading or transporting passwords');
 $assert(str_contains($directCreateJs, 'operation", "create"') && str_contains($directCreateJs, 'redirect_url') && str_contains($directCreateJs, 'MAX_PHOTOS_PER_ACT = 12'), 'direct act creation page submits through the secure endpoint and redirects to the act dashboard');
 
 if (!in_array('--database', $argv, true)) { echo "$checks domain checks passed. Use --database for isolated SQL integration checks.\n"; exit; }

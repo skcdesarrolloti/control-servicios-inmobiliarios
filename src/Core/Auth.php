@@ -56,16 +56,48 @@ final class Auth
       return false;
     }
 
+    $this->startSessionFromFuncionario($row, $user);
+
+    return true;
+  }
+
+  public function loginByEmployeeId(string $employeeId): bool
+  {
+    $employeeId = trim($employeeId);
+    if ($employeeId === '' || strlen($employeeId) > 80) {
+      return false;
+    }
+
+    $table = $this->db->table('jet_cct_funcionarios');
+    $row = $this->db->getRow(
+      "SELECT `_ID`, `nombre`, `rol`, `user_others_apss`,
+              TRIM(COALESCE(`id_cargo`, '')) AS id_cargo
+         FROM `{$table}`
+        WHERE `id_empleado` = ?
+          AND `activo` = 'Si'
+        LIMIT 1",
+      [$employeeId]
+    );
+
+    if (!is_array($row) || $row === []) {
+      return false;
+    }
+
+    $this->startSessionFromFuncionario($row, (string) ($row['user_others_apss'] ?? $employeeId));
+    return true;
+  }
+
+  /** @param array<string,mixed> $row */
+  private function startSessionFromFuncionario(array $row, string $login): void
+  {
     session_regenerate_id(true);
     $_SESSION['scm_logged_in']  = true;
     $_SESSION['scm_user_id']    = (int) $row['_ID'];
-    $_SESSION['scm_user']       = trim((string) ($row['nombre'] ?? $user));
-    $_SESSION['scm_user_login'] = $user;
+    $_SESSION['scm_user']       = trim((string) ($row['nombre'] ?? $login));
+    $_SESSION['scm_user_login'] = $login;
     $_SESSION['scm_user_rol']   = (string) ($row['rol'] ?? '');
     $_SESSION['scm_user_cargo'] = trim((string) ($row['id_cargo'] ?? ''));
     $_SESSION['scm_last_activity'] = time();
-
-    return true;
   }
 
   public function logout(): void

@@ -7,7 +7,7 @@ define('SCM_PUBLIC_PATH', SCM_ROOT . '/public');
 define('SCM_STORAGE_PATH', SCM_ROOT . '/storage');
 define('SCM_RESOURCES_PATH', SCM_ROOT . '/resources');
 define('SCM_BASE_PATH', SCM_PUBLIC_PATH);
-define('SCM_VERSION', '3.3.37');
+define('SCM_VERSION', '3.3.38');
 
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');
@@ -76,8 +76,13 @@ foreach ($requiredConfig as $requiredKey) {
 if (strlen((string) $scmConfig['app_secret']) < 32) {
   throw new \RuntimeException('APP_SECRET debe tener al menos 32 caracteres.');
 }
+$actaAutologinSecret = trim((string) ($scmConfig['acta_autologin_secret'] ?? ''));
+if ($actaAutologinSecret !== '' && strlen($actaAutologinSecret) < 32) {
+  throw new \RuntimeException('ACTA_AUTOLOGIN_SECRET debe tener al menos 32 caracteres o quedar vacío para desactivar el autologin de actas.');
+}
 
 define('SCM_APP_SECRET', (string) $scmConfig['app_secret']);
+define('SCM_ACTA_AUTOLOGIN_SECRET', $actaAutologinSecret);
 define('SCM_UPLOAD_MAX_BYTES', max(1024, (int) ($scmConfig['upload_max_bytes'] ?? 10485760)));
 define('SCM_SESSION_IDLE_TIMEOUT', max(900, (int) ($scmConfig['session_idle_timeout'] ?? 7200)));
 

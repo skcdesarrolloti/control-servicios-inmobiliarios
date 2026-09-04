@@ -23,6 +23,7 @@ return [
   'timezone' => $env('APP_TIMEZONE', 'America/Bogota'),
   'base_url' => $env('APP_URL', ''),
   'app_secret' => $env('APP_SECRET', ''),
+  'acta_autologin_secret' => $env('ACTA_AUTOLOGIN_SECRET', ''),
 
   'db_host' => $env('DB_HOST', ''),
   'db_port' => (int) $env('DB_PORT', '3306'),
