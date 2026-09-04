@@ -21,24 +21,16 @@ if ($ticketPk <= 0) {
   exit('Falta el identificador interno del caso. Usa crear-acta.php?ticket_pk=_ID');
 }
 
-$trySignedEmployeeLogin = static function (int $ticketPk): bool {
+$tryEmployeeTokenLogin = static function (): bool {
   if (Auth::isLoggedIn()) {
     return true;
   }
 
   $employeeId = trim((string) ($_GET['id_empleado'] ?? ''));
-  $expires = (int) ($_GET['expires'] ?? 0);
-  $signature = strtolower(trim((string) ($_GET['sig'] ?? $_GET['firma'] ?? '')));
+  $token = trim((string) ($_GET['token'] ?? ''));
   $secret = defined('SCM_ACTA_AUTOLOGIN_SECRET') ? trim((string) SCM_ACTA_AUTOLOGIN_SECRET) : '';
-  $now = time();
 
-  if ($secret === '' || $employeeId === '' || $expires <= $now || $expires > $now + 86400 || !preg_match('/^[a-f0-9]{64}$/D', $signature)) {
-    return false;
-  }
-
-  $payload = 'crear-acta|' . $ticketPk . '|' . $employeeId . '|' . $expires;
-  $expected = hash_hmac('sha256', $payload, $secret);
-  if (!hash_equals($expected, $signature)) {
+  if ($secret === '' || $employeeId === '' || $token === '' || !hash_equals($secret, $token)) {
     return false;
   }
 
@@ -46,7 +38,7 @@ $trySignedEmployeeLogin = static function (int $ticketPk): bool {
 };
 
 $relativeTarget = 'crear-acta.php?ticket_pk=' . $ticketPk;
-if (!Auth::isLoggedIn() && $trySignedEmployeeLogin($ticketPk)) {
+if (!Auth::isLoggedIn() && $tryEmployeeTokenLogin()) {
   header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/' . $relativeTarget, true, 302);
   exit;
 }

@@ -143,14 +143,14 @@ permisos y muestra una pantalla autenticada de creación. Al guardar, redirige a
 `Actividades administrativas → Actas de satisfacción`, filtrada por el caso. Un
 ticket cerrado o con acta activa muestra su estado y no permite crear un duplicado.
 
-### Enlace directo con autologin seguro
+### Enlace directo con autologin por token
 
 Si el enlace se abre desde un flujo externo donde ya sabes qué funcionario está
-operando, puedes agregar autologin con `id_empleado`, pero debe venir firmado y con
-vencimiento:
+operando, puedes agregar autologin con `id_empleado` y un `token` compartido del
+entorno:
 
 ```text
-https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/crear-acta.php?ticket_pk=<ID_INTERNO_CASO>&id_empleado=<ID_EMPLEADO>&expires=<UNIX_TS>&sig=<HMAC>
+https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/crear-acta.php?ticket_pk=<ID_INTERNO_CASO>&id_empleado=<ID_EMPLEADO>&token=<ACTA_AUTOLOGIN_SECRET>
 ```
 
 Primero define un secret exclusivo para este flujo en `.env`:
@@ -159,25 +159,17 @@ Primero define un secret exclusivo para este flujo en `.env`:
 ACTA_AUTOLOGIN_SECRET=coloca-aqui-un-valor-largo-aleatorio-de-minimo-32-caracteres
 ```
 
-La firma se calcula con:
-
-```php
-$expires = time() + 900; // recomendado: 15 minutos
-$payload = 'crear-acta|' . $ticketPk . '|' . $idEmpleado . '|' . $expires;
-$sig = hash_hmac('sha256', $payload, getenv('ACTA_AUTOLOGIN_SECRET'));
-```
-
 El autologin solo funciona si:
 
-- `sig` coincide con el HMAC esperado.
-- `expires` no venció ni supera 24 horas hacia el futuro.
+- `token` coincide exactamente con `ACTA_AUTOLOGIN_SECRET`.
 - `ACTA_AUTOLOGIN_SECRET` está configurado con mínimo 32 caracteres.
 - `id_empleado` existe en `wp_jet_cct_funcionarios` y el funcionario está activo.
 - El funcionario tiene permiso para crear/consultar actas del caso.
 
 No usar `pass_others_apss` en URLs ni para generar sesión. La contraseña nunca debe
-viajar por enlace; el autologin firmado crea la sesión directamente con la identidad
-del funcionario activo.
+viajar por enlace; el autologin por token crea la sesión directamente con la
+identidad del funcionario activo. Trata este token como una contraseña maestra de
+este flujo y rótalo si se filtra.
 
 No publicar enlaces con el token personal del destinatario ni reutilizar el token de
 Solicitudes Web. Esos contratos tienen otra identidad y otros permisos.
