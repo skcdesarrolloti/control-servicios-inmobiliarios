@@ -526,6 +526,33 @@
   letter-spacing: 0.05em;
 }
 
+#scm-app .scm-case-work-group {
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+#scm-app .scm-case-work-group + .scm-case-work-group {
+  margin-top: 10px;
+}
+
+#scm-app .scm-case-work-group h5 {
+  margin: 0 0 10px;
+  color: #10264a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+#scm-app .scm-case-work-group.is-quote {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+#scm-app .scm-case-work-group.is-secondary {
+  background: #ffffff;
+}
+
 #scm-app .scm-case-work-action-list {
   display: flex;
   flex-wrap: wrap;

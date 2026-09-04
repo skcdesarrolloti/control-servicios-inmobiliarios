@@ -4198,98 +4198,129 @@
           seguimientoWrap.setAttribute("id", "scm-sec-seguimiento");
           seguimientoWrap.style.display = "none";
         }
-        var caseActionsHtml =
-          '<section class="scm-case-work-actions"><h4>' +
-          (isPublicPqr ? "Acciones de la solicitud" : "Acciones del caso") +
-          '</h4><div class="scm-case-work-action-list">';
+        var isPreventiveForActions = !isPublicPqr && isPreventivaCase(btn);
+        var mainActionButtons = [];
+        var complementaryActionButtons = [];
+        var quoteActionButtons = [];
+
+        function renderActionGroup(label, buttons, extraClass) {
+          if (!buttons.length) return "";
+          return (
+            '<div class="scm-case-work-group ' +
+            escHtml(extraClass || "") +
+            '"><h5>' +
+            escHtml(label) +
+            '</h5><div class="scm-case-work-action-list">' +
+            buttons.join("") +
+            "</div></div>"
+          );
+        }
+
         if (
           isPublicPqr &&
           card &&
           card.querySelector("[data-scm-open-pqr-transfer]")
         ) {
-          caseActionsHtml +=
+          mainActionButtons.push(
             '<button type="button" class="scm-case-work-btn" data-scm-open-pqr-transfer-from-case data-ticket-pk="' +
             escHtml(btn.dataset.ticketPk || "") +
-            '">Trasladar solicitud</button>';
+            '">Trasladar solicitud</button>',
+          );
         }
         if (isPublicPqr) {
-          caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>';
+          mainActionButtons.push(
+            '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>',
+          );
           if (statusBucket !== "cerrados") {
-            caseActionsHtml +=
-              '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar solicitud</button>';
-            caseActionsHtml +=
-              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder solicitud</button>';
-            caseActionsHtml +=
-              '<button type="button" class="scm-case-work-btn" data-scm-close-ticket>Cerrar solicitud</button>';
+            mainActionButtons.push(
+              '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar solicitud</button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder solicitud</button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-close-ticket>Cerrar solicitud</button>',
+            );
           }
           if (statusBucket === "postergados" || statusBucket === "cerrados") {
-            caseActionsHtml +=
-              '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket>Activar solicitud</button>';
+            mainActionButtons.push(
+              '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket>Activar solicitud</button>',
+            );
           }
         }
         if (!isPublicPqr && seguimientoWrap) {
-          caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-section="scm-sec-seguimiento">Agregar seguimiento</button>';
+          mainActionButtons.push(
+            '<button type="button" class="scm-case-work-btn" data-scm-open-section="scm-sec-seguimiento">Agregar seguimiento</button>',
+          );
         }
         if (!isPublicPqr) {
-          caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-view-contacts>Ver contactos</button>';
-          caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-view-property-map>Ubicaci&oacute;n del inmueble</button>';
+          complementaryActionButtons.push(
+            '<button type="button" class="scm-case-work-btn" data-scm-view-contacts>Ver contactos</button>',
+            '<button type="button" class="scm-case-work-btn" data-scm-view-property-map>Ubicaci&oacute;n del inmueble</button>',
+          );
           if (String(btn.dataset.empleadoId || "").trim()) {
-            caseActionsHtml +=
-              '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-employee>Ver calendario del funcionario</button>';
+            complementaryActionButtons.push(
+              '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-employee>Ver calendario del funcionario</button>',
+            );
           }
-          caseActionsHtml +=
+          complementaryActionButtons.push(
             '<button type="button" class="scm-case-work-btn" data-scm-edit-case-magnitude data-ticket-pk="' +
             escHtml(btn.dataset.ticketPk || "") +
-            '">Editar magnitud caso</button>';
+            '">Editar magnitud caso</button>',
+          );
           if (calendarTicketPk) {
-            caseActionsHtml +=
-              '<button type="button" class="scm-case-work-btn" data-scm-calendar-create-case>Agendar cita del caso</button>';
+            mainActionButtons.push(
+              '<button type="button" class="scm-case-work-btn" data-scm-calendar-create-case>Agendar cita del caso</button>',
+            );
           }
-          caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>';
-          caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar ticket</button>';
-          if (statusBucket !== "cerrados") {
-            caseActionsHtml +=
-              '<button type="button" class="scm-case-work-btn" data-scm-open-corrective-review>Crear revisi&oacute;n correctiva</button>';
+          mainActionButtons.push(
+            '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>',
+            '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar ticket</button>',
+          );
+          if (statusBucket !== "cerrados" && !isPreventiveForActions) {
+            complementaryActionButtons.push(
+              '<button type="button" class="scm-case-work-btn" data-scm-open-corrective-review>Crear revisi&oacute;n correctiva</button>',
+            );
           }
         }
         if (!isPublicPqr && (statusBucket === "postergados" || statusBucket === "cerrados")) {
-          caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket>Activar ticket</button>';
+          mainActionButtons.push(
+            '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket>Activar ticket</button>',
+          );
         }
         if (!isPublicPqr) {
-          caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder ticket</button>';
-          caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-acta>Acta de solución y firma</button>';
-          caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>';
+          mainActionButtons.push(
+            '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder ticket</button>',
+            '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-acta>Acta de solución y firma</button>',
+            '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>',
+          );
         }
         if (!isPublicPqr && (cotizacionUrl || cotizacionId) && cotizacionSinResponder) {
-          caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-cotizacion-response>Responder cotizaci&oacute;n</button>';
+          quoteActionButtons.push(
+            '<button type="button" class="scm-case-work-btn" data-scm-open-cotizacion-response>Responder cotizaci&oacute;n</button>',
+          );
         }
         if (isPublicPqr && ticketUrl) {
-          caseActionsHtml +=
+          complementaryActionButtons.push(
             '<button type="button" class="scm-case-work-btn" data-scm-open-iframe' +
             (isPublicPqr ? ' data-scm-compact-iframe' : '') +
             ' data-iframe-url="' +
             escHtml(ticketUrl) +
             '" data-iframe-title="Solicitud">Abrir solicitud original' +
-            "</button>";
+            "</button>",
+          );
         }
         if (!isPublicPqr && cotizacionUrl) {
-          caseActionsHtml +=
+          quoteActionButtons.push(
             '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' +
             escHtml(cotizacionUrl) +
-            '" data-iframe-title="Cotizaci&oacute;n">Abrir cotizaci&oacute;n</button>';
+            '" data-iframe-title="Cotizaci&oacute;n">Abrir cotizaci&oacute;n</button>',
+          );
         }
-        caseActionsHtml += "</div></section>";
+        var caseActionsHtml =
+          '<section class="scm-case-work-actions"><h4>' +
+          (isPublicPqr ? "Acciones de la solicitud" : "Acciones del caso") +
+          "</h4>" +
+          renderActionGroup(isPublicPqr ? "Gestión de la solicitud" : "Gestión del caso", mainActionButtons, "is-main") +
+          renderActionGroup("Complementarias", complementaryActionButtons, "is-secondary") +
+          renderActionGroup("Cotización", quoteActionButtons, "is-quote") +
+          "</section>";
 
         var firstHistory = srcWrap.querySelector(".scm-case-history");
         if (firstHistory) {

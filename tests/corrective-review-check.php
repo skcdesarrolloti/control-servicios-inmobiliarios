@@ -21,6 +21,8 @@ $checks = [
   'dashboard exposes runtime action' => is_string($dashboard) && str_contains($dashboard, "'revision_correctiva' => self::AJAX_CORRECTIVE_REVIEW"),
   'dashboard supports direct media refs for compressed uploads' => is_string($dashboard) && str_contains($dashboard, 'cotizacion_split_media_refs'),
   'case modal has corrective review button' => is_string($js) && str_contains($js, 'data-scm-open-corrective-review'),
+  'case modal hides corrective review for preventive tickets' => is_string($js) && str_contains($js, 'isPreventiveForActions') && str_contains($js, '&& !isPreventiveForActions'),
+  'case actions are separated into groups' => is_string($js) && str_contains($js, 'renderActionGroup("Complementarias"') && str_contains($js, 'renderActionGroup("Cotización"'),
   'JS compresses corrective photos' => is_string($js) && str_contains($js, 'function compressPhoto(file)'),
 ];
 
