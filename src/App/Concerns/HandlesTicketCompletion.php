@@ -127,13 +127,13 @@ trait HandlesTicketCompletion
       $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
       $operation = (string) ($_POST['operation'] ?? '');
       $actor = $this->ticketCompletionActor();
-      $canDeleteActive = $this->canDeleteActiveTicketCompletionActs();
+      $canDeleteAny = $this->canDeleteAnyTicketCompletionActs();
       if ($operation === 'archive') {
         $id = (int) ($_POST['act_id'] ?? 0);
         $service->archive($id, (string) ($_POST['reason'] ?? ''), $actor);
       } elseif ($operation === 'delete') {
         $id = (int) ($_POST['act_id'] ?? 0);
-        $service->deleteRetired($id, $actor, $canDeleteActive);
+        $service->deleteRetired($id, $actor, $canDeleteAny);
       } elseif ($operation !== '') {
         throw new \DomainException('Operación de acta no válida.');
       }
@@ -143,7 +143,7 @@ trait HandlesTicketCompletion
         ? 'Acta archivada. Salió de pendientes, el ticket sigue abierto y no se generó cobro.'
         : ($operation === 'delete' ? 'Acta eliminada permanentemente. No se cerró el ticket ni se generó cobro.' : '');
       $this->jsonOk([
-        'table_html' => $view->dashboardTable($data['items'], $service, $data['pagination'], $canDeleteActive),
+        'table_html' => $view->dashboardTable($data['items'], $service, $data['pagination'], $canDeleteAny),
         'kpis_html' => $view->dashboardKpis($data['stats']),
         'count' => (string) $data['count'],
         'message' => $message,
@@ -199,7 +199,7 @@ trait HandlesTicketCompletion
     return $actor;
   }
 
-  private function canDeleteActiveTicketCompletionActs(): bool
+  private function canDeleteAnyTicketCompletionActs(): bool
   {
     return in_array(Auth::userCargo(), $this->dashboardPermissionAdminCargos(), true);
   }

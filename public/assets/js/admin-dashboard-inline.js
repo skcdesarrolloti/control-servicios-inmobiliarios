@@ -239,7 +239,7 @@
                   window.Swal.fire({
                     icon: 'warning',
                     title: 'Eliminar acta #' + actId + '?',
-                    text: 'Esta acción borra permanentemente el acta permitida para tu cargo. No se puede eliminar un acta firmada.',
+                    text: 'Esta acción borra permanentemente el acta. Si estaba firmada, también retira sus soportes internos asociados al acta y al cobro.',
                     input: 'text',
                     inputLabel: 'Escribe ELIMINAR para confirmar',
                     showCancelButton: true,

@@ -3786,7 +3786,7 @@ trait RendersDashboard
       0,
       ['page' => 1, 'per_page' => 30, 'total' => 0, 'total_pages' => 1],
       new \SCM\Modules\TicketCompletion\CompletionService(new \SCM\Modules\TicketCompletion\CompletionRepository($this->db), SCM_APP_SECRET, SCM_BASE_URL),
-      $this->canDeleteActiveTicketCompletionActs()
+      $this->canDeleteAnyTicketCompletionActs()
     );
   }
 

@@ -301,21 +301,18 @@ final class CompletionService
     $this->retirePending($id, $reason, $actor, 'archived', 'archivo', 'archivada');
   }
 
-  public function deleteRetired(int $id, array $actor, bool $allowPending = false): void
+  public function deleteRetired(int $id, array $actor, bool $allowAny = false): void
   {
     $photos = [];
     $act = $this->repo->act($id);
-    $this->repo->transaction((int) $act['ticket_pk'], function (array $ticket) use ($id, $actor, $allowPending, &$photos): void {
+    $this->repo->transaction((int) $act['ticket_pk'], function (array $ticket) use ($id, $actor, $allowAny, &$photos): void {
       $act = $this->repo->act($id);
       $status = (string) $act['status'];
-      $allowedStatuses = $allowPending ? ['pending', 'archived', 'cancelled'] : ['archived', 'cancelled'];
+      $allowedStatuses = $allowAny ? ['pending', 'signed', 'archived', 'cancelled'] : ['archived', 'cancelled'];
       if (!in_array($status, $allowedStatuses, true)) {
         throw new \DomainException($status === 'pending'
           ? 'Solo un cargo administrativo puede eliminar actas pendientes. También puedes archivarla para sacarla de pendientes sin borrarla.'
           : 'Solo se pueden eliminar actas archivadas o anuladas. Las actas firmadas se conservan como soporte de cierre y cobro.');
-      }
-      if (!empty($act['legacy_act_id']) || !empty($act['report_id']) || !empty($act['signed_pdf'])) {
-        throw new \DomainException('Esta acta ya tiene soportes de cierre o cobro y no se puede eliminar.');
       }
       try {
         $payload = $this->payload($act);
@@ -329,13 +326,28 @@ final class CompletionService
       } catch (\Throwable) {
         $photos = [];
       }
+      $legacyId = (int) ($act['legacy_act_id'] ?? 0);
+      $reportId = (int) ($act['report_id'] ?? 0);
+      if ($legacyId > 0) {
+        $this->repo->db->delete($this->repo->db->table('jet_cct_actas_de_satisfaccion'), ['_ID' => $legacyId]);
+      }
+      if ($reportId > 0) {
+        $this->repo->db->delete($this->repo->db->table('jet_cct_reportes_administrativos'), ['_ID' => $reportId]);
+      }
       if ($this->repo->db->delete($this->repo->table(), ['id' => $id]) !== 1) {
         throw new \RuntimeException('No se pudo eliminar el acta.');
       }
-      if ($status === 'pending') {
+      if ($status === 'pending' || $status === 'signed') {
         $previousAdmin = trim((string) ($payload['previous']['estado_administrativo'] ?? ''));
-        $this->repo->updateTicket((int) $ticket['_ID'], ['estado' => 'En proceso', 'estado_administrativo' => $previousAdmin]);
-        $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' eliminada permanentemente por cargo administrativo. El ticket volvió al estado anterior; no se cerró ni generó cobro.', $actor['name'], $actor['employee_id']);
+        $ticketUpdate = [
+          'estado' => 'En proceso',
+          'estado_administrativo' => $previousAdmin,
+          'id_acta_satisfaccion' => trim((string) ($payload['previous']['id_acta_satisfaccion'] ?? '')),
+          'estado_acta_satisfaccion' => trim((string) ($payload['previous']['estado_acta_satisfaccion'] ?? 'No')) ?: 'No',
+          'final_trabajo' => '',
+        ];
+        $this->repo->updateTicket((int) $ticket['_ID'], $ticketUpdate);
+        $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' eliminada permanentemente por cargo administrativo. El ticket volvió al estado anterior; se retiraron los soportes internos asociados y no queda cobro de esta acta.', $actor['name'], $actor['employee_id']);
       } else {
         $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' eliminada permanentemente del tablero de actas. No cerró el ticket ni generó cobro.', $actor['name'], $actor['employee_id']);
       }
