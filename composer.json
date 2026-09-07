@@ -10,7 +10,8 @@
     "ext-mbstring": "*",
     "ext-pdo": "*",
     "shuchkin/simplexls": "^1.0",
-    "shuchkin/simplexlsx": "^1.1"
+    "shuchkin/simplexlsx": "^1.1",
+    "smalot/pdfparser": "^2.12"
   },
   "require-dev": {
     "phpstan/phpstan": "^2.1",
