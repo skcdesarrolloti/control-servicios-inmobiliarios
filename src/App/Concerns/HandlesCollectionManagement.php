@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\App\Concerns;
 
+use SCM\Core\Auth;
 use SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService;
 use SCM\Modules\CollectionManagement\CollectionPortfolioService;
 
@@ -247,7 +248,7 @@ trait HandlesCollectionManagement
   /** @param array<string,mixed> $result */
   private function collection_prejuridico_internal_notification_message(array $result): string
   {
-    $sender = trim(\SCM\Support\Auth::user());
+    $sender = trim(Auth::user());
     if ($sender === '') {
       $sender = 'Funcionario';
     }
