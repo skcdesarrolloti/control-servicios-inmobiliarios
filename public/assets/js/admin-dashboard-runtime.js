@@ -2698,6 +2698,7 @@
       var testFields = panel.querySelector("[data-admin-notif-test-fields]");
       var testEmailInput = panel.querySelector("[data-admin-notif-test-email]");
       var testPhoneInput = panel.querySelector("[data-admin-notif-test-phone]");
+      var testRealContactsEl = panel.querySelector("[data-admin-notif-test-real-contacts]");
       var recipientsEl = panel.querySelector("[data-admin-notif-recipients]");
       var paginationEl = panel.querySelector("[data-admin-notif-pagination]");
       var totalEl = panel.querySelector("[data-admin-notif-total]");
@@ -2847,6 +2848,40 @@
         var enabled = !!testModeInput.checked;
         testFields.hidden = !enabled;
         testFields.classList.toggle("is-hidden", !enabled);
+        renderTestModeRealContacts();
+      }
+
+      function renderTestModeRealContacts() {
+        if (!testRealContactsEl) {
+          return;
+        }
+        if (!testModeInput || !testModeInput.checked) {
+          testRealContactsEl.innerHTML = "";
+          return;
+        }
+        if (allFiltered && allFiltered.checked) {
+          testRealContactsEl.innerHTML =
+            '<strong>Contactos reales</strong><span>Estas usando todos los resultados filtrados. Desactiva esa opcion para ver la lista individual de seleccionados antes de enviar.</span>';
+          return;
+        }
+        if (selected.size === 0) {
+          testRealContactsEl.innerHTML =
+            '<strong>Contactos reales</strong><span>No hay destinatarios seleccionados todavia.</span>';
+          return;
+        }
+        var rows = Array.from(selected).map(function (id) {
+          var detail = selectedDetail(id);
+          return (
+            '<article class="scm-admin-notif-test-real-contact">' +
+            '<strong>' + escHtml(detail.name || ("Destinatario " + id)) + '</strong>' +
+            '<span>ID ' + escHtml(id) + '</span>' +
+            '<small>Email real: ' + escHtml(detail.email || "Sin correo") + '</small>' +
+            '<small>Celular real: ' + escHtml(detail.phone || "Sin celular") + '</small>' +
+            '</article>'
+          );
+        });
+        testRealContactsEl.innerHTML =
+          '<strong>Contactos reales seleccionados</strong><div>' + rows.join("") + '</div>';
       }
 
       function supportsContractStatus(type) {
@@ -4985,6 +5020,7 @@
             allFiltered.checked = false;
           }
           syncContext();
+          renderTestModeRealContacts();
         });
 
         if (selectVisibleBtn) {

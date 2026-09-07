@@ -2133,6 +2133,7 @@ trait RendersDashboard
                   <label for="scm-admin-notif-test-phone">Celular de prueba</label>
                   <input id="scm-admin-notif-test-phone" name="test_phone" type="tel" class="input input-bordered input-sm scm-input" value="3006838984" data-admin-notif-test-phone>
                 </div>
+                <div class="scm-admin-notif-test-real-contacts" data-admin-notif-test-real-contacts></div>
               </div>
             </div>
 

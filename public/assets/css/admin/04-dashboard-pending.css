@@ -7290,6 +7290,49 @@
   gap: 10px;
 }
 
+#scm-app .scm-admin-notif-test-real-contacts {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #fdba74;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #7c2d12;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#scm-app .scm-admin-notif-test-real-contacts > span {
+  color: #9a3412;
+  font-weight: 700;
+}
+
+#scm-app .scm-admin-notif-test-real-contacts > div {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+#scm-app .scm-admin-notif-test-real-contact {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 0.9fr) minmax(140px, 0.7fr);
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #ffedd5;
+  border-radius: 8px;
+  background: #fff7ed;
+}
+
+#scm-app .scm-admin-notif-test-real-contact span,
+#scm-app .scm-admin-notif-test-real-contact small {
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 #scm-app .scm-admin-notif-test-fields[hidden],
 #scm-app .scm-admin-notif-test-fields.is-hidden {
   display: none !important;
@@ -7724,6 +7767,10 @@
   }
 
   #scm-app .scm-admin-notif-test-fields {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-admin-notif-test-real-contact {
     grid-template-columns: 1fr;
   }
 
