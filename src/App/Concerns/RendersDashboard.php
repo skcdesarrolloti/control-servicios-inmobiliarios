@@ -2069,7 +2069,7 @@ trait RendersDashboard
         <section class="scm-admin-notif-card scm-admin-notif-composer scm-admin-notif-modal-panel">
           <div class="scm-admin-notif-modal-head">
             <div class="scm-admin-notif-modal-titleblock">
-              <span class="scm-calendar-action-kicker">Mensaje</span>
+              <span class="scm-calendar-action-kicker" data-admin-notif-modal-kicker>Mensaje</span>
               <h4 id="scm-admin-notif-modal-title">Enviar notificaci&oacute;n</h4>
               <p data-admin-notif-modal-description>Prepara el mensaje, elige canales y revisa la vista previa antes de encolar. Si hay texto escrito, el cierre pide confirmaci&oacute;n.</p>
             </div>

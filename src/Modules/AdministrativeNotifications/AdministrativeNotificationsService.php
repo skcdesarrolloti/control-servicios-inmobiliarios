@@ -2127,7 +2127,8 @@ final class AdministrativeNotificationsService
     $channels = $this->sanitizeChannels($channels);
     $whatsappTemplateConfig = $this->whatsappTemplateConfig($whatsappTemplate);
     $emailTemplateConfig = $this->emailTemplateConfig($emailTemplate);
-    if ($this->isCopropiedadPaymentSupportTemplate($whatsappTemplateConfig, $emailTemplateConfig)) {
+    $isPaymentSupportTemplate = $this->isCopropiedadPaymentSupportTemplate($whatsappTemplateConfig, $emailTemplateConfig);
+    if ($isPaymentSupportTemplate) {
       $channels = array_values(array_filter($channels, static fn(string $channel): bool => $channel !== 'sms'));
     }
     $testOptions = $this->sanitizeTestModeOptions($testOptions, $channels);
@@ -2144,11 +2145,14 @@ final class AdministrativeNotificationsService
     }
     $notificationMetaMap = $this->sanitizeNotificationMetaMap($recipientMetaMap);
     $recipientMetaMap = $this->sanitizeImportMetaMap($recipientMetaMap);
+    if ($isPaymentSupportTemplate && $recipientMetaMap === []) {
+      throw new \RuntimeException('Importa primero los comprobantes PDF para que el sistema pueda adjuntar soportes y armar el detalle.');
+    }
     $canUseImportDetail = $this->templateCanUseImportDetail($whatsappTemplateConfig, $emailTemplateConfig);
     $hasImportedDetail = $canUseImportDetail && $recipientMetaMap !== [];
-    $messageRequired = in_array('sms', $channels, true)
+    $messageRequired = !$isPaymentSupportTemplate && (in_array('sms', $channels, true)
       || (in_array('whatsapp', $channels, true) && $this->whatsappTemplateNeedsMessage($whatsappTemplateConfig) && !$hasImportedDetail)
-      || (in_array('email', $channels, true) && $this->emailTemplateNeedsMessage($emailTemplateConfig) && !$hasImportedDetail);
+      || (in_array('email', $channels, true) && $this->emailTemplateNeedsMessage($emailTemplateConfig) && !$hasImportedDetail));
     if ($messageRequired && $messageText === '') {
       throw new \RuntimeException('El mensaje no puede estar vacio.');
     }

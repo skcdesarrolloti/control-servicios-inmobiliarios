@@ -26,10 +26,16 @@ $respondError = static function (string $message, int $status, string $code = ''
   exit;
 };
 
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+  header('Allow: POST, OPTIONS');
+  http_response_code(204);
+  exit;
+}
 if (!\SCM\Core\Auth::isLoggedIn()) {
   $respondError('Tu sesión venció. Inicia sesión nuevamente.', 401, 'AUTH_REQUIRED');
 }
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+  header('Allow: POST, OPTIONS');
   $respondError('Método no permitido.', 405);
 }
 

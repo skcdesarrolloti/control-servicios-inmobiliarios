@@ -2723,6 +2723,7 @@
       var composerModal = panel.querySelector("[data-admin-notif-modal]");
       var composerTitle = panel.querySelector("#scm-admin-notif-modal-title");
       var composerDescription = panel.querySelector("[data-admin-notif-modal-description]");
+      var composerKicker = panel.querySelector("[data-admin-notif-modal-kicker]");
       var channelGroup = panel.querySelector(".scm-admin-notif-channel-group");
       var closeComposerBtn = panel.querySelector("[data-admin-notif-close-composer]");
       var closeConfirmModal = panel.querySelector("[data-admin-notif-confirm]");
@@ -3412,15 +3413,24 @@
           allFilteredWrap.hidden = composerSingleRecipient;
           allFilteredWrap.classList.toggle("is-hidden", composerSingleRecipient);
         }
+        if (composerKicker) {
+          composerKicker.textContent = selectedTemplateIsPaymentSupport()
+            ? "Comprobantes copropiedades"
+            : "Mensaje";
+        }
         if (composerTitle) {
           composerTitle.textContent = isChannelMode
-            ? "Enviar notificación por " + label
+            ? (selectedTemplateIsPaymentSupport() ? "Enviar soportes por " : "Enviar notificación por ") + label
             : composerSingleRecipient
             ? "Enviar notificación individual"
+            : selectedTemplateIsPaymentSupport()
+            ? "Enviar soportes de pago"
             : "Enviar notificación";
         }
         if (composerDescription) {
-          composerDescription.textContent = isChannelMode
+          composerDescription.textContent = selectedTemplateIsPaymentSupport()
+            ? "Revisa destinatarios, adjuntos y vista previa. Este envio solo usa Email y WhatsApp."
+            : isChannelMode
             ? "Vista dedicada para " + label + ". Puedes cambiar a todos los canales antes de encolar."
             : composerSingleRecipient
             ? "Notificación para un solo destinatario. Escoge plantilla, canales y revisa la vista previa."
@@ -4106,6 +4116,11 @@
           openCollectionBtn.hidden = !canCollection;
           openCollectionBtn.classList.toggle("is-hidden", !canCollection);
         }
+        panel.querySelectorAll('[data-admin-notif-open-channel="sms"]').forEach(function (btn) {
+          var hideSmsLaunch = selectedTemplateIsPaymentSupport();
+          btn.hidden = hideSmsLaunch;
+          btn.classList.toggle("is-hidden", hideSmsLaunch);
+        });
         panel.querySelectorAll("[data-admin-notif-type-shortcut]").forEach(function (btn) {
           btn.classList.toggle(
             "active",
@@ -4608,9 +4623,14 @@
           importResultEl.classList.remove("is-error", "is-success");
         }
         setLoading(true);
-        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        fetch(ajaxUrl, {
+          method: "POST",
+          body: fd,
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        })
           .then(function (response) {
-            return response.json();
+            return responseJson(response);
           })
           .then(function (json) {
             if (!json || !json.success) {
@@ -5442,9 +5462,14 @@
             resultEl.textContent = "Encolando notificaciones...";
             resultEl.classList.remove("is-error");
           }
-          fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          fetch(ajaxUrl, {
+            method: "POST",
+            body: fd,
+            credentials: "same-origin",
+            headers: { Accept: "application/json" },
+          })
             .then(function (response) {
-              return response.json();
+              return responseJson(response);
             })
             .then(function (json) {
               if (!json || !json.success) {
