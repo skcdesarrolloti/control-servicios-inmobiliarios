@@ -622,6 +622,135 @@ final class CollectionPortfolioService
   }
 
   /** @return array<string,mixed> */
+  public function timeline(int $portfolioId = 0, int $contractId = 0, string $propertyCode = ''): array
+  {
+    $this->ensureSchema();
+    $propertyCode = $this->digits($propertyCode);
+    $item = [];
+
+    if ($portfolioId > 0) {
+      $item = $this->item($portfolioId);
+      $contractId = (int) ($item['contract_id'] ?? $contractId);
+      $propertyCode = $this->digits($item['property_code'] ?? $propertyCode);
+    } elseif ($contractId > 0) {
+      $current = $this->db->getRow(
+        "SELECT * FROM `{$this->portfolioTable()}` WHERE `is_current` = 1 AND `contract_id` = ? ORDER BY `id` DESC LIMIT 1",
+        [$contractId]
+      );
+      if (is_array($current)) {
+        $item = $current;
+        $portfolioId = (int) ($item['id'] ?? 0);
+        $propertyCode = $this->digits($item['property_code'] ?? $propertyCode);
+      } else {
+        $item = $this->timelineItemFromContract($contractId, $propertyCode);
+        $propertyCode = $this->digits($item['property_code'] ?? $propertyCode);
+      }
+    }
+
+    if ($item === []) {
+      throw new \RuntimeException('Selecciona un contrato o registro de cartera válido.');
+    }
+
+    $items = [];
+    $counts = ['events' => 0, 'managements' => 0, 'property_history' => 0, 'total' => 0];
+    $currentDate = (string) (($item['last_action_at'] ?? '') ?: ($item['updated_at'] ?? '') ?: ($item['last_imported_at'] ?? ''));
+    if ($currentDate !== '') {
+      $items[] = $this->timelineEntry(
+        'snapshot',
+        'Estado actual de cartera',
+        $currentDate,
+        'Saldo: ' . $this->timelineMoney($item['balance'] ?? null) . '. Estado: ' . $this->portfolioStatusLabel((string) ($item['status'] ?? 'sin_dato')) . '. Etapa: ' . $this->portfolioStageLabel((string) ($item['collection_stage'] ?? 'normal')) . '.',
+        (string) ($item['stage_changed_by'] ?? ''),
+        'Foto de cartera',
+        '',
+        $item['balance'] ?? null,
+        $item['previous_balance'] ?? null
+      );
+    }
+
+    if ($portfolioId > 0) {
+      $rows = $this->db->getResults(
+        "SELECT `id`, `event_type`, `previous_balance`, `balance`, `notes`, `document_url`, `created_by_name`, `created_at`
+           FROM `{$this->eventsTable()}`
+          WHERE `portfolio_id` = ?
+          ORDER BY `created_at` DESC, `id` DESC
+          LIMIT 80",
+        [$portfolioId]
+      );
+      foreach ($rows as $row) {
+        $counts['events']++;
+        $items[] = $this->timelineEntry(
+          'event',
+          $this->portfolioEventLabel((string) ($row['event_type'] ?? '')),
+          (string) ($row['created_at'] ?? ''),
+          (string) ($row['notes'] ?? ''),
+          (string) ($row['created_by_name'] ?? ''),
+          'Movimiento de cartera',
+          (string) ($row['document_url'] ?? ''),
+          $row['balance'] ?? null,
+          $row['previous_balance'] ?? null
+        );
+      }
+    }
+
+    foreach ($this->timelineManagementRows($contractId) as $row) {
+      $counts['managements']++;
+      $type = trim((string) ($row['tipo_gestion'] ?? ''));
+      $items[] = $this->timelineEntry(
+        'management',
+        'Gestión registrada' . ($type !== '' ? ' · ' . $this->managementTypeLabel($type) : ''),
+        $this->timelineDate($row['fecha_raw'] ?? '', $row['created_at'] ?? ''),
+        (string) ($row['observacion'] ?? ''),
+        trim((string) (($row['realizado_por'] ?? '') ?: ($row['cargo'] ?? ''))),
+        'Gestiones de cobro'
+      );
+    }
+
+    foreach ($this->timelinePropertyHistoryRows($propertyCode) as $row) {
+      $counts['property_history']++;
+      $type = trim((string) ($row['tipo_reporte'] ?? ''));
+      $items[] = $this->timelineEntry(
+        'property',
+        'Historial del inmueble' . ($type !== '' ? ' · ' . $type : ''),
+        $this->timelineDate($row['fecha_raw'] ?? '', $row['created_at'] ?? ''),
+        (string) ($row['observacion'] ?? ''),
+        trim((string) (($row['funcionario'] ?? '') ?: ($row['realizado_por'] ?? ''))),
+        'Historial del inmueble'
+      );
+    }
+
+    usort($items, static function (array $a, array $b): int {
+      $dateCompare = ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+      return $dateCompare !== 0 ? $dateCompare : strcmp((string) ($b['source'] ?? ''), (string) ($a['source'] ?? ''));
+    });
+    $items = array_slice($items, 0, 140);
+    $counts['total'] = count($items);
+
+    return [
+      'portfolio' => [
+        'id' => $portfolioId,
+        'contract_id' => $contractId,
+        'tenant_id' => (int) ($item['tenant_id'] ?? 0),
+        'tenant_name' => (string) (($item['tenant_name'] ?? '') ?: 'Sin nombre en plataforma'),
+        'tenant_document' => (string) (($item['tenant_document'] ?? '') ?: '-'),
+        'contract_number' => (string) (($item['contract_number'] ?? '') ?: ($contractId > 0 ? (string) $contractId : '-')),
+        'property_code' => (string) (($item['property_code'] ?? '') ?: ($propertyCode !== '' ? $propertyCode : '-')),
+        'property_address' => (string) (($item['property_address'] ?? '') ?: 'Sin dirección'),
+        'balance' => $item['balance'] ?? null,
+        'balance_label' => $this->timelineMoney($item['balance'] ?? null),
+        'status' => (string) ($item['status'] ?? 'sin_dato'),
+        'status_label' => $this->portfolioStatusLabel((string) ($item['status'] ?? 'sin_dato')),
+        'stage' => (string) ($item['collection_stage'] ?? 'normal'),
+        'stage_label' => $this->portfolioStageLabel((string) ($item['collection_stage'] ?? 'normal')),
+        'last_action_label' => $this->portfolioActionLabel((string) ($item['last_action_type'] ?? '')),
+        'last_action_at' => (string) ($item['last_action_at'] ?? ''),
+      ],
+      'items' => $items,
+      'counts' => $counts,
+    ];
+  }
+
+  /** @return array<string,mixed> */
   public function updateStage(int $portfolioId, string $stage, string $note = ''): array
   {
     $item = $this->item($portfolioId);
@@ -1270,6 +1399,265 @@ final class CollectionPortfolioService
     ];
     $payload = $this->schema->filterTableData($table, $payload);
     return $payload !== [] && $this->db->insert($table, $payload);
+  }
+
+  /** @return array<string,mixed> */
+  private function timelineItemFromContract(int $contractId, string $propertyCode = ''): array
+  {
+    foreach ($this->activeContracts() as $contract) {
+      if ((int) ($contract['_ID'] ?? 0) !== $contractId) {
+        continue;
+      }
+      $property = $this->digits($contract['inmueble'] ?? '') ?: $propertyCode;
+      $stage = strtolower(trim((string) ($contract['esta_sinestrado'] ?? ''))) === 'si' ? 'siniestro' : 'normal';
+      return [
+        'id' => 0,
+        'contract_id' => $contractId,
+        'contract_number' => trim((string) ($contract['contrato'] ?? $contract['contrato_arrendamiento'] ?? $contractId)),
+        'property_code' => $property,
+        'property_address' => trim((string) ($contract['direccion'] ?? '')),
+        'tenant_id' => (int) preg_replace('/\D+/', '', (string) ($contract['id_arrendatario'] ?? '0')),
+        'tenant_document' => $this->digits($contract['documento_arrendatario'] ?? ''),
+        'tenant_name' => trim((string) ($contract['arrendatario'] ?? '')),
+        'tenant_email' => trim((string) ($contract['correo_arrendatario'] ?? '')),
+        'tenant_phone' => trim((string) ($contract['celular_arrendatario'] ?? '')),
+        'landlord_name' => trim((string) ($contract['propietario'] ?? '')),
+        'balance' => null,
+        'previous_balance' => null,
+        'status' => 'sin_dato',
+        'collection_stage' => $stage,
+        'last_action_type' => '',
+        'last_action_at' => '',
+        'updated_at' => '',
+        'last_imported_at' => '',
+      ];
+    }
+    throw new \RuntimeException('Contrato de arrendamiento no encontrado o no está activo.');
+  }
+
+  /** @return array<int,array<string,mixed>> */
+  private function timelineManagementRows(int $contractId): array
+  {
+    if ($contractId <= 0) {
+      return [];
+    }
+    $table = $this->db->table('jet_cct_gestiones_cobro');
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+    $contractColumn = $this->timelineDetect($table, ['id_contrato', 'contract_id', 'contrato']);
+    if ($contractColumn === '') {
+      return [];
+    }
+    $select = [
+      $this->timelineSelect($table, ['_ID', 'id'], 'id'),
+      $this->timelineSelect($table, ['fecha', 'fecha_gestion_cobro', 'cct_created', 'created_at'], 'fecha_raw'),
+      $this->timelineSelect($table, ['cct_created', 'created_at'], 'created_at'),
+      $this->timelineSelect($table, ['tipo_gestion', 'tipo_gestion_cobro'], 'tipo_gestion'),
+      $this->timelineSelect($table, ['observacion', 'observaciones', 'detalle'], 'observacion'),
+      $this->timelineSelect($table, ['realizado_por', 'funcionario', 'empleado'], 'realizado_por'),
+      $this->timelineSelect($table, ['cargo'], 'cargo'),
+    ];
+    $idColumn = $this->timelineDetect($table, ['_ID', 'id']) ?: $contractColumn;
+    $dateColumn = $this->timelineDetect($table, ['fecha', 'fecha_gestion_cobro', 'cct_created', 'created_at']);
+    $order = $dateColumn !== '' ? "`{$dateColumn}` DESC, `{$idColumn}` DESC" : "`{$idColumn}` DESC";
+    return $this->db->getResults(
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE CAST(`{$contractColumn}` AS UNSIGNED) = ? ORDER BY {$order} LIMIT 80",
+      [$contractId]
+    );
+  }
+
+  /** @return array<int,array<string,mixed>> */
+  private function timelinePropertyHistoryRows(string $propertyCode): array
+  {
+    $propertyCode = $this->digits($propertyCode);
+    if ($propertyCode === '') {
+      return [];
+    }
+    $table = $this->db->table('jet_cct_historial_del_inmueble');
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+    $propertyColumns = array_values(array_filter([
+      $this->schema->columnExists($table, 'id_inmueble') ? 'id_inmueble' : '',
+      $this->schema->columnExists($table, 'id_inmueble_data') ? 'id_inmueble_data' : '',
+    ]));
+    if ($propertyColumns === []) {
+      return [];
+    }
+    $select = [
+      $this->timelineSelect($table, ['_ID', 'id'], 'id'),
+      $this->timelineSelect($table, ['fecha', 'cct_created', 'created_at'], 'fecha_raw'),
+      $this->timelineSelect($table, ['cct_created', 'created_at'], 'created_at'),
+      $this->timelineSelect($table, ['tipo_reporte', 'tipo_de_reporte_his'], 'tipo_reporte'),
+      $this->timelineSelect($table, ['observacion', 'observacion_his', 'respuesta', 'descripcion'], 'observacion'),
+      $this->timelineSelect($table, ['funcionario', 'reporte_realizado_por_his', 'realizado_por'], 'funcionario'),
+      $this->timelineSelect($table, ['reporte_realizado_por_his', 'realizado_por'], 'realizado_por'),
+    ];
+    $where = [];
+    $args = [];
+    foreach ($propertyColumns as $column) {
+      $where[] = "TRIM(COALESCE(`{$column}`, '')) = ?";
+      $args[] = $propertyCode;
+    }
+    $textFilters = [];
+    foreach (['tipo_reporte', 'tipo_de_reporte_his', 'observacion', 'observacion_his', 'respuesta', 'descripcion'] as $column) {
+      if ($this->schema->columnExists($table, $column)) {
+        $textFilters[] = "LOWER(COALESCE(`{$column}`, '')) REGEXP 'cobro|cartera|prejur|siniestro|mora|arrendamiento'";
+      }
+    }
+    $idColumn = $this->timelineDetect($table, ['_ID', 'id']) ?: $propertyColumns[0];
+    $dateColumn = $this->timelineDetect($table, ['fecha', 'cct_created', 'created_at']);
+    $order = $dateColumn !== '' ? "`{$dateColumn}` DESC, `{$idColumn}` DESC" : "`{$idColumn}` DESC";
+    $filterSql = $textFilters !== [] ? ' AND (' . implode(' OR ', $textFilters) . ')' : '';
+    return $this->db->getResults(
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE (" . implode(' OR ', $where) . "){$filterSql} ORDER BY {$order} LIMIT 80",
+      $args
+    );
+  }
+
+  /** @param string[] $candidates */
+  private function timelineDetect(string $table, array $candidates): string
+  {
+    foreach ($candidates as $candidate) {
+      if ($this->schema->columnExists($table, $candidate)) {
+        return $candidate;
+      }
+    }
+    return '';
+  }
+
+  /** @param string[] $candidates */
+  private function timelineSelect(string $table, array $candidates, string $alias): string
+  {
+    $column = $this->timelineDetect($table, $candidates);
+    return $column !== '' ? "COALESCE(`{$column}`, '') AS `{$alias}`" : "'' AS `{$alias}`";
+  }
+
+  /** @return array<string,mixed> */
+  private function timelineEntry(
+    string $source,
+    string $label,
+    string $date,
+    string $note = '',
+    string $actor = '',
+    string $sourceLabel = '',
+    string $documentUrl = '',
+    mixed $balance = null,
+    mixed $previousBalance = null
+  ): array {
+    $date = $this->timelineDate($date);
+    $note = trim(wp_strip_all_tags($note));
+    return [
+      'source' => $source,
+      'source_label' => $sourceLabel !== '' ? $sourceLabel : ucfirst($source),
+      'label' => $label !== '' ? $label : 'Movimiento de cartera',
+      'date' => $date,
+      'timestamp' => $date !== '' ? (int) (strtotime($date) ?: 0) : 0,
+      'note' => $note,
+      'actor' => trim(wp_strip_all_tags($actor)),
+      'document_url' => trim($documentUrl),
+      'balance_label' => $this->timelineMoney($balance),
+      'previous_balance_label' => $this->timelineMoney($previousBalance),
+    ];
+  }
+
+  private function timelineDate(mixed $value, mixed $fallback = ''): string
+  {
+    foreach ([$value, $fallback] as $candidate) {
+      $text = trim((string) $candidate);
+      if ($text === '' || $text === '0000-00-00' || $text === '0000-00-00 00:00:00') {
+        continue;
+      }
+      if (ctype_digit($text)) {
+        $timestamp = (int) $text;
+        if ($timestamp > 0) {
+          return date('Y-m-d H:i:s', $timestamp);
+        }
+      }
+      $timestamp = strtotime($text);
+      if ($timestamp !== false && $timestamp > 0) {
+        return date('Y-m-d H:i:s', $timestamp);
+      }
+    }
+    return '';
+  }
+
+  private function timelineMoney(mixed $value): string
+  {
+    if ($value === null || $value === '') {
+      return 'Sin dato';
+    }
+    return '$' . number_format((float) $value, 0, ',', '.');
+  }
+
+  private function portfolioStatusLabel(string $status): string
+  {
+    return match ($status) {
+      'deuda' => 'Con deuda',
+      'al_dia' => 'Al día',
+      'saldo_favor' => 'Saldo a favor',
+      'sin_contrato' => 'Sin cruce',
+      default => 'Sin dato 1380',
+    };
+  }
+
+  private function portfolioStageLabel(string $stage): string
+  {
+    return match ($stage) {
+      'prejuridico' => 'Prejurídico',
+      'siniestro' => 'Siniestro',
+      default => 'Cobro normal',
+    };
+  }
+
+  private function portfolioActionLabel(string $action): string
+  {
+    return match ($action) {
+      'saldo_manual' => 'Saldo manual',
+      'pago_detectado' => 'Pago detectado',
+      'gestion_cobro' => 'Gestión registrada',
+      'notificacion_fecha_pago', 'recordatorio_fecha_cobro' => 'Notificación fecha de pago',
+      'siniestro_notificado' => 'Aviso siniestro',
+      'carta_prejuridico_enviada' => 'Aviso prejurídico',
+      'carta_prejuridico_generada' => 'Carta prejurídica generada',
+      'estado_normal' => 'Etapa normal',
+      'estado_prejuridico' => 'Etapa prejurídica',
+      'estado_siniestro' => 'Etapa siniestro',
+      default => $action !== '' ? $action : 'Sin acciones',
+    };
+  }
+
+  private function portfolioEventLabel(string $eventType): string
+  {
+    return match ($eventType) {
+      'debt_detected' => 'Deuda detectada',
+      'payment_received' => 'Pago detectado',
+      'balance_updated' => 'Saldo actualizado',
+      'manual_balance' => 'Saldo anexado manualmente',
+      'stage_changed' => 'Cambio de etapa',
+      'collection_management' => 'Gestión registrada',
+      'siniestro_notificado' => 'Aviso siniestro registrado',
+      'letter_sent_prejuridico' => 'Aviso prejurídico enviado',
+      'letter_generated_prejuridico' => 'Carta prejurídica generada',
+      'imported' => 'Cuenta incorporada',
+      default => $eventType !== '' ? str_replace('_', ' ', $eventType) : 'Movimiento de cartera',
+    };
+  }
+
+  private function managementTypeLabel(string $type): string
+  {
+    $normalized = strtolower(strtr(trim($type), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U']));
+    if (str_contains($normalized, 'servicio')) {
+      return 'Servicios públicos';
+    }
+    if (str_contains($normalized, 'admin')) {
+      return 'Administración';
+    }
+    if (str_contains($normalized, 'canon')) {
+      return 'Canon';
+    }
+    return trim($type) !== '' ? trim($type) : 'Sin tipo';
   }
 
   private function addEvent(int $portfolioId, ?int $importId, string $eventType, mixed $previousBalance, mixed $balance, string $notes, string $documentUrl = ''): void

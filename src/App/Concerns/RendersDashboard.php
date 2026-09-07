@@ -412,6 +412,7 @@ trait RendersDashboard
         'collection_portfolio_import' => self::AJAX_COLLECTION_PORTFOLIO_IMPORT,
         'collection_portfolio_action' => self::AJAX_COLLECTION_PORTFOLIO_ACTION,
         'collection_portfolio_pdf' => self::AJAX_COLLECTION_PORTFOLIO_PDF,
+        'collection_portfolio_timeline' => self::AJAX_COLLECTION_PORTFOLIO_TIMELINE,
         'internal_notifications_save' => self::AJAX_INTERNAL_NOTIFICATIONS_SAVE,
         'public_pqr_settings_read' => self::AJAX_PUBLIC_PQR_SETTINGS_READ,
         'internal_notifications_read' => self::AJAX_INTERNAL_NOTIFICATIONS_READ,
@@ -2526,6 +2527,7 @@ trait RendersDashboard
                     <td>
                       <?php if ($canManage): ?>
                         <div class="scm-portfolio-actions">
+                          <button type="button" class="scm-case-work-btn scm-portfolio-timeline-btn" data-scm-portfolio-timeline data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-property-code="<?php echo esc_attr((string) ($row['property_code'] ?? '')); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Ver movimientos, gestiones y reportes de cartera de este contrato">Ver trazabilidad</button>
                           <button type="button" class="scm-case-work-btn scm-portfolio-balance-btn" data-scm-portfolio-balance data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-current-balance="<?php echo esc_attr($balance === null ? '' : (string) $balance); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Anexar o corregir saldo manual para pruebas o ajustes de cartera">Anexar saldo</button>
                           <button type="button" class="scm-case-work-btn scm-portfolio-due-btn" data-scm-portfolio-due-date data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar gestión Canon y enviar notificación informativa de fecha de pago">Notificar pago</button>
                           <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar contacto, acuerdo, compromiso o seguimiento sin cambiar la etapa">Hacer gesti&oacute;n</button>
@@ -2628,23 +2630,26 @@ trait RendersDashboard
                     <td><span class="scm-portfolio-stage scm-portfolio-stage--<?php echo esc_attr($rowStage); ?>"><?php echo esc_html($this->collection_portfolio_stage_label($rowStage)); ?></span></td>
                     <td><?php echo esc_html($this->collection_portfolio_action_label((string) ($row['last_action_type'] ?? ''))); ?><small><?php echo esc_html($this->format_collection_management_date($row['last_action_at'] ?? '')); ?></small></td>
                     <td>
-                      <?php if ($portfolioId > 0): ?>
+                      <?php if ((int) ($row['contract_id'] ?? 0) > 0): ?>
                         <div class="scm-portfolio-actions">
-                          <button type="button" class="scm-case-work-btn scm-portfolio-balance-btn" data-scm-portfolio-balance data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-current-balance="<?php echo esc_attr($balance === null ? '' : (string) $balance); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Anexar o corregir saldo manual para pruebas o ajustes de cartera">Anexar saldo</button>
-                          <button type="button" class="scm-case-work-btn scm-portfolio-due-btn" data-scm-portfolio-due-date data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar gestión Canon y enviar notificación informativa de fecha de pago">Notificar pago</button>
-                          <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar contacto, acuerdo, compromiso o seguimiento sin cambiar la etapa">Hacer gesti&oacute;n</button>
-                          <?php if ($canCollect): ?>
-                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="prejuridico" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Revisar la carta antes de descargarla o enviarla">Preparar prejur&iacute;dico</button>
-                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-siniestro data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Muestra vista previa y encola aviso previo por WhatsApp y email, sin marcar siniestro">Notificar siniestro</button>
-                          <?php endif; ?>
-                          <?php if ($canCollect && $rowStage !== 'siniestro'): ?>
-                            <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="siniestro" data-scm-portfolio-current-stage="<?php echo esc_attr($rowStage); ?>" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Marca la etapa siniestro, registra historial del inmueble y avisa al funcionario configurado">Marcar siniestro</button>
-                          <?php endif; ?>
-                          <?php if ($rowStage === 'siniestro'): ?>
-                            <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="normal" data-scm-portfolio-current-stage="siniestro" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Quita la marca de siniestro y devuelve el contrato a cobro normal">Quitar siniestro</button>
-                          <?php elseif ($rowStage === 'prejuridico'): ?>
-                            <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="normal" data-scm-portfolio-current-stage="prejuridico" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Quita la etapa prejurídica y devuelve el contrato a cobro normal">Quitar prejur&iacute;dico</button>
-                          <?php elseif (!$canCollect): ?><span class="scm-portfolio-no-action">Sin saldo para escalar</span><?php endif; ?>
+                          <button type="button" class="scm-case-work-btn scm-portfolio-timeline-btn" data-scm-portfolio-timeline data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-property-code="<?php echo esc_attr((string) ($row['property_code'] ?? '')); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Ver movimientos, gestiones y reportes de cartera de este contrato">Ver trazabilidad</button>
+                          <?php if ($portfolioId > 0): ?>
+                            <button type="button" class="scm-case-work-btn scm-portfolio-balance-btn" data-scm-portfolio-balance data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-current-balance="<?php echo esc_attr($balance === null ? '' : (string) $balance); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Anexar o corregir saldo manual para pruebas o ajustes de cartera">Anexar saldo</button>
+                            <button type="button" class="scm-case-work-btn scm-portfolio-due-btn" data-scm-portfolio-due-date data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar gestión Canon y enviar notificación informativa de fecha de pago">Notificar pago</button>
+                            <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar contacto, acuerdo, compromiso o seguimiento sin cambiar la etapa">Hacer gesti&oacute;n</button>
+                            <?php if ($canCollect): ?>
+                              <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="prejuridico" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Revisar la carta antes de descargarla o enviarla">Preparar prejur&iacute;dico</button>
+                              <button type="button" class="scm-case-work-btn" data-scm-portfolio-siniestro data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Muestra vista previa y encola aviso previo por WhatsApp y email, sin marcar siniestro">Notificar siniestro</button>
+                            <?php endif; ?>
+                            <?php if ($canCollect && $rowStage !== 'siniestro'): ?>
+                              <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="siniestro" data-scm-portfolio-current-stage="<?php echo esc_attr($rowStage); ?>" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Marca la etapa siniestro, registra historial del inmueble y avisa al funcionario configurado">Marcar siniestro</button>
+                            <?php endif; ?>
+                            <?php if ($rowStage === 'siniestro'): ?>
+                              <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="normal" data-scm-portfolio-current-stage="siniestro" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Quita la marca de siniestro y devuelve el contrato a cobro normal">Quitar siniestro</button>
+                            <?php elseif ($rowStage === 'prejuridico'): ?>
+                              <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="normal" data-scm-portfolio-current-stage="prejuridico" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Quita la etapa prejurídica y devuelve el contrato a cobro normal">Quitar prejur&iacute;dico</button>
+                            <?php elseif (!$canCollect): ?><span class="scm-portfolio-no-action">Sin saldo para escalar</span><?php endif; ?>
+                          <?php else: ?><span class="scm-portfolio-no-action">Sin foto de cartera</span><?php endif; ?>
                         </div>
                       <?php else: ?><span class="scm-portfolio-no-action">Sin foto de cartera</span><?php endif; ?>
                     </td>
@@ -2682,6 +2687,7 @@ trait RendersDashboard
       <?php echo $this->render_collection_management_modal(); ?>
       <?php echo $this->render_collection_letter_preview_modal(); ?>
       <?php echo $this->render_collection_report_drilldown_modal(); ?>
+      <?php echo $this->render_collection_portfolio_timeline_modal(); ?>
     </div>
 <?php
     return (string) ob_get_clean();
@@ -2771,6 +2777,27 @@ trait RendersDashboard
           <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-report-search-clear>Limpiar</button>
         </div>
         <div class="scm-portfolio-report-detail-table-wrap" data-scm-portfolio-report-body></div>
+      </section>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  private function render_collection_portfolio_timeline_modal(): string
+  {
+    ob_start();
+?>
+    <div class="scm-admin-notif-modal scm-portfolio-timeline-modal" data-scm-portfolio-timeline-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-portfolio-timeline-title">
+      <div class="scm-admin-notif-modal-backdrop" data-scm-portfolio-timeline-close aria-hidden="true"></div>
+      <section class="scm-admin-notif-card scm-admin-notif-modal-panel scm-portfolio-timeline-panel">
+        <div class="scm-admin-notif-modal-head">
+          <div class="scm-admin-notif-modal-titleblock"><span class="scm-calendar-action-kicker">Trazabilidad</span><h4 id="scm-portfolio-timeline-title" data-scm-portfolio-timeline-title>Contrato de arrendamiento</h4><p data-scm-portfolio-timeline-subtitle>Movimientos de cartera, gestiones registradas y reportes del inmueble asociados.</p></div>
+          <button type="button" class="scm-modal-close" data-scm-portfolio-timeline-close aria-label="Cerrar trazabilidad"><span aria-hidden="true">&times;</span></button>
+        </div>
+        <div class="scm-portfolio-timeline-summary" data-scm-portfolio-timeline-summary aria-live="polite"></div>
+        <div class="scm-portfolio-timeline-list" data-scm-portfolio-timeline-body aria-live="polite">
+          <div class="scm-admin-notif-empty"><strong>Selecciona un contrato</strong><span>Aqu&iacute; ver&aacute;s la trazabilidad de cartera.</span></div>
+        </div>
       </section>
     </div>
 <?php

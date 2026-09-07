@@ -270,6 +270,22 @@ trait HandlesCollectionManagement
     }
   }
 
+  public function ajax_handler_collection_portfolio_timeline(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('gestiones_cobro')) {
+      $this->jsonFail('No tienes permiso para ver la trazabilidad de cartera.');
+    }
+    $portfolioId = max(0, (int) ($_POST['portfolio_id'] ?? 0));
+    $contractId = max(0, (int) ($_POST['contract_id'] ?? 0));
+    $propertyCode = sanitize_text_field(wp_unslash((string) ($_POST['property_code'] ?? '')));
+    try {
+      $this->jsonOk($this->get_collection_portfolio_service()->timeline($portfolioId, $contractId, $propertyCode));
+    } catch (\Throwable $exception) {
+      $this->jsonFail($exception->getMessage());
+    }
+  }
+
   private function get_collection_portfolio_service(): CollectionPortfolioService
   {
     return new CollectionPortfolioService($this->db);

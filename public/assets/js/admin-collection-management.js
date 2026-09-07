@@ -20,6 +20,7 @@
     var actionImport = actions.collection_portfolio_import || "";
     var actionPortfolio = actions.collection_portfolio_action || "";
     var actionPdf = actions.collection_portfolio_pdf || "";
+    var actionTimeline = actions.collection_portfolio_timeline || "";
     var actionPanel = actions.admin_notifications_collection_log || "";
     var actionManagement = actions.admin_notifications_collection || "";
     var actionOptions = actions.admin_notifications_collection_options || "";
@@ -444,7 +445,7 @@
     }
 
     function syncModalBodyState() {
-      var openModal = root.querySelector("[data-scm-portfolio-management-modal]:not([hidden]), [data-scm-portfolio-letter-preview-modal]:not([hidden]), [data-scm-portfolio-report-modal]:not([hidden])");
+      var openModal = root.querySelector("[data-scm-portfolio-management-modal]:not([hidden]), [data-scm-portfolio-letter-preview-modal]:not([hidden]), [data-scm-portfolio-report-modal]:not([hidden]), [data-scm-portfolio-timeline-modal]:not([hidden])");
       document.body.classList.toggle("scm-modal-open", !!openModal);
     }
 
@@ -555,6 +556,121 @@
           : "Nombre, contrato, inmueble o saldo";
         window.setTimeout(function () { search.focus(); }, 50);
       }
+    }
+
+    function closeTimelineModal() {
+      var modal = root.querySelector("[data-scm-portfolio-timeline-modal]");
+      if (!modal) return;
+      modal.hidden = true;
+      var body = modal.querySelector("[data-scm-portfolio-timeline-body]");
+      var summary = modal.querySelector("[data-scm-portfolio-timeline-summary]");
+      if (body) body.innerHTML = "";
+      if (summary) summary.innerHTML = "";
+      syncModalBodyState();
+    }
+
+    function formatTimelineDate(value) {
+      var text = String(value || "").trim();
+      if (!text) return "Sin fecha";
+      var parsed = new Date(text.replace(" ", "T"));
+      if (Number.isNaN(parsed.getTime())) return text;
+      try {
+        return parsed.toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" });
+      } catch (_err) {
+        return text;
+      }
+    }
+
+    function timelineSummaryCard(label, value, helper) {
+      return '<article><span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(value || "-") + '</strong><small>' + escapeHtml(helper || "") + '</small></article>';
+    }
+
+    function renderTimeline(modal, data) {
+      var portfolio = data && data.portfolio ? data.portfolio : {};
+      var items = Array.isArray(data && data.items) ? data.items : [];
+      var counts = data && data.counts ? data.counts : {};
+      var title = modal.querySelector("[data-scm-portfolio-timeline-title]");
+      var subtitle = modal.querySelector("[data-scm-portfolio-timeline-subtitle]");
+      var summary = modal.querySelector("[data-scm-portfolio-timeline-summary]");
+      var body = modal.querySelector("[data-scm-portfolio-timeline-body]");
+      if (title) title.textContent = "Trazabilidad contrato " + String(portfolio.contract_number || "-");
+      if (subtitle) {
+        subtitle.textContent = String(portfolio.tenant_name || "Arrendatario") + " · Inmueble " + String(portfolio.property_code || "-") + " · " + String(portfolio.property_address || "Sin dirección");
+      }
+      if (summary) {
+        summary.innerHTML = [
+          timelineSummaryCard("Saldo actual", portfolio.balance_label || "Sin dato", portfolio.status_label || "Sin dato 1380"),
+          timelineSummaryCard("Etapa", portfolio.stage_label || "Cobro normal", "Estado operativo actual"),
+          timelineSummaryCard("Última acción", portfolio.last_action_label || "Sin acciones", formatTimelineDate(portfolio.last_action_at || "")),
+          timelineSummaryCard("Registros", String(counts.total || items.length || 0), "Cartera, gestiones e historial")
+        ].join("");
+      }
+      if (!body) return;
+      if (!items.length) {
+        body.innerHTML = '<div class="scm-admin-notif-empty"><strong>Sin trazabilidad registrada</strong><span>Este contrato todavía no tiene movimientos de cartera, gestiones ni reportes asociados.</span></div>';
+        return;
+      }
+      body.innerHTML = items.map(function (item) {
+        var note = String(item.note || "").trim();
+        var actor = String(item.actor || "").trim();
+        var previous = String(item.previous_balance_label || "").trim();
+        var current = String(item.balance_label || "").trim();
+        var meta = [
+          item.source_label ? "Origen: " + item.source_label : "",
+          actor ? "Funcionario: " + actor : "",
+          previous && previous !== "Sin dato" ? "Saldo anterior: " + previous : "",
+          current && current !== "Sin dato" ? "Saldo: " + current : ""
+        ].filter(Boolean);
+        var documentLink = item.document_url
+          ? '<a class="scm-portfolio-timeline-link" href="' + escapeHtml(item.document_url) + '" target="_blank" rel="noopener">Ver documento asociado</a>'
+          : "";
+        return '<article class="scm-portfolio-timeline-item scm-portfolio-timeline-item--' + escapeHtml(item.source || "event") + '">'
+          + '<span class="scm-portfolio-timeline-dot" aria-hidden="true"></span>'
+          + '<div class="scm-portfolio-timeline-content">'
+          + '<div class="scm-portfolio-timeline-item-head"><strong>' + escapeHtml(item.label || "Movimiento de cartera") + '</strong><time>' + escapeHtml(formatTimelineDate(item.date || "")) + '</time></div>'
+          + (note ? '<p>' + escapeHtml(note) + '</p>' : '<p class="is-muted">Sin observación registrada.</p>')
+          + (meta.length ? '<div class="scm-portfolio-timeline-meta">' + meta.map(function (value) { return '<span>' + escapeHtml(value) + '</span>'; }).join("") + '</div>' : "")
+          + documentLink
+          + '</div>'
+          + '</article>';
+      }).join("");
+    }
+
+    function openTimelineModal(button) {
+      var modal = root.querySelector("[data-scm-portfolio-timeline-modal]");
+      if (!modal) return;
+      var portfolioId = String(button.getAttribute("data-portfolio-id") || "");
+      var contractId = String(button.getAttribute("data-contract-id") || "");
+      var propertyCode = String(button.getAttribute("data-property-code") || "");
+      var tenantName = String(button.getAttribute("data-tenant-name") || "Arrendatario");
+      var contractNumber = String(button.getAttribute("data-contract-number") || "");
+      var title = modal.querySelector("[data-scm-portfolio-timeline-title]");
+      var subtitle = modal.querySelector("[data-scm-portfolio-timeline-subtitle]");
+      var body = modal.querySelector("[data-scm-portfolio-timeline-body]");
+      var summary = modal.querySelector("[data-scm-portfolio-timeline-summary]");
+      if (title) title.textContent = "Trazabilidad contrato " + (contractNumber || contractId || "-");
+      if (subtitle) subtitle.textContent = tenantName + " · Consultando movimientos asociados.";
+      if (summary) summary.innerHTML = "";
+      if (body) body.innerHTML = '<div class="scm-admin-notif-empty"><strong>Cargando trazabilidad...</strong><span>Estamos cruzando cartera, gestiones y reportes del inmueble.</span></div>';
+      modal.hidden = false;
+      syncModalBodyState();
+      var close = modal.querySelector("[data-scm-portfolio-timeline-close]");
+      if (close) close.focus();
+      var fd = new FormData();
+      fd.set("portfolio_id", portfolioId);
+      fd.set("contract_id", contractId);
+      fd.set("property_code", propertyCode);
+      button.disabled = true;
+      postJson(actionTimeline, fd).then(function (data) {
+        renderTimeline(modal, data);
+      }).catch(function (error) {
+        if (body) {
+          body.innerHTML = '<div class="scm-admin-notif-empty"><strong>No se pudo cargar la trazabilidad</strong><span>' + escapeHtml(error.message) + '</span></div>';
+        }
+        notify("error", error.message, "Cartera");
+      }).finally(function () {
+        button.disabled = false;
+      });
     }
 
     function closeLetterPreview() {
@@ -807,6 +923,12 @@
         }
         return;
       }
+      var timelineButton = event.target.closest && event.target.closest("[data-scm-portfolio-timeline]");
+      if (timelineButton && root.contains(timelineButton)) {
+        event.preventDefault();
+        openTimelineModal(timelineButton);
+        return;
+      }
       var resetButton = event.target.closest && event.target.closest("[data-scm-portfolio-reset]");
       if (resetButton && root.contains(resetButton)) {
         event.preventDefault();
@@ -867,6 +989,12 @@
         closeReportDrilldown();
         return;
       }
+      var timelineClose = event.target.closest && event.target.closest("[data-scm-portfolio-timeline-close]");
+      if (timelineClose && root.contains(timelineClose)) {
+        event.preventDefault();
+        closeTimelineModal();
+        return;
+      }
       var previewDownload = event.target.closest && event.target.closest("[data-scm-portfolio-letter-preview-download]");
       if (previewDownload && root.contains(previewDownload)) {
         event.preventDefault();
@@ -903,8 +1031,10 @@
       if (event.key === "Escape") {
         var preview = root.querySelector("[data-scm-portfolio-letter-preview-modal]:not([hidden])");
         var reportDetail = root.querySelector("[data-scm-portfolio-report-modal]:not([hidden])");
+        var timeline = root.querySelector("[data-scm-portfolio-timeline-modal]:not([hidden])");
         if (preview) closeLetterPreview();
         else if (reportDetail) closeReportDrilldown();
+        else if (timeline) closeTimelineModal();
         else closeManagementModal();
       }
     });

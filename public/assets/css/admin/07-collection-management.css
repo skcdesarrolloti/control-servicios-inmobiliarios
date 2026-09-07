@@ -366,6 +366,164 @@
   line-height: 1.35;
 }
 
+#scm-app .scm-portfolio-timeline-panel {
+  width: min(980px, calc(100vw - 38px));
+  max-height: min(780px, calc(100vh - 48px));
+  overflow: auto;
+}
+
+#scm-app .scm-portfolio-timeline-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0 16px;
+}
+
+#scm-app .scm-portfolio-timeline-summary article {
+  min-height: 92px;
+  padding: 15px;
+  border: 1px solid #dce6ef;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f8fbfe 0%, #ffffff 100%);
+  box-shadow: 0 8px 22px rgba(23, 52, 84, 0.06);
+}
+
+#scm-app .scm-portfolio-timeline-summary span,
+#scm-app .scm-portfolio-timeline-summary small {
+  display: block;
+  color: #52687e;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+#scm-app .scm-portfolio-timeline-summary strong {
+  display: block;
+  margin: 7px 0 5px;
+  color: var(--portfolio-navy);
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+#scm-app .scm-portfolio-timeline-list {
+  display: grid;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+#scm-app .scm-portfolio-timeline-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dce6ef;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 9px 22px rgba(23, 52, 84, 0.05);
+}
+
+#scm-app .scm-portfolio-timeline-dot {
+  width: 12px;
+  height: 12px;
+  margin-top: 5px;
+  border: 3px solid #dbeafe;
+  border-radius: 999px;
+  background: var(--portfolio-blue);
+  box-shadow: 0 0 0 4px #eff6ff;
+}
+
+#scm-app .scm-portfolio-timeline-item--management .scm-portfolio-timeline-dot {
+  border-color: #ccfbf1;
+  background: var(--portfolio-teal);
+  box-shadow: 0 0 0 4px #f0fdfa;
+}
+
+#scm-app .scm-portfolio-timeline-item--property .scm-portfolio-timeline-dot {
+  border-color: #fed7aa;
+  background: #f97316;
+  box-shadow: 0 0 0 4px #fff7ed;
+}
+
+#scm-app .scm-portfolio-timeline-item--snapshot .scm-portfolio-timeline-dot {
+  border-color: #c4b5fd;
+  background: #6d28d9;
+  box-shadow: 0 0 0 4px #f5f3ff;
+}
+
+#scm-app .scm-portfolio-timeline-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+#scm-app .scm-portfolio-timeline-item-head strong {
+  color: var(--portfolio-navy);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+#scm-app .scm-portfolio-timeline-item-head time {
+  color: #52687e;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+#scm-app .scm-portfolio-timeline-content p {
+  margin: 0;
+  color: #263f58;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+#scm-app .scm-portfolio-timeline-content p.is-muted {
+  color: #6b7f93;
+}
+
+#scm-app .scm-portfolio-timeline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 11px;
+}
+
+#scm-app .scm-portfolio-timeline-meta span {
+  padding: 6px 9px;
+  border: 1px solid #dce6ef;
+  border-radius: 999px;
+  background: #f8fbfe;
+  color: #3f566e;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+#scm-app .scm-portfolio-timeline-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border: 1px solid #9bb8d4;
+  border-radius: 999px;
+  background: #f2f7fb;
+  color: var(--portfolio-navy);
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+#scm-app .scm-portfolio-timeline-btn {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #4c1d95;
+}
+
 #scm-app .scm-portfolio-import-card,
 #scm-app .scm-portfolio-control,
 #scm-app .scm-portfolio-table-card,
@@ -828,7 +986,8 @@
   #scm-app .scm-portfolio-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #scm-app .scm-portfolio-workflow,
   #scm-app .scm-portfolio-report-grid,
-  #scm-app .scm-portfolio-report-grid--lower { grid-template-columns: 1fr; }
+  #scm-app .scm-portfolio-report-grid--lower,
+  #scm-app .scm-portfolio-timeline-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
@@ -854,6 +1013,9 @@
   #scm-app .scm-portfolio-report-detail-toolbar { grid-template-columns: 1fr; }
   #scm-app .scm-portfolio-report-detail-toolbar button { width: 100%; }
   #scm-app .scm-portfolio-report-search input { width: 100%; }
+  #scm-app .scm-portfolio-timeline-summary { grid-template-columns: 1fr; }
+  #scm-app .scm-portfolio-timeline-item-head { display: grid; }
+  #scm-app .scm-portfolio-timeline-item-head time { white-space: normal; }
   #scm-app .scm-portfolio-letter-preview-frame { min-height: 340px; height: 58vh; padding: 7px; }
 }
 
