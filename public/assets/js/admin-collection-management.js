@@ -319,6 +319,9 @@
         fd.set("portfolio_id", portfolioId);
         fd.set("operation", "send_due_date");
         fd.set("due_day", day);
+        channels = channels.filter(function (channel) {
+          return ["email", "whatsapp"].indexOf(channel) !== -1;
+        });
         channels.forEach(function (channel) { fd.append("notify_channels[]", channel); });
         return runPortfolioOperation(button, fd, "Registrando y encolando notificación...", "success");
       };
@@ -339,7 +342,6 @@
             + '<div class="scm-portfolio-swal-checks">'
             + '<label><input type="checkbox" value="whatsapp" checked> WhatsApp</label>'
             + '<label><input type="checkbox" value="email"> Email</label>'
-            + '<label><input type="checkbox" value="sms"> SMS</label>'
             + '</div>'
             + '</div>',
           didOpen: function () {

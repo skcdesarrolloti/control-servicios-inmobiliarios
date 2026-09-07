@@ -74,7 +74,7 @@ trait HandlesCollectionManagement
           static fn($value): string => sanitize_key((string) $value),
           is_array($rawChannels) ? $rawChannels : [$rawChannels]
         );
-        $notifyChannels = array_values(array_unique(array_filter($notifyChannels, static fn(string $channel): bool => in_array($channel, ['email', 'sms', 'whatsapp'], true))));
+        $notifyChannels = array_values(array_unique(array_filter($notifyChannels, static fn(string $channel): bool => in_array($channel, ['email', 'whatsapp'], true))));
         if ($notifyChannels === []) {
           $this->jsonFail('Selecciona al menos un canal para enviar la notificación.');
         }
@@ -113,29 +113,15 @@ trait HandlesCollectionManagement
                 'ordinal' => $adminService->collectionDueDateOrdinal($dueDay),
               ];
             }
-            $nonSmsChannels = array_values(array_filter($notifyChannels, static fn(string $channel): bool => $channel !== 'sms'));
-            if ($nonSmsChannels !== []) {
+            if ($notifyChannels !== []) {
               $notifyResult = $this->merge_admin_notification_results($notifyResult, $adminService->enqueue(
                 'arrendatarios_activos',
                 $notifyIds,
-                $nonSmsChannels,
+                $notifyChannels,
                 'Notificación de fecha de pago',
                 $adminService->collectionDueDateReminderMessage($dueDay),
                 'scm_arrendatario_fecha_pago_v1',
                 'scm_email_arrendatario_fecha_pago_v1',
-                $notificationMeta,
-                AdministrativeNotificationsService::COLLECTION_SMS_MAX
-              ));
-            }
-            if (in_array('sms', $notifyChannels, true)) {
-              $notifyResult = $this->merge_admin_notification_results($notifyResult, $adminService->enqueue(
-                'arrendatarios_activos',
-                $notifyIds,
-                ['sms'],
-                'Notificación de fecha de pago',
-                $adminService->collectionDueDateReminderSmsMessage($dueDay),
-                '',
-                '',
                 $notificationMeta,
                 AdministrativeNotificationsService::COLLECTION_SMS_MAX
               ));
