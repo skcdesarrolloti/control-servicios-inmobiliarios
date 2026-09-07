@@ -1393,7 +1393,7 @@ trait RendersDashboard
         <button type="button" class="scm-pqr-settings-close" id="scm-close-internal-notifications" aria-label="Cerrar">&times;</button>
         <div class="scm-pqr-settings-head">
           <h3 id="scm-internal-notifications-title">Notificaciones internas administrativas</h3>
-          <p>Clasifica a qu&eacute; funcionarios se les avisa por cada acci&oacute;n del panel. Hoy Gesti&oacute;n de cobro ya encola Email interno real; las dem&aacute;s acciones quedan listas para conectar al flujo correspondiente.</p>
+          <p>Clasifica a qu&eacute; funcionarios se les avisa por cada acci&oacute;n del panel. Gesti&oacute;n de cobro y Cobro prejur&iacute;dico ya encolan Email interno real; las dem&aacute;s acciones quedan listas para conectar al flujo correspondiente.</p>
         </div>
         <form id="scm-internal-notifications-form" class="scm-internal-notifications-form" autocomplete="off">
           <section class="scm-pqr-settings-section">

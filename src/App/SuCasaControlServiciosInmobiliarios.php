@@ -196,6 +196,11 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Cuando se registra una gestión desde el módulo de Gestiones de cobro.',
             'channel' => 'Email interno',
           ],
+          'cobro_prejuridico' => [
+            'label' => 'Cobro prejurídico',
+            'description' => 'Cuando se genera y envía la carta prejurídica desde Gestiones de cobro.',
+            'channel' => 'Email interno',
+          ],
         ],
       ],
       'gestion_caso' => [

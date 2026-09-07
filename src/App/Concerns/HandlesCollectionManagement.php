@@ -145,10 +145,34 @@ trait HandlesCollectionManagement
       if ($operation === 'send_prejuridico') {
         $result = $service->generateLetter($portfolioId, 'prejuridico', true);
         $emailQueued = (int) ($result['email_queued'] ?? ($result['queued'] ?? 0));
+        $internalNotifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0];
+        $internalNotifyError = '';
+        $internalIds = $this->internalNotificationRecipientsForAction('cobro_prejuridico');
+        if ($internalIds !== []) {
+          try {
+            $adminService = $this->get_admin_notifications_service();
+            $internalNotifyResult = $adminService->enqueue(
+              'funcionarios',
+              $internalIds,
+              ['email'],
+              'Cobro prejuridico registrado',
+              $this->collection_prejuridico_internal_notification_message($result),
+              '',
+              AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE,
+              [],
+              AdministrativeNotificationsService::SMS_MAX
+            );
+          } catch (\Throwable $internalException) {
+            $internalNotifyError = $internalException->getMessage();
+          }
+        }
+        $internalQueued = (int) ($internalNotifyResult['queued'] ?? 0);
         $this->jsonOk($result + [
           'message' => $emailQueued > 0
-            ? 'Carta prejurídica generada, reporte del inmueble registrado y ' . $emailQueued . ' correo(s) encolado(s).'
-            : 'La carta prejurídica se generó y el reporte del inmueble quedó registrado, pero no se encontró un correo válido para encolarla.',
+            ? 'Carta prejurídica generada, reporte del inmueble registrado y ' . $emailQueued . ' correo(s) encolado(s).' . ($internalQueued > 0 ? " {$internalQueued} aviso(s) interno(s)." : '') . ($internalNotifyError !== '' ? ' No se pudo encolar todo: ' . $internalNotifyError : '')
+            : 'La carta prejurídica se generó y el reporte del inmueble quedó registrado, pero no se encontró un correo válido para encolarla.' . ($internalQueued > 0 ? " {$internalQueued} aviso(s) interno(s)." : '') . ($internalNotifyError !== '' ? ' No se pudo encolar todo: ' . $internalNotifyError : ''),
+          'internal_notifications' => $internalNotifyResult,
+          'internal_notification_error' => $internalNotifyError,
         ]);
       }
       if ($operation === 'send_siniestro') {
@@ -218,5 +242,41 @@ trait HandlesCollectionManagement
   private function get_collection_portfolio_service(): CollectionPortfolioService
   {
     return new CollectionPortfolioService($this->db);
+  }
+
+  /** @param array<string,mixed> $result */
+  private function collection_prejuridico_internal_notification_message(array $result): string
+  {
+    $sender = trim(\SCM\Support\Auth::user());
+    if ($sender === '') {
+      $sender = 'Funcionario';
+    }
+    $managements = (array) ($result['managements'] ?? []);
+    $summary = [];
+    foreach (array_slice($managements, 0, 8) as $management) {
+      if (!is_array($management)) {
+        continue;
+      }
+      $contract = trim((string) ($management['contract_number'] ?? ''));
+      $property = trim((string) ($management['property'] ?? ''));
+      $piece = trim(($contract !== '' ? 'Contrato ' . $contract : '') . ($property !== '' ? ' · Inmueble ' . $property : ''));
+      if ($piece !== '') {
+        $summary[] = $piece;
+      }
+    }
+
+    $lines = [
+      'Se registró un cobro prejurídico desde el módulo Gestiones de cobro.',
+      'Realizado por: ' . $sender . '.',
+      'La carta prejurídica fue generada y el reporte del inmueble quedó registrado como Cobro prejuridico.',
+    ];
+    if ($summary !== []) {
+      $lines[] = 'Registro: ' . implode('; ', $summary) . (count($managements) > count($summary) ? '; y más.' : '.');
+    }
+    $url = trim((string) ($result['url'] ?? ''));
+    if ($url !== '') {
+      $lines[] = 'PDF: ' . $url;
+    }
+    return implode("\n\n", $lines);
   }
 }
