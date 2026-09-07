@@ -805,17 +805,27 @@ final class CollectionPortfolioService
       $recipients = array_values(array_unique(array_filter($recipients, static fn(string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false)));
       if ($recipients !== []) {
         $subject = 'Gestión prejurídica de cobro - contrato de arrendamiento';
-        $html = '<p>Cordial saludo.</p><p>Adjuntamos mediante enlace seguro la carta relacionada con el contrato <strong>'
+        $content = '<p>Cordial saludo.</p><p>Adjuntamos mediante enlace seguro la carta relacionada con el contrato <strong>'
           . htmlspecialchars((string) ($item['contract_number'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
           . '</strong> y el inmueble <strong>' . htmlspecialchars((string) ($item['property_code'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
           . '</strong>.</p><p><a href="' . htmlspecialchars((string) $document['url'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
           . '">Abrir carta en PDF</a></p><p>Atentamente,<br>'
-          . htmlspecialchars((string) $sender['signature_line'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>';
+          . htmlspecialchars((string) $sender['signature_line'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>'
+          . '<div style="margin-top:24px;padding:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">'
+          . '<p style="margin:0 0 10px;">🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro <strong>Bot Guardián</strong> desde el botón de abajo.</p>'
+          . '<p style="margin:0;">🌐 Recuerda que puedes ingresar a tu <strong>menú personal en nuestra página web</strong> para consultar información y gestionar tus servicios.</p>'
+          . '</div>';
+        $html = EmailTemplate::render($subject, $content, [
+          'buttons' => [
+            ['url' => 'https://sucasainmobiliaria.com.co/guardian/', 'label' => 'Hablar con Guardián'],
+            ['url' => 'https://sucasainmobiliaria.com.co/arrendatario', 'label' => 'Ir a mi menú'],
+          ],
+        ]);
         $queued = (new EmailQueue($this->db))->enqueue($recipients, $subject, $html, [
           'source_module' => 'collection-management',
           'destination_name' => (string) ($item['tenant_name'] ?? ''),
           'dedupe_key' => 'collection-letter:' . $portfolioId . ':' . $letterType . ':' . date('YmdHi'),
-          'meta' => ['portfolio_id' => $portfolioId, 'letter_type' => $letterType, 'document_url' => $document['url']],
+          'meta' => ['portfolio_id' => $portfolioId, 'letter_type' => $letterType, 'document_url' => $document['url'], 'template_name' => 'scm_email_cobro_prejuridico_v1'],
         ]);
       }
     }
