@@ -423,6 +423,34 @@ trait MaintenanceQueriesConcern
     return $this->getDistinctValuesFromCandidates($this->ticketsTable(), ['tema_ayuda'], 500);
   }
 
+  /** @return array<int,string> */
+  public function getTicketTopicFilterOptionsExceptDepartment(string $excludedDepartment): array
+  {
+    $table = $this->ticketsTable();
+    if (!$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'tema_ayuda')) {
+      return [];
+    }
+
+    $where = ["TRIM(COALESCE(`tema_ayuda`, '')) <> ''"];
+    $args = [];
+    $excludedDepartment = trim($excludedDepartment);
+    if ($excludedDepartment !== '' && $this->schema->columnExists($table, 'departamento')) {
+      $where[] = "LOWER(TRIM(COALESCE(`departamento`, ''))) <> ?";
+      $args[] = mb_strtolower($excludedDepartment, 'UTF-8');
+    }
+
+    $rows = $this->db->getCol(
+      "SELECT DISTINCT TRIM(COALESCE(`tema_ayuda`, '')) AS tema
+       FROM `{$table}`
+       WHERE " . implode(' AND ', $where) . '
+       ORDER BY tema ASC
+       LIMIT 500',
+      $args
+    );
+
+    return $this->uniqueNonEmptyValues(is_array($rows) ? $rows : []);
+  }
+
   /**
    * @param array<string,string> $filters
    * @return array<int,array<string,mixed>>

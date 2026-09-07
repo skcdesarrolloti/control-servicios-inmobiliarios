@@ -4224,6 +4224,7 @@
           );
           collectSummary("Barrio", btn.dataset.barrio || "");
           collectSummary("Dirección", btn.dataset.direccion || "");
+          collectSummary("Departamento", btn.dataset.departamento || "");
           collectSummary("Creado", btn.dataset.creado || "");
           collectSummary("Asignado a", btn.dataset.empleado || "");
           collectSummary("Propietario", btn.dataset.propietario || "");

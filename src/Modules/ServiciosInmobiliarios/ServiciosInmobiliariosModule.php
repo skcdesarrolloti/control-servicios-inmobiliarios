@@ -46,6 +46,12 @@ final class ServiciosInmobiliariosModule
     return $this->ticketsRepository->getMaintenanceFilterOptions();
   }
 
+  /** @return array<int,string> */
+  public function getTicketTopicOptionsExceptDepartment(string $excludedDepartment): array
+  {
+    return $this->ticketsRepository->getTicketTopicFilterOptionsExceptDepartment($excludedDepartment);
+  }
+
   /**
    * Conteo liviano para vistas ocultas: evita renderizar cards e historial
    * hasta que el usuario abra la subpestana.

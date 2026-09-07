@@ -90,6 +90,12 @@ trait GenericQueryConcern
       $args[] = $p['fTema'];
     }
 
+    $excludedDepartment = trim((string) ($p['_scmExcludeDepartamento'] ?? ''));
+    if ($excludedDepartment !== '' && $this->column_exists($tabla, 'departamento')) {
+      $where[] = "LOWER(TRIM(COALESCE(`departamento`, ''))) <> ?";
+      $args[] = mb_strtolower($excludedDepartment, 'UTF-8');
+    }
+
     $statusBucket = strtolower(trim((string) ($p['_scmStatusBucket'] ?? 'active')));
     if (!in_array($statusBucket, ['active', 'postergados', 'cerrados', 'all'], true)) {
       $statusBucket = 'active';

@@ -106,6 +106,7 @@ trait HandlesMaintenanceActions
     $employeeId = $this->current_employee_id();
     $params['fEmpleado'] = $employeeId !== '' ? $employeeId : '__sin_funcionario__';
     $params['_scmStatusBucket'] = 'all';
+    $params['_scmExcludeDepartamento'] = 'Servicio al cliente';
     $result = $this->run_query_generic([], $params, $config);
     $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
     $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];

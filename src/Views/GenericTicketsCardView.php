@@ -248,6 +248,7 @@ final class GenericTicketsCardView
     $asuntoRaw = trim((string) ($row['asunto'] ?? $row['descripcion'] ?? ''));
     $descripcionRaw = trim((string) ($row['descripcion'] ?? ''));
     $temaRaw = trim((string) ($row['tema_ayuda'] ?? ''));
+    $departamentoRaw = trim((string) ($row['departamento'] ?? ''));
     $effectiveTabKey = $this->inferTabKeyForRow($tabKey, $row);
     $effectiveStatusBucket = $this->inferStatusBucketForRow($statusBucket, $row);
     $estadoRaw = trim((string) ($row['estado'] ?? ''));
@@ -410,6 +411,7 @@ final class GenericTicketsCardView
     $dataAttrs .= ' data-origen="' . esc_attr($origenLabel) . '"';
     $dataAttrs .= ' data-tab-key="' . esc_attr($effectiveTabKey) . '"';
     $dataAttrs .= ' data-tema="' . esc_attr($temaRaw) . '"';
+    $dataAttrs .= ' data-departamento="' . esc_attr($departamentoRaw) . '"';
     if ($effectiveStatusBucket !== '') {
       $dataAttrs .= ' data-status-bucket="' . esc_attr($effectiveStatusBucket) . '"';
     }
