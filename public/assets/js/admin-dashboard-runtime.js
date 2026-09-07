@@ -2830,7 +2830,8 @@
         if (!paymentReceiptsImportForm) {
           return;
         }
-        var canImportReceipts = currentType().indexOf("copropiedades") === 0;
+        var type = currentType();
+        var canImportReceipts = type === "copropiedades_activas" || type === "copropiedades_no_activas";
         paymentReceiptsImportForm.hidden = !canImportReceipts;
         paymentReceiptsImportForm.classList.toggle("is-hidden", !canImportReceipts);
         if (!canImportReceipts && paymentReceiptsFileInput) {
