@@ -7219,6 +7219,8 @@
 }
 
 #scm-app .scm-admin-notif-channel-group[hidden],
+#scm-app .scm-admin-notif-channel-pill[hidden],
+#scm-app .scm-admin-notif-channel-pill.is-hidden,
 #scm-app .scm-admin-notif-modal.is-channel-specific .scm-admin-notif-channel-group {
   display: none !important;
 }

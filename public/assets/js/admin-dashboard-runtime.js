@@ -3215,7 +3215,13 @@
           "scm_arrendatario_aviso_pago_canon_v1",
           "scm_aviso_siniestro_v1",
           "scm_aviso_siniestro_v2",
+          "scm_copropiedad_soportes_pago_v1",
         ].indexOf(String(option.value || "")) !== -1;
+      }
+
+      function selectedTemplateIsPaymentSupport() {
+        var option = selectedMessageTemplateOption();
+        return !!option && String(option.value || "") === "scm_copropiedad_soportes_pago_v1";
       }
 
       function templateReservedForCollectionManagement(option, type) {
@@ -3244,18 +3250,29 @@
         var emailChecked = !!panel.querySelector(
           '[data-admin-notif-channel][value="email"]:checked',
         );
+        var whatsappInput = panel.querySelector('[data-admin-notif-channel][value="whatsapp"]');
         var whatsappChecked = !!panel.querySelector(
           '[data-admin-notif-channel][value="whatsapp"]:checked',
         );
         var usesFixedTemplate = (emailChecked || whatsappChecked) && selectedTemplateIsFixedNoMessage();
+        var usesPaymentSupport = selectedTemplateIsPaymentSupport();
+        if (usesPaymentSupport && String(composerChannelMode || "").toLowerCase() === "sms") {
+          composerChannelMode = "whatsapp";
+          if (whatsappInput) {
+            whatsappInput.checked = true;
+          }
+          updateComposerMode();
+        }
         var lockSms = usesFixedTemplate && String(composerChannelMode || "").toLowerCase() !== "sms";
-        if (lockSms) {
+        if (lockSms || usesPaymentSupport) {
           smsInput.checked = false;
         }
-        smsInput.disabled = lockSms;
+        smsInput.disabled = lockSms || usesPaymentSupport;
         var smsPill = smsInput.closest ? smsInput.closest(".scm-admin-notif-channel-pill") : null;
         if (smsPill) {
-          smsPill.classList.toggle("is-disabled", lockSms);
+          smsPill.hidden = usesPaymentSupport;
+          smsPill.classList.toggle("is-hidden", usesPaymentSupport);
+          smsPill.classList.toggle("is-disabled", lockSms || usesPaymentSupport);
         }
       }
 
@@ -3480,6 +3497,10 @@
         var wanted = String(channel || "").trim().toLowerCase();
         if (["email", "sms", "whatsapp"].indexOf(wanted) === -1) {
           return;
+        }
+        if (wanted === "sms" && selectedTemplateIsPaymentSupport()) {
+          wanted = "whatsapp";
+          showToast("warning", "Soportes de pago solo se envian por Email o WhatsApp.");
         }
         var opts = options || {};
         composerSingleRecipient = !!opts.singleRecipient;
@@ -4302,6 +4323,9 @@
       }
 
       function selectedWhatsappNeedsMessage() {
+        if (selectedTemplateIsPaymentSupport()) {
+          return false;
+        }
         var option = selectedMessageTemplateOption();
         var mode = option ? option.getAttribute("data-template-mode") || "name_message_signature" : "name_message_signature";
         return (mode === "name_message_signature" || mode === "name_message") && !selectedTemplateUsesImportedDetail();
@@ -4312,6 +4336,9 @@
       }
 
       function selectedTemplateUsesImportedDetail() {
+        if (selectedTemplateIsPaymentSupport()) {
+          return true;
+        }
         var option = selectedMessageTemplateOption();
         if (!option || !hasImportedRecipients()) {
           return false;
@@ -4332,7 +4359,9 @@
             return detail;
           }
         }
-        return "Canon: $1.850.000\nContrato: #700\nInmueble SIMI: 10578\nPeriodo: Agosto 2026";
+        return selectedTemplateIsPaymentSupport()
+          ? "Soportes adjuntos: 1\nNIT: 901133921\nPeriodo: SEPTIEMBRE 2026\nInmueble(s) indicados en el nombre del PDF: APTO 302 T10"
+          : "Canon: $1.850.000\nContrato: #700\nInmueble SIMI: 10578\nPeriodo: Agosto 2026";
       }
 
       function messageRequiredForCurrentSelection() {

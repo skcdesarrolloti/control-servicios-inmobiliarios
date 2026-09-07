@@ -173,6 +173,7 @@ final class AdministrativeNotificationsService
         'actors' => array_merge($copropiedades, $funcionarios),
         'email_template' => 'scm_email_copropiedad_soportes_pago_v1',
         'parameter_mode' => 'name_message_signature',
+        'requires_message' => false,
       ],
       'scm_arrendatario_aviso_pago_canon_v1' => [
         'name' => 'scm_arrendatario_aviso_pago_canon_v1',
@@ -380,7 +381,7 @@ final class AdministrativeNotificationsService
         'editable_message' => '',
         'is_html' => true,
         'is_full_document' => false,
-        'requires_message' => true,
+        'requires_message' => false,
         'preview_excerpt' => 'Envio de soportes de pago con detalle editable.',
       ],
     ];
@@ -2124,9 +2125,12 @@ final class AdministrativeNotificationsService
   {
     $config = $this->typeConfig($type);
     $channels = $this->sanitizeChannels($channels);
-    $testOptions = $this->sanitizeTestModeOptions($testOptions, $channels);
     $whatsappTemplateConfig = $this->whatsappTemplateConfig($whatsappTemplate);
     $emailTemplateConfig = $this->emailTemplateConfig($emailTemplate);
+    if ($this->isCopropiedadPaymentSupportTemplate($whatsappTemplateConfig, $emailTemplateConfig)) {
+      $channels = array_values(array_filter($channels, static fn(string $channel): bool => $channel !== 'sms'));
+    }
+    $testOptions = $this->sanitizeTestModeOptions($testOptions, $channels);
     $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
     $subject = trim($subject);
     $message = trim($message);
@@ -4364,9 +4368,16 @@ final class AdministrativeNotificationsService
   {
     return (string) ($whatsappTemplateConfig['template_id'] ?? '') === 'scm_propietario_arriendo_consignado_v1'
       || (string) ($whatsappTemplateConfig['name'] ?? '') === 'scm_propietario_arriendo_consignado_v1'
-      || (string) ($whatsappTemplateConfig['template_id'] ?? '') === 'scm_copropiedad_soportes_pago_v1'
-      || (string) ($whatsappTemplateConfig['name'] ?? '') === 'scm_copropiedad_soportes_pago_v1'
+      || $this->isCopropiedadPaymentSupportTemplate($whatsappTemplateConfig, $emailTemplateConfig)
       || (string) ($emailTemplateConfig['name'] ?? '') === 'scm_email_propietario_arriendo_consignado_v1'
+      || (string) ($emailTemplateConfig['name'] ?? '') === 'scm_email_copropiedad_soportes_pago_v1';
+  }
+
+  /** @param array<string,mixed> $whatsappTemplateConfig @param array<string,mixed> $emailTemplateConfig */
+  private function isCopropiedadPaymentSupportTemplate(array $whatsappTemplateConfig, array $emailTemplateConfig): bool
+  {
+    return (string) ($whatsappTemplateConfig['template_id'] ?? '') === 'scm_copropiedad_soportes_pago_v1'
+      || (string) ($whatsappTemplateConfig['name'] ?? '') === 'scm_copropiedad_soportes_pago_v1'
       || (string) ($emailTemplateConfig['name'] ?? '') === 'scm_email_copropiedad_soportes_pago_v1';
   }
 
