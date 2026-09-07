@@ -624,7 +624,6 @@
         form.querySelector("[name='contract_ids[]']").value = contractId;
         modal.querySelector("[data-scm-portfolio-management-context]").textContent = tenantName + " · Contrato " + (contractNumber || contract.contrato || contractId);
         renderCodeudores(modal, contract);
-        modal.querySelectorAll("[data-scm-portfolio-followup-field]").forEach(function (field) { field.hidden = true; });
         var result = modal.querySelector("[data-scm-portfolio-management-result]");
         if (result) result.textContent = "";
         modal.hidden = false;
@@ -694,16 +693,6 @@
           notify("error", error.message, "Cartera");
         }).finally(function () { setBusy(managementForm, false); });
       }
-    });
-
-    root.addEventListener("change", function (event) {
-      if (!event.target.matches || !event.target.matches("[data-scm-portfolio-followup]")) return;
-      var modal = event.target.closest("[data-scm-portfolio-management-modal]");
-      if (!modal) return;
-      var show = String(event.target.value || "") === "Si";
-      modal.querySelectorAll("[data-scm-portfolio-followup-field]").forEach(function (field) {
-        field.hidden = !show;
-      });
     });
 
     root.addEventListener("input", function (event) {

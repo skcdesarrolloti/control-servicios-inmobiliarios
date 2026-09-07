@@ -588,7 +588,7 @@
 
 #scm-app .scm-portfolio-management-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(220px, 360px);
   gap: 12px;
 }
 
