@@ -1266,7 +1266,8 @@ final class CollectionPortfolioService
     foreach ([
       'estado', 'contrato', 'contrato_arrendamiento', 'inmueble', 'id_inmueble', 'id_inmueble_data', 'direccion',
       'id_arrendatario', 'documento_arrendatario', 'arrendatario', 'correo_arrendatario', 'celular_arrendatario',
-      'id_propietario', 'propietario', 'correo_propietario', 'celular_propietario', 'esta_sinestrado'
+      'id_propietario', 'propietario', 'correo_propietario', 'celular_propietario', 'esta_sinestrado',
+      'aseguradora', 'id_estudio_aseguradora', 'numero_solicitud'
     ] as $column) {
       if ($this->schema->columnExists($table, $column)) {
         $columns[] = $column;
@@ -1369,17 +1370,8 @@ final class CollectionPortfolioService
     }
 
     $contract = trim((string) ($item['contract_number'] ?? ''));
-    $tenant = trim((string) ($item['tenant_name'] ?? ''));
-    $detail = 'Contrato marcado como siniestro desde el modulo Gestiones de cobro.';
-    if ($contract !== '') {
-      $detail .= ' Contrato: ' . $contract . '.';
-    }
-    if ($tenant !== '') {
-      $detail .= ' Arrendatario: ' . $tenant . '.';
-    }
-    if ($note !== '') {
-      $detail .= ' Observacion: ' . $note;
-    }
+    $insurer = $this->siniestroInsurerName($item);
+    $detail = 'El contrato ' . ($contract !== '' ? $contract : 'seleccionado') . ' ha sido siniestrado en la aseguradora' . ($insurer !== '' ? ' ' . $insurer : '') . '.';
 
     $payload = [
       'cct_status' => 'publish',
@@ -1658,6 +1650,97 @@ final class CollectionPortfolioService
       return 'Canon';
     }
     return trim($type) !== '' ? trim($type) : 'Sin tipo';
+  }
+
+  /** @param array<string,mixed> $item */
+  private function siniestroInsurerName(array $item): string
+  {
+    $candidate = $this->insurerDisplayName((string) ($item['aseguradora'] ?? ''));
+    if ($candidate !== '') {
+      return $candidate;
+    }
+
+    $contractId = (int) ($item['contract_id'] ?? 0);
+    $contractTable = $this->contractsTable();
+    if ($contractId <= 0 || !$this->schema->tableExists($contractTable)) {
+      return '';
+    }
+
+    $select = ['_ID'];
+    foreach (['aseguradora', 'id_estudio_aseguradora', 'numero_solicitud'] as $column) {
+      if ($this->schema->columnExists($contractTable, $column)) {
+        $select[] = $column;
+      }
+    }
+    if (count($select) === 1) {
+      return '';
+    }
+
+    $contract = $this->db->getRow(
+      'SELECT `' . implode('`, `', array_values(array_unique($select))) . "` FROM `{$contractTable}` WHERE `_ID` = ? LIMIT 1",
+      [$contractId]
+    );
+    if (!is_array($contract)) {
+      return '';
+    }
+
+    $candidate = $this->insurerDisplayName((string) ($contract['aseguradora'] ?? ''));
+    if ($candidate !== '') {
+      return $candidate;
+    }
+
+    return $this->insurerNameFromStudy(
+      trim((string) ($contract['id_estudio_aseguradora'] ?? '')),
+      trim((string) ($contract['numero_solicitud'] ?? ''))
+    );
+  }
+
+  private function insurerNameFromStudy(string $studyId, string $requestNumber): string
+  {
+    $table = $this->db->table('jet_cct_estudios_aseguradoras');
+    if (!$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'aseguradora')) {
+      return '';
+    }
+
+    $where = [];
+    $args = [];
+    if ($studyId !== '' && $this->schema->columnExists($table, '_ID')) {
+      $where[] = 'CAST(`_ID` AS CHAR) = ?';
+      $args[] = $studyId;
+    }
+    if ($requestNumber !== '' && $this->schema->columnExists($table, 'numero_solicitud')) {
+      $where[] = 'TRIM(COALESCE(`numero_solicitud`, \'\')) = ?';
+      $args[] = $requestNumber;
+    }
+    if ($where === []) {
+      return '';
+    }
+
+    $orderColumn = $this->schema->columnExists($table, '_ID') ? '`_ID` DESC' : '`aseguradora` ASC';
+    $value = $this->db->getVar(
+      "SELECT `aseguradora` FROM `{$table}` WHERE " . implode(' OR ', $where) . " ORDER BY {$orderColumn} LIMIT 1",
+      $args
+    );
+    return $this->insurerDisplayName((string) ($value ?? ''));
+  }
+
+  private function insurerDisplayName(string $value): string
+  {
+    $value = trim(wp_strip_all_tags($value));
+    if ($value === '') {
+      return '';
+    }
+    $normalized = strtolower(strtr($value, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U']));
+    if (str_contains($normalized, 'libertador')) {
+      return 'El Libertador';
+    }
+    if (str_contains($normalized, 'unifianza')) {
+      return 'Unifianza';
+    }
+    if (str_contains($normalized, 'fianza')) {
+      return 'Fianza Bogotá';
+    }
+    return str_replace('_', ' ', $value);
   }
 
   private function addEvent(int $portfolioId, ?int $importId, string $eventType, mixed $previousBalance, mixed $balance, string $notes, string $documentUrl = ''): void
