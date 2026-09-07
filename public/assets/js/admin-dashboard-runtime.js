@@ -3156,6 +3156,24 @@
         ].indexOf(String(option.value || "")) !== -1;
       }
 
+      function templateReservedForCollectionManagement(option, type) {
+        if (!option) {
+          return false;
+        }
+        var currentMessageType = String(type || currentType() || "");
+        if (currentMessageType.indexOf("arrendatarios_") !== 0) {
+          return false;
+        }
+        return [
+          "scm_arrendatario_aviso_pago_canon_v1",
+          "scm_aviso_siniestro_v1",
+          "scm_aviso_siniestro_v2",
+          "scm_arrendatario_gestion_cobro_v1",
+          "scm_arrendatario_fecha_cobro_v1",
+          "scm_arrendatario_fecha_pago_v1",
+        ].indexOf(String(option.value || "")) !== -1;
+      }
+
       function syncFixedTemplateChannels() {
         var smsInput = panel.querySelector('[data-admin-notif-channel][value="sms"]');
         if (!smsInput) {
@@ -3181,6 +3199,9 @@
 
       function messageTemplateAllowedForType(option, type) {
         if (!option) {
+          return false;
+        }
+        if (templateReservedForCollectionManagement(option, type)) {
           return false;
         }
         var actors = String(option.getAttribute("data-actors") || "")
