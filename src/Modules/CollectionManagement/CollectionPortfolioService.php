@@ -720,7 +720,8 @@ final class CollectionPortfolioService
     if ($portfolioId <= 0 || $created <= 0) {
       return;
     }
-    $actionType = in_array($actionType, ['gestion_cobro', 'recordatorio_fecha_cobro', 'notificacion_fecha_pago'], true) ? $actionType : 'gestion_cobro';
+    $actionType = in_array($actionType, ['gestion_cobro', 'recordatorio_fecha_cobro', 'notificacion_fecha_pago', 'siniestro_notificado'], true) ? $actionType : 'gestion_cobro';
+    $eventType = $actionType === 'siniestro_notificado' ? 'siniestro_notificado' : 'collection_management';
     $now = date('Y-m-d H:i:s');
     $this->db->update($this->portfolioTable(), [
       'last_action_type' => $actionType,
@@ -728,7 +729,7 @@ final class CollectionPortfolioService
       'notes' => mb_substr(trim($observation), 0, 2000, 'UTF-8'),
       'updated_at' => $now,
     ], ['id' => $portfolioId]);
-    $this->addEvent($portfolioId, null, 'collection_management', null, null, trim($observation));
+    $this->addEvent($portfolioId, null, $eventType, null, null, trim($observation));
   }
 
   /** @return array{url:string,path:string,filename:string,title:string} */
@@ -809,21 +810,36 @@ final class CollectionPortfolioService
       throw new \RuntimeException('Solo se puede notificar siniestro cuando el contrato registra saldo pendiente.');
     }
 
-    $sender = (new AdministrativeNotificationsService($this->db))->senderProfile();
-    $now = date('Y-m-d H:i:s');
-    $this->db->update($this->portfolioTable(), [
-      'last_action_type' => 'siniestro_notificado',
-      'last_action_at' => $now,
-      'updated_at' => $now,
-    ], ['id' => $portfolioId]);
+    $tenantId = (int) ($item['tenant_id'] ?? 0);
+    $contractId = (int) ($item['contract_id'] ?? 0);
+    if ($tenantId <= 0) {
+      throw new \RuntimeException('Este registro no tiene arrendatario vinculado para registrar la gestión de siniestro.');
+    }
+
+    $adminService = new AdministrativeNotificationsService($this->db);
+    $sender = $adminService->senderProfile();
+    $observation = 'Aviso previo de posible siniestro enviado por WhatsApp y email. Se informó al arrendatario que el incumplimiento puede dar lugar al reporte ante la aseguradora.';
+    $management = $adminService->registerCollectionManagement([$tenantId], [
+      'tipo_gestion_cobro' => 'Canon',
+      'observacion' => $observation,
+      'volver_llamar' => 'No',
+      'siguiente_fecha' => '',
+      'siguiente_hora' => '',
+      'otro_horario_cobro' => '',
+      'contract_ids' => [$contractId],
+    ]);
+    $created = (int) ($management['created'] ?? 0);
+    if ($created <= 0) {
+      throw new \RuntimeException('No se pudo registrar la gestión de cobro del aviso de siniestro.');
+    }
 
     $emailQueued = $this->enqueueSiniestroEmails($item, $sender, $portfolioId);
     $whatsapp = $this->enqueueSiniestroWhatsApp($item, $sender, $portfolioId, '');
-    $notes = 'Aviso previo de posible siniestro. Correos encolados: ' . $emailQueued . '. WhatsApp encolados: ' . $whatsapp['queued'];
+    $notes = $observation . ' Correos encolados: ' . $emailQueued . '. WhatsApp encolados: ' . $whatsapp['queued'];
     if ($whatsapp['failed'] > 0) {
       $notes .= '. WhatsApp fallidos: ' . $whatsapp['failed'];
     }
-    $this->addEvent($portfolioId, null, 'siniestro_notificado', $item['balance'] ?? null, $item['balance'] ?? null, $notes);
+    $this->recordManagement($portfolioId, $created, $notes, 'siniestro_notificado');
 
     return [
       'stage' => (string) ($item['collection_stage'] ?? 'normal'),
@@ -833,6 +849,10 @@ final class CollectionPortfolioService
       'whatsapp_failed' => $whatsapp['failed'],
       'whatsapp_recipients' => $whatsapp['recipients'],
       'recipients' => $emailQueued + $whatsapp['recipients'],
+      'management_created' => $created,
+      'management_history' => (int) ($management['history'] ?? 0),
+      'management_properties' => (int) ($management['properties'] ?? 0),
+      'managements' => (array) ($management['managements'] ?? []),
     ];
   }
 

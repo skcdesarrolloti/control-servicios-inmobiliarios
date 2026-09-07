@@ -164,8 +164,8 @@ trait HandlesCollectionManagement
           $deliveryParts[] = $whatsappQueued . ' WhatsApp';
         }
         $message = $deliveryParts !== []
-          ? 'Aviso previo de siniestro encolado por ' . implode(' + ', $deliveryParts) . '.'
-          : 'No se encontró un correo o celular válido para encolar el aviso previo de siniestro.';
+          ? 'Aviso previo de siniestro registrado en gestión e historial, y encolado por ' . implode(' + ', $deliveryParts) . '.'
+          : 'Aviso previo de siniestro registrado en gestión e historial, pero no se encontró un correo o celular válido para encolar la notificación.';
         if ($whatsappFailed > 0) {
           $message .= ' No se pudieron encolar ' . $whatsappFailed . ' WhatsApp.';
         }
