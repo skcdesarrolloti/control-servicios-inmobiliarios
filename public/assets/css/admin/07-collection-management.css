@@ -184,8 +184,8 @@
 
 #scm-app .scm-portfolio-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
 }
 
 #scm-app .scm-portfolio-kpi {
@@ -197,6 +197,10 @@
   background: #fff;
   padding: 18px;
   box-shadow: 0 8px 24px rgba(23, 52, 84, 0.06);
+}
+
+#scm-app .scm-portfolio-kpi--money {
+  grid-column: span 2;
 }
 
 #scm-app .scm-portfolio-kpi::before {
@@ -820,6 +824,7 @@
 
 @media (max-width: 1180px) {
   #scm-app .scm-portfolio-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #scm-app .scm-portfolio-kpi--money { grid-column: span 1; }
   #scm-app .scm-portfolio-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #scm-app .scm-portfolio-workflow,
   #scm-app .scm-portfolio-report-grid,
