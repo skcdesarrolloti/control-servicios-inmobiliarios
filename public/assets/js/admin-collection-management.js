@@ -135,7 +135,7 @@
         window.Swal.fire({
           title: isMarkingSiniestro ? "Marcar contrato como siniestro" : (isRemovingSiniestro ? "Quitar siniestro" : (isRemovingPrejuridico ? "Quitar prejurídico" : "Normalizar etapa de cobro")),
           text: isMarkingSiniestro
-            ? "Se registrará una gestión, se guardará reporte en el historial del inmueble, se marcará el contrato como siniestro y se avisará al funcionario configurado."
+            ? "Se guardará un reporte en el historial del inmueble, se marcará el contrato como siniestro y se avisará al funcionario configurado."
             : "El contrato volverá a cobro normal y el cambio quedará registrado en la trazabilidad de cartera.",
           input: "textarea",
           inputLabel: "Motivo u observación (opcional)",

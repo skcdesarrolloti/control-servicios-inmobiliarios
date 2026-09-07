@@ -169,7 +169,7 @@ trait HandlesCollectionManagement
         }
         $internalQueued = (int) ($internalNotifyResult['queued'] ?? 0);
         $message = $stage === 'siniestro'
-          ? 'Contrato marcado como siniestro, gestión registrada en el historial del inmueble.' . ($internalQueued > 0 ? " {$internalQueued} aviso(s) interno(s)." : '') . ($internalNotifyError !== '' ? ' No se pudo encolar todo: ' . $internalNotifyError : '')
+          ? 'Contrato marcado como siniestro y reporte guardado en el historial del inmueble.' . ($internalQueued > 0 ? " {$internalQueued} aviso(s) interno(s)." : '') . ($internalNotifyError !== '' ? ' No se pudo encolar todo: ' . $internalNotifyError : '')
           : 'Estado de cobranza actualizado.';
         $this->jsonOk(['item' => $item, 'message' => $message, 'internal_notifications' => $internalNotifyResult, 'internal_notification_error' => $internalNotifyError]);
       }
@@ -336,7 +336,7 @@ trait HandlesCollectionManagement
       'Arrendatario: ' . ($tenant !== '' ? $tenant : 'Sin nombre registrado') . '.',
       'Contrato: ' . ($contract !== '' ? $contract : '-') . ' · Inmueble: ' . ($property !== '' ? $property : '-') . '.',
       'Saldo actual: ' . $balance . '.',
-      'El registro quedó guardado como gestión de Canon y reporte del inmueble tipo Siniestro.',
+      'El registro quedó guardado únicamente en el historial del inmueble con tipo Siniestro.',
     ];
     $note = trim($note);
     if ($note !== '') {

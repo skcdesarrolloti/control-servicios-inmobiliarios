@@ -634,29 +634,14 @@ final class CollectionPortfolioService
     $previousStage = (string) ($item['collection_stage'] ?? 'normal');
     $now = date('Y-m-d H:i:s');
     $contractId = (int) ($item['contract_id'] ?? 0);
-    $stageManagement = ['created' => 0, 'history' => 0, 'properties' => 0, 'managements' => []];
+    $stageHistoryCreated = false;
     if ($stage === 'siniestro' && $previousStage !== 'siniestro') {
-      $tenantId = (int) ($item['tenant_id'] ?? 0);
-      if ($tenantId <= 0 || $contractId <= 0) {
-        throw new \RuntimeException('Este registro no tiene arrendatario y contrato vinculados para registrar el siniestro.');
+      if ($contractId <= 0) {
+        throw new \RuntimeException('Este registro no tiene contrato vinculado para registrar el siniestro.');
       }
-      $observation = 'Contrato marcado como siniestro desde el módulo Gestiones de cobro.';
-      $note = trim($note);
-      if ($note !== '') {
-        $observation .= ' Observación: ' . $note;
-      }
-      $stageManagement = (new AdministrativeNotificationsService($this->db))->registerCollectionManagement([$tenantId], [
-        'tipo_gestion_cobro' => 'Canon',
-        'observacion' => $observation,
-        'volver_llamar' => 'No',
-        'siguiente_fecha' => '',
-        'siguiente_hora' => '',
-        'otro_horario_cobro' => '',
-        'tipo_reporte_inmueble' => 'Siniestro',
-        'contract_ids' => [$contractId],
-      ]);
-      if ((int) ($stageManagement['created'] ?? 0) <= 0) {
-        throw new \RuntimeException('No se pudo registrar el siniestro en la gestión y el historial del inmueble.');
+      $stageHistoryCreated = $this->insertSiniestroPropertyHistory($item, Auth::user(), Auth::userId(), time(), $now, trim($note));
+      if (!$stageHistoryCreated) {
+        throw new \RuntimeException('No se pudo registrar el siniestro en el historial del inmueble.');
       }
     }
     $this->db->update($this->portfolioTable(), [
@@ -677,7 +662,7 @@ final class CollectionPortfolioService
     $this->addEvent($portfolioId, null, 'stage_changed', $item['balance'] ?? null, $item['balance'] ?? null, $note !== '' ? $note : 'Estado actualizado a ' . $stage);
     $updated = $this->item($portfolioId);
     $updated['_previous_stage'] = $previousStage;
-    $updated['_stage_management'] = $stageManagement;
+    $updated['_stage_history_created'] = $stageHistoryCreated;
     return $updated;
   }
 
@@ -1239,6 +1224,52 @@ final class CollectionPortfolioService
       'celular' => trim((string) ($row['celular'] ?? '')),
       'direccion' => trim((string) ($row['direccion'] ?? '')),
     ], $rows);
+  }
+
+  /** @param array<string,mixed> $item */
+  private function insertSiniestroPropertyHistory(array $item, string $employeeName, int $employeeId, int $nowTs, string $nowMysql, string $note = ''): bool
+  {
+    $table = $this->db->table('jet_cct_historial_del_inmueble');
+    if (!$this->schema->tableExists($table)) {
+      return false;
+    }
+
+    $propertyId = trim((string) ($item['property_code'] ?? ''));
+    if ($propertyId === '') {
+      return false;
+    }
+
+    $contract = trim((string) ($item['contract_number'] ?? ''));
+    $tenant = trim((string) ($item['tenant_name'] ?? ''));
+    $detail = 'Contrato marcado como siniestro desde el modulo Gestiones de cobro.';
+    if ($contract !== '') {
+      $detail .= ' Contrato: ' . $contract . '.';
+    }
+    if ($tenant !== '') {
+      $detail .= ' Arrendatario: ' . $tenant . '.';
+    }
+    if ($note !== '') {
+      $detail .= ' Observacion: ' . $note;
+    }
+
+    $payload = [
+      'cct_status' => 'publish',
+      'cct_author_id' => $employeeId,
+      'cct_created' => $nowMysql,
+      'cct_modified' => $nowMysql,
+      'id_inmueble' => $propertyId,
+      'id_inmueble_data' => $propertyId,
+      'id_empleado' => $employeeId,
+      'fecha' => $nowTs,
+      'tipo_reporte' => 'Siniestro',
+      'tipo_de_reporte_his' => 'Siniestro',
+      'observacion' => $detail,
+      'observacion_his' => $detail,
+      'funcionario' => $employeeName,
+      'reporte_realizado_por_his' => $employeeName,
+    ];
+    $payload = $this->schema->filterTableData($table, $payload);
+    return $payload !== [] && $this->db->insert($table, $payload);
   }
 
   private function addEvent(int $portfolioId, ?int $importId, string $eventType, mixed $previousBalance, mixed $balance, string $notes, string $documentUrl = ''): void
