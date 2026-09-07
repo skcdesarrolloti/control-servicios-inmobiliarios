@@ -812,27 +812,21 @@ final class CollectionPortfolioService
     $sender = (new AdministrativeNotificationsService($this->db))->senderProfile();
     $now = date('Y-m-d H:i:s');
     $this->db->update($this->portfolioTable(), [
-      'collection_stage' => 'siniestro',
-      'stage_changed_at' => $now,
-      'stage_changed_by' => mb_substr(Auth::user(), 0, 190, 'UTF-8'),
       'last_action_type' => 'siniestro_notificado',
       'last_action_at' => $now,
       'updated_at' => $now,
     ], ['id' => $portfolioId]);
-    if ($this->schema->columnExists($this->contractsTable(), 'esta_sinestrado')) {
-      $this->db->update($this->contractsTable(), ['esta_sinestrado' => 'Si', 'cct_modified' => $now], ['_ID' => (int) $item['contract_id']]);
-    }
 
     $emailQueued = $this->enqueueSiniestroEmails($item, $sender, $portfolioId);
     $whatsapp = $this->enqueueSiniestroWhatsApp($item, $sender, $portfolioId, '');
-    $notes = 'Notificación de siniestro. Correos encolados: ' . $emailQueued . '. WhatsApp encolados: ' . $whatsapp['queued'];
+    $notes = 'Aviso previo de posible siniestro. Correos encolados: ' . $emailQueued . '. WhatsApp encolados: ' . $whatsapp['queued'];
     if ($whatsapp['failed'] > 0) {
       $notes .= '. WhatsApp fallidos: ' . $whatsapp['failed'];
     }
     $this->addEvent($portfolioId, null, 'siniestro_notificado', $item['balance'] ?? null, $item['balance'] ?? null, $notes);
 
     return [
-      'stage' => 'siniestro',
+      'stage' => (string) ($item['collection_stage'] ?? 'normal'),
       'email_queued' => $emailQueued,
       'queued' => $emailQueued,
       'whatsapp_queued' => $whatsapp['queued'],

@@ -199,19 +199,43 @@
       }).finally(function () { button.disabled = false; });
     }
 
+    function siniestroSenderSignature(button) {
+      var container = button && button.closest ? button.closest("[data-scm-portfolio]") : null;
+      return String(
+        (container && container.getAttribute("data-scm-portfolio-sender-signature")) ||
+        "Control Servicios Inmobiliarios"
+      ).trim();
+    }
+
+    function siniestroPreviewMessage(tenantName, signature) {
+      return "Estimado(a) *" + (tenantName || "Arrendatario") + "*, reciba un cordial saludo.\n\n"
+        + "Le recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.\n\n"
+        + "Una vez activado el proceso con la aseguradora, se puede generar un recargo adicional del 50% sobre el valor del canon adeudado, además de los costos y gestiones asociados al trámite.\n\n"
+        + "*Para evitar mayores consecuencias económicas y administrativas, le solicitamos realizar el pago de manera inmediata.*\n\n"
+        + "Atentamente,\n*" + (signature || "Control Servicios Inmobiliarios") + "*\n\n"
+        + "🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro *Bot Guardián* desde el botón de abajo.\n"
+        + "🌐 Recuerda que puedes ingresar a tu *menú personal en nuestra página web* para consultar información y gestionar tus servicios.";
+    }
+
+    function nl2br(value) {
+      return escapeHtml(value).replace(/\n/g, "<br>");
+    }
+
     function sendSiniestroNotification(button) {
       var portfolioId = String(button.getAttribute("data-portfolio-id") || "");
       var tenantName = String(button.getAttribute("data-tenant-name") || "Arrendatario");
       var contractNumber = String(button.getAttribute("data-contract-number") || "");
+      var signature = siniestroSenderSignature(button);
+      var preview = siniestroPreviewMessage(tenantName, signature);
       var submit = function () {
         var fd = new FormData();
         fd.set("portfolio_id", portfolioId);
         fd.set("operation", "send_siniestro");
         button.disabled = true;
-        notify("info", "Marcando siniestro y encolando notificación...", "Cartera");
+        notify("info", "Encolando aviso previo de siniestro...", "Cartera");
         return postJson(actionPortfolio, fd).then(function (data) {
           var delivered = Number(data.email_queued || data.queued || 0) + Number(data.whatsapp_queued || 0);
-          notify(delivered > 0 ? "success" : "warning", data.message || "Siniestro notificado.", "Cartera");
+          notify(delivered > 0 ? "success" : "warning", data.message || "Aviso previo de siniestro encolado.", "Cartera");
           return refreshPanel();
         }).catch(function (error) {
           notify("error", error.message, "Cartera");
@@ -220,13 +244,17 @@
 
       if (window.Swal && typeof window.Swal.fire === "function") {
         window.Swal.fire({
-          title: "Notificar siniestro",
+          title: "Aviso previo de siniestro",
           html: '<div class="scm-portfolio-swal-form">'
             + '<p><strong>' + escapeHtml(tenantName) + '</strong>' + (contractNumber ? ' · Contrato ' + escapeHtml(contractNumber) : '') + '</p>'
-            + '<p>Se marcará el contrato como siniestro y se encolará la notificación por WhatsApp y email. No se genera carta PDF.</p>'
+            + '<p>Se encolará esta notificación por WhatsApp y email. No cambia la etapa ni marca el contrato como siniestro.</p>'
+            + '<div class="scm-portfolio-swal-preview" role="region" aria-label="Vista previa del aviso de siniestro">'
+            + '<span>Vista previa del mensaje</span>'
+            + '<div>' + nl2br(preview) + '</div>'
+            + '</div>'
             + '</div>',
           showCancelButton: true,
-          confirmButtonText: "Notificar siniestro",
+          confirmButtonText: "Encolar aviso",
           cancelButtonText: "Cancelar",
           confirmButtonColor: "#1e3a5f"
         }).then(function (result) {
@@ -235,7 +263,7 @@
         return;
       }
 
-      if (window.confirm("¿Deseas marcar y notificar este siniestro?")) submit();
+      if (window.confirm("¿Deseas encolar el aviso previo de siniestro?")) submit();
     }
 
     function escapeHtml(value) {

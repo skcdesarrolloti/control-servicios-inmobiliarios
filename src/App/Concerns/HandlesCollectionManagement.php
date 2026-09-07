@@ -164,8 +164,8 @@ trait HandlesCollectionManagement
           $deliveryParts[] = $whatsappQueued . ' WhatsApp';
         }
         $message = $deliveryParts !== []
-          ? 'Siniestro marcado y ' . implode(' + ', $deliveryParts) . ' encolado(s).'
-          : 'Siniestro marcado, pero no se encontró un correo o celular válido para encolarlo.';
+          ? 'Aviso previo de siniestro encolado por ' . implode(' + ', $deliveryParts) . '.'
+          : 'No se encontró un correo o celular válido para encolar el aviso previo de siniestro.';
         if ($whatsappFailed > 0) {
           $message .= ' No se pudieron encolar ' . $whatsappFailed . ' WhatsApp.';
         }

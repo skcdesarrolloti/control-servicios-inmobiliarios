@@ -2270,6 +2270,7 @@ trait RendersDashboard
     ];
     $page = max(1, (int) ($input['scmgc_page'] ?? 1));
     $service = new AdministrativeNotificationsService($this->db);
+    $senderProfile = $service->senderProfile();
     $report = $service->collectionManagementReport($managementFilters, $page, 20);
     $rows = is_array($report['rows'] ?? null) ? $report['rows'] : [];
     $stats = is_array($report['stats'] ?? null) ? $report['stats'] : ['total' => 0, 'by_type' => []];
@@ -2331,12 +2332,12 @@ trait RendersDashboard
 
     ob_start();
 ?>
-    <div class="scm-collection-log scm-portfolio" data-scm-collection-log data-scm-collection-log-loaded="1" data-scm-portfolio>
+    <div class="scm-collection-log scm-portfolio" data-scm-collection-log data-scm-collection-log-loaded="1" data-scm-portfolio data-scm-portfolio-sender-signature="<?php echo esc_attr((string) ($senderProfile['signature_line'] ?? $senderProfile['signature'] ?? 'Control Servicios Inmobiliarios')); ?>">
       <div class="scm-status-topic-head scm-collection-log-head">
         <div>
           <span class="scm-calendar-action-kicker">Cartera y cobranza</span>
           <h3>Control de cartera y gestiones de cobro</h3>
-          <p>Actualiza saldos con el auxiliar 1380, identifica pagos, registra gestiones y prepara cartas prejur&iacute;dicas o de siniestro desde un solo lugar.</p>
+          <p>Actualiza saldos con el auxiliar 1380, identifica pagos, registra gestiones, prepara cartas prejur&iacute;dicas y env&iacute;a avisos previos de siniestro desde un solo lugar.</p>
         </div>
         <span class="scm-status-count"><strong><?php echo esc_html((string) $currentTotal); ?></strong> cuentas visibles</span>
       </div>
@@ -2411,7 +2412,7 @@ trait RendersDashboard
         <div class="scm-portfolio-workflow" aria-label="Guía de acciones de cartera">
           <article><span>1</span><div><strong>Hacer gesti&oacute;n</strong><p>Registra llamada, acuerdo o compromiso; puede programar seguimiento y enviar mensajes. No cambia la etapa de cobro.</p></div></article>
           <article><span>2</span><div><strong>Preparar carta prejur&iacute;dica</strong><p>Abre una vista previa. Descargar o enviar registra la etapa prejur&iacute;dica.</p></div></article>
-          <article><span>3</span><div><strong>Notificar siniestro</strong><p>Marca el contrato como siniestro y encola notificaci&oacute;n por WhatsApp y email. No genera carta PDF.</p></div></article>
+          <article><span>3</span><div><strong>Notificar siniestro</strong><p>Muestra la vista previa y encola el aviso previo por WhatsApp y email. No cambia la etapa del contrato.</p></div></article>
         </div>
 
       <section class="scm-admin-notif-card scm-portfolio-import-card">
@@ -2524,7 +2525,7 @@ trait RendersDashboard
                           <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar contacto, acuerdo, compromiso o seguimiento sin cambiar la etapa">Hacer gesti&oacute;n</button>
                           <?php if ($canCollect): ?>
                             <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="prejuridico" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="Revisar la carta antes de descargarla o enviarla">Preparar prejur&iacute;dico</button>
-                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-siniestro data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Marca siniestro y encola notificación por WhatsApp y email, sin carta PDF">Notificar siniestro</button>
+                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-siniestro data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Muestra vista previa y encola aviso previo por WhatsApp y email, sin marcar siniestro">Notificar siniestro</button>
                             <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="<?php echo $rowStage === 'siniestro' ? 'normal' : 'siniestro'; ?>" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="<?php echo $rowStage === 'siniestro' ? 'Devuelve el contrato a cobro normal' : 'Cambia la etapa sin generar ni enviar una carta'; ?>"><?php echo $rowStage === 'siniestro' ? 'Quitar siniestro' : 'Marcar siniestro'; ?></button>
                           <?php elseif ($rowStage !== 'normal'): ?>
                             <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="normal" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>">Normalizar etapa</button>
@@ -2623,7 +2624,7 @@ trait RendersDashboard
                           <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar contacto, acuerdo, compromiso o seguimiento sin cambiar la etapa">Hacer gesti&oacute;n</button>
                           <?php if ($canCollect): ?>
                             <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="prejuridico" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Revisar la carta antes de descargarla o enviarla">Preparar prejur&iacute;dico</button>
-                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-siniestro data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Marca siniestro y encola notificación por WhatsApp y email, sin carta PDF">Notificar siniestro</button>
+                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-siniestro data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Muestra vista previa y encola aviso previo por WhatsApp y email, sin marcar siniestro">Notificar siniestro</button>
                             <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="<?php echo $rowStage === 'siniestro' ? 'normal' : 'siniestro'; ?>" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="<?php echo $rowStage === 'siniestro' ? 'Devuelve el contrato a cobro normal' : 'Cambia la etapa sin generar ni enviar una carta'; ?>"><?php echo $rowStage === 'siniestro' ? 'Quitar siniestro' : 'Marcar siniestro'; ?></button>
                           <?php elseif ($rowStage !== 'normal'): ?>
                             <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="normal" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>">Normalizar etapa</button>
@@ -2887,6 +2888,7 @@ trait RendersDashboard
       'estado_normal' => 'Etapa normalizada',
       'estado_prejuridico' => 'Marcado prejurídico',
       'estado_siniestro' => 'Marcado siniestro',
+      'siniestro_notificado' => 'Aviso siniestro enviado',
       'carta_prejuridico_generada' => 'Carta prejurídica generada',
       'carta_prejuridico_enviada' => 'Carta prejurídica enviada',
       'carta_siniestro_generada' => 'Carta de siniestro generada',

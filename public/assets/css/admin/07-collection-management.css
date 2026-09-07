@@ -684,6 +684,35 @@
   line-height: 1.45;
 }
 
+.swal2-popup .scm-portfolio-swal-preview {
+  display: grid;
+  gap: 8px;
+  max-height: min(420px, 46vh);
+  overflow: auto;
+  border: 1px solid #dce6ef;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fbfe 0%, #ffffff 100%);
+  padding: 12px;
+}
+
+.swal2-popup .scm-portfolio-swal-preview > span {
+  color: #b54708;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-portfolio-swal-preview > div {
+  border: 1px solid #e4ebf2;
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px;
+  color: #20364d;
+  font-size: 13px;
+  line-height: 1.58;
+}
+
 .swal2-popup .scm-portfolio-swal-form label {
   margin: 2px 0 0;
   color: #465f78;
