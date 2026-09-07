@@ -1991,7 +1991,7 @@ trait RendersDashboard
           </div>
           <p class="scm-admin-notif-import-result" data-admin-notif-import-result aria-live="polite"></p>
         </form>
-        <form class="scm-admin-notif-receipts-import is-hidden" data-admin-notif-payment-receipts-import enctype="multipart/form-data" hidden>
+        <form class="scm-admin-notif-receipts-import is-hidden" data-admin-notif-payment-receipts-import enctype="multipart/form-data" hidden style="display:none;">
           <div class="scm-admin-notif-import-copy">
             <span class="scm-calendar-action-kicker">Comprobantes copropiedades</span>
             <h4>Importar soportes PDF por NIT</h4>

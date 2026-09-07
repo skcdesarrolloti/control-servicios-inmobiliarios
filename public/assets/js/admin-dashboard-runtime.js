@@ -2834,6 +2834,7 @@
         var canImportReceipts = type === "copropiedades_activas" || type === "copropiedades_no_activas";
         paymentReceiptsImportForm.hidden = !canImportReceipts;
         paymentReceiptsImportForm.classList.toggle("is-hidden", !canImportReceipts);
+        paymentReceiptsImportForm.style.display = canImportReceipts ? "" : "none";
         if (!canImportReceipts && paymentReceiptsFileInput) {
           paymentReceiptsFileInput.value = "";
         }
