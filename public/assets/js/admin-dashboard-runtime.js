@@ -472,6 +472,10 @@
         "scmgc_etapa",
         "scmgc_movimiento",
         "scmgc_cartera_page",
+        "scmgc_contratos_buscar",
+        "scmgc_contratos_estado",
+        "scmgc_contratos_etapa",
+        "scmgc_contratos_page",
         "scmgc_view",
       ].forEach(function (key) {
         if (key === "scmgc_view") {
@@ -498,6 +502,10 @@
         "scmgc_etapa",
         "scmgc_movimiento",
         "scmgc_cartera_page",
+        "scmgc_contratos_buscar",
+        "scmgc_contratos_estado",
+        "scmgc_contratos_etapa",
+        "scmgc_contratos_page",
         "scmgc_view",
       ].forEach(function (key) {
         if (parsed.searchParams.has(key)) {
@@ -3138,8 +3146,11 @@
         return [
           "scm_factura_disponible_v1",
           "scm_factura_disponible_v2",
+          "scm_mes_generado_pago_v1",
           "scm_cupon_disponible_v1",
           "scm_cupon_disponible_v2",
+          "scm_arrendatario_fecha_pago_v1",
+          "scm_arrendatario_aviso_pago_canon_v1",
           "scm_aviso_siniestro_v1",
           "scm_aviso_siniestro_v2",
         ].indexOf(String(option.value || "")) !== -1;

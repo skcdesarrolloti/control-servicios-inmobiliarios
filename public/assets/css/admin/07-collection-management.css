@@ -15,7 +15,7 @@
   top: 0;
   z-index: 8;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   border: 1px solid #dce6ef;
   border-radius: 16px;
@@ -311,6 +311,10 @@
   grid-template-columns: minmax(250px, 1.45fr) repeat(3, minmax(155px, 0.65fr)) auto;
   align-items: end;
   gap: 12px;
+}
+
+#scm-app .scm-portfolio-filter-grid--contracts {
+  grid-template-columns: minmax(280px, 1.6fr) repeat(2, minmax(155px, 0.7fr)) auto;
 }
 
 #scm-app .scm-portfolio-filter-form .scm-collection-log-actions {

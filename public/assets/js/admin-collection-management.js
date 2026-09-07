@@ -71,6 +71,7 @@
       var panel = root.querySelector("#scm-panel-gestiones-cobro [data-scm-collection-log]");
       [
         "scmgc_buscar", "scmgc_estado", "scmgc_etapa", "scmgc_movimiento", "scmgc_cartera_page",
+        "scmgc_contratos_buscar", "scmgc_contratos_estado", "scmgc_contratos_etapa", "scmgc_contratos_page",
         "scmgc_fecha_desde", "scmgc_fecha_hasta", "scmgc_tipo", "scmgc_page"
       ].forEach(function (name) {
         var field = panel ? panel.querySelector("[name='" + name + "']") : null;
@@ -128,7 +129,7 @@
         window.Swal.fire({
           title: stage === "siniestro" ? "Marcar contrato como siniestro" : "Normalizar etapa de cobro",
           text: stage === "siniestro"
-            ? "Esta acción cambia la etapa y deja trazabilidad, pero no genera ni envía la carta de siniestro. Para la carta usa Preparar siniestro."
+            ? "Esta acción solo cambia la etapa y deja trazabilidad. No envía notificaciones."
             : "El contrato volverá a cobro normal y el cambio quedará registrado en el historial.",
           input: "textarea",
           inputLabel: "Motivo u observación (opcional)",
@@ -164,7 +165,7 @@
           if (!response.ok) throw new Error("No se pudo generar la carta.");
           var disposition = String(response.headers.get("content-disposition") || "");
           var match = disposition.match(/filename="?([^";]+)"?/i);
-          var filename = match ? match[1] : (type === "siniestro" ? "carta-siniestro.pdf" : "carta-prejuridica.pdf");
+          var filename = match ? match[1] : "carta-prejuridica.pdf";
           return response.blob().then(function (blob) {
             var url = URL.createObjectURL(blob);
             var link = document.createElement("a");
@@ -174,7 +175,7 @@
             link.click();
             link.remove();
             window.setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
-            notify("success", "Carta generada y descargada.", "Cartera");
+            notify("success", "Carta prejurídica generada y descargada.", "Cartera");
             return refreshPanel();
           });
         })
@@ -189,13 +190,52 @@
       fd.set("portfolio_id", portfolioId);
       fd.set("operation", "send_" + type);
       button.disabled = true;
-      notify("info", "Generando y encolando la carta...", "Cartera");
+      notify("info", "Generando y encolando la carta prejurídica...", "Cartera");
       return postJson(actionPortfolio, fd).then(function (data) {
-        notify(Number(data.queued || 0) > 0 ? "success" : "warning", data.message || "Carta procesada.", "Cartera");
+        notify(Number(data.queued || 0) > 0 ? "success" : "warning", data.message || "Carta prejurídica procesada.", "Cartera");
         return refreshPanel();
       }).catch(function (error) {
         notify("error", error.message, "Cartera");
       }).finally(function () { button.disabled = false; });
+    }
+
+    function sendSiniestroNotification(button) {
+      var portfolioId = String(button.getAttribute("data-portfolio-id") || "");
+      var tenantName = String(button.getAttribute("data-tenant-name") || "Arrendatario");
+      var contractNumber = String(button.getAttribute("data-contract-number") || "");
+      var submit = function () {
+        var fd = new FormData();
+        fd.set("portfolio_id", portfolioId);
+        fd.set("operation", "send_siniestro");
+        button.disabled = true;
+        notify("info", "Marcando siniestro y encolando notificación...", "Cartera");
+        return postJson(actionPortfolio, fd).then(function (data) {
+          var delivered = Number(data.email_queued || data.queued || 0) + Number(data.whatsapp_queued || 0);
+          notify(delivered > 0 ? "success" : "warning", data.message || "Siniestro notificado.", "Cartera");
+          return refreshPanel();
+        }).catch(function (error) {
+          notify("error", error.message, "Cartera");
+        }).finally(function () { button.disabled = false; });
+      };
+
+      if (window.Swal && typeof window.Swal.fire === "function") {
+        window.Swal.fire({
+          title: "Notificar siniestro",
+          html: '<div class="scm-portfolio-swal-form">'
+            + '<p><strong>' + escapeHtml(tenantName) + '</strong>' + (contractNumber ? ' · Contrato ' + escapeHtml(contractNumber) : '') + '</p>'
+            + '<p>Se marcará el contrato como siniestro y se encolará la notificación por WhatsApp y email. No se genera carta PDF.</p>'
+            + '</div>',
+          showCancelButton: true,
+          confirmButtonText: "Notificar siniestro",
+          cancelButtonText: "Cancelar",
+          confirmButtonColor: "#1e3a5f"
+        }).then(function (result) {
+          if (result.isConfirmed) submit();
+        });
+        return;
+      }
+
+      if (window.confirm("¿Deseas marcar y notificar este siniestro?")) submit();
     }
 
     function escapeHtml(value) {
@@ -421,7 +461,7 @@
           modal.setAttribute("data-portfolio-id", portfolioId);
           modal.setAttribute("data-letter-type", type);
           if (frame) frame.src = activePreviewUrl;
-          if (title) title.textContent = type === "siniestro" ? "Vista previa de carta de siniestro" : "Vista previa de carta prejurídica";
+          if (title) title.textContent = "Vista previa de carta prejurídica";
           if (context) context.textContent = "Revisa nombres, contrato, inmueble, saldo y destinatarios antes de continuar.";
           modal.hidden = false;
           syncModalBodyState();
@@ -517,7 +557,7 @@
 
     function activatePortfolioTab(container, view, focusTab) {
       if (!container) return;
-      var allowed = ["principal", "informe", "historial"];
+      var allowed = ["principal", "contratos", "informe", "historial"];
       if (allowed.indexOf(view) === -1) view = "principal";
       container.querySelectorAll("[data-scm-portfolio-tab]").forEach(function (tab) {
         var selected = String(tab.getAttribute("data-scm-portfolio-tab") || "") === view;
@@ -624,6 +664,12 @@
       if (stageButton && root.contains(stageButton)) {
         event.preventDefault();
         confirmStage(stageButton);
+        return;
+      }
+      var siniestroButton = event.target.closest && event.target.closest("[data-scm-portfolio-siniestro]");
+      if (siniestroButton && root.contains(siniestroButton)) {
+        event.preventDefault();
+        sendSiniestroNotification(siniestroButton);
         return;
       }
       var letterButton = event.target.closest && event.target.closest("[data-scm-portfolio-letter]");

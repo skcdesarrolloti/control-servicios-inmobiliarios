@@ -9,7 +9,9 @@ use SCM\Core\Database;
 use SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService;
 use SCM\Modules\CanonInsuranceAudit\SpreadsheetReader;
 use SCM\Support\EmailQueue;
+use SCM\Support\EmailTemplate;
 use SCM\Support\SchemaInspector;
+use SCM\Support\SmsQueue;
 
 final class CollectionPortfolioService
 {
@@ -371,6 +373,124 @@ final class CollectionPortfolioService
     ];
   }
 
+  /** @param array<string,mixed> $filters @return array<string,mixed> */
+  public function contractsDashboard(array $filters = []): array
+  {
+    $this->ensureSchema();
+    $contracts = $this->activeContracts();
+    $contractIds = array_values(array_filter(array_map(static fn(array $row): int => (int) ($row['_ID'] ?? 0), $contracts), static fn(int $id): bool => $id > 0));
+    $portfolioByContract = [];
+    foreach (array_chunk($contractIds, 500) as $chunk) {
+      $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+      $rows = $this->db->getResults(
+        "SELECT * FROM `{$this->portfolioTable()}` WHERE `is_current` = 1 AND `contract_id` IN ({$placeholders}) ORDER BY `id` DESC",
+        $chunk
+      );
+      foreach ($rows as $row) {
+        $contractId = (int) ($row['contract_id'] ?? 0);
+        if ($contractId > 0 && !isset($portfolioByContract[$contractId])) {
+          $portfolioByContract[$contractId] = $row;
+        }
+      }
+    }
+
+    $status = trim((string) ($filters['status'] ?? ''));
+    $stage = trim((string) ($filters['stage'] ?? ''));
+    $search = trim((string) ($filters['search'] ?? ''));
+    if (!in_array($status, ['', 'deuda', 'al_dia', 'saldo_favor', 'sin_dato'], true)) {
+      $status = '';
+    }
+    if (!in_array($stage, ['', 'normal', 'prejuridico', 'siniestro'], true)) {
+      $stage = '';
+    }
+
+    $rows = [];
+    foreach ($contracts as $contract) {
+      $contractId = (int) ($contract['_ID'] ?? 0);
+      if ($contractId <= 0) {
+        continue;
+      }
+      $portfolio = is_array($portfolioByContract[$contractId] ?? null) ? $portfolioByContract[$contractId] : [];
+      $contractNumber = trim((string) ($contract['contrato'] ?? $contract['contrato_arrendamiento'] ?? $contractId));
+      $propertyCandidates = $this->contractPropertyCandidates($contract);
+      $rowStatus = $portfolio !== [] ? (string) ($portfolio['status'] ?? 'sin_dato') : 'sin_dato';
+      $rowStage = $portfolio !== []
+        ? (string) ($portfolio['collection_stage'] ?? 'normal')
+        : (strtolower(trim((string) ($contract['esta_sinestrado'] ?? ''))) === 'si' ? 'siniestro' : 'normal');
+
+      $row = [
+        'id' => (int) ($portfolio['id'] ?? 0),
+        'contract_id' => $contractId,
+        'contract_number' => $contractNumber !== '' ? $contractNumber : (string) $contractId,
+        'property_code' => trim((string) ($portfolio['property_code'] ?? ($propertyCandidates[0] ?? ''))),
+        'property_address' => trim((string) ($portfolio['property_address'] ?? ($contract['direccion'] ?? ''))),
+        'tenant_id' => (int) preg_replace('/\D+/', '', (string) ($contract['id_arrendatario'] ?? '0')),
+        'tenant_document' => trim((string) ($portfolio['tenant_document'] ?? $this->digits($contract['documento_arrendatario'] ?? ''))),
+        'tenant_name' => trim((string) ($portfolio['tenant_name'] ?? ($contract['arrendatario'] ?? ''))),
+        'tenant_email' => trim((string) ($portfolio['tenant_email'] ?? ($contract['correo_arrendatario'] ?? ''))),
+        'tenant_phone' => trim((string) ($portfolio['tenant_phone'] ?? ($contract['celular_arrendatario'] ?? ''))),
+        'landlord_name' => trim((string) ($portfolio['landlord_name'] ?? ($contract['propietario'] ?? ''))),
+        'balance' => array_key_exists('balance', $portfolio) ? $portfolio['balance'] : null,
+        'previous_balance' => array_key_exists('previous_balance', $portfolio) ? $portfolio['previous_balance'] : null,
+        'status' => $rowStatus,
+        'match_status' => (string) ($portfolio['match_status'] ?? 'sin_archivo'),
+        'collection_stage' => $rowStage,
+        'last_action_type' => (string) ($portfolio['last_action_type'] ?? ''),
+        'last_action_at' => $portfolio['last_action_at'] ?? null,
+      ];
+
+      if ($status !== '' && $rowStatus !== $status) {
+        continue;
+      }
+      if ($stage !== '' && $rowStage !== $stage) {
+        continue;
+      }
+      if ($search !== '') {
+        $haystack = mb_strtolower(implode(' ', [
+          $row['tenant_name'],
+          $row['tenant_document'],
+          $row['contract_number'],
+          $row['property_code'],
+          $row['property_address'],
+          $row['tenant_email'],
+          $row['tenant_phone'],
+          $row['landlord_name'],
+        ]), 'UTF-8');
+        if (!str_contains($haystack, mb_strtolower($search, 'UTF-8'))) {
+          continue;
+        }
+      }
+      $rows[] = $row;
+    }
+
+    usort($rows, static function (array $a, array $b): int {
+      $stageRank = ['siniestro' => 0, 'prejuridico' => 1, 'normal' => 2];
+      $statusRank = ['deuda' => 0, 'sin_dato' => 1, 'saldo_favor' => 2, 'al_dia' => 3];
+      $stageCompare = ($stageRank[(string) ($a['collection_stage'] ?? '')] ?? 9) <=> ($stageRank[(string) ($b['collection_stage'] ?? '')] ?? 9);
+      if ($stageCompare !== 0) {
+        return $stageCompare;
+      }
+      $statusCompare = ($statusRank[(string) ($a['status'] ?? '')] ?? 9) <=> ($statusRank[(string) ($b['status'] ?? '')] ?? 9);
+      if ($statusCompare !== 0) {
+        return $statusCompare;
+      }
+      return strnatcasecmp((string) ($a['tenant_name'] ?? ''), (string) ($b['tenant_name'] ?? ''));
+    });
+
+    $page = max(1, (int) ($filters['page'] ?? 1));
+    $perPage = max(20, min(100, (int) ($filters['per_page'] ?? 60)));
+    $total = count($rows);
+    $totalPages = max(1, (int) ceil($total / $perPage));
+    $page = min($page, $totalPages);
+    $offset = ($page - 1) * $perPage;
+
+    return [
+      'rows' => array_slice($rows, $offset, $perPage),
+      'filters' => ['status' => $status, 'stage' => $stage, 'search' => $search],
+      'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
+    ];
+  }
+
   /** @return array<string,mixed> */
   public function item(int $portfolioId): array
   {
@@ -527,7 +647,7 @@ final class CollectionPortfolioService
     $generator = new CollectionLetterPdfGenerator();
     $document = $generator->generate($item, $letterType, $sender);
     $now = date('Y-m-d H:i:s');
-    $stage = $letterType === 'siniestro' ? 'siniestro' : 'prejuridico';
+    $stage = 'prejuridico';
     $this->db->update($this->portfolioTable(), [
       'collection_stage' => $stage,
       'stage_changed_at' => $now,
@@ -536,25 +656,13 @@ final class CollectionPortfolioService
       'last_action_at' => $now,
       'updated_at' => $now,
     ], ['id' => $portfolioId]);
-    if ($stage === 'siniestro' && $this->schema->columnExists($this->contractsTable(), 'esta_sinestrado')) {
-      $this->db->update($this->contractsTable(), ['esta_sinestrado' => 'Si', 'cct_modified' => $now], ['_ID' => (int) $item['contract_id']]);
-    }
-
     $queued = 0;
     $recipients = [];
     if ($sendEmail) {
       $recipients[] = trim((string) ($item['tenant_email'] ?? ''));
-      if ($letterType === 'siniestro') {
-        $recipients[] = trim((string) ($item['landlord_email'] ?? ''));
-        foreach ((array) ($item['codeudores'] ?? []) as $codeudor) {
-          $recipients[] = trim((string) ($codeudor['correo'] ?? ''));
-        }
-      }
       $recipients = array_values(array_unique(array_filter($recipients, static fn(string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false)));
       if ($recipients !== []) {
-        $subject = $letterType === 'siniestro'
-          ? 'Aviso de siniestro por mora en contrato de arrendamiento'
-          : 'Gestión prejurídica de cobro - contrato de arrendamiento';
+        $subject = 'Gestión prejurídica de cobro - contrato de arrendamiento';
         $html = '<p>Cordial saludo.</p><p>Adjuntamos mediante enlace seguro la carta relacionada con el contrato <strong>'
           . htmlspecialchars((string) ($item['contract_number'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
           . '</strong> y el inmueble <strong>' . htmlspecialchars((string) ($item['property_code'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
@@ -569,23 +677,209 @@ final class CollectionPortfolioService
         ]);
       }
     }
+    $eventNotes = 'Carta generada';
+    if ($sendEmail) {
+      $eventNotes = 'Correos encolados: ' . $queued;
+    }
     $this->addEvent(
       $portfolioId,
       null,
       $sendEmail ? 'letter_sent_' . $letterType : 'letter_generated_' . $letterType,
       $item['balance'] ?? null,
       $item['balance'] ?? null,
-      $sendEmail ? ('Correos encolados: ' . $queued) : 'Carta generada',
+      $eventNotes,
       (string) $document['url']
     );
-    return $document + ['queued' => $queued, 'recipients' => count($recipients), 'stage' => $stage];
+    return $document + [
+      'queued' => $queued,
+      'email_queued' => $queued,
+      'recipients' => count($recipients),
+      'stage' => $stage,
+    ];
+  }
+
+  /** @return array<string,mixed> */
+  public function sendSiniestroNotification(int $portfolioId): array
+  {
+    $item = $this->item($portfolioId);
+    if ((int) ($item['contract_id'] ?? 0) <= 0) {
+      throw new \RuntimeException('Primero debes vincular esta cuenta con un contrato de arrendamiento.');
+    }
+    if ((string) ($item['status'] ?? '') !== 'deuda') {
+      throw new \RuntimeException('Solo se puede notificar siniestro cuando el contrato registra saldo pendiente.');
+    }
+
+    $sender = (new AdministrativeNotificationsService($this->db))->senderProfile();
+    $now = date('Y-m-d H:i:s');
+    $this->db->update($this->portfolioTable(), [
+      'collection_stage' => 'siniestro',
+      'stage_changed_at' => $now,
+      'stage_changed_by' => mb_substr(Auth::user(), 0, 190, 'UTF-8'),
+      'last_action_type' => 'siniestro_notificado',
+      'last_action_at' => $now,
+      'updated_at' => $now,
+    ], ['id' => $portfolioId]);
+    if ($this->schema->columnExists($this->contractsTable(), 'esta_sinestrado')) {
+      $this->db->update($this->contractsTable(), ['esta_sinestrado' => 'Si', 'cct_modified' => $now], ['_ID' => (int) $item['contract_id']]);
+    }
+
+    $emailQueued = $this->enqueueSiniestroEmails($item, $sender, $portfolioId);
+    $whatsapp = $this->enqueueSiniestroWhatsApp($item, $sender, $portfolioId, '');
+    $notes = 'Notificación de siniestro. Correos encolados: ' . $emailQueued . '. WhatsApp encolados: ' . $whatsapp['queued'];
+    if ($whatsapp['failed'] > 0) {
+      $notes .= '. WhatsApp fallidos: ' . $whatsapp['failed'];
+    }
+    $this->addEvent($portfolioId, null, 'siniestro_notificado', $item['balance'] ?? null, $item['balance'] ?? null, $notes);
+
+    return [
+      'stage' => 'siniestro',
+      'email_queued' => $emailQueued,
+      'queued' => $emailQueued,
+      'whatsapp_queued' => $whatsapp['queued'],
+      'whatsapp_failed' => $whatsapp['failed'],
+      'whatsapp_recipients' => $whatsapp['recipients'],
+      'recipients' => $emailQueued + $whatsapp['recipients'],
+    ];
+  }
+
+  /**
+   * @param array<string,mixed> $item
+   * @param array<string,mixed> $sender
+   */
+  private function enqueueSiniestroEmails(array $item, array $sender, int $portfolioId): int
+  {
+    $recipients = [
+      trim((string) ($item['tenant_email'] ?? '')),
+    ];
+    foreach ((array) ($item['codeudores'] ?? []) as $codeudor) {
+      if (is_array($codeudor)) {
+        $recipients[] = trim((string) ($codeudor['correo'] ?? ''));
+      }
+    }
+    $recipients = array_values(array_unique(array_filter($recipients, static fn(string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false)));
+    if ($recipients === []) {
+      return 0;
+    }
+
+    $signature = trim((string) ($sender['signature_line'] ?? '')) ?: Auth::user();
+    $tenantName = trim((string) ($item['tenant_name'] ?? 'arrendatario')) ?: 'arrendatario';
+    $html = '<p><strong>Estimado(a) ' . htmlspecialchars($tenantName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong>, reciba un cordial saludo.</p>'
+      . '<p>Le recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.</p>'
+      . '<p>Una vez activado el proceso con la aseguradora, se puede generar un recargo adicional del <strong>50%</strong> sobre el valor del canon adeudado, además de los costos y gestiones asociados al trámite.</p>'
+      . '<p><strong>Para evitar mayores consecuencias económicas y administrativas, le solicitamos realizar el pago de manera inmediata.</strong></p>'
+      . '<p style="margin-top:24px;">Atentamente,<br><strong>' . htmlspecialchars($signature, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong></p>'
+      . '<div style="margin-top:24px;padding:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">'
+      . '<p style="margin:0 0 10px;">🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro <strong>Bot Guardián</strong> desde el botón de abajo.</p>'
+      . '<p style="margin:0 0 14px;">🌐 Recuerda que puedes ingresar a tu <strong>menú personal en nuestra página web</strong> para consultar información y gestionar tus servicios.</p>'
+      . '</div>';
+    $html = EmailTemplate::render('Aviso de siniestro por mora en contrato de arrendamiento', $html, [
+      'buttons' => [
+        ['url' => 'https://sucasainmobiliaria.com.co/guardian/', 'label' => 'Hablar con Guardián'],
+        ['url' => 'https://sucasainmobiliaria.com.co/arrendatario', 'label' => 'Ir a mi menú'],
+      ],
+    ]);
+
+    return (new EmailQueue($this->db))->enqueue($recipients, 'Aviso de siniestro por mora en contrato de arrendamiento', $html, [
+      'source_module' => 'collection-management',
+      'destination_name' => $tenantName,
+      'dedupe_key' => 'collection-siniestro-notification:' . $portfolioId . ':' . date('YmdHi'),
+      'meta' => ['portfolio_id' => $portfolioId, 'letter_type' => 'siniestro', 'template_name' => 'scm_email_aviso_siniestro_v1'],
+    ]);
+  }
+
+  /**
+   * @param array<string,mixed> $item
+   * @param array<string,mixed> $sender
+   * @return array{queued:int,failed:int,recipients:int}
+   */
+  private function enqueueSiniestroWhatsApp(array $item, array $sender, int $portfolioId, string $documentUrl): array
+  {
+    $signature = trim((string) ($sender['signature_line'] ?? ''));
+    if ($signature === '') {
+      $signature = Auth::user();
+    }
+
+    $recipients = [];
+    $seen = [];
+    $addRecipient = static function (string $phone, string $name, string $role) use (&$recipients, &$seen): void {
+      $phone = trim($phone);
+      if ($phone === '') {
+        return;
+      }
+      $key = preg_replace('/\D+/', '', $phone);
+      $key = is_string($key) && $key !== '' ? $key : $phone;
+      if (isset($seen[$key])) {
+        return;
+      }
+      $seen[$key] = true;
+      $recipients[] = [
+        'phone' => $phone,
+        'name' => mb_substr(trim($name) !== '' ? trim($name) : 'Arrendatario', 0, 190, 'UTF-8'),
+        'role' => $role,
+      ];
+    };
+
+    $addRecipient(
+      (string) ($item['tenant_phone'] ?? ''),
+      (string) ($item['tenant_name'] ?? 'Arrendatario'),
+      'arrendatario'
+    );
+    foreach ((array) ($item['codeudores'] ?? []) as $codeudor) {
+      if (!is_array($codeudor)) {
+        continue;
+      }
+      $addRecipient(
+        (string) ($codeudor['celular'] ?? ''),
+        (string) ($codeudor['nombre'] ?? 'Codeudor'),
+        'codeudor'
+      );
+    }
+
+    $queue = new SmsQueue($this->db);
+    $queued = 0;
+    $failed = 0;
+    foreach ($recipients as $recipient) {
+      $ok = $queue->enqueue(
+        (string) $recipient['phone'],
+        (string) $recipient['name'],
+        'Aviso de siniestro por mora en contrato de arrendamiento.',
+        [
+          'source_module' => 'collection-management',
+          'campaign_tag' => 'collection_siniestro_whatsapp',
+          'categoria_mensaje' => 'informacion',
+          'portfolio_id' => $portfolioId,
+          'letter_type' => 'siniestro',
+          'document_url' => $documentUrl,
+          'recipient_role' => (string) $recipient['role'],
+          'dedupe_key' => 'collection-letter-whatsapp:' . $portfolioId . ':siniestro:' . date('YmdHi'),
+          'template_name' => 'scm_aviso_siniestro_v2',
+          'template_language' => 'es_CO',
+          'template_components' => [[
+            'type' => 'body',
+            'parameters' => [
+              ['type' => 'text', 'text' => (string) $recipient['name']],
+              ['type' => 'text', 'text' => $signature],
+            ],
+          ]],
+          'priority' => 100,
+          'max_attempts' => 3,
+        ]
+      );
+      if ($ok) {
+        $queued++;
+      } else {
+        $failed++;
+      }
+    }
+
+    return ['queued' => $queued, 'failed' => $failed, 'recipients' => count($recipients)];
   }
 
   /** @return array<string,mixed> */
   private function letterItem(int $portfolioId, string $letterType): array
   {
-    if (!in_array($letterType, ['prejuridico', 'siniestro'], true)) {
-      throw new \RuntimeException('Tipo de carta no válido.');
+    if ($letterType !== 'prejuridico') {
+      throw new \RuntimeException('La carta PDF solo está disponible para prejurídico. Siniestro se maneja como notificación.');
     }
     $item = $this->item($portfolioId);
     if ((int) ($item['contract_id'] ?? 0) <= 0) {

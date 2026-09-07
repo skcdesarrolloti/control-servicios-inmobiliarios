@@ -299,10 +299,10 @@ trait HandlesAdministrativeNotifications
               $type,
               $notifyIds,
               $nonSmsChannels,
-              'Aviso importante sobre canon de arrendamiento',
+              'Gestion de cobro de contrato de arrendamiento',
               $queuedDetail,
-              'scm_aviso_siniestro_v2',
-              'scm_email_aviso_siniestro_v1',
+              'scm_arrendatario_gestion_cobro_v1',
+              'scm_email_arrendatario_gestion_cobro_v1',
               $notificationMeta,
               AdministrativeNotificationsService::COLLECTION_SMS_MAX
             ));
@@ -325,10 +325,10 @@ trait HandlesAdministrativeNotifications
               $codeudorNotifyResult = $this->merge_admin_notification_results($codeudorNotifyResult, $service->enqueueCollectionCodeudores(
                 (array) ($result['managements'] ?? []),
                 $nonSmsChannels,
-                'Aviso importante sobre canon de arrendamiento',
+                'Gestion de cobro de contrato de arrendamiento',
                 $queuedDetail,
-                'scm_aviso_siniestro_v2',
-                'scm_email_aviso_siniestro_v1',
+                'scm_arrendatario_gestion_cobro_v1',
+                'scm_email_arrendatario_gestion_cobro_v1',
                 AdministrativeNotificationsService::COLLECTION_SMS_MAX,
                 $notifyCodeudorKeys
               ));

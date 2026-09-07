@@ -119,10 +119,10 @@ trait HandlesCollectionManagement
                 'arrendatarios_activos',
                 $notifyIds,
                 $nonSmsChannels,
-                'Cupón disponible',
+                'Notificación de fecha de pago',
                 $adminService->collectionDueDateReminderMessage($dueDay),
-                'scm_cupon_disponible_v2',
-                'scm_email_cupon_disponible_v1',
+                'scm_arrendatario_fecha_pago_v1',
+                'scm_email_arrendatario_fecha_pago_v1',
                 $notificationMeta,
                 AdministrativeNotificationsService::COLLECTION_SMS_MAX
               ));
@@ -156,14 +156,35 @@ trait HandlesCollectionManagement
         $item = $service->updateStage($portfolioId, $stage, $note);
         $this->jsonOk(['item' => $item, 'message' => 'Estado de cobranza actualizado.']);
       }
-      if (in_array($operation, ['send_prejuridico', 'send_siniestro'], true)) {
-        $type = str_replace('send_', '', $operation);
-        $result = $service->generateLetter($portfolioId, $type, true);
-        $queued = (int) ($result['queued'] ?? 0);
+      if ($operation === 'send_prejuridico') {
+        $result = $service->generateLetter($portfolioId, 'prejuridico', true);
+        $emailQueued = (int) ($result['email_queued'] ?? ($result['queued'] ?? 0));
         $this->jsonOk($result + [
-          'message' => $queued > 0
-            ? 'Carta generada y ' . $queued . ' correo(s) encolado(s).'
-            : 'La carta se generó, pero no se encontró un correo válido para encolarla.',
+          'message' => $emailQueued > 0
+            ? 'Carta prejurídica generada y ' . $emailQueued . ' correo(s) encolado(s).'
+            : 'La carta prejurídica se generó, pero no se encontró un correo válido para encolarla.',
+        ]);
+      }
+      if ($operation === 'send_siniestro') {
+        $result = $service->sendSiniestroNotification($portfolioId);
+        $emailQueued = (int) ($result['email_queued'] ?? ($result['queued'] ?? 0));
+        $whatsappQueued = (int) ($result['whatsapp_queued'] ?? 0);
+        $whatsappFailed = (int) ($result['whatsapp_failed'] ?? 0);
+        $deliveryParts = [];
+        if ($emailQueued > 0) {
+          $deliveryParts[] = $emailQueued . ' correo(s)';
+        }
+        if ($whatsappQueued > 0) {
+          $deliveryParts[] = $whatsappQueued . ' WhatsApp';
+        }
+        $message = $deliveryParts !== []
+          ? 'Siniestro marcado y ' . implode(' + ', $deliveryParts) . ' encolado(s).'
+          : 'Siniestro marcado, pero no se encontró un correo o celular válido para encolarlo.';
+        if ($whatsappFailed > 0) {
+          $message .= ' No se pudieron encolar ' . $whatsappFailed . ' WhatsApp.';
+        }
+        $this->jsonOk($result + [
+          'message' => $message,
         ]);
       }
       $this->jsonFail('Operación de cartera no válida.');
