@@ -1551,7 +1551,7 @@ final class AdministrativeNotificationsService
         continue;
       }
 
-      $matches = $this->paymentReceiptCopropiedadMatches($nit, $this->effectiveContractStatus($config, ''));
+      $matches = $this->paymentReceiptCopropiedadMatches($nit, $this->effectiveContractStatus($config, ''), $type, (string) ($config['label'] ?? 'Copropiedades'));
       if ($matches === []) {
         $unmatched++;
         $reportRows[] = $this->importReportRow($index, $meta, null, 'Sin coincidencia', 'No', 'No se encontro copropiedad activa para el NIT del PDF.');
@@ -2118,12 +2118,13 @@ final class AdministrativeNotificationsService
   /**
    * @param int[] $ids
    * @param string[] $channels
-   * @return array{queued:int,failed:int,invalid:int,filtered:int,selected:int,channels:array<int,string>,type:string}
+   * @return array{queued:int,failed:int,invalid:int,filtered:int,selected:int,channels:array<int,string>,type:string,test_mode?:bool,test_email?:string,test_phone?:string}
    */
-  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = '', array $recipientMetaMap = [], int $smsMax = self::SMS_MAX): array
+  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = '', array $recipientMetaMap = [], int $smsMax = self::SMS_MAX, array $testOptions = []): array
   {
     $config = $this->typeConfig($type);
     $channels = $this->sanitizeChannels($channels);
+    $testOptions = $this->sanitizeTestModeOptions($testOptions, $channels);
     $whatsappTemplateConfig = $this->whatsappTemplateConfig($whatsappTemplate);
     $emailTemplateConfig = $this->emailTemplateConfig($emailTemplate);
     $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
@@ -2173,14 +2174,28 @@ final class AdministrativeNotificationsService
 
     foreach ($recipients as $recipient) {
       foreach ($channels as $channel) {
-        if ($this->isBlockedByPreference($recipient, $channel, $type)) {
+        if (empty($testOptions['enabled']) && $this->isBlockedByPreference($recipient, $channel, $type)) {
           $filtered++;
           continue;
         }
-        $destination = $this->destination($recipient, $channel);
+        $originalDestination = $this->destination($recipient, $channel);
+        $destination = !empty($testOptions['enabled'])
+          ? $this->testModeDestination($testOptions, $channel)
+          : $originalDestination;
         if ($destination === '') {
           $invalid++;
           continue;
+        }
+        $queueRecipient = $recipient;
+        if (!empty($testOptions['enabled'])) {
+          $queueRecipient['_scm_test_mode'] = [
+            'enabled' => true,
+            'channel' => $channel,
+            'test_destination' => $destination,
+            'test_email' => (string) ($testOptions['email'] ?? ''),
+            'test_phone' => (string) ($testOptions['phone'] ?? ''),
+            'original_destination' => $originalDestination,
+          ];
         }
         $baseMessage = $this->messageForRecipient($message, $recipient, $whatsappTemplateConfig, $emailTemplateConfig);
         $channelNeedsMessage = $channel === 'sms'
@@ -2203,7 +2218,7 @@ final class AdministrativeNotificationsService
         } else {
           $resolvedMessage = $this->plainText($resolvedMessage);
         }
-        if ($this->insertQueueRow($channel, $destination, $recipient, $resolvedSubject, $resolvedMessage, $batchId, $whatsappTemplateConfig, $emailTemplateConfig)) {
+        if ($this->insertQueueRow($channel, $destination, $queueRecipient, $resolvedSubject, $resolvedMessage, $batchId, $whatsappTemplateConfig, $emailTemplateConfig)) {
           $queued++;
         } else {
           $failed++;
@@ -2219,7 +2234,11 @@ final class AdministrativeNotificationsService
       'selected' => count($ids),
       'channels' => $channels,
       'type' => $type,
-    ];
+    ] + (!empty($testOptions['enabled']) ? [
+      'test_mode' => true,
+      'test_email' => (string) ($testOptions['email'] ?? ''),
+      'test_phone' => (string) ($testOptions['phone'] ?? ''),
+    ] : []);
   }
 
   /**
@@ -2508,7 +2527,7 @@ final class AdministrativeNotificationsService
   }
 
   /** @return array<int,array{recipient:array<string,mixed>,contracts:array<int,array<string,mixed>>}> */
-  private function paymentReceiptCopropiedadMatches(string $nit, string $contractStatus): array
+  private function paymentReceiptCopropiedadMatches(string $nit, string $contractStatus, string $type, string $typeLabel): array
   {
     $nit = $this->normalizeImportDocument($nit);
     if ($nit === '') {
@@ -2562,8 +2581,8 @@ final class AdministrativeNotificationsService
             'correo' => $this->firstNonEmpty([$row['cp_correo'] ?? '', $row['correo_copropiedad'] ?? '']),
             'celular' => $this->firstNonEmpty([$row['cp_contacto'] ?? '', $row['celular_copropiedad'] ?? '']),
             'documento' => $this->firstNonEmpty([$row['cp_nit'] ?? '', $row['nit_copropiedad'] ?? $nit]),
-            'tipo_actor' => 'copropiedades_activas',
-            'tipo_label' => 'Copropiedades activas',
+            'tipo_actor' => $type,
+            'tipo_label' => $typeLabel,
             'rol_persona' => 'Copropiedad',
           ],
           'contracts' => [],
@@ -4160,6 +4179,7 @@ final class AdministrativeNotificationsService
         'email_template' => $channel === 'email' ? $templateName : '',
         'import_meta' => is_array($recipient['_scm_import_meta'] ?? null) ? $recipient['_scm_import_meta'] : [],
         'context_meta' => is_array($recipient['_scm_notification_meta'] ?? null) ? $recipient['_scm_notification_meta'] : [],
+        'test_mode' => is_array($recipient['_scm_test_mode'] ?? null) ? $recipient['_scm_test_mode'] : [],
         'collection_management_lookup' => $this->collectionManagementLookupFromRecipient($recipient),
       ],
     ];
@@ -4664,6 +4684,36 @@ final class AdministrativeNotificationsService
     }
     $phone = $this->normalizePhone((string) ($recipient['celular'] ?? ''), (string) ($recipient['indicativo'] ?? ''), $channel === 'whatsapp');
     return $phone;
+  }
+
+  /** @param string[] $channels @return array{enabled:bool,email:string,phone:string} */
+  private function sanitizeTestModeOptions(array $options, array $channels): array
+  {
+    $enabled = filter_var($options['enabled'] ?? false, FILTER_VALIDATE_BOOL);
+    if (!$enabled) {
+      return ['enabled' => false, 'email' => '', 'phone' => ''];
+    }
+
+    $email = trim((string) ($options['email'] ?? ''));
+    $email = filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : '';
+    $phone = $this->normalizePhone((string) ($options['phone'] ?? ''));
+    if (in_array('email', $channels, true) && $email === '') {
+      throw new \RuntimeException('En modo prueba, escribe un correo de prueba valido.');
+    }
+    if ((in_array('sms', $channels, true) || in_array('whatsapp', $channels, true)) && $phone === '') {
+      throw new \RuntimeException('En modo prueba, escribe un celular de prueba valido.');
+    }
+
+    return ['enabled' => true, 'email' => $email, 'phone' => $phone];
+  }
+
+  /** @param array{enabled:bool,email:string,phone:string} $testOptions */
+  private function testModeDestination(array $testOptions, string $channel): string
+  {
+    if ($channel === 'email') {
+      return (string) ($testOptions['email'] ?? '');
+    }
+    return $this->normalizePhone((string) ($testOptions['phone'] ?? ''), '', $channel === 'whatsapp');
   }
 
   private function normalizePhone(string $phone, string $indicator = '', bool $withPlus = false): string

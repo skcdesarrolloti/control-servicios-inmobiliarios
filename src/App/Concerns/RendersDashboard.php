@@ -1986,7 +1986,7 @@ trait RendersDashboard
           </div>
           <p class="scm-admin-notif-import-result" data-admin-notif-import-result aria-live="polite"></p>
         </form>
-        <form class="scm-admin-notif-receipts-import" data-admin-notif-payment-receipts-import enctype="multipart/form-data">
+        <form class="scm-admin-notif-receipts-import is-hidden" data-admin-notif-payment-receipts-import enctype="multipart/form-data" hidden>
           <div class="scm-admin-notif-import-copy">
             <span class="scm-calendar-action-kicker">Comprobantes copropiedades</span>
             <h4>Importar soportes PDF por NIT</h4>
@@ -2113,6 +2113,23 @@ trait RendersDashboard
               <input type="checkbox" name="all_filtered" value="1" data-admin-notif-all-filtered>
               <span>Usar todos los resultados filtrados al encolar</span>
             </label>
+
+            <div class="scm-admin-notif-test-mode" data-admin-notif-test-mode-wrap>
+              <label class="scm-admin-notif-test-toggle">
+                <input type="checkbox" name="test_mode" value="1" data-admin-notif-test-mode>
+                <span><strong>Modo prueba</strong><small>Enviar todo a un correo y celular de prueba sin cambiar los datos del destinatario.</small></span>
+              </label>
+              <div class="scm-admin-notif-test-fields" data-admin-notif-test-fields hidden>
+                <div class="scm-field">
+                  <label for="scm-admin-notif-test-email">Correo de prueba</label>
+                  <input id="scm-admin-notif-test-email" name="test_email" type="email" class="input input-bordered input-sm scm-input" value="roycreativos@gmail.com" data-admin-notif-test-email>
+                </div>
+                <div class="scm-field">
+                  <label for="scm-admin-notif-test-phone">Celular de prueba</label>
+                  <input id="scm-admin-notif-test-phone" name="test_phone" type="tel" class="input input-bordered input-sm scm-input" value="3006838984" data-admin-notif-test-phone>
+                </div>
+              </div>
+            </div>
 
             <input type="hidden"
               name="email_template"

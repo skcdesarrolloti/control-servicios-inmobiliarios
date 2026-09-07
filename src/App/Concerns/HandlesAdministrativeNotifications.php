@@ -88,6 +88,11 @@ trait HandlesAdministrativeNotifications
     $message = trim(wp_kses_post(wp_unslash((string) ($_POST['message'] ?? ''))));
     $whatsappTemplate = sanitize_key((string) ($_POST['whatsapp_template'] ?? ''));
     $emailTemplate = sanitize_key((string) ($_POST['email_template'] ?? ''));
+    $testOptions = [
+      'enabled' => (string) ($_POST['test_mode'] ?? '') === '1',
+      'email' => trim(sanitize_email(wp_unslash((string) ($_POST['test_email'] ?? '')))),
+      'phone' => trim(sanitize_text_field(wp_unslash((string) ($_POST['test_phone'] ?? '')))),
+    ];
     $importPayloadRaw = trim((string) wp_unslash($_POST['import_payload'] ?? ''));
     $importPayload = [];
     if ($importPayloadRaw !== '') {
@@ -98,7 +103,7 @@ trait HandlesAdministrativeNotifications
     }
 
     try {
-      $result = $service->enqueue($type, $ids, $channels, $subject, $message, $whatsappTemplate, $emailTemplate, $importPayload);
+      $result = $service->enqueue($type, $ids, $channels, $subject, $message, $whatsappTemplate, $emailTemplate, $importPayload, AdministrativeNotificationsService::SMS_MAX, $testOptions);
       $queued = (int) ($result['queued'] ?? 0);
       $invalid = (int) ($result['invalid'] ?? 0);
       $failed = (int) ($result['failed'] ?? 0);
@@ -106,6 +111,9 @@ trait HandlesAdministrativeNotifications
       $messageText = $queued > 0
         ? sprintf('Se encolaron %d notificaciones.%s%s%s', $queued, $invalid > 0 ? " {$invalid} sin contacto valido." : '', $filtered > 0 ? " {$filtered} bloqueadas por preferencia." : '', $failed > 0 ? " {$failed} fallaron." : '')
         : 'No se pudo encolar ninguna notificacion. Revisa contactos y canales.';
+      if (!empty($result['test_mode'])) {
+        $messageText = 'MODO PRUEBA: ' . $messageText;
+      }
       $this->jsonOk($result + ['message' => $messageText]);
     } catch (\Throwable $e) {
       $this->jsonFail($e->getMessage());

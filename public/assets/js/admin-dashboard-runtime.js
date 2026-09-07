@@ -2694,6 +2694,10 @@
       var sendInmuebleSimi = panel.querySelector("[data-admin-notif-send-inmueble-simi]");
       var sendContractNumber = panel.querySelector("[data-admin-notif-send-contract-number]");
       var sendImportPayload = panel.querySelector("[data-admin-notif-import-payload]");
+      var testModeInput = panel.querySelector("[data-admin-notif-test-mode]");
+      var testFields = panel.querySelector("[data-admin-notif-test-fields]");
+      var testEmailInput = panel.querySelector("[data-admin-notif-test-email]");
+      var testPhoneInput = panel.querySelector("[data-admin-notif-test-phone]");
       var recipientsEl = panel.querySelector("[data-admin-notif-recipients]");
       var paginationEl = panel.querySelector("[data-admin-notif-pagination]");
       var totalEl = panel.querySelector("[data-admin-notif-total]");
@@ -2820,6 +2824,27 @@
         }
         var label = currentTypeLabel() || "la pestaña activa";
         importScopeEl.textContent = "Se cruzara solo en: " + label + ".";
+      }
+
+      function updatePaymentReceiptsImportVisibility() {
+        if (!paymentReceiptsImportForm) {
+          return;
+        }
+        var canImportReceipts = currentType().indexOf("copropiedades") === 0;
+        paymentReceiptsImportForm.hidden = !canImportReceipts;
+        paymentReceiptsImportForm.classList.toggle("is-hidden", !canImportReceipts);
+        if (!canImportReceipts && paymentReceiptsFileInput) {
+          paymentReceiptsFileInput.value = "";
+        }
+      }
+
+      function updateTestModeFields() {
+        if (!testFields || !testModeInput) {
+          return;
+        }
+        var enabled = !!testModeInput.checked;
+        testFields.hidden = !enabled;
+        testFields.classList.toggle("is-hidden", !enabled);
       }
 
       function supportsContractStatus(type) {
@@ -3999,6 +4024,7 @@
           importWrap.classList.toggle("is-hidden", !canImport);
           updateImportScope();
         }
+        updatePaymentReceiptsImportVisibility();
         if (sendImportPayload) {
           sendImportPayload.value = JSON.stringify(importedPayload || {});
         }
@@ -4046,6 +4072,7 @@
           whatsappTemplateWrap.classList.toggle("is-hidden", !templateVisible);
         }
         updateMessageVisibility();
+        updateTestModeFields();
         updateSmsCounter();
         updatePreview();
         updateCollectionPreview();
@@ -5136,6 +5163,18 @@
             syncContext();
           });
         }
+        if (testModeInput) {
+          testModeInput.addEventListener("change", function () {
+            markComposerDirty();
+            updateTestModeFields();
+          });
+        }
+        [testEmailInput, testPhoneInput].forEach(function (input) {
+          if (!input) {
+            return;
+          }
+          input.addEventListener("input", markComposerDirty);
+        });
         [
           collectionTypeSelect,
           collectionObservationInput,
@@ -5293,6 +5332,19 @@
             return;
           }
           var fd = new FormData(sendForm);
+          var testModeEnabled = !!(testModeInput && testModeInput.checked);
+          if (testModeEnabled) {
+            var wantsEmail = !!panel.querySelector('[data-admin-notif-channel][value="email"]:checked');
+            var wantsPhone = !!panel.querySelector('[data-admin-notif-channel][value="sms"]:checked, [data-admin-notif-channel][value="whatsapp"]:checked');
+            if (wantsEmail && (!testEmailInput || String(testEmailInput.value || "").indexOf("@") === -1)) {
+              showToast("error", "En modo prueba escribe un correo valido.");
+              return;
+            }
+            if (wantsPhone && (!testPhoneInput || String(testPhoneInput.value || "").replace(/\D+/g, "").length < 7)) {
+              showToast("error", "En modo prueba escribe un celular valido.");
+              return;
+            }
+          }
           fd.set("action", actionAdminNotificationsSend);
           fd.set("nonce", nonce);
           fd.set("type", currentType());
@@ -5306,6 +5358,13 @@
           fd.set("contract_number", currentContractNumber());
           fd.set("import_payload", JSON.stringify(importedPayload || {}));
           fd.set("all_filtered", useAll ? "1" : "0");
+          fd.set("test_mode", testModeEnabled ? "1" : "0");
+          if (testEmailInput) {
+            fd.set("test_email", String(testEmailInput.value || ""));
+          }
+          if (testPhoneInput) {
+            fd.set("test_phone", String(testPhoneInput.value || ""));
+          }
           if (!useAll) {
             selected.forEach(function (id) {
               fd.append("ids[]", id);
