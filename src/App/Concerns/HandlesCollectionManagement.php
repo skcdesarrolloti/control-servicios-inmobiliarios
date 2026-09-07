@@ -141,7 +141,37 @@ trait HandlesCollectionManagement
       if (in_array($operation, ['mark_normal', 'mark_prejuridico', 'mark_siniestro'], true)) {
         $stage = str_replace('mark_', '', $operation);
         $item = $service->updateStage($portfolioId, $stage, $note);
-        $this->jsonOk(['item' => $item, 'message' => 'Estado de cobranza actualizado.']);
+        $internalNotifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0];
+        $internalNotifyError = '';
+        if ($stage === 'siniestro') {
+          $internalIds = $this->internalNotificationRecipientsForAction('contrato_siniestro');
+          if ($internalIds === []) {
+            $internalIds = $this->internalNotificationRecipientsForAction('cobro_prejuridico');
+          }
+          if ($internalIds !== []) {
+            try {
+              $adminService = $this->get_admin_notifications_service();
+              $internalNotifyResult = $adminService->enqueue(
+                'funcionarios',
+                $internalIds,
+                ['email'],
+                'Contrato marcado como siniestro',
+                $this->collection_siniestro_internal_notification_message($item, $note),
+                '',
+                AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE,
+                [],
+                AdministrativeNotificationsService::SMS_MAX
+              );
+            } catch (\Throwable $internalException) {
+              $internalNotifyError = $internalException->getMessage();
+            }
+          }
+        }
+        $internalQueued = (int) ($internalNotifyResult['queued'] ?? 0);
+        $message = $stage === 'siniestro'
+          ? 'Contrato marcado como siniestro, gestión registrada en el historial del inmueble.' . ($internalQueued > 0 ? " {$internalQueued} aviso(s) interno(s)." : '') . ($internalNotifyError !== '' ? ' No se pudo encolar todo: ' . $internalNotifyError : '')
+          : 'Estado de cobranza actualizado.';
+        $this->jsonOk(['item' => $item, 'message' => $message, 'internal_notifications' => $internalNotifyResult, 'internal_notification_error' => $internalNotifyError]);
       }
       if ($operation === 'send_prejuridico') {
         $result = $service->generateLetter($portfolioId, 'prejuridico', true);
@@ -284,6 +314,37 @@ trait HandlesCollectionManagement
       $html .= '<div style="margin:20px 0 4px;text-align:center;">'
         . '<a href="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" style="display:inline-block;background:#f28c00;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px;">Ver carta prejur&iacute;dica en PDF</a>'
         . '</div>';
+    }
+    return $html;
+  }
+
+  /** @param array<string,mixed> $item */
+  private function collection_siniestro_internal_notification_message(array $item, string $note = ''): string
+  {
+    $sender = trim(Auth::user());
+    if ($sender === '') {
+      $sender = 'Funcionario';
+    }
+    $tenant = trim((string) ($item['tenant_name'] ?? ''));
+    $contract = trim((string) ($item['contract_number'] ?? ''));
+    $property = trim((string) ($item['property_code'] ?? ''));
+    $rawBalance = array_key_exists('balance', $item) ? $item['balance'] : null;
+    $balance = $rawBalance !== null ? '$' . number_format((float) $rawBalance, 0, ',', '.') : 'Sin saldo registrado';
+    $lines = [
+      'Se marcó un contrato como siniestro desde el módulo Gestiones de cobro.',
+      'Realizado por: ' . $sender . '.',
+      'Arrendatario: ' . ($tenant !== '' ? $tenant : 'Sin nombre registrado') . '.',
+      'Contrato: ' . ($contract !== '' ? $contract : '-') . ' · Inmueble: ' . ($property !== '' ? $property : '-') . '.',
+      'Saldo actual: ' . $balance . '.',
+      'El registro quedó guardado como gestión de Canon y reporte del inmueble tipo Siniestro.',
+    ];
+    $note = trim($note);
+    if ($note !== '') {
+      $lines[] = 'Observación: ' . $note;
+    }
+    $html = '';
+    foreach ($lines as $line) {
+      $html .= '<p style="margin:0 0 14px;">' . htmlspecialchars($line, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>';
     }
     return $html;
   }

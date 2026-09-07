@@ -107,8 +107,14 @@
 
     function confirmStage(button) {
       var stage = String(button.getAttribute("data-scm-portfolio-stage") || "");
+      var currentStage = String(button.getAttribute("data-scm-portfolio-current-stage") || "");
       var portfolioId = String(button.getAttribute("data-portfolio-id") || "");
-      var label = stage === "siniestro" ? "marcar como siniestro" : "volver a cobro normal";
+      var isMarkingSiniestro = stage === "siniestro";
+      var isRemovingSiniestro = stage === "normal" && currentStage === "siniestro";
+      var isRemovingPrejuridico = stage === "normal" && currentStage === "prejuridico";
+      var label = isMarkingSiniestro
+        ? "marcar como siniestro"
+        : (isRemovingSiniestro ? "quitar siniestro" : (isRemovingPrejuridico ? "quitar prejurídico" : "volver a cobro normal"));
       var run = function (note) {
         var fd = new FormData();
         fd.set("portfolio_id", portfolioId);
@@ -127,10 +133,10 @@
 
       if (window.Swal && typeof window.Swal.fire === "function") {
         window.Swal.fire({
-          title: stage === "siniestro" ? "Marcar contrato como siniestro" : "Normalizar etapa de cobro",
-          text: stage === "siniestro"
-            ? "Esta acción solo cambia la etapa y deja trazabilidad. No envía notificaciones."
-            : "El contrato volverá a cobro normal y el cambio quedará registrado en el historial.",
+          title: isMarkingSiniestro ? "Marcar contrato como siniestro" : (isRemovingSiniestro ? "Quitar siniestro" : (isRemovingPrejuridico ? "Quitar prejurídico" : "Normalizar etapa de cobro")),
+          text: isMarkingSiniestro
+            ? "Se registrará una gestión, se guardará reporte en el historial del inmueble, se marcará el contrato como siniestro y se avisará al funcionario configurado."
+            : "El contrato volverá a cobro normal y el cambio quedará registrado en la trazabilidad de cartera.",
           input: "textarea",
           inputLabel: "Motivo u observación (opcional)",
           inputPlaceholder: "Indica por qué cambia la etapa...",

@@ -201,6 +201,11 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Cuando se genera y envía la carta prejurídica desde Gestiones de cobro.',
             'channel' => 'Email interno',
           ],
+          'contrato_siniestro' => [
+            'label' => 'Contrato marcado como siniestro',
+            'description' => 'Cuando un contrato se marca manualmente como siniestro desde Gestiones de cobro.',
+            'channel' => 'Email interno',
+          ],
         ],
       ],
       'gestion_caso' => [

@@ -631,7 +631,34 @@ final class CollectionPortfolioService
     if (!in_array($stage, ['normal', 'prejuridico', 'siniestro'], true)) {
       throw new \RuntimeException('Estado de cobranza no válido.');
     }
+    $previousStage = (string) ($item['collection_stage'] ?? 'normal');
     $now = date('Y-m-d H:i:s');
+    $contractId = (int) ($item['contract_id'] ?? 0);
+    $stageManagement = ['created' => 0, 'history' => 0, 'properties' => 0, 'managements' => []];
+    if ($stage === 'siniestro' && $previousStage !== 'siniestro') {
+      $tenantId = (int) ($item['tenant_id'] ?? 0);
+      if ($tenantId <= 0 || $contractId <= 0) {
+        throw new \RuntimeException('Este registro no tiene arrendatario y contrato vinculados para registrar el siniestro.');
+      }
+      $observation = 'Contrato marcado como siniestro desde el módulo Gestiones de cobro.';
+      $note = trim($note);
+      if ($note !== '') {
+        $observation .= ' Observación: ' . $note;
+      }
+      $stageManagement = (new AdministrativeNotificationsService($this->db))->registerCollectionManagement([$tenantId], [
+        'tipo_gestion_cobro' => 'Canon',
+        'observacion' => $observation,
+        'volver_llamar' => 'No',
+        'siguiente_fecha' => '',
+        'siguiente_hora' => '',
+        'otro_horario_cobro' => '',
+        'tipo_reporte_inmueble' => 'Siniestro',
+        'contract_ids' => [$contractId],
+      ]);
+      if ((int) ($stageManagement['created'] ?? 0) <= 0) {
+        throw new \RuntimeException('No se pudo registrar el siniestro en la gestión y el historial del inmueble.');
+      }
+    }
     $this->db->update($this->portfolioTable(), [
       'collection_stage' => $stage,
       'stage_changed_at' => $now,
@@ -641,7 +668,6 @@ final class CollectionPortfolioService
       'notes' => mb_substr(trim($note), 0, 2000, 'UTF-8'),
       'updated_at' => $now,
     ], ['id' => $portfolioId]);
-    $contractId = (int) ($item['contract_id'] ?? 0);
     if ($contractId > 0 && $this->schema->columnExists($this->contractsTable(), 'esta_sinestrado')) {
       $this->db->update($this->contractsTable(), [
         'esta_sinestrado' => $stage === 'siniestro' ? 'Si' : 'No',
@@ -649,7 +675,10 @@ final class CollectionPortfolioService
       ], ['_ID' => $contractId]);
     }
     $this->addEvent($portfolioId, null, 'stage_changed', $item['balance'] ?? null, $item['balance'] ?? null, $note !== '' ? $note : 'Estado actualizado a ' . $stage);
-    return $this->item($portfolioId);
+    $updated = $this->item($portfolioId);
+    $updated['_previous_stage'] = $previousStage;
+    $updated['_stage_management'] = $stageManagement;
+    return $updated;
   }
 
   /** @return array<string,mixed> */
