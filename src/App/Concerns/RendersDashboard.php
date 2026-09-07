@@ -404,6 +404,7 @@ trait RendersDashboard
         'admin_notifications_panel' => self::AJAX_ADMIN_NOTIFICATIONS_PANEL,
         'admin_notifications_send' => self::AJAX_ADMIN_NOTIFICATIONS_SEND,
         'admin_notifications_import' => self::AJAX_ADMIN_NOTIFICATIONS_IMPORT,
+        'admin_notifications_payment_receipts_import' => self::AJAX_ADMIN_NOTIFICATIONS_PAYMENT_RECEIPTS_IMPORT,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
@@ -1982,6 +1983,17 @@ trait RendersDashboard
             <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-import-clear>Quitar importaci&oacute;n</button>
           </div>
           <p class="scm-admin-notif-import-result" data-admin-notif-import-result aria-live="polite"></p>
+        </form>
+        <form class="scm-admin-notif-receipts-import" data-admin-notif-payment-receipts-import enctype="multipart/form-data">
+          <div class="scm-admin-notif-import-copy">
+            <span class="scm-calendar-action-kicker">Comprobantes copropiedades</span>
+            <h4>Importar soportes PDF por NIT</h4>
+            <p>Sube los comprobantes de pago en PDF. El nombre debe iniciar o contener el NIT de la copropiedad; si incluye apartamento o torre, el sistema lo agrega al detalle del mensaje.</p>
+          </div>
+          <div class="scm-admin-notif-import-controls">
+            <input type="file" name="receipts[]" accept="application/pdf,.pdf" multiple data-admin-notif-payment-receipts-file>
+            <button type="submit" class="scm-btn-primary btn btn-primary">Importar comprobantes</button>
+          </div>
         </form>
       </section>
 

@@ -123,7 +123,8 @@ trait HandlesAdministrativeNotifications
     $file = is_array($_FILES['file'] ?? null) ? $_FILES['file'] : [];
 
     try {
-      $result = $this->get_admin_notifications_service()->importRecipientsFromFile($type, $file);
+      $service = $this->get_admin_notifications_service();
+      $result = $service->importRecipientsFromFile($type, $file);
       $matched = (int) ($result['matched'] ?? 0);
       $unmatched = (int) ($result['unmatched'] ?? 0);
       $duplicates = (int) ($result['duplicates'] ?? 0);
@@ -157,6 +158,45 @@ trait HandlesAdministrativeNotifications
         'suggested_type' => (string) ($suggestion['type'] ?? ''),
         'suggested_type_label' => (string) ($suggestion['type_label'] ?? ''),
         'suggested_matched' => (int) ($suggestion['matched'] ?? 0),
+        'message' => $message,
+      ]);
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
+  public function ajax_handler_admin_notifications_payment_receipts_import(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para usar Notificaciones.');
+    }
+
+    $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'copropiedades_activas'));
+    $files = is_array($_FILES['receipts'] ?? null) ? $_FILES['receipts'] : [];
+
+    try {
+      $result = $this->get_admin_notifications_service()->importCopropiedadPaymentReceipts($type, $files);
+      $matched = (int) ($result['matched'] ?? 0);
+      $filesMatched = (int) ($result['files_matched'] ?? 0);
+      $usable = (int) ($result['usable_rows'] ?? 0);
+      $unmatched = (int) ($result['unmatched'] ?? 0);
+      $ambiguous = (int) ($result['ambiguous'] ?? 0);
+      $message = $matched > 0
+        ? sprintf('Comprobantes importados: %d copropiedad(es) marcadas con %d PDF de %d archivo(s).%s%s', $matched, $filesMatched, $usable, $unmatched > 0 ? " {$unmatched} sin coincidencia." : '', $ambiguous > 0 ? " {$ambiguous} con coincidencia multiple." : '')
+        : 'No se encontraron copropiedades activas para esos comprobantes. Revisa el NIT en el nombre del PDF.';
+
+      $this->jsonOk([
+        'html' => $this->render_admin_notification_recipient_rows((array) ($result['rows'] ?? [])),
+        'payload' => (array) ($result['payload'] ?? []),
+        'report_rows' => (array) ($result['report_rows'] ?? []),
+        'matched' => $matched,
+        'files_matched' => $filesMatched,
+        'unmatched' => $unmatched,
+        'ambiguous' => $ambiguous,
+        'duplicates' => (int) ($result['duplicates'] ?? 0),
+        'usable_rows' => $usable,
+        'type_label' => (string) ($result['type_label'] ?? ''),
         'message' => $message,
       ]);
     } catch (\Throwable $e) {

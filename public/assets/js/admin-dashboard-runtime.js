@@ -175,6 +175,8 @@
     var actionAdminNotificationsSend = actions.admin_notifications_send || "";
     var actionAdminNotificationsImport =
       actions.admin_notifications_import || "";
+    var actionAdminNotificationsPaymentReceiptsImport =
+      actions.admin_notifications_payment_receipts_import || "";
     var actionAdminNotificationsCollection =
       actions.admin_notifications_collection || "";
     var actionAdminNotificationsCollectionOptions =
@@ -2654,8 +2656,10 @@
       }
       var searchForm = panel.querySelector("[data-admin-notif-search]");
       var importForm = panel.querySelector("[data-admin-notif-import]");
+      var paymentReceiptsImportForm = panel.querySelector("[data-admin-notif-payment-receipts-import]");
       var importWrap = panel.querySelector("[data-admin-notif-import-wrap]");
       var importFileInput = panel.querySelector("[data-admin-notif-import-file]");
+      var paymentReceiptsFileInput = panel.querySelector("[data-admin-notif-payment-receipts-file]");
       var importClearBtn = panel.querySelector("[data-admin-notif-import-clear]");
       var importReportBtn = panel.querySelector("[data-admin-notif-import-report]");
       var importResultEl = panel.querySelector("[data-admin-notif-import-result]");
@@ -2830,6 +2834,9 @@
         if (clearFile && importFileInput) {
           importFileInput.value = "";
         }
+        if (clearFile && paymentReceiptsFileInput) {
+          paymentReceiptsFileInput.value = "";
+        }
       }
 
       function recipientDetailsFromRow(row) {
@@ -2989,7 +2996,7 @@
 
       function downloadImportReport() {
         if (!Array.isArray(importReportRows) || importReportRows.length === 0) {
-          showToast("warning", "Primero importa un Excel para generar el reporte.");
+          showToast("warning", "Primero importa un archivo para generar el reporte.");
           return;
         }
         var columns = [
@@ -3002,6 +3009,9 @@
           ["canon_excel", "Canon Excel"],
           ["periodo_excel", "Periodo Excel"],
           ["direccion_excel", "Direccion Excel"],
+          ["archivo_pdf", "Archivo PDF"],
+          ["nit_pdf", "NIT PDF"],
+          ["inmuebles_pdf", "Inmuebles PDF"],
           ["destinatario_id", "ID destinatario"],
           ["destinatario_nombre", "Nombre destinatario"],
           ["destinatario_tipo", "Tipo destinatario"],
@@ -3211,6 +3221,24 @@
         if (subjectInput && !subjectDirty) {
           subjectInput.value = option.getAttribute("data-email-subject") || subjectInput.value || "";
         }
+      }
+
+      function selectMessageTemplate(value) {
+        if (!whatsappTemplateSelect || !whatsappTemplateSelect.options || !value) {
+          return false;
+        }
+        var found = false;
+        Array.prototype.slice.call(whatsappTemplateSelect.options).forEach(function (option) {
+          if (!found && String(option.value || "") === String(value) && !option.disabled) {
+            whatsappTemplateSelect.value = option.value;
+            found = true;
+          }
+        });
+        if (found) {
+          subjectDirty = false;
+          syncEmailTemplateFromMessageTemplate();
+        }
+        return found;
       }
 
       function senderProfile() {
@@ -4190,10 +4218,22 @@
         if (!option || !hasImportedRecipients()) {
           return false;
         }
-        return String(option.value || "") === "scm_propietario_arriendo_consignado_v1";
+        return [
+          "scm_propietario_arriendo_consignado_v1",
+          "scm_copropiedad_soportes_pago_v1",
+        ].indexOf(String(option.value || "")) !== -1;
       }
 
       function importedDetailPreview() {
+        if (importedPayload && typeof importedPayload === "object") {
+          var firstKey = Object.keys(importedPayload)[0];
+          var detail = firstKey && importedPayload[firstKey]
+            ? String(importedPayload[firstKey].detalle_excel || "")
+            : "";
+          if (detail) {
+            return detail;
+          }
+        }
         return "Canon: $1.850.000\nContrato: #700\nInmueble SIMI: 10578\nPeriodo: Agosto 2026";
       }
 
@@ -4519,6 +4559,110 @@
           });
       }
 
+      function importPaymentReceiptsFromFiles() {
+        if (!paymentReceiptsImportForm || !paymentReceiptsFileInput || !actionAdminNotificationsPaymentReceiptsImport) {
+          showToast("error", "La importacion de comprobantes no esta disponible.");
+          return;
+        }
+        if (!paymentReceiptsFileInput.files || paymentReceiptsFileInput.files.length === 0) {
+          showToast("warning", "Selecciona uno o varios comprobantes PDF.");
+          return;
+        }
+        if (currentType().indexOf("copropiedades") !== 0) {
+          if (typeSelect) {
+            typeSelect.value = "copropiedades_activas";
+          }
+          resetImportState(false);
+        }
+        var fd = new FormData(paymentReceiptsImportForm);
+        fd.set("action", actionAdminNotificationsPaymentReceiptsImport);
+        fd.set("nonce", nonce);
+        fd.set("type", currentType().indexOf("copropiedades") === 0 ? currentType() : "copropiedades_activas");
+        recipientsEl.innerHTML =
+          '<div class="scm-admin-notif-empty"><strong>Importando comprobantes...</strong><span>Estamos cruzando los PDF por NIT de copropiedad.</span></div>';
+        if (paginationEl) {
+          paginationEl.innerHTML = "";
+        }
+        if (importReportBtn) {
+          importReportBtn.hidden = true;
+        }
+        if (importResultEl) {
+          importResultEl.textContent = "Importando comprobantes PDF por NIT...";
+          importResultEl.classList.remove("is-error", "is-success");
+        }
+        filterMessageTemplateOptions();
+        selectMessageTemplate("scm_copropiedad_soportes_pago_v1");
+        setLoading(true);
+        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (response) {
+            return response.json();
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error(
+                (json && json.data && json.data.message) ||
+                  "No se pudieron importar los comprobantes.",
+              );
+            }
+            var data = json.data || {};
+            importedPayload = data.payload || {};
+            importReportRows = Array.isArray(data.report_rows) ? data.report_rows : [];
+            selected.clear();
+            Object.keys(importedPayload).forEach(function (id) {
+              selected.add(String(id));
+            });
+            if (allFiltered) {
+              allFiltered.checked = false;
+            }
+            recipientsEl.innerHTML = data.html || "";
+            cacheVisibleRecipientDetails();
+            if (importReportBtn) {
+              importReportBtn.hidden = importReportRows.length === 0;
+            }
+            if (paginationEl) {
+              paginationEl.innerHTML =
+                '<span class="scm-admin-notif-page-info">Copropiedades marcadas: ' +
+                String(data.matched || 0) +
+                "</span>";
+            }
+            if (totalEl) {
+              totalEl.textContent = String(data.matched || 0);
+            }
+            if (listTitle) {
+              listTitle.textContent = (data.type_label || "Copropiedades") + " con comprobantes";
+            }
+            if (importResultEl) {
+              importResultEl.textContent = data.message || "Comprobantes importados.";
+              importResultEl.classList.add((data.matched || 0) > 0 ? "is-success" : "is-error");
+            }
+            updateVisibleChecks();
+            filterMessageTemplateOptions();
+            selectMessageTemplate("scm_copropiedad_soportes_pago_v1");
+            syncContext();
+            showToast((data.matched || 0) > 0 ? "success" : "warning", data.message || "Comprobantes importados.");
+          })
+          .catch(function (err) {
+            importedPayload = {};
+            importReportRows = [];
+            if (importReportBtn) {
+              importReportBtn.hidden = true;
+            }
+            recipientsEl.innerHTML =
+              '<div class="scm-admin-notif-empty is-error"><strong>No se pudo importar.</strong><span>' +
+              escHtml(err.message || "Error desconocido") +
+              "</span></div>";
+            if (importResultEl) {
+              importResultEl.textContent = err.message || "Error desconocido.";
+              importResultEl.classList.add("is-error");
+            }
+            syncContext();
+            showToast("error", err.message || "No se pudieron importar los comprobantes.");
+          })
+          .finally(function () {
+            setLoading(false);
+          });
+      }
+
       if (!panel.dataset.scmAdminNotificationsEvents) {
         panel.dataset.scmAdminNotificationsEvents = "1";
 
@@ -4810,6 +4954,12 @@
           importForm.addEventListener("submit", function (event) {
             event.preventDefault();
             importRecipientsFromFile();
+          });
+        }
+        if (paymentReceiptsImportForm) {
+          paymentReceiptsImportForm.addEventListener("submit", function (event) {
+            event.preventDefault();
+            importPaymentReceiptsFromFiles();
           });
         }
         if (importClearBtn) {

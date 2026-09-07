@@ -6403,6 +6403,12 @@
   align-items: center;
 }
 
+#scm-app .scm-admin-notif-import-card .scm-admin-notif-receipts-import {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
 #scm-app .scm-admin-notif-import-copy h4 {
   margin: 4px 0 6px;
   color: #0f172a;
