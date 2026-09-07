@@ -282,7 +282,7 @@ trait HandlesCollectionManagement
     $url = trim((string) ($result['url'] ?? ''));
     if ($url !== '') {
       $html .= '<div style="margin:20px 0 4px;text-align:center;">'
-        . '<a href="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" style="display:inline-block;background:#f28c00;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px;">Ver acta</a>'
+        . '<a href="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" style="display:inline-block;background:#f28c00;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px;">Ver carta prejur&iacute;dica en PDF</a>'
         . '</div>';
     }
     return $html;

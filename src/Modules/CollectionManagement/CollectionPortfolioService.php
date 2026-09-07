@@ -808,8 +808,7 @@ final class CollectionPortfolioService
         $content = '<p>Cordial saludo.</p><p>Adjuntamos mediante enlace seguro la carta relacionada con el contrato <strong>'
           . htmlspecialchars((string) ($item['contract_number'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
           . '</strong> y el inmueble <strong>' . htmlspecialchars((string) ($item['property_code'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
-          . '</strong>.</p><p><a href="' . htmlspecialchars((string) $document['url'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
-          . '">Abrir carta en PDF</a></p><p>Atentamente,<br>'
+          . '</strong>.</p><p>Usa el bot&oacute;n <strong>Ver carta prejur&iacute;dica en PDF</strong> para consultar el documento.</p><p>Atentamente,<br>'
           . htmlspecialchars((string) $sender['signature_line'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>'
           . '<div style="margin-top:24px;padding:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">'
           . '<p style="margin:0 0 10px;">🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro <strong>Bot Guardián</strong> desde el botón de abajo.</p>'
@@ -817,6 +816,7 @@ final class CollectionPortfolioService
           . '</div>';
         $html = EmailTemplate::render($subject, $content, [
           'buttons' => [
+            ['url' => (string) $document['url'], 'label' => 'Ver carta prejurídica en PDF'],
             ['url' => 'https://sucasainmobiliaria.com.co/guardian/', 'label' => 'Hablar con Guardián'],
             ['url' => 'https://sucasainmobiliaria.com.co/arrendatario', 'label' => 'Ir a mi menú'],
           ],
