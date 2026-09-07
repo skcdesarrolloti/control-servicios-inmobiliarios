@@ -1364,8 +1364,8 @@ final class CollectionPortfolioService
       return false;
     }
 
-    $propertyId = trim((string) ($item['property_code'] ?? ''));
-    if ($propertyId === '') {
+    $propertyIds = $this->siniestroPropertyHistoryIds($item);
+    if ($propertyIds['id_inmueble'] === '' && $propertyIds['id_inmueble_data'] === '') {
       return false;
     }
 
@@ -1378,8 +1378,8 @@ final class CollectionPortfolioService
       'cct_author_id' => $employeeId,
       'cct_created' => $nowMysql,
       'cct_modified' => $nowMysql,
-      'id_inmueble' => $propertyId,
-      'id_inmueble_data' => $propertyId,
+      'id_inmueble' => $propertyIds['id_inmueble'],
+      'id_inmueble_data' => $propertyIds['id_inmueble_data'],
       'id_empleado' => $employeeId,
       'fecha' => $nowTs,
       'tipo_reporte' => 'Siniestro',
@@ -1650,6 +1650,50 @@ final class CollectionPortfolioService
       return 'Canon';
     }
     return trim($type) !== '' ? trim($type) : 'Sin tipo';
+  }
+
+  /** @param array<string,mixed> $item @return array{id_inmueble:string,id_inmueble_data:string} */
+  private function siniestroPropertyHistoryIds(array $item): array
+  {
+    $fallback = trim((string) ($item['property_code'] ?? ''));
+    $out = ['id_inmueble' => '', 'id_inmueble_data' => ''];
+
+    $contractId = (int) ($item['contract_id'] ?? 0);
+    $contractTable = $this->contractsTable();
+    if ($contractId > 0 && $this->schema->tableExists($contractTable)) {
+      $select = ['_ID'];
+      foreach (['id_inmueble', 'id_inmueble_data', 'inmueble'] as $column) {
+        if ($this->schema->columnExists($contractTable, $column)) {
+          $select[] = $column;
+        }
+      }
+      if (count($select) > 1) {
+        $contract = $this->db->getRow(
+          'SELECT `' . implode('`, `', array_values(array_unique($select))) . "` FROM `{$contractTable}` WHERE `_ID` = ? LIMIT 1",
+          [$contractId]
+        );
+        if (is_array($contract)) {
+          $out['id_inmueble'] = trim((string) ($contract['id_inmueble'] ?? ''));
+          $out['id_inmueble_data'] = trim((string) ($contract['id_inmueble_data'] ?? ''));
+          $visibleCode = trim((string) ($contract['inmueble'] ?? ''));
+          if ($out['id_inmueble_data'] === '') {
+            $out['id_inmueble_data'] = $visibleCode;
+          }
+          if ($fallback === '') {
+            $fallback = $visibleCode;
+          }
+        }
+      }
+    }
+
+    if ($out['id_inmueble'] === '') {
+      $out['id_inmueble'] = $fallback;
+    }
+    if ($out['id_inmueble_data'] === '') {
+      $out['id_inmueble_data'] = $fallback !== '' ? $fallback : $out['id_inmueble'];
+    }
+
+    return $out;
   }
 
   /** @param array<string,mixed> $item */
