@@ -2262,10 +2262,6 @@ trait RendersDashboard
     $contractApplied = is_array($contractsPortfolio['filters'] ?? null) ? $contractsPortfolio['filters'] : [];
     $contractPagination = is_array($contractsPortfolio['pagination'] ?? null) ? $contractsPortfolio['pagination'] : [];
     $reportDrilldowns = $this->collection_report_drilldown_payload($portfolioService->reportDrilldowns());
-    $reportDrilldownsJson = json_encode($reportDrilldowns, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
-    if (!is_string($reportDrilldownsJson)) {
-      $reportDrilldownsJson = '{}';
-    }
 
     $managementFilters = [
       'date_from' => trim((string) ($input['scmgc_fecha_desde'] ?? '')),
@@ -2278,6 +2274,23 @@ trait RendersDashboard
     $rows = is_array($report['rows'] ?? null) ? $report['rows'] : [];
     $stats = is_array($report['stats'] ?? null) ? $report['stats'] : ['total' => 0, 'by_type' => []];
     $byType = is_array($stats['by_type'] ?? null) ? $stats['by_type'] : [];
+    $byTypeDrilldownKeys = [];
+    foreach ($byType as $typeLabel => $typeTotal) {
+      $typeName = (string) $typeLabel;
+      $groupKey = $this->collection_report_concept_group_key($typeName);
+      $typeReport = $service->collectionManagementReport(['type' => $typeName], 1, 100);
+      $typeRows = is_array($typeReport['rows'] ?? null) ? $typeReport['rows'] : [];
+      $reportDrilldowns[$groupKey] = $this->collection_management_report_drilldown_payload(
+        $typeName,
+        $typeRows,
+        (int) $typeTotal
+      );
+      $byTypeDrilldownKeys[$typeName] = $groupKey;
+    }
+    $reportDrilldownsJson = json_encode($reportDrilldowns, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
+    if (!is_string($reportDrilldownsJson)) {
+      $reportDrilldownsJson = '{}';
+    }
     $types = array_values(array_unique(array_filter(array_map('strval', (array) ($report['types'] ?? [])))));
     foreach (['Canon', 'Administracion', 'Servicios publicos'] as $fixedType) {
       if (!in_array($fixedType, $types, true)) {
@@ -2388,7 +2401,7 @@ trait RendersDashboard
             <span class="scm-calendar-action-kicker">Actividad del equipo</span>
             <h5>Gestiones por concepto</h5>
             <?php if ($byType === []): ?><p class="scm-portfolio-report-empty">A&uacute;n no hay gestiones clasificadas para resumir.</p><?php else: ?>
-              <dl class="scm-portfolio-report-types"><?php foreach ($byType as $typeLabel => $typeTotal): ?><div><dt><?php echo esc_html((string) $typeLabel); ?></dt><dd><?php echo esc_html((string) ((int) $typeTotal)); ?></dd></div><?php endforeach; ?></dl>
+              <dl class="scm-portfolio-report-types"><?php foreach ($byType as $typeLabel => $typeTotal): $typeName = (string) $typeLabel; ?><div><dt><?php echo esc_html($typeName); ?></dt><dd><?php echo esc_html((string) ((int) $typeTotal)); ?></dd><?php echo $this->render_collection_report_drilldown_button((string) ($byTypeDrilldownKeys[$typeName] ?? $this->collection_report_concept_group_key($typeName)), 'Ver'); ?></div><?php endforeach; ?></dl>
             <?php endif; ?>
           </article>
         </div>
@@ -2736,8 +2749,9 @@ trait RendersDashboard
           <button type="button" class="scm-modal-close" data-scm-portfolio-report-close aria-label="Cerrar detalle"><span aria-hidden="true">&times;</span></button>
         </div>
         <div class="scm-portfolio-report-detail-toolbar">
-          <span data-scm-portfolio-report-count>0 contratos</span>
-          <input type="search" class="input input-bordered input-sm scm-input" data-scm-portfolio-report-search placeholder="Buscar en este grupo">
+          <div class="scm-portfolio-report-detail-count"><span data-scm-portfolio-report-count>0 contratos</span><small>Filtra el detalle sin salir del informe.</small></div>
+          <label class="scm-portfolio-report-search"><span>Buscar</span><input type="search" class="input input-bordered input-sm scm-input" data-scm-portfolio-report-search placeholder="Nombre, contrato, inmueble o saldo"></label>
+          <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-report-search-clear>Limpiar</button>
         </div>
         <div class="scm-portfolio-report-detail-table-wrap" data-scm-portfolio-report-body></div>
       </section>
@@ -2786,9 +2800,46 @@ trait RendersDashboard
     return $payload;
   }
 
+  /** @param array<int,array<string,mixed>> $rows @return array<string,mixed> */
+  private function collection_management_report_drilldown_payload(string $typeLabel, array $rows, int $total): array
+  {
+    $cleanRows = [];
+    foreach ($rows as $row) {
+      if (!is_array($row)) {
+        continue;
+      }
+      $cleanRows[] = [
+        'kind' => 'management',
+        'date' => $this->format_collection_management_date($row['fecha_raw'] ?? ''),
+        'tenant' => (string) (($row['arrendatario'] ?? '') ?: 'Sin nombre'),
+        'contract' => (string) (($row['contrato'] ?? '') ?: '-'),
+        'property' => (string) (($row['inmueble'] ?? '') ?: '-'),
+        'address' => (string) (($row['direccion'] ?? '') ?: ''),
+        'landlord' => (string) (($row['propietario'] ?? '') ?: ''),
+        'concept' => $this->collection_management_type_label((string) ($row['tipo_gestion'] ?? $typeLabel)),
+        'observation' => (string) (($row['observacion'] ?? '') ?: '-'),
+        'performed_by' => (string) (($row['realizado_por'] ?? '') ?: '-'),
+        'role' => (string) (($row['cargo'] ?? '') ?: ''),
+      ];
+    }
+    return [
+      'kind' => 'management',
+      'title' => 'Gestiones de ' . $this->collection_management_type_label($typeLabel),
+      'subtitle' => 'Últimas ' . count($cleanRows) . ' gestiones registradas para este concepto. Total histórico: ' . $total . '.',
+      'count' => $total,
+      'rows' => $cleanRows,
+    ];
+  }
+
   private function render_collection_report_drilldown_button(string $group, string $label): string
   {
     return '<button type="button" class="scm-portfolio-report-detail-btn" data-scm-portfolio-report-group="' . esc_attr($group) . '">' . esc_html($label) . '</button>';
+  }
+
+  private function collection_report_concept_group_key(string $typeLabel): string
+  {
+    $key = sanitize_key(remove_accents($this->collection_management_type_label($typeLabel)));
+    return 'gestion_concepto_' . ($key !== '' ? $key : 'sin_tipo');
   }
 
   private function collection_money(mixed $value): string

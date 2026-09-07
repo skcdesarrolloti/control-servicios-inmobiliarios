@@ -437,6 +437,10 @@
       syncModalBodyState();
     }
 
+    function reportGroupItemName(group) {
+      return String(group && group.kind || "") === "management" ? "gestión(es)" : "contrato(s)";
+    }
+
     function renderReportRows(modal, group, filter) {
       var body = modal.querySelector("[data-scm-portfolio-report-body]");
       var count = modal.querySelector("[data-scm-portfolio-report-count]");
@@ -448,15 +452,34 @@
           return [
             row.tenant, row.document, row.phone, row.email, row.contract,
             row.property, row.address, row.landlord, row.balance_label,
-            row.status_label, row.stage_label, row.last_action
+            row.status_label, row.stage_label, row.last_action, row.date,
+            row.concept, row.observation, row.performed_by, row.role
           ].join(" ").toLowerCase().indexOf(needle) !== -1;
         });
       }
       if (count) {
-        count.textContent = rows.length + " de " + (Number(group.count || rows.length)) + " contrato(s)";
+        count.textContent = rows.length + " de " + (Number(group.count || rows.length)) + " " + reportGroupItemName(group);
       }
       if (!rows.length) {
-        body.innerHTML = '<div class="scm-admin-notif-empty"><strong>Sin contratos para mostrar</strong><span>No hay resultados en este grupo con la búsqueda actual.</span></div>';
+        body.innerHTML = '<div class="scm-admin-notif-empty"><strong>Sin registros para mostrar</strong><span>No hay resultados en este grupo con la búsqueda actual.</span></div>';
+        return;
+      }
+      if (String(group.kind || "") === "management") {
+        body.innerHTML = '<table class="scm-collection-log-table scm-portfolio-report-detail-table scm-portfolio-report-detail-table--management">'
+          + '<thead><tr><th>Fecha</th><th>Arrendatario</th><th>Contrato</th><th>Inmueble</th><th>Concepto</th><th>Observación</th><th>Realizado por</th></tr></thead>'
+          + '<tbody>' + rows.map(function (row) {
+            var property = '<strong>' + escapeHtml(row.property || "-") + '</strong>' + (row.address ? '<small>' + escapeHtml(row.address) + '</small>' : "");
+            var officer = '<strong>' + escapeHtml(row.performed_by || "-") + '</strong>' + (row.role ? '<small>' + escapeHtml(row.role) + '</small>' : "");
+            return '<tr>'
+              + '<td>' + escapeHtml(row.date || "-") + '</td>'
+              + '<td><strong>' + escapeHtml(row.tenant || "Sin nombre") + '</strong></td>'
+              + '<td><span class="scm-collection-log-pill">' + escapeHtml(row.contract || "-") + '</span></td>'
+              + '<td>' + property + '</td>'
+              + '<td><span class="scm-collection-log-type">' + escapeHtml(row.concept || "-") + '</span></td>'
+              + '<td class="scm-collection-log-note">' + escapeHtml(row.observation || "-") + '</td>'
+              + '<td>' + officer + '</td>'
+              + '</tr>';
+          }).join("") + '</tbody></table>';
         return;
       }
       body.innerHTML = '<table class="scm-collection-log-table scm-portfolio-report-detail-table">'
@@ -493,6 +516,9 @@
       syncModalBodyState();
       if (search) {
         search.value = "";
+        search.placeholder = String(group.kind || "") === "management"
+          ? "Fecha, arrendatario, contrato, concepto o funcionario"
+          : "Nombre, contrato, inmueble o saldo";
         window.setTimeout(function () { search.focus(); }, 50);
       }
     }
@@ -729,6 +755,22 @@
       if (reportDetailButton && root.contains(reportDetailButton)) {
         event.preventDefault();
         openReportDrilldown(reportDetailButton);
+        return;
+      }
+      var reportSearchClear = event.target.closest && event.target.closest("[data-scm-portfolio-report-search-clear]");
+      if (reportSearchClear && root.contains(reportSearchClear)) {
+        event.preventDefault();
+        var reportModal = reportSearchClear.closest("[data-scm-portfolio-report-modal]");
+        var reportSearch = reportModal ? reportModal.querySelector("[data-scm-portfolio-report-search]") : null;
+        var currentGroupKey = reportModal ? String(reportModal.getAttribute("data-current-group") || "") : "";
+        var currentGroup = reportGroups()[currentGroupKey];
+        if (reportSearch) {
+          reportSearch.value = "";
+          reportSearch.focus();
+        }
+        if (reportModal && currentGroup) {
+          renderReportRows(reportModal, currentGroup, "");
+        }
         return;
       }
       var resetButton = event.target.closest && event.target.closest("[data-scm-portfolio-reset]");
