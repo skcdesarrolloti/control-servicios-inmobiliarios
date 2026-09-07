@@ -2839,7 +2839,16 @@ trait RendersDashboard
 
   private function collection_report_concept_group_key(string $typeLabel): string
   {
-    $key = sanitize_key(remove_accents($this->collection_management_type_label($typeLabel)));
+    $label = $this->collection_management_type_label($typeLabel);
+    if (function_exists('remove_accents')) {
+      $label = \remove_accents($label);
+    } else {
+      $label = strtr($label, [
+        'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n',
+        'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ü' => 'U', 'Ñ' => 'N',
+      ]);
+    }
+    $key = sanitize_key($label);
     return 'gestion_concepto_' . ($key !== '' ? $key : 'sin_tipo');
   }
 
