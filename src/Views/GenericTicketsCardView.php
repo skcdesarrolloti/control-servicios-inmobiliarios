@@ -248,6 +248,8 @@ final class GenericTicketsCardView
     $asuntoRaw = trim((string) ($row['asunto'] ?? $row['descripcion'] ?? ''));
     $descripcionRaw = trim((string) ($row['descripcion'] ?? ''));
     $temaRaw = trim((string) ($row['tema_ayuda'] ?? ''));
+    $effectiveTabKey = $this->inferTabKeyForRow($tabKey, $row);
+    $effectiveStatusBucket = $this->inferStatusBucketForRow($statusBucket, $row);
     $estadoRaw = trim((string) ($row['estado'] ?? ''));
     $estadoAdmRaw = trim((string) ($row['estado_admin_ticket'] ?? $row['estado_administrativo'] ?? $row['estado_admin'] ?? ''));
     $prioridadRaw = trim((string) ($row['prioridad'] ?? ''));
@@ -327,7 +329,7 @@ final class GenericTicketsCardView
     $cotzUrl = ($cotizacionBaseUrl !== '' && $cotzFirstId !== '') ? esc_url($cotizacionBaseUrl . rawurlencode($cotzFirstId)) : '';
     $cotEstadoParaRespuesta = $cotRespuestaEstadoRaw !== '' ? $cotRespuestaEstadoRaw : $cotEstadoRaw;
     $cotizacionPendienteRespuesta = $idCotz !== '' && in_array(strtolower($cotEstadoParaRespuesta), ['', 'esperando respuesta'], true);
-    $isPreventivaTicket = $tabKey === 'preventiva' || $idPrev !== '' || stripos($temaRaw . ' ' . $asuntoRaw . ' ' . $descripcionRaw, 'preventiva') !== false;
+    $isPreventivaTicket = $effectiveTabKey === 'preventiva' || $idPrev !== '' || stripos($temaRaw . ' ' . $asuntoRaw . ' ' . $descripcionRaw, 'preventiva') !== false;
 
     $historialItems = is_array($row['_scm_historial_items'] ?? null) ? $row['_scm_historial_items'] : [];
     $seguimientosItems = is_array($row['_scm_seguimientos_ticket'] ?? null) ? $row['_scm_seguimientos_ticket'] : [];
@@ -406,9 +408,10 @@ final class GenericTicketsCardView
     $dataAttrs .= ' data-ejecucion="' . esc_attr($tiempoEjecucion) . '"';
     $dataAttrs .= ' data-sin-actualizar="' . esc_attr($tiempoSinActualizar) . '"';
     $dataAttrs .= ' data-origen="' . esc_attr($origenLabel) . '"';
-    $dataAttrs .= ' data-tab-key="' . esc_attr($tabKey) . '"';
-    if ($statusBucket !== '') {
-      $dataAttrs .= ' data-status-bucket="' . esc_attr($statusBucket) . '"';
+    $dataAttrs .= ' data-tab-key="' . esc_attr($effectiveTabKey) . '"';
+    $dataAttrs .= ' data-tema="' . esc_attr($temaRaw) . '"';
+    if ($effectiveStatusBucket !== '') {
+      $dataAttrs .= ' data-status-bucket="' . esc_attr($effectiveStatusBucket) . '"';
     }
     $dataAttrs .= ' data-empleado-id="' . esc_attr($empleadoIdRaw) . '"';
     $dataAttrs .= ' data-id-estudio-aseguradora="' . esc_attr($idEstudioAseguradoraRaw) . '"';
@@ -427,37 +430,37 @@ final class GenericTicketsCardView
     $c .= '<p class="scm-ticket-card-property">Inmueble <strong>' . esc_html($inmuebleRaw !== '' ? $inmuebleRaw : '-') . '</strong></p>';
     $c .= '<p class="scm-ticket-card-barrio">Barrio <strong>' . esc_html($barrioRaw !== '' ? $barrioRaw : '-') . '</strong></p>';
     $c .= '<p class="scm-ticket-card-address">Direccion <strong>' . esc_html($direccionRaw !== '' ? $direccionRaw : '-') . '</strong></p>';
-    $ownerLabel = $propietarioRaw !== '' ? $propietarioRaw : (($tabKey === 'entrega' && $solicitanteRaw !== '') ? $solicitanteRaw : '');
+    $ownerLabel = $propietarioRaw !== '' ? $propietarioRaw : (($effectiveTabKey === 'entrega' && $solicitanteRaw !== '') ? $solicitanteRaw : '');
     if ($ownerLabel !== '') {
       $c .= '<p class="scm-ticket-card-owner">Propietario <strong>' . esc_html($ownerLabel) . '</strong></p>';
     }
     if ($arrendatarioRaw !== '') {
       $c .= '<p class="scm-ticket-card-tenant">Arrendatario <strong>' . esc_html($arrendatarioRaw) . '</strong></p>';
     }
-    if ($tabKey === 'entrega') {
+    if ($effectiveTabKey === 'entrega') {
       $c .= '<p class="scm-ticket-card-request">Numero solicitud <strong>' . esc_html($numeroSolicitudRaw !== '' ? $numeroSolicitudRaw : '-') . '</strong></p>';
     }
     $c .= '<p class="scm-ticket-card-employee">Asignado a <strong>' . esc_html($empleadoRaw !== '' ? $empleadoRaw : '-') . '</strong></p>';
-    if ($statusBucket !== 'cerrados') {
+    if ($effectiveStatusBucket !== 'cerrados') {
       $c .= '<p class="scm-ticket-card-execution">En ejecucion <strong>' . esc_html($tiempoEjecucion) . '</strong></p>';
       $c .= '<p class="scm-ticket-card-stale">Sin actualizar <strong>' . esc_html($tiempoSinActualizar) . '</strong></p>';
     }
     $c .= '<div class="scm-ticket-card-states"><div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Estado</span>' . (string) call_user_func($this->estadoBadge, $estadoRaw !== '' ? $estadoRaw : '-') . '</div><div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Estado administrativo</span>' . (string) call_user_func($this->estadoBadge, $estadoAdmRaw !== '' ? $estadoAdmRaw : '-') . '</div>';
-    if ($tabKey === 'preventiva') {
+    if ($effectiveTabKey === 'preventiva') {
       $c .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Magnitud caso</span>' . $magnitudCasoBadge . '</div>';
       $c .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Perturbaci&oacute;n</span>' . $perturbacionBadge . '</div>';
     }
     $c .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Origen</span>' . $origenBadge . '</div>';
     $c .= '</div>';
-    if ($tabKey === 'preventiva') {
+    if ($effectiveTabKey === 'preventiva') {
       $c .= '<p class="scm-ticket-card-barrio">Area afectada <strong>' . esc_html($areaAfectadaLabel) . '</strong></p>';
     }
     $c .= '<div class="scm-ticket-card-footer">';
-    if ($tabKey === 'entrega') {
+    if ($effectiveTabKey === 'entrega') {
       $c .= '<button class="btn btn-outline btn-sm" type="button" data-scm-open-card-consultor>Consultor/a de entrega</button>';
       $c .= '<button class="btn btn-outline btn-sm" type="button" data-scm-open-card-llaves>Llaves</button>';
     }
-    if (in_array($statusBucket, ['postergados', 'cerrados'], true)) {
+    if (in_array($effectiveStatusBucket, ['postergados', 'cerrados'], true)) {
       $c .= '<button class="btn btn-outline btn-sm scm-activate-ticket-btn" type="button" data-scm-activate-ticket>Activar ticket</button>';
     }
     $c .= '<button class="scm-btn-case btn btn-primary btn-sm" type="button" onclick="scmOpenCase(this)" ' . $dataAttrs . '>Ver caso</button>';
@@ -612,10 +615,67 @@ final class GenericTicketsCardView
     }
     $html = '';
     foreach ($rows as $row) {
-      $hitos = (array) call_user_func($this->resolveTimelineHitosForRow, $tabKey, $row);
-      $html .= $this->renderGenericCard($row, $config, $hitos, $tabKey, $statusBucket);
+      $effectiveTabKey = $this->inferTabKeyForRow($tabKey, $row);
+      $hitos = (array) call_user_func($this->resolveTimelineHitosForRow, $effectiveTabKey, $row);
+      $html .= $this->renderGenericCard($row, $config, $hitos, $effectiveTabKey, $statusBucket);
     }
     return $html;
+  }
+
+  private function inferTabKeyForRow(string $tabKey, array $row): string
+  {
+    if ($tabKey !== 'mis_tickets') {
+      return $tabKey;
+    }
+
+    $tema = trim((string) ($row['tema_ayuda'] ?? ''));
+    $temaKey = mb_strtolower($tema, 'UTF-8');
+    $departamentoKey = mb_strtolower(trim((string) ($row['departamento'] ?? '')), 'UTF-8');
+    $textKey = mb_strtolower(trim($tema . ' ' . (string) ($row['asunto'] ?? '') . ' ' . (string) ($row['descripcion'] ?? '')), 'UTF-8');
+
+    if (trim((string) ($row['id_revision_preventiva'] ?? '')) !== '' || strpos($textKey, 'preventiva') !== false) {
+      return 'preventiva';
+    }
+    if ($temaKey === 'entrega de inmuebles') {
+      return 'entrega';
+    }
+    if ($temaKey === 'recibo de inmuebles') {
+      return 'recibo';
+    }
+    if ($temaKey === 'contable y tributaria') {
+      return 'contable';
+    }
+    if ($temaKey === 'certificaciones tributarias') {
+      return 'certificaciones';
+    }
+    if (in_array($tema, ['Procesos juridicos', 'Solicitud contractual', 'Solicitud de servicios publicos', 'Retencion de contrato', 'Otros servicios'], true)) {
+      return 'contractual';
+    }
+
+    $maintenanceTopics = array_map(static fn(string $topic): string => mb_strtolower($topic, 'UTF-8'), \SCM\Repositories\TicketsRepository::MAINTENANCE_TOPICS);
+    if ($departamentoKey === 'mantenimiento' || in_array($temaKey, $maintenanceTopics, true) || strpos($textKey, 'reparacion') !== false || strpos($textKey, 'mantenimiento') !== false) {
+      return 'mantenimiento';
+    }
+
+    return '';
+  }
+
+  private function inferStatusBucketForRow(string $statusBucket, array $row): string
+  {
+    if ($statusBucket !== 'all') {
+      return $statusBucket;
+    }
+
+    $estado = mb_strtolower(trim((string) ($row['estado'] ?? '')), 'UTF-8');
+    $estadoAdmin = mb_strtolower(trim((string) ($row['estado_admin_ticket'] ?? $row['estado_administrativo'] ?? $row['estado_admin'] ?? '')), 'UTF-8');
+    if (in_array($estado, ['cerrado', 'resuelto', 'finalizado'], true) || in_array($estadoAdmin, ['cerrado', 'resuelto', 'finalizado'], true)) {
+      return 'cerrados';
+    }
+    if ($estadoAdmin === 'postergado') {
+      return 'postergados';
+    }
+
+    return '';
   }
 
   private function renderTicketDocumentsSection($raw, string $sectionId): string

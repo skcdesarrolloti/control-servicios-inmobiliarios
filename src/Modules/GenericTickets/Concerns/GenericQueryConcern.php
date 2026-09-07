@@ -70,17 +70,19 @@ trait GenericQueryConcern
   {
     $tabla = $this->db->table('jet_cct_tickets');
 
-    if (!$this->table_exists($tabla) || empty($temas)) {
+    if (!$this->table_exists($tabla)) {
       return ['rows' => [], 'stats' => ['total' => 0, 'abiertos' => 0, 'cerrados' => 0], 'pagination' => ['page' => 1, 'per_page' => 10, 'total' => 0, 'total_pages' => 1]];
     }
 
     $where = [];
     $args = [];
 
-    $temaPhs = implode(',', array_fill(0, count($temas), '?'));
-    $where[] = "CONVERT(`tema_ayuda` USING utf8mb4) COLLATE utf8mb4_unicode_ci IN ({$temaPhs})";
-    foreach ($temas as $t) {
-      $args[] = $t;
+    if (!empty($temas)) {
+      $temaPhs = implode(',', array_fill(0, count($temas), '?'));
+      $where[] = "CONVERT(`tema_ayuda` USING utf8mb4) COLLATE utf8mb4_unicode_ci IN ({$temaPhs})";
+      foreach ($temas as $t) {
+        $args[] = $t;
+      }
     }
 
     if (!empty($p['fTema'])) {
@@ -89,7 +91,7 @@ trait GenericQueryConcern
     }
 
     $statusBucket = strtolower(trim((string) ($p['_scmStatusBucket'] ?? 'active')));
-    if (!in_array($statusBucket, ['active', 'postergados', 'cerrados'], true)) {
+    if (!in_array($statusBucket, ['active', 'postergados', 'cerrados', 'all'], true)) {
       $statusBucket = 'active';
     }
 
@@ -119,7 +121,7 @@ trait GenericQueryConcern
         }
       }
       $where[] = '(' . implode(' OR ', $closedWhere) . ')';
-    } else {
+    } elseif ($statusBucket === 'active') {
       $where[] = 'LOWER(TRIM(COALESCE(`estado`, \'\'))) IN (?, ?)';
       $args[] = 'nuevo';
       $args[] = 'en proceso';
@@ -130,6 +132,18 @@ trait GenericQueryConcern
           $where[] = 'LOWER(TRIM(COALESCE(`estado`, \'\'))) = ?';
           $args[] = $estadoFilter;
         }
+      }
+      if (!empty($p['fEstadoAdmin'])) {
+        $col = $this->detect_first_existing_column($tabla, ['estado_admin_ticket', 'estado_administrativo', 'estado_admin']);
+        if ($col !== '') {
+          $where[] = "CONVERT(`{$col}` USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci";
+          $args[] = $p['fEstadoAdmin'];
+        }
+      }
+    } else {
+      if (!empty($p['fEstado'])) {
+        $where[] = 'CONVERT(`estado` USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci';
+        $args[] = $p['fEstado'];
       }
       if (!empty($p['fEstadoAdmin'])) {
         $col = $this->detect_first_existing_column($tabla, ['estado_admin_ticket', 'estado_administrativo', 'estado_admin']);
@@ -234,6 +248,8 @@ trait GenericQueryConcern
           $args[] = $p['fEmpleado'];
         }
         $where[] = '(' . implode(' OR ', $empWhere) . ')';
+      } else {
+        $where[] = '1 = 0';
       }
     }
 
@@ -479,7 +495,7 @@ trait GenericQueryConcern
       }
     }
 
-    $whereStr = implode(' AND ', $where);
+    $whereStr = !empty($where) ? implode(' AND ', $where) : '1 = 1';
     $countSql = "SELECT COUNT(*) FROM `{$tabla}` WHERE {$whereStr}";
     $total = (int) $this->db->getVar($countSql, $args);
 

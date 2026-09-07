@@ -8355,7 +8355,7 @@
         ["select[name$='prioridad']", options.prioridad || [], "value", "label"],
         ["select[name$='cotizacion_estado']", options.cotizacion_estado || [], "value", "label"],
         ["select[name$='revision_estado']", options.revision_estado || [], "value", "label"],
-        ["#scm_tema", options.tema || [], "value", "label"],
+        ["select[name$='tema']", options.tema || [], "value", "label"],
       ];
       mappings.forEach(function (mapping) {
         root.querySelectorAll(mapping[0]).forEach(function (select) {

@@ -93,11 +93,11 @@ trait RendersDashboard
     $statusBucketDefs = $this->get_status_bucket_definitions();
     $statusTopicDefs = $this->get_status_topic_definitions();
     $statusResults = $this->build_status_bucket_results($statusBucketDefs, $statusTopicDefs, $config, $filterOptions, false);
-    $currentEmployeeId = '';
+    $currentEmployeeId = $this->current_employee_id();
     $config['calendar_current_employee_id'] = $currentEmployeeId;
-    $myTicketsParams = $module->parseParams($_GET, 'scm_my_');
+    $myTicketsParams = $this->parse_params_generic($_GET, 'scm_my_');
     $myTicketsParams['fEmpleado'] = $currentEmployeeId !== '' ? $currentEmployeeId : '__sin_funcionario__';
-    $myTicketsParams['_scmEmpleadoExact'] = '1';
+    $myTicketsParams['_scmStatusBucket'] = 'all';
     $myTicketsResult = ['tbody' => $this->render_lazy_tickets_placeholder('Abre esta pestaña para cargar tus tickets.'), 'pagination_html' => ''];
     $myTicketsStats = ['total' => 0];
     $cotizacionesParams = $this->parse_cotizaciones_mantenimiento_params($_GET, 'scmqt_');
@@ -1794,9 +1794,10 @@ trait RendersDashboard
   {
     $cards = (string) ($result['tbody'] ?? '');
     $pagination = (string) ($result['pagination_html'] ?? '');
-    $form = $this->render_status_maintenance_filter_form('mis_tickets', 'scm_my_', $params, $filterOptions, 'Mis tickets');
+    $temaOptions = is_array($filterOptions['tema'] ?? null) ? $filterOptions['tema'] : [];
+    $form = $this->render_generic_filter_form('mis_tickets', 'scm_my_', $params, true, $temaOptions, $filterOptions, 'mis_tickets', 'Mis tickets');
     return '<span id="scm-mis_tickets-count" style="display:none;">' . esc_html((string) ($stats['total'] ?? 0)) . '</span>'
-      . '<div class="scm-status-topic-head"><div><h3>Mis tickets</h3><p>Tickets abiertos asignados a tu funcionario.</p></div><span class="scm-status-count"><strong>' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> tickets</span></div>'
+      . '<div class="scm-status-topic-head"><div><h3>Mis tickets</h3><p>Tickets asignados a tu funcionario, sin limitar por tema.</p></div><span class="scm-status-count"><strong>' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> tickets</span></div>'
       . $form
       . '<div class="scm-cards-wrap"><div class="scm-ticket-cards" id="scm-cards-mis_tickets">' . $cards . '</div></div>'
       . '<div class="scm-pagination" id="scm-pagination-mis_tickets">' . $pagination . '</div>';

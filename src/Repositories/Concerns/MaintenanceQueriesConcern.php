@@ -33,7 +33,7 @@ trait MaintenanceQueriesConcern
     $table = $this->ticketsTable();
 
     return [
-      'tema' => $this->formatTopicOptions(self::MAINTENANCE_TOPICS),
+      'tema' => $this->getTicketTopicFilterOptions(),
       'estado' => ['Nuevo', 'En proceso'],
       'estado_admin' => $this->getDistinctValuesFromCandidates($table, ['estado_administrativo']),
       'prioridad' => $this->getDistinctValuesFromCandidates($table, ['prioridad']),
@@ -415,6 +415,12 @@ trait MaintenanceQueriesConcern
 
     /** @var array<int,array<string,mixed>> $rows */
     return $this->enrichRowsWithRelatedTables($rows);
+  }
+
+  /** @return array<int,string> */
+  public function getTicketTopicFilterOptions(): array
+  {
+    return $this->getDistinctValuesFromCandidates($this->ticketsTable(), ['tema_ayuda'], 500);
   }
 
   /**

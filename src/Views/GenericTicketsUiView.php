@@ -516,8 +516,8 @@ final class GenericTicketsUiView
       <form id="scm-form-<?php echo esc_attr($tabKey); ?>" autocomplete="off">
         <input type="hidden" id="<?php echo esc_attr($prefix); ?>page" name="<?php echo esc_attr($prefix); ?>page" value="<?php echo esc_attr((string) ($p['fPage'] ?? 1)); ?>">
         <div class="scm-grid">
-          <?php if ($showTema && !empty($temaOpts)): ?>
-            <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>tema">Categoria</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>tema" name="<?php echo esc_attr($prefix); ?>tema">
+          <?php if ($showTema): ?>
+            <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>tema">Tema</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>tema" name="<?php echo esc_attr($prefix); ?>tema">
                 <option value="">Todas</option><?php foreach ($temaOpts as $t): ?><option value="<?php echo esc_attr($t); ?>" <?php selected(strtolower((string) ($p['fTema'] ?? '')), strtolower($t)); ?>><?php echo esc_html($t); ?></option><?php endforeach; ?>
               </select></div>
           <?php endif; ?>

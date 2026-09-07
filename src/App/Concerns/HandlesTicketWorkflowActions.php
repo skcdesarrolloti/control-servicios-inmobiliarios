@@ -84,7 +84,7 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_dashboard_filter_options(): void
   {
     $this->verifyCsrf();
-    $cacheName = 'dashboard-filter-options-v5';
+    $cacheName = 'dashboard-filter-options-v6';
     $payload = $this->readDashboardPerformanceCache($cacheName, 3600);
     if (
       is_array($payload)
@@ -292,6 +292,8 @@ trait HandlesTicketWorkflowActions
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->refresh();
     $this->clearDashboardPerformanceCache('dashboard-filter-options-v4');
+    $this->clearDashboardPerformanceCache('dashboard-filter-options-v5');
+    $this->clearDashboardPerformanceCache('dashboard-filter-options-v6');
     $calendarFuncionarios = $this->get_calendar_allowed_funcionarios();
 
     $this->jsonOk([

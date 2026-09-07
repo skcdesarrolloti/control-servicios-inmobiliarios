@@ -102,19 +102,42 @@ trait HandlesMaintenanceActions
       'acta_url'       => self::sanitizeUrl($rawConfig['acta_url']       ?? self::DEFAULT_ACTA_URL),
     ];
 
-    $module = $this->get_servicios_inmobiliarios_module();
-    $params = $module->parseParams($_POST, 'scm_my_');
+    $params = $this->parse_params_generic($_POST, 'scm_my_');
     $employeeId = $this->current_employee_id();
     $params['fEmpleado'] = $employeeId !== '' ? $employeeId : '__sin_funcionario__';
-    $params['_scmEmpleadoExact'] = '1';
-    $result = $module->run($params, $config);
+    $params['_scmStatusBucket'] = 'all';
+    $result = $this->run_query_generic([], $params, $config);
+    $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
     $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];
+    $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : ['page' => 1, 'total_pages' => 1, 'total' => 0];
 
     $this->jsonOk([
-      'cards' => (string) ($result['tbody'] ?? ''),
-      'pagination' => (string) ($result['pagination_html'] ?? ''),
+      'cards' => $this->render_generic_cards($rows, $config, 'mis_tickets', 'all'),
+      'pagination' => $this->get_generic_tickets_module()->render_generic_pagination('mis_tickets', $pagination),
       'count' => (string) ($stats['total'] ?? 0),
       'kpi_total' => (string) ($stats['total'] ?? 0),
+      'kpi_con_cotz' => (string)($stats['con_cotizacion'] ?? 0),
+      'kpi_sin_cotz' => (string)($stats['sin_cotizacion'] ?? 0),
+      'kpi_con_prev' => (string)($stats['con_revision'] ?? 0),
+      'kpi_sin_prev' => (string)($stats['sin_revision'] ?? 0),
+      'kpi_con_rev_entrega' => (string)($stats['con_revision_entrega'] ?? 0),
+      'kpi_sin_rev_entrega' => (string)($stats['sin_revision_entrega'] ?? 0),
+      'kpi_con_inventario' => (string)($stats['con_inventario'] ?? 0),
+      'kpi_sin_inventario' => (string)($stats['sin_inventario'] ?? 0),
+      'kpi_con_cita' => (string)($stats['con_cita'] ?? 0),
+      'kpi_sin_cita' => (string)($stats['sin_cita'] ?? 0),
+      'kpi_con_rev_recibo' => (string)($stats['con_revision_recibo'] ?? 0),
+      'kpi_sin_rev_recibo' => (string)($stats['sin_revision_recibo'] ?? 0),
+      'kpi_nuevo' => (string)($stats['estado_nuevo'] ?? 0),
+      'kpi_en_proceso' => (string)($stats['estado_en_proceso'] ?? 0),
+      'kpi_avg_first_h' => isset($stats['avg_first_h']) && is_numeric($stats['avg_first_h']) ? number_format((float) $stats['avg_first_h'], 1) . 'h' : '-',
+      'kpi_avg_stale_h' => isset($stats['avg_stale_h']) && is_numeric($stats['avg_stale_h']) ? number_format((float) $stats['avg_stale_h'], 1) . 'h' : '-',
+      'kpi_magnitud_critico' => (string)($stats['magnitud_critico'] ?? 0),
+      'kpi_magnitud_alto' => (string)($stats['magnitud_alto'] ?? 0),
+      'kpi_magnitud_medio' => (string)($stats['magnitud_medio'] ?? 0),
+      'kpi_magnitud_bajo' => (string)($stats['magnitud_bajo'] ?? 0),
+      'kpi_danos_si' => (string)($stats['danos_si'] ?? 0),
+      'kpi_danos_no' => (string)($stats['danos_no'] ?? 0),
     ]);
   }
 
