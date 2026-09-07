@@ -6409,6 +6409,11 @@
   border-top: 1px solid #e2e8f0;
 }
 
+#scm-app .scm-admin-notif-import-card .scm-admin-notif-receipts-import[hidden],
+#scm-app .scm-admin-notif-import-card .scm-admin-notif-receipts-import.is-hidden {
+  display: none !important;
+}
+
 #scm-app .scm-admin-notif-import-copy h4 {
   margin: 4px 0 6px;
   color: #0f172a;
