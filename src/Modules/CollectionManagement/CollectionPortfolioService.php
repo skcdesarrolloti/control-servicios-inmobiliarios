@@ -762,9 +762,32 @@ final class CollectionPortfolioService
   public function generateLetter(int $portfolioId, string $letterType, bool $sendEmail): array
   {
     $item = $this->letterItem($portfolioId, $letterType);
-    $sender = (new AdministrativeNotificationsService($this->db))->senderProfile();
+    $adminService = new AdministrativeNotificationsService($this->db);
+    $sender = $adminService->senderProfile();
     $generator = new CollectionLetterPdfGenerator();
     $document = $generator->generate($item, $letterType, $sender);
+    $tenantId = (int) ($item['tenant_id'] ?? 0);
+    $contractId = (int) ($item['contract_id'] ?? 0);
+    if ($tenantId <= 0 || $contractId <= 0) {
+      throw new \RuntimeException('Este registro no tiene arrendatario y contrato vinculados para registrar el cobro prejurídico.');
+    }
+    $managementObservation = $sendEmail
+      ? 'Carta de cobro prejurídico generada y enviada por correo al arrendatario.'
+      : 'Carta de cobro prejurídico generada desde gestión de cartera.';
+    $management = $adminService->registerCollectionManagement([$tenantId], [
+      'tipo_gestion_cobro' => 'Canon',
+      'observacion' => $managementObservation,
+      'volver_llamar' => 'No',
+      'siguiente_fecha' => '',
+      'siguiente_hora' => '',
+      'otro_horario_cobro' => '',
+      'tipo_reporte_inmueble' => 'Cobro prejuridico',
+      'contract_ids' => [$contractId],
+    ]);
+    $managementCreated = (int) ($management['created'] ?? 0);
+    if ($managementCreated <= 0) {
+      throw new \RuntimeException('No se pudo registrar el cobro prejurídico en el historial del inmueble.');
+    }
     $now = date('Y-m-d H:i:s');
     $stage = 'prejuridico';
     $this->db->update($this->portfolioTable(), [
@@ -814,6 +837,10 @@ final class CollectionPortfolioService
       'email_queued' => $queued,
       'recipients' => count($recipients),
       'stage' => $stage,
+      'management_created' => $managementCreated,
+      'management_history' => (int) ($management['history'] ?? 0),
+      'management_properties' => (int) ($management['properties'] ?? 0),
+      'managements' => (array) ($management['managements'] ?? []),
     ];
   }
 

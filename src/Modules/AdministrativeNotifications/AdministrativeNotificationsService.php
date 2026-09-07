@@ -734,7 +734,7 @@ final class AdministrativeNotificationsService
     ];
   }
 
-  /** @param array<string,mixed> $payload @return array{tipo_gestion_cobro:string,observacion:string,volver_llamar:string,siguiente_fecha:string,siguiente_hora:string,otro_horario_cobro:string,contract_ids:array<int,int>} */
+  /** @param array<string,mixed> $payload @return array{tipo_gestion_cobro:string,observacion:string,volver_llamar:string,siguiente_fecha:string,siguiente_hora:string,otro_horario_cobro:string,tipo_reporte_inmueble:string,contract_ids:array<int,int>} */
   private function normalizeCollectionPayload(array $payload): array
   {
     $type = trim((string) ($payload['tipo_gestion_cobro'] ?? 'Canon'));
@@ -777,6 +777,7 @@ final class AdministrativeNotificationsService
       'siguiente_fecha' => $date,
       'siguiente_hora' => $hour,
       'otro_horario_cobro' => mb_substr(trim(wp_strip_all_tags((string) ($payload['otro_horario_cobro'] ?? ''))), 0, 240, 'UTF-8'),
+      'tipo_reporte_inmueble' => mb_substr(trim(wp_strip_all_tags((string) ($payload['tipo_reporte_inmueble'] ?? 'Cobro'))), 0, 190, 'UTF-8') ?: 'Cobro',
       'contract_ids' => $contractIds,
     ];
   }
@@ -1209,6 +1210,10 @@ final class AdministrativeNotificationsService
     if ($data['volver_llamar'] === 'Si' && $data['siguiente_fecha'] !== '') {
       $detail .= ' Proxima gestion: ' . $data['siguiente_fecha'] . ($data['siguiente_hora'] !== '' ? ' ' . $data['siguiente_hora'] : '');
     }
+    $propertyReportType = trim((string) ($data['tipo_reporte_inmueble'] ?? ''));
+    if ($propertyReportType === '') {
+      $propertyReportType = 'Cobro';
+    }
     $payload = [
       'cct_status' => 'publish',
       'cct_author_id' => $employeeId,
@@ -1218,8 +1223,8 @@ final class AdministrativeNotificationsService
       'id_inmueble_data' => $propertyId,
       'id_empleado' => $employeeId,
       'fecha' => $nowTs,
-      'tipo_reporte' => 'Cobro',
-      'tipo_de_reporte_his' => 'Cobro',
+      'tipo_reporte' => $propertyReportType,
+      'tipo_de_reporte_his' => $propertyReportType,
       'observacion' => $detail,
       'observacion_his' => $detail,
       'funcionario' => $employeeName,

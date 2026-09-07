@@ -147,8 +147,8 @@ trait HandlesCollectionManagement
         $emailQueued = (int) ($result['email_queued'] ?? ($result['queued'] ?? 0));
         $this->jsonOk($result + [
           'message' => $emailQueued > 0
-            ? 'Carta prejurídica generada y ' . $emailQueued . ' correo(s) encolado(s).'
-            : 'La carta prejurídica se generó, pero no se encontró un correo válido para encolarla.',
+            ? 'Carta prejurídica generada, reporte del inmueble registrado y ' . $emailQueued . ' correo(s) encolado(s).'
+            : 'La carta prejurídica se generó y el reporte del inmueble quedó registrado, pero no se encontró un correo válido para encolarla.',
         ]);
       }
       if ($operation === 'send_siniestro') {
