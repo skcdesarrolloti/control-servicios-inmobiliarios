@@ -213,7 +213,8 @@
 #scm-app .scm-portfolio-kpi--success::before,
 #scm-app .scm-portfolio-kpi--paid::before { background: var(--portfolio-teal); }
 #scm-app .scm-portfolio-kpi--credit::before { background: var(--portfolio-blue); }
-#scm-app .scm-portfolio-kpi--warning::before { background: var(--portfolio-amber); }
+#scm-app .scm-portfolio-kpi--warning::before,
+#scm-app .scm-portfolio-kpi--notice::before { background: var(--portfolio-amber); }
 
 #scm-app .scm-portfolio-kpi span,
 #scm-app .scm-portfolio-kpi small {

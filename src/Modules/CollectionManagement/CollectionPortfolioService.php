@@ -407,6 +407,24 @@ final class CollectionPortfolioService
         'subtitle' => 'Registros que requieren verificación contra contratos o datos 1380.',
         'rows' => $this->reportRows(['`status` IN (?, ?)'], ['sin_dato', 'sin_contrato'], $limit),
       ],
+      'aviso_prejuridico' => [
+        'title' => 'Aviso prejurídico',
+        'subtitle' => 'Contratos con carta prejurídica enviada desde gestión de cobro.',
+        'rows' => $this->reportRows(
+          ['(`last_action_type` = ? OR `id` IN (SELECT `portfolio_id` FROM `' . $this->eventsTable() . '` WHERE `event_type` = ?))'],
+          ['carta_prejuridico_enviada', 'letter_sent_prejuridico'],
+          $limit
+        ),
+      ],
+      'aviso_siniestro' => [
+        'title' => 'Aviso siniestro',
+        'subtitle' => 'Contratos con aviso preventivo de siniestro enviado o registrado.',
+        'rows' => $this->reportRows(
+          ['(`last_action_type` = ? OR `id` IN (SELECT `portfolio_id` FROM `' . $this->eventsTable() . '` WHERE `event_type` = ?))'],
+          ['siniestro_notificado', 'siniestro_notificado'],
+          $limit
+        ),
+      ],
       'cuentas_cruzadas' => [
         'title' => 'Cuentas cruzadas',
         'subtitle' => 'Registros identificados con estado de saldo válido.',

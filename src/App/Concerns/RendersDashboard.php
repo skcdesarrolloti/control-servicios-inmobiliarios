@@ -2261,7 +2261,10 @@ trait RendersDashboard
     $contractRows = is_array($contractsPortfolio['rows'] ?? null) ? $contractsPortfolio['rows'] : [];
     $contractApplied = is_array($contractsPortfolio['filters'] ?? null) ? $contractsPortfolio['filters'] : [];
     $contractPagination = is_array($contractsPortfolio['pagination'] ?? null) ? $contractsPortfolio['pagination'] : [];
-    $reportDrilldowns = $this->collection_report_drilldown_payload($portfolioService->reportDrilldowns());
+    $rawReportDrilldowns = $portfolioService->reportDrilldowns();
+    $prelegalNoticeAccounts = (int) ($rawReportDrilldowns['aviso_prejuridico']['count'] ?? count((array) ($rawReportDrilldowns['aviso_prejuridico']['rows'] ?? [])));
+    $claimNoticeAccounts = (int) ($rawReportDrilldowns['aviso_siniestro']['count'] ?? count((array) ($rawReportDrilldowns['aviso_siniestro']['rows'] ?? [])));
+    $reportDrilldowns = $this->collection_report_drilldown_payload($rawReportDrilldowns);
 
     $managementFilters = [
       'date_from' => trim((string) ($input['scmgc_fecha_desde'] ?? '')),
@@ -2364,6 +2367,8 @@ trait RendersDashboard
         <article class="scm-portfolio-kpi scm-portfolio-kpi--credit"><span>Saldo a favor</span><strong><?php echo esc_html((string) $creditAccounts); ?></strong><small>No registran deuda</small><?php echo $this->render_collection_report_drilldown_button('saldo_favor', 'Ver saldos'); ?></article>
         <article class="scm-portfolio-kpi scm-portfolio-kpi--paid"><span>Pagaron en el &uacute;ltimo cargue</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['paid'] ?? 0))); ?></strong><small>Dejaron de tener saldo positivo</small><?php echo $this->render_collection_report_drilldown_button('pagaron_ultimo_cargue', 'Ver pagos'); ?></article>
         <article class="scm-portfolio-kpi scm-portfolio-kpi--warning"><span>Sin cruce</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['without_data'] ?? 0) + (int) ($portfolioSummary['unmatched'] ?? 0))); ?></strong><small>Requieren verificaci&oacute;n</small><?php echo $this->render_collection_report_drilldown_button('sin_cruce', 'Ver pendientes'); ?></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--notice"><span>Aviso prejur&iacute;dico</span><strong><?php echo esc_html((string) $prelegalNoticeAccounts); ?></strong><small>Cartas enviadas</small><?php echo $this->render_collection_report_drilldown_button('aviso_prejuridico', 'Ver avisos'); ?></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--notice"><span>Aviso siniestro</span><strong><?php echo esc_html((string) $claimNoticeAccounts); ?></strong><small>Notificaci&oacute;n preventiva</small><?php echo $this->render_collection_report_drilldown_button('aviso_siniestro', 'Ver avisos'); ?></article>
         <article class="scm-portfolio-kpi scm-portfolio-kpi--claim"><span>Siniestrados</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['claims'] ?? 0))); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['prejuridical'] ?? 0))); ?> en prejur&iacute;dico</small><?php echo $this->render_collection_report_drilldown_button('etapa_siniestro', 'Ver siniestros'); ?></article>
       </div>
 
