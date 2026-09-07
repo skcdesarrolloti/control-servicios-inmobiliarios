@@ -408,8 +408,91 @@
     }
 
     function syncModalBodyState() {
-      var openModal = root.querySelector("[data-scm-portfolio-management-modal]:not([hidden]), [data-scm-portfolio-letter-preview-modal]:not([hidden])");
+      var openModal = root.querySelector("[data-scm-portfolio-management-modal]:not([hidden]), [data-scm-portfolio-letter-preview-modal]:not([hidden]), [data-scm-portfolio-report-modal]:not([hidden])");
       document.body.classList.toggle("scm-modal-open", !!openModal);
+    }
+
+    function reportGroups() {
+      var source = root.querySelector("[data-scm-portfolio-report-details]");
+      if (!source) return {};
+      try {
+        var parsed = JSON.parse(source.textContent || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch (_err) {
+        return {};
+      }
+    }
+
+    function closeReportDrilldown() {
+      var modal = root.querySelector("[data-scm-portfolio-report-modal]");
+      if (!modal) return;
+      modal.hidden = true;
+      var body = modal.querySelector("[data-scm-portfolio-report-body]");
+      var search = modal.querySelector("[data-scm-portfolio-report-search]");
+      if (body) body.innerHTML = "";
+      if (search) search.value = "";
+      modal.removeAttribute("data-current-group");
+      syncModalBodyState();
+    }
+
+    function renderReportRows(modal, group, filter) {
+      var body = modal.querySelector("[data-scm-portfolio-report-body]");
+      var count = modal.querySelector("[data-scm-portfolio-report-count]");
+      if (!body) return;
+      var rows = Array.isArray(group.rows) ? group.rows : [];
+      var needle = String(filter || "").trim().toLowerCase();
+      if (needle) {
+        rows = rows.filter(function (row) {
+          return [
+            row.tenant, row.document, row.phone, row.email, row.contract,
+            row.property, row.address, row.landlord, row.balance_label,
+            row.status_label, row.stage_label, row.last_action
+          ].join(" ").toLowerCase().indexOf(needle) !== -1;
+        });
+      }
+      if (count) {
+        count.textContent = rows.length + " de " + (Number(group.count || rows.length)) + " contrato(s)";
+      }
+      if (!rows.length) {
+        body.innerHTML = '<div class="scm-admin-notif-empty"><strong>Sin contratos para mostrar</strong><span>No hay resultados en este grupo con la búsqueda actual.</span></div>';
+        return;
+      }
+      body.innerHTML = '<table class="scm-collection-log-table scm-portfolio-report-detail-table">'
+        + '<thead><tr><th>Arrendatario</th><th>Contrato</th><th>Inmueble</th><th>Saldo</th><th>Estado</th><th>Etapa</th><th>Última acción</th></tr></thead>'
+        + '<tbody>' + rows.map(function (row) {
+          var contact = [row.document || "", row.phone || "", row.email || ""].filter(Boolean).join(" · ");
+          var property = '<strong>' + escapeHtml(row.property || "-") + '</strong>' + (row.address ? '<small>' + escapeHtml(row.address) + '</small>' : "");
+          return '<tr>'
+            + '<td><strong>' + escapeHtml(row.tenant || "Sin nombre") + '</strong><small>' + escapeHtml(contact || "-") + '</small></td>'
+            + '<td><span class="scm-collection-log-pill">' + escapeHtml(row.contract || "-") + '</span></td>'
+            + '<td>' + property + '</td>'
+            + '<td class="scm-portfolio-money">' + escapeHtml(row.balance_label || "-") + '</td>'
+            + '<td><span class="scm-portfolio-status scm-portfolio-status--' + escapeHtml(row.status || "") + '">' + escapeHtml(row.status_label || "-") + '</span></td>'
+            + '<td><span class="scm-portfolio-stage scm-portfolio-stage--' + escapeHtml(row.stage || "") + '">' + escapeHtml(row.stage_label || "-") + '</span></td>'
+            + '<td>' + escapeHtml(row.last_action || "-") + '<small>' + escapeHtml(row.last_action_at || "") + '</small></td>'
+            + '</tr>';
+        }).join("") + '</tbody></table>';
+    }
+
+    function openReportDrilldown(button) {
+      var groupKey = String(button.getAttribute("data-scm-portfolio-report-group") || "");
+      var groups = reportGroups();
+      var group = groups[groupKey];
+      var modal = root.querySelector("[data-scm-portfolio-report-modal]");
+      if (!modal || !group) return;
+      var title = modal.querySelector("[data-scm-portfolio-report-title]");
+      var subtitle = modal.querySelector("[data-scm-portfolio-report-subtitle]");
+      var search = modal.querySelector("[data-scm-portfolio-report-search]");
+      modal.setAttribute("data-current-group", groupKey);
+      if (title) title.textContent = String(group.title || "Grupo de cartera");
+      if (subtitle) subtitle.textContent = String(group.subtitle || "Contratos incluidos en este indicador.");
+      renderReportRows(modal, group, "");
+      modal.hidden = false;
+      syncModalBodyState();
+      if (search) {
+        search.value = "";
+        window.setTimeout(function () { search.focus(); }, 50);
+      }
     }
 
     function closeLetterPreview() {
@@ -623,6 +706,15 @@
       });
     });
 
+    root.addEventListener("input", function (event) {
+      if (!event.target.matches || !event.target.matches("[data-scm-portfolio-report-search]")) return;
+      var modal = event.target.closest("[data-scm-portfolio-report-modal]");
+      if (!modal) return;
+      var groupKey = String(modal.getAttribute("data-current-group") || "");
+      var group = reportGroups()[groupKey];
+      if (group) renderReportRows(modal, group, event.target.value);
+    });
+
     root.addEventListener("click", function (event) {
       var portfolioTab = event.target.closest && event.target.closest("[data-scm-portfolio-tab]");
       if (portfolioTab && root.contains(portfolioTab)) {
@@ -640,6 +732,12 @@
         document.body.classList.add("scm-print-portfolio-report");
         window.print();
         window.setTimeout(function () { document.body.classList.remove("scm-print-portfolio-report"); }, 10000);
+        return;
+      }
+      var reportDetailButton = event.target.closest && event.target.closest("[data-scm-portfolio-report-group]");
+      if (reportDetailButton && root.contains(reportDetailButton)) {
+        event.preventDefault();
+        openReportDrilldown(reportDetailButton);
         return;
       }
       var resetButton = event.target.closest && event.target.closest("[data-scm-portfolio-reset]");
@@ -696,6 +794,12 @@
         closeLetterPreview();
         return;
       }
+      var reportClose = event.target.closest && event.target.closest("[data-scm-portfolio-report-close]");
+      if (reportClose && root.contains(reportClose)) {
+        event.preventDefault();
+        closeReportDrilldown();
+        return;
+      }
       var previewDownload = event.target.closest && event.target.closest("[data-scm-portfolio-letter-preview-download]");
       if (previewDownload && root.contains(previewDownload)) {
         event.preventDefault();
@@ -731,7 +835,9 @@
       }
       if (event.key === "Escape") {
         var preview = root.querySelector("[data-scm-portfolio-letter-preview-modal]:not([hidden])");
+        var reportDetail = root.querySelector("[data-scm-portfolio-report-modal]:not([hidden])");
         if (preview) closeLetterPreview();
+        else if (reportDetail) closeReportDrilldown();
         else closeManagementModal();
       }
     });

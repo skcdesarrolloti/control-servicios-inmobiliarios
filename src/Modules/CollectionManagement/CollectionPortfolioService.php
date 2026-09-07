@@ -373,6 +373,106 @@ final class CollectionPortfolioService
     ];
   }
 
+  /** @return array<string,array<string,mixed>> */
+  public function reportDrilldowns(int $limit = 700): array
+  {
+    $this->ensureSchema();
+    $limit = max(50, min(1000, $limit));
+    $latest = $this->db->getRow("SELECT * FROM `{$this->importsTable()}` ORDER BY `id` DESC LIMIT 1");
+    $latestImportId = is_array($latest) ? (int) ($latest['id'] ?? 0) : 0;
+
+    $groups = [
+      'cartera_pendiente' => [
+        'title' => 'Cartera pendiente',
+        'subtitle' => 'Contratos con saldo positivo en el último auxiliar.',
+        'rows' => $this->reportRows(['`status` = ?'], ['deuda'], $limit),
+      ],
+      'no_al_dia' => [
+        'title' => 'Contratos no al día',
+        'subtitle' => 'Saldo positivo pendiente.',
+        'rows' => $this->reportRows(['`status` = ?'], ['deuda'], $limit),
+      ],
+      'al_dia' => [
+        'title' => 'Contratos al día',
+        'subtitle' => 'Saldo exacto en cero.',
+        'rows' => $this->reportRows(['`status` = ?'], ['al_dia'], $limit),
+      ],
+      'saldo_favor' => [
+        'title' => 'Saldo a favor',
+        'subtitle' => 'Contratos con saldo negativo en la 1380.',
+        'rows' => $this->reportRows(['`status` = ?'], ['saldo_favor'], $limit),
+      ],
+      'sin_cruce' => [
+        'title' => 'Sin cruce',
+        'subtitle' => 'Registros que requieren verificación contra contratos o datos 1380.',
+        'rows' => $this->reportRows(['`status` IN (?, ?)'], ['sin_dato', 'sin_contrato'], $limit),
+      ],
+      'cuentas_cruzadas' => [
+        'title' => 'Cuentas cruzadas',
+        'subtitle' => 'Registros identificados con estado de saldo válido.',
+        'rows' => $this->reportRows(['`status` IN (?, ?, ?)'], ['deuda', 'al_dia', 'saldo_favor'], $limit),
+      ],
+      'al_dia_o_favor' => [
+        'title' => 'Al día o a favor',
+        'subtitle' => 'Contratos sin deuda según la última foto de cartera.',
+        'rows' => $this->reportRows(['`status` IN (?, ?)'], ['al_dia', 'saldo_favor'], $limit),
+      ],
+      'etapa_normal' => [
+        'title' => 'Cobro normal',
+        'subtitle' => 'Contratos con deuda que siguen en etapa normal.',
+        'rows' => $this->reportRows(['`status` = ?', '`collection_stage` = ?'], ['deuda', 'normal'], $limit),
+      ],
+      'etapa_prejuridico' => [
+        'title' => 'Prejurídico',
+        'subtitle' => 'Contratos clasificados en etapa prejurídica.',
+        'rows' => $this->reportRows(['`collection_stage` = ?'], ['prejuridico'], $limit),
+      ],
+      'etapa_siniestro' => [
+        'title' => 'Siniestrados',
+        'subtitle' => 'Contratos marcados como siniestro.',
+        'rows' => $this->reportRows(['`collection_stage` = ?'], ['siniestro'], $limit),
+      ],
+      'pagaron_ultimo_cargue' => [
+        'title' => 'Pagaron en el último cargue',
+        'subtitle' => 'Contratos que dejaron de tener saldo positivo frente al cargue anterior.',
+        'rows' => $latestImportId > 0 ? $this->reportRows(
+          ['`id` IN (SELECT `portfolio_id` FROM `' . $this->eventsTable() . '` WHERE `import_id` = ? AND `event_type` = ?)'],
+          [$latestImportId, 'payment_received'],
+          $limit
+        ) : [],
+      ],
+    ];
+
+    foreach ($groups as $key => $group) {
+      $groups[$key]['count'] = count((array) ($group['rows'] ?? []));
+      $groups[$key]['truncated'] = false;
+    }
+
+    return $groups;
+  }
+
+  /**
+   * @param string[] $where
+   * @param array<int,mixed> $args
+   * @return array<int,array<string,mixed>>
+   */
+  private function reportRows(array $where, array $args, int $limit): array
+  {
+    array_unshift($where, '`is_current` = 1');
+    $whereSql = implode(' AND ', $where);
+    return $this->db->getResults(
+      "SELECT `id`, `contract_id`, `tenant_id`, `tenant_name`, `tenant_document`, `tenant_email`, `tenant_phone`,
+          `contract_number`, `property_code`, `property_address`, `landlord_name`, `balance`, `previous_balance`,
+          `status`, `collection_stage`, `last_action_type`, `last_action_at`, `source_date`, `updated_at`
+        FROM `{$this->portfolioTable()}`
+        WHERE {$whereSql}
+        ORDER BY CASE `status` WHEN 'deuda' THEN 0 WHEN 'sin_contrato' THEN 1 WHEN 'sin_dato' THEN 2 WHEN 'saldo_favor' THEN 3 ELSE 4 END,
+          ABS(COALESCE(`balance`, 0)) DESC, `tenant_name` ASC, `id` ASC
+        LIMIT {$limit}",
+      $args
+    );
+  }
+
   /** @param array<string,mixed> $filters @return array<string,mixed> */
   public function contractsDashboard(array $filters = []): array
   {

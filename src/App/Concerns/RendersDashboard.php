@@ -2261,6 +2261,11 @@ trait RendersDashboard
     $contractRows = is_array($contractsPortfolio['rows'] ?? null) ? $contractsPortfolio['rows'] : [];
     $contractApplied = is_array($contractsPortfolio['filters'] ?? null) ? $contractsPortfolio['filters'] : [];
     $contractPagination = is_array($contractsPortfolio['pagination'] ?? null) ? $contractsPortfolio['pagination'] : [];
+    $reportDrilldowns = $this->collection_report_drilldown_payload($portfolioService->reportDrilldowns());
+    $reportDrilldownsJson = json_encode($reportDrilldowns, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
+    if (!is_string($reportDrilldownsJson)) {
+      $reportDrilldownsJson = '{}';
+    }
 
     $managementFilters = [
       'date_from' => trim((string) ($input['scmgc_fecha_desde'] ?? '')),
@@ -2332,19 +2337,20 @@ trait RendersDashboard
       </div>
 
       <section id="scm-portfolio-panel-informe" class="scm-portfolio-view scm-portfolio-report" role="tabpanel" aria-labelledby="scm-portfolio-tab-informe" data-scm-portfolio-panel="informe"<?php echo $activeView === 'informe' ? '' : ' hidden'; ?>>
+        <script type="application/json" data-scm-portfolio-report-details><?php echo $reportDrilldownsJson; ?></script>
         <div class="scm-portfolio-report-head">
           <div><span class="scm-calendar-action-kicker">Informe para gerencia administrativa</span><h4>Estado ejecutivo de la cartera</h4><p>Cifras consolidadas del &uacute;ltimo auxiliar y de las gestiones registradas. Corte contable: <strong><?php echo esc_html($reportCutoff); ?></strong>.</p></div>
           <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-report-print>Imprimir / guardar PDF</button>
         </div>
 
       <div class="scm-portfolio-kpis" aria-label="Resumen ejecutivo de cartera">
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--money"><span>Cartera pendiente</span><strong><?php echo esc_html($this->collection_money($portfolioSummary['balance'] ?? 0)); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['debtors'] ?? 0))); ?> contratos con saldo</small></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--danger"><span>Contratos no al d&iacute;a</span><strong><?php echo esc_html((string) $notUpToDateAccounts); ?></strong><small>Saldo positivo pendiente</small></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--success"><span>Contratos al d&iacute;a</span><strong><?php echo esc_html((string) $upToDateAccounts); ?></strong><small>Saldo exacto en 0</small></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--credit"><span>Saldo a favor</span><strong><?php echo esc_html((string) $creditAccounts); ?></strong><small>No registran deuda</small></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--paid"><span>Pagaron en el &uacute;ltimo cargue</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['paid'] ?? 0))); ?></strong><small>Dejaron de tener saldo positivo</small></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--warning"><span>Sin cruce</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['without_data'] ?? 0) + (int) ($portfolioSummary['unmatched'] ?? 0))); ?></strong><small>Requieren verificaci&oacute;n</small></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--claim"><span>Siniestrados</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['claims'] ?? 0))); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['prejuridical'] ?? 0))); ?> en prejur&iacute;dico</small></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--money"><span>Cartera pendiente</span><strong><?php echo esc_html($this->collection_money($portfolioSummary['balance'] ?? 0)); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['debtors'] ?? 0))); ?> contratos con saldo</small><?php echo $this->render_collection_report_drilldown_button('cartera_pendiente', 'Ver contratos'); ?></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--danger"><span>Contratos no al d&iacute;a</span><strong><?php echo esc_html((string) $notUpToDateAccounts); ?></strong><small>Saldo positivo pendiente</small><?php echo $this->render_collection_report_drilldown_button('no_al_dia', 'Ver pendientes'); ?></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--success"><span>Contratos al d&iacute;a</span><strong><?php echo esc_html((string) $upToDateAccounts); ?></strong><small>Saldo exacto en 0</small><?php echo $this->render_collection_report_drilldown_button('al_dia', 'Ver al día'); ?></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--credit"><span>Saldo a favor</span><strong><?php echo esc_html((string) $creditAccounts); ?></strong><small>No registran deuda</small><?php echo $this->render_collection_report_drilldown_button('saldo_favor', 'Ver saldos'); ?></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--paid"><span>Pagaron en el &uacute;ltimo cargue</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['paid'] ?? 0))); ?></strong><small>Dejaron de tener saldo positivo</small><?php echo $this->render_collection_report_drilldown_button('pagaron_ultimo_cargue', 'Ver pagos'); ?></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--warning"><span>Sin cruce</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['without_data'] ?? 0) + (int) ($portfolioSummary['unmatched'] ?? 0))); ?></strong><small>Requieren verificaci&oacute;n</small><?php echo $this->render_collection_report_drilldown_button('sin_cruce', 'Ver pendientes'); ?></article>
+        <article class="scm-portfolio-kpi scm-portfolio-kpi--claim"><span>Siniestrados</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['claims'] ?? 0))); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['prejuridical'] ?? 0))); ?> en prejur&iacute;dico</small><?php echo $this->render_collection_report_drilldown_button('etapa_siniestro', 'Ver siniestros'); ?></article>
       </div>
 
         <div class="scm-portfolio-report-grid">
@@ -2363,10 +2369,10 @@ trait RendersDashboard
           <article class="scm-portfolio-report-card">
             <span class="scm-calendar-action-kicker">Indicadores de control</span>
             <h5>Calidad y exposici&oacute;n</h5>
-            <div class="scm-portfolio-report-metric"><span>Contratos no al d&iacute;a</span><strong><?php echo esc_html((string) $notUpToDateAccounts); ?></strong><small><?php echo esc_html((string) $debtRate); ?>% de la cartera vigente</small></div>
-            <div class="scm-portfolio-report-metric"><span>Contratos al d&iacute;a</span><strong><?php echo esc_html((string) $upToDateAccounts); ?></strong><small>Saldo exacto en 0</small></div>
-            <div class="scm-portfolio-report-metric"><span>Cuentas cruzadas</span><strong><?php echo esc_html((string) $matchedRate); ?>%</strong><small><?php echo esc_html((string) max(0, $totalAccounts - $reviewAccounts)); ?> cuentas identificadas</small></div>
-            <div class="scm-portfolio-report-metric"><span>Al d&iacute;a o a favor</span><strong><?php echo esc_html((string) ($currentAccounts + $creditAccounts)); ?></strong><small><?php echo esc_html((string) $creditAccounts); ?> presentan saldo a favor</small></div>
+            <div class="scm-portfolio-report-metric"><span>Contratos no al d&iacute;a</span><strong><?php echo esc_html((string) $notUpToDateAccounts); ?></strong><small><?php echo esc_html((string) $debtRate); ?>% de la cartera vigente</small><?php echo $this->render_collection_report_drilldown_button('no_al_dia', 'Ver'); ?></div>
+            <div class="scm-portfolio-report-metric"><span>Contratos al d&iacute;a</span><strong><?php echo esc_html((string) $upToDateAccounts); ?></strong><small>Saldo exacto en 0</small><?php echo $this->render_collection_report_drilldown_button('al_dia', 'Ver'); ?></div>
+            <div class="scm-portfolio-report-metric"><span>Cuentas cruzadas</span><strong><?php echo esc_html((string) $matchedRate); ?>%</strong><small><?php echo esc_html((string) max(0, $totalAccounts - $reviewAccounts)); ?> cuentas identificadas</small><?php echo $this->render_collection_report_drilldown_button('cuentas_cruzadas', 'Ver'); ?></div>
+            <div class="scm-portfolio-report-metric"><span>Al d&iacute;a o a favor</span><strong><?php echo esc_html((string) ($currentAccounts + $creditAccounts)); ?></strong><small><?php echo esc_html((string) $creditAccounts); ?> presentan saldo a favor</small><?php echo $this->render_collection_report_drilldown_button('al_dia_o_favor', 'Ver'); ?></div>
           </article>
         </div>
 
@@ -2374,8 +2380,8 @@ trait RendersDashboard
           <article class="scm-portfolio-report-card">
             <span class="scm-calendar-action-kicker">Etapas de cobro</span>
             <h5>Distribuci&oacute;n de contratos con deuda</h5>
-            <?php foreach ([['Cobro normal', $normalDebtAccounts, $normalStageRate, 'normal'], ['Prejurídico', $prelegalAccounts, $prelegalStageRate, 'prelegal'], ['Siniestro', $claimAccounts, $claimStageRate, 'claim']] as $stageMetric): ?>
-              <div class="scm-portfolio-report-bar-row"><div><span><?php echo esc_html($stageMetric[0]); ?></span><strong><?php echo esc_html((string) $stageMetric[1]); ?></strong></div><div class="scm-portfolio-report-bar" role="img" aria-label="<?php echo esc_attr($stageMetric[0] . ': ' . $stageMetric[1] . ' contratos'); ?>"><i class="scm-portfolio-report-bar-fill scm-portfolio-report-bar-fill--<?php echo esc_attr($stageMetric[3]); ?>" style="--scm-portfolio-bar: <?php echo esc_attr((string) max(0, min(100, (int) $stageMetric[2]))); ?>%"></i></div></div>
+            <?php foreach ([['Cobro normal', $normalDebtAccounts, $normalStageRate, 'normal', 'etapa_normal'], ['Prejurídico', $prelegalAccounts, $prelegalStageRate, 'prelegal', 'etapa_prejuridico'], ['Siniestro', $claimAccounts, $claimStageRate, 'claim', 'etapa_siniestro']] as $stageMetric): ?>
+              <div class="scm-portfolio-report-bar-row"><div><span><?php echo esc_html($stageMetric[0]); ?></span><strong><?php echo esc_html((string) $stageMetric[1]); ?></strong><?php echo $this->render_collection_report_drilldown_button((string) $stageMetric[4], 'Ver grupo'); ?></div><div class="scm-portfolio-report-bar" role="img" aria-label="<?php echo esc_attr($stageMetric[0] . ': ' . $stageMetric[1] . ' contratos'); ?>"><i class="scm-portfolio-report-bar-fill scm-portfolio-report-bar-fill--<?php echo esc_attr($stageMetric[3]); ?>" style="--scm-portfolio-bar: <?php echo esc_attr((string) max(0, min(100, (int) $stageMetric[2]))); ?>%"></i></div></div>
             <?php endforeach; ?>
           </article>
           <article class="scm-portfolio-report-card">
@@ -2645,6 +2651,7 @@ trait RendersDashboard
 
       <?php echo $this->render_collection_management_modal(); ?>
       <?php echo $this->render_collection_letter_preview_modal(); ?>
+      <?php echo $this->render_collection_report_drilldown_modal(); ?>
     </div>
 <?php
     return (string) ob_get_clean();
@@ -2719,6 +2726,73 @@ trait RendersDashboard
     </div>
 <?php
     return (string) ob_get_clean();
+  }
+
+  private function render_collection_report_drilldown_modal(): string
+  {
+    ob_start();
+?>
+    <div class="scm-admin-notif-modal scm-portfolio-report-detail-modal" data-scm-portfolio-report-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-portfolio-report-detail-title">
+      <div class="scm-admin-notif-modal-backdrop" data-scm-portfolio-report-close aria-hidden="true"></div>
+      <section class="scm-admin-notif-card scm-admin-notif-modal-panel scm-portfolio-report-detail-panel">
+        <div class="scm-admin-notif-modal-head">
+          <div class="scm-admin-notif-modal-titleblock"><span class="scm-calendar-action-kicker">Detalle del informe</span><h4 id="scm-portfolio-report-detail-title" data-scm-portfolio-report-title>Grupo de cartera</h4><p data-scm-portfolio-report-subtitle>Contratos incluidos en este indicador.</p></div>
+          <button type="button" class="scm-modal-close" data-scm-portfolio-report-close aria-label="Cerrar detalle"><span aria-hidden="true">&times;</span></button>
+        </div>
+        <div class="scm-portfolio-report-detail-toolbar">
+          <span data-scm-portfolio-report-count>0 contratos</span>
+          <input type="search" class="input input-bordered input-sm scm-input" data-scm-portfolio-report-search placeholder="Buscar en este grupo">
+        </div>
+        <div class="scm-portfolio-report-detail-table-wrap" data-scm-portfolio-report-body></div>
+      </section>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<string,array<string,mixed>> $groups @return array<string,array<string,mixed>> */
+  private function collection_report_drilldown_payload(array $groups): array
+  {
+    $payload = [];
+    foreach ($groups as $key => $group) {
+      $rows = [];
+      foreach ((array) ($group['rows'] ?? []) as $row) {
+        if (!is_array($row)) {
+          continue;
+        }
+        $balance = array_key_exists('balance', $row) && $row['balance'] !== null ? (float) $row['balance'] : null;
+        $rows[] = [
+          'tenant' => (string) (($row['tenant_name'] ?? '') ?: 'Sin nombre'),
+          'document' => (string) (($row['tenant_document'] ?? '') ?: '-'),
+          'phone' => (string) (($row['tenant_phone'] ?? '') ?: ''),
+          'email' => (string) (($row['tenant_email'] ?? '') ?: ''),
+          'contract' => (string) (($row['contract_number'] ?? '') ?: '-'),
+          'property' => (string) (($row['property_code'] ?? '') ?: '-'),
+          'address' => (string) (($row['property_address'] ?? '') ?: ''),
+          'landlord' => (string) (($row['landlord_name'] ?? '') ?: ''),
+          'balance' => $balance,
+          'balance_label' => $balance === null ? '-' : $this->collection_money($balance),
+          'status' => (string) ($row['status'] ?? ''),
+          'status_label' => $this->collection_portfolio_status_label((string) ($row['status'] ?? '')),
+          'stage' => (string) ($row['collection_stage'] ?? ''),
+          'stage_label' => $this->collection_portfolio_stage_label((string) ($row['collection_stage'] ?? '')),
+          'last_action' => $this->collection_portfolio_action_label((string) ($row['last_action_type'] ?? '')),
+          'last_action_at' => $this->format_collection_management_date($row['last_action_at'] ?? ''),
+        ];
+      }
+      $payload[(string) $key] = [
+        'title' => (string) ($group['title'] ?? 'Grupo de cartera'),
+        'subtitle' => (string) ($group['subtitle'] ?? ''),
+        'count' => (int) ($group['count'] ?? count($rows)),
+        'rows' => $rows,
+      ];
+    }
+    return $payload;
+  }
+
+  private function render_collection_report_drilldown_button(string $group, string $label): string
+  {
+    return '<button type="button" class="scm-portfolio-report-detail-btn" data-scm-portfolio-report-group="' . esc_attr($group) . '">' . esc_html($label) . '</button>';
   }
 
   private function collection_money(mixed $value): string

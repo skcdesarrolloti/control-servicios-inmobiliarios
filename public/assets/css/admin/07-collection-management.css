@@ -147,7 +147,8 @@
 
 #scm-app .scm-portfolio-report-metric {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
   gap: 2px 12px;
   padding: 11px 0;
   border-top: 1px solid #e4ebf2;
@@ -159,7 +160,7 @@
 #scm-app .scm-portfolio-report-metric small { color: #52687e; font-size: 10px; }
 
 #scm-app .scm-portfolio-report-bar-row { margin-top: 13px; }
-#scm-app .scm-portfolio-report-bar-row > div:first-child { display: flex; justify-content: space-between; gap: 10px; color: #263f58; font-size: 12px; }
+#scm-app .scm-portfolio-report-bar-row > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #263f58; font-size: 12px; }
 #scm-app .scm-portfolio-report-bar-row strong { color: var(--portfolio-navy); font-variant-numeric: tabular-nums; }
 #scm-app .scm-portfolio-report-bar { height: 10px; margin-top: 6px; overflow: hidden; border-radius: 999px; background: #e9eff5; }
 #scm-app .scm-portfolio-report-bar-fill { display: block; width: var(--scm-portfolio-bar); height: 100%; border-radius: inherit; background: var(--portfolio-blue); }
@@ -225,6 +226,87 @@
   color: var(--portfolio-navy);
   font-size: clamp(24px, 2.1vw, 34px);
   line-height: 1;
+}
+
+#scm-app .scm-portfolio-report-detail-btn {
+  min-height: 34px;
+  margin-top: 12px;
+  border: 1px solid #bfd0e0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--portfolio-navy);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 9px 13px;
+  cursor: pointer;
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+
+#scm-app .scm-portfolio-report-detail-btn:hover,
+#scm-app .scm-portfolio-report-detail-btn:focus-visible {
+  border-color: #f59120;
+  background: #fff7ed;
+  color: #8a3d00;
+  box-shadow: 0 6px 16px rgba(245, 145, 32, 0.16);
+  outline: none;
+}
+
+#scm-app .scm-portfolio-report-metric .scm-portfolio-report-detail-btn,
+#scm-app .scm-portfolio-report-bar-row .scm-portfolio-report-detail-btn {
+  grid-row: span 2;
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+#scm-app .scm-portfolio-report-detail-panel {
+  width: min(1180px, calc(100vw - 38px));
+  max-height: min(760px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+#scm-app .scm-portfolio-report-detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 12px 0 14px;
+  padding: 12px;
+  border: 1px solid #dce6ef;
+  border-radius: 14px;
+  background: #f8fbfe;
+}
+
+#scm-app .scm-portfolio-report-detail-toolbar span {
+  color: var(--portfolio-navy);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+#scm-app .scm-portfolio-report-detail-toolbar input {
+  width: min(360px, 100%);
+  min-height: 42px;
+}
+
+#scm-app .scm-portfolio-report-detail-table-wrap {
+  min-height: 180px;
+  overflow: auto;
+  border: 1px solid #dce6ef;
+  border-radius: 14px;
+  background: #fff;
+}
+
+#scm-app .scm-portfolio-report-detail-table {
+  min-width: 960px;
+}
+
+#scm-app .scm-portfolio-report-detail-table td small {
+  display: block;
+  margin-top: 3px;
+  color: #52687e;
+  font-size: 10px;
+  line-height: 1.35;
 }
 
 #scm-app .scm-portfolio-import-card,
@@ -678,6 +760,10 @@
   #scm-app .scm-portfolio-report-head { display: grid; }
   #scm-app .scm-portfolio-report-head button,
   #scm-app .scm-portfolio-letter-preview-actions button { width: 100%; }
+  #scm-app .scm-portfolio-report-metric { grid-template-columns: minmax(0, 1fr) auto; }
+  #scm-app .scm-portfolio-report-metric .scm-portfolio-report-detail-btn { grid-column: 1 / -1; justify-self: start; margin-top: 6px; }
+  #scm-app .scm-portfolio-report-detail-toolbar { display: grid; }
+  #scm-app .scm-portfolio-report-detail-toolbar input { width: 100%; }
   #scm-app .scm-portfolio-letter-preview-frame { min-height: 340px; height: 58vh; padding: 7px; }
 }
 
@@ -698,7 +784,9 @@
     border: 0;
     box-shadow: none;
   }
-  body.scm-print-portfolio-report .scm-portfolio-report-head button { display: none !important; }
+  body.scm-print-portfolio-report .scm-portfolio-report-head button,
+  body.scm-print-portfolio-report .scm-portfolio-report-detail-btn,
+  body.scm-print-portfolio-report [data-scm-portfolio-report-details] { display: none !important; }
   body.scm-print-portfolio-report .scm-portfolio-kpis { grid-template-columns: repeat(4, 1fr); }
   body.scm-print-portfolio-report .scm-portfolio-kpi { min-height: 92px; box-shadow: none; }
   body.scm-print-portfolio-report .scm-portfolio-report-grid,
