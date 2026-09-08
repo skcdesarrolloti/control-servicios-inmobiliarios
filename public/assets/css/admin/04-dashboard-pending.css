@@ -6760,6 +6760,216 @@
   cursor: not-allowed;
 }
 
+#scm-app .scm-admin-notif-queue-card {
+  margin-top: 16px;
+}
+
+#scm-app .scm-admin-notif-queue-card details {
+  display: grid;
+  gap: 14px;
+}
+
+#scm-app .scm-admin-notif-queue-card summary {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  min-height: 58px;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+#scm-app .scm-admin-notif-queue-card summary::-webkit-details-marker {
+  display: none;
+}
+
+#scm-app .scm-admin-notif-queue-card summary::after {
+  content: "+";
+  position: absolute;
+  right: 34px;
+  color: #f59e0b;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+#scm-app .scm-admin-notif-queue-card details[open] summary::after {
+  content: "-";
+}
+
+#scm-app .scm-admin-notif-queue-card summary strong {
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+#scm-app .scm-admin-notif-queue-card summary small {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#scm-app .scm-admin-notif-queue-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+}
+
+#scm-app .scm-admin-notif-queue-search {
+  grid-column: span 2;
+}
+
+#scm-app .scm-admin-notif-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#scm-app .scm-admin-notif-queue-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+#scm-app .scm-admin-notif-queue-summary article {
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid #dbe7f4;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-admin-notif-queue-summary span,
+#scm-app .scm-admin-notif-queue-summary small {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-admin-notif-queue-summary strong {
+  display: block;
+  margin-top: 5px;
+  color: #08234b;
+  font-size: 22px;
+  line-height: 1;
+}
+
+#scm-app .scm-admin-notif-queue-summary > small {
+  align-self: center;
+  text-align: right;
+}
+
+#scm-app .scm-admin-notif-queue-results {
+  margin-top: 14px;
+}
+
+#scm-app .scm-admin-notif-queue-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #dbe7f4;
+  border-radius: 8px;
+}
+
+#scm-app .scm-admin-notif-queue-table {
+  width: 100%;
+  min-width: 1320px;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: #10233f;
+  font-size: 12px;
+}
+
+#scm-app .scm-admin-notif-queue-table th {
+  padding: 12px 10px;
+  background: #08234b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#scm-app .scm-admin-notif-queue-table td {
+  max-width: 260px;
+  padding: 12px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+
+#scm-app .scm-admin-notif-queue-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+#scm-app .scm-admin-notif-queue-table td strong,
+#scm-app .scm-admin-notif-queue-table td span,
+#scm-app .scm-admin-notif-queue-table td small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+#scm-app .scm-admin-notif-queue-table td small {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+#scm-app .scm-admin-notif-queue-table code {
+  padding: 2px 5px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+#scm-app .scm-admin-notif-queue-status {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 26px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+#scm-app .scm-admin-notif-queue-status--pending,
+#scm-app .scm-admin-notif-queue-status--processing {
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+#scm-app .scm-admin-notif-queue-status--sent {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+#scm-app .scm-admin-notif-queue-status--failed {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+#scm-app .scm-admin-notif-queue-status--cancelled,
+#scm-app .scm-admin-notif-queue-status--other {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+}
+
 #scm-app .scm-admin-notif-modal[hidden] {
   display: none !important;
 }

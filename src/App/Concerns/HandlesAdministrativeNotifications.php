@@ -58,6 +58,20 @@ trait HandlesAdministrativeNotifications
     }
   }
 
+  public function ajax_handler_admin_notifications_stats(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para consultar Notificaciones.');
+    }
+
+    try {
+      $this->jsonOk(['stats' => $this->get_admin_notifications_service()->stats()]);
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
   public function ajax_handler_admin_notifications_send(): void
   {
     try {
@@ -210,6 +224,32 @@ trait HandlesAdministrativeNotifications
         'type_label' => (string) ($result['type_label'] ?? ''),
         'message' => $message,
       ]);
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
+  public function ajax_handler_admin_notifications_queue(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para consultar la cola de Notificaciones.');
+    }
+
+    $filters = [
+      'date_from' => trim(sanitize_text_field(wp_unslash((string) ($_POST['date_from'] ?? '')))),
+      'date_to' => trim(sanitize_text_field(wp_unslash((string) ($_POST['date_to'] ?? '')))),
+      'status' => sanitize_key((string) ($_POST['status'] ?? '')),
+      'channel' => sanitize_key((string) ($_POST['channel'] ?? '')),
+      'type' => sanitize_key((string) ($_POST['type'] ?? '')),
+      'template' => trim(sanitize_text_field(wp_unslash((string) ($_POST['template'] ?? '')))),
+      'q' => trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? '')))),
+      'page' => max(1, (int) ($_POST['page'] ?? 1)),
+      'per_page' => max(10, min(100, (int) ($_POST['per_page'] ?? 25))),
+    ];
+
+    try {
+      $this->jsonOk($this->get_admin_notifications_service()->notificationQueue($filters));
     } catch (\Throwable $e) {
       $this->jsonFail($e->getMessage());
     }

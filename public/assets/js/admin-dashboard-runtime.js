@@ -172,11 +172,15 @@
       actions.admin_notifications_recipients || "";
     var actionAdminNotificationsPanel =
       actions.admin_notifications_panel || "";
+    var actionAdminNotificationsStats =
+      actions.admin_notifications_stats || "";
     var actionAdminNotificationsSend = actions.admin_notifications_send || "";
     var actionAdminNotificationsImport =
       actions.admin_notifications_import || "";
     var actionAdminNotificationsPaymentReceiptsImport =
       actions.admin_notifications_payment_receipts_import || "";
+    var actionAdminNotificationsQueue =
+      actions.admin_notifications_queue || "";
     var actionAdminNotificationsCollection =
       actions.admin_notifications_collection || "";
     var actionAdminNotificationsCollectionOptions =
@@ -2672,6 +2676,19 @@
       var importReportBtn = panel.querySelector("[data-admin-notif-import-report]");
       var importResultEl = panel.querySelector("[data-admin-notif-import-result]");
       var importScopeEl = panel.querySelector("[data-admin-notif-import-scope]");
+      var queueDetails = panel.querySelector("[data-admin-notif-queue-details]");
+      var queueForm = panel.querySelector("[data-admin-notif-queue-form]");
+      var queueDateFrom = panel.querySelector("[data-admin-notif-queue-date-from]");
+      var queueDateTo = panel.querySelector("[data-admin-notif-queue-date-to]");
+      var queueStatus = panel.querySelector("[data-admin-notif-queue-status]");
+      var queueChannel = panel.querySelector("[data-admin-notif-queue-channel]");
+      var queueType = panel.querySelector("[data-admin-notif-queue-type]");
+      var queueTemplate = panel.querySelector("[data-admin-notif-queue-template]");
+      var queueSearch = panel.querySelector("[data-admin-notif-queue-q]");
+      var queueClearBtn = panel.querySelector("[data-admin-notif-queue-clear]");
+      var queueSummaryEl = panel.querySelector("[data-admin-notif-queue-summary]");
+      var queueResultsEl = panel.querySelector("[data-admin-notif-queue-results]");
+      var queuePaginationEl = panel.querySelector("[data-admin-notif-queue-pagination]");
       var sendForm = panel.querySelector("[data-admin-notif-send]");
       var typeSelect = panel.querySelector("[data-admin-notif-type]");
       var queryInput = panel.querySelector("[data-admin-notif-query]");
@@ -2766,6 +2783,9 @@
       var selected = new Set();
       var currentPage = 1;
       var recipientsRequestId = 0;
+      var queuePage = 1;
+      var queueLoaded = false;
+      var queueRequestId = 0;
       var composerDirty = false;
       var subjectDirty = false;
       var composerChannelMode = "";
@@ -4522,6 +4542,194 @@
         smsCounter.classList.toggle("is-over", smsChecked && smsText.length > 160);
       }
 
+      function loadNotificationStats() {
+        if (!actionAdminNotificationsStats) {
+          return;
+        }
+        var fd = new FormData();
+        fd.set("action", actionAdminNotificationsStats);
+        fd.set("nonce", nonce);
+        fetchWithTimeout(ajaxUrl, {
+          method: "POST",
+          body: fd,
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        })
+          .then(function (response) {
+            return responseJson(response);
+          })
+          .then(function (json) {
+            if (!json || !json.success || !json.data || !json.data.stats) {
+              throw new Error("No se pudieron actualizar los conteos.");
+            }
+            var stats = json.data.stats || {};
+            panel.querySelectorAll("[data-admin-notif-type-shortcut]").forEach(function (btn) {
+              var type = btn.getAttribute("data-admin-notif-type-shortcut") || "";
+              var row = stats[type] || {};
+              var total = btn.querySelector("[data-admin-notif-stat-total]");
+              var contact = btn.querySelector("[data-admin-notif-stat-contact]");
+              if (total) {
+                total.textContent = String(row.total || 0);
+              }
+              if (contact) {
+                contact.textContent = String(row.email || 0) + " email · " + String(row.phone || 0) + " celular";
+              }
+            });
+          })
+          .catch(function () {
+            panel.querySelectorAll("[data-admin-notif-stat-contact]").forEach(function (el) {
+              el.textContent = "Conteo no disponible";
+            });
+          });
+      }
+
+      function queueFieldValue(input) {
+        return input ? String(input.value || "").trim() : "";
+      }
+
+      function queueStatusClass(status) {
+        var value = String(status || "").toLowerCase();
+        return ["pending", "processing", "sent", "failed", "cancelled"].indexOf(value) >= 0
+          ? value
+          : "other";
+      }
+
+      function renderQueueSummary(stats, pagination) {
+        if (!queueSummaryEl) {
+          return;
+        }
+        var info = stats || {};
+        var page = pagination || {};
+        var chips = [
+          ["Total", info.total || 0],
+          ["Pendientes", info.pending || 0],
+          ["Procesando", info.processing || 0],
+          ["Enviadas", info.sent || 0],
+          ["Fallidas", info.failed || 0],
+        ];
+        queueSummaryEl.innerHTML = chips.map(function (chip) {
+          return "<article><span>" + escHtml(chip[0]) + "</span><strong>" + escHtml(String(chip[1])) + "</strong></article>";
+        }).join("") +
+          '<small>Pagina ' + escHtml(String(page.page || 1)) + ' de ' + escHtml(String(page.total_pages || 1)) + '</small>';
+      }
+
+      function renderQueueRows(rows) {
+        if (!queueResultsEl) {
+          return;
+        }
+        if (!Array.isArray(rows) || rows.length === 0) {
+          queueResultsEl.innerHTML =
+            '<div class="scm-admin-notif-empty"><strong>Sin registros</strong><span>No hay notificaciones para esos filtros.</span></div>';
+          return;
+        }
+        queueResultsEl.innerHTML =
+          '<div class="scm-admin-notif-queue-table-wrap"><table class="scm-admin-notif-queue-table">' +
+          '<thead><tr><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Plantilla</th><th>Lote</th><th>Intentos</th><th>Detalle</th></tr></thead><tbody>' +
+          rows.map(function (row) {
+            var statusKey = queueStatusClass(row.status_key || row.status);
+            var detailBits = [];
+            if (row.subject) detailBits.push("Asunto: " + row.subject);
+            if (row.message_text) detailBits.push("Mensaje: " + row.message_text);
+            if (row.last_error) detailBits.push("Error: " + row.last_error);
+            var recipientBits = [
+              row.destination_name || "Sin nombre",
+              row.destination || "",
+              row.type_label || row.recipient_role_label || "",
+              row.test_mode ? "Modo prueba" : "",
+            ].filter(Boolean);
+            return (
+              "<tr>" +
+              "<td><strong>#" + escHtml(row.id || "") + "</strong></td>" +
+              "<td><span>" + escHtml(row.created_at || "") + "</span><small>" + escHtml(row.sent_at ? "Enviada: " + row.sent_at : "") + "</small></td>" +
+              '<td><span class="scm-admin-notif-queue-status scm-admin-notif-queue-status--' + escAttr(statusKey) + '">' + escHtml(row.status_label || row.status || "") + "</span></td>" +
+              "<td>" + escHtml(row.channel_label || row.channel || "") + "</td>" +
+              "<td><strong>" + escHtml(recipientBits[0] || "") + "</strong><small>" + escHtml(recipientBits.slice(1).join(" · ")) + "</small></td>" +
+              "<td><span>" + escHtml(row.template_name || "-") + "</span></td>" +
+              "<td><code>" + escHtml(row.batch_id || "-") + "</code></td>" +
+              "<td>" + escHtml((row.attempts || 0) + "/" + (row.max_attempts || 0)) + "</td>" +
+              "<td><small>" + escHtml(detailBits.join(" · ") || "-") + "</small></td>" +
+              "</tr>"
+            );
+          }).join("") +
+          "</tbody></table></div>";
+      }
+
+      function renderQueuePagination(pagination) {
+        if (!queuePaginationEl) {
+          return;
+        }
+        var page = Number((pagination && pagination.page) || 1);
+        var totalPages = Number((pagination && pagination.total_pages) || 1);
+        var total = Number((pagination && pagination.total) || 0);
+        if (totalPages <= 1) {
+          queuePaginationEl.innerHTML = total > 0 ? '<span>' + total + ' registro(s)</span>' : "";
+          return;
+        }
+        var prev = Math.max(1, page - 1);
+        var next = Math.min(totalPages, page + 1);
+        queuePaginationEl.innerHTML =
+          '<button type="button" data-admin-notif-queue-page="' + prev + '"' + (page <= 1 ? " disabled" : "") + ">Anterior</button>" +
+          '<span>Pagina ' + page + ' de ' + totalPages + ' · ' + total + ' registro(s)</span>' +
+          '<button type="button" data-admin-notif-queue-page="' + next + '"' + (page >= totalPages ? " disabled" : "") + ">Siguiente</button>";
+      }
+
+      function loadNotificationQueue(page) {
+        if (!queueForm || !queueResultsEl || !actionAdminNotificationsQueue) {
+          return Promise.resolve();
+        }
+        queuePage = page || 1;
+        queueLoaded = true;
+        queueRequestId += 1;
+        var requestId = queueRequestId;
+        var fd = new FormData();
+        fd.set("action", actionAdminNotificationsQueue);
+        fd.set("nonce", nonce);
+        fd.set("date_from", queueFieldValue(queueDateFrom));
+        fd.set("date_to", queueFieldValue(queueDateTo));
+        fd.set("status", queueFieldValue(queueStatus));
+        fd.set("channel", queueFieldValue(queueChannel));
+        fd.set("type", queueFieldValue(queueType));
+        fd.set("template", queueFieldValue(queueTemplate));
+        fd.set("q", queueFieldValue(queueSearch));
+        fd.set("page", String(queuePage));
+        fd.set("per_page", "25");
+        queueResultsEl.innerHTML =
+          '<div class="scm-admin-notif-empty"><strong>Consultando cola...</strong><span>Un momento mientras revisamos los estados.</span></div>';
+        return fetchWithTimeout(ajaxUrl, {
+          method: "POST",
+          body: fd,
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        })
+          .then(function (response) {
+            return responseJson(response);
+          })
+          .then(function (json) {
+            if (requestId !== queueRequestId) {
+              return;
+            }
+            if (!json || !json.success) {
+              throw new Error(
+                (json && json.data && json.data.message) ||
+                  "No se pudo consultar la cola de notificaciones.",
+              );
+            }
+            var data = json.data || {};
+            renderQueueSummary(data.stats || {}, data.pagination || {});
+            renderQueueRows(data.rows || []);
+            renderQueuePagination(data.pagination || {});
+          })
+          .catch(function (err) {
+            if (queueResultsEl) {
+              queueResultsEl.innerHTML =
+                '<div class="scm-admin-notif-empty is-error"><strong>No se pudo consultar la cola.</strong><span>' +
+                escHtml(err.message || "Error desconocido") +
+                "</span></div>";
+            }
+            showToast("error", err.message || "No se pudo consultar la cola.");
+          });
+      }
+
       function loadRecipients(page) {
         currentPage = page || 1;
         recipientsRequestId += 1;
@@ -5156,6 +5364,42 @@
           });
         }
 
+        if (queueDetails) {
+          queueDetails.addEventListener("toggle", function () {
+            if (queueDetails.open && !queueLoaded) {
+              loadNotificationQueue(1);
+            }
+          });
+        }
+        if (queueForm) {
+          queueForm.addEventListener("submit", function (event) {
+            event.preventDefault();
+            loadNotificationQueue(1);
+          });
+        }
+        if (queueClearBtn) {
+          queueClearBtn.addEventListener("click", function () {
+            [queueDateFrom, queueDateTo, queueStatus, queueChannel, queueType, queueTemplate, queueSearch].forEach(function (input) {
+              if (input) {
+                input.value = "";
+              }
+            });
+            loadNotificationQueue(1);
+          });
+        }
+        if (queuePaginationEl) {
+          queuePaginationEl.addEventListener("click", function (event) {
+            var btn = event.target && event.target.closest
+              ? event.target.closest("[data-admin-notif-queue-page]")
+              : null;
+            if (!btn || btn.disabled) {
+              return;
+            }
+            event.preventDefault();
+            loadNotificationQueue(parseInt(btn.getAttribute("data-admin-notif-queue-page") || "1", 10));
+          });
+        }
+
         panel.querySelectorAll("[data-admin-notif-channel]").forEach(function (input) {
           input.addEventListener("change", function () {
             markComposerDirty();
@@ -5486,6 +5730,9 @@
               }
               composerDirty = false;
               showToast((data.queued || 0) > 0 ? "success" : "warning", msg);
+              if (queueDetails && queueDetails.open) {
+                loadNotificationQueue(1);
+              }
             })
             .catch(function (err) {
               if (resultEl) {
@@ -5501,6 +5748,7 @@
       }
 
       syncContext();
+      loadNotificationStats();
       if (!panel.dataset.scmAdminNotificationsLoaded || forceReload) {
         panel.dataset.scmAdminNotificationsLoaded = "1";
         return loadRecipients(currentPage);

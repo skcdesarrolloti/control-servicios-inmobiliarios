@@ -404,9 +404,11 @@ trait RendersDashboard
         'calendar_cita_notify' => self::AJAX_CALENDAR_CITA_NOTIFY,
         'admin_notifications_recipients' => self::AJAX_ADMIN_NOTIFICATIONS_RECIPIENTS,
         'admin_notifications_panel' => self::AJAX_ADMIN_NOTIFICATIONS_PANEL,
+        'admin_notifications_stats' => self::AJAX_ADMIN_NOTIFICATIONS_STATS,
         'admin_notifications_send' => self::AJAX_ADMIN_NOTIFICATIONS_SEND,
         'admin_notifications_import' => self::AJAX_ADMIN_NOTIFICATIONS_IMPORT,
         'admin_notifications_payment_receipts_import' => self::AJAX_ADMIN_NOTIFICATIONS_PAYMENT_RECEIPTS_IMPORT,
+        'admin_notifications_queue' => self::AJAX_ADMIN_NOTIFICATIONS_QUEUE,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
@@ -1932,7 +1934,7 @@ trait RendersDashboard
   {
     $service = new AdministrativeNotificationsService($this->db);
     $types = $service->types();
-    $stats = $service->stats();
+    $stats = [];
     $emailTemplates = $service->emailTemplates();
     $whatsappTemplates = $service->whatsappTemplates();
     $senderProfile = $service->senderProfile();
@@ -1965,8 +1967,8 @@ trait RendersDashboard
         <?php foreach ($types as $typeKey => $typeDef): $typeStats = $stats[$typeKey] ?? ['total' => 0, 'email' => 0, 'phone' => 0]; ?>
           <button type="button" class="scm-admin-notif-stat<?php echo $typeKey === $firstType ? ' active' : ''; ?>" data-admin-notif-type-shortcut="<?php echo esc_attr((string) $typeKey); ?>">
             <span><?php echo esc_html((string) ($typeDef['label'] ?? $typeKey)); ?></span>
-            <strong><?php echo esc_html((string) ($typeStats['total'] ?? 0)); ?></strong>
-            <small><?php echo esc_html((string) ($typeStats['email'] ?? 0)); ?> email · <?php echo esc_html((string) ($typeStats['phone'] ?? 0)); ?> celular</small>
+            <strong data-admin-notif-stat-total><?php echo isset($stats[$typeKey]) ? esc_html((string) ($typeStats['total'] ?? 0)) : '...'; ?></strong>
+            <small data-admin-notif-stat-contact><?php echo isset($stats[$typeKey]) ? esc_html((string) ($typeStats['email'] ?? 0)) . ' email · ' . esc_html((string) ($typeStats['phone'] ?? 0)) . ' celular' : 'Actualizando conteo...'; ?></small>
           </button>
         <?php endforeach; ?>
       </div>
@@ -2063,6 +2065,72 @@ trait RendersDashboard
           <div class="scm-admin-notif-pagination" data-admin-notif-pagination></div>
         </section>
       </div>
+
+      <section class="scm-admin-notif-card scm-admin-notif-queue-card" data-admin-notif-queue-card>
+        <details data-admin-notif-queue-details>
+          <summary>
+            <span class="scm-calendar-action-kicker">Trazabilidad</span>
+            <strong>Cola de notificaciones</strong>
+            <small>Consulta si lo encolado desde este m&oacute;dulo qued&oacute; pendiente, enviado o fallido.</small>
+          </summary>
+          <form class="scm-admin-notif-queue-filters" data-admin-notif-queue-form autocomplete="off">
+            <div class="scm-field">
+              <label for="scm-admin-notif-queue-date-from">Desde</label>
+              <input id="scm-admin-notif-queue-date-from" name="date_from" type="date" class="input input-bordered input-sm scm-input" data-admin-notif-queue-date-from>
+            </div>
+            <div class="scm-field">
+              <label for="scm-admin-notif-queue-date-to">Hasta</label>
+              <input id="scm-admin-notif-queue-date-to" name="date_to" type="date" class="input input-bordered input-sm scm-input" data-admin-notif-queue-date-to>
+            </div>
+            <div class="scm-field">
+              <label for="scm-admin-notif-queue-status">Estado</label>
+              <select id="scm-admin-notif-queue-status" name="status" class="select select-bordered select-sm scm-select" data-admin-notif-queue-status>
+                <option value="">Todos</option>
+                <option value="pending">Pendiente</option>
+                <option value="processing">Procesando</option>
+                <option value="sent">Enviada</option>
+                <option value="failed">Fallida</option>
+                <option value="cancelled">Cancelada</option>
+              </select>
+            </div>
+            <div class="scm-field">
+              <label for="scm-admin-notif-queue-channel">Canal</label>
+              <select id="scm-admin-notif-queue-channel" name="channel" class="select select-bordered select-sm scm-select" data-admin-notif-queue-channel>
+                <option value="">Todos</option>
+                <option value="email">Email</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="sms">SMS</option>
+              </select>
+            </div>
+            <div class="scm-field">
+              <label for="scm-admin-notif-queue-type">Pesta&ntilde;a</label>
+              <select id="scm-admin-notif-queue-type" name="type" class="select select-bordered select-sm scm-select" data-admin-notif-queue-type>
+                <option value="">Todas</option>
+                <?php foreach ($types as $typeKey => $typeDef): ?>
+                  <option value="<?php echo esc_attr((string) $typeKey); ?>"><?php echo esc_html((string) ($typeDef['label'] ?? $typeKey)); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="scm-field">
+              <label for="scm-admin-notif-queue-template">Plantilla</label>
+              <input id="scm-admin-notif-queue-template" name="template" type="search" class="input input-bordered input-sm scm-input" placeholder="Nombre t&eacute;cnico" data-admin-notif-queue-template>
+            </div>
+            <div class="scm-field scm-admin-notif-queue-search">
+              <label for="scm-admin-notif-queue-q">Buscar</label>
+              <input id="scm-admin-notif-queue-q" name="q" type="search" class="input input-bordered input-sm scm-input" placeholder="Nombre, destino, asunto, error o lote" data-admin-notif-queue-q>
+            </div>
+            <div class="scm-admin-notif-queue-actions">
+              <button type="submit" class="scm-btn-primary btn btn-primary">Consultar cola</button>
+              <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-queue-clear>Limpiar</button>
+            </div>
+          </form>
+          <div class="scm-admin-notif-queue-summary" data-admin-notif-queue-summary></div>
+          <div class="scm-admin-notif-queue-results" data-admin-notif-queue-results>
+            <div class="scm-admin-notif-empty"><strong>Cola sin consultar</strong><span>Abre los filtros y presiona consultar para revisar los env&iacute;os.</span></div>
+          </div>
+          <div class="scm-admin-notif-pagination" data-admin-notif-queue-pagination></div>
+        </details>
+      </section>
 
       <div class="scm-admin-notif-modal" data-admin-notif-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-modal-title">
         <div class="scm-admin-notif-modal-backdrop" aria-hidden="true"></div>

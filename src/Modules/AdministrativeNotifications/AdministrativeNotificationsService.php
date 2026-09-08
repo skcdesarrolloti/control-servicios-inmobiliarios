@@ -735,6 +735,143 @@ final class AdministrativeNotificationsService
     ];
   }
 
+  /**
+   * @param array<string,mixed> $filters
+   * @return array{rows:array<int,array<string,mixed>>,stats:array<string,int>,pagination:array<string,int>,filters:array<string,string>}
+   */
+  public function notificationQueue(array $filters = []): array
+  {
+    if (!$this->schema->tableExists(self::QUEUE_TABLE)) {
+      throw new \RuntimeException('La tabla skc_notification_queue no esta disponible.');
+    }
+
+    $page = max(1, (int) ($filters['page'] ?? 1));
+    $perPage = (int) ($filters['per_page'] ?? 25);
+    if (!in_array($perPage, [10, 25, 50, 100], true)) {
+      $perPage = 25;
+    }
+    $offset = ($page - 1) * $perPage;
+
+    $status = strtolower(trim((string) ($filters['status'] ?? '')));
+    $channel = strtolower(trim((string) ($filters['channel'] ?? '')));
+    $type = trim((string) ($filters['type'] ?? ''));
+    $template = mb_substr(trim((string) ($filters['template'] ?? '')), 0, 120, 'UTF-8');
+    $query = mb_substr(trim((string) ($filters['q'] ?? '')), 0, 160, 'UTF-8');
+    $dateFrom = $this->normalizeQueueDate((string) ($filters['date_from'] ?? ''));
+    $dateTo = $this->normalizeQueueDate((string) ($filters['date_to'] ?? ''));
+
+    $allowedStatuses = ['pending', 'processing', 'sent', 'failed', 'cancelled'];
+    $allowedChannels = ['email', 'sms', 'whatsapp'];
+    $types = $this->types();
+
+    $where = ['`project_code` = ?', '`source_module` = ?'];
+    $args = [self::PROJECT_CODE, self::SOURCE_MODULE];
+
+    if ($dateFrom !== '') {
+      $where[] = '`created_at` >= ?';
+      $args[] = $dateFrom . ' 00:00:00';
+    }
+    if ($dateTo !== '') {
+      $where[] = '`created_at` <= ?';
+      $args[] = $dateTo . ' 23:59:59';
+    }
+    if (in_array($status, $allowedStatuses, true)) {
+      $where[] = '`status` = ?';
+      $args[] = $status;
+    } else {
+      $status = '';
+    }
+    if (in_array($channel, $allowedChannels, true)) {
+      $where[] = '`channel` = ?';
+      $args[] = $channel;
+    } else {
+      $channel = '';
+    }
+    if (array_key_exists($type, $types)) {
+      $where[] = '`meta_json` LIKE ?';
+      $args[] = '%"tipo_actor":"' . $this->db->escapeLike($type) . '"%';
+    } else {
+      $type = '';
+    }
+    if ($template !== '') {
+      $where[] = '`template_name` LIKE ?';
+      $args[] = '%' . $this->db->escapeLike($template) . '%';
+    }
+    if ($query !== '') {
+      $needle = '%' . $this->db->escapeLike($query) . '%';
+      $where[] = '(`destination_name` LIKE ? OR `destination` LIKE ? OR `subject` LIKE ? OR `template_name` LIKE ? OR `message_text` LIKE ? OR `last_error` LIKE ? OR `meta_json` LIKE ?)';
+      array_push($args, $needle, $needle, $needle, $needle, $needle, $needle, $needle);
+    }
+
+    $whereSql = implode(' AND ', $where);
+    $total = (int) ($this->db->getVar('SELECT COUNT(1) FROM `' . self::QUEUE_TABLE . '` WHERE ' . $whereSql, $args) ?? 0);
+    $totalPages = max(1, (int) ceil($total / $perPage));
+    if ($page > $totalPages) {
+      $page = $totalPages;
+      $offset = ($page - 1) * $perPage;
+    }
+
+    $rows = $this->db->getResults(
+      'SELECT `id`, `channel`, `provider`, `destination`, `destination_name`, `subject`, `template_name`, `status`, `attempts`, `max_attempts`, `created_at`, `updated_at`, `sent_at`, `meta_json`, LEFT(COALESCE(`message_text`, \'\'), 900) AS `message_text`, LEFT(COALESCE(`last_error`, \'\'), 700) AS `last_error`
+        FROM `' . self::QUEUE_TABLE . '`
+        WHERE ' . $whereSql . '
+        ORDER BY `id` DESC
+        LIMIT ' . $perPage . ' OFFSET ' . $offset,
+      $args
+    );
+
+    $statsRows = $this->db->getResults(
+      'SELECT LOWER(TRIM(COALESCE(`status`, \'\'))) AS status_key, COUNT(1) AS total
+        FROM `' . self::QUEUE_TABLE . '`
+        WHERE ' . $whereSql . '
+        GROUP BY LOWER(TRIM(COALESCE(`status`, \'\')))',
+      $args
+    );
+    $stats = ['total' => $total, 'pending' => 0, 'processing' => 0, 'sent' => 0, 'failed' => 0, 'cancelled' => 0, 'other' => 0];
+    foreach ($statsRows as $statsRow) {
+      $key = trim((string) ($statsRow['status_key'] ?? ''));
+      $count = (int) ($statsRow['total'] ?? 0);
+      if (isset($stats[$key])) {
+        $stats[$key] = $count;
+      } else {
+        $stats['other'] += $count;
+      }
+    }
+
+    foreach ($rows as &$row) {
+      $meta = json_decode((string) ($row['meta_json'] ?? ''), true);
+      $admin = is_array($meta['admin_notifications'] ?? null) ? $meta['admin_notifications'] : [];
+      $typeKey = trim((string) ($admin['tipo_actor'] ?? ''));
+      $statusKey = strtolower(trim((string) ($row['status'] ?? '')));
+      $channelKey = strtolower(trim((string) ($row['channel'] ?? '')));
+      $row['channel_label'] = $this->queueChannelLabel($channelKey);
+      $row['status_label'] = $this->queueStatusLabel($statusKey);
+      $row['status_key'] = $statusKey;
+      $row['type_key'] = $typeKey;
+      $row['type_label'] = trim((string) ($admin['tipo_label'] ?? '')) ?: (string) ($types[$typeKey]['label'] ?? '');
+      $row['recipient_role_label'] = $this->queueRecipientRoleLabel((string) ($row['meta_json'] ?? ''));
+      $row['actor_id'] = (int) ($admin['id_actor'] ?? 0);
+      $row['batch_id'] = trim((string) ($admin['batch_id'] ?? ''));
+      $row['employee_name'] = trim((string) ($admin['nombre_funcionario'] ?? ''));
+      $row['test_mode'] = is_array($admin['test_mode'] ?? null) && $admin['test_mode'] !== [];
+      unset($row['meta_json']);
+    }
+    unset($row);
+
+    return [
+      'rows' => $rows,
+      'stats' => $stats,
+      'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
+      'filters' => ['date_from' => $dateFrom, 'date_to' => $dateTo, 'status' => $status, 'channel' => $channel, 'type' => $type, 'template' => $template, 'q' => $query],
+    ];
+  }
+
+  private function normalizeQueueDate(string $value): string
+  {
+    $value = trim($value);
+    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : '';
+  }
+
   /** @param array<string,mixed> $payload @return array{tipo_gestion_cobro:string,observacion:string,volver_llamar:string,siguiente_fecha:string,siguiente_hora:string,otro_horario_cobro:string,tipo_reporte_inmueble:string,contract_ids:array<int,int>} */
   private function normalizeCollectionPayload(array $payload): array
   {
