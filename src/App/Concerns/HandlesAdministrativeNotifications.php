@@ -111,10 +111,13 @@ trait HandlesAdministrativeNotifications
       $rawImportPayload = $_POST['import_payload'] ?? '';
       $importPayloadRaw = is_array($rawImportPayload)
         ? ''
-        : trim((string) wp_unslash((string) $rawImportPayload));
+        : trim((string) $rawImportPayload);
       $importPayload = [];
       if ($importPayloadRaw !== '') {
         $decoded = json_decode($importPayloadRaw, true);
+        if (!is_array($decoded)) {
+          $decoded = json_decode(trim((string) wp_unslash($importPayloadRaw)), true);
+        }
         if (is_array($decoded)) {
           $importPayload = $decoded;
         }

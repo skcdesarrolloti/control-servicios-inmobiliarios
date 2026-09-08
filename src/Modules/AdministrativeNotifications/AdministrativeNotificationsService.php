@@ -9,6 +9,7 @@ use SCM\Core\Database;
 use SCM\Support\EmailTemplate;
 use SCM\Support\LegacyXlsReader;
 use SCM\Support\SchemaInspector;
+use SCM\Support\StoredFileService;
 
 final class AdministrativeNotificationsService
 {
@@ -1719,17 +1720,26 @@ final class AdministrativeNotificationsService
         continue;
       }
 
-      $contracts = array_values((array) ($match['contracts'] ?? []));
+      $contracts = $this->filterPaymentReceiptContracts(
+        array_values((array) ($match['contracts'] ?? [])),
+        (string) ($meta['inmueble_simi_excel'] ?? ''),
+        (string) ($meta['pagos_pdf_detalle'] ?? '')
+      );
       $receiptMeta = $meta;
       $receiptMeta['archivo_pdf'] = (string) ($stored['name'] ?? '');
       $receiptMeta['ruta_pdf'] = (string) ($stored['path'] ?? '');
+      $receiptMeta['url_pdf'] = (string) ($stored['url'] ?? '');
+      $receiptMeta['archivo_pdf_guardado'] = (string) ($stored['stored_name'] ?? '');
       $receiptMeta['comprobantes_pago'] = [[
         'path' => (string) ($stored['path'] ?? ''),
         'name' => (string) ($stored['name'] ?? ''),
+        'stored_name' => (string) ($stored['stored_name'] ?? ''),
+        'url' => (string) ($stored['url'] ?? ''),
         'nit' => $nit,
         'periodo' => (string) ($meta['mes_excel'] ?? ''),
         'inmuebles' => (string) ($meta['inmueble_simi_excel'] ?? ''),
         'pagos_pdf' => (string) ($meta['pagos_pdf'] ?? ''),
+        'pagos_pdf_detalle' => (string) ($meta['pagos_pdf_detalle'] ?? ''),
       ]];
       $receiptMeta['contratos_sistema'] = implode(', ', $this->paymentReceiptContractLabels($contracts));
       $receiptMeta['detalle_excel'] = $this->paymentReceiptDetail($receiptMeta, $contracts);
@@ -2561,16 +2571,17 @@ final class AdministrativeNotificationsService
       'archivo_pdf' => $name,
       'pdf_texto_leido' => $pdfStats['read'] ? 'Si' : 'No',
       'pagos_pdf' => $pdfStats['payments'] > 0 ? (string) $pdfStats['payments'] : '',
+      'pagos_pdf_detalle' => $pdfStats['detail'],
       'detalle_excel' => '',
     ];
   }
 
-  /** @param array{name:string,tmp_name:string,error:int,size:int,type:string} $file @return array{read:bool,payments:int} */
+  /** @param array{name:string,tmp_name:string,error:int,size:int,type:string} $file @return array{read:bool,payments:int,detail:string,records:array<int,array<string,string>>} */
   private function paymentReceiptPdfStatsFromUpload(array $file, string $nit): array
   {
     $tmp = (string) ($file['tmp_name'] ?? '');
     if ($tmp === '' || !is_readable($tmp)) {
-      return ['read' => false, 'payments' => 0];
+      return ['read' => false, 'payments' => 0, 'detail' => '', 'records' => []];
     }
 
     $text = '';
@@ -2591,6 +2602,8 @@ final class AdministrativeNotificationsService
     return [
       'read' => $text !== '',
       'payments' => $text !== '' ? $this->paymentReceiptPaymentCountFromText($text, $nit) : 0,
+      'detail' => $text !== '' ? $this->paymentReceiptPaymentDetailFromText($text, $nit) : '',
+      'records' => $text !== '' ? $this->paymentReceiptPaymentRecordsFromText($text, $nit) : [],
     ];
   }
 
@@ -2623,23 +2636,88 @@ final class AdministrativeNotificationsService
 
   private function paymentReceiptPaymentCountFromText(string $text, string $nit): int
   {
+    $records = $this->paymentReceiptPaymentRecordsFromText($text, $nit);
+    return $records !== [] ? count($records) : 0;
+  }
+
+  /** @return array<int,array{tercero:string,valor:string,transaccion:string}> */
+  private function paymentReceiptPaymentRecordsFromText(string $text, string $nit): array
+  {
     $candidates = $this->paymentReceiptNitCandidates($nit);
     if ($candidates === []) {
-      return 0;
+      return [];
+    }
+    $flat = html_entity_decode($text, ENT_QUOTES, 'UTF-8');
+    $flat = preg_replace('/[ \t\x{00A0}]+/u', ' ', $flat) ?? $flat;
+    $flat = preg_replace('/\R+/u', ' ', $flat) ?? $flat;
+    $flat = trim($flat);
+    if ($flat === '') {
+      return [];
     }
 
-    $max = 0;
+    $records = [];
     foreach ($candidates as $candidate) {
       if ($candidate === '') {
         continue;
       }
-      $count = preg_match_all('/(?<!\d)' . preg_quote($candidate, '/') . '(?!\d)/', $text);
-      if (is_int($count) && $count > $max) {
-        $max = $count;
+      $pattern = '/(?:\b(?:NI|NIT|CC)\b\s*)?(?<!\d)' . preg_quote($candidate, '/') . '(?!\d)\s+(?<third>[\p{L}\p{N}\s\.\-ÁÉÍÓÚÜÑáéíóúüñ&]{2,160}?)\s+\$(?<value>[0-9\.\,]+)(?<tail>.{0,220}?)(?=\b(?:Enero|Febrero|Marzo|Abril|Mayo|Junio|Julio|Agosto|Septiembre|Setiembre|Octubre|Noviembre|Diciembre)\b|Página|Imprimir|$)/iu';
+      if (preg_match_all($pattern, $flat, $matches, PREG_SET_ORDER) !== false && $matches !== []) {
+        foreach ($matches as $match) {
+          $third = $this->cleanPaymentReceiptPdfFragment((string) ($match['third'] ?? ''));
+          $value = trim((string) ($match['value'] ?? ''));
+          $tail = (string) ($match['tail'] ?? '');
+          $transaction = '';
+          if (preg_match('/([0-9]{7,})\s*Proveedores/iu', $tail, $txMatch) === 1) {
+            $transaction = (string) $txMatch[1];
+          }
+          $key = strtolower($candidate . '|' . $third . '|' . $value . '|' . $transaction);
+          $records[$key] = [
+            'tercero' => $third,
+            'valor' => $value !== '' ? '$' . $value : '',
+            'transaccion' => $transaction,
+          ];
+        }
+        if ($records !== []) {
+          break;
+        }
       }
     }
 
-    return $max;
+    return array_values($records);
+  }
+
+  private function paymentReceiptPaymentDetailFromText(string $text, string $nit): string
+  {
+    $records = $this->paymentReceiptPaymentRecordsFromText($text, $nit);
+    if ($records === []) {
+      return '';
+    }
+    $lines = [];
+    foreach ($records as $index => $record) {
+      $parts = [];
+      $third = trim((string) ($record['tercero'] ?? ''));
+      $value = trim((string) ($record['valor'] ?? ''));
+      $transaction = trim((string) ($record['transaccion'] ?? ''));
+      $parts[] = 'Pago ' . ($index + 1);
+      if ($third !== '') {
+        $parts[] = 'tercero ' . $third;
+      }
+      if ($value !== '') {
+        $parts[] = 'valor ' . $value;
+      }
+      if ($transaction !== '') {
+        $parts[] = 'transaccion ' . $transaction;
+      }
+      $lines[] = implode(' - ', $parts);
+    }
+    return implode("\n", $lines);
+  }
+
+  private function cleanPaymentReceiptPdfFragment(string $value): string
+  {
+    $value = preg_replace('/\s+/u', ' ', trim($value)) ?? $value;
+    $value = preg_replace('/\b(Cuenta|Ahorros|Corriente|Davivienda|Bancolombia|Banco|Destino|Numero|Número).*$/iu', '', $value) ?? $value;
+    return trim($value);
   }
 
   private function paymentReceiptPeriodFromName(string $name): string
@@ -2757,11 +2835,12 @@ final class AdministrativeNotificationsService
     return $candidates;
   }
 
-  /** @param array{name:string,tmp_name:string,error:int,size:int,type:string} $file @return array{path:string,name:string} */
+  /** @param array{name:string,tmp_name:string,error:int,size:int,type:string} $file @return array{path:string,name:string,stored_name:string,url:string} */
   private function storePaymentReceiptUpload(array $file, string $nit): array
   {
-    $root = dirname(__DIR__, 3);
-    $dir = $root . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'admin-notification-receipts' . DIRECTORY_SEPARATOR . date('Y') . DIRECTORY_SEPARATOR . date('m');
+    $dir = defined('SCM_UPLOAD_PATH')
+      ? (string) SCM_UPLOAD_PATH
+      : dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'uploads';
     if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
       throw new \RuntimeException('No se pudo crear la carpeta para comprobantes.');
     }
@@ -2771,13 +2850,20 @@ final class AdministrativeNotificationsService
     if ($safeName === '') {
       $safeName = 'comprobante.pdf';
     }
-    $target = $dir . DIRECTORY_SEPARATOR . date('Ymd-His') . '-' . ($nit !== '' ? $nit . '-' : '') . bin2hex(random_bytes(4)) . '-' . $safeName;
+    $storedName = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
+    $target = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . $storedName;
     $tmp = (string) ($file['tmp_name'] ?? '');
     $stored = is_uploaded_file($tmp) ? move_uploaded_file($tmp, $target) : copy($tmp, $target);
     if (!$stored || !is_readable($target)) {
       throw new \RuntimeException('No se pudo guardar el comprobante PDF.');
     }
-    return ['path' => $target, 'name' => $safeName];
+    $url = '';
+    try {
+      $url = StoredFileService::fromRuntime()->urlFor($storedName);
+    } catch (\Throwable) {
+      $url = '';
+    }
+    return ['path' => $target, 'name' => $safeName, 'stored_name' => $storedName, 'url' => $url];
   }
 
   /** @param array<int,array<string,mixed>> $contracts @return string[] */
@@ -2803,6 +2889,69 @@ final class AdministrativeNotificationsService
       }
     }
     return array_values(array_unique($labels));
+  }
+
+  /** @param array<int,array<string,mixed>> $contracts @return array<int,array<string,mixed>> */
+  private function filterPaymentReceiptContracts(array $contracts, string $properties, string $pdfDetail): array
+  {
+    $tokens = $this->paymentReceiptPropertyTokens($properties . ' ' . $pdfDetail);
+    if ($tokens === [] || $contracts === []) {
+      return $contracts;
+    }
+
+    $filtered = [];
+    foreach ($contracts as $contract) {
+      $haystack = $this->normalizePaymentReceiptMatchText(implode(' ', array_map('strval', [
+        $contract['contrato'] ?? '',
+        $contract['contrato_arrendamiento'] ?? '',
+        $contract['inmueble'] ?? '',
+        $contract['id_inmueble'] ?? '',
+        $contract['id_inmueble_data'] ?? '',
+        $contract['direccion'] ?? '',
+      ])));
+      foreach ($tokens as $token) {
+        if ($token !== '' && str_contains($haystack, $token)) {
+          $filtered[] = $contract;
+          break;
+        }
+      }
+    }
+
+    return $filtered !== [] ? array_values($filtered) : $contracts;
+  }
+
+  /** @return string[] */
+  private function paymentReceiptPropertyTokens(string $value): array
+  {
+    $value = $this->normalizePaymentReceiptMatchText($value);
+    $tokens = [];
+    if (preg_match_all('/\b(?:APTO|APT|APARTAMENTO|AP)\s*([A-Z0-9-]{1,12})\b/u', $value, $matches) > 0) {
+      foreach ($matches[1] as $match) {
+        $token = trim((string) $match);
+        if ($token !== '') {
+          $tokens[$token] = $token;
+        }
+      }
+    }
+    if (preg_match_all('/\bTORRE\s*([A-Z0-9-]{1,12})\b/u', $value, $matches) > 0) {
+      foreach ($matches[1] as $match) {
+        $token = 'TORRE ' . trim((string) $match);
+        $tokens[$token] = $token;
+      }
+    }
+    return array_values($tokens);
+  }
+
+  private function normalizePaymentReceiptMatchText(string $value): string
+  {
+    $value = html_entity_decode($value, ENT_QUOTES, 'UTF-8');
+    $value = strtr($value, [
+      'á' => 'A', 'é' => 'E', 'í' => 'I', 'ó' => 'O', 'ú' => 'U', 'ü' => 'U', 'ñ' => 'N',
+      'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ü' => 'U', 'Ñ' => 'N',
+    ]);
+    $value = strtoupper($value);
+    $value = preg_replace('/[^A-Z0-9]+/u', ' ', $value) ?? $value;
+    return trim(preg_replace('/\s+/u', ' ', $value) ?? $value);
   }
 
   /** @param array<string,mixed> $meta @param array<int,array<string,mixed>> $contracts */
@@ -2831,6 +2980,16 @@ final class AdministrativeNotificationsService
     if ($pdfPayments > 0) {
       $lines[] = 'Pagos detectados en PDF: ' . $pdfPayments;
     }
+    $pdfDetail = trim((string) ($meta['pagos_pdf_detalle'] ?? ''));
+    if ($pdfDetail !== '') {
+      $lines[] = 'Detalle leído del PDF:';
+      foreach (preg_split('/\R+/', $pdfDetail) ?: [] as $line) {
+        $line = trim((string) $line);
+        if ($line !== '') {
+          $lines[] = '- ' . $line;
+        }
+      }
+    }
     $contractLabels = $this->paymentReceiptContractLabels($contracts);
     foreach (array_filter(array_map('trim', explode(',', (string) ($meta['contratos_sistema'] ?? '')))) as $label) {
       $contractLabels[] = $label;
@@ -2842,6 +3001,26 @@ final class AdministrativeNotificationsService
         $lines[] = '- ' . $label;
       }
     }
+    $pdfUrls = [];
+    $url = trim((string) ($meta['url_pdf'] ?? ''));
+    if ($url !== '') {
+      $pdfUrls[$url] = $url;
+    }
+    foreach ($receipts as $receipt) {
+      if (!is_array($receipt)) {
+        continue;
+      }
+      $receiptUrl = trim((string) ($receipt['url'] ?? ''));
+      if ($receiptUrl !== '') {
+        $pdfUrls[$receiptUrl] = $receiptUrl;
+      }
+    }
+    if ($pdfUrls !== []) {
+      $lines[] = count($pdfUrls) === 1 ? 'Link del comprobante PDF:' : 'Links de comprobantes PDF:';
+      foreach ($pdfUrls as $pdfUrl) {
+        $lines[] = '- ' . $pdfUrl;
+      }
+    }
     return implode("\n", $lines);
   }
 
@@ -2851,11 +3030,17 @@ final class AdministrativeNotificationsService
     $baseReceipts = is_array($base['comprobantes_pago'] ?? null) ? $base['comprobantes_pago'] : [];
     $extraReceipts = is_array($extra['comprobantes_pago'] ?? null) ? $extra['comprobantes_pago'] : [];
     $base['comprobantes_pago'] = array_merge($baseReceipts, $extraReceipts);
-    foreach (['inmueble_simi_excel', 'mes_excel', 'contratos_sistema'] as $key) {
+    foreach (['inmueble_simi_excel', 'mes_excel', 'contratos_sistema', 'url_pdf'] as $key) {
       $values = array_filter(array_map('trim', explode(',', (string) ($base[$key] ?? ''))));
       $extraValues = array_filter(array_map('trim', explode(',', (string) ($extra[$key] ?? ''))));
       $merged = array_values(array_unique(array_merge($values, $extraValues)));
       $base[$key] = implode(', ', $merged);
+    }
+    foreach (['pagos_pdf_detalle'] as $key) {
+      $values = array_filter(array_map('trim', preg_split('/\R+/', (string) ($base[$key] ?? '')) ?: []));
+      $extraValues = array_filter(array_map('trim', preg_split('/\R+/', (string) ($extra[$key] ?? '')) ?: []));
+      $merged = array_values(array_unique(array_merge($values, $extraValues)));
+      $base[$key] = implode("\n", $merged);
     }
     $base['pagos_pdf'] = (string) ((int) ($base['pagos_pdf'] ?? 0) + (int) ($extra['pagos_pdf'] ?? 0));
     $base['pdf_texto_leido'] = (($base['pdf_texto_leido'] ?? '') === 'Si' || ($extra['pdf_texto_leido'] ?? '') === 'Si') ? 'Si' : 'No';
@@ -3332,8 +3517,16 @@ final class AdministrativeNotificationsService
         continue;
       }
       $clean = [];
-      foreach (['contrato_excel', 'inmueble_simi_excel', 'documento_excel', 'canon_excel', 'canon_excel_raw', 'mes_excel', 'direccion_excel', 'detalle_excel', 'archivo_pdf', 'ruta_pdf', 'contratos_sistema', 'pdf_texto_leido', 'pagos_pdf'] as $key) {
-        $clean[$key] = trim(mb_substr((string) ($meta[$key] ?? ''), 0, 500, 'UTF-8'));
+      $limits = [
+        'detalle_excel' => 3000,
+        'contratos_sistema' => 2000,
+        'pagos_pdf_detalle' => 2000,
+        'url_pdf' => 900,
+        'ruta_pdf' => 900,
+      ];
+      foreach (['contrato_excel', 'inmueble_simi_excel', 'documento_excel', 'canon_excel', 'canon_excel_raw', 'mes_excel', 'direccion_excel', 'detalle_excel', 'archivo_pdf', 'archivo_pdf_guardado', 'ruta_pdf', 'url_pdf', 'contratos_sistema', 'pdf_texto_leido', 'pagos_pdf', 'pagos_pdf_detalle'] as $key) {
+        $limit = (int) ($limits[$key] ?? 500);
+        $clean[$key] = trim(mb_substr((string) ($meta[$key] ?? ''), 0, $limit, 'UTF-8'));
       }
       $receipts = is_array($meta['comprobantes_pago'] ?? null) ? $meta['comprobantes_pago'] : [];
       $cleanReceipts = [];
@@ -3349,10 +3542,13 @@ final class AdministrativeNotificationsService
         $cleanReceipts[] = [
           'path' => $path,
           'name' => $name !== '' ? $name : basename($path),
+          'stored_name' => trim((string) ($receipt['stored_name'] ?? '')),
+          'url' => trim((string) ($receipt['url'] ?? '')),
           'nit' => trim((string) ($receipt['nit'] ?? '')),
           'periodo' => trim((string) ($receipt['periodo'] ?? '')),
           'inmuebles' => trim((string) ($receipt['inmuebles'] ?? '')),
           'pagos_pdf' => trim((string) ($receipt['pagos_pdf'] ?? '')),
+          'pagos_pdf_detalle' => trim((string) ($receipt['pagos_pdf_detalle'] ?? '')),
         ];
         if (count($cleanReceipts) >= 20) {
           break;
@@ -4269,6 +4465,7 @@ final class AdministrativeNotificationsService
   private function insertQueueRow(string $channel, string $destination, array $recipient, string $subject, string $message, string $batchId, array $whatsappTemplateConfig = [], array $emailTemplateConfig = []): bool
   {
     $now = gmdate('Y-m-d H:i:s');
+    $message = $this->normalizeNotificationLineBreaks($message);
     $actorId = (int) ($recipient['_ID'] ?? 0);
     $type = (string) ($recipient['tipo_actor'] ?? '');
     $name = trim((string) ($recipient['nombre'] ?? ''));
@@ -4337,7 +4534,7 @@ final class AdministrativeNotificationsService
       'destination_name' => $name,
       'subject' => $channel === 'email' ? $subject : '',
       'message_html' => $channel === 'email' ? $this->queueEmailHtml($subject, $message) : '',
-      'message_text' => trim(html_entity_decode(strip_tags($message), ENT_QUOTES, 'UTF-8')),
+      'message_text' => $this->plainText($message),
       'template_name' => $templateName,
       'template_language' => $templateLanguage,
       'payload_json' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
@@ -4504,6 +4701,13 @@ final class AdministrativeNotificationsService
     return $directValue !== '' && filter_var($directValue, FILTER_VALIDATE_URL) ? $directValue : '';
   }
 
+  private function normalizeNotificationLineBreaks(string $message): string
+  {
+    $message = str_replace(["\\r\\n", "\\n", "\\r"], "\n", $message);
+    $message = str_replace(["\r\n", "\r"], "\n", $message);
+    return trim($message);
+  }
+
   /** @param array<string,mixed> $whatsappTemplateConfig @param array<string,mixed> $emailTemplateConfig */
   private function templateCanUseImportDetail(array $whatsappTemplateConfig, array $emailTemplateConfig): bool
   {
@@ -4536,7 +4740,7 @@ final class AdministrativeNotificationsService
       return $message;
     }
     $cleanMeta = $this->sanitizeImportMetaMap(['1' => $meta])['1'] ?? [];
-    $detail = trim((string) ($cleanMeta['detalle_excel'] ?? ''));
+    $detail = $this->normalizeNotificationLineBreaks((string) ($cleanMeta['detalle_excel'] ?? ''));
     if ($detail === '') {
       $detail = $this->importCanonSummary($cleanMeta);
     }
