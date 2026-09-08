@@ -156,7 +156,7 @@
   function scmNotify(type, message, title) {
     var icon = type === "error" ? "error" : "success";
     if (window.Swal && typeof window.Swal.fire === "function") {
-      window.Swal.fire({
+      return window.Swal.fire({
         icon: icon,
         title: title || (type === "error" ? "No se pudo guardar" : "Guardado"),
         text: message || "",
@@ -169,6 +169,7 @@
     if (type === "error") {
       alert(message || "No se pudo guardar.");
     }
+    return Promise.resolve();
   }
 
   function bindTabs(root, runtime) {

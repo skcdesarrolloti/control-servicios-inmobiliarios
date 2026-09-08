@@ -4845,8 +4845,8 @@ final class AdministrativeNotificationsService
     }
     if ($mode === 'name_signature') {
       return [
-        ['type' => 'text', 'text' => $name],
-        ['type' => 'text', 'text' => $signature],
+        $this->whatsappTextParameter($name),
+        $this->whatsappTextParameter($signature),
       ];
     }
     if ($mode === 'name_message') {
@@ -4855,8 +4855,8 @@ final class AdministrativeNotificationsService
         $messageWithSignature .= "\n\nAtentamente,\n" . $signature;
       }
       return [
-        ['type' => 'text', 'text' => $name],
-        ['type' => 'text', 'text' => $messageWithSignature],
+        $this->whatsappTextParameter($name),
+        $this->whatsappTextParameter($messageWithSignature),
       ];
     }
     if ($mode === 'collection_due_date') {
@@ -4871,17 +4871,33 @@ final class AdministrativeNotificationsService
         $ordinal = $this->collectionDueDateOrdinal($day);
       }
       return [
-        ['type' => 'text', 'text' => $name],
-        ['type' => 'text', 'text' => (string) $day],
-        ['type' => 'text', 'text' => $ordinal],
-        ['type' => 'text', 'text' => $signature],
+        $this->whatsappTextParameter($name),
+        $this->whatsappTextParameter((string) $day),
+        $this->whatsappTextParameter($ordinal),
+        $this->whatsappTextParameter($signature),
       ];
     }
     return [
-      ['type' => 'text', 'text' => $name],
-      ['type' => 'text', 'text' => $message],
-      ['type' => 'text', 'text' => $signature],
+      $this->whatsappTextParameter($name),
+      $this->whatsappTextParameter($message),
+      $this->whatsappTextParameter($signature),
     ];
+  }
+
+  /** @return array{type:string,text:string} */
+  private function whatsappTextParameter(string $text): array
+  {
+    return ['type' => 'text', 'text' => $this->sanitizeWhatsAppTemplateParameterText($text)];
+  }
+
+  private function sanitizeWhatsAppTemplateParameterText(string $text): string
+  {
+    $text = html_entity_decode($text, ENT_QUOTES, 'UTF-8');
+    $text = $this->normalizeNotificationLineBreaks($text);
+    $text = preg_replace('/[\r\n\t]+/u', ' | ', $text) ?? $text;
+    $text = preg_replace('/ {2,}/u', ' ', $text) ?? $text;
+    $text = trim($text, " \t\n\r\0\x0B|");
+    return mb_substr($text, 0, 1024, 'UTF-8');
   }
 
   /**

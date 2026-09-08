@@ -2603,7 +2603,7 @@
     }
 
     function showToast(type, message) {
-      scmNotify(type, message);
+      return scmNotify(type, message);
     }
 
     var adminNotificationsPanelPromise = null;
@@ -5729,7 +5729,18 @@
                 resultEl.classList.remove("is-error");
               }
               composerDirty = false;
-              showToast((data.queued || 0) > 0 ? "success" : "warning", msg);
+              var queuedCount = Number(data.queued || 0);
+              var notifyResult = showToast(queuedCount > 0 ? "success" : "warning", msg);
+              if (queuedCount > 0) {
+                var closeAfterNotify = function () {
+                  closeComposer(true);
+                };
+                if (notifyResult && typeof notifyResult.then === "function") {
+                  notifyResult.then(closeAfterNotify);
+                } else {
+                  closeAfterNotify();
+                }
+              }
               if (activeNotificationView() === "queue") {
                 loadNotificationQueue(1);
               }
