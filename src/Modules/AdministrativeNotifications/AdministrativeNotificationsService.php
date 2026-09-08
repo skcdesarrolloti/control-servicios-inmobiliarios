@@ -174,6 +174,8 @@ final class AdministrativeNotificationsService
         'actors' => array_merge($copropiedades, $funcionarios),
         'email_template' => 'scm_email_copropiedad_soportes_pago_v1',
         'parameter_mode' => 'name_message_signature',
+        'header_type' => 'document',
+        'header_media_source' => 'import_receipt_pdf',
         'requires_message' => false,
       ],
       'scm_arrendatario_aviso_pago_canon_v1' => [
@@ -2352,7 +2354,7 @@ final class AdministrativeNotificationsService
             'original_destination' => $originalDestination,
           ];
         }
-        $baseMessage = $this->messageForRecipient($message, $recipient, $whatsappTemplateConfig, $emailTemplateConfig);
+        $baseMessage = $this->messageForRecipient($message, $recipient, $whatsappTemplateConfig, $emailTemplateConfig, $channel);
         $channelNeedsMessage = $channel === 'sms'
           || ($channel === 'whatsapp' && $this->whatsappTemplateNeedsMessage($whatsappTemplateConfig))
           || ($channel === 'email' && $this->emailTemplateNeedsMessage($emailTemplateConfig));
@@ -4481,7 +4483,7 @@ final class AdministrativeNotificationsService
       $templateName = trim((string) ($whatsappTemplateConfig['name'] ?? ''));
       $templateLanguage = trim((string) ($whatsappTemplateConfig['language'] ?? 'es_CO')) ?: 'es_CO';
       $components = [];
-      $headerComponent = $this->whatsappTemplateHeaderComponent($whatsappTemplateConfig);
+      $headerComponent = $this->whatsappTemplateHeaderComponent($whatsappTemplateConfig, $recipient);
       if ($headerComponent !== []) {
         $components[] = $headerComponent;
       }
@@ -4634,19 +4636,23 @@ final class AdministrativeNotificationsService
     return $mode === 'name_message_signature' || $mode === 'name_message';
   }
 
-  /** @param array<string,mixed> $templateConfig @return array<string,mixed> */
-  private function whatsappTemplateHeaderComponent(array $templateConfig): array
+  /** @param array<string,mixed> $templateConfig @param array<string,mixed> $recipient @return array<string,mixed> */
+  private function whatsappTemplateHeaderComponent(array $templateConfig, array $recipient = []): array
   {
     $headerType = strtolower(trim((string) ($templateConfig['header_type'] ?? '')));
     if ($headerType === '') {
       return [];
     }
 
-    $mediaUrl = $this->whatsappTemplateHeaderUrl($templateConfig);
+    $media = $headerType === 'document' ? $this->whatsappTemplateDocumentHeaderFromRecipient($templateConfig, $recipient) : [];
+    $mediaUrl = trim((string) ($media['url'] ?? ''));
+    if ($mediaUrl === '') {
+      $mediaUrl = $this->whatsappTemplateHeaderUrl($templateConfig);
+    }
     if ($mediaUrl === '') {
       if (!empty($templateConfig['header_required'])) {
         $templateName = trim((string) ($templateConfig['name'] ?? ''));
-        throw new \RuntimeException("La plantilla WhatsApp {$templateName} requiere imagen de encabezado. Configura SCM_WHATSAPP_FACTURA_DISPONIBLE_IMAGE_URL o la imagen del sistema whatsapp_factura_disponible_header_url.");
+        throw new \RuntimeException("La plantilla WhatsApp {$templateName} requiere un archivo de encabezado.");
       }
       return [];
     }
@@ -4664,15 +4670,64 @@ final class AdministrativeNotificationsService
     }
 
     if ($headerType === 'document') {
+      $document = ['link' => $mediaUrl];
+      $filename = trim((string) ($media['filename'] ?? ''));
+      if ($filename !== '') {
+        $document['filename'] = mb_substr($filename, 0, 240, 'UTF-8');
+      }
       return [
         'type' => 'header',
         'parameters' => [
           [
             'type' => 'document',
-            'document' => ['link' => $mediaUrl],
+            'document' => $document,
           ],
         ],
       ];
+    }
+
+    return [];
+  }
+
+  /** @param array<string,mixed> $templateConfig @param array<string,mixed> $recipient @return array{url:string,filename:string}|array{} */
+  private function whatsappTemplateDocumentHeaderFromRecipient(array $templateConfig, array $recipient): array
+  {
+    if (strtolower(trim((string) ($templateConfig['header_media_source'] ?? ''))) !== 'import_receipt_pdf') {
+      return [];
+    }
+
+    $meta = is_array($recipient['_scm_import_meta'] ?? null) ? $recipient['_scm_import_meta'] : [];
+    $candidates = [];
+    $url = trim((string) ($meta['url_pdf'] ?? ''));
+    if ($url !== '') {
+      $candidates[] = [
+        'url' => $url,
+        'filename' => trim((string) ($meta['archivo_pdf'] ?? '')) ?: 'comprobante.pdf',
+      ];
+    }
+    $receipts = is_array($meta['comprobantes_pago'] ?? null) ? $meta['comprobantes_pago'] : [];
+    foreach ($receipts as $receipt) {
+      if (!is_array($receipt)) {
+        continue;
+      }
+      $receiptUrl = trim((string) ($receipt['url'] ?? ''));
+      if ($receiptUrl === '') {
+        continue;
+      }
+      $candidates[] = [
+        'url' => $receiptUrl,
+        'filename' => trim((string) ($receipt['name'] ?? '')) ?: 'comprobante.pdf',
+      ];
+    }
+
+    foreach ($candidates as $candidate) {
+      $candidateUrl = trim((string) ($candidate['url'] ?? ''));
+      if ($candidateUrl !== '' && filter_var($candidateUrl, FILTER_VALIDATE_URL)) {
+        return [
+          'url' => $candidateUrl,
+          'filename' => trim((string) ($candidate['filename'] ?? '')) ?: 'comprobante.pdf',
+        ];
+      }
     }
 
     return [];
@@ -4727,7 +4782,7 @@ final class AdministrativeNotificationsService
   }
 
   /** @param array<string,mixed> $recipient @param array<string,mixed> $whatsappTemplateConfig @param array<string,mixed> $emailTemplateConfig */
-  private function messageForRecipient(string $message, array $recipient, array $whatsappTemplateConfig, array $emailTemplateConfig): string
+  private function messageForRecipient(string $message, array $recipient, array $whatsappTemplateConfig, array $emailTemplateConfig, string $channel = ''): string
   {
     if ((string) ($whatsappTemplateConfig['parameter_mode'] ?? '') === 'static' && $this->plainText($message) === '') {
       return trim((string) ($whatsappTemplateConfig['body'] ?? ''));
@@ -4744,7 +4799,39 @@ final class AdministrativeNotificationsService
     if ($detail === '') {
       $detail = $this->importCanonSummary($cleanMeta);
     }
+    if ($channel === 'whatsapp'
+      && strtolower(trim((string) ($whatsappTemplateConfig['header_type'] ?? ''))) === 'document'
+      && $this->whatsappTemplateDocumentHeaderFromRecipient($whatsappTemplateConfig, $recipient) !== []
+    ) {
+      $detail = $this->removePaymentReceiptPdfLinksFromDetail($detail);
+    }
     return $detail !== '' ? $detail : $message;
+  }
+
+  private function removePaymentReceiptPdfLinksFromDetail(string $detail): string
+  {
+    $lines = preg_split('/\R+/', $detail) ?: [];
+    $out = [];
+    $skipPdfLinks = false;
+    foreach ($lines as $line) {
+      $line = trim((string) $line);
+      if ($line === '') {
+        if (!$skipPdfLinks) {
+          $out[] = $line;
+        }
+        continue;
+      }
+      if (preg_match('/^Links? del comprobante PDF:/iu', $line) === 1) {
+        $skipPdfLinks = true;
+        continue;
+      }
+      if ($skipPdfLinks && str_starts_with($line, '- ') && str_contains($line, '/file.php?n=')) {
+        continue;
+      }
+      $skipPdfLinks = false;
+      $out[] = $line;
+    }
+    return trim(implode("\n", $out));
   }
 
   /** @param array<string,mixed> $templateConfig @return array<int,array{type:string,text:string}> */
