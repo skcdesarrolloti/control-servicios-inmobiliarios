@@ -51,12 +51,15 @@ try {
   }
 } catch (\Throwable $exception) {
   $requestId = bin2hex(random_bytes(8));
+  $actionForLog = $action !== '' ? $action : sanitize_key((string) ($_REQUEST['action'] ?? ''));
   error_log(sprintf(
-    '[api:%s] %s in %s:%d',
+    '[api:%s] action=%s method=%s %s in %s:%d',
     $requestId,
+    $actionForLog !== '' ? $actionForLog : '(none)',
+    (string) ($_SERVER['REQUEST_METHOD'] ?? ''),
     $exception->getMessage(),
     $exception->getFile(),
     $exception->getLine()
   ));
-  $respondError('Error interno. Referencia: ' . $requestId, 500);
+  $respondError('Error interno' . ($actionForLog !== '' ? ' en ' . $actionForLog : '') . '. Referencia: ' . $requestId, 500);
 }

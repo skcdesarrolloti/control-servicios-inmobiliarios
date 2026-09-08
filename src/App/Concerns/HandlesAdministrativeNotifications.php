@@ -60,49 +60,52 @@ trait HandlesAdministrativeNotifications
 
   public function ajax_handler_admin_notifications_send(): void
   {
-    $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('notificaciones')) {
-      $this->jsonFail('No tienes permiso para usar Notificaciones.');
-    }
-
-    $service = $this->get_admin_notifications_service();
-    $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'propietarios'));
-    $query = trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? ''))));
-    $fieldFilters = $this->admin_notification_field_filters($_POST);
-    $contractStatus = $this->sanitize_admin_notification_contract_status((string) ($_POST['contract_status'] ?? ''));
-    $inmuebleSimi = trim(sanitize_text_field(wp_unslash((string) ($_POST['inmueble_simi'] ?? ''))));
-    $contractNumber = trim(sanitize_text_field(wp_unslash((string) ($_POST['contract_number'] ?? ''))));
-    $allFiltered = false;
-    $rawChannels = $_POST['channels'] ?? [];
-    $rawIds = $_POST['ids'] ?? [];
-
-    $channels = array_map(
-      static fn($value): string => sanitize_key((string) $value),
-      is_array($rawChannels) ? $rawChannels : [$rawChannels]
-    );
-    $ids = $allFiltered
-      ? $service->idsForFilter($type, $query, 5000, $contractStatus, $inmuebleSimi, $contractNumber, $fieldFilters)
-      : array_map('intval', is_array($rawIds) ? $rawIds : [$rawIds]);
-
-    $subject = trim(sanitize_text_field(wp_unslash((string) ($_POST['subject'] ?? ''))));
-    $message = trim(wp_kses_post(wp_unslash((string) ($_POST['message'] ?? ''))));
-    $whatsappTemplate = sanitize_key((string) ($_POST['whatsapp_template'] ?? ''));
-    $emailTemplate = sanitize_key((string) ($_POST['email_template'] ?? ''));
-    $testOptions = [
-      'enabled' => (string) ($_POST['test_mode'] ?? '') === '1',
-      'email' => trim(sanitize_email(wp_unslash((string) ($_POST['test_email'] ?? '')))),
-      'phone' => trim(sanitize_text_field(wp_unslash((string) ($_POST['test_phone'] ?? '')))),
-    ];
-    $importPayloadRaw = trim((string) wp_unslash($_POST['import_payload'] ?? ''));
-    $importPayload = [];
-    if ($importPayloadRaw !== '') {
-      $decoded = json_decode($importPayloadRaw, true);
-      if (is_array($decoded)) {
-        $importPayload = $decoded;
-      }
-    }
-
     try {
+      $this->verifyCsrf();
+      if (!$this->canAccessDashboardTab('notificaciones')) {
+        $this->jsonFail('No tienes permiso para usar Notificaciones.');
+      }
+
+      $service = $this->get_admin_notifications_service();
+      $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'propietarios'));
+      $query = trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? ''))));
+      $fieldFilters = $this->admin_notification_field_filters($_POST);
+      $contractStatus = $this->sanitize_admin_notification_contract_status((string) ($_POST['contract_status'] ?? ''));
+      $inmuebleSimi = trim(sanitize_text_field(wp_unslash((string) ($_POST['inmueble_simi'] ?? ''))));
+      $contractNumber = trim(sanitize_text_field(wp_unslash((string) ($_POST['contract_number'] ?? ''))));
+      $allFiltered = (string) ($_POST['all_filtered'] ?? '') === '1';
+      $rawChannels = $_POST['channels'] ?? [];
+      $rawIds = $_POST['ids'] ?? [];
+
+      $channels = array_map(
+        static fn($value): string => sanitize_key((string) $value),
+        is_array($rawChannels) ? $rawChannels : [$rawChannels]
+      );
+      $ids = $allFiltered
+        ? $service->idsForFilter($type, $query, 5000, $contractStatus, $inmuebleSimi, $contractNumber, $fieldFilters)
+        : array_map('intval', is_array($rawIds) ? $rawIds : [$rawIds]);
+
+      $subject = trim(sanitize_text_field(wp_unslash((string) ($_POST['subject'] ?? ''))));
+      $message = trim(wp_kses_post(wp_unslash((string) ($_POST['message'] ?? ''))));
+      $whatsappTemplate = sanitize_key((string) ($_POST['whatsapp_template'] ?? ''));
+      $emailTemplate = sanitize_key((string) ($_POST['email_template'] ?? ''));
+      $testOptions = [
+        'enabled' => (string) ($_POST['test_mode'] ?? '') === '1',
+        'email' => trim(sanitize_email(wp_unslash((string) ($_POST['test_email'] ?? '')))),
+        'phone' => trim(sanitize_text_field(wp_unslash((string) ($_POST['test_phone'] ?? '')))),
+      ];
+      $rawImportPayload = $_POST['import_payload'] ?? '';
+      $importPayloadRaw = is_array($rawImportPayload)
+        ? ''
+        : trim((string) wp_unslash((string) $rawImportPayload));
+      $importPayload = [];
+      if ($importPayloadRaw !== '') {
+        $decoded = json_decode($importPayloadRaw, true);
+        if (is_array($decoded)) {
+          $importPayload = $decoded;
+        }
+      }
+
       $result = $service->enqueue($type, $ids, $channels, $subject, $message, $whatsappTemplate, $emailTemplate, $importPayload, AdministrativeNotificationsService::SMS_MAX, $testOptions);
       $queued = (int) ($result['queued'] ?? 0);
       $invalid = (int) ($result['invalid'] ?? 0);
