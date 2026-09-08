@@ -1963,12 +1963,18 @@ trait RendersDashboard
         <span class="scm-status-count"><strong data-admin-notif-total>0</strong> destinatarios</span>
       </div>
 
+      <div class="scm-admin-notif-tabs" role="tablist" aria-label="Vistas de notificaciones">
+        <button type="button" class="active" role="tab" aria-selected="true" data-admin-notif-view-tab="recipients">Destinatarios</button>
+        <button type="button" role="tab" aria-selected="false" data-admin-notif-view-tab="queue">Cola de notificaciones</button>
+      </div>
+
+      <div class="scm-admin-notif-view-panel active" data-admin-notif-view-panel="recipients">
       <div class="scm-admin-notif-stats" aria-label="Resumen de destinatarios">
         <?php foreach ($types as $typeKey => $typeDef): $typeStats = $stats[$typeKey] ?? ['total' => 0, 'email' => 0, 'phone' => 0]; ?>
           <button type="button" class="scm-admin-notif-stat<?php echo $typeKey === $firstType ? ' active' : ''; ?>" data-admin-notif-type-shortcut="<?php echo esc_attr((string) $typeKey); ?>">
             <span><?php echo esc_html((string) ($typeDef['label'] ?? $typeKey)); ?></span>
-            <strong data-admin-notif-stat-total><?php echo isset($stats[$typeKey]) ? esc_html((string) ($typeStats['total'] ?? 0)) : '...'; ?></strong>
-            <small data-admin-notif-stat-contact><?php echo isset($stats[$typeKey]) ? esc_html((string) ($typeStats['email'] ?? 0)) . ' email · ' . esc_html((string) ($typeStats['phone'] ?? 0)) . ' celular' : 'Actualizando conteo...'; ?></small>
+            <strong data-admin-notif-stat-total>-</strong>
+            <small data-admin-notif-stat-contact>Clic para consultar</small>
           </button>
         <?php endforeach; ?>
       </div>
@@ -2065,14 +2071,17 @@ trait RendersDashboard
           <div class="scm-admin-notif-pagination" data-admin-notif-pagination></div>
         </section>
       </div>
+      </div>
 
-      <section class="scm-admin-notif-card scm-admin-notif-queue-card" data-admin-notif-queue-card>
-        <details data-admin-notif-queue-details>
-          <summary>
+      <section class="scm-admin-notif-card scm-admin-notif-queue-card scm-admin-notif-view-panel" data-admin-notif-view-panel="queue" data-admin-notif-queue-card hidden>
+          <div class="scm-admin-notif-section-head">
+            <div>
             <span class="scm-calendar-action-kicker">Trazabilidad</span>
-            <strong>Cola de notificaciones</strong>
-            <small>Consulta si lo encolado desde este m&oacute;dulo qued&oacute; pendiente, enviado o fallido.</small>
-          </summary>
+              <h4>Cola de notificaciones</h4>
+              <p>Consulta si lo encolado desde este m&oacute;dulo qued&oacute; pendiente, enviado o fallido.</p>
+            </div>
+            <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-queue-refresh>Actualizar cola</button>
+          </div>
           <form class="scm-admin-notif-queue-filters" data-admin-notif-queue-form autocomplete="off">
             <div class="scm-field">
               <label for="scm-admin-notif-queue-date-from">Desde</label>
@@ -2126,10 +2135,9 @@ trait RendersDashboard
           </form>
           <div class="scm-admin-notif-queue-summary" data-admin-notif-queue-summary></div>
           <div class="scm-admin-notif-queue-results" data-admin-notif-queue-results>
-            <div class="scm-admin-notif-empty"><strong>Cola sin consultar</strong><span>Abre los filtros y presiona consultar para revisar los env&iacute;os.</span></div>
+            <div class="scm-admin-notif-empty"><strong>Cola sin consultar</strong><span>Presiona consultar o actualizar para revisar los env&iacute;os.</span></div>
           </div>
           <div class="scm-admin-notif-pagination" data-admin-notif-queue-pagination></div>
-        </details>
       </section>
 
       <div class="scm-admin-notif-modal" data-admin-notif-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-modal-title">

@@ -6194,6 +6194,45 @@
   margin-bottom: 0;
 }
 
+#scm-app .scm-admin-notif-tabs {
+  display: inline-flex;
+  width: fit-content;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid #dbe7f4;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-admin-notif-tabs button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+#scm-app .scm-admin-notif-tabs button.active,
+#scm-app .scm-admin-notif-tabs button:focus-visible {
+  background: #08234b;
+  color: #fff;
+  outline: 0;
+}
+
+#scm-app .scm-admin-notif-view-panel {
+  display: grid;
+  gap: 16px;
+}
+
+#scm-app .scm-admin-notif-view-panel[hidden] {
+  display: none !important;
+}
+
 #scm-app .scm-admin-notif-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -6761,7 +6800,7 @@
 }
 
 #scm-app .scm-admin-notif-queue-card {
-  margin-top: 16px;
+  margin-top: 0;
 }
 
 #scm-app .scm-admin-notif-queue-card details {

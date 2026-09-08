@@ -2676,7 +2676,8 @@
       var importReportBtn = panel.querySelector("[data-admin-notif-import-report]");
       var importResultEl = panel.querySelector("[data-admin-notif-import-result]");
       var importScopeEl = panel.querySelector("[data-admin-notif-import-scope]");
-      var queueDetails = panel.querySelector("[data-admin-notif-queue-details]");
+      var viewTabs = panel.querySelectorAll("[data-admin-notif-view-tab]");
+      var viewPanels = panel.querySelectorAll("[data-admin-notif-view-panel]");
       var queueForm = panel.querySelector("[data-admin-notif-queue-form]");
       var queueDateFrom = panel.querySelector("[data-admin-notif-queue-date-from]");
       var queueDateTo = panel.querySelector("[data-admin-notif-queue-date-to]");
@@ -2686,6 +2687,7 @@
       var queueTemplate = panel.querySelector("[data-admin-notif-queue-template]");
       var queueSearch = panel.querySelector("[data-admin-notif-queue-q]");
       var queueClearBtn = panel.querySelector("[data-admin-notif-queue-clear]");
+      var queueRefreshBtn = panel.querySelector("[data-admin-notif-queue-refresh]");
       var queueSummaryEl = panel.querySelector("[data-admin-notif-queue-summary]");
       var queueResultsEl = panel.querySelector("[data-admin-notif-queue-results]");
       var queuePaginationEl = panel.querySelector("[data-admin-notif-queue-pagination]");
@@ -4542,45 +4544,41 @@
         smsCounter.classList.toggle("is-over", smsChecked && smsText.length > 160);
       }
 
-      function loadNotificationStats() {
-        if (!actionAdminNotificationsStats) {
+      function activeNotificationView() {
+        var active = panel.querySelector("[data-admin-notif-view-tab].active");
+        return active ? String(active.getAttribute("data-admin-notif-view-tab") || "recipients") : "recipients";
+      }
+
+      function showNotificationView(view) {
+        var next = view === "queue" ? "queue" : "recipients";
+        viewTabs.forEach(function (btn) {
+          var isActive = String(btn.getAttribute("data-admin-notif-view-tab") || "") === next;
+          btn.classList.toggle("active", isActive);
+          btn.setAttribute("aria-selected", isActive ? "true" : "false");
+        });
+        viewPanels.forEach(function (section) {
+          var isActive = String(section.getAttribute("data-admin-notif-view-panel") || "") === next;
+          section.classList.toggle("active", isActive);
+          section.hidden = !isActive;
+        });
+        if (next === "queue" && !queueLoaded) {
+          loadNotificationQueue(1);
+        }
+      }
+
+      function updateActiveTypeCard(total, filtered) {
+        var active = panel.querySelector("[data-admin-notif-type-shortcut].active");
+        if (!active) {
           return;
         }
-        var fd = new FormData();
-        fd.set("action", actionAdminNotificationsStats);
-        fd.set("nonce", nonce);
-        fetchWithTimeout(ajaxUrl, {
-          method: "POST",
-          body: fd,
-          credentials: "same-origin",
-          headers: { Accept: "application/json" },
-        })
-          .then(function (response) {
-            return responseJson(response);
-          })
-          .then(function (json) {
-            if (!json || !json.success || !json.data || !json.data.stats) {
-              throw new Error("No se pudieron actualizar los conteos.");
-            }
-            var stats = json.data.stats || {};
-            panel.querySelectorAll("[data-admin-notif-type-shortcut]").forEach(function (btn) {
-              var type = btn.getAttribute("data-admin-notif-type-shortcut") || "";
-              var row = stats[type] || {};
-              var total = btn.querySelector("[data-admin-notif-stat-total]");
-              var contact = btn.querySelector("[data-admin-notif-stat-contact]");
-              if (total) {
-                total.textContent = String(row.total || 0);
-              }
-              if (contact) {
-                contact.textContent = String(row.email || 0) + " email · " + String(row.phone || 0) + " celular";
-              }
-            });
-          })
-          .catch(function () {
-            panel.querySelectorAll("[data-admin-notif-stat-contact]").forEach(function (el) {
-              el.textContent = "Conteo no disponible";
-            });
-          });
+        var totalEl = active.querySelector("[data-admin-notif-stat-total]");
+        var contactEl = active.querySelector("[data-admin-notif-stat-contact]");
+        if (totalEl) {
+          totalEl.textContent = String(Number(total || 0));
+        }
+        if (contactEl) {
+          contactEl.textContent = filtered ? "Resultados filtrados" : "Registros cargados";
+        }
       }
 
       function queueFieldValue(input) {
@@ -4773,6 +4771,7 @@
             if (totalEl) {
               totalEl.textContent = String(data.total || 0);
             }
+            updateActiveTypeCard(data.total || 0, !!(currentNameFilter() || currentEmailFilter() || currentPhoneFilter() || currentDocumentFilter() || currentInmuebleSimi() || currentContractNumber() || currentQuery()));
             if (listTitle) {
               listTitle.textContent = data.type_label || currentTypeLabel();
             }
@@ -5364,17 +5363,20 @@
           });
         }
 
-        if (queueDetails) {
-          queueDetails.addEventListener("toggle", function () {
-            if (queueDetails.open && !queueLoaded) {
-              loadNotificationQueue(1);
-            }
+        viewTabs.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            showNotificationView(btn.getAttribute("data-admin-notif-view-tab") || "recipients");
           });
-        }
+        });
         if (queueForm) {
           queueForm.addEventListener("submit", function (event) {
             event.preventDefault();
             loadNotificationQueue(1);
+          });
+        }
+        if (queueRefreshBtn) {
+          queueRefreshBtn.addEventListener("click", function () {
+            loadNotificationQueue(queuePage || 1);
           });
         }
         if (queueClearBtn) {
@@ -5730,7 +5732,7 @@
               }
               composerDirty = false;
               showToast((data.queued || 0) > 0 ? "success" : "warning", msg);
-              if (queueDetails && queueDetails.open) {
+              if (activeNotificationView() === "queue") {
                 loadNotificationQueue(1);
               }
             })
@@ -5748,7 +5750,6 @@
       }
 
       syncContext();
-      loadNotificationStats();
       if (!panel.dataset.scmAdminNotificationsLoaded || forceReload) {
         panel.dataset.scmAdminNotificationsLoaded = "1";
         return loadRecipients(currentPage);
