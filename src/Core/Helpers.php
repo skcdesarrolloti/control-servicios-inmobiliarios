@@ -111,6 +111,14 @@ if (!function_exists('sanitize_text_field')) {
   }
 }
 
+if (!function_exists('sanitize_email')) {
+  function sanitize_email(string $email): string
+  {
+    $clean = filter_var(trim(stripslashes($email)), FILTER_SANITIZE_EMAIL);
+    return is_string($clean) ? $clean : '';
+  }
+}
+
 if (!function_exists('sanitize_textarea_field')) {
   function sanitize_textarea_field(string $str): string
   {
