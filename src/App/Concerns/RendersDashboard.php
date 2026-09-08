@@ -2076,9 +2076,9 @@ trait RendersDashboard
       <section class="scm-admin-notif-card scm-admin-notif-queue-card scm-admin-notif-view-panel" data-admin-notif-view-panel="queue" data-admin-notif-queue-card hidden>
           <div class="scm-admin-notif-section-head">
             <div>
-            <span class="scm-calendar-action-kicker">Trazabilidad</span>
+              <span class="scm-calendar-action-kicker">Trazabilidad</span>
               <h4>Cola de notificaciones</h4>
-              <p>Consulta si lo encolado desde este m&oacute;dulo qued&oacute; pendiente, enviado o fallido.</p>
+              <p>Abre filtrada por la pesta&ntilde;a activa y por hoy; puedes limpiar los filtros para revisar todo el historial.</p>
             </div>
             <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-queue-refresh>Actualizar cola</button>
           </div>
