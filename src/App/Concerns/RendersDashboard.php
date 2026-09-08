@@ -2078,7 +2078,7 @@ trait RendersDashboard
             <div>
               <span class="scm-calendar-action-kicker">Trazabilidad</span>
               <h4>Cola de notificaciones</h4>
-              <p>Abre filtrada por la pesta&ntilde;a activa y por hoy; puedes limpiar los filtros para revisar todo el historial.</p>
+              <p>Muestra todo el historial por defecto; usa los filtros para revisar fecha, canal, pesta&ntilde;a, plantilla o estado.</p>
             </div>
             <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-queue-refresh>Actualizar cola</button>
           </div>

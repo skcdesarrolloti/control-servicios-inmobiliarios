@@ -4547,28 +4547,6 @@
         return active ? String(active.getAttribute("data-admin-notif-view-tab") || "recipients") : "recipients";
       }
 
-      function todayInputDate() {
-        var date = new Date();
-        var month = String(date.getMonth() + 1).padStart(2, "0");
-        var day = String(date.getDate()).padStart(2, "0");
-        return date.getFullYear() + "-" + month + "-" + day;
-      }
-
-      function primeQueueFiltersFromCurrentTab() {
-        if (!queueLoaded && queueType && !queueType.value) {
-          queueType.value = currentType();
-        }
-        if (!queueLoaded) {
-          var today = todayInputDate();
-          if (queueDateFrom && !queueDateFrom.value) {
-            queueDateFrom.value = today;
-          }
-          if (queueDateTo && !queueDateTo.value) {
-            queueDateTo.value = today;
-          }
-        }
-      }
-
       function showNotificationView(view) {
         var next = view === "queue" ? "queue" : "recipients";
         viewTabs.forEach(function (btn) {
@@ -4582,7 +4560,6 @@
           section.hidden = !isActive;
         });
         if (next === "queue" && !queueLoaded) {
-          primeQueueFiltersFromCurrentTab();
           loadNotificationQueue(1);
         }
       }
@@ -5169,9 +5146,6 @@
           if (allFiltered) {
             allFiltered.checked = false;
           }
-          if (queueType && !queueLoaded) {
-            queueType.value = currentType();
-          }
           syncContext();
           loadRecipients(1);
         });
@@ -5203,9 +5177,6 @@
               return;
             }
             typeSelect.value = nextType;
-            if (queueType && !queueLoaded) {
-              queueType.value = nextType;
-            }
             selected.clear();
             if (allFiltered) {
               allFiltered.checked = false;
