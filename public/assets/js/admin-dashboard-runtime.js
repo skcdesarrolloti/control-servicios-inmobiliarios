@@ -9975,22 +9975,16 @@
       };
 
       if (!current && !currentSent) {
-        ["enviadas", "no-enviadas", "aprobadas", "desaprobadas", "esperando-respuesta", "finalizadas"].forEach(function (key) {
+        ["no-enviadas", "aprobadas", "desaprobadas", "esperando-respuesta"].forEach(function (key) {
           visible[key] = true;
         });
       } else if (currentSent === "no" && !current) {
         visible["no-enviadas"] = true;
-      } else if (currentSent === "si" && !current) {
-        ["enviadas", "aprobadas", "desaprobadas", "esperando-respuesta", "finalizadas"].forEach(function (key) {
-          visible[key] = true;
-        });
       } else if (current) {
         var stateMap = {
           aprobada: "aprobadas",
           desaprobada: "desaprobadas",
           "esperando respuesta": "esperando-respuesta",
-          finalizado: "finalizadas",
-          finalizada: "finalizadas",
         };
         if (stateMap[current]) {
           visible[stateMap[current]] = true;
@@ -10012,14 +10006,12 @@
       var map = {
         "total": data.kpi_tab_total || data.kpi_total || "0",
         "no-enviadas": data.kpi_tab_no_enviadas || data.kpi_no_enviadas || "0",
-        "enviadas": data.kpi_tab_enviadas || data.kpi_enviadas || "0",
         "aprobadas": data.kpi_tab_aprobadas || data.kpi_aprobadas || "0",
         "desaprobadas": data.kpi_tab_desaprobadas || data.kpi_desaprobadas || "0",
         "esperando-respuesta":
           data.kpi_tab_esperando_respuesta ||
           data.kpi_esperando_respuesta ||
           "0",
-        "finalizadas": data.kpi_tab_finalizadas || data.kpi_finalizadas || "0",
       };
       Object.keys(map).forEach(function (key) {
         var el = root.querySelector("#scm-cotizaciones_mantenimiento-tab-" + key);
@@ -10153,7 +10145,6 @@
             updateGenericKPI(tabKey, "total", d.kpi_total || "0");
             if (tabKey === "cotizaciones_mantenimiento") {
               updateGenericKPI(tabKey, "total-card", d.kpi_total || "0");
-              updateGenericKPI(tabKey, "enviadas", d.kpi_enviadas || "0");
               updateGenericKPI(
                 tabKey,
                 "no-enviadas",
@@ -10169,11 +10160,6 @@
                 tabKey,
                 "esperando-respuesta",
                 d.kpi_esperando_respuesta || "0",
-              );
-              updateGenericKPI(
-                tabKey,
-                "finalizadas",
-                d.kpi_finalizadas || "0",
               );
               updateGenericKPI(
                 tabKey,

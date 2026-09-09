@@ -334,22 +334,18 @@ trait HandlesMaintenanceActions
       'pagination' => $this->render_cotizaciones_mantenimiento_pagination($pagination),
       'count' => (string) ($stats['total'] ?? 0),
       'kpi_total' => (string) ($stats['total'] ?? 0),
-      'kpi_enviadas' => (string) ($stats['enviadas'] ?? 0),
       'kpi_no_enviadas' => (string) ($stats['no_enviadas'] ?? 0),
       'kpi_aprobadas' => (string) ($stats['aprobadas'] ?? 0),
       'kpi_desaprobadas' => (string) ($stats['desaprobadas'] ?? 0),
       'kpi_esperando_respuesta' => (string) ($stats['esperando_respuesta'] ?? 0),
-      'kpi_finalizadas' => (string) ($stats['finalizadas'] ?? 0),
       'kpi_sin_estado' => (string) ($stats['sin_estado'] ?? 0),
       'kpi_ordenes_total' => (string) ($stats['ordenes_total'] ?? 0),
       'kpi_valor_total' => $this->format_cop_currency($stats['valor_total'] ?? 0),
       'kpi_tab_total' => (string) ($tabStats['total'] ?? 0),
-      'kpi_tab_enviadas' => (string) ($tabStats['enviadas'] ?? 0),
       'kpi_tab_no_enviadas' => (string) ($tabStats['no_enviadas'] ?? 0),
       'kpi_tab_aprobadas' => (string) ($tabStats['aprobadas'] ?? 0),
       'kpi_tab_desaprobadas' => (string) ($tabStats['desaprobadas'] ?? 0),
       'kpi_tab_esperando_respuesta' => (string) ($tabStats['esperando_respuesta'] ?? 0),
-      'kpi_tab_finalizadas' => (string) ($tabStats['finalizadas'] ?? 0),
     ]);
   }
 

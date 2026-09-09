@@ -105,7 +105,7 @@ trait RendersDashboard
     $cotizacionesParams = $this->parse_cotizaciones_mantenimiento_params($_GET, 'scmqt_');
     $cotizacionesResult = [
       'rows' => [],
-      'stats' => ['total' => 0, 'enviadas' => 0, 'no_enviadas' => 0, 'aprobadas' => 0, 'desaprobadas' => 0, 'esperando_respuesta' => 0, 'finalizadas' => 0, 'ordenes_total' => 0, 'valor_total' => 0],
+      'stats' => ['total' => 0, 'no_enviadas' => 0, 'aprobadas' => 0, 'desaprobadas' => 0, 'esperando_respuesta' => 0, 'ordenes_total' => 0, 'valor_total' => 0],
       'pagination' => ['page' => 1, 'per_page' => 20, 'total' => 0, 'total_pages' => 1],
     ];
     $openTopicDefs = [
@@ -1654,12 +1654,8 @@ trait RendersDashboard
       if (in_array($stateFilter, ['__sin_estado__', 'sin_estado', 'sin estado'], true)) {
         $where[] = "(TRIM(COALESCE(c.`estado`, '')) = '' OR LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'sin estado')";
       } else {
-        if (in_array($stateFilter, ['finalizado', 'finalizada'], true)) {
-          $where[] = "LOWER(TRIM(COALESCE(c.`estado`, ''))) IN ('finalizado', 'finalizada')";
-        } else {
-          $where[] = "LOWER(TRIM(COALESCE(c.`estado`, ''))) = ?";
-          $args[] = $stateFilter;
-        }
+        $where[] = "LOWER(TRIM(COALESCE(c.`estado`, ''))) = ?";
+        $args[] = $stateFilter;
       }
     }
     if (($p['fEnviada'] ?? '') !== '') {
@@ -1758,12 +1754,10 @@ trait RendersDashboard
     $row = $this->db->getRow(
       "SELECT
         COUNT(1) AS total,
-        SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`se_envio`, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado') THEN 1 ELSE 0 END) AS enviadas,
         SUM(CASE WHEN TRIM(COALESCE(c.`se_envio`, '')) = '' OR LOWER(TRIM(COALESCE(c.`se_envio`, ''))) IN ('no', '0', 'false') THEN 1 ELSE 0 END) AS no_enviadas,
         SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'aprobada' THEN 1 ELSE 0 END) AS aprobadas,
         SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'desaprobada' THEN 1 ELSE 0 END) AS desaprobadas,
         SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'esperando respuesta' THEN 1 ELSE 0 END) AS esperando_respuesta,
-        SUM(CASE WHEN LOWER(TRIM(COALESCE(c.`estado`, ''))) IN ('finalizado', 'finalizada') THEN 1 ELSE 0 END) AS finalizadas,
         SUM(CASE WHEN TRIM(COALESCE(c.`estado`, '')) = '' OR LOWER(TRIM(COALESCE(c.`estado`, ''))) = 'sin estado' THEN 1 ELSE 0 END) AS sin_estado,
         SUM(COALESCE(c.`total`, 0)) AS valor_total
        FROM `{$table}` c
@@ -1784,12 +1778,10 @@ trait RendersDashboard
 
     return [
       'total' => (int) ($row['total'] ?? 0),
-      'enviadas' => (int) ($row['enviadas'] ?? 0),
       'no_enviadas' => (int) ($row['no_enviadas'] ?? 0),
       'aprobadas' => (int) ($row['aprobadas'] ?? 0),
       'desaprobadas' => (int) ($row['desaprobadas'] ?? 0),
       'esperando_respuesta' => (int) ($row['esperando_respuesta'] ?? 0),
-      'finalizadas' => (int) ($row['finalizadas'] ?? 0),
       'sin_estado' => (int) ($row['sin_estado'] ?? 0),
       'ordenes_total' => $ordersTotal,
       'valor_total' => (float) ($row['valor_total'] ?? 0),
@@ -3417,12 +3409,10 @@ trait RendersDashboard
   {
     $items = [
       ['key' => 'total', 'label' => 'Total', 'id' => 'total-card', 'value' => (string) ($stats['total'] ?? 0)],
-      ['key' => 'enviadas', 'label' => 'Enviadas', 'id' => 'enviadas', 'value' => (string) ($stats['enviadas'] ?? 0)],
       ['key' => 'no-enviadas', 'label' => 'Sin enviar', 'id' => 'no-enviadas', 'value' => (string) ($stats['no_enviadas'] ?? 0)],
       ['key' => 'aprobadas', 'label' => 'Aprobadas', 'id' => 'aprobadas', 'value' => (string) ($stats['aprobadas'] ?? 0)],
       ['key' => 'desaprobadas', 'label' => 'Desaprobadas', 'id' => 'desaprobadas', 'value' => (string) ($stats['desaprobadas'] ?? 0)],
       ['key' => 'esperando-respuesta', 'label' => 'Esperando respuesta', 'id' => 'esperando-respuesta', 'value' => (string) ($stats['esperando_respuesta'] ?? 0)],
-      ['key' => 'finalizadas', 'label' => 'Finalizadas', 'id' => 'finalizadas', 'value' => (string) ($stats['finalizadas'] ?? 0)],
       ['key' => 'ordenes', 'label' => '&Oacute;rdenes', 'id' => 'ordenes', 'value' => (string) ($stats['ordenes_total'] ?? 0)],
       ['key' => 'valor-total', 'label' => 'Total cotizaciones', 'id' => 'valor-total', 'value' => $this->format_cop_currency($stats['valor_total'] ?? 0), 'class' => ' scm-kpi-money'],
     ];
@@ -3444,6 +3434,7 @@ trait RendersDashboard
       <form id="scm-form-cotizaciones_mantenimiento" autocomplete="off">
         <input type="hidden" id="scmqt_page" name="scmqt_page" value="<?php echo esc_attr((string) ($p['fPage'] ?? '1')); ?>">
         <input type="hidden" id="scmqt_estado" name="scmqt_estado" value="<?php echo esc_attr((string) ($p['fEstado'] ?? '')); ?>">
+        <input type="hidden" id="scmqt_enviada" name="scmqt_enviada" value="<?php echo esc_attr((string) ($p['fEnviada'] ?? '')); ?>">
         <div class="scm-grid">
           <div class="scm-field"><label for="scmqt_cotizacion">Cotizaci&oacute;n</label><input id="scmqt_cotizacion" name="scmqt_cotizacion" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fCotizacion'] ?? '')); ?>" placeholder="Ej: 528"></div>
           <div class="scm-field"><label for="scmqt_ticket"># caso</label><input id="scmqt_ticket" name="scmqt_ticket" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fTicket'] ?? '')); ?>" placeholder="Ej: 10055"></div>
@@ -3452,7 +3443,6 @@ trait RendersDashboard
           <div class="scm-field"><label for="scmqt_funcionario">Funcionario</label><select id="scmqt_funcionario" name="scmqt_funcionario" class="select select-bordered select-sm scm-select scm-select2" data-placeholder="Buscar funcionario..."><option value="">Todos</option><?php foreach ($funcionarios as $func): $fId = trim((string) ($func['id'] ?? '')); ?><option value="<?php echo esc_attr($fId); ?>" <?php selected((string) ($p['fFuncionario'] ?? ''), $fId); ?>><?php echo esc_html((string) ($func['label'] ?? $fId)); ?></option><?php endforeach; ?></select></div>
           <div class="scm-field"><label for="scmqt_inmueble">Inmueble SIMI</label><input id="scmqt_inmueble" name="scmqt_inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fInmueble'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="scmqt_contrato">Contrato</label><input id="scmqt_contrato" name="scmqt_contrato" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fContrato'] ?? '')); ?>"></div>
-          <div class="scm-field"><label for="scmqt_enviada">Fue enviada</label><select id="scmqt_enviada" name="scmqt_enviada" class="select select-bordered select-sm scm-select"><option value="">Todas</option><option value="si" <?php selected((string) ($p['fEnviada'] ?? ''), 'si'); ?>>S&iacute;</option><option value="no" <?php selected((string) ($p['fEnviada'] ?? ''), 'no'); ?>>No</option></select></div>
           <div class="scm-field"><label for="scmqt_tipo_mantenimiento">Tipo mantenimiento</label><select id="scmqt_tipo_mantenimiento" name="scmqt_tipo_mantenimiento" class="select select-bordered select-sm scm-select"><option value="">Todos</option></select></div>
           <div class="scm-field"><label for="scmqt_categoria">Categoria</label><select id="scmqt_categoria" name="scmqt_categoria" class="select select-bordered select-sm scm-select"><option value="">Todas</option></select></div>
         </div>
@@ -3470,11 +3460,9 @@ trait RendersDashboard
     $states = [
       ['state' => '', 'sent' => '', 'label' => 'Todos', 'key' => 'total'],
       ['state' => '', 'sent' => 'no', 'label' => 'Sin enviar', 'key' => 'no_enviadas'],
-      ['state' => '', 'sent' => 'si', 'label' => 'Enviadas', 'key' => 'enviadas'],
       ['state' => 'Aprobada', 'sent' => '', 'label' => 'Aprobadas', 'key' => 'aprobadas'],
       ['state' => 'Desaprobada', 'sent' => '', 'label' => 'Desaprobadas', 'key' => 'desaprobadas'],
       ['state' => 'Esperando respuesta', 'sent' => '', 'label' => 'Esperando respuesta', 'key' => 'esperando_respuesta'],
-      ['state' => 'Finalizado', 'sent' => '', 'label' => 'Finalizadas', 'key' => 'finalizadas'],
     ];
 
     $html = '<div class="scm-cotizacion-state-tabs" role="tablist" aria-label="Estados de cotizaciones">';
@@ -3597,7 +3585,6 @@ trait RendersDashboard
     $sucursal = trim((string) ($row['sucursal'] ?? '1'));
     $estado = trim((string) ($row['estado'] ?? ''));
     $cotizacionAprobada = strtolower($estado) === 'aprobada';
-    $cotizacionFinalizada = in_array(strtolower($estado), ['finalizado', 'finalizada'], true);
     $seEnvio = strtolower(trim((string) ($row['se_envio'] ?? '')));
     $enviada = in_array($seEnvio, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true);
     $fechaTs = (int) ($row['fecha'] ?? 0);
@@ -3729,7 +3716,7 @@ trait RendersDashboard
       . $ticketCaseButton
       . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-view-cotizacion-orders>Ver &oacute;rdenes <span class="scm-action-count">' . esc_html((string) count($orders)) . '</span></button>' : '')
       . '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizaci&oacute;n</button>'
-      . (!$cotizacionAprobada && !$cotizacionFinalizada ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-approve-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Marcar como aprobada</button>' : '')
+      . (!$cotizacionAprobada ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-approve-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Marcar como aprobada</button>' : '')
       . '<button type="button" class="scm-case-work-btn scm-danger-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizaci&oacute;n</button>'
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($noteUrl) . '" data-iframe-title="A&ntilde;adir nota a cotizaci&oacute;n">A&ntilde;adir nota</button>'
       . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($orderUrl) . '" data-iframe-title="A&ntilde;adir orden de mantenimiento">A&ntilde;adir orden</button>' : '')
