@@ -368,6 +368,7 @@ trait RendersDashboard
         'actas_satisfaccion' => self::AJAX_TICKET_COMPLETION_LIST,
         'revision_correctiva' => self::AJAX_CORRECTIVE_REVIEW,
         'delete_cotizacion' => self::AJAX_DELETE_COTIZACION,
+        'approve_cotizacion' => self::AJAX_APPROVE_COTIZACION,
         'cotizacion_pdf' => self::AJAX_COTIZACION_MANTENIMIENTO_PDF,
         'activate_ticket' => self::AJAX_ACTIVATE_TICKET,
         'cotizacion_response' => self::AJAX_COTIZACION_RESPONSE,
@@ -3456,6 +3457,7 @@ trait RendersDashboard
     $sucursal = trim((string) ($row['sucursal'] ?? '1'));
     $estado = trim((string) ($row['estado'] ?? ''));
     $cotizacionAprobada = strtolower($estado) === 'aprobada';
+    $cotizacionFinalizada = in_array(strtolower($estado), ['finalizado', 'finalizada'], true);
     $seEnvio = strtolower(trim((string) ($row['se_envio'] ?? '')));
     $enviada = in_array($seEnvio, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true);
     $fechaTs = (int) ($row['fecha'] ?? 0);
@@ -3587,6 +3589,7 @@ trait RendersDashboard
       . $ticketCaseButton
       . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-view-cotizacion-orders>Ver &oacute;rdenes <span class="scm-action-count">' . esc_html((string) count($orders)) . '</span></button>' : '')
       . '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizaci&oacute;n</button>'
+      . (!$cotizacionAprobada && !$cotizacionFinalizada ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-approve-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Marcar como aprobada</button>' : '')
       . '<button type="button" class="scm-case-work-btn scm-danger-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizaci&oacute;n</button>'
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($noteUrl) . '" data-iframe-title="A&ntilde;adir nota a cotizaci&oacute;n">A&ntilde;adir nota</button>'
       . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($orderUrl) . '" data-iframe-title="A&ntilde;adir orden de mantenimiento">A&ntilde;adir orden</button>' : '')

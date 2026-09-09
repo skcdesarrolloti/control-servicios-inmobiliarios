@@ -571,6 +571,102 @@ trait HandlesMaintenanceActions
     ]);
   }
 
+  public function ajax_handler_approve_cotizacion_mantenimiento(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento')) {
+      $this->jsonFail('No tienes permiso para actualizar cotizaciones.');
+    }
+
+    $cotizacionId = (int) ($_POST['id_cotizacion'] ?? 0);
+    $observacion = trim(wp_kses_post(wp_unslash((string) ($_POST['observacion'] ?? ''))));
+    if ($cotizacionId <= 0) {
+      $this->jsonFail('Cotizacion invalida.');
+    }
+
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($table)) {
+      $this->jsonFail('La tabla de cotizaciones no esta disponible.');
+    }
+
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
+    if (!is_array($row)) {
+      $this->jsonFail('Cotizacion no encontrada.');
+    }
+
+    $now = time();
+    $nowMysql = date('Y-m-d H:i:s', $now);
+    $userId = Auth::userId();
+    $employeeId = (string) $userId;
+    $schema = new \SCM\Support\SchemaInspector($this->db);
+    if (method_exists($this, 'current_employee_id')) {
+      $currentEmployeeId = trim((string) $this->current_employee_id());
+      if ($currentEmployeeId !== '') {
+        $employeeId = $currentEmployeeId;
+      }
+    }
+
+    $update = [
+      'estado' => 'Aprobada',
+      'estado_respuesta_cotizacion_mantenimiento' => 'Aprobada',
+      'fecha_respuesta' => $now,
+      'observacion_respuesta' => $observacion !== '' ? $observacion : 'Cotizacion marcada como aprobada desde el panel.',
+      'motivo' => '',
+      'tuvo_seguimiento' => 'Si',
+      'fecha_seguimiento' => $now,
+      'cct_modified' => $nowMysql,
+      'cct_author_id' => $employeeId,
+      'id_coordinador' => $employeeId,
+    ];
+    $update = $schema->filterTableData($table, $update);
+    $updatedCotizacion = !empty($update) ? $this->db->update($table, $update, ['_ID' => $cotizacionId]) : 0;
+    $updatedRow = $this->db->getRow("SELECT `estado` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
+    $updatedEstado = is_array($updatedRow) ? strtolower(trim((string) ($updatedRow['estado'] ?? ''))) : '';
+    if (empty($update) || ($updatedCotizacion < 1 && $updatedEstado !== 'aprobada')) {
+      $this->jsonFail('No se pudo marcar la cotizacion como aprobada.');
+    }
+
+    $ticketRef = trim((string) ($row['id_ticket'] ?? ''));
+    $ticketRowsUpdated = 0;
+    $ticketsTable = $this->db->table('jet_cct_tickets');
+    if ($ticketRef !== '' && $this->table_exists($ticketsTable)) {
+      $ticketRows = [];
+      if (ctype_digit($ticketRef)) {
+        $ticketRows = $this->db->getResults(
+          "SELECT `_ID`, `id_cotizacion_mantenimiento` FROM `{$ticketsTable}` WHERE `_ID` = ? OR TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 5",
+          [(int) $ticketRef, $ticketRef]
+        );
+      } else {
+        $ticketRows = $this->db->getResults(
+          "SELECT `_ID`, `id_cotizacion_mantenimiento` FROM `{$ticketsTable}` WHERE TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 5",
+          [$ticketRef]
+        );
+      }
+      foreach ($ticketRows as $ticketRow) {
+        $linkedCotIds = $this->cotizacion_split_ids((string) ($ticketRow['id_cotizacion_mantenimiento'] ?? ''));
+        if (!empty($linkedCotIds) && !in_array((string) $cotizacionId, $linkedCotIds, true)) {
+          continue;
+        }
+        $ticketUpdate = [
+          'estado_cotizacion_mantenimiento' => 'Aprobada',
+          'estado_respuesta_cotizacion_mantenimiento' => 'Aprobada',
+          'fecha_respuesta_cotizacion_mantenimiento' => $now,
+          'fecha_actualizacion' => $now,
+          'cct_modified' => $nowMysql,
+        ];
+        $ticketUpdate = $schema->filterTableData($ticketsTable, $ticketUpdate);
+        if (!empty($ticketUpdate)) {
+          $ticketRowsUpdated += $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => (int) ($ticketRow['_ID'] ?? 0)]);
+        }
+      }
+    }
+
+    $this->jsonOk([
+      'message' => 'Cotizacion marcada como aprobada.' . ($ticketRowsUpdated > 0 ? ' Ticket sincronizado.' : ''),
+      'id_cotizacion' => (string) $cotizacionId,
+    ]);
+  }
+
   public function ajax_handler_cotizacion_mantenimiento_pdf(): void
   {
     $this->verifyCsrf();

@@ -144,6 +144,7 @@
     var actionCotizacionesMantenimiento =
       actions.cotizaciones_mantenimiento || "";
     var actionDeleteCotizacion = actions.delete_cotizacion || "";
+    var actionApproveCotizacion = actions.approve_cotizacion || "";
     var actionCotizacionPdf = actions.cotizacion_pdf || "";
     var actionActivateTicket = actions.activate_ticket || "";
     var actionCloseTicket = actions.close_ticket || "";
@@ -11358,6 +11359,43 @@
             fd,
             actionCotizacionResponse,
             "Error enviando respuesta de cotizacion.",
+          );
+        });
+        return;
+      }
+
+      var approveBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-approve-cotizacion]")
+          : null;
+      if (approveBtn) {
+        e.preventDefault();
+        var approveCotizacionId = approveBtn.getAttribute("data-cotizacion-id") || "";
+        if (!approveCotizacionId || !window.Swal) {
+          showToast("error", "No se pudo abrir la confirmación.");
+          return;
+        }
+        window.Swal.fire({
+          title: "Marcar cotización como aprobada",
+          text: "Se actualizará esta cotización exacta y se habilitarán sus acciones de órdenes y acta.",
+          icon: "question",
+          input: "textarea",
+          inputLabel: "Observación opcional",
+          inputPlaceholder: "Agrega una nota si necesitas dejar contexto interno.",
+          showCancelButton: true,
+          allowOutsideClick: false,
+          allowEscapeKey: true,
+          confirmButtonText: "Marcar aprobada",
+          cancelButtonText: "Cancelar",
+        }).then(function (res) {
+          if (!res.isConfirmed) return;
+          var fd = new FormData();
+          fd.append("id_cotizacion", approveCotizacionId);
+          fd.append("observacion", res.value || "");
+          submitCotizacionAction(
+            fd,
+            actionApproveCotizacion,
+            "Error marcando cotización como aprobada.",
           );
         });
         return;

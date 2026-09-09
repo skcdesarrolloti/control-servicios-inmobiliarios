@@ -29,6 +29,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_EXPORT_CASES_EXCEL = 'scm_exportar_casos_excel';
   const AJAX_COTIZACIONES_MANTENIMIENTO = 'scm_cotizaciones_mantenimiento';
   const AJAX_DELETE_COTIZACION = 'scm_eliminar_cotizacion_mantenimiento';
+  const AJAX_APPROVE_COTIZACION = 'scm_aprobar_cotizacion_mantenimiento';
   const AJAX_COTIZACION_MANTENIMIENTO_PDF = 'scm_cotizacion_mantenimiento_pdf';
   const AJAX_ACTIVATE_TICKET = 'scm_activar_ticket';
   const AJAX_COTIZACION_RESPONSE = 'scm_responder_cotizacion';
