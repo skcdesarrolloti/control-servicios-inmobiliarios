@@ -15,6 +15,7 @@ $checks = [
   'runtime exposes approve quote action' => str_contains($dashboard, "'approve_cotizacion' => self::AJAX_APPROVE_COTIZACION"),
   'quote cards render quick approval button' => str_contains($dashboard, 'data-scm-approve-cotizacion') && str_contains($dashboard, 'Marcar como aprobada'),
   'quote cards show quick approval for every non-approved quote' => str_contains($dashboard, '!$cotizacionAprobada ?') && !str_contains($dashboard, '$cotizacionFinalizada'),
+  'quote approve and delete buttons use neutral quote action style' => str_contains($dashboard, 'class="scm-case-work-btn" data-scm-approve-cotizacion') && str_contains($dashboard, 'class="scm-case-work-btn" data-scm-delete-cotizacion'),
   'quote panel omits finalized buckets' => !str_contains($dashboard, "'label' => 'Finalizadas'") && !str_contains($dashboard, "'key' => 'finalizadas'") && !str_contains($handler, 'kpi_finalizadas'),
   'quote panel omits sent buckets' => !str_contains($dashboard, "'label' => 'Enviadas'") && !str_contains($dashboard, "'key' => 'enviadas'") && !str_contains($handler, 'kpi_enviadas'),
   'frontend submits exact quote approval action' => str_contains($runtimeJs, 'actionApproveCotizacion') && str_contains($runtimeJs, 'data-scm-approve-cotizacion') && str_contains($runtimeJs, 'fd.append("id_cotizacion", approveCotizacionId)'),
