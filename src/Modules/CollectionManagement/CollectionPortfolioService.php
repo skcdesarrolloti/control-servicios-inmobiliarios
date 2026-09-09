@@ -931,6 +931,7 @@ final class CollectionPortfolioService
     if ($managementCreated <= 0) {
       throw new \RuntimeException('No se pudo registrar el cobro prejurídico en el historial del inmueble.');
     }
+    $managementIds = $this->managementIdsFromResult($management);
     $now = date('Y-m-d H:i:s');
     $stage = 'prejuridico';
     $this->db->update($this->portfolioTable(), [
@@ -965,10 +966,16 @@ final class CollectionPortfolioService
           ],
         ]);
         $queued = (new EmailQueue($this->db))->enqueue($recipients, $subject, $html, [
-          'source_module' => 'collection-management',
+          'source_module' => AdministrativeNotificationsService::SOURCE_MODULE,
           'destination_name' => (string) ($item['tenant_name'] ?? ''),
           'dedupe_key' => 'collection-letter:' . $portfolioId . ':' . $letterType . ':' . date('YmdHi'),
-          'meta' => ['portfolio_id' => $portfolioId, 'letter_type' => $letterType, 'document_url' => $document['url'], 'template_name' => 'scm_email_cobro_prejuridico_v1'],
+          'meta' => array_merge([
+            'source_submodule' => 'collection-management',
+            'portfolio_id' => $portfolioId,
+            'letter_type' => $letterType,
+            'document_url' => $document['url'],
+            'template_name' => 'scm_email_cobro_prejuridico_v1',
+          ], $this->collectionManagementQueueMeta($managementIds)),
         ]);
       }
     }
@@ -993,6 +1000,8 @@ final class CollectionPortfolioService
       'management_created' => $managementCreated,
       'management_history' => (int) ($management['history'] ?? 0),
       'management_properties' => (int) ($management['properties'] ?? 0),
+      'management_ids' => $managementIds,
+      'management_id' => (int) ($managementIds[0] ?? 0),
       'managements' => (array) ($management['managements'] ?? []),
     ];
   }
@@ -1030,9 +1039,10 @@ final class CollectionPortfolioService
     if ($created <= 0) {
       throw new \RuntimeException('No se pudo registrar la gestión de cobro del aviso de siniestro.');
     }
+    $managementIds = $this->managementIdsFromResult($management);
 
-    $emailQueued = $this->enqueueSiniestroEmails($item, $sender, $portfolioId);
-    $whatsapp = $this->enqueueSiniestroWhatsApp($item, $sender, $portfolioId, '');
+    $emailQueued = $this->enqueueSiniestroEmails($item, $sender, $portfolioId, $managementIds);
+    $whatsapp = $this->enqueueSiniestroWhatsApp($item, $sender, $portfolioId, '', $managementIds);
     $notes = $observation . ' Correos encolados: ' . $emailQueued . '. WhatsApp encolados: ' . $whatsapp['queued'];
     if ($whatsapp['failed'] > 0) {
       $notes .= '. WhatsApp fallidos: ' . $whatsapp['failed'];
@@ -1050,15 +1060,47 @@ final class CollectionPortfolioService
       'management_created' => $created,
       'management_history' => (int) ($management['history'] ?? 0),
       'management_properties' => (int) ($management['properties'] ?? 0),
+      'management_ids' => $managementIds,
+      'management_id' => (int) ($managementIds[0] ?? 0),
       'managements' => (array) ($management['managements'] ?? []),
+    ];
+  }
+
+  /** @param array<string,mixed> $result @return int[] */
+  private function managementIdsFromResult(array $result): array
+  {
+    $ids = [];
+    foreach ((array) ($result['managements'] ?? []) as $management) {
+      if (!is_array($management)) {
+        continue;
+      }
+      $id = (int) ($management['id'] ?? 0);
+      if ($id > 0) {
+        $ids[$id] = $id;
+      }
+    }
+    return array_values($ids);
+  }
+
+  /** @param int[] $managementIds @return array<string,mixed> */
+  private function collectionManagementQueueMeta(array $managementIds): array
+  {
+    $managementIds = array_values(array_unique(array_filter(array_map('intval', $managementIds), static fn(int $id): bool => $id > 0)));
+    if ($managementIds === []) {
+      return [];
+    }
+    return [
+      'collection_management_ids' => $managementIds,
+      'collection_management_lookup' => '|' . implode('|', $managementIds) . '|',
     ];
   }
 
   /**
    * @param array<string,mixed> $item
    * @param array<string,mixed> $sender
+   * @param int[] $managementIds
    */
-  private function enqueueSiniestroEmails(array $item, array $sender, int $portfolioId): int
+  private function enqueueSiniestroEmails(array $item, array $sender, int $portfolioId, array $managementIds = []): int
   {
     $recipients = [
       trim((string) ($item['tenant_email'] ?? '')),
@@ -1092,19 +1134,25 @@ final class CollectionPortfolioService
     ]);
 
     return (new EmailQueue($this->db))->enqueue($recipients, 'Aviso de siniestro por mora en contrato de arrendamiento', $html, [
-      'source_module' => 'collection-management',
+      'source_module' => AdministrativeNotificationsService::SOURCE_MODULE,
       'destination_name' => $tenantName,
       'dedupe_key' => 'collection-siniestro-notification:' . $portfolioId . ':' . date('YmdHi'),
-      'meta' => ['portfolio_id' => $portfolioId, 'letter_type' => 'siniestro', 'template_name' => 'scm_email_aviso_siniestro_v1'],
+      'meta' => array_merge([
+        'source_submodule' => 'collection-management',
+        'portfolio_id' => $portfolioId,
+        'letter_type' => 'siniestro',
+        'template_name' => 'scm_email_aviso_siniestro_v1',
+      ], $this->collectionManagementQueueMeta($managementIds)),
     ]);
   }
 
   /**
    * @param array<string,mixed> $item
    * @param array<string,mixed> $sender
+   * @param int[] $managementIds
    * @return array{queued:int,failed:int,recipients:int}
    */
-  private function enqueueSiniestroWhatsApp(array $item, array $sender, int $portfolioId, string $documentUrl): array
+  private function enqueueSiniestroWhatsApp(array $item, array $sender, int $portfolioId, string $documentUrl, array $managementIds = []): array
   {
     $signature = trim((string) ($sender['signature_line'] ?? ''));
     if ($signature === '') {
@@ -1148,6 +1196,7 @@ final class CollectionPortfolioService
     }
 
     $queue = new SmsQueue($this->db);
+    $managementMeta = $this->collectionManagementQueueMeta($managementIds);
     $queued = 0;
     $failed = 0;
     foreach ($recipients as $recipient) {
@@ -1156,7 +1205,8 @@ final class CollectionPortfolioService
         (string) $recipient['name'],
         'Aviso de siniestro por mora en contrato de arrendamiento.',
         [
-          'source_module' => 'collection-management',
+          'source_module' => AdministrativeNotificationsService::SOURCE_MODULE,
+          'source_submodule' => 'collection-management',
           'campaign_tag' => 'collection_siniestro_whatsapp',
           'categoria_mensaje' => 'informacion',
           'portfolio_id' => $portfolioId,
@@ -1175,7 +1225,7 @@ final class CollectionPortfolioService
           ]],
           'priority' => 100,
           'max_attempts' => 3,
-        ]
+        ] + $managementMeta
       );
       if ($ok) {
         $queued++;

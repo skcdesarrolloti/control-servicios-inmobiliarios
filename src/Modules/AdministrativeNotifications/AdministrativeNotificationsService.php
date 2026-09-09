@@ -16,6 +16,7 @@ final class AdministrativeNotificationsService
   public const PROJECT_CODE = 'control-servicios-inmobiliarios';
   public const SOURCE_MODULE = 'admin_notifications';
   public const QUEUE_TABLE = 'skc_notification_queue';
+  private const COLLECTION_QUEUE_SOURCE_MODULE = 'collection-management';
   private const QUEUE_ATTEMPTS_TABLE = 'skc_notification_attempts';
   public const SMS_MAX = 160;
   public const COLLECTION_SMS_MAX = 480;
@@ -710,11 +711,14 @@ final class AdministrativeNotificationsService
     $rows = $this->db->getResults(
       'SELECT `id`, `channel`, `provider`, `destination`, `destination_name`, `subject`, `template_name`, `status`, `attempts`, `created_at`, `updated_at`, `sent_at`, `meta_json`, LEFT(COALESCE(`message_text`, \'\'), 1400) AS `message_text`, LEFT(COALESCE(`last_error`, \'\'), 500) AS `last_error`
         FROM `' . self::QUEUE_TABLE . '`
-        WHERE `source_module` = ? AND `meta_json` LIKE ?
+        WHERE `project_code` = ? AND `source_module` IN (?, ?) AND `meta_json` LIKE ?
         ORDER BY `id` DESC
         LIMIT 100',
-      [self::SOURCE_MODULE, $lookupNeedle]
+      [self::PROJECT_CODE, self::SOURCE_MODULE, self::COLLECTION_QUEUE_SOURCE_MODULE, $lookupNeedle]
     );
+    if ($rows === []) {
+      $rows = $this->legacyCollectionManagementQueueRows($managementId);
+    }
 
     $stats = ['total' => 0, 'pending' => 0, 'sent' => 0, 'failed' => 0, 'other' => 0];
     foreach ($rows as &$row) {
@@ -737,6 +741,130 @@ final class AdministrativeNotificationsService
       'stats' => $stats,
       'management_id' => $managementId,
     ];
+  }
+
+  /** @return array<int,array<string,mixed>> */
+  private function legacyCollectionManagementQueueRows(int $managementId): array
+  {
+    $management = $this->collectionManagementRecordForQueue($managementId);
+    if ($management === []) {
+      return [];
+    }
+
+    $contractId = (int) preg_replace('/\D+/', '', (string) ($management['contract_id'] ?? '0'));
+    $contractNumber = trim((string) ($management['contract_number'] ?? ''));
+    $tenantName = trim((string) ($management['tenant_name'] ?? ''));
+    $portfolioId = $this->collectionPortfolioIdForQueue($contractId, $contractNumber);
+    $where = ['`project_code` = ?', '`source_module` IN (?, ?)'];
+    $args = [self::PROJECT_CODE, self::SOURCE_MODULE, self::COLLECTION_QUEUE_SOURCE_MODULE];
+    $linkWhere = [];
+    $linkArgs = [];
+
+    if ($portfolioId > 0) {
+      $linkWhere[] = '`meta_json` LIKE ?';
+      $linkArgs[] = '%"portfolio_id":' . $portfolioId . '%';
+    }
+    if ($contractNumber !== '') {
+      $needle = '%' . $this->db->escapeLike($contractNumber) . '%';
+      $linkWhere[] = '(`subject` LIKE ? OR `message_text` LIKE ? OR `meta_json` LIKE ?)';
+      array_push($linkArgs, $needle, $needle, $needle);
+    }
+    if ($tenantName !== '') {
+      $needle = '%' . $this->db->escapeLike($tenantName) . '%';
+      $linkWhere[] = '`destination_name` LIKE ?';
+      $linkArgs[] = $needle;
+    }
+    if ($linkWhere === [] && $contractId > 0) {
+      $needle = '%' . $this->db->escapeLike((string) $contractId) . '%';
+      $linkWhere[] = '(`subject` LIKE ? OR `message_text` LIKE ? OR `meta_json` LIKE ?)';
+      array_push($linkArgs, $needle, $needle, $needle);
+    }
+    if ($linkWhere === []) {
+      return [];
+    }
+    $where[] = '(' . implode(' OR ', $linkWhere) . ')';
+    array_push($args, ...$linkArgs);
+
+    $hint = $this->collectionManagementQueueHint($management);
+    if ($hint !== '') {
+      $needle = '%' . $this->db->escapeLike($hint) . '%';
+      $where[] = '(`subject` LIKE ? OR `message_text` LIKE ? OR `template_name` LIKE ? OR `meta_json` LIKE ?)';
+      array_push($args, $needle, $needle, $needle, $needle);
+    }
+
+    return $this->db->getResults(
+      'SELECT `id`, `channel`, `provider`, `destination`, `destination_name`, `subject`, `template_name`, `status`, `attempts`, `created_at`, `updated_at`, `sent_at`, `meta_json`, LEFT(COALESCE(`message_text`, \'\'), 1400) AS `message_text`, LEFT(COALESCE(`last_error`, \'\'), 500) AS `last_error`
+        FROM `' . self::QUEUE_TABLE . '`
+        WHERE ' . implode(' AND ', $where) . '
+        ORDER BY `id` DESC
+        LIMIT 100',
+      $args
+    );
+  }
+
+  /** @return array<string,mixed> */
+  private function collectionManagementRecordForQueue(int $managementId): array
+  {
+    $table = $this->db->table('jet_cct_gestiones_cobro');
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+    $idColumn = $this->collectionIdColumn($table);
+    if (!$this->schema->columnExists($table, $idColumn)) {
+      return [];
+    }
+
+    $select = [
+      $this->collectionSelect($table, ['id_contrato'], 'contract_id'),
+      $this->collectionSelect($table, ['contrato', 'contrato_arrendamiento'], 'contract_number'),
+      $this->collectionSelect($table, ['arrendatario'], 'tenant_name'),
+      $this->collectionSelect($table, ['observacion'], 'observation'),
+      $this->collectionSelect($table, ['tipo_gestion', 'tipo_gestion_cobro'], 'management_type'),
+    ];
+    $row = $this->db->getRow(
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE `{$idColumn}` = ? LIMIT 1",
+      [$managementId]
+    );
+    return is_array($row) ? $row : [];
+  }
+
+  private function collectionPortfolioIdForQueue(int $contractId, string $contractNumber): int
+  {
+    $table = $this->db->table('scm_collection_portfolio');
+    if (!$this->schema->tableExists($table)) {
+      return 0;
+    }
+
+    if ($contractId > 0 && $this->schema->columnExists($table, 'contract_id')) {
+      return (int) ($this->db->getVar(
+        "SELECT `id` FROM `{$table}` WHERE `contract_id` = ? ORDER BY `is_current` DESC, `id` DESC LIMIT 1",
+        [$contractId]
+      ) ?? 0);
+    }
+    if ($contractNumber !== '' && $this->schema->columnExists($table, 'contract_number')) {
+      return (int) ($this->db->getVar(
+        "SELECT `id` FROM `{$table}` WHERE TRIM(COALESCE(`contract_number`, '')) = ? ORDER BY `is_current` DESC, `id` DESC LIMIT 1",
+        [$contractNumber]
+      ) ?? 0);
+    }
+    return 0;
+  }
+
+  /** @param array<string,mixed> $management */
+  private function collectionManagementQueueHint(array $management): string
+  {
+    $text = mb_strtolower(trim((string) ($management['observation'] ?? '') . ' ' . (string) ($management['management_type'] ?? '')), 'UTF-8');
+    $text = strtr($text, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n']);
+    if (str_contains($text, 'siniestro')) {
+      return 'siniestro';
+    }
+    if (str_contains($text, 'prejuridico')) {
+      return 'prejuridico';
+    }
+    if (str_contains($text, 'fecha') || str_contains($text, 'pago')) {
+      return 'fecha_pago';
+    }
+    return '';
   }
 
   /**
@@ -768,8 +896,8 @@ final class AdministrativeNotificationsService
     $allowedChannels = ['email', 'sms', 'whatsapp'];
     $types = $this->types();
 
-    $where = ['`project_code` = ?', '`source_module` = ?'];
-    $args = [self::PROJECT_CODE, self::SOURCE_MODULE];
+    $where = ['`project_code` = ?', '`source_module` IN (?, ?)'];
+    $args = [self::PROJECT_CODE, self::SOURCE_MODULE, self::COLLECTION_QUEUE_SOURCE_MODULE];
 
     if ($dateFrom !== '') {
       $where[] = '`created_at` >= ?';
@@ -896,7 +1024,7 @@ final class AdministrativeNotificationsService
     if (!is_array($row) || $row === []) {
       throw new \RuntimeException('El registro de cola no existe.');
     }
-    if ((string) ($row['project_code'] ?? '') !== self::PROJECT_CODE || (string) ($row['source_module'] ?? '') !== self::SOURCE_MODULE) {
+    if ((string) ($row['project_code'] ?? '') !== self::PROJECT_CODE || !in_array((string) ($row['source_module'] ?? ''), [self::SOURCE_MODULE, self::COLLECTION_QUEUE_SOURCE_MODULE], true)) {
       throw new \RuntimeException('Solo se pueden eliminar registros de Notificaciones administrativas.');
     }
     if (strtolower(trim((string) ($row['status'] ?? ''))) !== 'failed') {
