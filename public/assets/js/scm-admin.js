@@ -172,6 +172,231 @@
     return Promise.resolve();
   }
 
+  var imageLightboxState = {
+    overlay: null,
+    image: null,
+    caption: null,
+    counter: null,
+    original: null,
+    prev: null,
+    next: null,
+    items: [],
+    index: 0,
+    previousFocus: null,
+  };
+
+  function isImageUrl(url) {
+    var raw = String(url || "").trim();
+    if (!raw) return false;
+    if (/^(data:image\/|blob:)/i.test(raw)) return true;
+    try {
+      var parsed = new URL(raw, window.location.href);
+      return /\.(?:jpe?g|png|gif|webp|bmp|svg|avif)$/i.test(parsed.pathname || "");
+    } catch (_error) {
+      return /\.(?:jpe?g|png|gif|webp|bmp|svg|avif)(?:[?#].*)?$/i.test(raw);
+    }
+  }
+
+  function imageLinkFromEventTarget(target) {
+    if (!target || !target.closest) return null;
+    var anchor = target.closest("a[href]");
+    if (!anchor || anchor.closest(".scm-image-lightbox")) return null;
+    if (anchor.hasAttribute("download") || anchor.hasAttribute("data-scm-no-lightbox")) {
+      return null;
+    }
+    if (anchor.getAttribute("data-scm-lightbox") === "1") return anchor;
+    return isImageUrl(anchor.getAttribute("href") || anchor.href) ? anchor : null;
+  }
+
+  function imageCaptionFromAnchor(anchor) {
+    var image = anchor ? anchor.querySelector("img") : null;
+    var text =
+      (anchor && anchor.getAttribute("data-scm-lightbox-title")) ||
+      (image && image.getAttribute("alt")) ||
+      (anchor && anchor.getAttribute("title")) ||
+      (anchor && anchor.textContent) ||
+      "";
+    text = String(text || "").replace(/\s+/g, " ").trim();
+    if (text) return text;
+    try {
+      var parsed = new URL(anchor.href, window.location.href);
+      var name = decodeURIComponent((parsed.pathname || "").split("/").pop() || "");
+      return name || "Imagen adjunta";
+    } catch (_error) {
+      return "Imagen adjunta";
+    }
+  }
+
+  function imageItemFromAnchor(anchor) {
+    if (!anchor) return null;
+    var image = anchor.querySelector("img");
+    var url = anchor.getAttribute("href") || anchor.href || (image ? image.src : "");
+    if (!url && image) url = image.src || image.currentSrc || "";
+    if (!url) return null;
+    if (!image && !isImageUrl(url)) return null;
+    return {
+      url: url,
+      caption: imageCaptionFromAnchor(anchor),
+    };
+  }
+
+  function imageGalleryScope(anchor) {
+    if (!anchor || !anchor.closest) return document.body;
+    return (
+      anchor.closest(
+        ".scm-cotizacion-media-grid, .scm-acta-gallery-grid, .scm-acta-detail-photos, .scm-case-submodal-body, #scm-case-body, .scm-case-dialog, .swal2-popup, .scm-tab-panel, #scm-app",
+      ) || document.body
+    );
+  }
+
+  function imageGalleryFromAnchor(anchor) {
+    var scope = imageGalleryScope(anchor);
+    var links = Array.prototype.slice.call(scope.querySelectorAll("a[href]"));
+    var items = [];
+    var seen = {};
+    var activeIndex = 0;
+    links.forEach(function (link) {
+      var imageLink =
+        link.getAttribute("data-scm-lightbox") === "1" ||
+        isImageUrl(link.getAttribute("href") || link.href);
+      if (!imageLink || link.hasAttribute("download") || link.hasAttribute("data-scm-no-lightbox")) {
+        return;
+      }
+      var item = imageItemFromAnchor(link);
+      if (!item || seen[item.url]) return;
+      seen[item.url] = true;
+      if (link === anchor) activeIndex = items.length;
+      items.push(item);
+    });
+    if (!items.length) {
+      var single = imageItemFromAnchor(anchor);
+      if (single) items.push(single);
+      activeIndex = 0;
+    }
+    return { items: items, index: activeIndex };
+  }
+
+  function ensureImageLightbox() {
+    if (imageLightboxState.overlay) return imageLightboxState.overlay;
+    var overlay = document.createElement("div");
+    overlay.className = "scm-image-lightbox";
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.innerHTML =
+      '<div class="scm-image-lightbox-dialog" role="dialog" aria-modal="true" aria-label="Vista ampliada de imagen">' +
+      '<div class="scm-image-lightbox-head">' +
+      '<div><strong>Vista de evidencia</strong><span class="scm-image-lightbox-counter"></span></div>' +
+      '<div class="scm-image-lightbox-actions">' +
+      '<a class="scm-image-lightbox-original" href="#" target="_blank" rel="noopener noreferrer">Abrir original</a>' +
+      '<button type="button" class="scm-image-lightbox-close" aria-label="Cerrar visor">&times;</button>' +
+      "</div>" +
+      "</div>" +
+      '<button type="button" class="scm-image-lightbox-nav scm-image-lightbox-prev" aria-label="Imagen anterior">&lsaquo;</button>' +
+      '<figure class="scm-image-lightbox-stage"><img alt=""><figcaption></figcaption></figure>' +
+      '<button type="button" class="scm-image-lightbox-nav scm-image-lightbox-next" aria-label="Imagen siguiente">&rsaquo;</button>' +
+      "</div>";
+    document.body.appendChild(overlay);
+    imageLightboxState.overlay = overlay;
+    imageLightboxState.image = overlay.querySelector(".scm-image-lightbox-stage img");
+    imageLightboxState.caption = overlay.querySelector("figcaption");
+    imageLightboxState.counter = overlay.querySelector(".scm-image-lightbox-counter");
+    imageLightboxState.original = overlay.querySelector(".scm-image-lightbox-original");
+    imageLightboxState.prev = overlay.querySelector(".scm-image-lightbox-prev");
+    imageLightboxState.next = overlay.querySelector(".scm-image-lightbox-next");
+
+    overlay.addEventListener("click", function (event) {
+      if (event.target === overlay) closeImageLightbox();
+    });
+    overlay.querySelector(".scm-image-lightbox-close").addEventListener("click", closeImageLightbox);
+    imageLightboxState.prev.addEventListener("click", function () {
+      moveImageLightbox(-1);
+    });
+    imageLightboxState.next.addEventListener("click", function () {
+      moveImageLightbox(1);
+    });
+    return overlay;
+  }
+
+  function renderImageLightbox() {
+    var state = imageLightboxState;
+    var item = state.items[state.index] || {};
+    var total = state.items.length;
+    if (state.image) {
+      state.image.src = item.url || "";
+      state.image.alt = item.caption || "Imagen adjunta";
+    }
+    if (state.caption) state.caption.textContent = item.caption || "Imagen adjunta";
+    if (state.counter) state.counter.textContent = total > 1 ? (state.index + 1) + " de " + total : "1 imagen";
+    if (state.original) state.original.href = item.url || "#";
+    if (state.prev) state.prev.disabled = total < 2;
+    if (state.next) state.next.disabled = total < 2;
+  }
+
+  function moveImageLightbox(delta) {
+    var total = imageLightboxState.items.length;
+    if (total < 2) return;
+    imageLightboxState.index = (imageLightboxState.index + delta + total) % total;
+    renderImageLightbox();
+  }
+
+  function openImageLightbox(items, index) {
+    if (!Array.isArray(items) || !items.length) return;
+    ensureImageLightbox();
+    imageLightboxState.items = items;
+    imageLightboxState.index = Math.max(0, Math.min(Number(index) || 0, items.length - 1));
+    imageLightboxState.previousFocus = document.activeElement;
+    renderImageLightbox();
+    imageLightboxState.overlay.classList.add("is-open");
+    imageLightboxState.overlay.setAttribute("aria-hidden", "false");
+    document.body.classList.add("scm-image-lightbox-open");
+    var close = imageLightboxState.overlay.querySelector(".scm-image-lightbox-close");
+    if (close && typeof close.focus === "function") close.focus();
+  }
+
+  function closeImageLightbox() {
+    var state = imageLightboxState;
+    if (!state.overlay || !state.overlay.classList.contains("is-open")) return;
+    state.overlay.classList.remove("is-open");
+    state.overlay.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("scm-image-lightbox-open");
+    if (state.image) state.image.removeAttribute("src");
+    if (state.previousFocus && typeof state.previousFocus.focus === "function") {
+      state.previousFocus.focus();
+    }
+  }
+
+  function handleImageLightboxClick(event) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    var anchor = imageLinkFromEventTarget(event.target);
+    if (!anchor) return;
+    var gallery = imageGalleryFromAnchor(anchor);
+    if (!gallery.items.length) return;
+    event.preventDefault();
+    openImageLightbox(gallery.items, gallery.index);
+  }
+
+  function handleImageLightboxKeydown(event) {
+    if (!imageLightboxState.overlay || !imageLightboxState.overlay.classList.contains("is-open")) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeImageLightbox();
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      moveImageLightbox(-1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      moveImageLightbox(1);
+    }
+  }
+
+  function bindGlobalImageLightbox() {
+    if (document.documentElement.dataset.scmImageLightboxBound === "1") return;
+    document.documentElement.dataset.scmImageLightboxBound = "1";
+    document.addEventListener("click", handleImageLightboxClick);
+    document.addEventListener("keydown", handleImageLightboxKeydown);
+  }
+
   function bindTabs(root, runtime) {
     var tabs = root.querySelectorAll(".scm-tab[data-tab]");
     if (!tabs.length) {
@@ -4964,11 +5189,15 @@
     }
   }
 
+  bindGlobalImageLightbox();
+
   window.SCMAdminCore = {
     parseRuntime: parseRuntime,
     persistRuntime: persistRuntime,
     escHtml: escHtml,
     scmNotify: scmNotify,
+    openImageLightbox: openImageLightbox,
+    bindGlobalImageLightbox: bindGlobalImageLightbox,
     bindTabs: bindTabs,
     findRootFromNode: findRootFromNode,
     getCaseModal: getCaseModal,

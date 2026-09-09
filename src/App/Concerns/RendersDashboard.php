@@ -4274,7 +4274,7 @@ trait RendersDashboard
     foreach ($items as $item) {
       $isImage = strpos(strtolower($item['mime'] ?? ''), 'image/') === 0;
       $title = $this->cotizacion_clean_text($item['title'] !== '' ? $item['title'] : 'Ver adjunto');
-      $html .= '<a href="' . esc_attr($item['url']) . '" target="_blank" rel="noopener noreferrer" class="scm-cotizacion-media-item">';
+      $html .= '<a href="' . esc_attr($item['url']) . '" target="_blank" rel="noopener noreferrer" class="scm-cotizacion-media-item"' . ($isImage ? ' data-scm-lightbox="1" data-scm-lightbox-title="' . esc_attr($title !== '' ? $title : 'Imagen adjunta') . '"' : '') . '>';
       if ($isImage) {
         $html .= '<img src="' . esc_attr($item['url']) . '" alt="' . esc_attr($title !== '' ? $title : 'Imagen adjunta') . '">';
       } else {
