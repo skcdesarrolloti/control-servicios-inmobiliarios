@@ -11388,6 +11388,7 @@
           allowOutsideClick: false,
           allowEscapeKey: true,
           confirmButtonText: "Marcar aprobada",
+          confirmButtonColor: "#16a34a",
           cancelButtonText: "Cancelar",
         }).then(function (res) {
           if (!res.isConfirmed) return;
@@ -11415,7 +11416,7 @@
           return;
         }
         window.Swal.fire({
-          title: "Eliminar cotizacion",
+          title: "Eliminar cotización",
           html:
             '<label class="scm-seg-field"><span>Motivo</span><select id="swal-del-motivo" class="select select-bordered select-sm scm-select"><option value="">Elige una opcion</option><option value="Por costo">Por costo</option><option value="Ejecucción por cuenta propia">Ejecucción por cuenta propia</option><option value="Duplicada">Duplicada</option><option value="Error de registro">Error de registro</option></select></label>' +
             '<label class="scm-seg-field"><span>Observaciones a la cotizacion</span><textarea id="swal-del-observacion" class="textarea textarea-bordered" rows="5" placeholder="Por si tiene una observacion con respecto a la cotizacion presentada."></textarea></label>',
@@ -11423,7 +11424,8 @@
           showCancelButton: true,
           allowOutsideClick: false,
           allowEscapeKey: false,
-          confirmButtonText: "Eliminar cotizacion",
+          confirmButtonText: "Eliminar cotización",
+          confirmButtonColor: "#b91c1c",
           cancelButtonText: "Cancelar",
           preConfirm: function () {
             var motivo = document.getElementById("swal-del-motivo");
