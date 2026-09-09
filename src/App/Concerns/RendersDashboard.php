@@ -3908,10 +3908,7 @@ trait RendersDashboard
     $otros = $this->cotizacion_parse_list($row['items_otros_costos'] ?? '');
     $resumen = $this->cotizacion_parse_json($row['resumen_calculo_perturbacion'] ?? '');
     $totalCotizacion = $this->format_cop_currency($row['total'] ?? 0);
-    $coordinadorNombre = $this->cotizacion_clean_text($row['coordinador'] ?? '');
-    $coordinadorEmail = $this->cotizacion_clean_text($row['email_coordinador'] ?? '');
-    $coordinadorCelular = $this->cotizacion_clean_text($row['celular_coordinador'] ?? '');
-    $coordinadorCargo = $this->cotizacion_clean_text($row['cargo_coordinador'] ?? 'Coordinador contractual');
+    $responsableCotizacion = $this->cotizacion_responsable_contact($row);
     $creadorNombre = $this->cotizacion_clean_text($row['creador'] ?? '');
     $creadorEmail = $this->cotizacion_clean_text($row['email_creador'] ?? '');
     $creadorCelular = $this->cotizacion_clean_text($row['celular_creador'] ?? '');
@@ -3933,7 +3930,7 @@ trait RendersDashboard
       'Duración del trabajo' => $this->cotizacion_days_label($row['duracion'] ?? ''),
       'Inmueble' => (string) ($row['inmueble'] ?? '-'),
       'Dirección' => (string) ($row['direccion'] ?? '-'),
-      'Coordinador contractual' => $coordinadorNombre !== '' ? $coordinadorNombre : '-',
+      'Responsable de cotización' => $responsableCotizacion['nombre'] !== '' ? $responsableCotizacion['nombre'] : '-',
       'Elaboró la cotización' => $creadorNombre !== '' ? $creadorNombre : '-',
       'Ticket / Inmueble' => ($ticket !== '' ? '#' . $ticket : '-') . ' / ' . trim((string) ($row['id_inmueble'] ?? '-')),
     ] as $label => $value) {
@@ -3994,9 +3991,11 @@ trait RendersDashboard
     $html .= '<div class="is-grand-total"><span>Total cotización</span><strong>' . esc_html($totalCotizacion) . '</strong></div>';
     $html .= '</div></section>';
 
-    $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-balances"><div class="scm-cotizacion-native-section-title"><div><span>Control financiero</span><h3>Saldos de la cotizaci&oacute;n</h3></div></div>';
-    $html .= $this->render_cotizacion_balance_table($row);
-    $html .= '</section>';
+    if ($isFuncionario) {
+      $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-balances"><div class="scm-cotizacion-native-section-title"><div><span>Control financiero</span><h3>Saldos de la cotizaci&oacute;n</h3></div></div>';
+      $html .= $this->render_cotizacion_balance_table($row);
+      $html .= '</section>';
+    }
 
     $html .= '<section class="scm-cotizacion-native-section"><h3>Observaciones y perturbación</h3>';
     if (trim((string) ($row['observaciones'] ?? '')) !== '') {
@@ -4027,7 +4026,7 @@ trait RendersDashboard
     $html .= '</section>';
 
     $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-legal"><h3>Favor tener en cuenta</h3><p>Cuando las reparaciones sean responsabilidad de los propietarios, el administrador informará la novedad. Si no se atiende dentro del plazo contractual, la administración podrá realizar la gestión y descontar el valor correspondiente del canon de arrendamiento, de acuerdo con el contrato de mandato vigente.</p></section>';
-    $html .= '<footer class="scm-cotizacion-native-footer"><div><span>Coordinador contractual</span><strong>' . esc_html($coordinadorNombre !== '' ? $coordinadorNombre : '-') . '</strong><p>' . esc_html($coordinadorCargo !== '' ? $coordinadorCargo : 'Coordinador contractual') . '</p><p>Email: ' . esc_html($coordinadorEmail !== '' ? $coordinadorEmail : '-') . '</p><p>Celular: ' . esc_html($coordinadorCelular !== '' ? $coordinadorCelular : '-') . '</p></div><div><span>Elaboró la cotización</span><strong>' . esc_html($creadorNombre !== '' ? $creadorNombre : '-') . '</strong><p>Email: ' . esc_html($creadorEmail !== '' ? $creadorEmail : '-') . '</p><p>Celular: ' . esc_html($creadorCelular !== '' ? $creadorCelular : '-') . '</p></div><div><span>Empresa</span><strong>SKC SuCasa Inmobiliaria</strong><p>NIT 900623242-4</p><p>Cartagena de Indias - Colombia</p></div></footer>';
+    $html .= '<footer class="scm-cotizacion-native-footer"><div><span>Responsable de cotización</span><strong>' . esc_html($responsableCotizacion['nombre'] !== '' ? $responsableCotizacion['nombre'] : '-') . '</strong><p>' . esc_html($responsableCotizacion['cargo'] !== '' ? $responsableCotizacion['cargo'] : 'Responsable de cotización') . '</p><p>Email: ' . esc_html($responsableCotizacion['email'] !== '' ? $responsableCotizacion['email'] : '-') . '</p><p>Celular: ' . esc_html($responsableCotizacion['celular'] !== '' ? $responsableCotizacion['celular'] : '-') . '</p></div><div><span>Elaboró la cotización</span><strong>' . esc_html($creadorNombre !== '' ? $creadorNombre : '-') . '</strong><p>Email: ' . esc_html($creadorEmail !== '' ? $creadorEmail : '-') . '</p><p>Celular: ' . esc_html($creadorCelular !== '' ? $creadorCelular : '-') . '</p></div><div><span>Empresa</span><strong>SKC SuCasa Inmobiliaria</strong><p>NIT 900623242-4</p><p>Cartagena de Indias - Colombia</p></div></footer>';
     return $html . '</article>';
   }
 
@@ -4054,6 +4053,61 @@ trait RendersDashboard
     $text = strip_tags($text);
     $text = preg_replace('/\s+/', ' ', $text) ?: '';
     return trim($text);
+  }
+
+  /** @param array<string,mixed> $row @param array<int,string> $keys */
+  private function cotizacion_first_non_empty(array $row, array $keys): string
+  {
+    foreach ($keys as $key) {
+      if (!array_key_exists($key, $row)) {
+        continue;
+      }
+      $value = $this->cotizacion_clean_text($row[$key]);
+      if ($value !== '' && $value !== '-') {
+        return $value;
+      }
+    }
+    return '';
+  }
+
+  /** @return array{nombre:string,cargo:string,email:string,celular:string} */
+  private function cotizacion_responsable_contact(array $row): array
+  {
+    return [
+      'nombre' => $this->cotizacion_first_non_empty($row, [
+        'responsable_cotizacion',
+        'responsable',
+        'creador',
+        'coordinador',
+        'id_empleado',
+      ]),
+      'cargo' => $this->cotizacion_first_non_empty($row, [
+        'cargo_responsable_cotizacion',
+        'cargo_responsable',
+        'cargo_creador',
+        'cargo_coordinador',
+      ]),
+      'email' => $this->cotizacion_first_non_empty($row, [
+        'email_responsable_cotizacion',
+        'correo_responsable_cotizacion',
+        'email_responsable',
+        'correo_responsable',
+        'email_creador',
+        'correo_creador',
+        'email_coordinador',
+        'correo_coordinador',
+      ]),
+      'celular' => $this->cotizacion_first_non_empty($row, [
+        'celular_responsable_cotizacion',
+        'telefono_responsable_cotizacion',
+        'celular_responsable',
+        'telefono_responsable',
+        'celular_creador',
+        'telefono_creador',
+        'celular_coordinador',
+        'telefono_coordinador',
+      ]),
+    ];
   }
 
   private function cotizacion_days_label($value): string

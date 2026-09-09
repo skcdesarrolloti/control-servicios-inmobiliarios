@@ -735,10 +735,7 @@ trait HandlesMaintenanceActions
     $fechaEnvio = $this->cotizacion_date_label($row['fecha_envio'] ?? '');
     $destinatario = $this->cotizacion_clean_text($row['destinatario'] ?? '-');
     $direccion = $this->cotizacion_clean_text($row['direccion'] ?? '-');
-    $coordinador = $this->cotizacion_clean_text($row['coordinador'] ?? '');
-    $coordinadorCargo = $this->cotizacion_clean_text($row['cargo_coordinador'] ?? 'Coordinador contractual');
-    $coordinadorEmail = $this->cotizacion_clean_text($row['email_coordinador'] ?? '');
-    $coordinadorCelular = $this->cotizacion_clean_text($row['celular_coordinador'] ?? '');
+    $responsableCotizacion = $this->cotizacion_responsable_contact($row);
     $creador = $this->cotizacion_clean_text($row['creador'] ?? '');
     $creadorEmail = $this->cotizacion_clean_text($row['email_creador'] ?? '');
     $creadorCelular = $this->cotizacion_clean_text($row['celular_creador'] ?? '');
@@ -779,24 +776,26 @@ trait HandlesMaintenanceActions
       ['TOTAL COTIZACIÓN', $this->format_cop_currency($row['total'] ?? 0)],
     ], [0.68, 0.32], 8, [1]);
 
-    $pdf->heading('Control de saldos');
-    $pdf->table(['Categoría', 'Presupuesto', 'Saldo'], [
-      ['Materiales', $this->format_cop_currency($row['total_materiales'] ?? 0), $this->format_cop_currency($row['saldo_materiales'] ?? 0)],
-      ['Mano de obra', $this->format_cop_currency($row['total_mano_obra'] ?? 0), $this->format_cop_currency($row['saldo_obra'] ?? 0)],
-      ['Equipos / maquinarias', $this->format_cop_currency($row['total_maquinarias'] ?? 0), $this->format_cop_currency($row['saldo_maquinarias'] ?? 0)],
-      ['Otros costos', $this->format_cop_currency($row['total_otros_costos'] ?? 0), $this->format_cop_currency($row['saldo_otros_costo'] ?? 0)],
-      ['TOTAL', $this->format_cop_currency(
-        $this->cotizacion_money_value($row, ['total_materiales'])
-          + $this->cotizacion_money_value($row, ['total_mano_obra'])
-          + $this->cotizacion_money_value($row, ['total_maquinarias'])
-          + $this->cotizacion_money_value($row, ['total_otros_costos'])
-      ), $this->format_cop_currency(
-        $this->cotizacion_money_value($row, ['saldo_materiales'])
-          + $this->cotizacion_money_value($row, ['saldo_obra'])
-          + $this->cotizacion_money_value($row, ['saldo_maquinarias'])
-          + $this->cotizacion_money_value($row, ['saldo_otros_costo'])
-      )],
-    ], [0.46, 0.27, 0.27], 8, [1, 2]);
+    if ($isFuncionario) {
+      $pdf->heading('Control de saldos');
+      $pdf->table(['Categoría', 'Presupuesto', 'Saldo'], [
+        ['Materiales', $this->format_cop_currency($row['total_materiales'] ?? 0), $this->format_cop_currency($row['saldo_materiales'] ?? 0)],
+        ['Mano de obra', $this->format_cop_currency($row['total_mano_obra'] ?? 0), $this->format_cop_currency($row['saldo_obra'] ?? 0)],
+        ['Equipos / maquinarias', $this->format_cop_currency($row['total_maquinarias'] ?? 0), $this->format_cop_currency($row['saldo_maquinarias'] ?? 0)],
+        ['Otros costos', $this->format_cop_currency($row['total_otros_costos'] ?? 0), $this->format_cop_currency($row['saldo_otros_costo'] ?? 0)],
+        ['TOTAL', $this->format_cop_currency(
+          $this->cotizacion_money_value($row, ['total_materiales'])
+            + $this->cotizacion_money_value($row, ['total_mano_obra'])
+            + $this->cotizacion_money_value($row, ['total_maquinarias'])
+            + $this->cotizacion_money_value($row, ['total_otros_costos'])
+        ), $this->format_cop_currency(
+          $this->cotizacion_money_value($row, ['saldo_materiales'])
+            + $this->cotizacion_money_value($row, ['saldo_obra'])
+            + $this->cotizacion_money_value($row, ['saldo_maquinarias'])
+            + $this->cotizacion_money_value($row, ['saldo_otros_costo'])
+        )],
+      ], [0.46, 0.27, 0.27], 8, [1, 2]);
+    }
 
     $pdf->heading('Presupuesto detallado');
     foreach ([
@@ -923,7 +922,7 @@ trait HandlesMaintenanceActions
     $pdf->heading('Nota contractual');
     $pdf->paragraph('Cuando las reparaciones sean responsabilidad de los propietarios, el administrador informará la novedad. Si no se atiende dentro del plazo contractual, la administración podrá realizar la gestión y descontar el valor correspondiente del canon de arrendamiento, de acuerdo con el contrato de mandato vigente.', 8);
     $pdf->spacer(8);
-    $pdf->signatureBlock('Coordinador contractual', $coordinador !== '' ? $coordinador : 'Control Servicios Inmobiliarios', trim(($coordinadorCargo !== '' ? $coordinadorCargo : 'Coordinador contractual') . ' | Email: ' . ($coordinadorEmail !== '' ? $coordinadorEmail : '-') . ' | Cel. ' . ($coordinadorCelular !== '' ? $coordinadorCelular : '-'), ' |'));
+    $pdf->signatureBlock('Responsable de cotización', $responsableCotizacion['nombre'] !== '' ? $responsableCotizacion['nombre'] : 'Control Servicios Inmobiliarios', trim(($responsableCotizacion['cargo'] !== '' ? $responsableCotizacion['cargo'] : 'Responsable de cotización') . ' | Email: ' . ($responsableCotizacion['email'] !== '' ? $responsableCotizacion['email'] : '-') . ' | Cel. ' . ($responsableCotizacion['celular'] !== '' ? $responsableCotizacion['celular'] : '-'), ' |'));
     $pdf->signatureBlock('Elaboró la cotización', $creador !== '' ? $creador : 'Control Servicios Inmobiliarios', trim('Email: ' . ($creadorEmail !== '' ? $creadorEmail : '-') . ' | Cel. ' . ($creadorCelular !== '' ? $creadorCelular : '-'), ' |'));
     $pdf->signatureBlock('Empresa', 'SKC SuCasa Inmobiliaria', 'NIT 900623242-4 | Cartagena de Indias - Colombia');
 
