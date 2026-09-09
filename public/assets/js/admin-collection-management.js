@@ -73,7 +73,9 @@
       [
         "scmgc_buscar", "scmgc_estado", "scmgc_etapa", "scmgc_movimiento", "scmgc_cartera_page",
         "scmgc_contratos_buscar", "scmgc_contratos_estado", "scmgc_contratos_etapa", "scmgc_contratos_page",
-        "scmgc_fecha_desde", "scmgc_fecha_hasta", "scmgc_tipo", "scmgc_page"
+        "scmgc_fecha_desde", "scmgc_fecha_hasta", "scmgc_tipo", "scmgc_page",
+        "scmgc_queue_fecha_desde", "scmgc_queue_fecha_hasta", "scmgc_queue_estado", "scmgc_queue_canal",
+        "scmgc_queue_tipo", "scmgc_queue_plantilla", "scmgc_queue_buscar", "scmgc_queue_page"
       ].forEach(function (name) {
         var field = panel ? panel.querySelector("[name='" + name + "']") : null;
         fd.set(name, field ? String(field.value || "") : "");
@@ -817,7 +819,7 @@
 
     function activatePortfolioTab(container, view, focusTab) {
       if (!container) return;
-      var allowed = ["principal", "contratos", "informe", "historial"];
+      var allowed = ["principal", "contratos", "informe", "historial", "cola"];
       if (allowed.indexOf(view) === -1) view = "principal";
       container.querySelectorAll("[data-scm-portfolio-tab]").forEach(function (tab) {
         var selected = String(tab.getAttribute("data-scm-portfolio-tab") || "") === view;

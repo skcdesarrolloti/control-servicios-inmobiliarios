@@ -2410,8 +2410,25 @@ trait RendersDashboard
     $dateFrom = (string) ($applied['date_from'] ?? '');
     $dateTo = (string) ($applied['date_to'] ?? '');
     $currentType = (string) ($applied['type'] ?? '');
+    $queueFilters = [
+      'date_from' => trim((string) ($input['scmgc_queue_fecha_desde'] ?? '')),
+      'date_to' => trim((string) ($input['scmgc_queue_fecha_hasta'] ?? '')),
+      'status' => sanitize_key((string) ($input['scmgc_queue_estado'] ?? '')),
+      'channel' => sanitize_key((string) ($input['scmgc_queue_canal'] ?? '')),
+      'type' => sanitize_key((string) ($input['scmgc_queue_tipo'] ?? '')),
+      'template' => trim((string) ($input['scmgc_queue_plantilla'] ?? '')),
+      'q' => trim((string) ($input['scmgc_queue_buscar'] ?? '')),
+      'page' => max(1, (int) ($input['scmgc_queue_page'] ?? 1)),
+      'per_page' => 25,
+      'scope' => 'collection-management',
+    ];
+    $queueReport = $service->notificationQueue($queueFilters);
+    $queueRows = is_array($queueReport['rows'] ?? null) ? $queueReport['rows'] : [];
+    $queueStats = is_array($queueReport['stats'] ?? null) ? $queueReport['stats'] : ['total' => 0, 'pending' => 0, 'processing' => 0, 'sent' => 0, 'failed' => 0];
+    $queuePagination = is_array($queueReport['pagination'] ?? null) ? $queueReport['pagination'] : ['page' => 1, 'total_pages' => 1, 'total' => 0];
+    $queueApplied = is_array($queueReport['filters'] ?? null) ? $queueReport['filters'] : $queueFilters;
     $activeView = sanitize_key((string) ($input['scmgc_view'] ?? 'principal'));
-    if (!in_array($activeView, ['principal', 'contratos', 'informe', 'historial'], true)) {
+    if (!in_array($activeView, ['principal', 'contratos', 'informe', 'historial', 'cola'], true)) {
       $activeView = 'principal';
     }
     $totalAccounts = (int) ($portfolioSummary['total'] ?? 0);
@@ -2449,7 +2466,7 @@ trait RendersDashboard
       </div>
 
       <div class="scm-portfolio-tabs" role="tablist" aria-label="Vistas de control de cartera">
-        <?php foreach (['principal' => ['Cartera principal', 'Operación diaria'], 'contratos' => ['Todos los contratos', 'Auditoría completa'], 'informe' => ['Informe gerencial', 'Resumen para dirección'], 'historial' => ['Historial', 'Trazabilidad completa']] as $viewKey => $viewMeta): ?>
+        <?php foreach (['principal' => ['Cartera principal', 'Operación diaria'], 'contratos' => ['Todos los contratos', 'Auditoría completa'], 'informe' => ['Informe gerencial', 'Resumen para dirección'], 'historial' => ['Historial', 'Trazabilidad completa'], 'cola' => ['Cola de notificaciones', 'Envíos de cartera']] as $viewKey => $viewMeta): ?>
           <button type="button" id="scm-portfolio-tab-<?php echo esc_attr($viewKey); ?>" class="scm-portfolio-tab<?php echo $activeView === $viewKey ? ' is-active' : ''; ?>" role="tab" aria-selected="<?php echo $activeView === $viewKey ? 'true' : 'false'; ?>" aria-controls="scm-portfolio-panel-<?php echo esc_attr($viewKey); ?>" tabindex="<?php echo $activeView === $viewKey ? '0' : '-1'; ?>" data-scm-portfolio-tab="<?php echo esc_attr($viewKey); ?>">
             <strong><?php echo esc_html($viewMeta[0]); ?></strong><span><?php echo esc_html($viewMeta[1]); ?></span>
           </button>
@@ -2784,6 +2801,91 @@ trait RendersDashboard
           </tbody></table></div><?php echo $this->render_collection_management_pagination($pagination, $applied); ?>
         <?php endif; ?>
       </section>
+      </section>
+
+      <section id="scm-portfolio-panel-cola" class="scm-portfolio-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-cola" data-scm-portfolio-panel="cola"<?php echo $activeView === 'cola' ? '' : ' hidden'; ?>>
+        <section class="scm-admin-notif-card scm-admin-notif-queue-card scm-collection-queue-card">
+          <div class="scm-portfolio-section-head">
+            <div><span class="scm-calendar-action-kicker">Trazabilidad</span><h4>Cola de notificaciones de cartera</h4><p>Revisa los correos, WhatsApp y SMS generados desde Gestiones de cobro sin salir del m&oacute;dulo.</p></div>
+            <a class="scm-btn-secondary btn btn-outline" href="?scm_tab=gestiones_cobro&amp;scmgc_view=cola">Actualizar cola</a>
+          </div>
+          <form method="get" autocomplete="off" class="scm-admin-notif-queue-filters scm-collection-queue-filters">
+            <input type="hidden" name="scm_tab" value="gestiones_cobro">
+            <input type="hidden" name="scmgc_view" value="cola">
+            <input type="hidden" name="scmgc_queue_page" value="1">
+            <div class="scm-field">
+              <label for="scmgc_queue_fecha_desde">Desde</label>
+              <input id="scmgc_queue_fecha_desde" name="scmgc_queue_fecha_desde" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr((string) ($queueApplied['date_from'] ?? '')); ?>">
+            </div>
+            <div class="scm-field">
+              <label for="scmgc_queue_fecha_hasta">Hasta</label>
+              <input id="scmgc_queue_fecha_hasta" name="scmgc_queue_fecha_hasta" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr((string) ($queueApplied['date_to'] ?? '')); ?>">
+            </div>
+            <div class="scm-field">
+              <label for="scmgc_queue_estado">Estado</label>
+              <select id="scmgc_queue_estado" name="scmgc_queue_estado" class="select select-bordered select-sm scm-select">
+                <?php foreach (['' => 'Todos', 'pending' => 'Pendiente', 'processing' => 'Procesando', 'sent' => 'Enviada', 'failed' => 'Fallida', 'cancelled' => 'Cancelada'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($queueApplied['status'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+              </select>
+            </div>
+            <div class="scm-field">
+              <label for="scmgc_queue_canal">Canal</label>
+              <select id="scmgc_queue_canal" name="scmgc_queue_canal" class="select select-bordered select-sm scm-select">
+                <?php foreach (['' => 'Todos', 'email' => 'Email', 'whatsapp' => 'WhatsApp', 'sms' => 'SMS'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($queueApplied['channel'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+              </select>
+            </div>
+            <div class="scm-field">
+              <label for="scmgc_queue_tipo">Destinatario</label>
+              <select id="scmgc_queue_tipo" name="scmgc_queue_tipo" class="select select-bordered select-sm scm-select">
+                <?php foreach (['' => 'Todos', 'arrendatarios_activos' => 'Arrendatarios', 'codeudores' => 'Codeudores', 'funcionarios' => 'Funcionarios'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($queueApplied['type'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+              </select>
+            </div>
+            <div class="scm-field">
+              <label for="scmgc_queue_plantilla">Plantilla</label>
+              <input id="scmgc_queue_plantilla" name="scmgc_queue_plantilla" type="search" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr((string) ($queueApplied['template'] ?? '')); ?>" placeholder="Nombre técnico">
+            </div>
+            <div class="scm-field scm-admin-notif-queue-search">
+              <label for="scmgc_queue_buscar">Buscar</label>
+              <input id="scmgc_queue_buscar" name="scmgc_queue_buscar" type="search" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr((string) ($queueApplied['q'] ?? '')); ?>" placeholder="Nombre, destino, asunto, error o lote">
+            </div>
+            <div class="scm-admin-notif-queue-actions">
+              <button type="submit" class="scm-btn-primary btn btn-primary">Consultar cola</button>
+              <a class="scm-btn-secondary btn btn-outline" href="?scm_tab=gestiones_cobro&amp;scmgc_view=cola">Limpiar</a>
+            </div>
+          </form>
+          <div class="scm-admin-notif-queue-summary">
+            <?php foreach ([['Total', 'total'], ['Pendientes', 'pending'], ['Procesando', 'processing'], ['Enviadas', 'sent'], ['Fallidas', 'failed']] as $metric): ?>
+              <article><span><?php echo esc_html($metric[0]); ?></span><strong><?php echo esc_html((string) ((int) ($queueStats[$metric[1]] ?? 0))); ?></strong></article>
+            <?php endforeach; ?>
+          </div>
+          <?php if ($queueRows === []): ?>
+            <div class="scm-admin-notif-empty"><strong>Sin notificaciones de cartera</strong><span>No hay mensajes con los filtros actuales.</span></div>
+          <?php else: ?>
+            <div class="scm-admin-notif-queue-results">
+              <div class="scm-admin-notif-queue-table-wrap">
+                <table class="scm-admin-notif-queue-table">
+                  <thead><tr><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Plantilla</th><th>Lote</th><th>Intentos</th><th>Detalle</th></tr></thead>
+                  <tbody>
+                    <?php foreach ($queueRows as $queueRow): ?>
+                      <?php $queueStatusKey = sanitize_html_class((string) ($queueRow['status_key'] ?? $queueRow['status'] ?? 'other')); ?>
+                      <tr>
+                        <td><strong>#<?php echo esc_html((string) ((int) ($queueRow['id'] ?? 0))); ?></strong></td>
+                        <td><?php echo esc_html($this->format_collection_management_date($queueRow['created_at'] ?? '')); ?><small><?php echo trim((string) ($queueRow['sent_at'] ?? '')) !== '' ? 'Enviada: ' . esc_html($this->format_collection_management_date($queueRow['sent_at'] ?? '')) : ''; ?></small></td>
+                        <td><span class="scm-admin-notif-queue-status scm-admin-notif-queue-status--<?php echo esc_attr($queueStatusKey); ?>"><?php echo esc_html((string) ($queueRow['status_label'] ?? $queueRow['status'] ?? '-')); ?></span></td>
+                        <td><?php echo esc_html((string) ($queueRow['channel_label'] ?? $queueRow['channel'] ?? '-')); ?><small><?php echo esc_html((string) ($queueRow['provider'] ?? '')); ?></small></td>
+                        <td><strong><?php echo esc_html((string) (($queueRow['destination_name'] ?? '') ?: '-')); ?></strong><small><?php echo esc_html((string) (($queueRow['destination'] ?? '') ?: '-')); ?><?php echo trim((string) ($queueRow['recipient_role_label'] ?? '')) !== '' ? ' · ' . esc_html((string) ($queueRow['recipient_role_label'] ?? '')) : ''; ?></small></td>
+                        <td><code><?php echo esc_html((string) (($queueRow['template_name'] ?? '') ?: '-')); ?></code><small><?php echo esc_html((string) (($queueRow['type_label'] ?? '') ?: 'Cartera')); ?></small></td>
+                        <td><code><?php echo esc_html((string) (($queueRow['batch_id'] ?? '') ?: '-')); ?></code></td>
+                        <td><?php echo esc_html((string) ((int) ($queueRow['attempts'] ?? 0))); ?>/<?php echo esc_html((string) ((int) ($queueRow['max_attempts'] ?? 0))); ?></td>
+                        <td><strong><?php echo esc_html((string) (($queueRow['subject'] ?? '') ?: 'Mensaje de cartera')); ?></strong><small><?php echo esc_html(mb_substr(trim((string) (($queueRow['last_error'] ?? '') ?: ($queueRow['message_text'] ?? ''))), 0, 260, 'UTF-8')); ?></small></td>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <?php echo $this->render_collection_queue_pagination($queuePagination, $queueApplied); ?>
+          <?php endif; ?>
+        </section>
       </section>
 
       <?php echo $this->render_collection_management_modal(); ?>
@@ -3156,6 +3258,41 @@ trait RendersDashboard
     ];
     $link = static function (int $targetPage) use ($base): string {
       return '?' . http_build_query($base + ['scmgc_page' => $targetPage]);
+    };
+    $html = '<div class="scm-pagination-card card scm-collection-log-pagination"><div class="scm-pagination-summary">P&aacute;gina ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' | Total: ' . esc_html((string) $total) . '</div><div class="scm-pagination-controls">';
+    $prev = max(1, $page - 1);
+    $next = min($totalPages, $page + 1);
+    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page <= 1 ? ' disabled' : '') . '" href="' . esc_url($link(1)) . '">&laquo;</a>';
+    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page <= 1 ? ' disabled' : '') . '" href="' . esc_url($link($prev)) . '">&lsaquo;</a>';
+    for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++) {
+      $html .= '<a class="scm-page-btn btn btn-sm ' . ($i === $page ? 'btn-primary is-active' : 'btn-outline') . '" href="' . esc_url($link($i)) . '">' . esc_html((string) $i) . '</a>';
+    }
+    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page >= $totalPages ? ' disabled' : '') . '" href="' . esc_url($link($next)) . '">&rsaquo;</a>';
+    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page >= $totalPages ? ' disabled' : '') . '" href="' . esc_url($link($totalPages)) . '">&raquo;</a>';
+    return $html . '</div></div>';
+  }
+
+  private function render_collection_queue_pagination(array $pagination, array $filters): string
+  {
+    $page = max(1, (int) ($pagination['page'] ?? 1));
+    $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
+    $total = max(0, (int) ($pagination['total'] ?? 0));
+    if ($total <= 0 || $totalPages <= 1) {
+      return '';
+    }
+    $base = [
+      'scm_tab' => 'gestiones_cobro',
+      'scmgc_view' => 'cola',
+      'scmgc_queue_fecha_desde' => (string) ($filters['date_from'] ?? ''),
+      'scmgc_queue_fecha_hasta' => (string) ($filters['date_to'] ?? ''),
+      'scmgc_queue_estado' => (string) ($filters['status'] ?? ''),
+      'scmgc_queue_canal' => (string) ($filters['channel'] ?? ''),
+      'scmgc_queue_tipo' => (string) ($filters['type'] ?? ''),
+      'scmgc_queue_plantilla' => (string) ($filters['template'] ?? ''),
+      'scmgc_queue_buscar' => (string) ($filters['q'] ?? ''),
+    ];
+    $link = static function (int $targetPage) use ($base): string {
+      return '?' . http_build_query($base + ['scmgc_queue_page' => $targetPage]);
     };
     $html = '<div class="scm-pagination-card card scm-collection-log-pagination"><div class="scm-pagination-summary">P&aacute;gina ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' | Total: ' . esc_html((string) $total) . '</div><div class="scm-pagination-controls">';
     $prev = max(1, $page - 1);

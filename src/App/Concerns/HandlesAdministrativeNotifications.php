@@ -447,7 +447,7 @@ trait HandlesAdministrativeNotifications
               $internalMessage,
               '',
               AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE,
-              [],
+              $this->collection_management_notification_meta_for_recipients((array) ($result['managements'] ?? []), $internalIds),
               AdministrativeNotificationsService::SMS_MAX
             );
           } catch (\Throwable $internalException) {
@@ -641,6 +641,43 @@ trait HandlesAdministrativeNotifications
         'contract_number' => (string) ($management['contract_number'] ?? ''),
         'property' => (string) ($management['property'] ?? ''),
         'type' => (string) ($management['type'] ?? ''),
+      ];
+    }
+    return $out;
+  }
+
+  /** @param array<int,array<string,mixed>> $managements @param int[] $recipientIds @return array<int,array<string,mixed>> */
+  private function collection_management_notification_meta_for_recipients(array $managements, array $recipientIds): array
+  {
+    $cleanManagements = [];
+    foreach ($managements as $management) {
+      if (!is_array($management)) {
+        continue;
+      }
+      $managementId = (int) ($management['id'] ?? 0);
+      if ($managementId <= 0) {
+        continue;
+      }
+      $cleanManagements[] = [
+        'id' => $managementId,
+        'contract_id' => (int) ($management['contract_id'] ?? 0),
+        'contract_number' => (string) ($management['contract_number'] ?? ''),
+        'property' => (string) ($management['property'] ?? ''),
+        'type' => (string) ($management['type'] ?? ''),
+      ];
+    }
+    if ($cleanManagements === []) {
+      return [];
+    }
+
+    $out = [];
+    foreach (array_values(array_unique(array_filter(array_map('intval', $recipientIds), static fn(int $id): bool => $id > 0))) as $recipientId) {
+      $out[$recipientId] = [
+        '__notification_meta' => [
+          'collection_management' => [
+            'managements' => $cleanManagements,
+          ],
+        ],
       ];
     }
     return $out;

@@ -481,6 +481,14 @@
         "scmgc_contratos_estado",
         "scmgc_contratos_etapa",
         "scmgc_contratos_page",
+        "scmgc_queue_fecha_desde",
+        "scmgc_queue_fecha_hasta",
+        "scmgc_queue_estado",
+        "scmgc_queue_canal",
+        "scmgc_queue_tipo",
+        "scmgc_queue_plantilla",
+        "scmgc_queue_buscar",
+        "scmgc_queue_page",
         "scmgc_view",
       ].forEach(function (key) {
         if (key === "scmgc_view") {
@@ -511,6 +519,14 @@
         "scmgc_contratos_estado",
         "scmgc_contratos_etapa",
         "scmgc_contratos_page",
+        "scmgc_queue_fecha_desde",
+        "scmgc_queue_fecha_hasta",
+        "scmgc_queue_estado",
+        "scmgc_queue_canal",
+        "scmgc_queue_tipo",
+        "scmgc_queue_plantilla",
+        "scmgc_queue_buscar",
+        "scmgc_queue_page",
         "scmgc_view",
       ].forEach(function (key) {
         if (parsed.searchParams.has(key)) {

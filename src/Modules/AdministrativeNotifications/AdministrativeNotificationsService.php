@@ -889,6 +889,7 @@ final class AdministrativeNotificationsService
     $type = trim((string) ($filters['type'] ?? ''));
     $template = mb_substr(trim((string) ($filters['template'] ?? '')), 0, 120, 'UTF-8');
     $query = mb_substr(trim((string) ($filters['q'] ?? '')), 0, 160, 'UTF-8');
+    $scope = sanitize_key((string) ($filters['scope'] ?? ''));
     $dateFrom = $this->normalizeQueueDate((string) ($filters['date_from'] ?? ''));
     $dateTo = $this->normalizeQueueDate((string) ($filters['date_to'] ?? ''));
 
@@ -898,6 +899,17 @@ final class AdministrativeNotificationsService
 
     $where = ['`project_code` = ?', '`source_module` IN (?, ?)'];
     $args = [self::PROJECT_CODE, self::SOURCE_MODULE, self::COLLECTION_QUEUE_SOURCE_MODULE];
+    if ($scope === 'collection-management') {
+      $where[] = '(`source_module` = ? OR `meta_json` LIKE ? OR `meta_json` LIKE ?)';
+      array_push(
+        $args,
+        self::COLLECTION_QUEUE_SOURCE_MODULE,
+        '%"source_submodule":"collection-management"%',
+        '%"collection_management_lookup":"|%'
+      );
+    } else {
+      $scope = '';
+    }
 
     if ($dateFrom !== '') {
       $where[] = '`created_at` >= ?';
@@ -919,7 +931,10 @@ final class AdministrativeNotificationsService
     } else {
       $channel = '';
     }
-    if (array_key_exists($type, $types)) {
+    if ($type === 'codeudores') {
+      $where[] = '`meta_json` LIKE ?';
+      $args[] = '%"tipo_actor":"codeudores"%';
+    } elseif (array_key_exists($type, $types)) {
       $where[] = '`meta_json` LIKE ?';
       $args[] = '%"tipo_actor":"' . $this->db->escapeLike($type) . '"%';
     } else {
@@ -980,7 +995,7 @@ final class AdministrativeNotificationsService
       $row['status_label'] = $this->queueStatusLabel($statusKey);
       $row['status_key'] = $statusKey;
       $row['type_key'] = $typeKey;
-      $row['type_label'] = trim((string) ($admin['tipo_label'] ?? '')) ?: (string) ($types[$typeKey]['label'] ?? '');
+      $row['type_label'] = trim((string) ($admin['tipo_label'] ?? '')) ?: ($typeKey === 'codeudores' ? 'Codeudores' : (string) ($types[$typeKey]['label'] ?? ''));
       $row['recipient_role_label'] = $this->queueRecipientRoleLabel((string) ($row['meta_json'] ?? ''));
       $row['actor_id'] = (int) ($admin['id_actor'] ?? 0);
       $row['batch_id'] = trim((string) ($admin['batch_id'] ?? ''));
@@ -994,7 +1009,7 @@ final class AdministrativeNotificationsService
       'rows' => $rows,
       'stats' => $stats,
       'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
-      'filters' => ['date_from' => $dateFrom, 'date_to' => $dateTo, 'status' => $status, 'channel' => $channel, 'type' => $type, 'template' => $template, 'q' => $query],
+      'filters' => ['date_from' => $dateFrom, 'date_to' => $dateTo, 'status' => $status, 'channel' => $channel, 'type' => $type, 'template' => $template, 'q' => $query, 'scope' => $scope],
     ];
   }
 

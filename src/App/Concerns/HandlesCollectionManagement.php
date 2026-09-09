@@ -190,7 +190,7 @@ trait HandlesCollectionManagement
               $this->collection_prejuridico_internal_notification_message($result),
               '',
               AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE,
-              [],
+              $this->collection_management_notification_meta_for_recipients((array) ($result['managements'] ?? []), $internalIds),
               AdministrativeNotificationsService::SMS_MAX
             );
           } catch (\Throwable $internalException) {
