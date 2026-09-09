@@ -179,6 +179,8 @@
       actions.admin_notifications_payment_receipts_import || "";
     var actionAdminNotificationsQueue =
       actions.admin_notifications_queue || "";
+    var actionAdminNotificationsQueueDelete =
+      actions.admin_notifications_queue_delete || "";
     var actionAdminNotificationsCollection =
       actions.admin_notifications_collection || "";
     var actionAdminNotificationsCollectionOptions =
@@ -4620,7 +4622,7 @@
         }
         queueResultsEl.innerHTML =
           '<div class="scm-admin-notif-queue-table-wrap"><table class="scm-admin-notif-queue-table">' +
-          '<thead><tr><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Plantilla</th><th>Lote</th><th>Intentos</th><th>Detalle</th></tr></thead><tbody>' +
+          '<thead><tr><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Plantilla</th><th>Lote</th><th>Intentos</th><th>Detalle</th><th>Acción</th></tr></thead><tbody>' +
           rows.map(function (row) {
             var statusKey = queueStatusClass(row.status_key || row.status);
             var detailBits = [];
@@ -4633,6 +4635,10 @@
               row.type_label || row.recipient_role_label || "",
               row.test_mode ? "Modo prueba" : "",
             ].filter(Boolean);
+            var canDelete = statusKey === "failed";
+            var actionHtml = canDelete
+              ? '<button type="button" class="scm-admin-notif-queue-delete" data-admin-notif-queue-delete="' + escAttr(row.id || "") + '">Eliminar</button>'
+              : '<span class="scm-admin-notif-queue-action-muted">-</span>';
             return (
               "<tr>" +
               "<td><strong>#" + escHtml(row.id || "") + "</strong></td>" +
@@ -4644,6 +4650,7 @@
               "<td><code>" + escHtml(row.batch_id || "-") + "</code></td>" +
               "<td>" + escHtml((row.attempts || 0) + "/" + (row.max_attempts || 0)) + "</td>" +
               "<td><small>" + escHtml(detailBits.join(" · ") || "-") + "</small></td>" +
+              "<td>" + actionHtml + "</td>" +
               "</tr>"
             );
           }).join("") +
@@ -4657,16 +4664,90 @@
         var page = Number((pagination && pagination.page) || 1);
         var totalPages = Number((pagination && pagination.total_pages) || 1);
         var total = Number((pagination && pagination.total) || 0);
-        if (totalPages <= 1) {
-          queuePaginationEl.innerHTML = total > 0 ? '<span>' + total + ' registro(s)</span>' : "";
+        if (total <= 0) {
+          queuePaginationEl.innerHTML = "";
           return;
         }
         var prev = Math.max(1, page - 1);
         var next = Math.min(totalPages, page + 1);
+        var pages = [];
+        var start = Math.max(1, page - 2);
+        var end = Math.min(totalPages, page + 2);
+        if (start > 1) {
+          pages.push(1);
+          if (start > 2) pages.push("gap-start");
+        }
+        for (var i = start; i <= end; i++) {
+          pages.push(i);
+        }
+        if (end < totalPages) {
+          if (end < totalPages - 1) pages.push("gap-end");
+          pages.push(totalPages);
+        }
+        var pageButtons = pages.map(function (item) {
+          if (typeof item !== "number") {
+            return '<span class="scm-admin-notif-page-gap">...</span>';
+          }
+          return '<button type="button" class="scm-admin-notif-page-number' + (item === page ? ' is-active' : '') + '" data-admin-notif-queue-page="' + item + '"' + (item === page ? ' aria-current="page"' : '') + '>' + item + '</button>';
+        }).join("");
         queuePaginationEl.innerHTML =
-          '<button type="button" data-admin-notif-queue-page="' + prev + '"' + (page <= 1 ? " disabled" : "") + ">Anterior</button>" +
-          '<span>Pagina ' + page + ' de ' + totalPages + ' · ' + total + ' registro(s)</span>' +
-          '<button type="button" data-admin-notif-queue-page="' + next + '"' + (page >= totalPages ? " disabled" : "") + ">Siguiente</button>";
+          '<div class="scm-admin-notif-pagination-summary"><strong>Pagina ' + page + ' de ' + totalPages + '</strong><span>' + total + ' registro(s)</span></div>' +
+          '<div class="scm-admin-notif-pagination-actions">' +
+          '<button type="button" class="scm-admin-notif-page-nav" data-admin-notif-queue-page="1"' + (page <= 1 ? " disabled" : "") + ">Primera</button>" +
+          '<button type="button" class="scm-admin-notif-page-nav" data-admin-notif-queue-page="' + prev + '"' + (page <= 1 ? " disabled" : "") + ">Anterior</button>" +
+          '<div class="scm-admin-notif-page-numbers">' + pageButtons + "</div>" +
+          '<button type="button" class="scm-admin-notif-page-nav" data-admin-notif-queue-page="' + next + '"' + (page >= totalPages ? " disabled" : "") + ">Siguiente</button>" +
+          '<button type="button" class="scm-admin-notif-page-nav" data-admin-notif-queue-page="' + totalPages + '"' + (page >= totalPages ? " disabled" : "") + ">Ultima</button>" +
+          "</div>";
+      }
+
+      function deleteQueueRecord(id) {
+        id = String(id || "").trim();
+        if (!id || !actionAdminNotificationsQueueDelete) {
+          showToast("error", "La eliminacion de registros no esta disponible.");
+          return;
+        }
+        var ask = window.Swal && typeof window.Swal.fire === "function"
+          ? window.Swal.fire({
+              icon: "warning",
+              title: "Eliminar registro fallido",
+              text: "Se eliminara el registro #" + id + " y sus intentos. Esta accion no se puede deshacer.",
+              showCancelButton: true,
+              confirmButtonText: "Eliminar",
+              cancelButtonText: "Cancelar",
+              confirmButtonColor: "#b91c1c",
+            }).then(function (result) { return !!result.isConfirmed; })
+          : Promise.resolve(window.confirm("Eliminar el registro fallido #" + id + " y sus intentos?"));
+        ask.then(function (confirmed) {
+          if (!confirmed) {
+            return;
+          }
+          var fd = new FormData();
+          fd.set("action", actionAdminNotificationsQueueDelete);
+          fd.set("nonce", nonce);
+          fd.set("id", id);
+          return fetchWithTimeout(ajaxUrl, {
+            method: "POST",
+            body: fd,
+            credentials: "same-origin",
+            headers: { Accept: "application/json" },
+          })
+            .then(function (response) {
+              return responseJson(response);
+            })
+            .then(function (json) {
+              if (!json || !json.success) {
+                throw new Error(
+                  (json && json.data && json.data.message) ||
+                    "No se pudo eliminar el registro.",
+                );
+              }
+              showToast("success", (json.data && json.data.message) || "Registro eliminado.");
+              loadNotificationQueue(queuePage || 1);
+            });
+        }).catch(function (err) {
+          showToast("error", err.message || "No se pudo eliminar el registro.");
+        });
       }
 
       function loadNotificationQueue(page) {
@@ -5397,6 +5478,18 @@
             }
             event.preventDefault();
             loadNotificationQueue(parseInt(btn.getAttribute("data-admin-notif-queue-page") || "1", 10));
+          });
+        }
+        if (queueResultsEl) {
+          queueResultsEl.addEventListener("click", function (event) {
+            var btn = event.target && event.target.closest
+              ? event.target.closest("[data-admin-notif-queue-delete]")
+              : null;
+            if (!btn || !queueResultsEl.contains(btn) || btn.disabled) {
+              return;
+            }
+            event.preventDefault();
+            deleteQueueRecord(btn.getAttribute("data-admin-notif-queue-delete") || "");
           });
         }
 

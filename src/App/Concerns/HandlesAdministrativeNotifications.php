@@ -258,6 +258,26 @@ trait HandlesAdministrativeNotifications
     }
   }
 
+  public function ajax_handler_admin_notifications_queue_delete(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para eliminar registros de la cola de Notificaciones.');
+    }
+
+    $id = max(0, (int) ($_POST['id'] ?? 0));
+    try {
+      $deleted = $this->get_admin_notifications_service()->deleteFailedQueueNotification($id);
+      $this->jsonOk([
+        'deleted' => $deleted,
+        'id' => $id,
+        'message' => $deleted > 0 ? 'Registro fallido eliminado.' : 'No se elimino ningun registro.',
+      ]);
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
   /** @param array<string,mixed> $file @return array{type:string,type_label:string,matched:int}|array{} */
   private function admin_notification_import_type_suggestion(AdministrativeNotificationsService $service, string $currentType, array $file): array
   {

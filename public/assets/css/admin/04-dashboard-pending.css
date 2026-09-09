@@ -6773,6 +6773,83 @@
   border-top: 1px solid #e2e8f0;
 }
 
+#scm-app .scm-admin-notif-pagination-summary {
+  display: inline-grid;
+  gap: 2px;
+  min-width: 170px;
+}
+
+#scm-app .scm-admin-notif-pagination-summary strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+#scm-app .scm-admin-notif-pagination-summary span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#scm-app .scm-admin-notif-pagination-actions,
+#scm-app .scm-admin-notif-page-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+#scm-app .scm-admin-notif-page-nav,
+#scm-app .scm-admin-notif-page-number {
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+
+#scm-app .scm-admin-notif-page-nav {
+  padding: 8px 11px;
+}
+
+#scm-app .scm-admin-notif-page-number {
+  width: 34px;
+  padding: 0;
+}
+
+#scm-app .scm-admin-notif-page-nav:hover:not(:disabled),
+#scm-app .scm-admin-notif-page-number:hover:not(:disabled) {
+  border-color: #f59e0b;
+  background: #fff7ed;
+  color: #9a3412;
+  transform: translateY(-1px);
+}
+
+#scm-app .scm-admin-notif-page-number.is-active {
+  border-color: #08234b;
+  background: #08234b;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(8, 35, 75, 0.16);
+}
+
+#scm-app .scm-admin-notif-page-nav:disabled,
+#scm-app .scm-admin-notif-page-number:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#scm-app .scm-admin-notif-page-gap {
+  min-width: 18px;
+  color: #94a3b8;
+  text-align: center;
+  font-weight: 900;
+}
+
 #scm-app .scm-admin-notif-page-info {
   color: #64748b;
   font-size: 12px;
@@ -6918,7 +6995,7 @@
 
 #scm-app .scm-admin-notif-queue-table {
   width: 100%;
-  min-width: 1320px;
+  min-width: 1420px;
   border-collapse: separate;
   border-spacing: 0;
   color: #10233f;
@@ -6969,6 +7046,31 @@
   color: #334155;
   font-size: 11px;
   font-weight: 800;
+}
+
+#scm-app .scm-admin-notif-queue-delete {
+  min-height: 30px;
+  padding: 7px 10px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+#scm-app .scm-admin-notif-queue-delete:hover {
+  background: #fef2f2;
+  border-color: #f87171;
+}
+
+#scm-app .scm-admin-notif-queue-action-muted {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  color: #94a3b8;
+  font-weight: 900;
 }
 
 #scm-app .scm-admin-notif-queue-status {

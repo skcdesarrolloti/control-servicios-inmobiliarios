@@ -16,6 +16,7 @@ final class AdministrativeNotificationsService
   public const PROJECT_CODE = 'control-servicios-inmobiliarios';
   public const SOURCE_MODULE = 'admin_notifications';
   public const QUEUE_TABLE = 'skc_notification_queue';
+  private const QUEUE_ATTEMPTS_TABLE = 'skc_notification_attempts';
   public const SMS_MAX = 160;
   public const COLLECTION_SMS_MAX = 480;
   public const SMS_PREFIX = 'SKC SuCasa Inmobiliaria ';
@@ -873,6 +874,56 @@ final class AdministrativeNotificationsService
   {
     $value = trim($value);
     return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : '';
+  }
+
+  public function deleteFailedQueueNotification(int $id): int
+  {
+    $id = max(0, $id);
+    if ($id <= 0) {
+      throw new \RuntimeException('Registro de cola invalido.');
+    }
+    if (!$this->schema->tableExists(self::QUEUE_TABLE)) {
+      throw new \RuntimeException('La tabla skc_notification_queue no esta disponible.');
+    }
+
+    $row = $this->db->getRow(
+      'SELECT `id`, `status`, `project_code`, `source_module`
+        FROM `' . self::QUEUE_TABLE . '`
+        WHERE `id` = ?
+        LIMIT 1',
+      [$id]
+    );
+    if (!is_array($row) || $row === []) {
+      throw new \RuntimeException('El registro de cola no existe.');
+    }
+    if ((string) ($row['project_code'] ?? '') !== self::PROJECT_CODE || (string) ($row['source_module'] ?? '') !== self::SOURCE_MODULE) {
+      throw new \RuntimeException('Solo se pueden eliminar registros de Notificaciones administrativas.');
+    }
+    if (strtolower(trim((string) ($row['status'] ?? ''))) !== 'failed') {
+      throw new \RuntimeException('Solo se pueden eliminar registros fallidos.');
+    }
+
+    $pdo = $this->db->pdo();
+    $startedTransaction = !$pdo->inTransaction();
+    if ($startedTransaction) {
+      $pdo->beginTransaction();
+    }
+
+    try {
+      if ($this->schema->tableExists(self::QUEUE_ATTEMPTS_TABLE)) {
+        $this->db->delete(self::QUEUE_ATTEMPTS_TABLE, ['notification_id' => $id]);
+      }
+      $deleted = $this->db->delete(self::QUEUE_TABLE, ['id' => $id]);
+      if ($startedTransaction) {
+        $pdo->commit();
+      }
+      return $deleted;
+    } catch (\Throwable $e) {
+      if ($startedTransaction && $pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      throw $e;
+    }
   }
 
   /** @param array<string,mixed> $payload @return array{tipo_gestion_cobro:string,observacion:string,volver_llamar:string,siguiente_fecha:string,siguiente_hora:string,otro_horario_cobro:string,tipo_reporte_inmueble:string,contract_ids:array<int,int>} */

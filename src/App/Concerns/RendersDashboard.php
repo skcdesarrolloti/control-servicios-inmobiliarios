@@ -409,6 +409,7 @@ trait RendersDashboard
         'admin_notifications_import' => self::AJAX_ADMIN_NOTIFICATIONS_IMPORT,
         'admin_notifications_payment_receipts_import' => self::AJAX_ADMIN_NOTIFICATIONS_PAYMENT_RECEIPTS_IMPORT,
         'admin_notifications_queue' => self::AJAX_ADMIN_NOTIFICATIONS_QUEUE,
+        'admin_notifications_queue_delete' => self::AJAX_ADMIN_NOTIFICATIONS_QUEUE_DELETE,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
