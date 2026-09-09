@@ -2866,7 +2866,10 @@ trait RendersDashboard
                   <thead><tr><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Plantilla</th><th>Lote</th><th>Intentos</th><th>Detalle</th></tr></thead>
                   <tbody>
                     <?php foreach ($queueRows as $queueRow): ?>
-                      <?php $queueStatusKey = sanitize_html_class((string) ($queueRow['status_key'] ?? $queueRow['status'] ?? 'other')); ?>
+                      <?php
+                        $queueStatusKey = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($queueRow['status_key'] ?? $queueRow['status'] ?? 'other'));
+                        $queueStatusKey = is_string($queueStatusKey) && $queueStatusKey !== '' ? $queueStatusKey : 'other';
+                      ?>
                       <tr>
                         <td><strong>#<?php echo esc_html((string) ((int) ($queueRow['id'] ?? 0))); ?></strong></td>
                         <td><?php echo esc_html($this->format_collection_management_date($queueRow['created_at'] ?? '')); ?><small><?php echo trim((string) ($queueRow['sent_at'] ?? '')) !== '' ? 'Enviada: ' . esc_html($this->format_collection_management_date($queueRow['sent_at'] ?? '')) : ''; ?></small></td>
