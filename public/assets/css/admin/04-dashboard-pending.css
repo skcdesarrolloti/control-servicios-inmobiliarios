@@ -6987,6 +6987,36 @@
   margin-top: 14px;
 }
 
+#scm-app .scm-admin-notif-queue-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid #dbe7f4;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-admin-notif-queue-bulk strong,
+#scm-app .scm-admin-notif-queue-bulk span {
+  display: block;
+}
+
+#scm-app .scm-admin-notif-queue-bulk strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+#scm-app .scm-admin-notif-queue-bulk span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 #scm-app .scm-admin-notif-queue-table-wrap {
   overflow-x: auto;
   border: 1px solid #dbe7f4;
@@ -7018,6 +7048,19 @@
   padding: 12px 10px;
   border-bottom: 1px solid #e2e8f0;
   vertical-align: top;
+}
+
+#scm-app .scm-admin-notif-queue-check-col {
+  width: 42px;
+  max-width: 42px;
+  text-align: center;
+}
+
+#scm-app .scm-admin-notif-queue-check-col input {
+  width: 16px;
+  height: 16px;
+  accent-color: #b91c1c;
+  cursor: pointer;
 }
 
 #scm-app .scm-admin-notif-queue-table tbody tr:hover {
@@ -7063,6 +7106,16 @@
 #scm-app .scm-admin-notif-queue-delete:hover {
   background: #fef2f2;
   border-color: #f87171;
+}
+
+#scm-app .scm-admin-notif-queue-delete:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#scm-app .scm-admin-notif-queue-delete--bulk {
+  min-height: 34px;
+  padding: 8px 12px;
 }
 
 #scm-app .scm-admin-notif-queue-action-muted {

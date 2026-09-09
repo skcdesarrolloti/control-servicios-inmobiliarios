@@ -265,13 +265,22 @@ trait HandlesAdministrativeNotifications
       $this->jsonFail('No tienes permiso para eliminar registros de la cola de Notificaciones.');
     }
 
+    $idsRaw = $_POST['ids'] ?? [];
+    if (!is_array($idsRaw)) {
+      $idsRaw = [];
+    }
+    $ids = array_values(array_filter(array_map('intval', $idsRaw), static fn(int $id): bool => $id > 0));
     $id = max(0, (int) ($_POST['id'] ?? 0));
+    if ($ids === [] && $id > 0) {
+      $ids = [$id];
+    }
     try {
-      $deleted = $this->get_admin_notifications_service()->deleteFailedQueueNotification($id);
+      $result = $this->get_admin_notifications_service()->deleteFailedQueueNotifications($ids);
+      $deleted = (int) ($result['deleted'] ?? 0);
       $this->jsonOk([
         'deleted' => $deleted,
-        'id' => $id,
-        'message' => $deleted > 0 ? 'Registro fallido eliminado.' : 'No se elimino ningun registro.',
+        'ids' => $ids,
+        'message' => $deleted === 1 ? 'Registro fallido eliminado.' : $deleted . ' registros fallidos eliminados.',
       ]);
     } catch (\Throwable $e) {
       $this->jsonFail($e->getMessage());

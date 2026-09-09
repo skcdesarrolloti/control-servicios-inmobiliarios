@@ -2788,6 +2788,7 @@
       var queuePage = 1;
       var queueLoaded = false;
       var queueRequestId = 0;
+      var queueSelectedFailed = new Set();
       var composerDirty = false;
       var subjectDirty = false;
       var composerChannelMode = "";
@@ -4616,13 +4617,22 @@
           return;
         }
         if (!Array.isArray(rows) || rows.length === 0) {
+          queueSelectedFailed.clear();
           queueResultsEl.innerHTML =
             '<div class="scm-admin-notif-empty"><strong>Sin registros</strong><span>No hay notificaciones para esos filtros.</span></div>';
           return;
         }
+        queueSelectedFailed.clear();
+        var failedRows = rows.filter(function (row) {
+          return queueStatusClass(row.status_key || row.status) === "failed";
+        });
+        var bulkHtml = failedRows.length > 0
+          ? '<div class="scm-admin-notif-queue-bulk"><div><strong>Registros fallidos</strong><span data-admin-notif-queue-selected-count>0 seleccionados</span></div><button type="button" class="scm-admin-notif-queue-delete scm-admin-notif-queue-delete--bulk" data-admin-notif-queue-delete-selected disabled>Eliminar seleccionados</button></div>'
+          : "";
         queueResultsEl.innerHTML =
+          bulkHtml +
           '<div class="scm-admin-notif-queue-table-wrap"><table class="scm-admin-notif-queue-table">' +
-          '<thead><tr><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Plantilla</th><th>Lote</th><th>Intentos</th><th>Detalle</th><th>Acción</th></tr></thead><tbody>' +
+          '<thead><tr><th class="scm-admin-notif-queue-check-col">' + (failedRows.length > 0 ? '<input type="checkbox" aria-label="Seleccionar fallidas visibles" data-admin-notif-queue-select-all-failed>' : '') + '</th><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Plantilla</th><th>Lote</th><th>Intentos</th><th>Detalle</th><th>Acción</th></tr></thead><tbody>' +
           rows.map(function (row) {
             var statusKey = queueStatusClass(row.status_key || row.status);
             var detailBits = [];
@@ -4636,11 +4646,15 @@
               row.test_mode ? "Modo prueba" : "",
             ].filter(Boolean);
             var canDelete = statusKey === "failed";
+            var checkHtml = canDelete
+              ? '<input type="checkbox" aria-label="Seleccionar registro fallido #' + escAttr(row.id || "") + '" data-admin-notif-queue-select-failed="' + escAttr(row.id || "") + '">'
+              : "";
             var actionHtml = canDelete
               ? '<button type="button" class="scm-admin-notif-queue-delete" data-admin-notif-queue-delete="' + escAttr(row.id || "") + '">Eliminar</button>'
               : '<span class="scm-admin-notif-queue-action-muted">-</span>';
             return (
               "<tr>" +
+              '<td class="scm-admin-notif-queue-check-col">' + checkHtml + "</td>" +
               "<td><strong>#" + escHtml(row.id || "") + "</strong></td>" +
               "<td><span>" + escHtml(row.created_at || "") + "</span><small>" + escHtml(row.sent_at ? "Enviada: " + row.sent_at : "") + "</small></td>" +
               '<td><span class="scm-admin-notif-queue-status scm-admin-notif-queue-status--' + escAttr(statusKey) + '">' + escHtml(row.status_label || row.status || "") + "</span></td>" +
@@ -4655,6 +4669,29 @@
             );
           }).join("") +
           "</tbody></table></div>";
+        updateQueueBulkActions();
+      }
+
+      function updateQueueBulkActions() {
+        if (!queueResultsEl) {
+          return;
+        }
+        var count = queueSelectedFailed.size;
+        var counter = queueResultsEl.querySelector("[data-admin-notif-queue-selected-count]");
+        if (counter) {
+          counter.textContent = count + " seleccionado" + (count === 1 ? "" : "s");
+        }
+        var bulkBtn = queueResultsEl.querySelector("[data-admin-notif-queue-delete-selected]");
+        if (bulkBtn) {
+          bulkBtn.disabled = count <= 0;
+        }
+        var all = Array.prototype.slice.call(queueResultsEl.querySelectorAll("[data-admin-notif-queue-select-failed]"));
+        var checked = all.filter(function (input) { return input.checked; }).length;
+        var selectAll = queueResultsEl.querySelector("[data-admin-notif-queue-select-all-failed]");
+        if (selectAll) {
+          selectAll.checked = all.length > 0 && checked === all.length;
+          selectAll.indeterminate = checked > 0 && checked < all.length;
+        }
       }
 
       function renderQueuePagination(pagination) {
@@ -4701,23 +4738,29 @@
           "</div>";
       }
 
-      function deleteQueueRecord(id) {
-        id = String(id || "").trim();
-        if (!id || !actionAdminNotificationsQueueDelete) {
+      function deleteQueueRecords(ids) {
+        ids = Array.isArray(ids) ? ids.map(function (id) { return String(id || "").trim(); }).filter(Boolean) : [];
+        ids = Array.from(new Set(ids));
+        if (ids.length === 0 || !actionAdminNotificationsQueueDelete) {
           showToast("error", "La eliminacion de registros no esta disponible.");
           return;
         }
+        var multiple = ids.length > 1;
         var ask = window.Swal && typeof window.Swal.fire === "function"
           ? window.Swal.fire({
               icon: "warning",
-              title: "Eliminar registro fallido",
-              text: "Se eliminara el registro #" + id + " y sus intentos. Esta accion no se puede deshacer.",
+              title: multiple ? "Eliminar registros fallidos" : "Eliminar registro fallido",
+              text: multiple
+                ? "Se eliminaran " + ids.length + " registros fallidos y sus intentos. Esta accion no se puede deshacer."
+                : "Se eliminara el registro #" + ids[0] + " y sus intentos. Esta accion no se puede deshacer.",
               showCancelButton: true,
-              confirmButtonText: "Eliminar",
+              confirmButtonText: multiple ? "Eliminar seleccionados" : "Eliminar",
               cancelButtonText: "Cancelar",
               confirmButtonColor: "#b91c1c",
             }).then(function (result) { return !!result.isConfirmed; })
-          : Promise.resolve(window.confirm("Eliminar el registro fallido #" + id + " y sus intentos?"));
+          : Promise.resolve(window.confirm(multiple
+              ? "Eliminar " + ids.length + " registros fallidos y sus intentos?"
+              : "Eliminar el registro fallido #" + ids[0] + " y sus intentos?"));
         ask.then(function (confirmed) {
           if (!confirmed) {
             return;
@@ -4725,7 +4768,9 @@
           var fd = new FormData();
           fd.set("action", actionAdminNotificationsQueueDelete);
           fd.set("nonce", nonce);
-          fd.set("id", id);
+          ids.forEach(function (id) {
+            fd.append("ids[]", id);
+          });
           return fetchWithTimeout(ajaxUrl, {
             method: "POST",
             body: fd,
@@ -4743,11 +4788,16 @@
                 );
               }
               showToast("success", (json.data && json.data.message) || "Registro eliminado.");
+              queueSelectedFailed.clear();
               loadNotificationQueue(queuePage || 1);
             });
         }).catch(function (err) {
           showToast("error", err.message || "No se pudo eliminar el registro.");
         });
+      }
+
+      function deleteQueueRecord(id) {
+        deleteQueueRecords([id]);
       }
 
       function loadNotificationQueue(page) {
@@ -5490,6 +5540,50 @@
             }
             event.preventDefault();
             deleteQueueRecord(btn.getAttribute("data-admin-notif-queue-delete") || "");
+          });
+          queueResultsEl.addEventListener("change", function (event) {
+            var target = event.target;
+            if (!target || !target.matches) {
+              return;
+            }
+            if (target.matches("[data-admin-notif-queue-select-failed]")) {
+              var id = String(target.getAttribute("data-admin-notif-queue-select-failed") || "").trim();
+              if (id) {
+                if (target.checked) {
+                  queueSelectedFailed.add(id);
+                } else {
+                  queueSelectedFailed.delete(id);
+                }
+              }
+              updateQueueBulkActions();
+              return;
+            }
+            if (target.matches("[data-admin-notif-queue-select-all-failed]")) {
+              var checked = !!target.checked;
+              queueResultsEl.querySelectorAll("[data-admin-notif-queue-select-failed]").forEach(function (input) {
+                input.checked = checked;
+                var id = String(input.getAttribute("data-admin-notif-queue-select-failed") || "").trim();
+                if (!id) {
+                  return;
+                }
+                if (checked) {
+                  queueSelectedFailed.add(id);
+                } else {
+                  queueSelectedFailed.delete(id);
+                }
+              });
+              updateQueueBulkActions();
+            }
+          });
+          queueResultsEl.addEventListener("click", function (event) {
+            var btn = event.target && event.target.closest
+              ? event.target.closest("[data-admin-notif-queue-delete-selected]")
+              : null;
+            if (!btn || !queueResultsEl.contains(btn) || btn.disabled) {
+              return;
+            }
+            event.preventDefault();
+            deleteQueueRecords(Array.from(queueSelectedFailed));
           });
         }
 

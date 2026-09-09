@@ -926,6 +926,37 @@ final class AdministrativeNotificationsService
     }
   }
 
+  /** @param int[] $ids @return array{deleted:int,requested:int} */
+  public function deleteFailedQueueNotifications(array $ids): array
+  {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
+    if ($ids === []) {
+      throw new \RuntimeException('Selecciona al menos un registro fallido.');
+    }
+
+    $pdo = $this->db->pdo();
+    $startedTransaction = !$pdo->inTransaction();
+    if ($startedTransaction) {
+      $pdo->beginTransaction();
+    }
+
+    try {
+      $deleted = 0;
+      foreach ($ids as $id) {
+        $deleted += $this->deleteFailedQueueNotification($id);
+      }
+      if ($startedTransaction) {
+        $pdo->commit();
+      }
+      return ['deleted' => $deleted, 'requested' => count($ids)];
+    } catch (\Throwable $e) {
+      if ($startedTransaction && $pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      throw $e;
+    }
+  }
+
   /** @param array<string,mixed> $payload @return array{tipo_gestion_cobro:string,observacion:string,volver_llamar:string,siguiente_fecha:string,siguiente_hora:string,otro_horario_cobro:string,tipo_reporte_inmueble:string,contract_ids:array<int,int>} */
   private function normalizeCollectionPayload(array $payload): array
   {
