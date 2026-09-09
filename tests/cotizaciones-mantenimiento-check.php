@@ -15,6 +15,7 @@ $checks = [
   'runtime exposes approve quote action' => str_contains($dashboard, "'approve_cotizacion' => self::AJAX_APPROVE_COTIZACION"),
   'quote cards render quick approval button' => str_contains($dashboard, 'data-scm-approve-cotizacion') && str_contains($dashboard, 'Marcar como aprobada'),
   'quote cards show quick approval for every non-approved quote' => str_contains($dashboard, '!$cotizacionAprobada ?') && !str_contains($dashboard, '$cotizacionFinalizada'),
+  'quote card approve and delete actions use semantic colors' => str_contains($dashboard, 'scm-cotizacion-approve-action') && str_contains($dashboard, 'scm-cotizacion-delete-action'),
   'quote approve and delete popups use semantic confirm colors' => str_contains($runtimeJs, 'confirmButtonColor: "#16a34a"') && str_contains($runtimeJs, 'confirmButtonColor: "#b91c1c"'),
   'quote panel omits finalized buckets' => !str_contains($dashboard, "'label' => 'Finalizadas'") && !str_contains($dashboard, "'key' => 'finalizadas'") && !str_contains($handler, 'kpi_finalizadas'),
   'quote panel omits sent buckets' => !str_contains($dashboard, "'label' => 'Enviadas'") && !str_contains($dashboard, "'key' => 'enviadas'") && !str_contains($handler, 'kpi_enviadas'),

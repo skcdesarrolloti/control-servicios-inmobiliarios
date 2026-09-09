@@ -4388,6 +4388,32 @@
   box-shadow: 0 8px 18px rgba(249, 115, 22, 0.2);
 }
 
+#scm-app .scm-cotizacion-actions .scm-cotizacion-approve-action {
+  border-color: #16a34a;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(22, 163, 74, 0.22);
+}
+
+#scm-app .scm-cotizacion-actions .scm-cotizacion-approve-action:hover {
+  border-color: #15803d;
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #fff;
+}
+
+#scm-app .scm-cotizacion-actions .scm-cotizacion-delete-action {
+  border-color: #b91c1c !important;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 18px rgba(185, 28, 28, 0.2);
+}
+
+#scm-app .scm-cotizacion-actions .scm-cotizacion-delete-action:hover {
+  border-color: #991b1b !important;
+  background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%) !important;
+  color: #fff !important;
+}
+
 #scm-app .scm-cotizacion-actions .scm-action-count {
   display: inline-flex;
   min-width: 22px;
