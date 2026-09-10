@@ -10,6 +10,8 @@ $handler = (string) file_get_contents($root . '/src/App/Concerns/HandlesMaintena
 $runtimeJs = (string) file_get_contents($root . '/public/assets/js/admin-dashboard-runtime.js');
 $adminJs = (string) file_get_contents($root . '/public/assets/js/scm-admin.js');
 $adminCss = (string) file_get_contents($root . '/public/assets/css/admin/04-dashboard-pending.css');
+$publicOrder = (string) file_get_contents($root . '/public/orden-publica.php');
+$publicOrderCss = (string) file_get_contents($root . '/public/assets/css/public-order-response.css');
 $workflow = (string) file_get_contents($root . '/src/Modules/ServiciosInmobiliarios/Concerns/WorkflowCommandsConcern.php');
 $summaryPos = strpos($handler, "\$pdf->heading('Resumen económico');");
 $ordersPos = strpos($handler, "\$pdf->heading('Órdenes de mantenimiento');");
@@ -50,6 +52,9 @@ $checks = [
   'backend creates and responds orders through shared notification queue' => str_contains($handler, 'maintenance_order_enqueue_created_notifications') && str_contains($handler, 'maintenance_order_enqueue_response_notifications') && str_contains($handler, "new \\SCM\\Support\\EmailQueue") && str_contains($handler, "'source_module' => 'ordenes_mantenimiento'"),
   'internal notification settings include maintenance order events' => str_contains($app, 'orden_mantenimiento_creada') && str_contains($app, 'respuesta_orden_mantenimiento') && str_contains($app, 'Email interno en cola'),
   'backend accepts responses only for pending orders' => str_contains($handler, 'ajax_handler_cotizacion_order_response') && str_contains($handler, "Solo puedes responder una orden que este esperando respuesta.") && str_contains($handler, 'maintenance_order_insert_response_histories'),
+  'order notification email uses signed public response link' => str_contains($handler, 'orden-publica.php') && str_contains($handler, 'maintenance_order_public_signature') && str_contains($handler, 'public_cotizacion_order_signature_valid'),
+  'public order response page approves without panel login' => str_contains($publicOrder, 'public_respond_cotizacion_order') && str_contains($publicOrder, 'Respuesta de orden de mantenimiento') && str_contains($publicOrder, 'Aprobar orden') && str_contains($publicOrder, 'Desaprobar orden'),
+  'public order response page has dedicated responsive styles' => str_contains($publicOrderCss, '.scm-order-public-shell') && str_contains($publicOrderCss, '.scm-order-public-button') && str_contains($publicOrderCss, '@media (max-width: 760px)'),
   'frontend warns before submitting order above balance' => str_contains($runtimeJs, 'value > balance') && str_contains($runtimeJs, 'El valor supera el saldo disponible'),
   'frontend validates quote order amount live' => str_contains($runtimeJs, 'validateOrderAmount') && str_contains($runtimeJs, 'data-scm-order-value-error') && str_contains($runtimeJs, 'confirmButton.disabled = isOver') && str_contains($adminCss, '.scm-cotizacion-order-balance.is-over') && str_contains($adminCss, '.scm-cotizacion-order-value-error'),
   'backend creates maintenance orders from approved quotes' => str_contains($handler, 'ajax_handler_cotizacion_order_save') && str_contains($handler, "jet_cct_ordenes") && str_contains($handler, 'maintenance_order_update_cotizacion_balance') && str_contains($handler, 'maintenance_order_insert_histories') && str_contains($handler, 'maintenance_order_save_provider'),

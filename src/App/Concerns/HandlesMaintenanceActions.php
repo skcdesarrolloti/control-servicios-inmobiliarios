@@ -904,6 +904,91 @@ trait HandlesMaintenanceActions
     ]);
   }
 
+  /** @return array<string,mixed>|null */
+  public function public_cotizacion_order(int $orderId): ?array
+  {
+    if ($orderId <= 0) {
+      return null;
+    }
+    $ordersTable = $this->db->table('jet_cct_ordenes');
+    if (!$this->table_exists($ordersTable)) {
+      return null;
+    }
+    $row = $this->db->getRow("SELECT * FROM `{$ordersTable}` WHERE `_ID` = ? LIMIT 1", [$orderId]);
+    return is_array($row) ? $row : null;
+  }
+
+  public function public_cotizacion_order_signature_valid(int $orderId, int $expires, string $signature): bool
+  {
+    if ($orderId <= 0 || $expires <= time() || trim($signature) === '') {
+      return false;
+    }
+    $expected = $this->maintenance_order_public_signature($orderId, $expires);
+    return hash_equals($expected, trim($signature));
+  }
+
+  /** @return array{message:string,id_orden:string,estado:string,notifications_queued:int} */
+  public function public_respond_cotizacion_order(int $orderId, string $estadoRaw, string $observacionRaw, string $responderNameRaw): array
+  {
+    $estado = $this->maintenance_order_response_state($estadoRaw);
+    if ($estado === '') {
+      throw new \DomainException('Selecciona si la orden fue aprobada o desaprobada.');
+    }
+
+    $responderName = $this->maintenance_order_clean($responderNameRaw);
+    if ($responderName === '') {
+      throw new \DomainException('Escribe el nombre de quien responde la orden.');
+    }
+
+    $schema = new \SCM\Support\SchemaInspector($this->db);
+    $ordersTable = $this->db->table('jet_cct_ordenes');
+    if (!$schema->tableExists($ordersTable)) {
+      throw new \DomainException('La tabla de ordenes no esta disponible.');
+    }
+
+    $order = $this->db->getRow("SELECT * FROM `{$ordersTable}` WHERE `_ID` = ? LIMIT 1", [$orderId]);
+    if (!is_array($order)) {
+      throw new \DomainException('Orden no encontrada.');
+    }
+
+    $currentState = strtolower(trim((string) ($order['estado'] ?? '')));
+    if ($currentState !== '' && $currentState !== 'esperando respuesta') {
+      throw new \DomainException('Esta orden ya fue respondida. No se puede cambiar desde el enlace público.');
+    }
+
+    $now = time();
+    $nowMysql = date('Y-m-d H:i:s', $now);
+    $observacion = $this->maintenance_order_clean($observacionRaw);
+    $user = [
+      'nombre' => $responderName,
+      'email' => '',
+      'celular' => '',
+    ];
+
+    $update = [
+      'estado' => $estado,
+      'autorizador' => $responderName,
+      'id_autorizador' => '',
+      'cct_modified' => $nowMysql,
+    ];
+    $update = $schema->filterTableData($ordersTable, $update);
+    if (empty($update)) {
+      throw new \DomainException('No hay campos disponibles para actualizar la orden.');
+    }
+    $this->db->update($ordersTable, $update, ['_ID' => $orderId]);
+
+    $updatedOrder = array_merge($order, $update);
+    $this->maintenance_order_insert_response_histories($schema, $updatedOrder, $estado, $observacion, $user, '', $now, $nowMysql);
+    $queued = $this->maintenance_order_enqueue_response_notifications($updatedOrder, $estado, $observacion, $user, $orderId);
+
+    return [
+      'message' => 'Orden #' . $orderId . ' ' . strtolower($estado) . '.',
+      'id_orden' => (string) $orderId,
+      'estado' => $estado,
+      'notifications_queued' => $queued,
+    ];
+  }
+
   public function ajax_handler_cotizacion_mantenimiento_pdf(): void
   {
     $this->verifyCsrf();
@@ -1543,7 +1628,17 @@ trait HandlesMaintenanceActions
 
   private function maintenance_order_order_url(int $orderId): string
   {
-    return 'https://sucasainmobiliaria.com.co/orden/?numero=' . rawurlencode((string) $orderId);
+    $expires = time() + (30 * 86400);
+    return rtrim((string) SCM_BASE_URL, '/') . '/orden-publica.php?' . http_build_query([
+      'numero' => $orderId,
+      'expires' => $expires,
+      'sig' => $this->maintenance_order_public_signature($orderId, $expires),
+    ], '', '&', PHP_QUERY_RFC3986);
+  }
+
+  private function maintenance_order_public_signature(int $orderId, int $expires): string
+  {
+    return hash_hmac('sha256', 'maintenance-order-public|' . $orderId . '|' . $expires, (string) SCM_APP_SECRET);
   }
 
   private function maintenance_order_email_html(string $title, array $lines, int $orderId): string
