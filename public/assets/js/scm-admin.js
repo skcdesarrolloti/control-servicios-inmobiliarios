@@ -1911,7 +1911,6 @@
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
     body.innerHTML = '<div class="scm-acta"><p role="status">Cargando actas, firmantes y tarifa administrativa…</p></div>';
-    var sequence = 1;
     var busy = false;
     sub._scmActaReturnFocus = modal.querySelector("[data-scm-open-ticket-acta]");
     if (!sub._scmActaFocusBound) {
@@ -2330,7 +2329,7 @@
     var body = sub.querySelector(".scm-case-submodal-body");
     var busy = false;
     var sequence = 1;
-    if (title) title.textContent = "Crear revisión correctiva";
+    if (title) title.textContent = "Revisión correctiva";
     setCaseSubmodalMeta(sub, caseBtn);
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
@@ -2353,7 +2352,13 @@
       data.set("ticket_pk", caseBtn.dataset.ticketPk || "");
       data.set("operation", operation);
       body.querySelectorAll("button").forEach(function (button) { button.disabled = true; });
-      if (operation !== "read") message("Guardando revisión correctiva…", false);
+      if (operation === "delete") {
+        message("Eliminando revisión correctiva…", false);
+      } else if (operation === "edit") {
+        message("Cargando edición…", false);
+      } else if (operation !== "read") {
+        message("Guardando revisión correctiva…", false);
+      }
       return fetch(runtime.ajaxUrl || "api.php", { method: "POST", body: data, credentials: "same-origin", headers: { Accept: "application/json" } })
         .then(function (response) { return response.json(); })
         .then(function (json) {
@@ -2384,44 +2389,100 @@
     }
 
     function bind() {
-      var form = body.querySelector("[data-corrective-review-create]");
-      if (!form) return;
       var MAX_PER_DAMAGE = 10;
       var MAX_TOTAL = 30;
       var MAX_SOURCE_BYTES = 25 * 1024 * 1024;
 
-      function filesOf(input) {
-        return Array.isArray(input._scmFiles) ? input._scmFiles.slice() : Array.from(input.files || []);
+      if (!body._scmCorrectiveActionsBound) {
+        body._scmCorrectiveActionsBound = true;
+        body.addEventListener("click", function (event) {
+          var editBtn = event.target.closest("[data-corrective-edit-review]");
+          if (editBtn && body.contains(editBtn)) {
+            event.preventDefault();
+            var editData = new FormData();
+            editData.set("review_id", editBtn.dataset.correctiveEditReview || "");
+            request("edit", editData);
+            return;
+          }
+          var cancelEdit = event.target.closest("[data-corrective-cancel-edit]");
+          if (cancelEdit && body.contains(cancelEdit)) {
+            event.preventDefault();
+            request("read");
+            return;
+          }
+          var deleteBtn = event.target.closest("[data-corrective-delete-review]");
+          if (deleteBtn && body.contains(deleteBtn)) {
+            event.preventDefault();
+            var reviewId = deleteBtn.dataset.correctiveDeleteReview || "";
+            function deleteReview() {
+              var deleteData = new FormData();
+              deleteData.set("review_id", reviewId);
+              request("delete", deleteData);
+            }
+            if (window.Swal && typeof window.Swal.fire === "function") {
+              window.Swal.fire({
+                icon: "warning",
+                title: "Eliminar revisión #" + reviewId + "?",
+                text: "Esta acción borra el registro de la revisión correctiva del caso.",
+                input: "text",
+                inputLabel: "Escribe ELIMINAR para confirmar",
+                showCancelButton: true,
+                confirmButtonText: "Eliminar",
+                cancelButtonText: "Cancelar",
+                confirmButtonColor: "#b42318",
+                inputValidator: function (value) {
+                  return String(value || "").trim().toUpperCase() === "ELIMINAR" ? undefined : "Escribe ELIMINAR para confirmar.";
+                },
+              }).then(function (result) {
+                if (result && result.isConfirmed) deleteReview();
+              });
+              return;
+            }
+            if (window.confirm("¿Eliminar la revisión #" + reviewId + "? Esta acción no se puede deshacer.")) {
+              var typed = window.prompt("Escribe ELIMINAR para confirmar:", "") || "";
+              if (typed.trim().toUpperCase() === "ELIMINAR") deleteReview();
+            }
+          }
+        });
       }
-      function syncInput(input, files) {
+
+      Array.from(body.querySelectorAll("[data-corrective-review-create], [data-corrective-review-edit]")).forEach(function (form) {
+        if (form._scmCorrectiveBound) return;
+        form._scmCorrectiveBound = true;
+
+        function filesOf(input) {
+        return Array.isArray(input._scmFiles) ? input._scmFiles.slice() : Array.from(input.files || []);
+        }
+        function syncInput(input, files) {
         if (typeof DataTransfer === "undefined") return false;
         var transfer = new DataTransfer();
         files.forEach(function (file) { transfer.items.add(file); });
         input.files = transfer.files;
         input._scmFiles = files.slice();
         return true;
-      }
-      function totalFiles(except) {
+        }
+        function totalPhotos(except) {
         return Array.from(form.querySelectorAll("[data-corrective-photos]")).reduce(function (sum, input) {
           return sum + (input === except ? 0 : filesOf(input).length);
-        }, 0);
-      }
-      function preview(input) {
+        }, form.querySelectorAll("input[name$='[existing_fotos][]']").length);
+        }
+        function preview(input) {
         (input._scmPreviewUrls || []).forEach(function (url) { URL.revokeObjectURL(url); });
         input._scmPreviewUrls = [];
         var box = input.closest("[data-corrective-item]").querySelector("[data-corrective-photo-preview]");
-        box.innerHTML = "";
+        box.querySelectorAll("[data-corrective-new-photo]").forEach(function (node) { node.remove(); });
         filesOf(input).forEach(function (file, index) {
           var url = URL.createObjectURL(file);
           input._scmPreviewUrls.push(url);
           var fig = document.createElement("figure");
+          fig.setAttribute("data-corrective-new-photo", "1");
           fig.innerHTML = '<img alt="Evidencia ' + (index + 1) + '"><figcaption></figcaption><button type="button" class="scm-acta-photo-remove" data-corrective-remove-photo="' + index + '" aria-label="Quitar foto">×</button>';
           fig.querySelector("img").src = url;
           fig.querySelector("figcaption").textContent = file.name + " · " + Math.max(1, Math.round(file.size / 1024)) + " KB";
           box.appendChild(fig);
         });
-      }
-      function addFiles(input, incoming) {
+        }
+        function addFiles(input, incoming) {
         var current = filesOf(input);
         var existing = new Set(current.map(function (file) { return [file.name, file.size, file.type, file.lastModified].join("|"); }));
         var additions = [];
@@ -2446,7 +2507,7 @@
           syncInput(input, current);
           return false;
         }
-        if (totalFiles(input) + next.length > MAX_TOTAL) {
+        if (totalPhotos(input) + next.length > MAX_TOTAL) {
           message("La revisión admite máximo 30 fotos en total.", true);
           scmNotify("error", "La revisión admite máximo 30 fotos en total.", "Fotos");
           syncInput(input, current);
@@ -2458,8 +2519,8 @@
         }
         preview(input);
         return true;
-      }
-      function decodePhoto(file) {
+        }
+        function decodePhoto(file) {
         if (window.createImageBitmap) {
           return createImageBitmap(file, { imageOrientation: "from-image" }).catch(function () { return createImageBitmap(file); });
         }
@@ -2470,8 +2531,8 @@
           image.onerror = function () { URL.revokeObjectURL(url); reject(new Error("No se pudo leer " + file.name + ".")); };
           image.src = url;
         });
-      }
-      function compressPhoto(file) {
+        }
+        function compressPhoto(file) {
         return decodePhoto(file).then(function (image) {
           var width = image.width || image.naturalWidth;
           var height = image.height || image.naturalHeight;
@@ -2490,11 +2551,11 @@
             }, "image/jpeg", .78);
           });
         });
-      }
-      function compressedFormData() {
+        }
+        function compressedFormData() {
         var data = new FormData(form);
         var inputs = Array.from(form.querySelectorAll("[data-corrective-photos]"));
-        var total = inputs.reduce(function (sum, input) { return sum + filesOf(input).length; }, 0);
+        var total = inputs.reduce(function (sum, input) { return sum + filesOf(input).length; }, form.querySelectorAll("input[name$='[existing_fotos][]']").length);
         if (total > MAX_TOTAL) return Promise.reject(new Error("La revisión admite máximo 30 fotos en total."));
         return Promise.all(inputs.map(function (input) {
           var name = input.name;
@@ -2503,8 +2564,17 @@
             files.forEach(function (file) { data.append(name, file, file.name); });
           });
         })).then(function () { return data; });
-      }
-      form.addEventListener("click", function (event) {
+        }
+        function nextItemIndex() {
+          var next = 0;
+          form.querySelectorAll("[name^='items[']").forEach(function (field) {
+            var match = field.name.match(/^items\[(\d+)\]/);
+            if (match) next = Math.max(next, Number(match[1]) + 1);
+          });
+          return next;
+        }
+
+        form.addEventListener("click", function (event) {
         var removePhoto = event.target.closest("[data-corrective-remove-photo]");
         if (removePhoto) {
           var item = removePhoto.closest("[data-corrective-item]");
@@ -2512,6 +2582,11 @@
           var files = filesOf(input);
           files.splice(Number(removePhoto.dataset.correctiveRemovePhoto), 1);
           if (syncInput(input, files)) preview(input);
+          return;
+        }
+        var removeExistingPhoto = event.target.closest("[data-corrective-remove-existing-photo]");
+        if (removeExistingPhoto) {
+          removeExistingPhoto.closest("[data-corrective-existing-photo]").remove();
           return;
         }
         var removeItem = event.target.closest("[data-corrective-remove-item]");
@@ -2522,8 +2597,9 @@
           }
           removeItem.closest("[data-corrective-item]").remove();
         }
-      });
-      form.querySelector("[data-corrective-add-item]").addEventListener("click", function () {
+        });
+        var addItem = form.querySelector("[data-corrective-add-item]");
+        if (addItem) addItem.addEventListener("click", function () {
         var list = form.querySelector("[data-corrective-review-items]");
         if (list.children.length >= 30) {
           message("La revisión admite máximo 30 daños.", true);
@@ -2531,8 +2607,9 @@
         }
         var item = list.firstElementChild.cloneNode(true);
         item.querySelector("legend").textContent = "Daño #" + (list.children.length + 1);
+        var index = nextItemIndex();
         item.querySelectorAll("input, select, textarea").forEach(function (field) {
-          field.name = field.name.replace(/items\[\d+\]/, "items[" + sequence + "]").replace(/corrective_review_photos_\d+\[\]/, "corrective_review_photos_" + sequence + "[]");
+          field.name = field.name.replace(/items\[\d+\]/, "items[" + index + "]").replace(/corrective_review_photos_\d+\[\]/, "corrective_review_photos_" + index + "[]");
           if (field.type === "file") {
             field.value = "";
             field._scmFiles = [];
@@ -2541,18 +2618,19 @@
           }
         });
         item.querySelector("[data-corrective-photo-preview]").innerHTML = "";
-        sequence++;
         list.appendChild(item);
-      });
-      form.addEventListener("change", function (event) {
+        });
+        form.addEventListener("change", function (event) {
         if (event.target.matches("[data-corrective-photos]")) addFiles(event.target, Array.from(event.target.files || []));
-      });
-      form.addEventListener("submit", function (event) {
+        });
+        form.addEventListener("submit", function (event) {
         event.preventDefault();
         message("Comprimiendo fotos antes de guardar…", false);
-        compressedFormData().then(function (data) { request("create", data); }).catch(function (error) {
+        var operation = form.hasAttribute("data-corrective-review-edit") ? "update" : "create";
+        compressedFormData().then(function (data) { request(operation, data); }).catch(function (error) {
           message(error.message || "No se pudieron preparar las fotos.", true);
           scmNotify("error", error.message || "No se pudieron preparar las fotos.", "Fotos");
+        });
         });
       });
     }

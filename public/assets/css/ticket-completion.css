@@ -70,11 +70,15 @@
 .scm-corrective-summary span { display: block; color: var(--acta-muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
 .scm-corrective-summary strong { display: block; margin-top: 4px; color: var(--acta-ink); overflow-wrap: anywhere; }
 .scm-corrective-existing { margin: 18px 0; }
-.scm-corrective-existing article { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px; border: 1px solid var(--acta-border); border-radius: 10px; background: #fff; }
+.scm-corrective-existing article { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; padding: 12px; border: 1px solid var(--acta-border); border-radius: 10px; background: #fff; }
 .scm-corrective-existing article + article { margin-top: 10px; }
 .scm-corrective-existing span { color: var(--acta-muted); }
+.scm-corrective-existing-info { display: grid; gap: 2px; min-width: 180px; }
+.scm-corrective-existing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.scm-acta-empty { display: grid; gap: 6px; margin: 18px 0 0; padding: 14px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; color: var(--acta-ink); }
+.scm-acta-empty span { color: var(--acta-muted); }
 .scm-corrective-item select, .scm-corrective-item input, .scm-corrective-item textarea { color: var(--acta-ink); }
-@media (max-width: 720px) { .scm-corrective-summary { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .scm-corrective-summary { grid-template-columns: 1fr; } .scm-corrective-existing article { align-items: stretch; } .scm-corrective-existing-actions { width: 100%; } .scm-corrective-existing-actions .scm-acta-button { flex: 1 1 140px; } }
 .scm-acta-page { margin: 0; background: #eef2f7; padding: 24px 16px; }
 .scm-acta-create-body { min-height: 100vh; padding-top: 0; font-family: Poppins, system-ui, sans-serif; }
 .scm-acta-create-top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px clamp(14px, 4vw, 34px); background: #10264a; color: #fff; box-shadow: 0 10px 28px rgba(16, 38, 74, .22); }

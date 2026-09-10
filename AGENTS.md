@@ -1,0 +1,8 @@
+# Reglas operativas del proyecto SuCasa
+
+- Después de cada cambio solicitado y verificado, hacer commit y push.
+- No cambiar `estado_administrativo` de tickets salvo que el usuario lo pida explícitamente o que una regla existente del flujo lo requiera.
+- Las notificaciones nuevas deben ser configurables cuando aplique y deben encolarse mediante la integración compartida de `shared-notifications`; evitar envíos directos o destinatarios quemados en código.
+- En los modales del panel, preferir popups internos y conservar el contexto del caso; evitar abrir pestañas nuevas si la acción puede resolverse dentro de la app.
+- Las imágenes cargadas desde formularios del panel deben comprimirse o validarse antes de guardarse para controlar peso y tamaño.
+- Las acciones destructivas como eliminar/archivar/anular deben pedir confirmación clara y dejar trazabilidad cuando el módulo ya maneja historial.

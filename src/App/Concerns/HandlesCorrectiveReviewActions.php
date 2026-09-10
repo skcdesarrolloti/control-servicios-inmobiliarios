@@ -37,11 +37,32 @@ trait HandlesCorrectiveReviewActions
     try {
       if (!$this->canAccessCorrectiveReview($ticketId)) {
         http_response_code(403);
-        $this->jsonFail('No tienes permiso para crear la revisión correctiva de este caso.');
+        $this->jsonFail('No tienes permiso para gestionar la revisión correctiva de este caso.');
       }
       $operation = trim((string) ($_POST['operation'] ?? 'read'));
       if ($operation === 'create') {
         $result = $this->correctiveReviewCreate($ticketId);
+        $this->jsonOk($result + [
+          'html' => $this->renderCorrectiveReviewPanel($this->correctiveReviewContext($ticketId)),
+        ]);
+      }
+      if ($operation === 'edit') {
+        $reviewId = (int) ($_POST['review_id'] ?? 0);
+        $this->correctiveReviewTargetRow($ticketId, $reviewId);
+        $this->jsonOk([
+          'html' => $this->renderCorrectiveReviewPanel($this->correctiveReviewContext($ticketId), $reviewId),
+        ]);
+      }
+      if ($operation === 'update') {
+        $reviewId = (int) ($_POST['review_id'] ?? 0);
+        $result = $this->correctiveReviewUpdate($ticketId, $reviewId);
+        $this->jsonOk($result + [
+          'html' => $this->renderCorrectiveReviewPanel($this->correctiveReviewContext($ticketId)),
+        ]);
+      }
+      if ($operation === 'delete') {
+        $reviewId = (int) ($_POST['review_id'] ?? 0);
+        $result = $this->correctiveReviewDelete($ticketId, $reviewId);
         $this->jsonOk($result + [
           'html' => $this->renderCorrectiveReviewPanel($this->correctiveReviewContext($ticketId)),
         ]);
@@ -84,35 +105,7 @@ trait HandlesCorrectiveReviewActions
 
     $storedPhotos = [];
     try {
-      $photoTotal = 0;
-      foreach ($items as $index => &$item) {
-        $field = 'corrective_review_photos_' . $index;
-        $names = $_FILES[$field]['name'] ?? [];
-        $names = is_array($names) ? array_values(array_filter($names, static fn($name): bool => trim((string) $name) !== '')) : [];
-        if (count($names) > 10) {
-          throw new \DomainException('Cada daño admite máximo 10 fotos.');
-        }
-        $photoTotal += count($names);
-        if ($photoTotal > 30) {
-          throw new \DomainException('La revisión admite máximo 30 fotos en total.');
-        }
-        if (!$names) {
-          continue;
-        }
-        $photos = $this->handleImageUploadsDetailed($field, 10);
-        if (count($photos) !== count($names)) {
-          throw new \DomainException('No se pudieron procesar todas las fotos. Usa imágenes JPG, PNG o WebP de máximo ' . (int) floor(SCM_UPLOAD_MAX_BYTES / 1048576) . ' MB cada una.');
-        }
-        foreach ($photos as $photo) {
-          if ($photo['mime'] !== 'image/jpeg' || $photo['width'] > 1600 || $photo['height'] > 1600 || $photo['bytes'] > 1500000) {
-            throw new \DomainException('Una foto no pudo comprimirse por debajo de 1,5 MB y 1600 px. Prueba con otra imagen.');
-          }
-        }
-        $storedPhotos = array_merge($storedPhotos, $photos);
-        $urls = array_map(static fn(array $photo): string => (string) $photo['url'], $photos);
-        $item['registro_foto_dano'] = implode(',', array_values(array_filter($urls)));
-      }
-      unset($item);
+      $items = $this->correctiveReviewAttachUploadedPhotos($items, $storedPhotos);
 
       $actor = $this->ticketCompletionActor();
       $now = time();
@@ -236,6 +229,185 @@ trait HandlesCorrectiveReviewActions
     }
   }
 
+  /** @return array<string,mixed> */
+  private function correctiveReviewUpdate(int $ticketId, int $reviewId): array
+  {
+    $schema = new SchemaInspector($this->db);
+    $reviewTable = $this->db->table('jet_cct_revision_correctiva');
+    $historyTable = $this->db->table('jet_cct_historial_del_ticket');
+    $propertyHistoryTable = $this->db->table('jet_cct_historial_del_inmueble');
+    if (!$schema->tableExists($reviewTable)) {
+      throw new \DomainException('No está disponible la tabla requerida para actualizar la revisión correctiva.');
+    }
+    $context = $this->correctiveReviewContext($ticketId);
+    $review = $this->correctiveReviewTargetRowFromContext($context, $reviewId);
+    $items = $this->correctiveReviewInputItems();
+    if (empty($items)) {
+      throw new \DomainException('Agrega al menos un daño para actualizar la revisión correctiva.');
+    }
+
+    $storedPhotos = [];
+    try {
+      $items = $this->correctiveReviewAttachUploadedPhotos($items, $storedPhotos);
+      $now = time();
+      $nowSql = date('Y-m-d H:i:s', $now);
+      $actor = $this->ticketCompletionActor();
+      $update = $schema->filterTableData($reviewTable, [
+        'evaluacion_de_danos' => serialize($items),
+        'cct_modified' => $nowSql,
+        'cct_author_id' => Auth::userId(),
+      ]);
+      if (!$update || $this->db->update($reviewTable, $update, ['_ID' => $reviewId]) < 0) {
+        throw new \DomainException('No fue posible actualizar la revisión correctiva.');
+      }
+
+      if ($schema->tableExists($historyTable)) {
+        $history = $schema->filterTableData($historyTable, [
+          'cct_status' => 'publish',
+          'cct_author_id' => Auth::userId(),
+          'cct_created' => $nowSql,
+          'cct_modified' => $nowSql,
+          'id_ticket' => $ticketId,
+          'fecha' => $now,
+          'nombre' => $actor['name'] ?? Auth::user(),
+          'correo' => $actor['email'] ?? '',
+          'celular' => $actor['phone'] ?? '',
+          'respuesta' => 'Se actualizó la revisión correctiva #' . $reviewId . ' del inmueble.',
+          'id_revision_correctiva' => $reviewId,
+          'id_empleado' => $actor['employee_id'] ?? '',
+        ]);
+        if ($history) {
+          $this->db->insert($historyTable, $history);
+        }
+      }
+
+      if ($schema->tableExists($propertyHistoryTable)) {
+        $property = is_array($context['property'] ?? null) ? $context['property'] : [];
+        $history = $schema->filterTableData($propertyHistoryTable, [
+          'cct_status' => 'publish',
+          'cct_author_id' => Auth::userId(),
+          'cct_created' => $nowSql,
+          'cct_modified' => $nowSql,
+          'id_empleado' => $actor['employee_id'] ?? '',
+          'id_inmueble' => $this->correctiveReviewFirstText([$review['id_inmueble'] ?? '', $property['_ID'] ?? '']),
+          'fecha' => $now,
+          'tipo_reporte' => 'Revision correctiva',
+          'observacion' => 'Se actualizó la revisión correctiva #' . $reviewId . ' desde el panel de servicios.',
+          'funcionario' => $actor['name'] ?? Auth::user(),
+          'id_ticket' => $ticketId,
+          'id_inmueble_data' => $property['_ID'] ?? '',
+        ]);
+        if ($history) {
+          $this->db->insert($propertyHistoryTable, $history);
+        }
+      }
+
+      return [
+        'message' => 'Revisión correctiva #' . $reviewId . ' actualizada.',
+        'review_id' => (string) $reviewId,
+        'review_url' => self::DEFAULT_CORRECTIVA_URL . rawurlencode((string) $reviewId),
+      ];
+    } catch (\Throwable $error) {
+      if ($storedPhotos) {
+        $this->storedFiles()->deleteStoredImages($storedPhotos);
+      }
+      if ($error instanceof \DomainException) {
+        throw $error;
+      }
+      throw new \DomainException('No fue posible actualizar la revisión correctiva.');
+    }
+  }
+
+  /** @return array<string,mixed> */
+  private function correctiveReviewDelete(int $ticketId, int $reviewId): array
+  {
+    $schema = new SchemaInspector($this->db);
+    $reviewTable = $this->db->table('jet_cct_revision_correctiva');
+    $ticketTable = $this->db->table('jet_cct_tickets');
+    $historyTable = $this->db->table('jet_cct_historial_del_ticket');
+    if (!$schema->tableExists($reviewTable) || !$schema->tableExists($ticketTable)) {
+      throw new \DomainException('No está disponible la tabla requerida para eliminar la revisión correctiva.');
+    }
+    $context = $this->correctiveReviewContext($ticketId);
+    $this->correctiveReviewTargetRowFromContext($context, $reviewId);
+    $ticket = is_array($context['ticket'] ?? null) ? $context['ticket'] : [];
+    $deleted = $this->db->delete($reviewTable, ['_ID' => $reviewId]);
+    if ($deleted !== 1) {
+      throw new \DomainException('No fue posible eliminar la revisión correctiva.');
+    }
+
+    $remainingIds = array_values(array_diff($this->correctiveReviewSplitIds((string) ($ticket['id_revision_correctiva'] ?? '')), [(string) $reviewId]));
+    $ticketUpdate = $schema->filterTableData($ticketTable, [
+      'id_revision_correctiva' => implode(',', $remainingIds),
+      'estado_rev_correctiva' => $remainingIds ? 'Si' : 'No',
+      'fecha_actualizacion' => time(),
+    ]);
+    if ($ticketUpdate) {
+      $this->db->update($ticketTable, $ticketUpdate, ['_ID' => $ticketId]);
+    }
+
+    if ($schema->tableExists($historyTable)) {
+      $now = time();
+      $actor = $this->ticketCompletionActor();
+      $history = $schema->filterTableData($historyTable, [
+        'cct_status' => 'publish',
+        'cct_author_id' => Auth::userId(),
+        'cct_created' => date('Y-m-d H:i:s', $now),
+        'cct_modified' => date('Y-m-d H:i:s', $now),
+        'id_ticket' => $ticketId,
+        'fecha' => $now,
+        'nombre' => $actor['name'] ?? Auth::user(),
+        'correo' => $actor['email'] ?? '',
+        'celular' => $actor['phone'] ?? '',
+        'respuesta' => 'Se eliminó la revisión correctiva #' . $reviewId . '.',
+        'id_empleado' => $actor['employee_id'] ?? '',
+      ]);
+      if ($history) {
+        $this->db->insert($historyTable, $history);
+      }
+    }
+
+    return [
+      'message' => 'Revisión correctiva #' . $reviewId . ' eliminada.',
+      'review_id' => (string) $reviewId,
+    ];
+  }
+
+  /** @param array<int,array<string,string>> $items @param array<int,array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}> $storedPhotos @return array<int,array<string,string>> */
+  private function correctiveReviewAttachUploadedPhotos(array $items, array &$storedPhotos): array
+  {
+    $photoTotal = 0;
+    foreach ($items as $index => &$item) {
+      $existingPhotos = $this->correctiveReviewSplitPhotoRefs((string) ($item['registro_foto_dano'] ?? ''));
+      $field = 'corrective_review_photos_' . $index;
+      $names = $_FILES[$field]['name'] ?? [];
+      $names = is_array($names) ? array_values(array_filter($names, static fn($name): bool => trim((string) $name) !== '')) : [];
+      if ((count($existingPhotos) + count($names)) > 10) {
+        throw new \DomainException('Cada daño admite máximo 10 fotos.');
+      }
+      $photoTotal += count($existingPhotos) + count($names);
+      if ($photoTotal > 30) {
+        throw new \DomainException('La revisión admite máximo 30 fotos en total.');
+      }
+      if ($names) {
+        $photos = $this->handleImageUploadsDetailed($field, 10);
+        if (count($photos) !== count($names)) {
+          throw new \DomainException('No se pudieron procesar todas las fotos. Usa imágenes JPG, PNG o WebP de máximo ' . (int) floor(SCM_UPLOAD_MAX_BYTES / 1048576) . ' MB cada una.');
+        }
+        foreach ($photos as $photo) {
+          if ($photo['mime'] !== 'image/jpeg' || $photo['width'] > 1600 || $photo['height'] > 1600 || $photo['bytes'] > 1500000) {
+            throw new \DomainException('Una foto no pudo comprimirse por debajo de 1,5 MB y 1600 px. Prueba con otra imagen.');
+          }
+        }
+        $storedPhotos = array_merge($storedPhotos, $photos);
+        $existingPhotos = array_merge($existingPhotos, array_map(static fn(array $photo): string => (string) $photo['url'], $photos));
+      }
+      $item['registro_foto_dano'] = implode(',', array_values(array_unique(array_filter($existingPhotos))));
+    }
+    unset($item);
+    return $items;
+  }
+
   /** @return array<int,array<string,string>> */
   private function correctiveReviewInputItems(): array
   {
@@ -255,7 +427,8 @@ trait HandlesCorrectiveReviewActions
       $nivel = $this->correctiveReviewText($raw['nivel_dano'] ?? '');
       $tiempo = $this->correctiveReviewText($raw['tiempo_atencion'] ?? '');
       $corresponde = $this->correctiveReviewText($raw['a_quien_corresponde'] ?? '');
-      if ($indice === '' && $area === '' && $descripcion === '' && $consecuencia === '' && $nivel === '' && $tiempo === '' && $corresponde === '') {
+      $existingPhotos = $this->correctiveReviewSafePhotoRefs($raw['existing_fotos'] ?? '');
+      if ($indice === '' && $area === '' && $descripcion === '' && $consecuencia === '' && $nivel === '' && $tiempo === '' && $corresponde === '' && !$existingPhotos) {
         continue;
       }
       foreach ([
@@ -284,7 +457,7 @@ trait HandlesCorrectiveReviewActions
         'area_afectada_2' => '',
         'area_afectada_3' => '',
         'area_afectada_4' => '',
-        'registro_foto_dano' => '',
+        'registro_foto_dano' => implode(',', $existingPhotos),
         'descripcion_dano' => $descripcion,
         'consecuencia' => $consecuencia,
         'nivel_dano' => $nivel,
@@ -298,6 +471,27 @@ trait HandlesCorrectiveReviewActions
       }
     }
     return $out;
+  }
+
+  /** @return array<string,mixed> */
+  private function correctiveReviewTargetRow(int $ticketId, int $reviewId): array
+  {
+    return $this->correctiveReviewTargetRowFromContext($this->correctiveReviewContext($ticketId), $reviewId);
+  }
+
+  /** @param array<string,mixed> $context @return array<string,mixed> */
+  private function correctiveReviewTargetRowFromContext(array $context, int $reviewId): array
+  {
+    if ($reviewId <= 0) {
+      throw new \DomainException('Selecciona una revisión correctiva válida.');
+    }
+    $reviews = is_array($context['reviews'] ?? null) ? $context['reviews'] : [];
+    foreach ($reviews as $review) {
+      if ((int) ($review['_ID'] ?? 0) === $reviewId) {
+        return $review;
+      }
+    }
+    throw new \DomainException('No se encontró la revisión correctiva de este caso.');
   }
 
   /** @return array<string,mixed> */
@@ -393,7 +587,7 @@ trait HandlesCorrectiveReviewActions
   }
 
   /** @param array<string,mixed> $context */
-  private function renderCorrectiveReviewPanel(array $context): string
+  private function renderCorrectiveReviewPanel(array $context, int $editReviewId = 0): string
   {
     $ticket = is_array($context['ticket'] ?? null) ? $context['ticket'] : [];
     $contract = is_array($context['contract'] ?? null) ? $context['contract'] : [];
@@ -405,6 +599,15 @@ trait HandlesCorrectiveReviewActions
     $contrato = ltrim($this->correctiveReviewFirstText([$ticket['contrato'] ?? '', $ticket['id_contrato'] ?? '', $contract['contrato'] ?? '']), '#');
     $inmueble = $this->correctiveReviewFirstText([$ticket['inmueble'] ?? '', $contract['inmueble'] ?? '']);
     $direccion = $this->correctiveReviewFirstText([$ticket['direccion'] ?? '', $contract['direccion'] ?? '', $property['direccion'] ?? '', $property['direccion_fisica'] ?? '']);
+    $editReview = [];
+    if ($editReviewId > 0) {
+      foreach ($reviews as $review) {
+        if ((int) ($review['_ID'] ?? 0) === $editReviewId) {
+          $editReview = $review;
+          break;
+        }
+      }
+    }
     $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
     ob_start();
     ?>
@@ -425,35 +628,81 @@ trait HandlesCorrectiveReviewActions
           <h3>Revisiones correctivas registradas</h3>
           <?php foreach ($reviews as $review): $id = trim((string) ($review['_ID'] ?? '')); ?>
             <article>
-              <strong>Revisión #<?= $h($id) ?></strong>
-              <span><?= $h($this->correctiveReviewDateLabel($review['fecha'] ?? $review['cct_created'] ?? '')) ?></span>
-              <?php if ($id !== ''): ?><a class="scm-acta-button scm-acta-secondary" href="<?= $h(self::DEFAULT_CORRECTIVA_URL . rawurlencode($id)) ?>" target="_blank" rel="noopener">Ver informe</a><?php endif; ?>
+              <div class="scm-corrective-existing-info">
+                <strong>Revisión #<?= $h($id) ?></strong>
+                <span><?= $h($this->correctiveReviewDateLabel($review['fecha'] ?? $review['cct_created'] ?? '')) ?></span>
+              </div>
+              <div class="scm-corrective-existing-actions">
+                <?php if ($id !== ''): ?><a class="scm-acta-button scm-acta-secondary" href="<?= $h(self::DEFAULT_CORRECTIVA_URL . rawurlencode($id)) ?>" target="_blank" rel="noopener">Ver informe</a><?php endif; ?>
+                <?php if ($id !== ''): ?><button type="button" class="scm-acta-button scm-acta-secondary" data-corrective-edit-review="<?= $h($id) ?>">Editar</button><?php endif; ?>
+                <?php if ($id !== ''): ?><button type="button" class="scm-acta-button scm-acta-danger" data-corrective-delete-review="<?= $h($id) ?>">Eliminar</button><?php endif; ?>
+              </div>
             </article>
           <?php endforeach; ?>
         </section>
       <?php endif; ?>
-      <form data-corrective-review-create autocomplete="off" enctype="multipart/form-data">
-        <input type="hidden" name="ticket_pk" value="<?= $h((string) $ticketId) ?>">
-        <section>
-          <h3>Nueva revisión correctiva</h3>
-          <div data-corrective-review-items>
-            <?= $this->renderCorrectiveReviewItem(0) ?>
+      <?php if ($editReview): ?>
+        <?php $editItems = $this->correctiveReviewStoredItems($editReview['evaluacion_de_danos'] ?? []); ?>
+        <form data-corrective-review-edit autocomplete="off" enctype="multipart/form-data">
+          <input type="hidden" name="ticket_pk" value="<?= $h((string) $ticketId) ?>">
+          <input type="hidden" name="review_id" value="<?= $h((string) $editReviewId) ?>">
+          <section>
+            <h3>Editando revisión #<?= $h((string) $editReviewId) ?></h3>
+            <p class="scm-acta-help">Al guardar se reemplazan los datos de la revisión. Las fotos que dejes marcadas se conservan; las nuevas se comprimen antes de subir.</p>
+            <div data-corrective-review-items>
+              <?php foreach (($editItems ?: [[]]) as $index => $item): ?>
+                <?= $this->renderCorrectiveReviewItem((int) $index, is_array($item) ? $item : []) ?>
+              <?php endforeach; ?>
+            </div>
+            <button type="button" class="scm-acta-button scm-acta-secondary" data-corrective-add-item>Agregar otro daño</button>
+          </section>
+          <div class="scm-acta-actions">
+            <button type="submit" class="scm-acta-button">Actualizar revisión correctiva</button>
+            <button type="button" class="scm-acta-button scm-acta-secondary" data-corrective-cancel-edit>Cancelar edición</button>
+            <span data-corrective-review-message aria-live="polite"></span>
           </div>
-          <button type="button" class="scm-acta-button scm-acta-secondary" data-corrective-add-item>Agregar otro daño</button>
-        </section>
-        <div class="scm-acta-actions">
-          <button type="submit" class="scm-acta-button">Guardar revisión correctiva</button>
+        </form>
+      <?php elseif (!$reviews): ?>
+        <form data-corrective-review-create autocomplete="off" enctype="multipart/form-data">
+          <input type="hidden" name="ticket_pk" value="<?= $h((string) $ticketId) ?>">
+          <section>
+            <h3>Nueva revisión correctiva</h3>
+            <div data-corrective-review-items>
+              <?= $this->renderCorrectiveReviewItem(0) ?>
+            </div>
+            <button type="button" class="scm-acta-button scm-acta-secondary" data-corrective-add-item>Agregar otro daño</button>
+          </section>
+          <div class="scm-acta-actions">
+            <button type="submit" class="scm-acta-button">Guardar revisión correctiva</button>
+            <span data-corrective-review-message aria-live="polite"></span>
+          </div>
+        </form>
+      <?php else: ?>
+        <div class="scm-acta-empty">
+          <strong>Este caso ya tiene revisión correctiva.</strong>
+          <span>Para modificarla usa Editar; si fue una prueba, usa Eliminar y luego podrás crear una nueva revisión.</span>
           <span data-corrective-review-message aria-live="polite"></span>
         </div>
-      </form>
+      <?php endif; ?>
     </div>
     <?php
     return (string) ob_get_clean();
   }
 
-  private function renderCorrectiveReviewItem(int $index): string
+  /** @param array<string,mixed> $item */
+  private function renderCorrectiveReviewItem(int $index, array $item = []): string
   {
     $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    $selected = static fn($actual, string $expected): string => trim((string) $actual) === $expected ? ' selected' : '';
+    $indice = $this->correctiveReviewText($item['indice'] ?? '');
+    $area = $this->correctiveReviewFirstText([
+      $item['area_afectada'] ?? '',
+      $item['area_afectada_1'] ?? '',
+      $item['area_afectada_2'] ?? '',
+      $item['area_afectada_3'] ?? '',
+      $item['area_afectada_4'] ?? '',
+    ]);
+    $photos = $this->correctiveReviewSplitPhotoRefs((string) ($item['registro_foto_dano'] ?? ''));
     ob_start();
     ?>
     <fieldset class="scm-acta-item scm-corrective-item" data-corrective-item>
@@ -462,50 +711,50 @@ trait HandlesCorrectiveReviewActions
         <label>Índice *
           <select name="items[<?= $h((string) $index) ?>][indice]" required>
             <option value="">Seleccionar índice</option>
-            <option value="Evaluacion de los daños en elementos arquitectonicos">Elementos arquitectónicos</option>
-            <option value="Evaluacion de los daños en elementos estructurales">Elementos estructurales</option>
-            <option value="Otros inconvenientes al inmueble accesos y usos conexos">Otros inconvenientes / accesos y usos conexos</option>
-            <option value="Servicios publicos">Servicios públicos</option>
+            <option value="Evaluacion de los daños en elementos arquitectonicos"<?= $selected($indice, 'Evaluacion de los daños en elementos arquitectonicos') ?>>Elementos arquitectónicos</option>
+            <option value="Evaluacion de los daños en elementos estructurales"<?= $selected($indice, 'Evaluacion de los daños en elementos estructurales') ?>>Elementos estructurales</option>
+            <option value="Otros inconvenientes al inmueble accesos y usos conexos"<?= $selected($indice, 'Otros inconvenientes al inmueble accesos y usos conexos') ?>>Otros inconvenientes / accesos y usos conexos</option>
+            <option value="Servicios publicos"<?= $selected($indice, 'Servicios publicos') ?>>Servicios públicos</option>
           </select>
         </label>
         <label>Área afectada *
-          <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada]" required placeholder="Ej. Cocina, baño, sala, medidor...">
+          <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada]" required placeholder="Ej. Cocina, baño, sala, medidor..." value="<?= $h($area) ?>">
         </label>
       </div>
       <div class="scm-acta-grid">
         <label>Descripción del daño *
-          <textarea name="items[<?= $h((string) $index) ?>][descripcion_dano]" rows="4" required></textarea>
+          <textarea name="items[<?= $h((string) $index) ?>][descripcion_dano]" rows="4" required><?= $h($this->correctiveReviewText($item['descripcion_dano'] ?? '')) ?></textarea>
         </label>
         <label>Consecuencia *
-          <textarea name="items[<?= $h((string) $index) ?>][consecuencia]" rows="4" required></textarea>
+          <textarea name="items[<?= $h((string) $index) ?>][consecuencia]" rows="4" required><?= $h($this->correctiveReviewText($item['consecuencia'] ?? '')) ?></textarea>
         </label>
       </div>
       <div class="scm-acta-grid">
         <label>Nivel del daño *
           <select name="items[<?= $h((string) $index) ?>][nivel_dano]" required>
             <option value="">Seleccionar nivel</option>
-            <option value="Leve">Leve</option>
-            <option value="Moderado">Moderado</option>
-            <option value="Grave">Grave</option>
+            <option value="Leve"<?= $selected($item['nivel_dano'] ?? '', 'Leve') ?>>Leve</option>
+            <option value="Moderado"<?= $selected($item['nivel_dano'] ?? '', 'Moderado') ?>>Moderado</option>
+            <option value="Grave"<?= $selected($item['nivel_dano'] ?? '', 'Grave') ?>>Grave</option>
           </select>
         </label>
         <label>Tiempo de atención *
           <select name="items[<?= $h((string) $index) ?>][tiempo_atencion]" required>
             <option value="">Seleccionar tiempo</option>
-            <option value="De inmediato">De inmediato</option>
-            <option value="1 a 3 días">1 a 3 días</option>
-            <option value="4 a 8 días">4 a 8 días</option>
-            <option value="Programable">Programable</option>
+            <option value="De inmediato"<?= $selected($item['tiempo_atencion'] ?? '', 'De inmediato') ?>>De inmediato</option>
+            <option value="1 a 3 días"<?= $selected($item['tiempo_atencion'] ?? '', '1 a 3 días') ?>>1 a 3 días</option>
+            <option value="4 a 8 días"<?= $selected($item['tiempo_atencion'] ?? '', '4 a 8 días') ?>>4 a 8 días</option>
+            <option value="Programable"<?= $selected($item['tiempo_atencion'] ?? '', 'Programable') ?>>Programable</option>
           </select>
         </label>
       </div>
       <label>¿A quién corresponde el daño?
         <select name="items[<?= $h((string) $index) ?>][a_quien_corresponde]">
           <option value="">Por definir</option>
-          <option value="Propietario">Propietario</option>
-          <option value="Arrendatario">Arrendatario</option>
-          <option value="Inmobiliaria">Inmobiliaria</option>
-          <option value="Copropiedad">Copropiedad</option>
+          <option value="Propietario"<?= $selected($item['a_quien_corresponde'] ?? '', 'Propietario') ?>>Propietario</option>
+          <option value="Arrendatario"<?= $selected($item['a_quien_corresponde'] ?? '', 'Arrendatario') ?>>Arrendatario</option>
+          <option value="Inmobiliaria"<?= $selected($item['a_quien_corresponde'] ?? '', 'Inmobiliaria') ?>>Inmobiliaria</option>
+          <option value="Copropiedad"<?= $selected($item['a_quien_corresponde'] ?? '', 'Copropiedad') ?>>Copropiedad</option>
         </select>
       </label>
       <div class="scm-acta-photo-field">
@@ -513,12 +762,78 @@ trait HandlesCorrectiveReviewActions
           <input type="file" name="corrective_review_photos_<?= $h((string) $index) ?>[]" accept="image/jpeg,image/png,image/webp" multiple data-corrective-photos>
         </label>
         <small>Máximo 10 fotos por daño y 30 por revisión. Se comprimen automáticamente antes de guardarlas.</small>
-        <div class="scm-acta-photo-preview" data-corrective-photo-preview></div>
+        <div class="scm-acta-photo-preview" data-corrective-photo-preview>
+          <?php foreach ($photos as $photoIndex => $photo): ?>
+            <figure data-corrective-existing-photo>
+              <img src="<?= $h($photo) ?>" alt="Foto guardada <?= $h((string) ($photoIndex + 1)) ?>">
+              <figcaption>Foto guardada</figcaption>
+              <input type="hidden" name="items[<?= $h((string) $index) ?>][existing_fotos][]" value="<?= $h($photo) ?>">
+              <button type="button" class="scm-acta-photo-remove" data-corrective-remove-existing-photo aria-label="Quitar foto guardada">×</button>
+            </figure>
+          <?php endforeach; ?>
+        </div>
       </div>
       <button type="button" class="scm-acta-remove" data-corrective-remove-item>Quitar este daño</button>
     </fieldset>
     <?php
     return (string) ob_get_clean();
+  }
+
+  /** @return array<int,array<string,mixed>> */
+  private function correctiveReviewStoredItems($raw): array
+  {
+    $items = [];
+    if (is_string($raw) && trim($raw) !== '') {
+      $unserialized = @unserialize($raw);
+      if (is_array($unserialized)) {
+        $items = $unserialized;
+      } else {
+        $json = json_decode($raw, true);
+        $items = is_array($json) ? $json : [];
+      }
+    } elseif (is_array($raw)) {
+      $items = $raw;
+    }
+    $out = [];
+    foreach ($items as $item) {
+      if (is_array($item)) {
+        $out[] = $item;
+      }
+      if (count($out) >= 30) {
+        break;
+      }
+    }
+    return $out;
+  }
+
+  /** @return array<int,string> */
+  private function correctiveReviewSafePhotoRefs($value): array
+  {
+    $refs = [];
+    if (is_array($value)) {
+      foreach ($value as $entry) {
+        foreach ($this->correctiveReviewSafePhotoRefs($entry) as $ref) {
+          $refs[$ref] = $ref;
+        }
+      }
+      return array_values($refs);
+    }
+    foreach (preg_split('/[,\r\n]+/', html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?: [] as $part) {
+      $ref = trim(strip_tags((string) $part));
+      if ($ref === '' || strlen($ref) > 2048 || preg_match('/[\x00<>"\']/', $ref)) {
+        continue;
+      }
+      if (preg_match('#^https?://#i', $ref) || str_starts_with($ref, '/') || str_starts_with($ref, 'file.php?')) {
+        $refs[$ref] = $ref;
+      }
+    }
+    return array_values($refs);
+  }
+
+  /** @return array<int,string> */
+  private function correctiveReviewSplitPhotoRefs(string $raw): array
+  {
+    return $this->correctiveReviewSafePhotoRefs($raw);
   }
 
   private function correctiveReviewText($value): string
