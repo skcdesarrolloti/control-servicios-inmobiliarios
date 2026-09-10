@@ -14,6 +14,7 @@ $checks = [
   'trait exists and defines ajax handler' => is_string($trait) && str_contains($trait, 'ajax_handler_corrective_review'),
   'trait does not call administrative report hook' => is_string($trait) && !str_contains($trait, 'reporte-administrativos-unificado'),
   'trait writes revision_correctiva CCT' => is_string($trait) && str_contains($trait, "jet_cct_revision_correctiva"),
+  'trait stores combined affected area on corrective review' => is_string($trait) && str_contains($trait, "'area_afectada' => \$areaAfectada") && str_contains($trait, 'correctiveReviewCombinedAreas'),
   'trait supports editing and deleting corrective reviews' => is_string($trait) && str_contains($trait, 'correctiveReviewUpdate') && str_contains($trait, 'correctiveReviewDelete'),
   'trait updates ticket revision field' => is_string($trait) && str_contains($trait, "'id_revision_correctiva'"),
   'trait records ticket history' => is_string($trait) && str_contains($trait, "jet_cct_historial_del_ticket"),

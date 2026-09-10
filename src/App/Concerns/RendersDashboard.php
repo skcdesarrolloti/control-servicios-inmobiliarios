@@ -3993,8 +3993,9 @@ trait RendersDashboard
         trim((string) ($damage['area_afectada_3'] ?? '')),
         trim((string) ($damage['area_afectada_4'] ?? '')),
       ]);
+      $areaTitle = $areas ? implode(', ', array_map(fn($area): string => $this->cotizacion_clean_text($area), $areas)) : 'Daño evaluado';
       $html .= '<article class="scm-cotizacion-damage-card">';
-      $html .= '<div class="scm-cotizacion-damage-title"><div><span>Hallazgo</span><strong>#' . esc_html((string) ($damageIndex + 1)) . '</strong></div><p>' . esc_html($this->cotizacion_clean_text($damage['area_afectada_1'] ?? 'Da&ntilde;o evaluado')) . '</p></div>';
+      $html .= '<div class="scm-cotizacion-damage-title"><div><span>Hallazgo</span><strong>#' . esc_html((string) ($damageIndex + 1)) . '</strong></div><p>' . esc_html($areaTitle) . '</p></div>';
       $html .= '<div class="scm-cotizacion-damage-head"><div><span>Índice</span><strong>' . esc_html($this->cotizacion_clean_text($damage['indice'] ?? '-')) . '</strong></div><div><span>Corresponde a</span><strong>' . esc_html($this->cotizacion_clean_text($damage['a_quien_corresponde'] ?? '-')) . '</strong></div><div><span>Nivel</span><strong>' . esc_html($this->cotizacion_clean_text($damage['nivel_dano'] ?? '-')) . '</strong></div><div><span>Tiempo de atención</span><strong>' . esc_html($this->cotizacion_clean_text($damage['tiempo_atencion'] ?? '-')) . '</strong></div></div>';
       $html .= '<div class="scm-cotizacion-native-tags">' . (empty($areas) ? '<span>-</span>' : implode('', array_map(fn($area): string => '<span>' . esc_html($this->cotizacion_clean_text($area)) . '</span>', $areas))) . '</div>';
       $html .= '<div class="scm-cotizacion-native-rich"><h4>Descripción del daño</h4>' . $this->cotizacion_rich_text($damage['descripcion_dano'] ?? '') . '<h4>Consecuencia</h4>' . $this->cotizacion_rich_text($damage['consecuencia'] ?? '') . '</div>';

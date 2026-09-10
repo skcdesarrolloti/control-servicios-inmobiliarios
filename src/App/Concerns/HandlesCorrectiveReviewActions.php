@@ -110,6 +110,7 @@ trait HandlesCorrectiveReviewActions
       $actor = $this->ticketCompletionActor();
       $now = time();
       $nowSql = date('Y-m-d H:i:s', $now);
+      $areaAfectada = $this->correctiveReviewCombinedAreas($items);
       $contract = is_array($context['contract'] ?? null) ? $context['contract'] : [];
       $property = is_array($context['property'] ?? null) ? $context['property'] : [];
       $ownerEmail = $this->correctiveReviewFirstText([$ticket['correo_propietario'] ?? '', $contract['correo_propietario'] ?? '']);
@@ -120,6 +121,7 @@ trait HandlesCorrectiveReviewActions
         'cct_status' => 'publish',
         'direccion' => $this->correctiveReviewFirstText([$ticket['direccion'] ?? '', $contract['direccion'] ?? '', $property['direccion'] ?? '', $property['direccion_fisica'] ?? '']),
         'tip_inm' => $this->correctiveReviewFirstText([$ticket['tipo_inmueble'] ?? '', $contract['tipo_inmueble'] ?? '', $property['tipo_inmueble'] ?? '']),
+        'area_afectada' => $areaAfectada,
         'evaluacion_de_danos' => serialize($items),
         'cct_author_id' => Auth::userId(),
         'cct_created' => $nowSql,
@@ -249,11 +251,13 @@ trait HandlesCorrectiveReviewActions
     $storedPhotos = [];
     try {
       $items = $this->correctiveReviewAttachUploadedPhotos($items, $storedPhotos);
+      $areaAfectada = $this->correctiveReviewCombinedAreas($items);
       $now = time();
       $nowSql = date('Y-m-d H:i:s', $now);
       $actor = $this->ticketCompletionActor();
       $update = $schema->filterTableData($reviewTable, [
         'evaluacion_de_danos' => serialize($items),
+        'area_afectada' => $areaAfectada,
         'cct_modified' => $nowSql,
         'cct_author_id' => Auth::userId(),
       ]);
@@ -834,6 +838,21 @@ trait HandlesCorrectiveReviewActions
   private function correctiveReviewSplitPhotoRefs(string $raw): array
   {
     return $this->correctiveReviewSafePhotoRefs($raw);
+  }
+
+  /** @param array<int,array<string,mixed>> $items */
+  private function correctiveReviewCombinedAreas(array $items): string
+  {
+    $areas = [];
+    foreach ($items as $item) {
+      foreach (['area_afectada', 'area_afectada_1', 'area_afectada_2', 'area_afectada_3', 'area_afectada_4'] as $key) {
+        $area = $this->correctiveReviewText($item[$key] ?? '');
+        if ($area !== '') {
+          $areas[$area] = $area;
+        }
+      }
+    }
+    return implode(', ', array_values($areas));
   }
 
   private function correctiveReviewText($value): string
