@@ -10992,8 +10992,123 @@
         });
     }
 
-    function openCotizacionNativeModal(button) {
-      var card = button.closest(".scm-cotizacion-card");
+    var cotizacionCardCache = {};
+
+    function findCotizacionCardById(scope, cotizacionId) {
+      if (!scope || !cotizacionId || !scope.querySelectorAll) return null;
+      var cards = scope.querySelectorAll(".scm-cotizacion-card[data-cotizacion-id]");
+      for (var i = 0; i < cards.length; i += 1) {
+        if (String(cards[i].getAttribute("data-cotizacion-id") || "") === String(cotizacionId)) {
+          return cards[i];
+        }
+      }
+      return null;
+    }
+
+    function loadCotizacionCardById(cotizacionId) {
+      cotizacionId = String(cotizacionId || "").trim();
+      if (!cotizacionId) {
+        return Promise.reject(new Error("Cotización inválida."));
+      }
+      var existing = findCotizacionCardById(root, cotizacionId);
+      if (existing) {
+        return Promise.resolve(existing);
+      }
+      if (cotizacionCardCache[cotizacionId]) {
+        return Promise.resolve(cotizacionCardCache[cotizacionId]);
+      }
+      if (!ajaxUrl || !actionCotizacionesMantenimiento) {
+        return Promise.reject(new Error("No se puede cargar la cotización en este momento."));
+      }
+      var fd = new FormData();
+      fd.append("action", actionCotizacionesMantenimiento);
+      fd.append("nonce", nonce);
+      fd.append("config", JSON.stringify(config));
+      fd.append("scmqt_cotizacion", cotizacionId);
+      fd.append("scmqt_per_page", "10");
+      return fetch(ajaxUrl, {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error(
+              (json && json.data && json.data.message) ||
+                "No se encontró la cotización.",
+            );
+          }
+          var holder = document.createElement("div");
+          holder.innerHTML = (json.data && json.data.cards) || "";
+          var card = findCotizacionCardById(holder, cotizacionId) || holder.querySelector(".scm-cotizacion-card");
+          if (!card) {
+            throw new Error("No se encontró la cotización.");
+          }
+          cotizacionCardCache[cotizacionId] = card;
+          return card;
+        });
+    }
+
+    function loadCotizacionCardsByTicket(ticketRef, fallbackCotizacionId) {
+      ticketRef = String(ticketRef || "").trim();
+      fallbackCotizacionId = String(fallbackCotizacionId || "").trim();
+      if (!ticketRef && fallbackCotizacionId) {
+        return loadCotizacionCardById(fallbackCotizacionId).then(function (card) {
+          return [card];
+        });
+      }
+      if (!ticketRef) {
+        return Promise.reject(new Error("Ticket inválido."));
+      }
+      if (!ajaxUrl || !actionCotizacionesMantenimiento) {
+        return Promise.reject(new Error("No se pueden cargar las cotizaciones en este momento."));
+      }
+      var fd = new FormData();
+      fd.append("action", actionCotizacionesMantenimiento);
+      fd.append("nonce", nonce);
+      fd.append("config", JSON.stringify(config));
+      fd.append("scmqt_ticket_exact", ticketRef);
+      fd.append("scmqt_per_page", "60");
+      return fetch(ajaxUrl, {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error(
+              (json && json.data && json.data.message) ||
+                "No se pudieron cargar las cotizaciones.",
+            );
+          }
+          var holder = document.createElement("div");
+          holder.innerHTML = (json.data && json.data.cards) || "";
+          var cards = Array.prototype.slice.call(
+            holder.querySelectorAll(".scm-cotizacion-card[data-cotizacion-id]"),
+          );
+          if (!cards.length && fallbackCotizacionId) {
+            return loadCotizacionCardById(fallbackCotizacionId).then(function (card) {
+              return [card];
+            });
+          }
+          cards.forEach(function (card) {
+            var id = card.getAttribute("data-cotizacion-id") || "";
+            if (id) {
+              cotizacionCardCache[id] = card;
+            }
+          });
+          return cards;
+        });
+    }
+
+    function openCotizacionNativeModal(button, resolvedCard) {
+      var card = resolvedCard || button.closest(".scm-cotizacion-card");
       var cotizacionId = button.getAttribute("data-cotizacion-id") || "";
       var sourceFuncionario = card
         ? card.querySelector('[data-scm-cotizacion-native-audience="funcionario"]')
@@ -11004,7 +11119,17 @@
       var content = sourceFuncionario ? sourceFuncionario.innerHTML : "";
       var title = "Cotización #" + (cotizacionId || "");
       if (!content) {
-        showToast("error", "No se encontró la información de la cotización.");
+        if (resolvedCard) {
+          showToast("error", "No se encontró la información de la cotización.");
+          return;
+        }
+        loadCotizacionCardById(cotizacionId)
+          .then(function (loadedCard) {
+            openCotizacionNativeModal(button, loadedCard);
+          })
+          .catch(function (err) {
+            showToast("error", err.message || "No se encontró la información de la cotización.");
+          });
         return;
       }
       if (!window.Swal) {
@@ -11183,6 +11308,154 @@
       });
     }
 
+    function ensureCotizacionHiddenCard(card) {
+      if (!card) return null;
+      var id = card.getAttribute("data-cotizacion-id") || "";
+      if (!id) return null;
+      var holder = root.querySelector("[data-scm-cotizacion-cache-holder]");
+      if (!holder) {
+        holder = document.createElement("div");
+        holder.setAttribute("data-scm-cotizacion-cache-holder", "1");
+        holder.setAttribute("aria-hidden", "true");
+        holder.style.display = "none";
+        root.appendChild(holder);
+      }
+      var existing = findCotizacionCardById(holder, id);
+      if (existing) {
+        return existing;
+      }
+      var clone = card.cloneNode(true);
+      holder.appendChild(clone);
+      return clone;
+    }
+
+    function triggerCotizacionRootAction(card, selector) {
+      var hiddenCard = ensureCotizacionHiddenCard(card);
+      var target = hiddenCard ? hiddenCard.querySelector(selector) : null;
+      if (!target) {
+        showToast("error", "No se encontró la acción de la cotización.");
+        return;
+      }
+      target.click();
+    }
+
+    function openCaseCotizacionesModal(button) {
+      var ticketPk = button.getAttribute("data-ticket-pk") || "";
+      var ticketLabel = button.getAttribute("data-ticket") || ticketPk;
+      var fallbackCotizacionId = button.getAttribute("data-cotizacion-id") || "";
+      var primaryTicketRef = ticketPk || ticketLabel;
+      var secondaryTicketRef = ticketPk && ticketLabel && ticketLabel !== ticketPk ? ticketLabel : "";
+      var loading = window.Swal && window.Swal.fire({
+        title: "Cargando cotizaciones",
+        text: "Consultando cotizaciones vinculadas al caso #" + (ticketLabel || ticketPk || "-") + ".",
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: function () {
+          if (window.Swal.showLoading) window.Swal.showLoading();
+        },
+      });
+      loadCotizacionCardsByTicket(primaryTicketRef, "")
+        .then(function (cards) {
+          if (!cards.length && secondaryTicketRef) {
+            return loadCotizacionCardsByTicket(secondaryTicketRef, "");
+          }
+          return cards;
+        })
+        .then(function (cards) {
+          if (!cards.length && fallbackCotizacionId) {
+            return loadCotizacionCardById(fallbackCotizacionId).then(function (card) {
+              return [card];
+            });
+          }
+          return cards;
+        })
+        .then(function (cards) {
+          if (!cards.length) {
+            throw new Error("Este caso no tiene cotizaciones registradas por id_ticket.");
+          }
+          var html =
+            '<div class="scm-case-cotizaciones-modal"><p class="scm-cotizacion-dialog-intro">Selecciona la cotización exacta del caso. Las acciones se aplican sobre el número de cotización elegido.</p>' +
+            cards.map(function (card) { return card.outerHTML; }).join("") +
+            "</div>";
+          if (!window.Swal) {
+            showToast("info", "Cotizaciones encontradas: " + cards.length);
+            return;
+          }
+          return window.Swal.fire({
+            title: "Cotizaciones del caso #" + (ticketLabel || ticketPk || "-"),
+            html: html,
+            width: "min(1180px, 96vw)",
+            showCloseButton: true,
+            confirmButtonText: "Cerrar",
+            buttonsStyling: false,
+            focusConfirm: false,
+            returnFocus: true,
+            customClass: {
+              popup: "scm-cotizacion-dialog scm-case-cotizaciones-swal",
+              title: "scm-cotizacion-dialog-title",
+              htmlContainer: "scm-cotizacion-dialog-body",
+              actions: "scm-cotizacion-dialog-actions",
+              confirmButton: "scm-cotizacion-dialog-confirm",
+              closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+            },
+            didOpen: function () {
+              var popup = window.Swal.getPopup();
+              if (!popup) return;
+              popup.addEventListener("click", function (event) {
+                var iframeBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-open-iframe]")
+                  : null;
+                if (iframeBtn) {
+                  event.preventDefault();
+                  openIframeModal(
+                    iframeBtn.getAttribute("data-iframe-url") || "",
+                    iframeBtn.getAttribute("data-iframe-title") || "",
+                    iframeBtn.hasAttribute("data-scm-compact-iframe"),
+                  );
+                  return;
+                }
+                var nativeBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-view-cotizacion-native]")
+                  : null;
+                if (nativeBtn) {
+                  event.preventDefault();
+                  openCotizacionNativeModal(nativeBtn);
+                  return;
+                }
+                var ordersBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-view-cotizacion-orders]")
+                  : null;
+                if (ordersBtn) {
+                  event.preventDefault();
+                  openCotizacionOrdersModal(ordersBtn.closest(".scm-cotizacion-card"));
+                  return;
+                }
+                var actionBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-cotizacion-response-standalone], [data-scm-approve-cotizacion], [data-scm-delete-cotizacion]")
+                  : null;
+                if (actionBtn) {
+                  event.preventDefault();
+                  var actionCard = actionBtn.closest(".scm-cotizacion-card");
+                  if (actionBtn.matches("[data-scm-cotizacion-response-standalone]")) {
+                    triggerCotizacionRootAction(actionCard, "[data-scm-cotizacion-response-standalone]");
+                  } else if (actionBtn.matches("[data-scm-approve-cotizacion]")) {
+                    triggerCotizacionRootAction(actionCard, "[data-scm-approve-cotizacion]");
+                  } else {
+                    triggerCotizacionRootAction(actionCard, "[data-scm-delete-cotizacion]");
+                  }
+                }
+              });
+            },
+          });
+        })
+        .catch(function (err) {
+          if (loading && window.Swal && window.Swal.isVisible && window.Swal.isVisible()) {
+            window.Swal.close();
+          }
+          showToast("error", err.message || "No se pudieron cargar las cotizaciones del caso.");
+        });
+    }
+
     root.addEventListener("click", function (e) {
       var linkedTicketCaseBtn =
         e.target && e.target.closest
@@ -11213,6 +11486,16 @@
           return;
         }
         window.scmOpenCase(caseButton);
+        return;
+      }
+
+      var caseCotizacionesBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-view-case-cotizaciones]")
+          : null;
+      if (caseCotizacionesBtn) {
+        e.preventDefault();
+        openCaseCotizacionesModal(caseCotizacionesBtn);
         return;
       }
 
@@ -11265,7 +11548,17 @@
       if (ordersBtn) {
         e.preventDefault();
         var card = ordersBtn.closest(".scm-cotizacion-card");
-        openCotizacionOrdersModal(card);
+        if (card) {
+          openCotizacionOrdersModal(card);
+          return;
+        }
+        loadCotizacionCardById(ordersBtn.getAttribute("data-cotizacion-id") || "")
+          .then(function (loadedCard) {
+            openCotizacionOrdersModal(loadedCard);
+          })
+          .catch(function (err) {
+            showToast("error", err.message || "No se pudieron cargar las órdenes.");
+          });
         return;
       }
 
@@ -11351,6 +11644,10 @@
           var responseData = res.value || {};
           var fd = new FormData();
           fd.append("ticket_pk", ticketPk);
+          fd.append(
+            "id_cotizacion",
+            responseBtn.getAttribute("data-cotizacion-id") || "",
+          );
           fd.append("estado", responseData.estado || "");
           fd.append("motivo", responseData.motivo || "");
           fd.append("financiacion", responseData.financiacion || "");

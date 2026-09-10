@@ -328,6 +328,17 @@ final class GenericTicketsCardView
     $prevUrl = ($preventivaBaseUrl !== '' && $prevFirstId !== '') ? esc_url($preventivaBaseUrl . rawurlencode($prevFirstId)) : '';
     $corrUrl = ($correctivaBaseUrl !== '' && $corrFirstId !== '') ? esc_url($correctivaBaseUrl . rawurlencode($corrFirstId)) : '';
     $cotzUrl = ($cotizacionBaseUrl !== '' && $cotzFirstId !== '') ? esc_url($cotizacionBaseUrl . rawurlencode($cotzFirstId)) : '';
+    $cotzOrderUrl = $cotzFirstId !== ''
+      ? 'https://sucasainmobiliaria.com.co/mi-cuenta/anadir-orden-de-mantenimiento/?id_cotizacion=' . rawurlencode($cotzFirstId) . '&id_inmueble=' . rawurlencode($idInmuebleWebRaw !== '' ? $idInmuebleWebRaw : $inmuebleRaw)
+      : '';
+    $actaBaseUrl = rtrim((string) (defined('SCM_BASE_URL') ? SCM_BASE_URL : ''), '/');
+    $cotzActaUrl = $cotzFirstId !== '' && $actaBaseUrl !== ''
+      ? $actaBaseUrl . '/crear-acta.php?' . http_build_query([
+        'ticket_pk' => (string) $ticketPk,
+        'id_cotizacion' => $cotzFirstId,
+        'source_flow' => 'approved_quote',
+      ], '', '&', PHP_QUERY_RFC3986)
+      : '';
     $cotEstadoParaRespuesta = $cotRespuestaEstadoRaw !== '' ? $cotRespuestaEstadoRaw : $cotEstadoRaw;
     $cotizacionPendienteRespuesta = $idCotz !== '' && in_array(strtolower($cotEstadoParaRespuesta), ['', 'esperando respuesta'], true);
     $isPreventivaTicket = $effectiveTabKey === 'preventiva' || $idPrev !== '' || stripos($temaRaw . ' ' . $asuntoRaw . ' ' . $descripcionRaw, 'preventiva') !== false;
@@ -402,6 +413,8 @@ final class GenericTicketsCardView
     $dataAttrs .= ' data-ticket-url="' . esc_attr($ticketUrl) . '"';
     $dataAttrs .= ' data-cotizacion-id="' . esc_attr($cotzFirstId) . '"';
     $dataAttrs .= ' data-cotizacion-url="' . esc_attr($cotzUrl) . '"';
+    $dataAttrs .= ' data-cotizacion-order-url="' . esc_attr($cotzOrderUrl) . '"';
+    $dataAttrs .= ' data-cotizacion-acta-url="' . esc_attr($cotzActaUrl) . '"';
     $dataAttrs .= ' data-cot-estado="' . esc_attr($cotEstadoRaw) . '"';
     $dataAttrs .= ' data-id-revision-correctiva="' . esc_attr($corrFirstId) . '"';
     $dataAttrs .= ' data-id-revision-preventiva="' . esc_attr($prevFirstId) . '"';

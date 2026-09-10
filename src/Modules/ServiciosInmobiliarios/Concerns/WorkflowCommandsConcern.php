@@ -141,7 +141,7 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = [], string $estadoCotizacion = '__keep__', string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', bool $generarActaNoAccesoPreventiva = false): array
+  public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = [], string $estadoCotizacion = '__keep__', string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', bool $generarActaNoAccesoPreventiva = false, int $targetCotizacionId = 0): array
   {
     $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, $this->schema, $ticketPk, $cerrarTicket, $estadoAdministrativo);
     if ($actError !== '') {
@@ -286,7 +286,8 @@ trait WorkflowCommandsConcern
         $observacionCotizacion !== '' ? $observacionCotizacion : 'Ninguna',
         $motivoCotizacion,
         $financiacionCotizacion,
-        $notifyTargets
+        $notifyTargets,
+        $targetCotizacionId
       );
       if (($cotResult['ok'] ?? '0') !== '1') {
         return $cotResult;
@@ -754,7 +755,7 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function saveCotizacionResponse(int $ticketPk, string $estado, string $observacion, string $motivo, string $financiacion, array $notifyTargets = []): array
+  public function saveCotizacionResponse(int $ticketPk, string $estado, string $observacion, string $motivo, string $financiacion, array $notifyTargets = [], int $targetCotizacionId = 0): array
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
@@ -769,6 +770,28 @@ trait WorkflowCommandsConcern
     if (empty($cotIds)) {
       return ['ok' => '0', 'message' => 'Este ticket no tiene cotizacion asociada.'];
     }
+    if ($targetCotizacionId > 0) {
+      $target = (string) $targetCotizacionId;
+      if (!in_array($target, $cotIds, true)) {
+        return ['ok' => '0', 'message' => 'La cotizacion seleccionada no pertenece a este ticket.'];
+      }
+      $cotIds = [$target];
+    }
+    $pendingCotIds = [];
+    foreach ($cotIds as $cotId) {
+      $cotizacionActual = $this->fetchCotizacion($cotTable, (string) $cotId);
+      if (!is_array($cotizacionActual)) {
+        continue;
+      }
+      $estadoActual = strtolower(trim((string) ($cotizacionActual['estado'] ?? $cotizacionActual['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
+      if (in_array($estadoActual, ['', 'esperando respuesta'], true)) {
+        $pendingCotIds[] = (string) $cotId;
+      }
+    }
+    if (empty($pendingCotIds)) {
+      return ['ok' => '0', 'message' => 'Solo se puede cambiar una cotizacion sin estado o en Esperando respuesta.'];
+    }
+    $cotIds = $pendingCotIds;
 
     $nowTs = time();
     $nowMysql = date('Y-m-d H:i:s', $nowTs);

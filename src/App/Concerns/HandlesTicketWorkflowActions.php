@@ -692,6 +692,7 @@ trait HandlesTicketWorkflowActions
     $observacionCotizacion = trim(wp_kses_post(stripslashes((string) ($_POST['observacion_cotizacion'] ?? ''))));
     $motivoCotizacion = trim(strip_tags(stripslashes((string) ($_POST['motivo_cotizacion'] ?? ''))));
     $financiacionCotizacion = trim(strip_tags(stripslashes((string) ($_POST['financiacion_cotizacion'] ?? ''))));
+    $targetCotizacionId = isset($_POST['id_cotizacion']) ? (int) $_POST['id_cotizacion'] : 0;
     $cerrarTicket = !empty($_POST['cerrar_ticket']) && (string) $_POST['cerrar_ticket'] === '1';
     $generarActaNoAccesoPreventiva = !empty($_POST['generar_acta_no_acceso_preventiva']) && (string) $_POST['generar_acta_no_acceso_preventiva'] === '1';
     $notifyRecipients = $this->parse_notify_recipients($_POST['notify_recipients'] ?? []);
@@ -710,7 +711,7 @@ trait HandlesTicketWorkflowActions
     $imagenes = $this->handleImageUploads('imagen', 10);
     $documentTitles = isset($_POST['documento_nombre']) && is_array($_POST['documento_nombre']) ? $_POST['documento_nombre'] : [];
     $documentos = $this->handleDocumentUploads('documento', $documentTitles, 10);
-    $result = $service->saveTicketResponse($ticketPk, $respuesta, $estadoAdministrativo, $cerrarTicket, $notifyRecipients, $imagenes, $documentos, $estadoCotizacion, $observacionCotizacion, $motivoCotizacion, $financiacionCotizacion, $generarActaNoAccesoPreventiva);
+    $result = $service->saveTicketResponse($ticketPk, $respuesta, $estadoAdministrativo, $cerrarTicket, $notifyRecipients, $imagenes, $documentos, $estadoCotizacion, $observacionCotizacion, $motivoCotizacion, $financiacionCotizacion, $generarActaNoAccesoPreventiva, $targetCotizacionId);
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta.'));
     }
@@ -723,6 +724,7 @@ trait HandlesTicketWorkflowActions
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $estado = trim(strip_tags(stripslashes((string) ($_POST['estado'] ?? ''))));
+    $targetCotizacionId = isset($_POST['id_cotizacion']) ? (int) $_POST['id_cotizacion'] : 0;
     $observacion = trim(wp_kses_post(stripslashes((string) ($_POST['observacion'] ?? 'Ninguna'))));
     $motivo = trim(strip_tags(stripslashes((string) ($_POST['motivo'] ?? ''))));
     $financiacion = trim(strip_tags(stripslashes((string) ($_POST['financiacion'] ?? ''))));
@@ -751,7 +753,7 @@ trait HandlesTicketWorkflowActions
     }
 
     $service = $this->get_seguimiento_service();
-    $result = $service->saveCotizacionResponse($ticketPk, $estado, $observacion, $motivo, $financiacion, $notifyRecipients);
+    $result = $service->saveCotizacionResponse($ticketPk, $estado, $observacion, $motivo, $financiacion, $notifyRecipients, $targetCotizacionId);
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta de cotizacion.'));
     }

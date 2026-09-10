@@ -1786,12 +1786,15 @@
     return cotEstado === "" || cotEstado === "esperando respuesta";
   }
 
-  function renderCotizacionInlineFields(hasCotizacion) {
+  function renderCotizacionInlineFields(hasCotizacion, cotizacionId) {
     if (!hasCotizacion) {
       return '<input type="hidden" name="estado_cotizacion" value="__keep__">';
     }
     return (
       '<section class="scm-cotizacion-response-inline" data-scm-cotizacion-response-fields>' +
+      '<input type="hidden" name="id_cotizacion" value="' +
+      escHtml(cotizacionId || "") +
+      '">' +
       '<div class="scm-cotizacion-response-head"><strong>Respuesta de cotizaci&oacute;n</strong><span>Opcional: si respondes aqu&iacute;, tambi&eacute;n se actualiza la cotizaci&oacute;n asociada.</span></div>' +
       '<div class="scm-seg-grid">' +
       '<label class="scm-seg-field"><span>Estado cotizaci&oacute;n</span><select name="estado_cotizacion"><option value="__keep__">Sin cambio</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
@@ -2589,7 +2592,7 @@
             escHtml(String(nextNoAccessCount)) +
             '</b>, se anexar&aacute; al caso y se enviar&aacute; por correo al arrendatario.</span></div><label class="scm-seg-check scm-preventiva-no-access-check"><input type="checkbox" name="generar_acta_no_acceso_preventiva" value="1"> Crear y enviar comunicaci&oacute;n de no autorizaci&oacute;n de revisi&oacute;n preventiva</label></section>'
           : "") +
-        renderCotizacionInlineFields(!isPublicPqr && caseCotizacionCanRespond(caseBtn)) +
+        renderCotizacionInlineFields(!isPublicPqr && caseCotizacionCanRespond(caseBtn), caseBtn.dataset.cotizacionId || "") +
         '<label class="scm-seg-field"><span>Imagenes (opcional)</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
         renderPasteEvidenceBox("imagen[]") +
         renderTicketDocumentFields() +
@@ -2617,6 +2620,9 @@
         '<form class="scm-cotizacion-response-form" method="post" autocomplete="off">' +
         '<input type="hidden" name="ticket_pk" value="' +
         escHtml(ticketPk) +
+        '">' +
+        '<input type="hidden" name="id_cotizacion" value="' +
+        escHtml(caseBtn.dataset.cotizacionId || "") +
         '">' +
         '<section class="scm-cotizacion-response-inline" data-scm-cotizacion-response-fields>' +
         '<label class="scm-seg-field"><span>Respuesta</span><select name="estado" required><option value="">Elige una respuesta</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
@@ -4497,9 +4503,6 @@
         }
         var cotizacionUrl = (btn.dataset.cotizacionUrl || "").trim();
         var cotizacionId = (btn.dataset.cotizacionId || "").trim();
-        var cotEstado = (btn.dataset.cotEstado || "").trim().toLowerCase();
-        var cotizacionSinResponder =
-          cotEstado === "" || cotEstado === "esperando respuesta";
         var statusBucket = (btn.dataset.statusBucket || "").trim();
         var calendarTicketPk = String(btn.dataset.ticketPk || "").trim();
         if (seguimientoWrap) {
@@ -4599,9 +4602,15 @@
             '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>',
           );
         }
-        if (!isPublicPqr && (cotizacionUrl || cotizacionId) && cotizacionSinResponder) {
+        if (!isPublicPqr && (calendarTicketPk || btn.dataset.ticket || cotizacionUrl || cotizacionId)) {
           quoteActionButtons.push(
-            '<button type="button" class="scm-case-work-btn" data-scm-open-cotizacion-response>Responder cotizaci&oacute;n</button>',
+            '<button type="button" class="scm-case-work-btn" data-scm-view-case-cotizaciones data-ticket-pk="' +
+            escHtml(calendarTicketPk || "") +
+            '" data-ticket="' +
+            escHtml(btn.dataset.ticket || "") +
+            '" data-cotizacion-id="' +
+            escHtml(cotizacionId) +
+            '">Gestionar cotizaciones del caso</button>',
           );
         }
         if (isPublicPqr && ticketUrl) {
@@ -4612,13 +4621,6 @@
             escHtml(ticketUrl) +
             '" data-iframe-title="Solicitud">Abrir solicitud original' +
             "</button>",
-          );
-        }
-        if (!isPublicPqr && cotizacionUrl) {
-          quoteActionButtons.push(
-            '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' +
-            escHtml(cotizacionUrl) +
-            '" data-iframe-title="Cotizaci&oacute;n">Abrir cotizaci&oacute;n</button>',
           );
         }
         var caseActionsHtml =

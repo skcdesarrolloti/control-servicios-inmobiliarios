@@ -546,6 +546,10 @@ trait HandlesMaintenanceActions
     if (!is_array($row)) {
       $this->jsonFail('Cotizacion no encontrada.');
     }
+    $currentEstado = strtolower(trim((string) ($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
+    if (!in_array($currentEstado, ['', 'esperando respuesta'], true)) {
+      $this->jsonFail('Solo se puede eliminar/desaprobar una cotizacion sin estado o en Esperando respuesta.');
+    }
 
     $now = time();
     $update = [
@@ -588,6 +592,10 @@ trait HandlesMaintenanceActions
     $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
     if (!is_array($row)) {
       $this->jsonFail('Cotizacion no encontrada.');
+    }
+    $currentEstado = strtolower(trim((string) ($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
+    if (!in_array($currentEstado, ['', 'esperando respuesta'], true)) {
+      $this->jsonFail('Solo se puede marcar como aprobada una cotizacion sin estado o en Esperando respuesta.');
     }
 
     $now = time();
@@ -759,14 +767,13 @@ trait HandlesMaintenanceActions
       ['Validez / duración', $this->cotizacion_days_label($row['valides_oferta'] ?? '') . ' / ' . $this->cotizacion_days_label($row['duracion'] ?? '')],
     ], [0.30, 0.70], 8);
 
-    $pdf->heading('Resumen económico');
     $administrationLabel = $isFuncionario && $porcentajeAdmon !== ''
       ? 'Administración (' . $porcentajeAdmon . '%)'
       : 'Administración';
     $ivaLabel = $isFuncionario && $porcentajeIva !== ''
       ? 'IVA sobre administración (' . $porcentajeIva . '%)'
       : 'IVA sobre administración';
-    $pdf->table(['Concepto', 'Valor'], [
+    $economicRows = [
       ['Materiales', $this->format_cop_currency($row['total_materiales'] ?? 0)],
       ['Mano de obra', $this->format_cop_currency($row['total_mano_obra'] ?? 0)],
       ['Equipos / maquinarias', $this->format_cop_currency($row['total_maquinarias'] ?? 0)],
@@ -774,28 +781,7 @@ trait HandlesMaintenanceActions
       [$administrationLabel, $this->format_cop_currency($row['total_admon'] ?? 0)],
       [$ivaLabel, $this->format_cop_currency($row['iva_admon'] ?? 0)],
       ['TOTAL COTIZACIÓN', $this->format_cop_currency($row['total'] ?? 0)],
-    ], [0.68, 0.32], 8, [1]);
-
-    if ($isFuncionario) {
-      $pdf->heading('Control de saldos');
-      $pdf->table(['Categoría', 'Presupuesto', 'Saldo'], [
-        ['Materiales', $this->format_cop_currency($row['total_materiales'] ?? 0), $this->format_cop_currency($row['saldo_materiales'] ?? 0)],
-        ['Mano de obra', $this->format_cop_currency($row['total_mano_obra'] ?? 0), $this->format_cop_currency($row['saldo_obra'] ?? 0)],
-        ['Equipos / maquinarias', $this->format_cop_currency($row['total_maquinarias'] ?? 0), $this->format_cop_currency($row['saldo_maquinarias'] ?? 0)],
-        ['Otros costos', $this->format_cop_currency($row['total_otros_costos'] ?? 0), $this->format_cop_currency($row['saldo_otros_costo'] ?? 0)],
-        ['TOTAL', $this->format_cop_currency(
-          $this->cotizacion_money_value($row, ['total_materiales'])
-            + $this->cotizacion_money_value($row, ['total_mano_obra'])
-            + $this->cotizacion_money_value($row, ['total_maquinarias'])
-            + $this->cotizacion_money_value($row, ['total_otros_costos'])
-        ), $this->format_cop_currency(
-          $this->cotizacion_money_value($row, ['saldo_materiales'])
-            + $this->cotizacion_money_value($row, ['saldo_obra'])
-            + $this->cotizacion_money_value($row, ['saldo_maquinarias'])
-            + $this->cotizacion_money_value($row, ['saldo_otros_costo'])
-        )],
-      ], [0.46, 0.27, 0.27], 8, [1, 2]);
-    }
+    ];
 
     $pdf->heading('Presupuesto detallado');
     foreach ([
@@ -823,6 +809,27 @@ trait HandlesMaintenanceActions
       $budgetRows[] = ['TOTAL ' . strtoupper((string) $section), $this->format_cop_currency($data['total'] ?? 0)];
       $pdf->line(strtoupper((string) $section), 9, 'F2');
       $pdf->table(['Descripción / proveedor', 'Valor'], $budgetRows, [0.74, 0.26], 8, [1]);
+    }
+
+    if ($isFuncionario) {
+      $pdf->heading('Control de saldos');
+      $pdf->table(['Categoría', 'Presupuesto', 'Saldo'], [
+        ['Materiales', $this->format_cop_currency($row['total_materiales'] ?? 0), $this->format_cop_currency($row['saldo_materiales'] ?? 0)],
+        ['Mano de obra', $this->format_cop_currency($row['total_mano_obra'] ?? 0), $this->format_cop_currency($row['saldo_obra'] ?? 0)],
+        ['Equipos / maquinarias', $this->format_cop_currency($row['total_maquinarias'] ?? 0), $this->format_cop_currency($row['saldo_maquinarias'] ?? 0)],
+        ['Otros costos', $this->format_cop_currency($row['total_otros_costos'] ?? 0), $this->format_cop_currency($row['saldo_otros_costo'] ?? 0)],
+        ['TOTAL', $this->format_cop_currency(
+          $this->cotizacion_money_value($row, ['total_materiales'])
+            + $this->cotizacion_money_value($row, ['total_mano_obra'])
+            + $this->cotizacion_money_value($row, ['total_maquinarias'])
+            + $this->cotizacion_money_value($row, ['total_otros_costos'])
+        ), $this->format_cop_currency(
+          $this->cotizacion_money_value($row, ['saldo_materiales'])
+            + $this->cotizacion_money_value($row, ['saldo_obra'])
+            + $this->cotizacion_money_value($row, ['saldo_maquinarias'])
+            + $this->cotizacion_money_value($row, ['saldo_otros_costo'])
+        )],
+      ], [0.46, 0.27, 0.27], 8, [1, 2]);
     }
 
     $revision = $this->cotizacion_revision_row($row);
@@ -918,6 +925,9 @@ trait HandlesMaintenanceActions
       }
       $pdf->table(['Orden', 'Proveedor', 'Actividad', 'Valor', 'Estado'], $orderRows, [0.11, 0.21, 0.36, 0.17, 0.15], 7, [3]);
     }
+
+    $pdf->heading('Resumen económico');
+    $pdf->table(['Concepto', 'Valor'], $economicRows, [0.68, 0.32], 8, [1]);
 
     $pdf->heading('Nota contractual');
     $pdf->paragraph('Cuando las reparaciones sean responsabilidad de los propietarios, el administrador informará la novedad. Si no se atiende dentro del plazo contractual, la administración podrá realizar la gestión y descontar el valor correspondiente del canon de arrendamiento, de acuerdo con el contrato de mandato vigente.', 8);
