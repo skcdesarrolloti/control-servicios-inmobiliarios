@@ -10986,19 +10986,19 @@
         window.Swal.showValidationMessage("Selecciona el tipo de orden.");
         return false;
       }
-      if (!concept) {
-        window.Swal.showValidationMessage("Escribe el concepto de la orden.");
-        return false;
-      }
       if (value <= 0) {
         window.Swal.showValidationMessage("El valor de la orden debe ser mayor a cero.");
         return false;
       }
       var balance = balances && balances[category] ? Number(balances[category].value || 0) : 0;
-      if (balance > 0 && value > balance) {
+      if (value > balance) {
         window.Swal.showValidationMessage(
           "El valor supera el saldo disponible para " + category.toLowerCase() + ": " + formatCotizacionOrderCurrency(balance) + ".",
         );
+        return false;
+      }
+      if (!concept) {
+        window.Swal.showValidationMessage("Escribe el concepto de la orden.");
         return false;
       }
       var requiredProvider = [
@@ -11046,7 +11046,7 @@
         '<div class="scm-cotizacion-order-balance" data-scm-order-balance>Selecciona un tipo de orden para ver el saldo disponible.</div>' +
         '<div class="scm-cotizacion-order-grid">' +
         '<label class="scm-cotizacion-dialog-field"><span>Tipo de orden <em>*</em></span><select name="categoria" id="scm-order-category"><option value="Mano de obra">Mano de obra</option><option value="Materiales">Materiales</option><option value="Maquinarias">Maquinarias</option><option value="Otros costos">Otros costos</option></select></label>' +
-        '<label class="scm-cotizacion-dialog-field"><span>Valor <em>*</em></span><input name="valor" id="scm-order-value" type="text" inputmode="numeric" placeholder="Ej: 250000"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Valor <em>*</em></span><input name="valor" id="scm-order-value" type="text" inputmode="numeric" placeholder="Ej: 250000" aria-describedby="scm-order-value-error"><small id="scm-order-value-error" class="scm-cotizacion-order-value-error" data-scm-order-value-error role="alert" aria-live="polite"></small></label>' +
         '<label class="scm-cotizacion-dialog-field is-wide"><span>Actividad</span><input name="actividad" id="scm-order-activity" type="text" readonly></label>' +
         '<label class="scm-cotizacion-dialog-field is-wide"><span>Concepto <em>*</em></span><textarea name="concepto" id="scm-order-concept" rows="3" placeholder="Describe qué trabajo se va a ordenar"></textarea></label>' +
         '<label class="scm-cotizacion-dialog-field is-wide"><span>Proveedor</span><select name="id_proveedor" id="scm-order-provider">' + options + "</select><small>Selecciona uno existente o deja “Proveedor nuevo” y completa los datos.</small></label>" +
@@ -11076,14 +11076,51 @@
       var category = cotizacionOrderField(form, "categoria");
       var provider = cotizacionOrderField(form, "id_proveedor");
       var activity = cotizacionOrderField(form, "actividad");
+      var valueField = cotizacionOrderField(form, "valor");
       var balanceBox = popup.querySelector("[data-scm-order-balance]");
-      function updateBalance() {
+      var valueError = popup.querySelector("[data-scm-order-value-error]");
+      var confirmButton = popup.querySelector(".swal2-confirm");
+      function currentOrderBalance() {
         var selected = category ? category.value : "Mano de obra";
-        if (activity) activity.value = cotizacionOrderDefaultActivity(selected);
         var info = balances && balances[selected] ? balances[selected] : null;
-        if (balanceBox) {
-          balanceBox.innerHTML = '<span>Saldo disponible de ' + escHtml(selected) + '</span><strong>' + escHtml(info && info.label ? info.label : formatCotizacionOrderCurrency(0)) + "</strong>";
+        return {
+          category: selected,
+          info: info,
+          value: info ? Number(info.value || 0) : 0,
+          label: info && info.label ? info.label : formatCotizacionOrderCurrency(0),
+        };
+      }
+      function validateOrderAmount(showEmpty) {
+        var balance = currentOrderBalance();
+        var amount = parseCotizacionOrderMoney(valueField ? valueField.value : "");
+        var isOver = amount > balance.value;
+        if (valueField) {
+          valueField.classList.toggle("is-invalid", isOver);
+          valueField.setAttribute("aria-invalid", isOver ? "true" : "false");
         }
+        if (balanceBox) {
+          balanceBox.classList.toggle("is-over", isOver);
+        }
+        if (valueError) {
+          valueError.textContent = isOver
+            ? "El valor supera el saldo disponible de " + balance.category.toLowerCase() + ". Máximo permitido: " + balance.label + "."
+            : (showEmpty && amount <= 0 ? "Ingresa un valor mayor a cero." : "");
+        }
+        if (confirmButton) {
+          confirmButton.disabled = isOver;
+          confirmButton.setAttribute("aria-disabled", isOver ? "true" : "false");
+          confirmButton.title = isOver ? "Corrige el valor para guardar la orden." : "";
+        }
+        return !isOver;
+      }
+      function updateBalance() {
+        var balance = currentOrderBalance();
+        var selected = balance.category;
+        if (activity) activity.value = cotizacionOrderDefaultActivity(selected);
+        if (balanceBox) {
+          balanceBox.innerHTML = '<span>Saldo disponible de ' + escHtml(selected) + '</span><strong>' + escHtml(balance.label) + "</strong>";
+        }
+        validateOrderAmount(false);
       }
       function fillProvider() {
         var selected = provider ? cotizacionOrderProviderById(providers, provider.value) : null;
@@ -11105,6 +11142,14 @@
         });
       }
       if (category) category.addEventListener("change", updateBalance);
+      if (valueField) {
+        valueField.addEventListener("input", function () {
+          validateOrderAmount(false);
+        });
+        valueField.addEventListener("blur", function () {
+          validateOrderAmount(true);
+        });
+      }
       if (provider) provider.addEventListener("change", fillProvider);
       updateBalance();
     }

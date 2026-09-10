@@ -752,7 +752,7 @@ trait HandlesMaintenanceActions
 
     $balanceColumn = $this->maintenance_order_balance_column($category);
     $currentBalance = $this->maintenance_order_money_value($cotizacion[$balanceColumn] ?? 0);
-    if ($currentBalance > 0 && $value > ($currentBalance + 0.01)) {
+    if ($value > ($currentBalance + 0.01)) {
       $this->jsonFail('El valor supera el saldo disponible para ' . strtolower($category) . '. Saldo: ' . $this->format_cop_currency($currentBalance) . '.');
     }
 

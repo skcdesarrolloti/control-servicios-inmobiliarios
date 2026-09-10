@@ -4953,6 +4953,13 @@
   cursor: not-allowed;
 }
 
+.scm-cotizacion-dialog-field input.is-invalid,
+.scm-cotizacion-dialog-field select.is-invalid,
+.scm-cotizacion-dialog-field textarea.is-invalid {
+  border-color: #dc2626;
+  background: #fff7f7;
+}
+
 .scm-cotizacion-dialog-field textarea {
   min-height: 120px;
   resize: vertical;
@@ -5031,6 +5038,23 @@
   font-weight: 900;
 }
 
+.scm-cotizacion-order-balance.is-over {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.scm-cotizacion-order-balance.is-over span,
+.scm-cotizacion-order-balance.is-over strong {
+  color: #991b1b;
+}
+
+.scm-cotizacion-order-value-error {
+  min-height: 16px;
+  color: #b91c1c !important;
+  font-weight: 800;
+}
+
 .scm-cotizacion-order-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5041,6 +5065,13 @@
   background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
   color: #fff;
   box-shadow: 0 12px 26px rgba(22, 163, 74, 0.22);
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-order-confirm:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .scm-cotizacion-orders-summary {
