@@ -738,7 +738,9 @@ trait HandlesCorrectiveReviewActions
             <?= $this->correctiveReviewRenderOptions($indiceOptions, $indice, 'Seleccionar índice') ?>
           </select>
         </label>
-        <label data-corrective-area-group data-corrective-area-for="area_afectada_1"<?= $activeAreaKey === 'area_afectada_1' ? '' : ' hidden' ?>>Área afectada *
+        <div class="scm-corrective-area-field">
+          <span>Área afectada *</span>
+          <div data-corrective-area-group data-corrective-area-for="area_afectada_1"<?= $activeAreaKey === 'area_afectada_1' ? '' : ' hidden' ?>>
           <?php if ($areaArquitectonicaOptions): ?>
             <select name="items[<?= $h((string) $index) ?>][area_afectada_1]" data-corrective-area-field<?= $activeAreaKey === 'area_afectada_1' ? ' required' : ' disabled' ?>>
               <?= $this->correctiveReviewRenderOptions($areaArquitectonicaOptions, $item['area_afectada_1'] ?? $item['area_afectada'] ?? '', 'Elige un área') ?>
@@ -746,8 +748,8 @@ trait HandlesCorrectiveReviewActions
           <?php else: ?>
             <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada_1]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_1'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_1' ? ' required' : ' disabled' ?>>
           <?php endif; ?>
-        </label>
-        <label data-corrective-area-group data-corrective-area-for="area_afectada_2"<?= $activeAreaKey === 'area_afectada_2' ? '' : ' hidden' ?>>Área afectada *
+          </div>
+          <div data-corrective-area-group data-corrective-area-for="area_afectada_2"<?= $activeAreaKey === 'area_afectada_2' ? '' : ' hidden' ?>>
           <?php if ($areaEstructuralOptions): ?>
             <select name="items[<?= $h((string) $index) ?>][area_afectada_2]" data-corrective-area-field<?= $activeAreaKey === 'area_afectada_2' ? ' required' : ' disabled' ?>>
               <?= $this->correctiveReviewRenderOptions($areaEstructuralOptions, $item['area_afectada_2'] ?? $item['area_afectada'] ?? '', 'Elige un área') ?>
@@ -755,13 +757,14 @@ trait HandlesCorrectiveReviewActions
           <?php else: ?>
             <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada_2]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_2'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_2' ? ' required' : ' disabled' ?>>
           <?php endif; ?>
-        </label>
-        <label data-corrective-area-group data-corrective-area-for="area_afectada_3"<?= $activeAreaKey === 'area_afectada_3' ? '' : ' hidden' ?>>Área afectada *
+          </div>
+          <div data-corrective-area-group data-corrective-area-for="area_afectada_3"<?= $activeAreaKey === 'area_afectada_3' ? '' : ' hidden' ?>>
           <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada_3]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_3'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_3' ? ' required' : ' disabled' ?>>
-        </label>
-        <label data-corrective-area-group data-corrective-area-for="area_afectada_4"<?= $activeAreaKey === 'area_afectada_4' ? '' : ' hidden' ?>>Área afectada *
+          </div>
+          <div data-corrective-area-group data-corrective-area-for="area_afectada_4"<?= $activeAreaKey === 'area_afectada_4' ? '' : ' hidden' ?>>
           <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada_4]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_4'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_4' ? ' required' : ' disabled' ?>>
-        </label>
+          </div>
+        </div>
       </div>
       <div class="scm-acta-grid">
         <label>Descripción del daño *

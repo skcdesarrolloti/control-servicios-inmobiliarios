@@ -77,6 +77,8 @@
 .scm-corrective-existing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .scm-acta-empty { display: grid; gap: 6px; margin: 18px 0 0; padding: 14px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; color: var(--acta-ink); }
 .scm-acta-empty span { color: var(--acta-muted); }
+.scm-corrective-area-field { display: grid; gap: 6px; font-weight: 600; margin: 12px 0; min-width: 0; }
+.scm-corrective-area-field [data-corrective-area-group][hidden] { display: none !important; }
 .scm-corrective-item select, .scm-corrective-item input, .scm-corrective-item textarea { color: var(--acta-ink); }
 @media (max-width: 720px) { .scm-corrective-summary { grid-template-columns: 1fr; } .scm-corrective-existing article { align-items: stretch; } .scm-corrective-existing-actions { width: 100%; } .scm-corrective-existing-actions .scm-acta-button { flex: 1 1 140px; } }
 .scm-acta-page { margin: 0; background: #eef2f7; padding: 24px 16px; }
