@@ -6,3 +6,4 @@
 - En los modales del panel, preferir popups internos y conservar el contexto del caso; evitar abrir pestañas nuevas si la acción puede resolverse dentro de la app.
 - Las imágenes cargadas desde formularios del panel deben comprimirse o validarse antes de guardarse para controlar peso y tamaño.
 - Las acciones destructivas como eliminar/archivar/anular deben pedir confirmación clara y dejar trazabilidad cuando el módulo ya maneja historial.
+- Cuando se replique dentro del panel una funcionalidad que viene de JetForm/JetEngine, revisar el JSON del formulario y, si usa `glossary_id`, consultar ese glosario en la base de datos para conservar campos dinámicos y opciones reales.

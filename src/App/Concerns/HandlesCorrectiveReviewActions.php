@@ -425,7 +425,18 @@ trait HandlesCorrectiveReviewActions
         continue;
       }
       $indice = $this->correctiveReviewText($raw['indice'] ?? '');
-      $area = $this->correctiveReviewText($raw['area_afectada'] ?? '');
+      $areas = [
+        'area_afectada_1' => $this->correctiveReviewText($raw['area_afectada_1'] ?? ''),
+        'area_afectada_2' => $this->correctiveReviewText($raw['area_afectada_2'] ?? ''),
+        'area_afectada_3' => $this->correctiveReviewText($raw['area_afectada_3'] ?? ''),
+        'area_afectada_4' => $this->correctiveReviewText($raw['area_afectada_4'] ?? ''),
+      ];
+      $legacyArea = $this->correctiveReviewText($raw['area_afectada'] ?? '');
+      $areaKey = $this->correctiveReviewAreaKeyForIndice($indice);
+      $area = $areas[$areaKey] ?? '';
+      if ($area === '') {
+        $area = $legacyArea !== '' ? $legacyArea : $this->correctiveReviewFirstText(array_values($areas));
+      }
       $descripcion = $this->correctiveReviewHtml($raw['descripcion_dano'] ?? '');
       $consecuencia = $this->correctiveReviewHtml($raw['consecuencia'] ?? '');
       $nivel = $this->correctiveReviewText($raw['nivel_dano'] ?? '');
@@ -437,7 +448,7 @@ trait HandlesCorrectiveReviewActions
       }
       foreach ([
         'indice' => $indice,
-        'area afectada' => $area,
+        'área afectada' => $area,
         'descripción del daño' => $descripcion,
         'consecuencia' => $consecuencia,
         'nivel del daño' => $nivel,
@@ -446,14 +457,6 @@ trait HandlesCorrectiveReviewActions
         if ($value === '') {
           throw new \DomainException('Completa ' . $label . ' en todos los daños.');
         }
-      }
-      $areaKey = 'area_afectada_1';
-      if (stripos($indice, 'estructurales') !== false) {
-        $areaKey = 'area_afectada_2';
-      } elseif (stripos($indice, 'otros inconvenientes') !== false) {
-        $areaKey = 'area_afectada_3';
-      } elseif (stripos($indice, 'servicios publicos') !== false || stripos($indice, 'servicios públicos') !== false) {
-        $areaKey = 'area_afectada_4';
       }
       $item = [
         'indice' => $indice,
@@ -697,14 +700,32 @@ trait HandlesCorrectiveReviewActions
   private function renderCorrectiveReviewItem(int $index, array $item = []): string
   {
     $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-    $selected = static fn($actual, string $expected): string => trim((string) $actual) === $expected ? ' selected' : '';
     $indice = $this->correctiveReviewText($item['indice'] ?? '');
-    $area = $this->correctiveReviewFirstText([
-      $item['area_afectada'] ?? '',
-      $item['area_afectada_1'] ?? '',
-      $item['area_afectada_2'] ?? '',
-      $item['area_afectada_3'] ?? '',
-      $item['area_afectada_4'] ?? '',
+    $activeAreaKey = $this->correctiveReviewAreaKeyForIndice($indice);
+    $indiceOptions = $this->correctiveReviewGlossaryOptions(585, [
+      'Evaluacion de los daños en elementos arquitectonicos' => 'Elementos arquitectónicos',
+      'Evaluacion de los daños en elementos estructurales' => 'Elementos estructurales',
+      'Otros inconvenientes al inmueble accesos y usos conexos' => 'Otros inconvenientes / accesos y usos conexos',
+      'Servicios publicos' => 'Servicios públicos',
+    ]);
+    $areaArquitectonicaOptions = $this->correctiveReviewGlossaryOptions(581, []);
+    $areaEstructuralOptions = $this->correctiveReviewGlossaryOptions(582, []);
+    $nivelOptions = $this->correctiveReviewGlossaryOptions(583, [
+      'Leve' => 'Leve',
+      'Moderado' => 'Moderado',
+      'Grave' => 'Grave',
+    ]);
+    $tiempoOptions = $this->correctiveReviewGlossaryOptions(584, [
+      'De inmediato' => 'De inmediato',
+      '1 a 3 días' => '1 a 3 días',
+      '4 a 8 días' => '4 a 8 días',
+      'Programable' => 'Programable',
+    ]);
+    $correspondeOptions = $this->correctiveReviewGlossaryOptions(619, [
+      'Propietario' => 'Propietario',
+      'Arrendatario' => 'Arrendatario',
+      'Inmobiliaria' => 'Inmobiliaria',
+      'Copropiedad' => 'Copropiedad',
     ]);
     $photos = $this->correctiveReviewSplitPhotoRefs((string) ($item['registro_foto_dano'] ?? ''));
     ob_start();
@@ -713,16 +734,33 @@ trait HandlesCorrectiveReviewActions
       <legend>Daño #<?= $h((string) ($index + 1)) ?></legend>
       <div class="scm-acta-grid">
         <label>Índice *
-          <select name="items[<?= $h((string) $index) ?>][indice]" required>
-            <option value="">Seleccionar índice</option>
-            <option value="Evaluacion de los daños en elementos arquitectonicos"<?= $selected($indice, 'Evaluacion de los daños en elementos arquitectonicos') ?>>Elementos arquitectónicos</option>
-            <option value="Evaluacion de los daños en elementos estructurales"<?= $selected($indice, 'Evaluacion de los daños en elementos estructurales') ?>>Elementos estructurales</option>
-            <option value="Otros inconvenientes al inmueble accesos y usos conexos"<?= $selected($indice, 'Otros inconvenientes al inmueble accesos y usos conexos') ?>>Otros inconvenientes / accesos y usos conexos</option>
-            <option value="Servicios publicos"<?= $selected($indice, 'Servicios publicos') ?>>Servicios públicos</option>
+          <select name="items[<?= $h((string) $index) ?>][indice]" required data-corrective-indice>
+            <?= $this->correctiveReviewRenderOptions($indiceOptions, $indice, 'Seleccionar índice') ?>
           </select>
         </label>
-        <label>Área afectada *
-          <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada]" required placeholder="Ej. Cocina, baño, sala, medidor..." value="<?= $h($area) ?>">
+        <label data-corrective-area-group data-corrective-area-for="area_afectada_1"<?= $activeAreaKey === 'area_afectada_1' ? '' : ' hidden' ?>>Área afectada *
+          <?php if ($areaArquitectonicaOptions): ?>
+            <select name="items[<?= $h((string) $index) ?>][area_afectada_1]" data-corrective-area-field<?= $activeAreaKey === 'area_afectada_1' ? ' required' : ' disabled' ?>>
+              <?= $this->correctiveReviewRenderOptions($areaArquitectonicaOptions, $item['area_afectada_1'] ?? $item['area_afectada'] ?? '', 'Elige un área') ?>
+            </select>
+          <?php else: ?>
+            <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada_1]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_1'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_1' ? ' required' : ' disabled' ?>>
+          <?php endif; ?>
+        </label>
+        <label data-corrective-area-group data-corrective-area-for="area_afectada_2"<?= $activeAreaKey === 'area_afectada_2' ? '' : ' hidden' ?>>Área afectada *
+          <?php if ($areaEstructuralOptions): ?>
+            <select name="items[<?= $h((string) $index) ?>][area_afectada_2]" data-corrective-area-field<?= $activeAreaKey === 'area_afectada_2' ? ' required' : ' disabled' ?>>
+              <?= $this->correctiveReviewRenderOptions($areaEstructuralOptions, $item['area_afectada_2'] ?? $item['area_afectada'] ?? '', 'Elige un área') ?>
+            </select>
+          <?php else: ?>
+            <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada_2]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_2'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_2' ? ' required' : ' disabled' ?>>
+          <?php endif; ?>
+        </label>
+        <label data-corrective-area-group data-corrective-area-for="area_afectada_3"<?= $activeAreaKey === 'area_afectada_3' ? '' : ' hidden' ?>>Área afectada *
+          <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada_3]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_3'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_3' ? ' required' : ' disabled' ?>>
+        </label>
+        <label data-corrective-area-group data-corrective-area-for="area_afectada_4"<?= $activeAreaKey === 'area_afectada_4' ? '' : ' hidden' ?>>Área afectada *
+          <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada_4]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_4'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_4' ? ' required' : ' disabled' ?>>
         </label>
       </div>
       <div class="scm-acta-grid">
@@ -736,29 +774,18 @@ trait HandlesCorrectiveReviewActions
       <div class="scm-acta-grid">
         <label>Nivel del daño *
           <select name="items[<?= $h((string) $index) ?>][nivel_dano]" required>
-            <option value="">Seleccionar nivel</option>
-            <option value="Leve"<?= $selected($item['nivel_dano'] ?? '', 'Leve') ?>>Leve</option>
-            <option value="Moderado"<?= $selected($item['nivel_dano'] ?? '', 'Moderado') ?>>Moderado</option>
-            <option value="Grave"<?= $selected($item['nivel_dano'] ?? '', 'Grave') ?>>Grave</option>
+            <?= $this->correctiveReviewRenderOptions($nivelOptions, $item['nivel_dano'] ?? '', 'Seleccionar nivel') ?>
           </select>
         </label>
         <label>Tiempo de atención *
           <select name="items[<?= $h((string) $index) ?>][tiempo_atencion]" required>
-            <option value="">Seleccionar tiempo</option>
-            <option value="De inmediato"<?= $selected($item['tiempo_atencion'] ?? '', 'De inmediato') ?>>De inmediato</option>
-            <option value="1 a 3 días"<?= $selected($item['tiempo_atencion'] ?? '', '1 a 3 días') ?>>1 a 3 días</option>
-            <option value="4 a 8 días"<?= $selected($item['tiempo_atencion'] ?? '', '4 a 8 días') ?>>4 a 8 días</option>
-            <option value="Programable"<?= $selected($item['tiempo_atencion'] ?? '', 'Programable') ?>>Programable</option>
+            <?= $this->correctiveReviewRenderOptions($tiempoOptions, $item['tiempo_atencion'] ?? '', 'Seleccionar tiempo') ?>
           </select>
         </label>
       </div>
       <label>¿A quién corresponde el daño?
         <select name="items[<?= $h((string) $index) ?>][a_quien_corresponde]">
-          <option value="">Por definir</option>
-          <option value="Propietario"<?= $selected($item['a_quien_corresponde'] ?? '', 'Propietario') ?>>Propietario</option>
-          <option value="Arrendatario"<?= $selected($item['a_quien_corresponde'] ?? '', 'Arrendatario') ?>>Arrendatario</option>
-          <option value="Inmobiliaria"<?= $selected($item['a_quien_corresponde'] ?? '', 'Inmobiliaria') ?>>Inmobiliaria</option>
-          <option value="Copropiedad"<?= $selected($item['a_quien_corresponde'] ?? '', 'Copropiedad') ?>>Copropiedad</option>
+          <?= $this->correctiveReviewRenderOptions($correspondeOptions, $item['a_quien_corresponde'] ?? '', 'Por definir') ?>
         </select>
       </label>
       <div class="scm-acta-photo-field">
@@ -781,6 +808,171 @@ trait HandlesCorrectiveReviewActions
     </fieldset>
     <?php
     return (string) ob_get_clean();
+  }
+
+  private function correctiveReviewAreaKeyForIndice(string $indice): string
+  {
+    $normalized = $this->correctiveReviewNormalizeKey($indice);
+    if (str_contains($normalized, 'estructurales')) {
+      return 'area_afectada_2';
+    }
+    if (str_contains($normalized, 'otros inconvenientes')) {
+      return 'area_afectada_3';
+    }
+    if (str_contains($normalized, 'servicios publicos')) {
+      return 'area_afectada_4';
+    }
+    return 'area_afectada_1';
+  }
+
+  /** @param array<string,string> $fallback @return array<string,string> */
+  private function correctiveReviewGlossaryOptions(int $glossaryId, array $fallback = []): array
+  {
+    static $cache = [];
+    if (array_key_exists($glossaryId, $cache)) {
+      return $cache[$glossaryId] ?: $fallback;
+    }
+    $options = [];
+    $table = $this->db->table('options');
+    if ($this->table_exists($table)) {
+      $raw = (string) ($this->db->getVar("SELECT `option_value` FROM `{$table}` WHERE `option_name` = ? LIMIT 1", ['jet_engine_glossaries']) ?? '');
+      $decoded = $this->correctiveReviewDecodeStorage($raw);
+      if (is_array($decoded)) {
+        $node = $this->correctiveReviewFindGlossaryNode($decoded, (string) $glossaryId);
+        if ($node) {
+          $options = $this->correctiveReviewExtractGlossaryOptions($node);
+        }
+      }
+    }
+    $cache[$glossaryId] = $options;
+    return $options ?: $fallback;
+  }
+
+  /** @param array<string,string> $options */
+  private function correctiveReviewRenderOptions(array $options, $selectedValue, string $placeholder): string
+  {
+    $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    $selected = trim((string) $selectedValue);
+    $html = '<option value="">' . $h($placeholder) . '</option>';
+    $hasSelected = $selected === '';
+    foreach ($options as $value => $label) {
+      $value = trim((string) $value);
+      $label = trim((string) $label);
+      if ($value === '' && $label === '') {
+        continue;
+      }
+      if ($value === '') {
+        $value = $label;
+      }
+      if ($label === '') {
+        $label = $value;
+      }
+      $isSelected = $selected !== '' && $selected === $value;
+      if ($isSelected) {
+        $hasSelected = true;
+      }
+      $html .= '<option value="' . $h($value) . '"' . ($isSelected ? ' selected' : '') . '>' . $h($label) . '</option>';
+    }
+    if (!$hasSelected && $selected !== '') {
+      $html .= '<option value="' . $h($selected) . '" selected>' . $h($selected) . '</option>';
+    }
+    return $html;
+  }
+
+  private function correctiveReviewDecodeStorage(string $raw)
+  {
+    $raw = trim($raw);
+    if ($raw === '') {
+      return [];
+    }
+    $unserialized = @unserialize($raw);
+    if (is_array($unserialized)) {
+      return $unserialized;
+    }
+    $json = json_decode($raw, true);
+    return is_array($json) ? $json : [];
+  }
+
+  /** @param mixed $node @return array<string,mixed> */
+  private function correctiveReviewFindGlossaryNode($node, string $glossaryId): array
+  {
+    if (!is_array($node)) {
+      return [];
+    }
+    foreach (['id', 'ID', '_id', '_ID', 'glossary_id', 'glossaryId'] as $key) {
+      if (isset($node[$key]) && (string) $node[$key] === $glossaryId) {
+        return $node;
+      }
+    }
+    if (isset($node[$glossaryId]) && is_array($node[$glossaryId])) {
+      return $node[$glossaryId];
+    }
+    foreach ($node as $child) {
+      $found = $this->correctiveReviewFindGlossaryNode($child, $glossaryId);
+      if ($found) {
+        return $found;
+      }
+    }
+    return [];
+  }
+
+  /** @param mixed $node @return array<string,string> */
+  private function correctiveReviewExtractGlossaryOptions($node): array
+  {
+    $out = [];
+    $this->correctiveReviewCollectGlossaryOptions($node, $out, false);
+    return $out;
+  }
+
+  /** @param mixed $node @param array<string,string> $out */
+  private function correctiveReviewCollectGlossaryOptions($node, array &$out, bool $insideOptions): void
+  {
+    if (!is_array($node)) {
+      return;
+    }
+    if (isset($node['value']) || isset($node['val'])) {
+      $value = $this->correctiveReviewText($node['value'] ?? $node['val'] ?? '');
+      $label = $this->correctiveReviewText($node['label'] ?? $node['title'] ?? $node['name'] ?? $node['text'] ?? $value);
+      if ($value !== '' && $label !== '' && !$this->correctiveReviewLooksLikeGlossaryMeta($value, $label)) {
+        $out[$value] = $label;
+      }
+    }
+    foreach ($node as $key => $child) {
+      if (is_string($key) && in_array($key, ['id', 'ID', '_id', '_ID', 'glossary_id', 'glossaryId', 'name', 'slug', 'type'], true)) {
+        continue;
+      }
+      $nextInsideOptions = $insideOptions || (is_string($key) && in_array($key, ['options', 'fields', 'items', 'choices', 'data'], true));
+      if ($insideOptions && is_string($key) && is_scalar($child) && trim($key) !== '' && trim((string) $child) !== '') {
+        $value = $this->correctiveReviewText($child);
+        $label = $this->correctiveReviewText($key);
+        if ($value !== '' && $label !== '' && !$this->correctiveReviewLooksLikeGlossaryMeta($value, $label)) {
+          $out[$value] = $label;
+        }
+        continue;
+      }
+      $this->correctiveReviewCollectGlossaryOptions($child, $out, $nextInsideOptions);
+    }
+  }
+
+  private function correctiveReviewLooksLikeGlossaryMeta(string $value, string $label): bool
+  {
+    $valueKey = $this->correctiveReviewNormalizeKey($value);
+    $labelKey = $this->correctiveReviewNormalizeKey($label);
+    if ($valueKey === $labelKey && in_array($valueKey, ['manual', 'custom', 'select', 'checkbox', 'radio'], true)) {
+      return true;
+    }
+    return in_array($labelKey, ['id', 'name', 'slug', 'type', 'source', 'options', 'fields'], true);
+  }
+
+  private function correctiveReviewNormalizeKey(string $value): string
+  {
+    $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $from = ['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ü', 'Ñ'];
+    $to = ['a', 'e', 'i', 'o', 'u', 'u', 'n', 'a', 'e', 'i', 'o', 'u', 'u', 'n'];
+    $value = str_replace($from, $to, $value);
+    $value = strtolower($value);
+    $value = preg_replace('/\s+/', ' ', $value) ?: '';
+    return trim($value);
   }
 
   /** @return array<int,array<string,mixed>> */

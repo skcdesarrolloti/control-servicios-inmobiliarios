@@ -2573,6 +2573,30 @@
           });
           return next;
         }
+        function normalizeCorrectiveIndice(value) {
+          return String(value || "")
+            .normalize ? String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : String(value || "").toLowerCase();
+        }
+        function areaKeyForCorrectiveIndice(value) {
+          var normalized = normalizeCorrectiveIndice(value);
+          if (normalized.indexOf("estructurales") !== -1) return "area_afectada_2";
+          if (normalized.indexOf("otros inconvenientes") !== -1) return "area_afectada_3";
+          if (normalized.indexOf("servicios publicos") !== -1) return "area_afectada_4";
+          return "area_afectada_1";
+        }
+        function syncCorrectiveAreaFields(item) {
+          if (!item) return;
+          var indice = item.querySelector("[data-corrective-indice]");
+          var active = areaKeyForCorrectiveIndice(indice ? indice.value : "");
+          item.querySelectorAll("[data-corrective-area-group]").forEach(function (group) {
+            var isActive = group.getAttribute("data-corrective-area-for") === active;
+            group.hidden = !isActive;
+            group.querySelectorAll("[data-corrective-area-field]").forEach(function (field) {
+              field.disabled = !isActive;
+              field.required = isActive;
+            });
+          });
+        }
 
         form.addEventListener("click", function (event) {
         var removePhoto = event.target.closest("[data-corrective-remove-photo]");
@@ -2619,10 +2643,13 @@
         });
         item.querySelector("[data-corrective-photo-preview]").innerHTML = "";
         list.appendChild(item);
+        syncCorrectiveAreaFields(item);
         });
         form.addEventListener("change", function (event) {
+        if (event.target.matches("[data-corrective-indice]")) syncCorrectiveAreaFields(event.target.closest("[data-corrective-item]"));
         if (event.target.matches("[data-corrective-photos]")) addFiles(event.target, Array.from(event.target.files || []));
         });
+        form.querySelectorAll("[data-corrective-item]").forEach(syncCorrectiveAreaFields);
         form.addEventListener("submit", function (event) {
         event.preventDefault();
         message("Comprimiendo fotos antes de guardar…", false);
