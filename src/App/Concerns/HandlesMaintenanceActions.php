@@ -818,11 +818,89 @@ trait HandlesMaintenanceActions
     $this->maintenance_order_update_cotizacion_balance($schema, $cotizacion, $category, $currentBalance, $value, $nowMysql);
     $this->maintenance_order_update_ticket($schema, $cotizacion, $orderId, $now, $nowMysql);
     $this->maintenance_order_insert_histories($schema, $cotizacion, $orderId, $category, $concept, $value, $user, $employeeId, $now, $nowMysql);
+    $queued = $this->maintenance_order_enqueue_created_notifications(
+      array_merge($orderData, [
+        '_ID' => (string) $orderId,
+        'id_cotizacion' => (string) $cotizacionId,
+        'id_ticket' => $this->maintenance_order_first([$cotizacion['id_ticket'] ?? '', $_POST['ticket_pk'] ?? '']),
+      ]),
+      $cotizacion,
+      $user,
+      $orderId
+    );
 
     $this->jsonOk([
-      'message' => 'Orden de mantenimiento #' . $orderId . ' creada.',
+      'message' => 'Orden de mantenimiento #' . $orderId . ' creada.' . ($queued > 0 ? ' Notificaciones en cola: ' . $queued . '.' : ''),
       'id_orden' => (string) $orderId,
       'id_cotizacion' => (string) $cotizacionId,
+      'notifications_queued' => $queued,
+    ]);
+  }
+
+  public function ajax_handler_cotizacion_order_response(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->maintenance_order_can_manage()) {
+      $this->jsonFail('No tienes permiso para responder ordenes de mantenimiento.');
+    }
+
+    $orderId = (int) ($_POST['id_orden'] ?? 0);
+    if ($orderId <= 0) {
+      $this->jsonFail('Orden invalida.');
+    }
+
+    $estado = $this->maintenance_order_response_state((string) ($_POST['estado'] ?? ''));
+    if ($estado === '') {
+      $this->jsonFail('Selecciona si la orden fue aprobada o desaprobada.');
+    }
+
+    $schema = new \SCM\Support\SchemaInspector($this->db);
+    $ordersTable = $this->db->table('jet_cct_ordenes');
+    if (!$schema->tableExists($ordersTable)) {
+      $this->jsonFail('La tabla de ordenes no esta disponible.');
+    }
+
+    $order = $this->db->getRow("SELECT * FROM `{$ordersTable}` WHERE `_ID` = ? LIMIT 1", [$orderId]);
+    if (!is_array($order)) {
+      $this->jsonFail('Orden no encontrada.');
+    }
+
+    $currentState = strtolower(trim((string) ($order['estado'] ?? '')));
+    if ($currentState !== '' && $currentState !== 'esperando respuesta') {
+      $this->jsonFail('Solo puedes responder una orden que este esperando respuesta.');
+    }
+
+    $now = time();
+    $nowMysql = date('Y-m-d H:i:s', $now);
+    $user = $this->maintenance_order_current_user_payload();
+    $userId = Auth::userId();
+    $employeeId = trim((string) (method_exists($this, 'current_employee_id') ? $this->current_employee_id() : ''));
+    if ($employeeId === '') {
+      $employeeId = (string) $userId;
+    }
+    $observacion = $this->maintenance_order_clean($_POST['observacion'] ?? '');
+
+    $update = [
+      'estado' => $estado,
+      'autorizador' => $user['nombre'],
+      'id_autorizador' => $employeeId,
+      'cct_modified' => $nowMysql,
+    ];
+    $update = $schema->filterTableData($ordersTable, $update);
+    if (empty($update)) {
+      $this->jsonFail('No hay campos disponibles para actualizar la orden.');
+    }
+    $this->db->update($ordersTable, $update, ['_ID' => $orderId]);
+
+    $updatedOrder = array_merge($order, $update);
+    $this->maintenance_order_insert_response_histories($schema, $updatedOrder, $estado, $observacion, $user, $employeeId, $now, $nowMysql);
+    $queued = $this->maintenance_order_enqueue_response_notifications($updatedOrder, $estado, $observacion, $user, $orderId);
+
+    $this->jsonOk([
+      'message' => 'Orden #' . $orderId . ' ' . strtolower($estado) . '.' . ($queued > 0 ? ' Notificaciones en cola: ' . $queued . '.' : ''),
+      'id_orden' => (string) $orderId,
+      'estado' => $estado,
+      'notifications_queued' => $queued,
     ]);
   }
 
@@ -1046,6 +1124,16 @@ trait HandlesMaintenanceActions
       'materiales' => 'Materiales',
       'maquinarias', 'maquinaria', 'equipos', 'equipos / maquinarias' => 'Maquinarias',
       'otros costos', 'otros costo' => 'Otros costos',
+      default => '',
+    };
+  }
+
+  private function maintenance_order_response_state(string $raw): string
+  {
+    $normalized = strtolower(trim(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $raw)));
+    return match ($normalized) {
+      'aprobada', 'aprobado', 'aprobar', 'si', 's', 'yes' => 'Aprobada',
+      'desaprobada', 'desaprobado', 'rechazada', 'rechazado', 'rechazar', 'no' => 'Desaprobada',
       default => '',
     };
   }
@@ -1346,6 +1434,217 @@ trait HandlesMaintenanceActions
         $this->db->insert($histInmuebleTable, $propertyPayload);
       }
     }
+  }
+
+  /** @param array<string,mixed> $order @param array<string,string> $user */
+  private function maintenance_order_insert_response_histories(\SCM\Support\SchemaInspector $schema, array $order, string $estado, string $observacion, array $user, string $employeeId, int $now, string $nowMysql): void
+  {
+    $orderId = trim((string) ($order['_ID'] ?? ''));
+    $ticketRef = trim((string) ($order['id_ticket'] ?? ''));
+    $category = trim((string) ($order['categoria'] ?? 'mantenimiento'));
+    $propertyRef = $this->maintenance_order_first([$order['id_inmueble'] ?? '', $order['inmueble'] ?? '']);
+    $detail = 'Se ha ' . ($estado === 'Aprobada' ? 'aprobado' : 'desaprobado') . ' la orden de ' . strtolower($category) . ($orderId !== '' ? ' #' . $orderId : '') . '.';
+    if ($observacion !== '') {
+      $detail .= ' Observacion: ' . $observacion;
+    }
+
+    $histTicketTable = $this->db->table('jet_cct_historial_del_ticket');
+    if ($schema->tableExists($histTicketTable)) {
+      $ticketPayload = [
+        'cct_status' => 'publish',
+        'cct_author_id' => $employeeId,
+        'cct_created' => $nowMysql,
+        'cct_modified' => $nowMysql,
+        'id_ticket' => $ticketRef,
+        'fecha' => $now,
+        'nombre' => $user['nombre'],
+        'correo' => $user['email'],
+        'celular' => $user['celular'],
+        'respuesta' => $detail,
+        'respuesta_cct_ticket' => $detail,
+        'id_cotizacion_mantenimiento' => trim((string) ($order['id_cotizacion'] ?? '')),
+        'id_empleado' => $employeeId,
+        'id_orden' => $orderId,
+        'fue_editada' => 'Si',
+      ];
+      $ticketPayload = $schema->filterTableData($histTicketTable, $ticketPayload);
+      if (!empty($ticketPayload)) {
+        $this->db->insert($histTicketTable, $ticketPayload);
+      }
+    }
+
+    $histInmuebleTable = $this->db->table('jet_cct_historial_del_inmueble');
+    if ($schema->tableExists($histInmuebleTable)) {
+      $propertyPayload = [
+        'cct_status' => 'publish',
+        'cct_author_id' => $employeeId,
+        'cct_created' => $nowMysql,
+        'cct_modified' => $nowMysql,
+        'id_empleado' => $employeeId,
+        'id_inmueble' => $propertyRef,
+        'fecha' => $now,
+        'tipo_reporte' => 'Mantenimiento',
+        'observacion' => $detail,
+        'observacion_his' => $detail,
+        'funcionario' => $user['nombre'],
+        'id_ticket' => $ticketRef,
+        'id_inmueble_data' => $propertyRef,
+      ];
+      $propertyPayload = $schema->filterTableData($histInmuebleTable, $propertyPayload);
+      if (!empty($propertyPayload)) {
+        $this->db->insert($histInmuebleTable, $propertyPayload);
+      }
+    }
+  }
+
+  /** @return array<int,array{name:string,email:string}> */
+  private function maintenance_order_internal_email_recipients(string $action): array
+  {
+    $selectedIds = array_map('strval', $this->internalNotificationRecipientsForAction($action));
+    if ($selectedIds === []) {
+      return [];
+    }
+
+    $selected = array_fill_keys($selectedIds, true);
+    $recipients = [];
+    foreach ($this->internalNotificationFuncionarioOptions() as $funcionario) {
+      $id = trim((string) ($funcionario['id'] ?? ''));
+      $email = trim((string) ($funcionario['email'] ?? ''));
+      if ($id === '' || !isset($selected[$id]) || $email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        continue;
+      }
+      $recipients[] = [
+        'name' => trim((string) ($funcionario['name'] ?? '')),
+        'email' => $email,
+      ];
+    }
+
+    return $this->maintenance_order_unique_email_recipients($recipients);
+  }
+
+  /** @param array<int,array{name:string,email:string}> $recipients @return array<int,array{name:string,email:string}> */
+  private function maintenance_order_unique_email_recipients(array $recipients): array
+  {
+    $seen = [];
+    $out = [];
+    foreach ($recipients as $recipient) {
+      $email = strtolower(trim((string) ($recipient['email'] ?? '')));
+      if ($email === '' || isset($seen[$email]) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        continue;
+      }
+      $seen[$email] = true;
+      $out[] = [
+        'name' => trim((string) ($recipient['name'] ?? '')),
+        'email' => $email,
+      ];
+    }
+    return $out;
+  }
+
+  private function maintenance_order_order_url(int $orderId): string
+  {
+    return 'https://sucasainmobiliaria.com.co/orden/?numero=' . rawurlencode((string) $orderId);
+  }
+
+  private function maintenance_order_email_html(string $title, array $lines, int $orderId): string
+  {
+    $items = '';
+    foreach ($lines as $label => $value) {
+      $items .= '<tr><td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#475569;font-weight:700;">' . esc_html((string) $label) . '</td><td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#0b1f3a;">' . esc_html((string) $value) . '</td></tr>';
+    }
+    $url = $this->maintenance_order_order_url($orderId);
+    return '<div style="margin:0;padding:24px;background:#f4f7fb;font-family:Arial,sans-serif;color:#0b1f3a;">'
+      . '<div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #dbe4ef;border-radius:16px;overflow:hidden;">'
+      . '<div style="padding:20px 24px;background:#0b1f3a;color:#ffffff;"><h1 style="margin:0;font-size:21px;">' . esc_html($title) . '</h1></div>'
+      . '<div style="padding:24px;"><p style="margin:0 0 16px;">Se registró una novedad de orden de mantenimiento en Control Servicios Inmobiliarios.</p>'
+      . '<table style="width:100%;border-collapse:collapse;margin:0 0 20px;">' . $items . '</table>'
+      . '<p style="text-align:center;margin:22px 0 0;"><a href="' . esc_url($url) . '" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#f97316;color:#ffffff;text-decoration:none;font-weight:700;">Ver orden</a></p>'
+      . '</div></div></div>';
+  }
+
+  /** @param array<string,mixed> $order @param array<string,mixed> $cotizacion @param array<string,string> $user */
+  private function maintenance_order_enqueue_created_notifications(array $order, array $cotizacion, array $user, int $orderId): int
+  {
+    $recipients = $this->maintenance_order_internal_email_recipients('orden_mantenimiento_creada');
+    if ($recipients === []) {
+      return 0;
+    }
+
+    $emails = array_column($recipients, 'email');
+    $category = trim((string) ($order['categoria'] ?? 'mantenimiento'));
+    $ticket = $this->maintenance_order_first([$order['id_ticket'] ?? '', $cotizacion['id_ticket'] ?? '']);
+    $subject = 'Orden de ' . strtolower($category) . ($ticket !== '' ? ' del caso #' . $ticket : '') . ' pendiente';
+    $html = $this->maintenance_order_email_html('Orden de mantenimiento creada', [
+      'Orden' => '#' . $orderId,
+      'Estado' => trim((string) ($order['estado'] ?? 'Esperando respuesta')),
+      'Caso' => $ticket !== '' ? '#' . $ticket : '-',
+      'Cotizacion' => '#' . trim((string) ($order['id_cotizacion'] ?? $cotizacion['_ID'] ?? '-')),
+      'Inmueble' => $this->maintenance_order_first([$order['inmueble'] ?? '', $order['id_inmueble'] ?? '', $cotizacion['inmueble'] ?? '', $cotizacion['id_inmueble'] ?? '']),
+      'Proveedor' => trim((string) ($order['proveedor'] ?? '-')),
+      'Categoria' => $category !== '' ? $category : '-',
+      'Valor' => $this->format_cop_currency($order['valor'] ?? 0),
+      'Creada por' => trim((string) ($user['nombre'] ?? '-')),
+    ], $orderId);
+
+    return (new \SCM\Support\EmailQueue($this->db))->enqueue($emails, $subject, $html, [
+      'source_module' => 'ordenes_mantenimiento',
+      'dedupe_key' => 'orden-mantenimiento-creada:' . $orderId,
+      'meta' => [
+        'event' => 'orden_mantenimiento_creada',
+        'id_orden' => $orderId,
+        'id_cotizacion' => trim((string) ($order['id_cotizacion'] ?? $cotizacion['_ID'] ?? '')),
+        'id_ticket' => $ticket,
+        'categoria' => $category,
+        'actor' => trim((string) ($user['nombre'] ?? '')),
+      ],
+    ]);
+  }
+
+  /** @param array<string,mixed> $order @param array<string,string> $user */
+  private function maintenance_order_enqueue_response_notifications(array $order, string $estado, string $observacion, array $user, int $orderId): int
+  {
+    $recipients = $this->maintenance_order_internal_email_recipients('respuesta_orden_mantenimiento');
+    $creatorEmail = trim((string) ($order['email_creador'] ?? ''));
+    if ($creatorEmail !== '' && filter_var($creatorEmail, FILTER_VALIDATE_EMAIL)) {
+      $recipients[] = [
+        'name' => trim((string) ($order['creador'] ?? '')),
+        'email' => $creatorEmail,
+      ];
+    }
+    $recipients = $this->maintenance_order_unique_email_recipients($recipients);
+    if ($recipients === []) {
+      return 0;
+    }
+
+    $emails = array_column($recipients, 'email');
+    $category = trim((string) ($order['categoria'] ?? 'mantenimiento'));
+    $ticket = trim((string) ($order['id_ticket'] ?? ''));
+    $subject = 'Orden de ' . strtolower($category) . ($ticket !== '' ? ' del caso #' . $ticket : '') . ' ' . strtolower($estado);
+    $html = $this->maintenance_order_email_html('Respuesta de orden de mantenimiento', [
+      'Orden' => '#' . $orderId,
+      'Respuesta' => $estado,
+      'Caso' => $ticket !== '' ? '#' . $ticket : '-',
+      'Cotizacion' => '#' . trim((string) ($order['id_cotizacion'] ?? '-')),
+      'Proveedor' => trim((string) ($order['proveedor'] ?? '-')),
+      'Categoria' => $category !== '' ? $category : '-',
+      'Valor' => $this->format_cop_currency($order['valor'] ?? 0),
+      'Respondida por' => trim((string) ($user['nombre'] ?? '-')),
+      'Observacion' => $observacion !== '' ? $observacion : '-',
+    ], $orderId);
+
+    return (new \SCM\Support\EmailQueue($this->db))->enqueue($emails, $subject, $html, [
+      'source_module' => 'ordenes_mantenimiento',
+      'dedupe_key' => 'orden-mantenimiento-respuesta:' . $orderId . ':' . strtolower($estado),
+      'meta' => [
+        'event' => 'respuesta_orden_mantenimiento',
+        'id_orden' => $orderId,
+        'id_cotizacion' => trim((string) ($order['id_cotizacion'] ?? '')),
+        'id_ticket' => $ticket,
+        'categoria' => $category,
+        'estado' => $estado,
+        'actor' => trim((string) ($user['nombre'] ?? '')),
+      ],
+    ]);
   }
 
   /** @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders */

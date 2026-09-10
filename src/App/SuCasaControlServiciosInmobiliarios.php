@@ -32,6 +32,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_APPROVE_COTIZACION = 'scm_aprobar_cotizacion_mantenimiento';
   const AJAX_COTIZACION_ORDER_CONTEXT = 'scm_cotizacion_order_context';
   const AJAX_COTIZACION_ORDER_SAVE = 'scm_cotizacion_order_save';
+  const AJAX_COTIZACION_ORDER_RESPONSE = 'scm_cotizacion_order_response';
   const AJAX_COTIZACION_MANTENIMIENTO_PDF = 'scm_cotizacion_mantenimiento_pdf';
   const AJAX_ACTIVATE_TICKET = 'scm_activar_ticket';
   const AJAX_COTIZACION_RESPONSE = 'scm_responder_cotizacion';
@@ -267,6 +268,21 @@ final class SuCasaControlServiciosInmobiliarios
             'label' => 'Acta de servicios públicos',
             'description' => 'Cuando se genera una revisión nativa de servicios públicos y sus actas.',
             'channel' => 'Email interno',
+          ],
+        ],
+      ],
+      'mantenimiento' => [
+        'label' => 'Mantenimiento',
+        'items' => [
+          'orden_mantenimiento_creada' => [
+            'label' => 'Orden de mantenimiento creada',
+            'description' => 'Cuando se crea una orden desde una cotización aprobada.',
+            'channel' => 'Email interno en cola',
+          ],
+          'respuesta_orden_mantenimiento' => [
+            'label' => 'Respuesta de orden de mantenimiento',
+            'description' => 'Cuando una orden de mantenimiento se aprueba o se desaprueba.',
+            'channel' => 'Email interno en cola',
           ],
         ],
       ],

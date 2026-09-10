@@ -371,6 +371,7 @@ trait RendersDashboard
         'approve_cotizacion' => self::AJAX_APPROVE_COTIZACION,
         'cotizacion_order_context' => self::AJAX_COTIZACION_ORDER_CONTEXT,
         'cotizacion_order_save' => self::AJAX_COTIZACION_ORDER_SAVE,
+        'cotizacion_order_response' => self::AJAX_COTIZACION_ORDER_RESPONSE,
         'cotizacion_pdf' => self::AJAX_COTIZACION_MANTENIMIENTO_PDF,
         'activate_ticket' => self::AJAX_ACTIVATE_TICKET,
         'cotizacion_response' => self::AJAX_COTIZACION_RESPONSE,
@@ -3643,11 +3644,20 @@ trait RendersDashboard
         $orderDateTs = strtotime((string) ($order['cct_created'] ?? '')) ?: 0;
       }
       $orderDate = $orderDateTs > 0 ? date('d/m/Y', $orderDateTs) : '-';
+      $orderPending = in_array(strtolower(trim($orderState)), ['', 'esperando respuesta'], true);
+      $orderResponseAttrs = ' data-order-id="' . esc_attr($orderId) . '"'
+        . ' data-order-number="' . esc_attr($orderId !== '' ? $orderId : '-') . '"'
+        . ' data-order-category="' . esc_attr($orderCategory) . '"'
+        . ' data-order-provider="' . esc_attr($orderProvider) . '"'
+        . ' data-order-value="' . esc_attr($this->format_cop_currency($order['valor'] ?? 0)) . '"';
       $ordersHtml .= '<article class="scm-cotizacion-order-card">'
         . '<div class="scm-cotizacion-order-card-head"><div><span>Orden de mantenimiento</span><strong>#' . esc_html($orderId !== '' ? $orderId : '-') . '</strong></div><span class="scm-cotizacion-order-state">' . esc_html($orderState !== '' ? $orderState : 'Sin estado') . '</span></div>'
         . '<div class="scm-cotizacion-order-card-body"><div><span>Proveedor</span><strong>' . esc_html($orderProvider !== '' ? $orderProvider : '-') . '</strong></div><div><span>Categor&iacute;a</span><strong>' . esc_html($orderCategory !== '' ? $orderCategory : '-') . '</strong></div><div><span>Fecha</span><strong>' . esc_html($orderDate) . '</strong></div><div><span>Valor</span><strong>' . esc_html($this->format_cop_currency($order['valor'] ?? 0)) . '</strong></div></div>'
         . '<p class="scm-cotizacion-order-activity">' . esc_html($orderActivity !== '' ? $orderActivity : 'Sin actividad registrada.') . '</p>'
+        . '<div class="scm-cotizacion-order-card-actions">'
         . '<button type="button" class="scm-cotizacion-order-view" data-scm-view-cotizacion-order="' . esc_attr($orderKey) . '" aria-label="Ver detalle de la orden ' . esc_attr($orderId !== '' ? '#' . $orderId : '') . '">Ver orden <span aria-hidden="true">&rarr;</span></button>'
+        . ($orderPending ? '<button type="button" class="scm-cotizacion-order-view scm-cotizacion-order-response" data-scm-respond-cotizacion-order' . $orderResponseAttrs . '>Responder orden</button>' : '')
+        . '</div>'
         . '</article>';
       $ordersHistoryHtml .= '<article class="scm-case-history-item"><div class="scm-case-history-meta"><strong>Orden #' . esc_html($orderId !== '' ? $orderId : '-') . '</strong><span>' . esc_html($orderState !== '' ? $orderState : '-') . '</span></div><div class="scm-case-history-detail"><p><strong>Proveedor:</strong> ' . esc_html($orderProvider !== '' ? $orderProvider : '-') . '</p><p><strong>Actividad:</strong> ' . esc_html($orderActivity !== '' ? $orderActivity : '-') . '</p><p><strong>Valor:</strong> ' . esc_html($this->format_cop_currency($order['valor'] ?? 0)) . '</p></div></article>';
       $orderDetailsHtml .= '<template class="scm-cotizacion-order-detail-source" data-scm-cotizacion-order-detail="' . esc_attr($orderKey) . '" data-order-number="' . esc_attr($orderId !== '' ? $orderId : '-') . '">' . $this->render_cotizacion_order_detail($order) . '</template>';
@@ -3753,6 +3763,9 @@ trait RendersDashboard
     $date = $dateTs > 0 ? date('d/m/Y h:i a', $dateTs) : '-';
     $createdTs = strtotime((string) ($order['cct_created'] ?? '')) ?: 0;
     $modifiedTs = strtotime((string) ($order['cct_modified'] ?? '')) ?: 0;
+    $state = $value('estado', '');
+    $isPending = in_array(strtolower(trim($state)), ['', 'esperando respuesta'], true);
+    $orderId = $value('_ID', '');
     $detailItem = static function (string $label, string $content, bool $wide = false): string {
       return '<div class="scm-cotizacion-order-detail-item' . ($wide ? ' is-wide' : '') . '"><span>' . esc_html($label) . '</span><strong>' . esc_html($content !== '' ? $content : '-') . '</strong></div>';
     };
@@ -3796,6 +3809,16 @@ trait RendersDashboard
     $html .= $detailItem('Creada', $createdTs > 0 ? date('d/m/Y h:i a', $createdTs) : '-');
     $html .= $detailItem('Última actualización', $modifiedTs > 0 ? date('d/m/Y h:i a', $modifiedTs) : '-');
     $html .= '</div></section></div>';
+    if ($isPending) {
+      $html .= '<div class="scm-cotizacion-order-detail-actions">'
+        . '<button type="button" class="scm-cotizacion-order-view scm-cotizacion-order-response" data-scm-respond-cotizacion-order'
+        . ' data-order-id="' . esc_attr($orderId) . '"'
+        . ' data-order-number="' . esc_attr($orderId !== '' ? $orderId : '-') . '"'
+        . ' data-order-category="' . esc_attr($value('categoria', '')) . '"'
+        . ' data-order-provider="' . esc_attr($value('proveedor', '')) . '"'
+        . ' data-order-value="' . esc_attr($this->format_cop_currency($order['valor'] ?? 0)) . '">Responder orden</button>'
+        . '</div>';
+    }
 
     return $html;
   }

@@ -147,6 +147,7 @@
     var actionApproveCotizacion = actions.approve_cotizacion || "";
     var actionCotizacionOrderContext = actions.cotizacion_order_context || "";
     var actionCotizacionOrderSave = actions.cotizacion_order_save || "";
+    var actionCotizacionOrderResponse = actions.cotizacion_order_response || "";
     var actionCotizacionPdf = actions.cotizacion_pdf || "";
     var actionActivateTicket = actions.activate_ticket || "";
     var actionCloseTicket = actions.close_ticket || "";
@@ -11597,6 +11598,7 @@
         return Promise.resolve();
       }
       var orderNumber = source.getAttribute("data-order-number") || orderKey;
+      var openedResponse = false;
       return window.Swal.fire({
         title: "Detalle de la orden #" + orderNumber,
         html: source.innerHTML,
@@ -11617,7 +11619,28 @@
           cancelButton: "scm-cotizacion-dialog-cancel",
           closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
         },
+        didOpen: function () {
+          var popup = window.Swal.getPopup();
+          if (!popup) return;
+          popup.addEventListener("click", function (event) {
+            var responseButton =
+              event.target && event.target.closest
+                ? event.target.closest("[data-scm-respond-cotizacion-order]")
+                : null;
+            if (!responseButton) return;
+            event.preventDefault();
+            openedResponse = true;
+            openCotizacionOrderResponseModal(responseButton, {
+              onClose: function (delayMs) {
+                reopenCotizacionOrdersAfter(card, options, delayMs);
+              },
+            });
+          });
+        },
       }).then(function (result) {
+        if (openedResponse) {
+          return result;
+        }
         if (result.dismiss === window.Swal.DismissReason.cancel) {
           return openCotizacionOrdersModal(card, options);
         }
@@ -11625,6 +11648,126 @@
           options.onClose();
         }
         return result;
+      });
+    }
+
+    function reopenCotizacionOrdersAfter(card, options, delayMs) {
+      var cotizacionId = card ? card.getAttribute("data-cotizacion-id") || "" : "";
+      window.setTimeout(function () {
+        if (cotizacionId) {
+          delete cotizacionCardCache[cotizacionId];
+          loadCotizacionCardById(cotizacionId)
+            .then(function (loadedCard) {
+              openCotizacionOrdersModal(loadedCard, options);
+            })
+            .catch(function () {
+              openCotizacionOrdersModal(card, options);
+            });
+          return;
+        }
+        openCotizacionOrdersModal(card, options);
+      }, typeof delayMs === "number" ? delayMs : 160);
+    }
+
+    function openCotizacionOrderResponseModal(button, options) {
+      options = options || {};
+      var orderId = button ? button.getAttribute("data-order-id") || "" : "";
+      var orderNumber = button ? button.getAttribute("data-order-number") || orderId : orderId;
+      var orderCategory = button ? button.getAttribute("data-order-category") || "mantenimiento" : "mantenimiento";
+      var orderProvider = button ? button.getAttribute("data-order-provider") || "-" : "-";
+      var orderValue = button ? button.getAttribute("data-order-value") || "-" : "-";
+      if (!ajaxUrl || !actionCotizacionOrderResponse || !orderId || !window.Swal) {
+        showToast("error", "No se pudo abrir la respuesta de la orden.");
+        if (typeof options.onClose === "function") {
+          options.onClose();
+        }
+        return Promise.resolve(false);
+      }
+      return window.Swal.fire({
+        title: "Responder orden #" + (orderNumber || orderId),
+        html:
+          '<div class="scm-cotizacion-response-form scm-cotizacion-order-response-form">' +
+          '<p class="scm-cotizacion-dialog-intro">Registra si esta orden fue aprobada o desaprobada. Solo se permite responder órdenes pendientes.</p>' +
+          '<div class="scm-cotizacion-order-response-summary"><div><span>Tipo</span><strong>' + escHtml(orderCategory) + '</strong></div><div><span>Proveedor</span><strong>' + escHtml(orderProvider) + '</strong></div><div><span>Valor</span><strong>' + escHtml(orderValue) + '</strong></div></div>' +
+          '<div class="scm-cotizacion-response-grid">' +
+          '<label class="scm-cotizacion-dialog-field"><span>Respuesta <em>*</em></span><select id="swal-order-estado"><option value="">Selecciona una respuesta</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
+          '<label class="scm-cotizacion-dialog-field is-wide"><span>Observación interna</span><textarea id="swal-order-observacion" rows="5" placeholder="Agrega contexto para el equipo"></textarea><small>Esta observación queda en el historial del caso/inmueble y en la notificación interna.</small></label>' +
+          '</div></div>',
+        width: "min(700px, 94vw)",
+        showCloseButton: true,
+        showCancelButton: true,
+        allowOutsideClick: false,
+        allowEscapeKey: true,
+        confirmButtonText: "Guardar respuesta",
+        cancelButtonText: "Cancelar",
+        buttonsStyling: false,
+        focusConfirm: false,
+        returnFocus: true,
+        customClass: {
+          popup: "scm-cotizacion-dialog scm-cotizacion-response-swal scm-cotizacion-order-response-swal",
+          title: "scm-cotizacion-dialog-title",
+          htmlContainer: "scm-cotizacion-dialog-body",
+          actions: "scm-cotizacion-dialog-actions",
+          confirmButton: "scm-cotizacion-dialog-confirm scm-cotizacion-order-response-confirm",
+          cancelButton: "scm-cotizacion-dialog-cancel",
+          closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+        },
+        didOpen: function () {
+          var estado = document.getElementById("swal-order-estado");
+          var confirmButton = window.Swal.getConfirmButton ? window.Swal.getConfirmButton() : null;
+          var syncConfirm = function () {
+            var value = estado ? estado.value : "";
+            if (confirmButton) {
+              confirmButton.classList.toggle("is-success", value === "Aprobada");
+              confirmButton.classList.toggle("is-danger", value === "Desaprobada");
+              confirmButton.textContent =
+                value === "Aprobada"
+                  ? "Aprobar orden"
+                  : value === "Desaprobada"
+                    ? "Desaprobar orden"
+                    : "Guardar respuesta";
+            }
+          };
+          if (estado) {
+            estado.focus();
+            estado.addEventListener("change", syncConfirm);
+          }
+          syncConfirm();
+        },
+        preConfirm: function () {
+          var estado = document.getElementById("swal-order-estado");
+          var observacion = document.getElementById("swal-order-observacion");
+          if (!estado || !estado.value) {
+            window.Swal.showValidationMessage("Elige si la orden fue aprobada o desaprobada.");
+            return false;
+          }
+          return {
+            estado: estado.value,
+            observacion: observacion ? observacion.value : "",
+          };
+        },
+      }).then(function (res) {
+        if (!res.isConfirmed) {
+          if (typeof options.onClose === "function") {
+            options.onClose();
+          }
+          return false;
+        }
+        var responseData = res.value || {};
+        var fd = new FormData();
+        fd.append("id_orden", orderId);
+        fd.append("estado", responseData.estado || "");
+        fd.append("observacion", responseData.observacion || "");
+        return submitCotizacionAction(
+          fd,
+          actionCotizacionOrderResponse,
+          "Error guardando la respuesta de la orden.",
+        ).then(function (saved) {
+          if (saved && typeof options.onClose === "function") {
+            options.onClose(260);
+          }
+          return saved;
+        });
       });
     }
 
@@ -11658,6 +11801,20 @@
           var popup = window.Swal.getPopup();
           if (!popup) return;
           popup.addEventListener("click", function (event) {
+            var responseButton =
+              event.target && event.target.closest
+                ? event.target.closest("[data-scm-respond-cotizacion-order]")
+                : null;
+            if (responseButton) {
+              event.preventDefault();
+              openedDetail = true;
+              openCotizacionOrderResponseModal(responseButton, {
+                onClose: function (delayMs) {
+                  reopenCotizacionOrdersAfter(card, options, delayMs);
+                },
+              });
+              return;
+            }
             var orderButton =
               event.target && event.target.closest
                 ? event.target.closest("[data-scm-view-cotizacion-order]")
@@ -12014,6 +12171,16 @@
           .catch(function (err) {
             showToast("error", err.message || "No se pudieron cargar las órdenes.");
           });
+        return;
+      }
+
+      var respondCotizacionOrderBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-respond-cotizacion-order]")
+          : null;
+      if (respondCotizacionOrderBtn) {
+        e.preventDefault();
+        openCotizacionOrderResponseModal(respondCotizacionOrderBtn);
         return;
       }
 

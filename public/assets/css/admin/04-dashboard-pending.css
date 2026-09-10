@@ -5197,12 +5197,68 @@
   line-height: 1.55;
 }
 
+.scm-cotizacion-order-card-actions,
+.scm-cotizacion-order-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: center;
+}
+
 .scm-cotizacion-order-view {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
   justify-content: center;
   gap: 8px;
+}
+
+.scm-cotizacion-order-response,
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-order-response-confirm.is-success {
+  border-color: #16a34a;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #fff;
+  box-shadow: 0 9px 20px rgba(22, 163, 74, 0.22);
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-order-response-confirm.is-danger {
+  border-color: #b91c1c;
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: #fff;
+  box-shadow: 0 9px 20px rgba(185, 28, 28, 0.22);
+}
+
+.scm-cotizacion-order-response-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.scm-cotizacion-order-response-summary > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dbe4ef;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.scm-cotizacion-order-response-summary span {
+  display: block;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.scm-cotizacion-order-response-summary strong {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  color: #0b1f3a;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .scm-cotizacion-orders-empty {
@@ -5306,7 +5362,8 @@
   .scm-cotizacion-order-context,
   .scm-cotizacion-order-grid,
   .scm-cotizacion-orders-list,
-  .scm-cotizacion-order-detail-grid {
+  .scm-cotizacion-order-detail-grid,
+  .scm-cotizacion-order-response-summary {
     grid-template-columns: 1fr;
   }
 
