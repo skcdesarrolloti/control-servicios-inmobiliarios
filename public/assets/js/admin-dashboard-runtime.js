@@ -145,6 +145,8 @@
       actions.cotizaciones_mantenimiento || "";
     var actionDeleteCotizacion = actions.delete_cotizacion || "";
     var actionApproveCotizacion = actions.approve_cotizacion || "";
+    var actionCotizacionOrderContext = actions.cotizacion_order_context || "";
+    var actionCotizacionOrderSave = actions.cotizacion_order_save || "";
     var actionCotizacionPdf = actions.cotizacion_pdf || "";
     var actionActivateTicket = actions.activate_ticket || "";
     var actionCloseTicket = actions.close_ticket || "";
@@ -10898,6 +10900,314 @@
         });
     }
 
+    function formatCotizacionOrderCurrency(value) {
+      var number = Number(value || 0);
+      if (!isFinite(number)) number = 0;
+      try {
+        return new Intl.NumberFormat("es-CO", {
+          style: "currency",
+          currency: "COP",
+          maximumFractionDigits: 0,
+        }).format(number);
+      } catch (err) {
+        return "$" + Math.round(number).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      }
+    }
+
+    function parseCotizacionOrderMoney(value) {
+      var text = String(value || "").trim();
+      if (!text) return 0;
+      text = text.replace(/[^\d,.-]/g, "");
+      if (!text || text === "-") return 0;
+      var lastComma = text.lastIndexOf(",");
+      var lastDot = text.lastIndexOf(".");
+      if (lastComma > -1 && lastDot > -1) {
+        var decimal = lastComma > lastDot ? "," : ".";
+        var thousand = decimal === "," ? "." : ",";
+        text = text.split(thousand).join("");
+        text = text.replace(decimal, ".");
+      } else if (lastComma > -1) {
+        var commaParts = text.split(",");
+        text = commaParts[commaParts.length - 1].length <= 2
+          ? text.replace(/\./g, "").replace(",", ".")
+          : text.replace(/,/g, "");
+      } else if (lastDot > -1) {
+        var dotParts = text.split(".");
+        if (dotParts[dotParts.length - 1].length > 2) {
+          text = text.replace(/\./g, "");
+        }
+      }
+      var number = Number(text);
+      return isFinite(number) ? Math.max(0, number) : 0;
+    }
+
+    function cotizacionOrderDefaultActivity(category) {
+      if (category === "Materiales") {
+        return "MATERIAL PARA REALIZAR TRABAJOS CORRESPONDIENTES";
+      }
+      if (category === "Maquinarias") {
+        return "MAQUINARIA PARA REALIZAR TRABAJOS CORRESPONDIENTES";
+      }
+      if (category === "Otros costos") {
+        return "OTROS GASTOS PARA REALIZAR TRABAJOS CORRESPONDIENTES";
+      }
+      return "MANO DE OBRA PARA REALIZAR TRABAJOS CORRESPONDIENTES";
+    }
+
+    function cotizacionOrderProviderById(providers, id) {
+      id = String(id || "");
+      for (var i = 0; i < providers.length; i += 1) {
+        if (String(providers[i].id || "") === id) {
+          return providers[i];
+        }
+      }
+      return null;
+    }
+
+    function cotizacionOrderField(form, name) {
+      return form ? form.querySelector('[name="' + name + '"]') : null;
+    }
+
+    function setCotizacionOrderField(form, name, value) {
+      var field = cotizacionOrderField(form, name);
+      if (field) field.value = value || "";
+    }
+
+    function collectCotizacionOrderForm(form, balances) {
+      if (!form) {
+        window.Swal.showValidationMessage("No se encontro el formulario.");
+        return false;
+      }
+      var category = (cotizacionOrderField(form, "categoria") || {}).value || "";
+      var concept = ((cotizacionOrderField(form, "concepto") || {}).value || "").trim();
+      var valueField = cotizacionOrderField(form, "valor");
+      var value = parseCotizacionOrderMoney(valueField ? valueField.value : "");
+      if (!category) {
+        window.Swal.showValidationMessage("Selecciona el tipo de orden.");
+        return false;
+      }
+      if (!concept) {
+        window.Swal.showValidationMessage("Escribe el concepto de la orden.");
+        return false;
+      }
+      if (value <= 0) {
+        window.Swal.showValidationMessage("El valor de la orden debe ser mayor a cero.");
+        return false;
+      }
+      var balance = balances && balances[category] ? Number(balances[category].value || 0) : 0;
+      if (balance > 0 && value > balance) {
+        window.Swal.showValidationMessage(
+          "El valor supera el saldo disponible para " + category.toLowerCase() + ": " + formatCotizacionOrderCurrency(balance) + ".",
+        );
+        return false;
+      }
+      var requiredProvider = [
+        "proveedor",
+        "identificacion_proveedor",
+        "correo_proveedor",
+        "celular_proveedor",
+        "titular_proveedor",
+        "identificacion_cuenta_proveedor",
+        "cuenta_proveedor",
+        "correo_pago_proveedor",
+      ];
+      for (var i = 0; i < requiredProvider.length; i += 1) {
+        var requiredField = cotizacionOrderField(form, requiredProvider[i]);
+        if (!requiredField || !String(requiredField.value || "").trim()) {
+          window.Swal.showValidationMessage("Completa los datos obligatorios del proveedor.");
+          return false;
+        }
+      }
+      var data = new FormData(form);
+      data.set("valor", String(Math.round(value)));
+      if (!String(data.get("actividad") || "").trim()) {
+        data.set("actividad", cotizacionOrderDefaultActivity(category));
+      }
+      return data;
+    }
+
+    function buildCotizacionOrderFormHtml(context) {
+      var cotizacion = context.cotizacion || {};
+      var providers = Array.isArray(context.providers) ? context.providers : [];
+      var options = '<option value="">Proveedor nuevo</option>';
+      providers.forEach(function (provider) {
+        var name = provider.proveedor || ("Proveedor #" + (provider.id || ""));
+        options += '<option value="' + escHtml(provider.id || "") + '">' + escHtml(name) + "</option>";
+      });
+      return (
+        '<form id="scm-cotizacion-order-form" class="scm-cotizacion-order-form">' +
+        '<div class="scm-cotizacion-order-context">' +
+        '<div><span>Cotización</span><strong>#' + escHtml(cotizacion.id || "-") + "</strong></div>" +
+        '<div><span>Caso</span><strong>#' + escHtml(cotizacion.ticket_pk || "-") + "</strong></div>" +
+        '<div><span>Inmueble</span><strong>' + escHtml(cotizacion.inmueble || "-") + "</strong></div>" +
+        '<div><span>Dirección</span><strong>' + escHtml(cotizacion.direccion || "-") + "</strong></div>" +
+        "</div>" +
+        '<p class="scm-cotizacion-dialog-intro">Crea la orden desde la cotización aprobada. Se descuenta el saldo de la categoría elegida y se deja trazabilidad en el caso.</p>' +
+        '<div class="scm-cotizacion-order-balance" data-scm-order-balance>Selecciona un tipo de orden para ver el saldo disponible.</div>' +
+        '<div class="scm-cotizacion-order-grid">' +
+        '<label class="scm-cotizacion-dialog-field"><span>Tipo de orden <em>*</em></span><select name="categoria" id="scm-order-category"><option value="Mano de obra">Mano de obra</option><option value="Materiales">Materiales</option><option value="Maquinarias">Maquinarias</option><option value="Otros costos">Otros costos</option></select></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Valor <em>*</em></span><input name="valor" id="scm-order-value" type="text" inputmode="numeric" placeholder="Ej: 250000"></label>' +
+        '<label class="scm-cotizacion-dialog-field is-wide"><span>Actividad</span><input name="actividad" id="scm-order-activity" type="text" readonly></label>' +
+        '<label class="scm-cotizacion-dialog-field is-wide"><span>Concepto <em>*</em></span><textarea name="concepto" id="scm-order-concept" rows="3" placeholder="Describe qué trabajo se va a ordenar"></textarea></label>' +
+        '<label class="scm-cotizacion-dialog-field is-wide"><span>Proveedor</span><select name="id_proveedor" id="scm-order-provider">' + options + "</select><small>Selecciona uno existente o deja “Proveedor nuevo” y completa los datos.</small></label>" +
+        '<label class="scm-cotizacion-dialog-field"><span>Nombre proveedor <em>*</em></span><input name="proveedor" type="text"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Tipo identificación</span><input name="tipo_identificacion_proveedor" type="text" placeholder="CC / NIT / CE"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Identificación <em>*</em></span><input name="identificacion_proveedor" type="text"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Correo proveedor <em>*</em></span><input name="correo_proveedor" type="email"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Celular proveedor <em>*</em></span><input name="celular_proveedor" type="text"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Dirección proveedor</span><input name="direccion_proveedor" type="text"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Titular cuenta <em>*</em></span><input name="titular_proveedor" type="text"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Identificación titular <em>*</em></span><input name="identificacion_cuenta_proveedor" type="text"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Tipo cuenta</span><input name="tipo_cuenta_proveedor" type="text" placeholder="Ahorros / Corriente"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Número cuenta <em>*</em></span><input name="cuenta_proveedor" type="text"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Banco</span><input name="banco_proveedor" type="text"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Correo pago <em>*</em></span><input name="correo_pago_proveedor" type="email"></label>' +
+        "</div>" +
+        "</form>"
+      );
+    }
+
+    function wireCotizacionOrderForm(context) {
+      var popup = window.Swal ? window.Swal.getPopup() : null;
+      var form = popup ? popup.querySelector("#scm-cotizacion-order-form") : null;
+      if (!form) return;
+      var providers = Array.isArray(context.providers) ? context.providers : [];
+      var balances = context.cotizacion && context.cotizacion.balances ? context.cotizacion.balances : {};
+      var category = cotizacionOrderField(form, "categoria");
+      var provider = cotizacionOrderField(form, "id_proveedor");
+      var activity = cotizacionOrderField(form, "actividad");
+      var balanceBox = popup.querySelector("[data-scm-order-balance]");
+      function updateBalance() {
+        var selected = category ? category.value : "Mano de obra";
+        if (activity) activity.value = cotizacionOrderDefaultActivity(selected);
+        var info = balances && balances[selected] ? balances[selected] : null;
+        if (balanceBox) {
+          balanceBox.innerHTML = '<span>Saldo disponible de ' + escHtml(selected) + '</span><strong>' + escHtml(info && info.label ? info.label : formatCotizacionOrderCurrency(0)) + "</strong>";
+        }
+      }
+      function fillProvider() {
+        var selected = provider ? cotizacionOrderProviderById(providers, provider.value) : null;
+        [
+          "proveedor",
+          "tipo_identificacion_proveedor",
+          "identificacion_proveedor",
+          "correo_proveedor",
+          "celular_proveedor",
+          "direccion_proveedor",
+          "titular_proveedor",
+          "identificacion_cuenta_proveedor",
+          "tipo_cuenta_proveedor",
+          "cuenta_proveedor",
+          "banco_proveedor",
+          "correo_pago_proveedor",
+        ].forEach(function (name) {
+          setCotizacionOrderField(form, name, selected ? selected[name] || "" : "");
+        });
+      }
+      if (category) category.addEventListener("change", updateBalance);
+      if (provider) provider.addEventListener("change", fillProvider);
+      updateBalance();
+    }
+
+    function openCotizacionOrderFormModal(button, options) {
+      options = options || {};
+      var cotizacionId = button ? (button.getAttribute("data-cotizacion-id") || "") : "";
+      var ticketPk = button ? (button.getAttribute("data-ticket-pk") || "") : "";
+      if (!ajaxUrl || !actionCotizacionOrderContext || !actionCotizacionOrderSave || !cotizacionId || !window.Swal) {
+        showToast("error", "No se pudo abrir el formulario de orden.");
+        return Promise.resolve(false);
+      }
+      var fd = new FormData();
+      fd.append("action", actionCotizacionOrderContext);
+      fd.append("nonce", nonce);
+      fd.append("id_cotizacion", cotizacionId);
+      fd.append("ticket_pk", ticketPk);
+      window.Swal.fire({
+        title: "Cargando formulario de orden",
+        text: "Consultando cotización y proveedores.",
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: function () {
+          if (window.Swal.showLoading) window.Swal.showLoading();
+        },
+      });
+      var orderContext = null;
+      return fetch(ajaxUrl, {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin",
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error((json && json.data && json.data.message) || "No se pudo cargar el formulario de orden.");
+          }
+          var context = json.data || {};
+          orderContext = context;
+          return window.Swal.fire({
+            title: "Añadir orden de mantenimiento",
+            html: buildCotizacionOrderFormHtml(context),
+            width: "min(900px, 96vw)",
+            showCloseButton: true,
+            showCancelButton: true,
+            confirmButtonText: "Guardar orden",
+            cancelButtonText: "Cancelar",
+            buttonsStyling: false,
+            focusConfirm: false,
+            returnFocus: true,
+            customClass: {
+              popup: "scm-cotizacion-dialog scm-cotizacion-order-form-swal",
+              title: "scm-cotizacion-dialog-title",
+              htmlContainer: "scm-cotizacion-dialog-body",
+              actions: "scm-cotizacion-dialog-actions",
+              confirmButton: "scm-cotizacion-dialog-confirm scm-cotizacion-order-confirm",
+              cancelButton: "scm-cotizacion-dialog-cancel",
+              closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+            },
+            didOpen: function () {
+              wireCotizacionOrderForm(context);
+            },
+            preConfirm: function () {
+              var form = document.getElementById("scm-cotizacion-order-form");
+              return collectCotizacionOrderForm(form, context.cotizacion && context.cotizacion.balances ? context.cotizacion.balances : {});
+            },
+          });
+        })
+        .then(function (res) {
+          if (!res || !res.isConfirmed) {
+            if (typeof options.onClose === "function") {
+              options.onClose();
+            }
+            return false;
+          }
+          var formData = res.value;
+          formData.append("id_cotizacion", cotizacionId);
+          formData.append("ticket_pk", ticketPk || (orderContext && orderContext.cotizacion ? orderContext.cotizacion.ticket_pk || "" : ""));
+          return submitCotizacionAction(
+            formData,
+            actionCotizacionOrderSave,
+            "Error guardando la orden de mantenimiento.",
+          ).then(function (saved) {
+            if (saved && typeof options.onClose === "function") {
+              options.onClose(260);
+            }
+            return saved;
+          });
+        })
+        .catch(function (err) {
+          if (window.Swal && window.Swal.isVisible && window.Swal.isVisible()) {
+            window.Swal.close();
+          }
+          showToast("error", err.message || "No se pudo abrir el formulario de orden.");
+          if (typeof options.onClose === "function") {
+            options.onClose();
+          }
+          return false;
+        });
+    }
+
     function buildCotizacionPrintDocument(title, contentHtml, autoPrint) {
       var safeTitle = escHtml(title || "Cotización de mantenimiento");
       return (
@@ -11474,6 +11784,16 @@
               var popup = window.Swal.getPopup();
               if (!popup) return;
               popup.addEventListener("click", function (event) {
+                var orderBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-add-cotizacion-order]")
+                  : null;
+                if (orderBtn) {
+                  event.preventDefault();
+                  openCotizacionOrderFormModal(orderBtn, {
+                    onClose: makeCaseCotizacionesReturn(button),
+                  });
+                  return;
+                }
                 var iframeBtn = event.target && event.target.closest
                   ? event.target.closest("[data-scm-open-iframe]")
                   : null;
@@ -11576,6 +11896,16 @@
       if (caseCotizacionesBtn) {
         e.preventDefault();
         openCaseCotizacionesModal(caseCotizacionesBtn);
+        return;
+      }
+
+      var addCotizacionOrderBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-add-cotizacion-order]")
+          : null;
+      if (addCotizacionOrderBtn) {
+        e.preventDefault();
+        openCotizacionOrderFormModal(addCotizacionOrderBtn);
         return;
       }
 

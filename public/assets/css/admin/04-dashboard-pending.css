@@ -4932,6 +4932,7 @@
   font-style: normal;
 }
 
+.scm-cotizacion-dialog-field input,
 .scm-cotizacion-dialog-field select,
 .scm-cotizacion-dialog-field textarea {
   width: 100%;
@@ -4946,11 +4947,18 @@
   line-height: 1.45;
 }
 
+.scm-cotizacion-dialog-field input[readonly] {
+  background: #f1f5f9;
+  color: #334155;
+  cursor: not-allowed;
+}
+
 .scm-cotizacion-dialog-field textarea {
   min-height: 120px;
   resize: vertical;
 }
 
+.scm-cotizacion-dialog-field input:focus,
 .scm-cotizacion-dialog-field select:focus,
 .scm-cotizacion-dialog-field textarea:focus {
   border-color: #f59e0b;
@@ -4961,6 +4969,78 @@
   color: #64748b;
   font-size: 11px;
   line-height: 1.45;
+}
+
+.scm-cotizacion-order-form {
+  text-align: left;
+}
+
+.scm-cotizacion-order-context {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.scm-cotizacion-order-context > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dbe7f4;
+  border-radius: 13px;
+  background: #f8fbff;
+}
+
+.scm-cotizacion-order-context span,
+.scm-cotizacion-order-balance span {
+  display: block;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.scm-cotizacion-order-context strong {
+  display: block;
+  margin-top: 4px;
+  color: #0b1f3a;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.scm-cotizacion-order-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border: 1px solid #bbf7d0;
+  border-radius: 14px;
+  background: #f0fdf4;
+  color: #14532d;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.scm-cotizacion-order-balance strong {
+  color: #166534;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.scm-cotizacion-order-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-order-confirm {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(22, 163, 74, 0.22);
 }
 
 .scm-cotizacion-orders-summary {
@@ -5192,6 +5272,8 @@
   }
 
   .scm-cotizacion-response-grid,
+  .scm-cotizacion-order-context,
+  .scm-cotizacion-order-grid,
   .scm-cotizacion-orders-list,
   .scm-cotizacion-order-detail-grid {
     grid-template-columns: 1fr;

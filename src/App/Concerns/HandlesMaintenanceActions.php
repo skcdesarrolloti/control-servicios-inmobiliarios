@@ -671,6 +671,155 @@ trait HandlesMaintenanceActions
     ]);
   }
 
+  public function ajax_handler_cotizacion_order_context(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->maintenance_order_can_manage()) {
+      $this->jsonFail('No tienes permiso para crear ordenes de mantenimiento.');
+    }
+
+    $cotizacionId = (int) ($_POST['id_cotizacion'] ?? 0);
+    if ($cotizacionId <= 0) {
+      $this->jsonFail('Cotizacion invalida.');
+    }
+
+    $cotizacion = $this->maintenance_order_find_cotizacion($cotizacionId);
+    if (!is_array($cotizacion)) {
+      $this->jsonFail('Cotizacion no encontrada.');
+    }
+    if (strtolower(trim((string) ($cotizacion['estado'] ?? ''))) !== 'aprobada') {
+      $this->jsonFail('Solo puedes crear ordenes cuando la cotizacion esta aprobada.');
+    }
+
+    $this->jsonOk([
+      'cotizacion' => $this->maintenance_order_context_payload($cotizacion),
+      'providers' => $this->maintenance_order_provider_options(),
+    ]);
+  }
+
+  public function ajax_handler_cotizacion_order_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->maintenance_order_can_manage()) {
+      $this->jsonFail('No tienes permiso para crear ordenes de mantenimiento.');
+    }
+
+    $cotizacionId = (int) ($_POST['id_cotizacion'] ?? 0);
+    if ($cotizacionId <= 0) {
+      $this->jsonFail('Cotizacion invalida.');
+    }
+
+    $schema = new \SCM\Support\SchemaInspector($this->db);
+    $ordersTable = $this->db->table('jet_cct_ordenes');
+    $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$schema->tableExists($ordersTable)) {
+      $this->jsonFail('La tabla de ordenes no esta disponible.');
+    }
+    if (!$schema->tableExists($cotTable)) {
+      $this->jsonFail('La tabla de cotizaciones no esta disponible.');
+    }
+
+    $cotizacion = $this->maintenance_order_find_cotizacion($cotizacionId);
+    if (!is_array($cotizacion)) {
+      $this->jsonFail('Cotizacion no encontrada.');
+    }
+    if (strtolower(trim((string) ($cotizacion['estado'] ?? ''))) !== 'aprobada') {
+      $this->jsonFail('Solo puedes crear ordenes cuando la cotizacion esta aprobada.');
+    }
+
+    $category = $this->maintenance_order_category((string) ($_POST['categoria'] ?? ''));
+    if ($category === '') {
+      $this->jsonFail('Selecciona el tipo de orden.');
+    }
+    $concept = $this->maintenance_order_clean($_POST['concepto'] ?? '');
+    if ($concept === '') {
+      $this->jsonFail('Escribe el concepto de la orden.');
+    }
+    $activity = $this->maintenance_order_clean($_POST['actividad'] ?? '');
+    if ($activity === '') {
+      $activity = $this->maintenance_order_default_activity($category);
+    }
+    $value = $this->maintenance_order_money($_POST['valor'] ?? 0);
+    if ($value <= 0) {
+      $this->jsonFail('El valor de la orden debe ser mayor a cero.');
+    }
+
+    $balanceColumn = $this->maintenance_order_balance_column($category);
+    $currentBalance = $this->maintenance_order_money_value($cotizacion[$balanceColumn] ?? 0);
+    if ($currentBalance > 0 && $value > ($currentBalance + 0.01)) {
+      $this->jsonFail('El valor supera el saldo disponible para ' . strtolower($category) . '. Saldo: ' . $this->format_cop_currency($currentBalance) . '.');
+    }
+
+    $providerPayload = $this->maintenance_order_provider_payload($_POST);
+    foreach (['proveedor', 'identificacion_proveedor', 'correo_proveedor', 'celular_proveedor', 'titular_proveedor', 'identificacion_cuenta_proveedor', 'cuenta_proveedor', 'correo_pago_proveedor'] as $requiredProviderField) {
+      if (trim((string) ($providerPayload[$requiredProviderField] ?? '')) === '') {
+        $this->jsonFail('Completa los datos obligatorios del proveedor.');
+      }
+    }
+    $providerId = $this->maintenance_order_save_provider($schema, (int) ($_POST['id_proveedor'] ?? 0), $providerPayload);
+
+    $now = time();
+    $nowMysql = date('Y-m-d H:i:s', $now);
+    $userId = Auth::userId();
+    $employeeId = trim((string) (method_exists($this, 'current_employee_id') ? $this->current_employee_id() : ''));
+    if ($employeeId === '') {
+      $employeeId = (string) $userId;
+    }
+    $user = $this->maintenance_order_current_user_payload();
+    $orderItemPayload = $this->maintenance_order_item_payload($category, $concept, $providerPayload['proveedor'], $value);
+
+    $orderData = array_merge([
+      'cct_status' => 'publish',
+      'fecha' => $now,
+      'actividad' => $activity,
+      'valor' => (string) (int) round($value),
+      'categoria' => $category,
+      'estado' => 'Esperando respuesta',
+      'creador' => $user['nombre'],
+      'email_creador' => $user['email'],
+      'celular_creador' => $user['celular'],
+      'direccion' => $this->maintenance_order_first([$cotizacion['direccion'] ?? '', $_POST['direccion'] ?? '']),
+      'id_cotizacion' => (string) $cotizacionId,
+      'id_ticket' => $this->maintenance_order_first([$cotizacion['id_ticket'] ?? '', $_POST['ticket_pk'] ?? '']),
+      'id_inmueble' => $this->maintenance_order_first([$cotizacion['id_inmueble'] ?? '', $cotizacion['inmueble'] ?? '']),
+      'cct_author_id' => $employeeId,
+      'cct_created' => $nowMysql,
+      'cct_modified' => $nowMysql,
+      'coordinador' => $this->maintenance_order_first([$cotizacion['coordinador'] ?? '', $user['nombre']]),
+      'autorizador' => '',
+      'id_proveedor' => $providerId > 0 ? (string) $providerId : '',
+      'contrato' => $this->maintenance_order_first([$cotizacion['contrato'] ?? '', $cotizacion['id_contrato'] ?? '']),
+      'concepto' => $concept,
+      'id_empleado' => $employeeId,
+      'id_propietario' => trim((string) ($cotizacion['id_propietario'] ?? '')),
+      'id_autorizador' => '',
+      'id_coordinador' => trim((string) ($cotizacion['id_coordinador'] ?? '')),
+      'destinatario' => trim((string) ($cotizacion['destinatario'] ?? '')),
+      'email_destinatario' => trim((string) ($cotizacion['email_destinatario'] ?? '')),
+      'celular_destinatario' => trim((string) ($cotizacion['celular_destinatario'] ?? '')),
+      'id_contrato' => trim((string) ($cotizacion['id_contrato'] ?? '')),
+      'inmueble' => $this->maintenance_order_first([$cotizacion['inmueble'] ?? '', $cotizacion['id_inmueble'] ?? '']),
+      'sucursal' => trim((string) ($cotizacion['sucursal'] ?? '')),
+      'id_arrendatario' => trim((string) ($cotizacion['id_arrendatario'] ?? '')),
+    ], $providerPayload, $orderItemPayload);
+
+    $orderData = $schema->filterTableData($ordersTable, $orderData);
+    if (empty($orderData) || !$this->db->insert($ordersTable, $orderData)) {
+      $this->jsonFail('No se pudo guardar la orden.');
+    }
+    $orderId = (int) $this->db->lastInsertId();
+
+    $this->maintenance_order_update_cotizacion_balance($schema, $cotizacion, $category, $currentBalance, $value, $nowMysql);
+    $this->maintenance_order_update_ticket($schema, $cotizacion, $orderId, $now, $nowMysql);
+    $this->maintenance_order_insert_histories($schema, $cotizacion, $orderId, $category, $concept, $value, $user, $employeeId, $now, $nowMysql);
+
+    $this->jsonOk([
+      'message' => 'Orden de mantenimiento #' . $orderId . ' creada.',
+      'id_orden' => (string) $orderId,
+      'id_cotizacion' => (string) $cotizacionId,
+    ]);
+  }
+
   public function ajax_handler_cotizacion_mantenimiento_pdf(): void
   {
     $this->verifyCsrf();
@@ -721,6 +870,417 @@ trait HandlesMaintenanceActions
     readfile($path);
     @unlink($path);
     exit;
+  }
+
+  private function maintenance_order_can_manage(): bool
+  {
+    return $this->canAccessDashboardTab('cotizaciones_mantenimiento')
+      || $this->canAccessDashboardTab('abiertos')
+      || $this->canAccessDashboardTab('postergados')
+      || $this->canAccessDashboardTab('mis_tickets');
+  }
+
+  /** @return array<string,mixed>|null */
+  private function maintenance_order_find_cotizacion(int $cotizacionId): ?array
+  {
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($table)) {
+      return null;
+    }
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
+    return is_array($row) ? $row : null;
+  }
+
+  /** @param array<string,mixed> $cotizacion @return array<string,mixed> */
+  private function maintenance_order_context_payload(array $cotizacion): array
+  {
+    return [
+      'id' => trim((string) ($cotizacion['_ID'] ?? '')),
+      'ticket_pk' => trim((string) ($cotizacion['id_ticket'] ?? '')),
+      'direccion' => trim((string) ($cotizacion['direccion'] ?? '')),
+      'inmueble' => $this->maintenance_order_first([$cotizacion['inmueble'] ?? '', $cotizacion['id_inmueble'] ?? '']),
+      'contrato' => $this->maintenance_order_first([$cotizacion['contrato'] ?? '', $cotizacion['id_contrato'] ?? '']),
+      'destinatario' => trim((string) ($cotizacion['destinatario'] ?? '')),
+      'balances' => [
+        'Mano de obra' => [
+          'field' => 'saldo_obra',
+          'value' => $this->maintenance_order_money_value($cotizacion['saldo_obra'] ?? 0),
+          'label' => $this->format_cop_currency($cotizacion['saldo_obra'] ?? 0),
+        ],
+        'Materiales' => [
+          'field' => 'saldo_materiales',
+          'value' => $this->maintenance_order_money_value($cotizacion['saldo_materiales'] ?? 0),
+          'label' => $this->format_cop_currency($cotizacion['saldo_materiales'] ?? 0),
+        ],
+        'Maquinarias' => [
+          'field' => 'saldo_maquinarias',
+          'value' => $this->maintenance_order_money_value($cotizacion['saldo_maquinarias'] ?? 0),
+          'label' => $this->format_cop_currency($cotizacion['saldo_maquinarias'] ?? 0),
+        ],
+        'Otros costos' => [
+          'field' => 'saldo_otros_costo',
+          'value' => $this->maintenance_order_money_value($cotizacion['saldo_otros_costo'] ?? 0),
+          'label' => $this->format_cop_currency($cotizacion['saldo_otros_costo'] ?? 0),
+        ],
+      ],
+    ];
+  }
+
+  /** @return array<int,array<string,string>> */
+  private function maintenance_order_provider_options(): array
+  {
+    $table = $this->db->table('jet_cct_proveedores');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+    $rows = $this->db->getResults(
+      "SELECT `_ID`, `proveedor`, `tipo_identificacion_proveedor`, `identificacion_proveedor`, `correo_proveedor`, `celular_proveedor`, `direccion_proveedor`, `titular_proveedor`, `identificacion_cuenta_proveedor`, `tipo_cuenta_proveedor`, `cuenta_proveedor`, `banco_proveedor`, `correo_pago_proveedor`, `compras`
+         FROM `{$table}`
+        WHERE `cct_status` = 'publish' OR `cct_status` IS NULL OR `cct_status` = ''
+        ORDER BY `proveedor` ASC
+        LIMIT 400"
+    );
+    $providers = [];
+    foreach ($rows as $row) {
+      $providers[] = [
+        'id' => trim((string) ($row['_ID'] ?? '')),
+        'proveedor' => trim((string) ($row['proveedor'] ?? '')),
+        'tipo_identificacion_proveedor' => trim((string) ($row['tipo_identificacion_proveedor'] ?? '')),
+        'identificacion_proveedor' => trim((string) ($row['identificacion_proveedor'] ?? '')),
+        'correo_proveedor' => trim((string) ($row['correo_proveedor'] ?? '')),
+        'celular_proveedor' => trim((string) ($row['celular_proveedor'] ?? '')),
+        'direccion_proveedor' => trim((string) ($row['direccion_proveedor'] ?? '')),
+        'titular_proveedor' => trim((string) ($row['titular_proveedor'] ?? '')),
+        'identificacion_cuenta_proveedor' => trim((string) ($row['identificacion_cuenta_proveedor'] ?? '')),
+        'tipo_cuenta_proveedor' => trim((string) ($row['tipo_cuenta_proveedor'] ?? '')),
+        'cuenta_proveedor' => trim((string) ($row['cuenta_proveedor'] ?? '')),
+        'banco_proveedor' => trim((string) ($row['banco_proveedor'] ?? '')),
+        'correo_pago_proveedor' => trim((string) ($row['correo_pago_proveedor'] ?? '')),
+        'compras' => trim((string) ($row['compras'] ?? '0')),
+      ];
+    }
+    return $providers;
+  }
+
+  private function maintenance_order_clean($value): string
+  {
+    return trim(sanitize_text_field(wp_unslash((string) ($value ?? ''))));
+  }
+
+  private function maintenance_order_email($value): string
+  {
+    return trim(sanitize_email(wp_unslash((string) ($value ?? ''))));
+  }
+
+  private function maintenance_order_category(string $raw): string
+  {
+    $raw = trim($raw);
+    $normalized = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $raw));
+    return match ($normalized) {
+      'mano de obra' => 'Mano de obra',
+      'materiales' => 'Materiales',
+      'maquinarias', 'maquinaria', 'equipos', 'equipos / maquinarias' => 'Maquinarias',
+      'otros costos', 'otros costo' => 'Otros costos',
+      default => '',
+    };
+  }
+
+  private function maintenance_order_default_activity(string $category): string
+  {
+    return match ($category) {
+      'Mano de obra' => 'MANO DE OBRA PARA REALIZAR TRABAJOS CORRESPONDIENTES',
+      'Materiales' => 'MATERIAL PARA REALIZAR TRABAJOS CORRESPONDIENTES',
+      'Maquinarias' => 'MAQUINARIA PARA REALIZAR TRABAJOS CORRESPONDIENTES',
+      'Otros costos' => 'OTROS GASTOS PARA REALIZAR TRABAJOS CORRESPONDIENTES',
+      default => '',
+    };
+  }
+
+  private function maintenance_order_balance_column(string $category): string
+  {
+    return match ($category) {
+      'Mano de obra' => 'saldo_obra',
+      'Materiales' => 'saldo_materiales',
+      'Maquinarias' => 'saldo_maquinarias',
+      'Otros costos' => 'saldo_otros_costo',
+      default => 'saldo_obra',
+    };
+  }
+
+  private function maintenance_order_money($value): float
+  {
+    return $this->maintenance_order_money_value($value);
+  }
+
+  private function maintenance_order_money_value($value): float
+  {
+    if (is_int($value) || is_float($value)) {
+      return (float) $value;
+    }
+    $text = trim((string) $value);
+    if ($text === '') {
+      return 0.0;
+    }
+    $text = preg_replace('/[^\d,.\-]/', '', $text) ?? '';
+    if ($text === '' || $text === '-') {
+      return 0.0;
+    }
+    $lastComma = strrpos($text, ',');
+    $lastDot = strrpos($text, '.');
+    if ($lastComma !== false && $lastDot !== false) {
+      $decimal = $lastComma > $lastDot ? ',' : '.';
+      $thousand = $decimal === ',' ? '.' : ',';
+      $text = str_replace($thousand, '', $text);
+      $text = str_replace($decimal, '.', $text);
+    } elseif ($lastComma !== false) {
+      $parts = explode(',', $text);
+      if (strlen((string) end($parts)) <= 2) {
+        $text = str_replace(',', '.', str_replace('.', '', $text));
+      } else {
+        $text = str_replace(',', '', $text);
+      }
+    } elseif ($lastDot !== false) {
+      $parts = explode('.', $text);
+      if (strlen((string) end($parts)) > 2) {
+        $text = str_replace('.', '', $text);
+      }
+    }
+    return is_numeric($text) ? max(0.0, (float) $text) : 0.0;
+  }
+
+  /** @param array<mixed> $values */
+  private function maintenance_order_first(array $values): string
+  {
+    foreach ($values as $value) {
+      $text = trim((string) ($value ?? ''));
+      if ($text !== '') {
+        return $text;
+      }
+    }
+    return '';
+  }
+
+  /** @param array<string,mixed> $input @return array<string,string> */
+  private function maintenance_order_provider_payload(array $input): array
+  {
+    return [
+      'proveedor' => $this->maintenance_order_clean($input['proveedor'] ?? ''),
+      'tipo_identificacion_proveedor' => $this->maintenance_order_clean($input['tipo_identificacion_proveedor'] ?? ''),
+      'identificacion_proveedor' => $this->maintenance_order_clean($input['identificacion_proveedor'] ?? ''),
+      'correo_proveedor' => $this->maintenance_order_email($input['correo_proveedor'] ?? ''),
+      'celular_proveedor' => $this->maintenance_order_clean($input['celular_proveedor'] ?? ''),
+      'direccion_proveedor' => $this->maintenance_order_clean($input['direccion_proveedor'] ?? ''),
+      'titular_proveedor' => $this->maintenance_order_clean($input['titular_proveedor'] ?? ''),
+      'identificacion_cuenta_proveedor' => $this->maintenance_order_clean($input['identificacion_cuenta_proveedor'] ?? ''),
+      'tipo_cuenta_proveedor' => $this->maintenance_order_clean($input['tipo_cuenta_proveedor'] ?? ''),
+      'cuenta_proveedor' => $this->maintenance_order_clean($input['cuenta_proveedor'] ?? ''),
+      'banco_proveedor' => $this->maintenance_order_clean($input['banco_proveedor'] ?? ''),
+      'correo_pago_proveedor' => $this->maintenance_order_email($input['correo_pago_proveedor'] ?? ''),
+    ];
+  }
+
+  /** @param array<string,string> $providerPayload */
+  private function maintenance_order_save_provider(\SCM\Support\SchemaInspector $schema, int $providerId, array $providerPayload): int
+  {
+    $table = $this->db->table('jet_cct_proveedores');
+    if (!$schema->tableExists($table)) {
+      return 0;
+    }
+    $nowMysql = date('Y-m-d H:i:s');
+    $userId = Auth::userId();
+    $employeeId = trim((string) (method_exists($this, 'current_employee_id') ? $this->current_employee_id() : ''));
+    if ($employeeId === '') {
+      $employeeId = (string) $userId;
+    }
+
+    if ($providerId > 0) {
+      $currentCompras = (int) ($this->db->getVar("SELECT COALESCE(`compras`, 0) FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$providerId]) ?? 0);
+      $update = array_merge($providerPayload, [
+        'compras' => (string) ($currentCompras + 1),
+        'cct_modified' => $nowMysql,
+      ]);
+      $update = $schema->filterTableData($table, $update);
+      if (!empty($update)) {
+        $this->db->update($table, $update, ['_ID' => $providerId]);
+      }
+      return $providerId;
+    }
+
+    $insert = array_merge($providerPayload, [
+      'cct_status' => 'publish',
+      'compras' => '1',
+      'cct_author_id' => $employeeId,
+      'cct_created' => $nowMysql,
+      'cct_modified' => $nowMysql,
+    ]);
+    $insert = $schema->filterTableData($table, $insert);
+    if (!empty($insert) && $this->db->insert($table, $insert)) {
+      return (int) $this->db->lastInsertId();
+    }
+    return 0;
+  }
+
+  /** @return array<string,string> */
+  private function maintenance_order_current_user_payload(): array
+  {
+    $name = trim(Auth::user());
+    $email = '';
+    $phone = '';
+    $funcTable = $this->db->table('jet_cct_funcionarios');
+    $userId = Auth::userId();
+    if ($userId > 0 && $this->table_exists($funcTable)) {
+      $row = $this->db->getRow("SELECT * FROM `{$funcTable}` WHERE `_ID` = ? LIMIT 1", [$userId]);
+      if (is_array($row)) {
+        $name = $this->maintenance_order_first([$row['nombre'] ?? '', $name, 'Funcionario']);
+        $email = $this->maintenance_order_first([$row['correo'] ?? '', $row['correo_empleado'] ?? '', $row['email'] ?? '']);
+        $phone = $this->maintenance_order_first([$row['celular'] ?? '', $row['celular_empleado'] ?? '', $row['telefono'] ?? '']);
+      }
+    }
+    if ($name === '') {
+      $name = $userId > 0 ? 'Usuario #' . $userId : 'Sistema';
+    }
+    return ['nombre' => $name, 'email' => $email, 'celular' => $phone];
+  }
+
+  /** @return array<string,string> */
+  private function maintenance_order_item_payload(string $category, string $concept, string $provider, float $value): array
+  {
+    $valueText = (string) (int) round($value);
+    return match ($category) {
+      'Mano de obra' => [
+        'items_mano' => serialize([[
+          'descripcion_mano' => $concept,
+          'unidad_mano' => 'Unidad',
+          'cantidad_mano' => '1',
+          'valor_mano' => $valueText,
+          'valor_total_item_mo' => $valueText,
+        ]]),
+      ],
+      'Materiales' => [
+        'items_materiales' => serialize([[
+          'provedor_materiales' => $provider,
+          'valor_materiales' => $valueText,
+        ]]),
+      ],
+      'Maquinarias' => [
+        'items_otros_equi' => serialize([[
+          'provedor_maquinaria' => $provider,
+          'valor_maquinarias' => $valueText,
+        ]]),
+      ],
+      'Otros costos' => [
+        'items_otros_costos' => serialize([[
+          'descripcion_otros_costos' => $concept,
+          'valor_otros_costos' => $valueText,
+        ]]),
+      ],
+      default => [],
+    };
+  }
+
+  /** @param array<string,mixed> $cotizacion */
+  private function maintenance_order_update_cotizacion_balance(\SCM\Support\SchemaInspector $schema, array $cotizacion, string $category, float $currentBalance, float $value, string $nowMysql): void
+  {
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    $balanceColumn = $this->maintenance_order_balance_column($category);
+    $update = [
+      $balanceColumn => (string) max(0, (int) round($currentBalance - $value)),
+      'se_envio' => 'Si',
+      'estado' => 'Aprobada',
+      'cct_modified' => $nowMysql,
+    ];
+    $update = $schema->filterTableData($table, $update);
+    if (!empty($update)) {
+      $this->db->update($table, $update, ['_ID' => (int) ($cotizacion['_ID'] ?? 0)]);
+    }
+  }
+
+  /** @param array<string,mixed> $cotizacion */
+  private function maintenance_order_update_ticket(\SCM\Support\SchemaInspector $schema, array $cotizacion, int $orderId, int $now, string $nowMysql): void
+  {
+    $ticketRef = trim((string) ($cotizacion['id_ticket'] ?? ''));
+    if ($ticketRef === '') {
+      return;
+    }
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$schema->tableExists($table)) {
+      return;
+    }
+    $ticket = null;
+    if (ctype_digit($ticketRef)) {
+      $ticket = $this->db->getRow("SELECT `_ID` FROM `{$table}` WHERE `_ID` = ? OR TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 1", [(int) $ticketRef, $ticketRef]);
+    } else {
+      $ticket = $this->db->getRow("SELECT `_ID` FROM `{$table}` WHERE TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 1", [$ticketRef]);
+    }
+    if (!is_array($ticket)) {
+      return;
+    }
+    $update = [
+      'estado_administrativo' => 'En ejecucion por inmobiliaria',
+      'fecha_actualizacion' => $now,
+      'cct_modified' => $nowMysql,
+    ];
+    if ($orderId > 0) {
+      $update['id_orden'] = (string) $orderId;
+    }
+    $update = $schema->filterTableData($table, $update);
+    if (!empty($update)) {
+      $this->db->update($table, $update, ['_ID' => (int) ($ticket['_ID'] ?? 0)]);
+    }
+  }
+
+  /** @param array<string,mixed> $cotizacion @param array<string,string> $user */
+  private function maintenance_order_insert_histories(\SCM\Support\SchemaInspector $schema, array $cotizacion, int $orderId, string $category, string $concept, float $value, array $user, string $employeeId, int $now, string $nowMysql): void
+  {
+    $ticketRef = trim((string) ($cotizacion['id_ticket'] ?? ''));
+    $detail = 'Se ha elaborado orden de ' . strtolower($category) . ' #' . $orderId . ' por ' . $this->format_cop_currency($value) . '. Concepto: ' . $concept . '.';
+
+    $histTicketTable = $this->db->table('jet_cct_historial_del_ticket');
+    if ($schema->tableExists($histTicketTable)) {
+      $ticketPayload = [
+        'cct_status' => 'publish',
+        'cct_author_id' => $employeeId,
+        'cct_created' => $nowMysql,
+        'cct_modified' => $nowMysql,
+        'id_ticket' => $ticketRef,
+        'fecha' => $now,
+        'nombre' => $user['nombre'],
+        'correo' => $user['email'],
+        'celular' => $user['celular'],
+        'respuesta' => $detail,
+        'id_revision_correctiva' => trim((string) ($cotizacion['id_revision'] ?? '')),
+        'id_cotizacion_mantenimiento' => trim((string) ($cotizacion['_ID'] ?? '')),
+        'id_empleado' => $employeeId,
+        'id_orden' => (string) $orderId,
+        'fue_editada' => 'Si',
+      ];
+      $ticketPayload = $schema->filterTableData($histTicketTable, $ticketPayload);
+      if (!empty($ticketPayload)) {
+        $this->db->insert($histTicketTable, $ticketPayload);
+      }
+    }
+
+    $histInmuebleTable = $this->db->table('jet_cct_historial_del_inmueble');
+    if ($schema->tableExists($histInmuebleTable)) {
+      $propertyPayload = [
+        'cct_status' => 'publish',
+        'cct_author_id' => $employeeId,
+        'cct_created' => $nowMysql,
+        'cct_modified' => $nowMysql,
+        'id_empleado' => $employeeId,
+        'id_inmueble' => $this->maintenance_order_first([$cotizacion['id_inmueble'] ?? '', $cotizacion['inmueble'] ?? '']),
+        'fecha' => $now,
+        'tipo_reporte' => 'Mantenimiento',
+        'observacion' => 'Se ha creado orden de mantenimiento. ' . $detail,
+        'funcionario' => $user['nombre'],
+        'id_ticket' => $ticketRef,
+        'id_inmueble_data' => $this->maintenance_order_first([$cotizacion['id_inmueble'] ?? '', $cotizacion['inmueble'] ?? '']),
+      ];
+      $propertyPayload = $schema->filterTableData($histInmuebleTable, $propertyPayload);
+      if (!empty($propertyPayload)) {
+        $this->db->insert($histInmuebleTable, $propertyPayload);
+      }
+    }
   }
 
   /** @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders */
