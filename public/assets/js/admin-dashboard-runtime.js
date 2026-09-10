@@ -11373,10 +11373,17 @@
           if (!cards.length) {
             throw new Error("Este caso no tiene cotizaciones registradas por id_ticket.");
           }
+          var cardHtml = cards.map(function (card) {
+            var clone = card.cloneNode(true);
+            clone.classList.add("scm-case-cotizacion-card");
+            clone.setAttribute("role", "listitem");
+            return clone.outerHTML;
+          }).join("");
           var html =
             '<div class="scm-case-cotizaciones-modal"><p class="scm-cotizacion-dialog-intro">Selecciona la cotización exacta del caso. Las acciones se aplican sobre el número de cotización elegido.</p>' +
-            cards.map(function (card) { return card.outerHTML; }).join("") +
-            "</div>";
+            '<div class="scm-cotizaciones-list scm-case-cotizaciones-list" role="list">' +
+            cardHtml +
+            "</div></div>";
           if (!window.Swal) {
             showToast("info", "Cotizaciones encontradas: " + cards.length);
             return;
