@@ -23,6 +23,7 @@ $checks = [
   'dashboard exposes runtime action' => is_string($dashboard) && str_contains($dashboard, "'revision_correctiva' => self::AJAX_CORRECTIVE_REVIEW"),
   'dashboard supports direct media refs for compressed uploads' => is_string($dashboard) && str_contains($dashboard, 'cotizacion_split_media_refs'),
   'case modal has corrective review button' => is_string($js) && str_contains($js, 'data-scm-open-corrective-review'),
+  'case modal changes corrective review button label when review exists' => is_string($js) && str_contains($js, 'hasCorrectiveReview') && str_contains($js, 'Gestionar revisi'),
   'corrective review modal exposes edit and delete actions' => is_string($js) && str_contains($js, 'data-corrective-edit-review') && str_contains($js, 'data-corrective-delete-review') && str_contains($js, 'data-corrective-review-edit'),
   'maintenance rows mark their source tab' => is_string($maintenanceRows) && str_contains($maintenanceRows, 'data-tab-key="mantenimiento"'),
   'case modal limits corrective review to maintenance tab' => is_string($js) && str_contains($js, 'function isMaintenanceCase') && str_contains($js, '&& isMaintenanceForActions'),

@@ -4588,6 +4588,7 @@
           seguimientoWrap.style.display = "none";
         }
         var isMaintenanceForActions = !isPublicPqr && isMaintenanceCase(btn);
+        var hasCorrectiveReview = String(btn.dataset.idRevisionCorrectiva || "").trim() !== "";
         var mainActionButtons = [];
         var complementaryActionButtons = [];
         var quoteActionButtons = [];
@@ -4664,7 +4665,9 @@
           );
           if (statusBucket !== "cerrados" && isMaintenanceForActions) {
             complementaryActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-corrective-review>Crear revisi&oacute;n correctiva</button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-open-corrective-review>' +
+                (hasCorrectiveReview ? "Gestionar revisi&oacute;n correctiva" : "Crear revisi&oacute;n correctiva") +
+                "</button>",
             );
           }
         }
