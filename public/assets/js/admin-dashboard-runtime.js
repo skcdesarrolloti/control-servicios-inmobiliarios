@@ -11121,22 +11121,22 @@
       if (!content) {
         if (resolvedCard) {
           showToast("error", "No se encontró la información de la cotización.");
-          return;
+          return Promise.resolve();
         }
-        loadCotizacionCardById(cotizacionId)
+        return loadCotizacionCardById(cotizacionId)
           .then(function (loadedCard) {
-            openCotizacionNativeModal(button, loadedCard);
+            return openCotizacionNativeModal(button, loadedCard);
           })
           .catch(function (err) {
             showToast("error", err.message || "No se encontró la información de la cotización.");
+            return Promise.resolve();
           });
-        return;
       }
       if (!window.Swal) {
         openCotizacionPrintWindow(title, content, false);
-        return;
+        return Promise.resolve();
       }
-      window.Swal.fire({
+      return window.Swal.fire({
         title: "",
         html:
           '<div class="scm-cotizacion-native-modal">' +
@@ -11231,14 +11231,15 @@
       return null;
     }
 
-    function openCotizacionOrderDetailModal(card, orderKey) {
+    function openCotizacionOrderDetailModal(card, orderKey, options) {
+      options = options || {};
       var source = findCotizacionOrderDetailSource(card, orderKey);
       if (!source) {
         showToast("error", "No se encontró el detalle de la orden.");
-        return;
+        return Promise.resolve();
       }
       var orderNumber = source.getAttribute("data-order-number") || orderKey;
-      window.Swal.fire({
+      return window.Swal.fire({
         title: "Detalle de la orden #" + orderNumber,
         html: source.innerHTML,
         width: "min(920px, 94vw)",
@@ -11260,19 +11261,25 @@
         },
       }).then(function (result) {
         if (result.dismiss === window.Swal.DismissReason.cancel) {
-          openCotizacionOrdersModal(card);
+          return openCotizacionOrdersModal(card, options);
         }
+        if (typeof options.onClose === "function") {
+          options.onClose();
+        }
+        return result;
       });
     }
 
-    function openCotizacionOrdersModal(card) {
+    function openCotizacionOrdersModal(card, options) {
+      options = options || {};
       var source = card ? card.querySelector(".scm-cotizacion-orders-source") : null;
       var cotizacionId = card ? card.getAttribute("data-cotizacion-id") || "" : "";
       if (!window.Swal) {
         showToast("info", source ? source.textContent : "Sin órdenes registradas.");
-        return;
+        return Promise.resolve();
       }
-      window.Swal.fire({
+      var openedDetail = false;
+      return window.Swal.fire({
         title: "Órdenes de la cotización" + (cotizacionId ? " #" + cotizacionId : ""),
         html: source ? source.innerHTML : "Sin órdenes registradas.",
         width: "min(920px, 94vw)",
@@ -11299,12 +11306,19 @@
                 : null;
             if (!orderButton) return;
             event.preventDefault();
+            openedDetail = true;
             openCotizacionOrderDetailModal(
               card,
               orderButton.getAttribute("data-scm-view-cotizacion-order") || "",
+              options,
             );
           });
         },
+      }).then(function (result) {
+        if (!openedDetail && typeof options.onClose === "function") {
+          options.onClose();
+        }
+        return result;
       });
     }
 
@@ -11329,12 +11343,48 @@
       return clone;
     }
 
-    function triggerCotizacionRootAction(card, selector) {
+    function cloneCaseCotizacionesTrigger(button) {
+      var attrs = {};
+      if (button && button.attributes) {
+        Array.prototype.forEach.call(button.attributes, function (attr) {
+          attrs[attr.name] = attr.value;
+        });
+      }
+      return {
+        getAttribute: function (name) {
+          return Object.prototype.hasOwnProperty.call(attrs, name) ? attrs[name] : "";
+        },
+      };
+    }
+
+    function makeCaseCotizacionesReturn(button) {
+      var trigger = cloneCaseCotizacionesTrigger(button);
+      return function (delayMs) {
+        window.setTimeout(function () {
+          openCaseCotizacionesModal(trigger);
+        }, typeof delayMs === "number" ? delayMs : 160);
+      };
+    }
+
+    function reopenCaseCotizacionesAfter(childResult, reopen) {
+      if (childResult && typeof childResult.then === "function") {
+        childResult.then(function () {
+          reopen();
+        });
+        return;
+      }
+      reopen();
+    }
+
+    function triggerCotizacionRootAction(card, selector, returnContext) {
       var hiddenCard = ensureCotizacionHiddenCard(card);
       var target = hiddenCard ? hiddenCard.querySelector(selector) : null;
       if (!target) {
         showToast("error", "No se encontró la acción de la cotización.");
         return;
+      }
+      if (returnContext) {
+        target._scmCaseCotizacionesReturn = returnContext;
       }
       target.click();
     }
@@ -11426,7 +11476,10 @@
                   : null;
                 if (nativeBtn) {
                   event.preventDefault();
-                  openCotizacionNativeModal(nativeBtn);
+                  reopenCaseCotizacionesAfter(
+                    openCotizacionNativeModal(nativeBtn),
+                    makeCaseCotizacionesReturn(button),
+                  );
                   return;
                 }
                 var ordersBtn = event.target && event.target.closest
@@ -11434,7 +11487,9 @@
                   : null;
                 if (ordersBtn) {
                   event.preventDefault();
-                  openCotizacionOrdersModal(ordersBtn.closest(".scm-cotizacion-card"));
+                  openCotizacionOrdersModal(ordersBtn.closest(".scm-cotizacion-card"), {
+                    onClose: makeCaseCotizacionesReturn(button),
+                  });
                   return;
                 }
                 var actionBtn = event.target && event.target.closest
@@ -11443,12 +11498,15 @@
                 if (actionBtn) {
                   event.preventDefault();
                   var actionCard = actionBtn.closest(".scm-cotizacion-card");
+                  var returnContext = {
+                    reopen: makeCaseCotizacionesReturn(button),
+                  };
                   if (actionBtn.matches("[data-scm-cotizacion-response-standalone]")) {
-                    triggerCotizacionRootAction(actionCard, "[data-scm-cotizacion-response-standalone]");
+                    triggerCotizacionRootAction(actionCard, "[data-scm-cotizacion-response-standalone]", returnContext);
                   } else if (actionBtn.matches("[data-scm-approve-cotizacion]")) {
-                    triggerCotizacionRootAction(actionCard, "[data-scm-approve-cotizacion]");
+                    triggerCotizacionRootAction(actionCard, "[data-scm-approve-cotizacion]", returnContext);
                   } else {
-                    triggerCotizacionRootAction(actionCard, "[data-scm-delete-cotizacion]");
+                    triggerCotizacionRootAction(actionCard, "[data-scm-delete-cotizacion]", returnContext);
                   }
                 }
               });
@@ -11576,6 +11634,8 @@
       if (responseBtn) {
         e.preventDefault();
         var ticketPk = responseBtn.getAttribute("data-ticket-pk") || "";
+        var responseReturnContext = responseBtn._scmCaseCotizacionesReturn || null;
+        responseBtn._scmCaseCotizacionesReturn = null;
         if (!ticketPk) {
           showToast("error", "No se encontro el ticket de la cotizacion.");
           return;
@@ -11647,7 +11707,12 @@
             };
           },
         }).then(function (res) {
-          if (!res.isConfirmed) return;
+          if (!res.isConfirmed) {
+            if (responseReturnContext && typeof responseReturnContext.reopen === "function") {
+              responseReturnContext.reopen();
+            }
+            return;
+          }
           var responseData = res.value || {};
           var fd = new FormData();
           fd.append("ticket_pk", ticketPk);
@@ -11661,11 +11726,15 @@
           fd.append("observacion", responseData.observacion || "Ninguna");
           fd.append("notify_recipients_present", "1");
           fd.append("notify_recipients[]", "none");
-          submitCotizacionAction(
+          return submitCotizacionAction(
             fd,
             actionCotizacionResponse,
             "Error enviando respuesta de cotizacion.",
-          );
+          ).then(function () {
+            if (responseReturnContext && typeof responseReturnContext.reopen === "function") {
+              responseReturnContext.reopen(260);
+            }
+          });
         });
         return;
       }
@@ -11677,6 +11746,8 @@
       if (approveBtn) {
         e.preventDefault();
         var approveCotizacionId = approveBtn.getAttribute("data-cotizacion-id") || "";
+        var approveReturnContext = approveBtn._scmCaseCotizacionesReturn || null;
+        approveBtn._scmCaseCotizacionesReturn = null;
         if (!approveCotizacionId || !window.Swal) {
           showToast("error", "No se pudo abrir la confirmación.");
           return;
@@ -11695,15 +11766,24 @@
           confirmButtonColor: "#16a34a",
           cancelButtonText: "Cancelar",
         }).then(function (res) {
-          if (!res.isConfirmed) return;
+          if (!res.isConfirmed) {
+            if (approveReturnContext && typeof approveReturnContext.reopen === "function") {
+              approveReturnContext.reopen();
+            }
+            return;
+          }
           var fd = new FormData();
           fd.append("id_cotizacion", approveCotizacionId);
           fd.append("observacion", res.value || "");
-          submitCotizacionAction(
+          return submitCotizacionAction(
             fd,
             actionApproveCotizacion,
             "Error marcando cotización como aprobada.",
-          );
+          ).then(function () {
+            if (approveReturnContext && typeof approveReturnContext.reopen === "function") {
+              approveReturnContext.reopen(260);
+            }
+          });
         });
         return;
       }
@@ -11715,6 +11795,8 @@
       if (deleteBtn) {
         e.preventDefault();
         var cotizacionId = deleteBtn.getAttribute("data-cotizacion-id") || "";
+        var deleteReturnContext = deleteBtn._scmCaseCotizacionesReturn || null;
+        deleteBtn._scmCaseCotizacionesReturn = null;
         if (!cotizacionId || !window.Swal) {
           showToast("error", "No se pudo abrir el formulario.");
           return;
@@ -11740,7 +11822,12 @@
             return true;
           },
         }).then(function (res) {
-          if (!res.isConfirmed) return;
+          if (!res.isConfirmed) {
+            if (deleteReturnContext && typeof deleteReturnContext.reopen === "function") {
+              deleteReturnContext.reopen();
+            }
+            return;
+          }
           var fd = new FormData();
           fd.append("id_cotizacion", cotizacionId);
           fd.append("motivo", document.getElementById("swal-del-motivo").value || "");
@@ -11748,11 +11835,15 @@
             "observacion",
             document.getElementById("swal-del-observacion").value || "",
           );
-          submitCotizacionAction(
+          return submitCotizacionAction(
             fd,
             actionDeleteCotizacion,
             "Error eliminando cotizacion.",
-          );
+          ).then(function () {
+            if (deleteReturnContext && typeof deleteReturnContext.reopen === "function") {
+              deleteReturnContext.reopen(260);
+            }
+          });
         });
       }
     });
