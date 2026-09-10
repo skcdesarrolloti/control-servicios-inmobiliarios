@@ -10888,10 +10888,13 @@
           var message =
             (json.data && json.data.message) || "Accion realizada.";
           showToast("success", message);
-          return refreshActiveTab();
+          return refreshActiveTab().then(function () {
+            return true;
+          });
         })
         .catch(function (err) {
           showToast("error", err.message || errorMessage);
+          return false;
         });
     }
 
@@ -11345,12 +11348,24 @@
 
     function cloneCaseCotizacionesTrigger(button) {
       var attrs = {};
+      [
+        "data-ticket-pk",
+        "data-ticket",
+        "data-cotizacion-id",
+      ].forEach(function (name) {
+        if (button && typeof button.getAttribute === "function") {
+          attrs[name] = button.getAttribute(name) || "";
+        }
+      });
       if (button && button.attributes) {
         Array.prototype.forEach.call(button.attributes, function (attr) {
           attrs[attr.name] = attr.value;
         });
       }
       return {
+        attributes: Object.keys(attrs).map(function (name) {
+          return { name: name, value: attrs[name] };
+        }),
         getAttribute: function (name) {
           return Object.prototype.hasOwnProperty.call(attrs, name) ? attrs[name] : "";
         },
@@ -11730,8 +11745,8 @@
             fd,
             actionCotizacionResponse,
             "Error enviando respuesta de cotizacion.",
-          ).then(function () {
-            if (responseReturnContext && typeof responseReturnContext.reopen === "function") {
+          ).then(function (saved) {
+            if (saved && responseReturnContext && typeof responseReturnContext.reopen === "function") {
               responseReturnContext.reopen(260);
             }
           });
@@ -11779,8 +11794,8 @@
             fd,
             actionApproveCotizacion,
             "Error marcando cotización como aprobada.",
-          ).then(function () {
-            if (approveReturnContext && typeof approveReturnContext.reopen === "function") {
+          ).then(function (saved) {
+            if (saved && approveReturnContext && typeof approveReturnContext.reopen === "function") {
               approveReturnContext.reopen(260);
             }
           });
@@ -11839,8 +11854,8 @@
             fd,
             actionDeleteCotizacion,
             "Error eliminando cotizacion.",
-          ).then(function () {
-            if (deleteReturnContext && typeof deleteReturnContext.reopen === "function") {
+          ).then(function (saved) {
+            if (saved && deleteReturnContext && typeof deleteReturnContext.reopen === "function") {
               deleteReturnContext.reopen(260);
             }
           });
