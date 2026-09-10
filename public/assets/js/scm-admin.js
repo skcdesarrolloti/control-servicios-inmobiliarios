@@ -4683,7 +4683,7 @@
             '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>',
           );
         }
-        if (!isPublicPqr && (calendarTicketPk || btn.dataset.ticket || cotizacionUrl || cotizacionId)) {
+        if (!isPublicPqr && (cotizacionUrl || cotizacionId)) {
           quoteActionButtons.push(
             '<button type="button" class="scm-case-work-btn" data-scm-view-case-cotizaciones data-ticket-pk="' +
             escHtml(calendarTicketPk || "") +

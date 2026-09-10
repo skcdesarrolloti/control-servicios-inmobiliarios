@@ -806,7 +806,7 @@ final class PendingView
     $notasItems = is_array($ticket['_scm_notas_ticket'] ?? null) ? $ticket['_scm_notas_ticket'] : [];
     $historialInmuebleItems = is_array($ticket['_scm_historial_inmueble'] ?? null) ? $ticket['_scm_historial_inmueble'] : [];
     $ticketPk = (int) ($ticket['ticket_id'] ?? $ticket['_ID'] ?? 0);
-    $cotId = trim((string) ($ticket['id_cotizacion_mantenimiento'] ?? ''));
+    $cotId = trim((string) ($ticket['id_cotizacion_mantenimiento'] ?? $ticket['cot_id'] ?? $ticket['id_cotizacion'] ?? ''));
     $cotEstado = strtolower(trim((string) ($ticket['estado_cotizacion_mantenimiento'] ?? $ticket['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
     $hasCotizacionPendiente = $cotId !== '' && in_array($cotEstado, ['', 'esperando respuesta'], true);
 
@@ -859,7 +859,7 @@ final class PendingView
     $inmuebleData = is_array($ticket['_scm_inmueble_data'] ?? null) ? $ticket['_scm_inmueble_data'] : [];
     $propertyDataId = trim((string) ($inmuebleData['_ID'] ?? $inmuebleData['id_inmueble_data'] ?? ''));
     $propertyGoogleMaps = trim((string) ($inmuebleData['ubicacion_google_maps'] ?? ''));
-    $cotizacionId = trim((string) ($ticket['id_cotizacion_mantenimiento'] ?? ''));
+    $cotizacionId = trim((string) ($ticket['id_cotizacion_mantenimiento'] ?? $ticket['cot_id'] ?? $ticket['id_cotizacion'] ?? ''));
     $cotizacionUrl = $cotizacionId !== '' ? ('https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero=' . rawurlencode($cotizacionId)) : '';
     $createdTs = $this->ts($ticket['cct_created'] ?? $ticket['fecha'] ?? null);
     $updatedTs = $this->ts($ticket['fecha_actualizacion'] ?? null);

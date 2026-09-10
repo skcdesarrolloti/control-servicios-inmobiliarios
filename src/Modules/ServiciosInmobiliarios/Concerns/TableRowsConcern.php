@@ -70,7 +70,7 @@ trait TableRowsConcern
       $createdTs = $this->parser->parse($rawCreated);
       $updatedTs = $this->parser->parse($row['fecha_actualizacion'] ?? null);
 
-      $idCotz = trim((string) ($row['id_cotizacion_mantenimiento'] ?? ''));
+      $idCotz = trim((string) ($row['id_cotizacion_mantenimiento'] ?? $row['cot_id'] ?? ''));
       $tieneCotz = $idCotz !== '';
       $cotEstadoParaRespuesta = $cotRespuestaEstadoRaw !== '' ? $cotRespuestaEstadoRaw : $cotEstadoRaw;
       $cotizacionPendienteRespuesta = $tieneCotz && in_array(strtolower($cotEstadoParaRespuesta), ['', 'esperando respuesta'], true);
