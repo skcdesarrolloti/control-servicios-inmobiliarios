@@ -3520,12 +3520,13 @@ trait RendersDashboard
   }
 
   /** @return array{url:string,status:string,id:int} */
-  private function cotizacion_satisfaction_act_info(string $cotizacionId, string $legacyActId = ''): array
+  private function cotizacion_satisfaction_act_info(string $cotizacionId, string $legacyActId = '', string $ticketPk = ''): array
   {
     $empty = ['url' => '', 'status' => '', 'id' => 0];
     $cotizacionId = trim($cotizacionId);
     $legacyActId = trim($legacyActId);
-    if ($cotizacionId === '' && $legacyActId === '') {
+    $ticketPk = trim($ticketPk);
+    if ($cotizacionId === '' && $legacyActId === '' && $ticketPk === '') {
       return $empty;
     }
 
@@ -3545,6 +3546,10 @@ trait RendersDashboard
     if ($cotizacionId !== '') {
       $conditions[] = "JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.source.quote_id')) = ?";
       $params[] = $cotizacionId;
+    }
+    if ($ticketPk !== '' && ctype_digit($ticketPk)) {
+      $conditions[] = 'ticket_pk = ?';
+      $params[] = (int) $ticketPk;
     }
     if ($conditions === []) {
       return $empty;
@@ -3618,7 +3623,8 @@ trait RendersDashboard
       'id_cotizacion' => $id,
       'source_flow' => 'approved_quote',
     ], '', '&', PHP_QUERY_RFC3986);
-    $actaInfo = $this->cotizacion_satisfaction_act_info($id, trim((string) ($row['id_acta_satisfaccion'] ?? '')));
+    $actaInfo = $this->cotizacion_satisfaction_act_info($id, trim((string) ($row['id_acta_satisfaccion'] ?? '')), $ticket);
+    $hasActiveActa = in_array(strtolower(trim((string) ($actaInfo['status'] ?? ''))), ['pending', 'signed', 'legacy'], true);
     $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
     $ordersHtml = empty($orders)
       ? '<div class="scm-cotizacion-orders-empty"><span aria-hidden="true">&#128203;</span><strong>Sin &oacute;rdenes registradas</strong><p>Esta cotizaci&oacute;n todav&iacute;a no tiene &oacute;rdenes de mantenimiento asociadas.</p></div>'
@@ -3726,7 +3732,8 @@ trait RendersDashboard
       . ($cotizacionSinResponder ? '<button type="button" class="scm-case-work-btn scm-primary-action scm-cotizacion-approve-action" data-scm-approve-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Marcar como aprobada</button>' : '')
       . ($cotizacionSinResponder ? '<button type="button" class="scm-case-work-btn scm-danger-action scm-cotizacion-delete-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizaci&oacute;n</button>' : '')
       . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($noteUrl) . '" data-iframe-title="A&ntilde;adir nota a cotizaci&oacute;n">A&ntilde;adir nota</button>'
-      . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-add-cotizacion-order data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir orden</button>' : '')
+      . ($cotizacionAprobada && !$hasActiveActa ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-add-cotizacion-order data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir orden</button>' : '')
+      . ($cotizacionAprobada && $hasActiveActa ? '<button type="button" class="scm-case-work-btn" disabled title="Esta cotizaci&oacute;n o caso ya tiene acta activa">Orden bloqueada por acta</button>' : '')
       . ($actaInfo['url'] !== '' ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-iframe data-iframe-url="' . esc_attr($actaInfo['url']) . '" data-iframe-title="Acta de satisfacci&oacute;n">Ver acta' . ($actaInfo['status'] === 'pending' ? ' pendiente' : '') . '</button>' : '')
       . ($cotizacionAprobada && $actaInfo['url'] === '' ? '<a class="scm-case-work-btn" href="' . esc_attr($actaUrl) . '">A&ntilde;adir acta</a>' : '')
       . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div>' . $orderDetailsHtml

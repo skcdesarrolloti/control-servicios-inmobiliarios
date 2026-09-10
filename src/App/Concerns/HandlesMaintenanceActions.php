@@ -690,6 +690,9 @@ trait HandlesMaintenanceActions
     if (strtolower(trim((string) ($cotizacion['estado'] ?? ''))) !== 'aprobada') {
       $this->jsonFail('Solo puedes crear ordenes cuando la cotizacion esta aprobada.');
     }
+    if ($this->maintenance_order_active_satisfaction_act($cotizacion) !== null) {
+      $this->jsonFail('Esta cotizacion o caso ya tiene un acta de satisfaccion activa. No se pueden crear ordenes nuevas.');
+    }
 
     $this->jsonOk([
       'cotizacion' => $this->maintenance_order_context_payload($cotizacion),
@@ -725,6 +728,9 @@ trait HandlesMaintenanceActions
     }
     if (strtolower(trim((string) ($cotizacion['estado'] ?? ''))) !== 'aprobada') {
       $this->jsonFail('Solo puedes crear ordenes cuando la cotizacion esta aprobada.');
+    }
+    if ($this->maintenance_order_active_satisfaction_act($cotizacion) !== null) {
+      $this->jsonFail('Esta cotizacion o caso ya tiene un acta de satisfaccion activa. No se pueden crear ordenes nuevas.');
     }
 
     $category = $this->maintenance_order_category((string) ($_POST['categoria'] ?? ''));
@@ -889,6 +895,65 @@ trait HandlesMaintenanceActions
     }
     $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
     return is_array($row) ? $row : null;
+  }
+
+  /** @param array<string,mixed> $cotizacion @return array<string,mixed>|null */
+  private function maintenance_order_active_satisfaction_act(array $cotizacion): ?array
+  {
+    $cotizacionId = trim((string) ($cotizacion['_ID'] ?? ''));
+    $legacyActId = trim((string) ($cotizacion['id_acta_satisfaccion'] ?? ''));
+    $ticketRef = trim((string) ($cotizacion['id_ticket'] ?? ''));
+    $actsTable = $this->db->table('scm_ticket_completion_acts');
+
+    if ($this->table_exists($actsTable)) {
+      $conditions = [];
+      $params = [];
+      if ($legacyActId !== '') {
+        $conditions[] = 'legacy_act_id = ?';
+        $params[] = (int) $legacyActId;
+      }
+      if ($cotizacionId !== '') {
+        $conditions[] = "JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.source.quote_id')) = ?";
+        $params[] = $cotizacionId;
+      }
+      if ($ticketRef !== '' && ctype_digit($ticketRef)) {
+        $conditions[] = 'ticket_pk = ?';
+        $params[] = (int) $ticketRef;
+      }
+      if ($conditions !== []) {
+        $row = $this->db->getRow(
+          "SELECT id, status, legacy_act_id, ticket_pk FROM `{$actsTable}` WHERE status IN ('pending', 'signed') AND (" . implode(' OR ', $conditions) . ") ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'signed' THEN 1 ELSE 2 END, COALESCE(signed_at, created_at) DESC, id DESC LIMIT 1",
+          $params
+        );
+        if (is_array($row) && (int) ($row['id'] ?? 0) > 0) {
+          return $row;
+        }
+      }
+    }
+
+    if ($legacyActId !== '') {
+      return ['id' => (int) $legacyActId, 'status' => 'legacy'];
+    }
+
+    if ($ticketRef !== '') {
+      $ticketsTable = $this->db->table('jet_cct_tickets');
+      if ($this->table_exists($ticketsTable)) {
+        $ticket = ctype_digit($ticketRef)
+          ? $this->db->getRow("SELECT `id_acta_satisfaccion`, `estado_acta_satisfaccion` FROM `{$ticketsTable}` WHERE `_ID` = ? OR TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 1", [(int) $ticketRef, $ticketRef])
+          : $this->db->getRow("SELECT `id_acta_satisfaccion`, `estado_acta_satisfaccion` FROM `{$ticketsTable}` WHERE TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 1", [$ticketRef]);
+        if (is_array($ticket) && trim((string) ($ticket['id_acta_satisfaccion'] ?? '')) !== '') {
+          $actState = strtolower(trim((string) ($ticket['estado_acta_satisfaccion'] ?? '')));
+          if ($actState === '' || in_array($actState, ['si', 'sí', 'pending', 'signed', 'firmada', 'pendiente'], true)) {
+            return [
+              'id' => (int) ($ticket['id_acta_satisfaccion'] ?? 0),
+              'status' => $actState !== '' ? $actState : 'legacy',
+            ];
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   /** @param array<string,mixed> $cotizacion @return array<string,mixed> */
