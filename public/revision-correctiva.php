@@ -5,6 +5,8 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/bootstrap/app.php';
 
 use SCM\Core\App;
+use SCM\Core\Auth;
+use SCM\App\SuCasaControlServiciosInmobiliarios;
 use SCM\Modules\CorrectiveReview\CorrectiveReviewPublicView;
 
 header('Content-Type: text/html; charset=UTF-8');
@@ -17,6 +19,8 @@ header('X-Robots-Tag: noindex, nofollow');
 
 $escape = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $reviewId = (int) ($_GET['numero'] ?? $_GET['id_revision_correctiva'] ?? $_GET['id'] ?? 0);
+$expires = (int) ($_GET['expires'] ?? 0);
+$signature = is_string($_GET['sig'] ?? null) ? trim($_GET['sig']) : '';
 $result = [
   'title' => 'Revisión correctiva',
   'content' => '<article class="scm-corrective-public-card scm-corrective-public-error"><h1>No disponible</h1><p>No fue posible cargar la revisión.</p></article>',
@@ -24,9 +28,20 @@ $result = [
 ];
 
 try {
+  $hasPanelSession = Auth::isLoggedIn();
+  $hasValidPublicSignature = SuCasaControlServiciosInmobiliarios::correctiveReviewPublicSignatureValid($reviewId, $expires, $signature);
+  if (!$hasPanelSession && !$hasValidPublicSignature) {
+    $result = [
+      'title' => 'Enlace no válido',
+      'content' => '<article class="scm-corrective-public-card scm-corrective-public-error"><h1>Enlace no válido o vencido</h1><p role="alert">Solicita a la inmobiliaria un nuevo enlace para consultar esta revisión correctiva.</p></article>',
+      'status' => 403,
+    ];
+    http_response_code(403);
+  } else {
   $view = new CorrectiveReviewPublicView(App::db());
   $result = $view->render($reviewId);
   http_response_code((int) ($result['status'] ?? 200));
+  }
 } catch (Throwable $error) {
   http_response_code(500);
   error_log('[revision-correctiva-publica] Error revisión #' . $reviewId . ': ' . $error->getMessage());

@@ -258,6 +258,44 @@ body.scm-corrective-public-page {
   color: var(--scm-muted);
 }
 
+.scm-corrective-public-signature {
+  margin-left: auto;
+  width: min(440px, 100%);
+  border-left: 6px solid var(--scm-orange);
+  background:
+    linear-gradient(135deg, rgba(255, 133, 0, .08), transparent 42%),
+    rgba(255, 255, 255, .96);
+}
+
+.scm-corrective-public-signature span {
+  display: block;
+  color: var(--scm-muted);
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.scm-corrective-public-signature strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--scm-navy);
+  font-size: 1.24rem;
+}
+
+.scm-corrective-public-signature p {
+  margin: 8px 0 0;
+  color: #334864;
+}
+
+.scm-corrective-public-signature small {
+  display: block;
+  margin-top: 10px;
+  color: var(--scm-muted);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 @media (max-width: 900px) {
   .scm-corrective-public-grid,
   .scm-corrective-public-grid--item {

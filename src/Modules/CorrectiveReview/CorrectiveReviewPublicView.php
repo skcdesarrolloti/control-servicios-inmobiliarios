@@ -44,8 +44,6 @@ final class CorrectiveReviewPublicView
       'Dirección' => $this->first([$review['direccion'] ?? '', $ticket['direccion'] ?? '', $contract['direccion'] ?? '', $property['direccion'] ?? '', $property['direccion_fisica'] ?? '']),
       'Destinatario' => $this->first([$review['destinatario'] ?? '', $ticket['propietario'] ?? '', $contract['propietario'] ?? '']),
       'Fecha' => $this->dateLabel($this->first([$review['fecha'] ?? '', $review['cct_created'] ?? ''])),
-      'Funcionario' => $this->first([$review['creador'] ?? '', $review['funcionario'] ?? '', $review['coordinador'] ?? '']),
-      'Sucursal' => $this->first([$review['sucursal'] ?? '', $ticket['sucursal'] ?? '', $contract['sucursal'] ?? '']),
     ];
 
     $metaHtml = '';
@@ -70,6 +68,18 @@ final class CorrectiveReviewPublicView
     if ($itemsHtml === '') {
       $itemsHtml = '<article class="scm-corrective-public-empty">Esta revisión no tiene daños detallados guardados.</article>';
     }
+    $performedBy = $this->first([$review['creador'] ?? '', $review['funcionario'] ?? '', $review['coordinador'] ?? '']);
+    $performedEmail = $this->first([$review['email_creador'] ?? '', $review['email_coordinador'] ?? '']);
+    $performedPhone = $this->first([$review['celular_creador'] ?? '', $review['celular_coordinador'] ?? '']);
+    $signatureHtml = '';
+    if ($performedBy !== '') {
+      $signatureHtml = '<section class="scm-corrective-public-card scm-corrective-public-signature">'
+        . '<span>Atentamente</span>'
+        . '<strong>' . $this->h($performedBy) . '</strong>'
+        . '<p>Revisión correctiva realizada desde SuCasa Inmobiliaria.</p>'
+        . ($performedEmail !== '' || $performedPhone !== '' ? '<small>' . $this->h(implode(' · ', array_filter([$performedEmail, $performedPhone]))) . '</small>' : '')
+        . '</section>';
+    }
 
     $content = '<article class="scm-corrective-public-card scm-corrective-public-hero">'
       . '<div class="scm-corrective-public-title">'
@@ -83,7 +93,8 @@ final class CorrectiveReviewPublicView
       . '</article>'
       . '<section class="scm-corrective-public-card"><h2>Datos de la revisión</h2><div class="scm-corrective-public-grid">' . $metaHtml . '</div></section>'
       . '<section class="scm-corrective-public-card"><h2>Resumen</h2><div class="scm-corrective-public-grid scm-corrective-public-grid--summary">' . $summaryHtml . '</div></section>'
-      . '<section class="scm-corrective-public-card"><h2>Daños encontrados</h2><div class="scm-corrective-public-items">' . $itemsHtml . '</div></section>';
+      . '<section class="scm-corrective-public-card"><h2>Daños encontrados</h2><div class="scm-corrective-public-items">' . $itemsHtml . '</div></section>'
+      . $signatureHtml;
 
     return [
       'title' => $title,

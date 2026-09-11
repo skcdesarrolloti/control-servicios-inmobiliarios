@@ -538,6 +538,33 @@ final class SuCasaControlServiciosInmobiliarios
     return ($base !== '' ? $base . '/' : '') . self::DEFAULT_CORRECTIVA_URL;
   }
 
+  public static function correctiveReviewPublicUrl(int $reviewId): string
+  {
+    return self::defaultCorrectiveReviewUrl() . rawurlencode((string) $reviewId);
+  }
+
+  public static function signedCorrectiveReviewPublicUrl(int $reviewId, ?int $expires = null): string
+  {
+    $expires = $expires && $expires > time() ? $expires : (time() + 180 * 86400);
+    $signature = self::correctiveReviewPublicSignature($reviewId, $expires);
+    return self::correctiveReviewPublicUrl($reviewId)
+      . '&expires=' . rawurlencode((string) $expires)
+      . '&sig=' . rawurlencode($signature);
+  }
+
+  public static function correctiveReviewPublicSignature(int $reviewId, int $expires): string
+  {
+    return hash_hmac('sha256', $reviewId . '|' . $expires, (string) SCM_APP_SECRET);
+  }
+
+  public static function correctiveReviewPublicSignatureValid(int $reviewId, int $expires, string $signature): bool
+  {
+    if ($reviewId <= 0 || $expires <= time() || trim($signature) === '') {
+      return false;
+    }
+    return hash_equals(self::correctiveReviewPublicSignature($reviewId, $expires), trim($signature));
+  }
+
   private function normalizePropertyLocationInput(string $raw): string
   {
     $raw = trim($raw);

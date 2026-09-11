@@ -222,7 +222,7 @@ trait HandlesCorrectiveReviewActions
       return [
         'message' => 'Revisión correctiva #' . $reviewId . ' guardada. ' . ($queuedEmails > 0 ? 'Correos en cola: ' . $queuedEmails . '.' : 'No se encolaron correos porque no hay destinatarios válidos.'),
         'review_id' => (string) $reviewId,
-        'review_url' => self::defaultCorrectiveReviewUrl() . rawurlencode((string) $reviewId),
+        'review_url' => self::correctiveReviewPublicUrl($reviewId),
       ];
     } catch (\Throwable $error) {
       if ($storedPhotos) {
@@ -315,7 +315,7 @@ trait HandlesCorrectiveReviewActions
       return [
         'message' => 'Revisión correctiva #' . $reviewId . ' actualizada.',
         'review_id' => (string) $reviewId,
-        'review_url' => self::defaultCorrectiveReviewUrl() . rawurlencode((string) $reviewId),
+        'review_url' => self::correctiveReviewPublicUrl($reviewId),
       ];
     } catch (\Throwable $error) {
       if ($storedPhotos) {
@@ -653,7 +653,7 @@ trait HandlesCorrectiveReviewActions
    */
   private function correctiveReviewEnqueueCreatedNotifications(array $review, array $ticket, array $contract, array $actor, int $reviewId): int
   {
-    $reviewUrl = self::defaultCorrectiveReviewUrl() . rawurlencode((string) $reviewId);
+    $reviewUrl = self::signedCorrectiveReviewPublicUrl($reviewId);
     $ticketLabel = trim((string) ($ticket['id_ticket'] ?? '')) ?: (string) ($ticket['_ID'] ?? '');
     $propertyCode = $this->correctiveReviewFirstText([$review['inmueble'] ?? '', $ticket['inmueble'] ?? '', $contract['inmueble'] ?? '', $review['id_inmueble'] ?? '']);
     $address = $this->correctiveReviewFirstText([$review['direccion'] ?? '', $ticket['direccion'] ?? '', $contract['direccion'] ?? '']);
@@ -837,7 +837,7 @@ trait HandlesCorrectiveReviewActions
                 <span><?= $h($this->correctiveReviewDateLabel($review['fecha'] ?? $review['cct_created'] ?? '')) ?></span>
               </div>
               <div class="scm-corrective-existing-actions">
-                <?php if ($id !== ''): ?><button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-url="<?= $h(self::defaultCorrectiveReviewUrl() . rawurlencode($id)) ?>" data-iframe-title="Revisión correctiva #<?= $h($id) ?>">Ver informe</button><?php endif; ?>
+                <?php if ($id !== ''): ?><button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-url="<?= $h(self::correctiveReviewPublicUrl((int) $id)) ?>" data-iframe-title="Revisión correctiva #<?= $h($id) ?>">Ver informe</button><?php endif; ?>
                 <?php if ($id !== ''): ?><button type="button" class="scm-acta-button scm-acta-secondary" data-corrective-edit-review="<?= $h($id) ?>">Editar</button><?php endif; ?>
                 <?php if ($id !== ''): ?><button type="button" class="scm-acta-button scm-acta-danger" data-corrective-delete-review="<?= $h($id) ?>">Eliminar</button><?php endif; ?>
               </div>
