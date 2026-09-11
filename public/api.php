@@ -7,6 +7,9 @@ require_once dirname(__DIR__) . '/bootstrap/app.php';
 ob_end_clean();
 
 header('Content-Type: application/json; charset=UTF-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
 set_time_limit(60);
 ini_set('memory_limit', '256M');
 

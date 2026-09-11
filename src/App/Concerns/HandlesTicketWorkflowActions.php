@@ -374,15 +374,6 @@ trait HandlesTicketWorkflowActions
           break;
         }
       }
-      $isDefaultFirstPage = !$hasStatFilters && (int) ($params['fPage'] ?? 1) === 1;
-      $listCacheName = 'dashboard-maintenance-default-v3-'
-        . substr(hash('sha256', json_encode($config)), 0, 16);
-      if ($isDefaultFirstPage) {
-        $cachedList = $this->readDashboardPerformanceCache($listCacheName, 900);
-        if (is_array($cachedList)) {
-          $this->jsonOk($cachedList);
-        }
-      }
       if (!$hasStatFilters) {
         $cachedMetrics = $this->readDashboardPerformanceCache('dashboard-metrics-v2', 900);
         $cachedMaintenance = is_array($cachedMetrics['detalle_por_categoria']['mantenimiento'] ?? null)
@@ -419,9 +410,6 @@ trait HandlesTicketWorkflowActions
         'kpi_magnitud_medio' => (string)($stats['magnitud_medio'] ?? 0),
         'kpi_magnitud_bajo' => (string)($stats['magnitud_bajo'] ?? 0),
       ];
-      if ($isDefaultFirstPage) {
-        $this->writeDashboardPerformanceCache($listCacheName, $payload);
-      }
       $this->jsonOk($payload);
     }
 
