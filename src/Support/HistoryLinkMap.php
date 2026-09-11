@@ -16,6 +16,9 @@ final class HistoryLinkMap
    */
   public static function idButtons(): array
   {
+    $baseUrl = defined('SCM_BASE_URL') ? rtrim((string) SCM_BASE_URL, '/') . '/' : '';
+    $correctiveReviewUrl = $baseUrl . 'revision-correctiva.php?numero=';
+
     return [
       // Tickets
       'id_ticket_cliente' => ['label' => 'Ver ticket cliente', 'base' => 'https://sucasainmobiliaria.com.co/ticket/?id_ticket='],
@@ -24,7 +27,7 @@ final class HistoryLinkMap
 
       // Revisiones
       'id_revision_preventiva' => ['label' => 'Ver revision preventiva', 'base' => 'https://sucasainmobiliaria.com.co/revision-preventiva/?numero='],
-      'id_revision_correctiva' => ['label' => 'Ver revision correctiva', 'base' => 'https://sucasainmobiliaria.com.co/revision-correctiva/?numero='],
+      'id_revision_correctiva' => ['label' => 'Ver revision correctiva', 'base' => $correctiveReviewUrl],
       'id_revision_entrega' => ['label' => 'Ver revision de entrega', 'base' => 'https://sucasainmobiliaria.com.co/revision-de-entrega/?numero='],
       'id_revision_recibo' => ['label' => 'Ver revision de recibo', 'base' => 'https://sucasainmobiliaria.com.co/revision-de-recibo/?numero='],
       'id_revision_sp' => ['label' => 'Ver revision de servicios publicos', 'base' => 'https://sucasainmobiliaria.com.co/revision-de-servicios-publicos/?numero='],

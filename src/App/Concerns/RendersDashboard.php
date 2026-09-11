@@ -16,7 +16,7 @@ trait RendersDashboard
     $config = array_merge([
       'ticket_url'     => self::DEFAULT_TICKET_URL,
       'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
-      'correctiva_url' => self::DEFAULT_CORRECTIVA_URL,
+      'correctiva_url' => self::defaultCorrectiveReviewUrl(),
       'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
       'acta_url'       => self::DEFAULT_ACTA_URL,
       'calendar_app_url' => self::DEFAULT_CALENDAR_APP_URL,
@@ -3848,7 +3848,7 @@ trait RendersDashboard
         [
           'ticket_url' => self::DEFAULT_TICKET_URL,
           'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
-          'correctiva_url' => self::DEFAULT_CORRECTIVA_URL,
+          'correctiva_url' => self::defaultCorrectiveReviewUrl(),
           'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
           'acta_url' => self::DEFAULT_ACTA_URL,
         ]

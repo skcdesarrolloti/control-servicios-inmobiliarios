@@ -124,7 +124,7 @@ final class SuCasaControlServiciosInmobiliarios
 
   const DEFAULT_TICKET_URL = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=';
   const DEFAULT_PREVENTIVA_URL = 'https://sucasainmobiliaria.com.co/revision-preventiva/?numero=';
-  const DEFAULT_CORRECTIVA_URL = 'https://sucasainmobiliaria.com.co/revision-correctiva/?numero=';
+  const DEFAULT_CORRECTIVA_URL = 'revision-correctiva.php?numero=';
   const DEFAULT_COTIZACION_URL = 'https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero=';
   const DEFAULT_ACTA_URL = 'https://sucasainmobiliaria.com.co/acta-de-satisfaccion/?numero=';
   const DEFAULT_CALENDAR_APP_URL = 'https://calendar-skc.netlify.app';
@@ -530,6 +530,12 @@ final class SuCasaControlServiciosInmobiliarios
   private static function sanitizeUrl(string $url): string
   {
     return filter_var($url, FILTER_SANITIZE_URL) ?: $url;
+  }
+
+  public static function defaultCorrectiveReviewUrl(): string
+  {
+    $base = defined('SCM_BASE_URL') ? rtrim((string) SCM_BASE_URL, '/') : '';
+    return ($base !== '' ? $base . '/' : '') . self::DEFAULT_CORRECTIVA_URL;
   }
 
   private function normalizePropertyLocationInput(string $raw): string

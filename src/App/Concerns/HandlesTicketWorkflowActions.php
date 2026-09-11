@@ -139,7 +139,7 @@ trait HandlesTicketWorkflowActions
       $config = [
         'ticket_url' => self::DEFAULT_TICKET_URL,
         'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
-        'correctiva_url' => self::DEFAULT_CORRECTIVA_URL,
+        'correctiva_url' => self::defaultCorrectiveReviewUrl(),
         'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
         'acta_url' => self::DEFAULT_ACTA_URL,
       ];
@@ -357,7 +357,7 @@ trait HandlesTicketWorkflowActions
     $config = [
       'ticket_url'     => self::sanitizeUrl($rawConfig['ticket_url']     ?? self::DEFAULT_TICKET_URL),
       'preventiva_url' => self::sanitizeUrl($rawConfig['preventiva_url'] ?? self::DEFAULT_PREVENTIVA_URL),
-      'correctiva_url' => self::sanitizeUrl($rawConfig['correctiva_url'] ?? self::DEFAULT_CORRECTIVA_URL),
+      'correctiva_url' => self::sanitizeUrl($rawConfig['correctiva_url'] ?? self::defaultCorrectiveReviewUrl()),
       'cotizacion_url' => self::sanitizeUrl($rawConfig['cotizacion_url'] ?? self::DEFAULT_COTIZACION_URL),
       'acta_url'       => self::sanitizeUrl($rawConfig['acta_url']       ?? self::DEFAULT_ACTA_URL),
     ];
@@ -544,7 +544,7 @@ trait HandlesTicketWorkflowActions
     $config = [
       'ticket_url'     => self::sanitizeUrl($rawConfig['ticket_url']     ?? self::DEFAULT_TICKET_URL),
       'preventiva_url' => self::sanitizeUrl($rawConfig['preventiva_url'] ?? self::DEFAULT_PREVENTIVA_URL),
-      'correctiva_url' => self::sanitizeUrl($rawConfig['correctiva_url'] ?? self::DEFAULT_CORRECTIVA_URL),
+      'correctiva_url' => self::sanitizeUrl($rawConfig['correctiva_url'] ?? self::defaultCorrectiveReviewUrl()),
       'cotizacion_url' => self::sanitizeUrl($rawConfig['cotizacion_url'] ?? self::DEFAULT_COTIZACION_URL),
       'acta_url'       => self::sanitizeUrl($rawConfig['acta_url']       ?? self::DEFAULT_ACTA_URL),
     ];

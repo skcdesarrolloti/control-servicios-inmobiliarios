@@ -37,7 +37,13 @@ final class GenericTicketsUiView
     }
     $html = '<div class="scm-case-actions">';
     foreach ($buttons as $btn) {
-      $html .= '<a class="scm-case-action-btn" href="' . esc_url((string) $btn['url']) . '" target="_blank" rel="noopener noreferrer">' . esc_html((string) $btn['label']) . '</a>';
+      $url = (string) ($btn['url'] ?? '');
+      $label = (string) ($btn['label'] ?? '');
+      if (strpos($url, 'revision-correctiva.php?') !== false) {
+        $html .= '<button type="button" class="scm-case-action-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label !== '' ? $label : 'Revisión correctiva') . '">' . esc_html($label) . '</button>';
+      } else {
+        $html .= '<a class="scm-case-action-btn" href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($label) . '</a>';
+      }
     }
     $html .= '</div>';
     return $html;

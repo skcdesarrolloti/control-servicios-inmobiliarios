@@ -1,0 +1,320 @@
+:root {
+  color-scheme: light;
+  --scm-navy: #071f49;
+  --scm-navy-soft: #12376c;
+  --scm-orange: #ff8500;
+  --scm-bg: #eef4fb;
+  --scm-card: #ffffff;
+  --scm-line: #cfe0f4;
+  --scm-muted: #60708b;
+  --scm-text: #061a3d;
+  --scm-shadow: 0 20px 45px rgba(7, 31, 73, .10);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.scm-corrective-public-page {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(255, 133, 0, .12), transparent 30rem),
+    linear-gradient(180deg, #f8fbff 0%, var(--scm-bg) 100%);
+  color: var(--scm-text);
+  font-family: Poppins, Arial, sans-serif;
+}
+
+.scm-corrective-public-shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 34px 0 48px;
+}
+
+.scm-corrective-public-head,
+.scm-corrective-public-card {
+  background: rgba(255, 255, 255, .96);
+  border: 1px solid var(--scm-line);
+  box-shadow: var(--scm-shadow);
+}
+
+.scm-corrective-public-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  border-radius: 24px;
+  margin-bottom: 18px;
+}
+
+.scm-corrective-public-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 148px;
+  height: 70px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--scm-navy);
+}
+
+.scm-corrective-public-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 10px;
+}
+
+.scm-corrective-public-head p,
+.scm-corrective-public-title p {
+  margin: 0 0 4px;
+  color: var(--scm-muted);
+  font-size: .85rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+
+.scm-corrective-public-head strong {
+  color: var(--scm-navy);
+  font-size: 1.22rem;
+}
+
+.scm-corrective-public-card {
+  border-radius: 22px;
+  padding: 24px;
+  margin-top: 16px;
+}
+
+.scm-corrective-public-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 5px solid var(--scm-orange);
+}
+
+.scm-corrective-public-title h1 {
+  margin: 0;
+  color: var(--scm-navy);
+  font-size: clamp(1.6rem, 4vw, 2.35rem);
+  line-height: 1.12;
+}
+
+.scm-corrective-public-title span {
+  display: block;
+  margin-top: 8px;
+  color: var(--scm-muted);
+}
+
+.scm-corrective-public-actions button {
+  border: 0;
+  border-radius: 14px;
+  background: var(--scm-orange);
+  color: #fff;
+  min-height: 44px;
+  padding: 0 20px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 14px 25px rgba(255, 133, 0, .22);
+}
+
+.scm-corrective-public-card h2 {
+  margin: 0 0 16px;
+  color: var(--scm-navy);
+  font-size: 1.15rem;
+}
+
+.scm-corrective-public-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.scm-corrective-public-grid > div {
+  min-height: 86px;
+  padding: 15px;
+  border: 1px solid #dce8f7;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.scm-corrective-public-grid span {
+  display: block;
+  margin-bottom: 8px;
+  color: #6b7b95;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.scm-corrective-public-grid strong {
+  display: block;
+  color: var(--scm-text);
+  font-size: .96rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.scm-corrective-public-grid--summary {
+  grid-template-columns: 2fr 1fr;
+}
+
+.scm-corrective-public-items {
+  display: grid;
+  gap: 16px;
+}
+
+.scm-corrective-public-item,
+.scm-corrective-public-empty {
+  border: 1px solid var(--scm-line);
+  border-radius: 20px;
+  padding: 18px;
+  background: #fbfdff;
+}
+
+.scm-corrective-public-item header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed var(--scm-line);
+}
+
+.scm-corrective-public-item header span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #e8f1ff;
+  color: var(--scm-navy-soft);
+  font-weight: 800;
+}
+
+.scm-corrective-public-item header strong {
+  color: var(--scm-orange);
+  text-align: right;
+}
+
+.scm-corrective-public-grid--item {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.scm-corrective-public-item section {
+  margin-top: 14px;
+}
+
+.scm-corrective-public-item h3 {
+  margin: 0 0 6px;
+  color: var(--scm-navy);
+  font-size: .92rem;
+}
+
+.scm-corrective-public-item p {
+  margin: 0;
+  color: #263955;
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
+.scm-corrective-public-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.scm-corrective-public-photos a {
+  display: block;
+  height: 150px;
+  overflow: hidden;
+  border: 1px solid var(--scm-line);
+  border-radius: 16px;
+  background: #f1f5fb;
+}
+
+.scm-corrective-public-photos img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.scm-corrective-public-error {
+  text-align: center;
+}
+
+.scm-corrective-public-error h1 {
+  margin: 0 0 10px;
+  color: var(--scm-navy);
+}
+
+.scm-corrective-public-error p {
+  margin: 0;
+  color: var(--scm-muted);
+}
+
+@media (max-width: 900px) {
+  .scm-corrective-public-grid,
+  .scm-corrective-public-grid--item {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .scm-corrective-public-shell {
+    width: min(100% - 20px, 1120px);
+    padding: 18px 0 32px;
+  }
+
+  .scm-corrective-public-head,
+  .scm-corrective-public-hero,
+  .scm-corrective-public-item header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .scm-corrective-public-logo {
+    width: 132px;
+    height: 62px;
+  }
+
+  .scm-corrective-public-card {
+    padding: 18px;
+  }
+
+  .scm-corrective-public-grid,
+  .scm-corrective-public-grid--summary,
+  .scm-corrective-public-grid--item {
+    grid-template-columns: 1fr;
+  }
+
+  .scm-corrective-public-item header strong {
+    text-align: left;
+  }
+}
+
+@media print {
+  body.scm-corrective-public-page {
+    background: #fff;
+  }
+
+  .scm-corrective-public-shell {
+    width: 100%;
+    padding: 0;
+  }
+
+  .scm-corrective-public-card,
+  .scm-corrective-public-head {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .scm-corrective-public-actions {
+    display: none;
+  }
+}
