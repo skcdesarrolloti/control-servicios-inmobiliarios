@@ -170,7 +170,7 @@ trait HandlesCorrectiveReviewActions
           'nombre' => $actor['name'] ?? Auth::user(),
           'correo' => $actor['email'] ?? '',
           'celular' => $actor['phone'] ?? '',
-          'respuesta' => 'Se ha elaborado la revisión correctiva del inmueble. La cotización se podrá crear posteriormente sin generar reporte administrativo desde esta revisión.',
+          'respuesta' => 'Se ha elaborado la revisión correctiva del inmueble. La cotización y el cobro se gestionarán posteriormente desde el flujo de cotizaciones.',
           'id_revision_correctiva' => $reviewId,
           'id_empleado' => $actor['employee_id'] ?? '',
         ]);
@@ -216,8 +216,10 @@ trait HandlesCorrectiveReviewActions
         $this->db->update($ticketTable, $ticketUpdate, ['_ID' => $ticketId]);
       }
 
+      $queuedEmails = $this->correctiveReviewEnqueueCreatedNotifications($reviewData, $ticket, $contract, $actor, $reviewId);
+
       return [
-        'message' => 'Revisión correctiva #' . $reviewId . ' guardada. No se generó reporte administrativo.',
+        'message' => 'Revisión correctiva #' . $reviewId . ' guardada. ' . ($queuedEmails > 0 ? 'Correos en cola: ' . $queuedEmails . '.' : 'No se encolaron correos porque no hay destinatarios válidos.'),
         'review_id' => (string) $reviewId,
         'review_url' => self::DEFAULT_CORRECTIVA_URL . rawurlencode((string) $reviewId),
       ];
@@ -639,6 +641,127 @@ trait HandlesCorrectiveReviewActions
     }
   }
 
+  /**
+   * @param array<string,mixed> $review
+   * @param array<string,mixed> $ticket
+   * @param array<string,mixed> $contract
+   * @param array<string,mixed> $actor
+   */
+  private function correctiveReviewEnqueueCreatedNotifications(array $review, array $ticket, array $contract, array $actor, int $reviewId): int
+  {
+    $reviewUrl = self::DEFAULT_CORRECTIVA_URL . rawurlencode((string) $reviewId);
+    $ticketLabel = trim((string) ($ticket['id_ticket'] ?? '')) ?: (string) ($ticket['_ID'] ?? '');
+    $propertyCode = $this->correctiveReviewFirstText([$review['inmueble'] ?? '', $ticket['inmueble'] ?? '', $contract['inmueble'] ?? '', $review['id_inmueble'] ?? '']);
+    $address = $this->correctiveReviewFirstText([$review['direccion'] ?? '', $ticket['direccion'] ?? '', $contract['direccion'] ?? '']);
+    $creatorName = trim((string) ($actor['name'] ?? $review['creador'] ?? Auth::user()));
+    $creatorEmail = trim((string) ($actor['email'] ?? $review['email_creador'] ?? ''));
+    $ownerName = $this->correctiveReviewFirstText([$review['destinatario'] ?? '', $ticket['propietario'] ?? '', $contract['propietario'] ?? 'Propietario']);
+    $ownerEmail = $this->correctiveReviewFirstText([$review['email_destinatario'] ?? '', $ticket['correo_propietario'] ?? '', $contract['correo_propietario'] ?? '']);
+
+    $recipients = [
+      ['name' => $creatorName, 'email' => $creatorEmail, 'role' => 'creador'],
+      ['name' => $ownerName, 'email' => $ownerEmail, 'role' => 'propietario'],
+    ];
+    foreach ($this->correctiveReviewInternalEmailRecipients('revision_correctiva_creada') as $recipient) {
+      $recipients[] = [
+        'name' => (string) ($recipient['name'] ?? 'Administración SuCasa'),
+        'email' => (string) ($recipient['email'] ?? ''),
+        'role' => 'funcionario_configurado',
+      ];
+    }
+    $recipients = $this->correctiveReviewUniqueEmailRecipients($recipients);
+    if ($recipients === []) {
+      return 0;
+    }
+
+    $subject = 'Revisión correctiva agregada' . ($propertyCode !== '' ? ' del inmueble #' . $propertyCode : '') . ($ticketLabel !== '' ? ' - caso #' . $ticketLabel : '');
+    $queued = 0;
+    $queue = new \SCM\Support\EmailQueue($this->db);
+
+    foreach ($recipients as $recipient) {
+      $name = trim((string) ($recipient['name'] ?? 'Usuario')) ?: 'Usuario';
+      $role = trim((string) ($recipient['role'] ?? 'destinatario'));
+      $content = '<p style="margin:0 0 16px;font-weight:600;">Apreciado(a) ' . \SCM\Support\EmailTemplate::e($name) . ':</p>';
+      $content .= '<p style="margin:0 0 14px;line-height:1.65;">Se registró una revisión correctiva del inmueble' . ($propertyCode !== '' ? ' <b>#' . \SCM\Support\EmailTemplate::e($propertyCode) . '</b>' : '') . ($address !== '' ? ', ubicado en ' . \SCM\Support\EmailTemplate::e($address) : '') . '.</p>';
+      if ($ticketLabel !== '') {
+        $content .= '<p style="margin:0 0 14px;line-height:1.65;"><b>Caso:</b> #' . \SCM\Support\EmailTemplate::e($ticketLabel) . '.</p>';
+      }
+      $content .= '<p style="margin:0;line-height:1.65;">Puedes consultar el informe para revisar los daños registrados y continuar el proceso desde la cotización cuando corresponda.</p>';
+      $html = \SCM\Support\EmailTemplate::render($subject, $content, [
+        'buttons' => [
+          ['url' => $reviewUrl, 'label' => 'Consultar informe de inspección'],
+        ],
+      ]);
+
+      $queued += $queue->enqueue((string) $recipient['email'], $subject, $html, [
+        'source_module' => 'revision_correctiva',
+        'destination_name' => $name,
+        'dedupe_key' => 'revision-correctiva-creada:' . $reviewId . ':' . $role,
+        'payload' => [
+          'review_url' => $reviewUrl,
+          'reply_to' => $creatorEmail,
+        ],
+        'meta' => [
+          'event' => 'revision_correctiva_creada',
+          'role' => $role,
+          'id_revision_correctiva' => $reviewId,
+          'id_ticket' => $ticketLabel,
+          'id_contrato' => trim((string) ($review['id_contrato'] ?? $ticket['id_contrato'] ?? $contract['_ID'] ?? '')),
+          'contrato' => trim((string) ($review['contrato'] ?? $ticket['contrato'] ?? $contract['contrato'] ?? '')),
+          'inmueble' => $propertyCode,
+          'actor' => $creatorName,
+        ],
+      ]);
+    }
+
+    return $queued;
+  }
+
+  /** @return array<int,array{name:string,email:string}> */
+  private function correctiveReviewInternalEmailRecipients(string $action): array
+  {
+    $selectedIds = array_map('strval', $this->internalNotificationRecipientsForAction($action));
+    if ($selectedIds === []) {
+      return [];
+    }
+
+    $selected = array_fill_keys($selectedIds, true);
+    $recipients = [];
+    foreach ($this->internalNotificationFuncionarioOptions() as $funcionario) {
+      $id = trim((string) ($funcionario['id'] ?? ''));
+      $email = trim((string) ($funcionario['email'] ?? ''));
+      if ($id === '' || !isset($selected[$id]) || $email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        continue;
+      }
+      $recipients[] = [
+        'name' => trim((string) ($funcionario['name'] ?? '')),
+        'email' => $email,
+      ];
+    }
+
+    return $this->correctiveReviewUniqueEmailRecipients($recipients);
+  }
+
+  /** @param array<int,array<string,mixed>> $recipients @return array<int,array{name:string,email:string,role:string}> */
+  private function correctiveReviewUniqueEmailRecipients(array $recipients): array
+  {
+    $seen = [];
+    $out = [];
+    foreach ($recipients as $recipient) {
+      $email = strtolower(trim((string) ($recipient['email'] ?? '')));
+      if ($email === '' || isset($seen[$email]) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        continue;
+      }
+      $seen[$email] = true;
+      $out[] = [
+        'name' => trim((string) ($recipient['name'] ?? '')),
+        'email' => $email,
+        'role' => trim((string) ($recipient['role'] ?? 'destinatario')),
+      ];
+    }
+    return $out;
+  }
+
   /** @return array<int,array<string,mixed>> */
   private function correctiveReviewRows(int $ticketId, array $ticket): array
   {
@@ -689,7 +812,7 @@ trait HandlesCorrectiveReviewActions
     ob_start();
     ?>
     <div class="scm-acta scm-corrective-review">
-      <p class="scm-acta-notice">Esta revisión correctiva registra los daños encontrados y deja el caso como <strong>Inspeccionado</strong>. No genera reporte administrativo; el cobro se manejará cuando se cree la primera cotización.</p>
+      <p class="scm-acta-notice">Esta revisión correctiva registra los daños encontrados y deja el caso como <strong>Inspeccionado</strong>. La cotización y el cobro se gestionarán después, desde el flujo de cotizaciones.</p>
       <div class="scm-acta-meta">
         <strong>Caso #<?= $h($ticketLabel) ?></strong>
         <span>Inmueble <?= $h($idInmueble !== '' ? $idInmueble : '-') ?> · Contrato <?= $h($contrato !== '' ? $contrato : '-') ?></span>

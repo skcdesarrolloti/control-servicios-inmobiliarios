@@ -13,6 +13,7 @@ $js = file_get_contents($root . '/public/assets/js/scm-admin.js');
 $checks = [
   'trait exists and defines ajax handler' => is_string($trait) && str_contains($trait, 'ajax_handler_corrective_review'),
   'trait does not call administrative report hook' => is_string($trait) && !str_contains($trait, 'reporte-administrativos-unificado'),
+  'trait wording does not expose administrative report on corrective save' => is_string($trait) && !str_contains($trait, 'No se generó reporte administrativo') && !str_contains($trait, 'sin generar reporte administrativo'),
   'trait writes revision_correctiva CCT' => is_string($trait) && str_contains($trait, "jet_cct_revision_correctiva"),
   'trait stores combined affected area on corrective review' => is_string($trait) && str_contains($trait, "'area_afectada' => \$areaAfectada") && str_contains($trait, 'correctiveReviewCombinedAreas'),
   'trait reads JetEngine glossaries from wp_options' => is_string($trait) && str_contains($trait, 'correctiveReviewGlossaryOptions') && str_contains($trait, 'jet_engine_glossaries'),
@@ -23,6 +24,9 @@ $checks = [
   'trait validates corrective context before saving' => is_string($trait) && str_contains($trait, 'correctiveReviewValidateContext($ticket, $contract, $property)') && str_contains($trait, 'El número de contrato encontrado no coincide'),
   'trait prioritizes ticket owner as corrective recipient' => is_string($trait) && str_contains($trait, "'destinatario' => \$this->correctiveReviewFirstText([\$ticket['propietario'] ?? '', \$contract['propietario'] ?? ''"),
   'trait does not look up properties by database id using web code' => is_string($trait) && str_contains($trait, "WHERE `codigo` = ? OR `id_ticket` = ? LIMIT 1") && !str_contains($trait, "WHERE `_ID` = ? OR `id_ticket` = ?"),
+  'trait enqueues corrective review emails through shared queue' => is_string($trait) && str_contains($trait, 'correctiveReviewEnqueueCreatedNotifications') && str_contains($trait, "new \\SCM\\Support\\EmailQueue") && str_contains($trait, "'source_module' => 'revision_correctiva'"),
+  'trait notifies corrective creator and owner' => is_string($trait) && str_contains($trait, "'role' => 'creador'") && str_contains($trait, "'role' => 'propietario'") && str_contains($trait, "'event' => 'revision_correctiva_creada'"),
+  'internal notification settings include corrective review event' => is_string($app) && str_contains($app, 'revision_correctiva_creada') && str_contains($app, 'Revisión correctiva creada') && str_contains($app, 'Email interno en cola'),
   'trait supports editing and deleting corrective reviews' => is_string($trait) && str_contains($trait, 'correctiveReviewUpdate') && str_contains($trait, 'correctiveReviewDelete'),
   'trait updates ticket revision field' => is_string($trait) && str_contains($trait, "'id_revision_correctiva'"),
   'trait records ticket history' => is_string($trait) && str_contains($trait, "jet_cct_historial_del_ticket"),

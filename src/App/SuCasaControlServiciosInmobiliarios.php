@@ -274,6 +274,11 @@ final class SuCasaControlServiciosInmobiliarios
       'mantenimiento' => [
         'label' => 'Mantenimiento',
         'items' => [
+          'revision_correctiva_creada' => [
+            'label' => 'Revisión correctiva creada',
+            'description' => 'Cuando se registra una revisión correctiva desde el panel.',
+            'channel' => 'Email interno en cola',
+          ],
           'orden_mantenimiento_creada' => [
             'label' => 'Orden de mantenimiento creada',
             'description' => 'Cuando se crea una orden desde una cotización aprobada.',
