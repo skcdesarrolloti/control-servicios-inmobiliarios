@@ -108,6 +108,7 @@ trait HandlesCorrectiveReviewActions
       $items = $this->correctiveReviewAttachUploadedPhotos($items, $storedPhotos);
 
       $actor = $this->ticketCompletionActor();
+      $actorEmployeeId = $this->correctiveReviewFirstText([$actor['employee_id'] ?? '', Auth::userId()]);
       $now = time();
       $nowSql = date('Y-m-d H:i:s', $now);
       $areaAfectada = $this->correctiveReviewCombinedAreas($items);
@@ -124,7 +125,7 @@ trait HandlesCorrectiveReviewActions
         'tip_inm' => $this->correctiveReviewFirstText([$ticket['tipo_inmueble'] ?? '', $contract['tipo_inmueble'] ?? '', $property['tipo_inmueble'] ?? '']),
         'area_afectada' => $areaAfectada,
         'evaluacion_de_danos' => serialize($items),
-        'cct_author_id' => Auth::userId(),
+        'cct_author_id' => $actorEmployeeId,
         'cct_created' => $nowSql,
         'cct_modified' => $nowSql,
         'creador' => $actor['name'] ?? Auth::user(),
@@ -137,7 +138,7 @@ trait HandlesCorrectiveReviewActions
         'email_destinatario' => $this->correctiveReviewFirstText([$ownerEmail, $tenantEmail]),
         'contrato' => ltrim($this->correctiveReviewFirstText([$ticket['contrato'] ?? '', $contract['contrato'] ?? '', $ticket['id_contrato'] ?? '', $contract['_ID'] ?? '']), '#'),
         'inmueble' => $this->correctiveReviewFirstText([$ticket['inmueble'] ?? '', $contract['inmueble'] ?? '']),
-        'id_empleado' => $this->correctiveReviewFirstText([$ticket['id_empleado'] ?? '', $actor['employee_id'] ?? '']),
+        'id_empleado' => $actorEmployeeId,
         'id_propietario' => $this->correctiveReviewFirstText([$ticket['id_propietario'] ?? '', $contract['id_propietario'] ?? '', $property['id_propietario'] ?? '']),
         'id_arrendatario' => $this->correctiveReviewFirstText([$ticket['id_arrendatario'] ?? '', $contract['id_arrendatario'] ?? '', $property['id_arrendatario'] ?? '']),
         'sucursal' => $this->correctiveReviewFirstText([$ticket['id_sucursal'] ?? '', $contract['sucursal'] ?? '', $property['sucursal'] ?? '']),
@@ -162,7 +163,7 @@ trait HandlesCorrectiveReviewActions
       if ($schema->tableExists($historyTable)) {
         $history = $schema->filterTableData($historyTable, [
           'cct_status' => 'publish',
-          'cct_author_id' => Auth::userId(),
+          'cct_author_id' => $actorEmployeeId,
           'cct_created' => $nowSql,
           'cct_modified' => $nowSql,
           'id_ticket' => $ticketId,
@@ -172,7 +173,7 @@ trait HandlesCorrectiveReviewActions
           'celular' => $actor['phone'] ?? '',
           'respuesta' => 'Se ha elaborado la revisión correctiva del inmueble. La cotización y el cobro se gestionarán posteriormente desde el flujo de cotizaciones.',
           'id_revision_correctiva' => $reviewId,
-          'id_empleado' => $actor['employee_id'] ?? '',
+          'id_empleado' => $actorEmployeeId,
         ]);
         if ($history) {
           $this->db->insert($historyTable, $history);
@@ -182,10 +183,10 @@ trait HandlesCorrectiveReviewActions
       if ($schema->tableExists($propertyHistoryTable)) {
         $propertyHistory = $schema->filterTableData($propertyHistoryTable, [
           'cct_status' => 'publish',
-          'cct_author_id' => Auth::userId(),
+          'cct_author_id' => $actorEmployeeId,
           'cct_created' => $nowSql,
           'cct_modified' => $nowSql,
-          'id_empleado' => $actor['employee_id'] ?? '',
+          'id_empleado' => $actorEmployeeId,
           'id_inmueble' => $reviewData['id_inmueble'] ?? '',
           'fecha' => $now,
           'tipo_reporte' => 'Revision correctiva',
@@ -258,11 +259,13 @@ trait HandlesCorrectiveReviewActions
       $now = time();
       $nowSql = date('Y-m-d H:i:s', $now);
       $actor = $this->ticketCompletionActor();
+      $actorEmployeeId = $this->correctiveReviewFirstText([$actor['employee_id'] ?? '', Auth::userId()]);
       $update = $schema->filterTableData($reviewTable, [
         'evaluacion_de_danos' => serialize($items),
         'area_afectada' => $areaAfectada,
         'cct_modified' => $nowSql,
-        'cct_author_id' => Auth::userId(),
+        'cct_author_id' => $actorEmployeeId,
+        'id_empleado' => $actorEmployeeId,
       ]);
       if (!$update || $this->db->update($reviewTable, $update, ['_ID' => $reviewId]) < 0) {
         throw new \DomainException('No fue posible actualizar la revisión correctiva.');
@@ -271,7 +274,7 @@ trait HandlesCorrectiveReviewActions
       if ($schema->tableExists($historyTable)) {
         $history = $schema->filterTableData($historyTable, [
           'cct_status' => 'publish',
-          'cct_author_id' => Auth::userId(),
+          'cct_author_id' => $actorEmployeeId,
           'cct_created' => $nowSql,
           'cct_modified' => $nowSql,
           'id_ticket' => $ticketId,
@@ -281,7 +284,7 @@ trait HandlesCorrectiveReviewActions
           'celular' => $actor['phone'] ?? '',
           'respuesta' => 'Se actualizó la revisión correctiva #' . $reviewId . ' del inmueble.',
           'id_revision_correctiva' => $reviewId,
-          'id_empleado' => $actor['employee_id'] ?? '',
+          'id_empleado' => $actorEmployeeId,
         ]);
         if ($history) {
           $this->db->insert($historyTable, $history);
@@ -292,10 +295,10 @@ trait HandlesCorrectiveReviewActions
         $property = is_array($context['property'] ?? null) ? $context['property'] : [];
         $history = $schema->filterTableData($propertyHistoryTable, [
           'cct_status' => 'publish',
-          'cct_author_id' => Auth::userId(),
+          'cct_author_id' => $actorEmployeeId,
           'cct_created' => $nowSql,
           'cct_modified' => $nowSql,
-          'id_empleado' => $actor['employee_id'] ?? '',
+          'id_empleado' => $actorEmployeeId,
           'id_inmueble' => $this->correctiveReviewFirstText([$review['id_inmueble'] ?? '', $property['_ID'] ?? '']),
           'fecha' => $now,
           'tipo_reporte' => 'Revision correctiva',
@@ -356,9 +359,10 @@ trait HandlesCorrectiveReviewActions
     if ($schema->tableExists($historyTable)) {
       $now = time();
       $actor = $this->ticketCompletionActor();
+      $actorEmployeeId = $this->correctiveReviewFirstText([$actor['employee_id'] ?? '', Auth::userId()]);
       $history = $schema->filterTableData($historyTable, [
         'cct_status' => 'publish',
-        'cct_author_id' => Auth::userId(),
+        'cct_author_id' => $actorEmployeeId,
         'cct_created' => date('Y-m-d H:i:s', $now),
         'cct_modified' => date('Y-m-d H:i:s', $now),
         'id_ticket' => $ticketId,
@@ -367,7 +371,7 @@ trait HandlesCorrectiveReviewActions
         'correo' => $actor['email'] ?? '',
         'celular' => $actor['phone'] ?? '',
         'respuesta' => 'Se eliminó la revisión correctiva #' . $reviewId . '.',
-        'id_empleado' => $actor['employee_id'] ?? '',
+        'id_empleado' => $actorEmployeeId,
       ]);
       if ($history) {
         $this->db->insert($historyTable, $history);

@@ -16,6 +16,7 @@ $checks = [
   'trait wording does not expose administrative report on corrective save' => is_string($trait) && !str_contains($trait, 'No se generó reporte administrativo') && !str_contains($trait, 'sin generar reporte administrativo'),
   'trait writes revision_correctiva CCT' => is_string($trait) && str_contains($trait, "jet_cct_revision_correctiva"),
   'trait stores combined affected area on corrective review' => is_string($trait) && str_contains($trait, "'area_afectada' => \$areaAfectada") && str_contains($trait, 'correctiveReviewCombinedAreas'),
+  'trait stores employee id as corrective CCT author' => is_string($trait) && str_contains($trait, '$actorEmployeeId = $this->correctiveReviewFirstText') && str_contains($trait, "'cct_author_id' => \$actorEmployeeId") && str_contains($trait, "'id_empleado' => \$actorEmployeeId"),
   'trait reads JetEngine glossaries from wp_options' => is_string($trait) && str_contains($trait, 'correctiveReviewGlossaryOptions') && str_contains($trait, 'jet_engine_glossaries'),
   'trait renders dynamic affected area fields' => is_string($trait) && str_contains($trait, 'data-corrective-area-group') && str_contains($trait, 'area_afectada_1') && str_contains($trait, 'area_afectada_4'),
   'trait keeps JetForm affected-area select fallbacks' => is_string($trait) && str_contains($trait, 'Muros de fachada o antepechos') && str_contains($trait, 'Vigas, columnas'),
