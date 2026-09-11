@@ -9,6 +9,7 @@ $router = file_get_contents($root . '/src/Http/Api/AuthenticatedActionRouter.php
 $dashboard = file_get_contents($root . '/src/App/Concerns/RendersDashboard.php');
 $maintenanceRows = file_get_contents($root . '/src/Modules/ServiciosInmobiliarios/Concerns/TableRowsConcern.php');
 $js = file_get_contents($root . '/public/assets/js/scm-admin.js');
+$css = file_get_contents($root . '/public/assets/css/ticket-completion.css');
 
 $checks = [
   'trait exists and defines ajax handler' => is_string($trait) && str_contains($trait, 'ajax_handler_corrective_review'),
@@ -40,6 +41,7 @@ $checks = [
   'case modal changes corrective review button label when review exists' => is_string($js) && str_contains($js, 'hasCorrectiveReview') && str_contains($js, 'Gestionar revisi'),
   'corrective review modal exposes edit and delete actions' => is_string($js) && str_contains($js, 'data-corrective-edit-review') && str_contains($js, 'data-corrective-delete-review') && str_contains($js, 'data-corrective-review-edit'),
   'corrective review modal syncs dynamic affected area fields' => is_string($js) && str_contains($js, 'syncCorrectiveAreaFields') && str_contains($js, 'data-corrective-indice'),
+  'corrective review form keeps padded action spacing' => is_string($css) && str_contains($css, '.scm-corrective-review form > .scm-acta-actions') && str_contains($css, 'padding-top: 14px'),
   'maintenance rows mark their source tab' => is_string($maintenanceRows) && str_contains($maintenanceRows, 'data-tab-key="mantenimiento"'),
   'case modal limits corrective review to maintenance tab' => is_string($js) && str_contains($js, 'function isMaintenanceCase') && str_contains($js, '&& isMaintenanceForActions'),
   'case actions are separated into groups' => is_string($js) && str_contains($js, 'renderActionGroup("Complementarias"') && str_contains($js, 'renderActionGroup("Cotización"'),

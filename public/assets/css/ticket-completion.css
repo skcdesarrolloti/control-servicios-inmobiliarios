@@ -75,6 +75,8 @@
 .scm-corrective-existing span { color: var(--acta-muted); }
 .scm-corrective-existing-info { display: grid; gap: 2px; min-width: 180px; }
 .scm-corrective-existing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.scm-corrective-review form > .scm-acta-actions { margin-top: 10px; padding-top: 14px; }
+.scm-corrective-review [data-corrective-add-item] { margin-top: 8px; }
 .scm-acta-empty { display: grid; gap: 6px; margin: 18px 0 0; padding: 14px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; color: var(--acta-ink); }
 .scm-acta-empty span { color: var(--acta-muted); }
 .scm-corrective-area-field { display: grid; gap: 6px; font-weight: 600; margin: 12px 0; min-width: 0; }
