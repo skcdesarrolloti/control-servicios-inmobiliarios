@@ -113,6 +113,7 @@ trait HandlesCorrectiveReviewActions
       $areaAfectada = $this->correctiveReviewCombinedAreas($items);
       $contract = is_array($context['contract'] ?? null) ? $context['contract'] : [];
       $property = is_array($context['property'] ?? null) ? $context['property'] : [];
+      $this->correctiveReviewValidateContext($ticket, $contract, $property);
       $ownerEmail = $this->correctiveReviewFirstText([$ticket['correo_propietario'] ?? '', $contract['correo_propietario'] ?? '']);
       $tenantEmail = $this->correctiveReviewFirstText([$ticket['correo_arrendatario'] ?? '', $contract['correo_arrendatario'] ?? '']);
       $ownerPhone = $this->correctiveReviewFirstText([$ticket['celular_propietario'] ?? '', $contract['celular_propietario'] ?? '']);
@@ -131,10 +132,10 @@ trait HandlesCorrectiveReviewActions
         'id_ticket' => $ticketId,
         'id_inmueble' => $this->correctiveReviewFirstText([$ticket['id_inmueble'] ?? '', $contract['id_inmueble'] ?? '', $property['_ID'] ?? '']),
         'tiene_cotizacion' => 'No',
-        'destinatario' => $this->correctiveReviewFirstText([$contract['propietario'] ?? '', $ticket['propietario'] ?? '', $contract['arrendatario'] ?? '', $ticket['arrendatario'] ?? '']),
+        'destinatario' => $this->correctiveReviewFirstText([$ticket['propietario'] ?? '', $contract['propietario'] ?? '', $ticket['arrendatario'] ?? '', $contract['arrendatario'] ?? '']),
         'celular_destinatario' => $this->correctiveReviewFirstText([$ownerPhone, $tenantPhone]),
         'email_destinatario' => $this->correctiveReviewFirstText([$ownerEmail, $tenantEmail]),
-        'contrato' => ltrim($this->correctiveReviewFirstText([$ticket['contrato'] ?? '', $ticket['id_contrato'] ?? '', $contract['contrato'] ?? '', $contract['_ID'] ?? '']), '#'),
+        'contrato' => ltrim($this->correctiveReviewFirstText([$ticket['contrato'] ?? '', $contract['contrato'] ?? '', $ticket['id_contrato'] ?? '', $contract['_ID'] ?? '']), '#'),
         'inmueble' => $this->correctiveReviewFirstText([$ticket['inmueble'] ?? '', $contract['inmueble'] ?? '']),
         'id_empleado' => $this->correctiveReviewFirstText([$ticket['id_empleado'] ?? '', $actor['employee_id'] ?? '']),
         'id_propietario' => $this->correctiveReviewFirstText([$ticket['id_propietario'] ?? '', $contract['id_propietario'] ?? '', $property['id_propietario'] ?? '']),
@@ -146,8 +147,8 @@ trait HandlesCorrectiveReviewActions
         'coordinador' => $actor['name'] ?? '',
         'email_coordinador' => $actor['email'] ?? '',
         'celular_coordinador' => $actor['phone'] ?? '',
-        'tipo_negocio' => $this->correctiveReviewFirstText([$property['tipo_negocio'] ?? '', $contract['gestion_inmueble'] ?? '']),
-        'destinacion' => $this->correctiveReviewFirstText([$property['destinacion'] ?? '', $contract['destinacion_inmueble'] ?? '']),
+        'tipo_negocio' => $this->correctiveReviewFirstText([$ticket['tipo_negocio'] ?? '', $property['tipo_negocio'] ?? '', $contract['gestion_inmueble'] ?? '']),
+        'destinacion' => $this->correctiveReviewFirstText([$ticket['destinacion'] ?? '', $property['destinacion'] ?? '', $contract['destinacion_inmueble'] ?? '']),
       ];
       $reviewData = $schema->filterTableData($reviewTable, $reviewData);
       if (!$this->db->insert($reviewTable, $reviewData)) {
@@ -510,6 +511,7 @@ trait HandlesCorrectiveReviewActions
     }
     $contract = $this->correctiveReviewContract($ticket);
     $property = $this->correctiveReviewProperty($ticket, $contract);
+    $this->correctiveReviewValidateContext($ticket, $contract, $property);
     return [
       'ticket' => $ticket,
       'contract' => $contract,
@@ -535,16 +537,16 @@ trait HandlesCorrectiveReviewActions
     if (!$this->table_exists($table)) {
       return [];
     }
-    $idContrato = preg_replace('/\D+/', '', (string) ($ticket['id_contrato'] ?? '')) ?: '';
+    $idContrato = $this->correctiveReviewDigits($ticket['id_contrato'] ?? '');
     if ($idContrato !== '') {
-      $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? OR `contrato` = ? LIMIT 1", [$idContrato, $idContrato]);
+      $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$idContrato]);
       if ($row) {
         return $row;
       }
     }
-    $contrato = preg_replace('/\D+/', '', (string) ($ticket['contrato'] ?? '')) ?: '';
+    $contrato = $this->correctiveReviewDigits($ticket['contrato'] ?? '');
     if ($contrato !== '') {
-      return $this->db->getRow("SELECT * FROM `{$table}` WHERE `contrato` = ? OR `_ID` = ? LIMIT 1", [$contrato, $contrato]) ?: [];
+      return $this->db->getRow("SELECT * FROM `{$table}` WHERE `contrato` = ? LIMIT 1", [$contrato]) ?: [];
     }
     return [];
   }
@@ -556,17 +558,85 @@ trait HandlesCorrectiveReviewActions
     if (!$this->table_exists($table)) {
       return [];
     }
-    foreach ([$ticket['id_inmueble_data'] ?? '', $contract['id_inmueble_data'] ?? '', $ticket['id_inmueble'] ?? '', $contract['id_inmueble'] ?? ''] as $candidate) {
-      $id = preg_replace('/\D+/', '', (string) $candidate) ?: '';
+    foreach ([$contract['id_inmueble_data'] ?? '', $ticket['id_inmueble_data'] ?? ''] as $candidate) {
+      $id = $this->correctiveReviewDigits($candidate);
+      $row = $id !== '' ? $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$id]) : null;
+      if ($row) {
+        return $row;
+      }
+    }
+    $contractId = $this->correctiveReviewDigits($contract['_ID'] ?? ($ticket['id_contrato'] ?? ''));
+    if ($contractId !== '') {
+      $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `id_contrato_arrendamiento` = ? LIMIT 1", [$contractId]);
+      if ($row) {
+        return $row;
+      }
+    }
+    foreach ([$ticket['id_inmueble'] ?? '', $contract['id_inmueble'] ?? '', $ticket['inmueble'] ?? '', $contract['inmueble'] ?? ''] as $candidate) {
+      $id = $this->correctiveReviewDigits($candidate);
       if ($id === '') {
         continue;
       }
-      $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? OR `id_ticket` = ? LIMIT 1", [$id, $id]);
+      $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `codigo` = ? OR `id_ticket` = ? LIMIT 1", [$id, $id]);
       if ($row) {
         return $row;
       }
     }
     return [];
+  }
+
+  /**
+   * Evita guardar revisiones con datos mezclados de otro contrato/inmueble.
+   *
+   * @param array<string,mixed> $ticket
+   * @param array<string,mixed> $contract
+   * @param array<string,mixed> $property
+   */
+  private function correctiveReviewValidateContext(array $ticket, array $contract, array $property): void
+  {
+    if ($contract) {
+      $ticketContractId = $this->correctiveReviewDigits($ticket['id_contrato'] ?? '');
+      $contractId = $this->correctiveReviewDigits($contract['_ID'] ?? '');
+      if ($ticketContractId !== '' && $contractId !== '' && $ticketContractId !== $contractId) {
+        throw new \DomainException('El contrato encontrado no coincide con el contrato interno del caso. Recarga el caso antes de crear la revisión.');
+      }
+
+      $ticketContract = $this->correctiveReviewDigits($ticket['contrato'] ?? '');
+      $contractNumber = $this->correctiveReviewDigits($contract['contrato'] ?? '');
+      if ($ticketContract !== '' && $contractNumber !== '' && $ticketContract !== $contractNumber) {
+        throw new \DomainException('El número de contrato encontrado no coincide con el número de contrato del caso. Recarga el caso antes de crear la revisión.');
+      }
+
+      $ticketPropertyId = $this->correctiveReviewDigits($ticket['id_inmueble'] ?? '');
+      $contractPropertyId = $this->correctiveReviewDigits($contract['id_inmueble'] ?? '');
+      if ($ticketPropertyId !== '' && $contractPropertyId !== '' && $ticketPropertyId !== $contractPropertyId) {
+        throw new \DomainException('El inmueble encontrado no coincide con el inmueble del caso. Recarga el caso antes de crear la revisión.');
+      }
+
+      $ticketPropertyCode = $this->correctiveReviewDigits($ticket['inmueble'] ?? '');
+      $contractPropertyCode = $this->correctiveReviewDigits($contract['inmueble'] ?? '');
+      if ($ticketPropertyCode !== '' && $contractPropertyCode !== '' && $ticketPropertyCode !== $contractPropertyCode) {
+        throw new \DomainException('El código de inmueble encontrado no coincide con el código del caso. Recarga el caso antes de crear la revisión.');
+      }
+    }
+
+    if (!$property) {
+      return;
+    }
+
+    $propertyId = $this->correctiveReviewDigits($property['_ID'] ?? '');
+    foreach ([$contract['id_inmueble_data'] ?? '', $ticket['id_inmueble_data'] ?? ''] as $candidate) {
+      $expectedId = $this->correctiveReviewDigits($candidate);
+      if ($expectedId !== '' && $propertyId !== '' && $expectedId !== $propertyId) {
+        throw new \DomainException('El inmueble de datos encontrado no corresponde al caso. Recarga el caso antes de crear la revisión.');
+      }
+    }
+
+    $contractId = $this->correctiveReviewDigits($contract['_ID'] ?? ($ticket['id_contrato'] ?? ''));
+    $propertyContractId = $this->correctiveReviewDigits($property['id_contrato_arrendamiento'] ?? '');
+    if ($contractId !== '' && $propertyContractId !== '' && $contractId !== $propertyContractId) {
+      throw new \DomainException('El inmueble encontrado pertenece a otro contrato. Recarga el caso antes de crear la revisión.');
+    }
   }
 
   /** @return array<int,array<string,mixed>> */
@@ -1098,6 +1168,11 @@ trait HandlesCorrectiveReviewActions
       }
     }
     return '';
+  }
+
+  private function correctiveReviewDigits($value): string
+  {
+    return preg_replace('/\D+/', '', (string) $value) ?: '';
   }
 
   /** @return array<int,string> */
