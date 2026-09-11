@@ -86,9 +86,7 @@ final class CorrectiveReviewPublicView
 
     $content = '<article class="scm-corrective-public-card scm-corrective-public-hero">'
       . '<div class="scm-corrective-public-title">'
-      . '<p>Informe público</p>'
       . '<h1>' . $this->h($title) . '</h1>'
-      . '<span>Consulta nativa del panel de servicios inmobiliarios.</span>'
       . '</div>'
       . '<div class="scm-corrective-public-actions">'
       . '<button type="button" onclick="window.print()">Imprimir</button>'
@@ -288,7 +286,8 @@ final class CorrectiveReviewPublicView
       if ($url === '') {
         continue;
       }
-      $photosHtml .= '<a href="' . $this->h($url) . '" target="_blank" rel="noopener"><img src="' . $this->h($url) . '" alt="Evidencia del daño #' . $number . '" loading="lazy"></a>';
+      $photoAlt = 'Evidencia del daño #' . $number;
+      $photosHtml .= '<button type="button" class="scm-corrective-public-photo" data-corrective-photo-url="' . $this->h($url) . '" data-corrective-photo-alt="' . $this->h($photoAlt) . '" aria-label="Ver ' . $this->h(strtolower($photoAlt)) . '"><img src="' . $this->h($url) . '" alt="' . $this->h($photoAlt) . '" loading="lazy"><span>Ampliar</span></button>';
     }
 
     return '<article class="scm-corrective-public-item">'
