@@ -260,14 +260,21 @@ body.scm-corrective-public-page {
 
 .scm-corrective-public-signature {
   margin-left: auto;
-  width: min(440px, 100%);
+  width: min(520px, 100%);
   border-left: 6px solid var(--scm-orange);
   background:
     linear-gradient(135deg, rgba(255, 133, 0, .08), transparent 42%),
     rgba(255, 255, 255, .96);
 }
 
-.scm-corrective-public-signature span {
+.scm-corrective-public-signature-label,
+.scm-corrective-public-signature-name,
+.scm-corrective-public-signature-role,
+.scm-corrective-public-signature-contact {
+  display: block;
+}
+
+.scm-corrective-public-signature-label {
   display: block;
   color: var(--scm-muted);
   font-size: .78rem;
@@ -276,19 +283,29 @@ body.scm-corrective-public-page {
   text-transform: uppercase;
 }
 
-.scm-corrective-public-signature strong {
+.scm-corrective-public-signature-name {
   display: block;
-  margin-top: 8px;
+  margin-top: 10px;
   color: var(--scm-navy);
-  font-size: 1.24rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.scm-corrective-public-signature-role {
+  margin-top: 4px;
+  color: #1f3e6d;
+  font-size: .98rem;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .scm-corrective-public-signature p {
-  margin: 8px 0 0;
+  margin: 12px 0 0;
   color: #334864;
 }
 
-.scm-corrective-public-signature small {
+.scm-corrective-public-signature-contact {
   display: block;
   margin-top: 10px;
   color: var(--scm-muted);

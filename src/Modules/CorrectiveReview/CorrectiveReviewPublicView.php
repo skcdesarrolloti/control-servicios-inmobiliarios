@@ -68,16 +68,19 @@ final class CorrectiveReviewPublicView
     if ($itemsHtml === '') {
       $itemsHtml = '<article class="scm-corrective-public-empty">Esta revisión no tiene daños detallados guardados.</article>';
     }
-    $performedBy = $this->first([$review['creador'] ?? '', $review['funcionario'] ?? '', $review['coordinador'] ?? '']);
-    $performedEmail = $this->first([$review['email_creador'] ?? '', $review['email_coordinador'] ?? '']);
-    $performedPhone = $this->first([$review['celular_creador'] ?? '', $review['celular_coordinador'] ?? '']);
+    $employee = $this->employeeProfile($review);
+    $performedBy = $this->first([$employee['name'] ?? '', $review['creador'] ?? '', $review['funcionario'] ?? '', $review['coordinador'] ?? '']);
+    $performedCargo = $this->first([$employee['cargo'] ?? '', $review['cargo_creador'] ?? '', $review['cargo'] ?? '']);
+    $performedEmail = $this->first([$employee['email'] ?? '', $review['email_creador'] ?? '', $review['email_coordinador'] ?? '']);
+    $performedPhone = $this->first([$employee['phone'] ?? '', $review['celular_creador'] ?? '', $review['celular_coordinador'] ?? '']);
     $signatureHtml = '';
     if ($performedBy !== '') {
       $signatureHtml = '<section class="scm-corrective-public-card scm-corrective-public-signature">'
-        . '<span>Atentamente</span>'
-        . '<strong>' . $this->h($performedBy) . '</strong>'
-        . '<p>Revisión correctiva realizada desde SuCasa Inmobiliaria.</p>'
-        . ($performedEmail !== '' || $performedPhone !== '' ? '<small>' . $this->h(implode(' · ', array_filter([$performedEmail, $performedPhone]))) . '</small>' : '')
+        . '<div class="scm-corrective-public-signature-label">Atentamente,</div>'
+        . '<div class="scm-corrective-public-signature-name">' . $this->h($performedBy) . '</div>'
+        . ($performedCargo !== '' ? '<div class="scm-corrective-public-signature-role">' . $this->h($performedCargo) . '</div>' : '')
+        . '<p>Revisión correctiva realizada desde SKC SuCasa Inmobiliaria.</p>'
+        . ($performedEmail !== '' || $performedPhone !== '' ? '<div class="scm-corrective-public-signature-contact">' . $this->h(implode(' · ', array_filter([$performedEmail, $performedPhone]))) . '</div>' : '')
         . '</section>';
     }
 
@@ -177,6 +180,52 @@ final class CorrectiveReviewPublicView
       return $this->db->getRow("SELECT * FROM `{$table}` WHERE `codigo` = ? OR `id_ticket` = ? LIMIT 1", [$code, $code]) ?: [];
     }
     return [];
+  }
+
+  /** @param array<string,mixed> $review @return array{name:string,cargo:string,email:string,phone:string} */
+  private function employeeProfile(array $review): array
+  {
+    $profile = ['name' => '', 'cargo' => '', 'email' => '', 'phone' => ''];
+    $employeeId = $this->first([$review['id_empleado'] ?? '', $review['cct_author_id'] ?? '']);
+    if ($employeeId === '') {
+      return $profile;
+    }
+
+    $table = $this->db->table('jet_cct_funcionarios');
+    if (!$this->schema->tableExists($table)) {
+      return $profile;
+    }
+    $cargoTable = $this->db->table('jet_cct_cargos');
+    $hasCargoNames = $this->schema->tableExists($cargoTable)
+      && $this->schema->columnExists($cargoTable, '_ID')
+      && $this->schema->columnExists($cargoTable, 'nombre_cargo');
+    $cargoSelect = $hasCargoNames ? "TRIM(COALESCE(c.`nombre_cargo`, ''))" : "''";
+    $join = $hasCargoNames ? " LEFT JOIN `{$cargoTable}` c ON TRIM(COALESCE(f.`id_cargo`, '')) = CAST(c.`_ID` AS CHAR)" : '';
+    $row = $this->db->getRow(
+      "SELECT
+          TRIM(COALESCE(f.`nombre`, '')) AS nombre,
+          TRIM(COALESCE(f.`correo`, '')) AS correo,
+          TRIM(COALESCE(f.`celular`, '')) AS celular,
+          TRIM(COALESCE(f.`rol`, '')) AS rol,
+          TRIM(COALESCE(f.`gestion`, '')) AS gestion,
+          TRIM(COALESCE(f.`id_cargo`, '')) AS id_cargo,
+          {$cargoSelect} AS nombre_cargo
+        FROM `{$table}` f
+        {$join}
+        WHERE TRIM(COALESCE(f.`id_empleado`, '')) = ?
+        LIMIT 1",
+      [$employeeId]
+    );
+    if (!$row) {
+      return $profile;
+    }
+
+    return [
+      'name' => $this->first([$row['nombre'] ?? '']),
+      'cargo' => $this->first([$row['nombre_cargo'] ?? '', $row['rol'] ?? '', $row['gestion'] ?? '', $row['id_cargo'] ?? '']),
+      'email' => $this->first([$row['correo'] ?? '']),
+      'phone' => $this->first([$row['celular'] ?? '']),
+    ];
   }
 
   /** @return array<int,array<string,mixed>> */
