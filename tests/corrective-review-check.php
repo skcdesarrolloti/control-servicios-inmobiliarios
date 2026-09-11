@@ -17,6 +17,8 @@ $checks = [
   'trait stores combined affected area on corrective review' => is_string($trait) && str_contains($trait, "'area_afectada' => \$areaAfectada") && str_contains($trait, 'correctiveReviewCombinedAreas'),
   'trait reads JetEngine glossaries from wp_options' => is_string($trait) && str_contains($trait, 'correctiveReviewGlossaryOptions') && str_contains($trait, 'jet_engine_glossaries'),
   'trait renders dynamic affected area fields' => is_string($trait) && str_contains($trait, 'data-corrective-area-group') && str_contains($trait, 'area_afectada_1') && str_contains($trait, 'area_afectada_4'),
+  'trait keeps JetForm affected-area select fallbacks' => is_string($trait) && str_contains($trait, 'Muros de fachada o antepechos') && str_contains($trait, 'Vigas, columnas'),
+  'trait keeps JetForm damage metadata fallbacks' => is_string($trait) && str_contains($trait, "'Muy leve' => 'Muy leve'") && str_contains($trait, "'2 dias' => '2 dias'") && str_contains($trait, "'Fabricante' => 'Fabricante'"),
   'trait supports editing and deleting corrective reviews' => is_string($trait) && str_contains($trait, 'correctiveReviewUpdate') && str_contains($trait, 'correctiveReviewDelete'),
   'trait updates ticket revision field' => is_string($trait) && str_contains($trait, "'id_revision_correctiva'"),
   'trait records ticket history' => is_string($trait) && str_contains($trait, "jet_cct_historial_del_ticket"),

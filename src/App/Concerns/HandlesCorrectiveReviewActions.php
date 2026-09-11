@@ -708,24 +708,43 @@ trait HandlesCorrectiveReviewActions
       'Otros inconvenientes al inmueble accesos y usos conexos' => 'Otros inconvenientes / accesos y usos conexos',
       'Servicios publicos' => 'Servicios públicos',
     ]);
-    $areaArquitectonicaOptions = $this->correctiveReviewGlossaryOptions(581, []);
-    $areaEstructuralOptions = $this->correctiveReviewGlossaryOptions(582, []);
+    $areaArquitectonicaOptions = $this->correctiveReviewGlossaryOptions(581, [
+      'Muros de fachada o antepechos' => 'Muros de fachada o antepechos',
+      'Muros divisorios' => 'Muros divisorios (Mamposteria, estucos, pinturas)',
+      'Cielos rasos y luminarias' => 'Cielos rasos y luminarias',
+      'Cubiertas' => 'Cubiertas (Fibrocemento, placa, termo acustic, metalicas. etc) canales y Bajantes',
+      'Escaleras' => 'Escaleras',
+      'Instalaciones' => 'Instalaciones (Acueducto, Alcantarillado, Energia y Gas)',
+      'Tanques elevados' => 'Tanques elevados',
+      'Muebles' => 'Muebles (Cocinas, baños, closets, otros muebles instalados en el inmueble)',
+      'Puertas y Ventanas' => 'Puertas y Ventanas (Madera, metalicas, alumininos y otras)',
+      'Equipos y/o electrodomesticos instalados' => 'Equipos y/o electrodomesticos instalados',
+      'Pisos (Ceramica,Porcelanatos,Marmol, Estado de Juntas, Maderas, Laminados)' => 'Pisos (Ceramica,Porcelanatos,Marmol, Estado de Juntas, Maderas, Laminados)',
+    ]);
+    $areaEstructuralOptions = $this->correctiveReviewGlossaryOptions(582, [
+      'Vigas, columnas' => 'Vigas, columnas y muros estructurales en (Concreto reforzado, Madera o Acero)',
+      'Mamposteria' => 'Mampostería',
+      'Muros' => 'Muros',
+      'Entrepisos' => 'Entrepisos (incluye placa de cubierta)',
+    ]);
     $nivelOptions = $this->correctiveReviewGlossaryOptions(583, [
+      'Muy leve' => 'Muy leve',
       'Leve' => 'Leve',
       'Moderado' => 'Moderado',
-      'Grave' => 'Grave',
+      'Fuerte' => 'Fuerte',
+      'Severo' => 'Severo',
     ]);
     $tiempoOptions = $this->correctiveReviewGlossaryOptions(584, [
       'De inmediato' => 'De inmediato',
-      '1 a 3 días' => '1 a 3 días',
-      '4 a 8 días' => '4 a 8 días',
-      'Programable' => 'Programable',
+      '2 dias' => '2 dias',
+      '8 dias' => '8 dias',
     ]);
     $correspondeOptions = $this->correctiveReviewGlossaryOptions(619, [
       'Propietario' => 'Propietario',
       'Arrendatario' => 'Arrendatario',
-      'Inmobiliaria' => 'Inmobiliaria',
-      'Copropiedad' => 'Copropiedad',
+      'Administracion' => 'Administracion',
+      'Fabricante' => 'Fabricante',
+      'Constructor' => 'Constructor',
     ]);
     $photos = $this->correctiveReviewSplitPhotoRefs((string) ($item['registro_foto_dano'] ?? ''));
     ob_start();
