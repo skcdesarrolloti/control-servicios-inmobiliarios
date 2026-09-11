@@ -7137,6 +7137,35 @@
       return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     }
 
+    function activeCaseSearchScope() {
+      var activePanel = root.querySelector(".scm-tab-panel.active");
+      if (!activePanel) {
+        return root;
+      }
+      if (activePanel.id === "scm-panel-abiertos") {
+        return (
+          activePanel.querySelector(".scm-open-topic-panel.active") ||
+          activePanel
+        );
+      }
+      if (
+        activePanel.id === "scm-panel-postergados" ||
+        activePanel.id === "scm-panel-cerrados"
+      ) {
+        return (
+          activePanel.querySelector(".scm-status-topic-panel.active") ||
+          activePanel
+        );
+      }
+      if (activePanel.id === "scm-panel-actividades-administrativas") {
+        return (
+          activePanel.querySelector(".scm-admin-activity-panel.active") ||
+          activePanel
+        );
+      }
+      return activePanel;
+    }
+
     function reopenCaseFromUpdatedCard(ticketPk) {
       ticketPk = String(ticketPk || "").trim();
       if (!ticketPk) {
@@ -7146,7 +7175,8 @@
       if (!modal) {
         return false;
       }
-      var btn = root.querySelector(
+      var scope = activeCaseSearchScope();
+      var btn = scope.querySelector(
         '.scm-btn-case[data-ticket-pk="' + cssAttrValue(ticketPk) + '"]',
       );
       if (btn) {
