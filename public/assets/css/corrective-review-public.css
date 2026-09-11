@@ -469,9 +469,23 @@ body.scm-corrective-photo-open {
   }
 }
 
+@page {
+  size: letter;
+  margin: 9mm;
+}
+
 @media print {
+
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
   body.scm-corrective-public-page {
     background: #fff;
+    color: #051735;
+    font-size: 10.5px;
+    line-height: 1.35;
   }
 
   .scm-corrective-public-shell {
@@ -482,7 +496,171 @@ body.scm-corrective-photo-open {
   .scm-corrective-public-card,
   .scm-corrective-public-head {
     box-shadow: none;
+    border-color: #b8c9df;
+    background: #fff;
+  }
+
+  .scm-corrective-public-head {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+  }
+
+  .scm-corrective-public-logo {
+    width: 82px;
+    height: 40px;
+    border-radius: 8px;
+  }
+
+  .scm-corrective-public-logo img {
+    padding: 5px;
+  }
+
+  .scm-corrective-public-head p {
+    font-size: 9px;
+    margin: 0 0 1px;
+  }
+
+  .scm-corrective-public-head strong {
+    font-size: 13px;
+  }
+
+  .scm-corrective-public-card {
+    margin-top: 7px;
+    padding: 10px;
+    border-radius: 10px;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .scm-corrective-public-hero {
+    display: block;
+    border-top-width: 3px;
+  }
+
+  .scm-corrective-public-title h1 {
+    font-size: 19px;
+    line-height: 1.15;
+  }
+
+  .scm-corrective-public-card h2 {
+    margin: 0 0 7px;
+    font-size: 12.5px;
+  }
+
+  .scm-corrective-public-grid,
+  .scm-corrective-public-grid--summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .scm-corrective-public-grid--item {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 5px;
+    margin-bottom: 7px;
+  }
+
+  .scm-corrective-public-grid > div {
+    min-height: 0;
+    padding: 7px;
+    border-radius: 8px;
+    background: #f8fbff;
+  }
+
+  .scm-corrective-public-grid span {
+    margin-bottom: 3px;
+    font-size: 7.8px;
+    letter-spacing: .04em;
+  }
+
+  .scm-corrective-public-grid strong {
+    font-size: 9.4px;
+    line-height: 1.22;
+  }
+
+  .scm-corrective-public-items {
+    gap: 7px;
+  }
+
+  .scm-corrective-public-item,
+  .scm-corrective-public-empty {
+    padding: 9px;
+    border-radius: 10px;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .scm-corrective-public-item header {
+    gap: 8px;
+    margin-bottom: 7px;
+    padding-bottom: 7px;
+  }
+
+  .scm-corrective-public-item header span {
+    min-height: 0;
+    padding: 3px 8px;
+    font-size: 9px;
+  }
+
+  .scm-corrective-public-item header strong {
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  .scm-corrective-public-item section {
+    margin-top: 7px;
+  }
+
+  .scm-corrective-public-item h3 {
+    margin-bottom: 2px;
+    font-size: 10px;
+  }
+
+  .scm-corrective-public-item p {
+    font-size: 9.6px;
+    line-height: 1.32;
+  }
+
+  .scm-corrective-public-photos {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .scm-corrective-public-photo {
+    height: 78px;
+    border-radius: 8px;
     break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .scm-corrective-public-signature {
+    width: 58%;
+    margin-top: 9px;
+    padding: 9px 10px;
+    border-left-width: 4px;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .scm-corrective-public-signature-label {
+    font-size: 8px;
+  }
+
+  .scm-corrective-public-signature-name {
+    margin-top: 5px;
+    font-size: 13px;
+  }
+
+  .scm-corrective-public-signature-role,
+  .scm-corrective-public-signature p,
+  .scm-corrective-public-signature-contact {
+    margin-top: 4px;
+    font-size: 9px;
+    line-height: 1.25;
   }
 
   .scm-corrective-public-actions {

@@ -12,3 +12,4 @@
 - Las vistas públicas nativas no deben ser enumerables solo cambiando `?numero=`; si no hay sesión activa del panel, exigir enlace firmado con vencimiento (`expires` + `sig` HMAC) o token equivalente.
 - En vistas públicas/informes para destinatarios, no mostrar `sucursal` salvo que el usuario lo pida explícitamente; cuando se muestre el funcionario, ubicarlo como sello o cierre tipo “Realizado por” al final, no como dato suelto en la grilla principal.
 - Las evidencias/imágenes en vistas públicas deben poder previsualizarse dentro de la misma página o modal, evitando mandar al destinatario a pestañas nuevas salvo que el usuario lo pida.
+- Toda vista pública que tenga botón de imprimir debe incluir `@media print` compacto y probado: márgenes de página, grillas reducidas, evidencias pequeñas, acciones ocultas y `break-inside/page-break-inside` para no cortar tarjetas o firmas.
