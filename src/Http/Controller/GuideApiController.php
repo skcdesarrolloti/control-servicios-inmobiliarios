@@ -70,7 +70,7 @@ final class GuideApiController
       'reembolso' => $this->text($input, 'reembolso'),
       'observaciones' => $this->text($input, 'observaciones'),
       'cct_modified' => date('Y-m-d H:i:s'),
-      'cct_author_id' => Auth::userId(),
+      'cct_author_id' => Auth::employeeId() ?: Auth::userId(),
     ];
     if ($data['descripcion'] === '' || $data['clasificacion'] === '' || $data['quien_corresponde'] === '') {
       JsonResponse::error('Situación, Clasificación y Responsable son requeridos.');
@@ -125,7 +125,7 @@ final class GuideApiController
       'situacion' => $this->text($input, 'situacion'),
       'respuesta' => trim((string) ($input['respuesta'] ?? '')),
       'cct_modified' => date('Y-m-d H:i:s'),
-      'cct_author_id' => Auth::userId(),
+      'cct_author_id' => Auth::employeeId() ?: Auth::userId(),
     ];
     if ($data['respuesta'] === '') {
       JsonResponse::error('El campo Respuesta es requerido.');
@@ -176,7 +176,7 @@ final class GuideApiController
       'categoria' => $this->text($input, 'categoria'),
       'codigo_civil' => trim((string) ($input['codigo_civil'] ?? '')),
       'cct_modified' => date('Y-m-d H:i:s'),
-      'cct_author_id' => Auth::userId(),
+      'cct_author_id' => Auth::employeeId() ?: Auth::userId(),
     ];
     if ($data['categoria'] === '' || $data['codigo_civil'] === '') {
       JsonResponse::error('Categoría y Contenido son requeridos.');

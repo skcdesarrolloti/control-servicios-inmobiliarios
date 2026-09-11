@@ -7,3 +7,4 @@
 - Las imágenes cargadas desde formularios del panel deben comprimirse o validarse antes de guardarse para controlar peso y tamaño.
 - Las acciones destructivas como eliminar/archivar/anular deben pedir confirmación clara y dejar trazabilidad cuando el módulo ya maneja historial.
 - Cuando se replique dentro del panel una funcionalidad que viene de JetForm/JetEngine, revisar el JSON del formulario y, si usa `glossary_id`, consultar ese glosario en la base de datos para conservar campos dinámicos y opciones reales.
+- En registros CCT creados o modificados por funcionarios, `cct_author_id` debe guardar el `id_empleado` real de `wp_jet_cct_funcionarios`, no el `_ID` interno de la sesión; alinear también `id_empleado` e historiales cuando representen al funcionario que ejecuta la acción.

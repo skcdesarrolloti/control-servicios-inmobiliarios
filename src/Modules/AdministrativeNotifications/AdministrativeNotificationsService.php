@@ -432,7 +432,7 @@ final class AdministrativeNotificationsService
     $nowTs = time();
     $nowMysql = date('Y-m-d H:i:s', $nowTs);
     $sender = $this->senderProfile();
-    $userId = Auth::userId();
+    $employeeId = Auth::employeeId() ?: (string) Auth::userId();
     $nextTs = $this->collectionNextTimestamp($data['siguiente_fecha'], $data['siguiente_hora']);
 
     $created = 0;
@@ -455,12 +455,12 @@ final class AdministrativeNotificationsService
 
       $gestionPayload = [
         'cct_status' => 'publish',
-        'cct_author_id' => $userId,
+        'cct_author_id' => $employeeId,
         'cct_created' => $nowMysql,
         'cct_modified' => $nowMysql,
         'id_inmueble' => $this->firstNonEmpty([$contract['id_inmueble'] ?? '', $contract['inmueble'] ?? '']),
         'id_contrato' => $contractId,
-        'id_empleado' => $userId,
+        'id_empleado' => $employeeId,
         'realizado_por' => $sender['name'],
         'cargo' => $sender['cargo'],
         'fecha' => $nowTs,
@@ -511,7 +511,7 @@ final class AdministrativeNotificationsService
         'dia_cobro' => $data['siguiente_fecha'],
         'hora_cobro' => $data['siguiente_hora'],
         'tipo_gestion' => $data['tipo_gestion_cobro'],
-        'id_empleado' => $userId,
+        'id_empleado' => $employeeId,
         'realizado_por' => $sender['name'],
         'tuvo_revision' => 'Si',
       ];
@@ -520,7 +520,7 @@ final class AdministrativeNotificationsService
         $updatedContracts += $this->db->update($contractTable, $contractUpdate, ['_ID' => $contractId]) > 0 ? 1 : 0;
       }
 
-      $history += $this->insertCollectionPropertyHistory($contract, $sender['name'], $userId, $nowTs, $nowMysql, $data) ? 1 : 0;
+      $history += $this->insertCollectionPropertyHistory($contract, $sender['name'], $employeeId, $nowTs, $nowMysql, $data) ? 1 : 0;
       $properties += $this->updateCollectionPropertyCounter($contract, $nextCount, $nowMysql) ? 1 : 0;
     }
 

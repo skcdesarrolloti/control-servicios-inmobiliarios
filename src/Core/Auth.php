@@ -29,7 +29,7 @@ final class Auth
 
     $table = $this->db->table('jet_cct_funcionarios');
     $row = $this->db->getRow(
-      "SELECT `_ID`, `nombre`, `rol`, `user_others_apss`, `pass_others_apss`,
+      "SELECT `_ID`, `id_empleado`, `nombre`, `rol`, `user_others_apss`, `pass_others_apss`,
               TRIM(COALESCE(`id_cargo`, '')) AS id_cargo
          FROM `{$table}`
         WHERE `user_others_apss` = ?
@@ -70,7 +70,7 @@ final class Auth
 
     $table = $this->db->table('jet_cct_funcionarios');
     $row = $this->db->getRow(
-      "SELECT `_ID`, `nombre`, `rol`, `user_others_apss`,
+      "SELECT `_ID`, `id_empleado`, `nombre`, `rol`, `user_others_apss`,
               TRIM(COALESCE(`id_cargo`, '')) AS id_cargo
          FROM `{$table}`
         WHERE `id_empleado` = ?
@@ -93,6 +93,7 @@ final class Auth
     session_regenerate_id(true);
     $_SESSION['scm_logged_in']  = true;
     $_SESSION['scm_user_id']    = (int) $row['_ID'];
+    $_SESSION['scm_employee_id'] = trim((string) ($row['id_empleado'] ?? ''));
     $_SESSION['scm_user']       = trim((string) ($row['nombre'] ?? $login));
     $_SESSION['scm_user_login'] = $login;
     $_SESSION['scm_user_rol']   = (string) ($row['rol'] ?? '');
@@ -157,6 +158,33 @@ final class Auth
   public static function userId(): int
   {
     return (int) ($_SESSION['scm_user_id'] ?? 0);
+  }
+
+  /** Devuelve el id_empleado real del funcionario autenticado. */
+  public static function employeeId(): string
+  {
+    $employeeId = trim((string) ($_SESSION['scm_employee_id'] ?? ''));
+    if ($employeeId !== '') {
+      return $employeeId;
+    }
+
+    $userId = static::userId();
+    if ($userId <= 0) {
+      return '';
+    }
+
+    try {
+      $db = App::db();
+      $table = $db->table('jet_cct_funcionarios');
+      $row = $db->getRow("SELECT TRIM(COALESCE(`id_empleado`, '')) AS id_empleado FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$userId]);
+      $employeeId = trim((string) ($row['id_empleado'] ?? ''));
+      if ($employeeId !== '') {
+        $_SESSION['scm_employee_id'] = $employeeId;
+      }
+      return $employeeId;
+    } catch (\Throwable $exception) {
+      return '';
+    }
   }
 
   /** Devuelve el rol del funcionario autenticado. */

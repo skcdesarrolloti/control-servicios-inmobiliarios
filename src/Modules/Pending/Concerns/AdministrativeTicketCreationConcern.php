@@ -63,6 +63,7 @@ trait AdministrativeTicketCreationConcern
     $nowTs = time();
     $nowMysql = date('Y-m-d H:i:s', $nowTs);
     $userId = Auth::userId();
+    $creatorEmployeeId = Auth::employeeId() ?: (string) $userId;
     $userName = Auth::user();
     if ($userName === '') {
       $userName = $userId > 0 ? ('Usuario #' . $userId) : 'Sistema';
@@ -102,7 +103,7 @@ trait AdministrativeTicketCreationConcern
 
     $ticketPayload = [
       'cct_status' => 'publish',
-      'cct_author_id' => $userId,
+      'cct_author_id' => $creatorEmployeeId,
       'cct_created' => $nowMysql,
       'cct_modified' => $nowMysql,
       'estado' => 'Nuevo',
