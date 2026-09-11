@@ -171,7 +171,7 @@ trait HandlesCorrectiveReviewActions
           'nombre' => $actor['name'] ?? Auth::user(),
           'correo' => $actor['email'] ?? '',
           'celular' => $actor['phone'] ?? '',
-          'respuesta' => 'Se ha elaborado la revisión correctiva del inmueble. La cotización y el cobro se gestionarán posteriormente desde el flujo de cotizaciones.',
+          'respuesta' => 'Se ha elaborado la revisión correctiva del inmueble.',
           'id_revision_correctiva' => $reviewId,
           'id_empleado' => $actorEmployeeId,
         ]);
@@ -816,7 +816,7 @@ trait HandlesCorrectiveReviewActions
     ob_start();
     ?>
     <div class="scm-acta scm-corrective-review">
-      <p class="scm-acta-notice">Esta revisión correctiva registra los daños encontrados y deja el caso como <strong>Inspeccionado</strong>. La cotización y el cobro se gestionarán después, desde el flujo de cotizaciones.</p>
+      <p class="scm-acta-notice">Esta revisión correctiva registra los daños encontrados y deja el caso como <strong>Inspeccionado</strong>.</p>
       <div class="scm-acta-meta">
         <strong>Caso #<?= $h($ticketLabel) ?></strong>
         <span>Inmueble <?= $h($idInmueble !== '' ? $idInmueble : '-') ?> · Contrato <?= $h($contrato !== '' ? $contrato : '-') ?></span>
