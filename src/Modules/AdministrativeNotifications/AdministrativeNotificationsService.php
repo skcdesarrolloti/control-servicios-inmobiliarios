@@ -1562,7 +1562,7 @@ final class AdministrativeNotificationsService
   }
 
   /** @param array<string,mixed> $contract @param array<string,string> $data */
-  private function insertCollectionPropertyHistory(array $contract, string $employeeName, int $employeeId, int $nowTs, string $nowMysql, array $data): bool
+  private function insertCollectionPropertyHistory(array $contract, string $employeeName, string $employeeId, int $nowTs, string $nowMysql, array $data): bool
   {
     $table = $this->db->table('jet_cct_historial_del_inmueble');
     if (!$this->schema->tableExists($table)) {

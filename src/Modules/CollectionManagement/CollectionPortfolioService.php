@@ -763,12 +763,13 @@ final class CollectionPortfolioService
     $previousStage = (string) ($item['collection_stage'] ?? 'normal');
     $now = date('Y-m-d H:i:s');
     $contractId = (int) ($item['contract_id'] ?? 0);
+    $employeeId = Auth::employeeId() ?: (string) Auth::userId();
     $stageHistoryCreated = false;
     if ($stage === 'siniestro' && $previousStage !== 'siniestro') {
       if ($contractId <= 0) {
         throw new \RuntimeException('Este registro no tiene contrato vinculado para registrar el siniestro.');
       }
-      $stageHistoryCreated = $this->insertSiniestroPropertyHistory($item, Auth::user(), Auth::userId(), time(), $now, trim($note));
+      $stageHistoryCreated = $this->insertSiniestroPropertyHistory($item, Auth::user(), $employeeId, time(), $now, trim($note));
       if (!$stageHistoryCreated) {
         throw new \RuntimeException('No se pudo registrar el siniestro en el historial del inmueble.');
       }
@@ -1407,7 +1408,7 @@ final class CollectionPortfolioService
   }
 
   /** @param array<string,mixed> $item */
-  private function insertSiniestroPropertyHistory(array $item, string $employeeName, int $employeeId, int $nowTs, string $nowMysql, string $note = ''): bool
+  private function insertSiniestroPropertyHistory(array $item, string $employeeName, string $employeeId, int $nowTs, string $nowMysql, string $note = ''): bool
   {
     $table = $this->db->table('jet_cct_historial_del_inmueble');
     if (!$this->schema->tableExists($table)) {
