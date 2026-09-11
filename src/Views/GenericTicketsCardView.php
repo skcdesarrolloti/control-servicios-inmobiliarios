@@ -418,6 +418,7 @@ final class GenericTicketsCardView
     $dataAttrs .= ' data-cot-estado="' . esc_attr($cotEstadoRaw) . '"';
     $dataAttrs .= ' data-id-revision-correctiva="' . esc_attr($corrFirstId) . '"';
     $dataAttrs .= ' data-id-revision-preventiva="' . esc_attr($prevFirstId) . '"';
+    $dataAttrs .= ' data-prev-encontro-danos="' . esc_attr((string) ($row['_scm_prev_encontro_danos'] ?? $row['se_encontraron_danos'] ?? '')) . '"';
     $dataAttrs .= ' data-preventiva-no-access-count="' . esc_attr((string) $preventivaNoAccessCount) . '"';
     $dataAttrs .= ' data-ejecucion="' . esc_attr($tiempoEjecucion) . '"';
     $dataAttrs .= ' data-sin-actualizar="' . esc_attr($tiempoSinActualizar) . '"';

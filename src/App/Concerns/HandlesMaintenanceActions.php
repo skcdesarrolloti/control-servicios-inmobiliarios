@@ -349,6 +349,835 @@ trait HandlesMaintenanceActions
     ]);
   }
 
+  public function ajax_handler_cotizacion_mantenimiento_form_context(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('abiertos') && !$this->canAccessDashboardTab('postergados') && !$this->canAccessDashboardTab('mis_tickets')) {
+      $this->jsonFail('No tienes permiso para gestionar cotizaciones de mantenimiento.');
+    }
+
+    try {
+      $mode = $this->maintenance_quote_mode($_POST['mode'] ?? 'create');
+      $ticketPk = (int) ($_POST['ticket_pk'] ?? 0);
+      $quoteId = (int) ($_POST['id_cotizacion'] ?? 0);
+      $context = $this->maintenance_quote_form_context($mode, $ticketPk, $quoteId);
+      unset($context['ticket_raw'], $context['revision_raw'], $context['cotizacion_raw']);
+      $this->jsonOk($context);
+    } catch (\DomainException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      $this->jsonFail('No se pudo cargar el formulario de cotización.');
+    }
+  }
+
+  public function ajax_handler_cotizacion_mantenimiento_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('abiertos') && !$this->canAccessDashboardTab('postergados') && !$this->canAccessDashboardTab('mis_tickets')) {
+      $this->jsonFail('No tienes permiso para guardar cotizaciones de mantenimiento.');
+    }
+
+    $storedPhotos = [];
+    $pdo = $this->db->pdo();
+    try {
+      $mode = $this->maintenance_quote_mode($_POST['mode'] ?? 'create');
+      $ticketPk = (int) ($_POST['ticket_pk'] ?? 0);
+      $quoteId = (int) ($_POST['id_cotizacion'] ?? 0);
+      $context = $this->maintenance_quote_form_context($mode, $ticketPk, $quoteId);
+      $schema = new \SCM\Support\SchemaInspector($this->db);
+      $quoteTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
+      $ticketTable = $this->db->table('jet_cct_tickets');
+      if (!$schema->tableExists($quoteTable) || !$schema->tableExists($ticketTable)) {
+        throw new \DomainException('No está disponible la tabla de cotizaciones o tickets.');
+      }
+
+      $ticket = is_array($context['ticket_raw'] ?? null) ? $context['ticket_raw'] : [];
+      $revision = is_array($context['revision_raw'] ?? null) ? $context['revision_raw'] : [];
+      $sourceQuote = is_array($context['cotizacion_raw'] ?? null) ? $context['cotizacion_raw'] : [];
+      $actor = $this->ticketCompletionActor();
+      $employeeId = trim((string) ($actor['employee_id'] ?? ''));
+      if ($employeeId === '' && method_exists($this, 'current_employee_id')) {
+        $employeeId = trim((string) $this->current_employee_id());
+      }
+      if ($employeeId === '') {
+        $employeeId = (string) Auth::userId();
+      }
+      $now = time();
+      $nowSql = date('Y-m-d H:i:s', $now);
+
+      $itemsMano = $this->maintenance_quote_repeater_items('items_mano_json', ['descripcion_mano', 'unidad_mano', 'cantidad_mano', 'valor_mano']);
+      $itemsMateriales = $this->maintenance_quote_repeater_items('items_materiales_json', ['provedor_materiales', 'valor_materiales']);
+      $itemsEquipos = $this->maintenance_quote_repeater_items('items_otros_equi_json', ['descipcion_otros_equi', 'unidad_otros_equi', 'cantidad_otros_equi', 'valor_otros_equi']);
+      $itemsOtros = $this->maintenance_quote_repeater_items('items_otros_costos_json', ['descipcion_otros_costos', 'unidad_otros_costos', 'cantidad_otros_costos', 'valor_otros_costos']);
+
+      $totals = [
+        'total_mano_obra' => $this->maintenance_quote_total_items($itemsMano, 'cantidad_mano', 'valor_mano'),
+        'total_materiales' => $this->maintenance_quote_total_items($itemsMateriales, '', 'valor_materiales'),
+        'total_maquinarias' => $this->maintenance_quote_total_items($itemsEquipos, 'cantidad_otros_equi', 'valor_otros_equi'),
+        'total_otros_costos' => $this->maintenance_quote_total_items($itemsOtros, 'cantidad_otros_costos', 'valor_otros_costos'),
+      ];
+      $totals['total'] = $totals['total_mano_obra'] + $totals['total_materiales'] + $totals['total_maquinarias'] + $totals['total_otros_costos'];
+      if ($totals['total'] <= 0) {
+        throw new \DomainException('Agrega al menos un valor a la cotización.');
+      }
+
+      $destinatario = $this->maintenance_quote_clean($_POST['destinatario'] ?? ($context['defaults']['destinatario'] ?? ''));
+      $emailDestinatario = $this->maintenance_quote_clean($_POST['email_destinatario'] ?? ($context['defaults']['email_destinatario'] ?? ''));
+      $celularDestinatario = $this->maintenance_quote_digits($_POST['celular_destinatario'] ?? ($context['defaults']['celular_destinatario'] ?? ''));
+      if ($destinatario === '') {
+        throw new \DomainException('Completa el destinatario de la cotización.');
+      }
+
+      $mejorOferta = $this->maintenance_quote_existing_media('mejor_oferta_existing', $sourceQuote['mejor_oferta'] ?? '');
+      $otrasOferta = $this->maintenance_quote_existing_media('otras_oferta_existing', $sourceQuote['otras_oferta'] ?? '');
+      $newMejor = $this->maintenance_quote_store_media('mejor_oferta', 10);
+      $newOtras = $this->maintenance_quote_store_media('otras_oferta', 10);
+      $storedPhotos = array_merge($storedPhotos, $newMejor, $newOtras);
+      $mejorOferta = array_merge($mejorOferta, array_map(static fn(array $photo): string => (string) ($photo['url'] ?? ''), $newMejor));
+      $otrasOferta = array_merge($otrasOferta, array_map(static fn(array $photo): string => (string) ($photo['url'] ?? ''), $newOtras));
+
+      $tipoMantenimiento = $this->maintenance_quote_clean($_POST['tipo_mantenimiento'] ?? ($context['tipo_mantenimiento'] ?? 'Correctiva'));
+      $tipoMantenimiento = stripos($tipoMantenimiento, 'prevent') !== false ? 'Preventiva' : 'Correctiva';
+      $category = $mode === 'note' ? 'Nota' : ($mode === 'edit' ? trim((string) ($sourceQuote['categoria_cotizacion'] ?? 'Inicial')) : 'Inicial');
+      if ($category === '') {
+        $category = 'Inicial';
+      }
+
+      $idRevision = (int) ($context['revision_id'] ?? 0);
+      $ticketId = trim((string) ($ticket['_ID'] ?? $ticketPk));
+      $quoteData = [
+        'cct_status' => 'publish',
+        'items_mano' => serialize($itemsMano),
+        'items_materiales' => serialize($itemsMateriales),
+        'items_otros_equi' => serialize($itemsEquipos),
+        'items_otros_costos' => serialize($itemsOtros),
+        'total_mano_obra' => $totals['total_mano_obra'],
+        'total_materiales' => $totals['total_materiales'],
+        'total_maquinarias' => $totals['total_maquinarias'],
+        'total_otros_costos' => $totals['total_otros_costos'],
+        'total' => $totals['total'],
+        'saldo_obra' => $mode === 'edit' ? $this->maintenance_quote_balance_after_edit($sourceQuote, 'saldo_obra', $totals['total_mano_obra']) : $totals['total_mano_obra'],
+        'saldo_materiales' => $mode === 'edit' ? $this->maintenance_quote_balance_after_edit($sourceQuote, 'saldo_materiales', $totals['total_materiales']) : $totals['total_materiales'],
+        'saldo_maquinarias' => $mode === 'edit' ? $this->maintenance_quote_balance_after_edit($sourceQuote, 'saldo_maquinarias', $totals['total_maquinarias']) : $totals['total_maquinarias'],
+        'saldo_otros_costo' => $mode === 'edit' ? $this->maintenance_quote_balance_after_edit($sourceQuote, 'saldo_otros_costo', $totals['total_otros_costos']) : $totals['total_otros_costos'],
+        'observaciones' => wp_kses_post(wp_unslash((string) ($_POST['observaciones'] ?? ''))),
+        'valides_oferta' => $this->maintenance_quote_number($_POST['valides_oferta'] ?? '0'),
+        'duracion' => $this->maintenance_quote_number($_POST['duracion'] ?? '0'),
+        'mejor_oferta' => implode(',', array_values(array_unique(array_filter($mejorOferta)))),
+        'otras_oferta' => implode(',', array_values(array_unique(array_filter($otrasOferta)))),
+        'celular_destinatario' => $celularDestinatario,
+        'email_destinatario' => $emailDestinatario,
+        'cct_author_id' => $employeeId,
+        'cct_modified' => $nowSql,
+        'fecha' => $mode === 'edit' ? (int) ($sourceQuote['fecha'] ?? $now) : $now,
+        'se_envio' => 'No',
+        'creador' => trim((string) ($actor['name'] ?? Auth::user())),
+        'email_creador' => trim((string) ($actor['email'] ?? '')),
+        'celular_creador' => trim((string) ($actor['phone'] ?? '')),
+        'coordinador' => trim((string) ($actor['name'] ?? Auth::user())),
+        'email_coordinador' => trim((string) ($actor['email'] ?? '')),
+        'celular_coordinador' => trim((string) ($actor['phone'] ?? '')),
+        'destinatario' => $destinatario,
+        'id_ticket' => $ticketId,
+        'id_inmueble' => $this->maintenance_quote_first([$revision['id_inmueble'] ?? '', $ticket['id_inmueble'] ?? '', $sourceQuote['id_inmueble'] ?? '']),
+        'direccion' => $this->maintenance_quote_clean($_POST['direccion'] ?? ($revision['direccion'] ?? $ticket['direccion'] ?? $sourceQuote['direccion'] ?? '')),
+        'perturbacion' => $this->maintenance_quote_number($_POST['perturbacion'] ?? '0'),
+        'area_afectada' => $this->maintenance_quote_number($_POST['area_afectada'] ?? '0'),
+        'valor_bonificacion' => $this->maintenance_quote_number($_POST['valor_bonificacion'] ?? '0'),
+        'categoria_cotizacion' => $category,
+        'contrato' => ltrim($this->maintenance_quote_first([$revision['contrato'] ?? '', $ticket['contrato'] ?? '', $sourceQuote['contrato'] ?? '']), '#'),
+        'ejecutado' => $this->maintenance_quote_clean($_POST['ejecutado'] ?? ($sourceQuote['ejecutado'] ?? '')),
+        'id_empleado' => $employeeId,
+        'id_propietario' => $this->maintenance_quote_first([$revision['id_propietario'] ?? '', $ticket['id_propietario'] ?? '', $sourceQuote['id_propietario'] ?? '']),
+        'id_coordinador' => $employeeId,
+        'inmueble' => $this->maintenance_quote_first([$revision['inmueble'] ?? '', $ticket['inmueble'] ?? '', $sourceQuote['inmueble'] ?? '']),
+        'id_arrendatario' => $this->maintenance_quote_first([$revision['id_arrendatario'] ?? '', $ticket['id_arrendatario'] ?? '', $sourceQuote['id_arrendatario'] ?? '']),
+        'id_contrato' => $this->maintenance_quote_first([$revision['id_contrato'] ?? '', $ticket['id_contrato'] ?? '', $sourceQuote['id_contrato'] ?? '']),
+        'sucursal' => $this->maintenance_quote_first([$revision['sucursal'] ?? '', $ticket['sucursal'] ?? '', $sourceQuote['sucursal'] ?? '1']),
+        'estado' => $mode === 'edit' ? ($sourceQuote['estado'] ?? '') : '',
+        'tuvo_seguimiento' => 'No',
+        'tipo_mantenimiento' => $tipoMantenimiento,
+        'id_revision' => $idRevision > 0 ? (string) $idRevision : '',
+        'tipo_inmueble' => $this->maintenance_quote_clean($_POST['tipo_inmueble'] ?? ($revision['tip_inm'] ?? $revision['tipo_inmueble'] ?? $sourceQuote['tipo_inmueble'] ?? '')),
+        'tipo_negocio' => $this->maintenance_quote_clean($_POST['tipo_negocio'] ?? ($revision['tipo_negocio'] ?? $sourceQuote['tipo_negocio'] ?? '')),
+        'destinacion' => $this->maintenance_quote_clean($_POST['destinacion'] ?? ($revision['destinacion'] ?? $sourceQuote['destinacion'] ?? '')),
+        'justificacion_perturbacion' => wp_kses_post(wp_unslash((string) ($_POST['justificacion_perturbacion'] ?? ''))),
+        'indicativo_destinarario' => $this->maintenance_quote_clean($_POST['indicativo_destinarario'] ?? ($sourceQuote['indicativo_destinarario'] ?? '57')),
+        'resumen_calculo_perturbacion' => wp_kses_post(wp_unslash((string) ($_POST['resumen_calculo_perturbacion'] ?? ''))),
+        'dias_afectacion_calculados' => $this->maintenance_quote_number($_POST['dias_afectacion_calculados'] ?? '0'),
+      ];
+
+      $pdo->beginTransaction();
+      $quoteIdSaved = $quoteId;
+      if ($mode === 'edit') {
+        if ($quoteId <= 0 || empty($sourceQuote)) {
+          throw new \DomainException('Cotización inválida para editar.');
+        }
+        unset($quoteData['cct_created']);
+        $filtered = $schema->filterTableData($quoteTable, $quoteData);
+        if (!$filtered || $this->db->update($quoteTable, $filtered, ['_ID' => $quoteId]) < 0) {
+          throw new \DomainException('No fue posible actualizar la cotización.');
+        }
+      } else {
+        $quoteData['cct_created'] = $nowSql;
+        $filtered = $schema->filterTableData($quoteTable, $quoteData);
+        if (!$filtered || !$this->db->insert($quoteTable, $filtered)) {
+          throw new \DomainException('No fue posible crear la cotización.');
+        }
+        $quoteIdSaved = (int) $this->db->lastInsertId();
+        if ($quoteIdSaved <= 0) {
+          throw new \DomainException('La cotización se guardó sin identificador válido.');
+        }
+      }
+
+      $this->maintenance_quote_update_revision_flag($schema, $tipoMantenimiento, $idRevision);
+      $reportId = 0;
+      if ($mode === 'create' && stripos($tipoMantenimiento, 'correct') !== false) {
+        $reportId = $this->maintenance_quote_ensure_admin_report($schema, $quoteIdSaved, $quoteData, $ticket, $revision, $actor, $employeeId, $now, $nowSql);
+      }
+      $this->maintenance_quote_update_ticket($schema, $ticket, $quoteIdSaved, $tipoMantenimiento, $now, $nowSql);
+      $this->maintenance_quote_insert_histories($schema, $quoteIdSaved, $mode, $quoteData, $ticket, $actor, $employeeId, $now, $nowSql);
+      $queued = $this->maintenance_quote_enqueue_saved_notifications($mode, $quoteIdSaved, $quoteData, $actor);
+      $pdo->commit();
+
+      $this->jsonOk([
+        'message' => ($mode === 'edit' ? 'Cotización actualizada.' : ($mode === 'note' ? 'Nota de cotización creada.' : 'Cotización creada.')) . ($reportId > 0 ? ' Reporte administrativo #' . $reportId . ' creado.' : '') . ($queued > 0 ? ' Notificaciones en cola: ' . $queued . '.' : ''),
+        'id_cotizacion' => (string) $quoteIdSaved,
+        'id_reporte' => $reportId > 0 ? (string) $reportId : '',
+      ]);
+    } catch (\Throwable $error) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      if ($storedPhotos) {
+        $this->storedFiles()->deleteStoredImages($storedPhotos);
+      }
+      $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudo guardar la cotización.');
+    }
+  }
+
+  private function maintenance_quote_mode($raw): string
+  {
+    $mode = strtolower(trim((string) ($raw ?? 'create')));
+    if (in_array($mode, ['create', 'edit', 'note'], true)) {
+      return $mode;
+    }
+    throw new \DomainException('Modo de cotización inválido.');
+  }
+
+  /** @return array<string,mixed> */
+  private function maintenance_quote_form_context(string $mode, int $ticketPk, int $quoteId): array
+  {
+    $schema = new \SCM\Support\SchemaInspector($this->db);
+    $ticketTable = $this->db->table('jet_cct_tickets');
+    $quoteTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$schema->tableExists($ticketTable) || !$schema->tableExists($quoteTable)) {
+      throw new \DomainException('No están disponibles las tablas de tickets o cotizaciones.');
+    }
+
+    $quote = [];
+    if ($mode !== 'create') {
+      if ($quoteId <= 0) {
+        throw new \DomainException('Selecciona una cotización válida.');
+      }
+      $found = $this->db->getRow("SELECT * FROM `{$quoteTable}` WHERE `_ID` = ? LIMIT 1", [$quoteId]);
+      if (!is_array($found)) {
+        throw new \DomainException('Cotización no encontrada.');
+      }
+      $quote = $found;
+      if ($ticketPk <= 0) {
+        $ticketPk = (int) ($quote['id_ticket'] ?? 0);
+      }
+    }
+
+    $ticket = null;
+    if ($ticketPk > 0) {
+      $ticket = $this->db->getRow("SELECT * FROM `{$ticketTable}` WHERE `_ID` = ? OR TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 1", [$ticketPk, (string) $ticketPk]);
+    }
+    if (!is_array($ticket) && !empty($quote['id_ticket'])) {
+      $ticketRef = trim((string) $quote['id_ticket']);
+      $ticket = ctype_digit($ticketRef)
+        ? $this->db->getRow("SELECT * FROM `{$ticketTable}` WHERE `_ID` = ? OR TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 1", [(int) $ticketRef, $ticketRef])
+        : $this->db->getRow("SELECT * FROM `{$ticketTable}` WHERE TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 1", [$ticketRef]);
+    }
+    if (!is_array($ticket)) {
+      throw new \DomainException('Ticket inválido.');
+    }
+
+    [$revision, $tipoMantenimiento, $revisionId] = $this->maintenance_quote_resolve_revision($ticket, $quote);
+    if ($mode === 'create' && $revisionId <= 0) {
+      throw new \DomainException('Solo puedes crear cotización si el caso tiene revisión correctiva o preventiva con daños.');
+    }
+
+    $actor = $this->ticketCompletionActor();
+    $defaultDestinatario = $this->maintenance_quote_first([
+      $quote['destinatario'] ?? '',
+      $revision['destinatario'] ?? '',
+      $ticket['propietario'] ?? '',
+      $ticket['arrendatario'] ?? '',
+    ]);
+    $defaultEmail = $this->maintenance_quote_first([
+      $quote['email_destinatario'] ?? '',
+      $revision['email_destinatario'] ?? '',
+      $ticket['correo'] ?? '',
+      $ticket['email'] ?? '',
+    ]);
+    $defaultCelular = $this->maintenance_quote_first([
+      $quote['celular_destinatario'] ?? '',
+      $revision['celular_destinatario'] ?? '',
+      $ticket['celular'] ?? '',
+      $ticket['telefono'] ?? '',
+    ]);
+    $ticketId = trim((string) ($ticket['_ID'] ?? $ticketPk));
+    $logicalTicket = trim((string) ($ticket['id_ticket'] ?? $ticketId));
+    $cotizacion = [
+      'id' => trim((string) ($quote['_ID'] ?? '')),
+      'categoria' => trim((string) ($quote['categoria_cotizacion'] ?? ($mode === 'note' ? 'Nota' : 'Inicial'))),
+      'items_mano' => $this->maintenance_quote_decode_items($quote['items_mano'] ?? ''),
+      'items_materiales' => $this->maintenance_quote_decode_items($quote['items_materiales'] ?? ''),
+      'items_otros_equi' => $this->maintenance_quote_decode_items($quote['items_otros_equi'] ?? ''),
+      'items_otros_costos' => $this->maintenance_quote_decode_items($quote['items_otros_costos'] ?? ''),
+      'totals' => [
+        'mano' => $this->maintenance_quote_number($quote['total_mano_obra'] ?? 0),
+        'materiales' => $this->maintenance_quote_number($quote['total_materiales'] ?? 0),
+        'maquinarias' => $this->maintenance_quote_number($quote['total_maquinarias'] ?? 0),
+        'otros' => $this->maintenance_quote_number($quote['total_otros_costos'] ?? 0),
+        'total' => $this->maintenance_quote_number($quote['total'] ?? 0),
+      ],
+      'media' => [
+        'mejor_oferta' => $this->maintenance_quote_media_list($quote['mejor_oferta'] ?? ''),
+        'otras_oferta' => $this->maintenance_quote_media_list($quote['otras_oferta'] ?? ''),
+      ],
+    ];
+
+    return [
+      'mode' => $mode,
+      'tipo_mantenimiento' => $tipoMantenimiento,
+      'revision_id' => $revisionId > 0 ? (string) $revisionId : '',
+      'ticket' => [
+        'id' => $ticketId,
+        'numero' => $logicalTicket,
+        'inmueble' => $this->maintenance_quote_first([$revision['inmueble'] ?? '', $ticket['inmueble'] ?? '', $quote['inmueble'] ?? '']),
+        'id_inmueble' => $this->maintenance_quote_first([$revision['id_inmueble'] ?? '', $ticket['id_inmueble'] ?? '', $quote['id_inmueble'] ?? '']),
+        'contrato' => ltrim($this->maintenance_quote_first([$revision['contrato'] ?? '', $ticket['contrato'] ?? '', $quote['contrato'] ?? '']), '#'),
+        'direccion' => $this->maintenance_quote_first([$quote['direccion'] ?? '', $revision['direccion'] ?? '', $ticket['direccion'] ?? '']),
+      ],
+      'defaults' => [
+        'destinatario' => $defaultDestinatario,
+        'email_destinatario' => $defaultEmail,
+        'indicativo_destinarario' => $this->maintenance_quote_first([$quote['indicativo_destinarario'] ?? '', '57']),
+        'celular_destinatario' => $defaultCelular,
+        'ejecutado' => trim((string) ($quote['ejecutado'] ?? '')),
+        'valides_oferta' => trim((string) ($quote['valides_oferta'] ?? '')),
+        'duracion' => trim((string) ($quote['duracion'] ?? '')),
+        'observaciones' => trim((string) ($quote['observaciones'] ?? '')),
+        'perturbacion' => trim((string) ($quote['perturbacion'] ?? '')),
+        'area_afectada' => trim((string) ($quote['area_afectada'] ?? '')),
+        'valor_bonificacion' => trim((string) ($quote['valor_bonificacion'] ?? '')),
+        'justificacion_perturbacion' => trim((string) ($quote['justificacion_perturbacion'] ?? '')),
+        'resumen_calculo_perturbacion' => trim((string) ($quote['resumen_calculo_perturbacion'] ?? '')),
+        'dias_afectacion_calculados' => trim((string) ($quote['dias_afectacion_calculados'] ?? '')),
+        'tipo_inmueble' => trim((string) ($quote['tipo_inmueble'] ?? $revision['tip_inm'] ?? $revision['tipo_inmueble'] ?? '')),
+        'tipo_negocio' => trim((string) ($quote['tipo_negocio'] ?? $revision['tipo_negocio'] ?? '')),
+        'destinacion' => trim((string) ($quote['destinacion'] ?? $revision['destinacion'] ?? '')),
+      ],
+      'cotizacion' => $cotizacion,
+      'unit_options' => $this->maintenance_quote_glossary_options(612, [
+        ['value' => 'Unidad', 'label' => 'Unidad'],
+        ['value' => 'Metro', 'label' => 'Metro'],
+        ['value' => 'Global', 'label' => 'Global'],
+      ]),
+      'executor_options' => $this->maintenance_quote_glossary_options(853, [
+        ['value' => 'Propietario', 'label' => 'Propietario'],
+        ['value' => 'Arrendatario', 'label' => 'Arrendatario'],
+        ['value' => 'Inmobiliaria', 'label' => 'Inmobiliaria'],
+      ]),
+      'actor' => [
+        'name' => trim((string) ($actor['name'] ?? Auth::user())),
+        'employee_id' => trim((string) ($actor['employee_id'] ?? '')),
+      ],
+      'ticket_raw' => $ticket,
+      'revision_raw' => is_array($revision) ? $revision : [],
+      'cotizacion_raw' => $quote,
+    ];
+  }
+
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $quote @return array{0:array<string,mixed>,1:string,2:int} */
+  private function maintenance_quote_resolve_revision(array $ticket, array $quote = []): array
+  {
+    $quoteType = strtolower(trim((string) ($quote['tipo_mantenimiento'] ?? '')));
+    if (str_contains($quoteType, 'prevent')) {
+      $preventiveId = (int) $this->maintenance_quote_first([$quote['id_revision'] ?? '', $ticket['id_revision_preventiva'] ?? '']);
+      if ($preventiveId > 0) {
+        $table = $this->db->table('jet_cct_revision_preventiva');
+        if ($this->table_exists($table)) {
+          $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$preventiveId]);
+          if (is_array($row) && $this->maintenance_quote_preventive_has_damage($row, $ticket)) {
+            return [$row, 'Preventiva', $preventiveId];
+          }
+        }
+      }
+    }
+
+    $correctiveId = (int) $this->maintenance_quote_first([$quote['id_revision'] ?? '', $ticket['id_revision_correctiva'] ?? '']);
+    if ($correctiveId > 0) {
+      $table = $this->db->table('jet_cct_revision_correctiva');
+      if ($this->table_exists($table)) {
+        $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$correctiveId]);
+        if (is_array($row)) {
+          return [$row, 'Correctiva', $correctiveId];
+        }
+      }
+    }
+
+    $preventiveId = (int) $this->maintenance_quote_first([$ticket['id_revision_preventiva'] ?? '', $quote['id_revision'] ?? '']);
+    if ($preventiveId > 0) {
+      $table = $this->db->table('jet_cct_revision_preventiva');
+      if ($this->table_exists($table)) {
+        $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$preventiveId]);
+        if (is_array($row) && $this->maintenance_quote_preventive_has_damage($row, $ticket)) {
+          return [$row, 'Preventiva', $preventiveId];
+        }
+      }
+    }
+
+    return [[], '', 0];
+  }
+
+  /** @param array<string,mixed> $revision @param array<string,mixed> $ticket */
+  private function maintenance_quote_preventive_has_damage(array $revision, array $ticket): bool
+  {
+    foreach ([$revision['encontro_danos'] ?? null, $ticket['se_encontraron_danos'] ?? null] as $value) {
+      $normalized = strtolower(trim((string) ($value ?? '')));
+      if (in_array($normalized, ['si', 'sí', '1', 'true', 'yes', 'con daños', 'con danos'], true)) {
+        return true;
+      }
+    }
+    $evaluation = trim((string) ($revision['evaluacion_de_danos'] ?? ''));
+    if ($evaluation === '') {
+      return false;
+    }
+    $decoded = json_decode($evaluation, true);
+    if (is_array($decoded)) {
+      return count(array_filter($decoded)) > 0;
+    }
+    return strlen(strip_tags($evaluation)) > 3;
+  }
+
+  /** @param array<int,array<string,string>> $fallback @return array<int,array<string,string>> */
+  private function maintenance_quote_glossary_options(int $glossaryId, array $fallback): array
+  {
+    if (method_exists($this, 'correctiveReviewGlossaryOptions')) {
+      $options = $this->correctiveReviewGlossaryOptions($glossaryId, $fallback);
+      if (is_array($options) && $options !== []) {
+        return $options;
+      }
+    }
+    return $fallback;
+  }
+
+  /** @return array<int,array<string,string>> */
+  private function maintenance_quote_repeater_items(string $key, array $allowed): array
+  {
+    $raw = wp_unslash((string) ($_POST[$key] ?? '[]'));
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+      return [];
+    }
+    $items = [];
+    foreach ($decoded as $row) {
+      if (!is_array($row)) {
+        continue;
+      }
+      $clean = [];
+      $hasValue = false;
+      foreach ($allowed as $field) {
+        $value = in_array($field, ['cantidad_mano', 'valor_mano', 'valor_materiales', 'cantidad_otros_equi', 'valor_otros_equi', 'cantidad_otros_costos', 'valor_otros_costos'], true)
+          ? (string) (int) round($this->maintenance_quote_number($row[$field] ?? 0))
+          : $this->maintenance_quote_clean($row[$field] ?? '');
+        if (trim($value) !== '' && trim($value) !== '0') {
+          $hasValue = true;
+        }
+        $clean[$field] = $value;
+      }
+      if (!$hasValue) {
+        continue;
+      }
+      if (isset($clean['cantidad_mano'], $clean['valor_mano'])) {
+        $clean['valor_total_item_mo'] = (string) ((int) $clean['cantidad_mano'] * (int) $clean['valor_mano']);
+      }
+      if (isset($clean['cantidad_otros_equi'], $clean['valor_otros_equi'])) {
+        $clean['valor_total_otros_equi'] = (string) ((int) $clean['cantidad_otros_equi'] * (int) $clean['valor_otros_equi']);
+      }
+      if (isset($clean['cantidad_otros_costos'], $clean['valor_otros_costos'])) {
+        $clean['valor_total_otros_costos'] = (string) ((int) $clean['cantidad_otros_costos'] * (int) $clean['valor_otros_costos']);
+      }
+      $items[] = $clean;
+    }
+    return $items;
+  }
+
+  /** @param array<int,array<string,string>> $items */
+  private function maintenance_quote_total_items(array $items, string $quantityKey, string $valueKey): float
+  {
+    $total = 0.0;
+    foreach ($items as $item) {
+      $value = $this->maintenance_quote_number($item[$valueKey] ?? 0);
+      $quantity = $quantityKey !== '' ? max(1.0, $this->maintenance_quote_number($item[$quantityKey] ?? 1)) : 1.0;
+      $total += $quantity * $value;
+    }
+    return (float) (int) round($total);
+  }
+
+  private function maintenance_quote_clean($value): string
+  {
+    return trim(sanitize_text_field(wp_unslash((string) ($value ?? ''))));
+  }
+
+  private function maintenance_quote_digits($value): string
+  {
+    return preg_replace('/\D+/', '', (string) ($value ?? '')) ?? '';
+  }
+
+  private function maintenance_quote_number($value): float
+  {
+    return $this->maintenance_order_money_value($value);
+  }
+
+  /** @param array<mixed> $values */
+  private function maintenance_quote_first(array $values): string
+  {
+    foreach ($values as $value) {
+      $text = trim((string) ($value ?? ''));
+      if ($text !== '') {
+        return $text;
+      }
+    }
+    return '';
+  }
+
+  /** @return array<int,array<string,string>> */
+  private function maintenance_quote_decode_items($raw): array
+  {
+    if (is_array($raw)) {
+      return $raw;
+    }
+    $text = trim((string) ($raw ?? ''));
+    if ($text === '') {
+      return [];
+    }
+    $decoded = @unserialize($text);
+    if (is_array($decoded)) {
+      return array_values($decoded);
+    }
+    $json = json_decode($text, true);
+    return is_array($json) ? array_values($json) : [];
+  }
+
+  /** @return array<int,string> */
+  private function maintenance_quote_media_list($raw): array
+  {
+    if (is_array($raw)) {
+      return array_values(array_filter(array_map('strval', $raw)));
+    }
+    $text = trim((string) ($raw ?? ''));
+    if ($text === '') {
+      return [];
+    }
+    $json = json_decode($text, true);
+    if (is_array($json)) {
+      return array_values(array_filter(array_map('strval', $json)));
+    }
+    return array_values(array_filter(array_map('trim', preg_split('/[\r\n,]+/', $text) ?: [])));
+  }
+
+  /** @return array<int,string> */
+  private function maintenance_quote_existing_media(string $field, $current): array
+  {
+    $posted = $this->maintenance_quote_media_list($_POST[$field] ?? '');
+    return $posted !== [] ? $posted : $this->maintenance_quote_media_list($current);
+  }
+
+  /** @return array<int,array<string,mixed>> */
+  private function maintenance_quote_store_media(string $field, int $maxFiles): array
+  {
+    if (empty($_FILES[$field]) || !is_array($_FILES[$field])) {
+      return [];
+    }
+    $stored = $this->handleImageUploadsDetailed($field, $maxFiles);
+    foreach ($stored as $image) {
+      $bytes = (int) ($image['bytes'] ?? $image['size'] ?? 0);
+      if ($bytes > 1572864) {
+        throw new \DomainException('Una imagen de la cotización supera 1.5 MB. Comprime la imagen antes de guardarla.');
+      }
+      $width = (int) ($image['width'] ?? 0);
+      $height = (int) ($image['height'] ?? 0);
+      if (($width > 0 && $width > 2000) || ($height > 0 && $height > 2000)) {
+        throw new \DomainException('Una imagen de la cotización supera 2000px. Baja el tamaño antes de guardarla.');
+      }
+    }
+    return $stored;
+  }
+
+  /** @param array<string,mixed> $sourceQuote */
+  private function maintenance_quote_balance_after_edit(array $sourceQuote, string $saldoField, float $newTotal): string
+  {
+    $totalField = match ($saldoField) {
+      'saldo_obra' => 'total_mano_obra',
+      'saldo_materiales' => 'total_materiales',
+      'saldo_maquinarias' => 'total_maquinarias',
+      'saldo_otros_costo' => 'total_otros_costos',
+      default => '',
+    };
+    if ($totalField === '') {
+      return (string) (int) round($newTotal);
+    }
+    $oldTotal = $this->maintenance_quote_number($sourceQuote[$totalField] ?? 0);
+    $oldBalance = $this->maintenance_quote_number($sourceQuote[$saldoField] ?? $oldTotal);
+    $used = max(0.0, $oldTotal - $oldBalance);
+    return (string) max(0, (int) round($newTotal - $used));
+  }
+
+  private function maintenance_quote_update_revision_flag(\SCM\Support\SchemaInspector $schema, string $tipoMantenimiento, int $idRevision): void
+  {
+    if ($idRevision <= 0) {
+      return;
+    }
+    $table = stripos($tipoMantenimiento, 'prevent') !== false
+      ? $this->db->table('jet_cct_revision_preventiva')
+      : $this->db->table('jet_cct_revision_correctiva');
+    if (!$schema->tableExists($table)) {
+      return;
+    }
+    $update = $schema->filterTableData($table, [
+      'tiene_cotizacion' => 'Si',
+      'cct_modified' => date('Y-m-d H:i:s'),
+    ]);
+    if (!empty($update)) {
+      $this->db->update($table, $update, ['_ID' => $idRevision]);
+    }
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function maintenance_quote_update_ticket(\SCM\Support\SchemaInspector $schema, array $ticket, int $quoteId, string $tipoMantenimiento, int $now, string $nowSql): void
+  {
+    $ticketId = (int) ($ticket['_ID'] ?? 0);
+    if ($ticketId <= 0) {
+      return;
+    }
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$schema->tableExists($table)) {
+      return;
+    }
+    $update = [
+      'id_cotizacion_mantenimiento' => (string) $quoteId,
+      'estado_acta_cotizacion_mantenimiento' => 'Si',
+      'estado_cotizacion_mantenimiento' => 'Si',
+      'fue_enviada_cotizacion_mantenimiento' => 'No',
+      'estado_administrativo' => 'Cotizado',
+      'fecha_actualizacion' => $now,
+      'cct_modified' => $nowSql,
+    ];
+    $update = $schema->filterTableData($table, $update);
+    if (!empty($update)) {
+      $this->db->update($table, $update, ['_ID' => $ticketId]);
+    }
+  }
+
+  /** @param array<string,mixed> $quoteData @param array<string,mixed> $ticket @param array<string,mixed> $actor */
+  private function maintenance_quote_insert_histories(\SCM\Support\SchemaInspector $schema, int $quoteId, string $mode, array $quoteData, array $ticket, array $actor, string $employeeId, int $now, string $nowSql): void
+  {
+    $ticketRef = $this->maintenance_quote_first([$quoteData['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
+    $propertyRef = $this->maintenance_quote_first([$quoteData['id_inmueble'] ?? '', $quoteData['inmueble'] ?? '']);
+    $actorName = trim((string) ($actor['name'] ?? Auth::user()));
+    $actorEmail = trim((string) ($actor['email'] ?? ''));
+    $actorPhone = trim((string) ($actor['phone'] ?? ''));
+    $message = match ($mode) {
+      'edit' => 'Se actualizó la cotización de mantenimiento #' . $quoteId . '.',
+      'note' => 'Se agregó una nota de cotización de mantenimiento #' . $quoteId . '.',
+      default => 'Se ha elaborado la cotización de mantenimiento #' . $quoteId . '.',
+    };
+
+    $histTicketTable = $this->db->table('jet_cct_historial_del_ticket');
+    if ($schema->tableExists($histTicketTable)) {
+      $payload = [
+        'cct_status' => 'publish',
+        'cct_author_id' => $employeeId,
+        'cct_created' => $nowSql,
+        'cct_modified' => $nowSql,
+        'id_ticket' => $ticketRef,
+        'fecha' => $now,
+        'nombre' => $actorName,
+        'correo' => $actorEmail,
+        'celular' => $actorPhone,
+        'respuesta' => $message,
+        'respuesta_cct_ticket' => $message,
+        'id_revision_correctiva' => trim((string) ($quoteData['id_revision'] ?? '')),
+        'id_cotizacion_mantenimiento' => (string) $quoteId,
+        'id_empleado' => $employeeId,
+        'fue_editada' => 'Si',
+      ];
+      $payload = $schema->filterTableData($histTicketTable, $payload);
+      if (!empty($payload)) {
+        $this->db->insert($histTicketTable, $payload);
+      }
+    }
+
+    $histInmuebleTable = $this->db->table('jet_cct_historial_del_inmueble');
+    if ($schema->tableExists($histInmuebleTable)) {
+      $payload = [
+        'cct_status' => 'publish',
+        'cct_author_id' => $employeeId,
+        'cct_created' => $nowSql,
+        'cct_modified' => $nowSql,
+        'id_empleado' => $employeeId,
+        'id_inmueble' => $propertyRef,
+        'fecha' => $now,
+        'tipo_de_reporte_his' => 'Mantenimiento',
+        'tipo_reporte' => 'Mantenimiento',
+        'observacion_his' => $message,
+        'observacion' => $message,
+        'funcionario' => $actorName,
+        'id_ticket' => $ticketRef,
+        'id_inmueble_data' => $propertyRef,
+        'id_cotizacion_mantenimiento' => (string) $quoteId,
+      ];
+      $payload = $schema->filterTableData($histInmuebleTable, $payload);
+      if (!empty($payload)) {
+        $this->db->insert($histInmuebleTable, $payload);
+      }
+    }
+  }
+
+  /** @param array<string,mixed> $quoteData @param array<string,mixed> $ticket @param array<string,mixed> $revision @param array<string,mixed> $actor */
+  private function maintenance_quote_ensure_admin_report(\SCM\Support\SchemaInspector $schema, int $quoteId, array $quoteData, array $ticket, array $revision, array $actor, string $employeeId, int $now, string $nowSql): int
+  {
+    $table = $this->db->table('jet_cct_reportes_administrativos');
+    if (!$schema->tableExists($table) || $quoteId <= 0) {
+      return 0;
+    }
+    $ticketRef = trim((string) ($quoteData['id_ticket'] ?? $ticket['_ID'] ?? ''));
+    $revisionId = trim((string) ($quoteData['id_revision'] ?? ''));
+    $tipo = trim((string) ($quoteData['tipo_mantenimiento'] ?? 'Correctiva'));
+    $where = ['TRIM(COALESCE(`id_ticket`, "")) = ?'];
+    $params = [$ticketRef];
+    if ($revisionId !== '') {
+      $column = stripos($tipo, 'prevent') !== false ? 'id_revision_preventiva' : 'id_revision_correctiva';
+      $where[] = "TRIM(COALESCE(`{$column}`, '')) = ?";
+      $params[] = $revisionId;
+    }
+    $existing = $this->db->getVar("SELECT `_ID` FROM `{$table}` WHERE " . implode(' AND ', $where) . " LIMIT 1", $params);
+    if ((int) $existing > 0) {
+      return 0;
+    }
+
+    $config = [];
+    $configTable = $this->db->table('jet_cct_confi_sistema');
+    if ($schema->tableExists($configTable)) {
+      foreach ($this->db->getResults("SELECT `funcion`, `valor` FROM `{$configTable}` WHERE `funcion` IN ('salario','dias_trabajo','porcentaje_smlmv_co_pre','porcentaje_smlmv') ORDER BY `_ID`") as $row) {
+        $config[(string) ($row['funcion'] ?? '')] = $row['valor'] ?? '';
+      }
+    }
+    $fee = (float) (\SCM\Modules\TicketCompletion\CompletionPolicy::fee($config) ?? 0);
+    $value = $fee > 0 ? $fee : 0.0;
+    $actorName = trim((string) ($actor['name'] ?? Auth::user()));
+    $description = 'Cobro administrativo por cotización de mantenimiento #' . $quoteId . '.';
+    $payload = [
+      'cct_status' => 'publish',
+      'id_ticket' => $ticketRef,
+      'id_empleado' => $employeeId,
+      'creador' => $actorName,
+      'cct_author_id' => $employeeId,
+      'cct_created' => $nowSql,
+      'cct_modified' => $nowSql,
+      'fecha' => $now,
+      'fue_pagado' => 'No',
+      'categoria' => 'Cotización de mantenimiento',
+      'descripcion' => $description,
+      'valor' => (string) (int) round($value),
+      'transporte' => '0',
+      'valor_mantenimiento' => (string) (int) round($value),
+      'valor_otro' => '0',
+      'sucursal' => trim((string) ($quoteData['sucursal'] ?? $ticket['sucursal'] ?? '')),
+      'valor_revision' => (string) (int) round($value),
+      'contrato' => trim((string) ($quoteData['contrato'] ?? '')),
+      'id_cotizacion_mantenimiento' => (string) $quoteId,
+      'id_contrato' => trim((string) ($quoteData['id_contrato'] ?? '')),
+      'id_inmueble' => trim((string) ($quoteData['id_inmueble'] ?? '')),
+      'exportado' => 'No',
+      'fecha_revision' => $now,
+      'fecha_ticket' => trim((string) ($ticket['fecha'] ?? $ticket['cct_created'] ?? '')),
+      'inmueble' => trim((string) ($quoteData['inmueble'] ?? '')),
+      'arrendatario' => trim((string) ($ticket['arrendatario'] ?? '')),
+    ];
+    if ($revisionId !== '') {
+      if (stripos($tipo, 'prevent') !== false) {
+        $payload['id_revision_preventiva'] = $revisionId;
+      } else {
+        $payload['id_revision_correctiva'] = $revisionId;
+      }
+    }
+
+    $payload = $schema->filterTableData($table, $payload);
+    if (empty($payload) || !$this->db->insert($table, $payload)) {
+      return 0;
+    }
+    return (int) $this->db->lastInsertId();
+  }
+
+  /** @param array<string,mixed> $quoteData @param array<string,mixed> $actor */
+  private function maintenance_quote_enqueue_saved_notifications(string $mode, int $quoteId, array $quoteData, array $actor): int
+  {
+    $recipients = $this->maintenance_order_internal_email_recipients('cotizacion_mantenimiento_guardada');
+    $creatorEmail = trim((string) ($quoteData['email_creador'] ?? ''));
+    if ($creatorEmail !== '' && filter_var($creatorEmail, FILTER_VALIDATE_EMAIL)) {
+      $recipients[] = [
+        'name' => trim((string) ($quoteData['creador'] ?? $actor['name'] ?? '')),
+        'email' => $creatorEmail,
+      ];
+    }
+    $recipients = $this->maintenance_order_unique_email_recipients($recipients);
+    if ($recipients === []) {
+      return 0;
+    }
+
+    $ticket = trim((string) ($quoteData['id_ticket'] ?? ''));
+    $subject = ($mode === 'edit' ? 'Cotización actualizada' : ($mode === 'note' ? 'Nota de cotización creada' : 'Cotización creada'))
+      . ($ticket !== '' ? ' para el caso #' . $ticket : '');
+    $lines = [
+      'Cotización' => '#' . $quoteId,
+      'Categoría' => trim((string) ($quoteData['categoria_cotizacion'] ?? '-')),
+      'Tipo' => trim((string) ($quoteData['tipo_mantenimiento'] ?? 'Mantenimiento')),
+      'Caso' => $ticket !== '' ? '#' . $ticket : '-',
+      'Inmueble' => $this->maintenance_quote_first([$quoteData['inmueble'] ?? '', $quoteData['id_inmueble'] ?? '']),
+      'Destinatario' => trim((string) ($quoteData['destinatario'] ?? '-')),
+      'Total' => $this->format_cop_currency($quoteData['total'] ?? 0),
+      'Creada por' => trim((string) ($actor['name'] ?? $quoteData['creador'] ?? '-')),
+    ];
+    $items = '';
+    foreach ($lines as $label => $value) {
+      $items .= '<tr><td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#475569;font-weight:700;">' . esc_html($label) . '</td><td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#0b1f3a;">' . esc_html((string) $value) . '</td></tr>';
+    }
+    $html = '<div style="margin:0;padding:24px;background:#f4f7fb;font-family:Arial,sans-serif;color:#0b1f3a;">'
+      . '<div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #dbe4ef;border-radius:16px;overflow:hidden;">'
+      . '<div style="padding:20px 24px;background:#0b1f3a;color:#ffffff;"><h1 style="margin:0;font-size:21px;">Cotización de mantenimiento</h1></div>'
+      . '<div style="padding:24px;"><p style="margin:0 0 16px;">Se registró una novedad de cotización de mantenimiento en Control Servicios Inmobiliarios.</p>'
+      . '<table style="width:100%;border-collapse:collapse;margin:0 0 20px;">' . $items . '</table>'
+      . '</div></div></div>';
+
+    return (new \SCM\Support\EmailQueue($this->db))->enqueue(array_column($recipients, 'email'), $subject, $html, [
+      'source_module' => 'cotizaciones_mantenimiento',
+      'dedupe_key' => 'cotizacion-mantenimiento-' . $mode . ':' . $quoteId,
+      'meta' => [
+        'event' => 'cotizacion_mantenimiento_guardada',
+        'mode' => $mode,
+        'id_cotizacion' => $quoteId,
+        'id_ticket' => $ticket,
+        'actor' => trim((string) ($actor['name'] ?? '')),
+      ],
+    ]);
+  }
+
   /** @return array{from:string,to:string,from_ts:int,to_ts:int} */
   private function metrics_execution_date_range(array $input): array
   {

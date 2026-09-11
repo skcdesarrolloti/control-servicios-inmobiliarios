@@ -145,6 +145,8 @@
       actions.cotizaciones_mantenimiento || "";
     var actionDeleteCotizacion = actions.delete_cotizacion || "";
     var actionApproveCotizacion = actions.approve_cotizacion || "";
+    var actionCotizacionFormContext = actions.cotizacion_form_context || "";
+    var actionCotizacionSave = actions.cotizacion_save || "";
     var actionCotizacionOrderContext = actions.cotizacion_order_context || "";
     var actionCotizacionOrderSave = actions.cotizacion_order_save || "";
     var actionCotizacionOrderResponse = actions.cotizacion_order_response || "";
@@ -10931,6 +10933,289 @@
         });
     }
 
+    function cotizacionFormOptionHtml(options, selected) {
+      options = Array.isArray(options) ? options : [];
+      return options.map(function (option) {
+        var value = String(option.value || option.label || "");
+        var label = String(option.label || option.value || value);
+        return '<option value="' + escHtml(value) + '"' + (value === String(selected || "") ? " selected" : "") + ">" + escHtml(label) + "</option>";
+      }).join("");
+    }
+
+    function cotizacionFormItems(items, fallback) {
+      if (Array.isArray(items) && items.length) return items;
+      return [fallback || {}];
+    }
+
+    function renderCotizacionRepeaterRows(type, items, unitOptions) {
+      var configs = {
+        mano: {
+          title: "Mano de obra",
+          add: "Agregar mano de obra",
+          fields: [
+            ["textarea", "descripcion_mano", "Descripción", "Describe la actividad"],
+            ["select", "unidad_mano", "Unidad", ""],
+            ["number", "cantidad_mano", "Cantidad", "1"],
+            ["money", "valor_mano", "Valor", "0"],
+          ],
+        },
+        materiales: {
+          title: "Materiales",
+          add: "Agregar material",
+          fields: [
+            ["text", "provedor_materiales", "Proveedor", "Nombre del proveedor"],
+            ["money", "valor_materiales", "Valor", "0"],
+          ],
+        },
+        equipos: {
+          title: "Maquinarias y equipos",
+          add: "Agregar maquinaria/equipo",
+          fields: [
+            ["textarea", "descipcion_otros_equi", "Descripción", "Describe el equipo"],
+            ["select", "unidad_otros_equi", "Unidad", ""],
+            ["number", "cantidad_otros_equi", "Cantidad", "1"],
+            ["money", "valor_otros_equi", "Valor", "0"],
+          ],
+        },
+        otros: {
+          title: "Otros costos",
+          add: "Agregar otro costo",
+          fields: [
+            ["textarea", "descipcion_otros_costos", "Descripción", "Transporte, aseo, escombros..."],
+            ["select", "unidad_otros_costos", "Unidad", ""],
+            ["number", "cantidad_otros_costos", "Cantidad", "1"],
+            ["money", "valor_otros_costos", "Valor", "0"],
+          ],
+        },
+      };
+      var conf = configs[type];
+      var rows = cotizacionFormItems(items, {});
+      var html = '<section class="scm-maint-quote-section" data-quote-repeater="' + escHtml(type) + '"><div class="scm-maint-quote-section-head"><div><h4>' + escHtml(conf.title) + '</h4><span data-quote-total="' + escHtml(type) + '">$0</span></div><button type="button" class="scm-case-work-btn" data-quote-add-row="' + escHtml(type) + '">' + escHtml(conf.add) + '</button></div><div class="scm-maint-quote-rows">';
+      rows.forEach(function (row) {
+        html += '<div class="scm-maint-quote-row" data-quote-row="' + escHtml(type) + '">';
+        conf.fields.forEach(function (field) {
+          var inputType = field[0];
+          var name = field[1];
+          var label = field[2];
+          var placeholder = field[3] || "";
+          var value = row && row[name] != null ? String(row[name]) : "";
+          html += '<label class="scm-cotizacion-dialog-field"><span>' + escHtml(label) + '</span>';
+          if (inputType === "textarea") {
+            html += '<textarea data-quote-field="' + escHtml(name) + '" rows="2" placeholder="' + escHtml(placeholder) + '">' + escHtml(value) + '</textarea>';
+          } else if (inputType === "select") {
+            html += '<select data-quote-field="' + escHtml(name) + '"><option value="">Elige</option>' + cotizacionFormOptionHtml(unitOptions, value) + "</select>";
+          } else {
+            html += '<input type="' + (inputType === "money" ? "number" : inputType) + '" data-quote-field="' + escHtml(name) + '" value="' + escHtml(value) + '" placeholder="' + escHtml(placeholder) + '" min="0" step="1">';
+          }
+          html += "</label>";
+        });
+        html += '<button type="button" class="scm-maint-quote-remove" data-quote-remove-row aria-label="Quitar fila">Quitar</button></div>';
+      });
+      html += "</div></section>";
+      return html;
+    }
+
+    function buildMaintenanceQuoteFormHtml(context) {
+      context = context || {};
+      var d = context.defaults || {};
+      var q = context.cotizacion || {};
+      var ticket = context.ticket || {};
+      var title = context.mode === "edit" ? "Editar cotización" : (context.mode === "note" ? "Añadir nota de cotización" : "Añadir cotización");
+      var media = q.media || {};
+      return (
+        '<form class="scm-maint-quote-form" data-maint-quote-form>' +
+        '<div class="scm-maint-quote-hero"><div><span>' + escHtml(context.tipo_mantenimiento || "Mantenimiento") + '</span><h3>' + escHtml(title) + '</h3><p>Ticket #' + escHtml(ticket.numero || ticket.id || "-") + ' · Inmueble ' + escHtml(ticket.inmueble || ticket.id_inmueble || "-") + ' · Contrato ' + escHtml(ticket.contrato || "-") + '</p></div><strong data-quote-grand-total>$0</strong></div>' +
+        '<input type="hidden" name="mode" value="' + escHtml(context.mode || "create") + '">' +
+        '<input type="hidden" name="ticket_pk" value="' + escHtml(ticket.id || "") + '">' +
+        '<input type="hidden" name="id_cotizacion" value="' + escHtml(q.id || "") + '">' +
+        '<input type="hidden" name="tipo_mantenimiento" value="' + escHtml(context.tipo_mantenimiento || "") + '">' +
+        '<input type="hidden" name="tipo_inmueble" value="' + escHtml(d.tipo_inmueble || "") + '">' +
+        '<input type="hidden" name="tipo_negocio" value="' + escHtml(d.tipo_negocio || "") + '">' +
+        '<input type="hidden" name="destinacion" value="' + escHtml(d.destinacion || "") + '">' +
+        '<input type="hidden" name="direccion" value="' + escHtml(ticket.direccion || "") + '">' +
+        '<input type="hidden" name="mejor_oferta_existing" value="' + escHtml((media.mejor_oferta || []).join(",")) + '">' +
+        '<input type="hidden" name="otras_oferta_existing" value="' + escHtml((media.otras_oferta || []).join(",")) + '">' +
+        '<section class="scm-maint-quote-section"><h4>Datos de la cotización</h4><div class="scm-maint-quote-grid">' +
+        '<label class="scm-cotizacion-dialog-field"><span>¿Quién ejecutará y aprobará? <em>*</em></span><select name="ejecutado" required><option value="">Elige una opción</option>' + cotizacionFormOptionHtml(context.executor_options, d.ejecutado) + '</select></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Destinatario <em>*</em></span><input name="destinatario" value="' + escHtml(d.destinatario || "") + '" required></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Email</span><input type="email" name="email_destinatario" value="' + escHtml(d.email_destinatario || "") + '"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Indicativo</span><input name="indicativo_destinarario" value="' + escHtml(d.indicativo_destinarario || "57") + '"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Celular</span><input type="tel" name="celular_destinatario" value="' + escHtml(d.celular_destinatario || "") + '"></label>' +
+        '</div></section>' +
+        renderCotizacionRepeaterRows("mano", q.items_mano, context.unit_options) +
+        renderCotizacionRepeaterRows("materiales", q.items_materiales, context.unit_options) +
+        renderCotizacionRepeaterRows("equipos", q.items_otros_equi, context.unit_options) +
+        renderCotizacionRepeaterRows("otros", q.items_otros_costos, context.unit_options) +
+        '<section class="scm-maint-quote-section"><h4>Condiciones y perturbación</h4><div class="scm-maint-quote-grid">' +
+        '<label class="scm-cotizacion-dialog-field"><span>Validez de la oferta <em>*</em></span><input type="number" name="valides_oferta" min="0" value="' + escHtml(d.valides_oferta || "") + '" required><small>Días de vigencia.</small></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Duración del trabajo <em>*</em></span><input type="number" name="duracion" min="0" value="' + escHtml(d.duracion || "") + '" required><small>Días estimados.</small></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Perturbación</span><input type="number" name="perturbacion" min="0" step="1" value="' + escHtml(d.perturbacion || "") + '"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Área afectada</span><input type="number" name="area_afectada" min="0" step="1" value="' + escHtml(d.area_afectada || "") + '"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Valor bonificación</span><input type="number" name="valor_bonificacion" min="0" step="1" value="' + escHtml(d.valor_bonificacion || "") + '"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Días afectación calculados</span><input type="number" name="dias_afectacion_calculados" min="0" step="1" value="' + escHtml(d.dias_afectacion_calculados || "") + '"></label>' +
+        '</div><label class="scm-cotizacion-dialog-field is-wide"><span>Justificación</span><textarea name="justificacion_perturbacion" rows="3">' + escHtml(d.justificacion_perturbacion || "") + '</textarea></label><label class="scm-cotizacion-dialog-field is-wide"><span>Resumen cálculo perturbación</span><textarea name="resumen_calculo_perturbacion" rows="3">' + escHtml(d.resumen_calculo_perturbacion || "") + '</textarea></label><label class="scm-cotizacion-dialog-field is-wide"><span>Observaciones</span><textarea name="observaciones" rows="4">' + escHtml(d.observaciones || "") + '</textarea></label></section>' +
+        '<section class="scm-maint-quote-section"><h4>Soportes</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Mejores ofertas</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Otras ofertas</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><p class="scm-maint-quote-help">Usa imágenes livianas. El sistema valida peso y tamaño antes de guardar.</p></section>' +
+        '</form>'
+      );
+    }
+
+    function quoteRowToObject(row) {
+      var obj = {};
+      row.querySelectorAll("[data-quote-field]").forEach(function (input) {
+        obj[input.getAttribute("data-quote-field") || ""] = input.value || "";
+      });
+      return obj;
+    }
+
+    function collectQuoteRows(form, type) {
+      return Array.prototype.map.call(form.querySelectorAll('[data-quote-row="' + type + '"]'), quoteRowToObject);
+    }
+
+    function syncMaintenanceQuoteTotals(form) {
+      if (!form) return;
+      var totals = { mano: 0, materiales: 0, equipos: 0, otros: 0 };
+      collectQuoteRows(form, "mano").forEach(function (row) {
+        totals.mano += Math.max(1, parseCotizacionOrderMoney(row.cantidad_mano || 1)) * parseCotizacionOrderMoney(row.valor_mano);
+      });
+      collectQuoteRows(form, "materiales").forEach(function (row) {
+        totals.materiales += parseCotizacionOrderMoney(row.valor_materiales);
+      });
+      collectQuoteRows(form, "equipos").forEach(function (row) {
+        totals.equipos += Math.max(1, parseCotizacionOrderMoney(row.cantidad_otros_equi || 1)) * parseCotizacionOrderMoney(row.valor_otros_equi);
+      });
+      collectQuoteRows(form, "otros").forEach(function (row) {
+        totals.otros += Math.max(1, parseCotizacionOrderMoney(row.cantidad_otros_costos || 1)) * parseCotizacionOrderMoney(row.valor_otros_costos);
+      });
+      Object.keys(totals).forEach(function (key) {
+        var label = form.querySelector('[data-quote-total="' + key + '"]');
+        if (label) label.textContent = formatCotizacionOrderCurrency(totals[key]);
+      });
+      var grand = form.querySelector("[data-quote-grand-total]");
+      if (grand) grand.textContent = formatCotizacionOrderCurrency(totals.mano + totals.materiales + totals.equipos + totals.otros);
+    }
+
+    function wireMaintenanceQuoteForm(form, context) {
+      if (!form) return;
+      form.addEventListener("input", function () {
+        syncMaintenanceQuoteTotals(form);
+      });
+      form.addEventListener("click", function (event) {
+        var addBtn = event.target && event.target.closest ? event.target.closest("[data-quote-add-row]") : null;
+        if (addBtn) {
+          event.preventDefault();
+          var type = addBtn.getAttribute("data-quote-add-row") || "";
+          var section = form.querySelector('[data-quote-repeater="' + type + '"] .scm-maint-quote-rows');
+          if (!section) return;
+          var html = renderCotizacionRepeaterRows(type, [{}], context.unit_options || []);
+          var temp = document.createElement("div");
+          temp.innerHTML = html;
+          var row = temp.querySelector("[data-quote-row]");
+          if (row) section.appendChild(row);
+          syncMaintenanceQuoteTotals(form);
+          return;
+        }
+        var removeBtn = event.target && event.target.closest ? event.target.closest("[data-quote-remove-row]") : null;
+        if (removeBtn) {
+          event.preventDefault();
+          var rowsWrap = removeBtn.closest(".scm-maint-quote-rows");
+          var row = removeBtn.closest("[data-quote-row]");
+          if (rowsWrap && row && rowsWrap.querySelectorAll("[data-quote-row]").length > 1) {
+            row.remove();
+          } else if (row) {
+            row.querySelectorAll("input, textarea, select").forEach(function (input) { input.value = ""; });
+          }
+          syncMaintenanceQuoteTotals(form);
+        }
+      });
+      syncMaintenanceQuoteTotals(form);
+    }
+
+    function loadMaintenanceQuoteContext(button, mode) {
+      var fd = new FormData();
+      fd.append("action", actionCotizacionFormContext);
+      fd.append("nonce", nonce);
+      fd.append("mode", mode || button.getAttribute("data-cotizacion-mode") || "create");
+      fd.append("ticket_pk", button.getAttribute("data-ticket-pk") || "");
+      fd.append("id_cotizacion", button.getAttribute("data-cotizacion-id") || "");
+      return fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success || !json.data) {
+            throw new Error((json && json.data && json.data.message) || "No se pudo cargar el formulario.");
+          }
+          return json.data;
+        });
+    }
+
+    function openMaintenanceQuoteForm(button, options) {
+      options = options || {};
+      if (!ajaxUrl || !actionCotizacionFormContext || !actionCotizacionSave || !window.Swal) {
+        showToast("error", "No está disponible el formulario de cotización.");
+        return Promise.resolve(false);
+      }
+      var mode = options.mode || button.getAttribute("data-cotizacion-mode") || (button.hasAttribute("data-scm-create-cotizacion") ? "create" : "edit");
+      return loadMaintenanceQuoteContext(button, mode)
+        .then(function (context) {
+          return window.Swal.fire({
+            title: context.mode === "edit" ? "Editar cotización de mantenimiento" : (context.mode === "note" ? "Añadir nota de cotización" : "Añadir cotización de mantenimiento"),
+            html: buildMaintenanceQuoteFormHtml(context),
+            width: "min(1080px, 96vw)",
+            showCloseButton: true,
+            showCancelButton: true,
+            confirmButtonText: context.mode === "edit" ? "Guardar cambios" : (context.mode === "note" ? "Crear nota" : "Crear cotización"),
+            cancelButtonText: "Cancelar",
+            buttonsStyling: false,
+            focusConfirm: false,
+            allowOutsideClick: false,
+            returnFocus: true,
+            customClass: {
+              popup: "scm-cotizacion-dialog scm-maint-quote-swal",
+              title: "scm-cotizacion-dialog-title",
+              htmlContainer: "scm-cotizacion-dialog-body",
+              actions: "scm-cotizacion-dialog-actions",
+              confirmButton: "scm-cotizacion-dialog-confirm",
+              cancelButton: "scm-cotizacion-dialog-cancel",
+              closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+            },
+            didOpen: function () {
+              wireMaintenanceQuoteForm(window.Swal.getPopup().querySelector("[data-maint-quote-form]"), context);
+            },
+            preConfirm: function () {
+              var popup = window.Swal.getPopup();
+              var form = popup ? popup.querySelector("[data-maint-quote-form]") : null;
+              if (!form) {
+                window.Swal.showValidationMessage("Formulario no disponible.");
+                return false;
+              }
+              var formData = new FormData(form);
+              formData.append("items_mano_json", JSON.stringify(collectQuoteRows(form, "mano")));
+              formData.append("items_materiales_json", JSON.stringify(collectQuoteRows(form, "materiales")));
+              formData.append("items_otros_equi_json", JSON.stringify(collectQuoteRows(form, "equipos")));
+              formData.append("items_otros_costos_json", JSON.stringify(collectQuoteRows(form, "otros")));
+              if (!String(formData.get("destinatario") || "").trim()) {
+                window.Swal.showValidationMessage("Completa el destinatario.");
+                return false;
+              }
+              return formData;
+            },
+          }).then(function (result) {
+            if (!result.isConfirmed) {
+              if (options.onClose) options.onClose();
+              return false;
+            }
+            return submitCotizacionAction(result.value, actionCotizacionSave, "No se pudo guardar la cotización.").then(function (saved) {
+              if (saved && options.onClose) options.onClose(320);
+              return saved;
+            });
+          });
+        })
+        .catch(function (err) {
+          showToast("error", err.message || "No se pudo abrir el formulario de cotización.");
+          if (options.onClose) options.onClose();
+          return false;
+        });
+    }
+
     function formatCotizacionOrderCurrency(value) {
       var number = Number(value || 0);
       if (!isFinite(number)) number = 0;
@@ -12059,6 +12344,17 @@
                   });
                   return;
                 }
+                var editQuoteBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-edit-cotizacion], [data-scm-create-cotizacion]")
+                  : null;
+                if (editQuoteBtn) {
+                  event.preventDefault();
+                  openMaintenanceQuoteForm(editQuoteBtn, {
+                    mode: editQuoteBtn.getAttribute("data-cotizacion-mode") || (editQuoteBtn.hasAttribute("data-scm-create-cotizacion") ? "create" : "edit"),
+                    onClose: makeCaseCotizacionesReturn(button),
+                  });
+                  return;
+                }
                 var actionBtn = event.target && event.target.closest
                   ? event.target.closest("[data-scm-cotizacion-response-standalone], [data-scm-approve-cotizacion], [data-scm-delete-cotizacion]")
                   : null;
@@ -12128,6 +12424,33 @@
       if (caseCotizacionesBtn) {
         e.preventDefault();
         openCaseCotizacionesModal(caseCotizacionesBtn);
+        return;
+      }
+
+      var createCotizacionBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-create-cotizacion]")
+          : null;
+      if (createCotizacionBtn) {
+        e.preventDefault();
+        openMaintenanceQuoteForm(createCotizacionBtn, { mode: "create" });
+        return;
+      }
+
+      var editCotizacionBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-edit-cotizacion]")
+          : null;
+      if (editCotizacionBtn) {
+        e.preventDefault();
+        var editReturnContext = editCotizacionBtn._scmCaseCotizacionesReturn || null;
+        editCotizacionBtn._scmCaseCotizacionesReturn = null;
+        openMaintenanceQuoteForm(editCotizacionBtn, {
+          mode: editCotizacionBtn.getAttribute("data-cotizacion-mode") || "edit",
+          onClose: editReturnContext && typeof editReturnContext.reopen === "function"
+            ? editReturnContext.reopen
+            : null,
+        });
         return;
       }
 

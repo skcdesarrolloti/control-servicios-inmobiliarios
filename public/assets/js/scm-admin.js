@@ -1879,6 +1879,22 @@
     return tabKey === "mantenimiento";
   }
 
+  function scmIsYesLike(value) {
+    var text = String(value || "").trim().toLowerCase();
+    return ["si", "sí", "1", "true", "yes", "con daños", "con danos"].indexOf(text) !== -1;
+  }
+
+  function caseCanCreateMaintenanceQuote(caseBtn) {
+    if (!caseBtn || !caseBtn.dataset || !isMaintenanceCase(caseBtn)) return false;
+    if (String(caseBtn.dataset.idRevisionCorrectiva || "").trim()) {
+      return true;
+    }
+    if (!String(caseBtn.dataset.idRevisionPreventiva || "").trim()) {
+      return false;
+    }
+    return scmIsYesLike(caseBtn.dataset.prevEncontroDanos || "");
+  }
+
   function syncPreventivaNoAccessBox(scope) {
     if (!scope) return;
     var box = scope.querySelector("[data-scm-preventiva-no-access-box]");
@@ -4725,6 +4741,14 @@
             '" data-cotizacion-id="' +
             escHtml(cotizacionId) +
             '">Gestionar cotizaciones del caso</button>',
+          );
+        } else if (!isPublicPqr && caseCanCreateMaintenanceQuote(btn)) {
+          quoteActionButtons.push(
+            '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-create-cotizacion data-cotizacion-mode="create" data-ticket-pk="' +
+            escHtml(calendarTicketPk || "") +
+            '" data-ticket="' +
+            escHtml(btn.dataset.ticket || "") +
+            '">A&ntilde;adir cotizaci&oacute;n</button>',
           );
         }
         if (isPublicPqr && ticketUrl) {

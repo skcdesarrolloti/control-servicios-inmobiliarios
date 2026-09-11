@@ -369,6 +369,8 @@ trait RendersDashboard
         'revision_correctiva' => self::AJAX_CORRECTIVE_REVIEW,
         'delete_cotizacion' => self::AJAX_DELETE_COTIZACION,
         'approve_cotizacion' => self::AJAX_APPROVE_COTIZACION,
+        'cotizacion_form_context' => self::AJAX_COTIZACION_FORM_CONTEXT,
+        'cotizacion_save' => self::AJAX_COTIZACION_SAVE,
         'cotizacion_order_context' => self::AJAX_COTIZACION_ORDER_CONTEXT,
         'cotizacion_order_save' => self::AJAX_COTIZACION_ORDER_SAVE,
         'cotizacion_order_response' => self::AJAX_COTIZACION_ORDER_RESPONSE,
@@ -3595,8 +3597,6 @@ trait RendersDashboard
     $inmueble = trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? ''));
     $idInmueble = trim((string) ($row['id_inmueble'] ?? $inmueble));
     $contrato = trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? ''));
-    $idContrato = trim((string) ($row['id_contrato'] ?? $contrato));
-    $sucursal = trim((string) ($row['sucursal'] ?? '1'));
     $estado = trim((string) ($row['estado'] ?? ''));
     $cotizacionAprobada = strtolower($estado) === 'aprobada';
     $seEnvio = strtolower(trim((string) ($row['se_envio'] ?? '')));
@@ -3618,7 +3618,6 @@ trait RendersDashboard
     $barrio = trim((string) ($row['barrio'] ?? ''));
     $ticketUrl = $ticket !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticket) : '';
     $cotUrl = $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '';
-    $noteUrl = 'https://sucasainmobiliaria.com.co/mi-cuenta/anadir-nota-a-cotizacion-de-mantenimiento/?id_cotizacion=' . rawurlencode($id) . '&id_inmueble=' . rawurlencode($idInmueble) . '&id_sucursal=' . rawurlencode($sucursal) . '&id_contrato=' . rawurlencode($idContrato);
     $actaUrl = rtrim((string) SCM_BASE_URL, '/') . '/crear-acta.php?' . http_build_query([
       'ticket_pk' => $ticket,
       'id_cotizacion' => $id,
@@ -3736,12 +3735,13 @@ trait RendersDashboard
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="totales" hidden><div class="scm-cotizacion-finance-grid"><div><span>Total mano de obra</span><strong>' . esc_html($totalObra) . '</strong></div><div><span>Total materiales</span><strong>' . esc_html($totalMateriales) . '</strong></div><div><span>Total equipos</span><strong>' . esc_html($totalMaquinarias) . '</strong></div><div><span>Total otros costos</span><strong>' . esc_html($totalOtros) . '</strong></div><div class="scm-cotizacion-finance-total"><span>Total cotizaci&oacute;n</span><strong>' . esc_html($totalCotizacion) . '</strong></div></div></div>'
       . '<div class="scm-cotizacion-actions">'
       . ($id !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-native data-cotizacion-id="' . esc_attr($id) . '">Ver cotizaci&oacute;n</button>' : '')
+      . ($id !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-edit-cotizacion data-cotizacion-mode="edit" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Editar cotizaci&oacute;n</button>' : '')
       . $ticketCaseButton
       . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-view-cotizacion-orders>Ver &oacute;rdenes <span class="scm-action-count">' . esc_html((string) count($orders)) . '</span></button>' : '')
       . ($cotizacionSinResponder ? '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizaci&oacute;n</button>' : '')
       . ($cotizacionSinResponder ? '<button type="button" class="scm-case-work-btn scm-primary-action scm-cotizacion-approve-action" data-scm-approve-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Marcar como aprobada</button>' : '')
       . ($cotizacionSinResponder ? '<button type="button" class="scm-case-work-btn scm-danger-action scm-cotizacion-delete-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizaci&oacute;n</button>' : '')
-      . '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($noteUrl) . '" data-iframe-title="A&ntilde;adir nota a cotizaci&oacute;n">A&ntilde;adir nota</button>'
+      . ($id !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-edit-cotizacion data-cotizacion-mode="note" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir nota</button>' : '')
       . ($cotizacionAprobada && !$hasActiveActa ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-add-cotizacion-order data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir orden</button>' : '')
       . ($cotizacionAprobada && $hasActiveActa ? '<button type="button" class="scm-case-work-btn" disabled title="Esta cotizaci&oacute;n o caso ya tiene acta activa">Orden bloqueada por acta</button>' : '')
       . ($actaInfo['url'] !== '' ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-iframe data-iframe-url="' . esc_attr($actaInfo['url']) . '" data-iframe-title="Acta de satisfacci&oacute;n">Ver acta' . ($actaInfo['status'] === 'pending' ? ' pendiente' : '') . '</button>' : '')

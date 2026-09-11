@@ -5335,6 +5335,132 @@
   grid-column: 1 / -1;
 }
 
+.scm-maint-quote-form {
+  text-align: left;
+}
+
+.scm-maint-quote-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 18px;
+  margin-bottom: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #eff6ff 0%, #fff7ed 100%);
+}
+
+.scm-maint-quote-hero span,
+.scm-maint-quote-section-head span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scm-maint-quote-hero h3 {
+  margin: 4px 0 6px;
+  color: #0b1f3a;
+  font-size: 20px;
+}
+
+.scm-maint-quote-hero p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.scm-maint-quote-hero > strong {
+  min-width: 150px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #0b1f3a;
+  color: #fff;
+  font-size: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.scm-maint-quote-section {
+  padding: 16px;
+  margin-bottom: 14px;
+  border: 1px solid #dbe4ef;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.scm-maint-quote-section h4 {
+  margin: 0 0 14px;
+  color: #0b1f3a;
+  font-size: 15px;
+}
+
+.scm-maint-quote-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.scm-maint-quote-section-head h4 {
+  margin-bottom: 3px;
+}
+
+.scm-maint-quote-section-head [data-quote-total] {
+  color: #0f766e;
+  font-variant-numeric: tabular-nums;
+}
+
+.scm-maint-quote-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.scm-maint-quote-rows {
+  display: grid;
+  gap: 12px;
+}
+
+.scm-maint-quote-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.scm-maint-quote-remove {
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid #fecaca;
+  border-radius: 11px;
+  background: #fff1f2;
+  color: #991b1b;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.scm-maint-quote-remove:hover,
+.scm-maint-quote-remove:focus-visible {
+  background: #fee2e2;
+  outline: 3px solid rgba(220, 38, 38, 0.14);
+}
+
+.scm-maint-quote-help {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 @media (max-width: 680px) {
   .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-title {
     padding: 20px 66px 16px 18px;
@@ -5364,6 +5490,19 @@
   .scm-cotizacion-orders-list,
   .scm-cotizacion-order-detail-grid,
   .scm-cotizacion-order-response-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .scm-maint-quote-hero,
+  .scm-maint-quote-section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .scm-maint-quote-hero > strong,
+  .scm-maint-quote-grid,
+  .scm-maint-quote-row {
+    width: 100%;
     grid-template-columns: 1fr;
   }
 

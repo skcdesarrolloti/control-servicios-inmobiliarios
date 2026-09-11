@@ -30,6 +30,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_COTIZACIONES_MANTENIMIENTO = 'scm_cotizaciones_mantenimiento';
   const AJAX_DELETE_COTIZACION = 'scm_eliminar_cotizacion_mantenimiento';
   const AJAX_APPROVE_COTIZACION = 'scm_aprobar_cotizacion_mantenimiento';
+  const AJAX_COTIZACION_FORM_CONTEXT = 'scm_cotizacion_mantenimiento_form_context';
+  const AJAX_COTIZACION_SAVE = 'scm_guardar_cotizacion_mantenimiento';
   const AJAX_COTIZACION_ORDER_CONTEXT = 'scm_cotizacion_order_context';
   const AJAX_COTIZACION_ORDER_SAVE = 'scm_cotizacion_order_save';
   const AJAX_COTIZACION_ORDER_RESPONSE = 'scm_cotizacion_order_response';
@@ -287,6 +289,11 @@ final class SuCasaControlServiciosInmobiliarios
           'respuesta_orden_mantenimiento' => [
             'label' => 'Respuesta de orden de mantenimiento',
             'description' => 'Cuando una orden de mantenimiento se aprueba o se desaprueba.',
+            'channel' => 'Email interno en cola',
+          ],
+          'cotizacion_mantenimiento_guardada' => [
+            'label' => 'Cotización de mantenimiento guardada',
+            'description' => 'Cuando se crea, edita o agrega una nota de cotización de mantenimiento desde el panel.',
             'channel' => 'Email interno en cola',
           ],
         ],
