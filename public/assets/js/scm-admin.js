@@ -2370,7 +2370,7 @@
             scmNotify("success", json.data.message, "Revisión correctiva");
           }
           if (operation !== "read") {
-            root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+            dispatchCaseActionSaved(root, caseBtn.dataset.ticketPk || "", sub);
           }
         })
         .catch(function (error) {
