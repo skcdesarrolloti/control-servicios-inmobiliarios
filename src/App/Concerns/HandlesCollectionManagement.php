@@ -279,7 +279,7 @@ trait HandlesCollectionManagement
       if ($portfolioId <= 0 && ($tenantId <= 0 || $contractId <= 0)) {
         continue;
       }
-      $key = $portfolioId > 0 ? 'p:' . $portfolioId : 't:' . $tenantId . ':c:' . $contractId;
+      $key = $this->collection_bulk_item_key($portfolioId, $tenantId, $contractId);
       if (isset($seen[$key])) {
         continue;
       }
@@ -290,6 +290,11 @@ trait HandlesCollectionManagement
       }
     }
     return $items;
+  }
+
+  private function collection_bulk_item_key(int $portfolioId, int $tenantId, int $contractId): string
+  {
+    return $portfolioId > 0 ? 'p:' . $portfolioId : 't:' . $tenantId . ':c:' . $contractId;
   }
 
   /**
@@ -324,6 +329,20 @@ trait HandlesCollectionManagement
       throw new \RuntimeException('El filtro contiene ' . $total . ' registros. Refina el filtro para procesar máximo ' . $limit . ' registros por acción masiva.');
     }
 
+    $excluded = $this->collection_bulk_items([
+      'portfolio_ids' => $post['excluded_portfolio_ids'] ?? [],
+      'tenant_ids' => $post['excluded_tenant_ids'] ?? [],
+      'contract_ids' => $post['excluded_contract_ids'] ?? [],
+    ]);
+    $excludedKeys = [];
+    foreach ($excluded as $excludedItem) {
+      $excludedKeys[$this->collection_bulk_item_key(
+        (int) $excludedItem['portfolio_id'],
+        (int) $excludedItem['tenant_id'],
+        (int) $excludedItem['contract_id']
+      )] = true;
+    }
+
     $items = [];
     $seen = [];
     foreach ((array) ($result['rows'] ?? []) as $row) {
@@ -336,7 +355,10 @@ trait HandlesCollectionManagement
       if ($portfolioId <= 0 && ($tenantId <= 0 || $contractId <= 0)) {
         continue;
       }
-      $key = $portfolioId > 0 ? 'p:' . $portfolioId : 't:' . $tenantId . ':c:' . $contractId;
+      $key = $this->collection_bulk_item_key($portfolioId, $tenantId, $contractId);
+      if (isset($excludedKeys[$key])) {
+        continue;
+      }
       if (isset($seen[$key])) {
         continue;
       }

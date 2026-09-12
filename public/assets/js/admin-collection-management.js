@@ -429,6 +429,19 @@
       });
     }
 
+    function bulkUncheckedRows(container) {
+      if (!container) return [];
+      return Array.prototype.slice.call(container.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled):not(:checked)")).map(function (input) {
+        return {
+          portfolioId: String(input.getAttribute("data-portfolio-id") || "0"),
+          tenantId: String(input.getAttribute("data-tenant-id") || "0"),
+          contractId: String(input.getAttribute("data-contract-id") || "0"),
+          canManage: String(input.getAttribute("data-can-manage") || "") === "1",
+          canCollect: String(input.getAttribute("data-can-collect") || "") === "1"
+        };
+      });
+    }
+
     function bulkEligible(rows, action) {
       return rows.filter(function (row) {
         if (action === "management") return row.canManage && Number(row.tenantId) > 0 && Number(row.contractId) > 0;
@@ -466,6 +479,11 @@
       fd.set("bulk_all_filtered", "1");
       fd.set("bulk_source", bar ? String(bar.getAttribute("data-scm-bulk-scope") || "principal") : "principal");
       appendBulkFilterValues(fd, bulkFilterValues(panel));
+      bulkUncheckedRows(panel).forEach(function (row) {
+        fd.append("excluded_portfolio_ids[]", row.portfolioId || "0");
+        fd.append("excluded_tenant_ids[]", row.tenantId || "0");
+        fd.append("excluded_contract_ids[]", row.contractId || "0");
+      });
     }
 
     function appendBulkTarget(fd, rows, panel) {
@@ -481,12 +499,6 @@
       return Number(bar ? (bar.getAttribute("data-scm-bulk-total") || "0") : "0");
     }
 
-    function returnBulkToVisibleSelection(panel) {
-      if (panel && panel.getAttribute("data-scm-bulk-all-filtered") === "1") {
-        panel.removeAttribute("data-scm-bulk-all-filtered");
-      }
-    }
-
     function updateBulkBars(container) {
       var target = container || root;
       target.querySelectorAll("[data-scm-portfolio-bulkbar]").forEach(function (bar) {
@@ -494,10 +506,12 @@
         var rows = bulkRows(panel);
         var allMode = panel && panel.getAttribute("data-scm-bulk-all-filtered") === "1";
         var total = bulkAllCount(panel);
+        var excludedCount = allMode ? bulkUncheckedRows(panel).length : 0;
+        var selectedTotal = Math.max(0, total - excludedCount);
         var count = bar.querySelector("[data-scm-portfolio-bulk-count]");
         if (count) {
           count.textContent = allMode
-            ? total + (total === 1 ? " contrato filtrado seleccionado" : " contratos filtrados seleccionados")
+            ? selectedTotal + (selectedTotal === 1 ? " contrato filtrado seleccionado" : " contratos filtrados seleccionados")
             : rows.length + (rows.length === 1 ? " contrato seleccionado" : " contratos seleccionados");
         }
         var note = bar.querySelector("[data-scm-portfolio-bulk-all-note]");
@@ -508,7 +522,7 @@
         if (clearButton) clearButton.hidden = !allMode;
         bar.querySelectorAll("[data-scm-portfolio-bulk-action]").forEach(function (button) {
           var action = String(button.getAttribute("data-scm-portfolio-bulk-action") || "");
-          button.disabled = allMode ? total <= 0 : bulkEligible(rows, action).length === 0;
+          button.disabled = allMode ? selectedTotal <= 0 : bulkEligible(rows, action).length === 0;
         });
         var checkAll = panel ? panel.querySelector("[data-scm-portfolio-bulk-check-all]") : null;
         if (checkAll) {
@@ -1208,7 +1222,6 @@
     root.addEventListener("input", function (event) {
       if (event.target.matches && event.target.matches("[data-scm-portfolio-bulk-check]")) {
         var inputPanel = event.target.closest("[data-scm-portfolio-panel]");
-        returnBulkToVisibleSelection(inputPanel);
         updateBulkBars(inputPanel);
         return;
       }
@@ -1223,7 +1236,6 @@
     root.addEventListener("change", function (event) {
       if (event.target.matches && event.target.matches("[data-scm-portfolio-bulk-check]")) {
         var rowPanel = event.target.closest("[data-scm-portfolio-panel]");
-        returnBulkToVisibleSelection(rowPanel);
         updateBulkBars(rowPanel);
         return;
       }
@@ -1231,7 +1243,6 @@
       var panel = event.target.closest("[data-scm-portfolio-panel]");
       var checked = !!event.target.checked;
       if (!panel) return;
-      returnBulkToVisibleSelection(panel);
       panel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)").forEach(function (input) {
         input.checked = checked;
       });
@@ -1269,6 +1280,9 @@
         var allPanel = bulkAllButton.closest("[data-scm-portfolio-panel]");
         if (allPanel) {
           allPanel.setAttribute("data-scm-bulk-all-filtered", "1");
+          allPanel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)").forEach(function (input) {
+            input.checked = true;
+          });
           updateBulkBars(allPanel);
         }
         return;
