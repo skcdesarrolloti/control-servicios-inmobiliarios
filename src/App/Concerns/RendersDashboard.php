@@ -2637,7 +2637,7 @@ trait RendersDashboard
             <span>Carga el auxiliar 1380 o cambia los filtros actuales.</span>
           </div>
         <?php else: ?>
-          <?php echo $this->render_collection_portfolio_bulk_toolbar('principal'); ?>
+          <?php echo $this->render_collection_portfolio_bulk_toolbar('principal', (int) ($portfolioPagination['total'] ?? 0)); ?>
           <div class="scm-collection-log-table-wrap scm-portfolio-table-wrap">
             <table class="scm-collection-log-table scm-portfolio-table">
               <thead>
@@ -2752,7 +2752,7 @@ trait RendersDashboard
             <span>No hay contratos activos con los filtros actuales.</span>
           </div>
         <?php else: ?>
-          <?php echo $this->render_collection_portfolio_bulk_toolbar('contratos'); ?>
+          <?php echo $this->render_collection_portfolio_bulk_toolbar('contratos', (int) ($contractPagination['total'] ?? 0)); ?>
           <div class="scm-collection-log-table-wrap scm-portfolio-table-wrap">
             <table class="scm-collection-log-table scm-portfolio-table">
               <thead>
@@ -3153,17 +3153,20 @@ trait RendersDashboard
     return $timestamp === false ? '-' : date('d/m/Y', $timestamp);
   }
 
-  private function render_collection_portfolio_bulk_toolbar(string $scope): string
+  private function render_collection_portfolio_bulk_toolbar(string $scope, int $total = 0): string
   {
     $scopeLabel = $scope === 'contratos' ? 'contratos visibles' : 'registros visibles';
     ob_start();
 ?>
-    <div class="scm-portfolio-bulkbar" data-scm-portfolio-bulkbar data-scm-bulk-scope="<?php echo esc_attr($scope); ?>">
+    <div class="scm-portfolio-bulkbar" data-scm-portfolio-bulkbar data-scm-bulk-scope="<?php echo esc_attr($scope); ?>" data-scm-bulk-total="<?php echo esc_attr((string) max(0, $total)); ?>">
       <div class="scm-portfolio-bulkbar-info">
         <strong>Acciones en lote</strong>
         <span data-scm-portfolio-bulk-count>0 <?php echo esc_html($scopeLabel); ?> seleccionados</span>
+        <small data-scm-portfolio-bulk-all-note hidden>Se usar&aacute;n todos los resultados del filtro activo.</small>
       </div>
       <div class="scm-portfolio-bulkbar-actions" role="group" aria-label="Acciones en lote de cartera">
+        <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-bulk-all>Usar todos los filtrados</button>
+        <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-bulk-clear hidden>Volver a selecci&oacute;n visible</button>
         <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-bulk-action="management" disabled>Hacer gesti&oacute;n</button>
         <button type="button" class="scm-case-work-btn scm-portfolio-due-btn" data-scm-portfolio-bulk-action="due_date" disabled>Notificar pago</button>
         <button type="button" class="scm-case-work-btn" data-scm-portfolio-bulk-action="prejuridico" disabled>Prejur&iacute;dico</button>

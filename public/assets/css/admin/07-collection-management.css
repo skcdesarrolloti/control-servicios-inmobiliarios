@@ -777,6 +777,12 @@
   font-weight: 700;
 }
 
+#scm-app .scm-portfolio-bulkbar-info small {
+  color: #9f2017;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 #scm-app .scm-portfolio-bulkbar-actions {
   display: flex;
   flex-wrap: wrap;

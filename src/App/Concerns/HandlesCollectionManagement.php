@@ -243,7 +243,9 @@ trait HandlesCollectionManagement
    */
   private function handle_collection_portfolio_bulk_action(CollectionPortfolioService $service, string $operation, array $post): array
   {
-    $items = $this->collection_bulk_items($post);
+    $items = !empty($post['bulk_all_filtered'])
+      ? $this->collection_bulk_items_from_filters($service, $operation, $post)
+      : $this->collection_bulk_items($post);
     if ($items === []) {
       throw new \RuntimeException('Selecciona al menos un contrato para ejecutar la acción en lote.');
     }
@@ -283,11 +285,88 @@ trait HandlesCollectionManagement
       }
       $seen[$key] = true;
       $items[] = ['portfolio_id' => $portfolioId, 'tenant_id' => $tenantId, 'contract_id' => $contractId];
-      if (count($items) >= 100) {
+      if (count($items) >= 500) {
         break;
       }
     }
     return $items;
+  }
+
+  /**
+   * @param array<string,mixed> $post
+   * @return array<int,array{portfolio_id:int,tenant_id:int,contract_id:int}>
+   */
+  private function collection_bulk_items_from_filters(CollectionPortfolioService $service, string $operation, array $post): array
+  {
+    $source = sanitize_key((string) ($post['bulk_source'] ?? 'principal'));
+    $limit = 500;
+    if ($source === 'contratos') {
+      $result = $service->contractsDashboard([
+        'status' => sanitize_key((string) ($post['scmgc_contratos_estado'] ?? '')),
+        'stage' => sanitize_key((string) ($post['scmgc_contratos_etapa'] ?? '')),
+        'search' => sanitize_text_field(wp_unslash((string) ($post['scmgc_contratos_buscar'] ?? ''))),
+        'all' => true,
+        'limit' => $limit,
+      ]);
+    } else {
+      $result = $service->dashboard([
+        'status' => sanitize_key((string) ($post['scmgc_estado'] ?? '')),
+        'stage' => sanitize_key((string) ($post['scmgc_etapa'] ?? '')),
+        'movement' => sanitize_key((string) ($post['scmgc_movimiento'] ?? '')),
+        'search' => sanitize_text_field(wp_unslash((string) ($post['scmgc_buscar'] ?? ''))),
+        'all' => true,
+        'limit' => $limit,
+      ]);
+    }
+
+    $total = (int) (($result['pagination']['total'] ?? 0));
+    if ($total > $limit) {
+      throw new \RuntimeException('El filtro contiene ' . $total . ' registros. Refina el filtro para procesar máximo ' . $limit . ' registros por acción masiva.');
+    }
+
+    $items = [];
+    $seen = [];
+    foreach ((array) ($result['rows'] ?? []) as $row) {
+      if (!is_array($row) || !$this->collection_bulk_row_is_eligible($row, $operation)) {
+        continue;
+      }
+      $portfolioId = (int) ($row['id'] ?? 0);
+      $tenantId = (int) ($row['tenant_id'] ?? 0);
+      $contractId = (int) ($row['contract_id'] ?? 0);
+      if ($portfolioId <= 0 && ($tenantId <= 0 || $contractId <= 0)) {
+        continue;
+      }
+      $key = $portfolioId > 0 ? 'p:' . $portfolioId : 't:' . $tenantId . ':c:' . $contractId;
+      if (isset($seen[$key])) {
+        continue;
+      }
+      $seen[$key] = true;
+      $items[] = ['portfolio_id' => $portfolioId, 'tenant_id' => $tenantId, 'contract_id' => $contractId];
+    }
+
+    if ($items === []) {
+      throw new \RuntimeException('No hay contratos elegibles en los resultados filtrados para esta acción.');
+    }
+
+    return $items;
+  }
+
+  /** @param array<string,mixed> $row */
+  private function collection_bulk_row_is_eligible(array $row, string $operation): bool
+  {
+    $portfolioId = (int) ($row['id'] ?? 0);
+    $tenantId = (int) ($row['tenant_id'] ?? 0);
+    $contractId = (int) ($row['contract_id'] ?? 0);
+    if ($operation === 'bulk_management') {
+      return $tenantId > 0 && $contractId > 0;
+    }
+    if ($operation === 'bulk_due_date') {
+      return $portfolioId > 0 && $tenantId > 0 && $contractId > 0;
+    }
+    return $portfolioId > 0
+      && $tenantId > 0
+      && $contractId > 0
+      && (string) ($row['status'] ?? '') === 'deuda';
   }
 
   /**

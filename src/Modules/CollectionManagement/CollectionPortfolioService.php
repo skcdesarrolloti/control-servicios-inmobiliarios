@@ -304,11 +304,14 @@ final class CollectionPortfolioService
       array_push($args, $like, $like, $like, $like, $like);
     }
     $whereSql = implode(' AND ', $where);
+    $all = !empty($filters['all']);
     $page = max(1, (int) ($filters['page'] ?? 1));
-    $perPage = max(20, min(100, (int) ($filters['per_page'] ?? 40)));
+    $perPage = $all
+      ? max(1, min(500, (int) ($filters['limit'] ?? $filters['per_page'] ?? 500)))
+      : max(20, min(100, (int) ($filters['per_page'] ?? 40)));
     $total = (int) ($this->db->getVar("SELECT COUNT(*) FROM `{$this->portfolioTable()}` WHERE {$whereSql}", $args) ?? 0);
     $totalPages = max(1, (int) ceil($total / $perPage));
-    $page = min($page, $totalPages);
+    $page = $all ? 1 : min($page, $totalPages);
     $offset = ($page - 1) * $perPage;
     $rows = $this->db->getResults(
       "SELECT * FROM `{$this->portfolioTable()}` WHERE {$whereSql}
@@ -595,11 +598,14 @@ final class CollectionPortfolioService
       return strnatcasecmp((string) ($a['tenant_name'] ?? ''), (string) ($b['tenant_name'] ?? ''));
     });
 
+    $all = !empty($filters['all']);
     $page = max(1, (int) ($filters['page'] ?? 1));
-    $perPage = max(20, min(100, (int) ($filters['per_page'] ?? 60)));
+    $perPage = $all
+      ? max(1, min(500, (int) ($filters['limit'] ?? $filters['per_page'] ?? 500)))
+      : max(20, min(100, (int) ($filters['per_page'] ?? 60)));
     $total = count($rows);
     $totalPages = max(1, (int) ceil($total / $perPage));
-    $page = min($page, $totalPages);
+    $page = $all ? 1 : min($page, $totalPages);
     $offset = ($page - 1) * $perPage;
 
     return [
