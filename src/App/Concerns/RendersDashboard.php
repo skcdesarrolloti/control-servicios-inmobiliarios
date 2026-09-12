@@ -3162,7 +3162,7 @@ trait RendersDashboard
       <div class="scm-portfolio-bulkbar-info">
         <strong>Acciones en lote</strong>
         <span data-scm-portfolio-bulk-count>0 <?php echo esc_html($scopeLabel); ?> seleccionados</span>
-        <small data-scm-portfolio-bulk-all-note hidden>Se usar&aacute;n todos los resultados del filtro activo.</small>
+        <small data-scm-portfolio-bulk-all-note hidden>Se usar&aacute;n los resultados del filtro guardado; puedes buscar o paginar para desmarcar excepciones.</small>
       </div>
       <div class="scm-portfolio-bulkbar-actions" role="group" aria-label="Acciones en lote de cartera">
         <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-bulk-all>Usar todos los filtrados</button>

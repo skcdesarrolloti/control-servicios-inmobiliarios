@@ -26,8 +26,8 @@
     var actionOptions = actions.admin_notifications_collection_options || "";
     var activePreviewUrl = "";
     var bulkSelectionState = {
-      principal: { all: false, selected: {}, excluded: {}, filterSignature: "" },
-      contratos: { all: false, selected: {}, excluded: {}, filterSignature: "" }
+      principal: { all: false, selected: {}, excluded: {}, filterSignature: "", filterValues: {}, total: 0 },
+      contratos: { all: false, selected: {}, excluded: {}, filterSignature: "", filterValues: {}, total: 0 }
     };
 
     root.dataset.scmCollectionInit = "1";
@@ -430,7 +430,7 @@
     function bulkState(panelOrScope) {
       var scope = typeof panelOrScope === "string" ? panelOrScope : bulkScopeName(panelOrScope);
       if (!bulkSelectionState[scope]) {
-        bulkSelectionState[scope] = { all: false, selected: {}, excluded: {}, filterSignature: "" };
+        bulkSelectionState[scope] = { all: false, selected: {}, excluded: {}, filterSignature: "", filterValues: {}, total: 0 };
       }
       return bulkSelectionState[scope];
     }
@@ -559,7 +559,7 @@
       var state = bulkState(panel);
       fd.set("bulk_all_filtered", "1");
       fd.set("bulk_source", bar ? String(bar.getAttribute("data-scm-bulk-scope") || "principal") : "principal");
-      appendBulkFilterValues(fd, bulkFilterValues(panel));
+      appendBulkFilterValues(fd, Object.keys(state.filterValues || {}).length ? state.filterValues : bulkFilterValues(panel));
       objectValues(state.excluded).forEach(function (row) {
         fd.append("excluded_portfolio_ids[]", row.portfolioId || "0");
         fd.append("excluded_tenant_ids[]", row.tenantId || "0");
@@ -582,7 +582,7 @@
 
     function bulkSelectedFilteredCount(panel) {
       var state = bulkState(panel);
-      return Math.max(0, bulkAllCount(panel) - Object.keys(state.excluded || {}).length);
+      return Math.max(0, (Number(state.total || 0) || bulkAllCount(panel)) - Object.keys(state.excluded || {}).length);
     }
 
     function updateBulkBars(container) {
@@ -592,14 +592,7 @@
         var state = bulkState(panel);
         var rows = objectValues(state.selected);
         var allMode = panel && panel.getAttribute("data-scm-bulk-all-filtered") === "1";
-        if (allMode) {
-          var signature = bulkFilterSignature(panel);
-          if (state.filterSignature && state.filterSignature !== signature) {
-            state.excluded = {};
-          }
-          state.filterSignature = signature;
-        }
-        var total = bulkAllCount(panel);
+        var total = allMode ? (Number(state.total || 0) || bulkAllCount(panel)) : bulkAllCount(panel);
         var excludedCount = allMode ? Object.keys(state.excluded || {}).length : 0;
         var selectedTotal = Math.max(0, total - excludedCount);
         var count = bar.querySelector("[data-scm-portfolio-bulk-count]");
@@ -668,13 +661,13 @@
       form.dataset.bulkAll = allMode ? "1" : "0";
       var bulkBar = panel ? panel.querySelector("[data-scm-portfolio-bulkbar]") : null;
       form.dataset.bulkSource = bulkBar ? String(bulkBar.getAttribute("data-scm-bulk-scope") || "principal") : "principal";
-      form.dataset.bulkFilters = JSON.stringify(bulkFilterValues(panel));
+      form.dataset.bulkFilters = JSON.stringify(allMode && Object.keys(bulkState(panel).filterValues || {}).length ? bulkState(panel).filterValues : bulkFilterValues(panel));
       form.dataset.bulkExcludedRows = JSON.stringify(allMode ? objectValues(bulkState(panel).excluded) : []);
       form.querySelector("[name='portfolio_id']").value = "";
       form.querySelector("[name='ids[]']").value = "";
       form.querySelector("[name='contract_ids[]']").value = "";
       modal.querySelector("[data-scm-portfolio-management-context]").textContent = allMode
-        ? "Todos los " + total + " contrato(s) del filtro activo. Se registrará la misma observación para los elegibles."
+        ? "Todos los " + total + " contrato(s) del filtro guardado. Se registrará la misma observación para los elegibles."
         : eligible.length + " contrato(s) seleccionado(s). Se registrará la misma observación para todos.";
       var codeudores = modal.querySelector("[data-scm-portfolio-codeudores]");
       var codeudorList = modal.querySelector("[data-scm-portfolio-codeudores-list]");
@@ -703,7 +696,7 @@
         window.Swal.fire({
           title: "Notificar fecha de pago en lote",
           html: '<div class="scm-portfolio-swal-form">'
-            + '<p>Se procesarán <strong>' + total + '</strong> contrato(s) ' + (allMode ? 'del filtro activo que sean elegibles.' : 'seleccionado(s).') + '</p>'
+            + '<p>Se procesarán <strong>' + total + '</strong> contrato(s) ' + (allMode ? 'del filtro guardado que sean elegibles.' : 'seleccionado(s).') + '</p>'
             + '<label for="scm-bulk-due-day">Fecha de pago</label>'
             + '<select id="scm-bulk-due-day" class="swal2-select">'
             + '<option value="12">Día 12 · primera fecha</option>'
@@ -782,7 +775,7 @@
       if (window.Swal && typeof window.Swal.fire === "function") {
         window.Swal.fire({
           title: settings.title,
-          text: settings.text + " Contratos a revisar: " + total + (allMode ? " del filtro activo. Solo se procesarán los elegibles." : "."),
+          text: settings.text + " Contratos a revisar: " + total + (allMode ? " del filtro guardado. Solo se procesarán los elegibles." : "."),
           input: action === "mark_siniestro" ? "textarea" : undefined,
           inputLabel: action === "mark_siniestro" ? "Observación para el historial (opcional)" : undefined,
           inputPlaceholder: action === "mark_siniestro" ? "Motivo del siniestro..." : undefined,
@@ -1388,6 +1381,8 @@
           bulkState(allPanel).selected = {};
           bulkState(allPanel).excluded = {};
           bulkState(allPanel).filterSignature = bulkFilterSignature(allPanel);
+          bulkState(allPanel).filterValues = bulkFilterValues(allPanel);
+          bulkState(allPanel).total = bulkAllCount(allPanel);
           allPanel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)").forEach(function (input) {
             input.checked = true;
           });
@@ -1404,6 +1399,9 @@
           bulkState(clearPanel).all = false;
           bulkState(clearPanel).selected = {};
           bulkState(clearPanel).excluded = {};
+          bulkState(clearPanel).filterSignature = "";
+          bulkState(clearPanel).filterValues = {};
+          bulkState(clearPanel).total = 0;
           syncBulkSelectionFromPanel(clearPanel);
           updateBulkBars(clearPanel);
         }
