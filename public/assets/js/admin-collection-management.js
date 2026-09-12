@@ -25,6 +25,10 @@
     var actionManagement = actions.admin_notifications_collection || "";
     var actionOptions = actions.admin_notifications_collection_options || "";
     var activePreviewUrl = "";
+    var bulkSelectionState = {
+      principal: { all: false, selected: {}, excluded: {}, filterSignature: "" },
+      contratos: { all: false, selected: {}, excluded: {}, filterSignature: "" }
+    };
 
     root.dataset.scmCollectionInit = "1";
 
@@ -101,6 +105,7 @@
         if (!next) throw new Error("No se pudo actualizar la vista de cartera.");
         activatePortfolioTab(next, activeView, false);
         current.parentNode.replaceChild(next, current);
+        restoreBulkSelection(next);
       }).catch(function (error) {
         current.classList.remove("is-loading");
         current.removeAttribute("aria-busy");
@@ -416,30 +421,98 @@
       return button && button.closest ? button.closest("[data-scm-portfolio-panel]") : null;
     }
 
+    function bulkScopeName(panel) {
+      var bar = panel ? panel.querySelector("[data-scm-portfolio-bulkbar]") : null;
+      var value = bar ? String(bar.getAttribute("data-scm-bulk-scope") || "principal") : "principal";
+      return value === "contratos" ? "contratos" : "principal";
+    }
+
+    function bulkState(panelOrScope) {
+      var scope = typeof panelOrScope === "string" ? panelOrScope : bulkScopeName(panelOrScope);
+      if (!bulkSelectionState[scope]) {
+        bulkSelectionState[scope] = { all: false, selected: {}, excluded: {}, filterSignature: "" };
+      }
+      return bulkSelectionState[scope];
+    }
+
+    function rowFromBulkInput(input) {
+      return {
+        portfolioId: String(input.getAttribute("data-portfolio-id") || "0"),
+        tenantId: String(input.getAttribute("data-tenant-id") || "0"),
+        contractId: String(input.getAttribute("data-contract-id") || "0"),
+        canManage: String(input.getAttribute("data-can-manage") || "") === "1",
+        canCollect: String(input.getAttribute("data-can-collect") || "") === "1"
+      };
+    }
+
+    function bulkRowKey(row) {
+      return Number(row.portfolioId || 0) > 0
+        ? "p:" + String(row.portfolioId || "0")
+        : "t:" + String(row.tenantId || "0") + ":c:" + String(row.contractId || "0");
+    }
+
     function bulkRows(container) {
       if (!container) return [];
       return Array.prototype.slice.call(container.querySelectorAll("[data-scm-portfolio-bulk-check]:checked")).map(function (input) {
-        return {
-          portfolioId: String(input.getAttribute("data-portfolio-id") || "0"),
-          tenantId: String(input.getAttribute("data-tenant-id") || "0"),
-          contractId: String(input.getAttribute("data-contract-id") || "0"),
-          canManage: String(input.getAttribute("data-can-manage") || "") === "1",
-          canCollect: String(input.getAttribute("data-can-collect") || "") === "1"
-        };
+        return rowFromBulkInput(input);
       });
     }
 
     function bulkUncheckedRows(container) {
       if (!container) return [];
       return Array.prototype.slice.call(container.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled):not(:checked)")).map(function (input) {
-        return {
-          portfolioId: String(input.getAttribute("data-portfolio-id") || "0"),
-          tenantId: String(input.getAttribute("data-tenant-id") || "0"),
-          contractId: String(input.getAttribute("data-contract-id") || "0"),
-          canManage: String(input.getAttribute("data-can-manage") || "") === "1",
-          canCollect: String(input.getAttribute("data-can-collect") || "") === "1"
-        };
+        return rowFromBulkInput(input);
       });
+    }
+
+    function objectValues(map) {
+      return Object.keys(map || {}).map(function (key) { return map[key]; });
+    }
+
+    function syncBulkSelectionFromPanel(panel) {
+      if (!panel) return;
+      var state = bulkState(panel);
+      var allMode = panel.getAttribute("data-scm-bulk-all-filtered") === "1";
+      state.all = allMode;
+      if (allMode) {
+        panel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)").forEach(function (input) {
+          var row = rowFromBulkInput(input);
+          var key = bulkRowKey(row);
+          if (input.checked) {
+            delete state.excluded[key];
+          } else {
+            state.excluded[key] = row;
+          }
+        });
+        return;
+      }
+      panel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)").forEach(function (input) {
+        var row = rowFromBulkInput(input);
+        var key = bulkRowKey(row);
+        if (input.checked) {
+          state.selected[key] = row;
+        } else {
+          delete state.selected[key];
+        }
+      });
+    }
+
+    function restoreBulkSelection(container) {
+      var target = container || root;
+      target.querySelectorAll("[data-scm-portfolio-panel]").forEach(function (panel) {
+        var state = bulkState(panel);
+        if (state.all) {
+          panel.setAttribute("data-scm-bulk-all-filtered", "1");
+        } else {
+          panel.removeAttribute("data-scm-bulk-all-filtered");
+        }
+        panel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)").forEach(function (input) {
+          var row = rowFromBulkInput(input);
+          var key = bulkRowKey(row);
+          input.checked = state.all ? !state.excluded[key] : !!state.selected[key];
+        });
+      });
+      updateBulkBars(target);
     }
 
     function bulkEligible(rows, action) {
@@ -467,6 +540,13 @@
       return values;
     }
 
+    function bulkFilterSignature(panel) {
+      var values = bulkFilterValues(panel);
+      delete values.scmgc_cartera_page;
+      delete values.scmgc_contratos_page;
+      return JSON.stringify(values);
+    }
+
     function appendBulkFilterValues(fd, values) {
       Object.keys(values || {}).forEach(function (name) {
         fd.set(name, String(values[name] || ""));
@@ -476,10 +556,11 @@
     function appendBulkFilterContext(fd, panel) {
       if (!panel) return;
       var bar = panel.querySelector("[data-scm-portfolio-bulkbar]");
+      var state = bulkState(panel);
       fd.set("bulk_all_filtered", "1");
       fd.set("bulk_source", bar ? String(bar.getAttribute("data-scm-bulk-scope") || "principal") : "principal");
       appendBulkFilterValues(fd, bulkFilterValues(panel));
-      bulkUncheckedRows(panel).forEach(function (row) {
+      objectValues(state.excluded).forEach(function (row) {
         fd.append("excluded_portfolio_ids[]", row.portfolioId || "0");
         fd.append("excluded_tenant_ids[]", row.tenantId || "0");
         fd.append("excluded_contract_ids[]", row.contractId || "0");
@@ -499,14 +580,27 @@
       return Number(bar ? (bar.getAttribute("data-scm-bulk-total") || "0") : "0");
     }
 
+    function bulkSelectedFilteredCount(panel) {
+      var state = bulkState(panel);
+      return Math.max(0, bulkAllCount(panel) - Object.keys(state.excluded || {}).length);
+    }
+
     function updateBulkBars(container) {
       var target = container || root;
       target.querySelectorAll("[data-scm-portfolio-bulkbar]").forEach(function (bar) {
         var panel = bar.closest("[data-scm-portfolio-panel]");
-        var rows = bulkRows(panel);
+        var state = bulkState(panel);
+        var rows = objectValues(state.selected);
         var allMode = panel && panel.getAttribute("data-scm-bulk-all-filtered") === "1";
+        if (allMode) {
+          var signature = bulkFilterSignature(panel);
+          if (state.filterSignature && state.filterSignature !== signature) {
+            state.excluded = {};
+          }
+          state.filterSignature = signature;
+        }
         var total = bulkAllCount(panel);
-        var excludedCount = allMode ? bulkUncheckedRows(panel).length : 0;
+        var excludedCount = allMode ? Object.keys(state.excluded || {}).length : 0;
         var selectedTotal = Math.max(0, total - excludedCount);
         var count = bar.querySelector("[data-scm-portfolio-bulk-count]");
         if (count) {
@@ -562,7 +656,7 @@
       var panel = bulkScope(button);
       var allMode = panel && panel.getAttribute("data-scm-bulk-all-filtered") === "1";
       var eligible = allMode ? [] : bulkEligible(rows, "management");
-      var total = allMode ? bulkAllCount(panel) : eligible.length;
+      var total = allMode ? bulkSelectedFilteredCount(panel) : eligible.length;
       if (total === 0) return;
       var modal = root.querySelector("[data-scm-portfolio-management-modal]");
       if (!modal) return;
@@ -575,6 +669,7 @@
       var bulkBar = panel ? panel.querySelector("[data-scm-portfolio-bulkbar]") : null;
       form.dataset.bulkSource = bulkBar ? String(bulkBar.getAttribute("data-scm-bulk-scope") || "principal") : "principal";
       form.dataset.bulkFilters = JSON.stringify(bulkFilterValues(panel));
+      form.dataset.bulkExcludedRows = JSON.stringify(allMode ? objectValues(bulkState(panel).excluded) : []);
       form.querySelector("[name='portfolio_id']").value = "";
       form.querySelector("[name='ids[]']").value = "";
       form.querySelector("[name='contract_ids[]']").value = "";
@@ -599,7 +694,7 @@
       var panel = bulkScope(button);
       var allMode = panel && panel.getAttribute("data-scm-bulk-all-filtered") === "1";
       var eligible = allMode ? [] : bulkEligible(rows, "due_date");
-      var total = allMode ? bulkAllCount(panel) : eligible.length;
+      var total = allMode ? bulkSelectedFilteredCount(panel) : eligible.length;
       if (total === 0) return;
       var submit = function (day, channels) {
         return runBulkOperation(button, "bulk_due_date", eligible, { due_day: day, notify_channels: channels }, "Registrando y encolando notificaciones en lote...", panel);
@@ -655,7 +750,7 @@
       var panel = bulkScope(button);
       var allMode = panel && panel.getAttribute("data-scm-bulk-all-filtered") === "1";
       var eligible = allMode ? [] : bulkEligible(rows, action);
-      var total = allMode ? bulkAllCount(panel) : eligible.length;
+      var total = allMode ? bulkSelectedFilteredCount(panel) : eligible.length;
       if (total === 0) return;
       var settings = {
         prejuridico: {
@@ -706,7 +801,7 @@
     function handleBulkAction(button) {
       var action = String(button.getAttribute("data-scm-portfolio-bulk-action") || "");
       var panel = bulkScope(button);
-      var rows = bulkRows(panel);
+      var rows = objectValues(bulkState(panel).selected);
       var allMode = panel && panel.getAttribute("data-scm-bulk-all-filtered") === "1";
       if (!allMode && bulkEligible(rows, action).length === 0) {
         notify("warning", "Selecciona contratos válidos para esta acción.", "Cartera");
@@ -1113,6 +1208,7 @@
         form.removeAttribute("data-bulk-all");
         form.removeAttribute("data-bulk-source");
         form.removeAttribute("data-bulk-filters");
+        form.removeAttribute("data-bulk-excluded-rows");
         form.querySelector("[name='portfolio_id']").value = portfolioId;
         form.querySelector("[name='ids[]']").value = tenantId;
         form.querySelector("[name='contract_ids[]']").value = contractId;
@@ -1191,6 +1287,11 @@
             managementData.set("bulk_source", managementForm.dataset.bulkSource || "principal");
             try {
               appendBulkFilterValues(managementData, JSON.parse(managementForm.dataset.bulkFilters || "{}"));
+              JSON.parse(managementForm.dataset.bulkExcludedRows || "[]").forEach(function (row) {
+                managementData.append("excluded_portfolio_ids[]", row.portfolioId || "0");
+                managementData.append("excluded_tenant_ids[]", row.tenantId || "0");
+                managementData.append("excluded_contract_ids[]", row.contractId || "0");
+              });
             } catch (parseFilterError) {
               if (resultEl) resultEl.textContent = "No se pudo leer el filtro en lote.";
               notify("error", "No se pudo leer el filtro en lote.", "Cartera");
@@ -1222,6 +1323,7 @@
     root.addEventListener("input", function (event) {
       if (event.target.matches && event.target.matches("[data-scm-portfolio-bulk-check]")) {
         var inputPanel = event.target.closest("[data-scm-portfolio-panel]");
+        syncBulkSelectionFromPanel(inputPanel);
         updateBulkBars(inputPanel);
         return;
       }
@@ -1236,6 +1338,7 @@
     root.addEventListener("change", function (event) {
       if (event.target.matches && event.target.matches("[data-scm-portfolio-bulk-check]")) {
         var rowPanel = event.target.closest("[data-scm-portfolio-panel]");
+        syncBulkSelectionFromPanel(rowPanel);
         updateBulkBars(rowPanel);
         return;
       }
@@ -1246,6 +1349,7 @@
       panel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)").forEach(function (input) {
         input.checked = checked;
       });
+      syncBulkSelectionFromPanel(panel);
       updateBulkBars(panel);
     });
 
@@ -1280,6 +1384,10 @@
         var allPanel = bulkAllButton.closest("[data-scm-portfolio-panel]");
         if (allPanel) {
           allPanel.setAttribute("data-scm-bulk-all-filtered", "1");
+          bulkState(allPanel).all = true;
+          bulkState(allPanel).selected = {};
+          bulkState(allPanel).excluded = {};
+          bulkState(allPanel).filterSignature = bulkFilterSignature(allPanel);
           allPanel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)").forEach(function (input) {
             input.checked = true;
           });
@@ -1293,6 +1401,10 @@
         var clearPanel = bulkClearButton.closest("[data-scm-portfolio-panel]");
         if (clearPanel) {
           clearPanel.removeAttribute("data-scm-bulk-all-filtered");
+          bulkState(clearPanel).all = false;
+          bulkState(clearPanel).selected = {};
+          bulkState(clearPanel).excluded = {};
+          syncBulkSelectionFromPanel(clearPanel);
           updateBulkBars(clearPanel);
         }
         return;
@@ -1410,6 +1522,10 @@
         closeLetterPreview();
         sendLetter(sendPortfolioId, sendType, previewSend);
       }
+    });
+
+    root.addEventListener("scm:collection-log-replaced", function (event) {
+      restoreBulkSelection((event.detail && event.detail.container) || root);
     });
 
     document.addEventListener("keydown", function (event) {

@@ -549,6 +549,7 @@
       var next = tmp.querySelector("[data-scm-collection-log]");
       if (next && container && container.parentNode) {
         container.parentNode.replaceChild(next, container);
+        root.dispatchEvent(new CustomEvent("scm:collection-log-replaced", { detail: { container: next } }));
         return next;
       }
       return container;
