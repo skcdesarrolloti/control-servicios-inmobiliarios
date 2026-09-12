@@ -481,6 +481,12 @@
       return Number(bar ? (bar.getAttribute("data-scm-bulk-total") || "0") : "0");
     }
 
+    function returnBulkToVisibleSelection(panel) {
+      if (panel && panel.getAttribute("data-scm-bulk-all-filtered") === "1") {
+        panel.removeAttribute("data-scm-bulk-all-filtered");
+      }
+    }
+
     function updateBulkBars(container) {
       var target = container || root;
       target.querySelectorAll("[data-scm-portfolio-bulkbar]").forEach(function (bar) {
@@ -1201,7 +1207,9 @@
 
     root.addEventListener("input", function (event) {
       if (event.target.matches && event.target.matches("[data-scm-portfolio-bulk-check]")) {
-        updateBulkBars(event.target.closest("[data-scm-portfolio-panel]"));
+        var inputPanel = event.target.closest("[data-scm-portfolio-panel]");
+        returnBulkToVisibleSelection(inputPanel);
+        updateBulkBars(inputPanel);
         return;
       }
       if (!event.target.matches || !event.target.matches("[data-scm-portfolio-report-search]")) return;
@@ -1214,13 +1222,16 @@
 
     root.addEventListener("change", function (event) {
       if (event.target.matches && event.target.matches("[data-scm-portfolio-bulk-check]")) {
-        updateBulkBars(event.target.closest("[data-scm-portfolio-panel]"));
+        var rowPanel = event.target.closest("[data-scm-portfolio-panel]");
+        returnBulkToVisibleSelection(rowPanel);
+        updateBulkBars(rowPanel);
         return;
       }
       if (!event.target.matches || !event.target.matches("[data-scm-portfolio-bulk-check-all]")) return;
       var panel = event.target.closest("[data-scm-portfolio-panel]");
       var checked = !!event.target.checked;
       if (!panel) return;
+      returnBulkToVisibleSelection(panel);
       panel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)").forEach(function (input) {
         input.checked = checked;
       });
