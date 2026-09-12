@@ -1286,19 +1286,38 @@ trait RendersDashboard
 
       return $options;
     };
+    $countSelected = static function (array $selectedIds): int {
+      $selected = [];
+      foreach ($selectedIds as $selectedId) {
+        $selectedId = trim((string) $selectedId);
+        if ($selectedId !== '') {
+          $selected[$selectedId] = true;
+        }
+      }
+      return count($selected);
+    };
 
     $correspGridHtml = '';
+    $themeIndex = 0;
     foreach ($themes as $theme) {
       $assignmentValue = is_array($corresponsables[$theme] ?? null) ? $corresponsables[$theme] : [];
-      $generalOptions = $buildCorrespOptions($this->public_pqr_corresponsable_scope_ids($assignmentValue, 'default'));
-      $ownerOptions = $buildCorrespOptions($this->public_pqr_corresponsable_scope_ids($assignmentValue, 'propietario'));
-      $tenantOptions = $buildCorrespOptions($this->public_pqr_corresponsable_scope_ids($assignmentValue, 'arrendatario'));
-      $coproOptions = $buildCorrespOptions($this->public_pqr_corresponsable_scope_ids($assignmentValue, 'copropiedad'));
-      $clientOptions = $buildCorrespOptions($this->public_pqr_corresponsable_scope_ids($assignmentValue, 'cliente'));
+      $generalIds = $this->public_pqr_corresponsable_scope_ids($assignmentValue, 'default');
+      $ownerIds = $this->public_pqr_corresponsable_scope_ids($assignmentValue, 'propietario');
+      $tenantIds = $this->public_pqr_corresponsable_scope_ids($assignmentValue, 'arrendatario');
+      $coproIds = $this->public_pqr_corresponsable_scope_ids($assignmentValue, 'copropiedad');
+      $clientIds = $this->public_pqr_corresponsable_scope_ids($assignmentValue, 'cliente');
+      $totalSelected = $countSelected(array_merge($generalIds, $ownerIds, $tenantIds, $coproIds, $clientIds));
+      $generalOptions = $buildCorrespOptions($generalIds);
+      $ownerOptions = $buildCorrespOptions($ownerIds);
+      $tenantOptions = $buildCorrespOptions($tenantIds);
+      $coproOptions = $buildCorrespOptions($coproIds);
+      $clientOptions = $buildCorrespOptions($clientIds);
+      $isOpen = $themeIndex < 3 || $totalSelected > 0;
 
+      $correspGridHtml .= '<details class="scm-pqr-theme-details"' . ($isOpen ? ' open' : '') . '>';
+      $correspGridHtml .= '<summary><span>' . self::h((string) $theme) . '</span><small>' . self::h((string) $totalSelected) . ' seleccionados</small></summary>';
       $correspGridHtml .= '<form class="scm-public-pqr-corresponsable-form scm-pqr-config-form scm-dashboard-pqr-config-form" method="post" autocomplete="off">';
       $correspGridHtml .= '<input type="hidden" name="tema_ayuda" value="' . self::h((string) $theme) . '">';
-      $correspGridHtml .= '<label class="scm-pqr-config-theme">' . self::h((string) $theme) . '</label>';
       $correspGridHtml .= '<small>General aplica cuando no hay responsable especifico por actor.</small>';
       $correspGridHtml .= '<label>General</label>';
       $correspGridHtml .= '<select name="corresponsable_ids[]" class="select select-bordered select-sm scm-select" multiple size="4">' . $generalOptions . '</select>';
@@ -1310,9 +1329,10 @@ trait RendersDashboard
       $correspGridHtml .= '<select name="corresponsable_actor[copropiedad][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $coproOptions . '</select>';
       $correspGridHtml .= '<label>Cliente</label>';
       $correspGridHtml .= '<select name="corresponsable_actor[cliente][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $clientOptions . '</select>';
-      $correspGridHtml .= '<small>Ctrl/Command + click para seleccionar varios o quitar seleccion.</small>';
       $correspGridHtml .= '<div class="scm-pqr-config-actions"><button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Guardar</button><small class="scm-public-pqr-corresponsable-msg" aria-live="polite"></small></div>';
       $correspGridHtml .= '</form>';
+      $correspGridHtml .= '</details>';
+      $themeIndex++;
     }
 
     if (empty($corresponsableCandidates)) {
@@ -1328,13 +1348,18 @@ trait RendersDashboard
           <h3 id="scm-pqr-settings-title">Configuraci&oacute;n de Guardian</h3>
           <p>Define qui&eacute;n recibe notificaciones nuevas y qui&eacute;nes quedan como corresponsables por tipo de solicitud.</p>
         </div>
+        <div class="scm-pqr-settings-summary" aria-label="Resumen de configuraci&oacute;n">
+          <span><strong><?php echo count($currentNotifIds); ?></strong> notificadores</span>
+          <span><strong><?php echo count($themes); ?></strong> tipos de solicitud</span>
+          <span><strong><?php echo count($corresponsableCandidates); ?></strong> funcionarios disponibles</span>
+        </div>
         <section class="scm-pqr-settings-section">
           <h4>Funcionarios que reciben notificaciones</h4>
           <p>Recibir&aacute;n WhatsApp y correo cada vez que se cree una solicitud desde Guardian. Puedes seleccionar varios funcionarios.</p>
           <form class="scm-notif-responsable-form scm-pqr-config-form scm-dashboard-pqr-config-form" method="post" autocomplete="off">
             <div class="scm-pqr-settings-select-wrap">
-              <select name="notif_responsable_ids[]" class="select select-bordered select-sm scm-select" multiple size="6"><?php echo $notifOptions; ?></select>
-              <small>Ctrl/Command + click para seleccionar o quitar varios funcionarios.</small>
+              <select name="notif_responsable_ids[]" class="select select-bordered select-sm scm-select" multiple size="4"><?php echo $notifOptions; ?></select>
+              <small>Busca el funcionario y selecciónalo; puedes retirar cada chip con la x.</small>
             </div>
             <button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Guardar</button>
             <small class="scm-notif-responsable-msg" aria-live="polite"></small>

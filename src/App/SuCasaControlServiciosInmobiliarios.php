@@ -224,12 +224,12 @@ final class SuCasaControlServiciosInmobiliarios
           'respuesta_ticket' => [
             'label' => 'Responder ticket',
             'description' => 'Cuando un funcionario responde un caso.',
-            'channel' => 'Pendiente de conexión',
+            'channel' => 'Email interno en cola',
           ],
           'seguimiento_ticket' => [
             'label' => 'Agregar seguimiento',
             'description' => 'Cuando se registra un seguimiento en el caso.',
-            'channel' => 'Pendiente de conexión',
+            'channel' => 'Email interno en cola',
           ],
           'nota_ticket' => [
             'label' => 'Agregar nota',
@@ -245,6 +245,11 @@ final class SuCasaControlServiciosInmobiliarios
             'label' => 'Postergar ticket',
             'description' => 'Cuando el ticket queda postergado.',
             'channel' => 'Pendiente de conexión',
+          ],
+          'gestion_caso_admin' => [
+            'label' => 'Avisos administrativos generales',
+            'description' => 'Destinatarios internos usados cuando una acción del caso solicite notificar a administración y no tenga un evento más específico.',
+            'channel' => 'Email interno en cola',
           ],
         ],
       ],
@@ -281,9 +286,19 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Cuando se registra una revisión correctiva desde el panel.',
             'channel' => 'Email interno en cola',
           ],
+          'ticket_administrativo_creado' => [
+            'label' => 'Ticket administrativo creado',
+            'description' => 'Cuando se crea un ticket administrativo nativo y se marca notificación a administración.',
+            'channel' => 'Email interno en cola',
+          ],
           'orden_mantenimiento_creada' => [
             'label' => 'Orden de mantenimiento creada',
             'description' => 'Cuando se crea una orden desde una cotización aprobada.',
+            'channel' => 'Email interno en cola',
+          ],
+          'respuesta_cotizacion_mantenimiento' => [
+            'label' => 'Respuesta de cotización',
+            'description' => 'Cuando se responde o actualiza el estado de una cotización de mantenimiento notificando a administración.',
             'channel' => 'Email interno en cola',
           ],
           'respuesta_orden_mantenimiento' => [
@@ -304,7 +319,7 @@ final class SuCasaControlServiciosInmobiliarios
           'crear_ticket_preventiva' => [
             'label' => 'Crear ticket preventivo',
             'description' => 'Cuando se crea un ticket administrativo de revisión preventiva.',
-            'channel' => 'Pendiente de conexión',
+            'channel' => 'Email interno en cola',
           ],
           'comunicacion_no_acceso' => [
             'label' => 'Comunicación por no autorización',

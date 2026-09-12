@@ -432,6 +432,19 @@
               });
             }
 
+            function updatePqrSettingsThemeCounts(scope) {
+              if (!scope || !scope.querySelectorAll) return;
+              scope.querySelectorAll('.scm-pqr-theme-details').forEach(function(details) {
+                var selected = {};
+                details.querySelectorAll('select.scm-select option:checked').forEach(function(option) {
+                  var value = String(option.value || '').trim();
+                  if (value !== '') selected[value] = true;
+                });
+                var badge = details.querySelector('summary small');
+                if (badge) badge.textContent = Object.keys(selected).length + ' seleccionados';
+              });
+            }
+
             function setupSettingsObserver() {
               var settingsModal = document.getElementById('scm-pqr-settings-modal');
               if (!(settingsModal && window.MutationObserver) || settingsModal.dataset.scmObserved === '1') {
@@ -441,6 +454,7 @@
               var observer = new MutationObserver(function() {
                 if (settingsModal.style.display === 'flex') {
                   initEnhancedSelects(settingsModal);
+                  updatePqrSettingsThemeCounts(settingsModal);
                 }
               });
               observer.observe(settingsModal, {
@@ -533,6 +547,12 @@
             });
 
             setupSettingsObserver();
+
+            document.addEventListener('change', function(e) {
+              if (!e.target || !e.target.matches || !e.target.matches('#scm-pqr-settings-modal select.scm-select')) return;
+              var settingsModal = document.getElementById('scm-pqr-settings-modal');
+              if (settingsModal) updatePqrSettingsThemeCounts(settingsModal);
+            });
 
             pqrPanel.addEventListener('click', function(e) {
               var statusTab = e.target && e.target.closest ? e.target.closest('[data-public-pqr-bucket]') : null;
@@ -745,6 +765,10 @@
                   var data = json.data || {};
                   if (msg) msg.textContent = data.message || 'Actualizado';
                   if (rowMsg) rowMsg.textContent = data.message || 'Actualizado';
+                  if (isCorresponsableForm || isNotifForm) {
+                    var settingsModalForCounts = document.getElementById('scm-pqr-settings-modal');
+                    if (settingsModalForCounts) updatePqrSettingsThemeCounts(settingsModalForCounts);
+                  }
 
                   if (isAssignForm) {
                     var ticketPkForRefresh = String(fd.get('ticket_pk') || '').trim();

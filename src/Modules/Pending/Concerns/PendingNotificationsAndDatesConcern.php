@@ -7,6 +7,7 @@ namespace SCM\Modules\Pending\Concerns;
 use SCM\Core\Auth;
 use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
+use SCM\Support\InternalNotificationRecipients;
 use SCM\Support\SchemaInspector;
 
 trait PendingNotificationsAndDatesConcern
@@ -72,8 +73,10 @@ trait PendingNotificationsAndDatesConcern
       } elseif ($target === 'propietario') {
         $addJob($jobs, (string) ($ticketPayload['correo_propietario'] ?? ''), $target, $this->pdfsForTarget($generatedPdfs, 'propietario', 'arrendatario'));
       } elseif ($target === 'admin') {
-        $addJob($jobs, 'sucasacorreos@gmail.com', $target, $generatedPdfs);
-        $addJob($jobs, $mode === 'preventiva' ? 'mantenimientotickets@hotmail.com' : 'gcorrearivera@gmail.com', $target, $generatedPdfs);
+        $adminAction = $mode === 'preventiva' ? 'crear_ticket_preventiva' : 'ticket_administrativo_creado';
+        foreach (InternalNotificationRecipients::emailsForAction($this->repo->getDb(), $adminAction) as $adminEmail) {
+          $addJob($jobs, $adminEmail, $target, $generatedPdfs);
+        }
       }
     }
     if (empty($jobs)) {

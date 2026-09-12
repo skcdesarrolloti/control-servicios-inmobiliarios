@@ -7,6 +7,7 @@ namespace SCM\Modules\ServiciosInmobiliarios\Concerns;
 use SCM\Core\Database;
 use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
+use SCM\Support\InternalNotificationRecipients;
 use SCM\Support\SchemaInspector;
 
 trait NotificationDeliveryConcern
@@ -19,7 +20,7 @@ trait NotificationDeliveryConcern
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
     $subject = $estado === 'Cerrado' ? 'Ticket #' . $logicalTicket . ' cerrado' : 'Ticket #' . $logicalTicket . ' con nueva respuesta';
     $sent = 0;
-    foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets) as $recipient) {
+    foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets, [], 'respuesta_ticket') as $recipient) {
       $html = EmailTemplate::renderNamed('respuesta_ticket', [
         'asunto_correo' => EmailTemplate::e($subject),
         'destinatario' => EmailTemplate::e($recipient['name'] !== '' ? $recipient['name'] : 'cliente'),
@@ -45,7 +46,7 @@ trait NotificationDeliveryConcern
     $cotUrl = $cotId !== '' ? 'https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero=' . rawurlencode($cotId) : '';
     $subject = 'Nueva respuesta de cotizacion de mantenimiento #' . $cotId;
     $motivo = trim((string)($cotizacion['motivo'] ?? ''));
-    $recipients = $this->emailRecipientsForTargets($ticket, $notifyTargets);
+    $recipients = $this->emailRecipientsForTargets($ticket, $notifyTargets, [], 'respuesta_cotizacion_mantenimiento');
     if (!in_array('none', $this->normalizeTargets($notifyTargets), true)) {
       foreach (
         [
@@ -92,7 +93,7 @@ trait NotificationDeliveryConcern
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
     $subject = 'Nuevo seguimiento del ticket #' . $logicalTicket;
     $sent = 0;
-    foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets) as $recipient) {
+    foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets, [], 'seguimiento_ticket') as $recipient) {
       $html = EmailTemplate::renderNamed('nuevo_seguimiento', [
         'destinatario' => EmailTemplate::e($recipient['name'] !== '' ? $recipient['name'] : 'cliente'),
         'id_ticket' => EmailTemplate::e($logicalTicket),
@@ -237,7 +238,7 @@ trait NotificationDeliveryConcern
   }
 
   /** @param array<string,mixed> $ticket @param string[] $targets @param string[] $exclude @return array<int,array{email:string,name:string,role:string}> */
-  private function emailRecipientsForTargets(array $ticket, array $targets = [], array $exclude = []): array
+  private function emailRecipientsForTargets(array $ticket, array $targets = [], array $exclude = [], string $adminAction = 'gestion_caso_admin'): array
   {
     $targets = $this->normalizeTargets($targets);
     if (in_array('none', $targets, true)) {
@@ -276,7 +277,7 @@ trait NotificationDeliveryConcern
     $add('empleado', $employeeName, $employeeEmail);
 
     if (in_array('admin', $targets, true) && empty($excludeMap['admin'])) {
-      foreach ($this->adminNotificationEmails() as $adminEmail) {
+      foreach ($this->adminNotificationEmails($adminAction) as $adminEmail) {
         $recipients[] = ['email' => $adminEmail, 'name' => 'equipo administrativo', 'role' => 'admin'];
       }
     }
@@ -329,13 +330,9 @@ trait NotificationDeliveryConcern
   }
 
   /** @return string[] */
-  private function adminNotificationEmails(): array
+  private function adminNotificationEmails(string $action = 'gestion_caso_admin'): array
   {
-    return $this->normalizeEmails([
-      'sucasacorreos@gmail.com',
-      'gcorrearivera@gmail.com',
-      'sucasa.inmobiliaria@hotmail.com',
-    ]);
+    return $this->normalizeEmails(InternalNotificationRecipients::emailsForAction($this->db, $action));
   }
 
   /** @param array<int,mixed> $items @return string[] */

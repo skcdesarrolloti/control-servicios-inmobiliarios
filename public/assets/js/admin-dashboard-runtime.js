@@ -6172,10 +6172,24 @@
         });
       }
 
+      function updateThemeCounts(scope) {
+        (scope || modal).querySelectorAll(".scm-pqr-theme-details").forEach(function (details) {
+          var selected = {};
+          details.querySelectorAll("select.scm-select option:checked").forEach(function (option) {
+            var value = String(option.value || "").trim();
+            if (value !== "") selected[value] = true;
+          });
+          var count = Object.keys(selected).length;
+          var badge = details.querySelector("summary small");
+          if (badge) badge.textContent = count + " seleccionados";
+        });
+      }
+
       function openModal() {
         modal.classList.add("open");
         modal.setAttribute("aria-hidden", "false");
         initSelects();
+        updateThemeCounts(modal);
       }
 
       function closeModal() {
@@ -6201,6 +6215,11 @@
       modal.addEventListener("click", function (event) {
         if (event.target === modal) {
           closeModal();
+        }
+      });
+      modal.addEventListener("change", function (event) {
+        if (event.target && event.target.matches && event.target.matches("select.scm-select")) {
+          updateThemeCounts(modal);
         }
       });
 
@@ -6236,6 +6255,7 @@
               );
             }
             setMessage(form, (json.data && json.data.message) || "Configuracion guardada.", false);
+            updateThemeCounts(form.closest(".scm-pqr-theme-details") || modal);
             showToast("success", "Configuracion guardada.");
           })
           .catch(function (err) {

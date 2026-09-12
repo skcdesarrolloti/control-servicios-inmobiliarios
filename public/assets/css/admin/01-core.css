@@ -278,6 +278,34 @@
   padding: 20px 26px 24px;
 }
 
+#scm-app .scm-pqr-settings-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px 26px;
+  border-bottom: 1px solid #e5edf7;
+  background: #f8fbff;
+}
+
+#scm-app .scm-pqr-settings-summary span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #dbe6f1;
+  border-radius: 14px;
+  background: #fff;
+  color: #506882;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#scm-app .scm-pqr-settings-summary strong {
+  color: #0f2a4a;
+  font-size: 20px;
+}
+
 #scm-app .scm-permissions-toolbar {
   display: flex;
   align-items: center;
@@ -568,11 +596,70 @@
 
 #scm-app .scm-pqr-settings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 12px;
   max-height: 58vh;
   overflow: auto;
   padding-right: 4px;
+}
+
+#scm-app .scm-pqr-theme-details {
+  overflow: hidden;
+  border: 1px solid #dbe6f1;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(28, 55, 86, 0.05);
+}
+
+#scm-app .scm-pqr-theme-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px 14px;
+  cursor: pointer;
+  color: #102944;
+  font-size: 13px;
+  font-weight: 900;
+  list-style: none;
+}
+
+#scm-app .scm-pqr-theme-details summary::-webkit-details-marker {
+  display: none;
+}
+
+#scm-app .scm-pqr-theme-details summary::before {
+  content: "+";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 999px;
+  background: #edf5ff;
+  color: #1f4f99;
+  font-weight: 900;
+}
+
+#scm-app .scm-pqr-theme-details[open] summary::before {
+  content: "−";
+}
+
+#scm-app .scm-pqr-theme-details summary span {
+  flex: 1 1 auto;
+}
+
+#scm-app .scm-pqr-theme-details summary small {
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 #scm-app .scm-dashboard-pqr-config-form {
@@ -581,7 +668,8 @@
   gap: 7px;
   padding: 12px;
   border: 1px solid #dbe6f1;
-  border-radius: 12px;
+  border-width: 1px 0 0;
+  border-radius: 0;
   background: #f8fbff;
 }
 
@@ -603,13 +691,25 @@
 #scm-app .scm-pqr-config-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
+  padding-top: 4px;
 }
 
 #scm-app .scm-pqr-config-empty {
   margin: 0;
   color: #a95b26;
   font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  #scm-app .scm-pqr-settings-summary {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-pqr-settings-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 #scm-app .scm-internal-notif-grid {
