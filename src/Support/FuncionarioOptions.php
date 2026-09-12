@@ -77,7 +77,7 @@ final class FuncionarioOptions
    *   id_cargo:string
    * }>
    */
-  public static function panelFuncionarios(Database $db, ?SchemaInspector $schema = null, string $idMode = 'employee'): array
+  public static function panelFuncionarios(Database $db, ?SchemaInspector $schema = null, string $idMode = 'employee', ?array $cargoIds = null): array
   {
     $schema = $schema ?: new SchemaInspector($db);
     $table = $db->table('jet_cct_funcionarios');
@@ -114,7 +114,7 @@ final class FuncionarioOptions
         $where[] = "LOWER(TRIM(COALESCE(f.`{$activeColumn}`, 'si'))) IN ('si', 'sí', '1', 'true', 'activo', 'active', 'publish', 'published')";
       }
     }
-    $allowedCargoIds = self::panelCargoIds();
+    $allowedCargoIds = $cargoIds === null ? self::panelCargoIds() : self::sanitizeCargoIds($cargoIds);
     if ($cargoColumn !== '' && $allowedCargoIds !== []) {
       $where[] = 'TRIM(COALESCE(f.`' . $cargoColumn . "`, '')) IN (" . implode(',', array_fill(0, count($allowedCargoIds), '?')) . ')';
       array_push($args, ...$allowedCargoIds);
@@ -174,5 +174,26 @@ final class FuncionarioOptions
     }
 
     return $out;
+  }
+
+  /**
+   * Funcionarios activos sin limitar por cargos configurados para el panel.
+   *
+   * Usado por configuraciones como Guardian, donde los responsables pueden
+   * incluir cargos comerciales u operativos que no aparecen en el panel base.
+   *
+   * @return array<int,array{
+   *   id:string,
+   *   label:string,
+   *   name:string,
+   *   employee_id:string,
+   *   email:string,
+   *   cargo:string,
+   *   id_cargo:string
+   * }>
+   */
+  public static function activeFuncionarios(Database $db, ?SchemaInspector $schema = null, string $idMode = 'employee'): array
+  {
+    return self::panelFuncionarios($db, $schema, $idMode, []);
   }
 }

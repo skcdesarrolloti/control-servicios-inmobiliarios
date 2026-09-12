@@ -129,7 +129,7 @@ trait RendersPublicPqr
   private function get_public_pqr_corresponsable_candidates(): array
   {
     $out = [];
-    $rows = \SCM\Support\FuncionarioOptions::panelFuncionarios(
+    $rows = \SCM\Support\FuncionarioOptions::activeFuncionarios(
       $this->db,
       new \SCM\Support\SchemaInspector($this->db)
     );
@@ -138,9 +138,14 @@ trait RendersPublicPqr
       if ($id === '') {
         continue;
       }
+      $label = trim((string) ($row['label'] ?? $id));
+      $cargo = trim((string) ($row['cargo'] ?? ''));
+      if ($cargo !== '' && stripos($label, $cargo) === false) {
+        $label .= ' · ' . $cargo;
+      }
       $out[] = [
         'id' => $id,
-        'label' => trim((string) ($row['label'] ?? $id)),
+        'label' => $label,
       ];
     }
     return $out;
