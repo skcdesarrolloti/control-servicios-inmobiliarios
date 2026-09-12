@@ -749,6 +749,64 @@
   text-align: left;
 }
 
+#scm-app .scm-portfolio-bulkbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 0 12px;
+  border: 1px solid #cbd8e5;
+  border-radius: 14px;
+  background: #f8fbfe;
+  padding: 12px 14px;
+}
+
+#scm-app .scm-portfolio-bulkbar-info {
+  display: grid;
+  gap: 3px;
+  color: #20364d;
+}
+
+#scm-app .scm-portfolio-bulkbar-info strong {
+  font-size: 13px;
+}
+
+#scm-app .scm-portfolio-bulkbar-info span {
+  color: #52687e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#scm-app .scm-portfolio-bulkbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#scm-app .scm-portfolio-bulkbar-actions button {
+  min-height: 36px;
+  border-radius: 10px;
+}
+
+#scm-app .scm-portfolio-bulkbar-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#scm-app .scm-portfolio-select-col {
+  width: 44px;
+  min-width: 44px;
+  text-align: center;
+}
+
+#scm-app .scm-portfolio-select-col input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--portfolio-navy);
+  cursor: pointer;
+}
+
 #scm-app .scm-portfolio-management-btn {
   border-color: #9bb8d4;
   background: #f2f7fb;

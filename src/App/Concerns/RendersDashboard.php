@@ -2637,10 +2637,12 @@ trait RendersDashboard
             <span>Carga el auxiliar 1380 o cambia los filtros actuales.</span>
           </div>
         <?php else: ?>
+          <?php echo $this->render_collection_portfolio_bulk_toolbar('principal'); ?>
           <div class="scm-collection-log-table-wrap scm-portfolio-table-wrap">
             <table class="scm-collection-log-table scm-portfolio-table">
               <thead>
                 <tr>
+                  <th class="scm-portfolio-select-col"><input type="checkbox" data-scm-portfolio-bulk-check-all aria-label="Seleccionar registros visibles de cartera principal"></th>
                   <th>Estado</th>
                   <th>Arrendatario</th>
                   <th>Contrato</th>
@@ -2659,10 +2661,14 @@ trait RendersDashboard
                   $balance = $row['balance'] !== null ? (float) $row['balance'] : null;
                   $previous = $row['previous_balance'] !== null ? (float) $row['previous_balance'] : null;
                   $variation = $balance !== null && $previous !== null ? $balance - $previous : null;
+                  $rowPortfolioId = (int) ($row['id'] ?? 0);
+                  $rowTenantId = (int) ($row['tenant_id'] ?? 0);
+                  $rowContractId = (int) ($row['contract_id'] ?? 0);
                   $canManage = (int) ($row['contract_id'] ?? 0) > 0;
                   $canCollect = $canManage && $rowStatus === 'deuda';
                 ?>
                   <tr>
+                    <td class="scm-portfolio-select-col"><input type="checkbox" data-scm-portfolio-bulk-check data-portfolio-id="<?php echo esc_attr((string) $rowPortfolioId); ?>" data-tenant-id="<?php echo esc_attr((string) $rowTenantId); ?>" data-contract-id="<?php echo esc_attr((string) $rowContractId); ?>" data-can-manage="<?php echo $canManage ? '1' : '0'; ?>" data-can-collect="<?php echo $canCollect ? '1' : '0'; ?>" aria-label="Seleccionar contrato <?php echo esc_attr((string) (($row['contract_number'] ?? '') ?: $rowContractId)); ?>"<?php echo $canManage ? '' : ' disabled'; ?>></td>
                     <td><span class="scm-portfolio-status scm-portfolio-status--<?php echo esc_attr($rowStatus); ?>"><?php echo esc_html($this->collection_portfolio_status_label($rowStatus)); ?></span></td>
                     <td><strong><?php echo esc_html((string) (($row['tenant_name'] ?? '') ?: 'Sin nombre en plataforma')); ?></strong><small><?php echo esc_html((string) (($row['tenant_document'] ?? '') ?: '-')); ?></small></td>
                     <td><span class="scm-collection-log-pill"><?php echo esc_html((string) (($row['contract_number'] ?? '') ?: '-')); ?></span></td>
@@ -2746,10 +2752,12 @@ trait RendersDashboard
             <span>No hay contratos activos con los filtros actuales.</span>
           </div>
         <?php else: ?>
+          <?php echo $this->render_collection_portfolio_bulk_toolbar('contratos'); ?>
           <div class="scm-collection-log-table-wrap scm-portfolio-table-wrap">
             <table class="scm-collection-log-table scm-portfolio-table">
               <thead>
                 <tr>
+                  <th class="scm-portfolio-select-col"><input type="checkbox" data-scm-portfolio-bulk-check-all aria-label="Seleccionar contratos visibles"></th>
                   <th>Estado</th>
                   <th>Arrendatario</th>
                   <th>Contrato</th>
@@ -2766,9 +2774,13 @@ trait RendersDashboard
                   $rowStage = (string) ($row['collection_stage'] ?? 'normal');
                   $balance = $row['balance'] !== null ? (float) $row['balance'] : null;
                   $portfolioId = (int) ($row['id'] ?? 0);
+                  $contractTenantId = (int) ($row['tenant_id'] ?? 0);
+                  $contractId = (int) ($row['contract_id'] ?? 0);
+                  $canManageContract = $contractId > 0;
                   $canCollect = $portfolioId > 0 && $rowStatus === 'deuda';
                 ?>
                   <tr>
+                    <td class="scm-portfolio-select-col"><input type="checkbox" data-scm-portfolio-bulk-check data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-id="<?php echo esc_attr((string) $contractTenantId); ?>" data-contract-id="<?php echo esc_attr((string) $contractId); ?>" data-can-manage="<?php echo $canManageContract ? '1' : '0'; ?>" data-can-collect="<?php echo $canCollect ? '1' : '0'; ?>" aria-label="Seleccionar contrato <?php echo esc_attr((string) (($row['contract_number'] ?? '') ?: $contractId)); ?>"<?php echo $canManageContract ? '' : ' disabled'; ?>></td>
                     <td><span class="scm-portfolio-status scm-portfolio-status--<?php echo esc_attr($rowStatus); ?>"><?php echo esc_html($this->collection_portfolio_status_label($rowStatus)); ?></span></td>
                     <td><strong><?php echo esc_html((string) (($row['tenant_name'] ?? '') ?: 'Sin nombre en plataforma')); ?></strong><small><?php echo esc_html((string) (($row['tenant_document'] ?? '') ?: '-')); ?> &middot; <?php echo esc_html((string) (($row['tenant_phone'] ?? '') ?: 'Sin celular')); ?></small></td>
                     <td><span class="scm-collection-log-pill"><?php echo esc_html((string) (($row['contract_number'] ?? '') ?: '-')); ?></span></td>
@@ -2777,7 +2789,7 @@ trait RendersDashboard
                     <td><span class="scm-portfolio-stage scm-portfolio-stage--<?php echo esc_attr($rowStage); ?>"><?php echo esc_html($this->collection_portfolio_stage_label($rowStage)); ?></span></td>
                     <td><?php echo esc_html($this->collection_portfolio_action_label((string) ($row['last_action_type'] ?? ''))); ?><small><?php echo esc_html($this->format_collection_management_date($row['last_action_at'] ?? '')); ?></small></td>
                     <td>
-                      <?php if ((int) ($row['contract_id'] ?? 0) > 0): ?>
+                      <?php if ($canManageContract): ?>
                         <div class="scm-portfolio-actions">
                           <button type="button" class="scm-case-work-btn scm-portfolio-timeline-btn" data-scm-portfolio-timeline data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-property-code="<?php echo esc_attr((string) ($row['property_code'] ?? '')); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Ver movimientos, gestiones y reportes de cartera de este contrato">Ver trazabilidad</button>
                           <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar gestión de cobro e historial del inmueble aunque no exista foto 1380">Hacer gesti&oacute;n</button>
@@ -3139,6 +3151,28 @@ trait RendersDashboard
   {
     $timestamp = strtotime($value);
     return $timestamp === false ? '-' : date('d/m/Y', $timestamp);
+  }
+
+  private function render_collection_portfolio_bulk_toolbar(string $scope): string
+  {
+    $scopeLabel = $scope === 'contratos' ? 'contratos visibles' : 'registros visibles';
+    ob_start();
+?>
+    <div class="scm-portfolio-bulkbar" data-scm-portfolio-bulkbar data-scm-bulk-scope="<?php echo esc_attr($scope); ?>">
+      <div class="scm-portfolio-bulkbar-info">
+        <strong>Acciones en lote</strong>
+        <span data-scm-portfolio-bulk-count>0 <?php echo esc_html($scopeLabel); ?> seleccionados</span>
+      </div>
+      <div class="scm-portfolio-bulkbar-actions" role="group" aria-label="Acciones en lote de cartera">
+        <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-bulk-action="management" disabled>Hacer gesti&oacute;n</button>
+        <button type="button" class="scm-case-work-btn scm-portfolio-due-btn" data-scm-portfolio-bulk-action="due_date" disabled>Notificar pago</button>
+        <button type="button" class="scm-case-work-btn" data-scm-portfolio-bulk-action="prejuridico" disabled>Prejur&iacute;dico</button>
+        <button type="button" class="scm-case-work-btn" data-scm-portfolio-bulk-action="siniestro" disabled>Notificar siniestro</button>
+        <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-bulk-action="mark_siniestro" disabled>Marcar siniestro</button>
+      </div>
+    </div>
+<?php
+    return (string) ob_get_clean();
   }
 
   private function collection_portfolio_status_label(string $status): string

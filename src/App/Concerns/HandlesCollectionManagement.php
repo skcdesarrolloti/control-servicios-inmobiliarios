@@ -50,6 +50,9 @@ trait HandlesCollectionManagement
           'message' => 'Datos de prueba de la 1380 limpiados. No se tocaron contratos, gestiones históricas ni notificaciones.',
         ]);
       }
+      if (strpos($operation, 'bulk_') === 0) {
+        $this->jsonOk($this->handle_collection_portfolio_bulk_action($service, $operation, $_POST));
+      }
       if ($portfolioId <= 0) {
         $this->jsonFail('Selecciona un registro de cartera válido.');
       }
@@ -232,6 +235,431 @@ trait HandlesCollectionManagement
     } catch (\Throwable $exception) {
       $this->jsonFail($exception->getMessage());
     }
+  }
+
+  /**
+   * @param array<string,mixed> $post
+   * @return array<string,mixed>
+   */
+  private function handle_collection_portfolio_bulk_action(CollectionPortfolioService $service, string $operation, array $post): array
+  {
+    $items = $this->collection_bulk_items($post);
+    if ($items === []) {
+      throw new \RuntimeException('Selecciona al menos un contrato para ejecutar la acción en lote.');
+    }
+
+    return match ($operation) {
+      'bulk_management' => $this->handle_collection_bulk_management($service, $items, $post),
+      'bulk_due_date' => $this->handle_collection_bulk_due_date($service, $items, $post),
+      'bulk_prejuridico' => $this->handle_collection_bulk_prejuridico($service, $items),
+      'bulk_siniestro' => $this->handle_collection_bulk_siniestro($service, $items),
+      'bulk_mark_siniestro' => $this->handle_collection_bulk_mark_siniestro($service, $items, $post),
+      default => throw new \RuntimeException('Operación masiva de cartera no válida.'),
+    };
+  }
+
+  /**
+   * @param array<string,mixed> $post
+   * @return array<int,array{portfolio_id:int,tenant_id:int,contract_id:int}>
+   */
+  private function collection_bulk_items(array $post): array
+  {
+    $portfolioIds = $this->collection_bulk_int_array($post['portfolio_ids'] ?? []);
+    $tenantIds = $this->collection_bulk_int_array($post['tenant_ids'] ?? []);
+    $contractIds = $this->collection_bulk_int_array($post['contract_ids'] ?? []);
+    $max = max(count($portfolioIds), count($tenantIds), count($contractIds));
+    $items = [];
+    $seen = [];
+    for ($index = 0; $index < $max; $index++) {
+      $portfolioId = (int) ($portfolioIds[$index] ?? 0);
+      $tenantId = (int) ($tenantIds[$index] ?? 0);
+      $contractId = (int) ($contractIds[$index] ?? 0);
+      if ($portfolioId <= 0 && ($tenantId <= 0 || $contractId <= 0)) {
+        continue;
+      }
+      $key = $portfolioId > 0 ? 'p:' . $portfolioId : 't:' . $tenantId . ':c:' . $contractId;
+      if (isset($seen[$key])) {
+        continue;
+      }
+      $seen[$key] = true;
+      $items[] = ['portfolio_id' => $portfolioId, 'tenant_id' => $tenantId, 'contract_id' => $contractId];
+      if (count($items) >= 100) {
+        break;
+      }
+    }
+    return $items;
+  }
+
+  /**
+   * @param mixed $raw
+   * @return int[]
+   */
+  private function collection_bulk_int_array($raw): array
+  {
+    if (!is_array($raw)) {
+      $raw = [$raw];
+    }
+    return array_map(static fn($value): int => max(0, (int) $value), array_values($raw));
+  }
+
+  /** @param string[] $allowed */
+  private function collection_bulk_channels($raw, array $allowed): array
+  {
+    $values = is_array($raw) ? $raw : [$raw];
+    $channels = array_map(static fn($value): string => sanitize_key((string) $value), $values);
+    return array_values(array_unique(array_filter($channels, static fn(string $channel): bool => in_array($channel, $allowed, true))));
+  }
+
+  /**
+   * @param array<int,array{portfolio_id:int,tenant_id:int,contract_id:int}> $items
+   * @param array<string,mixed> $post
+   * @return array<string,mixed>
+   */
+  private function handle_collection_bulk_management(CollectionPortfolioService $service, array $items, array $post): array
+  {
+    $adminService = $this->get_admin_notifications_service();
+    $concept = sanitize_text_field(wp_unslash((string) ($post['tipo_gestion_cobro'] ?? 'Canon')));
+    $observation = trim(wp_strip_all_tags((string) ($post['observacion'] ?? '')));
+    if ($observation === '') {
+      throw new \RuntimeException('Escribe la observación que quedará en todas las gestiones seleccionadas.');
+    }
+    $channels = $this->collection_bulk_channels($post['notify_channels'] ?? [], ['email', 'whatsapp', 'sms']);
+    $payloadBase = [
+      'tipo_gestion_cobro' => $concept !== '' ? $concept : 'Canon',
+      'observacion' => $observation,
+      'volver_llamar' => 'No',
+      'siguiente_fecha' => '',
+      'siguiente_hora' => '',
+      'otro_horario_cobro' => '',
+    ];
+
+    $summary = $this->collection_bulk_summary(count($items));
+    $allManagements = [];
+    $allRecipientIds = [];
+    foreach ($items as $item) {
+      try {
+        [$portfolioId, $tenantId, $contractId] = $this->collection_bulk_resolve_contract($service, $item);
+        if ($tenantId <= 0 || $contractId <= 0) {
+          throw new \RuntimeException('No tiene arrendatario y contrato vinculados.');
+        }
+        $payload = $payloadBase + ['contract_ids' => [$contractId]];
+        $result = $adminService->registerCollectionManagement([$tenantId], $payload);
+        $created = (int) ($result['created'] ?? 0);
+        if ($created <= 0) {
+          throw new \RuntimeException('No se registró la gestión. Revisa que el contrato siga activo.');
+        }
+        if ($portfolioId > 0) {
+          $service->recordManagement($portfolioId, $created, $observation, 'gestion_cobro');
+        }
+        $summary['processed']++;
+        $managements = (array) ($result['managements'] ?? []);
+        $recipientIds = array_map('intval', (array) ($result['recipient_ids'] ?? [$tenantId]));
+        $allManagements = array_merge($allManagements, $managements);
+        $allRecipientIds = array_merge($allRecipientIds, $recipientIds);
+        if ($channels !== []) {
+          $notifyResult = $adminService->enqueue(
+            'arrendatarios_activos',
+            $recipientIds,
+            $channels,
+            'Gestión de cobro registrada',
+            $adminService->collectionNotificationMessage($payload),
+            'scm_arrendatario_gestion_cobro_v1',
+            'scm_email_arrendatario_gestion_cobro_v1',
+            $this->collection_management_notification_meta($managements),
+            AdministrativeNotificationsService::COLLECTION_SMS_MAX
+          );
+          $summary['notifications'] = $this->merge_admin_notification_results((array) $summary['notifications'], $notifyResult);
+        }
+      } catch (\Throwable $exception) {
+        $summary['failed']++;
+        $this->collection_bulk_add_error($summary, $item, $exception->getMessage());
+      }
+    }
+
+    $internalIds = $this->internalNotificationRecipientsForAction('gestion_cobro');
+    if ($internalIds !== [] && $allManagements !== []) {
+      try {
+        $internalResult = $adminService->enqueue(
+          'funcionarios',
+          $internalIds,
+          ['email'],
+          'Gestiones de cobro registradas en lote',
+          $this->collection_management_internal_notification_message(
+            $allManagements,
+            $payloadBase,
+            $channels !== [] ? $adminService->collectionNotificationMessage($payloadBase) : '',
+            (int) $summary['processed'],
+            (int) $summary['failed']
+          ),
+          '',
+          AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE,
+          $this->collection_management_notification_meta_for_recipients($allManagements, $internalIds),
+          AdministrativeNotificationsService::SMS_MAX
+        );
+        $summary['internal_notifications'] = $internalResult;
+      } catch (\Throwable $exception) {
+        $summary['internal_notification_error'] = $exception->getMessage();
+      }
+    }
+
+    return $this->collection_bulk_finish($summary, 'Gestión masiva registrada');
+  }
+
+  /**
+   * @param array<int,array{portfolio_id:int,tenant_id:int,contract_id:int}> $items
+   * @param array<string,mixed> $post
+   * @return array<string,mixed>
+   */
+  private function handle_collection_bulk_due_date(CollectionPortfolioService $service, array $items, array $post): array
+  {
+    $adminService = $this->get_admin_notifications_service();
+    $dueDay = $adminService->normalizeCollectionDueDateDay((string) ($post['due_day'] ?? date('j')));
+    $channels = $this->collection_bulk_channels($post['notify_channels'] ?? [], ['email', 'whatsapp']);
+    if ($channels === []) {
+      throw new \RuntimeException('Selecciona al menos WhatsApp o Email para notificar fecha de pago.');
+    }
+    $observation = $adminService->collectionDueDateReminderObservation($dueDay, $channels);
+    $summary = $this->collection_bulk_summary(count($items));
+    foreach ($items as $item) {
+      try {
+        [$portfolioId, $tenantId, $contractId] = $this->collection_bulk_resolve_contract($service, $item);
+        if ($portfolioId <= 0 || $tenantId <= 0 || $contractId <= 0) {
+          throw new \RuntimeException('Requiere foto de cartera, arrendatario y contrato vinculados.');
+        }
+        $payload = [
+          'tipo_gestion_cobro' => 'Canon',
+          'observacion' => $observation,
+          'volver_llamar' => 'No',
+          'siguiente_fecha' => '',
+          'siguiente_hora' => '',
+          'otro_horario_cobro' => '',
+          'contract_ids' => [$contractId],
+        ];
+        $result = $adminService->registerCollectionManagement([$tenantId], $payload);
+        $created = (int) ($result['created'] ?? 0);
+        if ($created <= 0) {
+          throw new \RuntimeException('No se registró la notificación. Revisa que el contrato siga activo.');
+        }
+        $service->recordManagement($portfolioId, $created, $observation, 'notificacion_fecha_pago');
+        $recipientIds = array_map('intval', (array) ($result['recipient_ids'] ?? [$tenantId]));
+        $notificationMeta = $this->collection_management_notification_meta((array) ($result['managements'] ?? []));
+        foreach ($recipientIds as $recipientId) {
+          if ($recipientId <= 0) {
+            continue;
+          }
+          if (!isset($notificationMeta[$recipientId])) {
+            $notificationMeta[$recipientId] = ['__notification_meta' => []];
+          }
+          $notificationMeta[$recipientId]['__notification_meta']['collection_due_date'] = [
+            'day' => $dueDay,
+            'ordinal' => $adminService->collectionDueDateOrdinal($dueDay),
+          ];
+        }
+        $summary['notifications'] = $this->merge_admin_notification_results((array) $summary['notifications'], $adminService->enqueue(
+          'arrendatarios_activos',
+          $recipientIds,
+          $channels,
+          'Notificación de fecha de pago',
+          $adminService->collectionDueDateReminderMessage($dueDay),
+          'scm_arrendatario_fecha_pago_v1',
+          'scm_email_arrendatario_fecha_pago_v1',
+          $notificationMeta,
+          AdministrativeNotificationsService::COLLECTION_SMS_MAX
+        ));
+        $summary['processed']++;
+      } catch (\Throwable $exception) {
+        $summary['failed']++;
+        $this->collection_bulk_add_error($summary, $item, $exception->getMessage());
+      }
+    }
+    return $this->collection_bulk_finish($summary, 'Notificaciones de fecha de pago procesadas');
+  }
+
+  /**
+   * @param array<int,array{portfolio_id:int,tenant_id:int,contract_id:int}> $items
+   * @return array<string,mixed>
+   */
+  private function handle_collection_bulk_prejuridico(CollectionPortfolioService $service, array $items): array
+  {
+    $adminService = $this->get_admin_notifications_service();
+    $summary = $this->collection_bulk_summary(count($items));
+    foreach ($items as $item) {
+      try {
+        $portfolioId = (int) $item['portfolio_id'];
+        if ($portfolioId <= 0) {
+          throw new \RuntimeException('Requiere foto de cartera vinculada.');
+        }
+        $result = $service->generateLetter($portfolioId, 'prejuridico', true);
+        $summary['processed']++;
+        $summary['email_queued'] += (int) ($result['email_queued'] ?? ($result['queued'] ?? 0));
+        $internalIds = $this->internalNotificationRecipientsForAction('cobro_prejuridico');
+        if ($internalIds !== []) {
+          try {
+            $summary['internal_notifications'] = $this->merge_admin_notification_results((array) $summary['internal_notifications'], $adminService->enqueue(
+              'funcionarios',
+              $internalIds,
+              ['email'],
+              'Cobro prejuridico registrado',
+              $this->collection_prejuridico_internal_notification_message($result),
+              '',
+              AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE,
+              $this->collection_management_notification_meta_for_recipients((array) ($result['managements'] ?? []), $internalIds),
+              AdministrativeNotificationsService::SMS_MAX
+            ));
+          } catch (\Throwable $internalException) {
+            $summary['internal_notification_error'] = $internalException->getMessage();
+          }
+        }
+      } catch (\Throwable $exception) {
+        $summary['failed']++;
+        $this->collection_bulk_add_error($summary, $item, $exception->getMessage());
+      }
+    }
+    return $this->collection_bulk_finish($summary, 'Prejurídicos procesados');
+  }
+
+  /**
+   * @param array<int,array{portfolio_id:int,tenant_id:int,contract_id:int}> $items
+   * @return array<string,mixed>
+   */
+  private function handle_collection_bulk_siniestro(CollectionPortfolioService $service, array $items): array
+  {
+    $summary = $this->collection_bulk_summary(count($items));
+    foreach ($items as $item) {
+      try {
+        $portfolioId = (int) $item['portfolio_id'];
+        if ($portfolioId <= 0) {
+          throw new \RuntimeException('Requiere foto de cartera vinculada.');
+        }
+        $result = $service->sendSiniestroNotification($portfolioId);
+        $summary['processed']++;
+        $summary['email_queued'] += (int) ($result['email_queued'] ?? ($result['queued'] ?? 0));
+        $summary['whatsapp_queued'] += (int) ($result['whatsapp_queued'] ?? 0);
+        $summary['whatsapp_failed'] += (int) ($result['whatsapp_failed'] ?? 0);
+      } catch (\Throwable $exception) {
+        $summary['failed']++;
+        $this->collection_bulk_add_error($summary, $item, $exception->getMessage());
+      }
+    }
+    return $this->collection_bulk_finish($summary, 'Avisos previos de siniestro procesados');
+  }
+
+  /**
+   * @param array<int,array{portfolio_id:int,tenant_id:int,contract_id:int}> $items
+   * @param array<string,mixed> $post
+   * @return array<string,mixed>
+   */
+  private function handle_collection_bulk_mark_siniestro(CollectionPortfolioService $service, array $items, array $post): array
+  {
+    $adminService = $this->get_admin_notifications_service();
+    $note = trim(wp_strip_all_tags((string) ($post['note'] ?? 'Marcado en lote desde Gestiones de cobro.')));
+    $summary = $this->collection_bulk_summary(count($items));
+    foreach ($items as $itemRef) {
+      try {
+        $portfolioId = (int) $itemRef['portfolio_id'];
+        if ($portfolioId <= 0) {
+          throw new \RuntimeException('Requiere foto de cartera vinculada.');
+        }
+        $item = $service->updateStage($portfolioId, 'siniestro', $note);
+        $summary['processed']++;
+        $internalIds = $this->internalNotificationRecipientsForAction('contrato_siniestro');
+        if ($internalIds === []) {
+          $internalIds = $this->internalNotificationRecipientsForAction('cobro_prejuridico');
+        }
+        if ($internalIds !== []) {
+          try {
+            $summary['internal_notifications'] = $this->merge_admin_notification_results((array) $summary['internal_notifications'], $adminService->enqueue(
+              'funcionarios',
+              $internalIds,
+              ['email'],
+              'Contrato marcado como siniestro',
+              $this->collection_siniestro_internal_notification_message($item, $note),
+              '',
+              AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE,
+              [],
+              AdministrativeNotificationsService::SMS_MAX
+            ));
+          } catch (\Throwable $internalException) {
+            $summary['internal_notification_error'] = $internalException->getMessage();
+          }
+        }
+      } catch (\Throwable $exception) {
+        $summary['failed']++;
+        $this->collection_bulk_add_error($summary, $itemRef, $exception->getMessage());
+      }
+    }
+    return $this->collection_bulk_finish($summary, 'Contratos marcados como siniestro');
+  }
+
+  /**
+   * @param array{portfolio_id:int,tenant_id:int,contract_id:int} $item
+   * @return array{0:int,1:int,2:int}
+   */
+  private function collection_bulk_resolve_contract(CollectionPortfolioService $service, array $item): array
+  {
+    $portfolioId = (int) $item['portfolio_id'];
+    $tenantId = (int) $item['tenant_id'];
+    $contractId = (int) $item['contract_id'];
+    if ($portfolioId > 0) {
+      $portfolioItem = $service->item($portfolioId);
+      $tenantId = (int) ($portfolioItem['tenant_id'] ?? $tenantId);
+      $contractId = (int) ($portfolioItem['contract_id'] ?? $contractId);
+    }
+    return [$portfolioId, $tenantId, $contractId];
+  }
+
+  /** @return array<string,mixed> */
+  private function collection_bulk_summary(int $requested): array
+  {
+    return [
+      'requested' => $requested,
+      'processed' => 0,
+      'failed' => 0,
+      'email_queued' => 0,
+      'whatsapp_queued' => 0,
+      'whatsapp_failed' => 0,
+      'notifications' => ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0],
+      'internal_notifications' => ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0],
+      'internal_notification_error' => '',
+      'errors' => [],
+    ];
+  }
+
+  /** @param array<string,mixed> $summary @param array{portfolio_id:int,tenant_id:int,contract_id:int} $item */
+  private function collection_bulk_add_error(array &$summary, array $item, string $message): void
+  {
+    if (count((array) $summary['errors']) >= 8) {
+      return;
+    }
+    $context = $item['portfolio_id'] > 0 ? 'cartera #' . $item['portfolio_id'] : 'contrato #' . $item['contract_id'];
+    $summary['errors'][] = $context . ': ' . $message;
+  }
+
+  /** @param array<string,mixed> $summary @return array<string,mixed> */
+  private function collection_bulk_finish(array $summary, string $label): array
+  {
+    $message = $label . ': ' . (int) $summary['processed'] . ' procesado(s)';
+    if ((int) $summary['failed'] > 0) {
+      $message .= ' y ' . (int) $summary['failed'] . ' con novedad';
+    }
+    $externalNotifications = (array) ($summary['notifications'] ?? []);
+    $internalNotifications = (array) ($summary['internal_notifications'] ?? []);
+    $queued = (int) ($externalNotifications['queued'] ?? 0) + (int) ($summary['email_queued'] ?? 0) + (int) ($summary['whatsapp_queued'] ?? 0);
+    $internalQueued = (int) ($internalNotifications['queued'] ?? 0);
+    if ($queued > 0) {
+      $message .= '. ' . $queued . ' notificación(es) externas en cola';
+    }
+    if ($internalQueued > 0) {
+      $message .= '. ' . $internalQueued . ' aviso(s) interno(s)';
+    }
+    if ((string) ($summary['internal_notification_error'] ?? '') !== '') {
+      $message .= '. No se pudo encolar todo internamente: ' . (string) $summary['internal_notification_error'];
+    }
+    if ((array) ($summary['errors'] ?? []) !== []) {
+      $message .= '. Revisa novedades: ' . implode(' | ', (array) $summary['errors']);
+    }
+    $summary['message'] = $message . '.';
+    return $summary;
   }
 
   public function ajax_handler_collection_portfolio_pdf(): void

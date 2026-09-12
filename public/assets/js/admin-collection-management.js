@@ -412,6 +412,232 @@
       submit(String(day), ["whatsapp"]);
     }
 
+    function bulkScope(button) {
+      return button && button.closest ? button.closest("[data-scm-portfolio-panel]") : null;
+    }
+
+    function bulkRows(container) {
+      if (!container) return [];
+      return Array.prototype.slice.call(container.querySelectorAll("[data-scm-portfolio-bulk-check]:checked")).map(function (input) {
+        return {
+          portfolioId: String(input.getAttribute("data-portfolio-id") || "0"),
+          tenantId: String(input.getAttribute("data-tenant-id") || "0"),
+          contractId: String(input.getAttribute("data-contract-id") || "0"),
+          canManage: String(input.getAttribute("data-can-manage") || "") === "1",
+          canCollect: String(input.getAttribute("data-can-collect") || "") === "1"
+        };
+      });
+    }
+
+    function bulkEligible(rows, action) {
+      return rows.filter(function (row) {
+        if (action === "management") return row.canManage && Number(row.tenantId) > 0 && Number(row.contractId) > 0;
+        if (action === "due_date") return row.canManage && Number(row.portfolioId) > 0;
+        return row.canCollect && Number(row.portfolioId) > 0;
+      });
+    }
+
+    function fillBulkFormData(fd, rows) {
+      rows.forEach(function (row) {
+        fd.append("portfolio_ids[]", row.portfolioId || "0");
+        fd.append("tenant_ids[]", row.tenantId || "0");
+        fd.append("contract_ids[]", row.contractId || "0");
+      });
+    }
+
+    function updateBulkBars(container) {
+      var target = container || root;
+      target.querySelectorAll("[data-scm-portfolio-bulkbar]").forEach(function (bar) {
+        var panel = bar.closest("[data-scm-portfolio-panel]");
+        var rows = bulkRows(panel);
+        var count = bar.querySelector("[data-scm-portfolio-bulk-count]");
+        if (count) {
+          count.textContent = rows.length + (rows.length === 1 ? " contrato seleccionado" : " contratos seleccionados");
+        }
+        bar.querySelectorAll("[data-scm-portfolio-bulk-action]").forEach(function (button) {
+          var action = String(button.getAttribute("data-scm-portfolio-bulk-action") || "");
+          button.disabled = bulkEligible(rows, action).length === 0;
+        });
+        var checkAll = panel ? panel.querySelector("[data-scm-portfolio-bulk-check-all]") : null;
+        if (checkAll) {
+          var checks = Array.prototype.slice.call(panel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)"));
+          var checked = checks.filter(function (input) { return input.checked; });
+          checkAll.checked = checks.length > 0 && checked.length === checks.length;
+          checkAll.indeterminate = checked.length > 0 && checked.length < checks.length;
+        }
+      });
+    }
+
+    function runBulkOperation(button, operation, rows, extra, workingMessage) {
+      var fd = new FormData();
+      fd.set("operation", operation);
+      fillBulkFormData(fd, rows);
+      Object.keys(extra || {}).forEach(function (key) {
+        var value = extra[key];
+        if (Array.isArray(value)) {
+          value.forEach(function (item) { fd.append(key + "[]", item); });
+        } else {
+          fd.set(key, value);
+        }
+      });
+      button.disabled = true;
+      if (workingMessage) notify("info", workingMessage, "Cartera");
+      return postJson(actionPortfolio, fd).then(function (data) {
+        notify(Number(data.failed || 0) > 0 ? "warning" : "success", data.message || "Acción en lote procesada.", "Cartera");
+        return refreshPanel();
+      }).catch(function (error) {
+        notify("error", error.message, "Cartera");
+      }).finally(function () {
+        button.disabled = false;
+      });
+    }
+
+    function openBulkManagementModal(button, rows) {
+      var eligible = bulkEligible(rows, "management");
+      if (eligible.length === 0) return;
+      var modal = root.querySelector("[data-scm-portfolio-management-modal]");
+      if (!modal) return;
+      var form = modal.querySelector("[data-scm-portfolio-management-form]");
+      if (!form) return;
+      form.reset();
+      form.setAttribute("data-scm-bulk-mode", "1");
+      form.dataset.bulkRows = JSON.stringify(eligible);
+      form.querySelector("[name='portfolio_id']").value = "";
+      form.querySelector("[name='ids[]']").value = "";
+      form.querySelector("[name='contract_ids[]']").value = "";
+      modal.querySelector("[data-scm-portfolio-management-context]").textContent = eligible.length + " contrato(s) seleccionado(s). Se registrará la misma observación para todos.";
+      var codeudores = modal.querySelector("[data-scm-portfolio-codeudores]");
+      var codeudorList = modal.querySelector("[data-scm-portfolio-codeudores-list]");
+      if (codeudores) codeudores.hidden = true;
+      if (codeudorList) codeudorList.innerHTML = "";
+      var result = modal.querySelector("[data-scm-portfolio-management-result]");
+      if (result) result.textContent = "";
+      modal.hidden = false;
+      syncModalBodyState();
+      window.setTimeout(function () {
+        var observation = form.querySelector("[name='observacion']");
+        if (observation) observation.focus();
+      }, 50);
+    }
+
+    function openBulkDueDate(button, rows) {
+      var eligible = bulkEligible(rows, "due_date");
+      if (eligible.length === 0) return;
+      var submit = function (day, channels) {
+        return runBulkOperation(button, "bulk_due_date", eligible, { due_day: day, notify_channels: channels }, "Registrando y encolando notificaciones en lote...");
+      };
+      if (window.Swal && typeof window.Swal.fire === "function") {
+        window.Swal.fire({
+          title: "Notificar fecha de pago en lote",
+          html: '<div class="scm-portfolio-swal-form">'
+            + '<p>Se procesarán <strong>' + eligible.length + '</strong> contrato(s) con saldo positivo pendiente.</p>'
+            + '<label for="scm-bulk-due-day">Fecha de pago</label>'
+            + '<select id="scm-bulk-due-day" class="swal2-select">'
+            + '<option value="12">Día 12 · primera fecha</option>'
+            + '<option value="22">Día 22 · segunda fecha</option>'
+            + '<option value="26">Día 26 · tercera fecha</option>'
+            + '<option value="31">Día 31 · última fecha</option>'
+            + '</select>'
+            + '<label>Canales</label>'
+            + '<div class="scm-portfolio-swal-checks">'
+            + '<label><input type="checkbox" value="whatsapp" checked> WhatsApp</label>'
+            + '<label><input type="checkbox" value="email"> Email</label>'
+            + '</div>'
+            + '</div>',
+          didOpen: function () {
+            var select = document.getElementById("scm-bulk-due-day");
+            if (select) select.value = defaultDueDay();
+          },
+          showCancelButton: true,
+          confirmButtonText: "Enviar notificaciones",
+          cancelButtonText: "Cancelar",
+          confirmButtonColor: "#1e3a5f",
+          preConfirm: function () {
+            var popup = window.Swal.getPopup();
+            var select = document.getElementById("scm-bulk-due-day");
+            var channels = Array.prototype.slice.call(popup.querySelectorAll(".scm-portfolio-swal-checks input:checked")).map(function (input) {
+              return String(input.value || "");
+            });
+            if (channels.length === 0) {
+              window.Swal.showValidationMessage("Selecciona al menos un canal.");
+              return false;
+            }
+            return { day: select ? String(select.value || "12") : "12", channels: channels };
+          }
+        }).then(function (result) {
+          if (result.isConfirmed && result.value) submit(result.value.day, result.value.channels);
+        });
+        return;
+      }
+      var day = window.prompt("Día de pago: 12, 22, 26 o 31", defaultDueDay());
+      if (["12", "22", "26", "31"].indexOf(String(day || "")) !== -1) submit(String(day), ["whatsapp"]);
+    }
+
+    function confirmBulkSimple(button, rows, action) {
+      var eligible = bulkEligible(rows, action);
+      if (eligible.length === 0) return;
+      var settings = {
+        prejuridico: {
+          title: "Enviar prejurídico en lote",
+          text: "Se generará y registrará la carta prejurídica para los contratos seleccionados, y se encolará el correo cuando exista email válido.",
+          confirm: "Enviar prejurídicos",
+          operation: "bulk_prejuridico",
+          working: "Generando cartas prejurídicas en lote..."
+        },
+        siniestro: {
+          title: "Notificar aviso previo de siniestro en lote",
+          text: "Se encolará el aviso previo por WhatsApp y email. No cambia la etapa del contrato.",
+          confirm: "Encolar avisos",
+          operation: "bulk_siniestro",
+          working: "Encolando avisos previos de siniestro..."
+        },
+        mark_siniestro: {
+          title: "Marcar siniestro en lote",
+          text: "Se marcará la etapa siniestro, se guardará historial del inmueble y se avisará al funcionario configurado.",
+          confirm: "Marcar siniestro",
+          operation: "bulk_mark_siniestro",
+          working: "Marcando contratos como siniestro..."
+        }
+      }[action];
+      if (!settings) return;
+      var run = function (note) {
+        return runBulkOperation(button, settings.operation, eligible, action === "mark_siniestro" ? { note: note || "" } : {}, settings.working);
+      };
+      if (window.Swal && typeof window.Swal.fire === "function") {
+        window.Swal.fire({
+          title: settings.title,
+          text: settings.text + " Contratos a procesar: " + eligible.length + ".",
+          input: action === "mark_siniestro" ? "textarea" : undefined,
+          inputLabel: action === "mark_siniestro" ? "Observación para el historial (opcional)" : undefined,
+          inputPlaceholder: action === "mark_siniestro" ? "Motivo del siniestro..." : undefined,
+          showCancelButton: true,
+          confirmButtonText: settings.confirm,
+          cancelButtonText: "Cancelar",
+          confirmButtonColor: "#1e3a5f"
+        }).then(function (result) {
+          if (result.isConfirmed) run(String(result.value || ""));
+        });
+        return;
+      }
+      if (window.confirm(settings.title + ". ¿Continuar con " + eligible.length + " contrato(s)?")) run("");
+    }
+
+    function handleBulkAction(button) {
+      var action = String(button.getAttribute("data-scm-portfolio-bulk-action") || "");
+      var rows = bulkRows(bulkScope(button));
+      if (bulkEligible(rows, action).length === 0) {
+        notify("warning", "Selecciona contratos válidos para esta acción.", "Cartera");
+        return;
+      }
+      if (action === "management") {
+        openBulkManagementModal(button, rows);
+      } else if (action === "due_date") {
+        openBulkDueDate(button, rows);
+      } else {
+        confirmBulkSimple(button, rows, action);
+      }
+    }
+
     function resetPortfolioImports(button) {
       var submit = function (confirmText) {
         var fd = new FormData();
@@ -799,6 +1025,8 @@
         });
         if (!contract) throw new Error("No se encontró el contrato activo para esta gestión.");
         form.reset();
+        form.removeAttribute("data-scm-bulk-mode");
+        form.removeAttribute("data-bulk-rows");
         form.querySelector("[name='portfolio_id']").value = portfolioId;
         form.querySelector("[name='ids[]']").value = tenantId;
         form.querySelector("[name='contract_ids[]']").value = contractId;
@@ -862,9 +1090,26 @@
       if (managementForm && root.contains(managementForm)) {
         event.preventDefault();
         var resultEl = managementForm.querySelector("[data-scm-portfolio-management-result]");
+        var isBulkManagement = managementForm.getAttribute("data-scm-bulk-mode") === "1";
         setBusy(managementForm, true);
-        if (resultEl) resultEl.textContent = "Guardando gestión...";
-        postJson(actionManagement, new FormData(managementForm)).then(function (data) {
+        if (resultEl) resultEl.textContent = isBulkManagement ? "Guardando gestiones en lote..." : "Guardando gestión...";
+        var managementData = new FormData(managementForm);
+        var managementAction = actionManagement;
+        if (isBulkManagement) {
+          managementAction = actionPortfolio;
+          managementData.set("operation", "bulk_management");
+          managementData.delete("ids[]");
+          managementData.delete("contract_ids[]");
+          try {
+            fillBulkFormData(managementData, JSON.parse(managementForm.dataset.bulkRows || "[]"));
+          } catch (parseError) {
+            if (resultEl) resultEl.textContent = "No se pudo leer la selección en lote.";
+            notify("error", "No se pudo leer la selección en lote.", "Cartera");
+            setBusy(managementForm, false);
+            return;
+          }
+        }
+        postJson(managementAction, managementData).then(function (data) {
           notify("success", data.message || "Gestión registrada.", "Cartera");
           closeManagementModal();
           return refreshPanel();
@@ -876,12 +1121,27 @@
     });
 
     root.addEventListener("input", function (event) {
+      if (event.target.matches && event.target.matches("[data-scm-portfolio-bulk-check]")) {
+        updateBulkBars(event.target.closest("[data-scm-portfolio-panel]"));
+        return;
+      }
       if (!event.target.matches || !event.target.matches("[data-scm-portfolio-report-search]")) return;
       var modal = event.target.closest("[data-scm-portfolio-report-modal]");
       if (!modal) return;
       var groupKey = String(modal.getAttribute("data-current-group") || "");
       var group = reportGroups()[groupKey];
       if (group) renderReportRows(modal, group, event.target.value);
+    });
+
+    root.addEventListener("change", function (event) {
+      if (!event.target.matches || !event.target.matches("[data-scm-portfolio-bulk-check-all]")) return;
+      var panel = event.target.closest("[data-scm-portfolio-panel]");
+      var checked = !!event.target.checked;
+      if (!panel) return;
+      panel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)").forEach(function (input) {
+        input.checked = checked;
+      });
+      updateBulkBars(panel);
     });
 
     root.addEventListener("click", function (event) {
@@ -907,6 +1167,12 @@
       if (reportDetailButton && root.contains(reportDetailButton)) {
         event.preventDefault();
         openReportDrilldown(reportDetailButton);
+        return;
+      }
+      var bulkActionButton = event.target.closest && event.target.closest("[data-scm-portfolio-bulk-action]");
+      if (bulkActionButton && root.contains(bulkActionButton)) {
+        event.preventDefault();
+        handleBulkAction(bulkActionButton);
         return;
       }
       var reportSearchClear = event.target.closest && event.target.closest("[data-scm-portfolio-report-search-clear]");
