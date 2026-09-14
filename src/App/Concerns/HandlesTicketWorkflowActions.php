@@ -1186,7 +1186,9 @@ trait HandlesTicketWorkflowActions
     $inmueble = $this->adminDueFirstText([$row, $ticket, $contract], ['inmueble', 'id_inmueble', 'codigo', 'codigo_inmueble']);
     $idInmuebleWeb = $this->adminDueFirstText([$row, $ticket, $contract], ['id_inmueble', 'inmueble', 'codigo', 'codigo_inmueble']);
     $createdTs = $this->adminDueFirstTimestamp($row, ['cct_created', 'fecha']);
-    return [
+    $statusBucket = $this->adminDueStatusBucket($ticket);
+    $nativeCase = $ticketPk !== '' ? $this->adminDueNativeTicketCasePayload((int) $ticketPk, $statusBucket) : [];
+    $case = [
       'ticket' => $ticketLabel !== '' ? $ticketLabel : ('Rev ' . ($revisionId !== '' ? $revisionId : '-')),
       'ticket_pk' => $ticketPk !== '' ? $ticketPk : $ticketLabel,
       'asunto' => $this->adminDueFirstText([$ticket, $row], ['asunto', 'tema_ayuda', 'tema']) ?: 'Revisión preventiva sin enviar',
@@ -1210,9 +1212,22 @@ trait HandlesTicketWorkflowActions
       'ticket_url' => $ticketPk !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticketPk) : '',
       'id_revision_preventiva' => $revisionId,
       'tab_key' => 'preventiva',
-      'status_bucket' => $this->adminDueStatusBucket($ticket),
+      'status_bucket' => $statusBucket,
       'case_source_html' => $this->adminDuePreventivaCaseSourceHtml($row, $ticket, $contract),
     ];
+    if (!empty($nativeCase)) {
+      foreach ($nativeCase as $key => $value) {
+        $value = trim((string) $value);
+        if ($value !== '') {
+          $case[$key] = $value;
+        }
+      }
+      $case['case_source_html'] = ($nativeCase['case_source_html'] ?? '') . $this->adminDuePreventivaDueDetailHtml($row, $ticket, $contract);
+      $case['id_revision_preventiva'] = $revisionId !== '' ? $revisionId : (string) ($nativeCase['id_revision_preventiva'] ?? '');
+      $case['tab_key'] = 'preventiva';
+      $case['status_bucket'] = $statusBucket;
+    }
+    return $case;
   }
 
   /** @return array<string,mixed> */
@@ -1307,6 +1322,65 @@ trait HandlesTicketWorkflowActions
     return 'abiertos';
   }
 
+  /** @return array<string,string> */
+  private function adminDueNativeTicketCasePayload(int $ticketPk, string $statusBucket): array
+  {
+    if ($ticketPk <= 0) {
+      return [];
+    }
+    try {
+      $cards = $this->get_servicios_inmobiliarios_module()->renderCardsByTicketIds(
+        [$ticketPk],
+        [
+          'ticket_url' => self::DEFAULT_TICKET_URL,
+          'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
+          'correctiva_url' => self::defaultCorrectiveReviewUrl(),
+          'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
+          'acta_url' => self::DEFAULT_ACTA_URL,
+        ],
+        $statusBucket
+      );
+    } catch (\Throwable $e) {
+      return [];
+    }
+    $html = trim((string) ($cards[(string) $ticketPk] ?? $cards[$ticketPk] ?? ''));
+    if ($html === '' || !class_exists(\DOMDocument::class)) {
+      return [];
+    }
+
+    $previous = libxml_use_internal_errors(true);
+    $dom = new \DOMDocument();
+    $dom->loadHTML('<?xml encoding="UTF-8"><div id="scm-due-native-card">' . $html . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+    libxml_clear_errors();
+    libxml_use_internal_errors($previous);
+
+    $xpath = new \DOMXPath($dom);
+    $source = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " scm-case-source ")]')->item(0);
+    $button = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " scm-btn-case ")]')->item(0);
+    if (!$source instanceof \DOMNode || !$button instanceof \DOMElement) {
+      return [];
+    }
+
+    $payload = ['case_source_html' => $this->adminDueDomInnerHtml($source)];
+    foreach ($button->attributes as $attr) {
+      if (!$attr instanceof \DOMAttr || strpos($attr->name, 'data-') !== 0) {
+        continue;
+      }
+      $key = str_replace('-', '_', substr($attr->name, 5));
+      $payload[$key] = $attr->value;
+    }
+    return $payload;
+  }
+
+  private function adminDueDomInnerHtml(\DOMNode $node): string
+  {
+    $html = '';
+    foreach ($node->childNodes as $child) {
+      $html .= $node->ownerDocument ? $node->ownerDocument->saveHTML($child) : '';
+    }
+    return $html;
+  }
+
   /** @param array<string,mixed> $row */
   private function adminDueQuoteCaseSourceHtml(array $row, bool $sent, int $ticketPk): string
   {
@@ -1353,14 +1427,21 @@ trait HandlesTicketWorkflowActions
     if ($ticketPk > 0) {
       $html .= '<div class="scm-seg-wrap">' . $this->render_seguimiento_form($ticketPk, Auth::isLoggedIn(), false) . '</div>';
     }
-    $html .= '<section class="scm-case-history"><h4>Detalle de la revisión preventiva</h4><article class="scm-case-history-item"><div class="scm-case-history-detail">'
+    $html .= $this->adminDuePreventivaDueDetailHtml($row, $ticket, $contract);
+    return $html;
+  }
+
+  /** @param array<string,mixed> $row @param array<string,mixed> $ticket @param array<string,mixed> $contract */
+  private function adminDuePreventivaDueDetailHtml(array $row, array $ticket, array $contract): string
+  {
+    $revisionId = trim((string) ($row['_ID'] ?? ''));
+    return '<section class="scm-case-history"><h4>Detalle de la revisión preventiva</h4><article class="scm-case-history-item"><div class="scm-case-history-detail">'
       . '<p><strong>Revisión preventiva:</strong> #' . esc_html($revisionId !== '' ? $revisionId : '-') . '</p>'
       . '<p><strong>Envío:</strong> Sin enviar</p>'
       . '<p><strong>Contrato:</strong> ' . esc_html($this->adminDueFirstText([$row, $ticket, $contract], ['contrato', 'id_contrato', '_ID']) ?: '-') . '</p>'
       . '<p><strong>Inmueble:</strong> ' . esc_html($this->adminDueFirstText([$row, $ticket, $contract], ['inmueble', 'id_inmueble', 'codigo', 'codigo_inmueble']) ?: '-') . '</p>'
       . '<p><strong>Dirección:</strong> ' . esc_html($this->adminDueFirstText([$row, $ticket, $contract], ['direccion', 'direccion_fisica']) ?: '-') . '</p>'
       . '</div></article></section>';
-    return $html;
   }
 
   public function ajax_handler_contratos_arrendamiento(): void

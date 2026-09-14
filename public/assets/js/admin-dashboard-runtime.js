@@ -1211,6 +1211,11 @@
           admin: "admin",
           prioridad: "prioridad",
           magnitud_caso: "magnitud-caso",
+          perturbacion: "perturbacion",
+          justificacion_perturbacion: "justificacion-perturbacion",
+          valor_bonificacion: "valor-bonificacion",
+          area_afectada: "area-afectada",
+          resumen_calculo_perturbacion: "resumen-calculo-perturbacion",
           departamento: "departamento",
           tema: "tema",
           contrato: "contrato",
@@ -1223,12 +1228,26 @@
           empleado: "empleado",
           empleado_id: "empleado-id",
           propietario: "propietario",
+          correo_propietario: "correo-propietario",
+          celular_propietario: "celular-propietario",
+          indicativo_propietario: "indicativo-propietario",
           arrendatario: "arrendatario",
+          correo_arrendatario: "correo-arrendatario",
+          celular_arrendatario: "celular-arrendatario",
+          indicativo_arrendatario: "indicativo-arrendatario",
           ticket_url: "ticket-url",
           cotizacion_id: "cotizacion-id",
           cotizacion_url: "cotizacion-url",
+          cotizacion_order_url: "cotizacion-order-url",
+          cotizacion_acta_url: "cotizacion-acta-url",
           cot_estado: "cot-estado",
+          id_revision_correctiva: "id-revision-correctiva",
           id_revision_preventiva: "id-revision-preventiva",
+          prev_encontro_danos: "prev-encontro-danos",
+          preventiva_no_access_count: "preventiva-no-access-count",
+          ejecucion: "ejecucion",
+          sin_actualizar: "sin-actualizar",
+          origen: "origen",
           tab_key: "tab-key",
           status_bucket: "status-bucket",
         };
@@ -1423,7 +1442,7 @@
           var items = groupRows.slice(0, 12).map(function (row) {
             var caseData = row && row.case ? row.case : {};
             var canOpen = String(caseData.case_source_html || "").trim() !== "";
-            return '<div class="scm-calendar-due-breakdown-row">' +
+            return '<div class="scm-calendar-due-breakdown-row scm-ticket-card">' +
               '<strong>' + escHtml(row.fecha_vencimiento || "-") + "</strong>" +
               '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
               '<em>' + escHtml(row.estado || "Pendiente") + "</em>" +
