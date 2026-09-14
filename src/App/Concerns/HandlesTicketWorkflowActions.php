@@ -964,7 +964,8 @@ trait HandlesTicketWorkflowActions
         continue;
       }
       $dueTs = strtotime('+' . $days . ' days', strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs);
-      if ($dueTs === false || $dueTs < $fromTs || $dueTs > $toTs) {
+      $calendarTs = $dueTs !== false ? $this->adminDueCalendarPlacementTimestamp((int) $dueTs, $fromTs, $toTs) : 0;
+      if ($dueTs === false || $calendarTs <= 0) {
         continue;
       }
 
@@ -979,6 +980,7 @@ trait HandlesTicketWorkflowActions
         'color' => $sent ? '#dc2626' : '#f59e0b',
         'base_ts' => $baseTs,
         'due_ts' => (int) $dueTs,
+        'calendar_ts' => $calendarTs,
         'days_limit' => $days,
         'case' => $this->adminDueCaseDataFromQuote($row, $sent),
       ]);
@@ -1011,7 +1013,8 @@ trait HandlesTicketWorkflowActions
         continue;
       }
       $dueTs = strtotime('+' . $days . ' days', strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs);
-      if ($dueTs === false || $dueTs < $fromTs || $dueTs > $toTs) {
+      $calendarTs = $dueTs !== false ? $this->adminDueCalendarPlacementTimestamp((int) $dueTs, $fromTs, $toTs) : 0;
+      if ($dueTs === false || $calendarTs <= 0) {
         continue;
       }
 
@@ -1025,6 +1028,7 @@ trait HandlesTicketWorkflowActions
         'color' => '#2563eb',
         'base_ts' => $baseTs,
         'due_ts' => (int) $dueTs,
+        'calendar_ts' => $calendarTs,
         'days_limit' => $days,
         'case' => $this->adminDueCaseDataFromPreventivaRevision($row),
       ]);
@@ -1037,6 +1041,7 @@ trait HandlesTicketWorkflowActions
   {
     $baseTs = (int) ($data['base_ts'] ?? 0);
     $dueTs = (int) ($data['due_ts'] ?? 0);
+    $calendarTs = (int) ($data['calendar_ts'] ?? $dueTs);
     $todayTs = strtotime(date('Y-m-d 00:00:00')) ?: time();
     $overdue = $dueTs < $todayTs;
     $daysOverdue = $overdue ? max(0, (int) floor(($todayTs - $dueTs) / 86400)) : 0;
@@ -1051,8 +1056,10 @@ trait HandlesTicketWorkflowActions
       'color' => (string) ($data['color'] ?? '#f59e0b'),
       'fecha_base' => $baseTs > 0 ? date('Y-m-d', $baseTs) : '',
       'fecha_vencimiento' => $dueTs > 0 ? date('Y-m-d', $dueTs) : '',
-      'fecha_inicio' => $dueTs > 0 ? date('Y-m-d 08:00:00', $dueTs) : '',
-      'fecha_fin' => $dueTs > 0 ? date('Y-m-d 18:00:00', $dueTs) : '',
+      'fecha_calendario' => $calendarTs > 0 ? date('Y-m-d', $calendarTs) : '',
+      'fecha_inicio' => $calendarTs > 0 ? date('Y-m-d 08:00:00', $calendarTs) : '',
+      'fecha_fin' => $calendarTs > 0 ? date('Y-m-d 18:00:00', $calendarTs) : '',
+      'acumulado_vencido' => $calendarTs > 0 && $dueTs > 0 && date('Y-m-d', $calendarTs) !== date('Y-m-d', $dueTs) ? 1 : 0,
       'dias_limite' => (int) ($data['days_limit'] ?? 0),
       'dias_transcurridos' => $baseTs > 0 ? $this->adminDueElapsedDays($baseTs) : 0,
       'dias_vencido' => $daysOverdue,
@@ -1068,6 +1075,21 @@ trait HandlesTicketWorkflowActions
       if ($ts > 0) {
         return $ts;
       }
+    }
+    return 0;
+  }
+
+  private function adminDueCalendarPlacementTimestamp(int $dueTs, int $fromTs, int $toTs): int
+  {
+    if ($dueTs <= 0) {
+      return 0;
+    }
+    if ($dueTs >= $fromTs && $dueTs <= $toTs) {
+      return $dueTs;
+    }
+    $todayTs = strtotime(date('Y-m-d 00:00:00')) ?: time();
+    if ($dueTs < $fromTs && $todayTs >= $fromTs && $todayTs <= $toTs) {
+      return $todayTs;
     }
     return 0;
   }

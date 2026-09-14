@@ -2273,6 +2273,12 @@
   .scm-calendar-due-breakdown-case {
     width: 100%;
   }
+
+  .swal2-popup .scm-due-entry-kpis,
+  .swal2-popup .scm-due-entry-groups,
+  .swal2-popup .scm-due-entry-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .swal2-container .swal2-popup.scm-calendar-swal-popup {
@@ -2299,6 +2305,87 @@
   max-height: min(680px, calc(100vh - 210px));
   overflow: auto;
   padding: 20px 24px 4px !important;
+}
+
+.swal2-popup .scm-due-entry-popup {
+  display: grid;
+  gap: 14px;
+  text-align: left;
+}
+
+.swal2-popup .scm-due-entry-kpis,
+.swal2-popup .scm-due-entry-groups {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.swal2-popup .scm-due-entry-kpis div,
+.swal2-popup .scm-due-entry-groups div {
+  background: #f8fafc;
+  border: 1px solid #dbe6f2;
+  border-radius: 10px;
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+}
+
+.swal2-popup .scm-due-entry-kpis span,
+.swal2-popup .scm-due-entry-groups span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-due-entry-kpis strong,
+.swal2-popup .scm-due-entry-groups strong {
+  color: #0f2742;
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.swal2-popup .scm-due-entry-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(44vh, 380px);
+  overflow: auto;
+}
+
+.swal2-popup .scm-due-entry-row {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #edf2f7;
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  padding: 9px 10px;
+}
+
+.swal2-popup .scm-due-entry-row strong,
+.swal2-popup .scm-due-entry-row em {
+  color: #64748b;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.swal2-popup .scm-due-entry-row span {
+  color: #0f2742;
+  font-size: 12px;
+  font-weight: 850;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swal2-popup .scm-due-entry-more {
+  color: #f59e0b;
+  font-size: 12px;
+  font-weight: 900;
+  margin: 0;
 }
 
 .swal2-popup.scm-calendar-swal-popup .swal2-actions {
