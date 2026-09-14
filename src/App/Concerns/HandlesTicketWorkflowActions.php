@@ -264,6 +264,7 @@ trait HandlesTicketWorkflowActions
       'cargos' => $this->getDashboardCargoOptions(),
       'permissions' => $this->dashboardPermissionsConfig(),
       'employee_cargo_ids' => FuncionarioOptions::panelCargoIds(),
+      'admin_due_popup_cargo_ids' => $this->adminDuePopupCargoIdsConfig(),
     ]);
   }
 
@@ -290,9 +291,21 @@ trait HandlesTicketWorkflowActions
       return;
     }
     $employeeCargoIds = $this->sanitizeDashboardFuncionarioCargoIds($decodedEmployeeCargoIds);
+    $adminDuePopupCargoIds = $this->adminDuePopupCargoIdsConfig();
+    if (array_key_exists('admin_due_popup_cargo_ids', $_POST)) {
+      $rawDuePopupCargoIds = stripslashes((string) ($_POST['admin_due_popup_cargo_ids'] ?? '[]'));
+      try {
+        $decodedDuePopupCargoIds = json_decode($rawDuePopupCargoIds, true, 512, JSON_THROW_ON_ERROR);
+      } catch (\JsonException $exception) {
+        $this->jsonFail('Los cargos del popup de vencimientos no son validos.');
+        return;
+      }
+      $adminDuePopupCargoIds = $this->sanitizeAdminDuePopupCargoIds($decodedDuePopupCargoIds);
+    }
 
     \SCM\Core\App::settings()->set('dashboard_tab_permissions', $permissions, Auth::userId());
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
+    \SCM\Core\App::settings()->set('admin_due_popup_cargo_ids', $adminDuePopupCargoIds, Auth::userId());
     \SCM\Core\App::settings()->refresh();
     $this->clearDashboardPerformanceCache('dashboard-filter-options-v4');
     $this->clearDashboardPerformanceCache('dashboard-filter-options-v5');
@@ -304,6 +317,7 @@ trait HandlesTicketWorkflowActions
       'message' => 'Permisos y funcionarios visibles guardados.',
       'permissions' => $permissions,
       'employee_cargo_ids' => $employeeCargoIds,
+      'admin_due_popup_cargo_ids' => $adminDuePopupCargoIds,
       'calendar_allowed_employee_ids' => array_values(array_filter(array_map(
         static fn(array $row): string => trim((string) ($row['id_empleado'] ?? '')),
         $calendarFuncionarios

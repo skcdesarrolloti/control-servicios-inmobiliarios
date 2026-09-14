@@ -443,6 +443,46 @@ final class SuCasaControlServiciosInmobiliarios
     return $this->sanitizeDashboardPermissions(is_array($raw) ? $raw : []);
   }
 
+  /** @return array<int,string> */
+  private function adminDuePopupCargoIdsConfig(): array
+  {
+    $raw = \SCM\Core\App::settings()->get('admin_due_popup_cargo_ids', null);
+    if ($raw === null) {
+      return $this->dashboardPermissionAdminCargos();
+    }
+    return $this->sanitizeAdminDuePopupCargoIds($raw);
+  }
+
+  /** @param mixed $raw @return array<int,string> */
+  private function sanitizeAdminDuePopupCargoIds($raw): array
+  {
+    $validCargoIds = [];
+    foreach ($this->getDashboardCargoOptions() as $cargo) {
+      $id = trim((string) ($cargo['id'] ?? ''));
+      if ($id !== '') {
+        $validCargoIds[$id] = true;
+      }
+    }
+
+    $selected = [];
+    foreach (FuncionarioOptions::sanitizeCargoIds($raw) as $cargoId) {
+      if (isset($validCargoIds[$cargoId])) {
+        $selected[$cargoId] = $cargoId;
+      }
+    }
+
+    return array_values($selected);
+  }
+
+  private function shouldShowAdminDuePopup(): bool
+  {
+    $cargo = trim((string) Auth::userCargo());
+    if ($cargo === '' || !in_array($cargo, $this->adminDuePopupCargoIdsConfig(), true)) {
+      return false;
+    }
+    return $this->canAccessDashboardTab('cotizaciones_mantenimiento') || $this->canAccessDashboardTab('preventivas_pendientes');
+  }
+
   /** @param mixed $raw @return array<int,string> */
   private function sanitizeDashboardFuncionarioCargoIds($raw): array
   {

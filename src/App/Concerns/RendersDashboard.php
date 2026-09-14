@@ -256,6 +256,7 @@ trait RendersDashboard
     $dashboardPermissionConfig = $this->dashboardPermissionsConfig();
     $dashboardCargoOptions = $this->getDashboardCargoOptions();
     $dashboardFuncionarioCargoIds = FuncionarioOptions::panelCargoIds();
+    $adminDuePopupCargoIds = $this->adminDuePopupCargoIdsConfig();
     $canManageDashboardPermissions = $this->canManageDashboardPermissions();
     $canManagePublicPqrSettings = $this->canManagePublicPqrSettings();
     $canManageInternalNotificationSettings = $this->canManageInternalNotificationSettings();
@@ -461,6 +462,11 @@ trait RendersDashboard
         'cargos' => $dashboardCargoOptions,
         'permissions' => $dashboardPermissionConfig,
         'employeeCargoIds' => $dashboardFuncionarioCargoIds,
+        'adminDuePopupCargoIds' => $adminDuePopupCargoIds,
+      ],
+      'duePopup' => [
+        'enabled' => $this->shouldShowAdminDuePopup(),
+        'cargoIds' => $adminDuePopupCargoIds,
       ],
       'session' => [
         'loginUrl' => rtrim((string) SCM_BASE_URL, '/') . '/login.php',
@@ -1216,7 +1222,7 @@ trait RendersDashboard
 
       <?php echo \SCM\Views\GuideModalView::render(); ?>
       <?php if ($canManageDashboardPermissions): ?>
-        <?php echo $this->renderDashboardPermissionsModal($dashboardPermissionTabs, $dashboardCargoOptions, $dashboardPermissionConfig, $dashboardFuncionarioCargoIds); ?>
+        <?php echo $this->renderDashboardPermissionsModal($dashboardPermissionTabs, $dashboardCargoOptions, $dashboardPermissionConfig, $dashboardFuncionarioCargoIds, $adminDuePopupCargoIds); ?>
       <?php endif; ?>
       <?php if ($canManagePublicPqrSettings): ?>
         <div id="scm-pqr-settings-modal" data-scm-lazy-settings="public-pqr" aria-hidden="true"></div>
@@ -1461,8 +1467,8 @@ trait RendersDashboard
     return (string) ob_get_clean();
   }
 
-  /** @param array<string,string> $tabs @param array<int,array<string,string>> $cargos @param array<string,array<int,string>> $permissions @param array<int,string> $employeeCargoIds */
-  private function renderDashboardPermissionsModal(array $tabs, array $cargos, array $permissions, array $employeeCargoIds): string
+  /** @param array<string,string> $tabs @param array<int,array<string,string>> $cargos @param array<string,array<int,string>> $permissions @param array<int,string> $employeeCargoIds @param array<int,string> $adminDuePopupCargoIds */
+  private function renderDashboardPermissionsModal(array $tabs, array $cargos, array $permissions, array $employeeCargoIds, array $adminDuePopupCargoIds): string
   {
     $activityPermissionKeys = [
       'cotizaciones_mantenimiento',
@@ -1480,6 +1486,13 @@ trait RendersDashboard
       $cargoId = trim((string) $cargoId);
       if ($cargoId !== '') {
         $selectedEmployeeCargoIds[$cargoId] = true;
+      }
+    }
+    $selectedAdminDuePopupCargoIds = [];
+    foreach ($adminDuePopupCargoIds as $cargoId) {
+      $cargoId = trim((string) $cargoId);
+      if ($cargoId !== '') {
+        $selectedAdminDuePopupCargoIds[$cargoId] = true;
       }
     }
     ob_start();
@@ -1544,6 +1557,23 @@ trait RendersDashboard
               <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); $isSelectedCargo = isset($selectedEmployeeCargoIds[$cargoId]); ?>
                 <label class="scm-permissions-check scm-funcionario-cargo-check<?php echo $isSelectedCargo ? ' is-checked' : ''; ?>">
                   <input type="checkbox" name="employee_cargo_ids[]" value="<?php echo esc_attr($cargoId); ?>" <?php checked($isSelectedCargo); ?>>
+                  <span><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?><?php if ($cargoTotal !== ''): ?> · <?php echo esc_html($cargoTotal); ?><?php endif; ?></span>
+                </label>
+              <?php endforeach; ?>
+            </div>
+          </section>
+          <section class="scm-permission-employee-cargos scm-permission-due-popup-cargos" aria-labelledby="scm-due-popup-cargos-title">
+            <div class="scm-permission-employee-cargos-head">
+              <div>
+                <h4 id="scm-due-popup-cargos-title">Popup de vencimientos administrativos</h4>
+                <p>El aviso se mostrar&aacute; al entrar al panel y al abrir Actividades administrativas solo para los cargos seleccionados.</p>
+              </div>
+              <small>Si no marcas ning&uacute;n cargo, el aviso no se mostrar&aacute; autom&aacute;ticamente.</small>
+            </div>
+            <div class="scm-permission-employee-cargos-grid">
+              <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); $isSelectedPopupCargo = isset($selectedAdminDuePopupCargoIds[$cargoId]); ?>
+                <label class="scm-permissions-check scm-due-popup-cargo-check<?php echo $isSelectedPopupCargo ? ' is-checked' : ''; ?>">
+                  <input type="checkbox" name="admin_due_popup_cargo_ids[]" value="<?php echo esc_attr($cargoId); ?>" <?php checked($isSelectedPopupCargo); ?>>
                   <span><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?><?php if ($cargoTotal !== ''): ?> · <?php echo esc_html($cargoTotal); ?><?php endif; ?></span>
                 </label>
               <?php endforeach; ?>
