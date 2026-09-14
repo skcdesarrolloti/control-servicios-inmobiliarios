@@ -770,6 +770,7 @@
       var calendarDueAllEvents = [];
       var calendarPendingRows = [];
       var calendarDueStats = null;
+      var calendarDueSettings = {};
       var popupAgendaRequestId = 0;
       var ticketCacheByEmployee = {};
       var holidayCache = {};
@@ -1345,6 +1346,7 @@
       }
 
       function applyDueSettings(settings) {
+        if (settings) calendarDueSettings = settings;
         if (!dueSettingsForm || !settings) return;
         Array.prototype.slice.call(dueSettingsForm.querySelectorAll("[data-scm-due-setting]")).forEach(function (input) {
           if (Object.prototype.hasOwnProperty.call(settings, input.name)) {
@@ -1428,6 +1430,74 @@
         renderCalendarGrid();
         renderSelectedDay();
         renderDueBreakdown(calendarEvents);
+      }
+
+      function dueSettingValue(settings, key, fallback) {
+        var value = Number(settings && settings[key] ? settings[key] : fallback);
+        return Number.isFinite(value) && value > 0 ? value : fallback;
+      }
+
+      function dueSettingsModalHtml(settings) {
+        settings = settings || {};
+        return '<form class="scm-calendar-due-settings-form scm-calendar-due-settings-form--modal" data-scm-calendar-due-settings-modal autocomplete="off">' +
+          '<label class="scm-field"><span>Cotizaciones sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_sin_enviar_dias", 3)) + '"><small>Días desde la creación.</small></label>' +
+          '<label class="scm-field"><span>Preventivas sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "preventivas_dias", 3)) + '"><small>Días desde que se crea la revisión preventiva.</small></label>' +
+          '<label class="scm-field"><span>Cotizaciones enviadas sin respuesta</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_enviadas_sin_respuesta_dias", 10)) + '"><small>Días desde el envío.</small></label>' +
+          "</form>";
+      }
+
+      function collectDueSettingsFromPopup(popup) {
+        var payload = {};
+        Array.prototype.slice.call((popup || document).querySelectorAll("[data-scm-due-setting]")).forEach(function (input) {
+          var value = Number(input.value || 0);
+          if (!Number.isFinite(value) || value <= 0) {
+            value = Number(input.getAttribute("value") || 1);
+          }
+          payload[input.name] = String(Math.max(1, Math.round(value)));
+        });
+        return payload;
+      }
+
+      function openDueSettingsModal() {
+        if (!window.Swal || !actionAdminDueSettingsSave) {
+          showToast("error", "La configuración de vencimientos no está disponible.");
+          return;
+        }
+        var settingsPromise = Object.keys(calendarDueSettings || {}).length
+          ? Promise.resolve({ settings: calendarDueSettings })
+          : dashboardAjax(actionAdminDueCalendar, monthRange(currentMonth));
+        settingsPromise.then(function (data) {
+          var settings = data.settings || calendarDueSettings || {};
+          window.Swal.fire({
+            title: "Días de vencimiento",
+            html: dueSettingsModalHtml(settings),
+            width: 980,
+            showCancelButton: true,
+            confirmButtonText: "Guardar configuración",
+            cancelButtonText: "Cerrar",
+            buttonsStyling: false,
+            customClass: {
+              popup: "scm-calendar-swal-popup scm-calendar-due-settings-swal",
+              confirmButton: "scm-btn-primary",
+              cancelButton: "scm-btn-secondary",
+            },
+            preConfirm: function () {
+              var popup = window.Swal.getPopup();
+              var payload = collectDueSettingsFromPopup(popup);
+              return dashboardAjax(actionAdminDueSettingsSave, payload).catch(function (err) {
+                window.Swal.showValidationMessage(err.message || "No se pudo guardar la configuración.");
+                return false;
+              });
+            },
+          }).then(function (result) {
+            if (!result.isConfirmed || !result.value) return;
+            applyDueSettings(result.value.settings || {});
+            showToast("success", result.value.message || "Configuración guardada.");
+            loadEvents();
+          });
+        }).catch(function (err) {
+          showToast("error", err.message || "No se pudo cargar la configuración.");
+        });
       }
 
       function renderDueCalendar(payload) {
@@ -3078,6 +3148,10 @@
           applyDueFilters();
         });
       }
+
+      panel.addEventListener("scm:open-due-settings", function () {
+        openDueSettingsModal();
+      });
 
       var reportBtn = panel.querySelector("[data-scm-calendar-open-report]");
       if (reportBtn) reportBtn.addEventListener("click", openCalendarReport);
@@ -13698,11 +13772,11 @@
         window.setTimeout(function () {
           var dueTab = root.querySelector('[data-calendar-section-target="scm-home-calendar-section-due"]');
           if (dueTab) dueTab.click();
-          var dueSettings = root.querySelector(".scm-calendar-due-settings-card");
-          if (dueSettings && dueSettings.scrollIntoView) {
-            dueSettings.scrollIntoView({ behavior: "smooth", block: "start" });
+          var duePanel = root.querySelector('#scm-home-calendar-section-due [data-scm-calendar-panel]');
+          if (duePanel) {
+            duePanel.dispatchEvent(new CustomEvent("scm:open-due-settings", { bubbles: false }));
           }
-        }, 80);
+        }, 180);
         return;
       }
 

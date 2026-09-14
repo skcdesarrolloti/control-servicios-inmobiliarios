@@ -1945,24 +1945,6 @@ trait RendersDashboard
       </section>
       <?php endif; ?>
 
-      <?php if ($view === 'pending' && $canConfigureDueCalendar): ?>
-        <section class="scm-calendar-card scm-calendar-due-settings-card">
-          <div class="scm-calendar-card-head">
-            <div>
-              <span class="scm-calendar-action-kicker">Configuraci&oacute;n</span>
-              <h4>D&iacute;as de vencimiento</h4>
-              <p>Define los plazos para agrupar cotizaciones y preventivas en el calendario.</p>
-            </div>
-            <button type="button" class="scm-case-work-btn" data-scm-calendar-refresh>Actualizar</button>
-          </div>
-          <form class="scm-calendar-due-settings-form" data-scm-calendar-due-settings autocomplete="off">
-            <label class="scm-field"><span>Cotizaciones sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="3"><small>D&iacute;as desde la creaci&oacute;n.</small></label>
-            <label class="scm-field"><span>Preventivas sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="3"><small>D&iacute;as desde que se crea la revisi&oacute;n preventiva.</small></label>
-            <label class="scm-field"><span>Cotizaciones enviadas sin respuesta</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="10"><small>D&iacute;as desde el env&iacute;o.</small></label>
-            <div class="scm-actions"><button class="scm-btn-primary btn btn-primary" type="submit">Guardar configuraci&oacute;n</button><span class="scm-spinner" data-scm-calendar-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span></div>
-          </form>
-        </section>
-      <?php endif; ?>
       <?php if ($view === 'pending'): ?>
         <section class="scm-calendar-card scm-calendar-due-filter-card">
           <div class="scm-calendar-card-head">
