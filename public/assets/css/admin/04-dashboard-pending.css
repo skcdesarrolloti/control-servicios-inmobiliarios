@@ -2187,7 +2187,9 @@
   text-align: center;
 }
 
-#scm-app .scm-calendar-due-breakdown-group ul {
+#scm-app .scm-calendar-due-breakdown-group ul,
+#scm-app .scm-calendar-due-breakdown-list,
+.scm-calendar-due-breakdown-list {
   display: grid;
   gap: 8px;
   list-style: none;
@@ -2195,32 +2197,47 @@
   padding: 0;
 }
 
-#scm-app .scm-calendar-due-breakdown-group li {
+#scm-app .scm-calendar-due-breakdown-group li,
+#scm-app .scm-calendar-due-breakdown-row,
+.scm-calendar-due-breakdown-row {
   align-items: center;
   background: #f8fafc;
   border: 1px solid #edf2f7;
   border-radius: 10px;
   display: grid;
   gap: 8px;
-  grid-template-columns: 92px minmax(0, 1fr) auto;
+  grid-template-columns: 96px minmax(0, 1fr) auto auto;
   padding: 8px 10px;
 }
 
 #scm-app .scm-calendar-due-breakdown-group li strong,
-#scm-app .scm-calendar-due-breakdown-group li em {
+#scm-app .scm-calendar-due-breakdown-group li em,
+#scm-app .scm-calendar-due-breakdown-row strong,
+#scm-app .scm-calendar-due-breakdown-row em,
+.scm-calendar-due-breakdown-row strong,
+.scm-calendar-due-breakdown-row em {
   color: #64748b;
   font-size: 11px;
   font-style: normal;
   font-weight: 900;
 }
 
-#scm-app .scm-calendar-due-breakdown-group li span {
+#scm-app .scm-calendar-due-breakdown-group li span,
+#scm-app .scm-calendar-due-breakdown-row span,
+.scm-calendar-due-breakdown-row span {
   color: #0f2742;
   font-size: 12px;
   font-weight: 850;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#scm-app .scm-calendar-due-breakdown-case,
+.scm-calendar-due-breakdown-case {
+  min-height: 30px;
+  padding: 6px 10px;
   white-space: nowrap;
 }
 
@@ -2245,6 +2262,16 @@
   #scm-app .scm-calendar-due-settings-form,
   .swal2-popup .scm-calendar-due-settings-form--modal {
     grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-calendar-due-breakdown-row,
+  .scm-calendar-due-breakdown-row {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-calendar-due-breakdown-case,
+  .scm-calendar-due-breakdown-case {
+    width: 100%;
   }
 }
 

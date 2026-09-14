@@ -1209,6 +1209,10 @@
           asunto: "asunto",
           estado: "estado",
           admin: "admin",
+          prioridad: "prioridad",
+          magnitud_caso: "magnitud-caso",
+          departamento: "departamento",
+          tema: "tema",
           contrato: "contrato",
           inmueble: "inmueble",
           id_inmueble_web: "id-inmueble-web",
@@ -1226,6 +1230,7 @@
           cot_estado: "cot-estado",
           id_revision_preventiva: "id-revision-preventiva",
           tab_key: "tab-key",
+          status_bucket: "status-bucket",
         };
         return Object.keys(map).map(function (key) {
           return ' data-' + map[key] + '="' + escHtml(String(caseData[key] || "")) + '"';
@@ -1416,10 +1421,18 @@
             return String(a.fecha_vencimiento || "").localeCompare(String(b.fecha_vencimiento || ""));
           });
           var items = groupRows.slice(0, 12).map(function (row) {
-            return '<li><strong>' + escHtml(row.fecha_vencimiento || "-") + '</strong><span>' + escHtml(row.titulo || "Vencimiento") + '</span><em>' + escHtml(row.estado || "Pendiente") + "</em></li>";
+            var caseData = row && row.case ? row.case : {};
+            var canOpen = String(caseData.case_source_html || "").trim() !== "";
+            return '<div class="scm-calendar-due-breakdown-row">' +
+              '<strong>' + escHtml(row.fecha_vencimiento || "-") + "</strong>" +
+              '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
+              '<em>' + escHtml(row.estado || "Pendiente") + "</em>" +
+              (canOpen ? '<button type="button" class="scm-case-work-btn scm-calendar-due-breakdown-case" data-scm-due-open-case' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : "") +
+              '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + String(caseData.case_source_html || "") + "</div>" +
+              "</div>";
           }).join("");
           var more = groupRows.length > 12 ? '<p class="scm-calendar-due-breakdown-more">+' + String(groupRows.length - 12) + " adicionales</p>" : "";
-          return '<article class="scm-calendar-due-breakdown-group"><header><span>' + escHtml(dueTypeLabel(type)) + '</span><strong>' + String(groupRows.length) + '</strong></header><ul>' + items + "</ul>" + more + "</article>";
+          return '<article class="scm-calendar-due-breakdown-group"><header><span>' + escHtml(dueTypeLabel(type)) + '</span><strong>' + String(groupRows.length) + '</strong></header><div class="scm-calendar-due-breakdown-list">' + items + "</div>" + more + "</article>";
         }).join("");
       }
 

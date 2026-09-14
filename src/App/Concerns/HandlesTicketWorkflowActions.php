@@ -942,6 +942,7 @@ trait HandlesTicketWorkflowActions
     $rows = $this->db->getResults(
       "SELECT * FROM `{$table}` ORDER BY COALESCE(NULLIF(`fecha`, 0), UNIX_TIMESTAMP(`cct_created`), `_ID`) DESC LIMIT 2000"
     );
+    $rows = $this->attach_cotizacion_orders(is_array($rows) ? $rows : []);
     $items = [];
     foreach ($rows as $row) {
       $estado = strtolower(trim((string) ($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
@@ -1118,29 +1119,56 @@ trait HandlesTicketWorkflowActions
     $ticketRow = $this->adminDueTicketByReference($ticketRef);
     $ticketPk = trim((string) ($ticketRow['_ID'] ?? $ticketRef));
     $ticketLabel = trim((string) ($ticketRow['id_ticket'] ?? $ticketRef));
+    $contractRef = $this->adminDueFirstText([$row, $ticketRow], ['id_contrato', 'id_contrato_arrendamiento', 'contrato']);
+    $contract = $this->adminDueContractByReference($contractRef);
     $createdTs = $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
     $estado = trim((string) ($row['estado'] ?? ''));
-    $inmueble = trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? ''));
+    $inmueble = $this->adminDueFirstText([$ticketRow, $row, $contract], ['inmueble', 'id_inmueble', 'codigo', 'codigo_inmueble']);
+    $contrato = $this->adminDueFirstText([$ticketRow, $row, $contract], ['contrato', 'id_contrato', 'id_contrato_arrendamiento', '_ID']);
+    $idInmuebleWeb = $this->adminDueFirstText([$ticketRow, $row, $contract], ['id_inmueble', 'inmueble', 'codigo', 'codigo_inmueble']);
+    $idInmuebleData = $this->adminDueFirstText([$ticketRow, $contract], ['id_inmueble_data', 'inmueble_data_id']);
+    $enrichedRow = array_merge($contract, $ticketRow, $row);
+    if ($ticketPk !== '') {
+      $enrichedRow['id_ticket'] = $ticketPk;
+    }
+    if ($contrato !== '') {
+      $enrichedRow['contrato'] = ltrim($contrato, '#');
+      $enrichedRow['id_contrato'] = $this->adminDueFirstText([$row, $ticketRow, $contract], ['id_contrato', '_ID', 'id_contrato_arrendamiento']);
+    }
+    if ($inmueble !== '') {
+      $enrichedRow['inmueble'] = $inmueble;
+    }
+    if ($idInmuebleWeb !== '') {
+      $enrichedRow['id_inmueble'] = $idInmuebleWeb;
+    }
     return [
       'ticket' => $ticketLabel !== '' ? $ticketLabel : ('Cot ' . ($id !== '' ? $id : '-')),
       'ticket_pk' => $ticketPk,
-      'asunto' => trim((string) ($row['asunto'] ?? $row['categoria_cotizacion'] ?? 'Cotización de mantenimiento')),
-      'estado' => trim((string) ($row['estado_ticket'] ?? $row['estado_caso'] ?? '-')) ?: '-',
-      'admin' => trim((string) ($row['estado_administrativo'] ?? $row['estado_administrativo_ticket'] ?? '-')) ?: '-',
-      'contrato' => trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? '')) !== '' ? '#' . trim((string) ($row['contrato'] ?? $row['id_contrato'])) : '-',
+      'asunto' => $this->adminDueFirstText([$ticketRow, $row], ['asunto', 'categoria_cotizacion', 'tipo_mantenimiento']) ?: 'Cotización de mantenimiento',
+      'estado' => $this->adminDueFirstText([$ticketRow, $row], ['estado', 'estado_ticket', 'estado_caso']) ?: '-',
+      'admin' => $this->adminDueFirstText([$ticketRow, $row], ['estado_administrativo', 'estado_administrativo_ticket']) ?: '-',
+      'prioridad' => $this->adminDueFirstText([$ticketRow, $row], ['prioridad']) ?: '-',
+      'magnitud_caso' => $this->adminDueFirstText([$ticketRow, $row], ['magnitud_caso']) ?: '-',
+      'departamento' => $this->adminDueFirstText([$ticketRow, $row], ['departamento']) ?: '-',
+      'tema' => $this->adminDueFirstText([$ticketRow, $row], ['tema_ayuda', 'tema']) ?: '-',
+      'contrato' => $contrato !== '' ? $this->adminDueHashLabel($contrato) : '-',
       'inmueble' => $inmueble !== '' ? $inmueble : '-',
-      'id_inmueble_web' => trim((string) ($row['id_inmueble'] ?? $inmueble)) ?: '-',
-      'barrio' => trim((string) ($row['barrio'] ?? '')) ?: '-',
-      'direccion' => trim((string) ($row['direccion'] ?? '')) ?: '-',
+      'id_inmueble_web' => $idInmuebleWeb !== '' ? $idInmuebleWeb : '-',
+      'id_inmueble_data' => $idInmuebleData,
+      'barrio' => $this->adminDueFirstText([$ticketRow, $row, $contract], ['barrio']) ?: '-',
+      'direccion' => $this->adminDueFirstText([$ticketRow, $row, $contract], ['direccion', 'direccion_fisica']) ?: '-',
       'creado' => $createdTs > 0 ? date('d/m/Y', $createdTs) : '-',
-      'empleado' => trim((string) ($row['coordinador'] ?? $row['creador'] ?? $row['id_empleado'] ?? '')) ?: '-',
-      'propietario' => trim((string) ($row['propietario'] ?? $row['nombre_propietario'] ?? '')),
-      'arrendatario' => trim((string) ($row['arrendatario'] ?? $row['nombre_arrendatario'] ?? '')),
+      'empleado' => $this->adminDueFirstText([$ticketRow, $row], ['nombre_empleado', 'empleado', 'coordinador', 'creador', 'id_empleado']) ?: '-',
+      'empleado_id' => $this->adminDueFirstText([$ticketRow, $row], ['id_empleado']),
+      'propietario' => $this->adminDueFirstText([$ticketRow, $row, $contract], ['propietario', 'nombre_propietario', 'nombre']),
+      'arrendatario' => $this->adminDueFirstText([$ticketRow, $row, $contract], ['arrendatario', 'nombre_arrendatario']),
+      'ticket_url' => $ticketPk !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticketPk) : '',
       'cotizacion_id' => $id,
       'cotizacion_url' => $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '',
       'cot_estado' => $estado !== '' ? $estado : ($sent ? 'Enviada sin respuesta' : 'Sin enviar'),
       'tab_key' => 'mantenimiento',
-      'case_source_html' => $this->adminDueQuoteCaseSourceHtml($row, $sent, $ticketPk !== '' ? (int) $ticketPk : 0),
+      'status_bucket' => $this->adminDueStatusBucket($ticketRow),
+      'case_source_html' => $this->adminDueQuoteCaseSourceHtml($enrichedRow, $sent, $ticketPk !== '' ? (int) $ticketPk : 0),
     ];
   }
 
@@ -1152,26 +1180,38 @@ trait HandlesTicketWorkflowActions
     $ticket = $this->adminDueTicketByReference($ticketRef);
     $ticketPk = trim((string) ($ticket['_ID'] ?? ''));
     $ticketLabel = trim((string) ($ticket['id_ticket'] ?? $ticketRef));
+    $contractRef = $this->adminDueFirstText([$row, $ticket], ['id_contrato', 'id_contrato_arrendamiento', 'contrato']);
+    $contract = $this->adminDueContractByReference($contractRef);
+    $contrato = $this->adminDueFirstText([$row, $ticket, $contract], ['contrato', 'id_contrato', 'id_contrato_arrendamiento', '_ID']);
+    $inmueble = $this->adminDueFirstText([$row, $ticket, $contract], ['inmueble', 'id_inmueble', 'codigo', 'codigo_inmueble']);
+    $idInmuebleWeb = $this->adminDueFirstText([$row, $ticket, $contract], ['id_inmueble', 'inmueble', 'codigo', 'codigo_inmueble']);
     $createdTs = $this->adminDueFirstTimestamp($row, ['cct_created', 'fecha']);
     return [
       'ticket' => $ticketLabel !== '' ? $ticketLabel : ('Rev ' . ($revisionId !== '' ? $revisionId : '-')),
       'ticket_pk' => $ticketPk !== '' ? $ticketPk : $ticketLabel,
-      'asunto' => 'Revisión preventiva sin enviar',
-      'estado' => trim((string) ($ticket['estado'] ?? $row['cct_status'] ?? '')) ?: '-',
-      'admin' => trim((string) ($ticket['estado_administrativo'] ?? '')) ?: '-',
-      'contrato' => trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? $ticket['contrato'] ?? $ticket['id_contrato'] ?? '')) !== '' ? '#' . trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? $ticket['contrato'] ?? $ticket['id_contrato'])) : '-',
-      'inmueble' => trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '')) ?: '-',
-      'id_inmueble_web' => trim((string) ($row['id_inmueble'] ?? '')) ?: '-',
-      'barrio' => trim((string) ($row['barrio'] ?? '')) ?: '-',
-      'direccion' => trim((string) ($row['direccion'] ?? '')) ?: '-',
+      'asunto' => $this->adminDueFirstText([$ticket, $row], ['asunto', 'tema_ayuda', 'tema']) ?: 'Revisión preventiva sin enviar',
+      'estado' => $this->adminDueFirstText([$ticket, $row], ['estado', 'cct_status']) ?: '-',
+      'admin' => $this->adminDueFirstText([$ticket], ['estado_administrativo']) ?: '-',
+      'prioridad' => $this->adminDueFirstText([$ticket, $row], ['prioridad']) ?: '-',
+      'magnitud_caso' => $this->adminDueFirstText([$ticket, $row], ['magnitud_caso']) ?: '-',
+      'departamento' => $this->adminDueFirstText([$ticket, $row], ['departamento']) ?: '-',
+      'tema' => $this->adminDueFirstText([$ticket, $row], ['tema_ayuda', 'tema']) ?: '-',
+      'contrato' => $contrato !== '' ? $this->adminDueHashLabel($contrato) : '-',
+      'inmueble' => $inmueble !== '' ? $inmueble : '-',
+      'id_inmueble_web' => $idInmuebleWeb !== '' ? $idInmuebleWeb : '-',
+      'id_inmueble_data' => $this->adminDueFirstText([$ticket, $contract], ['id_inmueble_data', 'inmueble_data_id']),
+      'barrio' => $this->adminDueFirstText([$ticket, $row, $contract], ['barrio']) ?: '-',
+      'direccion' => $this->adminDueFirstText([$ticket, $row, $contract], ['direccion', 'direccion_fisica']) ?: '-',
       'creado' => $createdTs > 0 ? date('d/m/Y', $createdTs) : '-',
-      'empleado' => trim((string) ($ticket['nombre_empleado'] ?? $ticket['empleado'] ?? $row['empleado'] ?? $row['id_empleado'] ?? '')) ?: '-',
-      'empleado_id' => trim((string) ($row['id_empleado'] ?? '')),
-      'propietario' => trim((string) ($row['propietario'] ?? '')),
-      'arrendatario' => trim((string) ($row['arrendatario'] ?? '')),
+      'empleado' => $this->adminDueFirstText([$ticket, $row], ['nombre_empleado', 'empleado', 'id_empleado']) ?: '-',
+      'empleado_id' => $this->adminDueFirstText([$ticket, $row], ['id_empleado']),
+      'propietario' => $this->adminDueFirstText([$ticket, $row, $contract], ['propietario', 'nombre_propietario', 'nombre']),
+      'arrendatario' => $this->adminDueFirstText([$ticket, $row, $contract], ['arrendatario', 'nombre_arrendatario']),
+      'ticket_url' => $ticketPk !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticketPk) : '',
       'id_revision_preventiva' => $revisionId,
       'tab_key' => 'preventiva',
-      'case_source_html' => $this->adminDuePreventivaCaseSourceHtml($row, $ticket),
+      'status_bucket' => $this->adminDueStatusBucket($ticket),
+      'case_source_html' => $this->adminDuePreventivaCaseSourceHtml($row, $ticket, $contract),
     ];
   }
 
@@ -1186,11 +1226,85 @@ trait HandlesTicketWorkflowActions
     if (!$this->table_exists($table)) {
       return [];
     }
-    $row = $this->db->getRow(
-      "SELECT * FROM `{$table}` WHERE `_ID` = ? OR TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 1",
-      [(int) $ticketRef, $ticketRef]
-    );
+    $where = ['`_ID` = ?'];
+    $args = [(int) $ticketRef];
+    foreach (['id_ticket', 'ticket_id', 'numero_ticket'] as $column) {
+      if ($this->column_exists($table, $column)) {
+        $where[] = "TRIM(COALESCE(`{$column}`, '')) = ?";
+        $args[] = $ticketRef;
+      }
+    }
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE " . implode(' OR ', $where) . " LIMIT 1", $args);
     return is_array($row) ? $row : [];
+  }
+
+  /** @return array<string,mixed> */
+  private function adminDueContractByReference(string $contractRef): array
+  {
+    $contractRef = trim(ltrim($contractRef, '#'));
+    if ($contractRef === '') {
+      return [];
+    }
+    static $cache = [];
+    if (array_key_exists($contractRef, $cache)) {
+      return $cache[$contractRef];
+    }
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    if (!$this->table_exists($table)) {
+      $cache[$contractRef] = [];
+      return [];
+    }
+    $where = ['`_ID` = ?'];
+    $args = [(int) $contractRef];
+    foreach (['contrato', 'id_contrato', 'id_contrato_arrendamiento'] as $column) {
+      if ($this->column_exists($table, $column)) {
+        $where[] = "TRIM(COALESCE(`{$column}`, '')) = ?";
+        $args[] = $contractRef;
+      }
+    }
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE " . implode(' OR ', $where) . " LIMIT 1", $args);
+    $cache[$contractRef] = is_array($row) ? $row : [];
+    return $cache[$contractRef];
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @param array<int,string> $columns */
+  private function adminDueFirstText(array $rows, array $columns): string
+  {
+    foreach ($rows as $row) {
+      if (!is_array($row)) {
+        continue;
+      }
+      foreach ($columns as $column) {
+        $value = trim((string) ($row[$column] ?? ''));
+        if ($value !== '') {
+          return $value;
+        }
+      }
+    }
+    return '';
+  }
+
+  private function adminDueHashLabel(string $value): string
+  {
+    $value = trim($value);
+    if ($value === '' || $value === '-') {
+      return '-';
+    }
+    return strpos($value, '#') === 0 ? $value : '#' . $value;
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function adminDueStatusBucket(array $ticket): string
+  {
+    $estado = strtolower(trim((string) ($ticket['estado'] ?? '')));
+    $admin = strtolower(trim((string) ($ticket['estado_administrativo'] ?? '')));
+    if (in_array($estado, ['cerrado', 'resuelto', 'finalizado'], true) || in_array($admin, ['cerrado', 'resuelto', 'finalizado'], true)) {
+      return 'cerrados';
+    }
+    if ($admin === 'postergado') {
+      return 'postergados';
+    }
+    return 'abiertos';
   }
 
   /** @param array<string,mixed> $row */
@@ -1204,18 +1318,32 @@ trait HandlesTicketWorkflowActions
     if ($ticketPk > 0) {
       $html .= '<div class="scm-seg-wrap">' . $this->render_seguimiento_form($ticketPk, Auth::isLoggedIn(), true) . '</div>';
     }
+    $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
     $html .= '<section class="scm-case-history"><h4>Detalle del vencimiento</h4><article class="scm-case-history-item"><div class="scm-case-history-detail">'
       . '<p><strong>Tipo:</strong> ' . esc_html($sent ? 'Cotización enviada sin respuesta' : 'Cotización sin enviar') . '</p>'
       . '<p><strong>Cotización:</strong> #' . esc_html($cotizacionId !== '' ? $cotizacionId : '-') . '</p>'
       . '<p><strong>Estado:</strong> ' . esc_html($estado) . '</p>'
+      . '<p><strong>Contrato:</strong> ' . esc_html((string) ($row['contrato'] ?? $row['id_contrato'] ?? '-')) . '</p>'
       . '<p><strong>Inmueble:</strong> ' . esc_html((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '-')) . '</p>'
       . '<p><strong>Dirección:</strong> ' . esc_html((string) ($row['direccion'] ?? '-')) . '</p>'
       . '</div></article></section>';
+    if ($cotizacionId !== '') {
+      $html .= '<section class="scm-case-history"><h4>Acciones de la cotizaci&oacute;n</h4><article class="scm-case-history-item"><div class="scm-case-work-action-list">'
+        . '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-native data-cotizacion-id="' . esc_attr($cotizacionId) . '">Ver cotizaci&oacute;n</button>'
+        . '<button type="button" class="scm-case-work-btn" data-scm-edit-cotizacion data-cotizacion-mode="edit" data-cotizacion-id="' . esc_attr($cotizacionId) . '" data-ticket-pk="' . esc_attr((string) $ticketPk) . '">Editar cotizaci&oacute;n</button>'
+        . '<button type="button" class="scm-case-work-btn" data-scm-view-case-cotizaciones data-ticket-pk="' . esc_attr((string) $ticketPk) . '" data-ticket="' . esc_attr((string) ($row['id_ticket'] ?? $ticketPk)) . '" data-cotizacion-id="' . esc_attr($cotizacionId) . '">Gestionar cotizaciones del caso</button>'
+        . (!empty($orders) ? '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-orders data-cotizacion-id="' . esc_attr($cotizacionId) . '">Ver &oacute;rdenes</button>' : '')
+        . ($sent ? '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr((string) $ticketPk) . '" data-ticket="' . esc_attr((string) ($row['id_ticket'] ?? $ticketPk)) . '" data-cotizacion-id="' . esc_attr($cotizacionId) . '">Responder cotizaci&oacute;n</button>' : '')
+        . '</div></article></section>';
+      $html .= '<div class="scm-calendar-due-cotizacion-source" style="display:none;" aria-hidden="true">'
+        . $this->render_cotizacion_mantenimiento_card($row, [])
+        . '</div>';
+    }
     return $html;
   }
 
-  /** @param array<string,mixed> $row @param array<string,mixed> $ticket */
-  private function adminDuePreventivaCaseSourceHtml(array $row, array $ticket): string
+  /** @param array<string,mixed> $row @param array<string,mixed> $ticket @param array<string,mixed> $contract */
+  private function adminDuePreventivaCaseSourceHtml(array $row, array $ticket, array $contract): string
   {
     $ticketPk = (int) ($ticket['_ID'] ?? 0);
     $revisionId = trim((string) ($row['_ID'] ?? ''));
@@ -1228,9 +1356,9 @@ trait HandlesTicketWorkflowActions
     $html .= '<section class="scm-case-history"><h4>Detalle de la revisión preventiva</h4><article class="scm-case-history-item"><div class="scm-case-history-detail">'
       . '<p><strong>Revisión preventiva:</strong> #' . esc_html($revisionId !== '' ? $revisionId : '-') . '</p>'
       . '<p><strong>Envío:</strong> Sin enviar</p>'
-      . '<p><strong>Contrato:</strong> ' . esc_html((string) ($row['contrato'] ?? $row['id_contrato'] ?? '-')) . '</p>'
-      . '<p><strong>Inmueble:</strong> ' . esc_html((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '-')) . '</p>'
-      . '<p><strong>Dirección:</strong> ' . esc_html((string) ($row['direccion'] ?? '-')) . '</p>'
+      . '<p><strong>Contrato:</strong> ' . esc_html($this->adminDueFirstText([$row, $ticket, $contract], ['contrato', 'id_contrato', '_ID']) ?: '-') . '</p>'
+      . '<p><strong>Inmueble:</strong> ' . esc_html($this->adminDueFirstText([$row, $ticket, $contract], ['inmueble', 'id_inmueble', 'codigo', 'codigo_inmueble']) ?: '-') . '</p>'
+      . '<p><strong>Dirección:</strong> ' . esc_html($this->adminDueFirstText([$row, $ticket, $contract], ['direccion', 'direccion_fisica']) ?: '-') . '</p>'
       . '</div></article></section>';
     return $html;
   }
