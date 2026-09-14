@@ -1012,7 +1012,7 @@ trait HandlesTicketWorkflowActions
         'due_ts' => (int) $dueTs,
         'calendar_ts' => $calendarTs,
         'days_limit' => $days,
-        'case' => $this->adminDueCaseDataFromQuote($row, $sent),
+        'case' => $this->adminDueLightCaseDataFromQuote($row, $sent),
       ]);
     }
     return $items;
@@ -1060,7 +1060,7 @@ trait HandlesTicketWorkflowActions
         'due_ts' => (int) $dueTs,
         'calendar_ts' => $calendarTs,
         'days_limit' => $days,
-        'case' => $this->adminDueCaseDataFromPreventivaRevision($row),
+        'case' => $this->adminDueLightCaseDataFromPreventivaRevision($row),
       ]);
     }
     return $items;
@@ -1134,6 +1134,73 @@ trait HandlesTicketWorkflowActions
     $todayTs = strtotime(date('Y-m-d 00:00:00')) ?: time();
     $fromDayTs = strtotime(date('Y-m-d 00:00:00', $fromTs)) ?: $fromTs;
     return max(0, (int) floor(($todayTs - $fromDayTs) / 86400));
+  }
+
+  /** @param array<string,mixed> $row @return array<string,string> */
+  private function adminDueLightCaseDataFromQuote(array $row, bool $sent): array
+  {
+    $id = trim((string) ($row['_ID'] ?? ''));
+    $ticketRef = trim((string) ($row['id_ticket'] ?? ''));
+    $contrato = trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? ''));
+    $inmueble = trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? ''));
+    $createdTs = $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
+    $estado = trim((string) ($row['estado'] ?? ''));
+    return [
+      'ticket' => $ticketRef !== '' ? $ticketRef : ('Cot ' . ($id !== '' ? $id : '-')),
+      'ticket_pk' => $ticketRef,
+      'asunto' => trim((string) ($row['asunto'] ?? $row['categoria_cotizacion'] ?? $row['tipo_mantenimiento'] ?? 'Cotización de mantenimiento')) ?: 'Cotización de mantenimiento',
+      'estado' => trim((string) ($row['estado_ticket'] ?? $row['estado_caso'] ?? '')) ?: '-',
+      'admin' => trim((string) ($row['estado_administrativo'] ?? $row['estado_administrativo_ticket'] ?? '')) ?: '-',
+      'contrato' => $contrato !== '' ? $this->adminDueHashLabel($contrato) : '-',
+      'inmueble' => $inmueble !== '' ? $inmueble : '-',
+      'id_inmueble_web' => trim((string) ($row['id_inmueble'] ?? $inmueble)) ?: '-',
+      'barrio' => trim((string) ($row['barrio'] ?? '')) ?: '-',
+      'direccion' => trim((string) ($row['direccion'] ?? '')) ?: '-',
+      'creado' => $createdTs > 0 ? date('d/m/Y', $createdTs) : '-',
+      'empleado' => trim((string) ($row['coordinador'] ?? $row['creador'] ?? $row['id_empleado'] ?? '')) ?: '-',
+      'cotizacion_id' => $id,
+      'cotizacion_url' => $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '',
+      'cot_estado' => $estado !== '' ? $estado : ($sent ? 'Enviada sin respuesta' : 'Sin enviar'),
+      'tab_key' => 'mantenimiento',
+      'status_bucket' => 'abiertos',
+      'case_source_html' => $this->adminDueLoadingCaseSourceHtml('Cargando detalle completo de la cotización #' . ($id !== '' ? $id : '-') . '.'),
+    ];
+  }
+
+  /** @param array<string,mixed> $row @return array<string,string> */
+  private function adminDueLightCaseDataFromPreventivaRevision(array $row): array
+  {
+    $revisionId = trim((string) ($row['_ID'] ?? ''));
+    $ticketRef = trim((string) ($row['id_ticket'] ?? $row['ticket_id'] ?? $row['numero_ticket'] ?? ''));
+    $contrato = trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? ''));
+    $inmueble = trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? ''));
+    $createdTs = $this->adminDueFirstTimestamp($row, ['cct_created', 'fecha']);
+    return [
+      'ticket' => $ticketRef !== '' ? $ticketRef : ('Rev ' . ($revisionId !== '' ? $revisionId : '-')),
+      'ticket_pk' => $ticketRef,
+      'asunto' => trim((string) ($row['asunto'] ?? $row['tema_ayuda'] ?? $row['tema'] ?? 'Revisión preventiva sin enviar')) ?: 'Revisión preventiva sin enviar',
+      'estado' => trim((string) ($row['cct_status'] ?? '')) ?: '-',
+      'admin' => '-',
+      'contrato' => $contrato !== '' ? $this->adminDueHashLabel($contrato) : '-',
+      'inmueble' => $inmueble !== '' ? $inmueble : '-',
+      'id_inmueble_web' => trim((string) ($row['id_inmueble'] ?? $inmueble)) ?: '-',
+      'barrio' => trim((string) ($row['barrio'] ?? '')) ?: '-',
+      'direccion' => trim((string) ($row['direccion'] ?? '')) ?: '-',
+      'creado' => $createdTs > 0 ? date('d/m/Y', $createdTs) : '-',
+      'empleado' => trim((string) ($row['empleado'] ?? $row['id_empleado'] ?? '')) ?: '-',
+      'empleado_id' => trim((string) ($row['id_empleado'] ?? '')),
+      'id_revision_preventiva' => $revisionId,
+      'tab_key' => 'preventiva',
+      'status_bucket' => 'abiertos',
+      'case_source_html' => $this->adminDueLoadingCaseSourceHtml('Cargando detalle completo de la revisión preventiva #' . ($revisionId !== '' ? $revisionId : '-') . '.'),
+    ];
+  }
+
+  private function adminDueLoadingCaseSourceHtml(string $message): string
+  {
+    return '<div class="scm-case-description"><strong>Detalle del vencimiento:</strong><div class="scm-case-description-content">'
+      . esc_html($message)
+      . '</div></div>';
   }
 
   /** @param array<int,array<string,mixed>> $items @return array<string,int> */
