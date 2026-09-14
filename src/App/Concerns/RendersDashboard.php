@@ -387,6 +387,7 @@ trait RendersDashboard
         'revision_servicios_publicos' => self::AJAX_REVISION_SERVICIOS_PUBLICOS,
         'reportes_administrativos_pendientes' => self::AJAX_REPORTES_ADMINISTRATIVOS_PENDIENTES,
         'admin_due_calendar' => self::AJAX_ADMIN_DUE_CALENDAR,
+        'admin_due_case' => self::AJAX_ADMIN_DUE_CASE,
         'admin_due_settings_save' => self::AJAX_ADMIN_DUE_SETTINGS_SAVE,
         'contratos_arrendamiento' => self::AJAX_CONTRATOS_ARRENDAMIENTO,
         'contrato_recibido' => self::AJAX_CONTRATO_RECIBIDO,

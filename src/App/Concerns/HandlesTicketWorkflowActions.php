@@ -830,6 +830,37 @@ trait HandlesTicketWorkflowActions
     ]);
   }
 
+  public function ajax_handler_admin_due_case(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('preventivas_pendientes')) {
+      $this->jsonFail('No tienes permiso para ver vencimientos administrativos.');
+    }
+
+    $type = sanitize_key((string) ($_POST['tipo_vencimiento'] ?? $_POST['due_type'] ?? ''));
+    $case = [];
+    if (strpos($type, 'cotizacion') === 0 && $this->canAccessDashboardTab('cotizaciones_mantenimiento')) {
+      $quoteId = (int) ($_POST['cotizacion_id'] ?? $_POST['id_cotizacion'] ?? 0);
+      $quote = $this->adminDueQuoteById($quoteId);
+      if (!empty($quote)) {
+        $sent = $this->adminDueIsTruthy($quote['se_envio'] ?? $quote['fue_enviada_cotizacion_mantenimiento'] ?? $quote['fue_enviada'] ?? '');
+        $case = $this->adminDueCaseDataFromQuote($quote, $sent, true);
+      }
+    }
+    if ($case === [] && $type === 'preventiva_sin_enviar' && $this->canAccessDashboardTab('preventivas_pendientes')) {
+      $revisionId = (int) ($_POST['id_revision_preventiva'] ?? $_POST['revision_id'] ?? 0);
+      $revision = $this->adminDuePreventivaRevisionById($revisionId);
+      if (!empty($revision)) {
+        $case = $this->adminDueCaseDataFromPreventivaRevision($revision, true);
+      }
+    }
+    if ($case === []) {
+      $this->jsonFail('No se pudo cargar el caso completo del vencimiento.');
+    }
+
+    $this->jsonOk(['case' => $case]);
+  }
+
   public function ajax_handler_admin_due_settings_save(): void
   {
     $this->verifyCsrf();
@@ -942,7 +973,6 @@ trait HandlesTicketWorkflowActions
     $rows = $this->db->getResults(
       "SELECT * FROM `{$table}` ORDER BY COALESCE(NULLIF(`fecha`, 0), UNIX_TIMESTAMP(`cct_created`), `_ID`) DESC LIMIT 2000"
     );
-    $rows = $this->attach_cotizacion_orders(is_array($rows) ? $rows : []);
     $items = [];
     foreach ($rows as $row) {
       $estado = strtolower(trim((string) ($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
@@ -1134,7 +1164,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $row @return array<string,string> */
-  private function adminDueCaseDataFromQuote(array $row, bool $sent): array
+  private function adminDueCaseDataFromQuote(array $row, bool $sent, bool $includeNativeCase = false): array
   {
     $id = trim((string) ($row['_ID'] ?? ''));
     $ticketRef = trim((string) ($row['id_ticket'] ?? ''));
@@ -1164,7 +1194,7 @@ trait HandlesTicketWorkflowActions
       $enrichedRow['id_inmueble'] = $idInmuebleWeb;
     }
     $statusBucket = $this->adminDueStatusBucket($ticketRow);
-    $nativeCase = $ticketPk !== '' ? $this->adminDueNativeTicketCasePayload((int) $ticketPk, $statusBucket) : [];
+    $nativeCase = $includeNativeCase && $ticketPk !== '' ? $this->adminDueNativeTicketCasePayload((int) $ticketPk, $statusBucket) : [];
     $case = [
       'ticket' => $ticketLabel !== '' ? $ticketLabel : ('Cot ' . ($id !== '' ? $id : '-')),
       'ticket_pk' => $ticketPk,
@@ -1192,7 +1222,7 @@ trait HandlesTicketWorkflowActions
       'cot_estado' => $estado !== '' ? $estado : ($sent ? 'Enviada sin respuesta' : 'Sin enviar'),
       'tab_key' => 'mantenimiento',
       'status_bucket' => $statusBucket,
-      'case_source_html' => $this->adminDueQuoteCaseSourceHtml($enrichedRow, $sent, $ticketPk !== '' ? (int) $ticketPk : 0),
+      'case_source_html' => $this->adminDueQuoteCaseSourceHtml($enrichedRow, $sent, $ticketPk !== '' ? (int) $ticketPk : 0, true, $includeNativeCase),
     ];
     if (!empty($nativeCase)) {
       foreach ($nativeCase as $key => $value) {
@@ -1204,7 +1234,7 @@ trait HandlesTicketWorkflowActions
           $case[$key] = $value;
         }
       }
-      $case['case_source_html'] = ($nativeCase['case_source_html'] ?? '') . $this->adminDueQuoteCaseSourceHtml($enrichedRow, $sent, $ticketPk !== '' ? (int) $ticketPk : 0, false);
+      $case['case_source_html'] = ($nativeCase['case_source_html'] ?? '') . $this->adminDueQuoteCaseSourceHtml($enrichedRow, $sent, $ticketPk !== '' ? (int) $ticketPk : 0, false, true);
       $case['cotizacion_id'] = $id;
       $case['cotizacion_url'] = $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '';
       $case['cot_estado'] = $estado !== '' ? $estado : ($sent ? 'Enviada sin respuesta' : 'Sin enviar');
@@ -1215,7 +1245,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $row @return array<string,string> */
-  private function adminDueCaseDataFromPreventivaRevision(array $row): array
+  private function adminDueCaseDataFromPreventivaRevision(array $row, bool $includeNativeCase = false): array
   {
     $revisionId = trim((string) ($row['_ID'] ?? ''));
     $ticketRef = trim((string) ($row['id_ticket'] ?? $row['ticket_id'] ?? $row['numero_ticket'] ?? ''));
@@ -1229,7 +1259,7 @@ trait HandlesTicketWorkflowActions
     $idInmuebleWeb = $this->adminDueFirstText([$row, $ticket, $contract], ['id_inmueble', 'inmueble', 'codigo', 'codigo_inmueble']);
     $createdTs = $this->adminDueFirstTimestamp($row, ['cct_created', 'fecha']);
     $statusBucket = $this->adminDueStatusBucket($ticket);
-    $nativeCase = $ticketPk !== '' ? $this->adminDueNativeTicketCasePayload((int) $ticketPk, $statusBucket) : [];
+    $nativeCase = $includeNativeCase && $ticketPk !== '' ? $this->adminDueNativeTicketCasePayload((int) $ticketPk, $statusBucket) : [];
     $case = [
       'ticket' => $ticketLabel !== '' ? $ticketLabel : ('Rev ' . ($revisionId !== '' ? $revisionId : '-')),
       'ticket_pk' => $ticketPk !== '' ? $ticketPk : $ticketLabel,
@@ -1292,6 +1322,38 @@ trait HandlesTicketWorkflowActions
       }
     }
     $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE " . implode(' OR ', $where) . " LIMIT 1", $args);
+    return is_array($row) ? $row : [];
+  }
+
+  /** @return array<string,mixed> */
+  private function adminDueQuoteById(int $quoteId): array
+  {
+    if ($quoteId <= 0) {
+      return [];
+    }
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$quoteId]);
+    if (!is_array($row)) {
+      return [];
+    }
+    $rows = $this->attach_cotizacion_orders([$row]);
+    return is_array($rows[0] ?? null) ? $rows[0] : $row;
+  }
+
+  /** @return array<string,mixed> */
+  private function adminDuePreventivaRevisionById(int $revisionId): array
+  {
+    if ($revisionId <= 0) {
+      return [];
+    }
+    $table = $this->db->table('jet_cct_revision_preventiva');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$revisionId]);
     return is_array($row) ? $row : [];
   }
 
@@ -1424,7 +1486,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $row */
-  private function adminDueQuoteCaseSourceHtml(array $row, bool $sent, int $ticketPk, bool $includeCaseShell = true): string
+  private function adminDueQuoteCaseSourceHtml(array $row, bool $sent, int $ticketPk, bool $includeCaseShell = true, bool $includeNativeQuoteSource = false): string
   {
     $cotizacionId = trim((string) ($row['_ID'] ?? ''));
     $estado = trim((string) ($row['estado'] ?? '')) ?: ($sent ? 'Enviada sin respuesta' : 'Sin enviar');
@@ -1454,9 +1516,11 @@ trait HandlesTicketWorkflowActions
         . (!empty($orders) ? '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-orders data-cotizacion-id="' . esc_attr($cotizacionId) . '">Ver &oacute;rdenes</button>' : '')
         . ($sent ? '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr((string) $ticketPk) . '" data-ticket="' . esc_attr((string) ($row['id_ticket'] ?? $ticketPk)) . '" data-cotizacion-id="' . esc_attr($cotizacionId) . '">Responder cotizaci&oacute;n</button>' : '')
         . '</div></article></section>';
-      $html .= '<div class="scm-calendar-due-cotizacion-source" style="display:none;" aria-hidden="true">'
-        . $this->render_cotizacion_mantenimiento_card($row, [])
-        . '</div>';
+      if ($includeNativeQuoteSource) {
+        $html .= '<div class="scm-calendar-due-cotizacion-source" style="display:none;" aria-hidden="true">'
+          . $this->render_cotizacion_mantenimiento_card($row, [])
+          . '</div>';
+      }
     }
     return $html;
   }

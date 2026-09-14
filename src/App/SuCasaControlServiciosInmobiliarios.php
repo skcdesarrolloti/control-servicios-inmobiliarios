@@ -54,6 +54,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_REVISION_SERVICIOS_PUBLICOS = 'scm_revision_servicios_publicos';
   const AJAX_REPORTES_ADMINISTRATIVOS_PENDIENTES = 'scm_reportes_administrativos_pendientes';
   const AJAX_ADMIN_DUE_CALENDAR = 'scm_admin_due_calendar';
+  const AJAX_ADMIN_DUE_CASE = 'scm_admin_due_case';
   const AJAX_ADMIN_DUE_SETTINGS_SAVE = 'scm_admin_due_settings_save';
   const AJAX_CONTRATOS_ARRENDAMIENTO = 'scm_contratos_arrendamiento';
   const AJAX_CONTRATO_RECIBIDO = 'scm_contrato_recibido';

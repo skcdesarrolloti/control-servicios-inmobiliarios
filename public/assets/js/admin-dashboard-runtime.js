@@ -162,6 +162,7 @@
       actions.contrato_ultima_preventiva || "";
     var actionPreventivasPendientes = actions.preventivas_pendientes || "";
     var actionAdminDueCalendar = actions.admin_due_calendar || "";
+    var actionAdminDueCase = actions.admin_due_case || "";
     var actionAdminDueSettingsSave = actions.admin_due_settings_save || "";
     var actionActasSatisfaccion = actions.actas_satisfaccion || "";
     var actionServiciosPublicosPendientes =
@@ -1204,7 +1205,14 @@
 
       function dueCaseAttrsHtml(caseData) {
         caseData = caseData || {};
-        var map = {
+        var map = dueCaseAttrMap();
+        return Object.keys(map).map(function (key) {
+          return ' data-' + map[key] + '="' + escHtml(String(caseData[key] || "")) + '"';
+        }).join("");
+      }
+
+      function dueCaseAttrMap() {
+        return {
           ticket: "ticket",
           ticket_pk: "ticket-pk",
           asunto: "asunto",
@@ -1252,9 +1260,49 @@
           tab_key: "tab-key",
           status_bucket: "status-bucket",
         };
-        return Object.keys(map).map(function (key) {
-          return ' data-' + map[key] + '="' + escHtml(String(caseData[key] || "")) + '"';
-        }).join("");
+      }
+
+      function applyDueCaseData(button, caseData) {
+        caseData = caseData || {};
+        var map = dueCaseAttrMap();
+        Object.keys(map).forEach(function (key) {
+          if (Object.prototype.hasOwnProperty.call(caseData, key)) {
+            button.setAttribute("data-" + map[key], String(caseData[key] || ""));
+          }
+        });
+        var sourceHtml = String(caseData.case_source_html || "").trim();
+        if (sourceHtml) {
+          var card = button.closest(".scm-ticket-card");
+          var source = card ? card.querySelector(".scm-case-source") : null;
+          if (source) source.innerHTML = sourceHtml;
+        }
+      }
+
+      function openDueCase(button) {
+        if (!button || typeof window.scmOpenCase !== "function") return;
+        if (button.getAttribute("data-scm-due-case-loaded") === "1" || !actionAdminDueCase) {
+          window.scmOpenCase(button);
+          return;
+        }
+        var oldText = button.textContent;
+        button.disabled = true;
+        button.textContent = "Cargando...";
+        dashboardAjax(actionAdminDueCase, {
+          tipo_vencimiento: button.getAttribute("data-due-type") || "",
+          cotizacion_id: button.getAttribute("data-cotizacion-id") || "",
+          id_revision_preventiva: button.getAttribute("data-id-revision-preventiva") || "",
+          ticket_pk: button.getAttribute("data-ticket-pk") || "",
+        }).then(function (data) {
+          applyDueCaseData(button, data.case || {});
+          button.setAttribute("data-scm-due-case-loaded", "1");
+          window.scmOpenCase(button);
+        }).catch(function (err) {
+          showToast("error", err.message || "No se pudo cargar el caso completo.");
+          window.scmOpenCase(button);
+        }).finally(function () {
+          button.disabled = false;
+          button.textContent = oldText || "Ver caso";
+        });
       }
 
       function dueEventCardHtml(row) {
@@ -1276,7 +1324,7 @@
           (Number(row.dias_vencido || 0) > 0 ? '<span>' + escHtml(String(row.dias_vencido)) + " dia(s) vencido</span>" : "") +
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
-          (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>') +
+          (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>') +
           '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div></div></article>";
       }
 
@@ -1447,7 +1495,7 @@
               '<strong>' + escHtml(row.fecha_vencimiento || "-") + "</strong>" +
               '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
               '<em>' + escHtml(row.estado || "Pendiente") + "</em>" +
-              (canOpen ? '<button type="button" class="scm-case-work-btn scm-calendar-due-breakdown-case" data-scm-due-open-case' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : "") +
+              (canOpen ? '<button type="button" class="scm-case-work-btn scm-calendar-due-breakdown-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : "") +
               '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + String(caseData.case_source_html || "") + "</div>" +
               "</div>";
           }).join("");
@@ -3261,7 +3309,7 @@
         var dueCaseBtn = e.target && e.target.closest ? e.target.closest("[data-scm-due-open-case]") : null;
         if (dueCaseBtn && panel.contains(dueCaseBtn) && typeof window.scmOpenCase === "function") {
           e.preventDefault();
-          window.scmOpenCase(dueCaseBtn);
+          openDueCase(dueCaseBtn);
           return;
         }
         var eventViewBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-view-event]") : null;
