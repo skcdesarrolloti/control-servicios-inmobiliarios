@@ -154,11 +154,11 @@ trait RendersDashboard
       'actas sin firmar' => 'scm-panel-actas-satisfaccion',
       'actas firmadas' => 'scm-panel-actas-satisfaccion',
       'scm-panel-actas-satisfaccion' => 'scm-panel-actas-satisfaccion',
-      'calendario_actividades' => 'scm-panel-calendario-actividades',
-      'calendario-actividades' => 'scm-panel-calendario-actividades',
-      'calendario' => 'scm-panel-calendario-actividades',
-      'agenda' => 'scm-panel-calendario-actividades',
-      'scm-panel-calendario-actividades' => 'scm-panel-calendario-actividades',
+      'calendario_actividades' => 'scm-panel-inicio',
+      'calendario-actividades' => 'scm-panel-inicio',
+      'calendario' => 'scm-panel-inicio',
+      'agenda' => 'scm-panel-inicio',
+      'scm-panel-calendario-actividades' => 'scm-panel-inicio',
       'notificaciones' => 'scm-panel-admin-notificaciones',
       'notificaciones-administrativas' => 'scm-panel-admin-notificaciones',
       'notificaciones_administrativas' => 'scm-panel-admin-notificaciones',
@@ -192,10 +192,6 @@ trait RendersDashboard
     ];
     $initialTab = $tabMap[$tabKey] ?? '';
     $administrativeActivityTabs = [
-      'calendario_actividades' => [
-        'panel' => 'scm-panel-calendario-actividades',
-        'label' => $dashboardPermissionTabs['calendario_actividades'] ?? 'Calendario',
-      ],
       'notificaciones' => [
         'panel' => 'scm-panel-admin-notificaciones',
         'label' => $dashboardPermissionTabs['notificaciones'] ?? 'Notificaciones',
@@ -269,6 +265,7 @@ trait RendersDashboard
         $allowedAdministrativeActivityTabs[] = $activityTabKey;
       }
     }
+    $canAccessAdministrativeCalendar = in_array('calendario_actividades', $dashboardAllowedTabs, true);
     $canAccessAdministrativeActivities = !empty($allowedAdministrativeActivityTabs);
 
     $dashboardPanelToTab = [
@@ -660,16 +657,43 @@ trait RendersDashboard
           </article>
         </div>
 
-        <?php if (in_array('calendario_actividades', $allowedAdministrativeActivityTabs, true)): ?>
-          <section class="scm-home-calendar" aria-labelledby="scm-home-calendar-title">
-            <?php echo $this->render_calendario_actividades_panel($config, [
-              'mode' => 'personal',
-              'variant' => 'home',
-              'title' => 'Mi calendario',
-              'title_id' => 'scm-home-calendar-title',
-              'description' => 'Tu agenda del mes se carga por defecto con el funcionario asociado a tu sesión.',
-              'show_report_action' => false,
-            ]); ?>
+        <?php if ($canAccessAdministrativeCalendar): ?>
+          <section class="scm-home-calendar" aria-labelledby="scm-home-calendar-title" data-calendar-sections>
+            <div class="scm-calendar-section-tabs" role="tablist" aria-label="Calendarios administrativos">
+              <button class="scm-status-topic-tab scm-calendar-section-tab active" type="button" data-calendar-section-target="scm-home-calendar-section-mine">Mi calendario</button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-team">Calendario equipo</button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-due">Vencimientos</button>
+            </div>
+            <div class="scm-calendar-section-panel active" id="scm-home-calendar-section-mine" data-calendar-section-panel>
+              <?php echo $this->render_calendario_actividades_panel($config, [
+                'mode' => 'personal',
+                'variant' => 'home',
+                'title' => 'Mi calendario',
+                'title_id' => 'scm-home-calendar-title',
+                'description' => 'Tu agenda del mes se carga por defecto con el funcionario asociado a tu sesión.',
+                'show_report_action' => false,
+              ]); ?>
+            </div>
+            <div class="scm-calendar-section-panel" id="scm-home-calendar-section-team" data-calendar-section-panel>
+              <?php echo $this->render_calendario_actividades_panel($config, [
+                'mode' => 'team',
+                'variant' => 'home',
+                'title' => 'Calendario del equipo',
+                'description' => 'Cambia el funcionario para revisar la disponibilidad y agenda de otras personas.',
+              ]); ?>
+            </div>
+            <div class="scm-calendar-section-panel" id="scm-home-calendar-section-due" data-calendar-section-panel>
+              <?php echo $this->render_calendario_actividades_panel($config, [
+                'mode' => 'due',
+                'view' => 'pending',
+                'variant' => 'home',
+                'title' => 'Vencimientos de actividades administrativas',
+                'description' => 'Eventos pendientes vencidos por funcionario, con acceso directo para revisar o marcar como realizado.',
+                'show_create_actions' => false,
+                'show_report_action' => false,
+                'show_pending_action' => false,
+              ]); ?>
+            </div>
           </section>
         <?php endif; ?>
 
@@ -1033,42 +1057,6 @@ trait RendersDashboard
               <button class="scm-status-topic-tab scm-admin-activity-tab<?php echo $initialAdministrativeActivityKey === $activityTabKey ? ' active' : ''; ?>" type="button" data-admin-activity-key="<?php echo esc_attr($activityTabKey); ?>" data-admin-activity-target="<?php echo esc_attr($activityPanelId); ?>"><?php echo esc_html((string)($activityDef['label'] ?? $activityTabKey)); ?></button>
             <?php endforeach; ?>
           </div>
-
-          <?php if (in_array('calendario_actividades', $allowedAdministrativeActivityTabs, true)): ?>
-            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'calendario_actividades' ? ' active' : ''; ?>" id="scm-panel-calendario-actividades" data-permission-tab="calendario_actividades" data-admin-activity-panel="calendario_actividades">
-              <div class="scm-calendar-section-tabs" role="tablist" aria-label="Calendarios administrativos">
-                <button class="scm-status-topic-tab scm-calendar-section-tab active" type="button" data-calendar-section-target="scm-calendar-section-mine">Mi calendario</button>
-                <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-calendar-section-team">Calendario equipo</button>
-                <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-calendar-section-due">Vencimientos</button>
-              </div>
-              <div class="scm-calendar-section-panel active" id="scm-calendar-section-mine" data-calendar-section-panel>
-                <?php echo $this->render_calendario_actividades_panel($config, [
-                  'mode' => 'personal',
-                  'title' => 'Mi calendario',
-                  'description' => 'Consulta y gestiona tu agenda administrativa sin cambiar de funcionario.',
-                  'show_report_action' => false,
-                ]); ?>
-              </div>
-              <div class="scm-calendar-section-panel" id="scm-calendar-section-team" data-calendar-section-panel>
-                <?php echo $this->render_calendario_actividades_panel($config, [
-                  'mode' => 'team',
-                  'title' => 'Calendario del equipo',
-                  'description' => 'Cambia el funcionario para revisar la disponibilidad y agenda de otras personas.',
-                ]); ?>
-              </div>
-              <div class="scm-calendar-section-panel" id="scm-calendar-section-due" data-calendar-section-panel>
-                <?php echo $this->render_calendario_actividades_panel($config, [
-                  'mode' => 'due',
-                  'view' => 'pending',
-                  'title' => 'Vencimientos de actividades administrativas',
-                  'description' => 'Eventos pendientes vencidos por funcionario, con acceso directo para revisar o marcar como realizado.',
-                  'show_create_actions' => false,
-                  'show_report_action' => false,
-                  'show_pending_action' => false,
-                ]); ?>
-              </div>
-            </div>
-          <?php endif; ?>
 
           <?php if (in_array('notificaciones', $allowedAdministrativeActivityTabs, true)): ?>
             <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'notificaciones' ? ' active' : ''; ?>" id="scm-panel-admin-notificaciones" data-permission-tab="notificaciones" data-admin-activity-panel="notificaciones" data-scm-loaded="0">

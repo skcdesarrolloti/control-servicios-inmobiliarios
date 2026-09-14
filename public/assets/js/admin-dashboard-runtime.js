@@ -7459,14 +7459,12 @@
       if (activeKey === "mant" && form) {
         return doFetch(new FormData(form));
       } else if (activeKey === "calendario_actividades") {
-        var calendarPanel = root.querySelector("#scm-panel-calendario-actividades");
-        initCalendarPanel(calendarPanel || root);
-        var visibleCalendarSection = calendarPanel
-          ? calendarPanel.querySelector(".scm-calendar-section-panel.active")
+        var homeCalendar = root.querySelector("#scm-panel-inicio [data-calendar-sections]");
+        var visibleCalendarSection = homeCalendar
+          ? homeCalendar.querySelector(".scm-calendar-section-panel.active")
           : null;
-        var calendarRefresh = (visibleCalendarSection || calendarPanel || root).querySelector(
-          "[data-scm-calendar-refresh]",
-        );
+        initCalendarPanel(visibleCalendarSection || homeCalendar || root);
+        var calendarRefresh = (visibleCalendarSection || homeCalendar || root).querySelector("[data-scm-calendar-refresh]");
         if (calendarRefresh) {
           calendarRefresh.click();
         }
@@ -9249,7 +9247,8 @@
       if (!panel) {
         return Promise.resolve();
       }
-      initCalendarPanel(panel);
+      var activeHomeCalendarSection = panel.querySelector("[data-calendar-sections] .scm-calendar-section-panel.active");
+      initCalendarPanel(activeHomeCalendarSection || panel);
       if (!ajaxUrl || !actionDashboardHome) {
         return Promise.resolve();
       }
@@ -13108,12 +13107,6 @@
         }
         if (
           activeAdministrativePanel &&
-          administrativeKey === "calendario_actividades"
-        ) {
-          initCalendarPanel(activeAdministrativePanel);
-        }
-        if (
-          activeAdministrativePanel &&
           administrativeKey === "notificaciones"
         ) {
           return loadAdminNotificationsPanel();
@@ -13170,7 +13163,7 @@
     root.querySelectorAll(".scm-calendar-section-tab").forEach(function (tab) {
       tab.addEventListener("click", function () {
         var target = tab.getAttribute("data-calendar-section-target") || "";
-        var parentPanel = tab.closest("#scm-panel-calendario-actividades");
+        var parentPanel = tab.closest("[data-calendar-sections]");
         if (!target || !parentPanel) {
           return;
         }
