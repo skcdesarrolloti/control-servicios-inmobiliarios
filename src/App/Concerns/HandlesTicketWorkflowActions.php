@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
+use SCM\Core\Settings;
 use SCM\Support\FuncionarioOptions;
 
 trait HandlesTicketWorkflowActions
@@ -806,6 +807,363 @@ trait HandlesTicketWorkflowActions
       'table_html' => $table,
       'count' => (string)($payload['count'] ?? 0),
     ]);
+  }
+
+  public function ajax_handler_admin_due_calendar(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('preventivas_pendientes')) {
+      $this->jsonFail('No tienes permiso para ver vencimientos administrativos.');
+    }
+
+    [$fromTs, $toTs] = $this->adminDueCalendarRange($_POST);
+    $settings = $this->adminDueCalendarSettings();
+    $items = $this->adminDueCalendarItems($settings, $fromTs, $toTs);
+    $stats = $this->adminDueCalendarStats($items);
+
+    $this->jsonOk([
+      'settings' => $settings,
+      'eventos' => $items,
+      'items' => $items,
+      'stats' => $stats,
+    ]);
+  }
+
+  public function ajax_handler_admin_due_settings_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('preventivas_pendientes')) {
+      $this->jsonFail('No tienes permiso para configurar vencimientos administrativos.');
+    }
+
+    $settings = [
+      'cotizaciones_sin_enviar_dias' => $this->adminDueDaysFromPost('cotizaciones_sin_enviar_dias', 3, 1, 120),
+      'preventivas_dias' => $this->adminDueDaysFromPost('preventivas_dias', 3, 1, 120),
+      'cotizaciones_enviadas_sin_respuesta_dias' => $this->adminDueDaysFromPost('cotizaciones_enviadas_sin_respuesta_dias', 10, 1, 180),
+    ];
+
+    try {
+      (new Settings($this->db))->set('admin_due_calendar_days', $settings, Auth::userId());
+    } catch (\Throwable $exception) {
+      error_log('[admin_due_settings_save] ' . $exception->getMessage());
+      $this->jsonFail('No se pudo guardar la configuración de vencimientos.');
+    }
+
+    $this->jsonOk([
+      'settings' => $settings,
+      'message' => 'Configuración guardada.',
+    ]);
+  }
+
+  /** @return array<string,int> */
+  private function adminDueCalendarSettings(): array
+  {
+    $defaults = [
+      'cotizaciones_sin_enviar_dias' => 3,
+      'preventivas_dias' => 3,
+      'cotizaciones_enviadas_sin_respuesta_dias' => 10,
+    ];
+
+    try {
+      $stored = (new Settings($this->db, true))->get('admin_due_calendar_days', []);
+    } catch (\Throwable $exception) {
+      error_log('[admin_due_settings_read] ' . $exception->getMessage());
+      $stored = [];
+    }
+    if (!is_array($stored)) {
+      return $defaults;
+    }
+
+    return [
+      'cotizaciones_sin_enviar_dias' => $this->adminDueClampDays($stored['cotizaciones_sin_enviar_dias'] ?? $defaults['cotizaciones_sin_enviar_dias'], 1, 120, $defaults['cotizaciones_sin_enviar_dias']),
+      'preventivas_dias' => $this->adminDueClampDays($stored['preventivas_dias'] ?? $defaults['preventivas_dias'], 1, 120, $defaults['preventivas_dias']),
+      'cotizaciones_enviadas_sin_respuesta_dias' => $this->adminDueClampDays($stored['cotizaciones_enviadas_sin_respuesta_dias'] ?? $defaults['cotizaciones_enviadas_sin_respuesta_dias'], 1, 180, $defaults['cotizaciones_enviadas_sin_respuesta_dias']),
+    ];
+  }
+
+  private function adminDueDaysFromPost(string $key, int $default, int $min, int $max): int
+  {
+    return $this->adminDueClampDays($_POST[$key] ?? $default, $min, $max, $default);
+  }
+
+  private function adminDueClampDays($value, int $min, int $max, int $default): int
+  {
+    $days = (int) sanitize_text_field(wp_unslash((string) $value));
+    if ($days < $min || $days > $max) {
+      return $default;
+    }
+    return $days;
+  }
+
+  /** @return array{0:int,1:int} */
+  private function adminDueCalendarRange(array $input): array
+  {
+    $from = trim(sanitize_text_field(wp_unslash((string) ($input['fecha_inicio'] ?? $input['from'] ?? ''))));
+    $to = trim(sanitize_text_field(wp_unslash((string) ($input['fecha_fin'] ?? $input['to'] ?? ''))));
+    $fromTs = $from !== '' ? strtotime($from . ' 00:00:00') : strtotime(date('Y-m-01 00:00:00'));
+    $toTs = $to !== '' ? strtotime($to . ' 23:59:59') : strtotime(date('Y-m-t 23:59:59'));
+    if ($fromTs === false || $toTs === false || $toTs < $fromTs) {
+      $fromTs = strtotime(date('Y-m-01 00:00:00')) ?: time();
+      $toTs = strtotime(date('Y-m-t 23:59:59')) ?: time();
+    }
+    return [(int) $fromTs, (int) $toTs];
+  }
+
+  /** @param array<string,int> $settings @return array<int,array<string,mixed>> */
+  private function adminDueCalendarItems(array $settings, int $fromTs, int $toTs): array
+  {
+    $items = [];
+    if ($this->canAccessDashboardTab('cotizaciones_mantenimiento')) {
+      $items = array_merge($items, $this->adminDueQuoteItems($settings, $fromTs, $toTs));
+    }
+    if ($this->canAccessDashboardTab('preventivas_pendientes')) {
+      $items = array_merge($items, $this->adminDuePreventivaItems($settings, $fromTs, $toTs));
+    }
+
+    usort($items, static function (array $a, array $b): int {
+      $date = strcmp((string) ($a['fecha_inicio'] ?? ''), (string) ($b['fecha_inicio'] ?? ''));
+      if ($date !== 0) {
+        return $date;
+      }
+      return strcmp((string) ($a['titulo'] ?? ''), (string) ($b['titulo'] ?? ''));
+    });
+    return $items;
+  }
+
+  /** @param array<string,int> $settings @return array<int,array<string,mixed>> */
+  private function adminDueQuoteItems(array $settings, int $fromTs, int $toTs): array
+  {
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+
+    $rows = $this->db->getResults(
+      "SELECT * FROM `{$table}` ORDER BY COALESCE(NULLIF(`fecha`, 0), UNIX_TIMESTAMP(`cct_created`), `_ID`) DESC LIMIT 2000"
+    );
+    $items = [];
+    foreach ($rows as $row) {
+      $estado = strtolower(trim((string) ($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
+      if (in_array($estado, ['aprobada', 'desaprobada', 'aprobado', 'desaprobado', 'aceptada', 'rechazada', 'cerrada', 'cerrado'], true)) {
+        continue;
+      }
+      if ($this->adminDueFirstTimestamp($row, ['fecha_respuesta_cotizacion_mantenimiento', 'fecha_respuesta']) > 0) {
+        continue;
+      }
+
+      $sent = $this->adminDueIsTruthy($row['se_envio'] ?? $row['fue_enviada_cotizacion_mantenimiento'] ?? $row['fue_enviada'] ?? '');
+      $days = $sent
+        ? (int) $settings['cotizaciones_enviadas_sin_respuesta_dias']
+        : (int) $settings['cotizaciones_sin_enviar_dias'];
+      $baseTs = $sent
+        ? $this->adminDueFirstTimestamp($row, ['fecha_envio_cotizacion_mantenimiento', 'fecha_envio', 'fecha_enviada', 'fecha_envio_correo', 'cct_modified', 'fecha', 'cct_created'])
+        : $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
+      if ($baseTs <= 0) {
+        continue;
+      }
+      $dueTs = strtotime('+' . $days . ' days', strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs);
+      if ($dueTs === false || $dueTs < $fromTs || $dueTs > $toTs) {
+        continue;
+      }
+
+      $items[] = $this->adminDueEvent([
+        'id' => 'cot-' . (string) ($row['_ID'] ?? '') . '-' . ($sent ? 'respuesta' : 'envio'),
+        'type' => $sent ? 'cotizacion_enviada_sin_respuesta' : 'cotizacion_sin_enviar',
+        'group' => $sent ? 'Cotizaciones enviadas sin respuesta' : 'Cotizaciones sin enviar',
+        'title' => 'Cotización #' . trim((string) ($row['_ID'] ?? '-')) . ($sent ? ' sin respuesta' : ' sin enviar'),
+        'description' => $sent
+          ? 'Han pasado ' . $this->adminDueElapsedDays($baseTs) . ' día(s) desde el envío.'
+          : 'Vence ' . $days . ' día(s) después de la creación.',
+        'color' => $sent ? '#dc2626' : '#f59e0b',
+        'base_ts' => $baseTs,
+        'due_ts' => (int) $dueTs,
+        'days_limit' => $days,
+        'case' => $this->adminDueCaseDataFromQuote($row, $sent),
+      ]);
+    }
+    return $items;
+  }
+
+  /** @param array<string,int> $settings @return array<int,array<string,mixed>> */
+  private function adminDuePreventivaItems(array $settings, int $fromTs, int $toTs): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+
+    $rows = $this->db->getResults(
+      "SELECT * FROM `{$table}` WHERE LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) LIKE '%preventiva%' ORDER BY `_ID` DESC LIMIT 2000"
+    );
+    $items = [];
+    $days = (int) $settings['preventivas_dias'];
+    foreach ($rows as $row) {
+      $estado = strtolower(trim((string) ($row['estado'] ?? '')));
+      if (in_array($estado, ['cerrado', 'cerrada', 'finalizado', 'finalizada'], true)) {
+        continue;
+      }
+      $baseTs = $this->adminDueFirstTimestamp($row, ['cct_created', 'fecha']);
+      if ($baseTs <= 0) {
+        continue;
+      }
+      $dueTs = strtotime('+' . $days . ' days', strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs);
+      if ($dueTs === false || $dueTs < $fromTs || $dueTs > $toTs) {
+        continue;
+      }
+
+      $ticketLabel = trim((string) ($row['id_ticket'] ?? $row['_ID'] ?? '-'));
+      $items[] = $this->adminDueEvent([
+        'id' => 'prev-' . trim((string) ($row['_ID'] ?? $ticketLabel)),
+        'type' => 'preventiva',
+        'group' => 'Preventivas',
+        'title' => 'Preventiva #' . $ticketLabel,
+        'description' => 'Vence ' . $days . ' día(s) después de crear el ticket preventivo.',
+        'color' => '#2563eb',
+        'base_ts' => $baseTs,
+        'due_ts' => (int) $dueTs,
+        'days_limit' => $days,
+        'case' => $this->adminDueCaseDataFromTicket($row, 'preventiva'),
+      ]);
+    }
+    return $items;
+  }
+
+  /** @param array<string,mixed> $data @return array<string,mixed> */
+  private function adminDueEvent(array $data): array
+  {
+    $baseTs = (int) ($data['base_ts'] ?? 0);
+    $dueTs = (int) ($data['due_ts'] ?? 0);
+    $todayTs = strtotime(date('Y-m-d 00:00:00')) ?: time();
+    $overdue = $dueTs < $todayTs;
+    $daysOverdue = $overdue ? max(0, (int) floor(($todayTs - $dueTs) / 86400)) : 0;
+
+    return [
+      'id' => (string) ($data['id'] ?? ''),
+      'titulo' => (string) ($data['title'] ?? 'Vencimiento'),
+      'descripcion' => (string) ($data['description'] ?? ''),
+      'grupo' => (string) ($data['group'] ?? ''),
+      'tipo_vencimiento' => (string) ($data['type'] ?? ''),
+      'estado' => $overdue ? 'Vencido' : 'Pendiente',
+      'color' => (string) ($data['color'] ?? '#f59e0b'),
+      'fecha_base' => $baseTs > 0 ? date('Y-m-d', $baseTs) : '',
+      'fecha_vencimiento' => $dueTs > 0 ? date('Y-m-d', $dueTs) : '',
+      'fecha_inicio' => $dueTs > 0 ? date('Y-m-d 08:00:00', $dueTs) : '',
+      'fecha_fin' => $dueTs > 0 ? date('Y-m-d 18:00:00', $dueTs) : '',
+      'dias_limite' => (int) ($data['days_limit'] ?? 0),
+      'dias_transcurridos' => $baseTs > 0 ? $this->adminDueElapsedDays($baseTs) : 0,
+      'dias_vencido' => $daysOverdue,
+      'case' => is_array($data['case'] ?? null) ? $data['case'] : [],
+    ];
+  }
+
+  /** @param array<string,mixed> $row @param array<int,string> $columns */
+  private function adminDueFirstTimestamp(array $row, array $columns): int
+  {
+    foreach ($columns as $column) {
+      $ts = $this->parse_unix_ts($row[$column] ?? null);
+      if ($ts > 0) {
+        return $ts;
+      }
+    }
+    return 0;
+  }
+
+  private function adminDueIsTruthy($value): bool
+  {
+    return in_array(strtolower(trim((string) $value)), ['si', 'sí', 'yes', '1', 'true', 'enviada', 'enviado'], true);
+  }
+
+  private function adminDueElapsedDays(int $fromTs): int
+  {
+    $todayTs = strtotime(date('Y-m-d 00:00:00')) ?: time();
+    $fromDayTs = strtotime(date('Y-m-d 00:00:00', $fromTs)) ?: $fromTs;
+    return max(0, (int) floor(($todayTs - $fromDayTs) / 86400));
+  }
+
+  /** @param array<int,array<string,mixed>> $items @return array<string,int> */
+  private function adminDueCalendarStats(array $items): array
+  {
+    $today = date('Y-m-d');
+    $stats = [
+      'total' => count($items),
+      'vencidos' => 0,
+      'hoy' => 0,
+      'cotizaciones_sin_enviar' => 0,
+      'cotizaciones_enviadas_sin_respuesta' => 0,
+      'preventivas' => 0,
+    ];
+    foreach ($items as $item) {
+      $type = (string) ($item['tipo_vencimiento'] ?? '');
+      if (array_key_exists($type, $stats)) {
+        $stats[$type]++;
+      }
+      if ((string) ($item['fecha_vencimiento'] ?? '') === $today) {
+        $stats['hoy']++;
+      }
+      if (strtolower((string) ($item['estado'] ?? '')) === 'vencido') {
+        $stats['vencidos']++;
+      }
+    }
+    return $stats;
+  }
+
+  /** @param array<string,mixed> $row @return array<string,string> */
+  private function adminDueCaseDataFromQuote(array $row, bool $sent): array
+  {
+    $id = trim((string) ($row['_ID'] ?? ''));
+    $ticket = trim((string) ($row['id_ticket'] ?? ''));
+    $createdTs = $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
+    $estado = trim((string) ($row['estado'] ?? ''));
+    $inmueble = trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? ''));
+    return [
+      'ticket' => $ticket !== '' ? $ticket : '-',
+      'ticket_pk' => $ticket,
+      'asunto' => trim((string) ($row['asunto'] ?? $row['categoria_cotizacion'] ?? 'Cotización de mantenimiento')),
+      'estado' => trim((string) ($row['estado_ticket'] ?? $row['estado_caso'] ?? '-')) ?: '-',
+      'admin' => trim((string) ($row['estado_administrativo'] ?? $row['estado_administrativo_ticket'] ?? '-')) ?: '-',
+      'contrato' => trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? '')) !== '' ? '#' . trim((string) ($row['contrato'] ?? $row['id_contrato'])) : '-',
+      'inmueble' => $inmueble !== '' ? $inmueble : '-',
+      'id_inmueble_web' => trim((string) ($row['id_inmueble'] ?? $inmueble)) ?: '-',
+      'barrio' => trim((string) ($row['barrio'] ?? '')) ?: '-',
+      'direccion' => trim((string) ($row['direccion'] ?? '')) ?: '-',
+      'creado' => $createdTs > 0 ? date('d/m/Y', $createdTs) : '-',
+      'empleado' => trim((string) ($row['coordinador'] ?? $row['creador'] ?? $row['id_empleado'] ?? '')) ?: '-',
+      'propietario' => trim((string) ($row['propietario'] ?? $row['nombre_propietario'] ?? '')),
+      'arrendatario' => trim((string) ($row['arrendatario'] ?? $row['nombre_arrendatario'] ?? '')),
+      'cotizacion_id' => $id,
+      'cotizacion_url' => $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '',
+      'cot_estado' => $estado !== '' ? $estado : ($sent ? 'Enviada sin respuesta' : 'Sin enviar'),
+      'tab_key' => 'mantenimiento',
+    ];
+  }
+
+  /** @param array<string,mixed> $row @return array<string,string> */
+  private function adminDueCaseDataFromTicket(array $row, string $tabKey): array
+  {
+    $ticketPk = trim((string) ($row['_ID'] ?? ''));
+    $ticketLabel = trim((string) ($row['id_ticket'] ?? $ticketPk));
+    $createdTs = $this->adminDueFirstTimestamp($row, ['cct_created', 'fecha']);
+    return [
+      'ticket' => $ticketLabel !== '' ? $ticketLabel : '-',
+      'ticket_pk' => $ticketPk !== '' ? $ticketPk : $ticketLabel,
+      'asunto' => trim((string) ($row['asunto'] ?? 'Revisión preventiva')),
+      'estado' => trim((string) ($row['estado'] ?? '')) ?: '-',
+      'admin' => trim((string) ($row['estado_administrativo'] ?? '')) ?: '-',
+      'contrato' => trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? '')) !== '' ? '#' . trim((string) ($row['contrato'] ?? $row['id_contrato'])) : '-',
+      'inmueble' => trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '')) ?: '-',
+      'id_inmueble_web' => trim((string) ($row['id_inmueble'] ?? '')) ?: '-',
+      'barrio' => trim((string) ($row['barrio'] ?? '')) ?: '-',
+      'direccion' => trim((string) ($row['direccion'] ?? '')) ?: '-',
+      'creado' => $createdTs > 0 ? date('d/m/Y', $createdTs) : '-',
+      'empleado' => trim((string) ($row['nombre_empleado'] ?? $row['empleado'] ?? $row['id_empleado'] ?? '')) ?: '-',
+      'empleado_id' => trim((string) ($row['id_empleado'] ?? '')),
+      'propietario' => trim((string) ($row['propietario'] ?? '')),
+      'arrendatario' => trim((string) ($row['arrendatario'] ?? '')),
+      'cotizacion_id' => trim((string) ($row['id_cotizacion_mantenimiento'] ?? '')),
+      'cotizacion_url' => trim((string) ($row['id_cotizacion_mantenimiento'] ?? '')) !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode(trim((string) ($row['id_cotizacion_mantenimiento'] ?? ''))) : '',
+      'cot_estado' => trim((string) ($row['estado_cotizacion_mantenimiento'] ?? '')),
+      'tab_key' => $tabKey,
+    ];
   }
 
   public function ajax_handler_contratos_arrendamiento(): void

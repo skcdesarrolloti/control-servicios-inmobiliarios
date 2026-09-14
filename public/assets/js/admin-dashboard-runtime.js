@@ -161,6 +161,8 @@
     var actionContratoUltimaPreventiva =
       actions.contrato_ultima_preventiva || "";
     var actionPreventivasPendientes = actions.preventivas_pendientes || "";
+    var actionAdminDueCalendar = actions.admin_due_calendar || "";
+    var actionAdminDueSettingsSave = actions.admin_due_settings_save || "";
     var actionActasSatisfaccion = actions.actas_satisfaccion || "";
     var actionServiciosPublicosPendientes =
       actions.servicios_publicos_pendientes || "";
@@ -732,9 +734,11 @@
       if (panelApiUrl) calendarApiUrl = panelApiUrl;
       var calendarMode = String(panel.getAttribute("data-calendar-mode") || "team").trim();
       var calendarView = String(panel.getAttribute("data-calendar-view") || "month").trim();
+      var isDueCalendar = calendarView === "pending";
       var lockCurrentEmployee = panel.getAttribute("data-calendar-lock-current") === "1" || calendarMode === "personal";
 
       var filterForm = panel.querySelector("[data-scm-calendar-filters]");
+      var dueSettingsForm = panel.querySelector("[data-scm-calendar-due-settings]");
       var eventsWrap = panel.querySelector("[data-scm-calendar-events]");
       var pendingInlineWrap = panel.querySelector("[data-scm-calendar-pending-inline]");
       var monthGrid = panel.querySelector("[data-scm-calendar-grid]");
@@ -762,6 +766,7 @@
       var selectedDay = toDateKey(new Date());
       var calendarEvents = [];
       var calendarPendingRows = [];
+      var calendarDueStats = null;
       var popupAgendaRequestId = 0;
       var ticketCacheByEmployee = {};
       var holidayCache = {};
@@ -787,6 +792,23 @@
         return fetch(calendarApiUrl + encodeURIComponent(action), options).then(function (r) {
           return r.json();
         });
+      }
+
+      function dashboardAjax(action, payload) {
+        var fd = new FormData();
+        fd.set("action", action || "");
+        fd.set("nonce", nonce);
+        Object.keys(payload || {}).forEach(function (key) {
+          fd.set(key, payload[key]);
+        });
+        return fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (response) { return response.json(); })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error((json && json.data && json.data.message) || "No se pudo completar la solicitud.");
+            }
+            return json.data || {};
+          });
       }
 
       function parseCalendarEmployees(raw) {
@@ -1156,6 +1178,14 @@
       }
 
       function renderKpis(rows) {
+        if (isDueCalendar && calendarDueStats) {
+          var dueTotal = Number(calendarDueStats.total || 0);
+          if (totalEl) totalEl.textContent = String(dueTotal);
+          if (pendingEl) pendingEl.textContent = String(dueTotal);
+          if (doneEl) doneEl.textContent = String(Number(calendarDueStats.vencidos || 0));
+          if (todayEl) todayEl.textContent = String(Number(calendarDueStats.hoy || 0));
+          return;
+        }
         var todayKey = toDateKey(new Date());
         var pending = rows.filter(function (row) { return String(row.estado || "").toLowerCase() !== "si"; }).length;
         var done = rows.filter(function (row) { return String(row.estado || "").toLowerCase() === "si"; }).length;
@@ -1166,7 +1196,62 @@
         if (todayEl) todayEl.textContent = String(todayCount || 0);
       }
 
+      function dueCaseAttrsHtml(caseData) {
+        caseData = caseData || {};
+        var map = {
+          ticket: "ticket",
+          ticket_pk: "ticket-pk",
+          asunto: "asunto",
+          estado: "estado",
+          admin: "admin",
+          contrato: "contrato",
+          inmueble: "inmueble",
+          id_inmueble_web: "id-inmueble-web",
+          id_inmueble_data: "id-inmueble-data",
+          barrio: "barrio",
+          direccion: "direccion",
+          creado: "creado",
+          empleado: "empleado",
+          empleado_id: "empleado-id",
+          propietario: "propietario",
+          arrendatario: "arrendatario",
+          ticket_url: "ticket-url",
+          cotizacion_id: "cotizacion-id",
+          cotizacion_url: "cotizacion-url",
+          cot_estado: "cot-estado",
+          tab_key: "tab-key",
+        };
+        return Object.keys(map).map(function (key) {
+          return ' data-' + map[key] + '="' + escHtml(String(caseData[key] || "")) + '"';
+        }).join("");
+      }
+
+      function dueEventCardHtml(row) {
+        var caseData = row && row.case ? row.case : {};
+        var canOpen = String(caseData.ticket_pk || "").trim() !== "";
+        var overdue = String(row.estado || "").toLowerCase() === "vencido";
+        var color = String(row.color || (overdue ? "#dc2626" : "#f59e0b")).trim();
+        return '<article class="scm-calendar-event-card scm-calendar-due-event-card">' +
+          '<div class="scm-calendar-event-color" style="background:' + escHtml(color) + '"></div>' +
+          '<div class="scm-calendar-event-main">' +
+          '<div class="scm-calendar-event-title-row"><h5>' + escHtml(row.titulo || "Vencimiento") + '</h5><span class="scm-calendar-event-state ' + (overdue ? "is-overdue" : "is-pending") + '">' + escHtml(row.estado || "Pendiente") + "</span></div>" +
+          '<div class="scm-calendar-event-description">' + escHtml(row.descripcion || "Control de vencimiento administrativo.") + "</div>" +
+          '<div class="scm-calendar-event-meta">' +
+          '<span>' + escHtml(row.grupo || "Vencimiento") + "</span>" +
+          '<span>Base: ' + escHtml(row.fecha_base || "-") + "</span>" +
+          '<span>Vence: ' + escHtml(row.fecha_vencimiento || "-") + "</span>" +
+          '<span>' + escHtml(String(row.dias_transcurridos || 0)) + " dia(s) transcurridos</span>" +
+          (Number(row.dias_vencido || 0) > 0 ? '<span>' + escHtml(String(row.dias_vencido)) + " dia(s) vencido</span>" : "") +
+          "</div>" +
+          '<div class="scm-calendar-event-actions">' +
+          (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>') +
+          "</div></div></article>";
+      }
+
       function eventCardHtml(row) {
+        if (isDueCalendar) {
+          return dueEventCardHtml(row);
+        }
         var id = String(row.id || "").trim();
         var ticket = String(row.id_ticket || "").trim();
         var isDone = String(row.estado || "").toLowerCase() === "si";
@@ -1195,9 +1280,9 @@
         var dayRows = calendarEvents.filter(function (row) { return eventDateKey(row) === selectedDay; });
         var holiday = holidayForDateKey(selectedDay);
         if (dayTitleEl) dayTitleEl.textContent = selectedDay || "Selecciona un dia";
-        if (daySubtitleEl) daySubtitleEl.textContent = (holiday ? "Festivo Colombia: " + holiday + ". " : "") + (dayRows.length ? dayRows.length + " evento(s) para este dia." : "Sin eventos para este dia.");
+        if (daySubtitleEl) daySubtitleEl.textContent = (holiday ? "Festivo Colombia: " + holiday + ". " : "") + (dayRows.length ? dayRows.length + (isDueCalendar ? " vencimiento(s) para este dia." : " evento(s) para este dia.") : (isDueCalendar ? "Sin vencimientos para este dia." : "Sin eventos para este dia."));
         if (!eventsWrap) return;
-        eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<div class="scm-empty scm-empty-cards">No hay eventos para este dia.</div>';
+        eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<div class="scm-empty scm-empty-cards">' + (isDueCalendar ? "No hay vencimientos para este dia." : "No hay eventos para este dia.") + "</div>";
       }
 
       function renderCalendarGrid() {
@@ -1227,7 +1312,7 @@
           html += '<button type="button" class="' + classes + '" data-scm-calendar-day="' + escHtml(key) + '">';
           html += '<span class="scm-calendar-day-number">' + String(cellDate.getDate()) + "</span>";
           if (holiday) html += '<span class="scm-calendar-day-holiday">Festivo · ' + escHtml(holiday) + "</span>";
-          html += '<span class="scm-calendar-day-events-count">' + (dayEvents.length ? dayEvents.length + " evento(s)" : "") + "</span>";
+          html += '<span class="scm-calendar-day-events-count">' + (dayEvents.length ? dayEvents.length + (isDueCalendar ? " venc." : " evento(s)") : "") + "</span>";
           dayEvents.slice(0, 3).forEach(function (row) {
             html += '<span class="scm-calendar-day-pill" style="border-color:' + escHtml(row.color || "#f59e0b") + '">' + escHtml(row.titulo || "Evento") + "</span>";
           });
@@ -1246,15 +1331,59 @@
 
       function renderEvents(payload) {
         calendarEvents = filterRowsByAllowedEmployees(extractRows(payload));
+        calendarDueStats = null;
         renderKpis(calendarEvents);
         updateFilterCategories(calendarEvents);
         renderCalendarGrid();
         renderSelectedDay();
       }
 
+      function applyDueSettings(settings) {
+        if (!dueSettingsForm || !settings) return;
+        Array.prototype.slice.call(dueSettingsForm.querySelectorAll("[data-scm-due-setting]")).forEach(function (input) {
+          if (Object.prototype.hasOwnProperty.call(settings, input.name)) {
+            input.value = String(settings[input.name] || input.value || "");
+          }
+        });
+      }
+
+      function renderDueCalendar(payload) {
+        payload = payload || {};
+        calendarEvents = extractRows(payload.eventos || payload.items || payload);
+        calendarDueStats = payload.stats || null;
+        applyDueSettings(payload.settings || {});
+        renderKpis(calendarEvents);
+        renderCalendarGrid();
+        renderSelectedDay();
+      }
+
+      function loadDueCalendar() {
+        if (!actionAdminDueCalendar) {
+          if (monthGrid) monthGrid.innerHTML = '<div class="scm-calendar-loading">La consulta de vencimientos no está disponible.</div>';
+          return Promise.resolve();
+        }
+        if (spinner) spinner.classList.add("active");
+        var range = monthRange(currentMonth);
+        return dashboardAjax(actionAdminDueCalendar, { fecha_inicio: range.from, fecha_fin: range.to })
+          .then(function (data) {
+            renderDueCalendar(data || {});
+          })
+          .catch(function (err) {
+            calendarEvents = [];
+            calendarDueStats = null;
+            renderKpis(calendarEvents);
+            if (monthGrid) monthGrid.innerHTML = '<div class="scm-calendar-loading">No se pudieron cargar los vencimientos.</div>';
+            if (eventsWrap) eventsWrap.innerHTML = '<div class="scm-empty scm-empty-cards">No se pudieron cargar vencimientos administrativos.</div>';
+            showToast("error", err.message || "No se pudieron cargar vencimientos.");
+          })
+          .finally(function () {
+            if (spinner) spinner.classList.remove("active");
+          });
+      }
+
       function loadEvents() {
-        if (calendarView === "pending") {
-          return loadPendingInline();
+        if (isDueCalendar) {
+          return loadDueCalendar();
         }
         if (spinner) spinner.classList.add("active");
         enforceLockedEmployeeFilter();
@@ -2794,19 +2923,23 @@
         });
       }
 
-      calendarBootstrapPromise = Promise.all([loadFuncionariosFallback(), calendarApi("listar_categorias")]).then(function (results) {
-        var funcionarios = Array.isArray(results[0]) ? results[0] : [];
-        categories = results[1] && results[1].success && Array.isArray(results[1].data) ? results[1].data : [];
-        categoriesById = {};
-        categories.forEach(function (row) {
-          var id = String(row.id || row._ID || row.id_categoria || "").trim();
-          if (id) categoriesById[id] = row;
-        });
-        applyCalendarEmployeeOptions(funcionarios, currentCalendarEmployeeId);
-        fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), calendarAdminCategories(), "Todas");
-      }).catch(function (err) {
-        showToast("error", (err && err.message) || "No se pudieron cargar los funcionarios del calendario.");
-      }).finally(loadEvents);
+      if (isDueCalendar) {
+        loadEvents();
+      } else {
+        calendarBootstrapPromise = Promise.all([loadFuncionariosFallback(), calendarApi("listar_categorias")]).then(function (results) {
+          var funcionarios = Array.isArray(results[0]) ? results[0] : [];
+          categories = results[1] && results[1].success && Array.isArray(results[1].data) ? results[1].data : [];
+          categoriesById = {};
+          categories.forEach(function (row) {
+            var id = String(row.id || row._ID || row.id_categoria || "").trim();
+            if (id) categoriesById[id] = row;
+          });
+          applyCalendarEmployeeOptions(funcionarios, currentCalendarEmployeeId);
+          fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), calendarAdminCategories(), "Todas");
+        }).catch(function (err) {
+          showToast("error", (err && err.message) || "No se pudieron cargar los funcionarios del calendario.");
+        }).finally(loadEvents);
+      }
 
       if (filterForm) {
         filterForm.addEventListener("submit", function (e) {
@@ -2829,6 +2962,33 @@
       var refreshBtn = panel.querySelector("[data-scm-calendar-refresh]");
       if (refreshBtn) refreshBtn.addEventListener("click", loadEvents);
 
+      if (dueSettingsForm) {
+        dueSettingsForm.addEventListener("submit", function (e) {
+          e.preventDefault();
+          if (!actionAdminDueSettingsSave) {
+            showToast("error", "La configuración de vencimientos no está disponible.");
+            return;
+          }
+          var payload = {};
+          Array.prototype.slice.call(dueSettingsForm.querySelectorAll("[data-scm-due-setting]")).forEach(function (input) {
+            payload[input.name] = input.value;
+          });
+          if (spinner) spinner.classList.add("active");
+          dashboardAjax(actionAdminDueSettingsSave, payload)
+            .then(function (data) {
+              applyDueSettings(data.settings || {});
+              showToast("success", data.message || "Configuración guardada.");
+              loadEvents();
+            })
+            .catch(function (err) {
+              showToast("error", err.message || "No se pudo guardar la configuración.");
+            })
+            .finally(function () {
+              if (spinner) spinner.classList.remove("active");
+            });
+        });
+      }
+
       var reportBtn = panel.querySelector("[data-scm-calendar-open-report]");
       if (reportBtn) reportBtn.addEventListener("click", openCalendarReport);
       var pendingEventsBtn = panel.querySelector("[data-scm-calendar-open-pending]");
@@ -2845,6 +3005,12 @@
       });
 
       panel.addEventListener("click", function (e) {
+        var dueCaseBtn = e.target && e.target.closest ? e.target.closest("[data-scm-due-open-case]") : null;
+        if (dueCaseBtn && panel.contains(dueCaseBtn) && typeof window.scmOpenCase === "function") {
+          e.preventDefault();
+          window.scmOpenCase(dueCaseBtn);
+          return;
+        }
         var eventViewBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-view-event]") : null;
         if (eventViewBtn && panel.contains(eventViewBtn)) {
           e.preventDefault();

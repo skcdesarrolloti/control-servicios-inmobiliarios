@@ -51,6 +51,8 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_SERVICIOS_PUBLICOS_PENDIENTES => 'ajax_handler_servicios_publicos_pendientes',
       SuCasaControlServiciosInmobiliarios::AJAX_REVISION_SERVICIOS_PUBLICOS => 'ajax_handler_revision_servicios_publicos',
       SuCasaControlServiciosInmobiliarios::AJAX_REPORTES_ADMINISTRATIVOS_PENDIENTES => 'ajax_handler_reportes_administrativos_pendientes',
+      SuCasaControlServiciosInmobiliarios::AJAX_ADMIN_DUE_CALENDAR => 'ajax_handler_admin_due_calendar',
+      SuCasaControlServiciosInmobiliarios::AJAX_ADMIN_DUE_SETTINGS_SAVE => 'ajax_handler_admin_due_settings_save',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRATOS_ARRENDAMIENTO => 'ajax_handler_contratos_arrendamiento',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRATO_RECIBIDO => 'ajax_handler_contrato_recibido',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRATO_ULTIMA_PREVENTIVA => 'ajax_handler_contrato_ultima_preventiva',

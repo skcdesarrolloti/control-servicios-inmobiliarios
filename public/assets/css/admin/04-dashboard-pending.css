@@ -2018,6 +2018,72 @@
   color: #334155;
 }
 
+#scm-app .scm-calendar-due-settings-card {
+  border-top: 3px solid #f59e0b;
+}
+
+#scm-app .scm-calendar-due-settings-form {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(180px, 1fr)) auto;
+}
+
+#scm-app .scm-calendar-due-settings-form .scm-field {
+  display: grid;
+  gap: 6px;
+}
+
+#scm-app .scm-calendar-due-settings-form .scm-field span {
+  color: #425875;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-calendar-due-settings-form .scm-field small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+#scm-app .scm-calendar-due-layout .scm-calendar-day-card {
+  min-width: min(100%, 420px);
+}
+
+#scm-app .scm-calendar-due-event-card {
+  border-left: 0;
+}
+
+#scm-app .scm-calendar-due-event-card .scm-calendar-event-state.is-overdue {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+#scm-app .scm-calendar-due-event-card .scm-calendar-event-state.is-pending {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+#scm-app .scm-calendar-due-event-card .scm-calendar-event-meta span {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+
+@media (max-width: 1100px) {
+  #scm-app .scm-calendar-due-settings-form {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  #scm-app .scm-calendar-due-settings-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 .swal2-container .swal2-popup.scm-calendar-swal-popup {
   border-radius: 20px !important;
   box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28) !important;

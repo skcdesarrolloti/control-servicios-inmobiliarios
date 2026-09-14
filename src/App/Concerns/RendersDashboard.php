@@ -386,6 +386,8 @@ trait RendersDashboard
         'servicios_publicos_pendientes' => self::AJAX_SERVICIOS_PUBLICOS_PENDIENTES,
         'revision_servicios_publicos' => self::AJAX_REVISION_SERVICIOS_PUBLICOS,
         'reportes_administrativos_pendientes' => self::AJAX_REPORTES_ADMINISTRATIVOS_PENDIENTES,
+        'admin_due_calendar' => self::AJAX_ADMIN_DUE_CALENDAR,
+        'admin_due_settings_save' => self::AJAX_ADMIN_DUE_SETTINGS_SAVE,
         'contratos_arrendamiento' => self::AJAX_CONTRATOS_ARRENDAMIENTO,
         'contrato_recibido' => self::AJAX_CONTRATO_RECIBIDO,
         'contrato_ultima_preventiva' => self::AJAX_CONTRATO_ULTIMA_PREVENTIVA,
@@ -1918,11 +1920,12 @@ trait RendersDashboard
       </div>
 
       <div class="scm-calendar-kpis">
-        <div class="scm-kpi"><div class="scm-kpi-label">Pendientes</div><div class="scm-kpi-value" data-scm-calendar-pending>0</div></div>
-        <div class="scm-kpi"><div class="scm-kpi-label">Realizados</div><div class="scm-kpi-value" data-scm-calendar-done>0</div></div>
-        <div class="scm-kpi"><div class="scm-kpi-label">Hoy</div><div class="scm-kpi-value" data-scm-calendar-today>0</div></div>
+        <div class="scm-kpi"><div class="scm-kpi-label"><?php echo $view === 'pending' ? 'Total vencimientos' : 'Pendientes'; ?></div><div class="scm-kpi-value" data-scm-calendar-pending>0</div></div>
+        <div class="scm-kpi"><div class="scm-kpi-label"><?php echo $view === 'pending' ? 'Vencidos' : 'Realizados'; ?></div><div class="scm-kpi-value" data-scm-calendar-done>0</div></div>
+        <div class="scm-kpi"><div class="scm-kpi-label"><?php echo $view === 'pending' ? 'Vencen hoy' : 'Hoy'; ?></div><div class="scm-kpi-value" data-scm-calendar-today>0</div></div>
       </div>
 
+      <?php if ($view !== 'pending'): ?>
       <section class="scm-calendar-card scm-calendar-filter-card">
         <form class="scm-calendar-filter-form" data-scm-calendar-filters autocomplete="off">
           <div class="scm-grid">
@@ -1937,29 +1940,33 @@ trait RendersDashboard
           </div>
         </form>
       </section>
+      <?php endif; ?>
 
       <?php if ($view === 'pending'): ?>
-        <section class="scm-calendar-card scm-calendar-pending-inline-card">
+        <section class="scm-calendar-card scm-calendar-due-settings-card">
           <div class="scm-calendar-card-head">
             <div>
-              <span class="scm-calendar-action-kicker">Vencimientos</span>
-              <h4>Actividades administrativas vencidas</h4>
-              <p>Selecciona un funcionario para consultar eventos pendientes cuya fecha ya pas&oacute;.</p>
+              <span class="scm-calendar-action-kicker">Configuraci&oacute;n</span>
+              <h4>D&iacute;as de vencimiento</h4>
+              <p>Define los plazos para agrupar cotizaciones y preventivas en el calendario.</p>
             </div>
             <button type="button" class="scm-case-work-btn" data-scm-calendar-refresh>Actualizar</button>
           </div>
-          <div class="scm-calendar-pending-inline" data-scm-calendar-pending-inline>
-            <div class="scm-calendar-loading">Selecciona un funcionario para ver vencimientos.</div>
-          </div>
+          <form class="scm-calendar-due-settings-form" data-scm-calendar-due-settings autocomplete="off">
+            <label class="scm-field"><span>Cotizaciones sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="3"><small>D&iacute;as desde la creaci&oacute;n.</small></label>
+            <label class="scm-field"><span>Preventivas</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="3"><small>D&iacute;as desde la creaci&oacute;n del ticket.</small></label>
+            <label class="scm-field"><span>Cotizaciones enviadas sin respuesta</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="10"><small>D&iacute;as desde el env&iacute;o.</small></label>
+            <div class="scm-actions"><button class="scm-btn-primary btn btn-primary" type="submit">Guardar configuraci&oacute;n</button><span class="scm-spinner" data-scm-calendar-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span></div>
+          </form>
         </section>
-      <?php else: ?>
-      <div class="scm-calendar-layout">
+      <?php endif; ?>
+      <div class="scm-calendar-layout<?php echo $view === 'pending' ? ' scm-calendar-due-layout' : ''; ?>">
         <section class="scm-calendar-card scm-calendar-board-card">
           <div class="scm-calendar-card-head">
             <div>
               <span class="scm-calendar-action-kicker">Vista mensual</span>
               <h4 data-scm-calendar-title>Calendario</h4>
-              <p>Haz clic en un d&iacute;a para ver sus eventos o crear uno nuevo.</p>
+              <p><?php echo $view === 'pending' ? 'Haz clic en un d&iacute;a para revisar los casos con vencimiento agrupado.' : 'Haz clic en un d&iacute;a para ver sus eventos o crear uno nuevo.'; ?></p>
             </div>
             <div class="scm-calendar-month-actions">
               <button type="button" class="scm-case-work-btn" data-scm-calendar-prev aria-label="Mes anterior">&lsaquo;</button>
@@ -1978,15 +1985,16 @@ trait RendersDashboard
             <div>
               <span class="scm-calendar-action-kicker">Agenda del d&iacute;a</span>
               <h4 data-scm-calendar-day-title>Selecciona un d&iacute;a</h4>
-              <p data-scm-calendar-day-subtitle>Los eventos se muestran seg&uacute;n funcionario, estado y categor&iacute;a.</p>
+              <p data-scm-calendar-day-subtitle><?php echo $view === 'pending' ? 'Los vencimientos se agrupan por tipo de control.' : 'Los eventos se muestran seg&uacute;n funcionario, estado y categor&iacute;a.'; ?></p>
             </div>
             <button type="button" class="scm-case-work-btn" data-scm-calendar-refresh>Actualizar</button>
           </div>
           <div class="scm-calendar-events" data-scm-calendar-events><div class="scm-empty scm-empty-cards">Selecciona un d&iacute;a del calendario.</div></div>
-          <button type="button" class="scm-btn-primary btn btn-primary scm-calendar-day-create" data-scm-calendar-open-create data-calendar-mode="single">Crear evento para este d&iacute;a</button>
+          <?php if ($view !== 'pending'): ?>
+            <button type="button" class="scm-btn-primary btn btn-primary scm-calendar-day-create" data-scm-calendar-open-create data-calendar-mode="single">Crear evento para este d&iacute;a</button>
+          <?php endif; ?>
         </section>
       </div>
-      <?php endif; ?>
     </div>
 <?php
     return (string) ob_get_clean();
