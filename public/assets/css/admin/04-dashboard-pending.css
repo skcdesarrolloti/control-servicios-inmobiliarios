@@ -2359,7 +2359,7 @@
   border-radius: 10px;
   display: grid;
   gap: 10px;
-  grid-template-columns: 96px minmax(0, 1fr) auto;
+  grid-template-columns: 96px minmax(0, 1fr) auto auto;
   padding: 9px 10px;
 }
 
@@ -2378,6 +2378,12 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swal2-popup .scm-due-entry-case-btn {
+  min-height: 32px;
+  padding: 7px 12px;
   white-space: nowrap;
 }
 

@@ -419,6 +419,162 @@
       return stats;
     }
 
+    function dashboardDueCaseAttrMap() {
+      return {
+        ticket: "ticket",
+        ticket_pk: "ticket-pk",
+        asunto: "asunto",
+        estado: "estado",
+        admin: "admin",
+        prioridad: "prioridad",
+        magnitud_caso: "magnitud-caso",
+        perturbacion: "perturbacion",
+        justificacion_perturbacion: "justificacion-perturbacion",
+        valor_bonificacion: "valor-bonificacion",
+        area_afectada: "area-afectada",
+        resumen_calculo_perturbacion: "resumen-calculo-perturbacion",
+        departamento: "departamento",
+        tema: "tema",
+        contrato: "contrato",
+        inmueble: "inmueble",
+        id_inmueble_web: "id-inmueble-web",
+        id_inmueble_data: "id-inmueble-data",
+        barrio: "barrio",
+        direccion: "direccion",
+        creado: "creado",
+        empleado: "empleado",
+        empleado_id: "empleado-id",
+        propietario: "propietario",
+        correo_propietario: "correo-propietario",
+        celular_propietario: "celular-propietario",
+        indicativo_propietario: "indicativo-propietario",
+        arrendatario: "arrendatario",
+        correo_arrendatario: "correo-arrendatario",
+        celular_arrendatario: "celular-arrendatario",
+        indicativo_arrendatario: "indicativo-arrendatario",
+        ticket_url: "ticket-url",
+        cotizacion_id: "cotizacion-id",
+        cotizacion_url: "cotizacion-url",
+        cotizacion_order_url: "cotizacion-order-url",
+        cotizacion_acta_url: "cotizacion-acta-url",
+        cot_estado: "cot-estado",
+        id_revision_correctiva: "id-revision-correctiva",
+        id_revision_preventiva: "id-revision-preventiva",
+        prev_encontro_danos: "prev-encontro-danos",
+        preventiva_no_access_count: "preventiva-no-access-count",
+        ejecucion: "ejecucion",
+        sin_actualizar: "sin-actualizar",
+        origen: "origen",
+        tab_key: "tab-key",
+        status_bucket: "status-bucket",
+      };
+    }
+
+    function dashboardDueCaseAttrsHtml(caseData) {
+      caseData = caseData || {};
+      var map = dashboardDueCaseAttrMap();
+      return Object.keys(map).map(function (key) {
+        return ' data-' + map[key] + '="' + escHtml(String(caseData[key] || "")) + '"';
+      }).join("");
+    }
+
+    function dashboardApplyDueCaseData(button, caseData) {
+      caseData = caseData || {};
+      var map = dashboardDueCaseAttrMap();
+      Object.keys(map).forEach(function (key) {
+        if (Object.prototype.hasOwnProperty.call(caseData, key)) {
+          button.setAttribute("data-" + map[key], String(caseData[key] || ""));
+        }
+      });
+      var sourceHtml = String(caseData.case_source_html || "").trim();
+      if (sourceHtml) {
+        var card = button.closest(".scm-ticket-card");
+        var source = card ? card.querySelector(".scm-case-source") : null;
+        if (source) source.innerHTML = sourceHtml;
+      }
+    }
+
+    function openDashboardRelatedTickets() {
+      var openTicketsTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-abiertos"]');
+      if (openTicketsTab) {
+        openTicketsTab.click();
+        openTicketsTab.focus({ preventScroll: true });
+      }
+      return new Promise(function (resolve) {
+        window.setTimeout(resolve, 180);
+      });
+    }
+
+    function dashboardDueCaseSourceHtml(button) {
+      var card = button && button.closest ? button.closest(".scm-ticket-card") : null;
+      var source = card ? card.querySelector(".scm-case-source") : null;
+      return source ? String(source.innerHTML || "").trim() : "";
+    }
+
+    function openDashboardDueCaseFromButton(button, sourceHtml) {
+      if (!button || typeof window.scmOpenCase !== "function") return;
+      sourceHtml = String(sourceHtml || dashboardDueCaseSourceHtml(button)).trim();
+      if (!sourceHtml) {
+        showToast("error", "No se encontró el detalle del caso.");
+        return;
+      }
+      var proxyCard = document.createElement("article");
+      proxyCard.className = "scm-ticket-card";
+      proxyCard.hidden = true;
+      var proxyButton = document.createElement("button");
+      proxyButton.type = "button";
+      proxyButton.className = "scm-btn-case";
+      Array.prototype.slice.call(button.attributes).forEach(function (attr) {
+        if (attr && attr.name && attr.name.indexOf("data-") === 0) {
+          proxyButton.setAttribute(attr.name, attr.value);
+        }
+      });
+      var proxySource = document.createElement("div");
+      proxySource.className = "scm-case-source";
+      proxySource.innerHTML = sourceHtml;
+      proxyCard.appendChild(proxyButton);
+      proxyCard.appendChild(proxySource);
+      root.appendChild(proxyCard);
+      window.scmOpenCase(proxyButton);
+      window.setTimeout(function () {
+        proxyCard.remove();
+      }, 500);
+    }
+
+    function dashboardOpenDueCase(button) {
+      if (!button || typeof window.scmOpenCase !== "function") return;
+      if (button.getAttribute("data-scm-due-case-loaded") === "1" || !actionAdminDueCase) {
+        var loadedSourceHtml = dashboardDueCaseSourceHtml(button);
+        if (window.Swal) window.Swal.close();
+        openDashboardRelatedTickets().then(function () {
+          openDashboardDueCaseFromButton(button, loadedSourceHtml);
+        });
+        return;
+      }
+      var oldText = button.textContent;
+      button.disabled = true;
+      button.textContent = "Cargando...";
+      dashboardAction(actionAdminDueCase, {
+        tipo_vencimiento: button.getAttribute("data-due-type") || "",
+        cotizacion_id: button.getAttribute("data-cotizacion-id") || "",
+        id_revision_preventiva: button.getAttribute("data-id-revision-preventiva") || "",
+        ticket_pk: button.getAttribute("data-ticket-pk") || "",
+      }).then(function (data) {
+        dashboardApplyDueCaseData(button, data.case || {});
+        button.setAttribute("data-scm-due-case-loaded", "1");
+        var loadedSourceHtml = dashboardDueCaseSourceHtml(button);
+        if (window.Swal) window.Swal.close();
+        openDashboardRelatedTickets().then(function () {
+          openDashboardDueCaseFromButton(button, loadedSourceHtml);
+        });
+      }).catch(function (error) {
+        showToast("error", error.message || "No se pudo cargar el caso completo.");
+      }).finally(function () {
+        button.disabled = false;
+        button.textContent = oldText || "Ver caso";
+      });
+    }
+
     function dashboardDueEntryPopupHtml(rows) {
       rows = Array.isArray(rows) ? rows.slice() : [];
       rows.sort(function (a, b) {
@@ -437,10 +593,14 @@
         return '<div><span>' + escHtml(dashboardDueTypeLabel(type)) + '</span><strong>' + escHtml(String(groups[type])) + '</strong></div>';
       }).join("");
       var detailRows = rows.slice(0, 18).map(function (row) {
-        return '<div class="scm-due-entry-row">' +
+        var caseData = row && row.case ? row.case : {};
+        var sourceHtml = String(caseData.case_source_html || "").trim();
+        return '<div class="scm-due-entry-row scm-ticket-card">' +
           '<strong>' + escHtml(row.fecha_vencimiento || "-") + "</strong>" +
           '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
           '<em>' + escHtml(row.estado || "Pendiente") + (Number(row.dias_vencido || 0) > 0 ? " · " + escHtml(String(row.dias_vencido)) + " día(s)" : "") + "</em>" +
+          (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" disabled>Sin caso</button>') +
+          '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div>" +
           "</div>";
       }).join("");
       var more = rows.length > 18 ? '<p class="scm-due-entry-more">+' + escHtml(String(rows.length - 18)) + " vencimiento(s) adicionales en el calendario.</p>" : "";
@@ -502,7 +662,7 @@
             html: dashboardDueEntryPopupHtml(rows),
             width: "min(980px, 94vw)",
             showCancelButton: true,
-            confirmButtonText: "Ver vencimientos",
+            confirmButtonText: "Ir a tickets abiertos",
             cancelButtonText: "Cerrar",
             buttonsStyling: false,
             customClass: {
@@ -510,9 +670,21 @@
               confirmButton: "scm-btn-primary",
               cancelButton: "scm-btn-secondary",
             },
+            didOpen: function () {
+              var popup = window.Swal.getPopup();
+              if (!popup) return;
+              popup.addEventListener("click", function (event) {
+                var caseBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-dashboard-due-open-case]")
+                  : null;
+                if (!caseBtn || !popup.contains(caseBtn)) return;
+                event.preventDefault();
+                dashboardOpenDueCase(caseBtn);
+              });
+            },
           }).then(function (result) {
             if (result && result.isConfirmed) {
-              openDashboardDueCalendar();
+              openDashboardRelatedTickets();
             }
           });
         })
