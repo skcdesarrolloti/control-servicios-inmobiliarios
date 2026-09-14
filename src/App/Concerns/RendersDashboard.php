@@ -634,29 +634,6 @@ trait RendersDashboard
           <button type="button" data-scm-home-retry hidden>Reintentar</button>
         </div>
 
-        <div class="scm-home-kpis" aria-label="Indicadores principales">
-          <article class="scm-home-kpi scm-home-kpi-total">
-            <span class="scm-home-kpi-icon"><i class="fas fa-layer-group" aria-hidden="true"></i></span>
-            <div><span>Total de casos</span><strong data-scm-home-metric="total">&mdash;</strong></div>
-          </article>
-          <article class="scm-home-kpi scm-home-kpi-open">
-            <span class="scm-home-kpi-icon"><i class="fas fa-folder-open" aria-hidden="true"></i></span>
-            <div><span>Abiertos</span><strong data-scm-home-metric="abiertos">&mdash;</strong></div>
-          </article>
-          <article class="scm-home-kpi scm-home-kpi-overdue">
-            <span class="scm-home-kpi-icon"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></span>
-            <div><span>SLA vencido</span><strong data-scm-home-metric="sla_vencido">&mdash;</strong></div>
-          </article>
-          <article class="scm-home-kpi scm-home-kpi-risk">
-            <span class="scm-home-kpi-icon"><i class="fas fa-clock" aria-hidden="true"></i></span>
-            <div><span>En riesgo</span><strong data-scm-home-metric="sla_riesgo">&mdash;</strong></div>
-          </article>
-          <article class="scm-home-kpi scm-home-kpi-closed">
-            <span class="scm-home-kpi-icon"><i class="fas fa-circle-check" aria-hidden="true"></i></span>
-            <div><span>Cerrados</span><strong data-scm-home-metric="cerrados">&mdash;</strong></div>
-          </article>
-        </div>
-
         <?php if ($canAccessAdministrativeCalendar): ?>
           <section class="scm-home-calendar" aria-labelledby="scm-home-calendar-title" data-calendar-sections>
             <div class="scm-calendar-section-tabs" role="tablist" aria-label="Calendarios administrativos">
@@ -1886,7 +1863,6 @@ trait RendersDashboard
     $allowedCargos = is_array($config['calendar_allowed_cargos'] ?? null) ? $config['calendar_allowed_cargos'] : FuncionarioOptions::panelCargoIds();
     $currentCalendarEmployeeId = trim((string) ($config['calendar_current_employee_id'] ?? ''));
     $allowedFuncionariosJson = json_encode($allowedFuncionarios, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
-    $todayLabel = date('Y-m-d');
     $mode = in_array((string) ($options['mode'] ?? 'team'), ['personal', 'team', 'due'], true) ? (string) $options['mode'] : 'team';
     $view = (string) ($options['view'] ?? 'month');
     $variant = trim((string) ($options['variant'] ?? ''));
@@ -1945,7 +1921,6 @@ trait RendersDashboard
         <div class="scm-kpi"><div class="scm-kpi-label">Pendientes</div><div class="scm-kpi-value" data-scm-calendar-pending>0</div></div>
         <div class="scm-kpi"><div class="scm-kpi-label">Realizados</div><div class="scm-kpi-value" data-scm-calendar-done>0</div></div>
         <div class="scm-kpi"><div class="scm-kpi-label">Hoy</div><div class="scm-kpi-value" data-scm-calendar-today>0</div></div>
-        <div class="scm-kpi"><div class="scm-kpi-label">Mes visible</div><div class="scm-kpi-value scm-calendar-range-value" data-scm-calendar-range><?php echo esc_html($todayLabel); ?></div></div>
       </div>
 
       <section class="scm-calendar-card scm-calendar-filter-card">

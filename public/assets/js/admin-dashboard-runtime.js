@@ -746,7 +746,6 @@
       var pendingEl = panel.querySelector("[data-scm-calendar-pending]");
       var doneEl = panel.querySelector("[data-scm-calendar-done]");
       var todayEl = panel.querySelector("[data-scm-calendar-today]");
-      var rangeEl = panel.querySelector("[data-scm-calendar-range]");
       var allowedCargos = String(panel.getAttribute("data-calendar-allowed-cargos") || "").split(",").map(function (v) { return v.trim(); }).filter(Boolean);
       var allowedEmployees = parseCalendarEmployees(panel.getAttribute("data-calendar-employees-json") || "[]");
       var currentCalendarEmployeeId = String(panel.getAttribute("data-calendar-current-employee-id") || "").trim();
@@ -1164,10 +1163,6 @@
         if (pendingEl) pendingEl.textContent = String(pending || 0);
         if (doneEl) doneEl.textContent = String(done || 0);
         if (todayEl) todayEl.textContent = String(todayCount || 0);
-        if (rangeEl) {
-          var range = monthRange(currentMonth);
-          rangeEl.textContent = range.from + " / " + range.to;
-        }
       }
 
       function eventCardHtml(row) {
@@ -9247,15 +9242,20 @@
       if (!panel) {
         return Promise.resolve();
       }
-      var activeHomeCalendarSection = panel.querySelector("[data-calendar-sections] .scm-calendar-section-panel.active");
-      initCalendarPanel(activeHomeCalendarSection || panel);
+      var initHomeCalendar = function () {
+        var activeHomeCalendarSection = panel.querySelector("[data-calendar-sections] .scm-calendar-section-panel.active");
+        initCalendarPanel(activeHomeCalendarSection || panel);
+      };
+      var calendarReady = loadDashboardFilterOptions().then(initHomeCalendar);
       if (!ajaxUrl || !actionDashboardHome) {
-        return Promise.resolve();
+        return calendarReady;
       }
       if (panel.getAttribute("data-scm-loaded") === "1") {
-        return Promise.resolve();
+        return calendarReady;
       }
-      if (dashboardHomePromise) return dashboardHomePromise;
+      if (dashboardHomePromise) {
+        return Promise.all([calendarReady, dashboardHomePromise]).then(function () {});
+      }
 
       panel.setAttribute("aria-busy", "true");
       showDashboardHomeMessage("Cargando el resumen…", false);
@@ -9297,7 +9297,7 @@
         .finally(function () {
           panel.removeAttribute("aria-busy");
         });
-      return dashboardHomePromise;
+      return Promise.all([calendarReady, dashboardHomePromise]).then(function () {});
     }
 
     function loadDashboardMetrics() {

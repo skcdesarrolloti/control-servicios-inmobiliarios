@@ -3099,13 +3099,6 @@ body.scm-modal-open {
   font-weight: 800;
 }
 
-#scm-app .scm-home-kpis {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
 #scm-app .scm-home-calendar {
   margin-bottom: 18px;
 }
@@ -3125,56 +3118,6 @@ body.scm-modal-open {
 #scm-app .scm-home-calendar .scm-calendar-board-card {
   min-height: 680px;
 }
-
-#scm-app .scm-home-kpi {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  min-width: 0;
-  padding: 17px;
-  border: 1px solid var(--scm-border);
-  border-top: 3px solid #64748b;
-  border-radius: var(--scm-r-md);
-  background: var(--scm-surface);
-  box-shadow: var(--scm-shadow-sm);
-}
-
-#scm-app .scm-home-kpi-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 auto;
-  border-radius: 10px;
-  background: #f1f5f9;
-  color: #475569;
-}
-
-#scm-app .scm-home-kpi span:not(.scm-home-kpi-icon) {
-  display: block;
-  color: var(--scm-text-soft);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-#scm-app .scm-home-kpi strong {
-  display: block;
-  margin-top: 2px;
-  color: var(--scm-text-main);
-  font-size: 24px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-
-#scm-app .scm-home-kpi-open { border-top-color: #2563eb; }
-#scm-app .scm-home-kpi-open .scm-home-kpi-icon { background: #eff6ff; color: #1d4ed8; }
-#scm-app .scm-home-kpi-overdue { border-top-color: #dc2626; }
-#scm-app .scm-home-kpi-overdue .scm-home-kpi-icon { background: #fef2f2; color: #b91c1c; }
-#scm-app .scm-home-kpi-risk { border-top-color: #d97706; }
-#scm-app .scm-home-kpi-risk .scm-home-kpi-icon { background: #fffbeb; color: #a16207; }
-#scm-app .scm-home-kpi-closed { border-top-color: #059669; }
-#scm-app .scm-home-kpi-closed .scm-home-kpi-icon { background: #ecfdf5; color: #047857; }
 
 #scm-app .scm-home-content-grid {
   display: grid;
@@ -3338,12 +3281,6 @@ body.scm-modal-open {
   to { transform: rotate(360deg); }
 }
 
-@media (max-width: 1080px) {
-  #scm-app .scm-home-kpis {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 760px) {
   #scm-app .scm-home-hero {
     align-items: flex-start;
@@ -3353,7 +3290,6 @@ body.scm-modal-open {
   #scm-app .scm-home-primary-action {
     width: 100%;
   }
-  #scm-app .scm-home-kpis,
   #scm-app .scm-home-content-grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -3366,9 +3302,6 @@ body.scm-modal-open {
 }
 
 @media (max-width: 480px) {
-  #scm-app .scm-home-kpis {
-    grid-template-columns: 1fr;
-  }
   #scm-app .scm-home-card-heading {
     align-items: flex-start;
     flex-direction: column;
