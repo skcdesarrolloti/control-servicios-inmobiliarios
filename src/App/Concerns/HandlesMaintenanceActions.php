@@ -610,20 +610,26 @@ trait HandlesMaintenanceActions
     }
 
     $actor = $this->ticketCompletionActor();
+    $recipientOptions = $this->maintenance_quote_recipient_options($ticket, is_array($revision) ? $revision : [], $quote);
+    $defaultExecutor = $this->maintenance_quote_first([$quote['ejecutado'] ?? '', $revision['ejecutado'] ?? '', 'Inmobiliaria']);
+    $defaultRecipient = $recipientOptions[$this->maintenance_quote_executor_key($defaultExecutor)] ?? [];
     $defaultDestinatario = $this->maintenance_quote_first([
       $quote['destinatario'] ?? '',
+      $defaultRecipient['destinatario'] ?? '',
       $revision['destinatario'] ?? '',
       $ticket['propietario'] ?? '',
       $ticket['arrendatario'] ?? '',
     ]);
     $defaultEmail = $this->maintenance_quote_first([
       $quote['email_destinatario'] ?? '',
+      $defaultRecipient['email_destinatario'] ?? '',
       $revision['email_destinatario'] ?? '',
       $ticket['correo'] ?? '',
       $ticket['email'] ?? '',
     ]);
     $defaultCelular = $this->maintenance_quote_first([
       $quote['celular_destinatario'] ?? '',
+      $defaultRecipient['celular_destinatario'] ?? '',
       $revision['celular_destinatario'] ?? '',
       $ticket['celular'] ?? '',
       $ticket['telefono'] ?? '',
@@ -665,9 +671,9 @@ trait HandlesMaintenanceActions
       'defaults' => [
         'destinatario' => $defaultDestinatario,
         'email_destinatario' => $defaultEmail,
-        'indicativo_destinarario' => $this->maintenance_quote_first([$quote['indicativo_destinarario'] ?? '', '57']),
+        'indicativo_destinarario' => $this->maintenance_quote_first([$quote['indicativo_destinarario'] ?? '', $defaultRecipient['indicativo_destinarario'] ?? '', '57']),
         'celular_destinatario' => $defaultCelular,
-        'ejecutado' => trim((string) ($quote['ejecutado'] ?? '')),
+        'ejecutado' => $defaultExecutor,
         'valides_oferta' => trim((string) ($quote['valides_oferta'] ?? '')),
         'duracion' => trim((string) ($quote['duracion'] ?? '')),
         'observaciones' => trim((string) ($quote['observaciones'] ?? '')),
@@ -692,6 +698,7 @@ trait HandlesMaintenanceActions
         ['value' => 'Arrendatario', 'label' => 'Arrendatario'],
         ['value' => 'Inmobiliaria', 'label' => 'Inmobiliaria'],
       ]),
+      'recipient_options' => $recipientOptions,
       'actor' => [
         'name' => trim((string) ($actor['name'] ?? Auth::user())),
         'employee_id' => trim((string) ($actor['employee_id'] ?? '')),
@@ -700,6 +707,176 @@ trait HandlesMaintenanceActions
       'revision_raw' => is_array($revision) ? $revision : [],
       'cotizacion_raw' => $quote,
     ];
+  }
+
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $revision @param array<string,mixed> $quote @return array<string,array<string,string>> */
+  private function maintenance_quote_recipient_options(array $ticket, array $revision, array $quote): array
+  {
+    $contract = $this->maintenance_quote_contract_row($ticket, $revision, $quote);
+    $owner = $this->maintenance_quote_owner_contact($contract, $ticket, $revision, $quote);
+    $tenant = $this->maintenance_quote_tenant_contact($contract, $ticket, $revision, $quote);
+    $community = $this->maintenance_quote_community_contact($contract, $owner, $ticket, $revision, $quote);
+    return [
+      'propietario' => $owner,
+      'inmobiliaria' => $owner,
+      'arrendatario' => $tenant,
+      'copropiedad' => $community,
+      'externo' => [
+        'destinatario' => '',
+        'email_destinatario' => '',
+        'celular_destinatario' => '',
+        'indicativo_destinarario' => '',
+        'indicativo_destinatario' => '',
+      ],
+    ];
+  }
+
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $revision @param array<string,mixed> $quote @return array<string,mixed> */
+  private function maintenance_quote_contract_row(array $ticket, array $revision, array $quote): array
+  {
+    $contractId = (int) $this->maintenance_quote_first([
+      $quote['id_contrato'] ?? '',
+      $revision['id_contrato'] ?? '',
+      $ticket['id_contrato'] ?? '',
+      $quote['id_contrato_arrendamiento'] ?? '',
+      $revision['id_contrato_arrendamiento'] ?? '',
+      $ticket['id_contrato_arrendamiento'] ?? '',
+    ]);
+    if ($contractId <= 0) {
+      return [];
+    }
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$contractId]);
+    return is_array($row) ? $row : [];
+  }
+
+  /** @param array<string,mixed> $contract @param array<string,mixed> $ticket @param array<string,mixed> $revision @param array<string,mixed> $quote @return array<string,string> */
+  private function maintenance_quote_owner_contact(array $contract, array $ticket, array $revision, array $quote): array
+  {
+    $ownerId = (int) $this->maintenance_quote_first([$contract['id_propietario'] ?? '', $revision['id_propietario'] ?? '', $ticket['id_propietario'] ?? '', $quote['id_propietario'] ?? '']);
+    $owner = [];
+    $table = $this->db->table('jet_cct_propietarios');
+    if ($ownerId > 0 && $this->table_exists($table)) {
+      $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$ownerId]);
+      if (is_array($row)) {
+        $owner = $row;
+      }
+    }
+    return $this->maintenance_quote_contact_payload(
+      [$owner, $contract, $revision, $ticket, $quote],
+      ['nombre', 'nombre_juridico', 'propietario', 'destinatario'],
+      ['correo', 'email', 'email_propietario', 'correo_propietario', 'email_destinatario'],
+      ['celular', 'telefono', 'celular_propietario', 'telefono_propietario', 'celular_destinatario'],
+      ['indicativo', 'indicativo_propietario', 'indicativo_destinarario', 'indicativo_destinatario']
+    );
+  }
+
+  /** @param array<string,mixed> $contract @param array<string,mixed> $ticket @param array<string,mixed> $revision @param array<string,mixed> $quote @return array<string,string> */
+  private function maintenance_quote_tenant_contact(array $contract, array $ticket, array $revision, array $quote): array
+  {
+    $tenantId = $this->maintenance_quote_first([$contract['id_arrendatario'] ?? '', $revision['id_arrendatario'] ?? '', $ticket['id_arrendatario'] ?? '', $quote['id_arrendatario'] ?? '']);
+    $tenant = [];
+    $table = $this->db->table('jet_cct_arrendatarios');
+    if ($tenantId !== '' && $this->table_exists($table)) {
+      $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE TRIM(COALESCE(`id_arrendatario`, '')) = ? LIMIT 1", [$tenantId]);
+      if (is_array($row)) {
+        $tenant = $row;
+      }
+    }
+    return $this->maintenance_quote_contact_payload(
+      [$tenant, $contract, $revision, $ticket, $quote],
+      ['nombre', 'nombre_juridico', 'arrendatario', 'destinatario'],
+      ['correo', 'email', 'email_arrendatario', 'correo_arrendatario', 'email_destinatario'],
+      ['celular', 'telefono', 'celular_arrendatario', 'telefono_arrendatario', 'celular_destinatario'],
+      ['indicativo', 'indicativo_arrendatario', 'indicativo_destinarario', 'indicativo_destinatario']
+    );
+  }
+
+  /** @param array<string,mixed> $contract @param array<string,string> $owner @param array<string,mixed> $ticket @param array<string,mixed> $revision @param array<string,mixed> $quote @return array<string,string> */
+  private function maintenance_quote_community_contact(array $contract, array $owner, array $ticket, array $revision, array $quote): array
+  {
+    $communityId = (int) $this->maintenance_quote_first([$contract['id_copropiedad'] ?? '', $revision['id_copropiedad'] ?? '', $ticket['id_copropiedad'] ?? '', $quote['id_copropiedad'] ?? '']);
+    $community = [];
+    $table = $this->db->table('jet_cct_copropiedades');
+    if ($communityId > 0 && $this->table_exists($table)) {
+      $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$communityId]);
+      if (is_array($row)) {
+        $community = $row;
+      }
+    }
+    $contact = $this->maintenance_quote_contact_payload(
+      [$community, $contract, $revision, $ticket, $quote],
+      ['administrador', 'copropiedad', 'nombre', 'destinatario'],
+      ['correo', 'email', 'correo_copropiedad', 'email_copropiedad', 'email_destinatario'],
+      ['contacto', 'celular', 'telefono', 'celular_copropiedad', 'telefono_copropiedad', 'celular_destinatario'],
+      ['indicativo', 'indicativo_copropiedad', 'indicativo_destinarario', 'indicativo_destinatario']
+    );
+    return trim($contact['destinatario']) !== '' ? $contact : $owner;
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @param array<int,string> $nameKeys @param array<int,string> $emailKeys @param array<int,string> $phoneKeys @param array<int,string> $indicativeKeys @return array<string,string> */
+  private function maintenance_quote_contact_payload(array $rows, array $nameKeys, array $emailKeys, array $phoneKeys, array $indicativeKeys): array
+  {
+    $indicative = $this->maintenance_quote_digits($this->maintenance_quote_contact_first($rows, $indicativeKeys));
+    if ($indicative === '') {
+      $indicative = '57';
+    }
+    return [
+      'destinatario' => $this->maintenance_quote_clean($this->maintenance_quote_contact_first($rows, $nameKeys)),
+      'email_destinatario' => $this->maintenance_quote_clean($this->maintenance_quote_contact_first($rows, $emailKeys)),
+      'celular_destinatario' => $this->maintenance_quote_digits($this->maintenance_quote_contact_first($rows, $phoneKeys)),
+      'indicativo_destinarario' => $indicative,
+      'indicativo_destinatario' => $indicative,
+    ];
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @param array<int,string> $keys */
+  private function maintenance_quote_contact_first(array $rows, array $keys): string
+  {
+    foreach ($rows as $row) {
+      foreach ($keys as $key) {
+        $value = trim((string) ($row[$key] ?? ''));
+        if ($value !== '') {
+          return $value;
+        }
+      }
+    }
+    return '';
+  }
+
+  private function maintenance_quote_executor_key(string $value): string
+  {
+    $plain = function_exists('remove_accents') ? remove_accents($value) : strtr($value, [
+      'á' => 'a',
+      'é' => 'e',
+      'í' => 'i',
+      'ó' => 'o',
+      'ú' => 'u',
+      'Á' => 'A',
+      'É' => 'E',
+      'Í' => 'I',
+      'Ó' => 'O',
+      'Ú' => 'U',
+      'ñ' => 'n',
+      'Ñ' => 'N',
+    ]);
+    $normalized = strtolower(trim((string) $plain));
+    if (str_contains($normalized, 'propiet')) {
+      return 'propietario';
+    }
+    if (str_contains($normalized, 'arrend')) {
+      return 'arrendatario';
+    }
+    if (str_contains($normalized, 'coprop')) {
+      return 'copropiedad';
+    }
+    if (str_contains($normalized, 'extern')) {
+      return 'externo';
+    }
+    return str_contains($normalized, 'inmobili') ? 'inmobiliaria' : $normalized;
   }
 
   /** @param array<string,mixed> $ticket @param array<string,mixed> $quote @return array{0:array<string,mixed>,1:string,2:int} */

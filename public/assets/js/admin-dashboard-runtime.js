@@ -10963,6 +10963,51 @@
       }).join("");
     }
 
+    function normalizeQuoteRecipientKey(value) {
+      var text = String(value || "").trim().toLowerCase();
+      if (text.normalize) text = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (text.indexOf("propiet") > -1) return "propietario";
+      if (text.indexOf("arrend") > -1) return "arrendatario";
+      if (text.indexOf("coprop") > -1) return "copropiedad";
+      if (text.indexOf("inmobili") > -1) return "inmobiliaria";
+      if (text.indexOf("extern") > -1) return "externo";
+      return text;
+    }
+
+    function quoteRecipientForExecutor(context, value) {
+      var recipients = context && context.recipient_options ? context.recipient_options : {};
+      var normalized = normalizeQuoteRecipientKey(value);
+      if (recipients[normalized]) return recipients[normalized];
+      if (recipients[value]) return recipients[value];
+      var keys = Object.keys(recipients);
+      for (var i = 0; i < keys.length; i += 1) {
+        if (normalizeQuoteRecipientKey(keys[i]) === normalized) {
+          return recipients[keys[i]];
+        }
+      }
+      return null;
+    }
+
+    function setMaintenanceQuoteField(form, name, value) {
+      var field = form ? form.querySelector('[name="' + name + '"]') : null;
+      if (field) field.value = value == null ? "" : String(value);
+    }
+
+    function syncMaintenanceQuoteRecipient(form, context) {
+      var executor = form ? form.querySelector('[name="ejecutado"]') : null;
+      if (!executor) return;
+      var recipient = quoteRecipientForExecutor(context || {}, executor.value);
+      if (!recipient) return;
+      var indicative = recipient.indicativo_destinarario;
+      if (indicative == null) indicative = recipient.indicativo_destinatario;
+      if (indicative == null) indicative = "57";
+      setMaintenanceQuoteField(form, "destinatario", recipient.destinatario || "");
+      setMaintenanceQuoteField(form, "email_destinatario", recipient.email_destinatario || "");
+      setMaintenanceQuoteField(form, "indicativo_destinarario", indicative);
+      setMaintenanceQuoteField(form, "indicativo_destinatario", indicative);
+      setMaintenanceQuoteField(form, "celular_destinatario", recipient.celular_destinatario || "");
+    }
+
     function cotizacionFormItems(items, fallback) {
       if (Array.isArray(items) && items.length) return items;
       return [fallback || {}];
@@ -11011,7 +11056,7 @@
       };
       var conf = configs[type];
       var rows = cotizacionFormItems(items, {});
-      var html = '<section class="scm-maint-quote-section" data-quote-repeater="' + escHtml(type) + '"><div class="scm-maint-quote-section-head"><div><h4>' + escHtml(conf.title) + '</h4><span data-quote-total="' + escHtml(type) + '">$0</span></div><button type="button" class="scm-case-work-btn" data-quote-add-row="' + escHtml(type) + '">' + escHtml(conf.add) + '</button></div><div class="scm-maint-quote-rows">';
+      var html = '<section class="scm-maint-quote-section" data-quote-repeater="' + escHtml(type) + '"><div class="scm-maint-quote-section-head"><div><h4>' + escHtml(conf.title) + '</h4><span data-quote-total="' + escHtml(type) + '">$0</span></div><button type="button" class="scm-maint-quote-add" data-quote-add-row="' + escHtml(type) + '">' + escHtml(conf.add) + '</button></div><div class="scm-maint-quote-rows">';
       rows.forEach(function (row) {
         html += '<div class="scm-maint-quote-row" data-quote-row="' + escHtml(type) + '">';
         conf.fields.forEach(function (field) {
@@ -11054,6 +11099,7 @@
         '<input type="hidden" name="tipo_negocio" value="' + escHtml(d.tipo_negocio || "") + '">' +
         '<input type="hidden" name="destinacion" value="' + escHtml(d.destinacion || "") + '">' +
         '<input type="hidden" name="direccion" value="' + escHtml(ticket.direccion || "") + '">' +
+        '<input type="hidden" name="indicativo_destinatario" value="' + escHtml(d.indicativo_destinarario || "57") + '">' +
         '<input type="hidden" name="mejor_oferta_existing" value="' + escHtml((media.mejor_oferta || []).join(",")) + '">' +
         '<input type="hidden" name="otras_oferta_existing" value="' + escHtml((media.otras_oferta || []).join(",")) + '">' +
         '<section class="scm-maint-quote-section"><h4>Datos de la cotización</h4><div class="scm-maint-quote-grid">' +
@@ -11119,6 +11165,12 @@
       if (!form) return;
       form.addEventListener("input", function () {
         syncMaintenanceQuoteTotals(form);
+      });
+      form.addEventListener("change", function (event) {
+        var target = event.target || null;
+        if (target && target.name === "ejecutado") {
+          syncMaintenanceQuoteRecipient(form, context || {});
+        }
       });
       form.addEventListener("click", function (event) {
         var addBtn = event.target && event.target.closest ? event.target.closest("[data-quote-add-row]") : null;

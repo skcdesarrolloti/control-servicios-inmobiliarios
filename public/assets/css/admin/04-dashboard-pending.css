@@ -5414,6 +5414,53 @@
   font-variant-numeric: tabular-nums;
 }
 
+.swal2-popup.scm-maint-quote-swal .scm-maint-quote-add,
+.scm-maint-quote-add {
+  min-height: 44px;
+  padding: 0 15px;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 10px 22px rgba(154, 52, 18, 0.08);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.swal2-popup.scm-maint-quote-swal .scm-maint-quote-add::before,
+.scm-maint-quote-add::before {
+  content: "+";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 7px;
+  border-radius: 999px;
+  background: #ffedd5;
+  color: #c2410c;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.swal2-popup.scm-maint-quote-swal .scm-maint-quote-add:hover,
+.swal2-popup.scm-maint-quote-swal .scm-maint-quote-add:focus-visible,
+.scm-maint-quote-add:hover,
+.scm-maint-quote-add:focus-visible {
+  border-color: #fb923c;
+  background: #ffedd5;
+  color: #7c2d12;
+  outline: 3px solid rgba(249, 115, 22, 0.15);
+  box-shadow: 0 14px 30px rgba(154, 52, 18, 0.13);
+}
+
 .scm-maint-quote-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
