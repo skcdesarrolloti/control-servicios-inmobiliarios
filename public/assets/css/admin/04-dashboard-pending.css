@@ -1428,6 +1428,21 @@
   gap: 16px;
 }
 
+#scm-app .scm-calendar-section-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+#scm-app .scm-calendar-section-panel {
+  display: none;
+}
+
+#scm-app .scm-calendar-section-panel.active {
+  display: block;
+}
+
 #scm-app .scm-calendar-head {
   align-items: center;
   background: #fff;
@@ -1448,6 +1463,12 @@
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+}
+
+#scm-app .scm-calendar-panel--personal [data-scm-calendar-filter-employees] {
+  background: #f8fafc;
+  color: #334155;
+  cursor: not-allowed;
 }
 
 #scm-app .scm-calendar-kpis {
@@ -1915,6 +1936,86 @@
   margin-top: 14px;
   min-height: 44px;
   width: 100%;
+}
+
+#scm-app .scm-calendar-pending-inline-card {
+  min-height: 420px;
+}
+
+#scm-app .scm-calendar-pending-inline {
+  display: grid;
+  gap: 12px;
+}
+
+#scm-app .scm-calendar-pending-inline .scm-calendar-report-empty {
+  background: #f8fafc;
+  border: 1px solid #dbe6f2;
+  border-radius: 12px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 18px !important;
+  text-align: center;
+}
+
+#scm-app .scm-calendar-pending-inline .scm-calendar-report-events,
+#scm-app .scm-calendar-pending-inline .scm-calendar-pending-events {
+  display: grid;
+  gap: 12px;
+}
+
+#scm-app .scm-calendar-pending-inline .scm-calendar-report-event {
+  background: #fff;
+  border: 1px solid #dbe6f2;
+  border-left: 4px solid #dc2626;
+  border-radius: 13px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  display: grid;
+  gap: 10px;
+  padding: 14px !important;
+}
+
+#scm-app .scm-calendar-pending-inline .scm-calendar-pending-event-head {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+#scm-app .scm-calendar-pending-inline .scm-calendar-pending-event-head strong {
+  color: var(--scm-text-main);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+#scm-app .scm-calendar-pending-inline .scm-calendar-pending-event-head span,
+#scm-app .scm-calendar-pending-inline .scm-calendar-pending-event-meta {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+#scm-app .scm-calendar-pending-inline .scm-calendar-action-btn {
+  align-items: center;
+  border: 1px solid #dbe6f2;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 12px !important;
+}
+
+#scm-app .scm-calendar-pending-inline .scm-calendar-action-btn--primary {
+  background: #dc2626;
+  border-color: #b91c1c;
+  color: #fff;
+}
+
+#scm-app .scm-calendar-pending-inline .scm-calendar-action-btn--ghost {
+  background: #f8fafc;
+  color: #334155;
 }
 
 .swal2-container .swal2-popup.scm-calendar-swal-popup {

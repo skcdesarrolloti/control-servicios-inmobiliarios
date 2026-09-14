@@ -710,8 +710,18 @@
       loadCollectionLog(container, collectionLogParamsFromUrl(pageLink.getAttribute("href") || ""));
     });
 
-    function initCalendarPanel() {
-      var panel = root.querySelector("[data-scm-calendar-panel]");
+    function initCalendarPanel(target) {
+      var scope = target && target.querySelectorAll ? target : root;
+      var panels = [];
+      if (target && target.matches && target.matches("[data-scm-calendar-panel]")) {
+        panels = [target];
+      } else {
+        panels = Array.prototype.slice.call(scope.querySelectorAll("[data-scm-calendar-panel]"));
+      }
+      panels.forEach(initSingleCalendarPanel);
+    }
+
+    function initSingleCalendarPanel(panel) {
       if (!panel || panel.getAttribute("data-scm-calendar-init") === "1") {
         return;
       }
@@ -720,9 +730,13 @@
       var panelApiUrl = String(panel.getAttribute("data-calendar-api-url") || "");
       if (panelAppUrl) calendarAppUrl = panelAppUrl;
       if (panelApiUrl) calendarApiUrl = panelApiUrl;
+      var calendarMode = String(panel.getAttribute("data-calendar-mode") || "team").trim();
+      var calendarView = String(panel.getAttribute("data-calendar-view") || "month").trim();
+      var lockCurrentEmployee = panel.getAttribute("data-calendar-lock-current") === "1" || calendarMode === "personal";
 
       var filterForm = panel.querySelector("[data-scm-calendar-filters]");
       var eventsWrap = panel.querySelector("[data-scm-calendar-events]");
+      var pendingInlineWrap = panel.querySelector("[data-scm-calendar-pending-inline]");
       var monthGrid = panel.querySelector("[data-scm-calendar-grid]");
       var titleEl = panel.querySelector("[data-scm-calendar-title]");
       var dayTitleEl = panel.querySelector("[data-scm-calendar-day-title]");
@@ -806,11 +820,13 @@
 
       function fillEmployeeOptions(selects, rows, firstLabel) {
         selects.forEach(function (select) {
-          var current = select.value || currentCalendarEmployeeId || "";
+          var current = lockCurrentEmployee
+            ? (currentCalendarEmployeeId || select.value || (rows.length ? getEmployeeId(rows[0]) : ""))
+            : (select.value || currentCalendarEmployeeId || "");
           if (current && !rows.some(function (row) { return getEmployeeId(row) === current; })) {
-            current = rows.length ? getEmployeeId(rows[0]) : "";
+            current = lockCurrentEmployee ? current : (rows.length ? getEmployeeId(rows[0]) : "");
           }
-          select.innerHTML = '<option value="">' + firstLabel + "</option>";
+          select.innerHTML = '<option value="">' + (lockCurrentEmployee ? "Mi calendario" : firstLabel) + "</option>";
           rows.forEach(function (row) {
             var id = getEmployeeId(row);
             var name = String(row.nombre || row.empleado || row.funcionario || id).trim();
@@ -820,7 +836,21 @@
             option.textContent = name ? name + " (" + id + ")" : id;
             select.appendChild(option);
           });
+          var hasCurrentOption = Array.prototype.slice.call(select.options || []).some(function (option) {
+            return option.value === current;
+          });
+          if (lockCurrentEmployee && current && !hasCurrentOption) {
+            var currentOption = document.createElement("option");
+            currentOption.value = current;
+            currentOption.textContent = "Funcionario actual (" + current + ")";
+            select.appendChild(currentOption);
+          }
           if (current) select.value = current;
+          if (lockCurrentEmployee) {
+            select.disabled = true;
+            select.setAttribute("aria-disabled", "true");
+            select.setAttribute("title", "Este calendario se carga con el funcionario de tu sesión.");
+          }
         });
       }
 
@@ -839,6 +869,15 @@
           allowedEmployees,
           "Selecciona funcionario",
         );
+        enforceLockedEmployeeFilter();
+      }
+
+      function enforceLockedEmployeeFilter() {
+        if (!lockCurrentEmployee || !filterForm || !currentCalendarEmployeeId) return;
+        var employeeField = filterForm.querySelector('[name="id_empleado"]');
+        if (employeeField) {
+          employeeField.value = currentCalendarEmployeeId;
+        }
       }
 
       function fillCategoryOptions(select, rows, firstLabel) {
@@ -1220,7 +1259,11 @@
       }
 
       function loadEvents() {
+        if (calendarView === "pending") {
+          return loadPendingInline();
+        }
         if (spinner) spinner.classList.add("active");
+        enforceLockedEmployeeFilter();
         var range = monthRange(currentMonth);
         var filters = { pagina: 1, limite: 500, fecha_inicio: range.from, fecha_fin: range.to };
         var selectedEmployeeId = "";
@@ -1981,6 +2024,48 @@
         });
       }
 
+      function renderPendingInline(rows) {
+        rows = rows || [];
+        calendarEvents = rows;
+        renderKpis(calendarEvents);
+        if (!pendingInlineWrap) return;
+        pendingInlineWrap.innerHTML = pendingEventRowsHtml(rows);
+      }
+
+      function loadPendingInline() {
+        if (spinner) spinner.classList.add("active");
+        enforceLockedEmployeeFilter();
+        var employeeId = selectedEmployeeFromFilter();
+        if (!employeeId) {
+          calendarEvents = [];
+          renderKpis(calendarEvents);
+          if (pendingInlineWrap) {
+            pendingInlineWrap.innerHTML = '<div class="scm-calendar-loading">Selecciona un funcionario para ver vencimientos.</div>';
+          }
+          if (spinner) spinner.classList.remove("active");
+          return Promise.resolve();
+        }
+        if (pendingInlineWrap) {
+          pendingInlineWrap.innerHTML = '<div class="scm-calendar-loading">Cargando vencimientos...</div>';
+        }
+        return calendarApi("listar_pendientes_vencidos", { id_empleado: employeeId })
+          .then(function (json) {
+            if (!json || !json.success) throw new Error((json && json.message) || "No se pudieron cargar vencimientos.");
+            renderPendingInline(filterRowsByAllowedEmployees(extractRows(json.data || [])));
+          })
+          .catch(function (err) {
+            calendarEvents = [];
+            renderKpis(calendarEvents);
+            if (pendingInlineWrap) {
+              pendingInlineWrap.innerHTML = '<div class="scm-calendar-report-empty">No se pudieron cargar los vencimientos: ' + escHtml(err.message || "Error") + '</div>';
+            }
+            showToast("error", err.message || "No se pudieron cargar vencimientos.");
+          })
+          .finally(function () {
+            if (spinner) spinner.classList.remove("active");
+          });
+      }
+
       function openCreateEventPopup(mode) {
         mode = mode === "multiple" ? "multiple" : "single";
         var preselectedEmployee = selectedEmployeeFromFilter();
@@ -2514,6 +2599,7 @@
       if (clearBtn && filterForm) {
         clearBtn.addEventListener("click", function () {
           filterForm.reset();
+          enforceLockedEmployeeFilter();
           loadEvents();
         });
       }
@@ -7373,9 +7459,13 @@
       if (activeKey === "mant" && form) {
         return doFetch(new FormData(form));
       } else if (activeKey === "calendario_actividades") {
-        initCalendarPanel();
-        var calendarRefresh = root.querySelector(
-          "#scm-panel-calendario-actividades [data-scm-calendar-refresh]",
+        var calendarPanel = root.querySelector("#scm-panel-calendario-actividades");
+        initCalendarPanel(calendarPanel || root);
+        var visibleCalendarSection = calendarPanel
+          ? calendarPanel.querySelector(".scm-calendar-section-panel.active")
+          : null;
+        var calendarRefresh = (visibleCalendarSection || calendarPanel || root).querySelector(
+          "[data-scm-calendar-refresh]",
         );
         if (calendarRefresh) {
           calendarRefresh.click();
@@ -9156,7 +9246,11 @@
 
     function loadDashboardHome() {
       var panel = root.querySelector("#scm-panel-inicio");
-      if (!panel || !ajaxUrl || !actionDashboardHome) {
+      if (!panel) {
+        return Promise.resolve();
+      }
+      initCalendarPanel(panel);
+      if (!ajaxUrl || !actionDashboardHome) {
         return Promise.resolve();
       }
       if (panel.getAttribute("data-scm-loaded") === "1") {
@@ -13016,7 +13110,7 @@
           activeAdministrativePanel &&
           administrativeKey === "calendario_actividades"
         ) {
-          initCalendarPanel();
+          initCalendarPanel(activeAdministrativePanel);
         }
         if (
           activeAdministrativePanel &&
@@ -13070,6 +13164,24 @@
             panel.classList.toggle("active", panel.id === target);
           });
         window.setTimeout(loadActiveLazyPanelWithFeedback, 0);
+      });
+    });
+
+    root.querySelectorAll(".scm-calendar-section-tab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        var target = tab.getAttribute("data-calendar-section-target") || "";
+        var parentPanel = tab.closest("#scm-panel-calendario-actividades");
+        if (!target || !parentPanel) {
+          return;
+        }
+        parentPanel.querySelectorAll(".scm-calendar-section-tab").forEach(function (item) {
+          item.classList.toggle("active", item === tab);
+        });
+        parentPanel.querySelectorAll(".scm-calendar-section-panel").forEach(function (panel) {
+          panel.classList.toggle("active", panel.id === target);
+        });
+        var activeSection = parentPanel.querySelector(".scm-calendar-section-panel.active");
+        initCalendarPanel(activeSection || parentPanel);
       });
     });
 

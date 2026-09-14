@@ -3106,6 +3106,26 @@ body.scm-modal-open {
   margin-bottom: 18px;
 }
 
+#scm-app .scm-home-calendar {
+  margin-bottom: 18px;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-panel--home {
+  gap: 14px;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-head h3 {
+  font-size: 20px;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-layout {
+  grid-template-columns: minmax(620px, 1.4fr) minmax(320px, 0.6fr);
+}
+
+#scm-app .scm-home-calendar .scm-calendar-board-card {
+  min-height: 680px;
+}
+
 #scm-app .scm-home-kpi {
   display: flex;
   align-items: center;
@@ -3336,6 +3356,9 @@ body.scm-modal-open {
   #scm-app .scm-home-kpis,
   #scm-app .scm-home-content-grid {
     grid-template-columns: 1fr 1fr;
+  }
+  #scm-app .scm-home-calendar .scm-calendar-layout {
+    grid-template-columns: 1fr;
   }
   #scm-app .scm-home-content-grid .scm-home-card {
     grid-column: 1 / -1;

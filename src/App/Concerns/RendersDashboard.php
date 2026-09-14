@@ -660,6 +660,19 @@ trait RendersDashboard
           </article>
         </div>
 
+        <?php if (in_array('calendario_actividades', $allowedAdministrativeActivityTabs, true)): ?>
+          <section class="scm-home-calendar" aria-labelledby="scm-home-calendar-title">
+            <?php echo $this->render_calendario_actividades_panel($config, [
+              'mode' => 'personal',
+              'variant' => 'home',
+              'title' => 'Mi calendario',
+              'title_id' => 'scm-home-calendar-title',
+              'description' => 'Tu agenda del mes se carga por defecto con el funcionario asociado a tu sesión.',
+              'show_report_action' => false,
+            ]); ?>
+          </section>
+        <?php endif; ?>
+
         <div class="scm-home-content-grid">
           <section class="scm-home-card" aria-labelledby="scm-home-priorities-title">
             <div class="scm-home-card-heading">
@@ -1023,7 +1036,37 @@ trait RendersDashboard
 
           <?php if (in_array('calendario_actividades', $allowedAdministrativeActivityTabs, true)): ?>
             <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'calendario_actividades' ? ' active' : ''; ?>" id="scm-panel-calendario-actividades" data-permission-tab="calendario_actividades" data-admin-activity-panel="calendario_actividades">
-              <?php echo $this->render_calendario_actividades_panel($config); ?>
+              <div class="scm-calendar-section-tabs" role="tablist" aria-label="Calendarios administrativos">
+                <button class="scm-status-topic-tab scm-calendar-section-tab active" type="button" data-calendar-section-target="scm-calendar-section-mine">Mi calendario</button>
+                <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-calendar-section-team">Calendario equipo</button>
+                <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-calendar-section-due">Vencimientos</button>
+              </div>
+              <div class="scm-calendar-section-panel active" id="scm-calendar-section-mine" data-calendar-section-panel>
+                <?php echo $this->render_calendario_actividades_panel($config, [
+                  'mode' => 'personal',
+                  'title' => 'Mi calendario',
+                  'description' => 'Consulta y gestiona tu agenda administrativa sin cambiar de funcionario.',
+                  'show_report_action' => false,
+                ]); ?>
+              </div>
+              <div class="scm-calendar-section-panel" id="scm-calendar-section-team" data-calendar-section-panel>
+                <?php echo $this->render_calendario_actividades_panel($config, [
+                  'mode' => 'team',
+                  'title' => 'Calendario del equipo',
+                  'description' => 'Cambia el funcionario para revisar la disponibilidad y agenda de otras personas.',
+                ]); ?>
+              </div>
+              <div class="scm-calendar-section-panel" id="scm-calendar-section-due" data-calendar-section-panel>
+                <?php echo $this->render_calendario_actividades_panel($config, [
+                  'mode' => 'due',
+                  'view' => 'pending',
+                  'title' => 'Vencimientos de actividades administrativas',
+                  'description' => 'Eventos pendientes vencidos por funcionario, con acceso directo para revisar o marcar como realizado.',
+                  'show_create_actions' => false,
+                  'show_report_action' => false,
+                  'show_pending_action' => false,
+                ]); ?>
+              </div>
             </div>
           <?php endif; ?>
 
@@ -1841,7 +1884,7 @@ trait RendersDashboard
   }
 
   /** @param array<string,mixed> $config */
-  private function render_calendario_actividades_panel(array $config): string
+  private function render_calendario_actividades_panel(array $config, array $options = []): string
   {
     $appUrl = rtrim(trim((string) ($config['calendar_app_url'] ?? self::DEFAULT_CALENDAR_APP_URL)), '/');
     $apiUrl = trim((string) ($config['calendar_api_url'] ?? self::DEFAULT_CALENDAR_API_URL));
@@ -1856,11 +1899,35 @@ trait RendersDashboard
     $currentCalendarEmployeeId = trim((string) ($config['calendar_current_employee_id'] ?? ''));
     $allowedFuncionariosJson = json_encode($allowedFuncionarios, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
     $todayLabel = date('Y-m-d');
+    $mode = in_array((string) ($options['mode'] ?? 'team'), ['personal', 'team', 'due'], true) ? (string) $options['mode'] : 'team';
+    $view = (string) ($options['view'] ?? 'month');
+    $variant = trim((string) ($options['variant'] ?? ''));
+    $panelClasses = 'scm-calendar-panel';
+    if ($variant !== '') {
+      $panelClasses .= ' scm-calendar-panel--' . preg_replace('/[^a-z0-9_-]+/i', '-', $variant);
+    }
+    if ($view === 'pending') {
+      $panelClasses .= ' scm-calendar-panel--pending';
+    }
+    if ($mode === 'personal') {
+      $panelClasses .= ' scm-calendar-panel--personal';
+    }
+    $title = trim((string) ($options['title'] ?? 'Calendario'));
+    $titleId = trim((string) ($options['title_id'] ?? ''));
+    $description = trim((string) ($options['description'] ?? 'Agenda citas, consulta disponibilidad y crea eventos solo para los cargos operativos permitidos.'));
+    $showCreateActions = !array_key_exists('show_create_actions', $options) || (bool) $options['show_create_actions'];
+    $showPendingAction = !array_key_exists('show_pending_action', $options) || (bool) $options['show_pending_action'];
+    $showReportAction = !array_key_exists('show_report_action', $options) || (bool) $options['show_report_action'];
+    $employeeLabel = $mode === 'personal' ? 'Funcionario' : 'Funcionario';
+    $employeePlaceholder = $mode === 'personal' ? 'Mi calendario' : 'Selecciona funcionario';
 
     ob_start();
 ?>
-    <div class="scm-calendar-panel"
+    <div class="<?php echo esc_attr($panelClasses); ?>"
       data-scm-calendar-panel
+      data-calendar-mode="<?php echo esc_attr($mode); ?>"
+      data-calendar-view="<?php echo esc_attr($view); ?>"
+      data-calendar-lock-current="<?php echo $mode === 'personal' ? '1' : '0'; ?>"
       data-calendar-app-url="<?php echo esc_attr($appUrl); ?>"
       data-calendar-api-url="<?php echo esc_attr($apiUrl); ?>"
       data-calendar-current-employee-id="<?php echo esc_attr($currentCalendarEmployeeId); ?>"
@@ -1868,15 +1935,21 @@ trait RendersDashboard
       data-calendar-employees-json="<?php echo esc_attr($allowedFuncionariosJson ?: '[]'); ?>">
       <div class="scm-status-topic-head scm-calendar-head">
         <div>
-          <h3>Calendario</h3>
-          <p>Agenda citas, consulta disponibilidad y crea eventos solo para los cargos operativos permitidos.</p>
+          <h3<?php echo $titleId !== '' ? ' id="' . esc_attr($titleId) . '"' : ''; ?>><?php echo esc_html($title); ?></h3>
+          <p><?php echo esc_html($description); ?></p>
         </div>
         <div class="scm-calendar-head-actions">
           <span class="scm-status-count"><strong data-scm-calendar-total>0</strong> eventos</span>
-          <button type="button" class="scm-btn-primary btn btn-primary" data-scm-calendar-open-create data-calendar-mode="single">Crear evento</button>
-          <button type="button" class="scm-case-work-btn" data-scm-calendar-open-create data-calendar-mode="multiple">Evento m&uacute;ltiple</button>
-          <button type="button" class="scm-case-work-btn" data-scm-calendar-open-pending>Eventos pendientes</button>
-          <button type="button" class="scm-case-work-btn scm-calendar-report-btn" data-scm-calendar-open-report>Informe del d&iacute;a</button>
+          <?php if ($showCreateActions): ?>
+            <button type="button" class="scm-btn-primary btn btn-primary" data-scm-calendar-open-create data-calendar-mode="single">Crear evento</button>
+            <button type="button" class="scm-case-work-btn" data-scm-calendar-open-create data-calendar-mode="multiple">Evento m&uacute;ltiple</button>
+          <?php endif; ?>
+          <?php if ($showPendingAction): ?>
+            <button type="button" class="scm-case-work-btn" data-scm-calendar-open-pending>Eventos pendientes</button>
+          <?php endif; ?>
+          <?php if ($showReportAction): ?>
+            <button type="button" class="scm-case-work-btn scm-calendar-report-btn" data-scm-calendar-open-report>Informe del d&iacute;a</button>
+          <?php endif; ?>
         </div>
       </div>
 
@@ -1890,7 +1963,7 @@ trait RendersDashboard
       <section class="scm-calendar-card scm-calendar-filter-card">
         <form class="scm-calendar-filter-form" data-scm-calendar-filters autocomplete="off">
           <div class="scm-grid">
-            <div class="scm-field"><label>Funcionario</label><select class="select select-bordered select-sm scm-select" name="id_empleado" data-scm-calendar-filter-employees><option value="">Selecciona funcionario</option></select></div>
+            <div class="scm-field"><label><?php echo esc_html($employeeLabel); ?></label><select class="select select-bordered select-sm scm-select" name="id_empleado" data-scm-calendar-filter-employees><option value=""><?php echo esc_html($employeePlaceholder); ?></option></select></div>
             <div class="scm-field"><label>Categor&iacute;a</label><select class="select select-bordered select-sm scm-select" name="id_categoria" data-scm-calendar-filter-categories><option value="">Todas</option></select></div>
             <div class="scm-field"><label>Estado</label><select class="select select-bordered select-sm scm-select" name="estado"><option value="">Todos</option><option value="No" selected>Pendientes</option><option value="Si">Realizados</option></select></div>
           </div>
@@ -1902,6 +1975,21 @@ trait RendersDashboard
         </form>
       </section>
 
+      <?php if ($view === 'pending'): ?>
+        <section class="scm-calendar-card scm-calendar-pending-inline-card">
+          <div class="scm-calendar-card-head">
+            <div>
+              <span class="scm-calendar-action-kicker">Vencimientos</span>
+              <h4>Actividades administrativas vencidas</h4>
+              <p>Selecciona un funcionario para consultar eventos pendientes cuya fecha ya pas&oacute;.</p>
+            </div>
+            <button type="button" class="scm-case-work-btn" data-scm-calendar-refresh>Actualizar</button>
+          </div>
+          <div class="scm-calendar-pending-inline" data-scm-calendar-pending-inline>
+            <div class="scm-calendar-loading">Selecciona un funcionario para ver vencimientos.</div>
+          </div>
+        </section>
+      <?php else: ?>
       <div class="scm-calendar-layout">
         <section class="scm-calendar-card scm-calendar-board-card">
           <div class="scm-calendar-card-head">
@@ -1935,6 +2023,7 @@ trait RendersDashboard
           <button type="button" class="scm-btn-primary btn btn-primary scm-calendar-day-create" data-scm-calendar-open-create data-calendar-mode="single">Crear evento para este d&iacute;a</button>
         </section>
       </div>
+      <?php endif; ?>
     </div>
 <?php
     return (string) ob_get_clean();
