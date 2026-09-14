@@ -761,6 +761,7 @@
       var currentMonth = startOfMonth(new Date());
       var selectedDay = toDateKey(new Date());
       var calendarEvents = [];
+      var calendarPendingRows = [];
       var popupAgendaRequestId = 0;
       var ticketCacheByEmployee = {};
       var holidayCache = {};
@@ -1171,8 +1172,6 @@
         var isDone = String(row.estado || "").toLowerCase() === "si";
         var estado = isDone ? "Realizado" : "Pendiente";
         var color = String(row.color || "#f59e0b").trim() || "#f59e0b";
-        var eventoUrl = id ? buildCalendarUrl("/evento/" + encodeURIComponent(id)) : "";
-        var ticketUrl = ticket ? "https://sucasainmobiliaria.com.co/ticket/?id_ticket=" + encodeURIComponent(ticket) : "";
         return '<article class="scm-calendar-event-card">' +
           '<div class="scm-calendar-event-color" style="background:' + escHtml(color) + '"></div>' +
           '<div class="scm-calendar-event-main">' +
@@ -1185,8 +1184,8 @@
           (ticket ? '<span>Ticket #' + escHtml(ticket) + "</span>" : "") +
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
-          (eventoUrl ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' + escHtml(eventoUrl) + '" data-iframe-title="Evento #' + escHtml(id) + '">Ver evento</button>' : "") +
-          (ticketUrl ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' + escHtml(ticketUrl) + '" data-iframe-title="Ticket #' + escHtml(ticket) + '">Ver ticket</button>' : "") +
+          (id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Ver evento</button>' : "") +
+          (ticket ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver ticket</button>' : "") +
           (id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Marcar realizado</button>' : "") +
           (id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar evento</button>' : "") +
           "</div></div></article>";
@@ -1757,9 +1756,232 @@
       function calendarEventById(id) {
         id = String(id || "").trim();
         if (!id) return null;
-        return calendarEvents.find(function (row) {
+        return calendarEvents.concat(calendarPendingRows).find(function (row) {
           return String(row.id || row._ID || row.event_id || "").trim() === id;
         }) || null;
+      }
+
+      function calendarEventByTicket(ticketId) {
+        ticketId = String(ticketId || "").trim();
+        if (!ticketId) return null;
+        return calendarEvents.concat(calendarPendingRows).find(function (row) {
+          return String(row.id_ticket || row.ticket || "").trim() === ticketId;
+        }) || null;
+      }
+
+      function compactCalendarActionMessage(message) {
+        message = String(message || "").trim();
+        if (normalizeText(message).indexOf("reporte comercial") !== -1) {
+          return "El calendario no permite cerrar este evento hasta completar el reporte comercial asociado.";
+        }
+        return message;
+      }
+
+      function calendarDetailValue(row, keys) {
+        for (var i = 0; i < keys.length; i += 1) {
+          var value = row && row[keys[i]];
+          if (value !== undefined && value !== null && String(value).trim() !== "") {
+            return String(value).trim();
+          }
+        }
+        return "";
+      }
+
+      function calendarDetailFieldHtml(label, value, wide) {
+        value = String(value || "").trim();
+        if (!value) return "";
+        return '<div' + (wide ? ' class="is-wide"' : "") + '><small>' + escHtml(label) + '</small><strong>' + escHtml(value) + '</strong></div>';
+      }
+
+      function calendarEventDetailHtml(row) {
+        var eventId = String(row.id || row._ID || row.event_id || "").trim();
+        var ticket = String(row.id_ticket || row.ticket || "").trim();
+        var isDone = String(row.estado || "").toLowerCase() === "si";
+        var title = String(row.titulo || row.title || "Evento").trim();
+        var location = calendarDetailValue(row, ["ubicacion", "lugar", "direccion"]);
+        var description = calendarDetailValue(row, ["descripcion", "observacion", "detalle"]);
+        return '<div class="scm-calendar-native-detail scm-case-calendar-event-mini-card">' +
+          '<div class="scm-case-calendar-event-mini-head"><span>Detalle del evento</span><strong>' + escHtml(title) + '</strong></div>' +
+          '<div class="scm-case-calendar-event-mini-grid">' +
+          calendarDetailFieldHtml("Inicio", formatDateTime(row.fecha_inicio || row.fecha || row.start), false) +
+          calendarDetailFieldHtml("Fin", formatDateTime(row.fecha_fin || row.end), false) +
+          calendarDetailFieldHtml("Categoria", categoryNameForRow(row), false) +
+          calendarDetailFieldHtml("Funcionario", employeeNameForRow(row), false) +
+          (ticket ? calendarDetailFieldHtml("Ticket", "#" + ticket, false) : "") +
+          calendarDetailFieldHtml("Ubicacion", location, true) +
+          "</div>" +
+          (description ? '<div class="scm-case-calendar-event-mini-description"><small>Descripci&oacute;n</small><p>' + calendarRichTextHtml(description) + "</p></div>" : "") +
+          '<div class="scm-case-calendar-event-mini-actions">' +
+          '<span class="scm-case-calendar-event-state-badge' + (isDone ? " is-done" : "") + '">' + (isDone ? "Realizado" : "Pendiente") + "</span>" +
+          (ticket ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-ticket data-event-id="' + escHtml(eventId) + '" data-ticket-id="' + escHtml(ticket) + '">Ver ticket</button>' : "") +
+          (eventId ? '<button type="button" class="scm-case-calendar-transfer-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(eventId) + '">Trasladar evento</button>' : "") +
+          (eventId && !isDone ? '<button type="button" class="scm-case-calendar-complete-btn" data-scm-calendar-complete-event data-event-id="' + escHtml(eventId) + '">Marcar realizado</button>' : "") +
+          "</div>" +
+          "</div>";
+      }
+
+      function cssCalendarAttrValue(value) {
+        value = String(value || "");
+        if (window.CSS && typeof window.CSS.escape === "function") {
+          return window.CSS.escape(value);
+        }
+        return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      }
+
+      function openLoadedNativeTicket(ticketId) {
+        ticketId = String(ticketId || "").trim();
+        if (!ticketId || typeof window.scmOpenCase !== "function") return false;
+        var selectors = [
+          '.scm-btn-case[data-ticket-pk="' + cssCalendarAttrValue(ticketId) + '"]',
+          '.scm-btn-case[data-ticket="' + cssCalendarAttrValue(ticketId) + '"]',
+        ];
+        for (var i = 0; i < selectors.length; i += 1) {
+          var btn = root.querySelector(selectors[i]) || document.querySelector(selectors[i]);
+          if (btn) {
+            window.scmOpenCase(btn);
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function ticketIdFromRow(ticket) {
+        return String((ticket && (ticket._ID || ticket.id_ticket || ticket.id || ticket.ticket_pk)) || "").trim();
+      }
+
+      function findTicketInRows(ticketId, rows) {
+        ticketId = String(ticketId || "").trim();
+        return (rows || []).find(function (ticket) {
+          return ticketIdFromRow(ticket) === ticketId || String(ticket.id_ticket || "").trim() === ticketId;
+        }) || null;
+      }
+
+      function calendarTicketDetailHtml(ticket, eventRow, ticketId) {
+        ticket = ticket || {};
+        ticketId = String(ticketId || ticketIdFromRow(ticket) || "").trim();
+        var description = calendarDetailValue(ticket, ["descripcion", "observacion", "detalle", "solicitud"]);
+        var eventTitle = eventRow ? String(eventRow.titulo || eventRow.title || "").trim() : "";
+        var eventId = eventRow ? String(eventRow.id || eventRow._ID || eventRow.event_id || "").trim() : "";
+        var ticketTitle = ticketId ? "Ticket #" + ticketId : (ticketIdFromRow(ticket) ? ticketLabel(ticket) : "Ticket");
+        return '<div class="scm-calendar-native-detail scm-calendar-ticket-native-detail">' +
+          '<div class="scm-case-calendar-event-mini-head"><span>Detalle del ticket</span><strong>' + escHtml(ticketTitle) + '</strong></div>' +
+          '<div class="scm-case-calendar-event-mini-grid">' +
+          calendarDetailFieldHtml("Ticket", ticketId ? "#" + ticketId : "", false) +
+          calendarDetailFieldHtml("Solicitante", calendarDetailValue(ticket, ["solicitante", "nombre_solicitante", "cliente"]), false) +
+          calendarDetailFieldHtml("Contrato", calendarDetailValue(ticket, ["contrato", "id_contrato"]), false) +
+          calendarDetailFieldHtml("Inmueble", calendarDetailValue(ticket, ["inmueble", "id_inmueble", "id_inmueble_web"]), false) +
+          calendarDetailFieldHtml("Departamento", calendarDetailValue(ticket, ["departamento", "area"]), false) +
+          calendarDetailFieldHtml("Categoria", calendarDetailValue(ticket, ["categoria", "tipo_pqrs", "tema_ayuda", "tipo"]), false) +
+          calendarDetailFieldHtml("Estado", calendarDetailValue(ticket, ["estado", "estado_ticket"]), false) +
+          calendarDetailFieldHtml("Estado administrativo", calendarDetailValue(ticket, ["estado_administrativo", "admin"]), false) +
+          calendarDetailFieldHtml("Funcionario", calendarDetailValue(ticket, ["funcionario", "empleado", "nombre_empleado"]) || (eventRow ? employeeNameForRow(eventRow) : ""), false) +
+          calendarDetailFieldHtml("Direccion", calendarDetailValue(ticket, ["direccion", "direccion_inmueble"]), true) +
+          (eventTitle ? calendarDetailFieldHtml("Evento relacionado", eventTitle, true) : "") +
+          "</div>" +
+          (description ? '<div class="scm-case-calendar-event-mini-description"><small>Descripci&oacute;n</small><p>' + calendarRichTextHtml(description) + "</p></div>" : "") +
+          (!ticketIdFromRow(ticket) ? '<p class="scm-calendar-native-note">No encontr&eacute; el caso cargado en esta vista; te muestro la informaci&oacute;n disponible desde el calendario.</p>' : "") +
+          (eventId ? '<div class="scm-case-calendar-event-mini-actions"><button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-event data-event-id="' + escHtml(eventId) + '">Ver evento relacionado</button></div>' : "") +
+          "</div>";
+      }
+
+      function bindCalendarNativePopupActions(eventRow) {
+        var popup = window.Swal && window.Swal.getPopup ? window.Swal.getPopup() : null;
+        if (!popup) return;
+        popup.addEventListener("click", function (event) {
+          var eventBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-view-event]") : null;
+          if (eventBtn) {
+            event.preventDefault();
+            var viewEventId = eventBtn.getAttribute("data-event-id") || "";
+            window.Swal.close();
+            window.setTimeout(function () { openCalendarEventDetailPopup(viewEventId); }, 50);
+            return;
+          }
+          var ticketBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-view-ticket]") : null;
+          if (ticketBtn) {
+            event.preventDefault();
+            var ticketId = ticketBtn.getAttribute("data-ticket-id") || "";
+            var ticketEventId = ticketBtn.getAttribute("data-event-id") || (eventRow ? String(eventRow.id || eventRow._ID || eventRow.event_id || "") : "");
+            window.Swal.close();
+            window.setTimeout(function () { openCalendarTicketDetailPopup(ticketId, ticketEventId); }, 50);
+            return;
+          }
+          var completeBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-complete-event]") : null;
+          if (completeBtn) {
+            event.preventDefault();
+            var completeId = completeBtn.getAttribute("data-event-id") || "";
+            window.Swal.close();
+            window.setTimeout(function () { openCompleteEventPopup(completeId); }, 50);
+            return;
+          }
+          var rescheduleBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-reschedule-event]") : null;
+          if (rescheduleBtn) {
+            event.preventDefault();
+            var rescheduleId = rescheduleBtn.getAttribute("data-event-id") || "";
+            window.Swal.close();
+            window.setTimeout(function () { openRescheduleEventPopup(rescheduleId); }, 50);
+          }
+        });
+      }
+
+      function openCalendarEventDetailPopup(eventId) {
+        if (!window.Swal || typeof window.Swal.fire !== "function") {
+          showToast("error", "No esta disponible el detalle del evento.");
+          return;
+        }
+        var row = calendarEventById(eventId);
+        if (!row) {
+          showToast("error", "No encontre el evento seleccionado.");
+          return;
+        }
+        window.Swal.fire({
+          title: "",
+          html: calendarEventDetailHtml(row),
+          width: 720,
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal" },
+          confirmButtonText: "Cerrar",
+          showCancelButton: false,
+          didOpen: function () { bindCalendarNativePopupActions(row); },
+        });
+      }
+
+      function openCalendarTicketDetailPopup(ticketId, eventId) {
+        ticketId = String(ticketId || "").trim();
+        if (!ticketId) {
+          showToast("warning", "Este evento no tiene ticket relacionado.");
+          return;
+        }
+        if (openLoadedNativeTicket(ticketId)) return;
+        if (!window.Swal || typeof window.Swal.fire !== "function") {
+          showToast("error", "No esta disponible el detalle del ticket.");
+          return;
+        }
+        var eventRow = calendarEventById(eventId) || calendarEventByTicket(ticketId) || {};
+        var employeeId = getEventEmployeeId(eventRow) || selectedEmployeeFromFilter();
+        window.Swal.fire({
+          title: "",
+          html: '<div class="scm-calendar-report-loading">Cargando detalle del ticket...</div>',
+          width: 760,
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal" },
+          confirmButtonText: "Cerrar",
+          showCancelButton: false,
+          didOpen: function () {
+            var popup = window.Swal.getPopup();
+            var container = popup ? popup.querySelector(".swal2-html-container") : null;
+            var finish = function (ticket) {
+              if (container) container.innerHTML = calendarTicketDetailHtml(ticket, eventRow, ticketId);
+              bindCalendarNativePopupActions(eventRow);
+            };
+            if (!employeeId) {
+              finish(null);
+              return;
+            }
+            loadTicketsForEmployee(employeeId).then(function (rows) {
+              finish(findTicketInRows(ticketId, rows));
+            }).catch(function () {
+              finish(null);
+            });
+          },
+        });
       }
 
       function openRescheduleEventPopup(eventId) {
@@ -1932,7 +2154,7 @@
               if (!json || !json.success) throw new Error((json && json.message) || "No se pudo marcar el evento como realizado.");
               return json;
             }).catch(function (err) {
-              window.Swal.showValidationMessage(err.message || "No se pudo marcar el evento como realizado.");
+              window.Swal.showValidationMessage(compactCalendarActionMessage(err && err.message) || "No se pudo marcar el evento como realizado.");
               return false;
             });
           },
@@ -1950,14 +2172,12 @@
         return '<div class="scm-calendar-report-events scm-calendar-pending-events">' + rows.map(function (row) {
           var id = String(row.id || row._ID || row.event_id || "").trim();
           var ticket = String(row.id_ticket || "").trim();
-          var eventoUrl = id ? buildCalendarUrl("/evento/" + encodeURIComponent(id)) : "";
-          var ticketUrl = ticket ? "https://sucasainmobiliaria.com.co/ticket/?id_ticket=" + encodeURIComponent(ticket) : "";
           return '<article class="scm-calendar-report-event scm-calendar-pending-event-card">' +
             '<div class="scm-calendar-pending-event-head"><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + '</span></div>' +
             '<p class="scm-calendar-pending-event-meta"><b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (ticket ? ' <b>Ticket:</b> #' + escHtml(ticket) : "") + '</p>' +
             '<div class="scm-calendar-event-actions scm-calendar-pending-event-actions">' +
-            (eventoUrl ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-open-iframe data-iframe-url="' + escHtml(eventoUrl) + '" data-iframe-title="Evento #' + escHtml(id) + '">Ver evento</button>' : "") +
-            (ticketUrl ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-open-iframe data-iframe-url="' + escHtml(ticketUrl) + '" data-iframe-title="Ticket #' + escHtml(ticket) + '">Ver ticket</button>' : "") +
+            (id ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Ver evento</button>' : "") +
+            (ticket ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver ticket</button>' : "") +
             (id ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--primary" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Marcar realizado</button>' : "") +
             '</div>' +
             '</article>';
@@ -1989,20 +2209,28 @@
               .then(function (json) {
                 if (!json || !json.success) throw new Error((json && json.message) || "No se pudieron cargar pendientes.");
                 var rows = filterRowsByAllowedEmployees(extractRows(json.data || []));
+                calendarPendingRows = rows;
                 if (content) content.innerHTML = pendingEventRowsHtml(rows);
               })
               .catch(function (err) {
                 if (content) content.innerHTML = '<div class="scm-calendar-report-empty">No se pudieron cargar los pendientes: ' + escHtml(err.message || "Error") + '</div>';
-              });
+            });
             if (popup) {
               popup.addEventListener("click", function (event) {
-                var iframeBtn = event.target && event.target.closest ? event.target.closest("[data-scm-open-iframe]") : null;
-                if (iframeBtn) {
+                var eventViewBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-view-event]") : null;
+                if (eventViewBtn) {
                   event.preventDefault();
-                  openIframeModal(
-                    iframeBtn.dataset.iframeUrl || "",
-                    iframeBtn.dataset.iframeTitle || "",
-                    iframeBtn.hasAttribute("data-scm-compact-iframe"),
+                  window.Swal.close();
+                  openCalendarEventDetailPopup(eventViewBtn.getAttribute("data-event-id") || "");
+                  return;
+                }
+                var ticketViewBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-view-ticket]") : null;
+                if (ticketViewBtn) {
+                  event.preventDefault();
+                  window.Swal.close();
+                  openCalendarTicketDetailPopup(
+                    ticketViewBtn.getAttribute("data-ticket-id") || "",
+                    ticketViewBtn.getAttribute("data-event-id") || "",
                   );
                   return;
                 }
@@ -2617,6 +2845,21 @@
       });
 
       panel.addEventListener("click", function (e) {
+        var eventViewBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-view-event]") : null;
+        if (eventViewBtn && panel.contains(eventViewBtn)) {
+          e.preventDefault();
+          openCalendarEventDetailPopup(eventViewBtn.getAttribute("data-event-id") || "");
+          return;
+        }
+        var ticketViewBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-view-ticket]") : null;
+        if (ticketViewBtn && panel.contains(ticketViewBtn)) {
+          e.preventDefault();
+          openCalendarTicketDetailPopup(
+            ticketViewBtn.getAttribute("data-ticket-id") || "",
+            ticketViewBtn.getAttribute("data-event-id") || "",
+          );
+          return;
+        }
         var completeBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-complete-event]") : null;
         if (completeBtn && panel.contains(completeBtn)) {
           e.preventDefault();

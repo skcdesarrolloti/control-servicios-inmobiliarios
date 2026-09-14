@@ -3560,6 +3560,38 @@
   padding-top: 10px !important;
 }
 
+.swal2-popup.scm-calendar-native-swal .swal2-html-container {
+  margin: 0 !important;
+}
+
+.swal2-popup .scm-calendar-native-detail {
+  box-shadow: none;
+  max-width: none;
+  padding: 4px 0 0 !important;
+  width: 100%;
+}
+
+.swal2-popup .scm-calendar-native-detail .scm-case-calendar-event-mini-actions {
+  justify-content: flex-start;
+}
+
+.swal2-popup .scm-calendar-ticket-native-detail .scm-case-calendar-event-mini-head strong {
+  font-size: 18px;
+}
+
+.swal2-popup .scm-calendar-native-note {
+  background: #f8fafc;
+  border: 1px dashed #cfe0f4;
+  border-radius: 12px;
+  color: #60718a;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+  margin: 12px 0 0 !important;
+  padding: 10px 12px !important;
+  text-align: left;
+}
+
 @media (max-width: 1100px) {
   #scm-app .scm-calendar-layout,
   #scm-app .scm-calendar-kpis,
