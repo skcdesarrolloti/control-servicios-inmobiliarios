@@ -739,6 +739,8 @@
 
       var filterForm = panel.querySelector("[data-scm-calendar-filters]");
       var dueSettingsForm = panel.querySelector("[data-scm-calendar-due-settings]");
+      var dueTypeFilterForm = panel.querySelector("[data-scm-calendar-due-type-filter]");
+      var dueBreakdownWrap = panel.querySelector("[data-scm-calendar-due-breakdown]");
       var eventsWrap = panel.querySelector("[data-scm-calendar-events]");
       var pendingInlineWrap = panel.querySelector("[data-scm-calendar-pending-inline]");
       var monthGrid = panel.querySelector("[data-scm-calendar-grid]");
@@ -765,6 +767,7 @@
       var currentMonth = startOfMonth(new Date());
       var selectedDay = toDateKey(new Date());
       var calendarEvents = [];
+      var calendarDueAllEvents = [];
       var calendarPendingRows = [];
       var calendarDueStats = null;
       var popupAgendaRequestId = 0;
@@ -1178,12 +1181,13 @@
       }
 
       function renderKpis(rows) {
-        if (isDueCalendar && calendarDueStats) {
-          var dueTotal = Number(calendarDueStats.total || 0);
+        if (isDueCalendar) {
+          var dueStats = computeDueStats(rows || calendarEvents);
+          var dueTotal = Number(dueStats.total || 0);
           if (totalEl) totalEl.textContent = String(dueTotal);
           if (pendingEl) pendingEl.textContent = String(dueTotal);
-          if (doneEl) doneEl.textContent = String(Number(calendarDueStats.vencidos || 0));
-          if (todayEl) todayEl.textContent = String(Number(calendarDueStats.hoy || 0));
+          if (doneEl) doneEl.textContent = String(Number(dueStats.vencidos || 0));
+          if (todayEl) todayEl.textContent = String(Number(dueStats.hoy || 0));
           return;
         }
         var todayKey = toDateKey(new Date());
@@ -1219,6 +1223,7 @@
           cotizacion_id: "cotizacion-id",
           cotizacion_url: "cotizacion-url",
           cot_estado: "cot-estado",
+          id_revision_preventiva: "id-revision-preventiva",
           tab_key: "tab-key",
         };
         return Object.keys(map).map(function (key) {
@@ -1228,10 +1233,11 @@
 
       function dueEventCardHtml(row) {
         var caseData = row && row.case ? row.case : {};
-        var canOpen = String(caseData.ticket_pk || "").trim() !== "";
+        var sourceHtml = String(caseData.case_source_html || "").trim();
+        var canOpen = sourceHtml !== "";
         var overdue = String(row.estado || "").toLowerCase() === "vencido";
         var color = String(row.color || (overdue ? "#dc2626" : "#f59e0b")).trim();
-        return '<article class="scm-calendar-event-card scm-calendar-due-event-card">' +
+        return '<article class="scm-calendar-event-card scm-calendar-due-event-card scm-ticket-card">' +
           '<div class="scm-calendar-event-color" style="background:' + escHtml(color) + '"></div>' +
           '<div class="scm-calendar-event-main">' +
           '<div class="scm-calendar-event-title-row"><h5>' + escHtml(row.titulo || "Vencimiento") + '</h5><span class="scm-calendar-event-state ' + (overdue ? "is-overdue" : "is-pending") + '">' + escHtml(row.estado || "Pendiente") + "</span></div>" +
@@ -1245,7 +1251,7 @@
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
           (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>') +
-          "</div></div></article>";
+          '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div></div></article>";
       }
 
       function eventCardHtml(row) {
@@ -1347,14 +1353,90 @@
         });
       }
 
-      function renderDueCalendar(payload) {
-        payload = payload || {};
-        calendarEvents = extractRows(payload.eventos || payload.items || payload);
-        calendarDueStats = payload.stats || null;
-        applyDueSettings(payload.settings || {});
+      function activeDueTypes() {
+        if (!dueTypeFilterForm) return [];
+        return Array.prototype.slice.call(dueTypeFilterForm.querySelectorAll('input[name="due_type"]:checked'))
+          .map(function (input) { return String(input.value || "").trim(); })
+          .filter(Boolean);
+      }
+
+      function filterDueRows(rows) {
+        rows = Array.isArray(rows) ? rows : [];
+        var active = activeDueTypes();
+        if (!active.length) return [];
+        return rows.filter(function (row) {
+          return active.indexOf(String(row.tipo_vencimiento || "")) !== -1;
+        });
+      }
+
+      function computeDueStats(rows) {
+        rows = Array.isArray(rows) ? rows : [];
+        var todayKey = toDateKey(new Date());
+        var stats = {
+          total: rows.length,
+          vencidos: 0,
+          hoy: 0,
+          preventiva_sin_enviar: 0,
+          cotizacion_sin_enviar: 0,
+          cotizacion_enviada_sin_respuesta: 0,
+        };
+        rows.forEach(function (row) {
+          var type = String(row.tipo_vencimiento || "");
+          if (Object.prototype.hasOwnProperty.call(stats, type)) stats[type] += 1;
+          if (String(row.estado || "").toLowerCase() === "vencido") stats.vencidos += 1;
+          if (String(row.fecha_vencimiento || "").slice(0, 10) === todayKey) stats.hoy += 1;
+        });
+        return stats;
+      }
+
+      function dueTypeLabel(type) {
+        if (type === "preventiva_sin_enviar") return "Preventivas sin enviar";
+        if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
+        if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
+        return type || "Vencimientos";
+      }
+
+      function renderDueBreakdown(rows) {
+        if (!dueBreakdownWrap) return;
+        rows = Array.isArray(rows) ? rows : [];
+        if (!rows.length) {
+          dueBreakdownWrap.innerHTML = '<div class="scm-empty scm-empty-cards">No hay vencimientos con los filtros activos en este mes.</div>';
+          return;
+        }
+        var groups = {};
+        rows.forEach(function (row) {
+          var type = String(row.tipo_vencimiento || "otros");
+          if (!groups[type]) groups[type] = [];
+          groups[type].push(row);
+        });
+        dueBreakdownWrap.innerHTML = Object.keys(groups).map(function (type) {
+          var groupRows = groups[type].slice().sort(function (a, b) {
+            return String(a.fecha_vencimiento || "").localeCompare(String(b.fecha_vencimiento || ""));
+          });
+          var items = groupRows.slice(0, 12).map(function (row) {
+            return '<li><strong>' + escHtml(row.fecha_vencimiento || "-") + '</strong><span>' + escHtml(row.titulo || "Vencimiento") + '</span><em>' + escHtml(row.estado || "Pendiente") + "</em></li>";
+          }).join("");
+          var more = groupRows.length > 12 ? '<p class="scm-calendar-due-breakdown-more">+' + String(groupRows.length - 12) + " adicionales</p>" : "";
+          return '<article class="scm-calendar-due-breakdown-group"><header><span>' + escHtml(dueTypeLabel(type)) + '</span><strong>' + String(groupRows.length) + '</strong></header><ul>' + items + "</ul>" + more + "</article>";
+        }).join("");
+      }
+
+      function applyDueFilters() {
+        calendarEvents = filterDueRows(calendarDueAllEvents);
+        calendarDueStats = computeDueStats(calendarEvents);
         renderKpis(calendarEvents);
         renderCalendarGrid();
         renderSelectedDay();
+        renderDueBreakdown(calendarEvents);
+      }
+
+      function renderDueCalendar(payload) {
+        payload = payload || {};
+        calendarDueAllEvents = extractRows(payload.eventos || payload.items || payload);
+        calendarEvents = filterDueRows(calendarDueAllEvents);
+        calendarDueStats = computeDueStats(calendarEvents);
+        applyDueSettings(payload.settings || {});
+        applyDueFilters();
       }
 
       function loadDueCalendar() {
@@ -1370,8 +1452,10 @@
           })
           .catch(function (err) {
             calendarEvents = [];
+            calendarDueAllEvents = [];
             calendarDueStats = null;
             renderKpis(calendarEvents);
+            renderDueBreakdown(calendarEvents);
             if (monthGrid) monthGrid.innerHTML = '<div class="scm-calendar-loading">No se pudieron cargar los vencimientos.</div>';
             if (eventsWrap) eventsWrap.innerHTML = '<div class="scm-empty scm-empty-cards">No se pudieron cargar vencimientos administrativos.</div>';
             showToast("error", err.message || "No se pudieron cargar vencimientos.");
@@ -2986,6 +3070,12 @@
             .finally(function () {
               if (spinner) spinner.classList.remove("active");
             });
+        });
+      }
+
+      if (dueTypeFilterForm) {
+        dueTypeFilterForm.addEventListener("change", function () {
+          applyDueFilters();
         });
       }
 
@@ -13600,6 +13690,22 @@
     });
 
     root.addEventListener("click", function (event) {
+      var dueSettingsShortcut = event.target.closest("[data-scm-open-due-settings]");
+      if (dueSettingsShortcut) {
+        event.preventDefault();
+        var homeTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-inicio"]');
+        if (homeTab) homeTab.click();
+        window.setTimeout(function () {
+          var dueTab = root.querySelector('[data-calendar-section-target="scm-home-calendar-section-due"]');
+          if (dueTab) dueTab.click();
+          var dueSettings = root.querySelector(".scm-calendar-due-settings-card");
+          if (dueSettings && dueSettings.scrollIntoView) {
+            dueSettings.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }, 80);
+        return;
+      }
+
       var retryButton = event.target.closest("[data-scm-home-retry]");
       if (retryButton) {
         dashboardHomePromise = null;

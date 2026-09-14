@@ -2022,6 +2022,38 @@
   border-top: 3px solid #f59e0b;
 }
 
+#scm-app .scm-calendar-due-filter-card {
+  border-top: 3px solid #2563eb;
+}
+
+#scm-app .scm-calendar-due-type-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+#scm-app .scm-calendar-due-type-filter label {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #dbe6f2;
+  border-radius: 10px;
+  color: #334155;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+#scm-app .scm-calendar-due-type-filter input {
+  accent-color: #f59e0b;
+}
+
+#scm-app .scm-calendar-due-type-filter span {
+  font-size: 12px;
+  font-weight: 900;
+}
+
 #scm-app .scm-calendar-due-settings-form {
   align-items: end;
   display: grid;
@@ -2072,9 +2104,100 @@
   padding: 4px 8px;
 }
 
+#scm-app .scm-calendar-due-breakdown-card {
+  margin-top: 14px;
+}
+
+#scm-app .scm-calendar-due-breakdown {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#scm-app .scm-calendar-due-breakdown-group {
+  background: #fff;
+  border: 1px solid #dbe6f2;
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+#scm-app .scm-calendar-due-breakdown-group header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+#scm-app .scm-calendar-due-breakdown-group header span {
+  color: #0f2742;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+#scm-app .scm-calendar-due-breakdown-group header strong {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  color: #9a3412;
+  font-size: 13px;
+  min-width: 34px;
+  padding: 4px 8px;
+  text-align: center;
+}
+
+#scm-app .scm-calendar-due-breakdown-group ul {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#scm-app .scm-calendar-due-breakdown-group li {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #edf2f7;
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  padding: 8px 10px;
+}
+
+#scm-app .scm-calendar-due-breakdown-group li strong,
+#scm-app .scm-calendar-due-breakdown-group li em {
+  color: #64748b;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+#scm-app .scm-calendar-due-breakdown-group li span {
+  color: #0f2742;
+  font-size: 12px;
+  font-weight: 850;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#scm-app .scm-calendar-due-breakdown-more {
+  color: #f59e0b;
+  font-size: 12px;
+  font-weight: 900;
+  margin: 0;
+}
+
 @media (max-width: 1100px) {
   #scm-app .scm-calendar-due-settings-form {
     grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  #scm-app .scm-calendar-due-breakdown {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -823,6 +823,7 @@ trait HandlesTicketWorkflowActions
 
     $this->jsonOk([
       'settings' => $settings,
+      'can_configure' => $this->canManageDashboardPermissions(),
       'eventos' => $items,
       'items' => $items,
       'stats' => $stats,
@@ -832,7 +833,7 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_admin_due_settings_save(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('preventivas_pendientes')) {
+    if (!$this->canManageDashboardPermissions()) {
       $this->jsonFail('No tienes permiso para configurar vencimientos administrativos.');
     }
 
@@ -987,19 +988,21 @@ trait HandlesTicketWorkflowActions
   /** @param array<string,int> $settings @return array<int,array<string,mixed>> */
   private function adminDuePreventivaItems(array $settings, int $fromTs, int $toTs): array
   {
-    $table = $this->db->table('jet_cct_tickets');
+    $table = $this->db->table('jet_cct_revision_preventiva');
     if (!$this->table_exists($table)) {
       return [];
     }
 
     $rows = $this->db->getResults(
-      "SELECT * FROM `{$table}` WHERE LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) LIKE '%preventiva%' ORDER BY `_ID` DESC LIMIT 2000"
+      "SELECT * FROM `{$table}` ORDER BY COALESCE(UNIX_TIMESTAMP(`cct_created`), `_ID`) DESC LIMIT 2000"
     );
     $items = [];
     $days = (int) $settings['preventivas_dias'];
     foreach ($rows as $row) {
-      $estado = strtolower(trim((string) ($row['estado'] ?? '')));
-      if (in_array($estado, ['cerrado', 'cerrada', 'finalizado', 'finalizada'], true)) {
+      if ($this->adminDueIsTruthy($row['se_envio'] ?? '')) {
+        continue;
+      }
+      if ($this->adminDueFirstTimestamp($row, ['fecha_envio']) > 0) {
         continue;
       }
       $baseTs = $this->adminDueFirstTimestamp($row, ['cct_created', 'fecha']);
@@ -1011,18 +1014,18 @@ trait HandlesTicketWorkflowActions
         continue;
       }
 
-      $ticketLabel = trim((string) ($row['id_ticket'] ?? $row['_ID'] ?? '-'));
+      $revisionId = trim((string) ($row['_ID'] ?? '-'));
       $items[] = $this->adminDueEvent([
-        'id' => 'prev-' . trim((string) ($row['_ID'] ?? $ticketLabel)),
-        'type' => 'preventiva',
-        'group' => 'Preventivas',
-        'title' => 'Preventiva #' . $ticketLabel,
-        'description' => 'Vence ' . $days . ' día(s) después de crear el ticket preventivo.',
+        'id' => 'prev-' . $revisionId,
+        'type' => 'preventiva_sin_enviar',
+        'group' => 'Preventivas sin enviar',
+        'title' => 'Preventiva #' . $revisionId . ' sin enviar',
+        'description' => 'Vence ' . $days . ' día(s) después de crear la revisión preventiva.',
         'color' => '#2563eb',
         'base_ts' => $baseTs,
         'due_ts' => (int) $dueTs,
         'days_limit' => $days,
-        'case' => $this->adminDueCaseDataFromTicket($row, 'preventiva'),
+        'case' => $this->adminDueCaseDataFromPreventivaRevision($row),
       ]);
     }
     return $items;
@@ -1088,9 +1091,9 @@ trait HandlesTicketWorkflowActions
       'total' => count($items),
       'vencidos' => 0,
       'hoy' => 0,
-      'cotizaciones_sin_enviar' => 0,
-      'cotizaciones_enviadas_sin_respuesta' => 0,
-      'preventivas' => 0,
+      'cotizacion_sin_enviar' => 0,
+      'cotizacion_enviada_sin_respuesta' => 0,
+      'preventiva_sin_enviar' => 0,
     ];
     foreach ($items as $item) {
       $type = (string) ($item['tipo_vencimiento'] ?? '');
@@ -1111,13 +1114,16 @@ trait HandlesTicketWorkflowActions
   private function adminDueCaseDataFromQuote(array $row, bool $sent): array
   {
     $id = trim((string) ($row['_ID'] ?? ''));
-    $ticket = trim((string) ($row['id_ticket'] ?? ''));
+    $ticketRef = trim((string) ($row['id_ticket'] ?? ''));
+    $ticketRow = $this->adminDueTicketByReference($ticketRef);
+    $ticketPk = trim((string) ($ticketRow['_ID'] ?? $ticketRef));
+    $ticketLabel = trim((string) ($ticketRow['id_ticket'] ?? $ticketRef));
     $createdTs = $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
     $estado = trim((string) ($row['estado'] ?? ''));
     $inmueble = trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? ''));
     return [
-      'ticket' => $ticket !== '' ? $ticket : '-',
-      'ticket_pk' => $ticket,
+      'ticket' => $ticketLabel !== '' ? $ticketLabel : ('Cot ' . ($id !== '' ? $id : '-')),
+      'ticket_pk' => $ticketPk,
       'asunto' => trim((string) ($row['asunto'] ?? $row['categoria_cotizacion'] ?? 'Cotización de mantenimiento')),
       'estado' => trim((string) ($row['estado_ticket'] ?? $row['estado_caso'] ?? '-')) ?: '-',
       'admin' => trim((string) ($row['estado_administrativo'] ?? $row['estado_administrativo_ticket'] ?? '-')) ?: '-',
@@ -1134,36 +1140,99 @@ trait HandlesTicketWorkflowActions
       'cotizacion_url' => $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '',
       'cot_estado' => $estado !== '' ? $estado : ($sent ? 'Enviada sin respuesta' : 'Sin enviar'),
       'tab_key' => 'mantenimiento',
+      'case_source_html' => $this->adminDueQuoteCaseSourceHtml($row, $sent, $ticketPk !== '' ? (int) $ticketPk : 0),
     ];
   }
 
   /** @param array<string,mixed> $row @return array<string,string> */
-  private function adminDueCaseDataFromTicket(array $row, string $tabKey): array
+  private function adminDueCaseDataFromPreventivaRevision(array $row): array
   {
-    $ticketPk = trim((string) ($row['_ID'] ?? ''));
-    $ticketLabel = trim((string) ($row['id_ticket'] ?? $ticketPk));
+    $revisionId = trim((string) ($row['_ID'] ?? ''));
+    $ticketRef = trim((string) ($row['id_ticket'] ?? $row['ticket_id'] ?? $row['numero_ticket'] ?? ''));
+    $ticket = $this->adminDueTicketByReference($ticketRef);
+    $ticketPk = trim((string) ($ticket['_ID'] ?? ''));
+    $ticketLabel = trim((string) ($ticket['id_ticket'] ?? $ticketRef));
     $createdTs = $this->adminDueFirstTimestamp($row, ['cct_created', 'fecha']);
     return [
-      'ticket' => $ticketLabel !== '' ? $ticketLabel : '-',
+      'ticket' => $ticketLabel !== '' ? $ticketLabel : ('Rev ' . ($revisionId !== '' ? $revisionId : '-')),
       'ticket_pk' => $ticketPk !== '' ? $ticketPk : $ticketLabel,
-      'asunto' => trim((string) ($row['asunto'] ?? 'Revisión preventiva')),
-      'estado' => trim((string) ($row['estado'] ?? '')) ?: '-',
-      'admin' => trim((string) ($row['estado_administrativo'] ?? '')) ?: '-',
-      'contrato' => trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? '')) !== '' ? '#' . trim((string) ($row['contrato'] ?? $row['id_contrato'])) : '-',
+      'asunto' => 'Revisión preventiva sin enviar',
+      'estado' => trim((string) ($ticket['estado'] ?? $row['cct_status'] ?? '')) ?: '-',
+      'admin' => trim((string) ($ticket['estado_administrativo'] ?? '')) ?: '-',
+      'contrato' => trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? $ticket['contrato'] ?? $ticket['id_contrato'] ?? '')) !== '' ? '#' . trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? $ticket['contrato'] ?? $ticket['id_contrato'])) : '-',
       'inmueble' => trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '')) ?: '-',
       'id_inmueble_web' => trim((string) ($row['id_inmueble'] ?? '')) ?: '-',
       'barrio' => trim((string) ($row['barrio'] ?? '')) ?: '-',
       'direccion' => trim((string) ($row['direccion'] ?? '')) ?: '-',
       'creado' => $createdTs > 0 ? date('d/m/Y', $createdTs) : '-',
-      'empleado' => trim((string) ($row['nombre_empleado'] ?? $row['empleado'] ?? $row['id_empleado'] ?? '')) ?: '-',
+      'empleado' => trim((string) ($ticket['nombre_empleado'] ?? $ticket['empleado'] ?? $row['empleado'] ?? $row['id_empleado'] ?? '')) ?: '-',
       'empleado_id' => trim((string) ($row['id_empleado'] ?? '')),
       'propietario' => trim((string) ($row['propietario'] ?? '')),
       'arrendatario' => trim((string) ($row['arrendatario'] ?? '')),
-      'cotizacion_id' => trim((string) ($row['id_cotizacion_mantenimiento'] ?? '')),
-      'cotizacion_url' => trim((string) ($row['id_cotizacion_mantenimiento'] ?? '')) !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode(trim((string) ($row['id_cotizacion_mantenimiento'] ?? ''))) : '',
-      'cot_estado' => trim((string) ($row['estado_cotizacion_mantenimiento'] ?? '')),
-      'tab_key' => $tabKey,
+      'id_revision_preventiva' => $revisionId,
+      'tab_key' => 'preventiva',
+      'case_source_html' => $this->adminDuePreventivaCaseSourceHtml($row, $ticket),
     ];
+  }
+
+  /** @return array<string,mixed> */
+  private function adminDueTicketByReference(string $ticketRef): array
+  {
+    $ticketRef = trim($ticketRef);
+    if ($ticketRef === '') {
+      return [];
+    }
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+    $row = $this->db->getRow(
+      "SELECT * FROM `{$table}` WHERE `_ID` = ? OR TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 1",
+      [(int) $ticketRef, $ticketRef]
+    );
+    return is_array($row) ? $row : [];
+  }
+
+  /** @param array<string,mixed> $row */
+  private function adminDueQuoteCaseSourceHtml(array $row, bool $sent, int $ticketPk): string
+  {
+    $cotizacionId = trim((string) ($row['_ID'] ?? ''));
+    $estado = trim((string) ($row['estado'] ?? '')) ?: ($sent ? 'Enviada sin respuesta' : 'Sin enviar');
+    $html = '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">'
+      . esc_html('Control de vencimiento para cotización #' . ($cotizacionId !== '' ? $cotizacionId : '-') . '.')
+      . '</div></div>';
+    if ($ticketPk > 0) {
+      $html .= '<div class="scm-seg-wrap">' . $this->render_seguimiento_form($ticketPk, Auth::isLoggedIn(), true) . '</div>';
+    }
+    $html .= '<section class="scm-case-history"><h4>Detalle del vencimiento</h4><article class="scm-case-history-item"><div class="scm-case-history-detail">'
+      . '<p><strong>Tipo:</strong> ' . esc_html($sent ? 'Cotización enviada sin respuesta' : 'Cotización sin enviar') . '</p>'
+      . '<p><strong>Cotización:</strong> #' . esc_html($cotizacionId !== '' ? $cotizacionId : '-') . '</p>'
+      . '<p><strong>Estado:</strong> ' . esc_html($estado) . '</p>'
+      . '<p><strong>Inmueble:</strong> ' . esc_html((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '-')) . '</p>'
+      . '<p><strong>Dirección:</strong> ' . esc_html((string) ($row['direccion'] ?? '-')) . '</p>'
+      . '</div></article></section>';
+    return $html;
+  }
+
+  /** @param array<string,mixed> $row @param array<string,mixed> $ticket */
+  private function adminDuePreventivaCaseSourceHtml(array $row, array $ticket): string
+  {
+    $ticketPk = (int) ($ticket['_ID'] ?? 0);
+    $revisionId = trim((string) ($row['_ID'] ?? ''));
+    $html = '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">'
+      . esc_html('Control de vencimiento para revisión preventiva #' . ($revisionId !== '' ? $revisionId : '-') . ' sin enviar.')
+      . '</div></div>';
+    if ($ticketPk > 0) {
+      $html .= '<div class="scm-seg-wrap">' . $this->render_seguimiento_form($ticketPk, Auth::isLoggedIn(), false) . '</div>';
+    }
+    $html .= '<section class="scm-case-history"><h4>Detalle de la revisión preventiva</h4><article class="scm-case-history-item"><div class="scm-case-history-detail">'
+      . '<p><strong>Revisión preventiva:</strong> #' . esc_html($revisionId !== '' ? $revisionId : '-') . '</p>'
+      . '<p><strong>Envío:</strong> Sin enviar</p>'
+      . '<p><strong>Contrato:</strong> ' . esc_html((string) ($row['contrato'] ?? $row['id_contrato'] ?? '-')) . '</p>'
+      . '<p><strong>Inmueble:</strong> ' . esc_html((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '-')) . '</p>'
+      . '<p><strong>Dirección:</strong> ' . esc_html((string) ($row['direccion'] ?? '-')) . '</p>'
+      . '</div></article></section>';
+    return $html;
   }
 
   public function ajax_handler_contratos_arrendamiento(): void

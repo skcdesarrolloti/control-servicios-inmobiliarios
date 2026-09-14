@@ -587,6 +587,7 @@ trait RendersDashboard
       <div class="scm-guide-bar">
         <?php if ($canManageDashboardPermissions): ?>
           <button class="scm-guide-btn scm-permissions-btn" type="button" id="scm-open-permissions">Configurar permisos</button>
+          <button class="scm-guide-btn scm-due-settings-shortcut" type="button" data-scm-open-due-settings>Configurar vencimientos</button>
         <?php endif; ?>
         <?php if ($canManagePublicPqrSettings): ?>
           <button class="scm-guide-btn scm-pqr-settings-shortcut" type="button" id="scm-open-pqr-settings">Configurar notificaciones</button>
@@ -1884,6 +1885,7 @@ trait RendersDashboard
     $showCreateActions = !array_key_exists('show_create_actions', $options) || (bool) $options['show_create_actions'];
     $showPendingAction = !array_key_exists('show_pending_action', $options) || (bool) $options['show_pending_action'];
     $showReportAction = !array_key_exists('show_report_action', $options) || (bool) $options['show_report_action'];
+    $canConfigureDueCalendar = $this->canManageDashboardPermissions();
     $employeeLabel = $mode === 'personal' ? 'Funcionario' : 'Funcionario';
     $employeePlaceholder = $mode === 'personal' ? 'Mi calendario' : 'Selecciona funcionario';
 
@@ -1896,6 +1898,7 @@ trait RendersDashboard
       data-calendar-lock-current="<?php echo $mode === 'personal' ? '1' : '0'; ?>"
       data-calendar-app-url="<?php echo esc_attr($appUrl); ?>"
       data-calendar-api-url="<?php echo esc_attr($apiUrl); ?>"
+      data-calendar-can-configure="<?php echo $canConfigureDueCalendar ? '1' : '0'; ?>"
       data-calendar-current-employee-id="<?php echo esc_attr($currentCalendarEmployeeId); ?>"
       data-calendar-allowed-cargos="<?php echo esc_attr(implode(',', array_map('strval', $allowedCargos))); ?>"
       data-calendar-employees-json="<?php echo esc_attr($allowedFuncionariosJson ?: '[]'); ?>">
@@ -1942,7 +1945,7 @@ trait RendersDashboard
       </section>
       <?php endif; ?>
 
-      <?php if ($view === 'pending'): ?>
+      <?php if ($view === 'pending' && $canConfigureDueCalendar): ?>
         <section class="scm-calendar-card scm-calendar-due-settings-card">
           <div class="scm-calendar-card-head">
             <div>
@@ -1954,9 +1957,25 @@ trait RendersDashboard
           </div>
           <form class="scm-calendar-due-settings-form" data-scm-calendar-due-settings autocomplete="off">
             <label class="scm-field"><span>Cotizaciones sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="3"><small>D&iacute;as desde la creaci&oacute;n.</small></label>
-            <label class="scm-field"><span>Preventivas</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="3"><small>D&iacute;as desde la creaci&oacute;n del ticket.</small></label>
+            <label class="scm-field"><span>Preventivas sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="3"><small>D&iacute;as desde que se crea la revisi&oacute;n preventiva.</small></label>
             <label class="scm-field"><span>Cotizaciones enviadas sin respuesta</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="10"><small>D&iacute;as desde el env&iacute;o.</small></label>
             <div class="scm-actions"><button class="scm-btn-primary btn btn-primary" type="submit">Guardar configuraci&oacute;n</button><span class="scm-spinner" data-scm-calendar-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span></div>
+          </form>
+        </section>
+      <?php endif; ?>
+      <?php if ($view === 'pending'): ?>
+        <section class="scm-calendar-card scm-calendar-due-filter-card">
+          <div class="scm-calendar-card-head">
+            <div>
+              <span class="scm-calendar-action-kicker">Filtro</span>
+              <h4>Tipo de vencimiento</h4>
+              <p>Filtra el calendario y el desglose mensual por el control que necesitas revisar.</p>
+            </div>
+          </div>
+          <form class="scm-calendar-due-type-filter" data-scm-calendar-due-type-filter autocomplete="off">
+            <label><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked> <span>Preventivas sin enviar</span></label>
+            <label><input type="checkbox" name="due_type" value="cotizacion_sin_enviar" checked> <span>Cotizaciones sin enviar</span></label>
+            <label><input type="checkbox" name="due_type" value="cotizacion_enviada_sin_respuesta" checked> <span>Cotizaciones sin respuesta</span></label>
           </form>
         </section>
       <?php endif; ?>
@@ -1995,6 +2014,20 @@ trait RendersDashboard
           <?php endif; ?>
         </section>
       </div>
+      <?php if ($view === 'pending'): ?>
+        <section class="scm-calendar-card scm-calendar-due-breakdown-card">
+          <div class="scm-calendar-card-head">
+            <div>
+              <span class="scm-calendar-action-kicker">Desglose</span>
+              <h4>Vencimientos del mes</h4>
+              <p>Resumen agrupado por tipo de control y fecha de vencimiento visible.</p>
+            </div>
+          </div>
+          <div class="scm-calendar-due-breakdown" data-scm-calendar-due-breakdown>
+            <div class="scm-calendar-loading">Cargando desglose...</div>
+          </div>
+        </section>
+      <?php endif; ?>
     </div>
 <?php
     return (string) ob_get_clean();
