@@ -668,7 +668,7 @@
             showConfirmButton: false,
             showCancelButton: false,
             buttonsStyling: false,
-            footer: '<button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--primary" data-scm-dashboard-due-open-calendar>Ir a calendario de vencidos</button><button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary" data-scm-dashboard-due-close>Cerrar</button>',
+            footer: '<button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--primary" data-scm-dashboard-due-open-calendar>Ver calendario</button><button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary" data-scm-dashboard-due-close>Cerrar</button>',
             customClass: {
               popup: "scm-calendar-swal-popup scm-due-entry-swal",
             },
@@ -1121,7 +1121,6 @@
       var calendarPendingRows = [];
       var calendarDueStats = null;
       var calendarDueSettings = {};
-      var dueEntryPopupShown = false;
       var popupAgendaRequestId = 0;
       var ticketCacheByEmployee = {};
       var holidayCache = {};
@@ -1853,61 +1852,6 @@
         }).join("");
       }
 
-      function dueEntryPopupHtml(rows) {
-        rows = Array.isArray(rows) ? rows.slice() : [];
-        rows.sort(function (a, b) {
-          var overdue = Number(b.dias_vencido || 0) - Number(a.dias_vencido || 0);
-          if (overdue !== 0) return overdue;
-          return String(a.fecha_vencimiento || "").localeCompare(String(b.fecha_vencimiento || ""));
-        });
-        var stats = computeDueStats(rows);
-        var groups = {};
-        rows.forEach(function (row) {
-          var type = String(row.tipo_vencimiento || "otros");
-          if (!groups[type]) groups[type] = 0;
-          groups[type] += 1;
-        });
-        var groupHtml = Object.keys(groups).map(function (type) {
-          return '<div><span>' + escHtml(dueTypeLabel(type)) + '</span><strong>' + escHtml(String(groups[type])) + '</strong></div>';
-        }).join("");
-        var detailRows = rows.slice(0, 18).map(function (row) {
-          return '<div class="scm-due-entry-row">' +
-            '<strong>' + escHtml(row.fecha_vencimiento || "-") + "</strong>" +
-            '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
-            '<em>' + escHtml(row.estado || "Pendiente") + (Number(row.dias_vencido || 0) > 0 ? " · " + escHtml(String(row.dias_vencido)) + " día(s)" : "") + "</em>" +
-            "</div>";
-        }).join("");
-        var more = rows.length > 18 ? '<p class="scm-due-entry-more">+' + escHtml(String(rows.length - 18)) + " vencimiento(s) adicionales en el calendario.</p>" : "";
-        return '<div class="scm-due-entry-popup">' +
-          '<div class="scm-due-entry-kpis">' +
-          '<div><span>Total en control</span><strong>' + escHtml(String(stats.total || 0)) + "</strong></div>" +
-          '<div><span>Vencidos</span><strong>' + escHtml(String(stats.vencidos || 0)) + "</strong></div>" +
-          '<div><span>Vencen hoy</span><strong>' + escHtml(String(stats.hoy || 0)) + "</strong></div>" +
-          "</div>" +
-          '<div class="scm-due-entry-groups">' + groupHtml + "</div>" +
-          '<div class="scm-due-entry-list">' + detailRows + "</div>" +
-          more +
-          "</div>";
-      }
-
-      function maybeShowDueEntryPopup() {
-        if (!isDueCalendar || dueEntryPopupShown || !window.Swal) return;
-        var rows = Array.isArray(calendarDueAllEvents) ? calendarDueAllEvents : [];
-        if (!rows.length) return;
-        dueEntryPopupShown = true;
-        window.Swal.fire({
-          title: "Vencimientos administrativos",
-          html: dueEntryPopupHtml(rows),
-          width: "min(980px, 94vw)",
-          confirmButtonText: "Revisar calendario",
-          buttonsStyling: false,
-          customClass: {
-            popup: "scm-calendar-swal-popup scm-due-entry-swal",
-            confirmButton: "scm-btn-primary",
-          },
-        });
-      }
-
       function applyDueFilters() {
         calendarEvents = filterDueRows(calendarDueAllEvents);
         calendarDueStats = computeDueStats(calendarEvents);
@@ -2004,7 +1948,6 @@
         return dashboardAjax(actionAdminDueCalendar, { fecha_inicio: range.from, fecha_fin: range.to })
           .then(function (data) {
             renderDueCalendar(data || {});
-            maybeShowDueEntryPopup();
           })
           .catch(function (err) {
             calendarEvents = [];
