@@ -826,7 +826,11 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_admin_due_calendar(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('preventivas_pendientes')) {
+    if (
+      !$this->canAccessDashboardTab('cotizaciones_mantenimiento')
+      && !$this->canAccessDashboardTab('preventivas_pendientes')
+      && !$this->canAccessDashboardTab('servicios_publicos_pendientes')
+    ) {
       $this->jsonFail('No tienes permiso para ver vencimientos administrativos.');
     }
 
@@ -847,7 +851,11 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_admin_due_case(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('preventivas_pendientes')) {
+    if (
+      !$this->canAccessDashboardTab('cotizaciones_mantenimiento')
+      && !$this->canAccessDashboardTab('preventivas_pendientes')
+      && !$this->canAccessDashboardTab('servicios_publicos_pendientes')
+    ) {
       $this->jsonFail('No tienes permiso para ver vencimientos administrativos.');
     }
 
@@ -978,6 +986,9 @@ trait HandlesTicketWorkflowActions
     if ($this->canAccessDashboardTab('preventivas_pendientes')) {
       $items = array_merge($items, $this->adminDuePreventivaItems($settings, $fromTs, $toTs));
       $items = array_merge($items, $this->adminDuePreventivaTicketItems($settings, $fromTs, $toTs));
+    }
+    if ($this->canAccessDashboardTab('servicios_publicos_pendientes')) {
+      $items = array_merge($items, $this->adminDueServiciosPublicosItems($fromTs, $toTs));
     }
 
     usort($items, static function (array $a, array $b): int {
@@ -1200,6 +1211,43 @@ trait HandlesTicketWorkflowActions
     return $items;
   }
 
+  /** @return array<int,array<string,mixed>> */
+  private function adminDueServiciosPublicosItems(int $fromTs, int $toTs): array
+  {
+    $controller = $this->get_pending_controller();
+    $payload = $controller->buildServiciosPublicosPayload([]);
+    $items = [];
+    foreach ((array) ($payload['items'] ?? []) as $item) {
+      $item = (array) $item;
+      $row = (array) ($item['row'] ?? []);
+      $dueTs = (int) ($item['due'] ?? 0);
+      if ($dueTs <= 0) {
+        continue;
+      }
+      $calendarTs = $this->adminDueCalendarPlacementTimestamp($dueTs, $fromTs, $toTs);
+      if ($calendarTs <= 0) {
+        continue;
+      }
+      $contractPk = trim((string) ($row['_ID'] ?? ''));
+      $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
+      $fallbackId = md5((string) json_encode($row));
+      $items[] = $this->adminDueEvent([
+        'id' => 'serv-pub-' . ($contractPk !== '' ? $contractPk : $fallbackId),
+        'type' => 'servicios_publicos_pendientes',
+        'group' => 'Servicios públicos pendientes',
+        'title' => 'Revisión servicios públicos contrato #' . ($contractCode !== '' ? $contractCode : '-'),
+        'description' => 'Revisión de servicios públicos pendiente por realizar.',
+        'color' => '#0ea5e9',
+        'base_ts' => (int) ($item['ultima'] ?? 0),
+        'due_ts' => $dueTs,
+        'calendar_ts' => $calendarTs,
+        'days_limit' => 0,
+        'case' => $this->adminDueLightCaseDataFromServiciosPublicos($row, $item),
+      ]);
+    }
+    return $items;
+  }
+
   private function adminDuePreventivaTicketWhereSql(string $alias): string
   {
     $p = trim($alias) !== '' ? trim($alias) . '.' : '';
@@ -1406,6 +1454,28 @@ trait HandlesTicketWorkflowActions
     ];
   }
 
+  /** @param array<string,mixed> $row @param array<string,mixed> $item @return array<string,string> */
+  private function adminDueLightCaseDataFromServiciosPublicos(array $row, array $item): array
+  {
+    $contractPk = trim((string) ($row['_ID'] ?? ''));
+    $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
+    $dueTs = (int) ($item['due'] ?? 0);
+    $lastTs = (int) ($item['ultima'] ?? 0);
+    return [
+      'public_services_review' => '1',
+      'contract_pk' => $contractPk,
+      'contract_code' => $contractCode !== '' ? $contractCode : $contractPk,
+      'contrato' => $this->adminDueHashLabel($contractCode !== '' ? $contractCode : $contractPk),
+      'inmueble' => $this->adminDueFirstText([$row], ['inmueble', 'id_inmueble']) ?: '-',
+      'id_inmueble_web' => $this->adminDueFirstText([$row], ['id_inmueble', 'inmueble']) ?: '-',
+      'direccion' => $this->adminDueFirstText([$row], ['direccion']) ?: '-',
+      'propietario' => $this->adminDueFirstText([$row], ['propietario']),
+      'arrendatario' => $this->adminDueFirstText([$row], ['arrendatario']),
+      'creado' => $lastTs > 0 ? date('d/m/Y', $lastTs) : '-',
+      'servicios_due' => $dueTs > 0 ? date('d/m/Y', $dueTs) : '-',
+    ];
+  }
+
   private function adminDueLoadingCaseSourceHtml(string $message): string
   {
     return '<div class="scm-case-description"><strong>Detalle del vencimiento:</strong><div class="scm-case-description-content">'
@@ -1485,6 +1555,7 @@ trait HandlesTicketWorkflowActions
       'preventiva_sin_enviar' => 0,
       'ticket_preventiva_sin_cita' => 0,
       'preventiva_cita_sin_realizar' => 0,
+      'servicios_publicos_pendientes' => 0,
     ];
     foreach ($items as $item) {
       $type = (string) ($item['tipo_vencimiento'] ?? '');

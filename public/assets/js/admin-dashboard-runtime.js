@@ -401,6 +401,7 @@
       if (type === "preventiva_sin_enviar") return "Preventivas sin enviar";
       if (type === "ticket_preventiva_sin_cita") return "Tickets sin cita preventiva";
       if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
+      if (type === "servicios_publicos_pendientes") return "Servicios públicos pendientes";
       if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
       if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
       return type || "Vencimientos";
@@ -469,6 +470,9 @@
         origen: "origen",
         tab_key: "tab-key",
         status_bucket: "status-bucket",
+        public_services_review: "public-services-review",
+        contract_pk: "contract-id",
+        contract_code: "contract-code",
       };
     }
 
@@ -616,6 +620,7 @@
         "ticket_preventiva_sin_cita",
         "preventiva_cita_sin_realizar",
         "preventiva_sin_enviar",
+        "servicios_publicos_pendientes",
         "cotizacion_sin_enviar",
         "cotizacion_enviada_sin_respuesta",
       ];
@@ -628,11 +633,12 @@
       var detailRows = rows.slice(0, 18).map(function (row) {
         var caseData = row && row.case ? row.case : {};
         var sourceHtml = String(caseData.case_source_html || "").trim();
+        var isPublicServices = String(caseData.public_services_review || "") === "1";
         return '<div class="scm-due-entry-row scm-ticket-card">' +
           '<strong>' + escHtml(row.fecha_vencimiento || "-") + "</strong>" +
           '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
           '<em>' + escHtml(row.estado || "Pendiente") + (Number(row.dias_vencido || 0) > 0 ? " · " + escHtml(String(row.dias_vencido)) + " día(s)" : "") + "</em>" +
-          (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" disabled>Sin caso</button>') +
+          (isPublicServices ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-services data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" disabled>Sin caso</button>')) +
           '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div>" +
           "</div>";
       }).join("");
@@ -711,6 +717,14 @@
                 if (!caseBtn || !popup.contains(caseBtn)) return;
                 event.preventDefault();
                 dashboardOpenDueCase(caseBtn);
+              });
+              popup.addEventListener("click", function (event) {
+                var servicesBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-dashboard-due-open-services]")
+                  : null;
+                if (!servicesBtn || !popup.contains(servicesBtn)) return;
+                event.preventDefault();
+                openPublicServicesReviewModal(servicesBtn);
               });
               var footer = popup.querySelector(".swal2-footer");
               if (footer) {
@@ -1636,6 +1650,9 @@
           origen: "origen",
           tab_key: "tab-key",
           status_bucket: "status-bucket",
+          public_services_review: "public-services-review",
+          contract_pk: "contract-id",
+          contract_code: "contract-code",
         };
       }
 
@@ -1685,6 +1702,7 @@
       function dueEventCardHtml(row) {
         var caseData = row && row.case ? row.case : {};
         var sourceHtml = String(caseData.case_source_html || "").trim();
+        var isPublicServices = String(caseData.public_services_review || "") === "1";
         var canOpen = sourceHtml !== "";
         var overdue = String(row.estado || "").toLowerCase() === "vencido";
         var color = String(row.color || (overdue ? "#dc2626" : "#f59e0b")).trim();
@@ -1701,7 +1719,7 @@
           (Number(row.dias_vencido || 0) > 0 ? '<span>' + escHtml(String(row.dias_vencido)) + " dia(s) vencido</span>" : "") +
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
-          (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>') +
+          (isPublicServices ? '<button type="button" class="scm-case-work-btn" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>')) +
           '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div></div></article>";
       }
 
@@ -1831,6 +1849,7 @@
           preventiva_sin_enviar: 0,
           ticket_preventiva_sin_cita: 0,
           preventiva_cita_sin_realizar: 0,
+          servicios_publicos_pendientes: 0,
           cotizacion_sin_enviar: 0,
           cotizacion_enviada_sin_respuesta: 0,
         };
@@ -1847,6 +1866,7 @@
         if (type === "preventiva_sin_enviar") return "Preventivas sin enviar";
         if (type === "ticket_preventiva_sin_cita") return "Tickets sin cita preventiva";
         if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
+        if (type === "servicios_publicos_pendientes") return "Servicios públicos pendientes";
         if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
         if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
         return type || "Vencimientos";

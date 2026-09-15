@@ -84,6 +84,7 @@
 
 #scm-app .scm-public-services-review-modal.open {
   display: flex;
+  z-index: 1000003;
 }
 
 #scm-app .scm-public-services-review-dialog {

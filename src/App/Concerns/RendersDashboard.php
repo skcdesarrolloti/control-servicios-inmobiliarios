@@ -1989,6 +1989,7 @@ trait RendersDashboard
             <label><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked> <span>Preventivas sin enviar</span></label>
             <label><input type="checkbox" name="due_type" value="ticket_preventiva_sin_cita" checked> <span>Tickets sin cita preventiva</span></label>
             <label><input type="checkbox" name="due_type" value="preventiva_cita_sin_realizar" checked> <span>Preventivas con cita sin realizar</span></label>
+            <label><input type="checkbox" name="due_type" value="servicios_publicos_pendientes" checked> <span>Servicios p&uacute;blicos pendientes</span></label>
             <label><input type="checkbox" name="due_type" value="cotizacion_sin_enviar" checked> <span>Cotizaciones sin enviar</span></label>
             <label><input type="checkbox" name="due_type" value="cotizacion_enviada_sin_respuesta" checked> <span>Cotizaciones sin respuesta</span></label>
           </form>
