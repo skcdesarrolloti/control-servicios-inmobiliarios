@@ -1986,6 +1986,7 @@ trait RendersDashboard
             </div>
           </div>
           <form class="scm-calendar-due-type-filter" data-scm-calendar-due-type-filter autocomplete="off">
+            <label><input type="checkbox" name="due_type" value="preventiva_pendiente" checked> <span>Preventivas pendientes</span></label>
             <label><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked> <span>Preventivas sin enviar</span></label>
             <label><input type="checkbox" name="due_type" value="ticket_preventiva_sin_cita" checked> <span>Tickets sin cita preventiva</span></label>
             <label><input type="checkbox" name="due_type" value="preventiva_cita_sin_realizar" checked> <span>Preventivas con cita sin realizar</span></label>

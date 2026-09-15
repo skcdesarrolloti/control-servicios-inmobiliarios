@@ -876,7 +876,7 @@ trait HandlesTicketWorkflowActions
         $case = $this->adminDueCaseDataFromPreventivaRevision($revision, true);
       }
     }
-    if ($case === [] && in_array($type, ['ticket_preventiva_sin_cita', 'preventiva_cita_sin_realizar'], true) && $this->canAccessDashboardTab('preventivas_pendientes')) {
+    if ($case === [] && in_array($type, ['ticket_preventiva_sin_cita', 'preventiva_cita_sin_realizar', 'preventiva_pendiente'], true) && $this->canAccessDashboardTab('preventivas_pendientes')) {
       $ticketRef = trim((string) ($_POST['ticket_pk'] ?? $_POST['id_ticket'] ?? $_POST['ticket'] ?? ''));
       $ticket = $this->adminDueTicketByReference($ticketRef);
       if (!empty($ticket)) {
@@ -984,6 +984,7 @@ trait HandlesTicketWorkflowActions
       $items = array_merge($items, $this->adminDueQuoteItems($settings, $fromTs, $toTs));
     }
     if ($this->canAccessDashboardTab('preventivas_pendientes')) {
+      $items = array_merge($items, $this->adminDuePreventivasPendientesItems($fromTs, $toTs));
       $items = array_merge($items, $this->adminDuePreventivaItems($settings, $fromTs, $toTs));
       $items = array_merge($items, $this->adminDuePreventivaTicketItems($settings, $fromTs, $toTs));
     }
@@ -1208,6 +1209,45 @@ trait HandlesTicketWorkflowActions
       ]);
     }
 
+    return $items;
+  }
+
+  /** @return array<int,array<string,mixed>> */
+  private function adminDuePreventivasPendientesItems(int $fromTs, int $toTs): array
+  {
+    $controller = $this->get_pending_controller();
+    $payload = $controller->buildPreventivasPayload([]);
+    $items = [];
+    foreach ((array) ($payload['items'] ?? []) as $item) {
+      $item = (array) $item;
+      $row = (array) ($item['row'] ?? []);
+      $dueTs = (int) ($item['due'] ?? 0);
+      if ($dueTs <= 0) {
+        continue;
+      }
+      $calendarTs = $this->adminDueCalendarPlacementTimestamp($dueTs, $fromTs, $toTs);
+      if ($calendarTs <= 0) {
+        continue;
+      }
+      $contractPk = trim((string) ($row['_ID'] ?? ''));
+      $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
+      $ticket = is_array($item['ticket'] ?? null) ? (array) $item['ticket'] : [];
+      $items[] = $this->adminDueEvent([
+        'id' => 'prev-pendiente-' . ($contractPk !== '' ? $contractPk : md5((string) json_encode($row))),
+        'type' => 'preventiva_pendiente',
+        'group' => 'Preventivas pendientes',
+        'title' => 'Preventiva pendiente contrato #' . ($contractCode !== '' ? $contractCode : '-'),
+        'description' => empty($ticket) ? 'Contrato pendiente para crear ticket preventivo.' : 'Contrato con ticket preventivo activo.',
+        'color' => '#14b8a6',
+        'base_ts' => (int) ($item['ultima'] ?? 0),
+        'due_ts' => $dueTs,
+        'calendar_ts' => $calendarTs,
+        'days_limit' => 0,
+        'case' => !empty($ticket)
+          ? $this->adminDueLightCaseDataFromPreventivaTicket($ticket, 'preventiva_pendiente')
+          : $this->adminDueLightCreatePreventivaTicketData($row, $item),
+      ]);
+    }
     return $items;
   }
 
@@ -1476,6 +1516,42 @@ trait HandlesTicketWorkflowActions
     ];
   }
 
+  /** @param array<string,mixed> $row @param array<string,mixed> $item @return array<string,string> */
+  private function adminDueLightCreatePreventivaTicketData(array $row, array $item): array
+  {
+    $contractPk = trim((string) ($row['_ID'] ?? ''));
+    $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
+    $dueTs = (int) ($item['due'] ?? 0);
+    $lastTs = (int) ($item['ultima'] ?? 0);
+    return [
+      'admin_ticket_create' => '1',
+      'ticket_mode' => 'preventiva',
+      'ticket_title' => 'Crear ticket preventivo',
+      'contract_pk' => $contractPk,
+      'contract_code' => $contractCode,
+      'contract_state' => (string) ($row['estado'] ?? ''),
+      'id_inmueble' => (string) ($row['id_inmueble'] ?? ''),
+      'inmueble' => (string) ($row['inmueble'] ?? ''),
+      'direccion' => (string) ($row['direccion'] ?? ''),
+      'barrio' => (string) ($row['barrio'] ?? ''),
+      'id_arrendatario' => (string) ($row['id_arrendatario'] ?? ''),
+      'arrendatario' => (string) ($row['arrendatario'] ?? ''),
+      'correo_arrendatario' => (string) ($row['correo_arrendatario'] ?? ''),
+      'celular_arrendatario' => (string) ($row['celular_arrendatario'] ?? ''),
+      'id_propietario' => (string) ($row['id_propietario'] ?? ''),
+      'propietario' => (string) ($row['propietario'] ?? ''),
+      'correo_propietario' => (string) ($row['correo_propietario'] ?? ''),
+      'celular_propietario' => (string) ($row['celular_propietario'] ?? ''),
+      'id_sucursal' => (string) ($row['id_sucursal'] ?? $row['sucursal'] ?? ''),
+      'id_inventario' => (string) ($row['id_inventario'] ?? ''),
+      'registro_fotografico' => (string) ($row['registro_fotografico'] ?? ''),
+      'fecha_final_contrato' => (string) ($row['fin_contrato'] ?? ''),
+      'contrato' => $this->adminDueHashLabel($contractCode !== '' ? $contractCode : $contractPk),
+      'creado' => $lastTs > 0 ? date('d/m/Y', $lastTs) : '-',
+      'preventiva_due' => $dueTs > 0 ? date('d/m/Y', $dueTs) : '-',
+    ];
+  }
+
   private function adminDueLoadingCaseSourceHtml(string $message): string
   {
     return '<div class="scm-case-description"><strong>Detalle del vencimiento:</strong><div class="scm-case-description-content">'
@@ -1552,6 +1628,7 @@ trait HandlesTicketWorkflowActions
       'hoy' => 0,
       'cotizacion_sin_enviar' => 0,
       'cotizacion_enviada_sin_respuesta' => 0,
+      'preventiva_pendiente' => 0,
       'preventiva_sin_enviar' => 0,
       'ticket_preventiva_sin_cita' => 0,
       'preventiva_cita_sin_realizar' => 0,
