@@ -310,17 +310,7 @@ final class GenericTicketsUiView
       return $url;
     }
 
-    $path = (string) parse_url($url, PHP_URL_PATH);
-    if ($path === '' || stripos($path, '/uploads/') === false) {
-      return $url;
-    }
-
-    $fileName = basename($path);
-    if (!$this->isSafeLegacyAttachmentName($fileName)) {
-      return $url;
-    }
-
-    return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
+    return $url;
   }
 
   private function resolveHistoryAttachmentUrlFromId(int $attachmentId): string

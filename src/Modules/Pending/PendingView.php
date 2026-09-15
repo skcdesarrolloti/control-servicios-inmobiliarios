@@ -1612,13 +1612,6 @@ final class PendingView
     }
 
     if (filter_var($url, FILTER_VALIDATE_URL)) {
-      $path = (string) parse_url($url, PHP_URL_PATH);
-      if ($path !== '' && stripos($path, '/uploads/') !== false) {
-        $fileName = basename($path);
-        if ($this->isSafePendingAttachmentName($fileName)) {
-          return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
-        }
-      }
       return $url;
     }
     if (strpos($url, 'file.php?') === 0 || strpos($url, 'legacy-file.php?') === 0) {

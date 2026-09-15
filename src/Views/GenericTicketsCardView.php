@@ -840,13 +840,6 @@ final class GenericTicketsCardView
     }
 
     if (filter_var($url, FILTER_VALIDATE_URL)) {
-      $path = (string) parse_url($url, PHP_URL_PATH);
-      if ($path !== '' && stripos($path, '/uploads/') !== false) {
-        $fileName = basename($path);
-        if ($this->isSafeLegacyAttachmentName($fileName)) {
-          return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
-        }
-      }
       return $url;
     }
 
