@@ -399,6 +399,8 @@
 
     function dashboardDueTypeLabel(type) {
       if (type === "preventiva_sin_enviar") return "Preventivas sin enviar";
+      if (type === "ticket_preventiva_sin_cita") return "Tickets sin cita preventiva";
+      if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
       if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
       if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
       return type || "Vencimientos";
@@ -1798,6 +1800,8 @@
           vencidos: 0,
           hoy: 0,
           preventiva_sin_enviar: 0,
+          ticket_preventiva_sin_cita: 0,
+          preventiva_cita_sin_realizar: 0,
           cotizacion_sin_enviar: 0,
           cotizacion_enviada_sin_respuesta: 0,
         };
@@ -1812,6 +1816,8 @@
 
       function dueTypeLabel(type) {
         if (type === "preventiva_sin_enviar") return "Preventivas sin enviar";
+        if (type === "ticket_preventiva_sin_cita") return "Tickets sin cita preventiva";
+        if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
         if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
         if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
         return type || "Vencimientos";
@@ -1868,6 +1874,7 @@
         settings = settings || {};
         return '<form class="scm-calendar-due-settings-form scm-calendar-due-settings-form--modal" data-scm-calendar-due-settings-modal autocomplete="off">' +
           '<label class="scm-field"><span>Cotizaciones sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_sin_enviar_dias", 3)) + '"><small>Días desde la creación.</small></label>' +
+          '<label class="scm-field"><span>Tickets sin cita preventiva</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="tickets_preventivos_sin_cita_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "tickets_preventivos_sin_cita_dias", 3)) + '"><small>Días desde que se crea el ticket preventivo.</small></label>' +
           '<label class="scm-field"><span>Preventivas sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "preventivas_dias", 3)) + '"><small>Días desde que se crea la revisión preventiva.</small></label>' +
           '<label class="scm-field"><span>Cotizaciones enviadas sin respuesta</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_enviadas_sin_respuesta_dias", 10)) + '"><small>Días desde el envío.</small></label>' +
           "</form>";

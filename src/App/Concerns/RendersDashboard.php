@@ -1982,11 +1982,13 @@ trait RendersDashboard
             <div>
               <span class="scm-calendar-action-kicker">Filtro</span>
               <h4>Tipo de vencimiento</h4>
-              <p>Filtra el calendario y el desglose mensual por el control que necesitas revisar.</p>
+              <p>Filtra el calendario y la agenda pendiente por el control que necesitas revisar.</p>
             </div>
           </div>
           <form class="scm-calendar-due-type-filter" data-scm-calendar-due-type-filter autocomplete="off">
             <label><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked> <span>Preventivas sin enviar</span></label>
+            <label><input type="checkbox" name="due_type" value="ticket_preventiva_sin_cita" checked> <span>Tickets sin cita preventiva</span></label>
+            <label><input type="checkbox" name="due_type" value="preventiva_cita_sin_realizar" checked> <span>Preventivas con cita sin realizar</span></label>
             <label><input type="checkbox" name="due_type" value="cotizacion_sin_enviar" checked> <span>Cotizaciones sin enviar</span></label>
             <label><input type="checkbox" name="due_type" value="cotizacion_enviada_sin_respuesta" checked> <span>Cotizaciones sin respuesta</span></label>
           </form>

@@ -868,6 +868,16 @@ trait HandlesTicketWorkflowActions
         $case = $this->adminDueCaseDataFromPreventivaRevision($revision, true);
       }
     }
+    if ($case === [] && in_array($type, ['ticket_preventiva_sin_cita', 'preventiva_cita_sin_realizar'], true) && $this->canAccessDashboardTab('preventivas_pendientes')) {
+      $ticketRef = trim((string) ($_POST['ticket_pk'] ?? $_POST['id_ticket'] ?? $_POST['ticket'] ?? ''));
+      $ticket = $this->adminDueTicketByReference($ticketRef);
+      if (!empty($ticket)) {
+        $appointment = $type === 'preventiva_cita_sin_realizar'
+          ? $this->adminDuePreventivaPendingAppointmentByTicket((int) ($ticket['_ID'] ?? 0), (string) ($ticket['id_ticket'] ?? ''))
+          : [];
+        $case = $this->adminDueCaseDataFromPreventivaTicket($ticket, $type, true, $appointment);
+      }
+    }
     if ($case === []) {
       $this->jsonFail('No se pudo cargar el caso completo del vencimiento.');
     }
@@ -884,6 +894,7 @@ trait HandlesTicketWorkflowActions
 
     $settings = [
       'cotizaciones_sin_enviar_dias' => $this->adminDueDaysFromPost('cotizaciones_sin_enviar_dias', 3, 1, 120),
+      'tickets_preventivos_sin_cita_dias' => $this->adminDueDaysFromPost('tickets_preventivos_sin_cita_dias', 3, 1, 120),
       'preventivas_dias' => $this->adminDueDaysFromPost('preventivas_dias', 3, 1, 120),
       'cotizaciones_enviadas_sin_respuesta_dias' => $this->adminDueDaysFromPost('cotizaciones_enviadas_sin_respuesta_dias', 10, 1, 180),
     ];
@@ -906,6 +917,7 @@ trait HandlesTicketWorkflowActions
   {
     $defaults = [
       'cotizaciones_sin_enviar_dias' => 3,
+      'tickets_preventivos_sin_cita_dias' => 3,
       'preventivas_dias' => 3,
       'cotizaciones_enviadas_sin_respuesta_dias' => 10,
     ];
@@ -922,6 +934,7 @@ trait HandlesTicketWorkflowActions
 
     return [
       'cotizaciones_sin_enviar_dias' => $this->adminDueClampDays($stored['cotizaciones_sin_enviar_dias'] ?? $defaults['cotizaciones_sin_enviar_dias'], 1, 120, $defaults['cotizaciones_sin_enviar_dias']),
+      'tickets_preventivos_sin_cita_dias' => $this->adminDueClampDays($stored['tickets_preventivos_sin_cita_dias'] ?? $defaults['tickets_preventivos_sin_cita_dias'], 1, 120, $defaults['tickets_preventivos_sin_cita_dias']),
       'preventivas_dias' => $this->adminDueClampDays($stored['preventivas_dias'] ?? $defaults['preventivas_dias'], 1, 120, $defaults['preventivas_dias']),
       'cotizaciones_enviadas_sin_respuesta_dias' => $this->adminDueClampDays($stored['cotizaciones_enviadas_sin_respuesta_dias'] ?? $defaults['cotizaciones_enviadas_sin_respuesta_dias'], 1, 180, $defaults['cotizaciones_enviadas_sin_respuesta_dias']),
     ];
@@ -964,6 +977,7 @@ trait HandlesTicketWorkflowActions
     }
     if ($this->canAccessDashboardTab('preventivas_pendientes')) {
       $items = array_merge($items, $this->adminDuePreventivaItems($settings, $fromTs, $toTs));
+      $items = array_merge($items, $this->adminDuePreventivaTicketItems($settings, $fromTs, $toTs));
     }
 
     usort($items, static function (array $a, array $b): int {
@@ -1078,6 +1092,123 @@ trait HandlesTicketWorkflowActions
       ]);
     }
     return $items;
+  }
+
+  /** @param array<string,int> $settings @return array<int,array<string,mixed>> */
+  private function adminDuePreventivaTicketItems(array $settings, int $fromTs, int $toTs): array
+  {
+    $ticketTable = $this->db->table('jet_cct_tickets');
+    $calendarTable = 'calendario_actividades';
+    if (!$this->table_exists($ticketTable)) {
+      return [];
+    }
+
+    $items = [];
+    $days = (int) ($settings['tickets_preventivos_sin_cita_dias'] ?? 3);
+    $preventivaWhere = $this->adminDuePreventivaTicketWhereSql('t');
+    $closedWhere = $this->adminDueOpenTicketWhereSql('t');
+    $calendarTicketJoin = "TRIM(COALESCE(c.`id_ticket`, '')) = TRIM(COALESCE(t.`_ID`, ''))";
+    $calendarTicketExists = "TRIM(COALESCE(c2.`id_ticket`, '')) = TRIM(COALESCE(t.`_ID`, ''))";
+    if ($this->column_exists($ticketTable, 'id_ticket')) {
+      $calendarTicketJoin = '(' . $calendarTicketJoin . " OR TRIM(COALESCE(c.`id_ticket`, '')) = TRIM(COALESCE(t.`id_ticket`, '')))";
+      $calendarTicketExists = '(' . $calendarTicketExists . " OR TRIM(COALESCE(c2.`id_ticket`, '')) = TRIM(COALESCE(t.`id_ticket`, '')))";
+    }
+
+    if ($this->table_exists($calendarTable)) {
+      $rows = $this->db->getResults(
+        "SELECT t.*, c.`id` AS `_scm_cita_id`, c.`titulo` AS `_scm_cita_titulo`, c.`descripcion` AS `_scm_cita_descripcion`,
+            c.`fecha_inicio` AS `_scm_cita_fecha_inicio`, c.`fecha_fin` AS `_scm_cita_fecha_fin`, c.`estado` AS `_scm_cita_estado`
+          FROM `{$ticketTable}` t
+          INNER JOIN `{$calendarTable}` c ON {$calendarTicketJoin}
+          WHERE {$preventivaWhere}
+            AND {$closedWhere}
+            AND LOWER(TRIM(COALESCE(c.`estado`, ''))) NOT IN ('si', 'sí', 'realizado', 'realizada', '1', 'true')
+          ORDER BY c.`fecha_inicio` ASC
+          LIMIT 2000"
+      );
+      foreach ($rows as $row) {
+        $appointmentTs = $this->parse_unix_ts($row['_scm_cita_fecha_inicio'] ?? null);
+        if ($appointmentTs <= 0) {
+          continue;
+        }
+        $dueTs = strtotime(date('Y-m-d 00:00:00', $appointmentTs)) ?: $appointmentTs;
+        $calendarTs = $this->adminDueCalendarPlacementTimestamp((int) $dueTs, $fromTs, $toTs);
+        if ($calendarTs <= 0) {
+          continue;
+        }
+        $ticketPk = trim((string) ($row['_ID'] ?? ''));
+        $items[] = $this->adminDueEvent([
+          'id' => 'prev-cita-' . $ticketPk . '-' . trim((string) ($row['_scm_cita_id'] ?? '')),
+          'type' => 'preventiva_cita_sin_realizar',
+          'group' => 'Preventivas con cita sin realizar',
+          'title' => 'Preventiva #' . ($ticketPk !== '' ? $ticketPk : '-') . ' con cita sin realizar',
+          'description' => 'Vence el día de la cita preventiva agendada.',
+          'color' => '#7c3aed',
+          'base_ts' => $appointmentTs,
+          'due_ts' => (int) $dueTs,
+          'calendar_ts' => $calendarTs,
+          'days_limit' => 0,
+          'case' => $this->adminDueLightCaseDataFromPreventivaTicket($row, 'preventiva_cita_sin_realizar'),
+        ]);
+      }
+    }
+
+    $noAppointmentJoin = $this->table_exists($calendarTable)
+      ? "AND NOT EXISTS (SELECT 1 FROM `{$calendarTable}` c2 WHERE {$calendarTicketExists})"
+      : '';
+    $rows = $this->db->getResults(
+      "SELECT t.*
+        FROM `{$ticketTable}` t
+        WHERE {$preventivaWhere}
+          AND {$closedWhere}
+          {$noAppointmentJoin}
+        ORDER BY COALESCE(UNIX_TIMESTAMP(t.`cct_created`), NULLIF(t.`fecha`, 0), t.`_ID`) DESC
+        LIMIT 2000"
+    );
+    foreach ($rows as $row) {
+      $baseTs = $this->adminDueFirstTimestamp($row, ['cct_created', 'fecha']);
+      if ($baseTs <= 0) {
+        continue;
+      }
+      $dueTs = strtotime('+' . max(1, $days) . ' days', strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs);
+      $calendarTs = $dueTs !== false ? $this->adminDueCalendarPlacementTimestamp((int) $dueTs, $fromTs, $toTs) : 0;
+      if ($dueTs === false || $calendarTs <= 0) {
+        continue;
+      }
+      $ticketPk = trim((string) ($row['_ID'] ?? ''));
+      $items[] = $this->adminDueEvent([
+        'id' => 'prev-ticket-sin-cita-' . ($ticketPk !== '' ? $ticketPk : uniqid('', false)),
+        'type' => 'ticket_preventiva_sin_cita',
+        'group' => 'Tickets sin cita preventiva',
+        'title' => 'Ticket #' . ($ticketPk !== '' ? $ticketPk : '-') . ' sin cita preventiva',
+        'description' => 'Vence ' . $days . ' día(s) después de crear el ticket preventivo.',
+        'color' => '#0f766e',
+        'base_ts' => $baseTs,
+        'due_ts' => (int) $dueTs,
+        'calendar_ts' => $calendarTs,
+        'days_limit' => $days,
+        'case' => $this->adminDueLightCaseDataFromPreventivaTicket($row, 'ticket_preventiva_sin_cita'),
+      ]);
+    }
+
+    return $items;
+  }
+
+  private function adminDuePreventivaTicketWhereSql(string $alias): string
+  {
+    $p = trim($alias) !== '' ? trim($alias) . '.' : '';
+    return "(
+      LOWER(COALESCE({$p}`tema_ayuda`, '')) LIKE '%prevent%'
+      OR LOWER(COALESCE({$p}`asunto`, '')) LIKE '%prevent%'
+      OR TRIM(COALESCE({$p}`id_revision_preventiva`, '')) <> ''
+    )";
+  }
+
+  private function adminDueOpenTicketWhereSql(string $alias): string
+  {
+    $p = trim($alias) !== '' ? trim($alias) . '.' : '';
+    return "LOWER(TRIM(COALESCE({$p}`estado`, ''))) NOT IN ('cerrado', 'cerrada', 'resuelto', 'resuelta', 'finalizado', 'finalizada', 'anulado', 'anulada')
+      AND LOWER(TRIM(COALESCE({$p}`estado_administrativo`, ''))) NOT IN ('cerrado', 'cerrada', 'resuelto', 'resuelta', 'finalizado', 'finalizada', 'anulado', 'anulada')";
   }
 
   /** @param array<string,mixed> $data @return array<string,mixed> */
@@ -1210,6 +1341,45 @@ trait HandlesTicketWorkflowActions
     ];
   }
 
+  /** @param array<string,mixed> $ticket @return array<string,string> */
+  private function adminDueLightCaseDataFromPreventivaTicket(array $ticket, string $type): array
+  {
+    $ticketPk = trim((string) ($ticket['_ID'] ?? ''));
+    $ticketLabel = trim((string) ($ticket['id_ticket'] ?? $ticketPk));
+    $createdTs = $this->adminDueFirstTimestamp($ticket, ['cct_created', 'fecha']);
+    return [
+      'ticket' => $ticketLabel !== '' ? $ticketLabel : ($ticketPk !== '' ? $ticketPk : '-'),
+      'ticket_pk' => $ticketPk,
+      'asunto' => $this->adminDueFirstText([$ticket], ['asunto', 'tema_ayuda']) ?: 'Revisión preventiva',
+      'estado' => $this->adminDueFirstText([$ticket], ['estado']) ?: '-',
+      'admin' => $this->adminDueFirstText([$ticket], ['estado_administrativo']) ?: '-',
+      'prioridad' => $this->adminDueFirstText([$ticket], ['prioridad']) ?: '-',
+      'magnitud_caso' => $this->adminDueFirstText([$ticket], ['magnitud_caso']) ?: '-',
+      'departamento' => $this->adminDueFirstText([$ticket], ['departamento']) ?: '-',
+      'tema' => $this->adminDueFirstText([$ticket], ['tema_ayuda']) ?: '-',
+      'contrato' => $this->adminDueHashLabel($this->adminDueFirstText([$ticket], ['contrato', 'id_contrato'])),
+      'inmueble' => $this->adminDueFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-',
+      'id_inmueble_web' => $this->adminDueFirstText([$ticket], ['id_inmueble', 'inmueble']) ?: '-',
+      'id_inmueble_data' => $this->adminDueFirstText([$ticket], ['id_inmueble_data']),
+      'barrio' => $this->adminDueFirstText([$ticket], ['barrio']) ?: '-',
+      'direccion' => $this->adminDueFirstText([$ticket], ['direccion']) ?: '-',
+      'creado' => $createdTs > 0 ? date('d/m/Y', $createdTs) : '-',
+      'empleado' => $this->adminDueFirstText([$ticket], ['nombre_empleado', 'empleado', 'id_empleado']) ?: '-',
+      'empleado_id' => $this->adminDueFirstText([$ticket], ['id_empleado']),
+      'propietario' => $this->adminDueFirstText([$ticket], ['propietario']),
+      'arrendatario' => $this->adminDueFirstText([$ticket], ['arrendatario']),
+      'ticket_url' => $ticketPk !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticketPk) : '',
+      'id_revision_preventiva' => $this->adminDueFirstText([$ticket], ['id_revision_preventiva']),
+      'tab_key' => 'preventiva',
+      'status_bucket' => $this->adminDueStatusBucket($ticket),
+      'case_source_html' => $this->adminDueLoadingCaseSourceHtml(
+        $type === 'preventiva_cita_sin_realizar'
+          ? 'Cargando detalle completo de la cita preventiva pendiente.'
+          : 'Cargando detalle completo del ticket preventivo sin cita.'
+      ),
+    ];
+  }
+
   private function adminDueLoadingCaseSourceHtml(string $message): string
   {
     return '<div class="scm-case-description"><strong>Detalle del vencimiento:</strong><div class="scm-case-description-content">'
@@ -1239,6 +1409,29 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @return array{base_ts:int,due_ts:int,days_limit:int,elapsed_days:int,overdue_days:int} */
+  private function adminDuePreventivaTicketNoAppointmentTiming(array $ticket): array
+  {
+    $settings = $this->adminDueCalendarSettings();
+    $baseTs = $this->adminDueFirstTimestamp($ticket, ['cct_created', 'fecha']);
+    return $this->adminDueTimingFromBase($baseTs, (int) ($settings['tickets_preventivos_sin_cita_dias'] ?? 3));
+  }
+
+  /** @return array{base_ts:int,due_ts:int,days_limit:int,elapsed_days:int,overdue_days:int} */
+  private function adminDuePreventivaAppointmentTiming(array $appointment): array
+  {
+    $baseTs = $this->adminDueFirstTimestamp($appointment, ['fecha_inicio']);
+    $dueTs = $baseTs > 0 ? (strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs) : 0;
+    $todayTs = strtotime(date('Y-m-d 00:00:00')) ?: time();
+    return [
+      'base_ts' => $baseTs,
+      'due_ts' => $dueTs,
+      'days_limit' => 0,
+      'elapsed_days' => $baseTs > 0 ? $this->adminDueElapsedDays($baseTs) : 0,
+      'overdue_days' => $dueTs > 0 && $dueTs < $todayTs ? max(0, (int) floor(($todayTs - $dueTs) / 86400)) : 0,
+    ];
+  }
+
+  /** @return array{base_ts:int,due_ts:int,days_limit:int,elapsed_days:int,overdue_days:int} */
   private function adminDueTimingFromBase(int $baseTs, int $days): array
   {
     $dueTs = $baseTs > 0 ? strtotime('+' . max(1, $days) . ' days', strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs) : false;
@@ -1264,6 +1457,8 @@ trait HandlesTicketWorkflowActions
       'cotizacion_sin_enviar' => 0,
       'cotizacion_enviada_sin_respuesta' => 0,
       'preventiva_sin_enviar' => 0,
+      'ticket_preventiva_sin_cita' => 0,
+      'preventiva_cita_sin_realizar' => 0,
     ];
     foreach ($items as $item) {
       $type = (string) ($item['tipo_vencimiento'] ?? '');
@@ -1419,6 +1614,38 @@ trait HandlesTicketWorkflowActions
     return $case;
   }
 
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $appointment @return array<string,string> */
+  private function adminDueCaseDataFromPreventivaTicket(array $ticket, string $type, bool $includeNativeCase = false, array $appointment = []): array
+  {
+    $ticketPk = trim((string) ($ticket['_ID'] ?? ''));
+    $statusBucket = $this->adminDueStatusBucket($ticket);
+    $nativeCase = $includeNativeCase && $ticketPk !== '' ? $this->adminDueNativeTicketCasePayload((int) $ticketPk, $statusBucket) : [];
+    $case = $this->adminDueLightCaseDataFromPreventivaTicket($ticket, $type);
+    $case['status_bucket'] = $statusBucket;
+    $detailHtml = $this->adminDuePreventivaTicketDueDetailHtml($ticket, $type, $appointment);
+    if (!empty($nativeCase)) {
+      foreach ($nativeCase as $key => $value) {
+        $value = trim((string) $value);
+        if ($value !== '') {
+          $case[$key] = $value;
+        }
+      }
+      $case['case_source_html'] = ($nativeCase['case_source_html'] ?? '') . $detailHtml;
+      $case['tab_key'] = 'preventiva';
+      $case['status_bucket'] = $statusBucket;
+    } else {
+      $ticketLabel = trim((string) ($ticket['id_ticket'] ?? $ticketPk));
+      $case['case_source_html'] = '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">'
+        . esc_html($type === 'preventiva_cita_sin_realizar'
+          ? 'Control de vencimiento para cita preventiva pendiente del ticket #' . ($ticketLabel !== '' ? $ticketLabel : '-')
+          : 'Control de vencimiento para ticket preventivo sin cita #' . ($ticketLabel !== '' ? $ticketLabel : '-'))
+        . '.</div></div>'
+        . ($ticketPk !== '' ? '<div class="scm-seg-wrap">' . $this->render_seguimiento_form((int) $ticketPk, Auth::isLoggedIn(), false) . '</div>' : '')
+        . $detailHtml;
+    }
+    return $case;
+  }
+
   /** @return array<string,mixed> */
   private function adminDueTicketByReference(string $ticketRef): array
   {
@@ -1471,6 +1698,35 @@ trait HandlesTicketWorkflowActions
       return [];
     }
     $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$revisionId]);
+    return is_array($row) ? $row : [];
+  }
+
+  /** @return array<string,mixed> */
+  private function adminDuePreventivaPendingAppointmentByTicket(int $ticketPk, string $ticketLabel = ''): array
+  {
+    if ($ticketPk <= 0) {
+      return [];
+    }
+    $table = 'calendario_actividades';
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+    $where = ["TRIM(COALESCE(`id_ticket`, '')) = ?"];
+    $args = [(string) $ticketPk];
+    $ticketLabel = trim($ticketLabel);
+    if ($ticketLabel !== '' && $ticketLabel !== (string) $ticketPk) {
+      $where[] = "TRIM(COALESCE(`id_ticket`, '')) = ?";
+      $args[] = $ticketLabel;
+    }
+    $row = $this->db->getRow(
+      "SELECT *
+        FROM `{$table}`
+        WHERE (" . implode(' OR ', $where) . ")
+          AND LOWER(TRIM(COALESCE(`estado`, ''))) NOT IN ('si', 'sí', 'realizado', 'realizada', '1', 'true')
+        ORDER BY `fecha_inicio` ASC
+        LIMIT 1",
+      $args
+    );
     return is_array($row) ? $row : [];
   }
 
@@ -1679,6 +1935,33 @@ trait HandlesTicketWorkflowActions
       . '<p><strong>Contrato:</strong> ' . esc_html($this->adminDueFirstText([$row, $ticket, $contract], ['contrato', 'id_contrato', '_ID']) ?: '-') . '</p>'
       . '<p><strong>Inmueble:</strong> ' . esc_html($this->adminDueFirstText([$row, $ticket, $contract], ['inmueble', 'id_inmueble', 'codigo', 'codigo_inmueble']) ?: '-') . '</p>'
       . '<p><strong>Dirección:</strong> ' . esc_html($this->adminDueFirstText([$row, $ticket, $contract], ['direccion', 'direccion_fisica']) ?: '-') . '</p>'
+      . '</div></article></section>';
+  }
+
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $appointment */
+  private function adminDuePreventivaTicketDueDetailHtml(array $ticket, string $type, array $appointment = []): string
+  {
+    $ticketPk = trim((string) ($ticket['_ID'] ?? ''));
+    $ticketLabel = trim((string) ($ticket['id_ticket'] ?? $ticketPk));
+    $createdTs = $this->adminDueFirstTimestamp($ticket, ['cct_created', 'fecha']);
+    $timing = $type === 'preventiva_cita_sin_realizar'
+      ? $this->adminDuePreventivaAppointmentTiming($appointment)
+      : $this->adminDuePreventivaTicketNoAppointmentTiming($ticket);
+    $appointmentTs = $this->adminDueFirstTimestamp($appointment, ['fecha_inicio']);
+    return '<section class="scm-case-history"><h4>Detalle del vencimiento preventivo</h4><article class="scm-case-history-item"><div class="scm-case-history-detail">'
+      . '<p><strong>Tipo:</strong> ' . esc_html($type === 'preventiva_cita_sin_realizar' ? 'Preventiva con cita sin realizar' : 'Ticket sin cita preventiva') . '</p>'
+      . '<p><strong>Ticket:</strong> #' . esc_html($ticketLabel !== '' ? $ticketLabel : '-') . '</p>'
+      . '<p><strong>Estado:</strong> ' . esc_html($this->adminDueFirstText([$ticket], ['estado']) ?: '-') . '</p>'
+      . '<p><strong>Estado administrativo:</strong> ' . esc_html($this->adminDueFirstText([$ticket], ['estado_administrativo']) ?: '-') . '</p>'
+      . '<p><strong>Fecha de creación:</strong> ' . esc_html($createdTs > 0 ? date('d/m/Y', $createdTs) : '-') . '</p>'
+      . ($type === 'preventiva_cita_sin_realizar' ? '<p><strong>Fecha de la cita:</strong> ' . esc_html($appointmentTs > 0 ? date('d/m/Y H:i', $appointmentTs) : '-') . '</p>' : '')
+      . '<p><strong>Fecha base del control:</strong> ' . esc_html($timing['base_ts'] > 0 ? date('d/m/Y', $timing['base_ts']) : '-') . '</p>'
+      . '<p><strong>Debió hacerse el:</strong> ' . esc_html($timing['due_ts'] > 0 ? date('d/m/Y', $timing['due_ts']) : '-') . '</p>'
+      . '<p><strong>Días transcurridos:</strong> ' . esc_html((string) $timing['elapsed_days']) . '</p>'
+      . '<p><strong>Días vencido:</strong> ' . esc_html((string) $timing['overdue_days']) . '</p>'
+      . '<p><strong>Contrato:</strong> ' . esc_html($this->adminDueHashLabel($this->adminDueFirstText([$ticket], ['contrato', 'id_contrato']))) . '</p>'
+      . '<p><strong>Inmueble:</strong> ' . esc_html($this->adminDueFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-') . '</p>'
+      . '<p><strong>Dirección:</strong> ' . esc_html($this->adminDueFirstText([$ticket], ['direccion']) ?: '-') . '</p>'
       . '</div></article></section>';
   }
 
