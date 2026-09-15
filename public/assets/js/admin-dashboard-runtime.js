@@ -550,9 +550,9 @@
       if (button.getAttribute("data-scm-due-case-loaded") === "1" || !actionAdminDueCase) {
         var loadedSourceHtml = dashboardDueCaseSourceHtml(button);
         if (window.Swal) window.Swal.close();
-        openDashboardRelatedTickets().then(function () {
+        window.setTimeout(function () {
           openDashboardDueCaseFromButton(button, loadedSourceHtml);
-        });
+        }, 120);
         return;
       }
       var oldText = button.textContent;
@@ -568,9 +568,9 @@
         button.setAttribute("data-scm-due-case-loaded", "1");
         var loadedSourceHtml = dashboardDueCaseSourceHtml(button);
         if (window.Swal) window.Swal.close();
-        openDashboardRelatedTickets().then(function () {
+        window.setTimeout(function () {
           openDashboardDueCaseFromButton(button, loadedSourceHtml);
-        });
+        }, 120);
       }).catch(function (error) {
         showToast("error", error.message || "No se pudo cargar el caso completo.");
       }).finally(function () {

@@ -1217,6 +1217,42 @@ trait HandlesTicketWorkflowActions
       . '</div></div>';
   }
 
+  /** @return array{base_ts:int,due_ts:int,days_limit:int,elapsed_days:int,overdue_days:int} */
+  private function adminDueQuoteTiming(array $row, bool $sent): array
+  {
+    $settings = $this->adminDueCalendarSettings();
+    $days = $sent
+      ? (int) $settings['cotizaciones_enviadas_sin_respuesta_dias']
+      : (int) $settings['cotizaciones_sin_enviar_dias'];
+    $baseTs = $sent
+      ? $this->adminDueFirstTimestamp($row, ['fecha_envio_cotizacion_mantenimiento', 'fecha_envio', 'fecha_enviada', 'fecha_envio_correo', 'cct_modified', 'fecha', 'cct_created'])
+      : $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
+    return $this->adminDueTimingFromBase($baseTs, $days);
+  }
+
+  /** @return array{base_ts:int,due_ts:int,days_limit:int,elapsed_days:int,overdue_days:int} */
+  private function adminDuePreventivaTiming(array $row): array
+  {
+    $settings = $this->adminDueCalendarSettings();
+    $baseTs = $this->adminDueFirstTimestamp($row, ['cct_created', 'fecha']);
+    return $this->adminDueTimingFromBase($baseTs, (int) $settings['preventivas_dias']);
+  }
+
+  /** @return array{base_ts:int,due_ts:int,days_limit:int,elapsed_days:int,overdue_days:int} */
+  private function adminDueTimingFromBase(int $baseTs, int $days): array
+  {
+    $dueTs = $baseTs > 0 ? strtotime('+' . max(1, $days) . ' days', strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs) : false;
+    $todayTs = strtotime(date('Y-m-d 00:00:00')) ?: time();
+    $dueDayTs = $dueTs !== false && $dueTs > 0 ? (strtotime(date('Y-m-d 00:00:00', (int) $dueTs)) ?: (int) $dueTs) : 0;
+    return [
+      'base_ts' => $baseTs,
+      'due_ts' => $dueTs !== false ? (int) $dueTs : 0,
+      'days_limit' => max(1, $days),
+      'elapsed_days' => $baseTs > 0 ? $this->adminDueElapsedDays($baseTs) : 0,
+      'overdue_days' => $dueDayTs > 0 && $dueDayTs < $todayTs ? max(0, (int) floor(($todayTs - $dueDayTs) / 86400)) : 0,
+    ];
+  }
+
   /** @param array<int,array<string,mixed>> $items @return array<string,int> */
   private function adminDueCalendarStats(array $items): array
   {
@@ -1571,6 +1607,8 @@ trait HandlesTicketWorkflowActions
   {
     $cotizacionId = trim((string) ($row['_ID'] ?? ''));
     $estado = trim((string) ($row['estado'] ?? '')) ?: ($sent ? 'Enviada sin respuesta' : 'Sin enviar');
+    $createdTs = $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
+    $timing = $this->adminDueQuoteTiming($row, $sent);
     $html = '';
     if ($includeCaseShell) {
       $html .= '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">'
@@ -1585,6 +1623,12 @@ trait HandlesTicketWorkflowActions
       . '<p><strong>Tipo:</strong> ' . esc_html($sent ? 'Cotización enviada sin respuesta' : 'Cotización sin enviar') . '</p>'
       . '<p><strong>Cotización:</strong> #' . esc_html($cotizacionId !== '' ? $cotizacionId : '-') . '</p>'
       . '<p><strong>Estado:</strong> ' . esc_html($estado) . '</p>'
+      . '<p><strong>Fecha de creación:</strong> ' . esc_html($createdTs > 0 ? date('d/m/Y', $createdTs) : '-') . '</p>'
+      . '<p><strong>Fecha base del control:</strong> ' . esc_html($timing['base_ts'] > 0 ? date('d/m/Y', $timing['base_ts']) : '-') . '</p>'
+      . '<p><strong>Debió hacerse el:</strong> ' . esc_html($timing['due_ts'] > 0 ? date('d/m/Y', $timing['due_ts']) : '-') . '</p>'
+      . '<p><strong>Días configurados:</strong> ' . esc_html((string) $timing['days_limit']) . '</p>'
+      . '<p><strong>Días transcurridos:</strong> ' . esc_html((string) $timing['elapsed_days']) . '</p>'
+      . '<p><strong>Días vencido:</strong> ' . esc_html((string) $timing['overdue_days']) . '</p>'
       . '<p><strong>Contrato:</strong> ' . esc_html((string) ($row['contrato'] ?? $row['id_contrato'] ?? '-')) . '</p>'
       . '<p><strong>Inmueble:</strong> ' . esc_html((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '-')) . '</p>'
       . '<p><strong>Dirección:</strong> ' . esc_html((string) ($row['direccion'] ?? '-')) . '</p>'
@@ -1625,9 +1669,15 @@ trait HandlesTicketWorkflowActions
   private function adminDuePreventivaDueDetailHtml(array $row, array $ticket, array $contract): string
   {
     $revisionId = trim((string) ($row['_ID'] ?? ''));
+    $timing = $this->adminDuePreventivaTiming($row);
     return '<section class="scm-case-history"><h4>Detalle de la revisión preventiva</h4><article class="scm-case-history-item"><div class="scm-case-history-detail">'
       . '<p><strong>Revisión preventiva:</strong> #' . esc_html($revisionId !== '' ? $revisionId : '-') . '</p>'
       . '<p><strong>Envío:</strong> Sin enviar</p>'
+      . '<p><strong>Fecha de creación:</strong> ' . esc_html($timing['base_ts'] > 0 ? date('d/m/Y', $timing['base_ts']) : '-') . '</p>'
+      . '<p><strong>Debió hacerse el:</strong> ' . esc_html($timing['due_ts'] > 0 ? date('d/m/Y', $timing['due_ts']) : '-') . '</p>'
+      . '<p><strong>Días configurados:</strong> ' . esc_html((string) $timing['days_limit']) . '</p>'
+      . '<p><strong>Días transcurridos:</strong> ' . esc_html((string) $timing['elapsed_days']) . '</p>'
+      . '<p><strong>Días vencido:</strong> ' . esc_html((string) $timing['overdue_days']) . '</p>'
       . '<p><strong>Contrato:</strong> ' . esc_html($this->adminDueFirstText([$row, $ticket, $contract], ['contrato', 'id_contrato', '_ID']) ?: '-') . '</p>'
       . '<p><strong>Inmueble:</strong> ' . esc_html($this->adminDueFirstText([$row, $ticket, $contract], ['inmueble', 'id_inmueble', 'codigo', 'codigo_inmueble']) ?: '-') . '</p>'
       . '<p><strong>Dirección:</strong> ' . esc_html($this->adminDueFirstText([$row, $ticket, $contract], ['direccion', 'direccion_fisica']) ?: '-') . '</p>'
