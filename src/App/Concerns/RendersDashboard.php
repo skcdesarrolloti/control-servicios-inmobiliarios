@@ -2022,25 +2022,22 @@ trait RendersDashboard
             <button type="button" class="scm-case-work-btn" data-scm-calendar-refresh>Actualizar</button>
           </div>
           <div class="scm-calendar-events" data-scm-calendar-events><div class="scm-empty scm-empty-cards">Selecciona un d&iacute;a del calendario.</div></div>
+          <?php if ($view === 'pending'): ?>
+            <section class="scm-calendar-pending-agenda" aria-label="Agenda pendiente">
+              <div class="scm-calendar-pending-agenda-head">
+                <span class="scm-calendar-action-kicker">Agenda pendiente</span>
+                <h5>Vencimientos filtrados</h5>
+              </div>
+              <div class="scm-calendar-due-breakdown" data-scm-calendar-due-breakdown>
+                <div class="scm-calendar-loading">Cargando agenda pendiente...</div>
+              </div>
+            </section>
+          <?php endif; ?>
           <?php if ($view !== 'pending'): ?>
             <button type="button" class="scm-btn-primary btn btn-primary scm-calendar-day-create" data-scm-calendar-open-create data-calendar-mode="single">Crear evento para este d&iacute;a</button>
           <?php endif; ?>
         </section>
       </div>
-      <?php if ($view === 'pending'): ?>
-        <section class="scm-calendar-card scm-calendar-due-breakdown-card">
-          <div class="scm-calendar-card-head">
-            <div>
-              <span class="scm-calendar-action-kicker">Desglose</span>
-              <h4>Vencimientos del mes</h4>
-              <p>Resumen agrupado por tipo de control y fecha de vencimiento visible.</p>
-            </div>
-          </div>
-          <div class="scm-calendar-due-breakdown" data-scm-calendar-due-breakdown>
-            <div class="scm-calendar-loading">Cargando desglose...</div>
-          </div>
-        </section>
-      <?php endif; ?>
     </div>
 <?php
     return (string) ob_get_clean();

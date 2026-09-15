@@ -549,7 +549,6 @@
       if (!button || typeof window.scmOpenCase !== "function") return;
       if (button.getAttribute("data-scm-due-case-loaded") === "1" || !actionAdminDueCase) {
         var loadedSourceHtml = dashboardDueCaseSourceHtml(button);
-        if (window.Swal) window.Swal.close();
         window.setTimeout(function () {
           openDashboardDueCaseFromButton(button, loadedSourceHtml);
         }, 120);
@@ -567,7 +566,6 @@
         dashboardApplyDueCaseData(button, data.case || {});
         button.setAttribute("data-scm-due-case-loaded", "1");
         var loadedSourceHtml = dashboardDueCaseSourceHtml(button);
-        if (window.Swal) window.Swal.close();
         window.setTimeout(function () {
           openDashboardDueCaseFromButton(button, loadedSourceHtml);
         }, 120);

@@ -2144,10 +2144,6 @@
   padding: 4px 8px;
 }
 
-#scm-app .scm-calendar-due-breakdown-card {
-  margin-top: 14px;
-}
-
 #scm-app .scm-calendar-due-breakdown {
   display: grid;
   gap: 12px;
@@ -2246,6 +2242,57 @@
   font-size: 12px;
   font-weight: 900;
   margin: 0;
+}
+
+#scm-app .scm-calendar-pending-agenda {
+  border-top: 1px solid #dbe6f2;
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+}
+
+#scm-app .scm-calendar-pending-agenda-head {
+  display: grid;
+  gap: 3px;
+}
+
+#scm-app .scm-calendar-pending-agenda-head h5 {
+  color: #0f2742;
+  font-size: 15px;
+  font-weight: 950;
+  line-height: 1.2;
+  margin: 0;
+}
+
+#scm-app .scm-calendar-pending-agenda .scm-calendar-due-breakdown {
+  grid-template-columns: 1fr;
+  max-height: 560px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+#scm-app .scm-calendar-pending-agenda .scm-calendar-due-breakdown-group {
+  gap: 9px;
+  padding: 12px;
+}
+
+#scm-app .scm-calendar-pending-agenda .scm-calendar-due-breakdown-row {
+  align-items: center;
+  gap: 4px 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+#scm-app .scm-calendar-pending-agenda .scm-calendar-due-breakdown-row strong,
+#scm-app .scm-calendar-pending-agenda .scm-calendar-due-breakdown-row span,
+#scm-app .scm-calendar-pending-agenda .scm-calendar-due-breakdown-row em {
+  grid-column: 1;
+}
+
+#scm-app .scm-calendar-pending-agenda .scm-calendar-due-breakdown-case {
+  align-self: center;
+  grid-column: 2;
+  grid-row: 1 / span 3;
 }
 
 @media (max-width: 1100px) {
