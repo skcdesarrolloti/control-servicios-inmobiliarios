@@ -517,6 +517,24 @@
       return source ? String(source.innerHTML || "").trim() : "";
     }
 
+    function elevateDashboardDueCaseModal() {
+      var modal = root.querySelector("#scm-case-modal.open");
+      if (!modal) return;
+      modal.classList.add("scm-case-modal--above-due-popup");
+      var clear = function () {
+        if (!modal.classList.contains("open")) {
+          modal.classList.remove("scm-case-modal--above-due-popup");
+          return true;
+        }
+        return false;
+      };
+      if (clear()) return;
+      var observer = new MutationObserver(function () {
+        if (clear()) observer.disconnect();
+      });
+      observer.observe(modal, { attributes: true, attributeFilter: ["class"] });
+    }
+
     function openDashboardDueCaseFromButton(button, sourceHtml) {
       if (!button || typeof window.scmOpenCase !== "function") return;
       sourceHtml = String(sourceHtml || dashboardDueCaseSourceHtml(button)).trim();
@@ -542,6 +560,7 @@
       proxyCard.appendChild(proxySource);
       root.appendChild(proxyCard);
       window.scmOpenCase(proxyButton);
+      window.setTimeout(elevateDashboardDueCaseModal, 30);
       window.setTimeout(function () {
         proxyCard.remove();
       }, 500);

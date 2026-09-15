@@ -4151,6 +4151,10 @@
   z-index: 1000000 !important;
 }
 
+#scm-app .scm-case-modal.open.scm-case-modal--above-due-popup {
+  z-index: 1000003;
+}
+
 /* ── Iframe popup modal ─────────────────────────────────────── */
 .scm-iframe-overlay {
   position: fixed;
