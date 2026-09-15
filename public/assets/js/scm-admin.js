@@ -4770,9 +4770,9 @@
           renderActionGroup("Cotización", quoteActionButtons, "is-quote") +
           "</section>";
 
-        var firstHistory = srcWrap.querySelector(".scm-case-history");
-        if (firstHistory) {
-          firstHistory.insertAdjacentHTML("beforebegin", caseActionsHtml);
+        var firstHistoryAfterAttachments = srcWrap.querySelector(".scm-case-history:not(.scm-case-documents-section)");
+        if (firstHistoryAfterAttachments) {
+          firstHistoryAfterAttachments.insertAdjacentHTML("beforebegin", caseActionsHtml);
         } else {
           srcWrap.insertAdjacentHTML("beforeend", caseActionsHtml);
         }

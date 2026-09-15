@@ -826,6 +826,13 @@ final class GenericTicketsCardView
       return '';
     }
 
+    if (preg_match('/^\d+$/', $url) && function_exists('wp_get_attachment_url')) {
+      $attachmentUrl = (string) wp_get_attachment_url((int) $url);
+      if ($attachmentUrl !== '' && filter_var($attachmentUrl, FILTER_VALIDATE_URL)) {
+        return $attachmentUrl;
+      }
+    }
+
     if (filter_var($url, FILTER_VALIDATE_URL)) {
       $path = (string) parse_url($url, PHP_URL_PATH);
       if ($path !== '' && stripos($path, '/uploads/') !== false) {

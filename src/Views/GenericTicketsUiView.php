@@ -281,6 +281,13 @@ final class GenericTicketsUiView
       return '';
     }
 
+    if (preg_match('/^\d+$/', $url) && function_exists('wp_get_attachment_url')) {
+      $attachmentUrl = (string) wp_get_attachment_url((int) $url);
+      if ($attachmentUrl !== '' && filter_var($attachmentUrl, FILTER_VALIDATE_URL)) {
+        return $attachmentUrl;
+      }
+    }
+
     if (!filter_var($url, FILTER_VALIDATE_URL)) {
       if (strpos($url, 'file.php?') === 0 || strpos($url, 'legacy-file.php?') === 0) {
         return rtrim((string) SCM_BASE_URL, '/') . '/' . $url;
