@@ -354,11 +354,23 @@ trait RendersPublicPqr
     $selectEstadoAdministrativo = $this->column_exists($ticketsTable, 'estado_administrativo')
       ? "TRIM(COALESCE(`estado_administrativo`, '')) AS estado_administrativo"
       : "'' AS estado_administrativo";
+    $selectImagen = $this->column_exists($ticketsTable, 'imagen')
+      ? "TRIM(COALESCE(`imagen`, '')) AS imagen"
+      : "'' AS imagen";
+    $selectEvidencia = $this->column_exists($ticketsTable, 'evidencia')
+      ? "TRIM(COALESCE(`evidencia`, '')) AS evidencia"
+      : "'' AS evidencia";
+    $selectArchivos = $this->column_exists($ticketsTable, 'archivos')
+      ? "TRIM(COALESCE(`archivos`, '')) AS archivos"
+      : "'' AS archivos";
     $sql = "SELECT
               `_ID`,
               TRIM(COALESCE(`id_ticket`, '')) AS id_ticket,
               TRIM(COALESCE(`asunto`, '')) AS asunto,
               TRIM(COALESCE(`descripcion`, '')) AS descripcion,
+              {$selectImagen},
+              {$selectEvidencia},
+              {$selectArchivos},
               TRIM(COALESCE(`solicitante`, '')) AS solicitante,
               TRIM(COALESCE(`correo_solicitante`, '')) AS correo_solicitante,
               TRIM(COALESCE(`celular_solicitante`, '')) AS celular_solicitante,
@@ -707,6 +719,7 @@ trait RendersPublicPqr
       $barrioActual = trim((string) ($row['barrio'] ?? ''));
       $direccionActual = trim((string) ($row['direccion'] ?? ''));
       $ticketDetailUrl = ($ticketUrl !== '' && $logicalId !== '') ? $ticketUrl . rawurlencode($logicalId) : '';
+      $ticketAttachmentsHtml = $this->render_public_pqr_ticket_attachments_section([$row['imagen'] ?? '', $row['evidencia'] ?? ''], $row['archivos'] ?? '', 'scm-sec-public-adjuntos');
 
       $tipoOptsRow = '';
       $deptoOptsRow = '';
@@ -743,6 +756,7 @@ trait RendersPublicPqr
       $caseSource .= '<section class="scm-public-pqr-case-detail">';
       $caseSource .= '<h4>Detalle de la solicitud</h4>';
       $caseSource .= '<div class="scm-public-pqr-description"><span>Descripción</span><p>' . ($descripcionActual !== '' ? nl2br(self::h($descripcionActual)) : 'Sin descripción registrada.') . '</p></div>';
+      $caseSource .= $ticketAttachmentsHtml;
       $caseSource .= '<div class="scm-public-pqr-detail-grid">';
       $caseSource .= '<div><span>Ticket</span><strong>#' . self::h($logicalId !== '' ? $logicalId : (string) $ticketPk) . '</strong></div>';
       $caseSource .= '<div><span>Tipo</span><strong>' . self::h($tipoActual !== '' ? $tipoActual : 'Solicitud web') . '</strong></div>';
@@ -1060,6 +1074,209 @@ trait RendersPublicPqr
     }
     $html .= '</div></article></section>';
     return $html;
+  }
+
+  private function render_public_pqr_ticket_attachments_section($imageRaw, $documentRaw, string $sectionId): string
+  {
+    $images = $this->extract_public_pqr_attachment_urls($imageRaw);
+    $docs = $this->extract_public_pqr_ticket_documents($documentRaw);
+    $fileDocs = [];
+
+    foreach ($docs as $doc) {
+      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+      if ($url === '') {
+        continue;
+      }
+      if ($this->is_public_pqr_image_attachment_url($url)) {
+        $images[] = $url;
+      } else {
+        $fileDocs[] = $doc;
+      }
+    }
+
+    $images = array_values(array_unique($images));
+    if (empty($images) && empty($fileDocs)) {
+      return '';
+    }
+
+    $html = '<section class="scm-case-history scm-case-documents-section" id="' . self::h($sectionId) . '">';
+    $html .= '<h4>Adjuntos del caso</h4>';
+    if (!empty($images)) {
+      $html .= '<div class="scm-case-history-img">';
+      foreach ($images as $url) {
+        $safeUrl = self::h($url);
+        $html .= '<button type="button" class="scm-case-attachment-image-btn" data-scm-open-iframe data-iframe-url="' . $safeUrl . '" data-iframe-title="Imagen del caso" style="background:none;border:0;padding:0;margin:0;cursor:zoom-in;">'
+          . '<img src="' . $safeUrl . '" alt="Imagen del caso" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:4px;margin-top:6px;">'
+          . '</button>';
+      }
+      $html .= '</div>';
+    }
+    if (!empty($fileDocs)) {
+      $html .= '<div class="scm-case-document-grid">';
+      foreach ($fileDocs as $doc) {
+        $label = trim((string) ($doc['nombre_archivo'] ?? ''));
+        $url = $this->normalize_public_pqr_attachment_url(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? '')));
+        if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+          continue;
+        }
+        if ($label === '') {
+          $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
+        }
+        $html .= '<button type="button" class="scm-case-action-btn scm-case-document-link" data-scm-open-iframe data-iframe-url="' . self::h($url) . '" data-iframe-title="' . self::h($label) . '">' . self::h($label) . '</button>';
+      }
+      $html .= '</div>';
+    }
+    $html .= '</section>';
+    return $html;
+  }
+
+  /** @return array<int,string> */
+  private function extract_public_pqr_attachment_urls($raw): array
+  {
+    if (is_array($raw)) {
+      $items = [];
+      foreach ($raw as $entry) {
+        if (is_array($entry)) {
+          $items[] = $entry;
+          continue;
+        }
+        $value = trim((string) $entry);
+        if ($value === '') {
+          continue;
+        }
+        $decoded = preg_match('/^[aObis]:/', $value) ? @unserialize($value, ['allowed_classes' => false]) : null;
+        if (is_array($decoded)) {
+          $items = array_merge($items, $decoded);
+          continue;
+        }
+        $json = json_decode($value, true);
+        if (is_array($json)) {
+          $items = array_merge($items, $json);
+          continue;
+        }
+        $items[] = $value;
+      }
+    } else {
+      $value = trim((string) $raw);
+      if ($value === '') {
+        return [];
+      }
+
+      $items = [$value];
+      $decoded = preg_match('/^[aObis]:/', $value) ? @unserialize($value, ['allowed_classes' => false]) : null;
+      if (is_array($decoded)) {
+        $items = $decoded;
+      } else {
+        $json = json_decode($value, true);
+        if (is_array($json)) {
+          $items = $json;
+        }
+      }
+    }
+
+    $out = [];
+    foreach ($items as $item) {
+      $url = is_array($item)
+        ? trim((string) ($item['url'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? ''))
+        : trim((string) $item);
+      $url = $this->normalize_public_pqr_attachment_url($url);
+      if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
+        $out[] = $url;
+      }
+    }
+
+    return array_values(array_unique($out));
+  }
+
+  /** @return array<int,array{nombre_archivo:string,archivo:string,media_archivo:string}> */
+  private function extract_public_pqr_ticket_documents($raw): array
+  {
+    $value = trim((string) $raw);
+    if ($value === '') {
+      return [];
+    }
+
+    $docs = preg_match('/^[aObis]:/', $value) ? @unserialize($value, ['allowed_classes' => false]) : null;
+    if (!is_array($docs)) {
+      $json = json_decode($value, true);
+      $docs = is_array($json) ? $json : [$value];
+    }
+
+    $out = [];
+    foreach ($docs as $doc) {
+      $label = '';
+      $url = '';
+      if (is_array($doc)) {
+        $label = trim((string) ($doc['nombre_archivo'] ?? $doc['title'] ?? $doc['label'] ?? ''));
+        $url = $this->normalize_public_pqr_attachment_url(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? $doc['url'] ?? '')));
+      } else {
+        $url = $this->normalize_public_pqr_attachment_url(trim((string) $doc));
+      }
+      if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+        continue;
+      }
+      $out[] = ['nombre_archivo' => $label, 'archivo' => $url, 'media_archivo' => $url];
+    }
+
+    return $out;
+  }
+
+  private function normalize_public_pqr_attachment_url(string $url): string
+  {
+    $url = trim($url);
+    if ($url === '') {
+      return '';
+    }
+
+    if (filter_var($url, FILTER_VALIDATE_URL)) {
+      $path = (string) parse_url($url, PHP_URL_PATH);
+      if ($path !== '' && stripos($path, '/uploads/') !== false) {
+        $fileName = basename($path);
+        if ($this->is_safe_public_pqr_attachment_name($fileName)) {
+          return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
+        }
+      }
+      return $url;
+    }
+
+    if (strpos($url, 'file.php?') === 0 || strpos($url, 'legacy-file.php?') === 0) {
+      return rtrim((string) SCM_BASE_URL, '/') . '/' . $url;
+    }
+    if (strpos($url, '/file.php?') === 0 || strpos($url, '/legacy-file.php?') === 0) {
+      return rtrim((string) SCM_BASE_URL, '/') . $url;
+    }
+
+    $fileName = basename((string) parse_url($url, PHP_URL_PATH));
+    if ($this->is_safe_public_pqr_attachment_name($fileName)) {
+      return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
+    }
+
+    return $url;
+  }
+
+  private function is_public_pqr_image_attachment_url(string $url): bool
+  {
+    $name = basename((string) parse_url($url, PHP_URL_PATH));
+    $query = (string) parse_url($url, PHP_URL_QUERY);
+    if ($query !== '') {
+      parse_str($query, $parts);
+      if (!empty($parts['n'])) {
+        $name = basename((string) $parts['n']);
+      }
+    }
+
+    $extension = strtolower((string) pathinfo($name, PATHINFO_EXTENSION));
+    return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif', 'tif', 'tiff'], true);
+  }
+
+  private function is_safe_public_pqr_attachment_name(string $fileName): bool
+  {
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,190}$/', $fileName)) {
+      return false;
+    }
+
+    $extension = strtolower((string) pathinfo($fileName, PATHINFO_EXTENSION));
+    return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv', 'bmp', 'heic', 'heif', 'tif', 'tiff'], true);
   }
 
   /** Panel principal - antes de render_shortcode(). Llamar desde index.php. */

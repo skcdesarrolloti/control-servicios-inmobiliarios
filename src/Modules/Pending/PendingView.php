@@ -792,7 +792,7 @@ final class PendingView
   private function renderPreventivaTicketCaseSource(array $ticket, array $contractRow = []): string
   {
     $descripcion = trim((string) ($ticket['descripcion'] ?? ''));
-    $documentsHtml = $this->renderPendingTicketDocumentsSection($ticket['archivos'] ?? '', 'scm-sec-documentos');
+    $documentsHtml = $this->renderPendingTicketAttachmentsSection([$ticket['imagen'] ?? '', $ticket['evidencia'] ?? ''], $ticket['archivos'] ?? '', 'scm-sec-documentos');
     $contratoData = is_array($ticket['_scm_contrato_data'] ?? null) ? $ticket['_scm_contrato_data'] : [];
     $inmuebleData = is_array($ticket['_scm_inmueble_data'] ?? null) ? $ticket['_scm_inmueble_data'] : [];
     if (empty($contratoData)) {
@@ -817,6 +817,7 @@ final class PendingView
     if ($html === '') {
       $html = '<div class="scm-case-description"><strong>Detalle del caso:</strong><div class="scm-case-description-content">Ticket preventivo creado desde contratos pendientes.</div></div>';
     }
+    $html .= $documentsHtml;
     $seguimientoHtml = '<div class="scm-seg-readonly">No se pudo cargar el formulario de seguimiento en este momento.</div>';
     try {
       $seguimientoHtml = (new \SCM\Views\SeguimientoFormView())->render($ticketPk, \SCM\Core\Auth::isLoggedIn(), $hasCotizacionPendiente);
@@ -831,15 +832,11 @@ final class PendingView
     $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-contrato">Ver contrato</button>';
     $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-inmueble">Ver inmueble</button>';
     $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-hist-inmueble">Ver historial del inmueble</button>';
-    if ($documentsHtml !== '') {
-      $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Ver documentos</button>';
-    }
     $html .= '</div>';
     $html .= '<div class="scm-case-hidden-sections" style="display:none;">';
     $html .= $this->renderPendingSingleRecordSection('Contrato', $contratoData, 'scm-sec-contrato');
     $html .= $this->renderPendingSingleRecordSection('Inmueble', $inmuebleData, 'scm-sec-inmueble');
     $html .= $this->renderPendingRecordSection('Historial del inmueble', $historialInmuebleItems, 'scm-sec-hist-inmueble');
-    $html .= $documentsHtml;
     $html .= '</div>';
     return $html;
   }
@@ -1115,7 +1112,7 @@ final class PendingView
   {
     $decoded = $this->pendingDecodedText($text);
     if (filter_var($text, FILTER_VALIDATE_URL)) {
-      return '<a class="scm-case-action-btn" href="' . esc_url($text) . '" target="_blank" rel="noopener noreferrer">Abrir enlace</a>';
+      return '<button type="button" class="scm-case-action-btn" data-scm-open-iframe data-iframe-url="' . esc_url($text) . '" data-iframe-title="Detalle">Abrir enlace</button>';
     }
     if ($this->pendingLooksLikeHtml($decoded)) {
       return wp_kses_post($decoded);
@@ -1162,7 +1159,7 @@ final class PendingView
         continue;
       }
       $seen[$key] = true;
-      $html .= '<a class="scm-case-action-btn" href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($label) . '</a>';
+      $html .= '<button type="button" class="scm-case-action-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '">' . esc_html($label) . '</button>';
     }
 
     return $html . '</div>';
@@ -1430,7 +1427,7 @@ final class PendingView
     }
     $html = '<div class="scm-case-history-img">';
     foreach ($urls as $url) {
-      $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer"><img src="' . esc_url($url) . '" alt="Imagen adjunta" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:8px;margin-top:6px;"></a>';
+      $html .= '<button type="button" class="scm-case-attachment-image-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="Imagen adjunta" style="background:none;border:0;padding:0;margin:0;cursor:zoom-in;"><img src="' . esc_url($url) . '" alt="Imagen adjunta" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:8px;margin-top:6px;"></button>';
     }
     return $html . '</div>';
   }
@@ -1444,11 +1441,11 @@ final class PendingView
     $html = '<div class="scm-case-actions">';
     foreach ($docs as $doc) {
       $label = trim((string) ($doc['nombre_archivo'] ?? '')) ?: 'Ver documento';
-      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+      $url = $this->normalizePendingAttachmentUrl(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? '')));
       if ($url === '') {
         continue;
       }
-      $html .= '<a class="scm-case-action-btn" href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($label) . '</a>';
+      $html .= '<button type="button" class="scm-case-action-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '">' . esc_html($label) . '</button>';
     }
     return $html . '</div>';
   }
@@ -1456,17 +1453,50 @@ final class PendingView
   /** @return array<int,string> */
   private function extractPendingAttachmentUrls($raw): array
   {
-    $value = trim((string) $raw);
-    if ($value === '') {
-      return [];
+    if (is_array($raw)) {
+      $items = [];
+      foreach ($raw as $entry) {
+        if (is_array($entry)) {
+          $items[] = $entry;
+          continue;
+        }
+        $value = trim((string) $entry);
+        if ($value === '') {
+          continue;
+        }
+        $decoded = preg_match('/^[aObis]:/', $value) ? @unserialize($value, ['allowed_classes' => false]) : null;
+        if (is_array($decoded)) {
+          $items = array_merge($items, $decoded);
+          continue;
+        }
+        $json = json_decode($value, true);
+        if (is_array($json)) {
+          $items = array_merge($items, $json);
+          continue;
+        }
+        $items[] = $value;
+      }
+    } else {
+      $value = trim((string) $raw);
+      if ($value === '') {
+        return [];
+      }
+      $items = [$value];
+      $decoded = preg_match('/^[aObis]:/', $value) ? @unserialize($value, ['allowed_classes' => false]) : null;
+      if (is_array($decoded)) {
+        $items = $decoded;
+      } else {
+        $json = json_decode($value, true);
+        if (is_array($json)) {
+          $items = $json;
+        }
+      }
     }
-    $decoded = preg_match('/^[aObis]:/', $value) ? @unserialize($value, ['allowed_classes' => false]) : null;
-    if (!is_array($decoded)) {
-      return filter_var($value, FILTER_VALIDATE_URL) ? [$value] : [];
-    }
+
     $out = [];
-    foreach ($decoded as $item) {
-      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
+    foreach ($items as $item) {
+      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
+      $url = $this->normalizePendingAttachmentUrl($url);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
         $out[] = $url;
       }
@@ -1474,28 +1504,54 @@ final class PendingView
     return $out;
   }
 
-  private function renderPendingTicketDocumentsSection($raw, string $sectionId): string
+  private function renderPendingTicketAttachmentsSection($imageRaw, $documentRaw, string $sectionId): string
   {
-    $docs = $this->extractPendingTicketDocuments($raw);
-    if (empty($docs)) {
+    $images = $this->extractPendingAttachmentUrls($imageRaw);
+    $docs = $this->extractPendingTicketDocuments($documentRaw);
+    $fileDocs = [];
+    foreach ($docs as $doc) {
+      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+      if ($url === '') {
+        continue;
+      }
+      if ($this->isPendingImageAttachmentUrl($url)) {
+        $images[] = $url;
+      } else {
+        $fileDocs[] = $doc;
+      }
+    }
+    $images = array_values(array_unique($images));
+    if (empty($images) && empty($fileDocs)) {
       return '';
     }
 
     $html = '<section class="scm-case-history scm-case-documents-section" id="' . esc_attr($sectionId) . '">';
-    $html .= '<h4>Documentos del caso</h4>';
-    $html .= '<div class="scm-case-document-grid">';
-    foreach ($docs as $doc) {
-      $label = trim((string) ($doc['nombre_archivo'] ?? ''));
-      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
-      if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
-        continue;
+    $html .= '<h4>Adjuntos del caso</h4>';
+    if (!empty($images)) {
+      $html .= '<div class="scm-case-history-img">';
+      foreach ($images as $url) {
+        $html .= '<button type="button" class="scm-case-attachment-image-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="Imagen del caso" style="background:none;border:0;padding:0;margin:0;cursor:zoom-in;">'
+          . '<img src="' . esc_url($url) . '" alt="Imagen del caso" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:8px;margin-top:6px;">'
+          . '</button>';
       }
-      if ($label === '') {
-        $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
-      }
-      $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="scm-case-action-btn scm-case-document-link">' . esc_html($label) . '</a>';
+      $html .= '</div>';
     }
-    $html .= '</div></section>';
+    if (!empty($fileDocs)) {
+      $html .= '<div class="scm-case-document-grid">';
+      foreach ($fileDocs as $doc) {
+        $label = trim((string) ($doc['nombre_archivo'] ?? ''));
+        $url = $this->normalizePendingAttachmentUrl(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? '')));
+        if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+          continue;
+        }
+        if ($label === '') {
+          $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
+        }
+        $html .= '<button type="button" class="scm-case-action-btn scm-case-document-link" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '">' . esc_html($label) . '</button>';
+      }
+      $html .= '</div>';
+    }
+    $html .= '</section>';
     return $html;
   }
 
@@ -1522,9 +1578,9 @@ final class PendingView
       $url = '';
       if (is_array($doc)) {
         $label = trim((string) ($doc['nombre_archivo'] ?? $doc['title'] ?? $doc['label'] ?? ''));
-        $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? $doc['url'] ?? ''));
+        $url = $this->normalizePendingAttachmentUrl(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? $doc['url'] ?? '')));
       } else {
-        $url = trim((string) $doc);
+        $url = $this->normalizePendingAttachmentUrl(trim((string) $doc));
       }
       if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
         continue;
@@ -1532,6 +1588,58 @@ final class PendingView
       $out[] = ['nombre_archivo' => $label, 'media_archivo' => $url, 'archivo' => $url];
     }
     return $out;
+  }
+
+  private function normalizePendingAttachmentUrl(string $url): string
+  {
+    $url = trim($url);
+    if ($url === '') {
+      return '';
+    }
+    if (filter_var($url, FILTER_VALIDATE_URL)) {
+      $path = (string) parse_url($url, PHP_URL_PATH);
+      if ($path !== '' && stripos($path, '/uploads/') !== false) {
+        $fileName = basename($path);
+        if ($this->isSafePendingAttachmentName($fileName)) {
+          return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
+        }
+      }
+      return $url;
+    }
+    if (strpos($url, 'file.php?') === 0 || strpos($url, 'legacy-file.php?') === 0) {
+      return rtrim((string) SCM_BASE_URL, '/') . '/' . $url;
+    }
+    if (strpos($url, '/file.php?') === 0 || strpos($url, '/legacy-file.php?') === 0) {
+      return rtrim((string) SCM_BASE_URL, '/') . $url;
+    }
+    $fileName = basename((string) parse_url($url, PHP_URL_PATH));
+    if ($this->isSafePendingAttachmentName($fileName)) {
+      return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
+    }
+    return $url;
+  }
+
+  private function isPendingImageAttachmentUrl(string $url): bool
+  {
+    $name = basename((string) parse_url($url, PHP_URL_PATH));
+    $query = (string) parse_url($url, PHP_URL_QUERY);
+    if ($query !== '') {
+      parse_str($query, $parts);
+      if (!empty($parts['n'])) {
+        $name = basename((string) $parts['n']);
+      }
+    }
+    $extension = strtolower((string) pathinfo($name, PATHINFO_EXTENSION));
+    return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif', 'tif', 'tiff'], true);
+  }
+
+  private function isSafePendingAttachmentName(string $fileName): bool
+  {
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,190}$/', $fileName)) {
+      return false;
+    }
+    $extension = strtolower((string) pathinfo($fileName, PATHINFO_EXTENSION));
+    return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv', 'bmp', 'heic', 'heif', 'tif', 'tiff'], true);
   }
 
   private function durationSince(int $ts): string

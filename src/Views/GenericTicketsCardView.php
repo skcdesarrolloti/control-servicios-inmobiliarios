@@ -356,29 +356,27 @@ final class GenericTicketsCardView
     $propertyGoogleMaps = trim((string) ($inmuebleData['ubicacion_google_maps'] ?? ''));
     $preventivaNoAccessCount = $isPreventivaTicket ? $this->countPreventivaNoAccessNotices($row, $historialItems) : 0;
 
+    $ticketDocumentsHtml = $this->renderTicketAttachmentsSection([$row['imagen'] ?? '', $row['evidencia'] ?? ''], $row['archivos'] ?? '', 'scm-sec-documentos');
+
     $caseSource  = '';
     if ($descripcionRaw !== '') {
       $caseSource .= '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">' . $descripcionRaw . '</div></div>';
     }
+    $caseSource .= $ticketDocumentsHtml;
     if ($isPreventivaTicket) {
       $caseSource .= $this->renderPreventivaNoAccessSummary($preventivaNoAccessCount);
     }
-    $ticketDocumentsHtml = $this->renderTicketAttachmentsSection($row['imagen'] ?? $row['evidencia'] ?? '', $row['archivos'] ?? '', 'scm-sec-documentos');
     $caseSource .= '<div class="scm-modal-timeline-only">' . $timelineHtml . '</div>';
     $caseSource .= '<div class="scm-seg-wrap">' . (string) call_user_func($this->renderSeguimientoForm, $ticketPk, Auth::isLoggedIn(), $cotizacionPendienteRespuesta) . '</div>';
     $caseSource .= (string) call_user_func($this->renderHistorialBlock, $historialItems);
     $caseSource .= (string) call_user_func($this->renderRecordSection, 'Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);
     $caseSource .= (string) call_user_func($this->renderRecordSection, 'Notas del ticket', $notasItems);
     $caseSource .= '<div class="scm-case-action-buttons"><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-contrato">Ver contrato</button><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-inmueble">Ver inmueble</button><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-hist-inmueble">Ver historial del inmueble</button>';
-    if ($ticketDocumentsHtml !== '') {
-      $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Ver adjuntos</button>';
-    }
     $caseSource .= '</div>';
     $caseSource .= '<div class="scm-case-hidden-sections" style="display:none;">';
     $caseSource .= (string) call_user_func($this->renderSingleRecordSection, 'Contrato', $contratoData, 'scm-sec-contrato');
     $caseSource .= (string) call_user_func($this->renderSingleRecordSection, 'Inmueble', $inmuebleData, 'scm-sec-inmueble');
     $caseSource .= (string) call_user_func($this->renderRecordSection, 'Historial del inmueble', $historialInmuebleItems, 'scm-sec-hist-inmueble');
-    $caseSource .= $ticketDocumentsHtml;
     $caseSource .= '</div>';
 
     $dataAttrs  = 'data-ticket="' . esc_attr($ticketLabel) . '"';
@@ -516,7 +514,7 @@ final class GenericTicketsCardView
     $collectDocuments = function ($raw) use (&$documents): void {
       foreach ($this->extractTicketDocuments($raw) as $doc) {
         $label = $this->normalizePreventivaNoAccessText((string) ($doc['nombre_archivo'] ?? ''));
-        $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+        $url = $this->normalizeTicketAttachmentUrl(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? '')));
         $urlKey = strtolower($url);
         if ($url !== '' && $this->looksLikePreventivaNoAccessNotice($label . ' ' . $urlKey)) {
           $documents[$urlKey !== '' ? $urlKey : md5($label)] = true;
@@ -698,7 +696,20 @@ final class GenericTicketsCardView
   {
     $images = $this->extractTicketAttachmentUrls($imageRaw);
     $docs = $this->extractTicketDocuments($documentRaw);
-    if (empty($images) && empty($docs)) {
+    $fileDocs = [];
+    foreach ($docs as $doc) {
+      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+      if ($url === '') {
+        continue;
+      }
+      if ($this->isImageAttachmentUrl($url)) {
+        $images[] = $url;
+      } else {
+        $fileDocs[] = $doc;
+      }
+    }
+    $images = array_values(array_unique($images));
+    if (empty($images) && empty($fileDocs)) {
       return '';
     }
 
@@ -707,24 +718,24 @@ final class GenericTicketsCardView
     if (!empty($images)) {
       $html .= '<div class="scm-case-history-img">';
       foreach ($images as $url) {
-        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">'
+        $html .= '<button type="button" class="scm-case-attachment-image-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="Imagen del caso" style="background:none;border:0;padding:0;margin:0;cursor:zoom-in;">'
           . '<img src="' . esc_url($url) . '" alt="Imagen del caso" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:4px;margin-top:6px;">'
-          . '</a>';
+          . '</button>';
       }
       $html .= '</div>';
     }
-    if (!empty($docs)) {
+    if (!empty($fileDocs)) {
       $html .= '<div class="scm-case-document-grid">';
-      foreach ($docs as $doc) {
+      foreach ($fileDocs as $doc) {
         $label = trim((string) ($doc['nombre_archivo'] ?? ''));
-        $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+        $url = $this->normalizeTicketAttachmentUrl(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? '')));
         if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
           continue;
         }
         if ($label === '') {
           $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
         }
-        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="scm-case-action-btn scm-case-document-link">' . esc_html($label) . '</a>';
+        $html .= '<button type="button" class="scm-case-action-btn scm-case-document-link" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '">' . esc_html($label) . '</button>';
       }
       $html .= '</div>';
     }
@@ -736,7 +747,31 @@ final class GenericTicketsCardView
   private function extractTicketAttachmentUrls($raw): array
   {
     if (is_array($raw)) {
-      $items = $raw;
+      $items = [];
+      foreach ($raw as $entry) {
+        if (is_array($entry)) {
+          $items[] = $entry;
+          continue;
+        }
+        $value = trim((string) $entry);
+        if ($value === '') {
+          continue;
+        }
+        if (preg_match('/^[aObis]:/', $value)) {
+          $decoded = @unserialize($value, ['allowed_classes' => false]);
+          if (is_array($decoded)) {
+            $items = array_merge($items, $decoded);
+            continue;
+          }
+        } else {
+          $decoded = json_decode($value, true);
+          if (is_array($decoded)) {
+            $items = array_merge($items, $decoded);
+            continue;
+          }
+        }
+        $items[] = $value;
+      }
     } else {
       $value = trim((string) $raw);
       if ($value === '') {
@@ -761,11 +796,70 @@ final class GenericTicketsCardView
       $url = is_array($item)
         ? trim((string) ($item['url'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? ''))
         : trim((string) $item);
+      $url = $this->normalizeTicketAttachmentUrl($url);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
         $out[] = $url;
       }
     }
     return array_values(array_unique($out));
+  }
+
+  private function isImageAttachmentUrl(string $url): bool
+  {
+    $name = basename((string) parse_url($url, PHP_URL_PATH));
+    $query = (string) parse_url($url, PHP_URL_QUERY);
+    if ($query !== '') {
+      parse_str($query, $parts);
+      if (!empty($parts['n'])) {
+        $name = basename((string) $parts['n']);
+      }
+    }
+
+    $extension = strtolower((string) pathinfo($name, PATHINFO_EXTENSION));
+    return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif', 'tif', 'tiff'], true);
+  }
+
+  private function normalizeTicketAttachmentUrl(string $url): string
+  {
+    $url = trim($url);
+    if ($url === '') {
+      return '';
+    }
+
+    if (filter_var($url, FILTER_VALIDATE_URL)) {
+      $path = (string) parse_url($url, PHP_URL_PATH);
+      if ($path !== '' && stripos($path, '/uploads/') !== false) {
+        $fileName = basename($path);
+        if ($this->isSafeLegacyAttachmentName($fileName)) {
+          return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
+        }
+      }
+      return $url;
+    }
+
+    if (strpos($url, 'file.php?') === 0 || strpos($url, 'legacy-file.php?') === 0) {
+      return rtrim((string) SCM_BASE_URL, '/') . '/' . $url;
+    }
+    if (strpos($url, '/file.php?') === 0 || strpos($url, '/legacy-file.php?') === 0) {
+      return rtrim((string) SCM_BASE_URL, '/') . $url;
+    }
+
+    $fileName = basename((string) parse_url($url, PHP_URL_PATH));
+    if ($this->isSafeLegacyAttachmentName($fileName)) {
+      return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
+    }
+
+    return $url;
+  }
+
+  private function isSafeLegacyAttachmentName(string $fileName): bool
+  {
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,190}$/', $fileName)) {
+      return false;
+    }
+
+    $extension = strtolower((string) pathinfo($fileName, PATHINFO_EXTENSION));
+    return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv', 'bmp', 'heic', 'heif', 'tif', 'tiff'], true);
   }
 
   /** @return array<int,array{nombre_archivo:string,archivo:string,media_archivo:string}> */
@@ -791,9 +885,9 @@ final class GenericTicketsCardView
       $url = '';
       if (is_array($doc)) {
         $label = trim((string) ($doc['nombre_archivo'] ?? $doc['title'] ?? $doc['label'] ?? ''));
-        $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? $doc['url'] ?? ''));
+        $url = $this->normalizeTicketAttachmentUrl(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? $doc['url'] ?? '')));
       } else {
-        $url = trim((string) $doc);
+        $url = $this->normalizeTicketAttachmentUrl(trim((string) $doc));
       }
       if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
         continue;

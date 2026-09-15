@@ -134,9 +134,9 @@ trait HistoryPresentationConcern
 
     $html = '<div class="scm-case-history-img">';
     foreach ($urls as $url) {
-      $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">'
+      $html .= '<button type="button" class="scm-case-attachment-image-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="Imagen adjunta" style="background:none;border:0;padding:0;margin:0;cursor:zoom-in;">'
         . '<img src="' . esc_url($url) . '" alt="Imagen adjunta" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:4px;margin-top:6px;">'
-        . '</a>';
+        . '</button>';
     }
     return $html . '</div>';
   }
@@ -158,7 +158,7 @@ trait HistoryPresentationConcern
       if ($label === '') {
         $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
       }
-      $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="scm-case-action-btn">' . esc_html($label) . '</a>';
+      $html .= '<button type="button" class="scm-case-action-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '">' . esc_html($label) . '</button>';
     }
     return $html . '</div>';
   }
@@ -169,7 +169,31 @@ trait HistoryPresentationConcern
   private function extractAttachmentUrls($raw): array
   {
     if (is_array($raw)) {
-      $items = $raw;
+      $items = [];
+      foreach ($raw as $entry) {
+        if (is_array($entry)) {
+          $items[] = $entry;
+          continue;
+        }
+        $value = trim((string) $entry);
+        if ($value === '') {
+          continue;
+        }
+        if (preg_match('/^[aObis]:/', $value)) {
+          $decoded = @unserialize($value, ['allowed_classes' => false]);
+          if (is_array($decoded)) {
+            $items = array_merge($items, $decoded);
+            continue;
+          }
+        } else {
+          $decoded = json_decode($value, true);
+          if (is_array($decoded)) {
+            $items = array_merge($items, $decoded);
+            continue;
+          }
+        }
+        $items[] = $value;
+      }
     } else {
       $value = trim((string) $raw);
       if ($value === '') {
@@ -192,8 +216,9 @@ trait HistoryPresentationConcern
     $out = [];
     foreach ($items as $item) {
       $url = is_array($item) ? trim((string) ($item['url'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
+      $url = $this->normalizeHistoryAttachmentUrl($url);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
-        $out[] = $this->normalizeHistoryAttachmentUrl($url);
+        $out[] = $url;
       }
     }
     return array_values(array_unique($out));
@@ -202,7 +227,23 @@ trait HistoryPresentationConcern
   private function normalizeHistoryAttachmentUrl(string $url): string
   {
     $url = trim($url);
-    if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+    if ($url === '') {
+      return '';
+    }
+
+    if (!filter_var($url, FILTER_VALIDATE_URL)) {
+      if (strpos($url, 'file.php?') === 0 || strpos($url, 'legacy-file.php?') === 0) {
+        return rtrim((string) SCM_BASE_URL, '/') . '/' . $url;
+      }
+      if (strpos($url, '/file.php?') === 0 || strpos($url, '/legacy-file.php?') === 0) {
+        return rtrim((string) SCM_BASE_URL, '/') . $url;
+      }
+
+      $fileName = basename((string) parse_url($url, PHP_URL_PATH));
+      if ($this->isSafeLegacyAttachmentName($fileName)) {
+        return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
+      }
+
       return $url;
     }
 
@@ -460,9 +501,9 @@ trait HistoryPresentationConcern
         $url = $this->normalizeHistoryAttachmentUrl($text);
         if (filter_var($url, FILTER_VALIDATE_URL)) {
           $lines .= '<p><strong>' . esc_html((string) $label) . ':</strong></p>'
-            . '<p><a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">'
+            . '<p><button type="button" class="scm-case-attachment-image-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr((string) $label) . '" style="background:none;border:0;padding:0;margin:0;cursor:zoom-in;">'
             . '<img src="' . esc_url($url) . '" alt="' . esc_attr((string) $label) . '" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:4px;margin-top:4px;">'
-            . '</a></p>';
+            . '</button></p>';
           continue;
         }
       }
@@ -552,7 +593,7 @@ trait HistoryPresentationConcern
       if (strpos($url, 'revision-correctiva.php?') !== false) {
         $html .= '<button type="button" class="scm-case-action-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label !== '' ? $label : 'Revisión correctiva') . '">' . esc_html($label) . '</button>';
       } else {
-        $html .= '<a class="scm-case-action-btn" href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($label) . '</a>';
+        $html .= '<button type="button" class="scm-case-action-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label !== '' ? $label : 'Detalle') . '">' . esc_html($label) . '</button>';
       }
     }
     $html .= '</div>';
