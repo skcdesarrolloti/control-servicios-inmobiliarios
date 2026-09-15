@@ -181,12 +181,17 @@ trait HistoryPresentationConcern
         if (is_array($decoded)) {
           $items = $decoded;
         }
+      } else {
+        $decoded = json_decode($value, true);
+        if (is_array($decoded)) {
+          $items = $decoded;
+        }
       }
     }
 
     $out = [];
     foreach ($items as $item) {
-      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
+      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
         $out[] = $this->normalizeHistoryAttachmentUrl($url);
       }

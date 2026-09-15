@@ -169,7 +169,7 @@ trait TableRowsConcern
       if ($isPreventivaTicket) {
         $caseSource .= $this->renderPreventivaNoAccessSummary($preventivaNoAccessCount);
       }
-      $ticketDocumentsHtml = $this->renderTicketRootDocumentsSection($row['archivos'] ?? '', 'scm-sec-documentos');
+      $ticketDocumentsHtml = $this->renderTicketRootAttachmentsSection($row['imagen'] ?? $row['evidencia'] ?? '', $row['archivos'] ?? '', 'scm-sec-documentos');
       $caseSource .= '<div class="scm-modal-timeline-only">';
       $caseSource .= $timeline;
       $caseSource .= '</div>';
@@ -184,7 +184,7 @@ trait TableRowsConcern
       $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-inmueble">Ver inmueble</button>';
       $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-hist-inmueble">Ver historial del inmueble</button>';
       if ($ticketDocumentsHtml !== '') {
-        $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Ver documentos</button>';
+        $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Ver adjuntos</button>';
       }
       $caseSource .= '</div>';
       $caseSource .= '<div class="scm-case-hidden-sections" style="display:none;">';
@@ -419,28 +419,41 @@ trait TableRowsConcern
     return '<span class="scm-magnitude-badge scm-magnitude-' . esc_attr($key) . '">' . $labels[$key] . '</span>';
   }
 
-  private function renderTicketRootDocumentsSection($raw, string $sectionId): string
+  private function renderTicketRootAttachmentsSection($imageRaw, $documentRaw, string $sectionId): string
   {
-    $docs = $this->extractTicketRootDocuments($raw);
-    if (empty($docs)) {
+    $images = $this->extractAttachmentUrls($imageRaw);
+    $docs = $this->extractTicketRootDocuments($documentRaw);
+    if (empty($images) && empty($docs)) {
       return '';
     }
 
     $html = '<section class="scm-case-history scm-case-documents-section" id="' . esc_attr($sectionId) . '">';
-    $html .= '<h4>Documentos del caso</h4>';
-    $html .= '<div class="scm-case-document-grid">';
-    foreach ($docs as $doc) {
-      $label = trim((string) ($doc['nombre_archivo'] ?? ''));
-      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
-      if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
-        continue;
+    $html .= '<h4>Adjuntos del caso</h4>';
+    if (!empty($images)) {
+      $html .= '<div class="scm-case-history-img">';
+      foreach ($images as $url) {
+        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">'
+          . '<img src="' . esc_url($url) . '" alt="Imagen del caso" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:4px;margin-top:6px;">'
+          . '</a>';
       }
-      if ($label === '') {
-        $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
-      }
-      $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="scm-case-action-btn scm-case-document-link">' . esc_html($label) . '</a>';
+      $html .= '</div>';
     }
-    $html .= '</div></section>';
+    if (!empty($docs)) {
+      $html .= '<div class="scm-case-document-grid">';
+      foreach ($docs as $doc) {
+        $label = trim((string) ($doc['nombre_archivo'] ?? ''));
+        $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+        if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+          continue;
+        }
+        if ($label === '') {
+          $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
+        }
+        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="scm-case-action-btn scm-case-document-link">' . esc_html($label) . '</a>';
+      }
+      $html .= '</div>';
+    }
+    $html .= '</section>';
     return $html;
   }
 

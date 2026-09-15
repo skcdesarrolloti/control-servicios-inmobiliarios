@@ -363,7 +363,7 @@ final class GenericTicketsCardView
     if ($isPreventivaTicket) {
       $caseSource .= $this->renderPreventivaNoAccessSummary($preventivaNoAccessCount);
     }
-    $ticketDocumentsHtml = $this->renderTicketDocumentsSection($row['archivos'] ?? '', 'scm-sec-documentos');
+    $ticketDocumentsHtml = $this->renderTicketAttachmentsSection($row['imagen'] ?? $row['evidencia'] ?? '', $row['archivos'] ?? '', 'scm-sec-documentos');
     $caseSource .= '<div class="scm-modal-timeline-only">' . $timelineHtml . '</div>';
     $caseSource .= '<div class="scm-seg-wrap">' . (string) call_user_func($this->renderSeguimientoForm, $ticketPk, Auth::isLoggedIn(), $cotizacionPendienteRespuesta) . '</div>';
     $caseSource .= (string) call_user_func($this->renderHistorialBlock, $historialItems);
@@ -371,7 +371,7 @@ final class GenericTicketsCardView
     $caseSource .= (string) call_user_func($this->renderRecordSection, 'Notas del ticket', $notasItems);
     $caseSource .= '<div class="scm-case-action-buttons"><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-contrato">Ver contrato</button><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-inmueble">Ver inmueble</button><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-hist-inmueble">Ver historial del inmueble</button>';
     if ($ticketDocumentsHtml !== '') {
-      $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Ver documentos</button>';
+      $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Ver adjuntos</button>';
     }
     $caseSource .= '</div>';
     $caseSource .= '<div class="scm-case-hidden-sections" style="display:none;">';
@@ -694,29 +694,78 @@ final class GenericTicketsCardView
     return '';
   }
 
-  private function renderTicketDocumentsSection($raw, string $sectionId): string
+  private function renderTicketAttachmentsSection($imageRaw, $documentRaw, string $sectionId): string
   {
-    $docs = $this->extractTicketDocuments($raw);
-    if (empty($docs)) {
+    $images = $this->extractTicketAttachmentUrls($imageRaw);
+    $docs = $this->extractTicketDocuments($documentRaw);
+    if (empty($images) && empty($docs)) {
       return '';
     }
 
     $html = '<section class="scm-case-history scm-case-documents-section" id="' . esc_attr($sectionId) . '">';
-    $html .= '<h4>Documentos del caso</h4>';
-    $html .= '<div class="scm-case-document-grid">';
-    foreach ($docs as $doc) {
-      $label = trim((string) ($doc['nombre_archivo'] ?? ''));
-      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
-      if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
-        continue;
+    $html .= '<h4>Adjuntos del caso</h4>';
+    if (!empty($images)) {
+      $html .= '<div class="scm-case-history-img">';
+      foreach ($images as $url) {
+        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">'
+          . '<img src="' . esc_url($url) . '" alt="Imagen del caso" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:4px;margin-top:6px;">'
+          . '</a>';
       }
-      if ($label === '') {
-        $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
-      }
-      $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="scm-case-action-btn scm-case-document-link">' . esc_html($label) . '</a>';
+      $html .= '</div>';
     }
-    $html .= '</div></section>';
+    if (!empty($docs)) {
+      $html .= '<div class="scm-case-document-grid">';
+      foreach ($docs as $doc) {
+        $label = trim((string) ($doc['nombre_archivo'] ?? ''));
+        $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+        if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+          continue;
+        }
+        if ($label === '') {
+          $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
+        }
+        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="scm-case-action-btn scm-case-document-link">' . esc_html($label) . '</a>';
+      }
+      $html .= '</div>';
+    }
+    $html .= '</section>';
     return $html;
+  }
+
+  /** @return array<int,string> */
+  private function extractTicketAttachmentUrls($raw): array
+  {
+    if (is_array($raw)) {
+      $items = $raw;
+    } else {
+      $value = trim((string) $raw);
+      if ($value === '') {
+        return [];
+      }
+      $items = [$value];
+      if (preg_match('/^[aObis]:/', $value)) {
+        $decoded = @unserialize($value, ['allowed_classes' => false]);
+        if (is_array($decoded)) {
+          $items = $decoded;
+        }
+      } else {
+        $decoded = json_decode($value, true);
+        if (is_array($decoded)) {
+          $items = $decoded;
+        }
+      }
+    }
+
+    $out = [];
+    foreach ($items as $item) {
+      $url = is_array($item)
+        ? trim((string) ($item['url'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? ''))
+        : trim((string) $item);
+      if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
+        $out[] = $url;
+      }
+    }
+    return array_values(array_unique($out));
   }
 
   /** @return array<int,array{nombre_archivo:string,archivo:string,media_archivo:string}> */
