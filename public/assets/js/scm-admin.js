@@ -607,6 +607,9 @@
     if (!url) {
       return;
     }
+    document.querySelectorAll(".scm-iframe-overlay").forEach(function (existingOverlay) {
+      existingOverlay.remove();
+    });
     var overlay = document.createElement("div");
     var compactMode = compact === true || compact === "1";
     var previouslyFocused = document.activeElement;
@@ -5140,7 +5143,9 @@
       modal
         .querySelectorAll("[data-scm-open-iframe]")
         .forEach(function (iframeBtn) {
-          iframeBtn.addEventListener("click", function () {
+          iframeBtn.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
             openIframeModal(
               iframeBtn.dataset.iframeUrl || "",
               iframeBtn.dataset.iframeTitle || "",

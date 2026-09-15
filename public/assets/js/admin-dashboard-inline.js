@@ -346,6 +346,8 @@
             sraPanel.addEventListener('click', function(e) {
               var iframeBtn = e.target.closest('[data-scm-open-iframe]');
               if (iframeBtn) {
+                e.preventDefault();
+                e.stopPropagation();
                 if (typeof window.openIframeModal === 'function') {
                   window.openIframeModal(iframeBtn.dataset.iframeUrl || '', iframeBtn.dataset.iframeTitle || '', iframeBtn.hasAttribute('data-scm-compact-iframe'));
                 }
