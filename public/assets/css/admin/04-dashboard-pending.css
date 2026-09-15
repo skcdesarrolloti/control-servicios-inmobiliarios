@@ -2401,6 +2401,15 @@
   padding: 16px 24px 20px !important;
 }
 
+.swal2-popup.scm-calendar-swal-popup .swal2-footer {
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 16px 24px 20px;
+}
+
 .swal2-popup.scm-calendar-swal-popup .swal2-confirm,
 .swal2-popup.scm-calendar-swal-popup .swal2-cancel {
   border-radius: 10px !important;

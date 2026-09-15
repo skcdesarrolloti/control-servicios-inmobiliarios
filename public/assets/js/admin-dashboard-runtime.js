@@ -499,6 +499,10 @@
       if (openTicketsTab) {
         openTicketsTab.click();
         openTicketsTab.focus({ preventScroll: true });
+      } else {
+        var url = new URL(window.location.href);
+        url.searchParams.set("scm_tab", "abiertos");
+        window.location.href = url.toString();
       }
       return new Promise(function (resolve) {
         window.setTimeout(resolve, 180);
@@ -661,14 +665,12 @@
             title: "Vencimientos administrativos",
             html: dashboardDueEntryPopupHtml(rows),
             width: "min(980px, 94vw)",
-            showCancelButton: true,
-            confirmButtonText: "Ir a tickets abiertos",
-            cancelButtonText: "Cerrar",
+            showConfirmButton: false,
+            showCancelButton: false,
             buttonsStyling: false,
+            footer: '<button type="button" class="scm-btn-primary" data-scm-dashboard-due-open-tickets>Ir a tickets abiertos</button><button type="button" class="scm-btn-secondary" data-scm-dashboard-due-close>Cerrar</button>',
             customClass: {
               popup: "scm-calendar-swal-popup scm-due-entry-swal",
-              confirmButton: "scm-btn-primary",
-              cancelButton: "scm-btn-secondary",
             },
             didOpen: function () {
               var popup = window.Swal.getPopup();
@@ -681,11 +683,28 @@
                 event.preventDefault();
                 dashboardOpenDueCase(caseBtn);
               });
+              var footer = popup.querySelector(".swal2-footer");
+              if (footer) {
+                footer.addEventListener("click", function (event) {
+                  var ticketsBtn = event.target && event.target.closest
+                    ? event.target.closest("[data-scm-dashboard-due-open-tickets]")
+                    : null;
+                  if (ticketsBtn && footer.contains(ticketsBtn)) {
+                    event.preventDefault();
+                    window.Swal.close();
+                    openDashboardRelatedTickets();
+                    return;
+                  }
+                  var closeBtn = event.target && event.target.closest
+                    ? event.target.closest("[data-scm-dashboard-due-close]")
+                    : null;
+                  if (closeBtn && footer.contains(closeBtn)) {
+                    event.preventDefault();
+                    window.Swal.close();
+                  }
+                });
+              }
             },
-          }).then(function (result) {
-            if (result && result.isConfirmed) {
-              openDashboardRelatedTickets();
-            }
           });
         })
         .catch(function (error) {
