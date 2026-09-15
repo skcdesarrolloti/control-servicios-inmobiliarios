@@ -1604,6 +1604,12 @@ final class PendingView
         return $attachmentUrl;
       }
     }
+    if (preg_match('/^\d+$/', $url)) {
+      $attachmentUrl = $this->resolvePendingAttachmentUrlFromId((int) $url);
+      if ($attachmentUrl !== '') {
+        return $attachmentUrl;
+      }
+    }
 
     if (filter_var($url, FILTER_VALIDATE_URL)) {
       $path = (string) parse_url($url, PHP_URL_PATH);
@@ -1626,6 +1632,24 @@ final class PendingView
       return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
     }
     return $url;
+  }
+
+  private function resolvePendingAttachmentUrlFromId(int $attachmentId): string
+  {
+    if ($attachmentId <= 0) {
+      return '';
+    }
+
+    try {
+      $postsTable = $this->db->table('posts');
+      $url = trim((string) ($this->db->getVar(
+        "SELECT `guid` FROM `{$postsTable}` WHERE `ID` = ? AND TRIM(COALESCE(`guid`, '')) <> '' LIMIT 1",
+        [$attachmentId]
+      ) ?? ''));
+      return filter_var($url, FILTER_VALIDATE_URL) ? $url : '';
+    } catch (\Throwable $e) {
+      return '';
+    }
   }
 
   private function isPendingImageAttachmentUrl(string $url): bool

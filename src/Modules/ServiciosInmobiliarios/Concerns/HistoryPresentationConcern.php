@@ -237,6 +237,12 @@ trait HistoryPresentationConcern
         return $attachmentUrl;
       }
     }
+    if (preg_match('/^\d+$/', $url)) {
+      $attachmentUrl = $this->resolveHistoryAttachmentUrlFromId((int) $url);
+      if ($attachmentUrl !== '') {
+        return $attachmentUrl;
+      }
+    }
 
     if (!filter_var($url, FILTER_VALIDATE_URL)) {
       if (strpos($url, 'file.php?') === 0 || strpos($url, 'legacy-file.php?') === 0) {
@@ -265,6 +271,24 @@ trait HistoryPresentationConcern
     }
 
     return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
+  }
+
+  private function resolveHistoryAttachmentUrlFromId(int $attachmentId): string
+  {
+    if ($attachmentId <= 0 || !isset($this->db)) {
+      return '';
+    }
+
+    try {
+      $postsTable = $this->db->table('posts');
+      $url = trim((string) ($this->db->getVar(
+        "SELECT `guid` FROM `{$postsTable}` WHERE `ID` = ? AND TRIM(COALESCE(`guid`, '')) <> '' LIMIT 1",
+        [$attachmentId]
+      ) ?? ''));
+      return filter_var($url, FILTER_VALIDATE_URL) ? $url : '';
+    } catch (\Throwable $e) {
+      return '';
+    }
   }
 
   private function isSafeLegacyAttachmentName(string $fileName): bool

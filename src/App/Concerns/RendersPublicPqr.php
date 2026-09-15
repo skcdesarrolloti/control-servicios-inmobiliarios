@@ -1238,6 +1238,12 @@ trait RendersPublicPqr
         return $attachmentUrl;
       }
     }
+    if (preg_match('/^\d+$/', $url)) {
+      $attachmentUrl = $this->resolve_public_pqr_attachment_url_from_id((int) $url);
+      if ($attachmentUrl !== '') {
+        return $attachmentUrl;
+      }
+    }
 
     if (filter_var($url, FILTER_VALIDATE_URL)) {
       $path = (string) parse_url($url, PHP_URL_PATH);
@@ -1263,6 +1269,24 @@ trait RendersPublicPqr
     }
 
     return $url;
+  }
+
+  private function resolve_public_pqr_attachment_url_from_id(int $attachmentId): string
+  {
+    if ($attachmentId <= 0) {
+      return '';
+    }
+
+    try {
+      $postsTable = $this->db->table('posts');
+      $url = trim((string) ($this->db->getVar(
+        "SELECT `guid` FROM `{$postsTable}` WHERE `ID` = ? AND TRIM(COALESCE(`guid`, '')) <> '' LIMIT 1",
+        [$attachmentId]
+      ) ?? ''));
+      return filter_var($url, FILTER_VALIDATE_URL) ? $url : '';
+    } catch (\Throwable $e) {
+      return '';
+    }
   }
 
   private function is_public_pqr_image_attachment_url(string $url): bool

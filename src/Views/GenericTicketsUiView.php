@@ -287,6 +287,12 @@ final class GenericTicketsUiView
         return $attachmentUrl;
       }
     }
+    if (preg_match('/^\d+$/', $url)) {
+      $attachmentUrl = $this->resolveHistoryAttachmentUrlFromId((int) $url);
+      if ($attachmentUrl !== '') {
+        return $attachmentUrl;
+      }
+    }
 
     if (!filter_var($url, FILTER_VALIDATE_URL)) {
       if (strpos($url, 'file.php?') === 0 || strpos($url, 'legacy-file.php?') === 0) {
@@ -315,6 +321,29 @@ final class GenericTicketsUiView
     }
 
     return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
+  }
+
+  private function resolveHistoryAttachmentUrlFromId(int $attachmentId): string
+  {
+    if ($attachmentId <= 0) {
+      return '';
+    }
+
+    global $wpdb;
+    if (!is_object($wpdb) || !method_exists($wpdb, 'get_var') || !method_exists($wpdb, 'prepare')) {
+      return '';
+    }
+
+    try {
+      $postsTable = (string) ($wpdb->posts ?? (($wpdb->prefix ?? 'wp_') . 'posts'));
+      $url = trim((string) $wpdb->get_var($wpdb->prepare(
+        "SELECT `guid` FROM `{$postsTable}` WHERE `ID` = %d AND TRIM(COALESCE(`guid`, '')) <> '' LIMIT 1",
+        $attachmentId
+      )));
+      return filter_var($url, FILTER_VALIDATE_URL) ? $url : '';
+    } catch (\Throwable $e) {
+      return '';
+    }
   }
 
   private function isSafeLegacyAttachmentName(string $fileName): bool
