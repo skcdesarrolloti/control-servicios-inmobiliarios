@@ -53,7 +53,7 @@ trait HistoryPresentationConcern
       $html .= '<article class="scm-case-history-item" data-page="' . esc_attr((string) $page) . '"' . $itemStyle . '>';
       $html .= '<div class="scm-case-history-meta"><strong>' . esc_html($author) . '</strong><span>' . esc_html($date) . '</span></div>';
       $html .= '<div class="scm-case-history-detail">' . $detailHtml . '</div>';
-      $html .= $this->renderHistoryImages($item['imagen'] ?? '');
+      $html .= $this->renderHistoryImages([$item['imagenes'] ?? '', $item['imagen'] ?? '', $item['evidencia'] ?? '']);
       $html .= $this->renderHistoryDocuments($item['archivos'] ?? '');
       if (!empty($itemButtons)) {
         $html .= $this->renderCaseActionButtons($itemButtons);
@@ -111,7 +111,7 @@ trait HistoryPresentationConcern
       $html .= '</div>';
       $html .= '<div class="scm-case-history-detail scm-case-record-detail">' . $this->formatHistoryDetailHtml($detail) . '</div>';
       $html .= $this->renderRecordItemFields($item, $visibleFields);
-      $html .= $this->renderHistoryImages($item['evidencia'] ?? $item['imagen'] ?? '');
+      $html .= $this->renderHistoryImages([$item['imagenes'] ?? '', $item['evidencia'] ?? '', $item['imagen'] ?? '']);
       $html .= $this->renderHistoryDocuments($item['archivos'] ?? '');
       $html .= '<div class="scm-case-record-date"><span class="scm-case-record-date-icon" aria-hidden="true"></span><strong>' . esc_html($date) . '</strong></div>';
       $html .= '</article>';
@@ -215,7 +215,7 @@ trait HistoryPresentationConcern
 
     $out = [];
     foreach ($items as $item) {
-      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
+      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['imagenes'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
       $url = $this->normalizeHistoryAttachmentUrl($url);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
         $out[] = $url;
@@ -497,7 +497,7 @@ trait HistoryPresentationConcern
         }
       }
 
-      if ($field === 'evidencia' || $field === 'imagen') {
+      if ($field === 'evidencia' || $field === 'imagen' || $field === 'imagenes') {
         $url = $this->normalizeHistoryAttachmentUrl($text);
         if (filter_var($url, FILTER_VALIDATE_URL)) {
           $lines .= '<p><strong>' . esc_html((string) $label) . ':</strong></p>'

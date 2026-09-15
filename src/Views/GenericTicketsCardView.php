@@ -356,7 +356,7 @@ final class GenericTicketsCardView
     $propertyGoogleMaps = trim((string) ($inmuebleData['ubicacion_google_maps'] ?? ''));
     $preventivaNoAccessCount = $isPreventivaTicket ? $this->countPreventivaNoAccessNotices($row, $historialItems) : 0;
 
-    $ticketDocumentsHtml = $this->renderTicketAttachmentsSection([$row['imagen'] ?? '', $row['evidencia'] ?? ''], $row['archivos'] ?? '', 'scm-sec-documentos');
+    $ticketDocumentsHtml = $this->renderTicketAttachmentsSection([$row['imagenes'] ?? '', $row['imagen'] ?? '', $row['evidencia'] ?? ''], $row['archivos'] ?? '', 'scm-sec-documentos');
 
     $caseSource  = '';
     if ($descripcionRaw !== '') {
@@ -794,7 +794,7 @@ final class GenericTicketsCardView
     $out = [];
     foreach ($items as $item) {
       $url = is_array($item)
-        ? trim((string) ($item['url'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? ''))
+        ? trim((string) ($item['url'] ?? $item['imagenes'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? ''))
         : trim((string) $item);
       $url = $this->normalizeTicketAttachmentUrl($url);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {

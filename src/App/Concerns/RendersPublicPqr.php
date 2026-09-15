@@ -360,6 +360,9 @@ trait RendersPublicPqr
     $selectEvidencia = $this->column_exists($ticketsTable, 'evidencia')
       ? "TRIM(COALESCE(`evidencia`, '')) AS evidencia"
       : "'' AS evidencia";
+    $selectImagenes = $this->column_exists($ticketsTable, 'imagenes')
+      ? "TRIM(COALESCE(`imagenes`, '')) AS imagenes"
+      : "'' AS imagenes";
     $selectArchivos = $this->column_exists($ticketsTable, 'archivos')
       ? "TRIM(COALESCE(`archivos`, '')) AS archivos"
       : "'' AS archivos";
@@ -370,6 +373,7 @@ trait RendersPublicPqr
               TRIM(COALESCE(`descripcion`, '')) AS descripcion,
               {$selectImagen},
               {$selectEvidencia},
+              {$selectImagenes},
               {$selectArchivos},
               TRIM(COALESCE(`solicitante`, '')) AS solicitante,
               TRIM(COALESCE(`correo_solicitante`, '')) AS correo_solicitante,
@@ -719,7 +723,7 @@ trait RendersPublicPqr
       $barrioActual = trim((string) ($row['barrio'] ?? ''));
       $direccionActual = trim((string) ($row['direccion'] ?? ''));
       $ticketDetailUrl = ($ticketUrl !== '' && $logicalId !== '') ? $ticketUrl . rawurlencode($logicalId) : '';
-      $ticketAttachmentsHtml = $this->render_public_pqr_ticket_attachments_section([$row['imagen'] ?? '', $row['evidencia'] ?? ''], $row['archivos'] ?? '', 'scm-sec-public-adjuntos');
+      $ticketAttachmentsHtml = $this->render_public_pqr_ticket_attachments_section([$row['imagenes'] ?? '', $row['imagen'] ?? '', $row['evidencia'] ?? ''], $row['archivos'] ?? '', 'scm-sec-public-adjuntos');
 
       $tipoOptsRow = '';
       $deptoOptsRow = '';
@@ -1177,7 +1181,7 @@ trait RendersPublicPqr
     $out = [];
     foreach ($items as $item) {
       $url = is_array($item)
-        ? trim((string) ($item['url'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? ''))
+        ? trim((string) ($item['url'] ?? $item['imagenes'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? ''))
         : trim((string) $item);
       $url = $this->normalize_public_pqr_attachment_url($url);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {

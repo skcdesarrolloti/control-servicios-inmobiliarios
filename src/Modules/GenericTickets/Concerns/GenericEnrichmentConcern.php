@@ -48,7 +48,7 @@ trait GenericEnrichmentConcern
       $this->db->table('jet_cct_seguimiento_ticket'),
       ['id_ticket'],
       array_keys($ticketKeys),
-      ['_ID', 'cct_status', 'id_ticket', 'fecha', 'nombre', 'observacion', 'cct_author_id', 'cct_created', 'cct_modified', 'id_coordinador', 'id_empleado', 'evidencia']
+      ['_ID', 'cct_status', 'id_ticket', 'fecha', 'nombre', 'observacion', 'cct_author_id', 'cct_created', 'cct_modified', 'id_coordinador', 'id_empleado', 'evidencia', 'imagen', 'imagenes', 'archivos']
     );
     $notesByTicket = $this->fetch_rows_grouped_by_column_candidates(
       $this->db->table('jet_cct_notas_ticket'),

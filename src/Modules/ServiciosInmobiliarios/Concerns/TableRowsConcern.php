@@ -131,6 +131,7 @@ trait TableRowsConcern
         'cct_created' => 'Creado',
         'cct_modified' => 'Modificado',
         'evidencia' => 'Evidencia',
+        'imagenes' => 'Imagenes',
       ];
       $notasFields = [
         'cct_status' => 'Estado',
@@ -162,7 +163,7 @@ trait TableRowsConcern
       $baseUpdateTs = $updatedTs > 0 ? $updatedTs : $createdTs;
       $tiempoSinActualizar = $this->humanDurationSince($baseUpdateTs);
 
-      $ticketDocumentsHtml = $this->renderTicketRootAttachmentsSection([$row['imagen'] ?? '', $row['evidencia'] ?? ''], $row['archivos'] ?? '', 'scm-sec-documentos');
+      $ticketDocumentsHtml = $this->renderTicketRootAttachmentsSection([$row['imagenes'] ?? '', $row['imagen'] ?? '', $row['evidencia'] ?? ''], $row['archivos'] ?? '', 'scm-sec-documentos');
 
       $caseSource = '';
       if ($descripcionRaw !== '') {

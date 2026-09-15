@@ -792,7 +792,7 @@ final class PendingView
   private function renderPreventivaTicketCaseSource(array $ticket, array $contractRow = []): string
   {
     $descripcion = trim((string) ($ticket['descripcion'] ?? ''));
-    $documentsHtml = $this->renderPendingTicketAttachmentsSection([$ticket['imagen'] ?? '', $ticket['evidencia'] ?? ''], $ticket['archivos'] ?? '', 'scm-sec-documentos');
+    $documentsHtml = $this->renderPendingTicketAttachmentsSection([$ticket['imagenes'] ?? '', $ticket['imagen'] ?? '', $ticket['evidencia'] ?? ''], $ticket['archivos'] ?? '', 'scm-sec-documentos');
     $contratoData = is_array($ticket['_scm_contrato_data'] ?? null) ? $ticket['_scm_contrato_data'] : [];
     $inmuebleData = is_array($ticket['_scm_inmueble_data'] ?? null) ? $ticket['_scm_inmueble_data'] : [];
     if (empty($contratoData)) {
@@ -963,7 +963,7 @@ final class PendingView
         $html .= '<div class="scm-case-history-detail"><p><strong>' . esc_html($label) . ':</strong> ' . esc_html($value) . '</p></div>';
       }
       $html .= $this->renderPendingCaseActionButtons($this->pendingHistoryItemButtons($item, $title));
-      $html .= $this->renderPendingHistoryImages($item['evidencia'] ?? $item['imagen'] ?? '');
+      $html .= $this->renderPendingHistoryImages([$item['imagenes'] ?? '', $item['evidencia'] ?? '', $item['imagen'] ?? '']);
       $html .= $this->renderPendingHistoryDocuments($item['archivos'] ?? '');
       $html .= '<div class="scm-case-record-date"><span class="scm-case-record-date-icon" aria-hidden="true"></span><strong>' . esc_html($this->pendingRecordDate($item)) . '</strong></div>';
       $html .= '</article>';
@@ -1386,6 +1386,7 @@ final class PendingView
       'evidencia' => 'Evidencia',
       'archivos' => 'Archivos',
       'imagen' => 'Imagen',
+      'imagenes' => 'Imagenes',
       'id_revision_preventiva' => 'Revisión preventiva',
       'id_revision_correctiva' => 'Revisión correctiva',
       'id_revision_entrega' => 'Revisión de entrega',
@@ -1495,7 +1496,7 @@ final class PendingView
 
     $out = [];
     foreach ($items as $item) {
-      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
+      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['imagenes'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
       $url = $this->normalizePendingAttachmentUrl($url);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
         $out[] = $url;

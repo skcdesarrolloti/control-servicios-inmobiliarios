@@ -530,6 +530,7 @@ trait MaintenanceQueriesConcern
       'tuvo_seguimiento',
       'fecha_seguimiento',
       'imagen',
+      'imagenes',
       'evidencia',
       'archivos',
       'estado_administrativo',

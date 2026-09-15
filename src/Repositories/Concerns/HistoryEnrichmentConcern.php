@@ -119,6 +119,8 @@ trait HistoryEnrichmentConcern
       'observacion',
       'descripcion',
       'imagen',
+      'imagenes',
+      'evidencia',
       'archivos',
       'id_empleado',
       'cct_author_id',

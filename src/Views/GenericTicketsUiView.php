@@ -92,7 +92,7 @@ final class GenericTicketsUiView
       }
       $html .= '</div>';
       $html .= '<div class="scm-case-history-detail scm-case-record-detail">' . $detailHtml . '</div>';
-      $html .= $this->renderHistoryImages($item['imagen'] ?? '');
+      $html .= $this->renderHistoryImages([$item['imagenes'] ?? '', $item['imagen'] ?? '', $item['evidencia'] ?? '']);
       $html .= $this->renderHistoryDocuments($item['archivos'] ?? '');
       $html .= '<div class="scm-case-record-date"><span class="scm-case-record-date-icon" aria-hidden="true"></span><strong>' . esc_html($date) . '</strong></div>';
       $html .= '</article>';
@@ -153,7 +153,7 @@ final class GenericTicketsUiView
       $html .= '</div>';
       $html .= '<div class="scm-case-history-detail scm-case-record-detail">' . (string) call_user_func($this->formatDetailHtml, $detail) . '</div>';
       $html .= $this->renderRecordItemFields($item, $visibleFields);
-      $html .= $this->renderHistoryImages($item['evidencia'] ?? $item['imagen'] ?? '');
+      $html .= $this->renderHistoryImages([$item['imagenes'] ?? '', $item['evidencia'] ?? '', $item['imagen'] ?? '']);
       $html .= $this->renderHistoryDocuments($item['archivos'] ?? '');
       $html .= '<div class="scm-case-record-date"><span class="scm-case-record-date-icon" aria-hidden="true"></span><strong>' . esc_html($date) . '</strong></div>';
       $html .= '</article>';
@@ -265,7 +265,7 @@ final class GenericTicketsUiView
 
     $out = [];
     foreach ($items as $item) {
-      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
+      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['imagenes'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
       $url = $this->normalizeHistoryAttachmentUrl($url);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
         $out[] = $url;
@@ -373,7 +373,7 @@ final class GenericTicketsUiView
           $text = (string) call_user_func($this->formatDate, $ts);
         }
       }
-      if ($field === 'evidencia' || $field === 'imagen') {
+      if ($field === 'evidencia' || $field === 'imagen' || $field === 'imagenes') {
         $url = $this->normalizeHistoryAttachmentUrl($text);
         if (filter_var($url, FILTER_VALIDATE_URL)) {
           $lines .= '<p><strong>' . esc_html((string) $label) . ':</strong></p>'

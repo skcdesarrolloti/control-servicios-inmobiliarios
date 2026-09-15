@@ -555,6 +555,9 @@ final class PendingRepository
       'area_afectada',
       'resumen_calculo_perturbacion',
       'archivos',
+      'imagen',
+      'imagenes',
+      'evidencia',
       'acta_revision_preventiva_arrendatario',
       'acta_revision_preventiva_propietario',
     ] as $column) {
@@ -628,7 +631,7 @@ final class PendingRepository
       $this->db->table('jet_cct_seguimiento_ticket'),
       'id_ticket',
       array_keys($ticketKeys),
-      ['_ID', 'cct_status', 'id_ticket', 'fecha', 'nombre', 'observacion', 'cct_author_id', 'cct_created', 'cct_modified', 'id_coordinador', 'id_empleado', 'evidencia', 'archivos']
+      ['_ID', 'cct_status', 'id_ticket', 'fecha', 'nombre', 'observacion', 'cct_author_id', 'cct_created', 'cct_modified', 'id_coordinador', 'id_empleado', 'evidencia', 'imagen', 'imagenes', 'archivos']
     );
     $notesByTicket = $this->fetchPendingRowsGrouped(
       $this->db->table('jet_cct_notas_ticket'),
@@ -882,6 +885,8 @@ final class PendingRepository
         'id_empleado',
         'archivos',
         'imagen',
+        'imagenes',
+        'evidencia',
       ],
       array_keys(HistoryLinkMap::idButtons()),
       ['id_hoja_cierre']

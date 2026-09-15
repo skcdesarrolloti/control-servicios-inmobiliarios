@@ -253,6 +253,8 @@ trait GenericFiltersAndHistoryConcern
       'observacion',
       'descripcion',
       'imagen',
+      'imagenes',
+      'evidencia',
       'archivos',
       'id_empleado',
       'cct_author_id',
