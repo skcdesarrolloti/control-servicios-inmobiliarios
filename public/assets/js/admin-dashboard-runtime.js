@@ -668,7 +668,7 @@
             showConfirmButton: false,
             showCancelButton: false,
             buttonsStyling: false,
-            footer: '<button type="button" class="scm-btn-primary" data-scm-dashboard-due-open-tickets>Ir a tickets abiertos</button><button type="button" class="scm-btn-secondary" data-scm-dashboard-due-close>Cerrar</button>',
+            footer: '<button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--primary" data-scm-dashboard-due-open-calendar>Ir a calendario de vencidos</button><button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary" data-scm-dashboard-due-close>Cerrar</button>',
             customClass: {
               popup: "scm-calendar-swal-popup scm-due-entry-swal",
             },
@@ -686,13 +686,13 @@
               var footer = popup.querySelector(".swal2-footer");
               if (footer) {
                 footer.addEventListener("click", function (event) {
-                  var ticketsBtn = event.target && event.target.closest
-                    ? event.target.closest("[data-scm-dashboard-due-open-tickets]")
+                  var calendarBtn = event.target && event.target.closest
+                    ? event.target.closest("[data-scm-dashboard-due-open-calendar]")
                     : null;
-                  if (ticketsBtn && footer.contains(ticketsBtn)) {
+                  if (calendarBtn && footer.contains(calendarBtn)) {
                     event.preventDefault();
                     window.Swal.close();
-                    openDashboardRelatedTickets();
+                    openDashboardDueCalendar();
                     return;
                   }
                   var closeBtn = event.target && event.target.closest

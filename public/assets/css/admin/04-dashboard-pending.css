@@ -2279,6 +2279,16 @@
   .swal2-popup .scm-due-entry-row {
     grid-template-columns: 1fr;
   }
+
+  .swal2-popup.scm-calendar-swal-popup .swal2-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .swal2-popup.scm-calendar-swal-popup .scm-due-entry-footer-btn,
+  .swal2-popup .scm-due-entry-case-btn {
+    width: 100%;
+  }
 }
 
 .swal2-container .swal2-popup.scm-calendar-swal-popup {
@@ -2382,9 +2392,25 @@
 }
 
 .swal2-popup .scm-due-entry-case-btn {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #1f3350;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
   min-height: 32px;
   padding: 7px 12px;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
   white-space: nowrap;
+}
+
+.swal2-popup .scm-due-entry-case-btn:hover,
+.swal2-popup .scm-due-entry-case-btn:focus-visible {
+  background: #fff7ed;
+  border-color: #f59e0b;
+  color: #9a3412;
 }
 
 .swal2-popup .scm-due-entry-more {
@@ -2408,6 +2434,47 @@
   justify-content: flex-end;
   margin: 0;
   padding: 16px 24px 20px;
+}
+
+.swal2-popup.scm-calendar-swal-popup .scm-due-entry-footer-btn {
+  align-items: center;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  justify-content: center;
+  line-height: 1;
+  min-height: 44px;
+  min-width: 126px;
+  padding: 0 18px;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+
+.swal2-popup.scm-calendar-swal-popup .scm-due-entry-footer-btn--primary {
+  background: #f59e0b;
+  border: 1px solid #d97706;
+  box-shadow: 0 10px 24px rgba(245, 158, 11, 0.28);
+  color: #fff;
+}
+
+.swal2-popup.scm-calendar-swal-popup .scm-due-entry-footer-btn--primary:hover,
+.swal2-popup.scm-calendar-swal-popup .scm-due-entry-footer-btn--primary:focus-visible {
+  background: #d97706;
+  border-color: #b45309;
+}
+
+.swal2-popup.scm-calendar-swal-popup .scm-due-entry-footer-btn--secondary {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #1f3350;
+}
+
+.swal2-popup.scm-calendar-swal-popup .scm-due-entry-footer-btn--secondary:hover,
+.swal2-popup.scm-calendar-swal-popup .scm-due-entry-footer-btn--secondary:focus-visible {
+  background: #eaf1f8;
+  border-color: #94a3b8;
 }
 
 .swal2-popup.scm-calendar-swal-popup .swal2-confirm,
