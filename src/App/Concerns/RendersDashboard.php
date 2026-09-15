@@ -1982,7 +1982,7 @@ trait RendersDashboard
             <div>
               <span class="scm-calendar-action-kicker">Filtro</span>
               <h4>Tipo de vencimiento</h4>
-              <p>Filtra el calendario y la agenda pendiente por el control que necesitas revisar.</p>
+              <p>Filtra el calendario por el control que necesitas revisar.</p>
             </div>
           </div>
           <form class="scm-calendar-due-type-filter" data-scm-calendar-due-type-filter autocomplete="off">
@@ -2024,17 +2024,6 @@ trait RendersDashboard
             <button type="button" class="scm-case-work-btn" data-scm-calendar-refresh>Actualizar</button>
           </div>
           <div class="scm-calendar-events" data-scm-calendar-events><div class="scm-empty scm-empty-cards">Selecciona un d&iacute;a del calendario.</div></div>
-          <?php if ($view === 'pending'): ?>
-            <section class="scm-calendar-pending-agenda" aria-label="Agenda pendiente">
-              <div class="scm-calendar-pending-agenda-head">
-                <span class="scm-calendar-action-kicker">Agenda pendiente</span>
-                <h5>Vencimientos filtrados</h5>
-              </div>
-              <div class="scm-calendar-due-breakdown" data-scm-calendar-due-breakdown>
-                <div class="scm-calendar-loading">Cargando agenda pendiente...</div>
-              </div>
-            </section>
-          <?php endif; ?>
           <?php if ($view !== 'pending'): ?>
             <button type="button" class="scm-btn-primary btn btn-primary scm-calendar-day-create" data-scm-calendar-open-create data-calendar-mode="single">Crear evento para este d&iacute;a</button>
           <?php endif; ?>

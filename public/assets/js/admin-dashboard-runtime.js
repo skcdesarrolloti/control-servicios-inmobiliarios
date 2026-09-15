@@ -593,8 +593,18 @@
         if (!groups[type]) groups[type] = 0;
         groups[type] += 1;
       });
-      var groupHtml = Object.keys(groups).map(function (type) {
-        return '<div><span>' + escHtml(dashboardDueTypeLabel(type)) + '</span><strong>' + escHtml(String(groups[type])) + '</strong></div>';
+      var groupOrder = [
+        "ticket_preventiva_sin_cita",
+        "preventiva_cita_sin_realizar",
+        "preventiva_sin_enviar",
+        "cotizacion_sin_enviar",
+        "cotizacion_enviada_sin_respuesta",
+      ];
+      Object.keys(groups).forEach(function (type) {
+        if (groupOrder.indexOf(type) === -1) groupOrder.push(type);
+      });
+      var groupHtml = groupOrder.map(function (type) {
+        return '<div><span>' + escHtml(dashboardDueTypeLabel(type)) + '</span><strong>' + escHtml(String(groups[type] || 0)) + '</strong></div>';
       }).join("");
       var detailRows = rows.slice(0, 18).map(function (row) {
         var caseData = row && row.case ? row.case : {};
