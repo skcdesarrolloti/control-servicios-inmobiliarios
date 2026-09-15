@@ -5438,6 +5438,12 @@
   color: #334155;
 }
 
+.swal2-popup.scm-cotizacion-dialog .scm-cotizacion-delete-confirm {
+  border-color: #b91c1c;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 9px 20px rgba(185, 28, 28, 0.22);
+}
+
 .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-confirm:hover,
 .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-cancel:hover,
 .scm-cotizacion-order-view:hover {
@@ -5457,6 +5463,21 @@
   color: #64748b;
   font-size: 13px;
   line-height: 1.6;
+}
+
+.scm-cotizacion-delete-form {
+  display: grid;
+  gap: 16px;
+}
+
+.scm-cotizacion-delete-intro {
+  margin-bottom: 0;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fff7f7;
+  color: #7f1d1d;
+  font-weight: 700;
 }
 
 .scm-cotizacion-response-grid {

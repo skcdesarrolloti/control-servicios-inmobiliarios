@@ -13953,15 +13953,34 @@
         window.Swal.fire({
           title: "Eliminar cotización",
           html:
-            '<label class="scm-seg-field"><span>Motivo</span><select id="swal-del-motivo" class="select select-bordered select-sm scm-select"><option value="">Elige una opcion</option><option value="Por costo">Por costo</option><option value="Ejecucción por cuenta propia">Ejecucción por cuenta propia</option><option value="Duplicada">Duplicada</option><option value="Error de registro">Error de registro</option></select></label>' +
-            '<label class="scm-seg-field"><span>Observaciones a la cotizacion</span><textarea id="swal-del-observacion" class="textarea textarea-bordered" rows="5" placeholder="Por si tiene una observacion con respecto a la cotizacion presentada."></textarea></label>',
-          icon: "warning",
+            '<div class="scm-cotizacion-delete-form">' +
+            '<p class="scm-cotizacion-dialog-intro scm-cotizacion-delete-intro">Esta acción retirará la cotización del caso y dejará trazabilidad del motivo registrado.</p>' +
+            '<label class="scm-cotizacion-dialog-field"><span>Motivo <em>*</em></span><select id="swal-del-motivo"><option value="">Elige una opción</option><option value="Por costo">Por costo</option><option value="Ejecución por cuenta propia">Ejecución por cuenta propia</option><option value="Duplicada">Duplicada</option><option value="Error de registro">Error de registro</option></select></label>' +
+            '<label class="scm-cotizacion-dialog-field is-wide"><span>Observaciones a la cotización</span><textarea id="swal-del-observacion" rows="5" placeholder="Agrega una observación para complementar el motivo."></textarea><small>Esta observación queda asociada al historial de la cotización.</small></label>' +
+            "</div>",
+          width: "min(560px, 94vw)",
           showCancelButton: true,
+          showCloseButton: true,
           allowOutsideClick: false,
           allowEscapeKey: false,
+          buttonsStyling: false,
           confirmButtonText: "Eliminar cotización",
-          confirmButtonColor: "#b91c1c",
           cancelButtonText: "Cancelar",
+          customClass: {
+            popup: "scm-cotizacion-dialog scm-cotizacion-delete-swal",
+            title: "scm-cotizacion-dialog-title",
+            htmlContainer: "scm-cotizacion-dialog-body",
+            actions: "scm-cotizacion-dialog-actions",
+            confirmButton: "scm-cotizacion-dialog-confirm scm-cotizacion-delete-confirm",
+            cancelButton: "scm-cotizacion-dialog-cancel",
+            closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+          },
+          focusConfirm: false,
+          returnFocus: true,
+          didOpen: function () {
+            var motivo = document.getElementById("swal-del-motivo");
+            if (motivo) motivo.focus();
+          },
           preConfirm: function () {
             var motivo = document.getElementById("swal-del-motivo");
             if (!motivo || !motivo.value) {
