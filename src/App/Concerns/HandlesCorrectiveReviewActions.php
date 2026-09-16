@@ -834,7 +834,7 @@ trait HandlesCorrectiveReviewActions
             <article>
               <div class="scm-corrective-existing-info">
                 <strong>Revisión #<?= $h($id) ?></strong>
-                <span><?= $h($this->correctiveReviewDateLabel($review['fecha'] ?? $review['cct_created'] ?? '')) ?></span>
+                <span><?= $h($this->correctiveReviewDateLabel($this->correctiveReviewDisplayDateRaw($review))) ?></span>
               </div>
               <div class="scm-corrective-existing-actions">
                 <?php if ($id !== ''): ?><button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-url="<?= $h(self::correctiveReviewPublicUrl((int) $id)) ?>" data-iframe-title="Revisión correctiva #<?= $h($id) ?>">Ver informe</button><?php endif; ?>
@@ -1316,13 +1316,33 @@ trait HandlesCorrectiveReviewActions
     return array_values($ids);
   }
 
-  private function correctiveReviewDateLabel($raw): string
+  /** @param array<string,mixed> $review */
+  private function correctiveReviewDisplayDateRaw(array $review)
+  {
+    $fechaRaw = $review['fecha'] ?? '';
+    $createdRaw = $review['cct_created'] ?? '';
+    $fechaTs = $this->correctiveReviewTimestamp($fechaRaw);
+    $createdTs = $this->correctiveReviewTimestamp($createdRaw);
+    if ($fechaTs > 0 && date('H:i:s', $fechaTs) !== '00:00:00') {
+      return $fechaRaw;
+    }
+    if ($createdTs > 0) {
+      return $createdRaw;
+    }
+    return $fechaRaw !== '' ? $fechaRaw : $createdRaw;
+  }
+
+  private function correctiveReviewTimestamp($raw): int
   {
     if (is_numeric($raw)) {
-      $ts = (int) $raw;
-    } else {
-      $ts = strtotime((string) $raw) ?: 0;
+      return (int) $raw;
     }
+    return strtotime((string) $raw) ?: 0;
+  }
+
+  private function correctiveReviewDateLabel($raw): string
+  {
+    $ts = $this->correctiveReviewTimestamp($raw);
     return $ts > 0 ? date('d/m/Y H:i', $ts) : '-';
   }
 }

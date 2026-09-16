@@ -43,7 +43,7 @@ final class CorrectiveReviewPublicView
       'Contrato' => $this->withHash($this->first([$review['contrato'] ?? '', $ticket['contrato'] ?? '', $contract['contrato'] ?? '', $review['id_contrato'] ?? ''])),
       'Dirección' => $this->first([$review['direccion'] ?? '', $ticket['direccion'] ?? '', $contract['direccion'] ?? '', $property['direccion'] ?? '', $property['direccion_fisica'] ?? '']),
       'Destinatario' => $this->first([$review['destinatario'] ?? '', $ticket['propietario'] ?? '', $contract['propietario'] ?? '']),
-      'Fecha' => $this->dateLabel($this->first([$review['fecha'] ?? '', $review['cct_created'] ?? ''])),
+      'Fecha' => $this->dateLabel($this->displayDateRaw($review)),
     ];
 
     $metaHtml = '';
@@ -417,12 +417,33 @@ final class CorrectiveReviewPublicView
     return str_starts_with($value, '#') ? $value : '#' . $value;
   }
 
-  private function dateLabel(mixed $value): string
+  /** @param array<string,mixed> $review */
+  private function displayDateRaw(array $review): mixed
+  {
+    $fechaRaw = $review['fecha'] ?? '';
+    $createdRaw = $review['cct_created'] ?? '';
+    $fechaTs = $this->timestamp($fechaRaw);
+    $createdTs = $this->timestamp($createdRaw);
+    if ($fechaTs > 0 && date('H:i:s', $fechaTs) !== '00:00:00') {
+      return $fechaRaw;
+    }
+    if ($createdTs > 0) {
+      return $createdRaw;
+    }
+    return $fechaRaw !== '' ? $fechaRaw : $createdRaw;
+  }
+
+  private function timestamp(mixed $value): int
   {
     if ($value === '') {
-      return '-';
+      return 0;
     }
-    $ts = is_numeric($value) ? (int) $value : strtotime((string) $value);
+    return is_numeric($value) ? (int) $value : (strtotime((string) $value) ?: 0);
+  }
+
+  private function dateLabel(mixed $value): string
+  {
+    $ts = $this->timestamp($value);
     return $ts > 0 ? date('d/m/Y H:i', $ts) : '-';
   }
 

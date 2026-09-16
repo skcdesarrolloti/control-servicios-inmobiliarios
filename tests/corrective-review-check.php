@@ -8,6 +8,7 @@ $app = file_get_contents($root . '/src/App/SuCasaControlServiciosInmobiliarios.p
 $router = file_get_contents($root . '/src/Http/Api/AuthenticatedActionRouter.php');
 $dashboard = file_get_contents($root . '/src/App/Concerns/RendersDashboard.php');
 $maintenanceRows = file_get_contents($root . '/src/Modules/ServiciosInmobiliarios/Concerns/TableRowsConcern.php');
+$publicView = file_get_contents($root . '/src/Modules/CorrectiveReview/CorrectiveReviewPublicView.php');
 $js = file_get_contents($root . '/public/assets/js/scm-admin.js');
 $css = file_get_contents($root . '/public/assets/css/ticket-completion.css');
 
@@ -30,6 +31,8 @@ $checks = [
   'trait notifies corrective creator and owner' => is_string($trait) && str_contains($trait, "'role' => 'creador'") && str_contains($trait, "'role' => 'propietario'") && str_contains($trait, "'event' => 'revision_correctiva_creada'"),
   'internal notification settings include corrective review event' => is_string($app) && str_contains($app, 'revision_correctiva_creada') && str_contains($app, 'Revisión correctiva creada') && str_contains($app, 'Email interno en cola'),
   'trait supports editing and deleting corrective reviews' => is_string($trait) && str_contains($trait, 'correctiveReviewUpdate') && str_contains($trait, 'correctiveReviewDelete'),
+  'trait displays corrective date from cct_created when fecha is date-only' => is_string($trait) && str_contains($trait, 'correctiveReviewDisplayDateRaw') && str_contains($trait, "date('H:i:s', \$fechaTs) !== '00:00:00'"),
+  'public corrective view displays cct_created when fecha is date-only' => is_string($publicView) && str_contains($publicView, 'displayDateRaw') && str_contains($publicView, "date('H:i:s', \$fechaTs) !== '00:00:00'"),
   'trait updates ticket revision field' => is_string($trait) && str_contains($trait, "'id_revision_correctiva'"),
   'trait records ticket history' => is_string($trait) && str_contains($trait, "jet_cct_historial_del_ticket"),
   'trait records property history' => is_string($trait) && str_contains($trait, "jet_cct_historial_del_inmueble"),
