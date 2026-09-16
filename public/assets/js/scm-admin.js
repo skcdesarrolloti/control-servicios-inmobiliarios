@@ -5105,7 +5105,9 @@
       modal
         .querySelectorAll("[data-scm-repair-followup-notice]")
         .forEach(function (noticeBtn) {
-          noticeBtn.addEventListener("click", function () {
+          noticeBtn.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
             openRepairFollowupNoticeEditor(modal, btn);
           });
         });

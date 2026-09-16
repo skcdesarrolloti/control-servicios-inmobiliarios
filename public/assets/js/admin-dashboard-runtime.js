@@ -14293,10 +14293,13 @@
           ? e.target.closest("[data-scm-repair-followup-notice]")
           : null;
       if (repairFollowupBtn) {
+        var repairCard = repairFollowupBtn.closest(".scm-cotizacion-card");
+        if (!repairCard) {
+          return;
+        }
         e.preventDefault();
         var repairReturnContext = repairFollowupBtn._scmCaseCotizacionesReturn || null;
         repairFollowupBtn._scmCaseCotizacionesReturn = null;
-        var repairCard = repairFollowupBtn.closest(".scm-cotizacion-card");
         var repairTicketPk =
           repairFollowupBtn.getAttribute("data-ticket-pk") ||
           (repairCard ? repairCard.getAttribute("data-ticket-pk") : "") ||
