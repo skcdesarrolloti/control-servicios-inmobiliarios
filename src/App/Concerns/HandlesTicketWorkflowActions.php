@@ -838,6 +838,9 @@ trait HandlesTicketWorkflowActions
     $settings = $this->adminDueCalendarSettings();
     $items = $this->adminDueCalendarItems($settings, $fromTs, $toTs);
     $stats = $this->adminDueCalendarStats($items);
+    $summaryGroups = !empty($_POST['include_summary'])
+      ? $this->adminDueCalendarSummaryGroups($fromTs, $toTs)
+      : [];
 
     $this->jsonOk([
       'settings' => $settings,
@@ -845,6 +848,7 @@ trait HandlesTicketWorkflowActions
       'eventos' => $items,
       'items' => $items,
       'stats' => $stats,
+      'summary_groups' => $summaryGroups,
     ]);
   }
 
@@ -997,12 +1001,8 @@ trait HandlesTicketWorkflowActions
       $items = array_merge($items, $this->adminDueQuoteItems($settings, $fromTs, $toTs));
     }
     if ($this->canAccessDashboardTab('preventivas_pendientes')) {
-      $items = array_merge($items, $this->adminDuePreventivasPendientesItems($fromTs, $toTs));
       $items = array_merge($items, $this->adminDuePreventivaItems($settings, $fromTs, $toTs));
       $items = array_merge($items, $this->adminDuePreventivaTicketItems($settings, $fromTs, $toTs));
-    }
-    if ($this->canAccessDashboardTab('servicios_publicos_pendientes')) {
-      $items = array_merge($items, $this->adminDueServiciosPublicosItems($fromTs, $toTs));
     }
 
     usort($items, static function (array $a, array $b): int {
@@ -1013,6 +1013,57 @@ trait HandlesTicketWorkflowActions
       return strcmp((string) ($a['titulo'] ?? ''), (string) ($b['titulo'] ?? ''));
     });
     return $items;
+  }
+
+  /** @return array<int,array<string,mixed>> */
+  private function adminDueCalendarSummaryGroups(int $fromTs, int $toTs): array
+  {
+    $groups = [];
+
+    if ($this->canAccessDashboardTab('preventivas_pendientes')) {
+      $groups[] = $this->adminDueCalendarSummaryGroup(
+        'preventiva_pendiente',
+        'Preventivas pendientes',
+        'preventivas_pendientes',
+        $this->adminDuePreventivasPendientesItems($fromTs, $toTs)
+      );
+    }
+
+    if ($this->canAccessDashboardTab('servicios_publicos_pendientes')) {
+      $groups[] = $this->adminDueCalendarSummaryGroup(
+        'servicios_publicos_pendientes',
+        'Servicios públicos pendientes',
+        'servicios_publicos_pendientes',
+        $this->adminDueServiciosPublicosItems($fromTs, $toTs)
+      );
+    }
+
+    return $groups;
+  }
+
+  /** @param array<int,array<string,mixed>> $items @return array<string,mixed> */
+  private function adminDueCalendarSummaryGroup(string $type, string $label, string $targetTab, array $items): array
+  {
+    $today = date('Y-m-d');
+    $vencidos = 0;
+    $hoy = 0;
+    foreach ($items as $item) {
+      if (strtolower((string) ($item['estado'] ?? '')) === 'vencido') {
+        $vencidos++;
+      }
+      if ((string) ($item['fecha_vencimiento'] ?? '') === $today) {
+        $hoy++;
+      }
+    }
+
+    return [
+      'type' => $type,
+      'label' => $label,
+      'target_tab' => $targetTab,
+      'count' => count($items),
+      'vencidos' => $vencidos,
+      'hoy' => $hoy,
+    ];
   }
 
   /** @param array<string,int> $settings @return array<int,array<string,mixed>> */

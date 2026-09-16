@@ -2403,6 +2403,31 @@
   font-weight: 950;
 }
 
+.swal2-popup .scm-due-entry-group-link {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #1f3350;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 30px;
+  padding: 6px 10px;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  width: fit-content;
+}
+
+.swal2-popup .scm-due-entry-group-link:hover,
+.swal2-popup .scm-due-entry-group-link:focus-visible {
+  background: #fff7ed;
+  border-color: #f59e0b;
+  color: #9a3412;
+}
+
 .swal2-popup .scm-due-entry-list {
   display: grid;
   gap: 8px;

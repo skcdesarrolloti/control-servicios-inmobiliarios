@@ -616,8 +616,27 @@
       });
     }
 
-    function dashboardDueEntryPopupHtml(rows) {
+    function openAdministrativeActivityTab(key) {
+      key = String(key || "").replace(/[^a-z0-9_-]/gi, "");
+      if (!key) return;
+      dashboardDuePopupShown.administrative = true;
+      var adminTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-actividades-administrativas"]');
+      if (adminTab) {
+        adminTab.click();
+        adminTab.focus({ preventScroll: true });
+      }
+      window.setTimeout(function () {
+        var activityTab = root.querySelector('.scm-admin-activity-tab[data-admin-activity-key="' + key + '"]');
+        if (activityTab) {
+          activityTab.click();
+          activityTab.focus({ preventScroll: true });
+        }
+      }, 160);
+    }
+
+    function dashboardDueEntryPopupHtml(rows, summaryGroups) {
       rows = Array.isArray(rows) ? rows.slice() : [];
+      summaryGroups = Array.isArray(summaryGroups) ? summaryGroups : [];
       rows.sort(function (a, b) {
         var overdue = Number(b.dias_vencido || 0) - Number(a.dias_vencido || 0);
         if (overdue !== 0) return overdue;
@@ -625,10 +644,21 @@
       });
       var stats = dashboardDueStats(rows);
       var groups = {};
+      var summaryByType = {};
       rows.forEach(function (row) {
         var type = String(row.tipo_vencimiento || "otros");
         if (!groups[type]) groups[type] = 0;
         groups[type] += 1;
+      });
+      summaryGroups.forEach(function (group) {
+        var type = String(group && group.type ? group.type : "");
+        var count = Math.max(0, Number(group && group.count ? group.count : 0));
+        if (!type) return;
+        summaryByType[type] = group || {};
+        groups[type] = count;
+        stats.total += count;
+        stats.vencidos += Math.max(0, Number(group && group.vencidos ? group.vencidos : 0));
+        stats.hoy += Math.max(0, Number(group && group.hoy ? group.hoy : 0));
       });
       var groupOrder = [
         "preventiva_pendiente",
@@ -643,7 +673,12 @@
         if (groupOrder.indexOf(type) === -1) groupOrder.push(type);
       });
       var groupHtml = groupOrder.map(function (type) {
-        return '<div><span>' + escHtml(dashboardDueTypeLabel(type)) + '</span><strong>' + escHtml(String(groups[type] || 0)) + '</strong></div>';
+        var summaryGroup = summaryByType[type] || {};
+        var targetTab = String(summaryGroup.target_tab || "");
+        var buttonHtml = targetTab
+          ? '<button type="button" class="scm-due-entry-group-link" data-scm-dashboard-due-open-admin-tab="' + escHtml(targetTab) + '">Ver pestaña</button>'
+          : "";
+        return '<div><span>' + escHtml(dashboardDueTypeLabel(type)) + '</span><strong>' + escHtml(String(groups[type] || 0)) + '</strong>' + buttonHtml + '</div>';
       }).join("");
       var detailRows = rows.slice(0, 18).map(function (row) {
         var caseData = row && row.case ? row.case : {};
@@ -658,6 +693,9 @@
           '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div>" +
           "</div>";
       }).join("");
+      if (!detailRows) {
+        detailRows = '<div class="scm-empty scm-empty-cards">Usa los accesos del resumen para revisar las pestañas correspondientes.</div>';
+      }
       var more = rows.length > 18 ? '<p class="scm-due-entry-more">+' + escHtml(String(rows.length - 18)) + " vencimiento(s) adicionales en el calendario.</p>" : "";
       return '<div class="scm-due-entry-popup">' +
         '<div class="scm-due-entry-kpis">' +
@@ -689,11 +727,15 @@
       dashboardDuePopupPromise = dashboardAction(actionAdminDueCalendar, {
         fecha_inicio: range.from,
         fecha_fin: range.to,
+        include_summary: "1",
       }).then(function (data) {
         var rows = Array.isArray(data.eventos)
           ? data.eventos
           : (Array.isArray(data.items) ? data.items : []);
-        return rows;
+        return {
+          rows: rows,
+          summaryGroups: Array.isArray(data.summary_groups) ? data.summary_groups : [],
+        };
       }).catch(function (error) {
         dashboardDuePopupPromise = null;
         throw error;
@@ -709,12 +751,17 @@
       }
       dashboardDuePopupShown[source] = true;
       return loadDashboardDuePopupRows()
-        .then(function (rows) {
-          rows = Array.isArray(rows) ? rows : [];
-          if (!rows.length) return;
+        .then(function (payload) {
+          payload = payload || {};
+          var rows = Array.isArray(payload.rows) ? payload.rows : [];
+          var summaryGroups = Array.isArray(payload.summaryGroups) ? payload.summaryGroups : [];
+          var summaryTotal = summaryGroups.reduce(function (total, group) {
+            return total + Math.max(0, Number(group && group.count ? group.count : 0));
+          }, 0);
+          if (!rows.length && !summaryTotal) return;
           return window.Swal.fire({
             title: "Vencimientos administrativos",
-            html: dashboardDueEntryPopupHtml(rows),
+            html: dashboardDueEntryPopupHtml(rows, summaryGroups),
             width: "min(980px, 94vw)",
             showConfirmButton: false,
             showCancelButton: false,
@@ -749,6 +796,15 @@
                 if (!servicesBtn || !popup.contains(servicesBtn)) return;
                 event.preventDefault();
                 openPublicServicesReviewModal(servicesBtn);
+              });
+              popup.addEventListener("click", function (event) {
+                var adminTabBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-dashboard-due-open-admin-tab]")
+                  : null;
+                if (!adminTabBtn || !popup.contains(adminTabBtn)) return;
+                event.preventDefault();
+                window.Swal.close();
+                openAdministrativeActivityTab(adminTabBtn.getAttribute("data-scm-dashboard-due-open-admin-tab") || "");
               });
               var footer = popup.querySelector(".swal2-footer");
               if (footer) {
