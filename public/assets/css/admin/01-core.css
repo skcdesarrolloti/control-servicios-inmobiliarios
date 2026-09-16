@@ -3336,7 +3336,7 @@ body.scm-modal-open {
   align-items: end;
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(260px, 1fr) auto auto;
+  grid-template-columns: minmax(210px, 1fr) minmax(210px, 1fr) auto auto;
 }
 
 #scm-app .scm-property-history-form .scm-field {
@@ -3436,9 +3436,25 @@ body.scm-modal-open {
 }
 
 #scm-app .scm-property-history-source {
+  appearance: none;
+  cursor: pointer;
   min-height: 92px;
   padding: 12px;
+  text-align: left;
   background: var(--scm-surface-soft);
+}
+
+#scm-app .scm-property-history-source:hover:not(:disabled),
+#scm-app .scm-property-history-source:focus-visible:not(:disabled) {
+  border-color: var(--scm-accent);
+  box-shadow: 0 8px 22px rgba(245, 145, 32, 0.13);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+#scm-app .scm-property-history-source:disabled {
+  cursor: default;
+  opacity: 0.72;
 }
 
 #scm-app .scm-property-history-source strong {
@@ -3464,6 +3480,15 @@ body.scm-modal-open {
   gap: 8px;
   overflow: auto;
   padding-right: 3px;
+}
+
+#scm-app .scm-property-history-list--modal {
+  max-height: 520px;
+  margin-top: 14px;
+}
+
+#scm-app .scm-property-history-source-modal {
+  text-align: left;
 }
 
 #scm-app .scm-property-history-row {

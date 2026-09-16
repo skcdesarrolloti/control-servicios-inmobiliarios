@@ -734,18 +734,22 @@ trait RendersDashboard
                   <div>
                     <span class="scm-calendar-action-kicker">Consulta</span>
                     <h3>Historial del inmueble</h3>
-                    <p>Busca por n&uacute;mero de contrato, id de inmueble o c&oacute;digo para visualizar el informe completo y generar PDF.</p>
+                    <p>Busca por contrato o por c&oacute;digo web/inmueble para visualizar el informe completo y generar PDF.</p>
                   </div>
                 </div>
                 <form class="scm-property-history-form" data-scm-property-history-form autocomplete="off">
-                  <label class="scm-field" for="scm_property_history_query">
-                    <span>Contrato, inmueble o c&oacute;digo</span>
-                    <input id="scm_property_history_query" name="query" type="text" class="input input-bordered" placeholder="Ej: 695, 98015, 51919" required>
+                  <label class="scm-field" for="scm_property_history_contract">
+                    <span>N&uacute;mero de contrato</span>
+                    <input id="scm_property_history_contract" name="contract_number" type="text" class="input input-bordered" placeholder="Ej: 660">
+                  </label>
+                  <label class="scm-field" for="scm_property_history_code">
+                    <span>C&oacute;digo web / inmueble</span>
+                    <input id="scm_property_history_code" name="property_code" type="text" class="input input-bordered" placeholder="Ej: 3825">
                   </label>
                   <button type="submit" class="scm-case-work-btn scm-primary-action">Consultar historial</button>
                   <button type="button" class="scm-case-work-btn" data-scm-property-history-pdf disabled>Generar PDF</button>
                 </form>
-                <div class="scm-property-history-status" data-scm-property-history-status>Ingresa un contrato, id de inmueble o c&oacute;digo para consultar.</div>
+                <div class="scm-property-history-status" data-scm-property-history-status>Ingresa un contrato o un c&oacute;digo web/inmueble para consultar.</div>
                 <div class="scm-property-history-results" data-scm-property-history-results></div>
               </section>
             </div>

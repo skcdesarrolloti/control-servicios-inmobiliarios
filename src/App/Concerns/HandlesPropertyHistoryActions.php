@@ -13,12 +13,12 @@ trait HandlesPropertyHistoryActions
       $this->jsonFail('No tienes permiso para consultar historial de inmuebles.');
     }
 
-    $query = $this->property_history_clean_query($_POST['query'] ?? '');
-    if ($query === '') {
-      $this->jsonFail('Escribe un contrato, id de inmueble o codigo para consultar.');
+    [$contractNumber, $propertyCode] = $this->property_history_request_filters();
+    if ($contractNumber === '' && $propertyCode === '') {
+      $this->jsonFail('Escribe un contrato o un codigo web/inmueble para consultar.');
     }
 
-    $this->jsonOk($this->property_history_payload($query));
+    $this->jsonOk($this->property_history_payload($contractNumber, $propertyCode));
   }
 
   public function ajax_handler_property_history_pdf(): void
@@ -28,12 +28,12 @@ trait HandlesPropertyHistoryActions
       $this->jsonFail('No tienes permiso para generar este PDF.');
     }
 
-    $query = $this->property_history_clean_query($_POST['query'] ?? '');
-    if ($query === '') {
-      $this->jsonFail('Escribe un contrato, id de inmueble o codigo para generar el PDF.');
+    [$contractNumber, $propertyCode] = $this->property_history_request_filters();
+    if ($contractNumber === '' && $propertyCode === '') {
+      $this->jsonFail('Escribe un contrato o un codigo web/inmueble para generar el PDF.');
     }
 
-    $payload = $this->property_history_payload($query);
+    $payload = $this->property_history_payload($contractNumber, $propertyCode);
     $pdf = $this->property_history_build_pdf($payload);
     $basename = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
     $dir = (string) SCM_STORAGE_PATH . '/tmp';
@@ -43,7 +43,7 @@ trait HandlesPropertyHistoryActions
 
     $path = $dir . '/' . $basename;
     $pdf->save($path);
-    $filenameToken = preg_replace('/[^0-9A-Za-z_-]+/', '-', (string) ($payload['property']['codigo'] ?? $query)) ?: 'inmueble';
+    $filenameToken = preg_replace('/[^0-9A-Za-z_-]+/', '-', (string) ($payload['property']['codigo'] ?? $propertyCode ?: $contractNumber)) ?: 'inmueble';
 
     if (ob_get_level() > 0) {
       ob_end_clean();
@@ -72,14 +72,26 @@ trait HandlesPropertyHistoryActions
     return preg_replace('/[^0-9A-Za-z_-]+/', '', $value) ?: '';
   }
 
-  /** @return array<string,mixed> */
-  private function property_history_payload(string $query): array
+  /** @return array{0:string,1:string} */
+  private function property_history_request_filters(): array
   {
-    $target = $this->property_history_resolve_target($query);
+    $contractNumber = $this->property_history_clean_query($_POST['contract_number'] ?? '');
+    $propertyCode = $this->property_history_clean_query($_POST['property_code'] ?? '');
+    $legacyQuery = $this->property_history_clean_query($_POST['query'] ?? '');
+    if ($contractNumber === '' && $propertyCode === '' && $legacyQuery !== '') {
+      $propertyCode = $legacyQuery;
+    }
+    return [$contractNumber, $propertyCode];
+  }
+
+  /** @return array<string,mixed> */
+  private function property_history_payload(string $contractNumber, string $propertyCode): array
+  {
+    $target = $this->property_history_resolve_target($contractNumber, $propertyCode);
     $property = is_array($target['property'] ?? null) ? $target['property'] : [];
     $contracts = is_array($target['contracts'] ?? null) ? $target['contracts'] : [];
     $tokens = array_values(array_unique(array_filter(array_map('strval', array_merge(
-      [$query],
+      [$propertyCode],
       (array) ($target['property_tokens'] ?? []),
       [
         $property['_ID'] ?? '',
@@ -90,7 +102,7 @@ trait HandlesPropertyHistoryActions
     )), static fn(string $value): bool => trim($value) !== '')));
     $contractTokens = array_values(array_unique(array_filter(array_map('strval', array_merge(
       (array) ($target['contract_tokens'] ?? []),
-      [$query]
+      [$contractNumber]
     )), static fn(string $value): bool => trim($value) !== '')));
 
     $sources = $this->property_history_source_labels();
@@ -130,10 +142,11 @@ trait HandlesPropertyHistoryActions
     }
     usort($timeline, static fn(array $a, array $b): int => (int) ($b['date_ts'] ?? 0) <=> (int) ($a['date_ts'] ?? 0));
 
-    $propertyInfo = $this->property_history_property_info($query, $property, $contracts);
+    $propertyInfo = $this->property_history_property_info($propertyCode !== '' ? $propertyCode : $contractNumber, $property, $contracts, $contractNumber);
     $sourceRows = [];
     foreach ($sections as $section) {
       $sourceRows[] = [
+        'key' => (string) ($section['key'] ?? ''),
         'label' => (string) ($section['label'] ?? ''),
         'description' => (string) ($section['description'] ?? ''),
         'count' => (int) ($section['count'] ?? 0),
@@ -141,7 +154,12 @@ trait HandlesPropertyHistoryActions
     }
 
     return [
-      'query' => $query,
+      'query' => $this->property_history_join([
+        $contractNumber !== '' ? 'Contrato ' . $contractNumber : '',
+        $propertyCode !== '' ? 'Codigo ' . $propertyCode : '',
+      ], ' / '),
+      'contract_number' => $contractNumber,
+      'property_code' => $propertyCode,
       'generated_at' => date('d/m/Y H:i'),
       'resolved_by' => (string) ($target['resolved_by'] ?? 'consulta'),
       'property' => $propertyInfo,
@@ -153,16 +171,16 @@ trait HandlesPropertyHistoryActions
   }
 
   /** @return array<string,mixed> */
-  private function property_history_resolve_target(string $query): array
+  private function property_history_resolve_target(string $contractNumber, string $propertyCode): array
   {
     $propertyTable = $this->db->table('jet_cct_inmuebles');
     $property = [];
-    $propertyTokens = [$query];
+    $propertyTokens = $propertyCode !== '' ? [$propertyCode] : [];
     $contractTokens = [];
     $contracts = [];
     $resolvedBy = 'codigo';
 
-    if ($this->table_exists($propertyTable)) {
+    if ($propertyCode !== '' && $this->table_exists($propertyTable)) {
       $where = [];
       $args = [];
       foreach (['_ID', 'codigo', 'id_inmueble', 'id_inmueble_data'] as $column) {
@@ -170,7 +188,7 @@ trait HandlesPropertyHistoryActions
           continue;
         }
         $where[] = "CAST(TRIM(COALESCE(`{$column}`, '')) AS CHAR) = ?";
-        $args[] = $query;
+        $args[] = $propertyCode;
       }
       if ($where !== []) {
         $row = $this->db->getRow("SELECT * FROM `{$propertyTable}` WHERE " . implode(' OR ', $where) . " LIMIT 1", $args);
@@ -181,51 +199,57 @@ trait HandlesPropertyHistoryActions
       }
     }
 
-    foreach (['jet_cct_contratos_arrendamiento', 'jet_cct_contrato_mandato'] as $suffix) {
-      $table = $this->db->table($suffix);
-      if (!$this->table_exists($table)) {
-        continue;
-      }
-      $where = [];
-      $args = [];
-      foreach (['contrato', 'id_contrato', '_ID'] as $column) {
-        if (!$this->column_exists($table, $column)) {
+    if ($contractNumber !== '') {
+      foreach (['jet_cct_contratos_arrendamiento', 'jet_cct_contrato_mandato'] as $suffix) {
+        $table = $this->db->table($suffix);
+        if (!$this->table_exists($table)) {
           continue;
         }
-        $where[] = "CAST(TRIM(COALESCE(`{$column}`, '')) AS CHAR) = ?";
-        $args[] = $query;
-      }
-      if ($where === []) {
-        continue;
-      }
-      $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE " . implode(' OR ', $where) . " ORDER BY `_ID` DESC LIMIT 5", $args);
-      foreach ($rows as $row) {
-        $contracts[] = $row;
-        $contractTokens = array_values(array_unique(array_merge($contractTokens, $this->property_history_contract_tokens_from_row($row))));
-        $rowTokens = $this->property_history_tokens_from_row($row);
-        if ($rowTokens !== []) {
-          $propertyTokens = array_values(array_unique(array_merge($propertyTokens, $rowTokens)));
-          $resolvedBy = 'contrato';
-          $foundProperty = $this->property_history_find_property($rowTokens);
-          if ($foundProperty !== []) {
-            $property = $foundProperty;
-            $propertyTokens = array_values(array_unique(array_merge($propertyTokens, $this->property_history_tokens_from_row($foundProperty))));
+        $where = [];
+        $args = [];
+        foreach (['contrato', 'id_contrato', '_ID'] as $column) {
+          if (!$this->column_exists($table, $column)) {
+            continue;
+          }
+          $where[] = "CAST(TRIM(COALESCE(`{$column}`, '')) AS CHAR) = ?";
+          $args[] = $contractNumber;
+        }
+        if ($where === []) {
+          continue;
+        }
+        $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE " . implode(' OR ', $where) . " ORDER BY `_ID` DESC LIMIT 5", $args);
+        foreach ($rows as $row) {
+          $contracts[] = $row;
+          $contractTokens = array_values(array_unique(array_merge($contractTokens, $this->property_history_contract_tokens_from_row($row))));
+          $rowTokens = $this->property_history_tokens_from_row($row);
+          if ($rowTokens !== []) {
+            $propertyTokens = array_values(array_unique(array_merge($propertyTokens, $rowTokens)));
+            $resolvedBy = 'contrato';
+            $foundProperty = $this->property_history_find_property($rowTokens);
+            if ($foundProperty !== []) {
+              $property = $foundProperty;
+              $propertyTokens = array_values(array_unique(array_merge($propertyTokens, $this->property_history_tokens_from_row($foundProperty))));
+            }
           }
         }
       }
     }
 
-    if ($property === []) {
+    if ($property === [] || ($contractNumber !== '' && $contractTokens === [])) {
       $ticketTable = $this->db->table('jet_cct_tickets');
       if ($this->table_exists($ticketTable)) {
         $where = [];
         $args = [];
-        foreach (['contrato', 'id_contrato', 'id_inmueble', 'id_inmueble_data', 'inmueble'] as $column) {
+        $ticketFilters = $contractNumber !== ''
+          ? ['contrato', 'id_contrato']
+          : ['id_inmueble', 'id_inmueble_data', 'inmueble'];
+        $lookupValue = $contractNumber !== '' ? $contractNumber : $propertyCode;
+        foreach ($ticketFilters as $column) {
           if (!$this->column_exists($ticketTable, $column)) {
             continue;
           }
           $where[] = "CAST(TRIM(COALESCE(`{$column}`, '')) AS CHAR) = ?";
-          $args[] = $query;
+          $args[] = $lookupValue;
         }
         if ($where !== []) {
           $row = $this->db->getRow("SELECT * FROM `{$ticketTable}` WHERE " . implode(' OR ', $where) . " ORDER BY `_ID` DESC LIMIT 1", $args);
@@ -236,7 +260,7 @@ trait HandlesPropertyHistoryActions
             if ($foundProperty !== []) {
               $property = $foundProperty;
             }
-            $resolvedBy = 'ticket/contrato';
+            $resolvedBy = $contractNumber !== '' ? 'ticket/contrato' : 'ticket/inmueble';
           }
         }
       }
@@ -375,7 +399,7 @@ trait HandlesPropertyHistoryActions
   }
 
   /** @return array<string,string> */
-  private function property_history_property_info(string $query, array $property, array $contracts): array
+  private function property_history_property_info(string $query, array $property, array $contracts, string $contractNumber = ''): array
   {
     $lastContract = $contracts[0] ?? [];
     $codigo = trim((string) ($property['codigo'] ?? $property['_ID'] ?? $property['id_inmueble'] ?? $query));
@@ -383,7 +407,7 @@ trait HandlesPropertyHistoryActions
     return [
       'codigo' => $codigo,
       'id_interno' => trim((string) ($property['_ID'] ?? '')),
-      'contrato' => trim((string) ($lastContract['contrato'] ?? $lastContract['id_contrato'] ?? '')),
+      'contrato' => trim((string) ($lastContract['contrato'] ?? $lastContract['id_contrato'] ?? $contractNumber)),
       'direccion' => $direccion,
       'barrio' => trim((string) ($property['barrio'] ?? $lastContract['barrio'] ?? '')),
       'ciudad' => trim((string) ($property['ciudad'] ?? $lastContract['ciudad'] ?? '')),
@@ -496,11 +520,12 @@ trait HandlesPropertyHistoryActions
   private function property_history_build_pdf(array $payload): \SCM\Support\SimplePdf
   {
     $pdf = new \SCM\Support\SimplePdf();
+    $pdf->backgroundImage(dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg');
     $pdf->footerLabel('SKC SuCasa Inmobiliaria - Historial del inmueble');
-    $pdf->layout(42, 44, 42);
+    $pdf->layout(58, 168, 118);
     $property = is_array($payload['property'] ?? null) ? $payload['property'] : [];
-    $pdf->logo();
     $pdf->title('Historial del inmueble');
+    $pdf->line('SKC SuCasa Inmobiliaria - NIT 900623242-4', 8, 'F2');
     $pdf->line('Generado: ' . (string) ($payload['generated_at'] ?? date('d/m/Y H:i')) . ' | Consulta: ' . (string) ($payload['query'] ?? ''), 8, 'F2');
     $pdf->paragraph('Informe consolidado de actividades, reportes, gestiones, tickets, contratos, revisiones, cotizaciones y registros relacionados con el inmueble consultado.', 8);
     $pdf->heading('Identificacion del inmueble');
@@ -556,6 +581,65 @@ trait HandlesPropertyHistoryActions
       $pdf->table(['Fecha', 'Registro', 'Referencia', 'Detalle'], $rows, [0.18, 0.28, 0.22, 0.32], 7);
     }
 
+    $actor = $this->property_history_current_employee_signature();
+    $pdf->spacer(8);
+    $pdf->signatureBlock('Informe generado por', $actor['name'], $actor['details']);
+    $pdf->signatureBlock('Empresa', 'SKC SuCasa Inmobiliaria', 'NIT 900623242-4 | Cartagena de Indias - Colombia');
+
     return $pdf;
+  }
+
+  /** @return array{name:string,details:string} */
+  private function property_history_current_employee_signature(): array
+  {
+    $name = trim((string) \SCM\Core\Auth::user());
+    $details = 'Control Servicios Inmobiliarios';
+    $userId = \SCM\Core\Auth::userId();
+    $table = $this->db->table('jet_cct_funcionarios');
+    if ($userId <= 0 || !$this->table_exists($table)) {
+      return ['name' => $name !== '' ? $name : 'Control Servicios Inmobiliarios', 'details' => $details];
+    }
+    $emailExpr = $this->property_history_first_column_expr($table, 'f', ['correo', 'correo_empleado', 'email']);
+    $phoneExpr = $this->property_history_first_column_expr($table, 'f', ['celular', 'celular_empleado', 'telefono', 'whatsapp']);
+    $cargoTable = $this->db->table('jet_cct_cargos');
+    $hasCargo = $this->table_exists($cargoTable) && $this->column_exists($cargoTable, 'nombre_cargo');
+    $cargoSelect = $hasCargo ? "TRIM(COALESCE(c.`nombre_cargo`, '')) AS nombre_cargo" : "'' AS nombre_cargo";
+    $cargoJoin = $hasCargo ? " LEFT JOIN `{$cargoTable}` c ON CAST(c.`_ID` AS CHAR) = TRIM(COALESCE(f.`id_cargo`, ''))" : '';
+    $row = $this->db->getRow(
+      "SELECT TRIM(COALESCE(f.`nombre`, '')) AS nombre,
+              TRIM(COALESCE(f.`rol`, '')) AS rol,
+              {$emailExpr} AS correo,
+              {$phoneExpr} AS telefono,
+              {$cargoSelect}
+       FROM `{$table}` f
+       {$cargoJoin}
+       WHERE f.`_ID` = ?
+       LIMIT 1",
+      [$userId]
+    );
+    if (is_array($row)) {
+      $name = trim((string) ($row['nombre'] ?? $name));
+      $parts = array_values(array_filter([
+        trim((string) ($row['nombre_cargo'] ?? '')) ?: trim((string) ($row['rol'] ?? '')),
+        trim((string) ($row['correo'] ?? '')) !== '' ? 'Email: ' . trim((string) ($row['correo'] ?? '')) : '',
+        trim((string) ($row['telefono'] ?? '')) !== '' ? 'Cel. ' . trim((string) ($row['telefono'] ?? '')) : '',
+      ], static fn(string $value): bool => $value !== ''));
+      $details = $parts !== [] ? implode(' | ', $parts) : $details;
+    }
+    return ['name' => $name !== '' ? $name : 'Control Servicios Inmobiliarios', 'details' => $details];
+  }
+
+  /** @param string[] $columns */
+  private function property_history_first_column_expr(string $table, string $alias, array $columns): string
+  {
+    $parts = [];
+    foreach ($columns as $column) {
+      if ($this->column_exists($table, $column)) {
+        $parts[] = "{$alias}.`{$column}`";
+      }
+    }
+    return $parts !== []
+      ? 'TRIM(COALESCE(' . implode(', ', $parts) . ", ''))"
+      : "''";
   }
 }

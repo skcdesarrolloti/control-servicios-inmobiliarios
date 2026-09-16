@@ -10349,7 +10349,8 @@
     var dashboardCompletedActivitiesPromise = null;
     var dashboardMetricsPromise = null;
     var dashboardCompletedActivitiesById = {};
-    var propertyHistoryCurrentQuery = "";
+    var propertyHistoryCurrentFilters = { contract_number: "", property_code: "" };
+    var propertyHistorySectionsByKey = {};
 
     function formatDashboardCount(value) {
       var numericValue = Number(value);
@@ -10590,11 +10591,13 @@
 
     function propertyHistorySourceCard(source) {
       source = source || {};
-      return '<article class="scm-property-history-source">' +
+      var key = String(source.key || "").trim();
+      var count = Number(source.count || 0);
+      return '<button type="button" class="scm-property-history-source" data-scm-property-history-source="' + escHtml(key) + '"' + (count > 0 ? "" : " disabled") + ">" +
         '<span>' + escHtml(source.label || "Fuente") + "</span>" +
-        '<strong>' + formatDashboardCount(source.count || 0) + "</strong>" +
+        '<strong>' + formatDashboardCount(count) + "</strong>" +
         '<small>' + escHtml(source.description || "") + "</small>" +
-      "</article>";
+      "</button>";
     }
 
     function propertyHistoryTimelineRow(item) {
@@ -10637,8 +10640,17 @@
       var sources = Array.isArray(data && data.sources) ? data.sources : [];
       var timeline = Array.isArray(data && data.timeline) ? data.timeline : [];
       var sections = Array.isArray(data && data.sections) ? data.sections : [];
-      propertyHistoryCurrentQuery = String((data && data.query) || "").trim();
-      if (pdfButton) pdfButton.disabled = !propertyHistoryCurrentQuery;
+      propertyHistoryCurrentFilters = {
+        contract_number: String((data && data.contract_number) || "").trim(),
+        property_code: String((data && data.property_code) || "").trim(),
+      };
+      propertyHistorySectionsByKey = {};
+      sections.forEach(function (section) {
+        if (section && section.key) {
+          propertyHistorySectionsByKey[String(section.key)] = section;
+        }
+      });
+      if (pdfButton) pdfButton.disabled = !propertyHistoryCurrentFilters.contract_number && !propertyHistoryCurrentFilters.property_code;
       if (status) {
         status.classList.remove("is-error");
         status.textContent = "Informe generado " + String((data && data.generated_at) || "") + ".";
@@ -10666,15 +10678,27 @@
         }).map(propertyHistorySection).join("") + "</div>";
     }
 
-    function loadPropertyHistory(query) {
+    function propertyHistoryFiltersFromForm(form) {
+      form = form || (root.querySelector("[data-scm-property-history-form]"));
+      var contractInput = form ? form.querySelector("input[name='contract_number']") : null;
+      var codeInput = form ? form.querySelector("input[name='property_code']") : null;
+      return {
+        contract_number: String((contractInput && contractInput.value) || "").trim(),
+        property_code: String((codeInput && codeInput.value) || "").trim(),
+      };
+    }
+
+    function loadPropertyHistory(filters) {
       var panel = root.querySelector("[data-scm-property-history-panel]");
       if (!panel || !ajaxUrl || !actionPropertyHistoryReport) {
         showToast("error", "La consulta de historial no está disponible.");
         return Promise.resolve();
       }
-      query = String(query || "").trim();
-      if (!query) {
-        showToast("warning", "Escribe un contrato, inmueble o código.");
+      filters = filters || {};
+      var contractNumber = String(filters.contract_number || "").trim();
+      var propertyCode = String(filters.property_code || "").trim();
+      if (!contractNumber && !propertyCode) {
+        showToast("warning", "Escribe un contrato o un código web/inmueble.");
         return Promise.resolve();
       }
       var status = panel.querySelector("[data-scm-property-history-status]");
@@ -10684,12 +10708,16 @@
         status.classList.remove("is-error");
         status.textContent = "Consultando historial del inmueble...";
       }
-      return dashboardAction(actionPropertyHistoryReport, { query: query })
+      return dashboardAction(actionPropertyHistoryReport, {
+        contract_number: contractNumber,
+        property_code: propertyCode,
+      })
         .then(function (data) {
           renderPropertyHistory(data || {});
         })
         .catch(function (error) {
-          propertyHistoryCurrentQuery = "";
+          propertyHistoryCurrentFilters = { contract_number: "", property_code: "" };
+          propertyHistorySectionsByKey = {};
           if (status) {
             status.classList.add("is-error");
             status.textContent = error && error.message ? error.message : "No se pudo consultar el historial.";
@@ -10701,13 +10729,14 @@
     function submitPropertyHistoryPdf() {
       var panel = root.querySelector("[data-scm-property-history-panel]");
       var form = panel ? panel.querySelector("[data-scm-property-history-form]") : null;
-      var queryInput = form ? form.querySelector("input[name='query']") : null;
-      var query = String((queryInput && queryInput.value) || propertyHistoryCurrentQuery || "").trim();
+      var filters = propertyHistoryFiltersFromForm(form);
+      var contractNumber = filters.contract_number || propertyHistoryCurrentFilters.contract_number || "";
+      var propertyCode = filters.property_code || propertyHistoryCurrentFilters.property_code || "";
       if (!ajaxUrl || !actionPropertyHistoryPdf) {
         showToast("error", "La generación de PDF no está disponible.");
         return;
       }
-      if (!query) {
+      if (!contractNumber && !propertyCode) {
         showToast("warning", "Consulta primero un inmueble para generar el PDF.");
         return;
       }
@@ -10719,7 +10748,8 @@
       [
         ["action", actionPropertyHistoryPdf],
         ["nonce", nonce],
-        ["query", query],
+        ["contract_number", contractNumber],
+        ["property_code", propertyCode],
       ].forEach(function (item) {
         var input = document.createElement("input");
         input.type = "hidden";
@@ -10732,6 +10762,37 @@
       window.setTimeout(function () {
         exportForm.remove();
       }, 1000);
+    }
+
+    function openPropertyHistorySourceDetail(sourceKey) {
+      sourceKey = String(sourceKey || "").trim();
+      var section = propertyHistorySectionsByKey[sourceKey];
+      if (!section || !window.Swal || typeof window.Swal.fire !== "function") {
+        showToast("warning", "No se encontró el detalle de esa fuente.");
+        return;
+      }
+      var items = Array.isArray(section.items) ? section.items : [];
+      var html = '<div class="scm-property-history-source-modal">' +
+        '<div class="scm-case-calendar-event-mini-head"><span>Fuente consultada</span><strong>' + escHtml(section.label || "Detalle") + "</strong></div>" +
+        '<div class="scm-property-history-list scm-property-history-list--modal">' +
+          (items.length ? items.map(function (item) {
+            return propertyHistoryTimelineRow({
+              date: item.date,
+              title: item.title,
+              detail: item.detail,
+              source: section.label,
+              reference: item.reference,
+            });
+          }).join("") : propertyHistoryEmpty("Sin registros en esta fuente.")) +
+        "</div></div>";
+      window.Swal.fire({
+        title: "",
+        html: html,
+        width: 860,
+        customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal" },
+        confirmButtonText: "Cerrar",
+        showCancelButton: false,
+      });
     }
 
     function loadDashboardHome() {
@@ -14695,7 +14756,7 @@
           loadCompletedActivities(false);
         }
         if (target === "scm-home-calendar-section-property-history") {
-          var input = parentPanel.querySelector("#scm_property_history_query");
+          var input = parentPanel.querySelector("#scm_property_history_contract");
           if (input) {
             window.setTimeout(function () { input.focus({ preventScroll: true }); }, 80);
           }
@@ -14767,6 +14828,13 @@
         return;
       }
 
+      var propertyHistorySource = event.target.closest("[data-scm-property-history-source]");
+      if (propertyHistorySource) {
+        event.preventDefault();
+        openPropertyHistorySourceDetail(propertyHistorySource.getAttribute("data-scm-property-history-source") || "");
+        return;
+      }
+
       var shortcut = event.target.closest("[data-scm-home-target]");
       if (!shortcut) return;
       var targetPanel = shortcut.getAttribute("data-scm-home-target") || "";
@@ -14814,8 +14882,7 @@
         : null;
       if (propertyHistoryForm) {
         e.preventDefault();
-        var input = propertyHistoryForm.querySelector("input[name='query']");
-        loadPropertyHistory(input ? input.value : "");
+        loadPropertyHistory(propertyHistoryFiltersFromForm(propertyHistoryForm));
         return;
       }
 
