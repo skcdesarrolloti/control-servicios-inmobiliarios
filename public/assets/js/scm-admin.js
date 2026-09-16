@@ -556,53 +556,6 @@
     return root.querySelector("#scm-case-modal");
   }
 
-  function injectIframePrintStyles(frameDocument) {
-    if (frameDocument && frameDocument.querySelector(".scm-acta-document")) return;
-    if (!frameDocument || !frameDocument.head || frameDocument.getElementById("scm-iframe-print-style")) {
-      return;
-    }
-    var printStyle = frameDocument.createElement("style");
-    printStyle.id = "scm-iframe-print-style";
-    printStyle.textContent =
-      "@page{size:letter;margin:8mm}" +
-      "@media print{" +
-      "html,body{background:#fff!important;color:#111827!important;overflow:visible!important}" +
-      "body{margin:0!important;font-size:10.5px!important;line-height:1.34!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}" +
-      "#wpadminbar,header,footer,nav,.site-header,.site-footer,.elementor-location-header,.elementor-location-footer,.jet-mobile-menu-cover,.jet-mobile-menu__container,.no-print,.noprint,.print-hide,.hide-print,button,input[type='button'],input[type='submit']{display:none!important}" +
-      "main,.site-main,#main,#content,.site-content,.entry-content,article{width:100%!important;max-width:100%!important;margin:0!important;padding:0!important;background:#fff!important;box-shadow:none!important}" +
-      "h1{font-size:18px!important;line-height:1.15!important;margin:0 0 8px!important}h2{font-size:14px!important;margin:8px 0 5px!important}h3,h4{font-size:12px!important;margin:6px 0 4px!important}" +
-      "p,li{font-size:10.5px!important;line-height:1.34!important;margin-top:0!important;margin-bottom:5px!important}" +
-      ".elementor-section,.elementor-container,.elementor-widget-wrap,.elementor-widget-container,.jet-listing-grid__item{margin:0!important;padding:0!important;box-shadow:none!important}" +
-      "table{width:100%!important;max-width:100%!important;border-collapse:collapse!important;page-break-inside:auto!important;font-size:10px!important}" +
-      "th,td{padding:3px 4px!important}" +
-      "tr,img,figure,.elementor-widget-image,.jet-listing-grid__item{page-break-inside:avoid!important;break-inside:avoid!important}" +
-      "img{max-width:100%!important;max-height:105px!important;width:auto!important;height:auto!important;object-fit:contain!important}" +
-      "figure{margin:0 0 5px!important}" +
-      ".elementor-gallery__container,.gallery,.jet-listing-grid__items{gap:5px!important}" +
-      "a[href]::after{content:''!important}" +
-      "}";
-    frameDocument.head.appendChild(printStyle);
-  }
-
-  function printIframeDocument(iframeEl, url) {
-    try {
-      var frameWindow = iframeEl ? iframeEl.contentWindow : null;
-      var frameDocument = iframeEl ? iframeEl.contentDocument || (frameWindow ? frameWindow.document : null) : null;
-      if (!frameWindow || !frameDocument) {
-        throw new Error("Iframe no disponible");
-      }
-      injectIframePrintStyles(frameDocument);
-      frameWindow.focus();
-      setTimeout(function () {
-        frameWindow.print();
-      }, 80);
-      return true;
-    } catch (error) {
-      window.open(url, "_blank", "noopener,noreferrer");
-      return false;
-    }
-  }
-
   function openIframeModal(url, title, compact) {
     if (!url) {
       return;
@@ -622,7 +575,6 @@
       "</span>" +
       '<div class="scm-iframe-toolbar-actions">' +
       '<a class="scm-iframe-open-tab" href="#" target="_blank" rel="noopener noreferrer">Ver en grande</a>' +
-      '<button type="button" class="scm-iframe-print">Imprimir / PDF</button>' +
       '<button type="button" class="scm-iframe-close" aria-label="Cerrar">&times;</button>' +
       "</div>" +
       "</div>" +
@@ -633,16 +585,10 @@
     var iframeEl = overlay.querySelector(".scm-iframe-frame");
     var loaderEl = overlay.querySelector(".scm-iframe-loader");
     var openTabLink = overlay.querySelector(".scm-iframe-open-tab");
-    var printButton = overlay.querySelector(".scm-iframe-print");
     if (openTabLink) {
       openTabLink.setAttribute("href", url);
     }
     iframeEl.addEventListener("load", function () {
-      try {
-        injectIframePrintStyles(iframeEl.contentDocument);
-      } catch (error) {
-        // Si el navegador bloquea el acceso por origen, queda disponible "Ver en grande".
-      }
       if (compactMode) {
         try {
           var frameDocument = iframeEl.contentDocument;
@@ -673,11 +619,6 @@
       }
     }
     var closeButton = overlay.querySelector(".scm-iframe-close");
-    if (printButton) {
-      printButton.addEventListener("click", function () {
-        printIframeDocument(iframeEl, url);
-      });
-    }
     closeButton.addEventListener("click", destroyOverlay);
     closeButton.focus();
   }

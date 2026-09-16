@@ -312,8 +312,7 @@ body {
           gap: 8px;
         }
 
-        .scm-public-iframe-open-tab,
-        .scm-public-iframe-print {
+        .scm-public-iframe-open-tab {
           min-height: 40px;
           display: inline-flex;
           align-items: center;
@@ -339,9 +338,7 @@ body {
         }
 
         .scm-public-iframe-open-tab:hover,
-        .scm-public-iframe-open-tab:focus-visible,
-        .scm-public-iframe-print:hover,
-        .scm-public-iframe-print:focus-visible {
+        .scm-public-iframe-open-tab:focus-visible {
           background: #fff;
           border-color: #f99200;
           color: #9a4300;
@@ -383,8 +380,7 @@ body {
             flex-direction: column;
           }
 
-          .scm-public-iframe-open-tab,
-          .scm-public-iframe-print {
+          .scm-public-iframe-open-tab {
             width: 100%;
           }
 
