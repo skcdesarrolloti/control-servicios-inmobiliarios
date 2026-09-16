@@ -10442,6 +10442,7 @@
         ["Caso", ticket && ticket !== "-" ? "#" + ticket : ""],
         ["Contrato", row.contrato || ""],
         ["Inmueble", row.inmueble || ""],
+        ["Dirección", row.direccion || ""],
         ["Estado", row.estado || ""],
         ["Estado administrativo", row.estado_admin || ""],
       ].filter(function (item) { return String(item[1] || "").trim() !== ""; });

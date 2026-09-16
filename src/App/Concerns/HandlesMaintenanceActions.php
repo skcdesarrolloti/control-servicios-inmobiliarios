@@ -369,6 +369,21 @@ trait HandlesMaintenanceActions
     if ($this->table_exists($calendarTable)) {
       $eventTsExpr = $this->dashboard_completed_date_expr($calendarTable, 'c', ['fecha_inicio', 'fecha', 'cct_created']);
       if ($eventTsExpr !== '') {
+        $eventTicketSelect = '';
+        $eventTicketJoin = '';
+        if ($ticketsAvailable) {
+          $eventTicketSelect = ",
+            t.`_ID` AS ticket_pk,
+            TRIM(COALESCE(t.`id_ticket`, '')) AS ticket_logico,
+            TRIM(COALESCE(t.`contrato`, t.`id_contrato`, '')) AS ticket_contrato,
+            TRIM(COALESCE(t.`inmueble`, t.`id_inmueble`, '')) AS ticket_inmueble,
+            TRIM(COALESCE(t.`direccion`, '')) AS ticket_direccion,
+            TRIM(COALESCE(t.`estado`, '')) AS ticket_estado,
+            TRIM(COALESCE(t.`estado_administrativo`, '')) AS ticket_estado_admin";
+          $eventTicketJoin = "LEFT JOIN `{$ticketsTable}` t
+            ON TRIM(COALESCE(t.`id_ticket`, '')) = TRIM(COALESCE(c.`id_ticket`, ''))
+            OR CAST(t.`_ID` AS CHAR) = TRIM(COALESCE(c.`id_ticket`, ''))";
+        }
         $where = [
           "{$eventTsExpr} BETWEEN ? AND ?",
           "LOWER(TRIM(COALESCE(c.`estado`, ''))) IN ('si', 'sí', 'realizado', 'realizada', '1', 'true')",
@@ -385,8 +400,9 @@ trait HandlesMaintenanceActions
           }
         }
         $rows = $this->db->getResults(
-          "SELECT c.*, {$eventTsExpr} AS fecha_ts
+          "SELECT c.*, {$eventTsExpr} AS fecha_ts{$eventTicketSelect}
            FROM `{$calendarTable}` c
+           {$eventTicketJoin}
            WHERE " . implode(' AND ', $where) . "
            ORDER BY fecha_ts DESC
            LIMIT 300",
@@ -395,6 +411,10 @@ trait HandlesMaintenanceActions
         foreach ($rows as $row) {
           $ts = (int) ($row['fecha_ts'] ?? 0);
           $ticket = trim((string) ($row['id_ticket'] ?? ''));
+          $eventEmployeeId = trim((string) ($row['id_empleado'] ?? ''));
+          $eventEmployee = $eventEmployeeId !== '' && isset($employees[$eventEmployeeId])
+            ? (string) ($employees[$eventEmployeeId]['label'] ?? $employees[$eventEmployeeId]['nombre'] ?? $eventEmployeeId)
+            : $eventEmployeeId;
           $events[] = [
             'id' => (string) ($row['id'] ?? $row['_ID'] ?? ''),
             'type' => 'evento',
@@ -403,8 +423,16 @@ trait HandlesMaintenanceActions
             'fecha' => $ts > 0 ? date('d/m/Y H:i', $ts) : '-',
             'titulo' => trim((string) ($row['titulo'] ?? 'Evento realizado')),
             'detalle' => $this->metrics_execution_clean_text((string) ($row['descripcion'] ?? '')),
-            'funcionario' => trim((string) ($row['funcionario'] ?? $row['nombre'] ?? $row['id_empleado'] ?? '')),
+            'funcionario_id' => $eventEmployeeId,
+            'funcionario' => $eventEmployee,
+            'funcionario_label' => $eventEmployee,
+            'ticket_pk' => trim((string) ($row['ticket_pk'] ?? '')),
             'ticket' => $ticket,
+            'contrato' => trim((string) ($row['ticket_contrato'] ?? '')),
+            'inmueble' => trim((string) ($row['ticket_inmueble'] ?? '')),
+            'direccion' => trim((string) ($row['ticket_direccion'] ?? '')),
+            'estado' => trim((string) ($row['ticket_estado'] ?? '')),
+            'estado_admin' => trim((string) ($row['ticket_estado_admin'] ?? '')),
           ];
         }
         $totals['eventos'] = count($events);
@@ -439,6 +467,7 @@ trait HandlesMaintenanceActions
             TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, '')) AS asunto,
             TRIM(COALESCE(t.`contrato`, t.`id_contrato`, '')) AS contrato,
             TRIM(COALESCE(t.`inmueble`, t.`id_inmueble`, '')) AS inmueble,
+            TRIM(COALESCE(t.`direccion`, '')) AS direccion,
             TRIM(COALESCE(t.`estado`, '')) AS estado,
             TRIM(COALESCE(t.`estado_administrativo`, '')) AS estado_admin
           FROM `{$segTable}` s
@@ -483,6 +512,7 @@ trait HandlesMaintenanceActions
             TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, '')) AS asunto,
             TRIM(COALESCE(t.`contrato`, t.`id_contrato`, '')) AS contrato,
             TRIM(COALESCE(t.`inmueble`, t.`id_inmueble`, '')) AS inmueble,
+            TRIM(COALESCE(t.`direccion`, '')) AS direccion,
             TRIM(COALESCE(t.`estado`, '')) AS estado,
             TRIM(COALESCE(t.`estado_administrativo`, '')) AS estado_admin
           FROM `{$histTable}` h
@@ -580,9 +610,9 @@ trait HandlesMaintenanceActions
   }
 
   /** @return array<string,mixed> */
-  private function dashboard_completed_action_item(string $type, string $label, int $ts, string $title, string $detail = '', string $ticket = '', string $ticketPk = ''): array
+  private function dashboard_completed_action_item(string $type, string $label, int $ts, string $title, string $detail = '', string $ticket = '', string $ticketPk = '', array $extra = []): array
   {
-    return [
+    return array_merge([
       'id' => sha1($type . '|' . $ts . '|' . $title . '|' . $ticket . '|' . $ticketPk),
       'type' => $type,
       'label' => $label,
@@ -592,7 +622,7 @@ trait HandlesMaintenanceActions
       'ticket' => $ticket !== '' ? $ticket : ($ticketPk !== '' ? $ticketPk : '-'),
       'asunto' => $title,
       'detalle' => $this->metrics_execution_clean_text($detail),
-    ];
+    ], $extra);
   }
 
   private function dashboard_completed_date_expr(string $table, string $alias, array $columns): string
@@ -648,6 +678,13 @@ trait HandlesMaintenanceActions
       "SELECT t.`_ID` AS ticket_pk,
               TRIM(COALESCE(t.`id_ticket`, '')) AS ticket_logico,
               TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, 'Ticket cerrado')) AS asunto,
+              TRIM(COALESCE(t.`contrato`, t.`id_contrato`, '')) AS contrato,
+              TRIM(COALESCE(t.`inmueble`, t.`id_inmueble`, '')) AS inmueble,
+              TRIM(COALESCE(t.`direccion`, '')) AS direccion,
+              TRIM(COALESCE(t.`nombre_empleado`, t.`empleado`, '')) AS funcionario,
+              TRIM(COALESCE(t.`id_empleado`, '')) AS funcionario_id,
+              TRIM(COALESCE(t.`estado`, '')) AS estado,
+              TRIM(COALESCE(t.`estado_administrativo`, '')) AS estado_admin,
               {$dateExpr} AS fecha_ts
        FROM `{$ticketsTable}` t
        WHERE " . implode(' AND ', $where) . "
@@ -666,7 +703,17 @@ trait HandlesMaintenanceActions
         'Ticket #' . ($ticket !== '' ? $ticket : $ticketPk) . ' cerrado',
         (string) ($row['asunto'] ?? ''),
         $ticket,
-        $ticketPk
+        $ticketPk,
+        [
+          'contrato' => trim((string) ($row['contrato'] ?? '')),
+          'inmueble' => trim((string) ($row['inmueble'] ?? '')),
+          'direccion' => trim((string) ($row['direccion'] ?? '')),
+          'funcionario_id' => trim((string) ($row['funcionario_id'] ?? '')),
+          'funcionario' => trim((string) ($row['funcionario'] ?? '')),
+          'funcionario_label' => trim((string) ($row['funcionario'] ?? '')),
+          'estado' => trim((string) ($row['estado'] ?? '')),
+          'estado_admin' => trim((string) ($row['estado_admin'] ?? '')),
+        ]
       );
       $totals['cerrados']++;
     }
@@ -692,7 +739,12 @@ trait HandlesMaintenanceActions
                 TRIM(COALESCE(a.`status`, '')) AS estado_acta,
                 {$dateExpr} AS fecha_ts,
                 TRIM(COALESCE(t.`id_ticket`, '')) AS ticket_logico,
-                TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, 'Acta de satisfacción')) AS asunto
+                TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, 'Acta de satisfacción')) AS asunto,
+                TRIM(COALESCE(t.`contrato`, t.`id_contrato`, '')) AS contrato,
+                TRIM(COALESCE(t.`inmueble`, t.`id_inmueble`, '')) AS inmueble,
+                TRIM(COALESCE(t.`direccion`, '')) AS direccion,
+                TRIM(COALESCE(t.`nombre_empleado`, t.`empleado`, '')) AS funcionario,
+                TRIM(COALESCE(t.`id_empleado`, '')) AS funcionario_id
          FROM `{$actsTable}` a
          LEFT JOIN `{$ticketsTable}` t ON t.`_ID` = a.`ticket_pk`
          WHERE " . implode(' AND ', $where) . "
@@ -711,7 +763,15 @@ trait HandlesMaintenanceActions
           'Acta #' . trim((string) ($row['acta_id'] ?? '-')) . ' registrada',
           ($status !== '' ? 'Estado: ' . $status . '. ' : '') . (string) ($row['asunto'] ?? ''),
           $ticket,
-          $ticketPk
+          $ticketPk,
+          [
+            'contrato' => trim((string) ($row['contrato'] ?? '')),
+            'inmueble' => trim((string) ($row['inmueble'] ?? '')),
+            'direccion' => trim((string) ($row['direccion'] ?? '')),
+            'funcionario_id' => trim((string) ($row['funcionario_id'] ?? '')),
+            'funcionario' => trim((string) ($row['funcionario'] ?? '')),
+            'funcionario_label' => trim((string) ($row['funcionario'] ?? '')),
+          ]
         );
         $totals['actas']++;
       }
@@ -725,6 +785,7 @@ trait HandlesMaintenanceActions
     if ($dateExpr === '') {
       return;
     }
+    $employees = $this->metrics_execution_employee_map($this->db->table('jet_cct_funcionarios'));
     $where = ["{$dateExpr} BETWEEN ? AND ?"];
     $args = [$range['from_ts'], $range['to_ts']];
     if ($funcionario !== '') {
@@ -742,6 +803,11 @@ trait HandlesMaintenanceActions
     $rows = $this->db->getResults(
       "SELECT a.`_ID` AS acta_id,
               TRIM(COALESCE(a.`id_ticket`, '')) AS ticket_ref,
+              TRIM(COALESCE(a.`id_contrato`, a.`contrato`, '')) AS contrato,
+              TRIM(COALESCE(a.`id_inmueble`, a.`inmueble`, '')) AS inmueble,
+              TRIM(COALESCE(a.`direccion`, '')) AS direccion,
+              TRIM(COALESCE(a.`coordinador`, a.`creador`, '')) AS funcionario,
+              TRIM(COALESCE(a.`id_empleado`, a.`cct_author_id`, '')) AS funcionario_id,
               {$dateExpr} AS fecha_ts
        FROM `{$legacyActsTable}` a
        WHERE " . implode(' AND ', $where) . "
@@ -758,7 +824,15 @@ trait HandlesMaintenanceActions
         'Acta #' . trim((string) ($row['acta_id'] ?? '-')) . ' registrada',
         'Acta de satisfacción registrada.',
         $ticket,
-        $ticket
+        $ticket,
+        [
+          'contrato' => trim((string) ($row['contrato'] ?? '')),
+          'inmueble' => trim((string) ($row['inmueble'] ?? '')),
+          'direccion' => trim((string) ($row['direccion'] ?? '')),
+          'funcionario_id' => trim((string) ($row['funcionario_id'] ?? '')),
+          'funcionario' => trim((string) ($row['funcionario'] ?? '')),
+          'funcionario_label' => trim((string) ($row['funcionario'] ?? '')),
+        ]
       );
       $totals['actas']++;
     }
@@ -796,6 +870,9 @@ trait HandlesMaintenanceActions
       "SELECT r.`_ID` AS revision_id,
               TRIM(COALESCE(r.`id_contrato`, r.`contrato`, '')) AS contrato,
               TRIM(COALESCE(r.`id_inmueble`, r.`inmueble`, '')) AS inmueble,
+              TRIM(COALESCE(r.`direccion`, '')) AS direccion,
+              TRIM(COALESCE(r.`id_empleado`, r.`cct_author_id`, '')) AS funcionario_id,
+              TRIM(COALESCE(r.`realizado_por`, '')) AS funcionario,
               {$dateExpr} AS fecha_ts
        FROM `{$servicesTable}` r
        WHERE " . implode(' AND ', $where) . "
@@ -806,6 +883,11 @@ trait HandlesMaintenanceActions
     foreach ($rows as $row) {
       $contract = trim((string) ($row['contrato'] ?? ''));
       $property = trim((string) ($row['inmueble'] ?? ''));
+      $employeeId = trim((string) ($row['funcionario_id'] ?? ''));
+      $employeeLabel = trim((string) ($row['funcionario'] ?? ''));
+      if ($employeeLabel === '' && $employeeId !== '' && isset($employees[$employeeId])) {
+        $employeeLabel = (string) ($employees[$employeeId]['label'] ?? $employees[$employeeId]['nombre'] ?? $employeeId);
+      }
       $actions[] = $this->dashboard_completed_action_item(
         'revision_servicios',
         'Revisión servicios públicos',
@@ -813,7 +895,15 @@ trait HandlesMaintenanceActions
         'Revisión servicios públicos #' . trim((string) ($row['revision_id'] ?? '-')),
         trim('Contrato ' . ($contract !== '' ? '#' . $contract : '-') . ($property !== '' ? ' · Inmueble ' . $property : '')),
         '',
-        ''
+        '',
+        [
+          'contrato' => $contract,
+          'inmueble' => $property,
+          'direccion' => trim((string) ($row['direccion'] ?? '')),
+          'funcionario_id' => $employeeId,
+          'funcionario' => $employeeLabel,
+          'funcionario_label' => $employeeLabel,
+        ]
       );
       $totals['revisiones_servicios']++;
     }
@@ -1945,6 +2035,7 @@ trait HandlesMaintenanceActions
       'asunto' => $this->metrics_execution_clean_text((string) ($row['asunto'] ?? '')),
       'contrato' => trim((string) ($row['contrato'] ?? '')),
       'inmueble' => trim((string) ($row['inmueble'] ?? '')),
+      'direccion' => trim((string) ($row['direccion'] ?? '')),
       'estado' => trim((string) ($row['estado'] ?? '')),
       'estado_admin' => trim((string) ($row['estado_admin'] ?? '')),
       'detalle' => $detailText,
