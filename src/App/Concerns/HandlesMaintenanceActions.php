@@ -1100,7 +1100,7 @@ trait HandlesMaintenanceActions
         $autoRejected = $this->maintenance_quote_disapprove_previous_quotes($schema, $quoteIdSaved, $quoteData, $employeeId, $nowSql);
       }
       $reportId = 0;
-      if ($mode === 'create' && stripos($tipoMantenimiento, 'correct') !== false) {
+      if ($mode === 'create') {
         $reportId = $this->maintenance_quote_ensure_admin_report($schema, $quoteIdSaved, $quoteData, $ticket, $revision, $actor, $employeeId, $now, $nowSql);
       }
       $this->maintenance_quote_update_ticket($schema, $ticket, $quoteIdSaved, $tipoMantenimiento, $now, $nowSql);
