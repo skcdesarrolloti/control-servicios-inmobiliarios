@@ -310,6 +310,271 @@ trait WorkflowCommandsConcern
     ];
   }
 
+  /**
+   * Genera la comunicacion de seguimiento de reparaciones para cotizaciones enviadas
+   * que siguen sin respuesta despues de 10 dias calendario.
+   *
+   * @return array<string,string>
+   */
+  public function generateRepairFollowupNotice(int $ticketPk, int $cotizacionId, string $observacion = ''): array
+  {
+    $ticketsTable = $this->db->table('jet_cct_tickets');
+    $histTable = $this->db->table('jet_cct_historial_del_ticket');
+    $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (
+      $ticketPk <= 0
+      || $cotizacionId <= 0
+      || !$this->schema->tableExists($ticketsTable)
+      || !$this->schema->tableExists($histTable)
+      || !$this->schema->tableExists($cotTable)
+    ) {
+      return ['ok' => '0', 'message' => 'No se pudo preparar el seguimiento de reparaciones.'];
+    }
+
+    $ticket = $this->db->getRow("SELECT * FROM `{$ticketsTable}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
+    if (!is_array($ticket)) {
+      return ['ok' => '0', 'message' => 'Ticket no encontrado.'];
+    }
+
+    $cotizacion = $this->fetchCotizacion($cotTable, (string) $cotizacionId);
+    if (!is_array($cotizacion)) {
+      return ['ok' => '0', 'message' => 'Cotizacion no encontrada.'];
+    }
+    if (!$this->cotizacionBelongsToTicket($ticket, $cotizacion, $ticketPk, $cotizacionId)) {
+      return ['ok' => '0', 'message' => 'La cotizacion seleccionada no pertenece a este ticket.'];
+    }
+
+    $estadoActual = strtolower(trim((string) ($cotizacion['estado'] ?? $cotizacion['estado_respuesta_cotizacion_mantenimiento'] ?? $cotizacion['estado_respuesta'] ?? '')));
+    if (!in_array($estadoActual, ['', 'esperando respuesta'], true)) {
+      return ['ok' => '0', 'message' => 'Solo se puede generar seguimiento si la cotizacion aun esta esperando respuesta.'];
+    }
+
+    if (!$this->cotizacionWasSent($cotizacion)) {
+      return ['ok' => '0', 'message' => 'La cotizacion seleccionada no registra envio.'];
+    }
+
+    $sentTs = $this->cotizacionSentTimestamp($cotizacion);
+    if ($sentTs <= 0) {
+      return ['ok' => '0', 'message' => 'La cotizacion no tiene fecha de envio valida.'];
+    }
+    $elapsedDays = $this->elapsedCalendarDays($sentTs);
+    if ($elapsedDays <= 10) {
+      return ['ok' => '0', 'message' => 'La cotizacion aun no supera los 10 dias calendario desde su envio.'];
+    }
+
+    $nowTs = time();
+    $nowMysql = date('Y-m-d H:i:s', $nowTs);
+    $userId = \SCM\Core\Auth::userId();
+    $userName = \SCM\Core\Auth::user() ?: ($userId > 0 ? ('Usuario #' . $userId) : 'Sistema');
+    $userInfo = $this->findFuncionario($userId);
+    $employeeId = $this->employeeLogicalId($userId, $userInfo);
+    $attempt = $this->nextRepairFollowupAttempt($ticketPk, $cotizacionId, (string) ($ticket['archivos'] ?? ''));
+    $logicalTicket = trim((string) ($ticket['id_ticket'] ?? ''));
+    if ($logicalTicket === '') {
+      $logicalTicket = (string) $ticketPk;
+    }
+
+    $ticketForNotice = array_merge($ticket, $this->preventivaNoAccessCreatorData($userName, $userInfo), [
+      '_scm_repair_followup_attempt' => $attempt,
+    ]);
+    try {
+      $notice = (new TicketPdfGenerator())->generateRepairFollowupNotice($ticketPk, $ticketForNotice, $cotizacion, $elapsedDays, $attempt);
+      $url = trim((string) ($notice['url'] ?? ''));
+      if ($url === '') {
+        throw new \RuntimeException('El PDF no retorno URL valida.');
+      }
+    } catch (\Throwable $exception) {
+      return ['ok' => '0', 'message' => 'No se pudo generar la comunicacion de seguimiento: ' . $exception->getMessage()];
+    }
+
+    $doc = [
+      'nombre_archivo' => (string) ($notice['title'] ?? ('Seguimiento de reparaciones cotizacion #' . $cotizacionId)),
+      'media_archivo' => (string) ($notice['url'] ?? ''),
+      'archivo' => (string) ($notice['url'] ?? ''),
+    ];
+    $histText = trim($observacion);
+    if ($histText === '') {
+      $histText = 'Se genera seguimiento de reparaciones de la cotizacion #' . $cotizacionId . ' por no recibir respuesta despues de ' . $elapsedDays . ' dias calendario.';
+    }
+    $histSaved = $this->insertHistorial(
+      $histTable,
+      $ticketPk,
+      $histText,
+      $userId,
+      $employeeId,
+      $userName,
+      $nowTs,
+      $nowMysql,
+      (string) ($ticket['estado'] ?? 'En proceso'),
+      '__keep__',
+      '__keep__',
+      '',
+      [$doc]
+    );
+    if (!$histSaved) {
+      return ['ok' => '0', 'message' => 'No se pudo guardar el historial del seguimiento.'];
+    }
+
+    $ticketDocs = $this->ticketDocumentsFromRaw($ticket['archivos'] ?? '');
+    $ticketDocs[] = $doc;
+    $ticketUpdate = [
+      'archivos' => serialize($this->uniqueTicketDocuments($ticketDocs)),
+      'fecha_actualizacion' => $nowTs,
+      'cct_modified' => $nowMysql,
+      'tuvo_seguimiento' => 'Si',
+      'fecha_seguimiento' => $nowTs,
+      'id_encargado_seguimiento' => $employeeId,
+    ];
+    if (isset($ticket['seguimientos'])) {
+      $ticketUpdate['seguimientos'] = (string) ((int) $ticket['seguimientos'] + 1);
+    }
+    $ticketUpdate = $this->schema->filterTableData($ticketsTable, $ticketUpdate);
+    if (!empty($ticketUpdate)) {
+      $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);
+    }
+
+    $delivery = $this->notifyRepairFollowupNotice($ticketForNotice, $cotizacion, $logicalTicket, $notice, $attempt, $elapsedDays, $userName);
+    $emailSent = (int) ($delivery['email'] ?? 0);
+    $whatsappSent = (int) ($delivery['whatsapp'] ?? 0);
+
+    return [
+      'ok' => '1',
+      'message' => 'Seguimiento de reparaciones #' . $attempt . ' generado y anexado.'
+        . ($emailSent > 0 ? ' Correos programados en cola: ' . $emailSent . '.' : ' Sin correos programados.')
+        . ($whatsappSent > 0 ? ' WhatsApp programados en cola: ' . $whatsappSent . '.' : ''),
+      'emails_sent' => (string) $emailSent,
+      'whatsapp_sent' => (string) $whatsappSent,
+      'attempt' => (string) $attempt,
+      'notice_url' => (string) ($notice['url'] ?? ''),
+      'elapsed_days' => (string) $elapsedDays,
+    ];
+  }
+
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $cotizacion */
+  private function cotizacionBelongsToTicket(array $ticket, array $cotizacion, int $ticketPk, int $cotizacionId): bool
+  {
+    $quoteIds = $this->splitIds((string) ($ticket['id_cotizacion_mantenimiento'] ?? ''));
+    if (in_array((string) $cotizacionId, $quoteIds, true)) {
+      return true;
+    }
+
+    $ticketRefs = array_values(array_filter(array_map('strval', [
+      $ticketPk,
+      $ticket['id_ticket'] ?? '',
+    ]), static fn(string $value): bool => trim($value) !== ''));
+    $quoteTicket = trim((string) ($cotizacion['id_ticket'] ?? ''));
+    return $quoteTicket !== '' && in_array($quoteTicket, $ticketRefs, true);
+  }
+
+  /** @param array<string,mixed> $cotizacion */
+  private function cotizacionWasSent(array $cotizacion): bool
+  {
+    foreach (['se_envio', 'fue_enviada_cotizacion_mantenimiento', 'fue_enviada'] as $field) {
+      $value = strtolower(trim((string) ($cotizacion[$field] ?? '')));
+      if (in_array($value, ['si', 'sí', '1', 'true', 'enviada', 'enviado', 'fue enviada'], true)) {
+        return true;
+      }
+    }
+    return $this->cotizacionSentTimestamp($cotizacion) > 0;
+  }
+
+  /** @param array<string,mixed> $cotizacion */
+  private function cotizacionSentTimestamp(array $cotizacion): int
+  {
+    foreach (['fecha_envio', 'fecha_envio_cotizacion_mantenimiento', 'fecha_enviada', 'fecha_envio_correo'] as $field) {
+      $ts = $this->parseFlexibleTimestamp($cotizacion[$field] ?? '');
+      if ($ts > 0) {
+        return $ts;
+      }
+    }
+    return 0;
+  }
+
+  private function parseFlexibleTimestamp($value): int
+  {
+    $text = trim((string) $value);
+    if ($text === '') {
+      return 0;
+    }
+    if (preg_match('/^\d{13}$/', $text)) {
+      return (int) floor(((int) $text) / 1000);
+    }
+    if (preg_match('/^\d{10}$/', $text)) {
+      return (int) $text;
+    }
+    $ts = strtotime($text);
+    return $ts > 0 ? $ts : 0;
+  }
+
+  private function elapsedCalendarDays(int $fromTs): int
+  {
+    if ($fromTs <= 0) {
+      return 0;
+    }
+    $today = new \DateTimeImmutable('today');
+    $from = (new \DateTimeImmutable('@' . $fromTs))->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+    $fromDay = $from->setTime(0, 0, 0);
+    if ($fromDay > $today) {
+      return 0;
+    }
+    return (int) $fromDay->diff($today)->days;
+  }
+
+  private function nextRepairFollowupAttempt(int $ticketPk, int $cotizacionId, string $rawTicketDocuments): int
+  {
+    $count = 0;
+    foreach ($this->ticketDocumentsFromRaw($rawTicketDocuments) as $doc) {
+      $text = $this->normalizePreventivaNoAccessText(implode(' ', [
+        (string) ($doc['nombre_archivo'] ?? ''),
+        (string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''),
+      ]));
+      if ($this->looksLikeRepairFollowupNotice($text, $cotizacionId)) {
+        $count++;
+        $count = max($count, $this->preventivaNoAccessAttemptNumber($text));
+      }
+    }
+
+    $histTable = $this->db->table('jet_cct_historial_del_ticket');
+    if (
+      $this->schema->tableExists($histTable)
+      && $this->schema->columnExists($histTable, 'id_ticket')
+      && $this->schema->columnExists($histTable, 'respuesta')
+    ) {
+      $rows = $this->db->getResults("SELECT * FROM `{$histTable}` WHERE `id_ticket` = ?", [$ticketPk]);
+      foreach (is_array($rows) ? $rows : [] as $row) {
+        if (!is_array($row)) {
+          continue;
+        }
+        $text = $this->normalizePreventivaNoAccessText(implode(' ', [
+          (string) ($row['respuesta'] ?? ''),
+          (string) ($row['observacion'] ?? ''),
+          (string) ($row['descripcion'] ?? ''),
+          (string) ($row['archivos'] ?? ''),
+        ]));
+        if ($this->looksLikeRepairFollowupNotice($text, $cotizacionId)) {
+          $count++;
+          $count = max($count, $this->preventivaNoAccessAttemptNumber($text));
+        }
+      }
+    }
+
+    return $count + 1;
+  }
+
+  private function looksLikeRepairFollowupNotice(string $text, int $cotizacionId): bool
+  {
+    if (strpos($text, 'seguimiento de reparaciones') === false && strpos($text, 'seguimiento reparaciones') === false) {
+      return false;
+    }
+    if ($cotizacionId <= 0) {
+      return true;
+    }
+    return strpos($text, 'cotizacion #' . $cotizacionId) !== false
+      || strpos($text, 'cotizacion_' . $cotizacionId) !== false
+      || strpos($text, 'cotizacion ' . $cotizacionId) !== false
+      || strpos($text, (string) $cotizacionId) !== false;
+  }
+
   /** @param array<string,mixed> $ticket */
   private function isPreventivaTicket(array $ticket): bool
   {

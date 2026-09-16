@@ -375,6 +375,7 @@ trait RendersDashboard
         'cotizacion_pdf' => self::AJAX_COTIZACION_MANTENIMIENTO_PDF,
         'activate_ticket' => self::AJAX_ACTIVATE_TICKET,
         'cotizacion_response' => self::AJAX_COTIZACION_RESPONSE,
+        'repair_followup_notice' => self::AJAX_REPAIR_FOLLOWUP_NOTICE,
         'close_ticket'    => self::AJAX_CLOSE_TICKET,
         'contacts_update' => self::AJAX_CONTACTS_UPDATE,
         'entrega'         => self::AJAX_ENTREGA,
@@ -3760,6 +3761,13 @@ trait RendersDashboard
     $cotizacionAprobada = strtolower($estado) === 'aprobada';
     $seEnvio = strtolower(trim((string) ($row['se_envio'] ?? '')));
     $enviada = in_array($seEnvio, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true);
+    $fechaEnvioTs = $this->parse_cotizacion_timestamp($row['fecha_envio'] ?? '');
+    $diasCalendarioSinRespuesta = 0;
+    if ($fechaEnvioTs > 0) {
+      $sentDay = strtotime(date('Y-m-d', $fechaEnvioTs)) ?: $fechaEnvioTs;
+      $todayDay = strtotime(date('Y-m-d')) ?: time();
+      $diasCalendarioSinRespuesta = max(0, (int) floor(($todayDay - $sentDay) / 86400));
+    }
     $fechaTs = (int) ($row['fecha'] ?? 0);
     if ($fechaTs <= 0) {
       $fechaTs = strtotime((string) ($row['cct_created'] ?? '')) ?: 0;
@@ -3837,6 +3845,7 @@ trait RendersDashboard
     $nativeCotizacionFuncionarioHtml = $this->render_native_cotizacion_mantenimiento_view($row, $orders, 'funcionario');
     $nativeCotizacionDestinatarioHtml = $this->render_native_cotizacion_mantenimiento_view($row, $orders, 'destinatario');
     $cotizacionSinResponder = in_array(strtolower($estado), ['', 'esperando respuesta'], true);
+    $seguimientoReparacionesDisponible = $id !== '' && $ticket !== '' && $cotizacionSinResponder && $enviada && $fechaEnvioTs > 0 && $diasCalendarioSinRespuesta > 10;
     $caseDescription = 'Cotizacion de mantenimiento #' . ($id !== '' ? $id : '-') . ($ticket !== '' ? ' relacionada con el ticket #' . $ticket . '.' : '.');
     if ($direccion !== '' && $direccion !== '-') {
       $caseDescription .= ' Direccion: ' . $direccion . '.';
@@ -3882,11 +3891,14 @@ trait RendersDashboard
           . ' data-cotizacion-id="' . esc_attr($id) . '"'
           . ' data-cotizacion-url="' . esc_attr($cotUrl) . '"'
           . ' data-cot-estado="' . esc_attr($estado) . '"'
+          . ' data-cot-fecha-envio="' . esc_attr((string) $fechaEnvioTs) . '"'
+          . ' data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '"'
+          . ' data-cot-seguimiento-reparaciones-disponible="' . esc_attr($seguimientoReparacionesDisponible ? '1' : '0') . '"'
           . '>Ver ticket</button>';
       }
     }
 
-    return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '">'
+    return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '" data-cot-fecha-envio="' . esc_attr((string) $fechaEnvioTs) . '" data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '" data-cot-seguimiento-reparaciones-disponible="' . esc_attr($seguimientoReparacionesDisponible ? '1' : '0') . '">'
       . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Ticket <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</span></div></div>'
       . '<div class="scm-cotizacion-meta"><div><span>Fecha</span><strong>' . esc_html($fecha) . '</strong></div><div><span>Destinatario</span><strong>' . esc_html($destinatario !== '' ? $destinatario : '-') . '</strong></div><div><span>Contacto</span><strong>' . esc_html($contacto !== '' ? $contacto : '-') . '</strong></div><div><span>Empleado</span><strong>' . esc_html($empleado !== '' ? $empleado : '-') . '</strong></div><div><span>Ordenes</span><strong>' . esc_html($ordenesTotal) . '</strong></div></div>'
       . '<div class="scm-cotizacion-finance-actions"><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="saldos" aria-expanded="false">Ver saldos</button><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="totales" aria-expanded="false">Ver totales</button></div>'
@@ -3900,6 +3912,7 @@ trait RendersDashboard
       . ($cotizacionSinResponder ? '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizaci&oacute;n</button>' : '')
       . ($cotizacionSinResponder ? '<button type="button" class="scm-case-work-btn scm-primary-action scm-cotizacion-approve-action" data-scm-approve-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Marcar como aprobada</button>' : '')
       . ($cotizacionSinResponder ? '<button type="button" class="scm-case-work-btn scm-danger-action scm-cotizacion-delete-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizaci&oacute;n</button>' : '')
+      . ($seguimientoReparacionesDisponible ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-repair-followup-notice data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '" data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '">Seguimiento reparaciones</button>' : '')
       . ($id !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-edit-cotizacion data-cotizacion-mode="note" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir nota</button>' : '')
       . ($cotizacionAprobada && !$hasActiveActa ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-add-cotizacion-order data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir orden</button>' : '')
       . ($cotizacionAprobada && $hasActiveActa ? '<button type="button" class="scm-case-work-btn" disabled title="Esta cotizaci&oacute;n o caso ya tiene acta activa">Orden bloqueada por acta</button>' : '')
@@ -4229,12 +4242,24 @@ trait RendersDashboard
 
   private function cotizacion_date_label($raw): string
   {
-    if (is_numeric($raw)) {
-      $ts = (int) $raw;
-    } else {
-      $ts = strtotime((string) $raw) ?: 0;
-    }
+    $ts = $this->parse_cotizacion_timestamp($raw);
     return $ts > 0 ? date('d-m-Y', $ts) : '-';
+  }
+
+  private function parse_cotizacion_timestamp($raw): int
+  {
+    $value = trim((string) $raw);
+    if ($value === '') {
+      return 0;
+    }
+    if (preg_match('/^\d{13}$/', $value)) {
+      return (int) floor(((int) $value) / 1000);
+    }
+    if (preg_match('/^\d{10}$/', $value)) {
+      return (int) $value;
+    }
+    $ts = strtotime($value);
+    return $ts > 0 ? $ts : 0;
   }
 
   private function cotizacion_clean_text($value): string

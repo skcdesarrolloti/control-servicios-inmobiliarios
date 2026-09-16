@@ -1736,6 +1736,15 @@
     return cotEstado === "" || cotEstado === "esperando respuesta";
   }
 
+  function caseCanGenerateRepairFollowup(caseBtn) {
+    return !!(
+      caseBtn &&
+      caseHasCotizacion(caseBtn) &&
+      caseCotizacionCanRespond(caseBtn) &&
+      String(caseBtn.dataset.cotSeguimientoReparacionesDisponible || "").trim() === "1"
+    );
+  }
+
   function renderCotizacionInlineFields(hasCotizacion, cotizacionId) {
     if (!hasCotizacion) {
       return '<input type="hidden" name="estado_cotizacion" value="__keep__">';
@@ -2706,6 +2715,35 @@
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
       initCotizacionResponseFields(body);
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
+  function openRepairFollowupNoticeEditor(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = String(caseBtn.dataset.ticketPk || caseBtn.dataset.ticket || "").trim();
+    var cotizacionId = String(caseBtn.dataset.cotizacionId || "").trim();
+    var elapsedDays = String(caseBtn.dataset.cotDiasCalendario || "").trim();
+    if (title) title.textContent = "Seguimiento de reparaciones";
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML =
+        '<form class="scm-repair-followup-form" method="post" autocomplete="off">' +
+        '<input type="hidden" name="ticket_pk" value="' + escHtml(ticketPk) + '">' +
+        '<input type="hidden" name="id_cotizacion" value="' + escHtml(cotizacionId) + '">' +
+        '<section class="scm-preventiva-no-access-box"><div><strong>Generar acta/carta de seguimiento</strong><span>Se crear&aacute; la comunicaci&oacute;n con membrete para la cotizaci&oacute;n <b>#' +
+        escHtml(cotizacionId || "-") +
+        '</b>, se anexar&aacute; al ticket y se enviar&aacute; por correo y WhatsApp al destinatario de la cotizaci&oacute;n. D&iacute;as calendario sin respuesta: <b>' +
+        escHtml(elapsedDays || "-") +
+        '</b>.</span></div></section>' +
+        '<label class="scm-seg-field"><span>Observaci&oacute;n para el historial</span><textarea name="observacion" rows="5" placeholder="Opcional. Si lo dejas vac&iacute;o, el sistema registrar&aacute; el seguimiento autom&aacute;tico."></textarea></label>' +
+        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Generar, guardar y enviar</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        "</form>";
+      prependCaseLocationPanel(body, caseBtn, modal);
     }
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
@@ -4686,6 +4724,11 @@
             escHtml(cotizacionId) +
             '">Gestionar cotizaciones del caso</button>',
           );
+          if (caseCanGenerateRepairFollowup(btn)) {
+            quoteActionButtons.push(
+              '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-repair-followup-notice>Seguimiento reparaciones</button>',
+            );
+          }
         } else if (!isPublicPqr && caseCanCreateMaintenanceQuote(btn)) {
           quoteActionButtons.push(
             '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-create-cotizacion data-cotizacion-mode="create" data-ticket-pk="' +
@@ -5060,6 +5103,13 @@
           });
         });
       modal
+        .querySelectorAll("[data-scm-repair-followup-notice]")
+        .forEach(function (noticeBtn) {
+          noticeBtn.addEventListener("click", function () {
+            openRepairFollowupNoticeEditor(modal, btn);
+          });
+        });
+      modal
         .querySelectorAll("[data-scm-open-perturbacion]")
         .forEach(function (pb) {
           pb.addEventListener("click", function () {
@@ -5208,6 +5258,65 @@
     if (box) {
       syncCotizacionResponseBox(box);
     }
+  });
+
+  document.addEventListener("submit", function (event) {
+    var form =
+      event.target && event.target.closest
+        ? event.target.closest(".scm-repair-followup-form")
+        : null;
+    if (!form) {
+      return;
+    }
+    event.preventDefault();
+    var root = form.closest("#scm-app") || document.querySelector("#scm-app");
+    var runtime = parseRuntime(root) || {};
+    var action =
+      (runtime.actions && runtime.actions.repair_followup_notice) ||
+      "scm_seguimiento_reparaciones_cotizacion";
+    var msg = form.querySelector(".scm-seg-msg");
+    var submit = form.querySelector('button[type="submit"]');
+    var fd = new FormData(form);
+    fd.set("action", action);
+    fd.set("nonce", runtime.nonce || "");
+    if (submit) submit.disabled = true;
+    if (msg) {
+      msg.textContent = "Generando comunicacion y encolando notificaciones...";
+      msg.classList.remove("error");
+    }
+    fetch(runtime.ajaxUrl || "api.php", {
+      method: "POST",
+      body: fd,
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (json) {
+        if (!json || !json.success) {
+          throw new Error(
+            (json && json.data && json.data.message) ||
+              "No se pudo generar el seguimiento de reparaciones.",
+          );
+        }
+        var data = json.data || {};
+        var text = data.message || "Seguimiento de reparaciones generado.";
+        if (msg) msg.textContent = text;
+        scmNotify("success", text, "Seguimiento de reparaciones");
+        if (root) root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+      })
+      .catch(function (error) {
+        var text = error.message || "No se pudo generar el seguimiento de reparaciones.";
+        if (msg) {
+          msg.textContent = text;
+          msg.classList.add("error");
+        }
+        scmNotify("error", text, "Seguimiento de reparaciones");
+      })
+      .finally(function () {
+        if (submit) submit.disabled = false;
+      });
   });
 
   function notifyCalendarAppointment(root, appointments) {

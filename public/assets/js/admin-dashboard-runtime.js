@@ -137,6 +137,7 @@
     var actionNote = actions.nota || "";
     var actionTicketResponse = actions.ticket_response || "";
     var actionCotizacionResponse = actions.cotizacion_response || "";
+    var actionRepairFollowupNotice = actions.repair_followup_notice || "";
     var actionPostponeTicket = actions.postpone_ticket || "";
     var actionStatusTickets = actions.status_tickets || "";
     var actionMyTickets = actions.my_tickets || "";
@@ -14104,7 +14105,7 @@
                   return;
                 }
                 var actionBtn = event.target && event.target.closest
-                  ? event.target.closest("[data-scm-cotizacion-response-standalone], [data-scm-approve-cotizacion], [data-scm-delete-cotizacion]")
+                  ? event.target.closest("[data-scm-cotizacion-response-standalone], [data-scm-approve-cotizacion], [data-scm-delete-cotizacion], [data-scm-repair-followup-notice]")
                   : null;
                 if (actionBtn) {
                   event.preventDefault();
@@ -14116,6 +14117,8 @@
                     triggerCotizacionRootAction(actionCard, "[data-scm-cotizacion-response-standalone]", returnContext);
                   } else if (actionBtn.matches("[data-scm-approve-cotizacion]")) {
                     triggerCotizacionRootAction(actionCard, "[data-scm-approve-cotizacion]", returnContext);
+                  } else if (actionBtn.matches("[data-scm-repair-followup-notice]")) {
+                    triggerCotizacionRootAction(actionCard, "[data-scm-repair-followup-notice]", returnContext);
                   } else {
                     triggerCotizacionRootAction(actionCard, "[data-scm-delete-cotizacion]", returnContext);
                   }
@@ -14282,6 +14285,85 @@
       if (respondCotizacionOrderBtn) {
         e.preventDefault();
         openCotizacionOrderResponseModal(respondCotizacionOrderBtn);
+        return;
+      }
+
+      var repairFollowupBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-repair-followup-notice]")
+          : null;
+      if (repairFollowupBtn) {
+        e.preventDefault();
+        var repairReturnContext = repairFollowupBtn._scmCaseCotizacionesReturn || null;
+        repairFollowupBtn._scmCaseCotizacionesReturn = null;
+        var repairCard = repairFollowupBtn.closest(".scm-cotizacion-card");
+        var repairTicketPk =
+          repairFollowupBtn.getAttribute("data-ticket-pk") ||
+          (repairCard ? repairCard.getAttribute("data-ticket-pk") : "") ||
+          "";
+        var repairCotizacionId =
+          repairFollowupBtn.getAttribute("data-cotizacion-id") ||
+          (repairCard ? repairCard.getAttribute("data-cotizacion-id") : "") ||
+          "";
+        var repairDays =
+          repairFollowupBtn.getAttribute("data-cot-dias-calendario") ||
+          (repairCard ? repairCard.getAttribute("data-cot-dias-calendario") : "") ||
+          "";
+        if (!repairTicketPk || !repairCotizacionId || !window.Swal) {
+          showToast("error", "No se pudo abrir el seguimiento de reparaciones.");
+          return;
+        }
+        window.Swal.fire({
+          title: "Seguimiento de reparaciones",
+          html:
+            '<div class="scm-cotizacion-response-form"><p class="scm-cotizacion-dialog-intro">Se generar&aacute; la carta con membrete, se anexar&aacute; al ticket y se enviar&aacute; por correo y WhatsApp al destinatario de la cotizaci&oacute;n.</p><div class="scm-cotizacion-response-grid">' +
+            '<div class="scm-cotizacion-dialog-field"><span>Cotizaci&oacute;n</span><strong>#' + escHtml(repairCotizacionId) + '</strong></div>' +
+            '<div class="scm-cotizacion-dialog-field"><span>D&iacute;as sin respuesta</span><strong>' + escHtml(repairDays || "-") + '</strong></div>' +
+            '<label class="scm-cotizacion-dialog-field is-wide"><span>Observaci&oacute;n para el historial</span><textarea id="swal-repair-followup-observacion" rows="5" placeholder="Opcional. Si lo dejas vac&iacute;o, se registra el seguimiento autom&aacute;tico."></textarea></label>' +
+            "</div></div>",
+          width: "min(700px, 94vw)",
+          showCloseButton: true,
+          showCancelButton: true,
+          allowOutsideClick: false,
+          confirmButtonText: "Generar, guardar y enviar",
+          cancelButtonText: "Cancelar",
+          buttonsStyling: false,
+          customClass: {
+            popup: "scm-cotizacion-dialog scm-cotizacion-response-swal",
+            title: "scm-cotizacion-dialog-title",
+            htmlContainer: "scm-cotizacion-dialog-body",
+            actions: "scm-cotizacion-dialog-actions",
+            confirmButton: "scm-cotizacion-dialog-confirm",
+            cancelButton: "scm-cotizacion-dialog-cancel",
+            closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+          },
+          preConfirm: function () {
+            var observacion = document.getElementById("swal-repair-followup-observacion");
+            return {
+              observacion: observacion ? observacion.value : "",
+            };
+          },
+        }).then(function (res) {
+          if (!res.isConfirmed) {
+            if (repairReturnContext && typeof repairReturnContext.reopen === "function") {
+              repairReturnContext.reopen();
+            }
+            return;
+          }
+          var fd = new FormData();
+          fd.append("ticket_pk", repairTicketPk);
+          fd.append("id_cotizacion", repairCotizacionId);
+          fd.append("observacion", (res.value && res.value.observacion) || "");
+          return submitCotizacionAction(
+            fd,
+            actionRepairFollowupNotice,
+            "Error generando seguimiento de reparaciones.",
+          ).then(function (saved) {
+            if (saved && repairReturnContext && typeof repairReturnContext.reopen === "function") {
+              repairReturnContext.reopen(260);
+            }
+          });
+        });
         return;
       }
 

@@ -341,6 +341,16 @@ final class GenericTicketsCardView
       : '';
     $cotEstadoParaRespuesta = $cotRespuestaEstadoRaw !== '' ? $cotRespuestaEstadoRaw : $cotEstadoRaw;
     $cotizacionPendienteRespuesta = $idCotz !== '' && in_array(strtolower($cotEstadoParaRespuesta), ['', 'esperando respuesta'], true);
+    $cotFechaEnvioTs = (int) call_user_func($this->parseTs, $row['_scm_cot_fecha_envio'] ?? $row['cot_fecha_envio'] ?? $row['fecha_envio_cotizacion_mantenimiento'] ?? $row['fecha_envio'] ?? '');
+    $cotSentFlag = strtolower(trim((string) ($row['_scm_cot_se_envio'] ?? $row['fue_enviada_cotizacion_mantenimiento'] ?? $row['fue_enviada'] ?? $row['se_envio'] ?? '')));
+    $cotEnviada = $cotFechaEnvioTs > 0 || in_array($cotSentFlag, ['si', 'sí', '1', 'true', 'enviada', 'enviado', 'fue enviada'], true);
+    $cotDiasCalendario = 0;
+    if ($cotFechaEnvioTs > 0) {
+      $sentDay = strtotime(date('Y-m-d', $cotFechaEnvioTs)) ?: $cotFechaEnvioTs;
+      $todayDay = strtotime(date('Y-m-d')) ?: time();
+      $cotDiasCalendario = max(0, (int) floor(($todayDay - $sentDay) / 86400));
+    }
+    $cotSeguimientoReparacionesDisponible = $cotizacionPendienteRespuesta && $cotEnviada && $cotFechaEnvioTs > 0 && $cotDiasCalendario > 10;
     $isPreventivaTicket = $effectiveTabKey === 'preventiva' || $idPrev !== '' || stripos($temaRaw . ' ' . $asuntoRaw . ' ' . $descripcionRaw, 'preventiva') !== false;
 
     $historialItems = is_array($row['_scm_historial_items'] ?? null) ? $row['_scm_historial_items'] : [];
@@ -414,6 +424,9 @@ final class GenericTicketsCardView
     $dataAttrs .= ' data-cotizacion-order-url="' . esc_attr($cotzOrderUrl) . '"';
     $dataAttrs .= ' data-cotizacion-acta-url="' . esc_attr($cotzActaUrl) . '"';
     $dataAttrs .= ' data-cot-estado="' . esc_attr($cotEstadoRaw) . '"';
+    $dataAttrs .= ' data-cot-fecha-envio="' . esc_attr((string) $cotFechaEnvioTs) . '"';
+    $dataAttrs .= ' data-cot-dias-calendario="' . esc_attr((string) $cotDiasCalendario) . '"';
+    $dataAttrs .= ' data-cot-seguimiento-reparaciones-disponible="' . esc_attr($cotSeguimientoReparacionesDisponible ? '1' : '0') . '"';
     $dataAttrs .= ' data-id-revision-correctiva="' . esc_attr($corrFirstId) . '"';
     $dataAttrs .= ' data-id-revision-preventiva="' . esc_attr($prevFirstId) . '"';
     $dataAttrs .= ' data-prev-encontro-danos="' . esc_attr((string) ($row['_scm_prev_encontro_danos'] ?? $row['se_encontraron_danos'] ?? '')) . '"';

@@ -13,6 +13,8 @@ $adminCss = (string) file_get_contents($root . '/public/assets/css/admin/04-dash
 $publicOrder = (string) file_get_contents($root . '/public/orden-publica.php');
 $publicOrderCss = (string) file_get_contents($root . '/public/assets/css/public-order-response.css');
 $workflow = (string) file_get_contents($root . '/src/Modules/ServiciosInmobiliarios/Concerns/WorkflowCommandsConcern.php');
+$ticketPdf = (string) file_get_contents($root . '/src/Modules/Pending/TicketPdfGenerator.php');
+$notificationDelivery = (string) file_get_contents($root . '/src/Modules/ServiciosInmobiliarios/Concerns/NotificationDeliveryConcern.php');
 $summaryPos = strpos($handler, "\$pdf->heading('Resumen económico');");
 $ordersPos = strpos($handler, "\$pdf->heading('Órdenes de mantenimiento');");
 
@@ -81,6 +83,14 @@ $checks = [
   'standalone quote response carries exact quote id' => str_contains($runtimeJs, 'fd.append(') && str_contains($runtimeJs, '"id_cotizacion"') && str_contains($runtimeJs, 'responseBtn.getAttribute("data-cotizacion-id")'),
   'backend validates targeted quote belongs to ticket' => str_contains($workflow, '$targetCotizacionId > 0') && str_contains($workflow, 'La cotizacion seleccionada no pertenece a este ticket.'),
   'backend rejects state changes for decided quotes' => str_contains($workflow, 'Solo se puede cambiar una cotizacion sin estado o en Esperando respuesta.') && str_contains($handler, 'Solo se puede marcar como aprobada una cotizacion sin estado o en Esperando respuesta.') && str_contains($handler, 'Solo se puede eliminar/desaprobar una cotizacion sin estado o en Esperando respuesta.'),
+  'app defines repair followup notice action' => str_contains($app, 'AJAX_REPAIR_FOLLOWUP_NOTICE') && str_contains($app, 'scm_seguimiento_reparaciones_cotizacion'),
+  'router maps repair followup notice action' => str_contains($router, 'AJAX_REPAIR_FOLLOWUP_NOTICE') && str_contains($router, 'ajax_handler_repair_followup_notice'),
+  'runtime exposes repair followup notice action' => str_contains($dashboard, "'repair_followup_notice' => self::AJAX_REPAIR_FOLLOWUP_NOTICE"),
+  'case and quote cards expose repair followup only after 10 calendar days' => str_contains($adminJs, 'caseCanGenerateRepairFollowup') && str_contains($dashboard, '$diasCalendarioSinRespuesta > 10') && str_contains($dashboard, 'data-scm-repair-followup-notice'),
+  'backend validates exact quote and 10 calendar days before generating repair followup' => str_contains($workflow, 'generateRepairFollowupNotice') && str_contains($workflow, 'cotizacionBelongsToTicket') && str_contains($workflow, 'elapsedCalendarDays') && str_contains($workflow, '$elapsedDays <= 10'),
+  'repair followup pdf uses SuCasa letterhead and corporate name' => str_contains($ticketPdf, 'generateRepairFollowupNotice') && str_contains($ticketPdf, "backgroundImage(\$this->letterheadPath())") && str_contains($ticketPdf, 'Seguimiento de reparaciones') && str_contains($ticketPdf, 'SKC SuCasa Inmobiliaria'),
+  'repair followup stores ticket document and history' => str_contains($workflow, 'generateRepairFollowupNotice') && str_contains($workflow, 'insertHistorial(') && str_contains($workflow, 'uniqueTicketDocuments($ticketDocs)'),
+  'repair followup enqueues shared email and whatsapp notifications' => str_contains($notificationDelivery, 'notifyRepairFollowupNotice') && str_contains($notificationDelivery, "'source_module' => 'seguimiento_reparaciones_cotizacion'") && str_contains($notificationDelivery, 'scm_seguimiento_reparaciones_v1') && str_contains($notificationDelivery, 'SmsQueue'),
 ];
 
 $failed = [];

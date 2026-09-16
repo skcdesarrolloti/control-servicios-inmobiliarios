@@ -763,6 +763,29 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk($result);
   }
 
+  public function ajax_handler_repair_followup_notice(): void
+  {
+    $this->verifyCsrf();
+
+    $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
+    $cotizacionId = isset($_POST['id_cotizacion']) ? (int) $_POST['id_cotizacion'] : 0;
+    $observacion = trim(wp_kses_post(stripslashes((string) ($_POST['observacion'] ?? ''))));
+
+    if ($ticketPk <= 0) {
+      $this->jsonFail('Ticket invalido.');
+    }
+    if ($cotizacionId <= 0) {
+      $this->jsonFail('Cotizacion invalida.');
+    }
+
+    $service = $this->get_seguimiento_service();
+    $result = $service->generateRepairFollowupNotice($ticketPk, $cotizacionId, $observacion);
+    if (($result['ok'] ?? '0') !== '1') {
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo generar el seguimiento de reparaciones.'));
+    }
+    $this->jsonOk($result);
+  }
+
   public function ajax_handler_preventivas_pendientes()
   {
     $this->verifyCsrf();

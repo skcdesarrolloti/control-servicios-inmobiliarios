@@ -195,6 +195,123 @@ trait NotificationDeliveryConcern
     return ['email' => $emailSent, 'whatsapp' => $whatsappSent];
   }
 
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $cotizacion @param array<string,string> $notice @return array{email:int,whatsapp:int} */
+  private function notifyRepairFollowupNotice(array $ticket, array $cotizacion, string $logicalTicket, array $notice, int $attempt, int $elapsedDays, string $userName): array
+  {
+    $emailSent = 0;
+    $whatsappSent = 0;
+    $quoteId = $this->firstNonEmpty([$cotizacion['_ID'] ?? '', $cotizacion['id_cotizacion_mantenimiento'] ?? '', $cotizacion['id_cotizacion'] ?? '']);
+    $recipientName = $this->firstNonEmpty([
+      $cotizacion['destinatario'] ?? '',
+      $ticket['propietario'] ?? '',
+      $ticket['arrendatario'] ?? '',
+      $ticket['solicitante'] ?? '',
+      'cliente',
+    ]);
+    $recipientEmail = $this->firstNonEmpty([
+      $cotizacion['email_destinatario'] ?? '',
+      $cotizacion['correo_destinatario'] ?? '',
+      $ticket['correo_propietario'] ?? '',
+      $ticket['correo_arrendatario'] ?? '',
+      $ticket['correo_solicitante'] ?? '',
+    ]);
+    $recipientPhone = $this->firstNonEmpty([
+      $cotizacion['celular_destinatario'] ?? '',
+      $cotizacion['telefono_destinatario'] ?? '',
+      $ticket['celular_propietario'] ?? '',
+      $ticket['celular_arrendatario'] ?? '',
+      $ticket['celular_solicitante'] ?? '',
+      $ticket['telefono_propietario'] ?? '',
+      $ticket['telefono_arrendatario'] ?? '',
+    ]);
+    $noticeUrl = trim((string) ($notice['url'] ?? ''));
+    $quoteUrl = $quoteId !== '' ? 'https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero=' . rawurlencode($quoteId) : '';
+    $subject = 'Seguimiento de reparaciones - cotizacion #' . ($quoteId !== '' ? $quoteId : '-') . ' del ticket #' . $logicalTicket;
+
+    $content = '<p style="font-weight:500;margin:10px 0;">Apreciado(a) ' . EmailTemplate::e($recipientName) . ',</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Se ha generado la comunicacion de seguimiento de reparaciones para dejar constancia de que la cotizacion de mantenimiento #' . EmailTemplate::e($quoteId !== '' ? $quoteId : '-') . ' continua sin respuesta.</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Han transcurrido ' . EmailTemplate::e((string) $elapsedDays) . ' dias calendario desde el envio de la cotizacion. La comunicacion queda anexada al historial del ticket #' . EmailTemplate::e($logicalTicket) . '.</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Puedes consultarla desde el siguiente boton. No adjuntamos el archivo para evitar bloqueos o marcaciones de spam.</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Cordialmente,<br><b>' . EmailTemplate::e($userName) . '</b><br>SKC SuCasa Inmobiliaria</p>';
+
+    if ($this->queue instanceof EmailQueue && $recipientEmail !== '' && filter_var($recipientEmail, FILTER_VALIDATE_EMAIL)) {
+      $buttons = [['url' => $noticeUrl, 'label' => 'Ver seguimiento']];
+      if ($quoteUrl !== '') {
+        $buttons[] = ['url' => $quoteUrl, 'label' => 'Ver cotizacion'];
+      }
+      $html = EmailTemplate::render('Seguimiento de reparaciones', $content, [
+        'buttons' => $buttons,
+      ]);
+      $emailSent = $this->sendMailToUnique($recipientEmail, $subject, $html, [
+        'source_module' => 'seguimiento_reparaciones_cotizacion',
+        'provider' => 'email_smtp',
+        'destination_name' => $recipientName,
+        'dedupe_key' => 'seguimiento_reparaciones_cotizacion:' . $logicalTicket . ':' . $quoteId . ':' . $attempt,
+        'meta' => [
+          'id_ticket' => $logicalTicket,
+          'id_cotizacion' => $quoteId,
+          'attempt' => $attempt,
+          'notice_url' => $noticeUrl,
+        ],
+      ]);
+    }
+
+    if ($recipientPhone !== '' && $noticeUrl !== '') {
+      try {
+        $buttonSuffix = $this->whatsappUrlButtonSuffix($noticeUrl);
+        $message = "Buen dia, {$recipientName}.\n\n";
+        $message .= "Generamos la comunicacion de seguimiento de reparaciones No. {$attempt} porque la cotizacion #{$quoteId} del ticket #{$logicalTicket} sigue sin respuesta despues de {$elapsedDays} dias.\n\n";
+        $message .= "Puedes consultar el documento en el boton.\n\n";
+        $message .= "Atentamente,\n{$userName}\nSKC SuCasa Inmobiliaria";
+
+        $smsQueue = new \SCM\Support\SmsQueue($this->db);
+        $ok = $smsQueue->enqueue($recipientPhone, $recipientName, $message, [
+          'source_module' => 'seguimiento_reparaciones_cotizacion',
+          'campaign_tag' => 'seguimiento_reparaciones_cotizacion',
+          'categoria_mensaje' => 'informacion',
+          'id_ticket' => $logicalTicket,
+          'id_cotizacion' => $quoteId,
+          'attempt' => $attempt,
+          'notice_url' => $noticeUrl,
+          'dedupe_key' => 'seguimiento_reparaciones_cotizacion:' . $logicalTicket . ':' . $quoteId . ':' . $attempt,
+          'template_name' => 'scm_seguimiento_reparaciones_v1',
+          'template_language' => 'es_CO',
+          'template_components' => [
+            [
+              'type' => 'body',
+              'parameters' => [
+                ['type' => 'text', 'text' => $recipientName],
+                ['type' => 'text', 'text' => (string) $attempt],
+                ['type' => 'text', 'text' => $quoteId !== '' ? $quoteId : '-'],
+                ['type' => 'text', 'text' => $logicalTicket],
+                ['type' => 'text', 'text' => (string) $elapsedDays],
+                ['type' => 'text', 'text' => $userName],
+              ],
+            ],
+            [
+              'type' => 'button',
+              'sub_type' => 'url',
+              'index' => '0',
+              'parameters' => [
+                ['type' => 'text', 'text' => $buttonSuffix],
+              ],
+            ],
+          ],
+        ]);
+        if ($ok) {
+          $whatsappSent = 1;
+        } else {
+          $detail = trim($smsQueue->lastError());
+          error_log('control-servicios-inmobiliarios: no se pudo encolar WhatsApp de seguimiento reparaciones #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : ''));
+        }
+      } catch (\Throwable $exception) {
+        error_log('control-servicios-inmobiliarios: error preparando WhatsApp de seguimiento reparaciones #' . $logicalTicket . ': ' . $exception->getMessage());
+      }
+    }
+
+    return ['email' => $emailSent, 'whatsapp' => $whatsappSent];
+  }
+
   private function whatsappUrlButtonSuffix(string $url): string
   {
     $parts = parse_url($url);
@@ -373,7 +490,7 @@ trait NotificationDeliveryConcern
     // Modo cola: encolar para procesamiento asíncrono
     if ($this->queue instanceof EmailQueue) {
       $allEmails = array_merge($to, isset($options['cc']) && is_array($options['cc']) ? $options['cc'] : []);
-      $this->queue->enqueue($allEmails, $subject, $html);
+      $this->queue->enqueue($allEmails, $subject, $html, $options);
       return count($allEmails);
     }
 

@@ -74,6 +74,16 @@ trait TableRowsConcern
       $tieneCotz = $idCotz !== '';
       $cotEstadoParaRespuesta = $cotRespuestaEstadoRaw !== '' ? $cotRespuestaEstadoRaw : $cotEstadoRaw;
       $cotizacionPendienteRespuesta = $tieneCotz && in_array(strtolower($cotEstadoParaRespuesta), ['', 'esperando respuesta'], true);
+      $cotFechaEnvioTs = $this->parser->parse($row['_scm_cot_fecha_envio'] ?? $row['cot_fecha_envio'] ?? $row['fecha_envio_cotizacion_mantenimiento'] ?? $row['fecha_envio'] ?? null);
+      $cotSentFlag = strtolower(trim((string) ($row['_scm_cot_se_envio'] ?? $row['fue_enviada_cotizacion_mantenimiento'] ?? $row['fue_enviada'] ?? $row['se_envio'] ?? '')));
+      $cotEnviada = $cotFechaEnvioTs > 0 || in_array($cotSentFlag, ['si', 'sí', '1', 'true', 'enviada', 'enviado', 'fue enviada'], true);
+      $cotDiasCalendario = 0;
+      if ($cotFechaEnvioTs > 0) {
+        $sentDay = strtotime(date('Y-m-d', $cotFechaEnvioTs)) ?: $cotFechaEnvioTs;
+        $todayDay = strtotime(date('Y-m-d')) ?: time();
+        $cotDiasCalendario = max(0, (int) floor(($todayDay - $sentDay) / 86400));
+      }
+      $cotSeguimientoReparacionesDisponible = $cotizacionPendienteRespuesta && $cotEnviada && $cotFechaEnvioTs > 0 && $cotDiasCalendario > 10;
 
       $idPrev = trim((string) ($row['id_revision_preventiva'] ?? ''));
       $tienePrev = $idPrev !== '';
@@ -264,6 +274,9 @@ trait TableRowsConcern
         . ' data-cotizacion-id="' . esc_attr($idCotzUrl) . '"'
         . ' data-cotizacion-url="' . esc_attr($cotzUrl) . '"'
         . ' data-cot-estado="' . esc_attr($cotEstadoRaw) . '"'
+        . ' data-cot-fecha-envio="' . esc_attr((string) $cotFechaEnvioTs) . '"'
+        . ' data-cot-dias-calendario="' . esc_attr((string) $cotDiasCalendario) . '"'
+        . ' data-cot-seguimiento-reparaciones-disponible="' . esc_attr($cotSeguimientoReparacionesDisponible ? '1' : '0') . '"'
         . ' data-id-revision-correctiva="' . esc_attr($idCorrUrl) . '"'
         . ' data-id-revision-preventiva="' . esc_attr($idPrevUrl) . '"'
         . ' data-prev-encontro-danos="' . esc_attr((string) ($row['_scm_prev_encontro_danos'] ?? $row['se_encontraron_danos'] ?? '')) . '"'

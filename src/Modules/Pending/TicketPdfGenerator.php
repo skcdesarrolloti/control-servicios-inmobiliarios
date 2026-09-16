@@ -57,6 +57,22 @@ final class TicketPdfGenerator
     );
   }
 
+  /**
+   * @param array<string,mixed> $ticket
+   * @param array<string,mixed> $cotizacion
+   * @return array{key:string,title:string,url:string,path:string}
+   */
+  public function generateRepairFollowupNotice(int $ticketId, array $ticket, array $cotizacion, int $elapsedDays, int $attempt = 1): array
+  {
+    $quoteId = trim((string) ($cotizacion['_ID'] ?? $cotizacion['id_cotizacion_mantenimiento'] ?? $cotizacion['id_cotizacion'] ?? ''));
+    return $this->save(
+      $this->buildRepairFollowupNotice($ticket, $cotizacion, max(0, $elapsedDays), max(1, $attempt)),
+      'seguimiento_reparaciones_cotizacion_' . $ticketId . ($quoteId !== '' ? '_' . $quoteId : '') . '_' . max(1, $attempt),
+      'Seguimiento de reparaciones cotizacion #' . ($quoteId !== '' ? $quoteId : '-') . ' #' . max(1, $attempt),
+      'seguimiento_reparaciones_cotizacion'
+    );
+  }
+
   /** @param array<string,mixed> $ticket */
   private function buildPreventiva(array $ticket, string $destinatario): SimplePdf
   {
@@ -142,6 +158,57 @@ final class TicketPdfGenerator
     $pdf->spacer(8);
     $pdf->signatureBlock('Creado por', $creator['name'], $creator['details']);
     $pdf->signatureBlock('Verificador asignado', $checker['name'], $checker['details']);
+
+    return $pdf;
+  }
+
+  /**
+   * @param array<string,mixed> $ticket
+   * @param array<string,mixed> $cotizacion
+   */
+  private function buildRepairFollowupNotice(array $ticket, array $cotizacion, int $elapsedDays, int $attempt): SimplePdf
+  {
+    $pdf = new SimplePdf();
+    $pdf->backgroundImage($this->letterheadPath());
+    $pdf->layout(58, 170, 118);
+
+    $city = $this->value($ticket, 'ciudad', 'Cartagena de Indias');
+    $recipient = $this->firstValue([
+      $cotizacion['destinatario'] ?? '',
+      $ticket['propietario'] ?? '',
+      $ticket['arrendatario'] ?? '',
+      $ticket['solicitante'] ?? '',
+      'destinatario(a)',
+    ]);
+    $quoteId = $this->firstValue([$cotizacion['_ID'] ?? '', $cotizacion['id_cotizacion_mantenimiento'] ?? '', $cotizacion['id_cotizacion'] ?? '', '-']);
+    $logicalTicket = $this->firstValue([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '-']);
+    $contract = $this->firstValue([$cotizacion['contrato'] ?? '', $ticket['contrato'] ?? '', '-']);
+    $property = $this->firstValue([$cotizacion['inmueble'] ?? '', $cotizacion['id_inmueble'] ?? '', $ticket['inmueble'] ?? '', $ticket['id_inmueble'] ?? '', '-']);
+    $address = $this->firstValue([$cotizacion['direccion'] ?? '', $ticket['direccion'] ?? '']);
+    $damageTopic = $this->firstValue([$ticket['tema_ayuda'] ?? '', $ticket['asunto'] ?? '', 'reparaciones reportadas']);
+    $sentDate = $this->dateLabel($this->firstValue([$cotizacion['fecha_envio'] ?? '', $cotizacion['fecha_envio_cotizacion_mantenimiento'] ?? '', $cotizacion['fecha_enviada'] ?? '']));
+    $creator = $this->contactParts($ticket, 'creador');
+    $checker = $this->contactParts($ticket, 'empleado');
+
+    $pdf->title('Seguimiento de reparaciones');
+    $pdf->line($city . ', ' . date('d/m/Y'), 8);
+    $pdf->spacer(5);
+    $pdf->line('Apreciado(a) ' . $recipient, 10, 'F2');
+    $pdf->line('Ticket #' . $logicalTicket . ' | Cotizacion #' . $quoteId . ' | Comunicacion No. ' . $attempt, 8, 'F2');
+    $pdf->line('Contrato: ' . $contract . ' | Inmueble SIMI: ' . $property, 8, 'F2');
+    if ($address !== '') {
+      $pdf->line('Direccion: ' . $address, 8);
+    }
+    $pdf->spacer(10);
+    $pdf->paragraph('Cordial saludo,');
+    $pdf->paragraph('Por medio de la presente, SKC SuCasa Inmobiliaria deja constancia de que las reparaciones relacionadas con "' . $damageTopic . '" se encuentran pendientes de autorizacion o respuesta a la cotizacion enviada.');
+    $pdf->paragraph('La cotizacion fue comunicada' . ($sentDate !== '' ? ' el ' . $sentDate : '') . ' mediante el ticket #' . $logicalTicket . '. A la fecha han transcurrido ' . $elapsedDays . ' dias calendario sin recibir aprobacion, desaprobacion o instruccion formal sobre la ejecucion de los trabajos.');
+    $pdf->paragraph('Le recordamos la importancia de mantener el inmueble en buen estado de conservacion y de atender oportunamente las reparaciones que correspondan, con el fin de evitar agravaciones, mayores costos, incomodidades para el ocupante o afectaciones en el uso normal del inmueble.');
+    $pdf->paragraph('En caso de requerir financiacion para llevar a feliz termino el trabajo, puede comunicarse con nuestro equipo para recibir orientacion sobre las alternativas disponibles. La presente comunicacion queda anexada al historial del caso como seguimiento de reparaciones.');
+    $pdf->spacer(8);
+    $pdf->signatureBlock('Realizado por', $creator['name'], $creator['details']);
+    $pdf->signatureBlock('Funcionario asignado', $checker['name'], $checker['details']);
+    $pdf->signatureBlock('Empresa', 'SKC SuCasa Inmobiliaria', 'NIT 900623242-4 | Cartagena de Indias - Colombia');
 
     return $pdf;
   }
@@ -249,5 +316,33 @@ final class TicketPdfGenerator
   {
     $value = trim((string) ($row[$key] ?? ''));
     return $value !== '' ? $value : $default;
+  }
+
+  /** @param array<int,mixed> $values */
+  private function firstValue(array $values): string
+  {
+    foreach ($values as $value) {
+      $text = trim((string) $value);
+      if ($text !== '') {
+        return $text;
+      }
+    }
+    return '';
+  }
+
+  private function dateLabel(string $value): string
+  {
+    $value = trim($value);
+    if ($value === '') {
+      return '';
+    }
+    if (preg_match('/^\d{10}$/', $value)) {
+      return date('d/m/Y', (int) $value);
+    }
+    if (preg_match('/^\d{13}$/', $value)) {
+      return date('d/m/Y', (int) floor(((int) $value) / 1000));
+    }
+    $ts = strtotime($value);
+    return $ts > 0 ? date('d/m/Y', $ts) : $value;
   }
 }

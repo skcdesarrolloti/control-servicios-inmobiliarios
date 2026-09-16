@@ -39,6 +39,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_COTIZACION_MANTENIMIENTO_PDF = 'scm_cotizacion_mantenimiento_pdf';
   const AJAX_ACTIVATE_TICKET = 'scm_activar_ticket';
   const AJAX_COTIZACION_RESPONSE = 'scm_responder_cotizacion';
+  const AJAX_REPAIR_FOLLOWUP_NOTICE = 'scm_seguimiento_reparaciones_cotizacion';
   const AJAX_CLOSE_TICKET = 'scm_cerrar_ticket';
   const AJAX_TICKET_COMPLETION = 'scm_ticket_acta';
   const AJAX_TICKET_COMPLETION_LIST = 'scm_ticket_actas_satisfaccion';
