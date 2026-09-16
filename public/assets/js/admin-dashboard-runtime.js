@@ -10600,14 +10600,31 @@
       "</button>";
     }
 
-    function propertyHistoryTimelineRow(item) {
+    function propertyHistoryMetaHtml(source, reference) {
+      var parts = [];
+      source = String(source || "").trim();
+      reference = String(reference || "").trim();
+      if (source) parts.push(source);
+      if (reference) {
+        reference.split(" · ").forEach(function (part) {
+          part = String(part || "").trim();
+          if (part) parts.push(part);
+        });
+      }
+      if (!parts.length) return "";
+      return '<div class="scm-property-history-meta">' + parts.map(function (part) {
+        return '<span>' + escHtml(part) + "</span>";
+      }).join("") + "</div>";
+    }
+
+    function propertyHistoryTimelineRow(item, compact) {
       item = item || {};
-      return '<article class="scm-property-history-row">' +
+      return '<article class="scm-property-history-row' + (compact ? " scm-property-history-row--compact" : "") + '">' +
         '<div class="scm-property-history-date">' + escHtml(item.date || "-") + "</div>" +
         '<div class="scm-property-history-main">' +
           '<strong>' + escHtml(item.title || "Registro") + "</strong>" +
           (item.detail ? '<span>' + escHtml(item.detail) + "</span>" : "") +
-          '<small>' + escHtml(item.source || item.reference || "") + (item.source && item.reference ? " · " : "") + escHtml(item.source && item.reference ? item.reference : "") + "</small>" +
+          propertyHistoryMetaHtml(item.source, item.reference) +
         "</div>" +
       "</article>";
     }
@@ -10775,8 +10792,12 @@
         return;
       }
       var items = Array.isArray(section.items) ? section.items : [];
+      var total = Number(section.count || items.length || 0);
       var html = '<div class="scm-property-history-source-modal">' +
-        '<div class="scm-case-calendar-event-mini-head"><span>Fuente consultada</span><strong>' + escHtml(section.label || "Detalle") + "</strong></div>" +
+        '<div class="scm-property-history-source-modal-head">' +
+          '<div><span>Fuente consultada</span><strong>' + escHtml(section.label || "Detalle") + "</strong></div>" +
+          '<em>' + formatDashboardCount(total) + ' registro' + (total === 1 ? "" : "s") + "</em>" +
+        "</div>" +
         '<div class="scm-property-history-list scm-property-history-list--modal">' +
           (items.length ? items.map(function (item) {
             return propertyHistoryTimelineRow({
@@ -10785,7 +10806,7 @@
               detail: item.detail,
               source: section.label,
               reference: item.reference,
-            });
+            }, true);
           }).join("") : propertyHistoryEmpty("Sin registros en esta fuente.")) +
         "</div></div>";
       window.Swal.fire({
