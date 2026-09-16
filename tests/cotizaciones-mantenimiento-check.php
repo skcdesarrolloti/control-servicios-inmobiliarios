@@ -15,6 +15,7 @@ $publicOrderCss = (string) file_get_contents($root . '/public/assets/css/public-
 $workflow = (string) file_get_contents($root . '/src/Modules/ServiciosInmobiliarios/Concerns/WorkflowCommandsConcern.php');
 $ticketPdf = (string) file_get_contents($root . '/src/Modules/Pending/TicketPdfGenerator.php');
 $notificationDelivery = (string) file_get_contents($root . '/src/Modules/ServiciosInmobiliarios/Concerns/NotificationDeliveryConcern.php');
+$repairFollowupTemplate = (string) file_get_contents($root . '/docs/whatsapp-seguimiento-reparaciones-template.json');
 $summaryPos = strpos($handler, "\$pdf->heading('Resumen económico');");
 $ordersPos = strpos($handler, "\$pdf->heading('Órdenes de mantenimiento');");
 
@@ -91,7 +92,8 @@ $checks = [
   'repair followup pdf uses SuCasa letterhead and corporate name' => str_contains($ticketPdf, 'generateRepairFollowupNotice') && str_contains($ticketPdf, "backgroundImage(\$this->letterheadPath())") && str_contains($ticketPdf, 'Seguimiento de reparaciones') && str_contains($ticketPdf, 'SKC SuCasa Inmobiliaria'),
   'repair followup stores ticket document and history' => str_contains($workflow, 'generateRepairFollowupNotice') && str_contains($workflow, 'insertHistorial(') && str_contains($workflow, 'uniqueTicketDocuments($ticketDocs)'),
   'repair followup enqueues shared email and whatsapp notifications' => str_contains($notificationDelivery, 'notifyRepairFollowupNotice') && str_contains($notificationDelivery, "'source_module' => 'seguimiento_reparaciones_cotizacion'") && str_contains($notificationDelivery, 'scm_seguimiento_reparaciones_v1') && str_contains($notificationDelivery, 'SmsQueue'),
-  'repair followup whatsapp button sends full signed url' => str_contains($notificationDelivery, '$buttonUrl = $noticeUrl') && str_contains($notificationDelivery, "'button_url_mode' => 'full_url'") && str_contains($notificationDelivery, "['type' => 'text', 'text' => \$buttonUrl]"),
+  'repair followup whatsapp button sends dynamic suffix expected by Meta' => str_contains($notificationDelivery, '$buttonSuffix = $this->whatsappUrlButtonSuffix($noticeUrl)') && str_contains($notificationDelivery, "'button_url_mode' => 'dynamic_suffix'") && str_contains($notificationDelivery, "['type' => 'text', 'text' => \$buttonSuffix]"),
+  'repair followup whatsapp template documents url placeholder without encoded braces' => str_contains($repairFollowupTemplate, 'https://sucasainmobiliaria.com.co/{{1}}') && !str_contains($repairFollowupTemplate, '%7B%7B1%7D%7D'),
 ];
 
 $failed = [];

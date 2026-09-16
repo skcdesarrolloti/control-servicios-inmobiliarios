@@ -1,0 +1,25 @@
+{
+  "name": "scm_seguimiento_reparaciones_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Buen día, {{1}}.\n\nGeneramos la comunicación de seguimiento de reparaciones No. {{2}} porque la cotización #{{3}} del ticket #{{4}} sigue sin respuesta después de {{5}} días.\n\nPuedes consultar el documento en el botón.\n\nAtentamente,\n{{6}}\nSKC SuCasa Inmobiliaria",
+      "example": {
+        "body_text": [["María Pérez", "1", "550", "10676", "11", "Royner Guardo"]]
+      }
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver seguimiento",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": ["control-servicios-inmobiliarios/public/file.php?n=e6c8f93437d3786000f9be8c_1789588298.pdf&s=56a7a35a9862b73e056c8dd4b3e4b794c8ee37bc4de6f7b54436269514f94220"]
+        }
+      ]
+    }
+  ]
+}

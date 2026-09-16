@@ -258,7 +258,7 @@ trait NotificationDeliveryConcern
 
     if ($recipientPhone !== '' && $noticeUrl !== '') {
       try {
-        $buttonUrl = $noticeUrl;
+        $buttonSuffix = $this->whatsappUrlButtonSuffix($noticeUrl);
         $message = "Buen dia, {$recipientName}.\n\n";
         $message .= "Generamos la comunicacion de seguimiento de reparaciones No. {$attempt} porque la cotizacion #{$quoteId} del ticket #{$logicalTicket} sigue sin respuesta despues de {$elapsedDays} dias.\n\n";
         $message .= "Puedes consultar el documento en el boton.\n\n";
@@ -274,7 +274,7 @@ trait NotificationDeliveryConcern
           'id_cotizacion' => $quoteId,
           'attempt' => $attempt,
           'notice_url' => $noticeUrl,
-          'button_url_mode' => 'full_url',
+          'button_url_mode' => 'dynamic_suffix',
           'dedupe_key' => 'seguimiento_reparaciones_cotizacion:' . $logicalTicket . ':' . $quoteId . ':' . $attempt,
           'template_name' => 'scm_seguimiento_reparaciones_v1',
           'template_language' => 'es_CO',
@@ -295,7 +295,7 @@ trait NotificationDeliveryConcern
               'sub_type' => 'url',
               'index' => '0',
               'parameters' => [
-                ['type' => 'text', 'text' => $buttonUrl],
+                ['type' => 'text', 'text' => $buttonSuffix],
               ],
             ],
           ],
