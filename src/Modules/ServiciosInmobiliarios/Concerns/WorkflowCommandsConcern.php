@@ -414,6 +414,18 @@ trait WorkflowCommandsConcern
     if (!$histSaved) {
       return ['ok' => '0', 'message' => 'No se pudo guardar el historial del seguimiento.'];
     }
+    $propertyHistorySaved = $this->insertRepairFollowupPropertyHistory(
+      $ticket,
+      $cotizacion,
+      $doc,
+      $histText,
+      $userName,
+      $employeeId,
+      $nowTs,
+      $nowMysql,
+      $ticketPk,
+      $cotizacionId
+    );
 
     $ticketDocs = $this->ticketDocumentsFromRaw($ticket['archivos'] ?? '');
     $ticketDocs[] = $doc;
@@ -440,6 +452,7 @@ trait WorkflowCommandsConcern
     return [
       'ok' => '1',
       'message' => 'Seguimiento de reparaciones #' . $attempt . ' generado y anexado.'
+        . ($propertyHistorySaved ? ' Reporte del inmueble creado.' : '')
         . ($emailSent > 0 ? ' Correos programados en cola: ' . $emailSent . '.' : ' Sin correos programados.')
         . ($whatsappSent > 0 ? ' WhatsApp programados en cola: ' . $whatsappSent . '.' : ''),
       'emails_sent' => (string) $emailSent,
@@ -447,7 +460,59 @@ trait WorkflowCommandsConcern
       'attempt' => (string) $attempt,
       'notice_url' => (string) ($notice['url'] ?? ''),
       'elapsed_days' => (string) $elapsedDays,
+      'property_history_saved' => $propertyHistorySaved ? '1' : '0',
     ];
+  }
+
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $cotizacion @param array<string,string> $doc */
+  private function insertRepairFollowupPropertyHistory(array $ticket, array $cotizacion, array $doc, string $histText, string $userName, string $employeeId, int $nowTs, string $nowMysql, int $ticketPk, int $cotizacionId): bool
+  {
+    $histTable = $this->db->table('jet_cct_historial_del_inmueble');
+    if (!$this->schema->tableExists($histTable)) {
+      return false;
+    }
+
+    $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticketPk]);
+    $propertyId = $this->firstNonEmpty([
+      $ticket['id_inmueble'] ?? '',
+      $cotizacion['id_inmueble'] ?? '',
+      $ticket['inmueble'] ?? '',
+      $cotizacion['inmueble'] ?? '',
+    ]);
+    $propertyDataId = $this->firstNonEmpty([
+      $ticket['id_inmueble_data'] ?? '',
+      $cotizacion['id_inmueble_data'] ?? '',
+      $propertyId,
+    ]);
+    if ($propertyId === '' && $propertyDataId === '') {
+      return false;
+    }
+
+    $detail = $histText !== ''
+      ? $histText
+      : 'Se genera seguimiento de reparaciones de la cotizacion #' . $cotizacionId . '.';
+    $documents = serialize([$doc]);
+    $payload = [
+      'cct_status' => 'publish',
+      'cct_author_id' => $employeeId,
+      'cct_created' => $nowMysql,
+      'cct_modified' => $nowMysql,
+      'id_ticket' => $logicalTicket,
+      'id_inmueble' => $propertyId,
+      'id_inmueble_data' => $propertyDataId,
+      'id_empleado' => $employeeId,
+      'fecha' => $nowTs,
+      'tipo_reporte' => 'Seguimiento de reparaciones',
+      'tipo_de_reporte_his' => 'Seguimiento de reparaciones',
+      'observacion' => $detail,
+      'observacion_his' => $detail,
+      'funcionario' => $userName,
+      'reporte_realizado_por_his' => $userName,
+      'id_cotizacion_mantenimiento' => (string) $cotizacionId,
+      'archivos' => $documents,
+    ];
+    $payload = $this->schema->filterTableData($histTable, $payload);
+    return !empty($payload) && $this->db->insert($histTable, $payload);
   }
 
   /** @param array<string,mixed> $ticket @param array<string,mixed> $cotizacion */
