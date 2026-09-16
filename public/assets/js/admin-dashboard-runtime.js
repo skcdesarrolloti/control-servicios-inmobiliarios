@@ -10590,6 +10590,29 @@
       return '<div class="scm-property-history-field"><small>' + escHtml(label) + '</small><strong>' + escHtml(value) + "</strong></div>";
     }
 
+    function propertyHistoryContractRow(contract) {
+      contract = contract || {};
+      var meta = [
+        contract.status ? "Estado: " + contract.status : "",
+        contract.canon ? "Canon: " + contract.canon : "",
+        contract.date ? "Inicio/registro: " + contract.date : "",
+        contract.end_date ? "Fin: " + contract.end_date : "",
+      ].filter(Boolean);
+      return '<article class="scm-property-history-contract-row">' +
+        '<div class="scm-property-history-contract-id">' +
+          '<span>' + escHtml(contract.type || "Contrato") + "</span>" +
+          '<strong>#' + escHtml(contract.number || "-") + "</strong>" +
+        "</div>" +
+        '<div class="scm-property-history-contract-main">' +
+          '<strong>' + escHtml(contract.tenant || "Sin arrendatario registrado") + "</strong>" +
+          (contract.reference ? '<p>' + escHtml(contract.reference) + "</p>" : "") +
+          (meta.length ? '<div class="scm-property-history-meta">' + meta.map(function (part) {
+            return '<span>' + escHtml(part) + "</span>";
+          }).join("") + "</div>" : "") +
+        "</div>" +
+      "</article>";
+    }
+
     function propertyHistorySourceCard(source) {
       source = source || {};
       var key = String(source.key || "").trim();
@@ -10658,6 +10681,7 @@
       var sources = Array.isArray(data && data.sources) ? data.sources : [];
       var timeline = Array.isArray(data && data.timeline) ? data.timeline : [];
       var sections = Array.isArray(data && data.sections) ? data.sections : [];
+      var contracts = Array.isArray(data && data.contracts) ? data.contracts : [];
       propertyHistoryCurrentFilters = {
         contract_number: String((data && data.contract_number) || "").trim(),
         property_code: String((data && data.property_code) || "").trim(),
@@ -10677,14 +10701,17 @@
       results.innerHTML =
         '<div class="scm-property-history-summary">' +
           propertyHistoryField("Código / inmueble", property.codigo) +
-          propertyHistoryField("Contrato", property.contrato) +
+          propertyHistoryField("ID interno", property.id_interno) +
           propertyHistoryField("Dirección", property.direccion) +
           propertyHistoryField("Barrio / ciudad", [property.barrio, property.ciudad].filter(Boolean).join(" / ")) +
           propertyHistoryField("Propietario", property.propietario) +
-          propertyHistoryField("Arrendatario", property.arrendatario) +
           propertyHistoryField("Tipo", property.tipo) +
-          propertyHistoryField("Canon", property.canon) +
+          propertyHistoryField("Matrícula inmobiliaria", property.matricula) +
+          propertyHistoryField("Referencia catastral", property.referencia_catastral) +
         "</div>" +
+        '<section class="scm-property-history-block scm-property-history-contracts-block"><div class="scm-property-history-block-head"><span class="scm-calendar-action-kicker">Contratos</span><h4>Contratos vinculados al inmueble</h4></div>' +
+          '<div class="scm-property-history-contracts">' + (contracts.length ? contracts.map(propertyHistoryContractRow).join("") : propertyHistoryEmpty("No se encontraron contratos vinculados para este inmueble.")) + "</div>" +
+        "</section>" +
         '<section class="scm-property-history-block"><div class="scm-property-history-block-head"><span class="scm-calendar-action-kicker">Fuentes</span><h4>Fuentes consultadas</h4></div>' +
           '<div class="scm-property-history-sources">' + (sources.length ? sources.map(propertyHistorySourceCard).join("") : propertyHistoryEmpty("No se encontraron fuentes disponibles.")) + "</div>" +
         "</section>" +
@@ -10814,7 +10841,7 @@
         title: "",
         html: html,
         width: 860,
-        customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal" },
+        customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal scm-property-history-source-swal" },
         confirmButtonText: "Cerrar",
         showCancelButton: false,
       });

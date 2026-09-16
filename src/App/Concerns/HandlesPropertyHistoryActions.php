@@ -119,6 +119,7 @@ trait HandlesPropertyHistoryActions
     $sources = $this->property_history_source_labels();
     $sections = [];
     $counts = [];
+    $contractHistory = [];
     foreach ($sources as $key => $source) {
       $rows = $this->property_history_rows(
         (string) $source['table'],
@@ -127,6 +128,11 @@ trait HandlesPropertyHistoryActions
         $contractTokens,
         (array) ($source['order'] ?? [])
       );
+      if (in_array((string) $key, ['contratos_arrendamiento', 'contratos_mandato'], true)) {
+        foreach ($rows as $row) {
+          $contractHistory[] = $this->property_history_contract_summary_row((string) $key, $row);
+        }
+      }
       $items = array_map(fn(array $row): array => $this->property_history_summarize_row($key, $row), $rows);
       $counts[$key] = count($items);
       $sections[] = [
@@ -152,6 +158,7 @@ trait HandlesPropertyHistoryActions
       }
     }
     usort($timeline, static fn(array $a, array $b): int => (int) ($b['date_ts'] ?? 0) <=> (int) ($a['date_ts'] ?? 0));
+    usort($contractHistory, static fn(array $a, array $b): int => (int) ($b['date_ts'] ?? 0) <=> (int) ($a['date_ts'] ?? 0));
     $totalMatches = array_sum(array_map(static fn($value): int => (int) $value, $counts));
     if ($totalMatches <= 0 && $property === [] && $contracts === []) {
       if ($contractNumber !== '' && $propertyCode !== '') {
@@ -184,6 +191,7 @@ trait HandlesPropertyHistoryActions
       'generated_at' => date('d/m/Y H:i'),
       'resolved_by' => (string) ($target['resolved_by'] ?? 'consulta'),
       'property' => $propertyInfo,
+      'contracts' => array_slice($contractHistory, 0, 120),
       'counts' => $counts,
       'sources' => $sourceRows,
       'sections' => $sections,
@@ -428,14 +436,43 @@ trait HandlesPropertyHistoryActions
     return [
       'codigo' => $codigo,
       'id_interno' => trim((string) ($property['_ID'] ?? '')),
-      'contrato' => trim((string) ($lastContract['contrato'] ?? $lastContract['id_contrato'] ?? $contractNumber)),
       'direccion' => $direccion,
       'barrio' => trim((string) ($property['barrio'] ?? $lastContract['barrio'] ?? '')),
       'ciudad' => trim((string) ($property['ciudad'] ?? $lastContract['ciudad'] ?? '')),
       'propietario' => trim((string) ($property['propietario'] ?? $lastContract['propietario'] ?? '')),
-      'arrendatario' => trim((string) ($lastContract['arrendatario'] ?? $property['arrendatario'] ?? '')),
       'tipo' => $this->property_history_join([$property['tipo_inmueble'] ?? '', $property['tipo_negocio'] ?? '', $property['destinacion'] ?? ''], ' / '),
-      'canon' => $this->format_cop_currency($property['precio_arriendo'] ?? $lastContract['valor_canon'] ?? ''),
+      'matricula' => trim((string) ($property['matricula_inmobiliaria'] ?? $property['matricula'] ?? '')),
+      'referencia_catastral' => trim((string) ($property['referencia_catastral'] ?? $property['referencia'] ?? '')),
+    ];
+  }
+
+  /** @return array<string,mixed> */
+  private function property_history_contract_summary_row(string $key, array $row): array
+  {
+    $number = $this->property_history_first($row, ['contrato', 'id_contrato', '_ID']);
+    $dateRaw = $this->property_history_first($row, ['fecha_inicio', 'fecha', 'fecha_contrato', 'cct_created', 'cct_modified']);
+    $endDate = $this->property_history_first($row, ['fecha_fin', 'fecha_finalizacion', 'fecha_terminacion', 'fecha_cierre']);
+    $tenant = $this->property_history_first($row, ['arrendatario', 'inquilino', 'cliente']);
+    $status = $this->property_history_first($row, ['estado', 'estado_contrato', 'estado_administrativo']);
+    $canonRaw = $this->property_history_first($row, ['valor_canon', 'canon', 'canon_arrendamiento', 'precio_arriendo']);
+    $type = $key === 'contratos_mandato' ? 'Administracion' : 'Arrendamiento';
+    $relation = $this->property_history_join([
+      $tenant !== '' ? 'Arrendatario: ' . $tenant : '',
+      $this->property_history_first($row, ['propietario']) !== '' ? 'Propietario: ' . $this->property_history_first($row, ['propietario']) : '',
+      $endDate !== '' ? 'Finaliza: ' . $this->property_history_date_label($endDate) : '',
+    ], ' · ');
+
+    return [
+      'type' => $type,
+      'number' => $number,
+      'title' => 'Contrato ' . strtolower($type) . ' #' . ($number !== '' ? $number : '-'),
+      'date' => $this->property_history_date_label($dateRaw),
+      'date_ts' => $this->property_history_timestamp($dateRaw),
+      'end_date' => $endDate !== '' ? $this->property_history_date_label($endDate) : '',
+      'status' => $status,
+      'tenant' => $tenant,
+      'canon' => $this->format_cop_currency($canonRaw),
+      'reference' => $relation,
     ];
   }
 
@@ -542,24 +579,45 @@ trait HandlesPropertyHistoryActions
   {
     $pdf = new \SCM\Support\SimplePdf();
     $pdf->backgroundImage(dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg');
-    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Historial del inmueble');
+    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Reporte de inmueble');
     $pdf->layout(58, 168, 118);
     $property = is_array($payload['property'] ?? null) ? $payload['property'] : [];
-    $pdf->title('Historial del inmueble');
-    $pdf->line('SKC SuCasa Inmobiliaria - NIT 900623242-4', 8, 'F2');
-    $pdf->line('Generado: ' . (string) ($payload['generated_at'] ?? date('d/m/Y H:i')) . ' | Consulta: ' . (string) ($payload['query'] ?? ''), 8, 'F2');
+    $propertyLabel = (string) ($property['codigo'] ?? ($payload['property_code'] ?? ''));
+    $pdf->actaHeader(
+      'Reporte de inmueble',
+      'Generado: ' . (string) ($payload['generated_at'] ?? date('d/m/Y H:i')) . ' | Inmueble ' . ($propertyLabel !== '' ? $propertyLabel : '-'),
+      'Informe consolidado de actividad del inmueble'
+    );
     $pdf->paragraph('Informe consolidado de actividades, reportes, gestiones, tickets, contratos, revisiones, cotizaciones y registros relacionados con el inmueble consultado.', 8);
     $pdf->heading('Identificacion del inmueble');
     $pdf->detailGrid([
       ['Codigo / inmueble', (string) ($property['codigo'] ?? '-')],
-      ['Contrato', (string) ($property['contrato'] ?? '-')],
+      ['ID interno', (string) ($property['id_interno'] ?? '-')],
       ['Direccion', (string) ($property['direccion'] ?? '-')],
       ['Barrio / ciudad', $this->property_history_join([$property['barrio'] ?? '', $property['ciudad'] ?? ''], ' / ') ?: '-'],
       ['Propietario', (string) ($property['propietario'] ?? '-')],
-      ['Arrendatario', (string) ($property['arrendatario'] ?? '-')],
       ['Tipo', (string) ($property['tipo'] ?? '-')],
-      ['Canon', (string) ($property['canon'] ?? '-')],
+      ['Matricula inmobiliaria', (string) ($property['matricula'] ?? '-')],
+      ['Referencia catastral', (string) ($property['referencia_catastral'] ?? '-')],
     ]);
+
+    $contractRows = [];
+    foreach ((array) ($payload['contracts'] ?? []) as $contract) {
+      $contractRows[] = [
+        (string) ($contract['type'] ?? ''),
+        (string) ($contract['number'] ?? ''),
+        (string) ($contract['status'] ?? ''),
+        (string) (($contract['tenant'] ?? '') ?: ($contract['reference'] ?? '')),
+        (string) ($contract['canon'] ?? ''),
+        (string) ($contract['date'] ?? '-'),
+      ];
+    }
+    $pdf->heading('Contratos vinculados al inmueble');
+    if ($contractRows !== []) {
+      $pdf->table(['Tipo', 'Contrato', 'Estado', 'Arrendatario / relacion', 'Canon', 'Fecha'], $contractRows, [0.16, 0.14, 0.16, 0.28, 0.13, 0.13], 7);
+    } else {
+      $pdf->paragraph('No se encontraron contratos vinculados para este inmueble en las fuentes consultadas.', 8);
+    }
 
     $sourceRows = [];
     foreach ((array) ($payload['sources'] ?? []) as $source) {
