@@ -14349,7 +14349,6 @@
             '<div class="scm-cotizacion-response-form"><p class="scm-cotizacion-dialog-intro">Se generar&aacute; la carta con membrete, se anexar&aacute; al ticket y se enviar&aacute; por correo y WhatsApp al destinatario de la cotizaci&oacute;n.</p><div class="scm-cotizacion-response-grid">' +
             '<div class="scm-cotizacion-dialog-field"><span>Cotizaci&oacute;n</span><strong>#' + escHtml(repairCotizacionId) + '</strong></div>' +
             '<div class="scm-cotizacion-dialog-field"><span>D&iacute;as sin respuesta</span><strong>' + escHtml(repairDays || "-") + '</strong></div>' +
-            '<label class="scm-cotizacion-dialog-field is-wide"><span>Observaci&oacute;n para el historial</span><textarea id="swal-repair-followup-observacion" rows="5" placeholder="Opcional. Si lo dejas vac&iacute;o, se registra el seguimiento autom&aacute;tico."></textarea></label>' +
             "</div></div>",
           width: "min(700px, 94vw)",
           showCloseButton: true,
@@ -14367,12 +14366,6 @@
             cancelButton: "scm-cotizacion-dialog-cancel",
             closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
           },
-          preConfirm: function () {
-            var observacion = document.getElementById("swal-repair-followup-observacion");
-            return {
-              observacion: observacion ? observacion.value : "",
-            };
-          },
         }).then(function (res) {
           if (!res.isConfirmed) {
             if (repairReturnContext && typeof repairReturnContext.reopen === "function") {
@@ -14383,7 +14376,6 @@
           var fd = new FormData();
           fd.append("ticket_pk", repairTicketPk);
           fd.append("id_cotizacion", repairCotizacionId);
-          fd.append("observacion", (res.value && res.value.observacion) || "");
           return submitCotizacionAction(
             fd,
             actionRepairFollowupNotice,

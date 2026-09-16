@@ -2740,7 +2740,6 @@
         '</b>, se anexar&aacute; al ticket y se enviar&aacute; por correo y WhatsApp al destinatario de la cotizaci&oacute;n. D&iacute;as calendario sin respuesta: <b>' +
         escHtml(elapsedDays || "-") +
         '</b>.</span></div></section>' +
-        '<label class="scm-seg-field"><span>Observaci&oacute;n para el historial</span><textarea name="observacion" rows="5" placeholder="Opcional. Si lo dejas vac&iacute;o, el sistema registrar&aacute; el seguimiento autom&aacute;tico."></textarea></label>' +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Generar, guardar y enviar</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
