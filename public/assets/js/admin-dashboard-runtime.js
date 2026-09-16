@@ -10703,7 +10703,9 @@
       }
       var status = panel.querySelector("[data-scm-property-history-status]");
       var pdfButton = panel.querySelector("[data-scm-property-history-pdf]");
+      var results = panel.querySelector("[data-scm-property-history-results]");
       if (pdfButton) pdfButton.disabled = true;
+      if (results) results.innerHTML = "";
       if (status) {
         status.classList.remove("is-error");
         status.textContent = "Consultando historial del inmueble...";
@@ -10722,6 +10724,7 @@
             status.classList.add("is-error");
             status.textContent = error && error.message ? error.message : "No se pudo consultar el historial.";
           }
+          if (results) results.innerHTML = propertyHistoryEmpty(error && error.message ? error.message : "No se encontraron registros para la consulta.");
           showToast("error", error && error.message ? error.message : "No se pudo consultar el historial.");
         });
     }

@@ -90,6 +90,17 @@ trait HandlesPropertyHistoryActions
     $target = $this->property_history_resolve_target($contractNumber, $propertyCode);
     $property = is_array($target['property'] ?? null) ? $target['property'] : [];
     $contracts = is_array($target['contracts'] ?? null) ? $target['contracts'] : [];
+    $targetContractTokens = array_values(array_filter(array_map('strval', (array) ($target['contract_tokens'] ?? [])), static fn(string $value): bool => trim($value) !== ''));
+    if ($contractNumber !== '' && $targetContractTokens === []) {
+      $this->jsonFail('No se encontro el contrato ' . $contractNumber . '. Revisa el numero e intenta nuevamente.');
+    }
+    if ($contractNumber !== '' && $propertyCode !== '' && $property !== []) {
+      $resolvedPropertyTokens = $this->property_history_tokens_from_row($property);
+      if ($resolvedPropertyTokens !== [] && !in_array($propertyCode, $resolvedPropertyTokens, true)) {
+        $resolvedCode = trim((string) ($property['codigo'] ?? $property['_ID'] ?? $property['id_inmueble'] ?? ''));
+        $this->jsonFail('El contrato ' . $contractNumber . ' corresponde al codigo/inmueble ' . ($resolvedCode !== '' ? $resolvedCode : 'registrado') . ', no al codigo ' . $propertyCode . '. Revisa los filtros.');
+      }
+    }
     $tokens = array_values(array_unique(array_filter(array_map('strval', array_merge(
       [$propertyCode],
       (array) ($target['property_tokens'] ?? []),
@@ -101,7 +112,7 @@ trait HandlesPropertyHistoryActions
       ]
     )), static fn(string $value): bool => trim($value) !== '')));
     $contractTokens = array_values(array_unique(array_filter(array_map('strval', array_merge(
-      (array) ($target['contract_tokens'] ?? []),
+      $targetContractTokens,
       [$contractNumber]
     )), static fn(string $value): bool => trim($value) !== '')));
 
@@ -141,6 +152,16 @@ trait HandlesPropertyHistoryActions
       }
     }
     usort($timeline, static fn(array $a, array $b): int => (int) ($b['date_ts'] ?? 0) <=> (int) ($a['date_ts'] ?? 0));
+    $totalMatches = array_sum(array_map(static fn($value): int => (int) $value, $counts));
+    if ($totalMatches <= 0 && $property === [] && $contracts === []) {
+      if ($contractNumber !== '' && $propertyCode !== '') {
+        $this->jsonFail('No se encontro informacion para el contrato ' . $contractNumber . ' ni para el codigo web/inmueble ' . $propertyCode . '. Revisa los filtros.');
+      }
+      if ($contractNumber !== '') {
+        $this->jsonFail('No se encontro el contrato ' . $contractNumber . '. Revisa el numero e intenta nuevamente.');
+      }
+      $this->jsonFail('No se encontro el codigo web/inmueble ' . $propertyCode . '. Revisa el codigo e intenta nuevamente.');
+    }
 
     $propertyInfo = $this->property_history_property_info($propertyCode !== '' ? $propertyCode : $contractNumber, $property, $contracts, $contractNumber);
     $sourceRows = [];
@@ -207,7 +228,7 @@ trait HandlesPropertyHistoryActions
         }
         $where = [];
         $args = [];
-        foreach (['contrato', 'id_contrato', '_ID'] as $column) {
+        foreach (['contrato', 'id_contrato'] as $column) {
           if (!$this->column_exists($table, $column)) {
             continue;
           }
@@ -389,7 +410,7 @@ trait HandlesPropertyHistoryActions
   private function property_history_contract_tokens_from_row(array $row): array
   {
     $tokens = [];
-    foreach (['_ID', 'contrato', 'id_contrato', 'contrato_arrendamiento'] as $field) {
+    foreach (['contrato', 'id_contrato', 'contrato_arrendamiento'] as $field) {
       $value = trim((string) ($row[$field] ?? ''));
       if ($value !== '') {
         $tokens[] = $value;
