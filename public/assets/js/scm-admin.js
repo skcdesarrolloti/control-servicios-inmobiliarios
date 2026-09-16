@@ -5304,9 +5304,11 @@
         }
         var data = json.data || {};
         var text = data.message || "Seguimiento de reparaciones generado.";
+        var ticketPk = String(fd.get("ticket_pk") || "").trim();
         if (msg) msg.textContent = text;
         scmNotify("success", text, "Seguimiento de reparaciones");
-        if (root) root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+        closeCaseSubmodal(form.closest(".scm-case-modal"));
+        dispatchCaseActionSaved(root, ticketPk, form);
       })
       .catch(function (error) {
         var text = error.message || "No se pudo generar el seguimiento de reparaciones.";
