@@ -877,8 +877,21 @@ trait HandlesTicketWorkflowActions
       }
     }
     if ($case === [] && in_array($type, ['ticket_preventiva_sin_cita', 'preventiva_cita_sin_realizar', 'preventiva_pendiente'], true) && $this->canAccessDashboardTab('preventivas_pendientes')) {
-      $ticketRef = trim((string) ($_POST['ticket_pk'] ?? $_POST['id_ticket'] ?? $_POST['ticket'] ?? ''));
-      $ticket = $this->adminDueTicketByReference($ticketRef);
+      $ticket = [];
+      $ticketRefs = [
+        trim((string) ($_POST['ticket_pk'] ?? '')),
+        trim((string) ($_POST['id_ticket'] ?? '')),
+        trim((string) ($_POST['ticket'] ?? '')),
+      ];
+      $ticketRefs = array_values(array_unique(array_filter($ticketRefs, static function ($ref): bool {
+        return $ref !== '';
+      })));
+      foreach ($ticketRefs as $ticketRef) {
+        $ticket = $this->adminDueTicketByReference($ticketRef);
+        if (!empty($ticket)) {
+          break;
+        }
+      }
       if (!empty($ticket)) {
         $appointment = $type === 'preventiva_cita_sin_realizar'
           ? $this->adminDuePreventivaPendingAppointmentByTicket((int) ($ticket['_ID'] ?? 0), (string) ($ticket['id_ticket'] ?? ''))

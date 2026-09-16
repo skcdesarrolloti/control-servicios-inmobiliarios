@@ -598,6 +598,7 @@
         cotizacion_id: button.getAttribute("data-cotizacion-id") || "",
         id_revision_preventiva: button.getAttribute("data-id-revision-preventiva") || "",
         ticket_pk: button.getAttribute("data-ticket-pk") || "",
+        ticket: button.getAttribute("data-ticket") || "",
       }).then(function (data) {
         dashboardApplyDueCaseData(button, data.case || {});
         button.setAttribute("data-scm-due-case-loaded", "1");
@@ -1717,13 +1718,13 @@
           cotizacion_id: button.getAttribute("data-cotizacion-id") || "",
           id_revision_preventiva: button.getAttribute("data-id-revision-preventiva") || "",
           ticket_pk: button.getAttribute("data-ticket-pk") || "",
+          ticket: button.getAttribute("data-ticket") || "",
         }).then(function (data) {
           applyDueCaseData(button, data.case || {});
           button.setAttribute("data-scm-due-case-loaded", "1");
           window.scmOpenCase(button);
         }).catch(function (err) {
           showToast("error", err.message || "No se pudo cargar el caso completo.");
-          window.scmOpenCase(button);
         }).finally(function () {
           button.disabled = false;
           button.textContent = oldText || "Ver caso";
