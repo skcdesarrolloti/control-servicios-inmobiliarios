@@ -16,6 +16,7 @@ $workflow = (string) file_get_contents($root . '/src/Modules/ServiciosInmobiliar
 $ticketPdf = (string) file_get_contents($root . '/src/Modules/Pending/TicketPdfGenerator.php');
 $notificationDelivery = (string) file_get_contents($root . '/src/Modules/ServiciosInmobiliarios/Concerns/NotificationDeliveryConcern.php');
 $repairFollowupTemplate = (string) file_get_contents($root . '/docs/whatsapp-seguimiento-reparaciones-template.json');
+$storedFiles = (string) file_get_contents($root . '/src/Support/StoredFileService.php');
 $summaryPos = strpos($handler, "\$pdf->heading('Resumen económico');");
 $ordersPos = strpos($handler, "\$pdf->heading('Órdenes de mantenimiento');");
 
@@ -57,6 +58,11 @@ $checks = [
   'native quote popup renders repeaters and totals without iframe' => str_contains($runtimeJs, 'openMaintenanceQuoteForm') && str_contains($runtimeJs, 'renderCotizacionRepeaterRows') && str_contains($runtimeJs, 'syncMaintenanceQuoteTotals') && str_contains($runtimeJs, 'items_mano_json'),
   'native quote popup uses styled responsive form classes' => str_contains($runtimeJs, 'scm-maint-quote-form') && str_contains($runtimeJs, 'scm-maint-quote-section') && str_contains($adminCss, '.scm-maint-quote-form') && str_contains($adminCss, '.scm-maint-quote-row'),
   'native quote popup syncs recipient from executor selection' => str_contains($runtimeJs, 'syncMaintenanceQuoteRecipient') && str_contains($runtimeJs, 'recipient_options') && str_contains($handler, 'maintenance_quote_recipient_options') && str_contains($handler, 'jet_cct_contratos_arrendamiento'),
+  'native quote popup warns before replacing active quotes' => str_contains($runtimeJs, 'maintenanceQuoteWarningHtml') && str_contains($runtimeJs, 'will_disapprove_previous') && str_contains($runtimeJs, 'quedará marcada como Desaprobada') && str_contains($handler, 'maintenance_quote_existing_quotes_for_context'),
+  'backend disapproves previous quotes on new quote creation' => str_contains($handler, 'maintenance_quote_disapprove_previous_quotes') && str_contains($handler, "'estado' => 'Desaprobada'") && str_contains($handler, 'Reemplazada por cotización #'),
+  'native quote materials use mini spreadsheet and generated support image' => str_contains($runtimeJs, 'descripcion_materiales') && str_contains($runtimeJs, 'valor_unitario_materiales') && str_contains($runtimeJs, 'buildMaterialsQuoteImageDataUrl') && str_contains($runtimeJs, 'COTIZACIÓN MATERIAL') && str_contains($handler, 'maintenance_quote_store_generated_materials_image') && str_contains($storedFiles, 'storeImageDataUri'),
+  'native quote popup calculates perturbation without legacy shortcode' => str_contains($runtimeJs, 'maintenanceQuotePerturbationHtml') && str_contains($runtimeJs, 'syncMaintenanceQuotePerturbation') && str_contains($runtimeJs, 'dias_afectacion_calculados') && str_contains($handler, 'maintenance_quote_perturbation_context'),
+  'quote timestamps prefer WordPress local time' => str_contains($handler, 'maintenance_quote_now_pair') && str_contains($handler, "current_time('mysql')"),
   'native quote repeater add buttons use styled controls' => str_contains($runtimeJs, 'scm-maint-quote-add') && str_contains($adminCss, '.scm-maint-quote-add'),
   'backend saves quote modes and revision quote flag' => str_contains($handler, 'maintenance_quote_mode') && str_contains($handler, "'categoria_cotizacion' => \$category") && str_contains($handler, 'maintenance_quote_update_revision_flag') && str_contains($handler, "'tiene_cotizacion' => 'Si'"),
   'backend creates administrative report on first maintenance quote' => str_contains($handler, 'maintenance_quote_ensure_admin_report') && str_contains($handler, "jet_cct_reportes_administrativos") && str_contains($handler, "'id_cotizacion_mantenimiento' => (string) \$quoteId"),

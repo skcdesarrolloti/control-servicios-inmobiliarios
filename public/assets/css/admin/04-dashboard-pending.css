@@ -6119,6 +6119,17 @@
   gap: 14px;
 }
 
+.scm-maint-quote-warning {
+  margin: 0 0 14px;
+  padding: 13px 15px;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  background: #fff7ed;
+  color: #7c2d12;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .scm-maint-quote-rows {
   display: grid;
   gap: 12px;
@@ -6133,6 +6144,70 @@
   border: 1px dashed #cbd5e1;
   border-radius: 14px;
   background: #f8fafc;
+}
+
+[data-quote-repeater="materiales"] .scm-maint-quote-row {
+  grid-template-columns: 72px minmax(220px, 1.5fr) minmax(120px, 0.75fr) minmax(105px, 0.7fr) minmax(130px, 0.8fr) minmax(130px, 0.8fr) auto;
+}
+
+.scm-maint-quote-perturb {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.scm-maint-quote-perturb-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.scm-maint-quote-perturb-head strong {
+  display: block;
+  color: #0b1f3a;
+  font-size: 15px;
+}
+
+.scm-maint-quote-perturb-head span {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.scm-maint-quote-perturb-result {
+  min-width: 150px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #0b1f3a;
+  color: #fff;
+  text-align: right;
+}
+
+.scm-maint-quote-perturb-result b,
+.scm-maint-quote-perturb-result small {
+  display: block;
+}
+
+.scm-maint-quote-perturb-result small {
+  margin-top: 4px;
+  color: #bbf7d0;
+  font-weight: 800;
+}
+
+.scm-maint-quote-perturb-detail {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #fff;
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .scm-maint-quote-remove {

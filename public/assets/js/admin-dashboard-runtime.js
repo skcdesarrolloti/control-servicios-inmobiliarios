@@ -12732,8 +12732,12 @@
           title: "Materiales",
           add: "Agregar material",
           fields: [
-            ["text", "provedor_materiales", "Proveedor", "Nombre del proveedor"],
-            ["money", "valor_materiales", "Valor", "0"],
+            ["number", "item_materiales", "Ítem", "1"],
+            ["text", "descripcion_materiales", "Descripción", "Material o referencia"],
+            ["select", "unidad_materiales", "Unidad", ""],
+            ["number", "cantidad_materiales", "Cantidad", "1"],
+            ["money", "valor_unitario_materiales", "Vr. unitario", "0"],
+            ["money", "valor_total_materiales", "Vr. total", "0"],
           ],
         },
         equipos: {
@@ -12784,6 +12788,52 @@
       return html;
     }
 
+    function maintenanceQuoteWarningHtml(context) {
+      var quotes = context && Array.isArray(context.existing_quotes) ? context.existing_quotes : [];
+      if (!context || !context.will_disapprove_previous || !quotes.length) return "";
+      var items = quotes.map(function (q) {
+        return "#" + escHtml(q.id || "") + " (" + escHtml(q.estado || "Sin estado") + ")";
+      }).join(", ");
+      return '<div class="scm-maint-quote-warning"><strong>Atención:</strong> este caso ya tiene cotización activa. Al crear una nueva, el sistema marcará como <b>Desaprobada</b> la anterior: ' + items + ".</div>";
+    }
+
+    function maintenanceQuotePerturbationHtml(context) {
+      var d = context.defaults || {};
+      var p = context.perturbation_context || {};
+      var tipo = String(d.tipo_inmueble || p.tipo_inmueble || "").toLowerCase().indexOf("comer") > -1 ? "comercial" : "residencial";
+      function select(name, label, options) {
+        return '<label class="scm-cotizacion-dialog-field"><span>' + escHtml(label) + '</span><select data-quote-perturb-field="' + escHtml(name) + '">' + options.map(function (o) {
+          return '<option value="' + escHtml(String(o[0])) + '">' + escHtml(o[1]) + "</option>";
+        }).join("") + "</select></label>";
+      }
+      var residential =
+        select("habitabilidad", "Uso normal del inmueble", [[0, "Sin afectación relevante"], [6, "Molestia menor"], [12, "Limita parcialmente una actividad"], [18, "Impide usar zona importante"], [25, "Compromete habitabilidad"]]) +
+        select("riesgo", "Riesgo salud/seguridad", [[0, "Sin riesgo"], [5, "Riesgo bajo"], [10, "Riesgo medio"], [15, "Riesgo alto"], [20, "Riesgo crítico"]]) +
+        select("servicio", "Servicio esencial", [[0, "Sin servicio afectado"], [4, "Afectación menor"], [8, "Parcialmente afectado"], [12, "Muy limitado"], [15, "Inutilizable"]]) +
+        select("duracion", "Duración desde reporte", [[0, "Menos de 24 horas"], [3, "1 a 2 días"], [6, "3 a 5 días"], [10, "6 a 10 días"], [15, "Más de 10 días"]]) +
+        select("area", "Zona afectada", [[0, "Decorativa/secundaria"], [3, "Secundaria funcional"], [6, "Zona importante"], [8, "Varias zonas"], [10, "Afectación general"]]) +
+        select("gestion", "Gestión realizada", [[0, "Oportuna/documentada"], [3, "Falta seguimiento"], [6, "Lenta/incompleta"], [8, "Sin solución clara"], [10, "Sin respuesta"]]) +
+        select("reincidencia", "Reincidencia", [[0, "Primera vez"], [2, "Antecedente leve"], [3, "Daño repetido"], [5, "Agravado por demora"]]);
+      var commercial =
+        select("operacion", "Operación del negocio", [[0, "Sin afectación operativa"], [6, "Molestia menor"], [12, "Limita actividad comercial"], [18, "Impide proceso importante"], [25, "Compromete operación"]]) +
+        select("riesgo_comercial", "Riesgo SST/inventario", [[0, "Sin riesgo"], [5, "Riesgo bajo"], [10, "Riesgo medio"], [15, "Riesgo alto"], [20, "Riesgo crítico"]]) +
+        select("servicio_operativo", "Servicio operativo", [[0, "Ninguno afectado"], [4, "Afectación menor"], [8, "Parcial"], [12, "Muy limitado"], [15, "Inutilizable"]]) +
+        select("duracion_operativa", "Tiempo de afectación", [[0, "Menos de 24 horas"], [3, "1 a 2 días"], [6, "3 a 5 días"], [10, "6 a 10 días"], [15, "Más de 10 días"]]) +
+        select("zona_proceso", "Zona/proceso afectado", [[0, "No operativa"], [3, "Secundaria"], [6, "Importante"], [8, "Varias zonas"], [10, "General"]]) +
+        select("gestion_comercial", "Mitigación/gestión", [[0, "Oportuna con mitigación"], [3, "Falta seguimiento"], [6, "Lenta/incompleta"], [8, "Sin continuidad clara"], [10, "Sin respuesta"]]) +
+        select("reincidencia_comercial", "Reincidencia", [[0, "Primera vez"], [2, "Antecedente leve"], [3, "Daño repetido"], [5, "Agravado"]]);
+      return (
+        '<div class="scm-maint-quote-perturb" data-quote-perturbation data-quote-perturb-type="' + escHtml(tipo) + '">' +
+        '<div class="scm-maint-quote-perturb-head"><div><strong>Calculadora de perturbación</strong><span>Canon ' + escHtml(formatCotizacionOrderCurrency(p.canon_total || 0)) + ' · Área ' + escHtml(String(p.area_construida || 0)) + ' m² · Días desde ticket ' + escHtml(String(p.dias_desde_ticket || 0)) + '</span></div><div class="scm-maint-quote-perturb-result"><b data-quote-perturb-percent>0%</b><small data-quote-perturb-bonus>$0</small></div></div>' +
+        '<div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Tipo de valoración</span><select name="tipo_inmueble_perturbacion" data-quote-perturb-type-select><option value="residencial"' + (tipo === "residencial" ? " selected" : "") + '>Residencial</option><option value="comercial"' + (tipo === "comercial" ? " selected" : "") + '>Comercial</option></select></label><label class="scm-cotizacion-dialog-field" data-quote-activity-wrap' + (tipo === "comercial" ? "" : " hidden") + '><span>Actividad comercial</span><select name="actividad_comercial_perturbacion" data-quote-activity><option value="deposito_bodega">Depósito / bodega</option><option value="fabricacion">Fabricación / taller</option><option value="prestacion_servicios">Prestación de servicios</option><option value="compra_venta">Compra y venta</option><option value="oficina">Oficina</option><option value="restaurante_alimentos">Restaurante / alimentos</option><option value="salud_estetica">Salud / estética</option><option value="otro">Otra</option></select></label></div>' +
+        '<div class="scm-maint-quote-grid" data-quote-criteria="residencial"' + (tipo === "residencial" ? "" : " hidden") + '>' + residential + '</div>' +
+        '<div class="scm-maint-quote-grid" data-quote-criteria="comercial"' + (tipo === "comercial" ? "" : " hidden") + '>' + commercial + '</div>' +
+        '<div class="scm-maint-quote-grid">' + select("responsabilidad", "Responsabilidad probable", [[1, "Propietario / arrendador"], [0.8, "Alta con gestión activa"], [0.6, "Compartida / por confirmar"], [0.35, "Tercero/copropiedad/fuerza mayor"], [0.15, "Daño locativo o mal uso"]]) + '</div>' +
+        '<div class="scm-maint-quote-perturb-detail" data-quote-perturb-detail>Completa área afectada y duración para calcular.</div>' +
+        '</div>'
+      );
+    }
+
     function buildMaintenanceQuoteFormHtml(context) {
       context = context || {};
       var d = context.defaults || {};
@@ -12805,6 +12855,8 @@
         '<input type="hidden" name="indicativo_destinatario" value="' + escHtml(d.indicativo_destinarario || "57") + '">' +
         '<input type="hidden" name="mejor_oferta_existing" value="' + escHtml((media.mejor_oferta || []).join(",")) + '">' +
         '<input type="hidden" name="otras_oferta_existing" value="' + escHtml((media.otras_oferta || []).join(",")) + '">' +
+        '<input type="hidden" name="materiales_oferta_image" value="">' +
+        maintenanceQuoteWarningHtml(context) +
         '<section class="scm-maint-quote-section"><h4>Datos de la cotización</h4><div class="scm-maint-quote-grid">' +
         '<label class="scm-cotizacion-dialog-field"><span>¿Quién ejecutará y aprobará? <em>*</em></span><select name="ejecutado" required><option value="">Elige una opción</option>' + cotizacionFormOptionHtml(context.executor_options, d.ejecutado) + '</select></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Destinatario <em>*</em></span><input name="destinatario" value="' + escHtml(d.destinatario || "") + '" required></label>' +
@@ -12819,11 +12871,11 @@
         '<section class="scm-maint-quote-section"><h4>Condiciones y perturbación</h4><div class="scm-maint-quote-grid">' +
         '<label class="scm-cotizacion-dialog-field"><span>Validez de la oferta <em>*</em></span><input type="number" name="valides_oferta" min="0" value="' + escHtml(d.valides_oferta || "") + '" required><small>Días de vigencia.</small></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Duración del trabajo <em>*</em></span><input type="number" name="duracion" min="0" value="' + escHtml(d.duracion || "") + '" required><small>Días estimados.</small></label>' +
-        '<label class="scm-cotizacion-dialog-field"><span>Perturbación</span><input type="number" name="perturbacion" min="0" step="1" value="' + escHtml(d.perturbacion || "") + '"></label>' +
-        '<label class="scm-cotizacion-dialog-field"><span>Área afectada</span><input type="number" name="area_afectada" min="0" step="1" value="' + escHtml(d.area_afectada || "") + '"></label>' +
-        '<label class="scm-cotizacion-dialog-field"><span>Valor bonificación</span><input type="number" name="valor_bonificacion" min="0" step="1" value="' + escHtml(d.valor_bonificacion || "") + '"></label>' +
-        '<label class="scm-cotizacion-dialog-field"><span>Días afectación calculados</span><input type="number" name="dias_afectacion_calculados" min="0" step="1" value="' + escHtml(d.dias_afectacion_calculados || "") + '"></label>' +
-        '</div><label class="scm-cotizacion-dialog-field is-wide"><span>Justificación</span><textarea name="justificacion_perturbacion" rows="3">' + escHtml(d.justificacion_perturbacion || "") + '</textarea></label><label class="scm-cotizacion-dialog-field is-wide"><span>Resumen cálculo perturbación</span><textarea name="resumen_calculo_perturbacion" rows="3">' + escHtml(d.resumen_calculo_perturbacion || "") + '</textarea></label><label class="scm-cotizacion-dialog-field is-wide"><span>Observaciones</span><textarea name="observaciones" rows="4">' + escHtml(d.observaciones || "") + '</textarea></label></section>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Área afectada</span><input type="number" name="area_afectada" min="0" step="1" value="' + escHtml(d.area_afectada || "") + '"><small>Metros cuadrados realmente afectados.</small></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Perturbación</span><input type="number" name="perturbacion" min="0" step="1" value="' + escHtml(d.perturbacion || "") + '" readonly></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Valor bonificación</span><input type="number" name="valor_bonificacion" min="0" step="1" value="' + escHtml(d.valor_bonificacion || "") + '" readonly></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Días afectación calculados</span><input type="number" name="dias_afectacion_calculados" min="0" step="1" value="' + escHtml(d.dias_afectacion_calculados || "") + '" readonly></label>' +
+        '</div>' + maintenanceQuotePerturbationHtml(context) + '<label class="scm-cotizacion-dialog-field is-wide"><span>Justificación</span><textarea name="justificacion_perturbacion" rows="3">' + escHtml(d.justificacion_perturbacion || "") + '</textarea></label><textarea name="resumen_calculo_perturbacion" hidden>' + escHtml(d.resumen_calculo_perturbacion || "") + '</textarea><label class="scm-cotizacion-dialog-field is-wide"><span>Observaciones</span><textarea name="observaciones" rows="4">' + escHtml(d.observaciones || "") + '</textarea></label></section>' +
         '<section class="scm-maint-quote-section"><h4>Soportes</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Mejores ofertas</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Otras ofertas</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><p class="scm-maint-quote-help">Usa imágenes livianas. El sistema valida peso y tamaño antes de guardar.</p></section>' +
         '</form>'
       );
@@ -12841,6 +12893,142 @@
       return Array.prototype.map.call(form.querySelectorAll('[data-quote-row="' + type + '"]'), quoteRowToObject);
     }
 
+    function quotePerturbationLevel(percent) {
+      if (percent <= 5) return { nivel: "Mínima", texto: "Afectación muy baja. Normalmente no compromete el uso del inmueble." };
+      if (percent <= 15) return { nivel: "Leve", texto: "Existe molestia, pero el inmueble o negocio puede usarse casi normalmente." };
+      if (percent <= 30) return { nivel: "Moderada", texto: "El daño limita parcialmente el uso, confort, servicio u operación." };
+      if (percent <= 50) return { nivel: "Alta", texto: "El daño afecta una zona, servicio o proceso importante. Requiere prioridad y seguimiento." };
+      if (percent <= 75) return { nivel: "Grave", texto: "El uso u operación está seriamente comprometido. Alto riesgo de reclamación." };
+      return { nivel: "Crítica", texto: "Puede existir inhabitabilidad, cierre, interrupción operativa o riesgo crítico." };
+    }
+
+    function syncMaintenanceQuotePerturbation(form, context) {
+      if (!form) return;
+      var box = form.querySelector("[data-quote-perturbation]");
+      if (!box) return;
+      var typeSelect = form.querySelector("[data-quote-perturb-type-select]");
+      var type = typeSelect ? String(typeSelect.value || "residencial") : "residencial";
+      form.querySelectorAll("[data-quote-criteria]").forEach(function (group) {
+        group.hidden = group.getAttribute("data-quote-criteria") !== type;
+      });
+      var activityWrap = form.querySelector("[data-quote-activity-wrap]");
+      if (activityWrap) activityWrap.hidden = type !== "comercial";
+      var criteria = [];
+      var totalBase = 0;
+      var active = form.querySelector('[data-quote-criteria="' + type + '"]');
+      if (active) {
+        active.querySelectorAll("[data-quote-perturb-field]").forEach(function (select) {
+          var value = parseFloat(select.value || 0) || 0;
+          var label = select.closest("label");
+          var option = select.options[select.selectedIndex];
+          totalBase += value;
+          criteria.push((label ? label.querySelector("span").textContent : "Criterio") + ": " + (option ? option.textContent : "") + " (" + value + " pts)");
+        });
+      }
+      var factorSelect = form.querySelector('[data-quote-perturb-field="responsabilidad"]');
+      var factor = factorSelect ? (parseFloat(factorSelect.value || 1) || 1) : 1;
+      var percent = Math.max(0, Math.min(100, Math.round(totalBase * factor)));
+      var perturbInfo = quotePerturbationLevel(percent);
+      var p = context && context.perturbation_context ? context.perturbation_context : {};
+      var areaConstruida = parseCotizacionOrderMoney(p.area_construida || 0);
+      var canonTotal = parseCotizacionOrderMoney(p.canon_total || 0);
+      var area = Math.max(0, parseCotizacionOrderMoney((form.querySelector('[name="area_afectada"]') || {}).value || 0));
+      if (areaConstruida > 0 && area > areaConstruida) area = areaConstruida;
+      var duracion = Math.max(0, parseCotizacionOrderMoney((form.querySelector('[name="duracion"]') || {}).value || 0));
+      var diasTicket = Math.max(0, parseCotizacionOrderMoney(p.dias_desde_ticket || 0));
+      var dias = Math.max(0, Math.ceil((diasTicket + duracion) * 1.2));
+      var bonus = 0;
+      if (canonTotal > 0 && areaConstruida > 0 && dias > 0 && area > 0) {
+        bonus = Math.round((area / areaConstruida) * (canonTotal / 30) * dias);
+      }
+      setMaintenanceQuoteField(form, "perturbacion", percent);
+      setMaintenanceQuoteField(form, "valor_bonificacion", bonus);
+      setMaintenanceQuoteField(form, "dias_afectacion_calculados", dias);
+      var resumen = {
+        tipo_valoracion: type === "comercial" ? "Comercial" : "Residencial",
+        actividad_comercial: type === "comercial" ? ((form.querySelector("[data-quote-activity]") || {}).selectedOptions || [{ textContent: "No aplica" }])[0].textContent : "No aplica",
+        criterios: criteria,
+        responsabilidad: { texto: factorSelect && factorSelect.selectedOptions[0] ? factorSelect.selectedOptions[0].textContent : "", factor: factor },
+        perturbacion: { porcentaje: percent, nivel: perturbInfo.nivel, descripcion: perturbInfo.texto },
+        ticket: { id_ticket: p.id_ticket || "", fecha_ticket: p.fecha_ticket_texto || "", fecha_cotizacion: p.fecha_cot_texto || "", dias_desde_ticket: diasTicket, duracion_trabajo: duracion, margen_seguridad: 1.2, dias_afectacion_calculados: dias },
+        inmueble: { codigo: p.codigo || "", canon_total: canonTotal, precio_arriendo: p.precio_arriendo || 0, precio_administracion: p.precio_admin || 0, area_construida: areaConstruida, area_afectada: area },
+        formula: { dias: "(" + diasTicket + " + " + duracion + ") x 1.2", bonificacion: "(" + area + " / " + areaConstruida + ") x (" + Math.round(canonTotal) + " / 30) x " + dias },
+        bonificacion_sugerida: bonus,
+      };
+      setMaintenanceQuoteField(form, "resumen_calculo_perturbacion", JSON.stringify(resumen));
+      var percentEl = form.querySelector("[data-quote-perturb-percent]");
+      var bonusEl = form.querySelector("[data-quote-perturb-bonus]");
+      var detailEl = form.querySelector("[data-quote-perturb-detail]");
+      if (percentEl) percentEl.textContent = percent + "% · " + perturbInfo.nivel;
+      if (bonusEl) bonusEl.textContent = formatCotizacionOrderCurrency(bonus);
+      if (detailEl) detailEl.innerHTML = escHtml(perturbInfo.texto) + "<br>Área usada: <strong>" + escHtml(String(area)) + " m²</strong> · Días calculados: <strong>" + escHtml(String(dias)) + "</strong>";
+    }
+
+    function buildMaterialsQuoteImageDataUrl(form) {
+      if (!form || !document.createElement) return "";
+      var rows = collectQuoteRows(form, "materiales").filter(function (row) {
+        return String(row.descripcion_materiales || row.provedor_materiales || "").trim() || parseCotizacionOrderMoney(row.valor_total_materiales || row.valor_materiales) > 0;
+      });
+      if (!rows.length) return "";
+      var width = 1100;
+      var rowH = 34;
+      var height = 96 + (rows.length + 1) * rowH;
+      var canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      var ctx = canvas.getContext && canvas.getContext("2d");
+      if (!ctx) return "";
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = "#0b1f3a";
+      ctx.font = "700 24px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("COTIZACIÓN MATERIAL", width / 2, 36);
+      var cols = [70, 390, 145, 145, 170, 180];
+      var labels = ["ITEMS", "DESCRIPCIÓN", "UNIDAD", "CANTIDAD", "VR. UNITARIO", "VR. TOTAL"];
+      var x = 0;
+      ctx.font = "700 15px Arial";
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 1;
+      labels.forEach(function (label, idx) {
+        ctx.strokeRect(x, 54, cols[idx], rowH);
+        ctx.fillStyle = "#0b1f3a";
+        ctx.textAlign = idx === 1 ? "left" : "center";
+        ctx.fillText(label, x + (idx === 1 ? 10 : cols[idx] / 2), 76);
+        x += cols[idx];
+      });
+      var total = 0;
+      rows.forEach(function (row, rIdx) {
+        var y = 54 + rowH * (rIdx + 1);
+        var q = Math.max(1, parseCotizacionOrderMoney(row.cantidad_materiales || 1));
+        var unit = parseCotizacionOrderMoney(row.valor_unitario_materiales || 0);
+        var line = parseCotizacionOrderMoney(row.valor_total_materiales || 0) || (unit * q) || parseCotizacionOrderMoney(row.valor_materiales || 0);
+        total += line;
+        var values = [row.item_materiales || (rIdx + 1), row.descripcion_materiales || row.provedor_materiales || "", row.unidad_materiales || "", q, formatCotizacionOrderCurrency(unit), formatCotizacionOrderCurrency(line)];
+        x = 0;
+        values.forEach(function (value, idx) {
+          ctx.strokeRect(x, y, cols[idx], rowH);
+          ctx.fillStyle = "#111827";
+          ctx.font = "13px Arial";
+          ctx.textAlign = idx === 1 ? "left" : "center";
+          ctx.fillText(String(value).slice(0, idx === 1 ? 52 : 18), x + (idx === 1 ? 10 : cols[idx] / 2), y + 22);
+          x += cols[idx];
+        });
+      });
+      var totalY = 54 + rowH * (rows.length + 1);
+      ctx.fillStyle = "#fffb00";
+      ctx.fillRect(0, totalY, width, rowH);
+      ctx.strokeStyle = "#111827";
+      ctx.strokeRect(0, totalY, width, rowH);
+      ctx.fillStyle = "#0b1f3a";
+      ctx.font = "700 15px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("TOTAL", width - 300, totalY + 22);
+      ctx.textAlign = "right";
+      ctx.fillText(formatCotizacionOrderCurrency(total), width - 22, totalY + 22);
+      try { return canvas.toDataURL("image/png"); } catch (err) { return ""; }
+    }
+
     function syncMaintenanceQuoteTotals(form) {
       if (!form) return;
       var totals = { mano: 0, materiales: 0, equipos: 0, otros: 0 };
@@ -12848,7 +13036,17 @@
         totals.mano += Math.max(1, parseCotizacionOrderMoney(row.cantidad_mano || 1)) * parseCotizacionOrderMoney(row.valor_mano);
       });
       collectQuoteRows(form, "materiales").forEach(function (row) {
-        totals.materiales += parseCotizacionOrderMoney(row.valor_materiales);
+        var quantity = Math.max(1, parseCotizacionOrderMoney(row.cantidad_materiales || 1));
+        var unit = parseCotizacionOrderMoney(row.valor_unitario_materiales);
+        var line = parseCotizacionOrderMoney(row.valor_total_materiales) || (quantity * unit) || parseCotizacionOrderMoney(row.valor_materiales);
+        totals.materiales += line;
+      });
+      form.querySelectorAll('[data-quote-row="materiales"]').forEach(function (rowEl) {
+        var row = quoteRowToObject(rowEl);
+        var quantity = Math.max(1, parseCotizacionOrderMoney(row.cantidad_materiales || 1));
+        var unit = parseCotizacionOrderMoney(row.valor_unitario_materiales);
+        var totalField = rowEl.querySelector('[data-quote-field="valor_total_materiales"]');
+        if (totalField && unit > 0) totalField.value = Math.round(quantity * unit);
       });
       collectQuoteRows(form, "equipos").forEach(function (row) {
         totals.equipos += Math.max(1, parseCotizacionOrderMoney(row.cantidad_otros_equi || 1)) * parseCotizacionOrderMoney(row.valor_otros_equi);
@@ -12868,11 +13066,15 @@
       if (!form) return;
       form.addEventListener("input", function () {
         syncMaintenanceQuoteTotals(form);
+        syncMaintenanceQuotePerturbation(form, context || {});
       });
       form.addEventListener("change", function (event) {
         var target = event.target || null;
         if (target && target.name === "ejecutado") {
           syncMaintenanceQuoteRecipient(form, context || {});
+        }
+        if (target && (target.matches("[data-quote-perturb-field], [data-quote-perturb-type-select], [data-quote-activity]") || target.name === "duracion" || target.name === "area_afectada")) {
+          syncMaintenanceQuotePerturbation(form, context || {});
         }
       });
       form.addEventListener("click", function (event) {
@@ -12904,6 +13106,7 @@
         }
       });
       syncMaintenanceQuoteTotals(form);
+      syncMaintenanceQuotePerturbation(form, context || {});
     }
 
     function loadMaintenanceQuoteContext(button, mode) {
@@ -12963,14 +13166,25 @@
                 window.Swal.showValidationMessage("Formulario no disponible.");
                 return false;
               }
+              syncMaintenanceQuotePerturbation(form, context || {});
               var formData = new FormData(form);
               formData.append("items_mano_json", JSON.stringify(collectQuoteRows(form, "mano")));
               formData.append("items_materiales_json", JSON.stringify(collectQuoteRows(form, "materiales")));
               formData.append("items_otros_equi_json", JSON.stringify(collectQuoteRows(form, "equipos")));
               formData.append("items_otros_costos_json", JSON.stringify(collectQuoteRows(form, "otros")));
+              var materialImage = buildMaterialsQuoteImageDataUrl(form);
+              if (materialImage) {
+                formData.set("materiales_oferta_image", materialImage);
+              }
               if (!String(formData.get("destinatario") || "").trim()) {
                 window.Swal.showValidationMessage("Completa el destinatario.");
                 return false;
+              }
+              if (context && context.will_disapprove_previous) {
+                var accepted = window.confirm("Este caso ya tiene una cotización activa. Si guardas esta nueva cotización, la anterior quedará marcada como Desaprobada. ¿Deseas continuar?");
+                if (!accepted) {
+                  return false;
+                }
               }
               return formData;
             },

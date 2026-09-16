@@ -962,17 +962,16 @@ trait HandlesMaintenanceActions
       if ($employeeId === '') {
         $employeeId = (string) Auth::userId();
       }
-      $now = time();
-      $nowSql = date('Y-m-d H:i:s', $now);
+      [$now, $nowSql] = $this->maintenance_quote_now_pair();
 
       $itemsMano = $this->maintenance_quote_repeater_items('items_mano_json', ['descripcion_mano', 'unidad_mano', 'cantidad_mano', 'valor_mano']);
-      $itemsMateriales = $this->maintenance_quote_repeater_items('items_materiales_json', ['provedor_materiales', 'valor_materiales']);
+      $itemsMateriales = $this->maintenance_quote_repeater_items('items_materiales_json', ['item_materiales', 'descripcion_materiales', 'unidad_materiales', 'cantidad_materiales', 'valor_unitario_materiales', 'valor_materiales', 'valor_total_materiales', 'provedor_materiales']);
       $itemsEquipos = $this->maintenance_quote_repeater_items('items_otros_equi_json', ['descipcion_otros_equi', 'unidad_otros_equi', 'cantidad_otros_equi', 'valor_otros_equi']);
       $itemsOtros = $this->maintenance_quote_repeater_items('items_otros_costos_json', ['descipcion_otros_costos', 'unidad_otros_costos', 'cantidad_otros_costos', 'valor_otros_costos']);
 
       $totals = [
         'total_mano_obra' => $this->maintenance_quote_total_items($itemsMano, 'cantidad_mano', 'valor_mano'),
-        'total_materiales' => $this->maintenance_quote_total_items($itemsMateriales, '', 'valor_materiales'),
+        'total_materiales' => $this->maintenance_quote_total_materials($itemsMateriales),
         'total_maquinarias' => $this->maintenance_quote_total_items($itemsEquipos, 'cantidad_otros_equi', 'valor_otros_equi'),
         'total_otros_costos' => $this->maintenance_quote_total_items($itemsOtros, 'cantidad_otros_costos', 'valor_otros_costos'),
       ];
@@ -993,6 +992,11 @@ trait HandlesMaintenanceActions
       $newMejor = $this->maintenance_quote_store_media('mejor_oferta', 10);
       $newOtras = $this->maintenance_quote_store_media('otras_oferta', 10);
       $storedPhotos = array_merge($storedPhotos, $newMejor, $newOtras);
+      $materialesOfertaImage = $this->maintenance_quote_store_generated_materials_image('materiales_oferta_image');
+      if ($materialesOfertaImage !== null) {
+        $storedPhotos[] = $materialesOfertaImage;
+        $newMejor[] = $materialesOfertaImage;
+      }
       $mejorOferta = array_merge($mejorOferta, array_map(static fn(array $photo): string => (string) ($photo['url'] ?? ''), $newMejor));
       $otrasOferta = array_merge($otrasOferta, array_map(static fn(array $photo): string => (string) ($photo['url'] ?? ''), $newOtras));
 
@@ -1091,6 +1095,10 @@ trait HandlesMaintenanceActions
       }
 
       $this->maintenance_quote_update_revision_flag($schema, $tipoMantenimiento, $idRevision);
+      $autoRejected = 0;
+      if ($mode === 'create') {
+        $autoRejected = $this->maintenance_quote_disapprove_previous_quotes($schema, $quoteIdSaved, $quoteData, $employeeId, $nowSql);
+      }
       $reportId = 0;
       if ($mode === 'create' && stripos($tipoMantenimiento, 'correct') !== false) {
         $reportId = $this->maintenance_quote_ensure_admin_report($schema, $quoteIdSaved, $quoteData, $ticket, $revision, $actor, $employeeId, $now, $nowSql);
@@ -1101,9 +1109,10 @@ trait HandlesMaintenanceActions
       $pdo->commit();
 
       $this->jsonOk([
-        'message' => ($mode === 'edit' ? 'Cotización actualizada.' : ($mode === 'note' ? 'Nota de cotización creada.' : 'Cotización creada.')) . ($reportId > 0 ? ' Reporte administrativo #' . $reportId . ' creado.' : '') . ($queued > 0 ? ' Notificaciones en cola: ' . $queued . '.' : ''),
+        'message' => ($mode === 'edit' ? 'Cotización actualizada.' : ($mode === 'note' ? 'Nota de cotización creada.' : 'Cotización creada.')) . ($autoRejected > 0 ? ' Cotizaciones anteriores desaprobadas: ' . $autoRejected . '.' : '') . ($reportId > 0 ? ' Reporte administrativo #' . $reportId . ' creado.' : '') . ($queued > 0 ? ' Notificaciones en cola: ' . $queued . '.' : ''),
         'id_cotizacion' => (string) $quoteIdSaved,
         'id_reporte' => $reportId > 0 ? (string) $reportId : '',
+        'auto_rejected' => (string) $autoRejected,
       ]);
     } catch (\Throwable $error) {
       if ($pdo->inTransaction()) {
@@ -1123,6 +1132,21 @@ trait HandlesMaintenanceActions
       return $mode;
     }
     throw new \DomainException('Modo de cotización inválido.');
+  }
+
+  /** @return array{0:int,1:string} */
+  private function maintenance_quote_now_pair(): array
+  {
+    if (function_exists('current_time')) {
+      $timestamp = (int) current_time('timestamp');
+      $mysql = (string) current_time('mysql');
+      if ($timestamp > 0 && $mysql !== '') {
+        return [$timestamp, $mysql];
+      }
+    }
+    $timezone = new \DateTimeZone(date_default_timezone_get() ?: 'America/Bogota');
+    $now = new \DateTimeImmutable('now', $timezone);
+    return [$now->getTimestamp(), $now->format('Y-m-d H:i:s')];
   }
 
   /** @return array<string,mixed> */
@@ -1215,6 +1239,10 @@ trait HandlesMaintenanceActions
         'otras_oferta' => $this->maintenance_quote_media_list($quote['otras_oferta'] ?? ''),
       ],
     ];
+    $existingQuotes = $mode === 'create'
+      ? $this->maintenance_quote_existing_quotes_for_context($quoteTable, $ticket, $revisionId, $tipoMantenimiento)
+      : [];
+    $perturbationContext = $this->maintenance_quote_perturbation_context($ticket, is_array($revision) ? $revision : [], $quote);
 
     return [
       'mode' => $mode,
@@ -1259,6 +1287,9 @@ trait HandlesMaintenanceActions
         ['value' => 'Inmobiliaria', 'label' => 'Inmobiliaria'],
       ]),
       'recipient_options' => $recipientOptions,
+      'existing_quotes' => $existingQuotes,
+      'will_disapprove_previous' => $mode === 'create' && !empty($existingQuotes),
+      'perturbation_context' => $perturbationContext,
       'actor' => [
         'name' => trim((string) ($actor['name'] ?? Auth::user())),
         'employee_id' => trim((string) ($actor['employee_id'] ?? '')),
@@ -1288,6 +1319,120 @@ trait HandlesMaintenanceActions
         'indicativo_destinarario' => '',
         'indicativo_destinatario' => '',
       ],
+    ];
+  }
+
+  /** @return array<int,array{id:string,estado:string,fecha:string,total:string}> */
+  private function maintenance_quote_existing_quotes_for_context(string $quoteTable, array $ticket, int $revisionId, string $tipoMantenimiento): array
+  {
+    $ticketRef = trim((string) ($ticket['_ID'] ?? ''));
+    if ($ticketRef === '' || !$this->table_exists($quoteTable)) {
+      return [];
+    }
+    $where = ['TRIM(COALESCE(`id_ticket`, "")) = ?'];
+    $params = [$ticketRef];
+    if ($revisionId > 0) {
+      $where[] = 'TRIM(COALESCE(`id_revision`, "")) = ?';
+      $params[] = (string) $revisionId;
+    }
+    if ($tipoMantenimiento !== '') {
+      $where[] = 'LOWER(TRIM(COALESCE(`tipo_mantenimiento`, ""))) = ?';
+      $params[] = strtolower(trim($tipoMantenimiento));
+    }
+    $where[] = "LOWER(TRIM(COALESCE(`estado`, ''))) NOT IN ('desaprobada','eliminada','anulada')";
+    $rows = $this->db->getResults(
+      "SELECT `_ID`, `estado`, `fecha`, `total` FROM `{$quoteTable}` WHERE " . implode(' AND ', $where) . " ORDER BY `_ID` DESC LIMIT 8",
+      $params
+    );
+    $out = [];
+    foreach ($rows as $row) {
+      $out[] = [
+        'id' => trim((string) ($row['_ID'] ?? '')),
+        'estado' => trim((string) ($row['estado'] ?? 'Sin estado')),
+        'fecha' => trim((string) ($row['fecha'] ?? '')),
+        'total' => trim((string) ($row['total'] ?? '0')),
+      ];
+    }
+    return $out;
+  }
+
+  /** @param array<string,mixed> $quoteData */
+  private function maintenance_quote_disapprove_previous_quotes(\SCM\Support\SchemaInspector $schema, int $newQuoteId, array $quoteData, string $employeeId, string $nowSql): int
+  {
+    $quoteTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if ($newQuoteId <= 0 || !$schema->tableExists($quoteTable)) {
+      return 0;
+    }
+    $ticketRef = trim((string) ($quoteData['id_ticket'] ?? ''));
+    if ($ticketRef === '') {
+      return 0;
+    }
+    $where = ['`_ID` <> ?', 'TRIM(COALESCE(`id_ticket`, "")) = ?'];
+    $params = [$newQuoteId, $ticketRef];
+    $revisionId = trim((string) ($quoteData['id_revision'] ?? ''));
+    if ($revisionId !== '') {
+      $where[] = 'TRIM(COALESCE(`id_revision`, "")) = ?';
+      $params[] = $revisionId;
+    }
+    $tipo = strtolower(trim((string) ($quoteData['tipo_mantenimiento'] ?? '')));
+    if ($tipo !== '') {
+      $where[] = 'LOWER(TRIM(COALESCE(`tipo_mantenimiento`, ""))) = ?';
+      $params[] = $tipo;
+    }
+    $where[] = "LOWER(TRIM(COALESCE(`estado`, ''))) NOT IN ('desaprobada','eliminada','anulada')";
+    $ids = array_values(array_filter(array_map('intval', array_column(
+      $this->db->getResults("SELECT `_ID` FROM `{$quoteTable}` WHERE " . implode(' AND ', $where), $params),
+      '_ID'
+    ))));
+    if ($ids === []) {
+      return 0;
+    }
+    $update = $schema->filterTableData($quoteTable, [
+      'estado' => 'Desaprobada',
+      'respuesta' => 'Desaprobada',
+      'motivo_desaprobacion' => 'Reemplazada por cotización #' . $newQuoteId,
+      'observacion_desaprobacion' => 'Se marcó automáticamente como desaprobada al crear una nueva cotización para el mismo caso/revisión.',
+      'id_empleado' => $employeeId,
+      'cct_modified' => $nowSql,
+    ]);
+    if (empty($update)) {
+      return 0;
+    }
+    $affected = 0;
+    foreach ($ids as $id) {
+      if ($id > 0 && $this->db->update($quoteTable, $update, ['_ID' => $id]) >= 0) {
+        $affected++;
+      }
+    }
+    return $affected;
+  }
+
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $revision @param array<string,mixed> $quote @return array<string,mixed> */
+  private function maintenance_quote_perturbation_context(array $ticket, array $revision, array $quote): array
+  {
+    $idInmueble = $this->maintenance_quote_first([$quote['id_inmueble'] ?? '', $revision['id_inmueble'] ?? '', $ticket['id_inmueble'] ?? '', $quote['inmueble'] ?? '', $revision['inmueble'] ?? '', $ticket['inmueble'] ?? '']);
+    $property = [];
+    $table = $this->db->table('jet_cct_inmuebles');
+    if ($idInmueble !== '' && $this->table_exists($table)) {
+      $property = $this->db->getRow("SELECT `_ID`, `codigo`, `tipo_inmueble`, `precio_arriendo`, `precio_admin`, `area_construida` FROM `{$table}` WHERE `_ID` = ? OR TRIM(COALESCE(`codigo`, '')) = ? LIMIT 1", [(int) $idInmueble, $idInmueble]) ?: [];
+    }
+    $createdRaw = trim((string) ($ticket['cct_created'] ?? ''));
+    $createdTs = $createdRaw !== '' ? strtotime($createdRaw) : 0;
+    [$now] = $this->maintenance_quote_now_pair();
+    $diasDesdeTicket = $createdTs > 0 ? (int) ceil(max(0, $now - $createdTs) / 86400) : 0;
+    $precioArriendo = $this->maintenance_quote_number($property['precio_arriendo'] ?? 0);
+    $precioAdmin = $this->maintenance_quote_number($property['precio_admin'] ?? 0);
+    return [
+      'codigo' => trim((string) ($property['codigo'] ?? $idInmueble)),
+      'tipo_inmueble' => trim((string) ($property['tipo_inmueble'] ?? $quote['tipo_inmueble'] ?? $revision['tip_inm'] ?? $revision['tipo_inmueble'] ?? '')),
+      'precio_arriendo' => (int) round($precioArriendo),
+      'precio_admin' => (int) round($precioAdmin),
+      'canon_total' => (int) round($precioArriendo + $precioAdmin),
+      'area_construida' => (float) $this->maintenance_quote_number($property['area_construida'] ?? 0),
+      'id_ticket' => trim((string) ($ticket['_ID'] ?? $quote['id_ticket'] ?? '')),
+      'fecha_ticket_texto' => $createdTs > 0 ? date('d/m/Y H:i', $createdTs) : '',
+      'fecha_cot_texto' => date('d/m/Y H:i', $now),
+      'dias_desde_ticket' => $diasDesdeTicket,
     ];
   }
 
@@ -1529,7 +1674,7 @@ trait HandlesMaintenanceActions
       $clean = [];
       $hasValue = false;
       foreach ($allowed as $field) {
-        $value = in_array($field, ['cantidad_mano', 'valor_mano', 'valor_materiales', 'cantidad_otros_equi', 'valor_otros_equi', 'cantidad_otros_costos', 'valor_otros_costos'], true)
+        $value = in_array($field, ['cantidad_mano', 'valor_mano', 'cantidad_materiales', 'valor_unitario_materiales', 'valor_materiales', 'valor_total_materiales', 'cantidad_otros_equi', 'valor_otros_equi', 'cantidad_otros_costos', 'valor_otros_costos'], true)
           ? (string) (int) round($this->maintenance_quote_number($row[$field] ?? 0))
           : $this->maintenance_quote_clean($row[$field] ?? '');
         if (trim($value) !== '' && trim($value) !== '0') {
@@ -1542,6 +1687,12 @@ trait HandlesMaintenanceActions
       }
       if (isset($clean['cantidad_mano'], $clean['valor_mano'])) {
         $clean['valor_total_item_mo'] = (string) ((int) $clean['cantidad_mano'] * (int) $clean['valor_mano']);
+      }
+      if (isset($clean['cantidad_materiales'], $clean['valor_unitario_materiales'])) {
+        $clean['valor_total_materiales'] = (string) ((int) $clean['cantidad_materiales'] * (int) $clean['valor_unitario_materiales']);
+        if (trim((string) ($clean['valor_materiales'] ?? '')) === '' || (int) ($clean['valor_materiales'] ?? 0) <= 0) {
+          $clean['valor_materiales'] = $clean['valor_total_materiales'];
+        }
       }
       if (isset($clean['cantidad_otros_equi'], $clean['valor_otros_equi'])) {
         $clean['valor_total_otros_equi'] = (string) ((int) $clean['cantidad_otros_equi'] * (int) $clean['valor_otros_equi']);
@@ -1562,6 +1713,22 @@ trait HandlesMaintenanceActions
       $value = $this->maintenance_quote_number($item[$valueKey] ?? 0);
       $quantity = $quantityKey !== '' ? max(1.0, $this->maintenance_quote_number($item[$quantityKey] ?? 1)) : 1.0;
       $total += $quantity * $value;
+    }
+    return (float) (int) round($total);
+  }
+
+  /** @param array<int,array<string,string>> $items */
+  private function maintenance_quote_total_materials(array $items): float
+  {
+    $total = 0.0;
+    foreach ($items as $item) {
+      $lineTotal = $this->maintenance_quote_number($item['valor_total_materiales'] ?? 0);
+      if ($lineTotal <= 0) {
+        $unit = $this->maintenance_quote_number($item['valor_unitario_materiales'] ?? 0);
+        $quantity = max(1.0, $this->maintenance_quote_number($item['cantidad_materiales'] ?? 1));
+        $lineTotal = $unit > 0 ? ($unit * $quantity) : $this->maintenance_quote_number($item['valor_materiales'] ?? 0);
+      }
+      $total += $lineTotal;
     }
     return (float) (int) round($total);
   }
@@ -1652,6 +1819,31 @@ trait HandlesMaintenanceActions
       if (($width > 0 && $width > 2000) || ($height > 0 && $height > 2000)) {
         throw new \DomainException('Una imagen de la cotización supera 2000px. Baja el tamaño antes de guardarla.');
       }
+    }
+    return $stored;
+  }
+
+  /** @return array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}|null */
+  private function maintenance_quote_store_generated_materials_image(string $field): ?array
+  {
+    $dataUri = trim((string) ($_POST[$field] ?? ''));
+    if ($dataUri === '') {
+      return null;
+    }
+    $stored = $this->storedFiles()->storeImageDataUri($dataUri);
+    if (!is_array($stored)) {
+      throw new \DomainException('No fue posible generar la imagen de la cotización de materiales.');
+    }
+    $bytes = (int) ($stored['bytes'] ?? 0);
+    if ($bytes > 1572864) {
+      $this->storedFiles()->deleteStoredImages([$stored]);
+      throw new \DomainException('La imagen generada de materiales supera 1.5 MB.');
+    }
+    $width = (int) ($stored['width'] ?? 0);
+    $height = (int) ($stored['height'] ?? 0);
+    if (($width > 0 && $width > 2000) || ($height > 0 && $height > 2000)) {
+      $this->storedFiles()->deleteStoredImages([$stored]);
+      throw new \DomainException('La imagen generada de materiales supera 2000px.');
     }
     return $stored;
   }
@@ -3383,7 +3575,9 @@ trait HandlesMaintenanceActions
           continue;
         }
         $label = $this->cotizacion_first_matching_value($item, ['prove', 'descripcion', 'actividad', 'concepto', 'detalle']);
-        $value = $this->cotizacion_first_matching_value($item, ['valor', 'total', 'saldo']);
+        $value = method_exists($this, 'cotizacion_budget_item_total')
+          ? $this->cotizacion_budget_item_total($item)
+          : $this->cotizacion_first_matching_value($item, ['valor', 'total', 'saldo']);
         $budgetRows[] = [
           $label !== '' ? $this->cotizacion_clean_text($label) : 'Ítem',
           $this->format_cop_currency($value),

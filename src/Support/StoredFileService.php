@@ -62,6 +62,63 @@ final class StoredFileService
     return $stored;
   }
 
+  /** @return array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}|null */
+  public function storeImageDataUri(string $dataUri): ?array
+  {
+    $dataUri = trim($dataUri);
+    if ($dataUri === '' || !preg_match('/^data:image\/(png|jpe?g|webp);base64,([a-z0-9+\/=\r\n]+)$/i', $dataUri, $matches)) {
+      return null;
+    }
+    $binary = base64_decode(preg_replace('/\s+/', '', $matches[2]) ?: '', true);
+    if (!is_string($binary) || $binary === '' || strlen($binary) > $this->maxBytes || !$this->ensureDirectory()) {
+      return null;
+    }
+    $tmp = tempnam(sys_get_temp_dir(), 'scm_img_');
+    if (!is_string($tmp) || $tmp === '') {
+      return null;
+    }
+    if (file_put_contents($tmp, $binary) === false) {
+      @unlink($tmp);
+      return null;
+    }
+    $info = @getimagesize($tmp);
+    if (!is_array($info)) {
+      @unlink($tmp);
+      return null;
+    }
+    $mime = (string) ($info['mime'] ?? '');
+    $extensionMap = [
+      'image/jpeg' => 'jpg',
+      'image/png' => 'png',
+      'image/webp' => 'webp',
+    ];
+    if (!isset($extensionMap[$mime])) {
+      @unlink($tmp);
+      return null;
+    }
+    $name = $this->newName($extensionMap[$mime]);
+    $target = $this->directory . '/' . $name;
+    if (!@rename($tmp, $target)) {
+      @unlink($tmp);
+      return null;
+    }
+    $hash = @hash_file('sha256', $target);
+    $storedInfo = @getimagesize($target);
+    if (!is_array($storedInfo) || !is_string($hash)) {
+      @unlink($target);
+      return null;
+    }
+    return [
+      'name' => $name,
+      'url' => $this->urlFor($name),
+      'mime' => (string) $storedInfo['mime'],
+      'width' => (int) $storedInfo[0],
+      'height' => (int) $storedInfo[1],
+      'bytes' => (int) filesize($target),
+      'sha256' => $hash,
+    ];
+  }
+
   /** @param array<int,array{name?:string,url?:string}> $files */
   public function deleteStoredImages(array $files): void
   {
