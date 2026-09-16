@@ -431,6 +431,8 @@ trait RendersDashboard
         'metrics_execution' => self::AJAX_METRICS_EXECUTION,
         'dashboard_home' => self::AJAX_DASHBOARD_HOME,
         'dashboard_completed_activities' => self::AJAX_DASHBOARD_COMPLETED_ACTIVITIES,
+        'property_history_report' => self::AJAX_PROPERTY_HISTORY_REPORT,
+        'property_history_pdf' => self::AJAX_PROPERTY_HISTORY_PDF,
         'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
@@ -652,6 +654,7 @@ trait RendersDashboard
               <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-team">Calendario equipo</button>
               <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-due">Vencimientos</button>
               <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-completed">Actividades realizadas</button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-property-history">Historial inmueble</button>
             </div>
             <div class="scm-calendar-section-panel active" id="scm-home-calendar-section-mine" data-calendar-section-panel>
               <?php echo $this->render_calendario_actividades_panel($config, [
@@ -723,6 +726,27 @@ trait RendersDashboard
                     <div class="scm-completed-activities-list" data-scm-completed-actions></div>
                   </section>
                 </div>
+              </section>
+            </div>
+            <div class="scm-calendar-section-panel" id="scm-home-calendar-section-property-history" data-calendar-section-panel>
+              <section class="scm-property-history-panel" data-scm-property-history-panel aria-live="polite">
+                <div class="scm-property-history-head">
+                  <div>
+                    <span class="scm-calendar-action-kicker">Consulta</span>
+                    <h3>Historial del inmueble</h3>
+                    <p>Busca por n&uacute;mero de contrato, id de inmueble o c&oacute;digo para visualizar el informe completo y generar PDF.</p>
+                  </div>
+                </div>
+                <form class="scm-property-history-form" data-scm-property-history-form autocomplete="off">
+                  <label class="scm-field" for="scm_property_history_query">
+                    <span>Contrato, inmueble o c&oacute;digo</span>
+                    <input id="scm_property_history_query" name="query" type="text" class="input input-bordered" placeholder="Ej: 695, 98015, 51919" required>
+                  </label>
+                  <button type="submit" class="scm-case-work-btn scm-primary-action">Consultar historial</button>
+                  <button type="button" class="scm-case-work-btn" data-scm-property-history-pdf disabled>Generar PDF</button>
+                </form>
+                <div class="scm-property-history-status" data-scm-property-history-status>Ingresa un contrato, id de inmueble o c&oacute;digo para consultar.</div>
+                <div class="scm-property-history-results" data-scm-property-history-results></div>
               </section>
             </div>
           </section>

@@ -16,6 +16,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesAdministrativeNotifications;
   use \SCM\App\Concerns\HandlesCollectionManagement;
   use \SCM\App\Concerns\HandlesCanonInsuranceAudits;
+  use \SCM\App\Concerns\HandlesPropertyHistoryActions;
   use \SCM\App\Concerns\RendersPublicPqr;
   use \SCM\App\Concerns\RendersDashboard;
 
@@ -97,6 +98,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_METRICS_EXECUTION = 'scm_metricas_ejecucion_funcionario';
   const AJAX_DASHBOARD_HOME = 'scm_dashboard_inicio';
   const AJAX_DASHBOARD_COMPLETED_ACTIVITIES = 'scm_dashboard_actividades_realizadas';
+  const AJAX_PROPERTY_HISTORY_REPORT = 'scm_historial_inmueble_consultar';
+  const AJAX_PROPERTY_HISTORY_PDF = 'scm_historial_inmueble_pdf';
   const AJAX_DASHBOARD_METRICS = 'scm_dashboard_metricas';
   const AJAX_DASHBOARD_FILTER_OPTIONS = 'scm_dashboard_filter_options';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';

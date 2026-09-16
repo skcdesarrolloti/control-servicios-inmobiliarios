@@ -207,6 +207,8 @@
     var actionDashboardHome = actions.dashboard_home || "";
     var actionDashboardCompletedActivities =
       actions.dashboard_completed_activities || "";
+    var actionPropertyHistoryReport = actions.property_history_report || "";
+    var actionPropertyHistoryPdf = actions.property_history_pdf || "";
     var actionDashboardMetrics = actions.dashboard_metrics || "";
     var actionDashboardFilterOptions = actions.dashboard_filter_options || "";
     var duePopupConfig = runtime.duePopup || {};
@@ -10347,6 +10349,7 @@
     var dashboardCompletedActivitiesPromise = null;
     var dashboardMetricsPromise = null;
     var dashboardCompletedActivitiesById = {};
+    var propertyHistoryCurrentQuery = "";
 
     function formatDashboardCount(value) {
       var numericValue = Number(value);
@@ -10573,6 +10576,162 @@
         dashboardCompletedActivitiesPromise = null;
       });
       return dashboardCompletedActivitiesPromise;
+    }
+
+    function propertyHistoryEmpty(message) {
+      return '<div class="scm-empty scm-empty-cards">' + escHtml(message || "Sin información para mostrar.") + "</div>";
+    }
+
+    function propertyHistoryField(label, value) {
+      value = String(value || "").trim();
+      if (!value) value = "-";
+      return '<div class="scm-property-history-field"><small>' + escHtml(label) + '</small><strong>' + escHtml(value) + "</strong></div>";
+    }
+
+    function propertyHistorySourceCard(source) {
+      source = source || {};
+      return '<article class="scm-property-history-source">' +
+        '<span>' + escHtml(source.label || "Fuente") + "</span>" +
+        '<strong>' + formatDashboardCount(source.count || 0) + "</strong>" +
+        '<small>' + escHtml(source.description || "") + "</small>" +
+      "</article>";
+    }
+
+    function propertyHistoryTimelineRow(item) {
+      item = item || {};
+      return '<article class="scm-property-history-row">' +
+        '<div class="scm-property-history-date">' + escHtml(item.date || "-") + "</div>" +
+        '<div class="scm-property-history-main">' +
+          '<strong>' + escHtml(item.title || "Registro") + "</strong>" +
+          (item.detail ? '<span>' + escHtml(item.detail) + "</span>" : "") +
+          '<small>' + escHtml(item.source || item.reference || "") + (item.source && item.reference ? " · " : "") + escHtml(item.source && item.reference ? item.reference : "") + "</small>" +
+        "</div>" +
+      "</article>";
+    }
+
+    function propertyHistorySection(section) {
+      section = section || {};
+      var items = Array.isArray(section.items) ? section.items : [];
+      return '<section class="scm-property-history-section">' +
+        '<div class="scm-property-history-section-head">' +
+          '<div><span class="scm-calendar-action-kicker">Detalle</span><h4>' + escHtml(section.label || "Sección") + "</h4></div>" +
+          '<strong>' + formatDashboardCount(section.count || 0) + "</strong>" +
+        "</div>" +
+        (items.length ? items.map(function (item) {
+          return '<article class="scm-property-history-mini-row">' +
+            '<div><strong>' + escHtml(item.title || "Registro") + "</strong>" +
+            '<span>' + escHtml(item.date || "-") + (item.reference ? " · " + escHtml(item.reference) : "") + "</span></div>" +
+            (item.detail ? '<p>' + escHtml(item.detail) + "</p>" : "") +
+          "</article>";
+        }).join("") : propertyHistoryEmpty("Sin registros en esta fuente.")) +
+      "</section>";
+    }
+
+    function renderPropertyHistory(data) {
+      var panel = root.querySelector("[data-scm-property-history-panel]");
+      if (!panel) return;
+      var results = panel.querySelector("[data-scm-property-history-results]");
+      var status = panel.querySelector("[data-scm-property-history-status]");
+      var pdfButton = panel.querySelector("[data-scm-property-history-pdf]");
+      var property = (data && data.property) || {};
+      var sources = Array.isArray(data && data.sources) ? data.sources : [];
+      var timeline = Array.isArray(data && data.timeline) ? data.timeline : [];
+      var sections = Array.isArray(data && data.sections) ? data.sections : [];
+      propertyHistoryCurrentQuery = String((data && data.query) || "").trim();
+      if (pdfButton) pdfButton.disabled = !propertyHistoryCurrentQuery;
+      if (status) {
+        status.classList.remove("is-error");
+        status.textContent = "Informe generado " + String((data && data.generated_at) || "") + ".";
+      }
+      if (!results) return;
+      results.innerHTML =
+        '<div class="scm-property-history-summary">' +
+          propertyHistoryField("Código / inmueble", property.codigo) +
+          propertyHistoryField("Contrato", property.contrato) +
+          propertyHistoryField("Dirección", property.direccion) +
+          propertyHistoryField("Barrio / ciudad", [property.barrio, property.ciudad].filter(Boolean).join(" / ")) +
+          propertyHistoryField("Propietario", property.propietario) +
+          propertyHistoryField("Arrendatario", property.arrendatario) +
+          propertyHistoryField("Tipo", property.tipo) +
+          propertyHistoryField("Canon", property.canon) +
+        "</div>" +
+        '<section class="scm-property-history-block"><div class="scm-property-history-block-head"><span class="scm-calendar-action-kicker">Fuentes</span><h4>Fuentes consultadas</h4></div>' +
+          '<div class="scm-property-history-sources">' + (sources.length ? sources.map(propertyHistorySourceCard).join("") : propertyHistoryEmpty("No se encontraron fuentes disponibles.")) + "</div>" +
+        "</section>" +
+        '<section class="scm-property-history-block"><div class="scm-property-history-block-head"><span class="scm-calendar-action-kicker">Cronología</span><h4>Cronología completa</h4></div>' +
+          '<div class="scm-property-history-list">' + (timeline.length ? timeline.map(propertyHistoryTimelineRow).join("") : propertyHistoryEmpty("No se encontraron registros para la consulta.")) + "</div>" +
+        "</section>" +
+        '<div class="scm-property-history-sections">' + sections.filter(function (section) {
+          return Number(section && section.count || 0) > 0;
+        }).map(propertyHistorySection).join("") + "</div>";
+    }
+
+    function loadPropertyHistory(query) {
+      var panel = root.querySelector("[data-scm-property-history-panel]");
+      if (!panel || !ajaxUrl || !actionPropertyHistoryReport) {
+        showToast("error", "La consulta de historial no está disponible.");
+        return Promise.resolve();
+      }
+      query = String(query || "").trim();
+      if (!query) {
+        showToast("warning", "Escribe un contrato, inmueble o código.");
+        return Promise.resolve();
+      }
+      var status = panel.querySelector("[data-scm-property-history-status]");
+      var pdfButton = panel.querySelector("[data-scm-property-history-pdf]");
+      if (pdfButton) pdfButton.disabled = true;
+      if (status) {
+        status.classList.remove("is-error");
+        status.textContent = "Consultando historial del inmueble...";
+      }
+      return dashboardAction(actionPropertyHistoryReport, { query: query })
+        .then(function (data) {
+          renderPropertyHistory(data || {});
+        })
+        .catch(function (error) {
+          propertyHistoryCurrentQuery = "";
+          if (status) {
+            status.classList.add("is-error");
+            status.textContent = error && error.message ? error.message : "No se pudo consultar el historial.";
+          }
+          showToast("error", error && error.message ? error.message : "No se pudo consultar el historial.");
+        });
+    }
+
+    function submitPropertyHistoryPdf() {
+      var panel = root.querySelector("[data-scm-property-history-panel]");
+      var form = panel ? panel.querySelector("[data-scm-property-history-form]") : null;
+      var queryInput = form ? form.querySelector("input[name='query']") : null;
+      var query = String((queryInput && queryInput.value) || propertyHistoryCurrentQuery || "").trim();
+      if (!ajaxUrl || !actionPropertyHistoryPdf) {
+        showToast("error", "La generación de PDF no está disponible.");
+        return;
+      }
+      if (!query) {
+        showToast("warning", "Consulta primero un inmueble para generar el PDF.");
+        return;
+      }
+      var exportForm = document.createElement("form");
+      exportForm.method = "POST";
+      exportForm.action = ajaxUrl;
+      exportForm.target = "_blank";
+      exportForm.style.display = "none";
+      [
+        ["action", actionPropertyHistoryPdf],
+        ["nonce", nonce],
+        ["query", query],
+      ].forEach(function (item) {
+        var input = document.createElement("input");
+        input.type = "hidden";
+        input.name = item[0];
+        input.value = item[1];
+        exportForm.appendChild(input);
+      });
+      document.body.appendChild(exportForm);
+      exportForm.submit();
+      window.setTimeout(function () {
+        exportForm.remove();
+      }, 1000);
     }
 
     function loadDashboardHome() {
@@ -14535,6 +14694,12 @@
         if (target === "scm-home-calendar-section-completed") {
           loadCompletedActivities(false);
         }
+        if (target === "scm-home-calendar-section-property-history") {
+          var input = parentPanel.querySelector("#scm_property_history_query");
+          if (input) {
+            window.setTimeout(function () { input.focus({ preventScroll: true }); }, 80);
+          }
+        }
       });
     });
 
@@ -14595,6 +14760,13 @@
         return;
       }
 
+      var propertyHistoryPdf = event.target.closest("[data-scm-property-history-pdf]");
+      if (propertyHistoryPdf) {
+        event.preventDefault();
+        submitPropertyHistoryPdf();
+        return;
+      }
+
       var shortcut = event.target.closest("[data-scm-home-target]");
       if (!shortcut) return;
       var targetPanel = shortcut.getAttribute("data-scm-home-target") || "";
@@ -14634,6 +14806,16 @@
         var completedPanel = completedFilterForm.closest("[data-scm-completed-activities-panel]");
         if (completedPanel) completedPanel.setAttribute("data-scm-loaded", "0");
         loadCompletedActivities(true);
+        return;
+      }
+
+      var propertyHistoryForm = e.target && e.target.closest
+        ? e.target.closest("[data-scm-property-history-form]")
+        : null;
+      if (propertyHistoryForm) {
+        e.preventDefault();
+        var input = propertyHistoryForm.querySelector("input[name='query']");
+        loadPropertyHistory(input ? input.value : "");
         return;
       }
 
