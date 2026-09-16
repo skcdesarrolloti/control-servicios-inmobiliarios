@@ -377,16 +377,8 @@ trait HandlesMaintenanceActions
         if ($funcionario !== '') {
           $employeeWhere = [];
           if ($this->column_exists($calendarTable, 'id_empleado')) {
-            $employeeWhere[] = "TRIM(COALESCE(c.`id_empleado`, '')) = ?";
+            $employeeWhere[] = $this->dashboard_completed_employee_equals('c', 'id_empleado');
             $args[] = $funcionario;
-          }
-          if ($employeeName !== '' && $this->column_exists($calendarTable, 'funcionario')) {
-            $employeeWhere[] = "TRIM(COALESCE(c.`funcionario`, '')) = ?";
-            $args[] = $employeeName;
-          }
-          if ($employeeName !== '' && $this->column_exists($calendarTable, 'nombre')) {
-            $employeeWhere[] = "TRIM(COALESCE(c.`nombre`, '')) = ?";
-            $args[] = $employeeName;
           }
           if (!empty($employeeWhere)) {
             $where[] = '(' . implode(' OR ', $employeeWhere) . ')';
@@ -423,9 +415,16 @@ trait HandlesMaintenanceActions
       $where = ['COALESCE(s.`fecha`, 0) BETWEEN ? AND ?'];
       $args = [$range['from_ts'], $range['to_ts']];
       if ($funcionario !== '') {
-        $where[] = "(TRIM(COALESCE(s.`id_coordinador`, '')) = ? OR TRIM(COALESCE(s.`id_empleado`, '')) = ?)";
-        $args[] = $funcionario;
-        $args[] = $funcionario;
+        $employeeWhere = [];
+        foreach (['id_coordinador', 'id_empleado'] as $column) {
+          if ($this->column_exists($segTable, $column)) {
+            $employeeWhere[] = $this->dashboard_completed_employee_equals('s', $column);
+            $args[] = $funcionario;
+          }
+        }
+        if (!empty($employeeWhere)) {
+          $where[] = '(' . implode(' OR ', $employeeWhere) . ')';
+        }
       }
       $rows = $this->db->getResults(
         "SELECT
@@ -466,8 +465,10 @@ trait HandlesMaintenanceActions
       $where = ['COALESCE(h.`fecha`, 0) BETWEEN ? AND ?'];
       $args = [$range['from_ts'], $range['to_ts']];
       if ($funcionario !== '') {
-        $where[] = "TRIM(COALESCE(h.`id_empleado`, '')) = ?";
-        $args[] = $funcionario;
+        if ($this->column_exists($histTable, 'id_empleado')) {
+          $where[] = $this->dashboard_completed_employee_equals('h', 'id_empleado');
+          $args[] = $funcionario;
+        }
       }
       $rows = $this->db->getResults(
         "SELECT
@@ -614,6 +615,13 @@ trait HandlesMaintenanceActions
     return 'COALESCE(' . implode(', ', $parts) . ')';
   }
 
+  private function dashboard_completed_employee_equals(string $alias, string $column): string
+  {
+    $alias = trim($alias);
+    $prefix = $alias !== '' ? $alias . '.' : '';
+    return "CAST(TRIM(COALESCE({$prefix}`{$column}`, '')) AS BINARY) = CAST(? AS BINARY)";
+  }
+
   /** @param array<int,array<string,mixed>> $actions @param array<string,int> $totals @param array{from_ts:int,to_ts:int} $range */
   private function dashboard_completed_add_closed_tickets(array &$actions, array &$totals, array $range, string $ticketsTable, string $funcionario = ''): void
   {
@@ -633,7 +641,7 @@ trait HandlesMaintenanceActions
     ];
     $args = [$range['from_ts'], $range['to_ts']];
     if ($funcionario !== '' && $this->column_exists($ticketsTable, 'id_empleado')) {
-      $where[] = "TRIM(COALESCE(t.`id_empleado`, '')) = ?";
+      $where[] = $this->dashboard_completed_employee_equals('t', 'id_empleado');
       $args[] = $funcionario;
     }
     $rows = $this->db->getResults(
@@ -675,7 +683,7 @@ trait HandlesMaintenanceActions
       $where = ["{$dateExpr} BETWEEN ? AND ?"];
       $args = [$range['from_ts'], $range['to_ts']];
       if ($funcionario !== '' && $this->column_exists($ticketsTable, 'id_empleado')) {
-        $where[] = "TRIM(COALESCE(t.`id_empleado`, '')) = ?";
+        $where[] = $this->dashboard_completed_employee_equals('t', 'id_empleado');
         $args[] = $funcionario;
       }
       $rows = $this->db->getResults(
@@ -723,7 +731,7 @@ trait HandlesMaintenanceActions
       $employeeWhere = [];
       foreach (['id_empleado', 'cct_author_id'] as $column) {
         if ($this->column_exists($legacyActsTable, $column)) {
-          $employeeWhere[] = "TRIM(COALESCE(a.`{$column}`, '')) = ?";
+          $employeeWhere[] = $this->dashboard_completed_employee_equals('a', $column);
           $args[] = $funcionario;
         }
       }
@@ -772,13 +780,13 @@ trait HandlesMaintenanceActions
       $employeeWhere = [];
       foreach (['id_empleado', 'cct_author_id'] as $column) {
         if ($this->column_exists($servicesTable, $column)) {
-          $employeeWhere[] = "TRIM(COALESCE(r.`{$column}`, '')) = ?";
+          $employeeWhere[] = $this->dashboard_completed_employee_equals('r', $column);
           $args[] = $funcionario;
         }
       }
       if ($employeeName !== '' && $this->column_exists($servicesTable, 'realizado_por')) {
-        $employeeWhere[] = "TRIM(COALESCE(r.`realizado_por`, '')) = ?";
-        $args[] = $employeeName;
+        // Avoid comparing names in SQL: production mixes collations across CCT tables.
+        // The employee id columns above are the stable filter when available.
       }
       if (!empty($employeeWhere)) {
         $where[] = '(' . implode(' OR ', $employeeWhere) . ')';
