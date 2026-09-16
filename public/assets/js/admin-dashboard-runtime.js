@@ -205,6 +205,8 @@
       actions.internal_notifications_read || "";
     var actionMetricsExecution = actions.metrics_execution || "";
     var actionDashboardHome = actions.dashboard_home || "";
+    var actionDashboardCompletedActivities =
+      actions.dashboard_completed_activities || "";
     var actionDashboardMetrics = actions.dashboard_metrics || "";
     var actionDashboardFilterOptions = actions.dashboard_filter_options || "";
     var duePopupConfig = runtime.duePopup || {};
@@ -10286,6 +10288,7 @@
     }
 
     var dashboardHomePromise = null;
+    var dashboardCompletedActivitiesPromise = null;
     var dashboardMetricsPromise = null;
 
     function formatDashboardCount(value) {
@@ -10340,6 +10343,103 @@
       }
       if (textNode) textNode.textContent = message;
       if (retryButton) retryButton.hidden = !isError;
+    }
+
+    function completedActivityRowHtml(row) {
+      row = row || {};
+      var ticket = String(row.ticket || row.ticket_pk || "").trim();
+      var detail = String(row.detalle || "").trim();
+      var person = String(row.funcionario || row.funcionario_label || "").trim();
+      return '<article class="scm-completed-activity-row">' +
+        '<div class="scm-completed-activity-date">' + escHtml(row.fecha || "-") + "</div>" +
+        '<div class="scm-completed-activity-main">' +
+          '<strong>' + escHtml(row.titulo || row.asunto || row.label || "Actividad realizada") + "</strong>" +
+          (detail ? '<span>' + escHtml(detail) + "</span>" : "") +
+          '<small>' +
+            escHtml(row.label || "Actividad") +
+            (ticket && ticket !== "-" ? " · Caso #" + escHtml(ticket) : "") +
+            (person ? " · " + escHtml(person) : "") +
+          "</small>" +
+        "</div>" +
+      "</article>";
+    }
+
+    function renderCompletedActivities(data) {
+      var panel = root.querySelector("[data-scm-completed-activities-panel]");
+      if (!panel) return;
+      var totals = (data && data.totals) || {};
+      var kpis = [
+        ["total", "Total realizado"],
+        ["eventos", "Eventos"],
+        ["respuestas", "Respuestas"],
+        ["seguimientos", "Seguimientos"],
+        ["actas", "Actas"],
+        ["cerrados", "Cerrados"],
+        ["revisiones_servicios", "Rev. servicios públicos"],
+      ];
+      var kpiWrap = panel.querySelector("[data-scm-completed-activities-kpis]");
+      if (kpiWrap) {
+        kpiWrap.innerHTML = kpis.map(function (item) {
+          return '<div class="scm-completed-activity-kpi"><span>' + escHtml(item[1]) + '</span><strong>' + formatDashboardCount(totals[item[0]]) + "</strong></div>";
+        }).join("");
+      }
+
+      var eventsWrap = panel.querySelector("[data-scm-completed-events]");
+      var events = Array.isArray(data && data.events) ? data.events : [];
+      if (eventsWrap) {
+        eventsWrap.innerHTML = events.length
+          ? events.map(completedActivityRowHtml).join("")
+          : '<div class="scm-empty scm-empty-cards">No hay eventos realizados en el rango visible.</div>';
+      }
+
+      var actionsWrap = panel.querySelector("[data-scm-completed-actions]");
+      var actions = Array.isArray(data && data.actions) ? data.actions : [];
+      if (actionsWrap) {
+        actionsWrap.innerHTML = actions.length
+          ? actions.map(completedActivityRowHtml).join("")
+          : '<div class="scm-empty scm-empty-cards">No hay acciones realizadas para resumir.</div>';
+      }
+
+      var status = panel.querySelector("[data-scm-completed-activities-status]");
+      if (status) {
+        status.classList.remove("is-error");
+        status.textContent = "Mostrando " + String(data.from || "") + " a " + String(data.to || "") + ".";
+      }
+      panel.setAttribute("data-scm-loaded", "1");
+    }
+
+    function loadCompletedActivities(force) {
+      var panel = root.querySelector("[data-scm-completed-activities-panel]");
+      if (!panel || !ajaxUrl || !actionDashboardCompletedActivities) {
+        return Promise.resolve();
+      }
+      if (!force && panel.getAttribute("data-scm-loaded") === "1") {
+        return Promise.resolve();
+      }
+      if (!force && dashboardCompletedActivitiesPromise) {
+        return dashboardCompletedActivitiesPromise;
+      }
+      var status = panel.querySelector("[data-scm-completed-activities-status]");
+      if (status) {
+        status.classList.remove("is-error");
+        status.textContent = "Cargando actividades realizadas...";
+      }
+      var from = dashboardDateKey(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+      var to = dashboardDateKey(new Date());
+      dashboardCompletedActivitiesPromise = dashboardAction(actionDashboardCompletedActivities, {
+        fecha_desde: from,
+        fecha_hasta: to,
+      }).then(function (data) {
+        renderCompletedActivities(data || {});
+      }).catch(function (error) {
+        if (status) {
+          status.classList.add("is-error");
+          status.textContent = error && error.message ? error.message : "No se pudieron cargar las actividades realizadas.";
+        }
+      }).finally(function () {
+        dashboardCompletedActivitiesPromise = null;
+      });
+      return dashboardCompletedActivitiesPromise;
     }
 
     function loadDashboardHome() {
@@ -14299,6 +14399,9 @@
         });
         var activeSection = parentPanel.querySelector(".scm-calendar-section-panel.active");
         initCalendarPanel(activeSection || parentPanel);
+        if (target === "scm-home-calendar-section-completed") {
+          loadCompletedActivities(false);
+        }
       });
     });
 
@@ -14339,6 +14442,13 @@
         var homePanel = root.querySelector("#scm-panel-inicio");
         if (homePanel) homePanel.setAttribute("data-scm-loaded", "0");
         loadDashboardHome();
+        return;
+      }
+
+      var completedRefresh = event.target.closest("[data-scm-completed-activities-refresh]");
+      if (completedRefresh) {
+        event.preventDefault();
+        loadCompletedActivities(true);
         return;
       }
 

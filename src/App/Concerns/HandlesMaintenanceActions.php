@@ -315,6 +315,192 @@ trait HandlesMaintenanceActions
     ]);
   }
 
+  public function ajax_handler_dashboard_completed_activities(): void
+  {
+    $this->verifyCsrf();
+    if (
+      !$this->canAccessDashboardTab('calendario_actividades')
+      && !$this->canAccessDashboardTab('metricas')
+      && !$this->canAccessDashboardTab('abiertos')
+    ) {
+      $this->jsonFail('No tienes permiso para ver actividades realizadas.');
+    }
+
+    $range = $this->metrics_execution_date_range($_POST);
+    $payload = $this->dashboard_completed_activities_payload($range);
+    $payload['generated_at'] = date(DATE_ATOM);
+    $this->jsonOk($payload);
+  }
+
+  /** @param array{from:string,to:string,from_ts:int,to_ts:int} $range @return array<string,mixed> */
+  private function dashboard_completed_activities_payload(array $range): array
+  {
+    $ticketsTable = $this->db->table('jet_cct_tickets');
+    $histTable = $this->db->table('jet_cct_historial_del_ticket');
+    $segTable = $this->db->table('jet_cct_seguimiento_ticket');
+    $funcTable = $this->db->table('jet_cct_funcionarios');
+    $calendarTable = 'calendario_actividades';
+    $actsTable = $this->db->table('scm_ticket_completion_acts');
+    $legacyActsTable = $this->db->table('jet_cct_actas_de_satisfaccion');
+    $servicesTable = $this->db->table('jet_cct_revisiones_servicios');
+
+    $ticketsAvailable = $this->table_exists($ticketsTable);
+    $employees = $this->metrics_execution_employee_map($funcTable);
+    $events = [];
+    $actions = [];
+    $totals = [
+      'eventos' => 0,
+      'respuestas' => 0,
+      'seguimientos' => 0,
+      'actualizaciones' => 0,
+      'actas' => 0,
+      'cerrados' => 0,
+      'revisiones_servicios' => 0,
+      'total' => 0,
+    ];
+
+    if ($this->table_exists($calendarTable)) {
+      $eventTsExpr = $this->dashboard_completed_date_expr($calendarTable, 'c', ['fecha_inicio', 'fecha', 'cct_created']);
+      if ($eventTsExpr !== '') {
+        $rows = $this->db->getResults(
+          "SELECT c.*, {$eventTsExpr} AS fecha_ts
+           FROM `{$calendarTable}` c
+           WHERE {$eventTsExpr} BETWEEN ? AND ?
+             AND LOWER(TRIM(COALESCE(c.`estado`, ''))) IN ('si', 'sí', 'realizado', 'realizada', '1', 'true')
+           ORDER BY fecha_ts DESC
+           LIMIT 300",
+          [$range['from_ts'], $range['to_ts']]
+        );
+        foreach ($rows as $row) {
+          $ts = (int) ($row['fecha_ts'] ?? 0);
+          $ticket = trim((string) ($row['id_ticket'] ?? ''));
+          $events[] = [
+            'id' => (string) ($row['id'] ?? $row['_ID'] ?? ''),
+            'type' => 'evento',
+            'label' => 'Evento realizado',
+            'fecha_ts' => $ts,
+            'fecha' => $ts > 0 ? date('d/m/Y H:i', $ts) : '-',
+            'titulo' => trim((string) ($row['titulo'] ?? 'Evento realizado')),
+            'detalle' => $this->metrics_execution_clean_text((string) ($row['descripcion'] ?? '')),
+            'funcionario' => trim((string) ($row['funcionario'] ?? $row['nombre'] ?? $row['id_empleado'] ?? '')),
+            'ticket' => $ticket,
+          ];
+        }
+        $totals['eventos'] = count($events);
+      }
+    }
+
+    if ($ticketsAvailable && $this->table_exists($segTable)) {
+      $rows = $this->db->getResults(
+        "SELECT
+            s.`_ID` AS movimiento_id,
+            COALESCE(s.`fecha`, 0) AS fecha_ts,
+            TRIM(COALESCE(s.`id_ticket`, '')) AS ticket_ref,
+            TRIM(COALESCE(s.`id_coordinador`, s.`id_empleado`, '')) AS funcionario_id,
+            TRIM(COALESCE(s.`nombre`, '')) AS funcionario_nombre,
+            TRIM(COALESCE(s.`observacion`, '')) AS detalle,
+            t.`_ID` AS ticket_pk,
+            TRIM(COALESCE(t.`id_ticket`, '')) AS ticket_logico,
+            TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, '')) AS asunto,
+            TRIM(COALESCE(t.`contrato`, t.`id_contrato`, '')) AS contrato,
+            TRIM(COALESCE(t.`inmueble`, t.`id_inmueble`, '')) AS inmueble,
+            TRIM(COALESCE(t.`estado`, '')) AS estado,
+            TRIM(COALESCE(t.`estado_administrativo`, '')) AS estado_admin
+          FROM `{$segTable}` s
+          LEFT JOIN `{$ticketsTable}` t
+            ON TRIM(COALESCE(t.`id_ticket`, '')) = TRIM(COALESCE(s.`id_ticket`, ''))
+            OR CAST(t.`_ID` AS CHAR) = TRIM(COALESCE(s.`id_ticket`, ''))
+          WHERE COALESCE(s.`fecha`, 0) BETWEEN ? AND ?
+          ORDER BY COALESCE(s.`fecha`, 0) DESC
+          LIMIT 300",
+        [$range['from_ts'], $range['to_ts']]
+      );
+      foreach ($rows as $row) {
+        $detailText = $this->metrics_execution_clean_text((string) ($row['detalle'] ?? ''));
+        if ($detailText === '') {
+          continue;
+        }
+        $employee = $this->metrics_execution_employee_label($row, $employees);
+        $actions[] = $this->metrics_execution_detail_item($row, 'seguimiento', 'Seguimiento', $detailText, $employee);
+        $totals['seguimientos']++;
+      }
+    }
+
+    if ($ticketsAvailable && $this->table_exists($histTable)) {
+      $rows = $this->db->getResults(
+        "SELECT
+            h.`_ID` AS movimiento_id,
+            COALESCE(h.`fecha`, 0) AS fecha_ts,
+            CAST(h.`id_ticket` AS CHAR) AS ticket_ref,
+            TRIM(COALESCE(h.`id_empleado`, '')) AS funcionario_id,
+            TRIM(COALESCE(h.`nombre`, '')) AS funcionario_nombre,
+            TRIM(COALESCE(h.`respuesta`, '')) AS detalle,
+            t.`_ID` AS ticket_pk,
+            TRIM(COALESCE(t.`id_ticket`, '')) AS ticket_logico,
+            TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, '')) AS asunto,
+            TRIM(COALESCE(t.`contrato`, t.`id_contrato`, '')) AS contrato,
+            TRIM(COALESCE(t.`inmueble`, t.`id_inmueble`, '')) AS inmueble,
+            TRIM(COALESCE(t.`estado`, '')) AS estado,
+            TRIM(COALESCE(t.`estado_administrativo`, '')) AS estado_admin
+          FROM `{$histTable}` h
+          LEFT JOIN `{$ticketsTable}` t
+            ON t.`_ID` = h.`id_ticket`
+            OR TRIM(COALESCE(t.`id_ticket`, '')) = CAST(h.`id_ticket` AS CHAR)
+          WHERE COALESCE(h.`fecha`, 0) BETWEEN ? AND ?
+          ORDER BY COALESCE(h.`fecha`, 0) DESC
+          LIMIT 400",
+        [$range['from_ts'], $range['to_ts']]
+      );
+      foreach ($rows as $row) {
+        $detailText = $this->metrics_execution_clean_text((string) ($row['detalle'] ?? ''));
+        if ($detailText === '') {
+          continue;
+        }
+        $classification = $this->metrics_execution_classify_history($detailText);
+        if ($classification === 'ignore') {
+          continue;
+        }
+        $employee = $this->metrics_execution_employee_label($row, $employees);
+        $label = $classification === 'actualizacion' ? 'Actualización' : 'Respuesta';
+        $actions[] = $this->metrics_execution_detail_item($row, $classification, $label, $detailText, $employee);
+        if ($classification === 'actualizacion') {
+          $totals['actualizaciones']++;
+        } else {
+          $totals['respuestas']++;
+        }
+      }
+    }
+
+    $this->dashboard_completed_add_closed_tickets($actions, $totals, $range, $ticketsTable);
+    $this->dashboard_completed_add_acts($actions, $totals, $range, $actsTable, $legacyActsTable);
+    $this->dashboard_completed_add_public_services_reviews($actions, $totals, $range, $servicesTable);
+
+    usort($events, static function (array $a, array $b): int {
+      return (int) ($b['fecha_ts'] ?? 0) <=> (int) ($a['fecha_ts'] ?? 0);
+    });
+    usort($actions, static function (array $a, array $b): int {
+      return (int) ($b['fecha_ts'] ?? 0) <=> (int) ($a['fecha_ts'] ?? 0);
+    });
+
+    $totals['total'] = array_sum([
+      $totals['eventos'],
+      $totals['respuestas'],
+      $totals['seguimientos'],
+      $totals['actualizaciones'],
+      $totals['actas'],
+      $totals['cerrados'],
+      $totals['revisiones_servicios'],
+    ]);
+
+    return [
+      'from' => $range['from'],
+      'to' => $range['to'],
+      'totals' => $totals,
+      'events' => array_slice($events, 0, 18),
+      'actions' => array_slice($actions, 0, 24),
+    ];
+  }
+
   public function ajax_handler_cotizaciones_mantenimiento(): void
   {
     $this->verifyCsrf();
@@ -347,6 +533,193 @@ trait HandlesMaintenanceActions
       'kpi_tab_desaprobadas' => (string) ($tabStats['desaprobadas'] ?? 0),
       'kpi_tab_esperando_respuesta' => (string) ($tabStats['esperando_respuesta'] ?? 0),
     ]);
+  }
+
+  /** @return array<string,mixed> */
+  private function dashboard_completed_action_item(string $type, string $label, int $ts, string $title, string $detail = '', string $ticket = '', string $ticketPk = ''): array
+  {
+    return [
+      'id' => sha1($type . '|' . $ts . '|' . $title . '|' . $ticket . '|' . $ticketPk),
+      'type' => $type,
+      'label' => $label,
+      'fecha_ts' => $ts,
+      'fecha' => $ts > 0 ? date('d/m/Y H:i', $ts) : '-',
+      'ticket_pk' => $ticketPk,
+      'ticket' => $ticket !== '' ? $ticket : ($ticketPk !== '' ? $ticketPk : '-'),
+      'asunto' => $title,
+      'detalle' => $this->metrics_execution_clean_text($detail),
+    ];
+  }
+
+  private function dashboard_completed_date_expr(string $table, string $alias, array $columns): string
+  {
+    $parts = [];
+    foreach ($columns as $column) {
+      $column = trim((string) $column);
+      if ($column === '' || !$this->column_exists($table, $column)) {
+        continue;
+      }
+      if (in_array($column, ['cct_created', 'cct_modified', 'fecha_inicio', 'fecha_fin'], true)) {
+        $parts[] = "UNIX_TIMESTAMP(NULLIF({$alias}.`{$column}`, ''))";
+      } else {
+        $parts[] = "NULLIF(CAST({$alias}.`{$column}` AS UNSIGNED), 0)";
+      }
+    }
+    if (empty($parts)) {
+      return '';
+    }
+    return 'COALESCE(' . implode(', ', $parts) . ')';
+  }
+
+  /** @param array<int,array<string,mixed>> $actions @param array<string,int> $totals @param array{from_ts:int,to_ts:int} $range */
+  private function dashboard_completed_add_closed_tickets(array &$actions, array &$totals, array $range, string $ticketsTable): void
+  {
+    if (!$this->table_exists($ticketsTable)) {
+      return;
+    }
+    $dateExpr = $this->dashboard_completed_date_expr($ticketsTable, 't', ['fecha_actualizacion', 'cct_modified', 'fecha_respuesta', 'fecha']);
+    if ($dateExpr === '') {
+      return;
+    }
+    $rows = $this->db->getResults(
+      "SELECT t.`_ID` AS ticket_pk,
+              TRIM(COALESCE(t.`id_ticket`, '')) AS ticket_logico,
+              TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, 'Ticket cerrado')) AS asunto,
+              {$dateExpr} AS fecha_ts
+       FROM `{$ticketsTable}` t
+       WHERE {$dateExpr} BETWEEN ? AND ?
+         AND (
+           LOWER(TRIM(COALESCE(t.`estado`, ''))) IN ('cerrado', 'resuelto', 'finalizado')
+           OR LOWER(TRIM(COALESCE(t.`estado_administrativo`, ''))) IN ('cerrado', 'resuelto', 'finalizado')
+         )
+       ORDER BY fecha_ts DESC
+       LIMIT 250",
+      [$range['from_ts'], $range['to_ts']]
+    );
+    foreach ($rows as $row) {
+      $ts = (int) ($row['fecha_ts'] ?? 0);
+      $ticketPk = trim((string) ($row['ticket_pk'] ?? ''));
+      $ticket = trim((string) ($row['ticket_logico'] ?? $ticketPk));
+      $actions[] = $this->dashboard_completed_action_item(
+        'cerrado',
+        'Ticket cerrado',
+        $ts,
+        'Ticket #' . ($ticket !== '' ? $ticket : $ticketPk) . ' cerrado',
+        (string) ($row['asunto'] ?? ''),
+        $ticket,
+        $ticketPk
+      );
+      $totals['cerrados']++;
+    }
+  }
+
+  /** @param array<int,array<string,mixed>> $actions @param array<string,int> $totals @param array{from_ts:int,to_ts:int} $range */
+  private function dashboard_completed_add_acts(array &$actions, array &$totals, array $range, string $actsTable, string $legacyActsTable): void
+  {
+    $ticketsTable = $this->db->table('jet_cct_tickets');
+    if ($this->table_exists($ticketsTable) && $this->table_exists($actsTable) && $this->column_exists($actsTable, 'created_at')) {
+      $dateExpr = $this->column_exists($actsTable, 'signed_at')
+        ? "COALESCE(NULLIF(CAST(a.`signed_at` AS UNSIGNED), 0), NULLIF(CAST(a.`created_at` AS UNSIGNED), 0))"
+        : "NULLIF(CAST(a.`created_at` AS UNSIGNED), 0)";
+      $rows = $this->db->getResults(
+        "SELECT a.`id` AS acta_id,
+                a.`ticket_pk`,
+                TRIM(COALESCE(a.`status`, '')) AS estado_acta,
+                {$dateExpr} AS fecha_ts,
+                TRIM(COALESCE(t.`id_ticket`, '')) AS ticket_logico,
+                TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, 'Acta de satisfacción')) AS asunto
+         FROM `{$actsTable}` a
+         LEFT JOIN `{$ticketsTable}` t ON t.`_ID` = a.`ticket_pk`
+         WHERE {$dateExpr} BETWEEN ? AND ?
+         ORDER BY fecha_ts DESC
+         LIMIT 250",
+        [$range['from_ts'], $range['to_ts']]
+      );
+      foreach ($rows as $row) {
+        $ticketPk = trim((string) ($row['ticket_pk'] ?? ''));
+        $ticket = trim((string) ($row['ticket_logico'] ?? $ticketPk));
+        $status = trim((string) ($row['estado_acta'] ?? ''));
+        $actions[] = $this->dashboard_completed_action_item(
+          'acta',
+          'Acta',
+          (int) ($row['fecha_ts'] ?? 0),
+          'Acta #' . trim((string) ($row['acta_id'] ?? '-')) . ' registrada',
+          ($status !== '' ? 'Estado: ' . $status . '. ' : '') . (string) ($row['asunto'] ?? ''),
+          $ticket,
+          $ticketPk
+        );
+        $totals['actas']++;
+      }
+      return;
+    }
+
+    if (!$this->table_exists($legacyActsTable)) {
+      return;
+    }
+    $dateExpr = $this->dashboard_completed_date_expr($legacyActsTable, 'a', ['fecha_satisfaccion', 'fecha', 'cct_created']);
+    if ($dateExpr === '') {
+      return;
+    }
+    $rows = $this->db->getResults(
+      "SELECT a.`_ID` AS acta_id,
+              TRIM(COALESCE(a.`id_ticket`, '')) AS ticket_ref,
+              {$dateExpr} AS fecha_ts
+       FROM `{$legacyActsTable}` a
+       WHERE {$dateExpr} BETWEEN ? AND ?
+       ORDER BY fecha_ts DESC
+       LIMIT 250",
+      [$range['from_ts'], $range['to_ts']]
+    );
+    foreach ($rows as $row) {
+      $ticket = trim((string) ($row['ticket_ref'] ?? ''));
+      $actions[] = $this->dashboard_completed_action_item(
+        'acta',
+        'Acta',
+        (int) ($row['fecha_ts'] ?? 0),
+        'Acta #' . trim((string) ($row['acta_id'] ?? '-')) . ' registrada',
+        'Acta de satisfacción registrada.',
+        $ticket,
+        $ticket
+      );
+      $totals['actas']++;
+    }
+  }
+
+  /** @param array<int,array<string,mixed>> $actions @param array<string,int> $totals @param array{from_ts:int,to_ts:int} $range */
+  private function dashboard_completed_add_public_services_reviews(array &$actions, array &$totals, array $range, string $servicesTable): void
+  {
+    if (!$this->table_exists($servicesTable)) {
+      return;
+    }
+    $dateExpr = $this->dashboard_completed_date_expr($servicesTable, 'r', ['fecha', 'cct_created']);
+    if ($dateExpr === '') {
+      return;
+    }
+    $rows = $this->db->getResults(
+      "SELECT r.`_ID` AS revision_id,
+              TRIM(COALESCE(r.`id_contrato`, r.`contrato`, '')) AS contrato,
+              TRIM(COALESCE(r.`id_inmueble`, r.`inmueble`, '')) AS inmueble,
+              {$dateExpr} AS fecha_ts
+       FROM `{$servicesTable}` r
+       WHERE {$dateExpr} BETWEEN ? AND ?
+       ORDER BY fecha_ts DESC
+       LIMIT 250",
+      [$range['from_ts'], $range['to_ts']]
+    );
+    foreach ($rows as $row) {
+      $contract = trim((string) ($row['contrato'] ?? ''));
+      $property = trim((string) ($row['inmueble'] ?? ''));
+      $actions[] = $this->dashboard_completed_action_item(
+        'revision_servicios',
+        'Revisión servicios públicos',
+        (int) ($row['fecha_ts'] ?? 0),
+        'Revisión servicios públicos #' . trim((string) ($row['revision_id'] ?? '-')),
+        trim('Contrato ' . ($contract !== '' ? '#' . $contract : '-') . ($property !== '' ? ' · Inmueble ' . $property : '')),
+        '',
+        ''
+      );
+      $totals['revisiones_servicios']++;
+    }
   }
 
   public function ajax_handler_cotizacion_mantenimiento_form_context(): void

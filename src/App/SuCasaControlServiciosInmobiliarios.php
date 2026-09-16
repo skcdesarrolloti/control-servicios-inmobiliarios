@@ -96,6 +96,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_INTERNAL_NOTIFICATIONS_READ = 'scm_internal_notifications_read';
   const AJAX_METRICS_EXECUTION = 'scm_metricas_ejecucion_funcionario';
   const AJAX_DASHBOARD_HOME = 'scm_dashboard_inicio';
+  const AJAX_DASHBOARD_COMPLETED_ACTIVITIES = 'scm_dashboard_actividades_realizadas';
   const AJAX_DASHBOARD_METRICS = 'scm_dashboard_metricas';
   const AJAX_DASHBOARD_FILTER_OPTIONS = 'scm_dashboard_filter_options';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';

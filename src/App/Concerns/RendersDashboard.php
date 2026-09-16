@@ -430,6 +430,7 @@ trait RendersDashboard
         'internal_notifications_read' => self::AJAX_INTERNAL_NOTIFICATIONS_READ,
         'metrics_execution' => self::AJAX_METRICS_EXECUTION,
         'dashboard_home' => self::AJAX_DASHBOARD_HOME,
+        'dashboard_completed_activities' => self::AJAX_DASHBOARD_COMPLETED_ACTIVITIES,
         'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
@@ -650,6 +651,7 @@ trait RendersDashboard
               <button class="scm-status-topic-tab scm-calendar-section-tab active" type="button" data-calendar-section-target="scm-home-calendar-section-mine">Mi calendario</button>
               <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-team">Calendario equipo</button>
               <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-due">Vencimientos</button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-completed">Actividades realizadas</button>
             </div>
             <div class="scm-calendar-section-panel active" id="scm-home-calendar-section-mine" data-calendar-section-panel>
               <?php echo $this->render_calendario_actividades_panel($config, [
@@ -680,6 +682,36 @@ trait RendersDashboard
                 'show_report_action' => false,
                 'show_pending_action' => false,
               ]); ?>
+            </div>
+            <div class="scm-calendar-section-panel" id="scm-home-calendar-section-completed" data-calendar-section-panel>
+              <section class="scm-completed-activities-panel" data-scm-completed-activities-panel aria-live="polite">
+                <div class="scm-completed-activities-head">
+                  <div>
+                    <span class="scm-calendar-action-kicker">Realizado</span>
+                    <h3>Actividades realizadas</h3>
+                    <p>Eventos cumplidos y resumen de acciones registradas durante el mes actual.</p>
+                  </div>
+                  <button type="button" class="scm-case-work-btn" data-scm-completed-activities-refresh>Actualizar</button>
+                </div>
+                <div class="scm-completed-activities-status" data-scm-completed-activities-status>Cargando actividades realizadas...</div>
+                <div class="scm-completed-activities-grid">
+                  <section class="scm-completed-activities-block">
+                    <div class="scm-completed-activities-block-head">
+                      <span class="scm-calendar-action-kicker">Agenda</span>
+                      <h4>Eventos realizados</h4>
+                    </div>
+                    <div class="scm-completed-activities-list" data-scm-completed-events></div>
+                  </section>
+                  <section class="scm-completed-activities-block">
+                    <div class="scm-completed-activities-block-head">
+                      <span class="scm-calendar-action-kicker">Resumen</span>
+                      <h4>Resumen de lo realizado</h4>
+                    </div>
+                    <div class="scm-completed-activities-kpis" data-scm-completed-activities-kpis></div>
+                    <div class="scm-completed-activities-list" data-scm-completed-actions></div>
+                  </section>
+                </div>
+              </section>
             </div>
           </section>
         <?php endif; ?>
