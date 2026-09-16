@@ -693,6 +693,18 @@ trait RendersDashboard
                   </div>
                   <button type="button" class="scm-case-work-btn" data-scm-completed-activities-refresh>Actualizar</button>
                 </div>
+                <form class="scm-completed-activities-filters" data-scm-completed-activities-filter autocomplete="off">
+                  <div class="scm-field">
+                    <label for="scm_completed_funcionario">Funcionario</label>
+                    <select id="scm_completed_funcionario" name="funcionario" class="select select-bordered select-sm scm-select scm-select2" data-placeholder="Selecciona funcionario" data-current-employee="<?php echo esc_attr($currentEmployeeId); ?>">
+                      <option value="">Todos</option>
+                      <?php foreach (($filterOptions['funcionarios'] ?? []) as $func): $fId = trim((string)($func['id'] ?? '')); if ($fId === '') continue; ?>
+                        <option value="<?php echo esc_attr($fId); ?>"<?php echo $fId === $currentEmployeeId ? ' selected' : ''; ?>><?php echo esc_html((string)($func['label'] ?? $fId)); ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                  </div>
+                  <button type="submit" class="scm-case-work-btn scm-primary-action">Filtrar</button>
+                </form>
                 <div class="scm-completed-activities-status" data-scm-completed-activities-status>Cargando actividades realizadas...</div>
                 <div class="scm-completed-activities-grid">
                   <section class="scm-completed-activities-block">
@@ -712,75 +724,6 @@ trait RendersDashboard
                   </section>
                 </div>
               </section>
-            </div>
-          </section>
-        <?php endif; ?>
-
-        <div class="scm-home-content-grid">
-          <section class="scm-home-card" aria-labelledby="scm-home-priorities-title">
-            <div class="scm-home-card-heading">
-              <div>
-                <span class="scm-home-card-kicker">Atención</span>
-                <h2 id="scm-home-priorities-title">Prioridades de hoy</h2>
-              </div>
-              <?php if (in_array('abiertos', $dashboardAllowedTabs, true)): ?>
-                <button class="scm-home-text-action" type="button" data-scm-home-target="scm-panel-abiertos">Revisar casos</button>
-              <?php endif; ?>
-            </div>
-            <div class="scm-home-priority-list">
-              <div class="scm-home-priority scm-home-priority-danger">
-                <span class="scm-home-priority-dot" aria-hidden="true"></span>
-                <div><strong data-scm-home-metric="sla_vencido">&mdash;</strong><span>casos con SLA vencido</span></div>
-              </div>
-              <div class="scm-home-priority scm-home-priority-warning">
-                <span class="scm-home-priority-dot" aria-hidden="true"></span>
-                <div><strong data-scm-home-metric="sin_revision">&mdash;</strong><span>casos sin revisión</span></div>
-              </div>
-              <div class="scm-home-priority scm-home-priority-neutral">
-                <span class="scm-home-priority-dot" aria-hidden="true"></span>
-                <div><strong data-scm-home-metric="sin_cotizacion">&mdash;</strong><span>casos sin cotización</span></div>
-              </div>
-            </div>
-          </section>
-
-          <section class="scm-home-card" aria-labelledby="scm-home-processes-title">
-            <div class="scm-home-card-heading">
-              <div>
-                <span class="scm-home-card-kicker">Volumen</span>
-                <h2 id="scm-home-processes-title">Casos por proceso</h2>
-              </div>
-              <?php if (in_array('metricas', $dashboardAllowedTabs, true)): ?>
-                <button class="scm-home-text-action" type="button" data-scm-home-target="scm-panel-metricas">Ver detalle</button>
-              <?php endif; ?>
-            </div>
-            <div class="scm-home-process-list">
-              <?php foreach (['Mantenimiento', 'Entrega', 'Preventiva', 'Recibo'] as $homeCategory): ?>
-                <div class="scm-home-process">
-                  <span><?php echo esc_html($homeCategory); ?></span>
-                  <strong data-scm-home-category="<?php echo esc_attr($homeCategory); ?>">&mdash;</strong>
-                </div>
-              <?php endforeach; ?>
-            </div>
-          </section>
-        </div>
-
-        <?php if (!empty($homeQuickLinks)): ?>
-          <section class="scm-home-shortcuts" aria-labelledby="scm-home-shortcuts-title">
-            <div class="scm-home-card-heading">
-              <div>
-                <span class="scm-home-card-kicker">Navegación</span>
-                <h2 id="scm-home-shortcuts-title">Accesos rápidos</h2>
-              </div>
-              <span class="scm-home-updated" data-scm-home-updated></span>
-            </div>
-            <div class="scm-home-shortcut-grid">
-              <?php foreach ($homeQuickLinks as $homeQuickLink): ?>
-                <button class="scm-home-shortcut" type="button" data-scm-home-target="<?php echo esc_attr((string)$homeQuickLink['panel']); ?>">
-                  <span><i class="fas <?php echo esc_attr((string)$homeQuickLink['icon']); ?>" aria-hidden="true"></i></span>
-                  <strong><?php echo esc_html((string)$homeQuickLink['label']); ?></strong>
-                  <i class="fas fa-chevron-right" aria-hidden="true"></i>
-                </button>
-              <?php endforeach; ?>
             </div>
           </section>
         <?php endif; ?>

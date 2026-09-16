@@ -327,13 +327,17 @@ trait HandlesMaintenanceActions
     }
 
     $range = $this->metrics_execution_date_range($_POST);
-    $payload = $this->dashboard_completed_activities_payload($range);
+    $funcionario = trim(sanitize_text_field(wp_unslash((string) ($_POST['funcionario'] ?? ''))));
+    if ($funcionario === '' && method_exists($this, 'current_employee_id')) {
+      $funcionario = trim((string) $this->current_employee_id());
+    }
+    $payload = $this->dashboard_completed_activities_payload($range, $funcionario);
     $payload['generated_at'] = date(DATE_ATOM);
     $this->jsonOk($payload);
   }
 
   /** @param array{from:string,to:string,from_ts:int,to_ts:int} $range @return array<string,mixed> */
-  private function dashboard_completed_activities_payload(array $range): array
+  private function dashboard_completed_activities_payload(array $range, string $funcionario = ''): array
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $histTable = $this->db->table('jet_cct_historial_del_ticket');
@@ -346,6 +350,9 @@ trait HandlesMaintenanceActions
 
     $ticketsAvailable = $this->table_exists($ticketsTable);
     $employees = $this->metrics_execution_employee_map($funcTable);
+    $employeeName = $funcionario !== '' && isset($employees[$funcionario])
+      ? trim((string) ($employees[$funcionario]['nombre'] ?? ''))
+      : '';
     $events = [];
     $actions = [];
     $totals = [
@@ -362,14 +369,36 @@ trait HandlesMaintenanceActions
     if ($this->table_exists($calendarTable)) {
       $eventTsExpr = $this->dashboard_completed_date_expr($calendarTable, 'c', ['fecha_inicio', 'fecha', 'cct_created']);
       if ($eventTsExpr !== '') {
+        $where = [
+          "{$eventTsExpr} BETWEEN ? AND ?",
+          "LOWER(TRIM(COALESCE(c.`estado`, ''))) IN ('si', 'sí', 'realizado', 'realizada', '1', 'true')",
+        ];
+        $args = [$range['from_ts'], $range['to_ts']];
+        if ($funcionario !== '') {
+          $employeeWhere = [];
+          if ($this->column_exists($calendarTable, 'id_empleado')) {
+            $employeeWhere[] = "TRIM(COALESCE(c.`id_empleado`, '')) = ?";
+            $args[] = $funcionario;
+          }
+          if ($employeeName !== '' && $this->column_exists($calendarTable, 'funcionario')) {
+            $employeeWhere[] = "TRIM(COALESCE(c.`funcionario`, '')) = ?";
+            $args[] = $employeeName;
+          }
+          if ($employeeName !== '' && $this->column_exists($calendarTable, 'nombre')) {
+            $employeeWhere[] = "TRIM(COALESCE(c.`nombre`, '')) = ?";
+            $args[] = $employeeName;
+          }
+          if (!empty($employeeWhere)) {
+            $where[] = '(' . implode(' OR ', $employeeWhere) . ')';
+          }
+        }
         $rows = $this->db->getResults(
           "SELECT c.*, {$eventTsExpr} AS fecha_ts
            FROM `{$calendarTable}` c
-           WHERE {$eventTsExpr} BETWEEN ? AND ?
-             AND LOWER(TRIM(COALESCE(c.`estado`, ''))) IN ('si', 'sí', 'realizado', 'realizada', '1', 'true')
+           WHERE " . implode(' AND ', $where) . "
            ORDER BY fecha_ts DESC
            LIMIT 300",
-          [$range['from_ts'], $range['to_ts']]
+          $args
         );
         foreach ($rows as $row) {
           $ts = (int) ($row['fecha_ts'] ?? 0);
@@ -391,6 +420,13 @@ trait HandlesMaintenanceActions
     }
 
     if ($ticketsAvailable && $this->table_exists($segTable)) {
+      $where = ['COALESCE(s.`fecha`, 0) BETWEEN ? AND ?'];
+      $args = [$range['from_ts'], $range['to_ts']];
+      if ($funcionario !== '') {
+        $where[] = "(TRIM(COALESCE(s.`id_coordinador`, '')) = ? OR TRIM(COALESCE(s.`id_empleado`, '')) = ?)";
+        $args[] = $funcionario;
+        $args[] = $funcionario;
+      }
       $rows = $this->db->getResults(
         "SELECT
             s.`_ID` AS movimiento_id,
@@ -410,10 +446,10 @@ trait HandlesMaintenanceActions
           LEFT JOIN `{$ticketsTable}` t
             ON TRIM(COALESCE(t.`id_ticket`, '')) = TRIM(COALESCE(s.`id_ticket`, ''))
             OR CAST(t.`_ID` AS CHAR) = TRIM(COALESCE(s.`id_ticket`, ''))
-          WHERE COALESCE(s.`fecha`, 0) BETWEEN ? AND ?
+          WHERE " . implode(' AND ', $where) . "
           ORDER BY COALESCE(s.`fecha`, 0) DESC
           LIMIT 300",
-        [$range['from_ts'], $range['to_ts']]
+        $args
       );
       foreach ($rows as $row) {
         $detailText = $this->metrics_execution_clean_text((string) ($row['detalle'] ?? ''));
@@ -427,6 +463,12 @@ trait HandlesMaintenanceActions
     }
 
     if ($ticketsAvailable && $this->table_exists($histTable)) {
+      $where = ['COALESCE(h.`fecha`, 0) BETWEEN ? AND ?'];
+      $args = [$range['from_ts'], $range['to_ts']];
+      if ($funcionario !== '') {
+        $where[] = "TRIM(COALESCE(h.`id_empleado`, '')) = ?";
+        $args[] = $funcionario;
+      }
       $rows = $this->db->getResults(
         "SELECT
             h.`_ID` AS movimiento_id,
@@ -446,10 +488,10 @@ trait HandlesMaintenanceActions
           LEFT JOIN `{$ticketsTable}` t
             ON t.`_ID` = h.`id_ticket`
             OR TRIM(COALESCE(t.`id_ticket`, '')) = CAST(h.`id_ticket` AS CHAR)
-          WHERE COALESCE(h.`fecha`, 0) BETWEEN ? AND ?
+          WHERE " . implode(' AND ', $where) . "
           ORDER BY COALESCE(h.`fecha`, 0) DESC
           LIMIT 400",
-        [$range['from_ts'], $range['to_ts']]
+        $args
       );
       foreach ($rows as $row) {
         $detailText = $this->metrics_execution_clean_text((string) ($row['detalle'] ?? ''));
@@ -471,9 +513,9 @@ trait HandlesMaintenanceActions
       }
     }
 
-    $this->dashboard_completed_add_closed_tickets($actions, $totals, $range, $ticketsTable);
-    $this->dashboard_completed_add_acts($actions, $totals, $range, $actsTable, $legacyActsTable);
-    $this->dashboard_completed_add_public_services_reviews($actions, $totals, $range, $servicesTable);
+    $this->dashboard_completed_add_closed_tickets($actions, $totals, $range, $ticketsTable, $funcionario);
+    $this->dashboard_completed_add_acts($actions, $totals, $range, $actsTable, $legacyActsTable, $funcionario);
+    $this->dashboard_completed_add_public_services_reviews($actions, $totals, $range, $servicesTable, $funcionario, $employeeName);
 
     usort($events, static function (array $a, array $b): int {
       return (int) ($b['fecha_ts'] ?? 0) <=> (int) ($a['fecha_ts'] ?? 0);
@@ -495,6 +537,7 @@ trait HandlesMaintenanceActions
     return [
       'from' => $range['from'],
       'to' => $range['to'],
+      'funcionario' => $funcionario,
       'totals' => $totals,
       'events' => array_slice($events, 0, 18),
       'actions' => array_slice($actions, 0, 24),
@@ -572,7 +615,7 @@ trait HandlesMaintenanceActions
   }
 
   /** @param array<int,array<string,mixed>> $actions @param array<string,int> $totals @param array{from_ts:int,to_ts:int} $range */
-  private function dashboard_completed_add_closed_tickets(array &$actions, array &$totals, array $range, string $ticketsTable): void
+  private function dashboard_completed_add_closed_tickets(array &$actions, array &$totals, array $range, string $ticketsTable, string $funcionario = ''): void
   {
     if (!$this->table_exists($ticketsTable)) {
       return;
@@ -581,20 +624,28 @@ trait HandlesMaintenanceActions
     if ($dateExpr === '') {
       return;
     }
+    $where = [
+      "{$dateExpr} BETWEEN ? AND ?",
+      "(
+           LOWER(TRIM(COALESCE(t.`estado`, ''))) IN ('cerrado', 'resuelto', 'finalizado')
+           OR LOWER(TRIM(COALESCE(t.`estado_administrativo`, ''))) IN ('cerrado', 'resuelto', 'finalizado')
+         )",
+    ];
+    $args = [$range['from_ts'], $range['to_ts']];
+    if ($funcionario !== '' && $this->column_exists($ticketsTable, 'id_empleado')) {
+      $where[] = "TRIM(COALESCE(t.`id_empleado`, '')) = ?";
+      $args[] = $funcionario;
+    }
     $rows = $this->db->getResults(
       "SELECT t.`_ID` AS ticket_pk,
               TRIM(COALESCE(t.`id_ticket`, '')) AS ticket_logico,
               TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, 'Ticket cerrado')) AS asunto,
               {$dateExpr} AS fecha_ts
        FROM `{$ticketsTable}` t
-       WHERE {$dateExpr} BETWEEN ? AND ?
-         AND (
-           LOWER(TRIM(COALESCE(t.`estado`, ''))) IN ('cerrado', 'resuelto', 'finalizado')
-           OR LOWER(TRIM(COALESCE(t.`estado_administrativo`, ''))) IN ('cerrado', 'resuelto', 'finalizado')
-         )
+       WHERE " . implode(' AND ', $where) . "
        ORDER BY fecha_ts DESC
        LIMIT 250",
-      [$range['from_ts'], $range['to_ts']]
+      $args
     );
     foreach ($rows as $row) {
       $ts = (int) ($row['fecha_ts'] ?? 0);
@@ -614,13 +665,19 @@ trait HandlesMaintenanceActions
   }
 
   /** @param array<int,array<string,mixed>> $actions @param array<string,int> $totals @param array{from_ts:int,to_ts:int} $range */
-  private function dashboard_completed_add_acts(array &$actions, array &$totals, array $range, string $actsTable, string $legacyActsTable): void
+  private function dashboard_completed_add_acts(array &$actions, array &$totals, array $range, string $actsTable, string $legacyActsTable, string $funcionario = ''): void
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     if ($this->table_exists($ticketsTable) && $this->table_exists($actsTable) && $this->column_exists($actsTable, 'created_at')) {
       $dateExpr = $this->column_exists($actsTable, 'signed_at')
         ? "COALESCE(NULLIF(CAST(a.`signed_at` AS UNSIGNED), 0), NULLIF(CAST(a.`created_at` AS UNSIGNED), 0))"
         : "NULLIF(CAST(a.`created_at` AS UNSIGNED), 0)";
+      $where = ["{$dateExpr} BETWEEN ? AND ?"];
+      $args = [$range['from_ts'], $range['to_ts']];
+      if ($funcionario !== '' && $this->column_exists($ticketsTable, 'id_empleado')) {
+        $where[] = "TRIM(COALESCE(t.`id_empleado`, '')) = ?";
+        $args[] = $funcionario;
+      }
       $rows = $this->db->getResults(
         "SELECT a.`id` AS acta_id,
                 a.`ticket_pk`,
@@ -630,10 +687,10 @@ trait HandlesMaintenanceActions
                 TRIM(COALESCE(t.`asunto`, t.`tema_ayuda`, 'Acta de satisfacción')) AS asunto
          FROM `{$actsTable}` a
          LEFT JOIN `{$ticketsTable}` t ON t.`_ID` = a.`ticket_pk`
-         WHERE {$dateExpr} BETWEEN ? AND ?
+         WHERE " . implode(' AND ', $where) . "
          ORDER BY fecha_ts DESC
          LIMIT 250",
-        [$range['from_ts'], $range['to_ts']]
+        $args
       );
       foreach ($rows as $row) {
         $ticketPk = trim((string) ($row['ticket_pk'] ?? ''));
@@ -660,15 +717,29 @@ trait HandlesMaintenanceActions
     if ($dateExpr === '') {
       return;
     }
+    $where = ["{$dateExpr} BETWEEN ? AND ?"];
+    $args = [$range['from_ts'], $range['to_ts']];
+    if ($funcionario !== '') {
+      $employeeWhere = [];
+      foreach (['id_empleado', 'cct_author_id'] as $column) {
+        if ($this->column_exists($legacyActsTable, $column)) {
+          $employeeWhere[] = "TRIM(COALESCE(a.`{$column}`, '')) = ?";
+          $args[] = $funcionario;
+        }
+      }
+      if (!empty($employeeWhere)) {
+        $where[] = '(' . implode(' OR ', $employeeWhere) . ')';
+      }
+    }
     $rows = $this->db->getResults(
       "SELECT a.`_ID` AS acta_id,
               TRIM(COALESCE(a.`id_ticket`, '')) AS ticket_ref,
               {$dateExpr} AS fecha_ts
        FROM `{$legacyActsTable}` a
-       WHERE {$dateExpr} BETWEEN ? AND ?
+       WHERE " . implode(' AND ', $where) . "
        ORDER BY fecha_ts DESC
        LIMIT 250",
-      [$range['from_ts'], $range['to_ts']]
+      $args
     );
     foreach ($rows as $row) {
       $ticket = trim((string) ($row['ticket_ref'] ?? ''));
@@ -686,7 +757,7 @@ trait HandlesMaintenanceActions
   }
 
   /** @param array<int,array<string,mixed>> $actions @param array<string,int> $totals @param array{from_ts:int,to_ts:int} $range */
-  private function dashboard_completed_add_public_services_reviews(array &$actions, array &$totals, array $range, string $servicesTable): void
+  private function dashboard_completed_add_public_services_reviews(array &$actions, array &$totals, array $range, string $servicesTable, string $funcionario = '', string $employeeName = ''): void
   {
     if (!$this->table_exists($servicesTable)) {
       return;
@@ -695,16 +766,34 @@ trait HandlesMaintenanceActions
     if ($dateExpr === '') {
       return;
     }
+    $where = ["{$dateExpr} BETWEEN ? AND ?"];
+    $args = [$range['from_ts'], $range['to_ts']];
+    if ($funcionario !== '') {
+      $employeeWhere = [];
+      foreach (['id_empleado', 'cct_author_id'] as $column) {
+        if ($this->column_exists($servicesTable, $column)) {
+          $employeeWhere[] = "TRIM(COALESCE(r.`{$column}`, '')) = ?";
+          $args[] = $funcionario;
+        }
+      }
+      if ($employeeName !== '' && $this->column_exists($servicesTable, 'realizado_por')) {
+        $employeeWhere[] = "TRIM(COALESCE(r.`realizado_por`, '')) = ?";
+        $args[] = $employeeName;
+      }
+      if (!empty($employeeWhere)) {
+        $where[] = '(' . implode(' OR ', $employeeWhere) . ')';
+      }
+    }
     $rows = $this->db->getResults(
       "SELECT r.`_ID` AS revision_id,
               TRIM(COALESCE(r.`id_contrato`, r.`contrato`, '')) AS contrato,
               TRIM(COALESCE(r.`id_inmueble`, r.`inmueble`, '')) AS inmueble,
               {$dateExpr} AS fecha_ts
        FROM `{$servicesTable}` r
-       WHERE {$dateExpr} BETWEEN ? AND ?
+       WHERE " . implode(' AND ', $where) . "
        ORDER BY fecha_ts DESC
        LIMIT 250",
-      [$range['from_ts'], $range['to_ts']]
+      $args
     );
     foreach ($rows as $row) {
       $contract = trim((string) ($row['contrato'] ?? ''));

@@ -3175,6 +3175,17 @@ body.scm-modal-open {
   color: #b91c1c;
 }
 
+#scm-app .scm-completed-activities-filters {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 360px) auto;
+}
+
+#scm-app .scm-completed-activities-filters .scm-field {
+  margin: 0;
+}
+
 #scm-app .scm-completed-activities-kpis {
   display: grid;
   grid-template-columns: repeat(7, minmax(120px, 1fr));
@@ -3233,8 +3244,9 @@ body.scm-modal-open {
 }
 
 #scm-app .scm-completed-activity-row {
+  align-items: center;
   display: grid;
-  grid-template-columns: 116px minmax(0, 1fr);
+  grid-template-columns: 116px minmax(0, 1fr) auto;
   gap: 12px;
   padding: 11px;
   border: 1px solid var(--scm-border);
@@ -3276,6 +3288,12 @@ body.scm-modal-open {
   color: var(--scm-blue-400);
   font-size: 11px;
   font-weight: 800;
+}
+
+#scm-app .scm-completed-activity-actions {
+  align-items: center;
+  display: flex;
+  justify-content: flex-end;
 }
 
 #scm-app .scm-home-content-grid {
@@ -3461,6 +3479,7 @@ body.scm-modal-open {
   #scm-app .scm-completed-activities-grid {
     grid-template-columns: 1fr;
   }
+  #scm-app .scm-completed-activities-filters,
   #scm-app .scm-completed-activity-row {
     grid-template-columns: 1fr;
   }

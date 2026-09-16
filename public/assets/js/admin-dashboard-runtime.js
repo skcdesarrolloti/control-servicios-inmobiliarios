@@ -10179,7 +10179,7 @@
     function replaceSelectOptions(select, rows, valueKey, labelKey) {
       if (!select) return;
       var current = String(
-        ((runtime.initialFilters || {})[select.name] || select.value || ""),
+        ((runtime.initialFilters || {})[select.name] || select.value || select.getAttribute("data-current-employee") || ""),
       );
       while (select.options.length > 1) {
         select.remove(1);
@@ -10264,7 +10264,7 @@
       }
       runtime.funcionarios = funcionarioOptions;
       var mappings = [
-        ["select[name$='id_empleado'], select[name$='_empleado'], select[name='empleado'], [data-scm-execution-form] select[name='funcionario']", funcionarioOptions, "id", "label"],
+        ["select[name$='id_empleado'], select[name$='_empleado'], select[name='empleado'], [data-scm-execution-form] select[name='funcionario'], [data-scm-completed-activities-filter] select[name='funcionario']", funcionarioOptions, "id", "label"],
         ["select[name$='barrio']", options.barrios || [], "value", "label"],
         ["select[name$='estado_admin']", options.estado_admin || [], "value", "label"],
         ["select[name$='prioridad']", options.prioridad || [], "value", "label"],
@@ -10346,6 +10346,7 @@
     var dashboardHomePromise = null;
     var dashboardCompletedActivitiesPromise = null;
     var dashboardMetricsPromise = null;
+    var dashboardCompletedActivitiesById = {};
 
     function formatDashboardCount(value) {
       var numericValue = Number(value);
@@ -10404,9 +10405,14 @@
     function completedActivityRowHtml(row) {
       row = row || {};
       var ticket = String(row.ticket || row.ticket_pk || "").trim();
+      var ticketPk = String(row.ticket_pk || "").trim();
+      var eventId = String(row.id || "").trim();
+      var rowId = String(row._completed_key || row.id || "").trim();
       var detail = String(row.detalle || "").trim();
       var person = String(row.funcionario || row.funcionario_label || "").trim();
-      return '<article class="scm-completed-activity-row">' +
+      var hasTicket = ticket && ticket !== "-";
+      var actionLabel = hasTicket ? "Ver caso" : (String(row.type || "") === "evento" ? "Ver evento" : "Ver detalle");
+      return '<article class="scm-completed-activity-row" data-scm-completed-row="' + escHtml(rowId) + '">' +
         '<div class="scm-completed-activity-date">' + escHtml(row.fecha || "-") + "</div>" +
         '<div class="scm-completed-activity-main">' +
           '<strong>' + escHtml(row.titulo || row.asunto || row.label || "Actividad realizada") + "</strong>" +
@@ -10417,7 +10423,65 @@
             (person ? " · " + escHtml(person) : "") +
           "</small>" +
         "</div>" +
+        '<div class="scm-completed-activity-actions">' +
+          '<button type="button" class="scm-case-work-btn" data-scm-completed-open-detail data-completed-row="' + escHtml(rowId) + '"' +
+            (hasTicket ? ' data-ticket-id="' + escHtml(ticketPk || ticket) + '"' : "") +
+            (eventId ? ' data-event-id="' + escHtml(eventId) + '"' : "") +
+          '>' + actionLabel + '</button>' +
+        "</div>" +
       "</article>";
+    }
+
+    function completedActivityDetailHtml(row) {
+      row = row || {};
+      var ticket = String(row.ticket || row.ticket_pk || "").trim();
+      var fields = [
+        ["Tipo", row.label || row.type || "Actividad"],
+        ["Fecha", row.fecha || "-"],
+        ["Funcionario", row.funcionario_label || row.funcionario || "-"],
+        ["Caso", ticket && ticket !== "-" ? "#" + ticket : ""],
+        ["Contrato", row.contrato || ""],
+        ["Inmueble", row.inmueble || ""],
+        ["Estado", row.estado || ""],
+        ["Estado administrativo", row.estado_admin || ""],
+      ].filter(function (item) { return String(item[1] || "").trim() !== ""; });
+      return '<div class="scm-calendar-native-detail scm-completed-activity-detail">' +
+        '<div class="scm-case-calendar-event-mini-head"><span>Detalle</span><strong>' + escHtml(row.titulo || row.asunto || row.label || "Actividad realizada") + "</strong></div>" +
+        '<div class="scm-case-calendar-event-mini-grid">' +
+          fields.map(function (item) {
+            return '<div><small>' + escHtml(item[0]) + '</small><strong>' + escHtml(item[1]) + '</strong></div>';
+          }).join("") +
+        "</div>" +
+        (row.detalle ? '<div class="scm-case-calendar-event-mini-description"><small>Observaci&oacute;n</small><p>' + escHtml(row.detalle) + "</p></div>" : "") +
+      "</div>";
+    }
+
+    function openCompletedActivityDetail(rowId, ticketId) {
+      var row = dashboardCompletedActivitiesById[String(rowId || "")] || {};
+      ticketId = String(ticketId || row.ticket_pk || row.ticket || "").trim();
+      if (ticketId && ticketId !== "-" && typeof window.scmOpenCase === "function") {
+        var selectors = [
+          '.scm-btn-case[data-ticket-pk="' + cssAttrValue(ticketId) + '"]',
+          '.scm-btn-case[data-ticket="' + cssAttrValue(ticketId) + '"]',
+        ];
+        for (var i = 0; i < selectors.length; i += 1) {
+          var button = root.querySelector(selectors[i]) || document.querySelector(selectors[i]);
+          if (button) {
+            window.scmOpenCase(button);
+            return;
+          }
+        }
+      }
+      if (window.Swal && typeof window.Swal.fire === "function") {
+        window.Swal.fire({
+          title: "",
+          html: completedActivityDetailHtml(row),
+          width: 720,
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal" },
+          confirmButtonText: "Cerrar",
+          showCancelButton: false,
+        });
+      }
     }
 
     function renderCompletedActivities(data) {
@@ -10442,6 +10506,16 @@
 
       var eventsWrap = panel.querySelector("[data-scm-completed-events]");
       var events = Array.isArray(data && data.events) ? data.events : [];
+      dashboardCompletedActivitiesById = {};
+      events.forEach(function (row, index) {
+        row._completed_key = "event-" + index + "-" + String(row.id || "");
+        dashboardCompletedActivitiesById[row._completed_key] = row;
+      });
+      var actions = Array.isArray(data && data.actions) ? data.actions : [];
+      actions.forEach(function (row, index) {
+        row._completed_key = "action-" + index + "-" + String(row.id || "");
+        dashboardCompletedActivitiesById[row._completed_key] = row;
+      });
       if (eventsWrap) {
         eventsWrap.innerHTML = events.length
           ? events.map(completedActivityRowHtml).join("")
@@ -10449,7 +10523,6 @@
       }
 
       var actionsWrap = panel.querySelector("[data-scm-completed-actions]");
-      var actions = Array.isArray(data && data.actions) ? data.actions : [];
       if (actionsWrap) {
         actionsWrap.innerHTML = actions.length
           ? actions.map(completedActivityRowHtml).join("")
@@ -10482,9 +10555,12 @@
       }
       var from = dashboardDateKey(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
       var to = dashboardDateKey(new Date());
+      var filterForm = panel.querySelector("[data-scm-completed-activities-filter]");
+      var funcionarioSelect = filterForm ? filterForm.querySelector("select[name='funcionario']") : null;
       dashboardCompletedActivitiesPromise = dashboardAction(actionDashboardCompletedActivities, {
         fecha_desde: from,
         fecha_hasta: to,
+        funcionario: funcionarioSelect ? funcionarioSelect.value : "",
       }).then(function (data) {
         renderCompletedActivities(data || {});
       }).catch(function (error) {
@@ -14508,6 +14584,16 @@
         return;
       }
 
+      var completedDetail = event.target.closest("[data-scm-completed-open-detail]");
+      if (completedDetail) {
+        event.preventDefault();
+        openCompletedActivityDetail(
+          completedDetail.getAttribute("data-completed-row") || "",
+          completedDetail.getAttribute("data-ticket-id") || "",
+        );
+        return;
+      }
+
       var shortcut = event.target.closest("[data-scm-home-target]");
       if (!shortcut) return;
       var targetPanel = shortcut.getAttribute("data-scm-home-target") || "";
@@ -14528,7 +14614,28 @@
       maybeShowDashboardDuePopup("login");
     }, 0);
 
+    root.addEventListener("change", function (e) {
+      var completedEmployeeSelect = e.target && e.target.closest
+        ? e.target.closest("[data-scm-completed-activities-filter] select[name='funcionario']")
+        : null;
+      if (!completedEmployeeSelect) return;
+      var completedPanel = completedEmployeeSelect.closest("[data-scm-completed-activities-panel]");
+      if (completedPanel) completedPanel.setAttribute("data-scm-loaded", "0");
+      loadCompletedActivities(true);
+    });
+
     root.addEventListener("submit", function (e) {
+      var completedFilterForm = e.target && e.target.closest
+        ? e.target.closest("[data-scm-completed-activities-filter]")
+        : null;
+      if (completedFilterForm) {
+        e.preventDefault();
+        var completedPanel = completedFilterForm.closest("[data-scm-completed-activities-panel]");
+        if (completedPanel) completedPanel.setAttribute("data-scm-loaded", "0");
+        loadCompletedActivities(true);
+        return;
+      }
+
       var segForm = e.target;
       if (
         !segForm ||
