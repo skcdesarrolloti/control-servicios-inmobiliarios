@@ -611,7 +611,10 @@ trait HistoryPresentationConcern
     foreach ($buttons as $btn) {
       $url = (string) ($btn['url'] ?? '');
       $label = (string) ($btn['label'] ?? '');
-      if (strpos($url, 'revision-correctiva.php?') !== false) {
+      $cotizacionId = $this->cotizacionMantenimientoIdFromUrl($url);
+      if ($cotizacionId !== '') {
+        $html .= '<button type="button" class="scm-case-action-btn" data-scm-view-cotizacion-native data-cotizacion-id="' . esc_attr($cotizacionId) . '">' . esc_html($label !== '' ? $label : 'Ver cotización de mantenimiento') . '</button>';
+      } elseif (strpos($url, 'revision-correctiva.php?') !== false) {
         $html .= '<button type="button" class="scm-case-action-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label !== '' ? $label : 'Revisión correctiva') . '">' . esc_html($label) . '</button>';
       } else {
         $html .= '<button type="button" class="scm-case-action-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label !== '' ? $label : 'Detalle') . '">' . esc_html($label) . '</button>';
@@ -619,6 +622,25 @@ trait HistoryPresentationConcern
     }
     $html .= '</div>';
     return $html;
+  }
+
+  private function cotizacionMantenimientoIdFromUrl(string $url): string
+  {
+    $decoded = html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if ($decoded === '' || stripos($decoded, 'cotizacion-de-mantenimiento') === false) {
+      return '';
+    }
+    $query = (string) (parse_url($decoded, PHP_URL_QUERY) ?: '');
+    $params = [];
+    if ($query !== '') {
+      parse_str($query, $params);
+    }
+    $id = trim((string) ($params['numero'] ?? $params['id_cotizacion'] ?? $params['id_cotizacion_mantenimiento'] ?? ''));
+    if ($id === '' && preg_match('/[?&](?:numero|id_cotizacion|id_cotizacion_mantenimiento)=([^&#]+)/i', $decoded, $match)) {
+      $id = rawurldecode((string) ($match[1] ?? ''));
+    }
+    $id = preg_replace('/\D+/', '', $id) ?? '';
+    return $id;
   }
 
   /**
