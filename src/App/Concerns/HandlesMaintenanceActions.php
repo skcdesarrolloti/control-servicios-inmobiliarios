@@ -969,6 +969,7 @@ trait HandlesMaintenanceActions
 
       $itemsMano = $this->maintenance_quote_repeater_items('items_mano_json', ['descripcion_mano', 'unidad_mano', 'cantidad_mano', 'valor_mano']);
       $itemsMateriales = $this->maintenance_quote_repeater_items('items_materiales_json', ['item_materiales', 'descripcion_materiales', 'unidad_materiales', 'cantidad_materiales', 'valor_unitario_materiales', 'valor_materiales', 'valor_total_materiales', 'provedor_materiales', 'proveedor_materiales']);
+      $itemsMateriales = $this->maintenance_quote_merge_generated_material_rows($itemsMateriales, $this->maintenance_quote_generated_material_offer_rows('materiales_oferta_image'));
       $itemsEquipos = $this->maintenance_quote_repeater_items('items_otros_equi_json', ['descipcion_otros_equi', 'unidad_otros_equi', 'cantidad_otros_equi', 'valor_otros_equi']);
       $itemsOtros = $this->maintenance_quote_repeater_items('items_otros_costos_json', ['descipcion_otros_costos', 'unidad_otros_costos', 'cantidad_otros_costos', 'valor_otros_costos']);
 
@@ -1814,7 +1815,7 @@ trait HandlesMaintenanceActions
         $value = in_array($field, ['cantidad_mano', 'valor_mano', 'cantidad_materiales', 'valor_unitario_materiales', 'valor_materiales', 'valor_total_materiales', 'cantidad_otros_equi', 'valor_otros_equi', 'cantidad_otros_costos', 'valor_otros_costos'], true)
           ? (string) (int) round($this->maintenance_quote_number($row[$field] ?? 0))
           : $this->maintenance_quote_clean($row[$field] ?? '');
-        if (trim($value) !== '' && trim($value) !== '0') {
+        if ($field !== 'item_materiales' && trim($value) !== '' && trim($value) !== '0') {
           $hasValue = true;
         }
         $clean[$field] = $value;
@@ -1871,6 +1872,73 @@ trait HandlesMaintenanceActions
       $total += $lineTotal;
     }
     return (float) (int) round($total);
+  }
+
+  /** @return array<int,array<string,string>> */
+  private function maintenance_quote_generated_material_offer_rows(string $field): array
+  {
+    $raw = trim((string) ($_POST[$field] ?? ''));
+    if ($raw === '' || str_starts_with($raw, 'data:image/')) {
+      return [];
+    }
+    $decoded = json_decode(wp_unslash($raw), true);
+    if (!is_array($decoded)) {
+      return [];
+    }
+    $rows = [];
+    foreach ($decoded as $item) {
+      if (!is_array($item)) {
+        continue;
+      }
+      $provider = $this->maintenance_quote_clean($item['provider'] ?? '');
+      $total = (int) round($this->maintenance_quote_number($item['total'] ?? 0));
+      if ($provider === '' || $total <= 0) {
+        continue;
+      }
+      $rows[] = [
+        'provedor_materiales' => $provider,
+        'proveedor_materiales' => $provider,
+        'valor_materiales' => (string) $total,
+        'valor_total_materiales' => (string) $total,
+      ];
+    }
+    return $rows;
+  }
+
+  /**
+   * @param array<int,array<string,string>> $items
+   * @param array<int,array<string,string>> $generatedRows
+   * @return array<int,array<string,string>>
+   */
+  private function maintenance_quote_merge_generated_material_rows(array $items, array $generatedRows): array
+  {
+    if ($generatedRows === []) {
+      return $items;
+    }
+    $out = [];
+    $seen = [];
+    foreach ($items as $item) {
+      $provider = $this->maintenance_quote_first([$item['provedor_materiales'] ?? '', $item['proveedor_materiales'] ?? '', $item['descripcion_materiales'] ?? '']);
+      $total = (int) round($this->maintenance_quote_number($item['valor_total_materiales'] ?? ($item['valor_materiales'] ?? 0)));
+      if ($provider === '' && $total <= 0) {
+        continue;
+      }
+      if ($provider !== '' && $total > 0) {
+        $seen[mb_strtolower($provider, 'UTF-8') . '|' . (string) $total] = true;
+      }
+      $out[] = $item;
+    }
+    foreach ($generatedRows as $row) {
+      $provider = $this->maintenance_quote_first([$row['provedor_materiales'] ?? '', $row['proveedor_materiales'] ?? '']);
+      $total = (int) round($this->maintenance_quote_number($row['valor_total_materiales'] ?? ($row['valor_materiales'] ?? 0)));
+      $key = mb_strtolower($provider, 'UTF-8') . '|' . (string) $total;
+      if ($provider === '' || $total <= 0 || isset($seen[$key])) {
+        continue;
+      }
+      $seen[$key] = true;
+      $out[] = $row;
+    }
+    return $out;
   }
 
   private function maintenance_quote_clean($value): string

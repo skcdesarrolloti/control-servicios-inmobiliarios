@@ -13355,19 +13355,17 @@
             row.setAttribute("data-generated-material-offer-row", key);
           }
         }
-        if (key) {
-          rowKeys[key] = true;
-          usedKeys[key] = true;
-        }
-      });
-      if (offers.length) {
-        var synced = offers.filter(function (offer) {
-          return offer.key && rowKeys[offer.key];
-        });
-        if (synced.length !== offers.length) {
-          setMaintenanceQuoteGeneratedMaterialOffers(form, synced);
-        }
+      if (key) {
+        rowKeys[key] = true;
+        usedKeys[key] = true;
       }
+    });
+      offers.forEach(function (offer) {
+        if (!offer || !offer.key || rowKeys[offer.key]) return;
+        appendMaterialRowFromGeneratedOffer(form, offer);
+        rowKeys[offer.key] = true;
+        usedKeys[offer.key] = true;
+      });
     }
 
     function showMaintenanceQuoteMaterialImagePreview(image, title) {
@@ -14124,6 +14122,7 @@
               if (maintenanceQuoteMaterialSupportRows(form).length && !generateMaterialOfferFromSupport(form, true)) {
                 return false;
               }
+              syncMaintenanceQuoteGeneratedMaterialRows(form);
               var formData = new FormData(form);
               formData.append("items_mano_json", JSON.stringify(collectQuoteRows(form, "mano")));
               formData.append("items_materiales_json", JSON.stringify(collectQuoteRows(form, "materiales")));
