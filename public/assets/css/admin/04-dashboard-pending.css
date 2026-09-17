@@ -7189,6 +7189,22 @@
   line-height: 1.3;
 }
 
+.scm-cotizacion-media-item.is-missing {
+  border-style: dashed;
+  border-color: #f7b267;
+  background: #fff7ed;
+  cursor: default;
+}
+
+.scm-cotizacion-media-item.is-missing small {
+  display: block;
+  margin-top: 6px;
+  color: #9a3412;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .scm-cotizacion-media-file {
   display: grid;
   place-items: center;

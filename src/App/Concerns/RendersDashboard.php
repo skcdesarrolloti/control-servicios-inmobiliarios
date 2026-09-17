@@ -4531,6 +4531,7 @@ trait RendersDashboard
     if (empty($ids)) {
       return [];
     }
+    $storedFiles = \SCM\Support\StoredFileService::fromRuntime();
     $directItems = [];
     $numericIds = [];
     foreach ($ids as $ref) {
@@ -4543,9 +4544,19 @@ trait RendersDashboard
         continue;
       }
       $localName = $this->cotizacion_local_file_name_from_ref($ref);
+      if ($localName !== '' && $storedFiles->pathFor($localName) === null) {
+        $directItems[] = [
+          'id' => '',
+          'title' => $localName,
+          'url' => '',
+          'mime' => '',
+          'missing' => '1',
+        ];
+        continue;
+      }
       $url = $localName !== ''
-        ? \SCM\Support\StoredFileService::fromRuntime()->urlFor($localName)
-        : (preg_match('/^https?:\/\//i', $ref) ? $ref : \SCM\Support\StoredFileService::fromRuntime()->urlFor($ref));
+        ? $storedFiles->urlFor($localName)
+        : (preg_match('/^https?:\/\//i', $ref) ? $ref : $storedFiles->urlFor($ref));
       $path = (string) parse_url($url, PHP_URL_PATH);
       $title = $localName !== '' ? $localName : (basename($path) ?: 'Imagen adjunta');
       $extension = strtolower(pathinfo($localName !== '' ? $localName : $path, PATHINFO_EXTENSION));
@@ -4594,6 +4605,10 @@ trait RendersDashboard
     foreach ($items as $item) {
       $isImage = strpos(strtolower($item['mime'] ?? ''), 'image/') === 0;
       $title = $this->cotizacion_clean_text($item['title'] !== '' ? $item['title'] : 'Ver adjunto');
+      if (($item['missing'] ?? '') === '1' || trim((string) ($item['url'] ?? '')) === '') {
+        $html .= '<div class="scm-cotizacion-media-item is-missing"><span class="scm-cotizacion-media-file">No disponible</span><strong>' . esc_html($title !== '' ? $title : 'Adjunto no disponible') . '</strong><small>El archivo ya no está en el almacenamiento.</small></div>';
+        continue;
+      }
       $html .= '<a href="' . esc_attr($item['url']) . '" target="_blank" rel="noopener noreferrer" class="scm-cotizacion-media-item"' . ($isImage ? ' data-scm-lightbox="1" data-scm-lightbox-title="' . esc_attr($title !== '' ? $title : 'Imagen adjunta') . '"' : '') . '>';
       if ($isImage) {
         $html .= '<img src="' . esc_attr($item['url']) . '" alt="' . esc_attr($title !== '' ? $title : 'Imagen adjunta') . '">';
