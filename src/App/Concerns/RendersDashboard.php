@@ -4437,11 +4437,15 @@ trait RendersDashboard
     $parts = preg_split('/[\s,]+/', trim((string) $raw)) ?: [];
     $out = [];
     foreach ($parts as $part) {
-      $part = trim((string) $part);
+      $part = html_entity_decode(trim((string) $part), ENT_QUOTES | ENT_HTML5, 'UTF-8');
       if ($part === '') {
         continue;
       }
-      if (preg_match('/^https?:\/\//i', $part) || preg_match('/^[a-f0-9]{24}_[0-9]+\.[a-z0-9]{1,8}$/D', basename($part))) {
+      if (
+        preg_match('/^https?:\/\//i', $part)
+        || str_contains($part, 'file.php?')
+        || preg_match('/^[a-f0-9]{24}_[0-9]+\.[a-z0-9]{1,8}$/D', basename($part))
+      ) {
         $out[$part] = $part;
         continue;
       }
@@ -4451,6 +4455,33 @@ trait RendersDashboard
       }
     }
     return array_values($out);
+  }
+
+  private function cotizacion_local_file_name_from_ref(string $ref): string
+  {
+    $ref = html_entity_decode(trim($ref), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if ($ref === '') {
+      return '';
+    }
+    $basename = basename((string) parse_url($ref, PHP_URL_PATH));
+    if (preg_match('/^[a-f0-9]{24}_[0-9]+\.[a-z0-9]{1,8}$/D', $basename)) {
+      return $basename;
+    }
+    $query = (string) parse_url($ref, PHP_URL_QUERY);
+    if ($query !== '') {
+      parse_str($query, $params);
+      $name = basename((string) ($params['n'] ?? ''));
+      if (preg_match('/^[a-f0-9]{24}_[0-9]+\.[a-z0-9]{1,8}$/D', $name)) {
+        return $name;
+      }
+    }
+    if (str_contains($ref, 'file.php?') && preg_match('/[?&]n=([^&]+)/', $ref, $matches)) {
+      $name = basename(rawurldecode((string) ($matches[1] ?? '')));
+      if (preg_match('/^[a-f0-9]{24}_[0-9]+\.[a-z0-9]{1,8}$/D', $name)) {
+        return $name;
+      }
+    }
+    return '';
   }
 
   /** @param array<int,string> $ids @return array<int,array<string,string>> */
@@ -4470,15 +4501,24 @@ trait RendersDashboard
         $numericIds[] = $ref;
         continue;
       }
-      $url = preg_match('/^https?:\/\//i', $ref)
-        ? $ref
-        : (\SCM\Support\StoredFileService::fromRuntime()->urlFor($ref));
+      $localName = $this->cotizacion_local_file_name_from_ref($ref);
+      $url = $localName !== ''
+        ? \SCM\Support\StoredFileService::fromRuntime()->urlFor($localName)
+        : (preg_match('/^https?:\/\//i', $ref) ? $ref : \SCM\Support\StoredFileService::fromRuntime()->urlFor($ref));
       $path = (string) parse_url($url, PHP_URL_PATH);
+      $title = $localName !== '' ? $localName : (basename($path) ?: 'Imagen adjunta');
+      $extension = strtolower(pathinfo($localName !== '' ? $localName : $path, PATHINFO_EXTENSION));
+      $mime = match ($extension) {
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        'gif' => 'image/gif',
+        default => 'image/jpeg',
+      };
       $directItems[] = [
         'id' => '',
-        'title' => basename($path) ?: 'Imagen adjunta',
+        'title' => $title,
         'url' => $url,
-        'mime' => 'image/jpeg',
+        'mime' => $mime,
       ];
     }
     $posts = $this->db->table('posts');

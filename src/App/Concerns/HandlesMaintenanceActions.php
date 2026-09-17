@@ -997,8 +997,8 @@ trait HandlesMaintenanceActions
         $storedPhotos[] = $materialesOfertaImage;
         $newMejor[] = $materialesOfertaImage;
       }
-      $mejorOferta = array_merge($mejorOferta, array_map(static fn(array $photo): string => (string) ($photo['url'] ?? ''), $newMejor));
-      $otrasOferta = array_merge($otrasOferta, array_map(static fn(array $photo): string => (string) ($photo['url'] ?? ''), $newOtras));
+      $mejorOferta = array_merge($mejorOferta, $this->maintenance_quote_stored_media_refs($newMejor));
+      $otrasOferta = array_merge($otrasOferta, $this->maintenance_quote_stored_media_refs($newOtras));
 
       $tipoMantenimiento = $this->maintenance_quote_clean($_POST['tipo_mantenimiento'] ?? ($context['tipo_mantenimiento'] ?? 'Correctiva'));
       $tipoMantenimiento = stripos($tipoMantenimiento, 'prevent') !== false ? 'Preventiva' : 'Correctiva';
@@ -1992,6 +1992,27 @@ trait HandlesMaintenanceActions
       $storedImages[] = $stored;
     }
     return $storedImages;
+  }
+
+  /**
+   * @param array<int,array{name?:string,url?:string}> $images
+   * @return array<int,string>
+   */
+  private function maintenance_quote_stored_media_refs(array $images): array
+  {
+    $refs = [];
+    foreach ($images as $image) {
+      $name = basename((string) ($image['name'] ?? ''));
+      if ($name !== '' && preg_match('/^[a-f0-9]{24}_[0-9]+\.[a-z0-9]{1,8}$/D', $name)) {
+        $refs[] = $name;
+        continue;
+      }
+      $url = trim((string) ($image['url'] ?? ''));
+      if ($url !== '') {
+        $refs[] = $url;
+      }
+    }
+    return $refs;
   }
 
   /** @return array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}|null */

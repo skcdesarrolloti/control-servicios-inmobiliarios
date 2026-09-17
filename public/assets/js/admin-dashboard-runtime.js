@@ -8605,12 +8605,19 @@
       var activePanel = root.querySelector(".scm-tab-panel.active");
       var panelId = activePanel ? activePanel.id : "";
       var activeKey = panelId.replace("scm-panel-", "");
+      function refreshGenericTab(tabKey) {
+        var fetcher = tabFetchers && tabFetchers[tabKey] ? tabFetchers[tabKey] : null;
+        if (!fetcher || !fetcher.form || typeof fetcher.fetchTab !== "function") {
+          return Promise.resolve();
+        }
+        return fetcher.fetchTab(new FormData(fetcher.form));
+      }
       if (activeKey === "mis-tickets") {
         activeKey = "mis_tickets";
       } else if (activeKey === "cotizaciones-mantenimiento") {
         activeKey = "cotizaciones_mantenimiento";
       } else if (activeKey === "preventivas-pendientes") {
-        activeKey = "preventiva";
+        activeKey = "preventivas_pendientes";
       } else if (activeKey === "servicios-publicos-pendientes") {
         activeKey = "servicios_publicos_pendientes";
       } else if (activeKey === "actividades-administrativas" && activePanel) {
@@ -8623,6 +8630,32 @@
       }
       if (activeKey === "mant" && form) {
         return doFetch(new FormData(form));
+      } else if (activeKey === "abiertos" && activePanel) {
+        var openPanel = activePanel.querySelector(
+          ".scm-open-topic-panel.active",
+        );
+        var openKey = openPanel
+          ? openPanel.getAttribute("data-open-topic") || ""
+          : "";
+        if (openKey === "mant" && form) {
+          return doFetch(new FormData(form));
+        }
+        if (openKey) {
+          return refreshGenericTab(openKey);
+        }
+      } else if (
+        (activeKey === "postergados" || activeKey === "cerrados") &&
+        activePanel
+      ) {
+        var statusPanel = activePanel.querySelector(
+          ".scm-status-topic-panel.active",
+        );
+        var statusKey = statusPanel
+          ? statusPanel.getAttribute("data-status-key") || ""
+          : "";
+        if (statusKey) {
+          return refreshGenericTab(statusKey);
+        }
       } else if (activeKey === "calendario_actividades") {
         var homeCalendar = root.querySelector("#scm-panel-inicio [data-calendar-sections]");
         var visibleCalendarSection = homeCalendar
@@ -8662,39 +8695,7 @@
           "rsp_kpis",
         );
       } else if (tabFetchers[activeKey]) {
-        return tabFetchers[activeKey].fetchTab(
-          new FormData(tabFetchers[activeKey].form),
-        );
-      } else if (activeKey === "abiertos" && activePanel) {
-        var openPanel = activePanel.querySelector(
-          ".scm-open-topic-panel.active",
-        );
-        var openKey = openPanel
-          ? openPanel.getAttribute("data-open-topic") || ""
-          : "";
-        if (openKey === "mant" && form) {
-          return doFetch(new FormData(form));
-        }
-        if (openKey && tabFetchers[openKey]) {
-          return tabFetchers[openKey].fetchTab(
-            new FormData(tabFetchers[openKey].form),
-          );
-        }
-      } else if (
-        (activeKey === "postergados" || activeKey === "cerrados") &&
-        activePanel
-      ) {
-        var statusPanel = activePanel.querySelector(
-          ".scm-status-topic-panel.active",
-        );
-        var statusKey = statusPanel
-          ? statusPanel.getAttribute("data-status-key") || ""
-          : "";
-        if (statusKey && tabFetchers[statusKey]) {
-          return tabFetchers[statusKey].fetchTab(
-            new FormData(tabFetchers[statusKey].form),
-          );
-        }
+        return refreshGenericTab(activeKey);
       } else if (activeKey === "pqr-publico" && activePanel) {
         var publicPqrForm = activePanel.querySelector(
           "form.scm-public-pqr-filter-form",
