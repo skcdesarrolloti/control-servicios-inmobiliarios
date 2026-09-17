@@ -3801,7 +3801,7 @@ trait HandlesMaintenanceActions
         if (!is_array($item)) {
           continue;
         }
-        $label = $this->cotizacion_first_matching_value($item, ['prove', 'descripcion', 'actividad', 'concepto', 'detalle']);
+        $label = $this->cotizacion_first_matching_value($item, ['prove', 'descipcion', 'descripcion', 'actividad', 'concepto', 'detalle']);
         $value = method_exists($this, 'cotizacion_budget_item_total')
           ? $this->cotizacion_budget_item_total($item)
           : $this->cotizacion_first_matching_value($item, ['valor', 'total', 'saldo']);

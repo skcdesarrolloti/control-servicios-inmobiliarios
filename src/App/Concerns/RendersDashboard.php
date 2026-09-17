@@ -4629,7 +4629,7 @@ trait RendersDashboard
     } else {
       $html .= '<div class="scm-cotizacion-table-wrap"><table class="scm-cotizacion-budget-table scm-cotizacion-materials-table"><thead><tr><th>Proveedor / material</th><th>Valor</th></tr></thead><tbody>';
       foreach ($items as $item) {
-        $description = $this->cotizacion_first_matching_value($item, ['descripcion_materiales', 'descripcion', 'prove', 'material', 'referencia']);
+        $description = $this->cotizacion_first_matching_value($item, ['proveedor_materiales', 'provedor_materiales', 'descripcion_materiales', 'descipcion_materiales', 'descripcion', 'descipcion', 'material', 'referencia', 'prove']);
         $lineValue = $this->cotizacion_budget_item_total($item);
         $html .= '<tr>'
           . '<td>' . esc_html($description !== '' ? $description : '-') . '</td>'
@@ -4651,7 +4651,7 @@ trait RendersDashboard
     } else {
       $html .= '<table class="scm-cotizacion-budget-table"><thead><tr><th>Descripción / proveedor</th><th>Valor</th></tr></thead><tbody>';
       foreach ($items as $item) {
-        $label = $this->cotizacion_first_matching_value($item, ['prove', 'descripcion', 'actividad', 'concepto', 'detalle']);
+        $label = $this->cotizacion_first_matching_value($item, ['prove', 'descipcion', 'descripcion', 'actividad', 'concepto', 'detalle']);
         $value = $this->cotizacion_budget_item_total($item);
         $html .= '<tr><td>' . esc_html($label !== '' ? $this->cotizacion_clean_text($label) : '-') . '</td><td>' . esc_html($this->format_cop_currency($value)) . '</td></tr>';
       }
@@ -4701,12 +4701,51 @@ trait RendersDashboard
   /** @param array<string,mixed> $item */
   private function cotizacion_budget_item_total(array $item): string
   {
-    foreach (['valor_total_materiales', 'valor_total_item_mo', 'valor_total_otros_equi', 'valor_total_otros_costos', 'valor_materiales', 'valor_mano', 'valor_otros_equi', 'valor_otros_costos', 'total'] as $key) {
+    foreach (['valor_total_materiales', 'valor_total_item_mo', 'valor_total_mano', 'valor_total_otros_equi', 'valor_total_otros_costos', 'total'] as $key) {
+      if (array_key_exists($key, $item) && trim((string) $item[$key]) !== '') {
+        return $this->cotizacion_clean_text($item[$key]);
+      }
+    }
+    foreach ([
+      ['cantidad_materiales', 'valor_unitario_materiales'],
+      ['cantidad_mano', 'valor_mano'],
+      ['cantidad_otros_equi', 'valor_otros_equi'],
+      ['cantidad_otros_costos', 'valor_otros_costos'],
+    ] as [$quantityKey, $unitValueKey]) {
+      if (!array_key_exists($quantityKey, $item) || !array_key_exists($unitValueKey, $item)) {
+        continue;
+      }
+      $quantity = $this->cotizacion_parse_budget_number($item[$quantityKey]);
+      $unitValue = $this->cotizacion_parse_budget_number($item[$unitValueKey]);
+      if ($quantity > 0 && $unitValue > 0) {
+        return (string) ($quantity * $unitValue);
+      }
+    }
+    foreach (['valor_materiales', 'valor_mano', 'valor_otros_equi', 'valor_otros_costos', 'valor_maquinarias'] as $key) {
       if (array_key_exists($key, $item) && trim((string) $item[$key]) !== '') {
         return $this->cotizacion_clean_text($item[$key]);
       }
     }
     return $this->cotizacion_first_matching_value($item, ['valor', 'total', 'saldo']);
+  }
+
+  private function cotizacion_parse_budget_number($value): float
+  {
+    $raw = trim((string) $value);
+    if ($raw === '') {
+      return 0.0;
+    }
+    $normalized = preg_replace('/[^\d,.\-]/', '', $raw) ?: '';
+    if ($normalized === '') {
+      return 0.0;
+    }
+    if (str_contains($normalized, ',') && str_contains($normalized, '.')) {
+      $normalized = str_replace('.', '', $normalized);
+      $normalized = str_replace(',', '.', $normalized);
+    } elseif (str_contains($normalized, ',')) {
+      $normalized = str_replace(',', '.', $normalized);
+    }
+    return is_numeric($normalized) ? (float) $normalized : 0.0;
   }
 
   private function cotizacion_rich_text($value): string
