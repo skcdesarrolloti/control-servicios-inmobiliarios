@@ -631,16 +631,20 @@ trait HandlesCorrectiveReviewActions
     }
 
     $propertyId = $this->correctiveReviewDigits($property['_ID'] ?? '');
+    $propertyMatchesExplicitContext = false;
     foreach ([$contract['id_inmueble_data'] ?? '', $ticket['id_inmueble_data'] ?? ''] as $candidate) {
       $expectedId = $this->correctiveReviewDigits($candidate);
       if ($expectedId !== '' && $propertyId !== '' && $expectedId !== $propertyId) {
         throw new \DomainException('El inmueble de datos encontrado no corresponde al caso. Recarga el caso antes de crear la revisión.');
       }
+      if ($expectedId !== '' && $propertyId !== '' && $expectedId === $propertyId) {
+        $propertyMatchesExplicitContext = true;
+      }
     }
 
     $contractId = $this->correctiveReviewDigits($contract['_ID'] ?? ($ticket['id_contrato'] ?? ''));
     $propertyContractId = $this->correctiveReviewDigits($property['id_contrato_arrendamiento'] ?? '');
-    if ($contractId !== '' && $propertyContractId !== '' && $contractId !== $propertyContractId) {
+    if (!$propertyMatchesExplicitContext && $contractId !== '' && $propertyContractId !== '' && $contractId !== $propertyContractId) {
       throw new \DomainException('El inmueble encontrado pertenece a otro contrato. Recarga el caso antes de crear la revisión.');
     }
   }
