@@ -13671,6 +13671,7 @@
       if (!box) return;
       var typeSelect = form.querySelector("[data-quote-perturb-type-select]");
       var type = typeSelect ? String(typeSelect.value || "residencial") : "residencial";
+      box.setAttribute("data-quote-perturb-type", type);
       form.querySelectorAll("[data-quote-criteria]").forEach(function (group) {
         group.hidden = group.getAttribute("data-quote-criteria") !== type;
       });

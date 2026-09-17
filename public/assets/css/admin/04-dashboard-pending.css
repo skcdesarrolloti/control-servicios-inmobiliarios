@@ -6596,6 +6596,11 @@
   gap: 16px;
 }
 
+.scm-maint-quote-criteria-grid[hidden],
+.scm-maint-quote-criterion-card[hidden] {
+  display: none !important;
+}
+
 .scm-maint-quote-type-grid {
   grid-template-columns: minmax(280px, 0.5fr) minmax(280px, 0.5fr);
 }
