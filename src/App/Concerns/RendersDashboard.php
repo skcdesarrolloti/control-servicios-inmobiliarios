@@ -4125,7 +4125,7 @@ trait RendersDashboard
     $html = '<article class="scm-cotizacion-native-doc is-audience-' . esc_attr($audience) . '" data-cotizacion-audience="' . esc_attr($audience) . '" data-cotizacion-print-title="Cotización #' . esc_attr($id) . '">';
     $html .= '<div class="scm-cotizacion-native-audience"><span>' . esc_html($isFuncionario ? 'Vista interna' : 'Copia para destinatario') . '</span><strong>' . esc_html($isFuncionario ? 'Documento completo para funcionario' : 'Documento comercial para compartir') . '</strong></div>';
     $html .= '<header class="scm-cotizacion-native-hero">';
-    $html .= '<div class="scm-cotizacion-native-brand"><div class="scm-cotizacion-native-logo"><img src="' . esc_attr($logo) . '" alt="SuCasa Inmobiliaria"><strong>SuCasa Inmobiliaria</strong><span>Control Servicios Inmobiliarios</span></div><div class="scm-cotizacion-native-number"><span>Cotización de mantenimiento</span><strong>#' . esc_html($id !== '' ? $id : '-') . '</strong></div></div>';
+    $html .= '<div class="scm-cotizacion-native-brand"><div class="scm-cotizacion-native-logo"><img src="' . esc_attr($logo) . '" alt="SKC SuCasa Inmobiliaria"><strong>SKC SuCasa Inmobiliaria</strong><span>Control Servicios Inmobiliarios</span></div><div class="scm-cotizacion-native-number"><span>Cotización de mantenimiento</span><strong>#' . esc_html($id !== '' ? $id : '-') . '</strong></div></div>';
     $html .= '<div class="scm-cotizacion-native-hero-bottom"><div><p class="scm-cotizacion-native-eyebrow">Documento comercial</p><h2>Cotización de mantenimiento para revisión ' . esc_html($tipo !== '' ? strtolower($this->cotizacion_clean_text($tipo)) : 'de mantenimiento') . '</h2></div><div class="scm-cotizacion-native-state"><span class="' . ($enviada ? 'is-sent' : 'is-pending') . '">' . esc_html($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><strong>' . esc_html($estado !== '' ? $this->cotizacion_clean_text($estado) : 'Sin estado') . '</strong><em>Total ' . esc_html($totalCotizacion) . '</em></div></div>';
     $html .= '</header>';
 
@@ -4147,11 +4147,6 @@ trait RendersDashboard
       $html .= '<div><span>' . esc_html($label) . '</span><strong>' . esc_html($cleanValue !== '' ? $cleanValue : '-') . '</strong></div>';
     }
     $html .= '</section>';
-
-    $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-offers"><h3>Ofertas y soportes</h3><div class="scm-cotizacion-native-two-col">';
-    $html .= '<div><h4>Mejor oferta</h4>' . $this->render_cotizacion_media_grid($mejorOferta, 'Sin mejor oferta adjunta.') . '</div>';
-    $html .= '<div><h4>Otras ofertas</h4>' . $this->render_cotizacion_media_grid($otrasOfertas, 'No se presentó ninguna otra oferta.') . '</div>';
-    $html .= '</div></section>';
 
     $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-damage-report"><div class="scm-cotizacion-native-section-title"><div><span>Informe t&eacute;cnico</span><h3>Da&ntilde;os encontrados</h3></div><strong>' . esc_html((string) count($danos)) . ' ' . (count($danos) === 1 ? 'hallazgo' : 'hallazgos') . '</strong></div>';
     if (empty($danos)) {
@@ -4177,7 +4172,11 @@ trait RendersDashboard
     $html .= '</section>';
 
     $html .= '<section class="scm-cotizacion-native-section"><h3>Presupuesto</h3>';
-    $html .= $this->render_cotizacion_budget_rows('Materiales', $materiales, ['total_materiales'], $row);
+    $html .= $this->render_cotizacion_materials_budget_rows($materiales, $row);
+    $html .= '<div class="scm-cotizacion-native-material-offers"><div class="scm-cotizacion-native-section-title"><div><span>Soportes de materiales</span><h3>Ofertas de materiales</h3></div></div><div class="scm-cotizacion-native-two-col">';
+    $html .= '<div><h4>Mejores ofertas</h4>' . $this->render_cotizacion_media_grid($mejorOferta, 'Sin mejor oferta adjunta.') . '</div>';
+    $html .= '<div><h4>Otras ofertas</h4>' . $this->render_cotizacion_media_grid($otrasOfertas, 'No se presentó ninguna otra oferta.') . '</div>';
+    $html .= '</div></div>';
     $html .= $this->render_cotizacion_budget_rows('Mano de obra', $mano, ['total_mano_obra'], $row);
     $html .= $this->render_cotizacion_budget_rows('Equipos / maquinarias', $equipos, ['total_maquinarias'], $row);
     $html .= $this->render_cotizacion_budget_rows('Otros costos', $otros, ['total_otros_costos'], $row);
@@ -4504,6 +4503,39 @@ trait RendersDashboard
       }
       $html .= '<strong>' . esc_html($title !== '' ? $title : 'Ver adjunto') . '</strong></a>';
     }
+    return $html . '</div>';
+  }
+
+  /** @param array<int,array<string,mixed>> $items @param array<string,mixed> $row */
+  private function render_cotizacion_materials_budget_rows(array $items, array $row): string
+  {
+    $html = '<div class="scm-cotizacion-budget-block scm-cotizacion-materials-budget"><h4>Materiales</h4>';
+    if (empty($items)) {
+      $html .= '<p class="scm-cotizacion-native-empty">Sin items registrados.</p>';
+    } else {
+      $html .= '<div class="scm-cotizacion-table-wrap"><table class="scm-cotizacion-budget-table scm-cotizacion-materials-table"><thead><tr><th>Ítem</th><th>Descripción</th><th>Unidad</th><th>Cantidad</th><th>Vr. unitario</th><th>Vr. total</th></tr></thead><tbody>';
+      foreach ($items as $idx => $item) {
+        $itemNumber = trim((string) ($item['item_materiales'] ?? ''));
+        if ($itemNumber === '') {
+          $itemNumber = (string) ($idx + 1);
+        }
+        $description = $this->cotizacion_first_matching_value($item, ['descripcion_materiales', 'descripcion', 'prove', 'material', 'referencia']);
+        $unit = $this->cotizacion_first_matching_value($item, ['unidad_materiales', 'unidad']);
+        $quantity = $this->cotizacion_first_matching_value($item, ['cantidad_materiales', 'cantidad']);
+        $unitValue = $this->cotizacion_first_matching_value($item, ['valor_unitario_materiales', 'unitario']);
+        $lineValue = $this->cotizacion_budget_item_total($item);
+        $html .= '<tr>'
+          . '<td>' . esc_html($this->cotizacion_clean_text($itemNumber)) . '</td>'
+          . '<td>' . esc_html($description !== '' ? $description : '-') . '</td>'
+          . '<td>' . esc_html($unit !== '' ? $unit : '-') . '</td>'
+          . '<td>' . esc_html($quantity !== '' ? $quantity : '-') . '</td>'
+          . '<td>' . esc_html($this->format_cop_currency($unitValue)) . '</td>'
+          . '<td>' . esc_html($this->format_cop_currency($lineValue)) . '</td>'
+          . '</tr>';
+      }
+      $html .= '</tbody></table></div>';
+    }
+    $html .= '<div class="scm-cotizacion-budget-subtotal"><span>Total materiales</span><strong>' . esc_html($this->format_cop_currency($this->cotizacion_money_value($row, ['total_materiales']))) . '</strong></div>';
     return $html . '</div>';
   }
 

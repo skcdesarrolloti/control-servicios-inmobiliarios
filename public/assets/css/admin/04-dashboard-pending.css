@@ -6932,6 +6932,45 @@
   white-space: nowrap;
 }
 
+.scm-cotizacion-materials-budget {
+  border-color: #fed7aa;
+  background: #fffaf3;
+}
+
+.scm-cotizacion-materials-table th,
+.scm-cotizacion-materials-table td {
+  text-align: center;
+}
+
+.scm-cotizacion-materials-table th:nth-child(2),
+.scm-cotizacion-materials-table td:nth-child(2) {
+  min-width: 220px;
+  text-align: left;
+}
+
+.scm-cotizacion-materials-table td:nth-child(5),
+.scm-cotizacion-materials-table td:nth-child(6) {
+  font-weight: 900;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.scm-cotizacion-materials-table td:last-child {
+  width: auto;
+}
+
+.scm-cotizacion-native-material-offers {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid #fed7aa;
+  border-radius: 16px;
+  background: #fffaf3;
+}
+
+.scm-cotizacion-native-material-offers .scm-cotizacion-native-section-title {
+  margin-bottom: 12px;
+}
+
 .scm-cotizacion-budget-subtotal,
 .scm-cotizacion-native-total-box > div {
   display: flex;
