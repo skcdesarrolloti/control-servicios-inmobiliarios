@@ -13010,8 +13010,9 @@
         materiales_soporte: {
           title: "Imagen de cotización material",
           add: "Agregar ítem a imagen",
-          help: "Usa esta mini tabla cuando necesites generar una imagen tipo Excel para anexarla en las ofertas. No reemplaza los materiales reales del formulario.",
+          help: "Diligencia la tabla y genera una oferta: el sistema creará el material con proveedor, total e imagen de soporte automáticamente.",
           showTotal: false,
+          supportBuilder: true,
           fields: [
             ["text", "descripcion_materiales", "Descripción", "Material o referencia"],
             ["select", "unidad_materiales", "Unidad", ""],
@@ -13047,6 +13048,9 @@
       var html = '<section class="scm-maint-quote-section" data-quote-repeater="' + escHtml(type) + '"><div class="scm-maint-quote-section-head"><div><h4>' + escHtml(conf.title) + '</h4>' + totalHtml + '</div><button type="button" class="scm-maint-quote-add" data-quote-add-row="' + escHtml(type) + '">' + escHtml(conf.add) + '</button></div>';
       if (conf.help) {
         html += '<p class="scm-maint-quote-help">' + escHtml(conf.help) + '</p>';
+      }
+      if (conf.supportBuilder) {
+        html += '<div class="scm-maint-quote-support-head"><label class="scm-cotizacion-dialog-field"><span>Proveedor de esta oferta</span><input type="text" data-material-support-provider placeholder="Proveedor o almacén"></label><div class="scm-maint-quote-support-total"><span>Total de la imagen</span><strong data-material-support-total>$0</strong></div><button type="button" class="scm-maint-quote-generate" data-generate-material-offer>Generar oferta</button></div>';
       }
       html += '<div class="scm-maint-quote-rows">';
       rows.forEach(function (row, index) {
@@ -13156,7 +13160,6 @@
       var rows = Array.isArray(items) ? items.filter(function (row) {
         if (!row) return false;
         return String(row.descripcion_materiales || row.unidad_materiales || "").trim()
-          || parseCotizacionOrderMoney(row.cantidad_materiales || 0) > 0
           || parseCotizacionOrderMoney(row.valor_unitario_materiales || 0) > 0
           || parseCotizacionOrderMoney(row.valor_total_materiales || 0) > 0;
       }) : [];
@@ -13195,6 +13198,7 @@
         '</div></section>' +
         renderCotizacionRepeaterRows("mano", q.items_mano, context.unit_options) +
         renderCotizacionRepeaterRows("materiales", q.items_materiales, context.unit_options) +
+        '<div class="scm-maint-quote-generated-offers" data-material-generated-offers><p>No hay ofertas generadas desde la tabla de materiales.</p></div>' +
         renderCotizacionRepeaterRows("materiales_soporte", maintenanceQuoteMaterialSupportItems(q.items_materiales), context.material_unit_options || context.unit_options) +
         '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Mejores ofertas</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Otras ofertas</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><p class="scm-maint-quote-help">La imagen generada desde la tabla anterior se anexará automáticamente como soporte de ofertas. También puedes subir imágenes livianas; el sistema valida peso y tamaño antes de guardar.</p></section>' +
         renderCotizacionRepeaterRows("equipos", q.items_otros_equi, context.unit_options) +
@@ -13236,6 +13240,168 @@
         var label = row.querySelector("[data-material-auto-item]");
         if (label) label.textContent = String(index + 1);
       });
+    }
+
+    function maintenanceQuoteMaterialSupportRows(form) {
+      if (!form) return [];
+      return collectQuoteRows(form, "materiales_soporte").filter(function (row) {
+        return String(row.descripcion_materiales || "").trim()
+          || String(row.unidad_materiales || "").trim()
+          || parseCotizacionOrderMoney(row.valor_unitario_materiales || 0) > 0
+          || parseCotizacionOrderMoney(row.valor_total_materiales || 0) > 0;
+      });
+    }
+
+    function maintenanceQuoteMaterialSupportTotal(form) {
+      return maintenanceQuoteMaterialSupportRows(form).reduce(function (sum, row) {
+        var quantity = Math.max(1, parseCotizacionOrderMoney(row.cantidad_materiales || 1));
+        var unit = parseCotizacionOrderMoney(row.valor_unitario_materiales || 0);
+        var line = parseCotizacionOrderMoney(row.valor_total_materiales || 0) || (quantity * unit);
+        return sum + line;
+      }, 0);
+    }
+
+    function maintenanceQuoteGeneratedMaterialOffers(form) {
+      var input = form ? form.querySelector('[name="materiales_oferta_image"]') : null;
+      var raw = input ? String(input.value || "").trim() : "";
+      if (!raw) return [];
+      if (raw.indexOf("data:image/") === 0) {
+        return [{ key: "legacy_" + Date.now(), provider: "", total: 0, image: raw }];
+      }
+      try {
+        var parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter(function (item) {
+          return item && String(item.image || "").indexOf("data:image/") === 0;
+        }).map(function (item, index) {
+          return {
+            key: String(item.key || ("generated_" + index)),
+            provider: String(item.provider || ""),
+            total: parseCotizacionOrderMoney(item.total || 0),
+            image: String(item.image || ""),
+          };
+        });
+      } catch (err) {
+        return [];
+      }
+    }
+
+    function setMaintenanceQuoteGeneratedMaterialOffers(form, offers) {
+      var input = form ? form.querySelector('[name="materiales_oferta_image"]') : null;
+      if (!input) return;
+      input.value = JSON.stringify((offers || []).map(function (offer) {
+        return {
+          key: offer.key,
+          provider: offer.provider,
+          total: String(Math.round(parseCotizacionOrderMoney(offer.total || 0))),
+          image: offer.image,
+        };
+      }));
+    }
+
+    function renderMaintenanceQuoteGeneratedMaterialOffers(form) {
+      var wrap = form ? form.querySelector("[data-material-generated-offers]") : null;
+      if (!wrap) return;
+      var offers = maintenanceQuoteGeneratedMaterialOffers(form);
+      if (!offers.length) {
+        wrap.innerHTML = "<p>No hay ofertas generadas desde la tabla de materiales.</p>";
+        return;
+      }
+      wrap.innerHTML = offers.map(function (offer, index) {
+        return '<article class="scm-maint-quote-generated-card" data-generated-offer-card="' + escHtml(offer.key) + '">' +
+          '<img src="' + escHtml(offer.image) + '" alt="Imagen de cotización material de ' + escHtml(offer.provider || ("oferta " + (index + 1))) + '">' +
+          '<div><span>Proveedor</span><strong>' + escHtml(offer.provider || ("Oferta " + (index + 1))) + '</strong><b>' + escHtml(formatCotizacionOrderCurrency(offer.total || 0)) + '</b></div>' +
+          '<button type="button" class="scm-maint-quote-remove" data-remove-generated-material-offer="' + escHtml(offer.key) + '">Quitar</button>' +
+          '</article>';
+      }).join("");
+    }
+
+    function appendMaterialRowFromGeneratedOffer(form, offer) {
+      var section = form ? form.querySelector('[data-quote-repeater="materiales"] .scm-maint-quote-rows') : null;
+      if (!section) return;
+      var rows = Array.prototype.slice.call(section.querySelectorAll('[data-quote-row="materiales"]'));
+      var target = rows.find(function (row) {
+        var data = quoteRowToObject(row);
+        return !String(data.provedor_materiales || data.proveedor_materiales || "").trim() && parseCotizacionOrderMoney(data.valor_materiales || 0) <= 0;
+      });
+      if (!target) {
+        var temp = document.createElement("div");
+        temp.innerHTML = renderCotizacionRepeaterRows("materiales", [{}], []);
+        target = temp.querySelector('[data-quote-row="materiales"]');
+        if (target) section.appendChild(target);
+      }
+      if (!target) return;
+      target.setAttribute("data-generated-material-offer-row", offer.key);
+      var providerInput = target.querySelector('[data-quote-field="provedor_materiales"]');
+      var valueInput = target.querySelector('[data-quote-field="valor_materiales"]');
+      if (providerInput) providerInput.value = offer.provider || "";
+      if (valueInput) valueInput.value = formatMaintenanceQuotePlainNumber(offer.total || 0);
+    }
+
+    function resetMaterialSupportBuilder(form) {
+      if (!form) return;
+      var provider = form.querySelector("[data-material-support-provider]");
+      if (provider) provider.value = "";
+      var rows = Array.prototype.slice.call(form.querySelectorAll('[data-quote-row="materiales_soporte"]'));
+      rows.forEach(function (row, index) {
+        if (index > 0) {
+          row.remove();
+          return;
+        }
+        row.querySelectorAll("input, textarea, select").forEach(function (input) {
+          input.value = "";
+        });
+      });
+      refreshMaterialAutoItems(form);
+    }
+
+    function setMaterialOfferValidationMessage(message, silent) {
+      if (silent && window.Swal && window.Swal.showValidationMessage) {
+        window.Swal.showValidationMessage(message);
+      } else {
+        showToast("error", message);
+      }
+    }
+
+    function generateMaterialOfferFromSupport(form, silent) {
+      if (!form) return false;
+      syncMaintenanceQuoteTotals(form);
+      var rows = maintenanceQuoteMaterialSupportRows(form);
+      if (!rows.length) {
+        setMaterialOfferValidationMessage("Agrega al menos un ítem a la imagen de materiales.", silent);
+        return false;
+      }
+      var providerInput = form.querySelector("[data-material-support-provider]");
+      var provider = providerInput ? String(providerInput.value || "").trim() : "";
+      if (!provider) {
+        setMaterialOfferValidationMessage("Escribe el proveedor de esta oferta de materiales.", silent);
+        if (providerInput && providerInput.focus) providerInput.focus();
+        return false;
+      }
+      var total = maintenanceQuoteMaterialSupportTotal(form);
+      if (total <= 0) {
+        setMaterialOfferValidationMessage("La oferta de materiales debe tener un total mayor a cero.", silent);
+        return false;
+      }
+      var image = buildMaterialsQuoteImageDataUrl(form);
+      if (!image) {
+        setMaterialOfferValidationMessage("No fue posible generar la imagen de materiales.", silent);
+        return false;
+      }
+      var offer = {
+        key: "mat_" + Date.now() + "_" + Math.round(Math.random() * 100000),
+        provider: provider,
+        total: total,
+        image: image,
+      };
+      var offers = maintenanceQuoteGeneratedMaterialOffers(form);
+      offers.push(offer);
+      setMaintenanceQuoteGeneratedMaterialOffers(form, offers);
+      appendMaterialRowFromGeneratedOffer(form, offer);
+      renderMaintenanceQuoteGeneratedMaterialOffers(form);
+      resetMaterialSupportBuilder(form);
+      syncMaintenanceQuoteTotals(form);
+      return true;
     }
 
     function quotePerturbationLevel(percent) {
@@ -13357,9 +13523,7 @@
 
     function buildMaterialsQuoteImageDataUrl(form) {
       if (!form || !document.createElement) return "";
-      var rows = collectQuoteRows(form, "materiales_soporte").filter(function (row) {
-        return String(row.descripcion_materiales || "").trim() || parseCotizacionOrderMoney(row.valor_total_materiales || 0) > 0;
-      });
+      var rows = maintenanceQuoteMaterialSupportRows(form);
       if (!rows.length) return "";
       var width = 1100;
       var rowH = 34;
@@ -13436,6 +13600,8 @@
         var totalField = rowEl.querySelector('[data-quote-field="valor_total_materiales"]');
         if (totalField && unit > 0) totalField.value = formatMaintenanceQuotePlainNumber(quantity * unit);
       });
+      var supportTotal = form.querySelector("[data-material-support-total]");
+      if (supportTotal) supportTotal.textContent = formatCotizacionOrderCurrency(maintenanceQuoteMaterialSupportTotal(form));
       collectQuoteRows(form, "equipos").forEach(function (row) {
         totals.equipos += Math.max(1, parseCotizacionOrderMoney(row.cantidad_otros_equi || 1)) * parseCotizacionOrderMoney(row.valor_otros_equi);
       });
@@ -13486,6 +13652,24 @@
           }
           return;
         }
+        var generateMaterialBtn = event.target && event.target.closest ? event.target.closest("[data-generate-material-offer]") : null;
+        if (generateMaterialBtn) {
+          event.preventDefault();
+          generateMaterialOfferFromSupport(form, false);
+          return;
+        }
+        var removeGeneratedBtn = event.target && event.target.closest ? event.target.closest("[data-remove-generated-material-offer]") : null;
+        if (removeGeneratedBtn) {
+          event.preventDefault();
+          var key = removeGeneratedBtn.getAttribute("data-remove-generated-material-offer") || "";
+          setMaintenanceQuoteGeneratedMaterialOffers(form, maintenanceQuoteGeneratedMaterialOffers(form).filter(function (offer) {
+            return offer.key !== key;
+          }));
+          form.querySelectorAll('[data-generated-material-offer-row="' + key + '"]').forEach(function (row) { row.remove(); });
+          renderMaintenanceQuoteGeneratedMaterialOffers(form);
+          syncMaintenanceQuoteTotals(form);
+          return;
+        }
         var addBtn = event.target && event.target.closest ? event.target.closest("[data-quote-add-row]") : null;
         if (addBtn) {
           event.preventDefault();
@@ -13506,6 +13690,16 @@
           event.preventDefault();
           var rowsWrap = removeBtn.closest(".scm-maint-quote-rows");
           var row = removeBtn.closest("[data-quote-row]");
+          var generatedKey = row ? (row.getAttribute("data-generated-material-offer-row") || "") : "";
+          if (generatedKey) {
+            row.remove();
+            setMaintenanceQuoteGeneratedMaterialOffers(form, maintenanceQuoteGeneratedMaterialOffers(form).filter(function (offer) {
+              return offer.key !== generatedKey;
+            }));
+            renderMaintenanceQuoteGeneratedMaterialOffers(form);
+            syncMaintenanceQuoteTotals(form);
+            return;
+          }
           if (rowsWrap && row && rowsWrap.querySelectorAll("[data-quote-row]").length > 1) {
             row.remove();
           } else if (row) {
@@ -13516,6 +13710,7 @@
         }
       });
       refreshMaterialAutoItems(form);
+      renderMaintenanceQuoteGeneratedMaterialOffers(form);
       syncMaintenanceQuoteTotals(form);
       syncMaintenanceQuotePerturbation(form, context || {});
     }
@@ -13578,14 +13773,17 @@
                 return false;
               }
               syncMaintenanceQuotePerturbation(form, context || {});
+              if (maintenanceQuoteMaterialSupportRows(form).length && !generateMaterialOfferFromSupport(form, true)) {
+                return false;
+              }
               var formData = new FormData(form);
               formData.append("items_mano_json", JSON.stringify(collectQuoteRows(form, "mano")));
               formData.append("items_materiales_json", JSON.stringify(collectQuoteRows(form, "materiales")));
               formData.append("items_otros_equi_json", JSON.stringify(collectQuoteRows(form, "equipos")));
               formData.append("items_otros_costos_json", JSON.stringify(collectQuoteRows(form, "otros")));
-              var materialImage = buildMaterialsQuoteImageDataUrl(form);
-              if (materialImage) {
-                formData.set("materiales_oferta_image", materialImage);
+              var generatedMaterialOffers = maintenanceQuoteGeneratedMaterialOffers(form);
+              if (generatedMaterialOffers.length) {
+                formData.set("materiales_oferta_image", JSON.stringify(generatedMaterialOffers));
               }
               if (!String(formData.get("destinatario") || "").trim()) {
                 window.Swal.showValidationMessage("Completa el destinatario.");

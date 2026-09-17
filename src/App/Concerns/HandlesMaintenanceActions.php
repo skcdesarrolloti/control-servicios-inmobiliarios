@@ -992,8 +992,8 @@ trait HandlesMaintenanceActions
       $newMejor = $this->maintenance_quote_store_media('mejor_oferta', 10);
       $newOtras = $this->maintenance_quote_store_media('otras_oferta', 10);
       $storedPhotos = array_merge($storedPhotos, $newMejor, $newOtras);
-      $materialesOfertaImage = $this->maintenance_quote_store_generated_materials_image('materiales_oferta_image');
-      if ($materialesOfertaImage !== null) {
+      $materialesOfertaImages = $this->maintenance_quote_store_generated_materials_images('materiales_oferta_image');
+      foreach ($materialesOfertaImages as $materialesOfertaImage) {
         $storedPhotos[] = $materialesOfertaImage;
         $newMejor[] = $materialesOfertaImage;
       }
@@ -1947,29 +1947,61 @@ trait HandlesMaintenanceActions
     return $stored;
   }
 
+  /** @return array<int,array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}> */
+  private function maintenance_quote_store_generated_materials_images(string $field): array
+  {
+    $raw = trim((string) ($_POST[$field] ?? ''));
+    if ($raw === '') {
+      return [];
+    }
+    $dataUris = [];
+    if (str_starts_with($raw, 'data:image/')) {
+      $dataUris[] = $raw;
+    } else {
+      $decoded = json_decode(wp_unslash($raw), true);
+      if (is_array($decoded)) {
+        foreach ($decoded as $item) {
+          $image = is_array($item) ? trim((string) ($item['image'] ?? '')) : trim((string) $item);
+          if (str_starts_with($image, 'data:image/')) {
+            $dataUris[] = $image;
+          }
+        }
+      }
+    }
+    if ($dataUris === []) {
+      return [];
+    }
+    $storedImages = [];
+    foreach (array_slice($dataUris, 0, 10) as $dataUri) {
+      $stored = $this->storedFiles()->storeImageDataUri($dataUri);
+      if (!is_array($stored)) {
+        $this->storedFiles()->deleteStoredImages($storedImages);
+        throw new \DomainException('No fue posible generar la imagen de la cotización de materiales.');
+      }
+      $bytes = (int) ($stored['bytes'] ?? 0);
+      if ($bytes > 1572864) {
+        $this->storedFiles()->deleteStoredImages(array_merge($storedImages, [$stored]));
+        throw new \DomainException('La imagen generada de materiales supera 1.5 MB.');
+      }
+      $width = (int) ($stored['width'] ?? 0);
+      $height = (int) ($stored['height'] ?? 0);
+      if (($width > 0 && $width > 2000) || ($height > 0 && $height > 2000)) {
+        $this->storedFiles()->deleteStoredImages(array_merge($storedImages, [$stored]));
+        throw new \DomainException('La imagen generada de materiales supera 2000px.');
+      }
+      $storedImages[] = $stored;
+    }
+    return $storedImages;
+  }
+
   /** @return array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}|null */
   private function maintenance_quote_store_generated_materials_image(string $field): ?array
   {
-    $dataUri = trim((string) ($_POST[$field] ?? ''));
-    if ($dataUri === '') {
+    $stored = $this->maintenance_quote_store_generated_materials_images($field);
+    if ($stored === []) {
       return null;
     }
-    $stored = $this->storedFiles()->storeImageDataUri($dataUri);
-    if (!is_array($stored)) {
-      throw new \DomainException('No fue posible generar la imagen de la cotización de materiales.');
-    }
-    $bytes = (int) ($stored['bytes'] ?? 0);
-    if ($bytes > 1572864) {
-      $this->storedFiles()->deleteStoredImages([$stored]);
-      throw new \DomainException('La imagen generada de materiales supera 1.5 MB.');
-    }
-    $width = (int) ($stored['width'] ?? 0);
-    $height = (int) ($stored['height'] ?? 0);
-    if (($width > 0 && $width > 2000) || ($height > 0 && $height > 2000)) {
-      $this->storedFiles()->deleteStoredImages([$stored]);
-      throw new \DomainException('La imagen generada de materiales supera 2000px.');
-    }
-    return $stored;
+    return $stored[0];
   }
 
   /** @param array<string,mixed> $sourceQuote */
