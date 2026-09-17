@@ -13084,6 +13084,11 @@
       return html;
     }
 
+    function renderCotizacionHiddenRepeaterRows(type, items, unitOptions) {
+      return renderCotizacionRepeaterRows(type, items, unitOptions)
+        .replace('<section class="scm-maint-quote-section"', '<section class="scm-maint-quote-section scm-maint-quote-hidden-repeater" hidden aria-hidden="true"');
+    }
+
     function maintenanceQuoteWarningHtml(context) {
       var quotes = context && Array.isArray(context.existing_quotes) ? context.existing_quotes : [];
       if (!context || !context.will_disapprove_previous || !quotes.length) return "";
@@ -13197,9 +13202,9 @@
         '<label class="scm-cotizacion-dialog-field"><span>Celular</span><input type="tel" name="celular_destinatario" value="' + escHtml(d.celular_destinatario || "") + '"></label>' +
         '</div></section>' +
         renderCotizacionRepeaterRows("mano", q.items_mano, context.unit_options) +
-        renderCotizacionRepeaterRows("materiales", q.items_materiales, context.unit_options) +
-        '<div class="scm-maint-quote-generated-offers" data-material-generated-offers><p>No hay ofertas generadas desde la tabla de materiales.</p></div>' +
+        renderCotizacionHiddenRepeaterRows("materiales", q.items_materiales, context.unit_options) +
         renderCotizacionRepeaterRows("materiales_soporte", maintenanceQuoteMaterialSupportItems(q.items_materiales), context.material_unit_options || context.unit_options) +
+        '<section class="scm-maint-quote-section scm-maint-quote-generated-materials"><h4>Materiales generados</h4><div class="scm-maint-quote-generated-offers" data-material-generated-offers><p>No hay ofertas generadas desde la tabla de materiales.</p></div></section>' +
         '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Mejores ofertas</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Otras ofertas</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><p class="scm-maint-quote-help">La imagen generada desde la tabla anterior se anexará automáticamente como soporte de ofertas. También puedes subir imágenes livianas; el sistema valida peso y tamaño antes de guardar.</p></section>' +
         renderCotizacionRepeaterRows("equipos", q.items_otros_equi, context.unit_options) +
         renderCotizacionRepeaterRows("otros", q.items_otros_costos, context.unit_options) +
@@ -13299,19 +13304,42 @@
       }));
     }
 
+    function maintenanceQuoteGeneratedOfferByKey(form) {
+      var byKey = {};
+      maintenanceQuoteGeneratedMaterialOffers(form).forEach(function (offer) {
+        if (offer.key) byKey[offer.key] = offer;
+      });
+      return byKey;
+    }
+
     function renderMaintenanceQuoteGeneratedMaterialOffers(form) {
       var wrap = form ? form.querySelector("[data-material-generated-offers]") : null;
       if (!wrap) return;
-      var offers = maintenanceQuoteGeneratedMaterialOffers(form);
-      if (!offers.length) {
+      var imageByKey = maintenanceQuoteGeneratedOfferByKey(form);
+      var rows = Array.prototype.slice.call(form.querySelectorAll('[data-quote-row="materiales"]')).map(function (row, index) {
+        var data = quoteRowToObject(row);
+        var provider = String(data.provedor_materiales || data.proveedor_materiales || "").trim();
+        var total = parseCotizacionOrderMoney(data.valor_materiales || 0);
+        var key = row.getAttribute("data-generated-material-offer-row") || "";
+        return { row: row, index: index, provider: provider, total: total, key: key, image: key && imageByKey[key] ? imageByKey[key].image : "" };
+      }).filter(function (item) {
+        return item.provider || item.total > 0 || item.image;
+      });
+      if (!rows.length) {
         wrap.innerHTML = "<p>No hay ofertas generadas desde la tabla de materiales.</p>";
         return;
       }
-      wrap.innerHTML = offers.map(function (offer, index) {
-        return '<article class="scm-maint-quote-generated-card" data-generated-offer-card="' + escHtml(offer.key) + '">' +
-          '<img src="' + escHtml(offer.image) + '" alt="Imagen de cotización material de ' + escHtml(offer.provider || ("oferta " + (index + 1))) + '">' +
-          '<div><span>Proveedor</span><strong>' + escHtml(offer.provider || ("Oferta " + (index + 1))) + '</strong><b>' + escHtml(formatCotizacionOrderCurrency(offer.total || 0)) + '</b></div>' +
-          '<button type="button" class="scm-maint-quote-remove" data-remove-generated-material-offer="' + escHtml(offer.key) + '">Quitar</button>' +
+      wrap.innerHTML = rows.map(function (item) {
+        var imageHtml = item.image
+          ? '<img src="' + escHtml(item.image) + '" alt="Imagen de cotización material de ' + escHtml(item.provider || ("oferta " + (item.index + 1))) + '">'
+          : '<div class="scm-maint-quote-generated-card-placeholder">Sin imagen<br>generada</div>';
+        var removeAttr = item.key
+          ? ' data-remove-generated-material-offer="' + escHtml(item.key) + '"'
+          : ' data-remove-material-row-index="' + escHtml(String(item.index)) + '"';
+        return '<article class="scm-maint-quote-generated-card" data-generated-offer-card="' + escHtml(item.key || ("row_" + item.index)) + '">' +
+          imageHtml +
+          '<div><span>Proveedor</span><strong>' + escHtml(item.provider || ("Oferta " + (item.index + 1))) + '</strong><b>' + escHtml(formatCotizacionOrderCurrency(item.total || 0)) + '</b></div>' +
+          '<button type="button" class="scm-maint-quote-remove"' + removeAttr + '>Quitar</button>' +
           '</article>';
       }).join("");
     }
@@ -13402,6 +13430,109 @@
       resetMaterialSupportBuilder(form);
       syncMaintenanceQuoteTotals(form);
       return true;
+    }
+
+    function maintenanceQuoteDraftKey(context) {
+      var ticket = context && context.ticket ? context.ticket : {};
+      var quote = context && context.cotizacion ? context.cotizacion : {};
+      return "scm:maintenance_quote_draft:" + [
+        context && context.mode ? context.mode : "create",
+        ticket.id || ticket.numero || ticket.ticket_pk || "ticket",
+        quote.id || "new",
+      ].join(":");
+    }
+
+    function maintenanceQuoteDraftPayload(form) {
+      var fields = {};
+      if (!form) return null;
+      form.querySelectorAll("[name]").forEach(function (field) {
+        if (!field.name || field.type === "file") return;
+        fields[field.name] = field.value || "";
+      });
+      return {
+        savedAt: Date.now(),
+        fields: fields,
+        materialSupportProvider: (form.querySelector("[data-material-support-provider]") || {}).value || "",
+        generatedMaterialOffers: maintenanceQuoteGeneratedMaterialOffers(form),
+        repeaters: {
+          mano: collectQuoteRows(form, "mano"),
+          materiales: collectQuoteRows(form, "materiales"),
+          materiales_soporte: collectQuoteRows(form, "materiales_soporte"),
+          equipos: collectQuoteRows(form, "equipos"),
+          otros: collectQuoteRows(form, "otros"),
+        },
+      };
+    }
+
+    function saveMaintenanceQuoteDraft(form, draftKey) {
+      if (!form || !draftKey || !window.localStorage) return;
+      try {
+        window.localStorage.setItem(draftKey, JSON.stringify(maintenanceQuoteDraftPayload(form)));
+      } catch (err) {
+        if (window.console && console.warn) console.warn("[cotizacion] No se pudo guardar el borrador local.", err);
+      }
+    }
+
+    function clearMaintenanceQuoteDraft(draftKey) {
+      if (!draftKey || !window.localStorage) return;
+      try { window.localStorage.removeItem(draftKey); } catch (err) {}
+    }
+
+    function replaceMaintenanceQuoteRepeaterRows(form, type, items, unitOptions) {
+      var section = form ? form.querySelector('[data-quote-repeater="' + type + '"] .scm-maint-quote-rows') : null;
+      if (!section) return;
+      var temp = document.createElement("div");
+      temp.innerHTML = renderCotizacionRepeaterRows(type, Array.isArray(items) && items.length ? items : [{}], unitOptions || []);
+      var nextRows = temp.querySelector(".scm-maint-quote-rows");
+      if (nextRows) section.innerHTML = nextRows.innerHTML;
+    }
+
+    function restoreMaintenanceQuoteDraft(form, context, draftKey) {
+      if (!form || !draftKey || !window.localStorage) return false;
+      var payload = null;
+      try {
+        payload = JSON.parse(window.localStorage.getItem(draftKey) || "null");
+      } catch (err) {
+        payload = null;
+      }
+      if (!payload || !payload.repeaters) return false;
+      replaceMaintenanceQuoteRepeaterRows(form, "mano", payload.repeaters.mano, context.unit_options);
+      replaceMaintenanceQuoteRepeaterRows(form, "materiales", payload.repeaters.materiales, context.unit_options);
+      replaceMaintenanceQuoteRepeaterRows(form, "materiales_soporte", payload.repeaters.materiales_soporte, context.material_unit_options || context.unit_options);
+      replaceMaintenanceQuoteRepeaterRows(form, "equipos", payload.repeaters.equipos, context.unit_options);
+      replaceMaintenanceQuoteRepeaterRows(form, "otros", payload.repeaters.otros, context.unit_options);
+      Object.keys(payload.fields || {}).forEach(function (name) {
+        var field = form.querySelector('[name="' + name + '"]');
+        if (field && field.type !== "file") field.value = payload.fields[name] == null ? "" : String(payload.fields[name]);
+      });
+      var provider = form.querySelector("[data-material-support-provider]");
+      if (provider) provider.value = payload.materialSupportProvider || "";
+      setMaintenanceQuoteGeneratedMaterialOffers(form, payload.generatedMaterialOffers || []);
+      refreshMaterialAutoItems(form);
+      renderMaintenanceQuoteGeneratedMaterialOffers(form);
+      syncMaintenanceQuoteTotals(form);
+      syncMaintenanceQuotePerturbation(form, context || {});
+      showToast("info", "Restauré un borrador local de esta cotización.");
+      return true;
+    }
+
+    function wireMaintenanceQuoteDraft(form, context, draftKey) {
+      if (!form || !draftKey) return;
+      var timer = null;
+      function schedule() {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(function () {
+          saveMaintenanceQuoteDraft(form, draftKey);
+        }, 350);
+      }
+      form.addEventListener("input", schedule);
+      form.addEventListener("change", schedule);
+      form.addEventListener("click", function (event) {
+        if (event.target && event.target.closest && event.target.closest("[data-generate-material-offer], [data-remove-generated-material-offer], [data-remove-material-row-index], [data-quote-add-row], [data-quote-remove-row]")) {
+          schedule();
+        }
+      });
+      restoreMaintenanceQuoteDraft(form, context || {}, draftKey);
     }
 
     function quotePerturbationLevel(percent) {
@@ -13670,6 +13801,18 @@
           syncMaintenanceQuoteTotals(form);
           return;
         }
+        var removeMaterialRowBtn = event.target && event.target.closest ? event.target.closest("[data-remove-material-row-index]") : null;
+        if (removeMaterialRowBtn) {
+          event.preventDefault();
+          var rowIndex = parseInt(removeMaterialRowBtn.getAttribute("data-remove-material-row-index") || "-1", 10);
+          var materialRows = Array.prototype.slice.call(form.querySelectorAll('[data-quote-row="materiales"]'));
+          if (rowIndex >= 0 && materialRows[rowIndex]) {
+            materialRows[rowIndex].remove();
+          }
+          renderMaintenanceQuoteGeneratedMaterialOffers(form);
+          syncMaintenanceQuoteTotals(form);
+          return;
+        }
         var addBtn = event.target && event.target.closest ? event.target.closest("[data-quote-add-row]") : null;
         if (addBtn) {
           event.preventDefault();
@@ -13741,6 +13884,7 @@
       var mode = options.mode || button.getAttribute("data-cotizacion-mode") || (button.hasAttribute("data-scm-create-cotizacion") ? "create" : "edit");
       return loadMaintenanceQuoteContext(button, mode)
         .then(function (context) {
+          var draftKey = maintenanceQuoteDraftKey(context || {});
           return window.Swal.fire({
             title: context.mode === "edit" ? "Editar cotización de mantenimiento" : (context.mode === "note" ? "Añadir nota de cotización" : "Añadir cotización de mantenimiento"),
             html: buildMaintenanceQuoteFormHtml(context),
@@ -13752,6 +13896,7 @@
             buttonsStyling: false,
             focusConfirm: false,
             allowOutsideClick: false,
+            showLoaderOnConfirm: true,
             returnFocus: true,
             customClass: {
               popup: "scm-cotizacion-dialog scm-maint-quote-swal",
@@ -13763,7 +13908,9 @@
               closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
             },
             didOpen: function () {
-              wireMaintenanceQuoteForm(window.Swal.getPopup().querySelector("[data-maint-quote-form]"), context);
+              var form = window.Swal.getPopup().querySelector("[data-maint-quote-form]");
+              wireMaintenanceQuoteForm(form, context);
+              wireMaintenanceQuoteDraft(form, context, draftKey);
             },
             preConfirm: function () {
               var popup = window.Swal.getPopup();
@@ -13795,17 +13942,24 @@
                   return false;
                 }
               }
-              return formData;
+              saveMaintenanceQuoteDraft(form, draftKey);
+              return submitCotizacionAction(formData, actionCotizacionSave, "No se pudo guardar la cotización.").then(function (saved) {
+                if (!saved) {
+                  window.Swal.showValidationMessage("No se pudo guardar. Dejé tu progreso en pantalla y en borrador local.");
+                  saveMaintenanceQuoteDraft(form, draftKey);
+                  return false;
+                }
+                clearMaintenanceQuoteDraft(draftKey);
+                return true;
+              });
             },
           }).then(function (result) {
             if (!result.isConfirmed) {
               if (options.onClose) options.onClose();
               return false;
             }
-            return submitCotizacionAction(result.value, actionCotizacionSave, "No se pudo guardar la cotización.").then(function (saved) {
-              if (saved && options.onClose) options.onClose(320);
-              return saved;
-            });
+            if (options.onClose) options.onClose(320);
+            return true;
           });
         })
         .catch(function (err) {

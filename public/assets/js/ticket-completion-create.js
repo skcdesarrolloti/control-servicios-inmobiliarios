@@ -238,6 +238,145 @@
     }).format(fee + transport);
   }
 
+  function appendBlankItem(focusNewItem) {
+    var items = form.querySelector("[data-acta-items]");
+    if (!items || !items.firstElementChild || items.children.length >= 30) return null;
+    var item = items.firstElementChild.cloneNode(true);
+    item.querySelectorAll("textarea").forEach(function (field) {
+      field.name = field.name.replace(/items\[\d+\]/, "items[" + sequence + "]");
+      field.value = "";
+    });
+    var photoInput = item.querySelector("[data-acta-photos]");
+    var photoHelp = item.querySelector("[data-acta-photo-help]");
+    var helpId = "acta-photo-help-" + sequence;
+    if (photoInput) {
+      photoInput.name = "acta_item_photos_" + sequence + "[]";
+      photoInput.value = "";
+      photoInput._actaFiles = [];
+      photoInput.setAttribute("aria-describedby", helpId);
+    }
+    if (photoHelp) photoHelp.id = helpId;
+    var preview = item.querySelector("[data-acta-photo-preview]");
+    if (preview) preview.innerHTML = "";
+    item.querySelectorAll("[data-acta-existing-photo]").forEach(function (photo) { photo.remove(); });
+    sequence++;
+    items.appendChild(item);
+    if (focusNewItem) {
+      var firstTextarea = item.querySelector("textarea");
+      if (firstTextarea) firstTextarea.focus();
+    }
+    return item;
+  }
+
+  function actaDraftKey() {
+    return [
+      "scm",
+      "ticket-acta-draft",
+      root.dataset.ticketPk || "ticket",
+      form.dataset.actaOperation || "create",
+      form.dataset.actaId || "new",
+    ].join(":");
+  }
+
+  function fieldValue(field) {
+    if (field.type === "checkbox" || field.type === "radio") return field.checked;
+    if (field.tagName === "SELECT" && field.multiple) {
+      return Array.from(field.selectedOptions || []).map(function (option) { return option.value; });
+    }
+    return field.value;
+  }
+
+  function setFieldValue(field, value) {
+    if (field.type === "checkbox" || field.type === "radio") {
+      field.checked = !!value;
+      return;
+    }
+    if (field.tagName === "SELECT" && field.multiple && Array.isArray(value)) {
+      Array.from(field.options || []).forEach(function (option) { option.selected = value.includes(option.value); });
+      return;
+    }
+    field.value = value == null ? "" : String(value);
+  }
+
+  function actaDraftPayload() {
+    var fields = {};
+    form.querySelectorAll("input[name], select[name], textarea[name]").forEach(function (field) {
+      if (field.type === "file" || field.closest("[data-acta-item]")) return;
+      fields[field.name] = fieldValue(field);
+    });
+    var items = Array.from(form.querySelectorAll("[data-acta-item]")).map(function (item) {
+      return Array.from(item.querySelectorAll("textarea[name]")).map(function (field) {
+        return field.value || "";
+      });
+    });
+    return {
+      version: 1,
+      savedAt: Date.now(),
+      fields: fields,
+      items: items,
+    };
+  }
+
+  function saveActaDraft() {
+    try {
+      window.localStorage.setItem(actaDraftKey(), JSON.stringify(actaDraftPayload()));
+    } catch (error) {
+      if (window.console && console.warn) console.warn("[acta] No se pudo guardar el borrador local.", error);
+    }
+  }
+
+  function clearActaDraft() {
+    try {
+      window.localStorage.removeItem(actaDraftKey());
+    } catch (error) {}
+  }
+
+  function restoreActaDraft() {
+    var raw = null;
+    try {
+      raw = window.localStorage.getItem(actaDraftKey());
+    } catch (error) {
+      raw = null;
+    }
+    if (!raw) return;
+    var payload = null;
+    try {
+      payload = JSON.parse(raw);
+    } catch (error) {
+      clearActaDraft();
+      return;
+    }
+    if (!payload || !payload.fields || !Array.isArray(payload.items)) return;
+
+    var itemsWrap = form.querySelector("[data-acta-items]");
+    if (itemsWrap && payload.items.length) {
+      while (itemsWrap.children.length < payload.items.length && itemsWrap.children.length < 30) appendBlankItem(false);
+      while (itemsWrap.children.length > payload.items.length && itemsWrap.children.length > 1) itemsWrap.lastElementChild.remove();
+    }
+
+    Object.keys(payload.fields).forEach(function (name) {
+      var field = form.querySelector('[name="' + (window.CSS && CSS.escape ? CSS.escape(name) : name.replace(/"/g, '\\"')) + '"]');
+      if (field) setFieldValue(field, payload.fields[name]);
+    });
+
+    Array.from(form.querySelectorAll("[data-acta-item]")).forEach(function (item, index) {
+      var values = payload.items[index] || [];
+      item.querySelectorAll("textarea[name]").forEach(function (field, fieldIndex) {
+        field.value = values[fieldIndex] || "";
+      });
+    });
+
+    syncSigner(false);
+    syncTotal();
+    message("Restauré un borrador local del acta. Las fotos solo se conservan si no recargaste la página.", false);
+  }
+
+  var draftSaveTimer = null;
+  function scheduleActaDraftSave() {
+    window.clearTimeout(draftSaveTimer);
+    draftSaveTimer = window.setTimeout(saveActaDraft, 250);
+  }
+
   function submit(retried) {
     if (busy) return;
     busy = true;
@@ -272,8 +411,10 @@
         throw new Error(json && json.data && json.data.message || "No se pudo crear el acta.");
       }
       message(json.data.message || "Acta guardada. Te llevamos a Actas de satisfacción…", json.data.queued === false);
+      clearActaDraft();
       window.location.assign(json.data.redirect_url || root.dataset.redirectUrl || "index.php?tab=actas_satisfaccion");
     }).catch(function (error) {
+      saveActaDraft();
       notifyError(error.message || "No se pudo crear el acta. Revisa los datos e inténtalo nuevamente.");
       if (/sesión venció/i.test(error.message || "")) {
         window.setTimeout(goLogin, 900);
@@ -294,6 +435,7 @@
   if (fee) fee.addEventListener("input", syncTotal);
   syncSigner(false);
   syncTotal();
+  restoreActaDraft();
 
   form.addEventListener("click", function (event) {
     var removePhoto = event.target.closest("[data-acta-remove-photo]");
@@ -304,6 +446,7 @@
       if (Number.isInteger(removeIndex) && removeIndex >= 0 && removeIndex < files.length) {
         files.splice(removeIndex, 1);
         syncPhotoInput(photoInput, files) ? photoPreview(photoInput) : notifyError("No se pudo quitar la foto en este navegador.");
+        scheduleActaDraftSave();
       }
       return;
     }
@@ -311,6 +454,7 @@
     if (removeExistingPhoto) {
       var existingPhoto = removeExistingPhoto.closest("[data-acta-existing-photo]");
       if (existingPhoto) existingPhoto.remove();
+      scheduleActaDraftSave();
       return;
     }
     var removeItem = event.target.closest("[data-acta-remove-item]");
@@ -320,6 +464,7 @@
         return;
       }
       removeItem.closest("[data-acta-item]").remove();
+      scheduleActaDraftSave();
       return;
     }
     var addItem = event.target.closest("[data-acta-add-item]");
@@ -329,28 +474,19 @@
         notifyError("El acta admite hasta 30 daños y soluciones.");
         return;
       }
-      var item = items.firstElementChild.cloneNode(true);
-      item.querySelectorAll("textarea").forEach(function (field) {
-        field.name = field.name.replace(/items\[\d+\]/, "items[" + sequence + "]");
-        field.value = "";
-      });
-      var photoInput = item.querySelector("[data-acta-photos]");
-      var photoHelp = item.querySelector("[data-acta-photo-help]");
-      var helpId = "acta-photo-help-" + sequence;
-      photoInput.name = "acta_item_photos_" + sequence + "[]";
-      photoInput.value = "";
-      photoInput._actaFiles = [];
-      photoInput.setAttribute("aria-describedby", helpId);
-      if (photoHelp) photoHelp.id = helpId;
-      item.querySelector("[data-acta-photo-preview]").innerHTML = "";
-      sequence++;
-      items.appendChild(item);
-      item.querySelector("textarea").focus();
+      appendBlankItem(true);
+      scheduleActaDraftSave();
     }
   });
 
   form.addEventListener("change", function (event) {
     if (event.target.matches("[data-acta-photos]")) addPhotos(event.target, Array.from(event.target.files || []));
+    scheduleActaDraftSave();
+  });
+
+  form.addEventListener("input", function () {
+    syncTotal();
+    scheduleActaDraftSave();
   });
 
   form.addEventListener("paste", function (event) {

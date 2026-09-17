@@ -2338,6 +2338,12 @@
         .then(function (response) { return response.json(); })
         .then(function (json) {
           if (!json || !json.success || !json.data) throw new Error((json && json.data && json.data.message) || "No se pudo completar la operación.");
+          if (operation === "create" || operation === "update") {
+            var savedCorrectiveForm = body.querySelector("[data-corrective-review-create], [data-corrective-review-edit]");
+            if (savedCorrectiveForm && typeof savedCorrectiveForm._scmCorrectiveClearDraft === "function") {
+              savedCorrectiveForm._scmCorrectiveClearDraft();
+            }
+          }
           body.innerHTML = json.data.html;
           bind();
           if (json.data.message) {
@@ -2349,6 +2355,12 @@
           }
         })
         .catch(function (error) {
+          if (operation === "create" || operation === "update") {
+            var activeCorrectiveForm = body.querySelector("[data-corrective-review-create], [data-corrective-review-edit]");
+            if (activeCorrectiveForm && typeof activeCorrectiveForm._scmCorrectiveSaveDraft === "function") {
+              activeCorrectiveForm._scmCorrectiveSaveDraft();
+            }
+          }
           if (!body.querySelector("[data-corrective-review-message]")) {
             body.innerHTML = '<div class="scm-acta scm-corrective-review"><p data-corrective-review-message></p><button type="button" class="scm-acta-button" data-corrective-retry>Reintentar</button></div>';
             var retry = body.querySelector("[data-corrective-retry]");
@@ -2572,38 +2584,9 @@
             });
           });
         }
-
-        form.addEventListener("click", function (event) {
-        var removePhoto = event.target.closest("[data-corrective-remove-photo]");
-        if (removePhoto) {
-          var item = removePhoto.closest("[data-corrective-item]");
-          var input = item.querySelector("[data-corrective-photos]");
-          var files = filesOf(input);
-          files.splice(Number(removePhoto.dataset.correctiveRemovePhoto), 1);
-          if (syncInput(input, files)) preview(input);
-          return;
-        }
-        var removeExistingPhoto = event.target.closest("[data-corrective-remove-existing-photo]");
-        if (removeExistingPhoto) {
-          removeExistingPhoto.closest("[data-corrective-existing-photo]").remove();
-          return;
-        }
-        var removeItem = event.target.closest("[data-corrective-remove-item]");
-        if (removeItem) {
-          if (form.querySelectorAll("[data-corrective-item]").length <= 1) {
-            message("Debes conservar al menos un daño.", true);
-            return;
-          }
-          removeItem.closest("[data-corrective-item]").remove();
-        }
-        });
-        var addItem = form.querySelector("[data-corrective-add-item]");
-        if (addItem) addItem.addEventListener("click", function () {
+        function appendCorrectiveItem(focusNewItem) {
         var list = form.querySelector("[data-corrective-review-items]");
-        if (list.children.length >= 30) {
-          message("La revisión admite máximo 30 daños.", true);
-          return;
-        }
+        if (!list || !list.firstElementChild || list.children.length >= 30) return null;
         var item = list.firstElementChild.cloneNode(true);
         item.querySelector("legend").textContent = "Daño #" + (list.children.length + 1);
         var index = nextItemIndex();
@@ -2616,20 +2599,147 @@
             field.value = "";
           }
         });
+        item.querySelectorAll("[data-corrective-existing-photo]").forEach(function (photo) { photo.remove(); });
         item.querySelector("[data-corrective-photo-preview]").innerHTML = "";
         list.appendChild(item);
         syncCorrectiveAreaFields(item);
+        if (focusNewItem) {
+          var firstField = item.querySelector("textarea, select, input:not([type='file'])");
+          if (firstField) firstField.focus();
+        }
+        return item;
+        }
+        function correctiveDraftKey() {
+        var reviewField = form.querySelector("[name='review_id']");
+        return [
+          "scm",
+          "revision-correctiva-draft",
+          caseBtn.dataset.ticketPk || "ticket",
+          form.hasAttribute("data-corrective-review-edit") ? "edit" : "create",
+          reviewField ? reviewField.value || "new" : "new",
+        ].join(":");
+        }
+        function correctiveDraftFieldElements(item) {
+        return Array.from(item.querySelectorAll("input[name], select[name], textarea[name]")).filter(function (field) {
+          if (field.type === "file") return false;
+          if (/\[existing_fotos\]\[\]$/.test(field.name)) return false;
+          return true;
+        });
+        }
+        function correctiveDraftFields(item) {
+        return correctiveDraftFieldElements(item).map(function (field) {
+          return {
+            name: field.name,
+            value: field.type === "checkbox" || field.type === "radio" ? !!field.checked : field.value || "",
+            checked: field.type === "checkbox" || field.type === "radio" ? !!field.checked : undefined,
+          };
+        });
+        }
+        function saveCorrectiveDraft() {
+        try {
+          window.localStorage.setItem(correctiveDraftKey(), JSON.stringify({
+            version: 1,
+            savedAt: Date.now(),
+            items: Array.from(form.querySelectorAll("[data-corrective-item]")).map(correctiveDraftFields),
+          }));
+        } catch (error) {
+          if (window.console && console.warn) console.warn("[correctiva] No se pudo guardar el borrador local.", error);
+        }
+        }
+        function clearCorrectiveDraft() {
+        try { window.localStorage.removeItem(correctiveDraftKey()); } catch (error) {}
+        }
+        function setCorrectiveDraftField(field, entry) {
+        if (!field || !entry) return;
+        if (field.type === "checkbox" || field.type === "radio") {
+          field.checked = !!entry.checked;
+        } else {
+          field.value = entry.value == null ? "" : String(entry.value);
+        }
+        }
+        function restoreCorrectiveDraft() {
+        var raw = null;
+        try { raw = window.localStorage.getItem(correctiveDraftKey()); } catch (error) { raw = null; }
+        if (!raw) return;
+        var payload = null;
+        try { payload = JSON.parse(raw); } catch (error) { clearCorrectiveDraft(); return; }
+        if (!payload || !Array.isArray(payload.items) || !payload.items.length) return;
+        var list = form.querySelector("[data-corrective-review-items]");
+        if (list) {
+          while (list.children.length < payload.items.length && list.children.length < 30) appendCorrectiveItem(false);
+          while (list.children.length > payload.items.length && list.children.length > 1) list.lastElementChild.remove();
+        }
+        Array.from(form.querySelectorAll("[data-corrective-item]")).forEach(function (item, itemIndex) {
+          var entries = payload.items[itemIndex] || [];
+          correctiveDraftFieldElements(item).forEach(function (field, fieldIndex) {
+            setCorrectiveDraftField(field, entries[fieldIndex]);
+          });
+          syncCorrectiveAreaFields(item);
+        });
+        message("Restauré un borrador local de la revisión correctiva. Las fotos solo se conservan si no recargaste la página.", false);
+        }
+        var correctiveDraftTimer = null;
+        function scheduleCorrectiveDraftSave() {
+        window.clearTimeout(correctiveDraftTimer);
+        correctiveDraftTimer = window.setTimeout(saveCorrectiveDraft, 250);
+        }
+        form._scmCorrectiveSaveDraft = saveCorrectiveDraft;
+        form._scmCorrectiveClearDraft = clearCorrectiveDraft;
+
+        form.addEventListener("click", function (event) {
+        var removePhoto = event.target.closest("[data-corrective-remove-photo]");
+        if (removePhoto) {
+          var item = removePhoto.closest("[data-corrective-item]");
+          var input = item.querySelector("[data-corrective-photos]");
+          var files = filesOf(input);
+          files.splice(Number(removePhoto.dataset.correctiveRemovePhoto), 1);
+          if (syncInput(input, files)) preview(input);
+          scheduleCorrectiveDraftSave();
+          return;
+        }
+        var removeExistingPhoto = event.target.closest("[data-corrective-remove-existing-photo]");
+        if (removeExistingPhoto) {
+          removeExistingPhoto.closest("[data-corrective-existing-photo]").remove();
+          scheduleCorrectiveDraftSave();
+          return;
+        }
+        var removeItem = event.target.closest("[data-corrective-remove-item]");
+        if (removeItem) {
+          if (form.querySelectorAll("[data-corrective-item]").length <= 1) {
+            message("Debes conservar al menos un daño.", true);
+            return;
+          }
+          removeItem.closest("[data-corrective-item]").remove();
+          scheduleCorrectiveDraftSave();
+        }
+        });
+        var addItem = form.querySelector("[data-corrective-add-item]");
+        if (addItem) addItem.addEventListener("click", function () {
+        var list = form.querySelector("[data-corrective-review-items]");
+        if (list.children.length >= 30) {
+          message("La revisión admite máximo 30 daños.", true);
+          return;
+        }
+        appendCorrectiveItem(true);
+        scheduleCorrectiveDraftSave();
         });
         form.addEventListener("change", function (event) {
         if (event.target.matches("[data-corrective-indice]")) syncCorrectiveAreaFields(event.target.closest("[data-corrective-item]"));
         if (event.target.matches("[data-corrective-photos]")) addFiles(event.target, Array.from(event.target.files || []));
+        scheduleCorrectiveDraftSave();
+        });
+        form.addEventListener("input", function () {
+        scheduleCorrectiveDraftSave();
         });
         form.querySelectorAll("[data-corrective-item]").forEach(syncCorrectiveAreaFields);
+        restoreCorrectiveDraft();
         form.addEventListener("submit", function (event) {
         event.preventDefault();
+        saveCorrectiveDraft();
         message("Comprimiendo fotos antes de guardar…", false);
         var operation = form.hasAttribute("data-corrective-review-edit") ? "update" : "create";
         compressedFormData().then(function (data) { request(operation, data); }).catch(function (error) {
+          saveCorrectiveDraft();
           message(error.message || "No se pudieron preparar las fotos.", true);
           scmNotify("error", error.message || "No se pudieron preparar las fotos.", "Fotos");
         });

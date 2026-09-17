@@ -6043,6 +6043,10 @@
   background: #fff;
 }
 
+.scm-maint-quote-hidden-repeater {
+  display: none !important;
+}
+
 .scm-maint-quote-section h4 {
   margin: 0 0 14px;
   color: #0b1f3a;
@@ -6248,6 +6252,21 @@
   border-radius: 12px;
   object-fit: cover;
   background: #fff;
+}
+
+.scm-maint-quote-generated-card-placeholder {
+  display: grid;
+  place-items: center;
+  width: 118px;
+  height: 72px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #fff;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
 }
 
 .scm-maint-quote-generated-card span {
@@ -6638,6 +6657,10 @@
     width: 100%;
     height: auto;
     max-height: 180px;
+  }
+
+  .scm-maint-quote-generated-card-placeholder {
+    width: 100%;
   }
 
   .scm-maint-quote-result-card {
