@@ -13136,7 +13136,7 @@
         '<label class="scm-cotizacion-dialog-field"><span>Celular</span><input type="tel" name="celular_destinatario" value="' + escHtml(d.celular_destinatario || "") + '"></label>' +
         '</div></section>' +
         renderCotizacionRepeaterRows("mano", q.items_mano, context.unit_options) +
-        renderCotizacionRepeaterRows("materiales", q.items_materiales, context.unit_options) +
+        renderCotizacionRepeaterRows("materiales", q.items_materiales, context.material_unit_options || context.unit_options) +
         '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Mejores ofertas</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Otras ofertas</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><p class="scm-maint-quote-help">Van debajo de materiales para mantener el mismo orden del formulario anterior. Usa imágenes livianas; el sistema valida peso y tamaño antes de guardar.</p></section>' +
         renderCotizacionRepeaterRows("equipos", q.items_otros_equi, context.unit_options) +
         renderCotizacionRepeaterRows("otros", q.items_otros_costos, context.unit_options) +

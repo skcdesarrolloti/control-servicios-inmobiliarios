@@ -1315,6 +1315,7 @@ trait HandlesMaintenanceActions
       ],
       'cotizacion' => $cotizacion,
       'unit_options' => $this->maintenance_quote_unit_options(),
+      'material_unit_options' => $this->maintenance_quote_material_unit_options(),
       'executor_options' => $this->maintenance_quote_glossary_options(853, [
         ['value' => 'Propietario', 'label' => 'Propietario'],
         ['value' => 'Arrendatario', 'label' => 'Arrendatario'],
@@ -1695,6 +1696,23 @@ trait HandlesMaintenanceActions
       ['value' => 'Tramo', 'label' => 'Tramo'],
       ['value' => 'Lb', 'label' => 'Lb'],
     ], true);
+  }
+
+  /** @return array<int,array<string,string>> */
+  private function maintenance_quote_material_unit_options(): array
+  {
+    return $this->maintenance_quote_merge_options($this->maintenance_quote_unit_options(), [
+      ['value' => 'Cm', 'label' => 'Cm'],
+      ['value' => 'Galón', 'label' => 'Galón'],
+      ['value' => 'Cuñete', 'label' => 'Cuñete'],
+      ['value' => 'Lata', 'label' => 'Lata'],
+      ['value' => 'Bulto', 'label' => 'Bulto'],
+      ['value' => 'Caja', 'label' => 'Caja'],
+      ['value' => 'Rollo', 'label' => 'Rollo'],
+      ['value' => 'Par', 'label' => 'Par'],
+      ['value' => 'Juego', 'label' => 'Juego'],
+      ['value' => 'Servicio', 'label' => 'Servicio'],
+    ]);
   }
 
   /** @param array<int,array<string,string>> $fallback @return array<int,array<string,string>> */
