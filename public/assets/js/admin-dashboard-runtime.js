@@ -13312,6 +13312,44 @@
       return byKey;
     }
 
+    function syncMaintenanceQuoteGeneratedMaterialRows(form) {
+      if (!form) return;
+      var offers = maintenanceQuoteGeneratedMaterialOffers(form);
+      var usedKeys = {};
+      var rowKeys = {};
+      var rows = Array.prototype.slice.call(form.querySelectorAll('[data-quote-row="materiales"]'));
+      rows.forEach(function (row) {
+        var key = row.getAttribute("data-generated-material-offer-row") || "";
+        var data = quoteRowToObject(row);
+        var provider = String(data.provedor_materiales || data.proveedor_materiales || "").trim().toLowerCase();
+        var total = parseCotizacionOrderMoney(data.valor_materiales || 0);
+        if (!key && (provider || total > 0)) {
+          var match = offers.find(function (offer) {
+            return offer.key
+              && !usedKeys[offer.key]
+              && String(offer.provider || "").trim().toLowerCase() === provider
+              && Math.round(parseCotizacionOrderMoney(offer.total || 0)) === Math.round(total);
+          });
+          if (match && match.key) {
+            key = match.key;
+            row.setAttribute("data-generated-material-offer-row", key);
+          }
+        }
+        if (key) {
+          rowKeys[key] = true;
+          usedKeys[key] = true;
+        }
+      });
+      if (offers.length) {
+        var synced = offers.filter(function (offer) {
+          return offer.key && rowKeys[offer.key];
+        });
+        if (synced.length !== offers.length) {
+          setMaintenanceQuoteGeneratedMaterialOffers(form, synced);
+        }
+      }
+    }
+
     function showMaintenanceQuoteMaterialImagePreview(image, title) {
       if (!image) return;
       var existing = document.querySelector("[data-maint-quote-image-preview]");
@@ -13371,6 +13409,7 @@
     function renderMaintenanceQuoteGeneratedMaterialOffers(form) {
       var wrap = form ? form.querySelector("[data-material-generated-offers]") : null;
       if (!wrap) return;
+      syncMaintenanceQuoteGeneratedMaterialRows(form);
       var imageByKey = maintenanceQuoteGeneratedOfferByKey(form);
       var rows = Array.prototype.slice.call(form.querySelectorAll('[data-quote-row="materiales"]')).map(function (row, index) {
         var data = quoteRowToObject(row);
@@ -13899,7 +13938,13 @@
           var rowIndex = parseInt(removeMaterialRowBtn.getAttribute("data-remove-material-row-index") || "-1", 10);
           var materialRows = Array.prototype.slice.call(form.querySelectorAll('[data-quote-row="materiales"]'));
           if (rowIndex >= 0 && materialRows[rowIndex]) {
+            var materialKey = materialRows[rowIndex].getAttribute("data-generated-material-offer-row") || "";
             materialRows[rowIndex].remove();
+            if (materialKey) {
+              setMaintenanceQuoteGeneratedMaterialOffers(form, maintenanceQuoteGeneratedMaterialOffers(form).filter(function (offer) {
+                return offer.key !== materialKey;
+              }));
+            }
           }
           renderMaintenanceQuoteGeneratedMaterialOffers(form);
           syncMaintenanceQuoteTotals(form);
