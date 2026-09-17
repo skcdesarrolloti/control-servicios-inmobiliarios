@@ -13001,7 +13001,17 @@
         },
         materiales: {
           title: "Materiales",
-          add: "Agregar material",
+          add: "Agregar proveedor/material",
+          fields: [
+            ["text", "provedor_materiales", "Proveedor", "Proveedor o almacén"],
+            ["money", "valor_materiales", "Valor", "0"],
+          ],
+        },
+        materiales_soporte: {
+          title: "Imagen de cotización material",
+          add: "Agregar ítem a imagen",
+          help: "Usa esta mini tabla cuando necesites generar una imagen tipo Excel para anexarla en las ofertas. No reemplaza los materiales reales del formulario.",
+          showTotal: false,
           fields: [
             ["text", "descripcion_materiales", "Descripción", "Material o referencia"],
             ["select", "unidad_materiales", "Unidad", ""],
@@ -13033,10 +13043,15 @@
       };
       var conf = configs[type];
       var rows = cotizacionFormItems(items, {});
-      var html = '<section class="scm-maint-quote-section" data-quote-repeater="' + escHtml(type) + '"><div class="scm-maint-quote-section-head"><div><h4>' + escHtml(conf.title) + '</h4><span data-quote-total="' + escHtml(type) + '">$0</span></div><button type="button" class="scm-maint-quote-add" data-quote-add-row="' + escHtml(type) + '">' + escHtml(conf.add) + '</button></div><div class="scm-maint-quote-rows">';
+      var totalHtml = conf.showTotal === false ? "" : '<span data-quote-total="' + escHtml(type) + '">$0</span>';
+      var html = '<section class="scm-maint-quote-section" data-quote-repeater="' + escHtml(type) + '"><div class="scm-maint-quote-section-head"><div><h4>' + escHtml(conf.title) + '</h4>' + totalHtml + '</div><button type="button" class="scm-maint-quote-add" data-quote-add-row="' + escHtml(type) + '">' + escHtml(conf.add) + '</button></div>';
+      if (conf.help) {
+        html += '<p class="scm-maint-quote-help">' + escHtml(conf.help) + '</p>';
+      }
+      html += '<div class="scm-maint-quote-rows">';
       rows.forEach(function (row, index) {
         html += '<div class="scm-maint-quote-row" data-quote-row="' + escHtml(type) + '">';
-        if (type === "materiales") {
+        if (type === "materiales_soporte") {
           html += '<div class="scm-maint-quote-auto-item" aria-label="Ítem automático"><span>Ítem</span><strong data-material-auto-item>' + escHtml(String(index + 1)) + '</strong></div>';
         }
         conf.fields.forEach(function (field) {
@@ -13045,6 +13060,9 @@
           var label = field[2];
           var placeholder = field[3] || "";
           var value = row && row[name] != null ? String(row[name]) : "";
+          if (value === "" && name === "provedor_materiales" && row && row.proveedor_materiales != null) {
+            value = String(row.proveedor_materiales);
+          }
           html += '<label class="scm-cotizacion-dialog-field"><span>' + escHtml(label) + '</span>';
           if (inputType === "textarea") {
             html += '<textarea data-quote-field="' + escHtml(name) + '" rows="2" placeholder="' + escHtml(placeholder) + '">' + escHtml(value) + '</textarea>';
@@ -13134,6 +13152,17 @@
       );
     }
 
+    function maintenanceQuoteMaterialSupportItems(items) {
+      var rows = Array.isArray(items) ? items.filter(function (row) {
+        if (!row) return false;
+        return String(row.descripcion_materiales || row.unidad_materiales || "").trim()
+          || parseCotizacionOrderMoney(row.cantidad_materiales || 0) > 0
+          || parseCotizacionOrderMoney(row.valor_unitario_materiales || 0) > 0
+          || parseCotizacionOrderMoney(row.valor_total_materiales || 0) > 0;
+      }) : [];
+      return rows.length ? rows : [{}];
+    }
+
     function buildMaintenanceQuoteFormHtml(context) {
       context = context || {};
       var d = context.defaults || {};
@@ -13165,8 +13194,9 @@
         '<label class="scm-cotizacion-dialog-field"><span>Celular</span><input type="tel" name="celular_destinatario" value="' + escHtml(d.celular_destinatario || "") + '"></label>' +
         '</div></section>' +
         renderCotizacionRepeaterRows("mano", q.items_mano, context.unit_options) +
-        renderCotizacionRepeaterRows("materiales", q.items_materiales, context.material_unit_options || context.unit_options) +
-        '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Mejores ofertas</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Otras ofertas</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><p class="scm-maint-quote-help">Van debajo de materiales para mantener el mismo orden del formulario anterior. Usa imágenes livianas; el sistema valida peso y tamaño antes de guardar.</p></section>' +
+        renderCotizacionRepeaterRows("materiales", q.items_materiales, context.unit_options) +
+        renderCotizacionRepeaterRows("materiales_soporte", maintenanceQuoteMaterialSupportItems(q.items_materiales), context.material_unit_options || context.unit_options) +
+        '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Mejores ofertas</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Otras ofertas</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><p class="scm-maint-quote-help">La imagen generada desde la tabla anterior se anexará automáticamente como soporte de ofertas. También puedes subir imágenes livianas; el sistema valida peso y tamaño antes de guardar.</p></section>' +
         renderCotizacionRepeaterRows("equipos", q.items_otros_equi, context.unit_options) +
         renderCotizacionRepeaterRows("otros", q.items_otros_costos, context.unit_options) +
         '<section class="scm-maint-quote-section scm-maint-quote-bottom-section"><h4>Condiciones y perturbación</h4><div class="scm-maint-quote-grid">' +
@@ -13195,14 +13225,14 @@
     function collectQuoteRows(form, type) {
       return Array.prototype.map.call(form.querySelectorAll('[data-quote-row="' + type + '"]'), function (row, index) {
         var obj = quoteRowToObject(row);
-        if (type === "materiales") obj.item_materiales = String(index + 1);
+        if (type === "materiales_soporte") obj.item_materiales = String(index + 1);
         return obj;
       });
     }
 
     function refreshMaterialAutoItems(form) {
       if (!form) return;
-      form.querySelectorAll('[data-quote-row="materiales"]').forEach(function (row, index) {
+      form.querySelectorAll('[data-quote-row="materiales_soporte"]').forEach(function (row, index) {
         var label = row.querySelector("[data-material-auto-item]");
         if (label) label.textContent = String(index + 1);
       });
@@ -13327,8 +13357,8 @@
 
     function buildMaterialsQuoteImageDataUrl(form) {
       if (!form || !document.createElement) return "";
-      var rows = collectQuoteRows(form, "materiales").filter(function (row) {
-        return String(row.descripcion_materiales || row.provedor_materiales || "").trim() || parseCotizacionOrderMoney(row.valor_total_materiales || row.valor_materiales) > 0;
+      var rows = collectQuoteRows(form, "materiales_soporte").filter(function (row) {
+        return String(row.descripcion_materiales || "").trim() || parseCotizacionOrderMoney(row.valor_total_materiales || 0) > 0;
       });
       if (!rows.length) return "";
       var width = 1100;
@@ -13363,9 +13393,9 @@
         var y = 54 + rowH * (rIdx + 1);
         var q = Math.max(1, parseCotizacionOrderMoney(row.cantidad_materiales || 1));
         var unit = parseCotizacionOrderMoney(row.valor_unitario_materiales || 0);
-        var line = parseCotizacionOrderMoney(row.valor_total_materiales || 0) || (unit * q) || parseCotizacionOrderMoney(row.valor_materiales || 0);
+        var line = parseCotizacionOrderMoney(row.valor_total_materiales || 0) || (unit * q);
         total += line;
-        var values = [row.item_materiales || (rIdx + 1), row.descripcion_materiales || row.provedor_materiales || "", row.unidad_materiales || "", q, formatCotizacionOrderCurrency(unit), formatCotizacionOrderCurrency(line)];
+        var values = [row.item_materiales || (rIdx + 1), row.descripcion_materiales || "", row.unidad_materiales || "", q, formatCotizacionOrderCurrency(unit), formatCotizacionOrderCurrency(line)];
         x = 0;
         values.forEach(function (value, idx) {
           ctx.strokeRect(x, y, cols[idx], rowH);
@@ -13397,12 +13427,9 @@
         totals.mano += Math.max(1, parseCotizacionOrderMoney(row.cantidad_mano || 1)) * parseCotizacionOrderMoney(row.valor_mano);
       });
       collectQuoteRows(form, "materiales").forEach(function (row) {
-        var quantity = Math.max(1, parseCotizacionOrderMoney(row.cantidad_materiales || 1));
-        var unit = parseCotizacionOrderMoney(row.valor_unitario_materiales);
-        var line = parseCotizacionOrderMoney(row.valor_total_materiales) || (quantity * unit) || parseCotizacionOrderMoney(row.valor_materiales);
-        totals.materiales += line;
+        totals.materiales += parseCotizacionOrderMoney(row.valor_materiales);
       });
-      form.querySelectorAll('[data-quote-row="materiales"]').forEach(function (rowEl) {
+      form.querySelectorAll('[data-quote-row="materiales_soporte"]').forEach(function (rowEl) {
         var row = quoteRowToObject(rowEl);
         var quantity = Math.max(1, parseCotizacionOrderMoney(row.cantidad_materiales || 1));
         var unit = parseCotizacionOrderMoney(row.valor_unitario_materiales);
@@ -13465,7 +13492,7 @@
           var type = addBtn.getAttribute("data-quote-add-row") || "";
           var section = form.querySelector('[data-quote-repeater="' + type + '"] .scm-maint-quote-rows');
           if (!section) return;
-          var html = renderCotizacionRepeaterRows(type, [{}], type === "materiales" ? (context.material_unit_options || context.unit_options || []) : (context.unit_options || []));
+          var html = renderCotizacionRepeaterRows(type, [{}], type === "materiales_soporte" ? (context.material_unit_options || context.unit_options || []) : (context.unit_options || []));
           var temp = document.createElement("div");
           temp.innerHTML = html;
           var row = temp.querySelector("[data-quote-row]");

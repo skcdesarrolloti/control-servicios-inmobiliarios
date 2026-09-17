@@ -965,7 +965,7 @@ trait HandlesMaintenanceActions
       [$now, $nowSql] = $this->maintenance_quote_now_pair();
 
       $itemsMano = $this->maintenance_quote_repeater_items('items_mano_json', ['descripcion_mano', 'unidad_mano', 'cantidad_mano', 'valor_mano']);
-      $itemsMateriales = $this->maintenance_quote_repeater_items('items_materiales_json', ['item_materiales', 'descripcion_materiales', 'unidad_materiales', 'cantidad_materiales', 'valor_unitario_materiales', 'valor_materiales', 'valor_total_materiales', 'provedor_materiales']);
+      $itemsMateriales = $this->maintenance_quote_repeater_items('items_materiales_json', ['item_materiales', 'descripcion_materiales', 'unidad_materiales', 'cantidad_materiales', 'valor_unitario_materiales', 'valor_materiales', 'valor_total_materiales', 'provedor_materiales', 'proveedor_materiales']);
       $itemsEquipos = $this->maintenance_quote_repeater_items('items_otros_equi_json', ['descipcion_otros_equi', 'unidad_otros_equi', 'cantidad_otros_equi', 'valor_otros_equi']);
       $itemsOtros = $this->maintenance_quote_repeater_items('items_otros_costos_json', ['descipcion_otros_costos', 'unidad_otros_costos', 'cantidad_otros_costos', 'valor_otros_costos']);
 
@@ -1814,6 +1814,9 @@ trait HandlesMaintenanceActions
         if (trim((string) ($clean['valor_materiales'] ?? '')) === '' || (int) ($clean['valor_materiales'] ?? 0) <= 0) {
           $clean['valor_materiales'] = $clean['valor_total_materiales'];
         }
+      }
+      if (isset($clean['proveedor_materiales']) && trim((string) ($clean['provedor_materiales'] ?? '')) === '') {
+        $clean['provedor_materiales'] = $clean['proveedor_materiales'];
       }
       if (isset($clean['cantidad_otros_equi'], $clean['valor_otros_equi'])) {
         $clean['valor_total_otros_equi'] = (string) ((int) $clean['cantidad_otros_equi'] * (int) $clean['valor_otros_equi']);

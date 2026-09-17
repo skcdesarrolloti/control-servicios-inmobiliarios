@@ -4531,23 +4531,12 @@ trait RendersDashboard
     if (empty($items)) {
       $html .= '<p class="scm-cotizacion-native-empty">Sin items registrados.</p>';
     } else {
-      $html .= '<div class="scm-cotizacion-table-wrap"><table class="scm-cotizacion-budget-table scm-cotizacion-materials-table"><thead><tr><th>Ítem</th><th>Descripción</th><th>Unidad</th><th>Cantidad</th><th>Vr. unitario</th><th>Vr. total</th></tr></thead><tbody>';
-      foreach ($items as $idx => $item) {
-        $itemNumber = trim((string) ($item['item_materiales'] ?? ''));
-        if ($itemNumber === '') {
-          $itemNumber = (string) ($idx + 1);
-        }
+      $html .= '<div class="scm-cotizacion-table-wrap"><table class="scm-cotizacion-budget-table scm-cotizacion-materials-table"><thead><tr><th>Proveedor / material</th><th>Valor</th></tr></thead><tbody>';
+      foreach ($items as $item) {
         $description = $this->cotizacion_first_matching_value($item, ['descripcion_materiales', 'descripcion', 'prove', 'material', 'referencia']);
-        $unit = $this->cotizacion_first_matching_value($item, ['unidad_materiales', 'unidad']);
-        $quantity = $this->cotizacion_first_matching_value($item, ['cantidad_materiales', 'cantidad']);
-        $unitValue = $this->cotizacion_first_matching_value($item, ['valor_unitario_materiales', 'unitario']);
         $lineValue = $this->cotizacion_budget_item_total($item);
         $html .= '<tr>'
-          . '<td>' . esc_html($this->cotizacion_clean_text($itemNumber)) . '</td>'
           . '<td>' . esc_html($description !== '' ? $description : '-') . '</td>'
-          . '<td>' . esc_html($unit !== '' ? $unit : '-') . '</td>'
-          . '<td>' . esc_html($quantity !== '' ? $quantity : '-') . '</td>'
-          . '<td>' . esc_html($this->format_cop_currency($unitValue)) . '</td>'
           . '<td>' . esc_html($this->format_cop_currency($lineValue)) . '</td>'
           . '</tr>';
       }
