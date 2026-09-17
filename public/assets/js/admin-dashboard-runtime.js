@@ -13205,7 +13205,7 @@
         renderCotizacionHiddenRepeaterRows("materiales", q.items_materiales, context.unit_options) +
         renderCotizacionRepeaterRows("materiales_soporte", maintenanceQuoteMaterialSupportItems(q.items_materiales), context.material_unit_options || context.unit_options) +
         '<section class="scm-maint-quote-section scm-maint-quote-generated-materials"><h4>Materiales generados</h4><div class="scm-maint-quote-generated-offers" data-material-generated-offers><p>No hay ofertas generadas desde la tabla de materiales.</p></div></section>' +
-        '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Mejores ofertas</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Otras ofertas</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><p class="scm-maint-quote-help">La imagen generada desde la tabla anterior se anexará automáticamente como soporte de ofertas. También puedes subir imágenes livianas; el sistema valida peso y tamaño antes de guardar.</p></section>' +
+        '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Mejores ofertas</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Otras ofertas</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><div class="scm-maint-quote-auto-offers"><strong>Generadas automáticamente para mejores ofertas</strong><div data-material-generated-offer-attachments><p>No has generado imágenes desde la tabla de materiales.</p></div></div><p class="scm-maint-quote-help">La imagen generada desde la tabla anterior se anexará automáticamente como soporte de mejores ofertas al guardar. También puedes subir imágenes livianas; el sistema valida peso y tamaño antes de guardar.</p></section>' +
         renderCotizacionRepeaterRows("equipos", q.items_otros_equi, context.unit_options) +
         renderCotizacionRepeaterRows("otros", q.items_otros_costos, context.unit_options) +
         '<section class="scm-maint-quote-section scm-maint-quote-bottom-section"><h4>Condiciones y perturbación</h4><div class="scm-maint-quote-grid">' +
@@ -13312,6 +13312,58 @@
       return byKey;
     }
 
+    function showMaintenanceQuoteMaterialImagePreview(image, title) {
+      if (!image) return;
+      var existing = document.querySelector("[data-maint-quote-image-preview]");
+      if (existing) existing.remove();
+      var overlay = document.createElement("div");
+      overlay.className = "scm-maint-quote-image-preview";
+      overlay.setAttribute("data-maint-quote-image-preview", "1");
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("aria-modal", "true");
+      overlay.setAttribute("aria-label", "Vista ampliada de cotización material");
+      overlay.innerHTML =
+        '<div class="scm-maint-quote-image-preview__backdrop" data-close-maint-quote-image-preview></div>' +
+        '<div class="scm-maint-quote-image-preview__dialog">' +
+        '<div class="scm-maint-quote-image-preview__head"><strong>' + escHtml(title || "Cotización material") + '</strong><button type="button" data-close-maint-quote-image-preview aria-label="Cerrar vista de imagen">&times;</button></div>' +
+        '<div class="scm-maint-quote-image-preview__body"><img src="' + escHtml(image) + '" alt="' + escHtml(title || "Cotización material") + '"></div>' +
+        '</div>';
+      document.body.appendChild(overlay);
+      function close() {
+        overlay.remove();
+        document.removeEventListener("keydown", onKeydown);
+      }
+      function onKeydown(event) {
+        if (event.key === "Escape") close();
+      }
+      overlay.addEventListener("click", function (event) {
+        if (event.target && event.target.closest("[data-close-maint-quote-image-preview]")) close();
+      });
+      document.addEventListener("keydown", onKeydown);
+      var closeButton = overlay.querySelector("[data-close-maint-quote-image-preview][aria-label]");
+      if (closeButton && closeButton.focus) closeButton.focus();
+    }
+
+    function renderMaintenanceQuoteGeneratedOfferAttachments(form) {
+      var wrap = form ? form.querySelector("[data-material-generated-offer-attachments]") : null;
+      if (!wrap) return;
+      var offers = maintenanceQuoteGeneratedMaterialOffers(form);
+      if (!offers.length) {
+        wrap.innerHTML = "<p>No has generado imágenes desde la tabla de materiales.</p>";
+        return;
+      }
+      wrap.innerHTML = offers.map(function (offer, index) {
+        var title = offer.provider || ("Oferta " + (index + 1));
+        return '<article class="scm-maint-quote-auto-offer-card">' +
+          '<button type="button" class="scm-maint-quote-image-thumb" data-view-generated-material-offer="' + escHtml(offer.key) + '" aria-label="Ver imagen de cotización material de ' + escHtml(title) + '">' +
+          '<img src="' + escHtml(offer.image) + '" alt="Imagen de cotización material de ' + escHtml(title) + '">' +
+          '</button>' +
+          '<div><span>Mejores ofertas</span><strong>' + escHtml(title) + '</strong><b>' + escHtml(formatCotizacionOrderCurrency(offer.total || 0)) + '</b></div>' +
+          '<button type="button" class="scm-maint-quote-view-image" data-view-generated-material-offer="' + escHtml(offer.key) + '">Ver imagen</button>' +
+          '</article>';
+      }).join("");
+    }
+
     function renderMaintenanceQuoteGeneratedMaterialOffers(form) {
       var wrap = form ? form.querySelector("[data-material-generated-offers]") : null;
       if (!wrap) return;
@@ -13327,21 +13379,23 @@
       });
       if (!rows.length) {
         wrap.innerHTML = "<p>No hay ofertas generadas desde la tabla de materiales.</p>";
+        renderMaintenanceQuoteGeneratedOfferAttachments(form);
         return;
       }
       wrap.innerHTML = rows.map(function (item) {
         var imageHtml = item.image
-          ? '<img src="' + escHtml(item.image) + '" alt="Imagen de cotización material de ' + escHtml(item.provider || ("oferta " + (item.index + 1))) + '">'
+          ? '<button type="button" class="scm-maint-quote-image-thumb" data-view-generated-material-offer="' + escHtml(item.key) + '" aria-label="Ver imagen de cotización material de ' + escHtml(item.provider || ("oferta " + (item.index + 1))) + '"><img src="' + escHtml(item.image) + '" alt="Imagen de cotización material de ' + escHtml(item.provider || ("oferta " + (item.index + 1))) + '"></button>'
           : '<div class="scm-maint-quote-generated-card-placeholder">Sin imagen<br>generada</div>';
         var removeAttr = item.key
           ? ' data-remove-generated-material-offer="' + escHtml(item.key) + '"'
           : ' data-remove-material-row-index="' + escHtml(String(item.index)) + '"';
         return '<article class="scm-maint-quote-generated-card" data-generated-offer-card="' + escHtml(item.key || ("row_" + item.index)) + '">' +
           imageHtml +
-          '<div><span>Proveedor</span><strong>' + escHtml(item.provider || ("Oferta " + (item.index + 1))) + '</strong><b>' + escHtml(formatCotizacionOrderCurrency(item.total || 0)) + '</b></div>' +
+          '<div><span>Proveedor</span><strong>' + escHtml(item.provider || ("Oferta " + (item.index + 1))) + '</strong><b>' + escHtml(formatCotizacionOrderCurrency(item.total || 0)) + '</b>' + (item.image ? '<button type="button" class="scm-maint-quote-view-image" data-view-generated-material-offer="' + escHtml(item.key) + '">Ver imagen</button>' : '') + '</div>' +
           '<button type="button" class="scm-maint-quote-remove"' + removeAttr + '>Quitar</button>' +
           '</article>';
       }).join("");
+      renderMaintenanceQuoteGeneratedOfferAttachments(form);
     }
 
     function appendMaterialRowFromGeneratedOffer(form, offer) {
@@ -13799,6 +13853,16 @@
           form.querySelectorAll('[data-generated-material-offer-row="' + key + '"]').forEach(function (row) { row.remove(); });
           renderMaintenanceQuoteGeneratedMaterialOffers(form);
           syncMaintenanceQuoteTotals(form);
+          return;
+        }
+        var viewGeneratedOfferBtn = event.target && event.target.closest ? event.target.closest("[data-view-generated-material-offer]") : null;
+        if (viewGeneratedOfferBtn) {
+          event.preventDefault();
+          var offerKey = viewGeneratedOfferBtn.getAttribute("data-view-generated-material-offer") || "";
+          var offer = maintenanceQuoteGeneratedOfferByKey(form)[offerKey] || null;
+          if (offer && offer.image) {
+            showMaintenanceQuoteMaterialImagePreview(offer.image, offer.provider || "Cotización material");
+          }
           return;
         }
         var removeMaterialRowBtn = event.target && event.target.closest ? event.target.closest("[data-remove-material-row-index]") : null;

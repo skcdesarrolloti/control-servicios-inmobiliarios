@@ -6244,6 +6244,23 @@
   background: #f8fbff;
 }
 
+.scm-maint-quote-image-thumb {
+  display: block;
+  width: 118px;
+  height: 72px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.scm-maint-quote-image-thumb:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.28);
+  outline-offset: 3px;
+}
+
+.scm-maint-quote-image-thumb img,
 .scm-maint-quote-generated-card img {
   display: block;
   width: 118px;
@@ -6289,6 +6306,152 @@
   margin-top: 3px;
   color: #0f766e;
   font-variant-numeric: tabular-nums;
+}
+
+.scm-maint-quote-view-image {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-top: 8px;
+  padding: 0 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #fff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.scm-maint-quote-view-image:hover,
+.scm-maint-quote-view-image:focus-visible {
+  background: #eff6ff;
+  outline: 3px solid rgba(37, 99, 235, 0.16);
+}
+
+.scm-maint-quote-auto-offers {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px dashed #fed7aa;
+  border-radius: 16px;
+  background: #fffaf2;
+}
+
+.scm-maint-quote-auto-offers > strong {
+  color: #7c2d12;
+  font-size: 12px;
+}
+
+.scm-maint-quote-auto-offers [data-material-generated-offer-attachments] {
+  display: grid;
+  gap: 10px;
+}
+
+.scm-maint-quote-auto-offers [data-material-generated-offer-attachments] > p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.scm-maint-quote-auto-offer-card {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.scm-maint-quote-auto-offer-card span {
+  display: block;
+  color: #9a3412;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.scm-maint-quote-auto-offer-card strong {
+  display: block;
+  color: #0b1f3a;
+  font-size: 13px;
+}
+
+.scm-maint-quote-auto-offer-card b {
+  display: block;
+  color: #0f766e;
+  font-variant-numeric: tabular-nums;
+}
+
+.scm-maint-quote-image-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 200000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.scm-maint-quote-image-preview__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.scm-maint-quote-image-preview__dialog {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: min(920px, 96vw);
+  max-height: 92vh;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.36);
+}
+
+.scm-maint-quote-image-preview__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #0b1f3a;
+}
+
+.scm-maint-quote-image-preview__head button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #0b1f3a;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.scm-maint-quote-image-preview__body {
+  max-height: calc(92vh - 70px);
+  overflow: auto;
+  padding: 18px;
+  background: #f8fafc;
+}
+
+.scm-maint-quote-image-preview__body img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  margin: 0 auto;
+  border-radius: 10px;
+  background: #fff;
 }
 
 .scm-maint-quote-auto-item {
@@ -6647,12 +6810,15 @@
   .scm-maint-quote-type-grid,
   .scm-maint-quote-criteria-grid,
   .scm-maint-quote-support-head,
+  .scm-maint-quote-auto-offer-card,
   .scm-maint-quote-generated-card,
   .scm-maint-quote-row {
     width: 100%;
     grid-template-columns: 1fr;
   }
 
+  .scm-maint-quote-image-thumb,
+  .scm-maint-quote-image-thumb img,
   .scm-maint-quote-generated-card img {
     width: 100%;
     height: auto;
@@ -6661,6 +6827,10 @@
 
   .scm-maint-quote-generated-card-placeholder {
     width: 100%;
+  }
+
+  .scm-maint-quote-image-preview {
+    padding: 12px;
   }
 
   .scm-maint-quote-result-card {
