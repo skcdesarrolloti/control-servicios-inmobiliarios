@@ -28,6 +28,7 @@ final class RentIncreasePdfGenerator
     $representative = $this->value($context, 'representante_legal', 'Representante legal');
     $representativeEmail = $this->value($context, 'correo_representante_legal', '');
     $representativePhone = $this->value($context, 'celular_representante_legal', '');
+    $representativeSignature = $this->prepareSignatureImage($this->value($context, 'firma_representante_legal_path', ''));
     $contractual = $this->value($context, 'contractual', 'Coordinador Contractual, Mantenimiento y Servicios Públicos');
     $contractualEmail = $this->value($context, 'correo_contractual', '');
     $contractualPhone = $this->value($context, 'celular_contractual', '');
@@ -58,12 +59,18 @@ final class RentIncreasePdfGenerator
     $pdf->paragraph('Agradecemos su atención.', 8);
     $pdf->spacer(10);
     $pdf->signatureBlock('Cordialmente', $contractual, $this->signatureDetails([$contractualPhone, $contractualEmail]));
-    $pdf->signatureBlock('Representante Legal', $representative, $this->signatureDetails([$representativePhone, $representativeEmail]));
+    $pdf->signatureBlock('Representante Legal', $representative, $this->signatureDetails([$representativePhone, $representativeEmail]), $representativeSignature['path']);
 
     $slug = $isCanon ? 'carta-aumento-canon' : 'carta-aumento-administracion';
     $basename = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
     $path = (string) SCM_UPLOAD_PATH . '/' . $basename;
-    $pdf->save($path);
+    try {
+      $pdf->save($path);
+    } finally {
+      if ($representativeSignature['temporary'] && $representativeSignature['path'] !== '') {
+        @unlink($representativeSignature['path']);
+      }
+    }
 
     return [
       'url' => StoredFileService::fromRuntime()->urlFor($basename),
@@ -100,6 +107,55 @@ final class RentIncreasePdfGenerator
   private function money(float $value): string
   {
     return '$' . number_format($value, 0, ',', '.');
+  }
+
+  /** @return array{path:string,temporary:bool} */
+  private function prepareSignatureImage(string $path): array
+  {
+    $path = trim($path);
+    if ($path === '' || !is_file($path)) {
+      return ['path' => '', 'temporary' => false];
+    }
+    $info = @getimagesize($path);
+    if (!is_array($info)) {
+      return ['path' => '', 'temporary' => false];
+    }
+    if ((string) ($info['mime'] ?? '') === 'image/jpeg') {
+      return ['path' => $path, 'temporary' => false];
+    }
+    if (!extension_loaded('gd')) {
+      return ['path' => '', 'temporary' => false];
+    }
+    $source = match ((string) ($info['mime'] ?? '')) {
+      'image/png' => @imagecreatefrompng($path),
+      'image/webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($path) : false,
+      'image/gif' => @imagecreatefromgif($path),
+      default => false,
+    };
+    if (!$source) {
+      return ['path' => '', 'temporary' => false];
+    }
+    $width = imagesx($source);
+    $height = imagesy($source);
+    $canvas = imagecreatetruecolor($width, $height);
+    if (!$canvas) {
+      imagedestroy($source);
+      return ['path' => '', 'temporary' => false];
+    }
+    $white = imagecolorallocate($canvas, 255, 255, 255);
+    imagefilledrectangle($canvas, 0, 0, $width, $height, $white);
+    imagecopy($canvas, $source, 0, 0, 0, 0, $width, $height);
+    imagedestroy($source);
+    $tmp = tempnam(sys_get_temp_dir(), 'scm_signature_');
+    if (!is_string($tmp) || $tmp === '') {
+      imagedestroy($canvas);
+      return ['path' => '', 'temporary' => false];
+    }
+    $jpg = $tmp . '.jpg';
+    $ok = imagejpeg($canvas, $jpg, 92);
+    imagedestroy($canvas);
+    @unlink($tmp);
+    return $ok && is_file($jpg) ? ['path' => $jpg, 'temporary' => true] : ['path' => '', 'temporary' => false];
   }
 
   /** @param array<string,mixed> $row */

@@ -486,7 +486,7 @@ final class SimplePdf
     $this->ensureSpace($height);
   }
 
-  public function signatureBlock(string $label, string $name, string $details): void
+  public function signatureBlock(string $label, string $name, string $details, string $imagePath = ''): void
   {
     $detailLines = trim($details) !== '' ? $this->wrap($details, $this->contentWidth, 8) : [];
     $this->ensureSpace(56 + count($detailLines) * 12);
@@ -499,6 +499,9 @@ final class SimplePdf
       $this->y += 11;
     }
     $this->y += 2;
+    if ($imagePath !== '' && is_file($imagePath)) {
+      $this->image($imagePath, 170, 54);
+    }
     $this->fill(6, 29, 73);
     foreach ($this->wrap($name, $this->contentWidth, 11) as $line) {
       $this->text($this->margin, $this->y, $line, 11, 'F2');

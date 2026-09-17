@@ -11,6 +11,7 @@ use SCM\Support\EmailTemplate;
 use SCM\Support\InternalNotificationRecipients;
 use SCM\Support\SchemaInspector;
 use SCM\Support\SmsQueue;
+use SCM\Support\StoredFileService;
 
 final class RentIncreaseService
 {
@@ -187,6 +188,7 @@ final class RentIncreaseService
   {
     $branch = $this->branch((string) ($contract['id_sucursal'] ?? $contract['sucursal'] ?? ''));
     $employee = $this->currentEmployee();
+    $legalRepresentative = $this->generalManagerRepresentative();
     $ctx = array_merge($contract, [
       'fecha_ts' => $fechaTs,
       'fecha' => date('Y-m-d', $fechaTs),
@@ -196,9 +198,12 @@ final class RentIncreaseService
       'contractual' => $this->firstNonEmpty([$branch['nombre_contractual'] ?? '', $branch['nombre'] ?? '', 'Coordinador Contractual, Mantenimiento y Servicios Públicos']),
       'correo_contractual' => $this->firstNonEmpty([$branch['correo_contractual'] ?? '', $branch['correo'] ?? '']),
       'celular_contractual' => $this->firstNonEmpty([$branch['celular_contractual'] ?? '', $branch['telefono'] ?? '']),
-      'representante_legal' => (string) ($branch['representante_legal'] ?? 'Representante legal'),
-      'correo_representante_legal' => (string) ($branch['correo_legal'] ?? $branch['correo_representante_legal'] ?? ''),
-      'celular_representante_legal' => (string) ($branch['celular_legal'] ?? $branch['celular_representante_legal'] ?? ''),
+      'representante_legal' => $this->firstNonEmpty([$legalRepresentative['nombre'] ?? '', $branch['representante_legal'] ?? '', 'Representante legal']),
+      'correo_representante_legal' => $this->firstNonEmpty([$legalRepresentative['correo'] ?? '', $branch['correo_legal'] ?? '', $branch['correo_representante_legal'] ?? '']),
+      'celular_representante_legal' => $this->firstNonEmpty([$legalRepresentative['celular'] ?? '', $branch['celular_legal'] ?? '', $branch['celular_representante_legal'] ?? '']),
+      'cargo_representante_legal' => $this->firstNonEmpty([$legalRepresentative['cargo'] ?? '', 'Gerente General']),
+      'firma_representante_legal' => (string) ($legalRepresentative['firma'] ?? ''),
+      'firma_representante_legal_path' => (string) ($legalRepresentative['firma_path'] ?? ''),
       'ciudad' => trim((string) ($input['ciudad'] ?? $branch['ciudad'] ?? 'Cartagena de Indias')),
       'incremento' => trim((string) ($input['incremento'] ?? '')),
       'canon' => $type === 'canon' ? $amount : $this->money((string) ($contract['valor_canon'] ?? '0')),
@@ -231,6 +236,8 @@ final class RentIncreaseService
       'representante_legal' => (string) ($context['representante_legal'] ?? ''),
       'representante_legal_celular' => (string) ($context['celular_representante_legal'] ?? ''),
       'representante_legal_correo' => (string) ($context['correo_representante_legal'] ?? ''),
+      'representante_legal_cargo' => (string) ($context['cargo_representante_legal'] ?? ''),
+      'representante_legal_firma' => (string) ($context['firma_representante_legal'] ?? ''),
       'arrendatario' => (string) ($context['arrendatario'] ?? ''),
       'arrendatario_correo' => (string) ($context['correo_arrendatario'] ?? ''),
       'arrendatario_celular' => (string) ($context['celular_arrendatario'] ?? ''),
@@ -443,6 +450,110 @@ final class RentIncreaseService
       return ['id_empleado' => $employeeId !== '' ? $employeeId : (string) $userId, 'nombre' => Auth::user()];
     }
     return $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$userId]) ?: ['id_empleado' => $employeeId !== '' ? $employeeId : (string) $userId, 'nombre' => Auth::user()];
+  }
+
+  /** @return array{nombre:string,correo:string,celular:string,cargo:string,firma:string,firma_path:string}|array{} */
+  private function generalManagerRepresentative(): array
+  {
+    $table = $this->db->table('jet_cct_funcionarios');
+    $cargoTable = $this->db->table('jet_cct_cargos');
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+    $nameColumn = $this->schema->detectFirstExistingColumn($table, ['nombre', 'empleado', 'nombre_empleado', 'nombre_funcionario']);
+    $emailColumn = $this->schema->detectFirstExistingColumn($table, ['correo', 'correo_dian', 'email']);
+    $phoneColumn = $this->schema->detectFirstExistingColumn($table, ['celular', 'telefono', 'phone']);
+    $signatureColumn = $this->schema->detectFirstExistingColumn($table, [
+      'firma',
+      'firma_imagen',
+      'imagen_firma',
+      'firma_digital',
+      'firma_representante_legal',
+      'firma_funcionario',
+      'imagen_firma_funcionario',
+    ]);
+    $cargoColumn = $this->schema->columnExists($table, 'id_cargo') ? 'id_cargo' : '';
+    $activeColumn = $this->schema->detectFirstExistingColumn($table, ['activo', 'cct_status']);
+    $hasCargoNames = $cargoColumn !== ''
+      && $this->schema->tableExists($cargoTable)
+      && $this->schema->columnExists($cargoTable, '_ID')
+      && $this->schema->columnExists($cargoTable, 'nombre_cargo');
+    if (!$hasCargoNames) {
+      return [];
+    }
+
+    $select = [
+      $nameColumn !== '' ? "TRIM(COALESCE(f.`{$nameColumn}`, '')) AS nombre" : "'' AS nombre",
+      $emailColumn !== '' ? "TRIM(COALESCE(f.`{$emailColumn}`, '')) AS correo" : "'' AS correo",
+      $phoneColumn !== '' ? "TRIM(COALESCE(f.`{$phoneColumn}`, '')) AS celular" : "'' AS celular",
+      $signatureColumn !== '' ? "TRIM(COALESCE(f.`{$signatureColumn}`, '')) AS firma" : "'' AS firma",
+      "TRIM(COALESCE(c.`nombre_cargo`, '')) AS cargo",
+    ];
+    $where = [
+      "(LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%gerente%' OR LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%gerencia%')",
+      "LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%general%'",
+    ];
+    if ($activeColumn !== '') {
+      if ($activeColumn === 'cct_status') {
+        $where[] = "LOWER(TRIM(COALESCE(f.`{$activeColumn}`, 'publish'))) IN ('publish', 'published', 'si', 'sí', '1', 'true', 'activo', 'active')";
+      } else {
+        $where[] = "LOWER(TRIM(COALESCE(f.`{$activeColumn}`, 'si'))) IN ('si', 'sí', '1', 'true', 'activo', 'active', 'publish', 'published')";
+      }
+    }
+    $row = $this->db->getRow(
+      'SELECT ' . implode(', ', $select)
+        . " FROM `{$table}` f"
+        . " INNER JOIN `{$cargoTable}` c ON TRIM(COALESCE(f.`{$cargoColumn}`, '')) = CAST(c.`_ID` AS CHAR)"
+        . ' WHERE ' . implode(' AND ', $where)
+        . ' ORDER BY f.`_ID` ASC LIMIT 1'
+    );
+    if (!is_array($row) || trim((string) ($row['nombre'] ?? '')) === '') {
+      return [];
+    }
+    $signature = trim((string) ($row['firma'] ?? ''));
+    return [
+      'nombre' => trim((string) ($row['nombre'] ?? '')),
+      'correo' => trim((string) ($row['correo'] ?? '')),
+      'celular' => trim((string) ($row['celular'] ?? '')),
+      'cargo' => trim((string) ($row['cargo'] ?? 'Gerente General')),
+      'firma' => $signature,
+      'firma_path' => $this->localFilePath($signature),
+    ];
+  }
+
+  private function localFilePath(string $value): string
+  {
+    $value = trim(html_entity_decode($value, ENT_QUOTES, 'UTF-8'));
+    if ($value === '') {
+      return '';
+    }
+    if (is_file($value)) {
+      return $value;
+    }
+    $query = [];
+    $urlQuery = (string) (parse_url($value, PHP_URL_QUERY) ?? '');
+    if ($urlQuery !== '') {
+      parse_str($urlQuery, $query);
+      $name = basename((string) ($query['n'] ?? ''));
+      if ($name !== '') {
+        $path = StoredFileService::fromRuntime()->pathFor($name);
+        if (is_string($path) && $path !== '') {
+          return $path;
+        }
+      }
+    }
+    $basename = basename((string) (parse_url($value, PHP_URL_PATH) ?? $value));
+    if ($basename !== '') {
+      $path = StoredFileService::fromRuntime()->pathFor($basename);
+      if (is_string($path) && $path !== '') {
+        return $path;
+      }
+      $uploadPath = rtrim((string) SCM_UPLOAD_PATH, '/\\') . '/' . $basename;
+      if (is_file($uploadPath)) {
+        return $uploadPath;
+      }
+    }
+    return '';
   }
 
   private function sanitizeType(string $type): string
