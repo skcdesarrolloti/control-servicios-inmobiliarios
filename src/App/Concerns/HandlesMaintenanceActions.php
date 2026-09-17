@@ -3808,8 +3808,8 @@ trait HandlesMaintenanceActions
       }
     }
 
-    $mejorOferta = $this->cotizacion_media_items($this->cotizacion_split_ids($row['mejor_oferta'] ?? ''));
-    $otrasOfertas = $this->cotizacion_media_items($this->cotizacion_split_ids($row['otras_oferta'] ?? ''));
+    $mejorOferta = $this->cotizacion_media_items($this->cotizacion_split_media_refs($row['mejor_oferta'] ?? ''));
+    $otrasOfertas = $this->cotizacion_media_items($this->cotizacion_split_media_refs($row['otras_oferta'] ?? ''));
     if (!empty($mejorOferta) || !empty($otrasOfertas)) {
       $pdf->heading('Soportes');
       foreach (array_merge($mejorOferta, $otrasOfertas) as $media) {

@@ -20,6 +20,7 @@ $repairFollowupTemplate = (string) file_get_contents($root . '/docs/whatsapp-seg
 $storedFiles = (string) file_get_contents($root . '/src/Support/StoredFileService.php');
 $genericTicketsUi = (string) file_get_contents($root . '/src/Views/GenericTicketsUiView.php');
 $historyPresentation = (string) file_get_contents($root . '/src/Modules/ServiciosInmobiliarios/Concerns/HistoryPresentationConcern.php');
+$mediaMigrator = (string) file_get_contents($root . '/bin/migrate-media-to-local-storage.php');
 $summaryPos = strpos($handler, "\$pdf->heading('Resumen económico');");
 $ordersPos = strpos($handler, "\$pdf->heading('Órdenes de mantenimiento');");
 $materialsRepeaterPos = strpos($runtimeJs, 'renderCotizacionHiddenRepeaterRows("materiales"');
@@ -101,6 +102,8 @@ $checks = [
   'backend enqueues configurable quote notifications' => str_contains($app, 'cotizacion_mantenimiento_guardada') && str_contains($handler, 'maintenance_quote_enqueue_saved_notifications') && str_contains($handler, "'source_module' => 'cotizaciones_mantenimiento'") && str_contains($handler, 'EmailQueue'),
   'backend loads quote glossary options from JetEngine glossaries' => str_contains($handler, 'maintenance_quote_glossary_options(612') && str_contains($handler, 'maintenance_quote_glossary_options(853') && str_contains($handler, 'correctiveReviewGlossaryOptions'),
   'backend validates quote support images before saving' => str_contains($handler, 'maintenance_quote_store_media') && str_contains($handler, 'handleImageUploadsDetailed') && str_contains($handler, 'supera 1.5 MB'),
+  'native quote support media accepts ids urls and local names' => str_contains($dashboard, 'cotizacion_split_media_refs($row[\'mejor_oferta\'] ?? \'\')') && str_contains($dashboard, 'cotizacion_split_media_refs($row[\'otras_oferta\'] ?? \'\')') && str_contains($handler, 'cotizacion_split_media_refs($row[\'mejor_oferta\'] ?? \'\')') && str_contains($handler, 'cotizacion_split_media_refs($row[\'otras_oferta\'] ?? \'\')'),
+  'media migrator defaults to dry run and handles php serialized data' => str_contains($mediaMigrator, 'array_key_exists(\'apply\', $options)') && str_contains($mediaMigrator, 'unserialize($raw, [\'allowed_classes\' => false])') && str_contains($mediaMigrator, "'jet_cct_cotizacion_mantenimiento'") && str_contains($mediaMigrator, "'mejor_oferta'"),
   'approved quote cards expose native add order action' => str_contains($dashboard, '$cotizacionAprobada ?') && str_contains($dashboard, 'data-scm-add-cotizacion-order') && !str_contains($dashboard, 'anadir-orden-de-mantenimiento'),
   'approved quote cards block add order when active act exists' => str_contains($dashboard, '$hasActiveActa') && str_contains($dashboard, 'Orden bloqueada por acta') && str_contains($dashboard, 'cotizacion_satisfaction_act_info($id, trim((string) ($row[\'id_acta_satisfaccion\'] ?? \'\')), $ticket)'),
   'native add order popup loads context and saves without iframe' => str_contains($runtimeJs, 'openCotizacionOrderFormModal') && str_contains($runtimeJs, 'actionCotizacionOrderContext') && str_contains($runtimeJs, 'actionCotizacionOrderSave') && str_contains($runtimeJs, '[data-scm-add-cotizacion-order]'),

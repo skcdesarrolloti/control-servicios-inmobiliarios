@@ -4127,8 +4127,8 @@ trait RendersDashboard
     $logo = function_exists('system_image') ? system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL) : SCM_DEFAULT_PORTAL_LOGO_URL;
     $revision = $this->cotizacion_revision_row($row);
     $danos = $this->cotizacion_parse_list($revision['evaluacion_de_danos'] ?? '');
-    $mejorOferta = $this->cotizacion_media_items($this->cotizacion_split_ids($row['mejor_oferta'] ?? ''));
-    $otrasOfertas = $this->cotizacion_media_items($this->cotizacion_split_ids($row['otras_oferta'] ?? ''));
+    $mejorOferta = $this->cotizacion_media_items($this->cotizacion_split_media_refs($row['mejor_oferta'] ?? ''));
+    $otrasOfertas = $this->cotizacion_media_items($this->cotizacion_split_media_refs($row['otras_oferta'] ?? ''));
     $materiales = $this->cotizacion_parse_list($row['items_materiales'] ?? '');
     $mano = $this->cotizacion_parse_list($row['items_mano'] ?? '');
     $equipos = $this->cotizacion_parse_list($row['items_otros_equi'] ?? '');
