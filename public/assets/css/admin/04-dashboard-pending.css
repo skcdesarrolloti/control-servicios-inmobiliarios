@@ -6412,6 +6412,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+.scm-maint-quote-auto-offer-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .scm-maint-quote-image-preview {
   position: fixed;
   inset: 0;

@@ -13363,7 +13363,7 @@
           '<img src="' + escHtml(offer.image) + '" alt="Imagen de cotización material de ' + escHtml(title) + '">' +
           '</button>' +
           '<div><span>Mejores ofertas</span><strong>' + escHtml(title) + '</strong><b>' + escHtml(formatCotizacionOrderCurrency(offer.total || 0)) + '</b></div>' +
-          '<button type="button" class="scm-maint-quote-view-image" data-view-generated-material-offer="' + escHtml(offer.key) + '">Ver imagen</button>' +
+          '<div class="scm-maint-quote-auto-offer-actions"><button type="button" class="scm-maint-quote-view-image" data-view-generated-material-offer="' + escHtml(offer.key) + '">Ver imagen</button><button type="button" class="scm-maint-quote-remove" data-remove-generated-material-offer="' + escHtml(offer.key) + '">Quitar</button></div>' +
           '</article>';
       }).join("");
     }
@@ -13395,7 +13395,7 @@
           : ' data-remove-material-row-index="' + escHtml(String(item.index)) + '"';
         return '<article class="scm-maint-quote-generated-card" data-generated-offer-card="' + escHtml(item.key || ("row_" + item.index)) + '">' +
           imageHtml +
-          '<div><span>Proveedor</span><strong>' + escHtml(item.provider || ("Oferta " + (item.index + 1))) + '</strong><b>' + escHtml(formatCotizacionOrderCurrency(item.total || 0)) + '</b>' + (item.image ? '<button type="button" class="scm-maint-quote-view-image" data-view-generated-material-offer="' + escHtml(item.key) + '">Ver imagen</button>' : '') + '</div>' +
+          '<div><span>Proveedor</span><strong>' + escHtml(item.provider || ("Oferta " + (item.index + 1))) + '</strong><b>' + escHtml(formatCotizacionOrderCurrency(item.total || 0)) + '</b></div>' +
           '<button type="button" class="scm-maint-quote-remove"' + removeAttr + '>Quitar</button>' +
           '</article>';
       }).join("");
