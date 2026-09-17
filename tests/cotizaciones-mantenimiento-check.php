@@ -19,6 +19,9 @@ $repairFollowupTemplate = (string) file_get_contents($root . '/docs/whatsapp-seg
 $storedFiles = (string) file_get_contents($root . '/src/Support/StoredFileService.php');
 $summaryPos = strpos($handler, "\$pdf->heading('Resumen económico');");
 $ordersPos = strpos($handler, "\$pdf->heading('Órdenes de mantenimiento');");
+$materialsRepeaterPos = strpos($runtimeJs, 'renderCotizacionRepeaterRows("materiales"');
+$offersSectionPos = strpos($runtimeJs, 'Ofertas de materiales');
+$equipmentRepeaterPos = strpos($runtimeJs, 'renderCotizacionRepeaterRows("equipos"');
 
 $checks = [
   'app defines approve quote action' => str_contains($app, "AJAX_APPROVE_COTIZACION") && str_contains($app, "scm_aprobar_cotizacion_mantenimiento"),
@@ -62,7 +65,10 @@ $checks = [
   'backend disapproves previous quotes on new quote creation' => str_contains($handler, 'maintenance_quote_disapprove_previous_quotes') && str_contains($handler, "'estado' => 'Desaprobada'") && str_contains($handler, 'Reemplazada por cotización #'),
   'quote save returns success with warnings when post-save steps fail' => str_contains($handler, '$postSaveWarnings') && str_contains($handler, 'Guardada con advertencias') && str_contains($handler, '[cotizacion_mantenimiento_save]'),
   'native quote materials use mini spreadsheet and generated support image' => str_contains($runtimeJs, 'descripcion_materiales') && str_contains($runtimeJs, 'valor_unitario_materiales') && str_contains($runtimeJs, 'buildMaterialsQuoteImageDataUrl') && str_contains($runtimeJs, 'COTIZACIÓN MATERIAL') && str_contains($handler, 'maintenance_quote_store_generated_materials_image') && str_contains($storedFiles, 'storeImageDataUri'),
+  'native quote material items are automatic and not editable' => str_contains($runtimeJs, 'data-material-auto-item') && str_contains($runtimeJs, 'refreshMaterialAutoItems') && str_contains($runtimeJs, 'obj.item_materiales = String(index + 1)') && !str_contains($runtimeJs, '["number", "item_materiales", "Ítem"'),
+  'native quote material offers render directly below materials' => is_int($materialsRepeaterPos) && is_int($offersSectionPos) && is_int($equipmentRepeaterPos) && $materialsRepeaterPos < $offersSectionPos && $offersSectionPos < $equipmentRepeaterPos && !str_contains($runtimeJs, '<section class="scm-maint-quote-section"><h4>Soportes</h4>'),
   'native quote popup calculates perturbation without legacy shortcode' => str_contains($runtimeJs, 'maintenanceQuotePerturbationHtml') && str_contains($runtimeJs, 'syncMaintenanceQuotePerturbation') && str_contains($runtimeJs, 'dias_afectacion_calculados') && str_contains($handler, 'maintenance_quote_perturbation_context'),
+  'native perturbation calculator matches legacy guided sections' => str_contains($runtimeJs, 'Calculadora de perturbación del inmueble') && str_contains($runtimeJs, '0. Tipo de valoración') && str_contains($runtimeJs, '1. Días de afectación calculados') && str_contains($runtimeJs, '2. Criterios de severidad') && str_contains($runtimeJs, '3. Responsabilidad probable') && str_contains($runtimeJs, 'Datos cargados desde inmuebles') && str_contains($adminCss, '.scm-maint-quote-days-box') && str_contains($adminCss, '.scm-maint-quote-result-card'),
   'native perturbation calculator includes in-popup guides' => str_contains($runtimeJs, 'quotePerturbationGuideContent') && str_contains($runtimeJs, 'showMaintenanceQuoteGuide') && str_contains($runtimeJs, 'data-quote-guide-key="general"') && str_contains($runtimeJs, 'data-quote-guide-panel') && str_contains($adminCss, '.scm-maint-quote-guide-panel'),
   'quote timestamps prefer WordPress local time' => str_contains($handler, 'maintenance_quote_now_pair') && str_contains($handler, "current_time('mysql')"),
   'native quote repeater add buttons use styled controls' => str_contains($runtimeJs, 'scm-maint-quote-add') && str_contains($adminCss, '.scm-maint-quote-add'),

@@ -12732,7 +12732,6 @@
           title: "Materiales",
           add: "Agregar material",
           fields: [
-            ["number", "item_materiales", "Ítem", "1"],
             ["text", "descripcion_materiales", "Descripción", "Material o referencia"],
             ["select", "unidad_materiales", "Unidad", ""],
             ["number", "cantidad_materiales", "Cantidad", "1"],
@@ -12764,8 +12763,11 @@
       var conf = configs[type];
       var rows = cotizacionFormItems(items, {});
       var html = '<section class="scm-maint-quote-section" data-quote-repeater="' + escHtml(type) + '"><div class="scm-maint-quote-section-head"><div><h4>' + escHtml(conf.title) + '</h4><span data-quote-total="' + escHtml(type) + '">$0</span></div><button type="button" class="scm-maint-quote-add" data-quote-add-row="' + escHtml(type) + '">' + escHtml(conf.add) + '</button></div><div class="scm-maint-quote-rows">';
-      rows.forEach(function (row) {
+      rows.forEach(function (row, index) {
         html += '<div class="scm-maint-quote-row" data-quote-row="' + escHtml(type) + '">';
+        if (type === "materiales") {
+          html += '<div class="scm-maint-quote-auto-item" aria-label="Ítem automático"><span>Ítem</span><strong data-material-auto-item>' + escHtml(String(index + 1)) + '</strong></div>';
+        }
         conf.fields.forEach(function (field) {
           var inputType = field[0];
           var name = field[1];
@@ -12801,37 +12803,61 @@
       var d = context.defaults || {};
       var p = context.perturbation_context || {};
       var tipo = String(d.tipo_inmueble || p.tipo_inmueble || "").toLowerCase().indexOf("comer") > -1 ? "comercial" : "residencial";
-      function select(name, label, options) {
-        return '<div class="scm-cotizacion-dialog-field scm-maint-quote-guide-field"><label><span>' + escHtml(label) + '</span><select data-quote-perturb-field="' + escHtml(name) + '">' + options.map(function (o) {
+      function dataValue(value, fallback) {
+        value = value == null || value === "" ? fallback : value;
+        return value == null || value === "" ? "No informado" : String(value);
+      }
+      function dataItem(label, value, fallback) {
+        return '<span><b>' + escHtml(label) + ':</b> ' + escHtml(dataValue(value, fallback)) + '</span>';
+      }
+      function select(name, label, options, help) {
+        return '<div class="scm-maint-quote-criterion-card"><label class="scm-cotizacion-dialog-field scm-maint-quote-guide-field"><span>' + escHtml(label) + '</span><select data-quote-perturb-field="' + escHtml(name) + '">' + options.map(function (o) {
           return '<option value="' + escHtml(String(o[0])) + '">' + escHtml(o[1]) + "</option>";
-        }).join("") + '</select></label><button type="button" class="scm-maint-quote-guide-btn" data-quote-guide-key="' + escHtml(name) + '">Ver guía</button></div>';
+        }).join("") + '</select><small>' + escHtml(help || "") + '</small></label><button type="button" class="scm-maint-quote-guide-btn" data-quote-guide-key="' + escHtml(name) + '">Ver guía</button></div>';
       }
       var residential =
-        select("habitabilidad", "Uso normal del inmueble", [[0, "Sin afectación relevante"], [6, "Molestia menor"], [12, "Limita parcialmente una actividad"], [18, "Impide usar zona importante"], [25, "Compromete habitabilidad"]]) +
-        select("riesgo", "Riesgo salud/seguridad", [[0, "Sin riesgo"], [5, "Riesgo bajo"], [10, "Riesgo medio"], [15, "Riesgo alto"], [20, "Riesgo crítico"]]) +
-        select("servicio", "Servicio esencial", [[0, "Sin servicio afectado"], [4, "Afectación menor"], [8, "Parcialmente afectado"], [12, "Muy limitado"], [15, "Inutilizable"]]) +
-        select("duracion", "Duración desde reporte", [[0, "Menos de 24 horas"], [3, "1 a 2 días"], [6, "3 a 5 días"], [10, "6 a 10 días"], [15, "Más de 10 días"]]) +
-        select("area", "Zona afectada", [[0, "Decorativa/secundaria"], [3, "Secundaria funcional"], [6, "Zona importante"], [8, "Varias zonas"], [10, "Afectación general"]]) +
-        select("gestion", "Gestión realizada", [[0, "Oportuna/documentada"], [3, "Falta seguimiento"], [6, "Lenta/incompleta"], [8, "Sin solución clara"], [10, "Sin respuesta"]]) +
-        select("reincidencia", "Reincidencia", [[0, "Primera vez"], [2, "Antecedente leve"], [3, "Daño repetido"], [5, "Agravado por demora"]]);
+        select("habitabilidad", "1. Afectación al uso normal del inmueble", [[0, "Sin afectación relevante"], [6, "Molestia menor"], [12, "Limita parcialmente una actividad"], [18, "Impide usar zona importante"], [25, "Compromete habitabilidad"]], "Peso máximo: 25 puntos.") +
+        select("riesgo", "2. Riesgo para salud o seguridad", [[0, "Sin riesgo"], [5, "Riesgo bajo"], [10, "Riesgo medio"], [15, "Riesgo alto"], [20, "Riesgo crítico"]], "Electricidad, gas, humedad, moho, aguas negras, estructura, etc.") +
+        select("servicio", "3. Servicio esencial comprometido", [[0, "Sin servicio afectado"], [4, "Afectación menor"], [8, "Parcialmente afectado"], [12, "Muy limitado"], [15, "Inutilizable"]], "Agua, energía, gas, baño, cocina, acceso o seguridad.") +
+        select("duracion", "4. Duración desde el reporte", [[0, "Menos de 24 horas"], [3, "1 a 2 días"], [6, "3 a 5 días"], [10, "6 a 10 días"], [15, "Más de 10 días"]], "A mayor demora sin solución o control, mayor puntaje.") +
+        select("area", "5. Área o zona afectada", [[0, "Área decorativa o secundaria"], [3, "Secundaria funcional"], [6, "Zona importante"], [8, "Varias zonas"], [10, "Afectación general"]], "Evalúa baño, cocina, habitación principal, sala o varias zonas.") +
+        select("gestion", "6. Gestión realizada", [[0, "Gestión oportuna y documentada"], [3, "Falta seguimiento"], [6, "Lenta/incompleta"], [8, "Sin solución clara"], [10, "Sin respuesta"]], "A mayor falta de gestión, mayor riesgo contractual.") +
+        select("reincidencia", "7. Reincidencia o agravamiento", [[0, "Primera vez / no se ha agravado"], [2, "Antecedente leve"], [3, "Daño repetido"], [5, "Agravado por demora"]], "Aplica cuando el daño ya había sido reportado o reparado mal.");
       var commercial =
-        select("operacion", "Operación del negocio", [[0, "Sin afectación operativa"], [6, "Molestia menor"], [12, "Limita actividad comercial"], [18, "Impide proceso importante"], [25, "Compromete operación"]]) +
-        select("riesgo_comercial", "Riesgo SST/inventario", [[0, "Sin riesgo"], [5, "Riesgo bajo"], [10, "Riesgo medio"], [15, "Riesgo alto"], [20, "Riesgo crítico"]]) +
-        select("servicio_operativo", "Servicio operativo", [[0, "Ninguno afectado"], [4, "Afectación menor"], [8, "Parcial"], [12, "Muy limitado"], [15, "Inutilizable"]]) +
-        select("duracion_operativa", "Tiempo de afectación", [[0, "Menos de 24 horas"], [3, "1 a 2 días"], [6, "3 a 5 días"], [10, "6 a 10 días"], [15, "Más de 10 días"]]) +
-        select("zona_proceso", "Zona/proceso afectado", [[0, "No operativa"], [3, "Secundaria"], [6, "Importante"], [8, "Varias zonas"], [10, "General"]]) +
-        select("gestion_comercial", "Mitigación/gestión", [[0, "Oportuna con mitigación"], [3, "Falta seguimiento"], [6, "Lenta/incompleta"], [8, "Sin continuidad clara"], [10, "Sin respuesta"]]) +
-        select("reincidencia_comercial", "Reincidencia", [[0, "Primera vez"], [2, "Antecedente leve"], [3, "Daño repetido"], [5, "Agravado"]]);
+        select("operacion", "1. Operación del negocio", [[0, "Sin afectación operativa"], [6, "Molestia menor"], [12, "Limita actividad comercial"], [18, "Impide proceso importante"], [25, "Compromete operación"]], "Ventas, producción, almacenamiento, atención o despacho.") +
+        select("riesgo_comercial", "2. Riesgo SST/inventario", [[0, "Sin riesgo"], [5, "Riesgo bajo"], [10, "Riesgo medio"], [15, "Riesgo alto"], [20, "Riesgo crítico"]], "Trabajadores, clientes, proveedores, inventario o equipos.") +
+        select("servicio_operativo", "3. Servicio operativo", [[0, "Ninguno afectado"], [4, "Afectación menor"], [8, "Parcial"], [12, "Muy limitado"], [15, "Inutilizable"]], "Servicios indispensables para operar.") +
+        select("duracion_operativa", "4. Tiempo de afectación", [[0, "Menos de 24 horas"], [3, "1 a 2 días"], [6, "3 a 5 días"], [10, "6 a 10 días"], [15, "Más de 10 días"]], "Tiempo limitado, detenido o expuesto.") +
+        select("zona_proceso", "5. Zona/proceso afectado", [[0, "No operativa"], [3, "Secundaria"], [6, "Importante"], [8, "Varias zonas"], [10, "General"]], "Ventas, caja, bodega, cocina, consultorio, acceso, etc.") +
+        select("gestion_comercial", "6. Mitigación/gestión", [[0, "Oportuna con mitigación"], [3, "Falta seguimiento"], [6, "Lenta/incompleta"], [8, "Sin continuidad clara"], [10, "Sin respuesta"]], "Seguimiento, soluciones temporales y trazabilidad.") +
+        select("reincidencia_comercial", "7. Reincidencia", [[0, "Primera vez / no se ha agravado"], [2, "Antecedente leve"], [3, "Daño repetido"], [5, "Agravado"]], "Falla repetida, mal reparada o agravada.");
+      var dataBox = '<div class="scm-maint-quote-data-box"><strong>Datos cargados desde inmuebles:</strong><div>' +
+        dataItem("Código", p.codigo || d.codigo_inmueble || "") +
+        dataItem("Tipo detectado", d.tipo_inmueble || p.tipo_inmueble || "", "No detectado") +
+        dataItem("Arriendo", formatCotizacionOrderCurrency(p.precio_arriendo || 0)) +
+        dataItem("Administración", formatCotizacionOrderCurrency(p.precio_admin || 0)) +
+        dataItem("Canon total", formatCotizacionOrderCurrency(p.canon_total || 0)) +
+        dataItem("Área construida", (p.area_construida || 0) + " m²") +
+        '</div><div>' +
+        dataItem("Ticket", p.id_ticket || "") +
+        dataItem("Fecha ticket", p.fecha_ticket_texto || "", "No encontrada") +
+        dataItem("Fecha cotización", p.fecha_cot_texto || "", "No encontrada") +
+        '</div></div>';
       return (
         '<div class="scm-maint-quote-perturb" data-quote-perturbation data-quote-perturb-type="' + escHtml(tipo) + '">' +
-        '<div class="scm-maint-quote-perturb-head"><div><strong>Calculadora de perturbación</strong><span>Canon ' + escHtml(formatCotizacionOrderCurrency(p.canon_total || 0)) + ' · Área ' + escHtml(String(p.area_construida || 0)) + ' m² · Días desde ticket ' + escHtml(String(p.dias_desde_ticket || 0)) + '</span></div><div class="scm-maint-quote-perturb-result"><b data-quote-perturb-percent>0%</b><small data-quote-perturb-bonus>$0</small></div></div>' +
+        '<div class="scm-maint-quote-perturb-head"><div><strong>Calculadora de perturbación del inmueble</strong><span>Esta herramienta calcula la perturbación, los días de afectación y el valor sugerido de compensación.</span></div></div>' +
+        dataBox +
+        '<h5 class="scm-maint-quote-perturb-section-title">0. Tipo de valoración</h5>' +
+        '<div class="scm-maint-quote-type-grid"><div class="scm-maint-quote-criterion-card"><label class="scm-cotizacion-dialog-field"><span>Tipo de inmueble</span><select name="tipo_inmueble_perturbacion" data-quote-perturb-type-select><option value="residencial"' + (tipo === "residencial" ? " selected" : "") + '>Residencial</option><option value="comercial"' + (tipo === "comercial" ? " selected" : "") + '>Comercial</option></select><small>Define si los criterios se valoran desde habitabilidad o continuidad operativa.</small></label></div><div class="scm-maint-quote-criterion-card" data-quote-activity-wrap' + (tipo === "comercial" ? "" : " hidden") + '><label class="scm-cotizacion-dialog-field"><span>Actividad comercial</span><select name="actividad_comercial_perturbacion" data-quote-activity><option value="deposito_bodega">Depósito / bodega</option><option value="fabricacion">Fabricación / taller</option><option value="prestacion_servicios">Prestación de servicios</option><option value="compra_venta">Compra y venta</option><option value="oficina">Oficina</option><option value="restaurante_alimentos">Restaurante / alimentos</option><option value="salud_estetica">Salud / estética</option><option value="otro">Otra</option></select><small>Solo aplica cuando la valoración es comercial.</small></label></div></div>' +
         '<div class="scm-maint-quote-guide-actions"><button type="button" class="scm-maint-quote-guide-btn is-primary" data-quote-guide-key="general">Ver guía de criterios</button><button type="button" class="scm-maint-quote-guide-btn" data-quote-guide-key="responsabilidad">Ver guía de responsabilidad</button></div>' +
         '<div class="scm-maint-quote-guide-panel" data-quote-guide-panel hidden></div>' +
-        '<div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Tipo de valoración</span><select name="tipo_inmueble_perturbacion" data-quote-perturb-type-select><option value="residencial"' + (tipo === "residencial" ? " selected" : "") + '>Residencial</option><option value="comercial"' + (tipo === "comercial" ? " selected" : "") + '>Comercial</option></select></label><label class="scm-cotizacion-dialog-field" data-quote-activity-wrap' + (tipo === "comercial" ? "" : " hidden") + '><span>Actividad comercial</span><select name="actividad_comercial_perturbacion" data-quote-activity><option value="deposito_bodega">Depósito / bodega</option><option value="fabricacion">Fabricación / taller</option><option value="prestacion_servicios">Prestación de servicios</option><option value="compra_venta">Compra y venta</option><option value="oficina">Oficina</option><option value="restaurante_alimentos">Restaurante / alimentos</option><option value="salud_estetica">Salud / estética</option><option value="otro">Otra</option></select></label></div>' +
-        '<div class="scm-maint-quote-grid" data-quote-criteria="residencial"' + (tipo === "residencial" ? "" : " hidden") + '>' + residential + '</div>' +
-        '<div class="scm-maint-quote-grid" data-quote-criteria="comercial"' + (tipo === "comercial" ? "" : " hidden") + '>' + commercial + '</div>' +
-        '<div class="scm-maint-quote-grid">' + select("responsabilidad", "Responsabilidad probable", [[1, "Propietario / arrendador"], [0.8, "Alta con gestión activa"], [0.6, "Compartida / por confirmar"], [0.35, "Tercero/copropiedad/fuerza mayor"], [0.15, "Daño locativo o mal uso"]]) + '</div>' +
-        '<div class="scm-maint-quote-perturb-detail" data-quote-perturb-detail>Completa área afectada y duración para calcular.</div>' +
+        '<h5 class="scm-maint-quote-perturb-section-title">1. Días de afectación calculados</h5><div class="scm-maint-quote-days-box"><strong data-quote-days-text>0 días</strong><span data-quote-days-detail>Días desde ticket: ' + escHtml(String(p.dias_desde_ticket || 0)) + ' | Duración trabajo: 0 | Margen seguridad: 1.2</span></div>' +
+        '<h5 class="scm-maint-quote-perturb-section-title">2. Criterios de severidad</h5>' +
+        '<div class="scm-maint-quote-criteria-grid" data-quote-criteria="residencial"' + (tipo === "residencial" ? "" : " hidden") + '>' + residential + '</div>' +
+        '<div class="scm-maint-quote-criteria-grid" data-quote-criteria="comercial"' + (tipo === "comercial" ? "" : " hidden") + '>' + commercial + '</div>' +
+        '<h5 class="scm-maint-quote-perturb-section-title">3. Responsabilidad probable</h5>' +
+        '<div class="scm-maint-quote-type-grid">' + select("responsabilidad", "Responsabilidad probable", [[1, "Responsabilidad probable del propietario / arrendador"], [0.8, "Alta con gestión activa"], [0.6, "Compartida / por confirmar"], [0.35, "Tercero/copropiedad/fuerza mayor"], [0.15, "Daño locativo o mal uso"]], "Este factor ajusta el porcentaje final sugerido.") + '</div>' +
+        '<div class="scm-maint-quote-result-card"><div><strong data-quote-perturb-level>Nivel: Mínima</strong><p data-quote-perturb-detail>Completa área afectada y duración para calcular.</p><small data-quote-perturb-bonus>Bonificación sugerida: $0</small></div><b data-quote-perturb-percent>0%</b></div>' +
         '</div>'
       );
     }
@@ -12868,6 +12894,7 @@
         '</div></section>' +
         renderCotizacionRepeaterRows("mano", q.items_mano, context.unit_options) +
         renderCotizacionRepeaterRows("materiales", q.items_materiales, context.unit_options) +
+        '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Mejores ofertas</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Otras ofertas</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><p class="scm-maint-quote-help">Van debajo de materiales para mantener el mismo orden del formulario anterior. Usa imágenes livianas; el sistema valida peso y tamaño antes de guardar.</p></section>' +
         renderCotizacionRepeaterRows("equipos", q.items_otros_equi, context.unit_options) +
         renderCotizacionRepeaterRows("otros", q.items_otros_costos, context.unit_options) +
         '<section class="scm-maint-quote-section"><h4>Condiciones y perturbación</h4><div class="scm-maint-quote-grid">' +
@@ -12878,7 +12905,6 @@
         '<label class="scm-cotizacion-dialog-field"><span>Valor bonificación</span><input type="number" name="valor_bonificacion" min="0" step="1" value="' + escHtml(d.valor_bonificacion || "") + '" readonly></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Días afectación calculados</span><input type="number" name="dias_afectacion_calculados" min="0" step="1" value="' + escHtml(d.dias_afectacion_calculados || "") + '" readonly></label>' +
         '</div>' + maintenanceQuotePerturbationHtml(context) + '<label class="scm-cotizacion-dialog-field is-wide"><span>Justificación</span><textarea name="justificacion_perturbacion" rows="3">' + escHtml(d.justificacion_perturbacion || "") + '</textarea></label><textarea name="resumen_calculo_perturbacion" hidden>' + escHtml(d.resumen_calculo_perturbacion || "") + '</textarea><label class="scm-cotizacion-dialog-field is-wide"><span>Observaciones</span><textarea name="observaciones" rows="4">' + escHtml(d.observaciones || "") + '</textarea></label></section>' +
-        '<section class="scm-maint-quote-section"><h4>Soportes</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Mejores ofertas</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Otras ofertas</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><p class="scm-maint-quote-help">Usa imágenes livianas. El sistema valida peso y tamaño antes de guardar.</p></section>' +
         '</form>'
       );
     }
@@ -12892,7 +12918,19 @@
     }
 
     function collectQuoteRows(form, type) {
-      return Array.prototype.map.call(form.querySelectorAll('[data-quote-row="' + type + '"]'), quoteRowToObject);
+      return Array.prototype.map.call(form.querySelectorAll('[data-quote-row="' + type + '"]'), function (row, index) {
+        var obj = quoteRowToObject(row);
+        if (type === "materiales") obj.item_materiales = String(index + 1);
+        return obj;
+      });
+    }
+
+    function refreshMaterialAutoItems(form) {
+      if (!form) return;
+      form.querySelectorAll('[data-quote-row="materiales"]').forEach(function (row, index) {
+        var label = row.querySelector("[data-material-auto-item]");
+        if (label) label.textContent = String(index + 1);
+      });
     }
 
     function quotePerturbationLevel(percent) {
@@ -13001,8 +13039,14 @@
       var percentEl = form.querySelector("[data-quote-perturb-percent]");
       var bonusEl = form.querySelector("[data-quote-perturb-bonus]");
       var detailEl = form.querySelector("[data-quote-perturb-detail]");
-      if (percentEl) percentEl.textContent = percent + "% · " + perturbInfo.nivel;
-      if (bonusEl) bonusEl.textContent = formatCotizacionOrderCurrency(bonus);
+      var levelEl = form.querySelector("[data-quote-perturb-level]");
+      var daysTextEl = form.querySelector("[data-quote-days-text]");
+      var daysDetailEl = form.querySelector("[data-quote-days-detail]");
+      if (percentEl) percentEl.textContent = percent + "%";
+      if (bonusEl) bonusEl.textContent = "Bonificación sugerida: " + formatCotizacionOrderCurrency(bonus);
+      if (levelEl) levelEl.textContent = "Nivel: " + perturbInfo.nivel;
+      if (daysTextEl) daysTextEl.textContent = dias + (dias === 1 ? " día" : " días");
+      if (daysDetailEl) daysDetailEl.textContent = "Días desde ticket: " + diasTicket + " | Duración trabajo: " + duracion + " | Margen seguridad: 1.2";
       if (detailEl) detailEl.innerHTML = escHtml(perturbInfo.texto) + "<br>Área usada: <strong>" + escHtml(String(area)) + " m²</strong> · Días calculados: <strong>" + escHtml(String(dias)) + "</strong>";
     }
 
@@ -13147,6 +13191,7 @@
           temp.innerHTML = html;
           var row = temp.querySelector("[data-quote-row]");
           if (row) section.appendChild(row);
+          refreshMaterialAutoItems(form);
           syncMaintenanceQuoteTotals(form);
           return;
         }
@@ -13160,9 +13205,11 @@
           } else if (row) {
             row.querySelectorAll("input, textarea, select").forEach(function (input) { input.value = ""; });
           }
+          refreshMaterialAutoItems(form);
           syncMaintenanceQuoteTotals(form);
         }
       });
+      refreshMaterialAutoItems(form);
       syncMaintenanceQuoteTotals(form);
       syncMaintenanceQuotePerturbation(form, context || {});
     }
