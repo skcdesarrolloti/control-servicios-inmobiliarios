@@ -212,6 +212,10 @@
     var actionPropertyHistoryPdf = actions.property_history_pdf || "";
     var actionDashboardMetrics = actions.dashboard_metrics || "";
     var actionDashboardFilterOptions = actions.dashboard_filter_options || "";
+    var actionRentIncreaseLettersList =
+      actions.rent_increase_letters_list || "";
+    var actionRentIncreaseLettersCreate =
+      actions.rent_increase_letters_create || "";
     var duePopupConfig = runtime.duePopup || {};
     var dashboardDuePopupShown = {};
     var dashboardDuePopupPromise = null;
@@ -8741,6 +8745,9 @@
       if (panelId === "scm-panel-auditoria-canon-aseguradoras") {
         return "auditoria_canon_aseguradoras";
       }
+      if (panelId === "scm-panel-cartas-aumento") {
+        return "cartas_aumento";
+      }
       return "";
     }
 
@@ -12623,6 +12630,234 @@
 
     initContractsPanel();
 
+    function initRentIncreasePanel() {
+      var wrap = root.querySelector("[data-rent-increase-panel]");
+      if (!wrap || !ajaxUrl || !actionRentIncreaseLettersList) {
+        return;
+      }
+
+      function activeSection() {
+        return wrap.querySelector(".scm-rent-increase-section.active");
+      }
+
+      function postRentIncrease(fd, actionName) {
+        fd.append("action", actionName);
+        fd.append("nonce", nonce);
+        return fetch(ajaxUrl, {
+          method: "POST",
+          body: fd,
+          credentials: "same-origin",
+        })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error(
+                (json && json.data && json.data.message) ||
+                  "No se pudo procesar la solicitud.",
+              );
+            }
+            return json.data || {};
+          });
+      }
+
+      function fetchRentIncrease(section, force) {
+        if (!section) {
+          return Promise.resolve();
+        }
+        if (!force && section.getAttribute("data-scm-loaded") === "1") {
+          return Promise.resolve();
+        }
+        var form = section.querySelector("[data-rent-increase-form]");
+        var table = section.querySelector("[data-rent-increase-table]");
+        var pagination = section.querySelector("[data-rent-increase-pagination]");
+        var spinner = section.querySelector(".scm-spinner");
+        if (!form || !table) {
+          return Promise.resolve();
+        }
+        if (spinner) spinner.classList.add("active");
+        form.classList.add("scm-loading");
+        return postRentIncrease(new FormData(form), actionRentIncreaseLettersList)
+          .then(function (data) {
+            table.innerHTML = data.table_html || "";
+            if (pagination) pagination.innerHTML = data.pagination_html || "";
+            var count = wrap.querySelector("[data-rent-increase-count]");
+            if (count) count.textContent = data.count || "0";
+            section.setAttribute("data-scm-loaded", "1");
+          })
+          .catch(function (err) {
+            showToast("error", err.message || "No se pudieron cargar cartas de aumento.");
+          })
+          .finally(function () {
+            if (spinner) spinner.classList.remove("active");
+            form.classList.remove("scm-loading");
+          });
+      }
+
+      function moneyValue(value) {
+        var text = String(value || "").replace(/[^\d]/g, "");
+        return text || "0";
+      }
+
+      function openRentIncreaseModal(button) {
+        var modal = wrap.querySelector("[data-rent-increase-modal]");
+        var body = wrap.querySelector("[data-rent-increase-form-wrap]");
+        var title = wrap.querySelector("[data-rent-increase-modal-title]");
+        var subtitle = wrap.querySelector("[data-rent-increase-modal-subtitle]");
+        if (!modal || !body || !button) return;
+        var type = button.getAttribute("data-type") || "canon";
+        var label = type === "canon" ? "Aumentar canon" : "Aumentar administración";
+        var contract = button.getAttribute("data-contract-code") || "";
+        var current = type === "canon"
+          ? moneyValue(button.getAttribute("data-canon") || "")
+          : moneyValue(button.getAttribute("data-administration") || "");
+        if (title) title.textContent = label;
+        if (subtitle) {
+          subtitle.textContent =
+            "Contrato #" + contract + " · " + (button.getAttribute("data-tenant") || "Sin arrendatario");
+        }
+        var today = new Date().toISOString().slice(0, 10);
+        body.innerHTML =
+          '<form class="scm-rent-increase-create-form" data-rent-increase-create-form autocomplete="off">' +
+          '<input type="hidden" name="type" value="' + escHtml(type) + '">' +
+          '<input type="hidden" name="contract_id" value="' + escHtml(button.getAttribute("data-contract-id") || "") + '">' +
+          '<section class="scm-maint-quote-section"><h4>Datos del contrato</h4><div class="scm-maint-quote-grid">' +
+          '<label class="scm-cotizacion-dialog-field"><span>Contrato</span><input value="' + escHtml(contract) + '" readonly></label>' +
+          '<label class="scm-cotizacion-dialog-field"><span>Inmueble</span><input value="' + escHtml(button.getAttribute("data-property") || "") + '" readonly></label>' +
+          '<label class="scm-cotizacion-dialog-field"><span>Arrendatario</span><input value="' + escHtml(button.getAttribute("data-tenant") || "") + '" readonly></label>' +
+          '<label class="scm-cotizacion-dialog-field"><span>Dirección</span><input value="' + escHtml(button.getAttribute("data-address") || "") + '" readonly></label>' +
+          '</div></section>' +
+          '<section class="scm-maint-quote-section"><h4>Datos de la carta</h4><div class="scm-maint-quote-grid">' +
+          '<label class="scm-cotizacion-dialog-field"><span>Fecha <em>*</em></span><input type="date" name="fecha" value="' + escHtml(today) + '" required></label>' +
+          '<label class="scm-cotizacion-dialog-field"><span>Ciudad</span><input name="ciudad" value="Cartagena de Indias"></label>' +
+          (type === "canon"
+            ? '<label class="scm-cotizacion-dialog-field"><span>Incremento <em>*</em></span><input name="incremento" placeholder="Ej. 9,28%" required></label><label class="scm-cotizacion-dialog-field"><span>Canon incrementado <em>*</em></span><input name="canon" type="number" inputmode="numeric" min="1" step="1" value="' + escHtml(current) + '" required></label>'
+            : '<label class="scm-cotizacion-dialog-field"><span>Administración incrementada <em>*</em></span><input name="administracion" type="number" inputmode="numeric" min="1" step="1" value="' + escHtml(current) + '" required></label><label class="scm-cotizacion-dialog-field"><span>Vigencia del aumento <em>*</em></span><input name="vigencia_aumento" type="date" value="' + escHtml(today) + '" required></label><label class="scm-cotizacion-dialog-field"><span>¿Tiene retroactivos?</span><select name="tiene_retroactivos"><option value="No">No</option><option value="Si">Sí</option></select></label><label class="scm-cotizacion-dialog-field"><span>Retroactivo administración</span><input name="retroactivo_administracion" type="number" inputmode="numeric" min="0" step="1" value="0"></label><label class="scm-cotizacion-dialog-field"><span>Mes inicio</span><input name="mes_inicio" type="date"></label><label class="scm-cotizacion-dialog-field"><span>Mes final</span><input name="mes_final" type="date"></label>') +
+          '</div></section>' +
+          '<div class="scm-public-services-review-error" role="alert" aria-live="assertive" hidden></div>' +
+          '<div class="scm-public-services-review-actions"><button type="button" class="scm-btn-secondary" data-rent-increase-close>Cancelar</button><button type="submit" class="scm-btn-primary" data-rent-increase-submit>Generar carta y notificar</button></div>' +
+          '</form>';
+        modal.hidden = false;
+        modal.setAttribute("aria-hidden", "false");
+        window.setTimeout(function () {
+          var firstField = modal.querySelector("input:not([readonly]), select");
+          if (firstField) firstField.focus();
+        }, 80);
+      }
+
+      function closeRentIncreaseModal() {
+        var modal = wrap.querySelector("[data-rent-increase-modal]");
+        if (!modal) return;
+        modal.hidden = true;
+        modal.setAttribute("aria-hidden", "true");
+      }
+
+      wrap.querySelectorAll("[data-rent-increase-tab]").forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          var key = tab.getAttribute("data-rent-increase-tab") || "contracts";
+          wrap.querySelectorAll("[data-rent-increase-tab]").forEach(function (item) {
+            item.classList.toggle("active", item === tab);
+          });
+          wrap.querySelectorAll("[data-rent-increase-section]").forEach(function (section) {
+            section.classList.toggle(
+              "active",
+              section.getAttribute("data-rent-increase-section") === key,
+            );
+          });
+          fetchRentIncrease(activeSection(), false);
+        });
+      });
+
+      wrap.querySelectorAll("[data-rent-increase-form]").forEach(function (form) {
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var page = form.querySelector('input[name="page"]');
+          if (page) page.value = "1";
+          fetchRentIncrease(form.closest("[data-rent-increase-section]"), true);
+        });
+      });
+
+      wrap.addEventListener("click", function (e) {
+        var clear = e.target.closest("[data-rent-increase-clear]");
+        if (clear) {
+          e.preventDefault();
+          var section = clear.closest("[data-rent-increase-section]");
+          var form = section ? section.querySelector("[data-rent-increase-form]") : null;
+          if (form) {
+            form.querySelectorAll("input[type='text'], input[type='date']").forEach(function (input) {
+              input.value = "";
+            });
+            form.querySelectorAll("select").forEach(function (select) {
+              select.selectedIndex = 0;
+            });
+            var page = form.querySelector('input[name="page"]');
+            if (page) page.value = "1";
+          }
+          fetchRentIncrease(section, true);
+          return;
+        }
+        var pageBtn = e.target.closest(".scm-page-btn-rent-increase");
+        if (pageBtn && !pageBtn.disabled) {
+          e.preventDefault();
+          var pageSection = pageBtn.closest("[data-rent-increase-section]");
+          var pageForm = pageSection ? pageSection.querySelector("[data-rent-increase-form]") : null;
+          var pageInput = pageForm ? pageForm.querySelector('input[name="page"]') : null;
+          if (pageInput) pageInput.value = String(pageBtn.getAttribute("data-page") || "1");
+          fetchRentIncrease(pageSection, true);
+          return;
+        }
+        var open = e.target.closest("[data-rent-increase-open]");
+        if (open) {
+          e.preventDefault();
+          openRentIncreaseModal(open);
+          return;
+        }
+        if (e.target.closest("[data-rent-increase-close]")) {
+          e.preventDefault();
+          closeRentIncreaseModal();
+        }
+      });
+
+      wrap.addEventListener("submit", function (e) {
+        var form = e.target.closest("[data-rent-increase-create-form]");
+        if (!form) return;
+        e.preventDefault();
+        if (!actionRentIncreaseLettersCreate) {
+          showToast("error", "La acción de cartas de aumento no está disponible.");
+          return;
+        }
+        var submit = form.querySelector("[data-rent-increase-submit]");
+        if (submit) submit.disabled = true;
+        postRentIncrease(new FormData(form), actionRentIncreaseLettersCreate)
+          .then(function (data) {
+            showToast("success", data.message || "Carta creada.");
+            closeRentIncreaseModal();
+            wrap.querySelectorAll("[data-rent-increase-section]").forEach(function (section) {
+              section.setAttribute("data-scm-loaded", "0");
+            });
+            return fetchRentIncrease(activeSection(), true);
+          })
+          .catch(function (err) {
+            var error = form.querySelector(".scm-public-services-review-error");
+            if (error) {
+              error.hidden = false;
+              error.textContent = err.message || "No se pudo crear la carta.";
+            }
+            showToast("error", err.message || "No se pudo crear la carta.");
+          })
+          .finally(function () {
+            if (submit) submit.disabled = false;
+          });
+      });
+
+      if (wrap.closest(".scm-admin-activity-panel.active")) {
+        fetchRentIncrease(activeSection(), false);
+      }
+    }
+
+    initRentIncreasePanel();
+
     function submitCotizacionAction(formData, action, errorMessage) {
       if (!ajaxUrl || !action) {
         showToast("error", "Accion no disponible.");
@@ -15126,6 +15361,26 @@
           );
           if (auditModule) {
             auditModule.dispatchEvent(new CustomEvent("scm:load-canon-audit"));
+          }
+          return Promise.resolve();
+        }
+        if (
+          activeAdministrativePanel &&
+          administrativeKey === "cartas_aumento"
+        ) {
+          var rentSection = activeAdministrativePanel.querySelector(
+            ".scm-rent-increase-section.active",
+          );
+          if (
+            rentSection &&
+            rentSection.getAttribute("data-scm-loaded") !== "1"
+          ) {
+            var rentForm = rentSection.querySelector("[data-rent-increase-form]");
+            if (rentForm) {
+              rentForm.dispatchEvent(
+                new Event("submit", { bubbles: true, cancelable: true }),
+              );
+            }
           }
           return Promise.resolve();
         }

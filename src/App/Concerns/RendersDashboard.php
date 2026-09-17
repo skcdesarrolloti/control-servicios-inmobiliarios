@@ -124,6 +124,7 @@ trait RendersDashboard
     $reportesAdministrativosPendientesHtml = $pendingController->renderReportesAdministrativosShell($filterOptions);
     $actasSatisfaccionHtml = $this->render_ticket_completion_acts_shell($_GET);
     $contratosArrendamientoHtml = $pendingController->renderContratosArrendamientoTab();
+    $cartasAumentoHtml = $this->renderRentIncreaseLettersPanel();
     $dashboardPermissionTabs = $this->dashboardPermissionTabs();
     $tabMap = [
       'inicio' => 'scm-panel-inicio',
@@ -189,6 +190,10 @@ trait RendersDashboard
       'auditoria-canon-aseguradoras' => 'scm-panel-auditoria-canon-aseguradoras',
       'auditoria de canon y aseguradoras' => 'scm-panel-auditoria-canon-aseguradoras',
       'scm-panel-auditoria-canon-aseguradoras' => 'scm-panel-auditoria-canon-aseguradoras',
+      'cartas_aumento' => 'scm-panel-cartas-aumento',
+      'cartas-aumento' => 'scm-panel-cartas-aumento',
+      'cartas de aumento' => 'scm-panel-cartas-aumento',
+      'scm-panel-cartas-aumento' => 'scm-panel-cartas-aumento',
     ];
     $initialTab = $tabMap[$tabKey] ?? '';
     $administrativeActivityTabs = [
@@ -223,6 +228,10 @@ trait RendersDashboard
       'auditoria_canon_aseguradoras' => [
         'panel' => 'scm-panel-auditoria-canon-aseguradoras',
         'label' => $dashboardPermissionTabs['auditoria_canon_aseguradoras'] ?? 'Auditoría de canon y aseguradoras',
+      ],
+      'cartas_aumento' => [
+        'panel' => 'scm-panel-cartas-aumento',
+        'label' => $dashboardPermissionTabs['cartas_aumento'] ?? 'Cartas de aumento',
       ],
     ];
     $administrativePanelToTab = [];
@@ -446,6 +455,8 @@ trait RendersDashboard
         'canon_insurance_audit_update_request' => self::AJAX_CANON_INSURANCE_AUDIT_UPDATE_REQUEST,
         'canon_insurance_audit_update_platform_values' => self::AJAX_CANON_INSURANCE_AUDIT_UPDATE_PLATFORM_VALUES,
         'canon_insurance_audit_purge' => self::AJAX_CANON_INSURANCE_AUDIT_PURGE,
+        'rent_increase_letters_list' => self::AJAX_RENT_INCREASE_LETTERS_LIST,
+        'rent_increase_letters_create' => self::AJAX_RENT_INCREASE_LETTERS_CREATE,
         // Guía
         'guide_gcd_read' => self::AJAX_GUIDE_GCD_READ,
         'guide_gcd_save' => self::AJAX_GUIDE_GCD_SAVE,
@@ -1096,6 +1107,12 @@ trait RendersDashboard
               <?php echo (new \SCM\Modules\CanonInsuranceAudit\CanonInsuranceAuditView())->renderPanel(); ?>
             </div>
           <?php endif; ?>
+
+          <?php if (in_array('cartas_aumento', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'cartas_aumento' ? ' active' : ''; ?>" id="scm-panel-cartas-aumento" data-permission-tab="cartas_aumento" data-admin-activity-panel="cartas_aumento" data-scm-loaded="0">
+              <?php echo $cartasAumentoHtml; ?>
+            </div>
+          <?php endif; ?>
         </div>
       </div>
 
@@ -1482,6 +1499,7 @@ trait RendersDashboard
       'preventivas_pendientes',
       'servicios_publicos_pendientes',
       'reportes_administrativos_pendientes',
+      'cartas_aumento',
     ];
     $mainPermissionTabs = array_diff_key($tabs, array_flip($activityPermissionKeys));
     $activityPermissionTabs = array_intersect_key($tabs, array_flip($activityPermissionKeys));

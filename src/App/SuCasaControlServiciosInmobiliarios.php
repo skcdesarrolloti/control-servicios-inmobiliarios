@@ -16,6 +16,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesAdministrativeNotifications;
   use \SCM\App\Concerns\HandlesCollectionManagement;
   use \SCM\App\Concerns\HandlesCanonInsuranceAudits;
+  use \SCM\App\Concerns\HandlesRentIncreaseLetters;
   use \SCM\App\Concerns\HandlesPropertyHistoryActions;
   use \SCM\App\Concerns\RendersPublicPqr;
   use \SCM\App\Concerns\RendersDashboard;
@@ -113,6 +114,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CANON_INSURANCE_AUDIT_UPDATE_REQUEST = 'scm_auditoria_canon_aseguradoras_actualizar_solicitud';
   const AJAX_CANON_INSURANCE_AUDIT_UPDATE_PLATFORM_VALUES = 'scm_auditoria_canon_aseguradoras_actualizar_plataforma';
   const AJAX_CANON_INSURANCE_AUDIT_PURGE = 'scm_auditoria_canon_aseguradoras_borrar_pruebas';
+  const AJAX_RENT_INCREASE_LETTERS_LIST = 'scm_cartas_aumento_arrendamiento_listar';
+  const AJAX_RENT_INCREASE_LETTERS_CREATE = 'scm_cartas_aumento_arrendamiento_crear';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';
@@ -183,6 +186,7 @@ final class SuCasaControlServiciosInmobiliarios
       'servicios_publicos_pendientes' => 'Servicios Publicos Pendientes',
       'reportes_administrativos_pendientes' => 'Reportes Administrativos',
       'auditoria_canon_aseguradoras' => 'Auditoría de canon y aseguradoras',
+      'cartas_aumento' => 'Cartas de aumento',
       'metricas' => 'Metricas',
     ];
   }
@@ -283,6 +287,21 @@ final class SuCasaControlServiciosInmobiliarios
             'label' => 'Acta de servicios públicos',
             'description' => 'Cuando se genera una revisión nativa de servicios públicos y sus actas.',
             'channel' => 'Email interno',
+          ],
+        ],
+      ],
+      'cartas_aumento' => [
+        'label' => 'Cartas de aumento',
+        'items' => [
+          'carta_aumento_canon' => [
+            'label' => 'Carta de aumento de canon',
+            'description' => 'Cuando se genera una carta de aumento de canon desde Actividades administrativas.',
+            'channel' => 'Email interno en cola',
+          ],
+          'carta_aumento_administracion' => [
+            'label' => 'Carta de aumento de administración',
+            'description' => 'Cuando se genera una carta de aumento de administración desde Actividades administrativas.',
+            'channel' => 'Email interno en cola',
           ],
         ],
       ],

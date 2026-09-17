@@ -9806,10 +9806,73 @@
   cursor: progress;
 }
 
+#scm-app .scm-rent-increase {
+  display: grid;
+  gap: 18px;
+}
+
+#scm-app .scm-rent-increase-note {
+  align-items: flex-start;
+  background: #f8fafc;
+  border: 1px solid #dbe3ef;
+  border-left: 5px solid #f59120;
+  border-radius: 8px;
+  color: #334155;
+  display: grid;
+  gap: 4px;
+  line-height: 1.45;
+  padding: 14px 16px;
+}
+
+#scm-app .scm-rent-increase-note strong {
+  color: #061d49;
+  font-size: 14px;
+}
+
+#scm-app .scm-rent-increase-note span {
+  font-size: 13px;
+}
+
+#scm-app .scm-rent-increase-note code {
+  background: #eef2f7;
+  border-radius: 5px;
+  color: #061d49;
+  padding: 2px 5px;
+}
+
+#scm-app .scm-rent-increase-section {
+  display: none;
+}
+
+#scm-app .scm-rent-increase-section.active {
+  display: grid;
+  gap: 14px;
+}
+
+#scm-app .scm-rent-increase-table td {
+  vertical-align: middle;
+}
+
+#scm-app .scm-rent-increase-table td small {
+  color: #64748b;
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 5px;
+}
+
+#scm-app .scm-rent-increase-table .scm-pending-action-cell {
+  min-width: 210px;
+}
+
 @media (max-width: 1050px) {
   #scm-app .scm-admin-notif-layout,
   #scm-app .scm-admin-notif-filter-grid {
     grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-rent-increase .scm-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
 
@@ -9886,6 +9949,10 @@
 
   #scm-app .scm-admin-notif-channel-copy {
     padding-right: 64px;
+  }
+
+  #scm-app .scm-rent-increase .scm-grid {
+    grid-template-columns: 1fr !important;
   }
 
 }
