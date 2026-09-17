@@ -1314,11 +1314,7 @@ trait HandlesMaintenanceActions
         'destinacion' => trim((string) ($quote['destinacion'] ?? $revision['destinacion'] ?? '')),
       ],
       'cotizacion' => $cotizacion,
-      'unit_options' => $this->maintenance_quote_glossary_options(612, [
-        ['value' => 'Unidad', 'label' => 'Unidad'],
-        ['value' => 'Metro', 'label' => 'Metro'],
-        ['value' => 'Global', 'label' => 'Global'],
-      ]),
+      'unit_options' => $this->maintenance_quote_unit_options(),
       'executor_options' => $this->maintenance_quote_glossary_options(853, [
         ['value' => 'Propietario', 'label' => 'Propietario'],
         ['value' => 'Arrendatario', 'label' => 'Arrendatario'],
@@ -1684,16 +1680,85 @@ trait HandlesMaintenanceActions
     return strlen(strip_tags($evaluation)) > 3;
   }
 
-  /** @param array<int,array<string,string>> $fallback @return array<int,array<string,string>> */
-  private function maintenance_quote_glossary_options(int $glossaryId, array $fallback): array
+  /** @return array<int,array<string,string>> */
+  private function maintenance_quote_unit_options(): array
   {
+    return $this->maintenance_quote_glossary_options(612, [
+      ['value' => 'Und', 'label' => 'Und'],
+      ['value' => 'Global', 'label' => 'Global'],
+      ['value' => 'M2', 'label' => 'M2'],
+      ['value' => 'M3', 'label' => 'M3'],
+      ['value' => 'Ml', 'label' => 'Ml'],
+      ['value' => 'Dia', 'label' => 'Dia'],
+      ['value' => 'Jornal', 'label' => 'Jornal'],
+      ['value' => 'Kg', 'label' => 'Kg'],
+      ['value' => 'Tramo', 'label' => 'Tramo'],
+      ['value' => 'Lb', 'label' => 'Lb'],
+    ], true);
+  }
+
+  /** @param array<int,array<string,string>> $fallback @return array<int,array<string,string>> */
+  private function maintenance_quote_glossary_options(int $glossaryId, array $fallback, bool $appendGlossaryOptions = false): array
+  {
+    $fallback = $this->maintenance_quote_normalize_options($fallback);
     if (method_exists($this, 'correctiveReviewGlossaryOptions')) {
       $options = $this->correctiveReviewGlossaryOptions($glossaryId, $fallback);
       if (is_array($options) && $options !== []) {
-        return $options;
+        $options = $this->maintenance_quote_normalize_options($options);
+        return $appendGlossaryOptions ? $this->maintenance_quote_merge_options($fallback, $options) : $options;
       }
     }
     return $fallback;
+  }
+
+  /** @param array<mixed> $options @return array<int,array<string,string>> */
+  private function maintenance_quote_normalize_options(array $options): array
+  {
+    $out = [];
+    foreach ($options as $key => $option) {
+      if (is_array($option)) {
+        $value = trim((string) ($option['value'] ?? $option['val'] ?? ''));
+        $label = trim((string) ($option['label'] ?? $option['title'] ?? $option['name'] ?? $value));
+      } else {
+        $value = trim((string) $key);
+        $label = trim((string) $option);
+        if (is_int($key)) {
+          $value = $label;
+        }
+      }
+      if ($value === '' && $label !== '') {
+        $value = $label;
+      }
+      if ($label === '' && $value !== '') {
+        $label = $value;
+      }
+      if ($value === '' || $label === '') {
+        continue;
+      }
+      $out[] = ['value' => $value, 'label' => $label];
+    }
+    return $this->maintenance_quote_merge_options([], $out);
+  }
+
+  /** @param array<int,array<string,string>> $base @param array<int,array<string,string>> $extra @return array<int,array<string,string>> */
+  private function maintenance_quote_merge_options(array $base, array $extra): array
+  {
+    $out = [];
+    $seen = [];
+    foreach (array_merge($base, $extra) as $option) {
+      $value = trim((string) ($option['value'] ?? ''));
+      $label = trim((string) ($option['label'] ?? $value));
+      if ($value === '') {
+        continue;
+      }
+      $key = strtolower($value);
+      if (isset($seen[$key])) {
+        continue;
+      }
+      $seen[$key] = true;
+      $out[] = ['value' => $value, 'label' => $label !== '' ? $label : $value];
+    }
+    return $out;
   }
 
   /** @return array<int,array<string,string>> */

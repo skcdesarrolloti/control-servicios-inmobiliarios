@@ -12894,11 +12894,19 @@
 
     function cotizacionFormOptionHtml(options, selected) {
       options = Array.isArray(options) ? options : [];
-      return options.map(function (option) {
+      var selectedValue = String(selected || "");
+      var hasSelected = !selectedValue;
+      var html = options.map(function (option) {
         var value = String(option.value || option.label || "");
         var label = String(option.label || option.value || value);
-        return '<option value="' + escHtml(value) + '"' + (value === String(selected || "") ? " selected" : "") + ">" + escHtml(label) + "</option>";
+        var isSelected = value === selectedValue;
+        if (isSelected) hasSelected = true;
+        return '<option value="' + escHtml(value) + '"' + (isSelected ? " selected" : "") + ">" + escHtml(label) + "</option>";
       }).join("");
+      if (!hasSelected && selectedValue) {
+        html += '<option value="' + escHtml(selectedValue) + '" selected>' + escHtml(selectedValue) + "</option>";
+      }
+      return html;
     }
 
     function normalizeQuoteRecipientKey(value) {
