@@ -13334,7 +13334,11 @@
         document.removeEventListener("keydown", onKeydown);
       }
       function onKeydown(event) {
-        if (event.key === "Escape") close();
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          close();
+        }
       }
       overlay.addEventListener("click", function (event) {
         if (event.target && event.target.closest("[data-close-maint-quote-image-preview]")) close();
@@ -13532,6 +13536,29 @@
       try { window.localStorage.removeItem(draftKey); } catch (err) {}
     }
 
+    function showMaintenanceQuoteDraftRestoredHint(form) {
+      if (!form) return;
+      var current = form.querySelector("[data-maint-quote-draft-hint]");
+      if (!current) {
+        current = document.createElement("div");
+        current.className = "scm-maint-quote-draft-hint";
+        current.setAttribute("data-maint-quote-draft-hint", "1");
+        current.setAttribute("role", "status");
+        current.setAttribute("aria-live", "polite");
+        current.innerHTML = '<strong>Borrador restaurado</strong><span>Recuperé lo que habías diligenciado en esta cotización.</span>';
+        var hero = form.querySelector(".scm-maint-quote-hero");
+        if (hero && hero.parentNode) {
+          hero.insertAdjacentElement("afterend", current);
+        } else {
+          form.prepend(current);
+        }
+      }
+      current.hidden = false;
+      window.setTimeout(function () {
+        if (current && current.parentNode) current.hidden = true;
+      }, 4500);
+    }
+
     function replaceMaintenanceQuoteRepeaterRows(form, type, items, unitOptions) {
       var section = form ? form.querySelector('[data-quote-repeater="' + type + '"] .scm-maint-quote-rows') : null;
       if (!section) return;
@@ -13566,7 +13593,7 @@
       renderMaintenanceQuoteGeneratedMaterialOffers(form);
       syncMaintenanceQuoteTotals(form);
       syncMaintenanceQuotePerturbation(form, context || {});
-      showToast("info", "Restauré un borrador local de esta cotización.");
+      showMaintenanceQuoteDraftRestoredHint(form);
       return true;
     }
 

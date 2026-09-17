@@ -6035,6 +6035,31 @@
   font-variant-numeric: tabular-nums;
 }
 
+.scm-maint-quote-draft-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 14px;
+  background: #f0fdf4;
+  color: #14532d;
+  font-size: 12px;
+}
+
+.scm-maint-quote-draft-hint[hidden] {
+  display: none !important;
+}
+
+.scm-maint-quote-draft-hint strong {
+  font-weight: 900;
+}
+
+.scm-maint-quote-draft-hint span {
+  color: #166534;
+}
+
 .scm-maint-quote-section {
   padding: 16px;
   margin-bottom: 14px;
