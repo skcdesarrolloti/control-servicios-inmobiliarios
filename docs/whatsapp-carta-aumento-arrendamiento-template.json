@@ -12,9 +12,9 @@
     },
     {
       "type": "BODY",
-      "text": "Hola {{1}}.\n\nSe generó la carta de aumento de {{2}} del contrato #{{3}}, inmueble #{{4}}.\n\nTe compartimos el PDF adjunto para tu consulta.\n\nAtentamente,\n{{5}}\nSKC SuCasa Inmobiliaria.",
+      "text": "Hola {{1}}.\n\nSe generó la carta de aumento de {{2}} del contrato #{{3}}, inmueble #{{4}}, ubicado en {{5}}.\n\nTe compartimos el PDF adjunto para tu consulta.\n\nAtentamente,\n{{6}}\nSKC SuCasa Inmobiliaria.",
       "example": {
-        "body_text": [["María Pérez", "canon de arrendamiento", "840", "105370", "Julian Maturana Ortega - 3145965047"]]
+        "body_text": [["María Pérez", "canon de arrendamiento", "840", "105370", "LA CAROLINA DIAGONAL 38 # 82-70 T 3 Apto 1102 Conjunto El Club", "Julian Maturana Ortega - 3145965047"]]
       }
     }
   ]

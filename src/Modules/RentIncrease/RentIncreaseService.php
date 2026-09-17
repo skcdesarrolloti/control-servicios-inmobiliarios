@@ -387,6 +387,7 @@ final class RentIncreaseService
               ['type' => 'text', 'text' => $this->waText($type === 'canon' ? 'canon de arrendamiento' : 'cuota de administración')],
               ['type' => 'text', 'text' => $this->waText((string) ($context['contrato'] ?? '-'))],
               ['type' => 'text', 'text' => $this->waText((string) ($context['id_inmueble'] ?? $context['inmueble'] ?? '-'))],
+              ['type' => 'text', 'text' => $this->waText((string) ($context['direccion'] ?? '-'))],
               ['type' => 'text', 'text' => $this->waText($this->signatureLine($context))],
             ],
           ],
@@ -423,7 +424,7 @@ final class RentIncreaseService
   private function whatsappMessage(string $type, array $context, string $letterUrl): string
   {
     $kind = $type === 'canon' ? 'canon de arrendamiento' : 'cuota de administración';
-    return 'Se registró la carta de aumento de ' . $kind . ' del contrato #' . (string) ($context['contrato'] ?? '') . ', inmueble #' . (string) ($context['id_inmueble'] ?? $context['inmueble'] ?? '') . '. Consulte la carta aquí: ' . $letterUrl;
+    return 'Se registró la carta de aumento de ' . $kind . ' del contrato #' . (string) ($context['contrato'] ?? '') . ', inmueble #' . (string) ($context['id_inmueble'] ?? $context['inmueble'] ?? '') . ', dirección ' . (string) ($context['direccion'] ?? '') . '. Consulte la carta aquí: ' . $letterUrl;
   }
 
   /** @param array<string,mixed> $context */
