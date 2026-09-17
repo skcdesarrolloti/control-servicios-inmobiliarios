@@ -631,20 +631,32 @@ trait HandlesCorrectiveReviewActions
     }
 
     $propertyId = $this->correctiveReviewDigits($property['_ID'] ?? '');
-    $propertyMatchesExplicitContext = false;
+    $propertyMatchesCaseContext = false;
     foreach ([$contract['id_inmueble_data'] ?? '', $ticket['id_inmueble_data'] ?? ''] as $candidate) {
       $expectedId = $this->correctiveReviewDigits($candidate);
       if ($expectedId !== '' && $propertyId !== '' && $expectedId !== $propertyId) {
         throw new \DomainException('El inmueble de datos encontrado no corresponde al caso. Recarga el caso antes de crear la revisión.');
       }
       if ($expectedId !== '' && $propertyId !== '' && $expectedId === $propertyId) {
-        $propertyMatchesExplicitContext = true;
+        $propertyMatchesCaseContext = true;
       }
     }
 
+    $propertyCode = $this->correctiveReviewDigits($property['codigo'] ?? '');
+    foreach ([$ticket['id_inmueble'] ?? '', $contract['id_inmueble'] ?? '', $ticket['inmueble'] ?? '', $contract['inmueble'] ?? ''] as $candidate) {
+      $expectedCode = $this->correctiveReviewDigits($candidate);
+      if ($expectedCode !== '' && $propertyCode !== '' && $expectedCode === $propertyCode) {
+        $propertyMatchesCaseContext = true;
+        break;
+      }
+    }
+
+    // id_inmueble_data apunta al _ID del CCT e id_inmueble suele ser el código web.
+    // En tickets históricos de entrega/recibo el inmueble puede tener id_contrato_arrendamiento
+    // actualizado al contrato vigente, por eso el contrato del inmueble queda solo como respaldo.
     $contractId = $this->correctiveReviewDigits($contract['_ID'] ?? ($ticket['id_contrato'] ?? ''));
     $propertyContractId = $this->correctiveReviewDigits($property['id_contrato_arrendamiento'] ?? '');
-    if (!$propertyMatchesExplicitContext && $contractId !== '' && $propertyContractId !== '' && $contractId !== $propertyContractId) {
+    if (!$propertyMatchesCaseContext && $contractId !== '' && $propertyContractId !== '' && $contractId !== $propertyContractId) {
       throw new \DomainException('El inmueble encontrado pertenece a otro contrato. Recarga el caso antes de crear la revisión.');
     }
   }
