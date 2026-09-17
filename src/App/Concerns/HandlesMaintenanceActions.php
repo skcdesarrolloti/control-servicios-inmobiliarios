@@ -938,6 +938,9 @@ trait HandlesMaintenanceActions
     }
 
     $storedPhotos = [];
+    $quoteIdSaved = 0;
+    $quoteTable = '';
+    $mode = 'create';
     $pdo = $this->db->pdo();
     try {
       $mode = $this->maintenance_quote_mode($_POST['mode'] ?? 'create');
@@ -1156,8 +1159,21 @@ trait HandlesMaintenanceActions
       if ($pdo->inTransaction()) {
         $pdo->rollBack();
       }
-      if ($storedPhotos) {
+      $quotePersisted = $quoteIdSaved > 0
+        && $quoteTable !== ''
+        && $this->maintenance_quote_persisted_after_error($quoteTable, $quoteIdSaved, $storedPhotos);
+      if ($storedPhotos && !$quotePersisted) {
         $this->storedFiles()->deleteStoredImages($storedPhotos);
+      }
+      if ($quotePersisted) {
+        error_log('[cotizacion_mantenimiento_save] Cotización #' . $quoteIdSaved . ' persistió después de error: ' . $error->getMessage());
+        $this->jsonOk([
+          'message' => ($mode === 'edit' ? 'Cotización actualizada.' : 'Cotización creada.') . ' Se detectó una advertencia posterior al guardado; recarga el caso para verla actualizada.',
+          'id_cotizacion' => (string) $quoteIdSaved,
+          'id_reporte' => '',
+          'auto_rejected' => '',
+          'warnings' => ['advertencia posterior al guardado'],
+        ]);
       }
       $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudo guardar la cotización.');
     }
@@ -2013,6 +2029,40 @@ trait HandlesMaintenanceActions
       }
     }
     return $refs;
+  }
+
+  /**
+   * @param array<int,array{name?:string,url?:string}> $storedPhotos
+   */
+  private function maintenance_quote_persisted_after_error(string $quoteTable, int $quoteId, array $storedPhotos): bool
+  {
+    if ($quoteId <= 0 || $quoteTable === '') {
+      return false;
+    }
+    try {
+      $row = $this->db->getRow("SELECT `_ID`, `mejor_oferta`, `otras_oferta` FROM `{$quoteTable}` WHERE `_ID` = ? LIMIT 1", [$quoteId]);
+    } catch (\Throwable) {
+      return false;
+    }
+    if (!$row) {
+      return false;
+    }
+    if ($storedPhotos === []) {
+      return true;
+    }
+
+    $mediaText = (string) ($row['mejor_oferta'] ?? '') . ',' . (string) ($row['otras_oferta'] ?? '');
+    foreach ($storedPhotos as $photo) {
+      $name = basename((string) ($photo['name'] ?? ''));
+      if ($name !== '' && str_contains($mediaText, $name)) {
+        return true;
+      }
+      $url = trim((string) ($photo['url'] ?? ''));
+      if ($url !== '' && str_contains($mediaText, $url)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** @return array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}|null */
