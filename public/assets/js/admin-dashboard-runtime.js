@@ -13215,7 +13215,7 @@
         '<label class="scm-cotizacion-dialog-field"><span>Perturbación</span><input type="number" name="perturbacion" min="0" step="1" value="' + escHtml(d.perturbacion || "") + '" readonly></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Valor bonificación</span><input type="number" name="valor_bonificacion" min="0" step="1" value="' + escHtml(d.valor_bonificacion || "") + '" readonly></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Días afectación calculados</span><input type="number" name="dias_afectacion_calculados" min="0" step="1" value="' + escHtml(d.dias_afectacion_calculados || "") + '" readonly></label>' +
-        '</div>' + maintenanceQuotePerturbationHtml(context) + '<label class="scm-cotizacion-dialog-field is-wide"><span>Justificación</span><textarea name="justificacion_perturbacion" rows="3">' + escHtml(d.justificacion_perturbacion || "") + '</textarea></label><textarea name="resumen_calculo_perturbacion" hidden>' + escHtml(d.resumen_calculo_perturbacion || "") + '</textarea><label class="scm-cotizacion-dialog-field is-wide"><span>Observaciones</span><textarea name="observaciones" rows="4">' + escHtml(d.observaciones || "") + '</textarea></label></section>' +
+        '</div>' + maintenanceQuotePerturbationHtml(context) + '<input type="hidden" name="justificacion_perturbacion" value="' + escHtml(d.justificacion_perturbacion || "") + '"><textarea name="resumen_calculo_perturbacion" hidden>' + escHtml(d.resumen_calculo_perturbacion || "") + '</textarea><label class="scm-cotizacion-dialog-field is-wide"><span>Observaciones</span><textarea name="observaciones" rows="4">' + escHtml(d.observaciones || "") + '</textarea></label></section>' +
         '</form>'
       );
     }
