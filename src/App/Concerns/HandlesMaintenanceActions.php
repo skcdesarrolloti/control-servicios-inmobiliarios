@@ -1073,6 +1073,11 @@ trait HandlesMaintenanceActions
 
       $pdo->beginTransaction();
       $quoteIdSaved = $quoteId;
+      $postSaveWarnings = [];
+      $warnPostSave = static function (string $label, \Throwable $error) use (&$postSaveWarnings): void {
+        $postSaveWarnings[] = $label;
+        error_log('[cotizacion_mantenimiento_save] ' . $label . ': ' . $error->getMessage());
+      };
       if ($mode === 'edit') {
         if ($quoteId <= 0 || empty($sourceQuote)) {
           throw new \DomainException('Cotización inválida para editar.');
@@ -1094,25 +1099,58 @@ trait HandlesMaintenanceActions
         }
       }
 
-      $this->maintenance_quote_update_revision_flag($schema, $tipoMantenimiento, $idRevision);
       $autoRejected = 0;
-      if ($mode === 'create') {
-        $autoRejected = $this->maintenance_quote_disapprove_previous_quotes($schema, $quoteIdSaved, $quoteData, $employeeId, $nowSql);
+      try {
+        $this->maintenance_quote_update_revision_flag($schema, $tipoMantenimiento, $idRevision);
+      } catch (\Throwable $error) {
+        $warnPostSave('no se pudo marcar la revisión con cotización', $error);
+      }
+      try {
+        if ($mode === 'create') {
+          $autoRejected = $this->maintenance_quote_disapprove_previous_quotes($schema, $quoteIdSaved, $quoteData, $employeeId, $nowSql);
+        }
+      } catch (\Throwable $error) {
+        $warnPostSave('no se pudieron desaprobar cotizaciones anteriores', $error);
       }
       $reportId = 0;
-      if ($mode === 'create') {
-        $reportId = $this->maintenance_quote_ensure_admin_report($schema, $quoteIdSaved, $quoteData, $ticket, $revision, $actor, $employeeId, $now, $nowSql);
+      try {
+        if ($mode === 'create') {
+          $reportId = $this->maintenance_quote_ensure_admin_report($schema, $quoteIdSaved, $quoteData, $ticket, $revision, $actor, $employeeId, $now, $nowSql);
+        }
+      } catch (\Throwable $error) {
+        $warnPostSave('no se pudo crear/verificar el reporte administrativo', $error);
       }
-      $this->maintenance_quote_update_ticket($schema, $ticket, $quoteIdSaved, $tipoMantenimiento, $now, $nowSql);
-      $this->maintenance_quote_insert_histories($schema, $quoteIdSaved, $mode, $quoteData, $ticket, $actor, $employeeId, $now, $nowSql);
-      $queued = $this->maintenance_quote_enqueue_saved_notifications($mode, $quoteIdSaved, $quoteData, $actor);
+      try {
+        $this->maintenance_quote_update_ticket($schema, $ticket, $quoteIdSaved, $tipoMantenimiento, $now, $nowSql);
+      } catch (\Throwable $error) {
+        $warnPostSave('no se pudo actualizar el ticket', $error);
+      }
+      try {
+        $this->maintenance_quote_insert_histories($schema, $quoteIdSaved, $mode, $quoteData, $ticket, $actor, $employeeId, $now, $nowSql);
+      } catch (\Throwable $error) {
+        $warnPostSave('no se pudo registrar el historial', $error);
+      }
+      $queued = 0;
+      try {
+        $queued = $this->maintenance_quote_enqueue_saved_notifications($mode, $quoteIdSaved, $quoteData, $actor);
+      } catch (\Throwable $error) {
+        $warnPostSave('no se pudieron encolar las notificaciones', $error);
+      }
       $pdo->commit();
 
+      $message = ($mode === 'edit' ? 'Cotización actualizada.' : ($mode === 'note' ? 'Nota de cotización creada.' : 'Cotización creada.'))
+        . ($autoRejected > 0 ? ' Cotizaciones anteriores desaprobadas: ' . $autoRejected . '.' : '')
+        . ($reportId > 0 ? ' Reporte administrativo #' . $reportId . ' creado.' : '')
+        . ($queued > 0 ? ' Notificaciones en cola: ' . $queued . '.' : '');
+      if (!empty($postSaveWarnings)) {
+        $message .= ' Guardada con advertencias: ' . implode('; ', array_values(array_unique($postSaveWarnings))) . '.';
+      }
       $this->jsonOk([
-        'message' => ($mode === 'edit' ? 'Cotización actualizada.' : ($mode === 'note' ? 'Nota de cotización creada.' : 'Cotización creada.')) . ($autoRejected > 0 ? ' Cotizaciones anteriores desaprobadas: ' . $autoRejected . '.' : '') . ($reportId > 0 ? ' Reporte administrativo #' . $reportId . ' creado.' : '') . ($queued > 0 ? ' Notificaciones en cola: ' . $queued . '.' : ''),
+        'message' => $message,
         'id_cotizacion' => (string) $quoteIdSaved,
         'id_reporte' => $reportId > 0 ? (string) $reportId : '',
         'auto_rejected' => (string) $autoRejected,
+        'warnings' => $postSaveWarnings,
       ]);
     } catch (\Throwable $error) {
       if ($pdo->inTransaction()) {
