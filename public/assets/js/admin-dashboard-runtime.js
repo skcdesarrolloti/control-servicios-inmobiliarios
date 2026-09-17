@@ -12882,9 +12882,16 @@
           var message =
             (json.data && json.data.message) || "Accion realizada.";
           showToast("success", message);
-          return refreshActiveTab().then(function () {
-            return true;
-          });
+          return refreshActiveTab()
+            .catch(function (refreshError) {
+              if (window.console && console.warn) {
+                console.warn("[cotizacion] Guardada, pero no se pudo refrescar el panel.", refreshError);
+              }
+              showToast("warning", "La cotización se guardó, pero no pude refrescar el panel. Recarga el caso para verla actualizada.");
+            })
+            .then(function () {
+              return true;
+            });
         })
         .catch(function (err) {
           showToast("error", err.message || errorMessage);
