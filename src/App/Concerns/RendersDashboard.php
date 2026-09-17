@@ -3802,7 +3802,7 @@ trait RendersDashboard
     $arrendatario = trim((string) ($row['arrendatario'] ?? $row['nombre_arrendatario'] ?? ''));
     $barrio = trim((string) ($row['barrio'] ?? ''));
     $ticketUrl = $ticket !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticket) : '';
-    $cotUrl = $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '';
+    $cotUrl = $id !== '' ? self::signedMaintenanceQuotePublicUrl((int) $id) : '';
     $actaUrl = rtrim((string) SCM_BASE_URL, '/') . '/crear-acta.php?' . http_build_query([
       'ticket_pk' => $ticket,
       'id_cotizacion' => $id,
@@ -4109,6 +4109,47 @@ trait RendersDashboard
       }
     }
     return $out;
+  }
+
+  /** @return array{title:string,content:string,status:int} */
+  public function render_public_cotizacion_mantenimiento(int $cotizacionId): array
+  {
+    if ($cotizacionId <= 0) {
+      return [
+        'title' => 'Cotización no disponible',
+        'content' => '<article class="scm-cotizacion-native-doc"><section class="scm-cotizacion-native-section"><h2>Cotización no disponible</h2><p>No se recibió un número de cotización válido.</p></section></article>',
+        'status' => 400,
+      ];
+    }
+
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($table)) {
+      return [
+        'title' => 'Cotización no disponible',
+        'content' => '<article class="scm-cotizacion-native-doc"><section class="scm-cotizacion-native-section"><h2>Cotización no disponible</h2><p>La tabla de cotizaciones no está disponible.</p></section></article>',
+        'status' => 503,
+      ];
+    }
+
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
+    if (!$row) {
+      return [
+        'title' => 'Cotización no encontrada',
+        'content' => '<article class="scm-cotizacion-native-doc"><section class="scm-cotizacion-native-section"><h2>Cotización no encontrada</h2><p>No encontramos una cotización de mantenimiento con ese número.</p></section></article>',
+        'status' => 404,
+      ];
+    }
+
+    $rows = $this->attach_cotizacion_orders([$row]);
+    $row = $rows[0] ?? $row;
+    $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
+    $title = 'Cotización de mantenimiento #' . $cotizacionId;
+
+    return [
+      'title' => $title,
+      'content' => $this->render_native_cotizacion_mantenimiento_view($row, $orders, 'destinatario'),
+      'status' => 200,
+    ];
   }
 
   /** @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders */

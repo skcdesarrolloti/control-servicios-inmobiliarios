@@ -1504,7 +1504,7 @@ trait HandlesTicketWorkflowActions
       'creado' => $createdTs > 0 ? date('d/m/Y', $createdTs) : '-',
       'empleado' => trim((string) ($row['coordinador'] ?? $row['creador'] ?? $row['id_empleado'] ?? '')) ?: '-',
       'cotizacion_id' => $id,
-      'cotizacion_url' => $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '',
+      'cotizacion_url' => $id !== '' ? self::signedMaintenanceQuotePublicUrl((int) $id) : '',
       'cot_estado' => $estado !== '' ? $estado : ($sent ? 'Enviada sin respuesta' : 'Sin enviar'),
       'tab_key' => 'mantenimiento',
       'status_bucket' => 'abiertos',
@@ -1791,7 +1791,7 @@ trait HandlesTicketWorkflowActions
       'arrendatario' => $this->adminDueFirstText([$ticketRow, $row, $contract], ['arrendatario', 'nombre_arrendatario']),
       'ticket_url' => $ticketPk !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticketPk) : '',
       'cotizacion_id' => $id,
-      'cotizacion_url' => $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '',
+      'cotizacion_url' => $id !== '' ? self::signedMaintenanceQuotePublicUrl((int) $id) : '',
       'cot_estado' => $estado !== '' ? $estado : ($sent ? 'Enviada sin respuesta' : 'Sin enviar'),
       'tab_key' => 'mantenimiento',
       'status_bucket' => $statusBucket,
@@ -1809,7 +1809,7 @@ trait HandlesTicketWorkflowActions
       }
       $case['case_source_html'] = ($nativeCase['case_source_html'] ?? '') . $this->adminDueQuoteCaseSourceHtml($enrichedRow, $sent, $ticketPk !== '' ? (int) $ticketPk : 0, false, true);
       $case['cotizacion_id'] = $id;
-      $case['cotizacion_url'] = $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '';
+      $case['cotizacion_url'] = $id !== '' ? self::signedMaintenanceQuotePublicUrl((int) $id) : '';
       $case['cot_estado'] = $estado !== '' ? $estado : ($sent ? 'Enviada sin respuesta' : 'Sin enviar');
       $case['tab_key'] = 'mantenimiento';
       $case['status_bucket'] = $statusBucket;

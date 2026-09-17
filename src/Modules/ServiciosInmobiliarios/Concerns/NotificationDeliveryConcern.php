@@ -43,7 +43,7 @@ trait NotificationDeliveryConcern
     }
     $cotId = $this->firstNonEmpty([$cotizacion['_ID'] ?? '', $ticket['id_cotizacion_mantenimiento'] ?? '']);
     $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
-    $cotUrl = $cotId !== '' ? 'https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero=' . rawurlencode($cotId) : '';
+    $cotUrl = $cotId !== '' ? \SCM\App\SuCasaControlServiciosInmobiliarios::signedMaintenanceQuotePublicUrl((int) $cotId) : '';
     $subject = 'Nueva respuesta de cotizacion de mantenimiento #' . $cotId;
     $motivo = trim((string)($cotizacion['motivo'] ?? ''));
     $recipients = $this->emailRecipientsForTargets($ticket, $notifyTargets, [], 'respuesta_cotizacion_mantenimiento');
@@ -225,7 +225,7 @@ trait NotificationDeliveryConcern
       $ticket['telefono_arrendatario'] ?? '',
     ]);
     $noticeUrl = trim((string) ($notice['url'] ?? ''));
-    $quoteUrl = $quoteId !== '' ? 'https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero=' . rawurlencode($quoteId) : '';
+    $quoteUrl = $quoteId !== '' ? \SCM\App\SuCasaControlServiciosInmobiliarios::signedMaintenanceQuotePublicUrl((int) $quoteId) : '';
     $subject = 'Seguimiento de reparaciones - cotizacion #' . ($quoteId !== '' ? $quoteId : '-') . ' del ticket #' . $logicalTicket;
 
     $content = '<p style="font-weight:500;margin:10px 0;">Apreciado(a) ' . EmailTemplate::e($recipientName) . ',</p>'

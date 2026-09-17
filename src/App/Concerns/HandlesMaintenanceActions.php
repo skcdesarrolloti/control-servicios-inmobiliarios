@@ -2264,12 +2264,12 @@ trait HandlesMaintenanceActions
     foreach ($lines as $label => $value) {
       $items .= '<tr><td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#475569;font-weight:700;">' . esc_html($label) . '</td><td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#0b1f3a;">' . esc_html((string) $value) . '</td></tr>';
     }
-    $html = '<div style="margin:0;padding:24px;background:#f4f7fb;font-family:Arial,sans-serif;color:#0b1f3a;">'
-      . '<div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #dbe4ef;border-radius:16px;overflow:hidden;">'
-      . '<div style="padding:20px 24px;background:#0b1f3a;color:#ffffff;"><h1 style="margin:0;font-size:21px;">Cotización de mantenimiento</h1></div>'
-      . '<div style="padding:24px;"><p style="margin:0 0 16px;">Se registró una novedad de cotización de mantenimiento en Control Servicios Inmobiliarios.</p>'
-      . '<table style="width:100%;border-collapse:collapse;margin:0 0 20px;">' . $items . '</table>'
-      . '</div></div></div>';
+    $quoteUrl = self::signedMaintenanceQuotePublicUrl($quoteId);
+    $content = '<p style="margin:0 0 16px;">Se registró una novedad de cotización de mantenimiento en Control Servicios Inmobiliarios.</p>'
+      . '<table style="width:100%;border-collapse:collapse;margin:0 0 20px;">' . $items . '</table>';
+    $html = \SCM\Support\EmailTemplate::render($subject, $content, [
+      'cotizacion_url' => $quoteUrl,
+    ]);
 
     return (new \SCM\Support\EmailQueue($this->db))->enqueue(array_column($recipients, 'email'), $subject, $html, [
       'source_module' => 'cotizaciones_mantenimiento',

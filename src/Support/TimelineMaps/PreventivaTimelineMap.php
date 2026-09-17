@@ -77,7 +77,7 @@ final class PreventivaTimelineMap
         'show_values' => ['Si', 'SI', 'si'],
         'elapsed_from_fields' => ['prev_fecha_registro'],
         'elapsed_from_label' => 'Revision preventiva registrada',
-        'link_url' => 'https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero={id_cotizacion_mantenimiento}',
+        'link_url' => 'cotizacion-mantenimiento.php?numero={id_cotizacion_mantenimiento}',
         'empty_text' => 'Sin cotizacion registrada',
       ],
       [
@@ -94,7 +94,7 @@ final class PreventivaTimelineMap
         'show_values' => ['Si', 'SI', 'si'],
         'elapsed_from_fields' => ['cot_fecha_registro'],
         'elapsed_from_label' => 'Cotizacion registrada',
-        'link_url' => 'https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero={id_cotizacion_mantenimiento}',
+        'link_url' => 'cotizacion-mantenimiento.php?numero={id_cotizacion_mantenimiento}',
         'empty_text' => 'Sin envio de cotizacion',
       ],
       [
@@ -111,7 +111,7 @@ final class PreventivaTimelineMap
         'show_values' => ['Si', 'SI', 'si'],
         'elapsed_from_fields' => ['cot_fecha_envio'],
         'elapsed_from_label' => 'Cotizacion enviada',
-        'link_url' => 'https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero={id_cotizacion_mantenimiento}',
+        'link_url' => 'cotizacion-mantenimiento.php?numero={id_cotizacion_mantenimiento}',
         'empty_text' => 'Sin respuesta de cotizacion',
       ],
       [

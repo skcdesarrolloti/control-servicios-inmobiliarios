@@ -55,7 +55,7 @@ final class GenericTicketsUiView
   private function cotizacionMantenimientoIdFromUrl(string $url): string
   {
     $decoded = html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    if ($decoded === '' || stripos($decoded, 'cotizacion-de-mantenimiento') === false) {
+    if ($decoded === '' || (stripos($decoded, 'cotizacion-de-mantenimiento') === false && stripos($decoded, 'cotizacion-mantenimiento.php') === false)) {
       return '';
     }
     $query = (string) (parse_url($decoded, PHP_URL_QUERY) ?: '');

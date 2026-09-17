@@ -857,7 +857,7 @@ final class PendingView
     $propertyDataId = trim((string) ($inmuebleData['_ID'] ?? $inmuebleData['id_inmueble_data'] ?? ''));
     $propertyGoogleMaps = trim((string) ($inmuebleData['ubicacion_google_maps'] ?? ''));
     $cotizacionId = trim((string) ($ticket['id_cotizacion_mantenimiento'] ?? $ticket['cot_id'] ?? $ticket['id_cotizacion'] ?? ''));
-    $cotizacionUrl = $cotizacionId !== '' ? ('https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero=' . rawurlencode($cotizacionId)) : '';
+    $cotizacionUrl = $cotizacionId !== '' ? \SCM\App\SuCasaControlServiciosInmobiliarios::signedMaintenanceQuotePublicUrl((int) $cotizacionId) : '';
     $createdTs = $this->ts($ticket['cct_created'] ?? $ticket['fecha'] ?? null);
     $updatedTs = $this->ts($ticket['fecha_actualizacion'] ?? null);
     $total = $createdTs > 0 ? $this->durationSince($createdTs) : '';

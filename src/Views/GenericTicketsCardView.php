@@ -327,7 +327,7 @@ final class GenericTicketsCardView
     $cotzFirstId = (string) call_user_func($this->firstIdValue, $idCotz);
     $prevUrl = ($preventivaBaseUrl !== '' && $prevFirstId !== '') ? esc_url($preventivaBaseUrl . rawurlencode($prevFirstId)) : '';
     $corrUrl = ($correctivaBaseUrl !== '' && $corrFirstId !== '') ? esc_url($correctivaBaseUrl . rawurlencode($corrFirstId)) : '';
-    $cotzUrl = ($cotizacionBaseUrl !== '' && $cotzFirstId !== '') ? esc_url($cotizacionBaseUrl . rawurlencode($cotzFirstId)) : '';
+    $cotzUrl = $cotzFirstId !== '' ? esc_url(\SCM\App\SuCasaControlServiciosInmobiliarios::signedMaintenanceQuotePublicUrl((int) $cotzFirstId)) : '';
     $cotzOrderUrl = $cotzFirstId !== ''
       ? 'https://sucasainmobiliaria.com.co/mi-cuenta/anadir-orden-de-mantenimiento/?id_cotizacion=' . rawurlencode($cotzFirstId) . '&id_inmueble=' . rawurlencode($idInmuebleWebRaw !== '' ? $idInmuebleWebRaw : $inmuebleRaw)
       : '';

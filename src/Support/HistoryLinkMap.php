@@ -38,7 +38,7 @@ final class HistoryLinkMap
       'id_inventario' => ['label' => 'Ver inventario inmueble', 'base' => 'https://sucasainmobiliaria.com.co/inventario-inmueble/?numero='],
 
       // Cotizaciones
-      'id_cotizacion_mantenimiento' => ['label' => 'Ver cotizacion de mantenimiento', 'base' => 'https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero='],
+      'id_cotizacion_mantenimiento' => ['label' => 'Ver cotizacion de mantenimiento', 'base' => 'cotizacion-mantenimiento.php?numero='],
       'id_cotizacion_comercial' => ['label' => 'Ver cotizacion de inmuebles', 'base' => 'https://sucasainmobiliaria.com.co/cotizacion-de-inmuebles/?numero='],
 
       // Actas

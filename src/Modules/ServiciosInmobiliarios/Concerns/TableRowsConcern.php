@@ -106,7 +106,7 @@ trait TableRowsConcern
       $prevUrl = ($tienePrev && $preventivaBaseUrl !== '' && $idPrevUrl !== '') ? esc_url($preventivaBaseUrl . rawurlencode($idPrevUrl)) : '';
       $corrUrl = ($tieneCorr && $correctivaBaseUrl !== '' && $idCorrUrl !== '') ? esc_url($correctivaBaseUrl . rawurlencode($idCorrUrl)) : '';
       $actaUrl = ($actaBaseUrl !== '' && $idActaUrl !== '') ? esc_url($actaBaseUrl . rawurlencode($idActaUrl)) : '';
-      $cotzUrl = ($tieneCotz && $cotizacionBaseUrl !== '' && $idCotzUrl !== '') ? esc_url($cotizacionBaseUrl . rawurlencode($idCotzUrl)) : '';
+      $cotzUrl = ($tieneCotz && $idCotzUrl !== '') ? esc_url(\SCM\App\SuCasaControlServiciosInmobiliarios::signedMaintenanceQuotePublicUrl((int) $idCotzUrl)) : '';
       $calendarUrl = $calendarEventId !== '' ? esc_url('https://calendar-skc.netlify.app/evento/' . rawurlencode($calendarEventId)) : '';
       $stepLinks = [
         'queja_registrada' => $ticketUrl,

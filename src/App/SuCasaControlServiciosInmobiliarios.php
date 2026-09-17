@@ -138,7 +138,7 @@ final class SuCasaControlServiciosInmobiliarios
   const DEFAULT_TICKET_URL = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=';
   const DEFAULT_PREVENTIVA_URL = 'https://sucasainmobiliaria.com.co/revision-preventiva/?numero=';
   const DEFAULT_CORRECTIVA_URL = 'revision-correctiva.php?numero=';
-  const DEFAULT_COTIZACION_URL = 'https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero=';
+  const DEFAULT_COTIZACION_URL = 'cotizacion-mantenimiento.php?numero=';
   const DEFAULT_ACTA_URL = 'https://sucasainmobiliaria.com.co/acta-de-satisfaccion/?numero=';
   const DEFAULT_CALENDAR_APP_URL = 'https://calendar-skc.netlify.app';
   const DEFAULT_CALENDAR_API_URL = 'https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action=';
@@ -652,6 +652,39 @@ final class SuCasaControlServiciosInmobiliarios
       return false;
     }
     return hash_equals(self::correctiveReviewPublicSignature($reviewId, $expires), trim($signature));
+  }
+
+  public static function defaultMaintenanceQuoteUrl(): string
+  {
+    $base = defined('SCM_BASE_URL') ? rtrim((string) SCM_BASE_URL, '/') : '';
+    return ($base !== '' ? $base . '/' : '') . self::DEFAULT_COTIZACION_URL;
+  }
+
+  public static function maintenanceQuotePublicUrl(int $quoteId): string
+  {
+    return self::defaultMaintenanceQuoteUrl() . rawurlencode((string) $quoteId);
+  }
+
+  public static function signedMaintenanceQuotePublicUrl(int $quoteId, ?int $expires = null): string
+  {
+    $expires = $expires && $expires > time() ? $expires : (time() + 180 * 86400);
+    $signature = self::maintenanceQuotePublicSignature($quoteId, $expires);
+    return self::maintenanceQuotePublicUrl($quoteId)
+      . '&expires=' . rawurlencode((string) $expires)
+      . '&sig=' . rawurlencode($signature);
+  }
+
+  public static function maintenanceQuotePublicSignature(int $quoteId, int $expires): string
+  {
+    return hash_hmac('sha256', 'cotizacion_mantenimiento|' . $quoteId . '|' . $expires, (string) SCM_APP_SECRET);
+  }
+
+  public static function maintenanceQuotePublicSignatureValid(int $quoteId, int $expires, string $signature): bool
+  {
+    if ($quoteId <= 0 || $expires <= time() || trim($signature) === '') {
+      return false;
+    }
+    return hash_equals(self::maintenanceQuotePublicSignature($quoteId, $expires), trim($signature));
   }
 
   private function normalizePropertyLocationInput(string $raw): string
