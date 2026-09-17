@@ -12802,9 +12802,9 @@
       var p = context.perturbation_context || {};
       var tipo = String(d.tipo_inmueble || p.tipo_inmueble || "").toLowerCase().indexOf("comer") > -1 ? "comercial" : "residencial";
       function select(name, label, options) {
-        return '<label class="scm-cotizacion-dialog-field"><span>' + escHtml(label) + '</span><select data-quote-perturb-field="' + escHtml(name) + '">' + options.map(function (o) {
+        return '<div class="scm-cotizacion-dialog-field scm-maint-quote-guide-field"><label><span>' + escHtml(label) + '</span><select data-quote-perturb-field="' + escHtml(name) + '">' + options.map(function (o) {
           return '<option value="' + escHtml(String(o[0])) + '">' + escHtml(o[1]) + "</option>";
-        }).join("") + "</select></label>";
+        }).join("") + '</select></label><button type="button" class="scm-maint-quote-guide-btn" data-quote-guide-key="' + escHtml(name) + '">Ver guía</button></div>';
       }
       var residential =
         select("habitabilidad", "Uso normal del inmueble", [[0, "Sin afectación relevante"], [6, "Molestia menor"], [12, "Limita parcialmente una actividad"], [18, "Impide usar zona importante"], [25, "Compromete habitabilidad"]]) +
@@ -12825,6 +12825,8 @@
       return (
         '<div class="scm-maint-quote-perturb" data-quote-perturbation data-quote-perturb-type="' + escHtml(tipo) + '">' +
         '<div class="scm-maint-quote-perturb-head"><div><strong>Calculadora de perturbación</strong><span>Canon ' + escHtml(formatCotizacionOrderCurrency(p.canon_total || 0)) + ' · Área ' + escHtml(String(p.area_construida || 0)) + ' m² · Días desde ticket ' + escHtml(String(p.dias_desde_ticket || 0)) + '</span></div><div class="scm-maint-quote-perturb-result"><b data-quote-perturb-percent>0%</b><small data-quote-perturb-bonus>$0</small></div></div>' +
+        '<div class="scm-maint-quote-guide-actions"><button type="button" class="scm-maint-quote-guide-btn is-primary" data-quote-guide-key="general">Ver guía de criterios</button><button type="button" class="scm-maint-quote-guide-btn" data-quote-guide-key="responsabilidad">Ver guía de responsabilidad</button></div>' +
+        '<div class="scm-maint-quote-guide-panel" data-quote-guide-panel hidden></div>' +
         '<div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Tipo de valoración</span><select name="tipo_inmueble_perturbacion" data-quote-perturb-type-select><option value="residencial"' + (tipo === "residencial" ? " selected" : "") + '>Residencial</option><option value="comercial"' + (tipo === "comercial" ? " selected" : "") + '>Comercial</option></select></label><label class="scm-cotizacion-dialog-field" data-quote-activity-wrap' + (tipo === "comercial" ? "" : " hidden") + '><span>Actividad comercial</span><select name="actividad_comercial_perturbacion" data-quote-activity><option value="deposito_bodega">Depósito / bodega</option><option value="fabricacion">Fabricación / taller</option><option value="prestacion_servicios">Prestación de servicios</option><option value="compra_venta">Compra y venta</option><option value="oficina">Oficina</option><option value="restaurante_alimentos">Restaurante / alimentos</option><option value="salud_estetica">Salud / estética</option><option value="otro">Otra</option></select></label></div>' +
         '<div class="scm-maint-quote-grid" data-quote-criteria="residencial"' + (tipo === "residencial" ? "" : " hidden") + '>' + residential + '</div>' +
         '<div class="scm-maint-quote-grid" data-quote-criteria="comercial"' + (tipo === "comercial" ? "" : " hidden") + '>' + commercial + '</div>' +
@@ -12900,6 +12902,46 @@
       if (percent <= 50) return { nivel: "Alta", texto: "El daño afecta una zona, servicio o proceso importante. Requiere prioridad y seguimiento." };
       if (percent <= 75) return { nivel: "Grave", texto: "El uso u operación está seriamente comprometido. Alto riesgo de reclamación." };
       return { nivel: "Crítica", texto: "Puede existir inhabitabilidad, cierre, interrupción operativa o riesgo crítico." };
+    }
+
+    function quotePerturbationGuideContent(key, type) {
+      var common = {
+        general: {
+          title: type === "comercial" ? "Guía general de criterios - Comercial" : "Guía general de criterios - Residencial",
+          body: type === "comercial"
+            ? "Valora continuidad operativa, ventas, producción, almacenamiento, atención al cliente, riesgos para trabajadores/clientes y medidas de mitigación documentadas."
+            : "Valora habitabilidad, uso normal de cocina, baños, habitaciones, sala, acceso, seguridad, servicios esenciales, gestión realizada y reincidencia.",
+        },
+        responsabilidad: {
+          title: "Guía de responsabilidad probable",
+          body: "Usa 1 cuando la responsabilidad probable sea del propietario/arrendador. Usa 0.8 si hay responsabilidad alta pero con gestión activa. Usa 0.6 cuando esté compartida o pendiente por confirmar. Usa 0.35 para tercero/copropiedad/fuerza mayor con gestión. Usa 0.15 si parece daño locativo, mal uso o uso inadecuado del arrendatario.",
+        },
+        habitabilidad: { title: "Afectación al uso normal del inmueble", body: "Mide qué tanto el daño afecta la vida diaria dentro del inmueble. Sube el puntaje cuando impide usar zonas relevantes o compromete habitabilidad." },
+        riesgo: { title: "Riesgo para salud o seguridad", body: "Considera electricidad, gas, humedad, moho, aguas negras, estructura, caídas, corto circuito o cualquier exposición que pueda afectar integridad o salud." },
+        servicio: { title: "Servicio esencial comprometido", body: "Aplica cuando se afecta agua, energía, gas, baño, cocina, acceso o seguridad. Mayor puntaje si el servicio queda inutilizable." },
+        duracion: { title: "Duración desde el reporte", body: "Cuenta desde el reporte formal del daño. A mayor demora sin solución o control, mayor puntaje de perturbación." },
+        area: { title: "Área o zona afectada - Residencial", body: "Evalúa la importancia funcional de la zona: una zona decorativa pesa poco; baño, cocina, habitación principal o varias zonas pesan más." },
+        gestion: { title: "Gestión realizada", body: "Mide oportunidad, seguimiento y trazabilidad. Baja el puntaje si hay gestión oportuna y documentada; súbelo si no hay solución clara." },
+        reincidencia: { title: "Reincidencia o agravamiento", body: "Aplica cuando el daño ya había ocurrido, fue mal reparado o empeoró por demora." },
+        operacion: { title: "Afectación a la operación normal del negocio", body: "Mide si el daño limita ventas, producción, almacenamiento, atención de clientes, despacho o recepción de proveedores." },
+        riesgo_comercial: { title: "Riesgo para salud, seguridad o SST", body: "Considera riesgos para trabajadores, clientes, proveedores, inventario, equipos o instalaciones." },
+        servicio_operativo: { title: "Servicio operativo crítico comprometido", body: "Evalúa energía, agua, gas, internet, acceso, ventilación, frío o seguridad cuando son indispensables para operar." },
+        duracion_operativa: { title: "Duración o tiempo de afectación operativa", body: "Mide durante cuánto tiempo el negocio estuvo limitado, detenido o expuesto." },
+        zona_proceso: { title: "Área, proceso o zona comercial afectada", body: "Considera ventas, caja, bodega, producción, cocina, consultorio, acceso, cargue o procesos esenciales." },
+        gestion_comercial: { title: "Gestión realizada y medidas de mitigación", body: "Valora las acciones tomadas para atender el daño y reducir impacto operativo, como seguimiento, soluciones temporales y trazabilidad." },
+        reincidencia_comercial: { title: "Reincidencia o agravamiento comercial", body: "Aplica si la falla se repite, fue mal reparada o se agravó y afecta operación, mercancía, clientes o equipos." },
+      };
+      return common[key] || common.general;
+    }
+
+    function showMaintenanceQuoteGuide(form, key) {
+      var panel = form ? form.querySelector("[data-quote-guide-panel]") : null;
+      if (!panel) return;
+      var typeSelect = form.querySelector("[data-quote-perturb-type-select]");
+      var type = typeSelect ? String(typeSelect.value || "residencial") : "residencial";
+      var guide = quotePerturbationGuideContent(key || "general", type);
+      panel.hidden = false;
+      panel.innerHTML = '<div><strong>' + escHtml(guide.title) + '</strong><p>' + escHtml(guide.body) + '</p></div><button type="button" aria-label="Cerrar guía" data-quote-guide-close>×</button>';
     }
 
     function syncMaintenanceQuotePerturbation(form, context) {
@@ -13078,6 +13120,22 @@
         }
       });
       form.addEventListener("click", function (event) {
+        var guideBtn = event.target && event.target.closest ? event.target.closest("[data-quote-guide-key]") : null;
+        if (guideBtn) {
+          event.preventDefault();
+          showMaintenanceQuoteGuide(form, guideBtn.getAttribute("data-quote-guide-key") || "general");
+          return;
+        }
+        var guideClose = event.target && event.target.closest ? event.target.closest("[data-quote-guide-close]") : null;
+        if (guideClose) {
+          event.preventDefault();
+          var panel = form.querySelector("[data-quote-guide-panel]");
+          if (panel) {
+            panel.hidden = true;
+            panel.innerHTML = "";
+          }
+          return;
+        }
         var addBtn = event.target && event.target.closest ? event.target.closest("[data-quote-add-row]") : null;
         if (addBtn) {
           event.preventDefault();

@@ -6179,6 +6179,101 @@
   font-size: 12px;
 }
 
+.scm-maint-quote-guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.swal2-popup.scm-maint-quote-swal .scm-maint-quote-guide-btn,
+.scm-maint-quote-guide-btn {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #0b1f3a;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.swal2-popup.scm-maint-quote-swal .scm-maint-quote-guide-btn.is-primary,
+.scm-maint-quote-guide-btn.is-primary {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.swal2-popup.scm-maint-quote-swal .scm-maint-quote-guide-btn:hover,
+.swal2-popup.scm-maint-quote-swal .scm-maint-quote-guide-btn:focus-visible,
+.scm-maint-quote-guide-btn:hover,
+.scm-maint-quote-guide-btn:focus-visible {
+  border-color: #fb923c;
+  background: #fff7ed;
+  color: #9a3412;
+  outline: 3px solid rgba(249, 115, 22, 0.14);
+}
+
+.scm-maint-quote-guide-field {
+  display: grid;
+  gap: 8px;
+}
+
+.scm-maint-quote-guide-field label {
+  display: grid;
+  gap: 7px;
+}
+
+.scm-maint-quote-guide-field .scm-maint-quote-guide-btn {
+  justify-self: start;
+  min-height: 34px;
+}
+
+.scm-maint-quote-guide-panel {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 0 0 14px;
+  padding: 13px 14px;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  background: #fff7ed;
+  color: #7c2d12;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.scm-maint-quote-guide-panel[hidden] {
+  display: none !important;
+}
+
+.scm-maint-quote-guide-panel strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #7c2d12;
+}
+
+.scm-maint-quote-guide-panel p {
+  margin: 0;
+}
+
+.scm-maint-quote-guide-panel button {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff;
+  color: #9a3412;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .scm-maint-quote-perturb-result {
   min-width: 150px;
   padding: 10px 12px;
