@@ -12959,6 +12959,34 @@
       return [fallback || {}];
     }
 
+    function formatMaintenanceQuotePlainNumber(value) {
+      var raw = String(value == null ? "" : value).trim();
+      if (!raw) return "";
+      var number = parseCotizacionOrderMoney(raw);
+      if (number <= 0 && !/\d/.test(raw)) return "";
+      var rounded = Math.round(number);
+      try {
+        return new Intl.NumberFormat("es-CO", {
+          maximumFractionDigits: 0,
+        }).format(rounded);
+      } catch (err) {
+        return String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      }
+    }
+
+    function normalizeMaintenanceQuoteNumber(value) {
+      var raw = String(value == null ? "" : value).trim();
+      if (!raw) return "";
+      return String(Math.round(parseCotizacionOrderMoney(raw)));
+    }
+
+    function formatMaintenanceQuoteNumericInput(input) {
+      if (!input) return;
+      var raw = String(input.value || "");
+      var formatted = formatMaintenanceQuotePlainNumber(raw);
+      input.value = formatted;
+    }
+
     function renderCotizacionRepeaterRows(type, items, unitOptions) {
       var configs = {
         mano: {
@@ -13023,7 +13051,8 @@
           } else if (inputType === "select") {
             html += '<select data-quote-field="' + escHtml(name) + '"><option value="">Elige</option>' + cotizacionFormOptionHtml(unitOptions, value) + "</select>";
           } else {
-            html += '<input type="' + (inputType === "money" ? "number" : inputType) + '" data-quote-field="' + escHtml(name) + '" value="' + escHtml(value) + '" placeholder="' + escHtml(placeholder) + '" min="0" step="1">';
+            var isFormattedNumber = inputType === "money" || inputType === "number";
+            html += '<input type="' + (isFormattedNumber ? "text" : inputType) + '" data-quote-field="' + escHtml(name) + '"' + (isFormattedNumber ? ' data-quote-format="' + escHtml(inputType) + '" inputmode="numeric" pattern="[0-9.]*"' : '') + ' value="' + escHtml(isFormattedNumber ? formatMaintenanceQuotePlainNumber(value) : value) + '" placeholder="' + escHtml(placeholder) + '"' + (isFormattedNumber ? '' : ' min="0" step="1"') + '>';
           }
           html += "</label>";
         });
@@ -13140,7 +13169,7 @@
         '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Mejores ofertas</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Otras ofertas</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><p class="scm-maint-quote-help">Van debajo de materiales para mantener el mismo orden del formulario anterior. Usa imágenes livianas; el sistema valida peso y tamaño antes de guardar.</p></section>' +
         renderCotizacionRepeaterRows("equipos", q.items_otros_equi, context.unit_options) +
         renderCotizacionRepeaterRows("otros", q.items_otros_costos, context.unit_options) +
-        '<section class="scm-maint-quote-section"><h4>Condiciones y perturbación</h4><div class="scm-maint-quote-grid">' +
+        '<section class="scm-maint-quote-section scm-maint-quote-bottom-section"><h4>Condiciones y perturbación</h4><div class="scm-maint-quote-grid">' +
         '<label class="scm-cotizacion-dialog-field"><span>Validez de la oferta <em>*</em></span><input type="number" name="valides_oferta" min="0" value="' + escHtml(d.valides_oferta || "") + '" required><small>Días de vigencia.</small></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Duración del trabajo <em>*</em></span><input type="number" name="duracion" min="0" value="' + escHtml(d.duracion || "") + '" required><small>Días estimados.</small></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Área afectada</span><input type="number" name="area_afectada" min="0" step="1" value="' + escHtml(d.area_afectada || "") + '"><small>Metros cuadrados realmente afectados.</small></label>' +
@@ -13155,7 +13184,10 @@
     function quoteRowToObject(row) {
       var obj = {};
       row.querySelectorAll("[data-quote-field]").forEach(function (input) {
-        obj[input.getAttribute("data-quote-field") || ""] = input.value || "";
+        var key = input.getAttribute("data-quote-field") || "";
+        obj[key] = input.hasAttribute("data-quote-format")
+          ? normalizeMaintenanceQuoteNumber(input.value)
+          : (input.value || "");
       });
       return obj;
     }
@@ -13375,7 +13407,7 @@
         var quantity = Math.max(1, parseCotizacionOrderMoney(row.cantidad_materiales || 1));
         var unit = parseCotizacionOrderMoney(row.valor_unitario_materiales);
         var totalField = rowEl.querySelector('[data-quote-field="valor_total_materiales"]');
-        if (totalField && unit > 0) totalField.value = Math.round(quantity * unit);
+        if (totalField && unit > 0) totalField.value = formatMaintenanceQuotePlainNumber(quantity * unit);
       });
       collectQuoteRows(form, "equipos").forEach(function (row) {
         totals.equipos += Math.max(1, parseCotizacionOrderMoney(row.cantidad_otros_equi || 1)) * parseCotizacionOrderMoney(row.valor_otros_equi);
@@ -13393,7 +13425,11 @@
 
     function wireMaintenanceQuoteForm(form, context) {
       if (!form) return;
-      form.addEventListener("input", function () {
+      form.addEventListener("input", function (event) {
+        var target = event.target || null;
+        if (target && target.hasAttribute && target.hasAttribute("data-quote-format")) {
+          formatMaintenanceQuoteNumericInput(target);
+        }
         syncMaintenanceQuoteTotals(form);
         syncMaintenanceQuotePerturbation(form, context || {});
       });
@@ -13429,7 +13465,7 @@
           var type = addBtn.getAttribute("data-quote-add-row") || "";
           var section = form.querySelector('[data-quote-repeater="' + type + '"] .scm-maint-quote-rows');
           if (!section) return;
-          var html = renderCotizacionRepeaterRows(type, [{}], context.unit_options || []);
+          var html = renderCotizacionRepeaterRows(type, [{}], type === "materiales" ? (context.material_unit_options || context.unit_options || []) : (context.unit_options || []));
           var temp = document.createElement("div");
           temp.innerHTML = html;
           var row = temp.querySelector("[data-quote-row]");
