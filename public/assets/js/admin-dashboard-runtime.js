@@ -13101,7 +13101,17 @@
     function maintenanceQuotePerturbationHtml(context) {
       var d = context.defaults || {};
       var p = context.perturbation_context || {};
-      var tipo = String(d.tipo_inmueble || p.tipo_inmueble || "").toLowerCase().indexOf("comer") > -1 ? "comercial" : "residencial";
+      var saved = {};
+      try {
+        saved = d.resumen_calculo_perturbacion ? (JSON.parse(d.resumen_calculo_perturbacion) || {}) : {};
+      } catch (err) {
+        saved = {};
+      }
+      var savedCriteria = saved && saved.criterios_valores && typeof saved.criterios_valores === "object" ? saved.criterios_valores : {};
+      var savedType = String(saved.tipo_valoracion_key || saved.tipo_valoracion || "").toLowerCase();
+      var detectedType = String(d.tipo_inmueble || p.tipo_inmueble || "").toLowerCase().indexOf("comer") > -1 ? "comercial" : "residencial";
+      var tipo = savedType.indexOf("comer") > -1 ? "comercial" : (savedType.indexOf("resid") > -1 ? "residencial" : detectedType);
+      var savedActivity = String(saved.actividad_comercial_key || "");
       function dataValue(value, fallback) {
         value = value == null || value === "" ? fallback : value;
         return value == null || value === "" ? "No informado" : String(value);
@@ -13110,8 +13120,10 @@
         return '<span><b>' + escHtml(label) + ':</b> ' + escHtml(dataValue(value, fallback)) + '</span>';
       }
       function select(name, label, options, help) {
-        return '<div class="scm-maint-quote-criterion-card"><label class="scm-cotizacion-dialog-field scm-maint-quote-guide-field"><span>' + escHtml(label) + '</span><select data-quote-perturb-field="' + escHtml(name) + '">' + options.map(function (o) {
-          return '<option value="' + escHtml(String(o[0])) + '">' + escHtml(o[1]) + "</option>";
+        var selectedValue = savedCriteria[name] != null ? String(savedCriteria[name]) : "";
+        return '<div class="scm-maint-quote-criterion-card"><label class="scm-cotizacion-dialog-field scm-maint-quote-guide-field"><span>' + escHtml(label) + '</span><select data-quote-perturb-field="' + escHtml(name) + '"><option value="">' + escHtml("Selecciona " + label.replace(/^[0-9]+\.\s*/, "").toLowerCase()) + '</option>' + options.map(function (o) {
+          var value = String(o[0]);
+          return '<option value="' + escHtml(value) + '"' + (selectedValue === value ? " selected" : "") + '>' + escHtml(o[1]) + "</option>";
         }).join("") + '</select><small>' + escHtml(help || "") + '</small></label><button type="button" class="scm-maint-quote-guide-btn" data-quote-guide-key="' + escHtml(name) + '">Ver guía</button></div>';
       }
       var residential =
@@ -13147,7 +13159,7 @@
         '<div class="scm-maint-quote-perturb-head"><div><strong>Calculadora de perturbación del inmueble</strong><span>Esta herramienta calcula la perturbación, los días de afectación y el valor sugerido de compensación.</span></div></div>' +
         dataBox +
         '<h5 class="scm-maint-quote-perturb-section-title">0. Tipo de valoración</h5>' +
-        '<div class="scm-maint-quote-type-grid"><div class="scm-maint-quote-criterion-card"><label class="scm-cotizacion-dialog-field"><span>Tipo de inmueble</span><select name="tipo_inmueble_perturbacion" data-quote-perturb-type-select><option value="residencial"' + (tipo === "residencial" ? " selected" : "") + '>Residencial</option><option value="comercial"' + (tipo === "comercial" ? " selected" : "") + '>Comercial</option></select><small>Define si los criterios se valoran desde habitabilidad o continuidad operativa.</small></label></div><div class="scm-maint-quote-criterion-card" data-quote-activity-wrap' + (tipo === "comercial" ? "" : " hidden") + '><label class="scm-cotizacion-dialog-field"><span>Actividad comercial</span><select name="actividad_comercial_perturbacion" data-quote-activity><option value="deposito_bodega">Depósito / bodega</option><option value="fabricacion">Fabricación / taller</option><option value="prestacion_servicios">Prestación de servicios</option><option value="compra_venta">Compra y venta</option><option value="oficina">Oficina</option><option value="restaurante_alimentos">Restaurante / alimentos</option><option value="salud_estetica">Salud / estética</option><option value="otro">Otra</option></select><small>Solo aplica cuando la valoración es comercial.</small></label></div></div>' +
+        '<div class="scm-maint-quote-type-grid"><div class="scm-maint-quote-criterion-card"><label class="scm-cotizacion-dialog-field"><span>Tipo de inmueble</span><select name="tipo_inmueble_perturbacion" data-quote-perturb-type-select><option value="">Selecciona tipo de valoración</option><option value="residencial"' + (tipo === "residencial" ? " selected" : "") + '>Residencial</option><option value="comercial"' + (tipo === "comercial" ? " selected" : "") + '>Comercial</option></select><small>Define si los criterios se valoran desde habitabilidad o continuidad operativa.</small></label></div><div class="scm-maint-quote-criterion-card" data-quote-activity-wrap' + (tipo === "comercial" ? "" : " hidden") + '><label class="scm-cotizacion-dialog-field"><span>Actividad comercial</span><select name="actividad_comercial_perturbacion" data-quote-activity><option value="">Selecciona actividad comercial</option><option value="deposito_bodega"' + (savedActivity === "deposito_bodega" ? " selected" : "") + '>Depósito / bodega</option><option value="fabricacion"' + (savedActivity === "fabricacion" ? " selected" : "") + '>Fabricación / taller</option><option value="prestacion_servicios"' + (savedActivity === "prestacion_servicios" ? " selected" : "") + '>Prestación de servicios</option><option value="compra_venta"' + (savedActivity === "compra_venta" ? " selected" : "") + '>Compra y venta</option><option value="oficina"' + (savedActivity === "oficina" ? " selected" : "") + '>Oficina</option><option value="restaurante_alimentos"' + (savedActivity === "restaurante_alimentos" ? " selected" : "") + '>Restaurante / alimentos</option><option value="salud_estetica"' + (savedActivity === "salud_estetica" ? " selected" : "") + '>Salud / estética</option><option value="otro"' + (savedActivity === "otro" ? " selected" : "") + '>Otra</option></select><small>Solo aplica cuando la valoración es comercial.</small></label></div></div>' +
         '<div class="scm-maint-quote-guide-actions"><button type="button" class="scm-maint-quote-guide-btn is-primary" data-quote-guide-key="general">Ver guía de criterios</button><button type="button" class="scm-maint-quote-guide-btn" data-quote-guide-key="responsabilidad">Ver guía de responsabilidad</button></div>' +
         '<div class="scm-maint-quote-guide-panel" data-quote-guide-panel hidden></div>' +
         '<h5 class="scm-maint-quote-perturb-section-title">1. Días de afectación calculados</h5><div class="scm-maint-quote-days-box"><strong data-quote-days-text>0 días</strong><span data-quote-days-detail>Días desde ticket: ' + escHtml(String(p.dias_desde_ticket || 0)) + ' | Duración trabajo: 0 | Margen seguridad: 1.2</span></div>' +
@@ -13717,19 +13729,24 @@
       var activityWrap = form.querySelector("[data-quote-activity-wrap]");
       if (activityWrap) activityWrap.hidden = type !== "comercial";
       var criteria = [];
+      var criteriaValues = {};
       var totalBase = 0;
       var active = form.querySelector('[data-quote-criteria="' + type + '"]');
       if (active) {
         active.querySelectorAll("[data-quote-perturb-field]").forEach(function (select) {
+          if (String(select.value || "") === "") return;
           var value = parseFloat(select.value || 0) || 0;
           var label = select.closest("label");
           var option = select.options[select.selectedIndex];
+          var key = select.getAttribute("data-quote-perturb-field") || "";
+          if (key) criteriaValues[key] = select.value;
           totalBase += value;
           criteria.push((label ? label.querySelector("span").textContent : "Criterio") + ": " + (option ? option.textContent : "") + " (" + value + " pts)");
         });
       }
       var factorSelect = form.querySelector('[data-quote-perturb-field="responsabilidad"]');
-      var factor = factorSelect ? (parseFloat(factorSelect.value || 1) || 1) : 1;
+      var factorValue = factorSelect ? String(factorSelect.value || "") : "";
+      var factor = factorValue !== "" ? (parseFloat(factorValue) || 1) : 1;
       var percent = Math.max(0, Math.min(100, Math.round(totalBase * factor)));
       var perturbInfo = quotePerturbationLevel(percent);
       var p = context && context.perturbation_context ? context.perturbation_context : {};
@@ -13747,11 +13764,19 @@
       setMaintenanceQuoteField(form, "perturbacion", percent);
       setMaintenanceQuoteField(form, "valor_bonificacion", bonus);
       setMaintenanceQuoteField(form, "dias_afectacion_calculados", dias);
+      var activitySelect = form.querySelector("[data-quote-activity]");
+      var activityOption = activitySelect && activitySelect.selectedOptions[0] ? activitySelect.selectedOptions[0] : null;
+      if (factorSelect && factorValue !== "") {
+        criteriaValues.responsabilidad = factorSelect.value;
+      }
       var resumen = {
+        tipo_valoracion_key: type,
         tipo_valoracion: type === "comercial" ? "Comercial" : "Residencial",
-        actividad_comercial: type === "comercial" ? ((form.querySelector("[data-quote-activity]") || {}).selectedOptions || [{ textContent: "No aplica" }])[0].textContent : "No aplica",
+        actividad_comercial_key: type === "comercial" && activitySelect ? String(activitySelect.value || "") : "",
+        actividad_comercial: type === "comercial" ? (activityOption && activityOption.value ? activityOption.textContent : "No seleccionada") : "No aplica",
+        criterios_valores: criteriaValues,
         criterios: criteria,
-        responsabilidad: { texto: factorSelect && factorSelect.selectedOptions[0] ? factorSelect.selectedOptions[0].textContent : "", factor: factor },
+        responsabilidad: { texto: factorSelect && factorValue !== "" && factorSelect.selectedOptions[0] ? factorSelect.selectedOptions[0].textContent : "", factor: factor },
         perturbacion: { porcentaje: percent, nivel: perturbInfo.nivel, descripcion: perturbInfo.texto },
         ticket: { id_ticket: p.id_ticket || "", fecha_ticket: p.fecha_ticket_texto || "", fecha_cotizacion: p.fecha_cot_texto || "", dias_desde_ticket: diasTicket, duracion_trabajo: duracion, margen_seguridad: 1.2, dias_afectacion_calculados: dias },
         inmueble: { codigo: p.codigo || "", canon_total: canonTotal, precio_arriendo: p.precio_arriendo || 0, precio_administracion: p.precio_admin || 0, area_construida: areaConstruida, area_afectada: area },
