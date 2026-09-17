@@ -13551,9 +13551,39 @@
       ].join(":");
     }
 
-    function maintenanceQuoteDraftPayload(form) {
+    function maintenanceQuotePerturbationSummaryFromForm(form) {
+      var field = form ? form.querySelector('[name="resumen_calculo_perturbacion"]') : null;
+      try {
+        return field && field.value ? (JSON.parse(field.value) || {}) : {};
+      } catch (err) {
+        return {};
+      }
+    }
+
+    function restoreMaintenanceQuotePerturbationSelections(form) {
+      if (!form) return;
+      var saved = maintenanceQuotePerturbationSummaryFromForm(form);
+      var savedCriteria = saved && saved.criterios_valores && typeof saved.criterios_valores === "object" ? saved.criterios_valores : {};
+      var type = String(saved.tipo_valoracion_key || saved.tipo_valoracion || "").toLowerCase();
+      var typeValue = type.indexOf("comer") > -1 ? "comercial" : (type.indexOf("resid") > -1 ? "residencial" : "");
+      var typeSelect = form.querySelector("[data-quote-perturb-type-select]");
+      if (typeSelect && typeValue) typeSelect.value = typeValue;
+      var activitySelect = form.querySelector("[data-quote-activity]");
+      if (activitySelect && saved.actividad_comercial_key != null) {
+        activitySelect.value = String(saved.actividad_comercial_key || "");
+      }
+      form.querySelectorAll("[data-quote-perturb-field]").forEach(function (select) {
+        var key = select.getAttribute("data-quote-perturb-field") || "";
+        if (key && savedCriteria[key] != null) {
+          select.value = String(savedCriteria[key]);
+        }
+      });
+    }
+
+    function maintenanceQuoteDraftPayload(form, context) {
       var fields = {};
       if (!form) return null;
+      syncMaintenanceQuotePerturbation(form, context || {});
       form.querySelectorAll("[name]").forEach(function (field) {
         if (!field.name || field.type === "file") return;
         fields[field.name] = field.value || "";
@@ -13573,10 +13603,10 @@
       };
     }
 
-    function saveMaintenanceQuoteDraft(form, draftKey) {
+    function saveMaintenanceQuoteDraft(form, draftKey, context) {
       if (!form || !draftKey || !window.localStorage) return;
       try {
-        window.localStorage.setItem(draftKey, JSON.stringify(maintenanceQuoteDraftPayload(form)));
+        window.localStorage.setItem(draftKey, JSON.stringify(maintenanceQuoteDraftPayload(form, context || {})));
       } catch (err) {
         if (window.console && console.warn) console.warn("[cotizacion] No se pudo guardar el borrador local.", err);
       }
@@ -13640,6 +13670,7 @@
       var provider = form.querySelector("[data-material-support-provider]");
       if (provider) provider.value = payload.materialSupportProvider || "";
       setMaintenanceQuoteGeneratedMaterialOffers(form, payload.generatedMaterialOffers || []);
+      restoreMaintenanceQuotePerturbationSelections(form);
       refreshMaterialAutoItems(form);
       renderMaintenanceQuoteGeneratedMaterialOffers(form);
       syncMaintenanceQuoteTotals(form);
@@ -13654,7 +13685,7 @@
       function schedule() {
         window.clearTimeout(timer);
         timer = window.setTimeout(function () {
-          saveMaintenanceQuoteDraft(form, draftKey);
+          saveMaintenanceQuoteDraft(form, draftKey, context || {});
         }, 350);
       }
       form.addEventListener("input", schedule);
@@ -14104,11 +14135,11 @@
                   return false;
                 }
               }
-              saveMaintenanceQuoteDraft(form, draftKey);
+              saveMaintenanceQuoteDraft(form, draftKey, context || {});
               return submitCotizacionAction(formData, actionCotizacionSave, "No se pudo guardar la cotización.").then(function (saved) {
                 if (!saved) {
                   window.Swal.showValidationMessage("No se pudo guardar. Dejé tu progreso en pantalla y en borrador local.");
-                  saveMaintenanceQuoteDraft(form, draftKey);
+                  saveMaintenanceQuoteDraft(form, draftKey, context || {});
                   return false;
                 }
                 clearMaintenanceQuoteDraft(draftKey);
