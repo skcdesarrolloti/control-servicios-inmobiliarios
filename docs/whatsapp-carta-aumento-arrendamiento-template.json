@@ -1,0 +1,21 @@
+{
+  "name": "scm_carta_aumento_arrendamiento_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "DOCUMENT",
+      "example": {
+        "header_handle": ["carta-aumento-ejemplo.pdf"]
+      }
+    },
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}.\n\nSe generó la carta de aumento de {{2}} del contrato #{{3}}, inmueble #{{4}}.\n\nTe compartimos el PDF adjunto para tu consulta.\n\nAtentamente,\n{{5}}\nSKC SuCasa Inmobiliaria.",
+      "example": {
+        "body_text": [["María Pérez", "canon de arrendamiento", "840", "105370", "Julian Maturana Ortega - 3145965047"]]
+      }
+    }
+  ]
+}

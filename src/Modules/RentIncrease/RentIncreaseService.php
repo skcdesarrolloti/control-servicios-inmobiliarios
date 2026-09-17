@@ -367,19 +367,35 @@ final class RentIncreaseService
       $ok = $sms->enqueue($recipient['phone'], $recipient['name'], $message, [
         'source_module' => 'cartas_aumento_arrendamiento',
         'dedupe_key' => 'carta_aumento_whatsapp_' . $type . '_' . $letterId,
-        'template_name' => 'scm_notificacion_general_v1',
+        'template_name' => 'scm_carta_aumento_arrendamiento_v1',
         'template_language' => 'es_CO',
-        'template_components' => [[
-          'type' => 'body',
-          'parameters' => [
-            ['type' => 'text', 'text' => $this->waText($recipient['name'])],
-            ['type' => 'text', 'text' => $this->waText($message)],
-            ['type' => 'text', 'text' => $this->waText($this->signatureLine($context))],
+        'template_components' => [
+          [
+            'type' => 'header',
+            'parameters' => [[
+              'type' => 'document',
+              'document' => [
+                'link' => $letterUrl,
+                'filename' => (string) ($document['attachment_name'] ?? 'carta-aumento.pdf'),
+              ],
+            ]],
           ],
-        ]],
+          [
+            'type' => 'body',
+            'parameters' => [
+              ['type' => 'text', 'text' => $this->waText($recipient['name'])],
+              ['type' => 'text', 'text' => $this->waText($type === 'canon' ? 'canon de arrendamiento' : 'cuota de administración')],
+              ['type' => 'text', 'text' => $this->waText((string) ($context['contrato'] ?? '-'))],
+              ['type' => 'text', 'text' => $this->waText((string) ($context['id_inmueble'] ?? $context['inmueble'] ?? '-'))],
+              ['type' => 'text', 'text' => $this->waText($this->signatureLine($context))],
+            ],
+          ],
+        ],
         'letter_id' => $letterId,
         'contract_id' => (int) ($context['_ID'] ?? 0),
         'letter_url' => $letterUrl,
+        'document_url' => $letterUrl,
+        'document_filename' => (string) ($document['attachment_name'] ?? 'carta-aumento.pdf'),
       ]);
       $whatsappQueued += $ok ? 1 : 0;
     }
@@ -552,6 +568,14 @@ final class RentIncreaseService
     if (is_file($value)) {
       return $value;
     }
+    $urlPath = trim((string) (parse_url($value, PHP_URL_PATH) ?? ''));
+    if ($urlPath !== '') {
+      foreach ($this->wordpressUploadPathCandidates($urlPath) as $candidate) {
+        if (is_file($candidate)) {
+          return $candidate;
+        }
+      }
+    }
     $query = [];
     $urlQuery = (string) (parse_url($value, PHP_URL_QUERY) ?? '');
     if ($urlQuery !== '') {
@@ -576,6 +600,32 @@ final class RentIncreaseService
       }
     }
     return '';
+  }
+
+  /** @return string[] */
+  private function wordpressUploadPathCandidates(string $urlPath): array
+  {
+    $path = '/' . ltrim(str_replace('\\', '/', $urlPath), '/');
+    $pos = stripos($path, '/wp-content/uploads/');
+    if ($pos === false) {
+      return [];
+    }
+    $relative = ltrim(substr($path, $pos), '/');
+    $uploadRelative = ltrim(substr($path, $pos + strlen('/wp-content/uploads/')), '/');
+    $roots = array_values(array_unique(array_filter([
+      dirname((string) SCM_ROOT),
+      dirname((string) SCM_ROOT, 2),
+      (string) SCM_ROOT,
+      trim((string) getenv('SCM_WORDPRESS_ROOT')),
+      trim((string) getenv('WP_ROOT')),
+    ])));
+    $candidates = [];
+    foreach ($roots as $root) {
+      $root = rtrim($root, '/\\');
+      $candidates[] = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative);
+      $candidates[] = $root . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $uploadRelative);
+    }
+    return array_values(array_unique($candidates));
   }
 
   private function sanitizeType(string $type): string
