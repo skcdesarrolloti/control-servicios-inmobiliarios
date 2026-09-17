@@ -23,7 +23,7 @@ final class RentIncreaseView
       </div>
       <aside class="scm-rent-increase-note">
         <strong>Firmas institucionales</strong>
-        <span>La carta toma el coordinador contractual desde <code>jet_cct_sucursales</code>. El representante legal sale del funcionario activo con cargo <code>Gerente General</code> en <code>jet_cct_funcionarios</code>; la imagen de firma se lee de su campo de firma.</span>
+        <span>La carta toma el coordinador contractual desde el funcionario activo con cargo contractual en <code>jet_cct_funcionarios</code>. El representante legal sale del funcionario activo con cargo <code>Gerente General</code>; la imagen de firma se lee de su campo de firma.</span>
       </aside>
       <div class="scm-status-subtabs scm-rent-increase-tabs" role="tablist" aria-label="Cartas de aumento">
         <button type="button" class="scm-status-topic-tab active" data-rent-increase-tab="contracts">Contratos</button>

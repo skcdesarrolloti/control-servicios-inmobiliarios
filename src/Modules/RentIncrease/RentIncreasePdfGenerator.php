@@ -43,12 +43,12 @@ final class RentIncreasePdfGenerator
 
     if ($isCanon) {
       $pdf->heading('REF: AUMENTO DE CANON DE ARRENDAMIENTO');
-      $pdf->paragraph('Por medio de la presente nos permitimos comunicarle que el canon de arrendamiento mensual del inmueble que usted ocupa en calidad de arrendatario será incrementado en ' . $this->value($context, 'incremento', '-') . ', es decir, que el nuevo valor a cancelar por concepto de canon será de ' . $this->money((float) ($context['canon'] ?? 0)) . ' (' . $this->value($context, 'canon_letras', '-') . ').', 8);
-      $pdf->paragraph('El aumento en el canon se aplicará conforme a la ley y al término estipulado en el contrato de arrendamiento.', 8);
+      $pdf->paragraph('Por medio de la presente nos permitimos comunicarle que el canon de arrendamiento mensual del inmueble que usted ocupa en calidad de arrendatario será incrementado ' . $this->value($context, 'incremento', '-') . ', es decir, que el nuevo valor a cancelar por concepto de canon es de ' . $this->moneyWords((float) ($context['canon'] ?? 0), $this->value($context, 'canon_letras', '-')) . '.', 8);
+      $pdf->paragraph('El aumento en el canon se realiza conforme a lo estipulado en la cláusula cuarta del contrato de arrendamiento.', 8);
       $pdf->paragraph('El término de vigencia del contrato ha sido renovado por el mismo término estipulado en el contrato de arrendamiento.', 8);
     } else {
       $pdf->heading('REF: AUMENTO CUOTA ADMINISTRACIÓN');
-      $pdf->paragraph('Por medio de la presente nos permitimos comunicarle que la nueva cuota de administración mensual del inmueble que usted ocupa en calidad de arrendatario será de ' . $this->money((float) ($context['administracion'] ?? 0)) . ' (' . $this->value($context, 'administracion_letras', '-') . '), valor que comenzará a regir a partir del ' . $this->dateLabel((int) ($context['vigencia_ts'] ?? $date)) . '.', 8);
+      $pdf->paragraph('Por medio de la presente nos permitimos comunicarle que la nueva cuota de administración mensual del inmueble que usted ocupa en calidad de arrendatario será de ' . $this->moneyWords((float) ($context['administracion'] ?? 0), $this->value($context, 'administracion_letras', '-')) . ', valor que comenzará a regir a partir del ' . $this->dateLabel((int) ($context['vigencia_ts'] ?? $date)) . '.', 8);
       $retro = trim((string) ($context['texto_retroactivos'] ?? ''));
       if ($retro !== '') {
         $pdf->paragraph($retro, 8);
@@ -106,7 +106,13 @@ final class RentIncreasePdfGenerator
 
   private function money(float $value): string
   {
-    return '$' . number_format($value, 0, ',', '.');
+    return '$' . "\u{00A0}" . number_format($value, 0, ',', '.');
+  }
+
+  private function moneyWords(float $value, string $words): string
+  {
+    $words = trim($words);
+    return ($words !== '' ? $words : '-') . ' (' . $this->money($value) . ')';
   }
 
   /** @return array{path:string,temporary:bool} */

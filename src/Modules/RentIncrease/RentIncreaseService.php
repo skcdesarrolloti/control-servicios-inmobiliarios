@@ -188,6 +188,7 @@ final class RentIncreaseService
   {
     $branch = $this->branch((string) ($contract['id_sucursal'] ?? $contract['sucursal'] ?? ''));
     $employee = $this->currentEmployee();
+    $contractualCoordinator = $this->contractualCoordinator();
     $legalRepresentative = $this->generalManagerRepresentative();
     $ctx = array_merge($contract, [
       'fecha_ts' => $fechaTs,
@@ -195,9 +196,9 @@ final class RentIncreaseService
       'tipo_carta' => $type === 'canon' ? 'Aumento de canon' : 'Aumento de administracion',
       'id_empleado' => (string) ($employee['id_empleado'] ?? Auth::employeeId() ?: Auth::userId()),
       'creador' => (string) ($employee['nombre'] ?? Auth::user()),
-      'contractual' => $this->firstNonEmpty([$branch['nombre_contractual'] ?? '', $branch['nombre'] ?? '', 'Coordinador Contractual, Mantenimiento y Servicios Públicos']),
-      'correo_contractual' => $this->firstNonEmpty([$branch['correo_contractual'] ?? '', $branch['correo'] ?? '']),
-      'celular_contractual' => $this->firstNonEmpty([$branch['celular_contractual'] ?? '', $branch['telefono'] ?? '']),
+      'contractual' => $this->firstNonEmpty([$contractualCoordinator['nombre'] ?? '', $branch['nombre_contractual'] ?? '', $branch['nombre'] ?? '', 'Coordinador Contractual, Mantenimiento y Servicios Públicos']),
+      'correo_contractual' => $this->firstNonEmpty([$contractualCoordinator['correo'] ?? '', $branch['correo_contractual'] ?? '', $branch['correo'] ?? '']),
+      'celular_contractual' => $this->firstNonEmpty([$contractualCoordinator['celular'] ?? '', $branch['celular_contractual'] ?? '', $branch['telefono'] ?? '']),
       'representante_legal' => $this->firstNonEmpty([$legalRepresentative['nombre'] ?? '', $branch['representante_legal'] ?? '', 'Representante legal']),
       'correo_representante_legal' => $this->firstNonEmpty([$legalRepresentative['correo'] ?? '', $branch['correo_legal'] ?? '', $branch['correo_representante_legal'] ?? '']),
       'celular_representante_legal' => $this->firstNonEmpty([$legalRepresentative['celular'] ?? '', $branch['celular_legal'] ?? '', $branch['celular_representante_legal'] ?? '']),
@@ -453,7 +454,28 @@ final class RentIncreaseService
   }
 
   /** @return array{nombre:string,correo:string,celular:string,cargo:string,firma:string,firma_path:string}|array{} */
+  private function contractualCoordinator(): array
+  {
+    return $this->employeeByCargo(
+      ["LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%contractual%'"],
+      "CASE WHEN LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%coordinador%' OR LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%cordinador%' THEN 0 ELSE 1 END, f.`_ID` ASC"
+    );
+  }
+
+  /** @return array{nombre:string,correo:string,celular:string,cargo:string,firma:string,firma_path:string}|array{} */
   private function generalManagerRepresentative(): array
+  {
+    return $this->employeeByCargo([
+      "(LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%gerente%' OR LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%gerencia%')",
+      "LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%general%'",
+    ], 'f.`_ID` ASC');
+  }
+
+  /**
+   * @param string[] $cargoWhere
+   * @return array{nombre:string,correo:string,celular:string,cargo:string,firma:string,firma_path:string}|array{}
+   */
+  private function employeeByCargo(array $cargoWhere, string $orderBy): array
   {
     $table = $this->db->table('jet_cct_funcionarios');
     $cargoTable = $this->db->table('jet_cct_cargos');
@@ -489,10 +511,10 @@ final class RentIncreaseService
       $signatureColumn !== '' ? "TRIM(COALESCE(f.`{$signatureColumn}`, '')) AS firma" : "'' AS firma",
       "TRIM(COALESCE(c.`nombre_cargo`, '')) AS cargo",
     ];
-    $where = [
-      "(LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%gerente%' OR LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%gerencia%')",
-      "LOWER(TRIM(COALESCE(c.`nombre_cargo`, ''))) LIKE '%general%'",
-    ];
+    $where = array_values(array_filter(array_map('trim', $cargoWhere)));
+    if ($where === []) {
+      return [];
+    }
     if ($activeColumn !== '') {
       if ($activeColumn === 'cct_status') {
         $where[] = "LOWER(TRIM(COALESCE(f.`{$activeColumn}`, 'publish'))) IN ('publish', 'published', 'si', 'sí', '1', 'true', 'activo', 'active')";
@@ -505,7 +527,7 @@ final class RentIncreaseService
         . " FROM `{$table}` f"
         . " INNER JOIN `{$cargoTable}` c ON TRIM(COALESCE(f.`{$cargoColumn}`, '')) = CAST(c.`_ID` AS CHAR)"
         . ' WHERE ' . implode(' AND ', $where)
-        . ' ORDER BY f.`_ID` ASC LIMIT 1'
+        . ' ORDER BY ' . $orderBy . ' LIMIT 1'
     );
     if (!is_array($row) || trim((string) ($row['nombre'] ?? '')) === '') {
       return [];
@@ -615,9 +637,126 @@ final class RentIncreaseService
   {
     $value = (int) round($amount);
     if ($value <= 0) {
-      return 'cero pesos m/cte';
+      return 'CERO PESOS';
     }
-    return number_format($value, 0, ',', '.') . ' pesos m/cte';
+    $unit = $value === 1 ? 'PESO' : 'PESOS';
+    return $this->apocopateOne($this->numberToSpanish($value)) . ' ' . $unit;
+  }
+
+  private function numberToSpanish(int $value): string
+  {
+    if ($value <= 0) {
+      return 'CERO';
+    }
+    if ($value < 1000) {
+      return $this->underThousandToSpanish($value);
+    }
+
+    $parts = [];
+    $billions = intdiv($value, 1000000000);
+    $value %= 1000000000;
+    if ($billions > 0) {
+      $parts[] = $billions === 1 ? 'MIL MILLONES' : $this->apocopateOne($this->numberToSpanish($billions)) . ' MIL MILLONES';
+    }
+
+    $millions = intdiv($value, 1000000);
+    $value %= 1000000;
+    if ($millions > 0) {
+      $parts[] = $millions === 1 ? 'UN MILLÓN' : $this->apocopateOne($this->numberToSpanish($millions)) . ' MILLONES';
+    }
+
+    $thousands = intdiv($value, 1000);
+    $value %= 1000;
+    if ($thousands > 0) {
+      $parts[] = $thousands === 1 ? 'MIL' : $this->apocopateOne($this->underThousandToSpanish($thousands)) . ' MIL';
+    }
+
+    if ($value > 0) {
+      $parts[] = $this->underThousandToSpanish($value);
+    }
+
+    return implode(' ', $parts);
+  }
+
+  private function underThousandToSpanish(int $value): string
+  {
+    $units = [
+      0 => '',
+      1 => 'UNO',
+      2 => 'DOS',
+      3 => 'TRES',
+      4 => 'CUATRO',
+      5 => 'CINCO',
+      6 => 'SEIS',
+      7 => 'SIETE',
+      8 => 'OCHO',
+      9 => 'NUEVE',
+      10 => 'DIEZ',
+      11 => 'ONCE',
+      12 => 'DOCE',
+      13 => 'TRECE',
+      14 => 'CATORCE',
+      15 => 'QUINCE',
+      16 => 'DIECISÉIS',
+      17 => 'DIECISIETE',
+      18 => 'DIECIOCHO',
+      19 => 'DIECINUEVE',
+      20 => 'VEINTE',
+      21 => 'VEINTIUNO',
+      22 => 'VEINTIDÓS',
+      23 => 'VEINTITRÉS',
+      24 => 'VEINTICUATRO',
+      25 => 'VEINTICINCO',
+      26 => 'VEINTISÉIS',
+      27 => 'VEINTISIETE',
+      28 => 'VEINTIOCHO',
+      29 => 'VEINTINUEVE',
+    ];
+    if ($value < 30) {
+      return $units[$value];
+    }
+
+    $hundreds = [
+      1 => 'CIENTO',
+      2 => 'DOSCIENTOS',
+      3 => 'TRESCIENTOS',
+      4 => 'CUATROCIENTOS',
+      5 => 'QUINIENTOS',
+      6 => 'SEISCIENTOS',
+      7 => 'SETECIENTOS',
+      8 => 'OCHOCIENTOS',
+      9 => 'NOVECIENTOS',
+    ];
+    if ($value === 100) {
+      return 'CIEN';
+    }
+    if ($value >= 100) {
+      $hundred = intdiv($value, 100);
+      $rest = $value % 100;
+      return trim($hundreds[$hundred] . ($rest > 0 ? ' ' . $this->underThousandToSpanish($rest) : ''));
+    }
+
+    $tens = [
+      3 => 'TREINTA',
+      4 => 'CUARENTA',
+      5 => 'CINCUENTA',
+      6 => 'SESENTA',
+      7 => 'SETENTA',
+      8 => 'OCHENTA',
+      9 => 'NOVENTA',
+    ];
+    $ten = intdiv($value, 10);
+    $unit = $value % 10;
+    return $tens[$ten] . ($unit > 0 ? ' Y ' . $units[$unit] : '');
+  }
+
+  private function apocopateOne(string $text): string
+  {
+    $text = trim($text);
+    $text = preg_replace('/VEINTIUNO$/u', 'VEINTIÚN', $text) ?? $text;
+    $text = preg_replace('/ Y UNO$/u', ' Y UN', $text) ?? $text;
+    $text = preg_replace('/ UNO$/u', ' UN', $text) ?? $text;
+    return $text === 'UNO' ? 'UN' : $text;
   }
 
   /** @param array<int,mixed> $values */
