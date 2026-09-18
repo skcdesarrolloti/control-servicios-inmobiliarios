@@ -2380,58 +2380,59 @@
       var MAX_TOTAL = 30;
       var MAX_SOURCE_BYTES = 25 * 1024 * 1024;
 
-      if (!body._scmCorrectiveActionsBound) {
-        body._scmCorrectiveActionsBound = true;
-        body.addEventListener("click", function (event) {
-          var editBtn = event.target.closest("[data-corrective-edit-review]");
-          if (editBtn && body.contains(editBtn)) {
-            event.preventDefault();
-            var editData = new FormData();
-            editData.set("review_id", editBtn.dataset.correctiveEditReview || "");
-            request("edit", editData);
-            return;
-          }
-          var cancelEdit = event.target.closest("[data-corrective-cancel-edit]");
-          if (cancelEdit && body.contains(cancelEdit)) {
-            event.preventDefault();
-            request("read");
-            return;
-          }
-          var deleteBtn = event.target.closest("[data-corrective-delete-review]");
-          if (deleteBtn && body.contains(deleteBtn)) {
-            event.preventDefault();
-            var reviewId = deleteBtn.dataset.correctiveDeleteReview || "";
-            function deleteReview() {
-              var deleteData = new FormData();
-              deleteData.set("review_id", reviewId);
-              request("delete", deleteData);
-            }
-            if (window.Swal && typeof window.Swal.fire === "function") {
-              window.Swal.fire({
-                icon: "warning",
-                title: "Eliminar revisión #" + reviewId + "?",
-                text: "Esta acción borra el registro de la revisión correctiva del caso.",
-                input: "text",
-                inputLabel: "Escribe ELIMINAR para confirmar",
-                showCancelButton: true,
-                confirmButtonText: "Eliminar",
-                cancelButtonText: "Cancelar",
-                confirmButtonColor: "#b42318",
-                inputValidator: function (value) {
-                  return String(value || "").trim().toUpperCase() === "ELIMINAR" ? undefined : "Escribe ELIMINAR para confirmar.";
-                },
-              }).then(function (result) {
-                if (result && result.isConfirmed) deleteReview();
-              });
-              return;
-            }
-            if (window.confirm("¿Eliminar la revisión #" + reviewId + "? Esta acción no se puede deshacer.")) {
-              var typed = window.prompt("Escribe ELIMINAR para confirmar:", "") || "";
-              if (typed.trim().toUpperCase() === "ELIMINAR") deleteReview();
-            }
-          }
-        });
+      if (body._scmCorrectiveClickHandler) {
+        body.removeEventListener("click", body._scmCorrectiveClickHandler);
       }
+      body._scmCorrectiveClickHandler = function (event) {
+        var editBtn = event.target.closest("[data-corrective-edit-review]");
+        if (editBtn && body.contains(editBtn)) {
+          event.preventDefault();
+          var editData = new FormData();
+          editData.set("review_id", editBtn.dataset.correctiveEditReview || "");
+          request("edit", editData);
+          return;
+        }
+        var cancelEdit = event.target.closest("[data-corrective-cancel-edit]");
+        if (cancelEdit && body.contains(cancelEdit)) {
+          event.preventDefault();
+          request("read");
+          return;
+        }
+        var deleteBtn = event.target.closest("[data-corrective-delete-review]");
+        if (deleteBtn && body.contains(deleteBtn)) {
+          event.preventDefault();
+          var reviewId = deleteBtn.dataset.correctiveDeleteReview || "";
+          function deleteReview() {
+            var deleteData = new FormData();
+            deleteData.set("review_id", reviewId);
+            request("delete", deleteData);
+          }
+          if (window.Swal && typeof window.Swal.fire === "function") {
+            window.Swal.fire({
+              icon: "warning",
+              title: "Eliminar revisión #" + reviewId + "?",
+              text: "Esta acción borra el registro de la revisión correctiva del caso.",
+              input: "text",
+              inputLabel: "Escribe ELIMINAR para confirmar",
+              showCancelButton: true,
+              confirmButtonText: "Eliminar",
+              cancelButtonText: "Cancelar",
+              confirmButtonColor: "#b42318",
+              inputValidator: function (value) {
+                return String(value || "").trim().toUpperCase() === "ELIMINAR" ? undefined : "Escribe ELIMINAR para confirmar.";
+              },
+            }).then(function (result) {
+              if (result && result.isConfirmed) deleteReview();
+            });
+            return;
+          }
+          if (window.confirm("¿Eliminar la revisión #" + reviewId + "? Esta acción no se puede deshacer.")) {
+            var typed = window.prompt("Escribe ELIMINAR para confirmar:", "") || "";
+            if (typed.trim().toUpperCase() === "ELIMINAR") deleteReview();
+          }
+        }
+      };
+      body.addEventListener("click", body._scmCorrectiveClickHandler);
 
       Array.from(body.querySelectorAll("[data-corrective-review-create], [data-corrective-review-edit]")).forEach(function (form) {
         if (form._scmCorrectiveBound) return;

@@ -45,6 +45,7 @@ $checks = [
   'case modal has corrective review button' => is_string($js) && str_contains($js, 'data-scm-open-corrective-review'),
   'case modal changes corrective review button label when review exists' => is_string($js) && str_contains($js, 'hasCorrectiveReview') && str_contains($js, 'Gestionar revisi'),
   'corrective review modal exposes edit and delete actions' => is_string($js) && str_contains($js, 'data-corrective-edit-review') && str_contains($js, 'data-corrective-delete-review') && str_contains($js, 'data-corrective-review-edit'),
+  'corrective review edit actions rebind to the current modal request handler' => is_string($js) && str_contains($js, '_scmCorrectiveClickHandler') && str_contains($js, 'removeEventListener("click", body._scmCorrectiveClickHandler)') && !str_contains($js, '_scmCorrectiveActionsBound'),
   'corrective review modal syncs dynamic affected area fields' => is_string($js) && str_contains($js, 'syncCorrectiveAreaFields') && str_contains($js, 'data-corrective-indice'),
   'corrective review form keeps padded action spacing' => is_string($css) && str_contains($css, '.scm-corrective-review form > .scm-acta-actions') && str_contains($css, 'padding-top: 14px'),
   'maintenance rows mark their source tab' => is_string($maintenanceRows) && str_contains($maintenanceRows, 'data-tab-key="mantenimiento"'),
