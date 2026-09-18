@@ -1103,7 +1103,10 @@ trait WorkflowCommandsConcern
     if ($targetCotizacionId > 0) {
       $target = (string) $targetCotizacionId;
       if (!in_array($target, $cotIds, true)) {
-        return ['ok' => '0', 'message' => 'La cotizacion seleccionada no pertenece a este ticket.'];
+        $targetCotizacion = $this->fetchCotizacion($cotTable, $target);
+        if (!is_array($targetCotizacion) || !$this->cotizacionBelongsToTicket($ticket, $targetCotizacion, $ticketPk, $targetCotizacionId)) {
+          return ['ok' => '0', 'message' => 'La cotizacion seleccionada no pertenece a este ticket.'];
+        }
       }
       $cotIds = [$target];
     }

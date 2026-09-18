@@ -87,6 +87,7 @@ session_write_close();
     .scm-public-quote-alert.is-success{background:#ecfdf5;color:#047857;border-color:#a7f3d0}
     .scm-public-quote-alert.is-error{background:#fff1f2;color:#be123c;border-color:#fecdd3}
     .scm-public-quote-response-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}
+    .scm-public-quote-response-form [hidden]{display:none!important}
     .scm-public-quote-response-form label{display:flex;flex-direction:column;gap:6px;color:#475569;font-size:12px;font-weight:800}
     .scm-public-quote-response-form label.is-wide{grid-column:1/-1}
     .scm-public-quote-response-form input,.scm-public-quote-response-form select,.scm-public-quote-response-form textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:12px;padding:11px 12px;font:500 14px Poppins,Arial,sans-serif;color:#0f172a;background:#fff}
@@ -121,8 +122,14 @@ session_write_close();
           var value = state ? state.value : "";
           var isApproved = value === "Aprobada";
           var isRejected = value === "Desaprobada";
-          if (rejectWrap) rejectWrap.hidden = !isRejected;
-          if (approveWrap) approveWrap.hidden = !isApproved;
+          if (rejectWrap) {
+            rejectWrap.hidden = !isRejected;
+            rejectWrap.style.display = isRejected ? "" : "none";
+          }
+          if (approveWrap) {
+            approveWrap.hidden = !isApproved;
+            approveWrap.style.display = isApproved ? "" : "none";
+          }
           if (rejectSelect) {
             rejectSelect.disabled = !isRejected;
             rejectSelect.required = isRejected;
