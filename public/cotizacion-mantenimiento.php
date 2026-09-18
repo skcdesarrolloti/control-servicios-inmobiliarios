@@ -13,13 +13,14 @@ header('Cache-Control: no-store, private');
 header('Referrer-Policy: no-referrer');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
-header("Content-Security-Policy: default-src 'none'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self' https: data:; script-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'");
+header("Content-Security-Policy: default-src 'none'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self' https: data:; script-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'");
 header('X-Robots-Tag: noindex, nofollow');
 
 $escape = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $quoteId = (int) ($_GET['numero'] ?? $_GET['id_cotizacion'] ?? $_GET['id'] ?? 0);
 $expires = (int) ($_GET['expires'] ?? 0);
 $signature = is_string($_GET['sig'] ?? null) ? trim($_GET['sig']) : '';
+$responseNotice = '';
 $result = [
   'title' => 'Cotización de mantenimiento',
   'content' => '<article class="scm-cotizacion-native-doc"><section class="scm-cotizacion-native-section"><h2>No disponible</h2><p>No fue posible cargar la cotización.</p></section></article>',
@@ -38,6 +39,22 @@ try {
     http_response_code(403);
   } else {
     $app = new SuCasaControlServiciosInmobiliarios(App::db());
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string) ($_POST['scm_public_quote_response'] ?? '') === '1') {
+      if (!$hasValidPublicSignature) {
+        $responseNotice = '<div class="scm-public-quote-alert is-error">El enlace no es válido o está vencido. Solicita un nuevo enlace para responder.</div>';
+      } else {
+        $saved = $app->public_respond_cotizacion_mantenimiento(
+          $quoteId,
+          (string) ($_POST['estado'] ?? ''),
+          (string) ($_POST['observacion'] ?? ''),
+          (string) ($_POST['motivo'] ?? ''),
+          (string) ($_POST['financiacion'] ?? ''),
+          (string) ($_POST['responder_nombre'] ?? '')
+        );
+        $ok = (string) ($saved['ok'] ?? '0') === '1';
+        $responseNotice = '<div class="scm-public-quote-alert ' . ($ok ? 'is-success' : 'is-error') . '">' . $escape((string) ($saved['message'] ?? ($ok ? 'Respuesta guardada.' : 'No se pudo guardar la respuesta.'))) . '</div>';
+      }
+    }
     $result = $app->render_public_cotizacion_mantenimiento($quoteId);
     http_response_code((int) ($result['status'] ?? 200));
   }
@@ -66,6 +83,15 @@ session_write_close();
     .scm-public-quote-logo img{display:block;max-width:100%;max-height:48px;object-fit:contain}
     .scm-public-quote-head p{margin:0;color:#64748b;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
     .scm-public-quote-head strong{display:block;font-size:22px;color:#0b1f3a}
+    .scm-public-quote-alert{margin:0 0 16px;padding:13px 16px;border-radius:14px;font-weight:700;border:1px solid}
+    .scm-public-quote-alert.is-success{background:#ecfdf5;color:#047857;border-color:#a7f3d0}
+    .scm-public-quote-alert.is-error{background:#fff1f2;color:#be123c;border-color:#fecdd3}
+    .scm-public-quote-response-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}
+    .scm-public-quote-response-form label{display:flex;flex-direction:column;gap:6px;color:#475569;font-size:12px;font-weight:800}
+    .scm-public-quote-response-form label.is-wide{grid-column:1/-1}
+    .scm-public-quote-response-form input,.scm-public-quote-response-form select,.scm-public-quote-response-form textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:12px;padding:11px 12px;font:500 14px Poppins,Arial,sans-serif;color:#0f172a;background:#fff}
+    .scm-public-quote-response-form button{grid-column:1/-1;justify-self:start;border:0;border-radius:13px;background:#ff8a00;color:#fff;font:800 14px Poppins,Arial,sans-serif;padding:12px 18px;cursor:pointer}
+    @media (max-width:720px){.scm-public-quote-response-form{grid-template-columns:1fr}.scm-public-quote-head{align-items:flex-start;flex-direction:column}.scm-public-quote-logo{max-width:100%;width:170px}}
     @media print{body{background:#fff}#scm-app{max-width:none;padding:0}.scm-public-quote-head{box-shadow:none;border:0;margin-bottom:8px}.scm-cotizacion-native-audience{display:none!important}}
   </style>
 </head>
@@ -78,6 +104,7 @@ session_write_close();
         <strong><?= $escape((string) ($result['title'] ?? 'Cotización de mantenimiento')) ?></strong>
       </div>
     </header>
+    <?= $responseNotice ?>
     <?= (string) ($result['content'] ?? '') ?>
   </main>
 </body>

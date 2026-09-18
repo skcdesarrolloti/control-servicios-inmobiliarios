@@ -3161,6 +3161,429 @@ trait HandlesMaintenanceActions
     exit;
   }
 
+  public function ajax_handler_send_cotizacion_mantenimiento(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('abiertos') && !$this->canAccessDashboardTab('postergados') && !$this->canAccessDashboardTab('mis_tickets')) {
+      $this->jsonFail('No tienes permiso para enviar cotizaciones de mantenimiento.');
+    }
+
+    $cotizacionId = (int) ($_POST['id_cotizacion'] ?? $_POST['cotizacion_id'] ?? 0);
+    if ($cotizacionId <= 0) {
+      $this->jsonFail('Cotización inválida.');
+    }
+
+    try {
+      $schema = new \SCM\Support\SchemaInspector($this->db);
+      $quoteTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
+      $ticketTable = $this->db->table('jet_cct_tickets');
+      if (!$schema->tableExists($quoteTable)) {
+        throw new \DomainException('La tabla de cotizaciones no está disponible.');
+      }
+
+      $quote = $this->db->getRow("SELECT * FROM `{$quoteTable}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
+      if (!is_array($quote)) {
+        throw new \DomainException('Cotización no encontrada.');
+      }
+
+      $estadoActual = strtolower(trim((string) ($quote['estado'] ?? $quote['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
+      if (in_array($estadoActual, ['aprobada', 'aprobado', 'desaprobada', 'desaprobado'], true)) {
+        throw new \DomainException('Esta cotización ya tiene respuesta y no se puede enviar nuevamente.');
+      }
+      $yaEnviada = in_array(strtolower(trim((string) ($quote['se_envio'] ?? ''))), ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true);
+      if ($yaEnviada && $estadoActual === 'esperando respuesta') {
+        throw new \DomainException('Esta cotización ya fue enviada y está esperando respuesta.');
+      }
+
+      $destinatario = $this->maintenance_quote_clean($_POST['destinatario'] ?? ($quote['destinatario'] ?? ''));
+      $email = strtolower($this->maintenance_quote_clean($_POST['email_destinatario'] ?? ($quote['email_destinatario'] ?? '')));
+      $indicativo = $this->maintenance_quote_clean($_POST['indicativo_destinarario'] ?? ($quote['indicativo_destinarario'] ?? '57'));
+      $celular = $this->maintenance_quote_digits($_POST['celular_destinatario'] ?? ($quote['celular_destinatario'] ?? ''));
+      if ($destinatario === '') {
+        throw new \DomainException('Completa el nombre del destinatario antes de enviar.');
+      }
+      if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new \DomainException('Completa un correo válido del destinatario antes de enviar.');
+      }
+      $whatsappPhone = $this->maintenance_quote_whatsapp_phone($indicativo, $celular);
+      if ($whatsappPhone === '') {
+        throw new \DomainException('Completa un celular válido del destinatario antes de enviar por WhatsApp.');
+      }
+
+      $rows = $this->attach_cotizacion_orders([$quote]);
+      $quote = is_array($rows[0] ?? null) ? $rows[0] : $quote;
+      $orders = is_array($quote['_scm_ordenes'] ?? null) ? $quote['_scm_ordenes'] : [];
+      $pdf = $this->build_cotizacion_mantenimiento_pdf(array_merge($quote, [
+        'destinatario' => $destinatario,
+        'email_destinatario' => $email,
+        'celular_destinatario' => $celular,
+        'indicativo_destinarario' => $indicativo,
+      ]), $orders, 'destinatario');
+      $document = $this->maintenance_quote_store_pdf_document($pdf, $cotizacionId, 'destinatario');
+      $quoteUrl = self::signedMaintenanceQuotePublicUrl($cotizacionId);
+
+      $actor = $this->ticketCompletionActor();
+      $actorName = trim((string) ($actor['name'] ?? Auth::user())) ?: 'SKC SuCasa Inmobiliaria';
+      $actorEmail = trim((string) ($actor['email'] ?? ''));
+      $ticketRef = trim((string) ($quote['id_ticket'] ?? ''));
+      $total = $this->format_cop_currency($quote['total'] ?? 0);
+      $subject = 'Cotización de mantenimiento #' . $cotizacionId . ($ticketRef !== '' ? ' del caso #' . $ticketRef : '');
+
+      $content = '<p style="font-weight:600;margin:0 0 14px;">Apreciado(a) ' . \SCM\Support\EmailTemplate::e($destinatario) . ',</p>'
+        . '<p style="line-height:1.65;margin:0 0 14px;">Te compartimos la cotización de mantenimiento <b>#' . \SCM\Support\EmailTemplate::e((string) $cotizacionId) . '</b>' . ($ticketRef !== '' ? ' asociada al caso <b>#' . \SCM\Support\EmailTemplate::e($ticketRef) . '</b>' : '') . '.</p>'
+        . '<p style="line-height:1.65;margin:0 0 14px;">El valor total registrado es <b>' . \SCM\Support\EmailTemplate::e($total) . '</b>. Adjuntamos el PDF de la cotización y también puedes verla y responderla desde el botón seguro.</p>'
+        . '<p style="line-height:1.65;margin:0;">Cordialmente,<br><b>' . \SCM\Support\EmailTemplate::e($actorName) . '</b><br>SKC SuCasa Inmobiliaria</p>';
+      $html = \SCM\Support\EmailTemplate::render($subject, $content, [
+        'buttons' => [
+          ['url' => $quoteUrl, 'label' => 'Ver y responder cotización'],
+          ['url' => (string) ($document['url'] ?? ''), 'label' => 'Ver PDF'],
+        ],
+      ]);
+
+      $emailQueued = (new \SCM\Support\EmailQueue($this->db))->enqueue($email, $subject, $html, [
+        'source_module' => 'cotizaciones_mantenimiento_envio',
+        'destination_name' => $destinatario,
+        'dedupe_key' => 'cotizacion_mantenimiento_envio:' . $cotizacionId . ':' . time(),
+        'payload' => [
+          'attachments' => [[
+            'path' => (string) ($document['path'] ?? ''),
+            'name' => (string) ($document['attachment_name'] ?? 'cotizacion-mantenimiento-' . $cotizacionId . '.pdf'),
+          ]],
+          'reply_to' => $actorEmail,
+        ],
+        'meta' => [
+          'event' => 'cotizacion_mantenimiento_enviada',
+          'id_cotizacion' => $cotizacionId,
+          'id_ticket' => $ticketRef,
+          'quote_url' => $quoteUrl,
+          'pdf_url' => (string) ($document['url'] ?? ''),
+          'actor' => $actorName,
+        ],
+      ]);
+
+      $whatsappQueued = 0;
+      $smsQueue = new \SCM\Support\SmsQueue($this->db);
+      $buttonSuffix = $this->maintenance_quote_whatsapp_url_button_suffix($quoteUrl);
+      $message = "Buen día, {$destinatario}.\n\n";
+      $message .= "Te compartimos la cotización de mantenimiento #{$cotizacionId}" . ($ticketRef !== '' ? " del caso #{$ticketRef}" : '') . " por {$total}.\n\n";
+      $message .= "Puedes ver el PDF adjunto y responder la cotización desde el botón.\n\n";
+      $message .= "Enlace directo: {$quoteUrl}\n\n";
+      $message .= "Atentamente,\n{$actorName}\nSKC SuCasa Inmobiliaria";
+      $whatsappOk = $smsQueue->enqueue($whatsappPhone, $destinatario, $message, [
+        'source_module' => 'cotizaciones_mantenimiento_envio',
+        'campaign_tag' => 'cotizaciones_mantenimiento_envio',
+        'categoria_mensaje' => 'informacion',
+        'id_ticket' => $ticketRef,
+        'id_cotizacion' => $cotizacionId,
+        'quote_url' => $quoteUrl,
+        'pdf_url' => (string) ($document['url'] ?? ''),
+        'document_url' => (string) ($document['url'] ?? ''),
+        'document_filename' => (string) ($document['attachment_name'] ?? 'cotizacion-mantenimiento-' . $cotizacionId . '.pdf'),
+        'button_url_mode' => 'dynamic_suffix',
+        'dedupe_key' => 'cotizacion_mantenimiento_envio_whatsapp:' . $cotizacionId . ':' . time(),
+        'template_name' => 'scm_cotizacion_mantenimiento_envio_v1',
+        'template_language' => 'es_CO',
+        'template_components' => [
+          [
+            'type' => 'header',
+            'parameters' => [[
+              'type' => 'document',
+              'document' => [
+                'link' => (string) ($document['url'] ?? ''),
+                'filename' => (string) ($document['attachment_name'] ?? 'cotizacion-mantenimiento-' . $cotizacionId . '.pdf'),
+              ],
+            ]],
+          ],
+          [
+            'type' => 'body',
+            'parameters' => [
+              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($destinatario)],
+              ['type' => 'text', 'text' => (string) $cotizacionId],
+              ['type' => 'text', 'text' => $ticketRef !== '' ? $ticketRef : '-'],
+              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($total)],
+              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($actorName)],
+            ],
+          ],
+          [
+            'type' => 'button',
+            'sub_type' => 'url',
+            'index' => '0',
+            'parameters' => [
+              ['type' => 'text', 'text' => $buttonSuffix],
+            ],
+          ],
+        ],
+      ]);
+      $whatsappQueued = $whatsappOk ? 1 : 0;
+
+      if ($emailQueued <= 0 && $whatsappQueued <= 0) {
+        @unlink((string) ($document['path'] ?? ''));
+        throw new \DomainException('No se pudo encolar el correo ni el WhatsApp. La cotización quedó sin marcar como enviada.');
+      }
+
+      [$now, $nowSql] = $this->maintenance_quote_now_pair();
+      $employeeId = trim((string) ($actor['employee_id'] ?? ''));
+      if ($employeeId === '' && method_exists($this, 'current_employee_id')) {
+        $employeeId = trim((string) $this->current_employee_id());
+      }
+      if ($employeeId === '') {
+        $employeeId = (string) Auth::userId();
+      }
+
+      $quoteUpdate = [
+        'destinatario' => $destinatario,
+        'email_destinatario' => $email,
+        'celular_destinatario' => $celular,
+        'indicativo_destinarario' => $indicativo,
+        'se_envio' => 'Si',
+        'estado' => 'Esperando respuesta',
+        'estado_respuesta_cotizacion_mantenimiento' => 'Esperando respuesta',
+        'fecha_envio' => $now,
+        'fecha_respuesta' => 0,
+        'observacion_respuesta' => '',
+        'motivo' => '',
+        'cct_modified' => $nowSql,
+        'cct_author_id' => $employeeId,
+      ];
+      $quoteUpdate = $schema->filterTableData($quoteTable, $quoteUpdate);
+      if (!empty($quoteUpdate)) {
+        $this->db->update($quoteTable, $quoteUpdate, ['_ID' => $cotizacionId]);
+      }
+
+      $ticket = $this->maintenance_quote_ticket_row_for_quote($schema, $quote);
+      if (is_array($ticket) && $schema->tableExists($ticketTable)) {
+        $ticketUpdate = [
+          'fue_enviada_cotizacion_mantenimiento' => 'Si',
+          'estado_respuesta_cotizacion_mantenimiento' => 'Esperando respuesta',
+          'fecha_envio_cotizacion_mantenimiento' => $now,
+          'fecha_actualizacion' => $now,
+          'cct_modified' => $nowSql,
+        ];
+        $ticketUpdate = $schema->filterTableData($ticketTable, $ticketUpdate);
+        if (!empty($ticketUpdate)) {
+          $this->db->update($ticketTable, $ticketUpdate, ['_ID' => (int) ($ticket['_ID'] ?? 0)]);
+        }
+      }
+      $this->maintenance_quote_insert_send_histories($schema, $cotizacionId, array_merge($quote, $quoteUpdate), is_array($ticket) ? $ticket : [], $actor, $employeeId, $now, $nowSql);
+
+      $warnings = [];
+      if ($emailQueued <= 0) {
+        $warnings[] = 'correo no encolado';
+      }
+      if ($whatsappQueued <= 0) {
+        $warnings[] = 'WhatsApp no encolado';
+      }
+      $messageText = 'Cotización enviada. Correo en cola: ' . $emailQueued . '. WhatsApp en cola: ' . $whatsappQueued . '.';
+      if ($warnings !== []) {
+        $messageText .= ' Revisa: ' . implode(', ', $warnings) . '.';
+      }
+      $this->jsonOk([
+        'message' => $messageText,
+        'id_cotizacion' => (string) $cotizacionId,
+        'email_queued' => (string) $emailQueued,
+        'whatsapp_queued' => (string) $whatsappQueued,
+        'quote_url' => $quoteUrl,
+        'pdf_url' => (string) ($document['url'] ?? ''),
+      ]);
+    } catch (\DomainException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[cotizacion_mantenimiento_send] ' . $error->getMessage());
+      $this->jsonFail('No se pudo enviar la cotización.');
+    }
+  }
+
+  /** @return array<string,string> */
+  public function public_respond_cotizacion_mantenimiento(int $cotizacionId, string $estadoRaw, string $observacionRaw, string $motivoRaw = '', string $financiacionRaw = '', string $responderNameRaw = ''): array
+  {
+    if ($cotizacionId <= 0) {
+      return ['ok' => '0', 'message' => 'Cotización inválida.'];
+    }
+    $estado = trim(strip_tags($estadoRaw));
+    if (!in_array($estado, ['Aprobada', 'Desaprobada'], true)) {
+      return ['ok' => '0', 'message' => 'Selecciona si apruebas o desapruebas la cotización.'];
+    }
+    $observacion = trim(wp_kses_post($observacionRaw));
+    if ($observacion === '') {
+      $observacion = 'Respuesta registrada desde enlace público.';
+    }
+    $motivo = trim(strip_tags($motivoRaw));
+    if ($estado === 'Desaprobada' && $motivo === '') {
+      return ['ok' => '0', 'message' => 'Indica el motivo de la desaprobación.'];
+    }
+    $financiacion = $estado === 'Aprobada' ? trim(strip_tags($financiacionRaw)) : '';
+    $responderName = trim(strip_tags($responderNameRaw));
+    if ($responderName !== '') {
+      $observacion .= "\n\nRespondido por: " . $responderName;
+    }
+
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($table)) {
+      return ['ok' => '0', 'message' => 'La tabla de cotizaciones no está disponible.'];
+    }
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
+    if (!is_array($row)) {
+      return ['ok' => '0', 'message' => 'Cotización no encontrada.'];
+    }
+    $currentState = strtolower(trim((string) ($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
+    if (!in_array($currentState, ['', 'esperando respuesta'], true)) {
+      return ['ok' => '0', 'message' => 'Esta cotización ya fue respondida.'];
+    }
+    $ticketPk = (int) ($row['id_ticket'] ?? 0);
+    if ($ticketPk <= 0) {
+      return ['ok' => '0', 'message' => 'La cotización no tiene ticket asociado.'];
+    }
+    return $this->get_seguimiento_service()->saveCotizacionResponse($ticketPk, $estado, $observacion, $motivo, $financiacion, [], $cotizacionId);
+  }
+
+  /** @return array{path:string,url:string,name:string,attachment_name:string} */
+  private function maintenance_quote_store_pdf_document(\SCM\Support\SimplePdf $pdf, int $cotizacionId, string $audience): array
+  {
+    $dir = (string) SCM_UPLOAD_PATH;
+    if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
+      throw new \DomainException('No se pudo preparar el PDF para adjuntar.');
+    }
+    $name = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
+    $path = rtrim($dir, '/\\') . '/' . $name;
+    $pdf->save($path);
+    if (!is_file($path)) {
+      throw new \DomainException('No se pudo generar el PDF de la cotización.');
+    }
+    $attachmentName = 'cotizacion-mantenimiento-' . $cotizacionId . '-' . ($audience === 'destinatario' ? 'destinatario' : 'funcionario') . '.pdf';
+    return [
+      'path' => $path,
+      'url' => \SCM\Support\StoredFileService::fromRuntime()->urlFor($name),
+      'name' => $name,
+      'attachment_name' => $attachmentName,
+    ];
+  }
+
+  private function maintenance_quote_whatsapp_phone(string $indicativo, string $celular): string
+  {
+    $indicativoDigits = preg_replace('/\D+/', '', $indicativo) ?: '';
+    $phoneDigits = preg_replace('/\D+/', '', $celular) ?: '';
+    if ($phoneDigits === '') {
+      return '';
+    }
+    if (strlen($phoneDigits) > 10 || str_starts_with($phoneDigits, '57')) {
+      return '+' . ltrim($phoneDigits, '+');
+    }
+    if ($indicativoDigits === '') {
+      $indicativoDigits = '57';
+    }
+    return '+' . $indicativoDigits . $phoneDigits;
+  }
+
+  private function maintenance_quote_whatsapp_url_button_suffix(string $url): string
+  {
+    $parts = parse_url($url);
+    if (!is_array($parts)) {
+      return $url;
+    }
+    $host = strtolower((string) ($parts['host'] ?? ''));
+    $path = ltrim((string) ($parts['path'] ?? ''), '/');
+    $query = trim((string) ($parts['query'] ?? ''));
+    if ($host === 'sucasainmobiliaria.com.co' && $path !== '') {
+      return $path . ($query !== '' ? '?' . $query : '');
+    }
+    return $url;
+  }
+
+  private function maintenance_quote_whatsapp_text(string $text): string
+  {
+    $text = preg_replace('/[\r\n\t]+/', ' ', trim($text)) ?: '';
+    $text = preg_replace('/ {2,}/', ' ', $text) ?: $text;
+    return mb_substr($text !== '' ? $text : '-', 0, 900, 'UTF-8');
+  }
+
+  /** @param array<string,mixed> $quote @return array<string,mixed>|null */
+  private function maintenance_quote_ticket_row_for_quote(\SCM\Support\SchemaInspector $schema, array $quote): ?array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$schema->tableExists($table)) {
+      return null;
+    }
+    $ticketRef = trim((string) ($quote['id_ticket'] ?? ''));
+    if ($ticketRef === '') {
+      return null;
+    }
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [(int) $ticketRef]);
+    if (is_array($row)) {
+      return $row;
+    }
+    if ($schema->columnExists($table, 'id_ticket')) {
+      $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 1", [$ticketRef]);
+      if (is_array($row)) {
+        return $row;
+      }
+    }
+    return null;
+  }
+
+  /** @param array<string,mixed> $quote @param array<string,mixed> $ticket @param array<string,mixed> $actor */
+  private function maintenance_quote_insert_send_histories(\SCM\Support\SchemaInspector $schema, int $quoteId, array $quote, array $ticket, array $actor, string $employeeId, int $now, string $nowSql): void
+  {
+    $ticketRef = $this->maintenance_quote_first([$quote['id_ticket'] ?? '', $ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
+    $propertyRef = $this->maintenance_quote_first([$quote['id_inmueble'] ?? '', $quote['inmueble'] ?? '', $ticket['id_inmueble'] ?? '', $ticket['inmueble'] ?? '']);
+    $propertyDataRef = $this->maintenance_quote_first([$ticket['id_inmueble_data'] ?? '', $propertyRef]);
+    $actorName = trim((string) ($actor['name'] ?? Auth::user()));
+    $actorEmail = trim((string) ($actor['email'] ?? ''));
+    $actorPhone = trim((string) ($actor['phone'] ?? ''));
+    $destinatario = trim((string) ($quote['destinatario'] ?? 'destinatario'));
+    $message = 'Se envió la cotización de mantenimiento #' . $quoteId . ' a ' . ($destinatario !== '' ? $destinatario : 'destinatario') . ' por correo y WhatsApp. Quedó en Esperando respuesta.';
+
+    $histTicketTable = $this->db->table('jet_cct_historial_del_ticket');
+    if ($schema->tableExists($histTicketTable)) {
+      $payload = [
+        'cct_status' => 'publish',
+        'cct_author_id' => $employeeId,
+        'cct_created' => $nowSql,
+        'cct_modified' => $nowSql,
+        'id_ticket' => $ticketRef,
+        'fecha' => $now,
+        'nombre' => $actorName,
+        'correo' => $actorEmail,
+        'celular' => $actorPhone,
+        'respuesta' => $message,
+        'respuesta_cct_ticket' => $message,
+        'id_revision_correctiva' => trim((string) ($quote['id_revision'] ?? '')),
+        'id_cotizacion_mantenimiento' => (string) $quoteId,
+        'id_empleado' => $employeeId,
+        'estado_cotizacion' => 'Esperando respuesta',
+        'fue_editada' => 'Si',
+      ];
+      $payload = $schema->filterTableData($histTicketTable, $payload);
+      if (!empty($payload)) {
+        $this->db->insert($histTicketTable, $payload);
+      }
+    }
+
+    $histInmuebleTable = $this->db->table('jet_cct_historial_del_inmueble');
+    if ($schema->tableExists($histInmuebleTable)) {
+      $payload = [
+        'cct_status' => 'publish',
+        'cct_author_id' => $employeeId,
+        'cct_created' => $nowSql,
+        'cct_modified' => $nowSql,
+        'id_empleado' => $employeeId,
+        'id_inmueble' => $propertyRef,
+        'id_inmueble_data' => $propertyDataRef,
+        'fecha' => $now,
+        'tipo_de_reporte_his' => 'Mantenimiento',
+        'tipo_reporte' => 'Mantenimiento',
+        'observacion_his' => $message,
+        'observacion' => $message,
+        'funcionario' => $actorName,
+        'id_ticket' => $ticketRef,
+        'id_cotizacion_mantenimiento' => (string) $quoteId,
+      ];
+      $payload = $schema->filterTableData($histInmuebleTable, $payload);
+      if (!empty($payload)) {
+        $this->db->insert($histInmuebleTable, $payload);
+      }
+    }
+  }
+
   private function maintenance_order_can_manage(): bool
   {
     return $this->canAccessDashboardTab('cotizaciones_mantenimiento')

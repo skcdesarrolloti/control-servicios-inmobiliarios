@@ -382,6 +382,7 @@ trait RendersDashboard
         'cotizacion_order_save' => self::AJAX_COTIZACION_ORDER_SAVE,
         'cotizacion_order_response' => self::AJAX_COTIZACION_ORDER_RESPONSE,
         'cotizacion_pdf' => self::AJAX_COTIZACION_MANTENIMIENTO_PDF,
+        'send_cotizacion' => self::AJAX_SEND_COTIZACION_MANTENIMIENTO,
         'activate_ticket' => self::AJAX_ACTIVATE_TICKET,
         'cotizacion_response' => self::AJAX_COTIZACION_RESPONSE,
         'repair_followup_notice' => self::AJAX_REPAIR_FOLLOWUP_NOTICE,
@@ -3793,6 +3794,8 @@ trait RendersDashboard
     $fecha = $fechaTs > 0 ? date('d/m/Y', $fechaTs) : '-';
     $destinatario = trim((string) ($row['destinatario'] ?? '-'));
     $contacto = trim((string) ($row['celular_destinatario'] ?? '-'));
+    $emailDestinatario = trim((string) ($row['email_destinatario'] ?? ''));
+    $indicativoDestinatario = trim((string) ($row['indicativo_destinarario'] ?? '57'));
     $empleado = trim((string) ($row['coordinador'] ?? $row['creador'] ?? $row['id_empleado'] ?? '-'));
     $direccion = trim((string) ($row['direccion'] ?? '-'));
     $asuntoCaso = trim((string) ($row['asunto'] ?? $row['categoria_cotizacion'] ?? $row['tipo_mantenimiento'] ?? 'Cotizacion de mantenimiento'));
@@ -3864,6 +3867,7 @@ trait RendersDashboard
     $nativeCotizacionDestinatarioHtml = $this->render_native_cotizacion_mantenimiento_view($row, $orders, 'destinatario');
     $cotizacionSinResponder = in_array(strtolower($estado), ['', 'esperando respuesta'], true);
     $cotizacionEditable = !in_array(strtolower(trim($estado)), ['desaprobada', 'desaprobado'], true);
+    $cotizacionPuedeEnviarse = $id !== '' && $cotizacionEditable && !$enviada && $cotizacionSinResponder;
     $seguimientoReparacionesDisponible = $id !== '' && $ticket !== '' && $cotizacionSinResponder && $enviada && $fechaEnvioTs > 0 && $diasCalendarioSinRespuesta > 10;
     $caseDescription = 'Cotizacion de mantenimiento #' . ($id !== '' ? $id : '-') . ($ticket !== '' ? ' relacionada con el ticket #' . $ticket . '.' : '.');
     if ($direccion !== '' && $direccion !== '-') {
@@ -3926,6 +3930,7 @@ trait RendersDashboard
       . '<div class="scm-cotizacion-actions">'
       . ($id !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-native data-cotizacion-id="' . esc_attr($id) . '">Ver cotizaci&oacute;n</button>' : '')
       . ($id !== '' && $cotizacionEditable ? '<button type="button" class="scm-case-work-btn" data-scm-edit-cotizacion data-cotizacion-mode="edit" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Editar cotizaci&oacute;n</button>' : '')
+      . ($cotizacionPuedeEnviarse ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-send-cotizacion data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '" data-destinatario="' . esc_attr($destinatario !== '-' ? $destinatario : '') . '" data-email-destinatario="' . esc_attr($emailDestinatario) . '" data-celular-destinatario="' . esc_attr($contacto !== '-' ? $contacto : '') . '" data-indicativo-destinatario="' . esc_attr($indicativoDestinatario !== '' ? $indicativoDestinatario : '57') . '" data-total-cotizacion="' . esc_attr($totalCotizacion) . '">Enviar cotizaci&oacute;n</button>' : '')
       . $ticketCaseButton
       . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-view-cotizacion-orders>Ver &oacute;rdenes <span class="scm-action-count">' . esc_html((string) count($orders)) . '</span></button>' : '')
       . ($cotizacionSinResponder ? '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizaci&oacute;n</button>' : '')
@@ -4147,9 +4152,34 @@ trait RendersDashboard
 
     return [
       'title' => $title,
-      'content' => $this->render_native_cotizacion_mantenimiento_view($row, $orders, 'destinatario'),
+      'content' => $this->render_native_cotizacion_mantenimiento_view($row, $orders, 'destinatario') . $this->render_public_cotizacion_response_panel($row),
       'status' => 200,
     ];
+  }
+
+  /** @param array<string,mixed> $row */
+  private function render_public_cotizacion_response_panel(array $row): string
+  {
+    $id = trim((string) ($row['_ID'] ?? ''));
+    $estado = strtolower(trim((string) ($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
+    if ($id === '') {
+      return '';
+    }
+    if (!in_array($estado, ['', 'esperando respuesta'], true)) {
+      return '<section class="scm-cotizacion-native-section scm-public-quote-response"><h3>Respuesta registrada</h3><p>Esta cotización ya fue respondida como <strong>' . esc_html($this->cotizacion_clean_text($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '-')) . '</strong>.</p></section>';
+    }
+    $destinatario = $this->cotizacion_clean_text($row['destinatario'] ?? '');
+    return '<section class="scm-cotizacion-native-section scm-public-quote-response"><h3>Responder cotización</h3>'
+      . '<p>Selecciona tu respuesta para que el equipo de SKC SuCasa Inmobiliaria pueda continuar el proceso.</p>'
+      . '<form method="post" class="scm-public-quote-response-form">'
+      . '<input type="hidden" name="scm_public_quote_response" value="1">'
+      . '<label><span>Nombre de quien responde</span><input type="text" name="responder_nombre" value="' . esc_attr($destinatario) . '" placeholder="Nombre completo"></label>'
+      . '<label><span>Respuesta *</span><select name="estado" required><option value="">Selecciona</option><option value="Aprobada">Aprobar cotización</option><option value="Desaprobada">Desaprobar cotización</option></select></label>'
+      . '<label><span>Motivo si desapruebas</span><select name="motivo"><option value="">No aplica</option><option value="Por costo">Por costo</option><option value="Ejecución por cuenta propia">Ejecución por cuenta propia</option></select></label>'
+      . '<label><span>Financiación si apruebas</span><select name="financiacion"><option value="">No aplica / sin respuesta</option><option value="Si">Sí</option><option value="No">No</option></select></label>'
+      . '<label class="is-wide"><span>Observaciones</span><textarea name="observacion" rows="4" placeholder="Agrega observaciones si deseas complementar la respuesta."></textarea></label>'
+      . '<button type="submit">Guardar respuesta</button>'
+      . '</form></section>';
   }
 
   /** @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders */

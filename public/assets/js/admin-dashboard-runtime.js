@@ -152,6 +152,7 @@
     var actionCotizacionOrderSave = actions.cotizacion_order_save || "";
     var actionCotizacionOrderResponse = actions.cotizacion_order_response || "";
     var actionCotizacionPdf = actions.cotizacion_pdf || "";
+    var actionSendCotizacion = actions.send_cotizacion || "";
     var actionActivateTicket = actions.activate_ticket || "";
     var actionCloseTicket = actions.close_ticket || "";
     var actionContactsUpdate = actions.contacts_update || "";
@@ -15085,6 +15086,107 @@
       });
     }
 
+    function openSendCotizacionModal(button, options) {
+      options = options || {};
+      var cotizacionId = button ? button.getAttribute("data-cotizacion-id") || "" : "";
+      var ticketPk = button ? button.getAttribute("data-ticket-pk") || "" : "";
+      var destinatario = button ? button.getAttribute("data-destinatario") || "" : "";
+      var email = button ? button.getAttribute("data-email-destinatario") || "" : "";
+      var celular = button ? button.getAttribute("data-celular-destinatario") || "" : "";
+      var indicativo = button ? button.getAttribute("data-indicativo-destinatario") || "57" : "57";
+      var total = button ? button.getAttribute("data-total-cotizacion") || "-" : "-";
+      if (!ajaxUrl || !actionSendCotizacion || !cotizacionId || !window.Swal) {
+        showToast("error", "No se pudo abrir el envío de la cotización.");
+        if (typeof options.onClose === "function") options.onClose();
+        return Promise.resolve(false);
+      }
+      return window.Swal.fire({
+        title: "Enviar cotización #" + cotizacionId,
+        html:
+          '<div class="scm-cotizacion-response-form"><p class="scm-cotizacion-dialog-intro">Se encolará el correo con el PDF adjunto y un WhatsApp con el PDF y botón seguro para ver y responder la cotización.</p>' +
+          '<div class="scm-cotizacion-response-grid">' +
+          '<div class="scm-cotizacion-dialog-field"><span>Total</span><strong>' + escHtml(total || "-") + '</strong></div>' +
+          '<label class="scm-cotizacion-dialog-field"><span>Destinatario <em>*</em></span><input id="swal-send-cot-destinatario" type="text" value="' + escHtml(destinatario) + '" placeholder="Nombre del destinatario"></label>' +
+          '<label class="scm-cotizacion-dialog-field"><span>Correo <em>*</em></span><input id="swal-send-cot-email" type="email" value="' + escHtml(email) + '" placeholder="correo@dominio.com"></label>' +
+          '<label class="scm-cotizacion-dialog-field"><span>Indicativo</span><input id="swal-send-cot-indicativo" type="text" value="' + escHtml(indicativo || "57") + '" placeholder="57"></label>' +
+          '<label class="scm-cotizacion-dialog-field"><span>Celular WhatsApp <em>*</em></span><input id="swal-send-cot-celular" type="tel" value="' + escHtml(celular) + '" placeholder="3001234567"></label>' +
+          '</div></div>',
+        width: "min(760px, 94vw)",
+        showCloseButton: true,
+        showCancelButton: true,
+        allowOutsideClick: false,
+        allowEscapeKey: true,
+        confirmButtonText: "Enviar por correo y WhatsApp",
+        cancelButtonText: "Cancelar",
+        buttonsStyling: false,
+        focusConfirm: false,
+        returnFocus: true,
+        customClass: {
+          popup: "scm-cotizacion-dialog scm-cotizacion-response-swal",
+          title: "scm-cotizacion-dialog-title",
+          htmlContainer: "scm-cotizacion-dialog-body",
+          actions: "scm-cotizacion-dialog-actions",
+          confirmButton: "scm-cotizacion-dialog-confirm",
+          cancelButton: "scm-cotizacion-dialog-cancel",
+          closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+        },
+        didOpen: function () {
+          var first = document.getElementById("swal-send-cot-destinatario");
+          if (first) first.focus();
+        },
+        preConfirm: function () {
+          var dest = document.getElementById("swal-send-cot-destinatario");
+          var mail = document.getElementById("swal-send-cot-email");
+          var ind = document.getElementById("swal-send-cot-indicativo");
+          var cell = document.getElementById("swal-send-cot-celular");
+          var destValue = dest ? dest.value.trim() : "";
+          var mailValue = mail ? mail.value.trim() : "";
+          var cellValue = cell ? cell.value.trim() : "";
+          if (!destValue) {
+            window.Swal.showValidationMessage("Completa el destinatario.");
+            return false;
+          }
+          if (!mailValue || mailValue.indexOf("@") === -1) {
+            window.Swal.showValidationMessage("Completa un correo válido.");
+            return false;
+          }
+          if (!cellValue || cellValue.replace(/\D+/g, "").length < 7) {
+            window.Swal.showValidationMessage("Completa un celular válido para WhatsApp.");
+            return false;
+          }
+          return {
+            destinatario: destValue,
+            email: mailValue,
+            indicativo: ind ? ind.value.trim() : "57",
+            celular: cellValue,
+          };
+        },
+      }).then(function (res) {
+        if (!res.isConfirmed) {
+          if (typeof options.onClose === "function") options.onClose();
+          return false;
+        }
+        var data = res.value || {};
+        var fd = new FormData();
+        fd.append("id_cotizacion", cotizacionId);
+        fd.append("ticket_pk", ticketPk);
+        fd.append("destinatario", data.destinatario || "");
+        fd.append("email_destinatario", data.email || "");
+        fd.append("indicativo_destinarario", data.indicativo || "57");
+        fd.append("celular_destinatario", data.celular || "");
+        return submitCotizacionAction(
+          fd,
+          actionSendCotizacion,
+          "Error enviando la cotización.",
+        ).then(function (saved) {
+          if (saved && typeof options.onClose === "function") {
+            options.onClose(260);
+          }
+          return saved;
+        });
+      });
+    }
+
     function openCotizacionOrdersModal(card, options) {
       options = options || {};
       var source = card ? card.querySelector(".scm-cotizacion-orders-source") : null;
@@ -15405,7 +15507,7 @@
                   return;
                 }
                 var actionBtn = event.target && event.target.closest
-                  ? event.target.closest("[data-scm-cotizacion-response-standalone], [data-scm-approve-cotizacion], [data-scm-delete-cotizacion], [data-scm-repair-followup-notice]")
+                  ? event.target.closest("[data-scm-send-cotizacion], [data-scm-cotizacion-response-standalone], [data-scm-approve-cotizacion], [data-scm-delete-cotizacion], [data-scm-repair-followup-notice]")
                   : null;
                 if (actionBtn) {
                   event.preventDefault();
@@ -15413,7 +15515,9 @@
                   var returnContext = {
                     reopen: makeCaseCotizacionesReturn(button),
                   };
-                  if (actionBtn.matches("[data-scm-cotizacion-response-standalone]")) {
+                  if (actionBtn.matches("[data-scm-send-cotizacion]")) {
+                    triggerCotizacionRootAction(actionCard, "[data-scm-send-cotizacion]", returnContext);
+                  } else if (actionBtn.matches("[data-scm-cotizacion-response-standalone]")) {
                     triggerCotizacionRootAction(actionCard, "[data-scm-cotizacion-response-standalone]", returnContext);
                   } else if (actionBtn.matches("[data-scm-approve-cotizacion]")) {
                     triggerCotizacionRootAction(actionCard, "[data-scm-approve-cotizacion]", returnContext);
@@ -15563,6 +15667,22 @@
       if (respondCotizacionOrderBtn) {
         e.preventDefault();
         openCotizacionOrderResponseModal(respondCotizacionOrderBtn);
+        return;
+      }
+
+      var sendCotizacionBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-send-cotizacion]")
+          : null;
+      if (sendCotizacionBtn) {
+        e.preventDefault();
+        var sendReturnContext = sendCotizacionBtn._scmCaseCotizacionesReturn || null;
+        sendCotizacionBtn._scmCaseCotizacionesReturn = null;
+        openSendCotizacionModal(sendCotizacionBtn, {
+          onClose: sendReturnContext && typeof sendReturnContext.reopen === "function"
+            ? sendReturnContext.reopen
+            : null,
+        });
         return;
       }
 

@@ -748,7 +748,7 @@ trait HandlesTicketWorkflowActions
     if ($estado === 'Desaprobada' && $motivo === '') {
       $this->jsonFail('Indica el motivo cuando la cotizacion fue desaprobada.');
     }
-    if ($estado === 'Desaprobada' && !in_array($motivo, ['Por costo', 'Ejecucción por cuenta propia'], true)) {
+    if ($estado === 'Desaprobada' && !in_array($motivo, ['Por costo', 'Ejecución por cuenta propia', 'Ejecucción por cuenta propia'], true)) {
       $this->jsonFail('Selecciona un motivo valido para cotizacion desaprobada.');
     }
     if ($estado !== 'Aprobada') {

@@ -1,0 +1,32 @@
+{
+  "name": "scm_cotizacion_mantenimiento_envio_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "DOCUMENT",
+      "example": {
+        "header_handle": ["cotizacion-mantenimiento-ejemplo.pdf"]
+      }
+    },
+    {
+      "type": "BODY",
+      "text": "Buen día, {{1}}.\n\nTe compartimos la cotización de mantenimiento #{{2}} del caso #{{3}} por {{4}}.\n\nPuedes ver el PDF adjunto y responder la cotización desde el botón.\n\nAtentamente,\n{{5}}\nSKC SuCasa Inmobiliaria",
+      "example": {
+        "body_text": [["María Pérez", "552", "10676", "$ 250.000", "Royner Guardo"]]
+      }
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver y responder",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": ["control-servicios-inmobiliarios/public/cotizacion-mantenimiento.php?numero=552&expires=1789680400&sig=abc123"]
+        }
+      ]
+    }
+  ]
+}
