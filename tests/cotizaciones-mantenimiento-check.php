@@ -197,6 +197,7 @@ $checks = [
   'repair followup whatsapp button sends dynamic suffix expected by Meta' => str_contains($notificationDelivery, '$buttonSuffix = $this->whatsappUrlButtonSuffix($noticeUrl)') && str_contains($notificationDelivery, "'button_url_mode' => 'dynamic_suffix'") && str_contains($notificationDelivery, "['type' => 'text', 'text' => \$buttonSuffix]"),
   'repair followup whatsapp template documents url placeholder without encoded braces' => str_contains($repairFollowupTemplate, 'https://sucasainmobiliaria.com.co/{{1}}') && !str_contains($repairFollowupTemplate, '%7B%7B1%7D%7D'),
   'maintenance material quote rows stay responsive on narrow screens' => str_contains($adminCss, '@media (max-width: 680px)') && str_contains($adminCss, '[data-quote-repeater="materiales_soporte"] .scm-maint-quote-row') && str_contains($adminCss, 'grid-template-columns: minmax(0, 1fr) !important') && str_contains($adminCss, '.scm-maint-quote-generate') && str_contains($adminCss, 'width: calc(100vw - 16px) !important'),
+  'case popup collapses to one column on mobile screens' => str_contains($adminCss, '@media (max-width: 640px)') && str_contains($adminCss, '#scm-app .scm-case-modal.open .scm-case-layout') && str_contains($adminCss, 'grid-template-columns: minmax(0, 1fr) !important') && str_contains($adminCss, '#scm-app .scm-case-head-actions') && str_contains($adminCss, 'width: calc(100vw - 16px) !important'),
 ];
 
 $failed = [];

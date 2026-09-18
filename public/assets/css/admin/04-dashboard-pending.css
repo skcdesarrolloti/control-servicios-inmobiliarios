@@ -6970,6 +6970,91 @@
   }
 }
 
+@media (max-width: 640px) {
+  #scm-app .scm-case-modal {
+    padding: 8px !important;
+  }
+
+  #scm-app .scm-case-dialog {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    min-width: 0 !important;
+    max-height: calc(100dvh - 16px);
+    border-radius: 14px !important;
+  }
+
+  #scm-app .scm-case-close {
+    top: 10px !important;
+    right: 10px !important;
+  }
+
+  #scm-app .scm-case-modal.open .scm-case-head {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px !important;
+    padding: 18px 58px 18px 18px !important;
+  }
+
+  #scm-app .scm-case-head > div:first-child,
+  #scm-app .scm-case-head-actions,
+  #scm-app .scm-case-head-meta {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #scm-app .scm-case-head h3 {
+    font-size: 24px !important;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+  }
+
+  #scm-app .scm-case-head p {
+    font-size: 16px !important;
+    overflow-wrap: anywhere;
+  }
+
+  #scm-app .scm-case-head-actions {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  #scm-app .scm-case-head-actions .scm-case-side-link {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+    text-align: center;
+    white-space: normal;
+  }
+
+  #scm-app .scm-case-modal.open .scm-case-body {
+    padding: 14px !important;
+    overflow-x: hidden !important;
+  }
+
+  #scm-app .scm-case-modal.open .scm-case-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 14px !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  #scm-app .scm-case-sidebar,
+  #scm-app .scm-case-main,
+  #scm-app .scm-case-main > *,
+  #scm-app .scm-case-main img,
+  #scm-app .scm-case-main iframe {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #scm-app .scm-case-sidebar {
+    padding: 10px !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-confirm,
   .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-cancel,
