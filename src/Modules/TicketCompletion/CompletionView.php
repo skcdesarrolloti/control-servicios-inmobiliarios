@@ -41,7 +41,8 @@ final class CompletionView
     $signerName = (string) ($formPayload['signer']['name'] ?? '');
     $selectedChannels = (array) ($formPayload['channels'] ?? []);
     $selectedChannel = count($selectedChannels) > 1 ? 'both' : (string) ($selectedChannels[0] ?? 'email');
-    $formItems = is_array($formPayload['items'] ?? null) && $formPayload['items'] ? $formPayload['items'] : [[]];
+    $suggestedItems = is_array($context['suggested_items'] ?? null) ? $context['suggested_items'] : [];
+    $formItems = is_array($formPayload['items'] ?? null) && $formPayload['items'] ? $formPayload['items'] : ($suggestedItems ?: [[]]);
     $formObservations = (string) ($formPayload['observations'] ?? '');
     $sourceFlow = is_array($formPayload['source'] ?? null) ? $formPayload['source'] : (is_array($context['source_flow'] ?? null) ? $context['source_flow'] : []);
     $sourceName = (string) ($sourceFlow['flow'] ?? 'ticket_solution');

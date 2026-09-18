@@ -10,6 +10,8 @@ $handler = (string) file_get_contents($root . '/src/App/Concerns/HandlesMaintena
 $runtimeJs = (string) file_get_contents($root . '/public/assets/js/admin-dashboard-runtime.js');
 $adminJs = (string) file_get_contents($root . '/public/assets/js/scm-admin.js');
 $ticketCompletionJs = (string) file_get_contents($root . '/public/assets/js/ticket-completion-create.js');
+$ticketCompletionService = (string) file_get_contents($root . '/src/Modules/TicketCompletion/CompletionService.php');
+$ticketCompletionView = (string) file_get_contents($root . '/src/Modules/TicketCompletion/CompletionView.php');
 $adminCss = (string) file_get_contents($root . '/public/assets/css/admin/04-dashboard-pending.css');
 $publicOrder = (string) file_get_contents($root . '/public/orden-publica.php');
 $publicOrderCss = (string) file_get_contents($root . '/public/assets/css/public-order-response.css');
@@ -38,6 +40,8 @@ $nativeLaborBudgetPos = strpos($dashboard, "render_cotizacion_budget_rows('Mano 
 $perturbDataBoxPos = strpos($runtimeJs, 'Datos cargados desde inmuebles:');
 $perturbConditionsPos = strpos($runtimeJs, 'scm-maint-quote-conditions-box');
 $perturbTypePos = strpos($runtimeJs, '0. Tipo de valoración');
+$actaUnderComplementaryActions = preg_match('/Editar magnitud caso<\/button>\',\s+\'<button type="button" class="scm-case-work-btn" data-scm-open-ticket-acta>Acta de solución y firma<\/button>\'/u', $adminJs) === 1;
+$actaStillUnderMainActions = preg_match('/data-scm-open-ticket-response>Responder ticket<\/button>\',\s+\'<button type="button" class="scm-case-work-btn" data-scm-open-ticket-acta>Acta de solución y firma<\/button>\'/u', $adminJs) === 1;
 
 $checks = [
   'app defines approve quote action' => str_contains($app, "AJAX_APPROVE_COTIZACION") && str_contains($app, "scm_aprobar_cotizacion_mantenimiento"),
@@ -78,6 +82,8 @@ $checks = [
   'case popup loads all quotes for the case instead of using one quote id' => str_contains($adminJs, 'data-scm-view-case-cotizaciones') && str_contains($runtimeJs, 'loadCotizacionCardsByTicket') && str_contains($runtimeJs, 'scmqt_ticket_exact'),
   'case quote selector delegates actions to the selected quote card' => str_contains($runtimeJs, 'scm-case-cotizaciones-modal') && str_contains($runtimeJs, 'triggerCotizacionRootAction') && str_contains($runtimeJs, 'Las acciones se aplican sobre el número de cotización elegido.'),
   'case popup exposes clean create quote for eligible maintenance cases even when quotes exist' => str_contains($adminJs, 'caseCanCreateMaintenanceQuote') && str_contains($adminJs, 'data-scm-create-cotizacion') && str_contains($adminJs, 'data-scm-clear-cotizacion-create-draft') && str_contains($adminJs, 'A&ntilde;adir nueva cotizaci&oacute;n') && str_contains($adminJs, 'prevEncontroDanos') && !str_contains($adminJs, '} else if (!isPublicPqr && caseCanCreateMaintenanceQuote(btn))'),
+  'case popup places solution act under complementary actions' => $actaUnderComplementaryActions && !$actaStillUnderMainActions,
+  'ticket completion preloads damage from corrective or preventive review without replacing drafts' => str_contains($ticketCompletionService, 'suggestedItemsForTicket') && str_contains($ticketCompletionService, 'jet_cct_revision_correctiva') && str_contains($ticketCompletionService, 'evaluacion_de_danos') && str_contains($ticketCompletionService, 'jet_cct_revision_preventiva') && str_contains($ticketCompletionView, '$suggestedItems') && str_contains($ticketCompletionView, '$formPayload[\'items\']') && str_contains($ticketCompletionView, '$suggestedItems ?: [[]]'),
   'maintenance case cards carry preventive damage flag' => str_contains((string) file_get_contents($root . '/src/Modules/ServiciosInmobiliarios/Concerns/TableRowsConcern.php'), 'data-prev-encontro-danos') && str_contains((string) file_get_contents($root . '/src/Views/GenericTicketsCardView.php'), 'data-prev-encontro-danos') && str_contains((string) file_get_contents($root . '/src/Modules/Pending/PendingView.php'), 'data-prev-encontro-danos'),
   'case quote selector keeps modal cards styled outside app shell' => str_contains($runtimeJs, 'scm-case-cotizaciones-list') && str_contains($runtimeJs, 'scm-case-cotizacion-card') && str_contains($adminCss, '.scm-case-cotizaciones-modal .scm-cotizacion-card') && str_contains($adminCss, '.scm-case-cotizaciones-modal .scm-case-work-btn'),
   'case quote selector reopens after child modal actions' => str_contains($runtimeJs, 'makeCaseCotizacionesReturn') && str_contains($runtimeJs, 'reopenCaseCotizacionesAfter') && str_contains($runtimeJs, '_scmCaseCotizacionesReturn') && str_contains($runtimeJs, 'responseReturnContext.reopen') && str_contains($runtimeJs, 'approveReturnContext.reopen') && str_contains($runtimeJs, 'deleteReturnContext.reopen'),

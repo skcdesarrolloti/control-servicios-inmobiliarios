@@ -63,7 +63,246 @@ final class CompletionService
       'acts' => $this->repo->history($ticketId),
       'branch_contact' => $this->branchContact($ticket),
       'source_flow' => $sourceFlow,
+      'suggested_items' => $this->suggestedItemsForTicket($ticket),
     ];
+  }
+
+  /** @return array<int,array{damage:string,solution:string}> */
+  private function suggestedItemsForTicket(array $ticket): array
+  {
+    $items = $this->suggestedItemsFromCorrectiveReview((string) ($ticket['id_revision_correctiva'] ?? ''));
+    if ($items !== []) {
+      return $items;
+    }
+
+    $items = $this->suggestedItemsFromPreventiveReview((string) ($ticket['id_revision_preventiva'] ?? ''), $ticket);
+    if ($items !== []) {
+      return $items;
+    }
+
+    return [];
+  }
+
+  /** @return array<int,array{damage:string,solution:string}> */
+  private function suggestedItemsFromCorrectiveReview(string $rawIds): array
+  {
+    $rows = $this->linkedRowsByIds('jet_cct_revision_correctiva', $rawIds);
+    $items = [];
+    foreach ($rows as $row) {
+      $stored = $this->decodeStoredItems($row['evaluacion_de_danos'] ?? null);
+      foreach ($stored as $item) {
+        if (!is_array($item)) {
+          continue;
+        }
+        $damage = $this->correctiveDamageText($item);
+        if ($damage !== '') {
+          $items[] = ['damage' => $damage, 'solution' => ''];
+        }
+      }
+      if ($stored === []) {
+        $damage = $this->linkedRecordDamageText($row, [
+          'descripcion_dano',
+          'descripcion_daño',
+          'dano_encontrado',
+          'daño_encontrado',
+          'descripcion',
+          'area_afectada',
+          'observacion',
+          'observaciones',
+        ]);
+        if ($damage !== '') {
+          $items[] = ['damage' => $damage, 'solution' => ''];
+        }
+      }
+    }
+
+    return $this->uniqueSuggestedItems($items);
+  }
+
+  /** @return array<int,array{damage:string,solution:string}> */
+  private function suggestedItemsFromPreventiveReview(string $rawIds, array $ticket): array
+  {
+    $rows = $this->linkedRowsByIds('jet_cct_revision_preventiva', $rawIds);
+    $items = [];
+    foreach ($rows as $row) {
+      $damageFlag = $this->firstTextFromRow($row, ['encontro_danos', 'tiene_cotizacion', 'se_encontraron_danos']);
+      if ($damageFlag !== '' && !$this->isPositiveDamageFlag($damageFlag)) {
+        continue;
+      }
+      $damage = $this->linkedRecordDamageText($row, [
+        'descripcion_dano',
+        'descripcion_daño',
+        'dano_encontrado',
+        'daño_encontrado',
+        'danos_encontrados',
+        'daños_encontrados',
+        'hallazgos',
+        'novedad',
+        'observacion',
+        'observaciones',
+        'descripcion',
+        'area_afectada',
+      ]);
+      if ($damage !== '') {
+        $items[] = ['damage' => $damage, 'solution' => ''];
+      }
+    }
+
+    if ($items === [] && $this->isPositiveDamageFlag((string) ($ticket['se_encontraron_danos'] ?? $ticket['_scm_prev_encontro_danos'] ?? ''))) {
+      $damage = $this->linkedRecordDamageText($ticket, [
+        'descripcion',
+        'asunto',
+        'area_afectada',
+        'observacion',
+        'observaciones',
+      ]);
+      if ($damage !== '') {
+        $items[] = ['damage' => $damage, 'solution' => ''];
+      }
+    }
+
+    return $this->uniqueSuggestedItems($items);
+  }
+
+  /** @return array<int,array<string,mixed>> */
+  private function linkedRowsByIds(string $tableName, string $rawIds): array
+  {
+    $ids = $this->linkedNumericIds($rawIds);
+    if ($ids === []) {
+      return [];
+    }
+    $table = $this->repo->db->table($tableName);
+    if (!$this->repo->schema->tableExists($table) || !$this->repo->schema->columnExists($table, '_ID')) {
+      return [];
+    }
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    return $this->repo->db->getResults("SELECT * FROM `{$table}` WHERE `_ID` IN ({$placeholders}) ORDER BY `_ID` DESC", $ids);
+  }
+
+  /** @return int[] */
+  private function linkedNumericIds(string $raw): array
+  {
+    preg_match_all('/\d+/', $raw, $matches);
+    $ids = [];
+    foreach ($matches[0] ?? [] as $id) {
+      $num = (int) $id;
+      if ($num > 0) {
+        $ids[$num] = $num;
+      }
+    }
+    return array_values($ids);
+  }
+
+  /** @return array<int,mixed> */
+  private function decodeStoredItems(mixed $raw): array
+  {
+    if (is_array($raw)) {
+      return array_values($raw);
+    }
+    $text = trim((string) $raw);
+    if ($text === '') {
+      return [];
+    }
+    $decoded = @unserialize($text, ['allowed_classes' => false]);
+    if (is_array($decoded)) {
+      return array_values($decoded);
+    }
+    $json = json_decode($text, true);
+    return is_array($json) ? array_values($json) : [];
+  }
+
+  private function correctiveDamageText(array $item): string
+  {
+    $area = $this->firstTextFromRow($item, ['area_afectada', 'area_afectada_1', 'area_afectada_2', 'area_afectada_3', 'area_afectada_4']);
+    $parts = [
+      'Área afectada' => $area,
+      'Descripción del daño' => $this->firstTextFromRow($item, ['descripcion_dano', 'descripcion_daño', 'descripcion']),
+      'Consecuencia' => $this->firstTextFromRow($item, ['consecuencia']),
+      'Nivel del daño' => $this->firstTextFromRow($item, ['nivel_dano', 'nivel_daño']),
+      'Tiempo de atención' => $this->firstTextFromRow($item, ['tiempo_atencion']),
+      'Corresponde a' => $this->firstTextFromRow($item, ['a_quien_corresponde']),
+    ];
+    return $this->labelledText($parts);
+  }
+
+  /** @param string[] $columns */
+  private function linkedRecordDamageText(array $row, array $columns): string
+  {
+    $parts = [];
+    foreach ($columns as $column) {
+      $value = $this->cleanSuggestionText($row[$column] ?? '');
+      if ($value === '') {
+        continue;
+      }
+      $label = ucfirst(str_replace('_', ' ', str_replace(['dano', 'danos'], ['daño', 'daños'], $column)));
+      $parts[$label] = $value;
+    }
+    return $this->labelledText($parts);
+  }
+
+  /** @param string[] $columns */
+  private function firstTextFromRow(array $row, array $columns): string
+  {
+    foreach ($columns as $column) {
+      $value = $this->cleanSuggestionText($row[$column] ?? '');
+      if ($value !== '') {
+        return $value;
+      }
+    }
+    return '';
+  }
+
+  /** @param array<string,string> $parts */
+  private function labelledText(array $parts): string
+  {
+    $lines = [];
+    foreach ($parts as $label => $value) {
+      $value = $this->cleanSuggestionText($value);
+      if ($value !== '') {
+        $lines[] = $label . ': ' . $value;
+      }
+    }
+    return implode("\n", array_values(array_unique($lines)));
+  }
+
+  private function cleanSuggestionText(mixed $value): string
+  {
+    if (is_array($value) || is_object($value)) {
+      return '';
+    }
+    $text = html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = preg_replace('/[ \t\x{00A0}]+/u', ' ', $text) ?? '';
+    $text = preg_replace('/\R\s*/u', "\n", $text) ?? '';
+    return trim($text);
+  }
+
+  private function isPositiveDamageFlag(string $value): bool
+  {
+    $value = strtolower(strtr(trim($value), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u']));
+    return in_array($value, ['si', '1', 'true', 'yes', 'con dano', 'con danos', 'con daño', 'con daños'], true);
+  }
+
+  /** @param array<int,array{damage:string,solution:string}> $items @return array<int,array{damage:string,solution:string}> */
+  private function uniqueSuggestedItems(array $items): array
+  {
+    $out = [];
+    $seen = [];
+    foreach ($items as $item) {
+      $damage = $this->cleanSuggestionText($item['damage'] ?? '');
+      if ($damage === '') {
+        continue;
+      }
+      $key = md5(mb_strtolower($damage, 'UTF-8'));
+      if (isset($seen[$key])) {
+        continue;
+      }
+      $seen[$key] = true;
+      $out[] = ['damage' => $damage, 'solution' => ''];
+      if (count($out) >= 30) {
+        break;
+      }
+    }
+    return $out;
   }
 
   public function payload(array $act): array

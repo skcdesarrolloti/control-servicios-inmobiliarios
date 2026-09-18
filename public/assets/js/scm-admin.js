@@ -4793,6 +4793,7 @@
             '<button type="button" class="scm-case-work-btn" data-scm-edit-case-magnitude data-ticket-pk="' +
             escHtml(btn.dataset.ticketPk || "") +
             '">Editar magnitud caso</button>',
+            '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-acta>Acta de solución y firma</button>',
           );
           if (calendarTicketPk) {
             mainActionButtons.push(
@@ -4819,7 +4820,6 @@
         if (!isPublicPqr) {
           mainActionButtons.push(
             '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder ticket</button>',
-            '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-acta>Acta de solución y firma</button>',
             '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>',
           );
         }
