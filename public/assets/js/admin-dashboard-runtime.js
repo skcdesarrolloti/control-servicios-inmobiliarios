@@ -14823,6 +14823,61 @@
         });
     }
 
+    function openCotizacionActaFromCard(target) {
+      var card = target && target.matches && target.matches(".scm-cotizacion-card")
+        ? target
+        : (target && target.closest ? target.closest(".scm-cotizacion-card") : null);
+      var cotizacionId = String(
+        (target && target.getAttribute && target.getAttribute("data-cotizacion-id")) ||
+        (card && card.getAttribute("data-cotizacion-id")) ||
+        "",
+      ).trim();
+      if (!card) {
+        if (cotizacionId) {
+          return loadCotizacionCardById(cotizacionId)
+            .then(function (loadedCard) {
+              return openCotizacionActaFromCard(loadedCard);
+            })
+            .catch(function (err) {
+              showToast("error", err.message || "No se pudo cargar la cotización para crear el acta.");
+            });
+        }
+        showToast("error", "No se encontró la cotización para crear el acta.");
+        return Promise.resolve();
+      }
+      var sourceTemplate = card.querySelector(".scm-cotizacion-linked-ticket-source");
+      var holder = card.querySelector(".scm-cotizacion-linked-ticket-dom");
+      if (!holder && sourceTemplate) {
+        holder = document.createElement("div");
+        holder.className = "scm-cotizacion-linked-ticket-dom";
+        holder.setAttribute("aria-hidden", "true");
+        holder.style.display = "none";
+        holder.innerHTML = sourceTemplate.innerHTML || "";
+        card.appendChild(holder);
+      }
+      var caseButton = (holder ? holder.querySelector(".scm-btn-case") : null) || card.querySelector(".scm-btn-case");
+      if (!caseButton || typeof window.scmOpenCase !== "function") {
+        showToast("error", "No se pudo abrir el caso ligado para crear el acta.");
+        return Promise.resolve();
+      }
+      if (cotizacionId) {
+        caseButton.setAttribute("data-cotizacion-id", cotizacionId);
+      }
+      caseButton.setAttribute("data-cot-estado", "Aprobada");
+      window.scmOpenCase(caseButton);
+      window.setTimeout(function () {
+        var actionBtn =
+          document.querySelector("#scm-app #scm-case-modal.open [data-scm-cotizacion-acta-button]") ||
+          document.querySelector("#scm-app #scm-case-modal.open [data-scm-open-ticket-acta]");
+        if (actionBtn) {
+          actionBtn.click();
+        } else {
+          showToast("error", "El acta no está disponible para esta cotización.");
+        }
+      }, 120);
+      return Promise.resolve();
+    }
+
     function openCotizacionNativeModal(button, resolvedCard) {
       var card = resolvedCard || button.closest(".scm-cotizacion-card");
       var cotizacionId = button.getAttribute("data-cotizacion-id") || "";
@@ -15548,6 +15603,14 @@
                   });
                   return;
                 }
+                var quoteActaBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-create-cotizacion-acta]")
+                  : null;
+                if (quoteActaBtn) {
+                  event.preventDefault();
+                  openCotizacionActaFromCard(quoteActaBtn);
+                  return;
+                }
                 var actionBtn = event.target && event.target.closest
                   ? event.target.closest("[data-scm-send-cotizacion], [data-scm-cotizacion-response-standalone], [data-scm-approve-cotizacion], [data-scm-delete-cotizacion], [data-scm-repair-followup-notice]")
                   : null;
@@ -15599,6 +15662,7 @@
         "scm_bridge_action",
         "scm_bridge_ticket_pk",
         "scm_bridge_quote_id",
+        "source_flow",
       ].forEach(function (key) {
         params.delete(key);
       });
@@ -15676,6 +15740,13 @@
             if (orderBtn) {
               openCotizacionOrderFormModal(orderBtn);
             }
+            return;
+          }
+          if (action === "acta_cotizacion") {
+            var actaBtn = quoteActionButtonFromCard(card, "[data-scm-create-cotizacion-acta]", "Esta cotización no permite crear acta en su estado actual.");
+            if (actaBtn) {
+              openCotizacionActaFromCard(actaBtn);
+            }
           }
         })
         .catch(function (err) {
@@ -15708,7 +15779,7 @@
         return;
       }
 
-      if (action === "editar_cotizacion" || action === "enviar_cotizacion" || action === "crear_orden") {
+      if (action === "editar_cotizacion" || action === "enviar_cotizacion" || action === "crear_orden" || action === "acta_cotizacion") {
         window.setTimeout(function () { openQuoteActionFromBridge(action, quoteId); }, 250);
         return;
       }
@@ -15792,6 +15863,16 @@
             ? editReturnContext.reopen
             : null,
         });
+        return;
+      }
+
+      var createCotizacionActaBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-create-cotizacion-acta]")
+          : null;
+      if (createCotizacionActaBtn) {
+        e.preventDefault();
+        openCotizacionActaFromCard(createCotizacionActaBtn);
         return;
       }
 

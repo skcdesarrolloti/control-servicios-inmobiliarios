@@ -60,14 +60,10 @@ try {
   $ticketPk = $ticketPk > 0 ? $ticketPk : 0;
 }
 
-$quoteActions = ['editar_cotizacion', 'enviar_cotizacion', 'crear_orden'];
+$quoteActions = ['editar_cotizacion', 'enviar_cotizacion', 'crear_orden', 'acta_cotizacion'];
 if (in_array($action, $quoteActions, true) && $quotePk <= 0) {
   http_response_code(400);
   exit('Falta id_cotizacion para esta acción.');
-}
-if ($action === 'acta_cotizacion' && $quotePk <= 0) {
-  http_response_code(400);
-  exit('Falta id_cotizacion para generar el acta de la cotización aprobada.');
 }
 if (in_array($action, ['revision_correctiva', 'crear_cotizacion', 'acta_satisfaccion'], true) && $ticketPk <= 0) {
   http_response_code(400);
@@ -90,37 +86,28 @@ $tryEmployeeTokenLogin = static function (): bool {
   return (new Auth(App::db()))->loginByEmployeeId($employeeId);
 };
 
-$isQuoteActTarget = $action === 'acta_cotizacion';
-if ($isQuoteActTarget) {
-  $targetQuery = [
-    'id_cotizacion' => $quotePk,
-    'source_flow' => 'approved_quote',
-  ];
-  if ($ticketPk > 0) {
-    $targetQuery['ticket_pk'] = $ticketPk;
-  }
-  $relativeTarget = 'crear-acta.php?' . http_build_query($targetQuery, '', '&', PHP_QUERY_RFC3986);
-} else {
-  $targetQuery = [
-    'scm_bridge_action' => $action,
-  ];
-  if ($ticketPk > 0) {
-    $targetQuery['scm_bridge_ticket_pk'] = $ticketPk;
-  }
-  if ($quotePk > 0) {
-    $targetQuery['scm_bridge_quote_id'] = $quotePk;
-  }
-
-  if (in_array($action, $quoteActions, true)) {
-    $targetQuery['scm_tab'] = 'cotizaciones_mantenimiento';
-    $targetQuery['scmqt_cotizacion'] = $quotePk;
-  } elseif ($action === 'crear_cotizacion') {
-    $targetQuery['scm_tab'] = 'cotizaciones_mantenimiento';
-  } else {
-    $targetQuery['scm_tab'] = 'abiertos';
-  }
-  $relativeTarget = 'index.php?' . http_build_query($targetQuery, '', '&', PHP_QUERY_RFC3986);
+$targetQuery = [
+  'scm_bridge_action' => $action,
+];
+if ($ticketPk > 0) {
+  $targetQuery['scm_bridge_ticket_pk'] = $ticketPk;
 }
+if ($quotePk > 0) {
+  $targetQuery['scm_bridge_quote_id'] = $quotePk;
+}
+if ($action === 'acta_cotizacion') {
+  $targetQuery['source_flow'] = 'approved_quote';
+}
+
+if (in_array($action, $quoteActions, true)) {
+  $targetQuery['scm_tab'] = 'cotizaciones_mantenimiento';
+  $targetQuery['scmqt_cotizacion'] = $quotePk;
+} elseif ($action === 'crear_cotizacion') {
+  $targetQuery['scm_tab'] = 'cotizaciones_mantenimiento';
+} else {
+  $targetQuery['scm_tab'] = 'abiertos';
+}
+$relativeTarget = 'index.php?' . http_build_query($targetQuery, '', '&', PHP_QUERY_RFC3986);
 if (Auth::isLoggedIn() && (isset($_GET['token']) || isset($_GET['id_empleado']))) {
   header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/' . $relativeTarget, true, 302);
   exit;

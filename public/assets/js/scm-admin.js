@@ -4833,6 +4833,13 @@
             escHtml(cotizacionId) +
             '">Gestionar cotizaciones del caso</button>',
           );
+          var cotEstadoKey = String(btn.dataset.cotEstado || "");
+          cotEstadoKey = cotEstadoKey.normalize ? cotEstadoKey.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : cotEstadoKey.toLowerCase();
+          if (cotizacionId && cotEstadoKey === "aprobada") {
+            quoteActionButtons.push(
+              '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-ticket-acta data-scm-cotizacion-acta-button>Crear acta de cotizaci&oacute;n</button>',
+            );
+          }
           if (caseCanGenerateRepairFollowup(btn)) {
             quoteActionButtons.push(
               '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-repair-followup-notice>Seguimiento reparaciones</button>',
