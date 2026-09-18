@@ -220,6 +220,19 @@
     var duePopupConfig = runtime.duePopup || {};
     var dashboardDuePopupShown = {};
     var dashboardDuePopupPromise = null;
+    var funcionarioBridgeMode = false;
+    try {
+      var initialBridgeParams = new URL(window.location.href).searchParams;
+      funcionarioBridgeMode =
+        String(initialBridgeParams.get("scm_bridge") || "") === "1" ||
+        String(initialBridgeParams.get("scm_bridge_action") || "").trim() !== "";
+    } catch (_bridgeModeError) {}
+    if (funcionarioBridgeMode) {
+      dashboardDuePopupShown.login = true;
+      dashboardDuePopupShown.administrative = true;
+      document.body.classList.add("scm-funcionario-bridge-mode");
+      root.classList.add("scm-funcionario-bridge-mode");
+    }
     var panelLoader = root.querySelector("[data-scm-panel-loader]");
     var panelLoaderTitle = panelLoader
       ? panelLoader.querySelector("[data-scm-panel-loader-title]")
@@ -753,6 +766,7 @@
 
     function maybeShowDashboardDuePopup(source) {
       source = source || "login";
+      if (funcionarioBridgeMode) return Promise.resolve();
       if (!duePopupConfig.enabled || dashboardDuePopupShown[source]) return Promise.resolve();
       if (!window.Swal || !ajaxUrl || !actionAdminDueCalendar) {
         return Promise.resolve();
@@ -15693,6 +15707,7 @@
     function clearFuncionarioBridgeParams(params) {
       [
         "scm_bridge_action",
+        "scm_bridge",
         "scm_bridge_ticket_pk",
         "scm_bridge_quote_id",
         "source_flow",

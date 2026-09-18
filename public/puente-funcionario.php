@@ -61,6 +61,7 @@ try {
 }
 
 $quoteActions = ['editar_cotizacion', 'enviar_cotizacion', 'crear_orden', 'acta_cotizacion'];
+$isQuoteActTarget = $action === 'acta_cotizacion';
 if (in_array($action, $quoteActions, true) && $quotePk <= 0) {
   http_response_code(400);
   exit('Falta id_cotizacion para esta acción.');
@@ -88,6 +89,7 @@ $tryEmployeeTokenLogin = static function (): bool {
 
 $targetQuery = [
   'scm_bridge_action' => $action,
+  'scm_bridge' => '1',
 ];
 if ($ticketPk > 0) {
   $targetQuery['scm_bridge_ticket_pk'] = $ticketPk;
@@ -99,6 +101,17 @@ if ($action === 'acta_cotizacion') {
   $targetQuery['source_flow'] = 'approved_quote';
 }
 
+$standaloneActQuery = [];
+if ($action === 'acta_satisfaccion' && $ticketPk > 0) {
+  $standaloneActQuery['ticket_pk'] = $ticketPk;
+}
+if ($action === 'acta_cotizacion' && $quotePk > 0) {
+  $standaloneActQuery['id_cotizacion'] = $quotePk;
+}
+$standaloneActTarget = $standaloneActQuery !== []
+  ? 'crear-acta.php?' . http_build_query($standaloneActQuery, '', '&', PHP_QUERY_RFC3986)
+  : '';
+
 if (in_array($action, $quoteActions, true)) {
   $targetQuery['scm_tab'] = 'cotizaciones_mantenimiento';
   $targetQuery['scmqt_cotizacion'] = $quotePk;
@@ -108,16 +121,17 @@ if (in_array($action, $quoteActions, true)) {
   $targetQuery['scm_tab'] = 'abiertos';
 }
 $relativeTarget = 'index.php?' . http_build_query($targetQuery, '', '&', PHP_QUERY_RFC3986);
+$resolvedTarget = $standaloneActTarget !== '' ? $standaloneActTarget : $relativeTarget;
 if (Auth::isLoggedIn() && (isset($_GET['token']) || isset($_GET['id_empleado']))) {
-  header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/' . $relativeTarget, true, 302);
+  header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/' . $resolvedTarget, true, 302);
   exit;
 }
 if (!Auth::isLoggedIn() && $tryEmployeeTokenLogin()) {
-  header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/' . $relativeTarget, true, 302);
+  header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/' . $resolvedTarget, true, 302);
   exit;
 }
 if (!Auth::isLoggedIn()) {
-  header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/login.php?next=' . rawurlencode($relativeTarget), true, 302);
+  header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/login.php?next=' . rawurlencode($resolvedTarget), true, 302);
   exit;
 }
 
@@ -135,5 +149,5 @@ if ($isQuoteActTarget && $ticketPk > 0 && !$app->canAccessTicketCompletion($tick
   exit('No tienes permiso para generar el acta de esta cotización.');
 }
 
-header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/' . $relativeTarget, true, 302);
+header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/' . $resolvedTarget, true, 302);
 exit;
