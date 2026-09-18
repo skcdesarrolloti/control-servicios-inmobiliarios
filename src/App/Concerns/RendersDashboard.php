@@ -3888,7 +3888,7 @@ trait RendersDashboard
       : '';
     if ($ticket !== '') {
       if ($linkedTicketCardHtml !== '') {
-        $ticketCaseButton = '<button type="button" class="scm-case-work-btn" data-scm-open-linked-ticket-case data-ticket-pk="' . esc_attr($ticket) . '">Ver ticket</button>';
+        $ticketCaseButton = '<button type="button" class="scm-case-work-btn" data-scm-open-linked-ticket-case data-ticket-pk="' . esc_attr($ticket) . '">Ver caso</button>';
       } else {
         $ticketCaseButton = '<button type="button" class="scm-case-work-btn scm-btn-case" onclick="scmOpenCase(this)"'
           . ' data-ticket="' . esc_attr($ticket) . '"'
@@ -3912,7 +3912,7 @@ trait RendersDashboard
           . ' data-cot-fecha-envio="' . esc_attr((string) $fechaEnvioTs) . '"'
           . ' data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '"'
           . ' data-cot-seguimiento-reparaciones-disponible="' . esc_attr($seguimientoReparacionesDisponible ? '1' : '0') . '"'
-          . '>Ver ticket</button>';
+          . '>Ver caso</button>';
       }
     }
 
@@ -3931,7 +3931,6 @@ trait RendersDashboard
       . ($cotizacionSinResponder ? '<button type="button" class="scm-case-work-btn scm-primary-action scm-cotizacion-approve-action" data-scm-approve-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Marcar como aprobada</button>' : '')
       . ($cotizacionSinResponder ? '<button type="button" class="scm-case-work-btn scm-danger-action scm-cotizacion-delete-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizaci&oacute;n</button>' : '')
       . ($seguimientoReparacionesDisponible ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-repair-followup-notice data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '" data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '">Seguimiento reparaciones</button>' : '')
-      . ($id !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-edit-cotizacion data-cotizacion-mode="note" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir nota</button>' : '')
       . ($cotizacionAprobada && !$hasActiveActa ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-add-cotizacion-order data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir orden</button>' : '')
       . ($cotizacionAprobada && $hasActiveActa ? '<button type="button" class="scm-case-work-btn" disabled title="Esta cotizaci&oacute;n o caso ya tiene acta activa">Orden bloqueada por acta</button>' : '')
       . ($actaInfo['url'] !== '' ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-iframe data-iframe-url="' . esc_attr($actaInfo['url']) . '" data-iframe-title="Acta de satisfacci&oacute;n">Ver acta' . ($actaInfo['status'] === 'pending' ? ' pendiente' : '') . '</button>' : '')
