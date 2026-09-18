@@ -52,7 +52,19 @@ try {
           (string) ($_POST['responder_nombre'] ?? '')
         );
         $ok = (string) ($saved['ok'] ?? '0') === '1';
-        $responseNotice = '<div class="scm-public-quote-alert ' . ($ok ? 'is-success' : 'is-error') . '">' . $escape((string) ($saved['message'] ?? ($ok ? 'Respuesta guardada.' : 'No se pudo guardar la respuesta.'))) . '</div>';
+        if ($ok) {
+          $estadoRespuesta = trim((string) ($_POST['estado'] ?? ''));
+          $noticeTitle = $estadoRespuesta === 'Desaprobada' ? 'Cotización desaprobada' : 'Cotización aprobada';
+          $noticeText = $estadoRespuesta === 'Desaprobada'
+            ? 'Tu respuesta fue registrada correctamente. El equipo de SKC SuCasa Inmobiliaria revisará la observación y continuará el proceso.'
+            : 'Tu aprobación fue registrada correctamente. El equipo de SKC SuCasa Inmobiliaria continuará con el proceso de mantenimiento.';
+          $responseNotice = '<section class="scm-public-quote-confirmation" role="status">'
+            . '<div><span>Respuesta registrada</span><strong>' . $escape($noticeTitle) . '</strong><p>' . $escape($noticeText) . '</p></div>'
+            . '<a href="https://sucasainmobiliaria.com.co/" target="_blank" rel="noopener noreferrer">Ver página web</a>'
+            . '</section>';
+        } else {
+          $responseNotice = '<div class="scm-public-quote-alert is-error">' . $escape((string) ($saved['message'] ?? 'No se pudo guardar la respuesta.')) . '</div>';
+        }
       }
     }
     $result = $app->render_public_cotizacion_mantenimiento($quoteId);
@@ -86,13 +98,18 @@ session_write_close();
     .scm-public-quote-alert{margin:0 0 16px;padding:13px 16px;border-radius:14px;font-weight:700;border:1px solid}
     .scm-public-quote-alert.is-success{background:#ecfdf5;color:#047857;border-color:#a7f3d0}
     .scm-public-quote-alert.is-error{background:#fff1f2;color:#be123c;border-color:#fecdd3}
+    .scm-public-quote-confirmation{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 16px;padding:16px 18px;border-radius:18px;border:1px solid #a7f3d0;background:#ecfdf5;color:#064e3b;box-shadow:0 14px 32px rgba(16,185,129,.12)}
+    .scm-public-quote-confirmation span{display:block;margin:0 0 3px;color:#047857;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+    .scm-public-quote-confirmation strong{display:block;color:#052e16;font-size:20px;font-weight:900}
+    .scm-public-quote-confirmation p{margin:4px 0 0;color:#065f46;font-weight:600;line-height:1.45}
+    .scm-public-quote-confirmation a{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;border-radius:13px;background:#ff8a00;color:#fff;text-decoration:none;font-weight:900;padding:12px 18px;box-shadow:0 10px 20px rgba(255,138,0,.22)}
     .scm-public-quote-response-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}
     .scm-public-quote-response-form [hidden]{display:none!important}
     .scm-public-quote-response-form label{display:flex;flex-direction:column;gap:6px;color:#475569;font-size:12px;font-weight:800}
     .scm-public-quote-response-form label.is-wide{grid-column:1/-1}
     .scm-public-quote-response-form input,.scm-public-quote-response-form select,.scm-public-quote-response-form textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:12px;padding:11px 12px;font:500 14px Poppins,Arial,sans-serif;color:#0f172a;background:#fff}
     .scm-public-quote-response-form button{grid-column:1/-1;justify-self:start;border:0;border-radius:13px;background:#ff8a00;color:#fff;font:800 14px Poppins,Arial,sans-serif;padding:12px 18px;cursor:pointer}
-    @media (max-width:720px){.scm-public-quote-response-form{grid-template-columns:1fr}.scm-public-quote-head{align-items:flex-start;flex-direction:column}.scm-public-quote-logo{max-width:100%;width:170px}}
+    @media (max-width:720px){.scm-public-quote-response-form{grid-template-columns:1fr}.scm-public-quote-head{align-items:flex-start;flex-direction:column}.scm-public-quote-logo{max-width:100%;width:170px}.scm-public-quote-confirmation{align-items:flex-start;flex-direction:column}.scm-public-quote-confirmation a{width:100%;box-sizing:border-box}}
     @media print{body{background:#fff}#scm-app{max-width:none;padding:0}.scm-public-quote-head{box-shadow:none;border:0;margin-bottom:8px}.scm-cotizacion-native-audience{display:none!important}}
   </style>
 </head>
