@@ -37,6 +37,9 @@
 .scm-acta .scm-acta-photo-field label { margin: 0; }
 .scm-acta .scm-acta-photo-field input { padding: 8px; background: #fff; cursor: pointer; }
 .scm-acta .scm-acta-photo-field small { color: var(--acta-muted); font-weight: 400; }
+.scm-acta .scm-acta-photo-reference { margin: 14px 0; padding: 12px 14px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; }
+.scm-acta .scm-acta-photo-reference > strong { display: block; color: #173d70; margin-bottom: 8px; }
+.scm-acta [data-acta-damage-photo] { border-color: #93c5fd; background: #f8fbff; }
 .scm-acta .scm-acta-photo-paste { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; min-height: 48px; width: 100%; padding: 10px 14px; color: #173d70; background: #fff; border: 1px dashed #5681b7; border-radius: 8px; cursor: pointer; text-align: left; }
 .scm-acta .scm-acta-photo-paste span { color: var(--acta-muted); font-size: 13px; font-weight: 400; }
 .scm-acta-photo-preview, .scm-acta-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin: 12px 0; }

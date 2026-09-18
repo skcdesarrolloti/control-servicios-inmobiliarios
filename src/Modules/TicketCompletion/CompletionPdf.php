@@ -33,13 +33,23 @@ final class CompletionPdf
     foreach ($payload['items'] as $index => $item) {
       $damage = $this->chunks($item['damage'], 500); $solution = $this->chunks($item['solution'], 500);
       $pdf->serviceCard($index + 1, implode(' ', $damage), implode(' ', $solution));
+      if (!empty($item['damage_photos'])) {
+        $pdf->sectionTitle('Evidencias del daño #' . ($index + 1));
+        foreach ($item['damage_photos'] as $photoIndex => $photo) {
+          $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . basename((string) $photo['name']);
+          $hash = is_file($path) ? @hash_file('sha256', $path) : false;
+          if (!is_string($hash) || !hash_equals((string) $photo['sha256'], $hash) || !$pdf->imageEvidence($path, 'Foto ' . ($photoIndex + 1) . ' del daño #' . ($index + 1))) {
+            throw new \DomainException('Una evidencia fotográfica del daño no está disponible o cambió.');
+          }
+        }
+      }
       if (empty($item['photos'])) { continue; }
-      $pdf->sectionTitle('Evidencias del daño #' . ($index + 1));
+      $pdf->sectionTitle('Evidencias de la solución #' . ($index + 1));
       foreach ($item['photos'] as $photoIndex => $photo) {
         $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . basename((string) $photo['name']);
         $hash = is_file($path) ? @hash_file('sha256', $path) : false;
-        if (!is_string($hash) || !hash_equals((string) $photo['sha256'], $hash) || !$pdf->imageEvidence($path, 'Foto ' . ($photoIndex + 1) . ' del daño #' . ($index + 1))) {
-          throw new \DomainException('Una evidencia fotográfica del acta no está disponible o cambió.');
+        if (!is_string($hash) || !hash_equals((string) $photo['sha256'], $hash) || !$pdf->imageEvidence($path, 'Foto ' . ($photoIndex + 1) . ' de la solución #' . ($index + 1))) {
+          throw new \DomainException('Una evidencia fotográfica de la solución no está disponible o cambió.');
         }
       }
     }

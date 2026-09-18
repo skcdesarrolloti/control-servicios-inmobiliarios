@@ -40,6 +40,7 @@ $signingForm = (new View())->signingForm(['payload_hash' => str_repeat('a', 64)]
 $assert(str_contains($signingForm, 'name="signature_name"') && str_contains($signingForm, 'value="ROYNÉR PROPIETARIO"'), 'signature form pre-fills the selected signer name as the actual input value');
 $photoDescriptor = ['name' => str_repeat('a', 24) . '_123.jpg', 'mime' => 'image/jpeg', 'width' => 1200, 'height' => 900, 'bytes' => 350000, 'sha256' => str_repeat('b', 64)];
 $assert(Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [$photoDescriptor]]])[0]['photos'][0]['width'] === 1200, 'compressed photo metadata accepted');
+$assert(Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'damage_photos' => [$photoDescriptor]]])[0]['damage_photos'][0]['width'] === 1200, 'damage photo metadata is kept separate from solution evidence');
 $rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [array_replace($photoDescriptor, ['bytes' => 1500001])]]]), 'oversized photo evidence rejected');
 $rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [array_replace($photoDescriptor, ['name' => '../otro.jpg'])]]]), 'unsafe photo path rejected');
 $rejects(static fn() => Policy::signature(['signature_name' => 'Ana Pérez'], 'Ana Pérez'), 'opening a link never constitutes consent');
@@ -256,7 +257,7 @@ $assert($signedQuote['estado'] === 'Desaprobada' && $signedQuote['motivo'] === '
 $assert($repo->ticket(1)['estado_cotizacion_mantenimiento'] === 'Desaprobada' && $repo->ticket(1)['estado_respuesta_cotizacion_mantenimiento'] === 'Desaprobada', 'signature synchronizes maintenance quote state on ticket');
 $assert(str_starts_with($signed['signed_pdf'], '%PDF-1.4') && hash('sha256', $signed['signed_pdf']) === $signed['pdf_hash'], 'immutable signed PDF saved with closure');
 $assert(str_contains($signed['signed_pdf'], '/Subtype /Image'), 'signed PDF embeds immutable photographic evidence');
-$assert(str_contains($signed['signed_pdf'], 'Evidencias del da'), 'signed PDF labels photographic evidence by damage');
+$assert(str_contains($signed['signed_pdf'], 'Evidencias de la soluci'), 'signed PDF labels uploaded photographic evidence by solution');
 $assert($signed['otp_json'] === null && !empty(json_decode($signed['signed_json'], true)['verification']), 'code consumed and verification evidence recorded');
 $assert($service->pdf($signed) === $signed['signed_pdf'], 'recipient receives exact persisted PDF');
 $badPdf = $signed; $badPdf['signed_pdf'] .= 'tamper';
@@ -289,7 +290,7 @@ $assert(str_contains($publicHtml, 'data-acta-gallery-item') && str_contains($pub
 $thanksHtml = (new View())->thankYou($signed, $service->payload($signed), $token);
 $assert(str_contains($thanksHtml, 'Gracias por tu firma') && str_contains($thanksHtml, 'Conocer más productos SuCasa') && str_contains($thanksHtml, 'https://sucasainmobiliaria.com.co/'), 'act thank-you page confirms signing and links to SuCasa website');
 $assert(str_contains($publicHtml, 'Fuga en tubería') && str_contains($publicHtml, 'reemplazó') && str_contains($publicHtml, 'Firma electrónica registrada'), 'document includes damage, solution and signature');
-$assert(str_contains($publicHtml, 'Evidencias del daño #1') && str_contains($publicHtml, rawurlencode($photoName)), 'recipient document displays lazy photographic evidence');
+$assert(str_contains($publicHtml, 'Evidencias de la solución #1') && str_contains($publicHtml, rawurlencode($photoName)), 'recipient document displays lazy solution photographic evidence');
 $legacySigned = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_actas_de_satisfaccion') . '` WHERE _ID = ?', [$signed['legacy_act_id']]);
 $assert(is_array($legacySigned) && (string) ($legacySigned['email_creador'] ?? '') === 'actor@example.invalid' && (string) ($legacySigned['celular_creador'] ?? '') === '3001234567', 'legacy satisfaction act stores creator email and phone');
 $assert((string) ($legacySigned['fecha_satisfaccion'] ?? '') !== '' && str_contains((string) ($legacySigned['registro_fotografico'] ?? ''), rawurlencode($photoName)), 'legacy satisfaction act stores satisfaction date and compressed photo URLs when columns exist');

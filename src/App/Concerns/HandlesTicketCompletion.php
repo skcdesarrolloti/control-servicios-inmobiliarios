@@ -59,9 +59,10 @@ trait HandlesTicketCompletion
         $requestedTotal = 0;
         $actId = (int) ($_POST['act_id'] ?? 0);
         $oldPhotoNames = [];
-        $allowedPhotos = [];
-        $allowExistingPhoto = static function (array $photo) use (&$allowedPhotos): void {
-          $photoKey = implode('|', [
+        $allowedDamagePhotos = [];
+        $allowedSolutionPhotos = [];
+        $photoKey = static function (array $photo): string {
+          return implode('|', [
             (string) ($photo['name'] ?? ''),
             (string) ($photo['mime'] ?? ''),
             (string) ($photo['width'] ?? ''),
@@ -69,8 +70,31 @@ trait HandlesTicketCompletion
             (string) ($photo['bytes'] ?? ''),
             (string) ($photo['sha256'] ?? ''),
           ]);
-          $allowedPhotos[$photoKey] = $photo;
         };
+        $allowDamagePhoto = static function (array $photo) use (&$allowedDamagePhotos, $photoKey): void {
+          $allowedDamagePhotos[$photoKey($photo)] = $photo;
+        };
+        $allowSolutionPhoto = static function (array $photo) use (&$allowedSolutionPhotos, $photoKey): void {
+          $allowedSolutionPhotos[$photoKey($photo)] = $photo;
+        };
+        $trackOldPhoto = static function (array $photo) use (&$oldPhotoNames): void {
+          if (trim((string) ($photo['name'] ?? '')) !== '') { $oldPhotoNames[] = (string) $photo['name']; }
+        };
+        $keptPostedPhotos = static function (mixed $postedPhotos, array $allowedPhotos) use ($photoKey): array {
+          $kept = [];
+          if (!is_array($postedPhotos)) {
+            return [];
+          }
+          foreach ($postedPhotos as $postedPhoto) {
+            if (!is_array($postedPhoto)) { continue; }
+            $key = $photoKey($postedPhoto);
+            if (isset($allowedPhotos[$key])) { $kept[] = $allowedPhotos[$key]; }
+          }
+          return $kept;
+        };
+        $allowExistingPhoto = static function (array $photo) use ($allowSolutionPhoto): void { $allowSolutionPhoto($photo); };
+        $allowExistingDamagePhoto = static function (array $photo) use ($allowDamagePhoto): void { $allowDamagePhoto($photo); };
+        $allowLegacySuggestedPhoto = static function (array $photo) use ($allowDamagePhoto): void { $allowDamagePhoto($photo); };
         $verifiedExistingPhoto = function (array $postedPhoto): ?array {
           $name = (string) ($postedPhoto['name'] ?? '');
           if (!preg_match('/^[a-f0-9]{24}_[0-9]+\.jpg$/D', $name)) {
@@ -104,13 +128,24 @@ trait HandlesTicketCompletion
             'sha256' => $hash,
           ];
         };
+        $verifySuggestedPhotos = function (array $photos, \Closure $allow) use ($verifiedExistingPhoto): void {
+          foreach ($photos as $suggestedPhoto) {
+            if (!is_array($suggestedPhoto)) { continue; }
+            $verifiedPhoto = $verifiedExistingPhoto($suggestedPhoto);
+            if ($verifiedPhoto !== null) { $allow($verifiedPhoto); }
+          }
+        };
+        $verifyOldPhotos = function (array $photos, \Closure $allow) use ($trackOldPhoto): void {
+          foreach ($photos as $oldPhoto) {
+            if (!is_array($oldPhoto)) { continue; }
+            $allow($oldPhoto);
+            $trackOldPhoto($oldPhoto);
+          }
+        };
         if ($operation === 'create') {
           foreach ((array) ($service->context($ticketId, $sourceFlow)['suggested_items'] ?? []) as $suggestedItem) {
-            foreach ((array) ($suggestedItem['photos'] ?? []) as $suggestedPhoto) {
-              if (!is_array($suggestedPhoto)) { continue; }
-              $verifiedPhoto = $verifiedExistingPhoto($suggestedPhoto);
-              if ($verifiedPhoto !== null) { $allowExistingPhoto($verifiedPhoto); }
-            }
+            $verifySuggestedPhotos((array) ($suggestedItem['damage_photos'] ?? []), $allowExistingDamagePhoto);
+            $verifySuggestedPhotos((array) ($suggestedItem['photos'] ?? []), $allowLegacySuggestedPhoto);
           }
         }
         if ($operation === 'update') {
@@ -120,11 +155,8 @@ trait HandlesTicketCompletion
           }
           $oldPayload = $service->payload($existingAct);
           foreach ((array) ($oldPayload['items'] ?? []) as $oldItem) {
-            foreach ((array) ($oldItem['photos'] ?? []) as $oldPhoto) {
-              if (!is_array($oldPhoto)) { continue; }
-              $allowExistingPhoto($oldPhoto);
-              if (trim((string) ($oldPhoto['name'] ?? '')) !== '') { $oldPhotoNames[] = (string) $oldPhoto['name']; }
-            }
+            $verifyOldPhotos((array) ($oldItem['damage_photos'] ?? []), $allowExistingDamagePhoto);
+            $verifyOldPhotos((array) ($oldItem['photos'] ?? []), $allowExistingPhoto);
           }
         }
         foreach (array_keys($items) as $index) {
@@ -136,23 +168,12 @@ trait HandlesTicketCompletion
         if ($requestedTotal > 12) { throw new \DomainException('El acta admite máximo 12 fotos en total.'); }
         foreach ($items as $index => &$item) {
           if (!is_array($item)) { continue; }
-          $keptPhotos = [];
-          if (is_array($item['photos'] ?? null)) {
-            foreach ($item['photos'] as $postedPhoto) {
-              if (!is_array($postedPhoto)) { continue; }
-              $photoKey = implode('|', [
-                (string) ($postedPhoto['name'] ?? ''),
-                (string) ($postedPhoto['mime'] ?? ''),
-                (string) ($postedPhoto['width'] ?? ''),
-                (string) ($postedPhoto['height'] ?? ''),
-                (string) ($postedPhoto['bytes'] ?? ''),
-                (string) ($postedPhoto['sha256'] ?? ''),
-              ]);
-              if (isset($allowedPhotos[$photoKey])) { $keptPhotos[] = $allowedPhotos[$photoKey]; }
-            }
-          }
+          $keptDamagePhotos = $keptPostedPhotos($item['damage_photos'] ?? [], $allowedDamagePhotos);
+          $keptPhotos = $keptPostedPhotos($item['photos'] ?? [], $allowedSolutionPhotos);
           unset($item['photos']);
+          unset($item['damage_photos']);
           if (!preg_match('/^\d+$/D', (string) $index)) { continue; }
+          $item['damage_photos'] = $keptDamagePhotos;
           $item['photos'] = $keptPhotos;
           $field = 'acta_item_photos_' . $index;
           $names = $_FILES[$field]['name'] ?? [];
@@ -190,6 +211,9 @@ trait HandlesTicketCompletion
             $newPayload = $service->payload($repo->act((int) $result['act_id']));
             $keptNames = [];
             foreach ((array) ($newPayload['items'] ?? []) as $newItem) {
+              foreach ((array) ($newItem['damage_photos'] ?? []) as $photo) {
+                if (is_array($photo) && trim((string) ($photo['name'] ?? '')) !== '') { $keptNames[(string) $photo['name']] = true; }
+              }
               foreach ((array) ($newItem['photos'] ?? []) as $photo) {
                 if (is_array($photo) && trim((string) ($photo['name'] ?? '')) !== '') { $keptNames[(string) $photo['name']] = true; }
               }
