@@ -14446,7 +14446,20 @@
 
     function setCotizacionOrderField(form, name, value) {
       var field = cotizacionOrderField(form, name);
-      if (field) field.value = value || "";
+      if (!field) return;
+      value = value || "";
+      if (field.tagName && field.tagName.toLowerCase() === "select" && value) {
+        var exists = Array.prototype.some.call(field.options || [], function (option) {
+          return option.value === value;
+        });
+        if (!exists) {
+          var customOption = document.createElement("option");
+          customOption.value = value;
+          customOption.textContent = value;
+          field.appendChild(customOption);
+        }
+      }
+      field.value = value;
     }
 
     function collectCotizacionOrderForm(form, balances) {
@@ -14502,14 +14515,46 @@
       return data;
     }
 
+    function buildCotizacionOrderSelectOptions(items, placeholder) {
+      var seen = {};
+      var html = '<option value="">' + escHtml(placeholder || "Elige una opción") + "</option>";
+      (Array.isArray(items) ? items : []).forEach(function (item) {
+        var value = "";
+        var label = "";
+        if (Array.isArray(item)) {
+          value = String(item[0] || "").trim();
+          label = String(item[1] || item[0] || "").trim();
+        } else if (item && typeof item === "object") {
+          value = String(item.value || item.banco || item.label || item.name || "").trim();
+          label = String(item.label || item.banco || item.value || item.name || "").trim();
+        } else {
+          value = String(item || "").trim();
+          label = value;
+        }
+        if (!value || seen[value.toLowerCase()]) return;
+        seen[value.toLowerCase()] = true;
+        html += '<option value="' + escHtml(value) + '">' + escHtml(label || value) + "</option>";
+      });
+      return html;
+    }
+
     function buildCotizacionOrderFormHtml(context) {
       var cotizacion = context.cotizacion || {};
       var providers = Array.isArray(context.providers) ? context.providers : [];
+      var banks = Array.isArray(context.banks) ? context.banks : [];
       var options = '<option value="">Proveedor nuevo</option>';
       providers.forEach(function (provider) {
         var name = provider.proveedor || ("Proveedor #" + (provider.id || ""));
         options += '<option value="' + escHtml(provider.id || "") + '">' + escHtml(name) + "</option>";
       });
+      var identityTypeOptions = buildCotizacionOrderSelectOptions([
+        "Cédula de Ciudadania",
+        "Nit",
+        "Cédula Extranjería",
+        "Pasaporte",
+      ], "Elige una opción");
+      var accountTypeOptions = buildCotizacionOrderSelectOptions(["Ahorros", "Corriente"], "Elige una opción");
+      var bankOptions = buildCotizacionOrderSelectOptions(banks, "Elige un banco");
       return (
         '<form id="scm-cotizacion-order-form" class="scm-cotizacion-order-form">' +
         '<div class="scm-cotizacion-order-context">' +
@@ -14527,16 +14572,16 @@
         '<label class="scm-cotizacion-dialog-field is-wide"><span>Concepto <em>*</em></span><textarea name="concepto" id="scm-order-concept" rows="3" placeholder="Describe qué trabajo se va a ordenar"></textarea></label>' +
         '<label class="scm-cotizacion-dialog-field is-wide"><span>Proveedor</span><select name="id_proveedor" id="scm-order-provider">' + options + "</select><small>Selecciona uno existente o deja “Proveedor nuevo” y completa los datos.</small></label>" +
         '<label class="scm-cotizacion-dialog-field"><span>Nombre proveedor <em>*</em></span><input name="proveedor" type="text"></label>' +
-        '<label class="scm-cotizacion-dialog-field"><span>Tipo identificación</span><input name="tipo_identificacion_proveedor" type="text" placeholder="CC / NIT / CE"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Tipo identificación</span><select name="tipo_identificacion_proveedor">' + identityTypeOptions + "</select></label>" +
         '<label class="scm-cotizacion-dialog-field"><span>Identificación <em>*</em></span><input name="identificacion_proveedor" type="text"></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Correo proveedor <em>*</em></span><input name="correo_proveedor" type="email"></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Celular proveedor <em>*</em></span><input name="celular_proveedor" type="text"></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Dirección proveedor</span><input name="direccion_proveedor" type="text"></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Titular cuenta <em>*</em></span><input name="titular_proveedor" type="text"></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Identificación titular <em>*</em></span><input name="identificacion_cuenta_proveedor" type="text"></label>' +
-        '<label class="scm-cotizacion-dialog-field"><span>Tipo cuenta</span><input name="tipo_cuenta_proveedor" type="text" placeholder="Ahorros / Corriente"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Tipo cuenta</span><select name="tipo_cuenta_proveedor">' + accountTypeOptions + "</select></label>" +
         '<label class="scm-cotizacion-dialog-field"><span>Número cuenta <em>*</em></span><input name="cuenta_proveedor" type="text"></label>' +
-        '<label class="scm-cotizacion-dialog-field"><span>Banco</span><input name="banco_proveedor" type="text"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Banco</span><select name="banco_proveedor">' + bankOptions + "</select></label>" +
         '<label class="scm-cotizacion-dialog-field"><span>Correo pago <em>*</em></span><input name="correo_pago_proveedor" type="email"></label>' +
         "</div>" +
         "</form>"

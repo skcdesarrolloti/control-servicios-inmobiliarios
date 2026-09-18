@@ -2869,6 +2869,7 @@ trait HandlesMaintenanceActions
     $this->jsonOk([
       'cotizacion' => $this->maintenance_order_context_payload($cotizacion),
       'providers' => $this->maintenance_order_provider_options(),
+      'banks' => $this->maintenance_order_bank_options(),
     ]);
   }
 
@@ -3802,6 +3803,45 @@ trait HandlesMaintenanceActions
       ];
     }
     return $providers;
+  }
+
+  /** @return array<int,array<string,string>> */
+  private function maintenance_order_bank_options(): array
+  {
+    $table = $this->db->table('jet_cct_bancos');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+
+    $rows = $this->db->getResults(
+      "SELECT `_ID`, `banco`, `pais`
+         FROM `{$table}`
+        WHERE (`cct_status` = 'publish' OR `cct_status` IS NULL OR `cct_status` = '')
+          AND TRIM(COALESCE(`banco`, '')) <> ''
+        ORDER BY `banco` ASC
+        LIMIT 400"
+    );
+
+    $banks = [];
+    $seen = [];
+    foreach ($rows as $row) {
+      $name = trim((string) ($row['banco'] ?? ''));
+      if ($name === '') {
+        continue;
+      }
+      $key = strtolower($name);
+      if (isset($seen[$key])) {
+        continue;
+      }
+      $seen[$key] = true;
+      $banks[] = [
+        'id' => trim((string) ($row['_ID'] ?? '')),
+        'value' => $name,
+        'label' => $name,
+        'pais' => trim((string) ($row['pais'] ?? '')),
+      ];
+    }
+    return $banks;
   }
 
   private function maintenance_order_clean($value): string
