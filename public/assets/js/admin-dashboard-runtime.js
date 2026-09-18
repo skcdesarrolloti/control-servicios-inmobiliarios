@@ -14070,12 +14070,13 @@
     }
 
     function loadMaintenanceQuoteContext(button, mode) {
+      var resolvedMode = mode || button.getAttribute("data-cotizacion-mode") || "create";
       var fd = new FormData();
       fd.append("action", actionCotizacionFormContext);
       fd.append("nonce", nonce);
-      fd.append("mode", mode || button.getAttribute("data-cotizacion-mode") || "create");
+      fd.append("mode", resolvedMode);
       fd.append("ticket_pk", button.getAttribute("data-ticket-pk") || "");
-      fd.append("id_cotizacion", button.getAttribute("data-cotizacion-id") || "");
+      fd.append("id_cotizacion", resolvedMode === "create" ? "" : (button.getAttribute("data-cotizacion-id") || ""));
       return fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
         .then(function (response) { return response.json(); })
         .then(function (json) {
@@ -14096,6 +14097,9 @@
       return loadMaintenanceQuoteContext(button, mode)
         .then(function (context) {
           var draftKey = maintenanceQuoteDraftKey(context || {});
+          if (mode === "create" && button.hasAttribute("data-scm-clear-cotizacion-create-draft")) {
+            clearMaintenanceQuoteDraft(draftKey);
+          }
           return window.Swal.fire({
             title: context.mode === "edit" ? "Editar cotización de mantenimiento" : (context.mode === "note" ? "Añadir nota de cotización" : "Añadir cotización de mantenimiento"),
             html: buildMaintenanceQuoteFormHtml(context),

@@ -983,6 +983,7 @@ trait HandlesMaintenanceActions
       if ($totals['total'] <= 0) {
         throw new \DomainException('Agrega al menos un valor a la cotización.');
       }
+      $usedBalances = $mode === 'edit' ? $this->maintenance_quote_order_used_balances($schema, $quoteId) : [];
 
       $destinatario = $this->maintenance_quote_clean($_POST['destinatario'] ?? ($context['defaults']['destinatario'] ?? ''));
       $emailDestinatario = $this->maintenance_quote_clean($_POST['email_destinatario'] ?? ($context['defaults']['email_destinatario'] ?? ''));
@@ -1024,10 +1025,10 @@ trait HandlesMaintenanceActions
         'total_maquinarias' => $totals['total_maquinarias'],
         'total_otros_costos' => $totals['total_otros_costos'],
         'total' => $totals['total'],
-        'saldo_obra' => $mode === 'edit' ? $this->maintenance_quote_balance_after_edit($sourceQuote, 'saldo_obra', $totals['total_mano_obra']) : $totals['total_mano_obra'],
-        'saldo_materiales' => $mode === 'edit' ? $this->maintenance_quote_balance_after_edit($sourceQuote, 'saldo_materiales', $totals['total_materiales']) : $totals['total_materiales'],
-        'saldo_maquinarias' => $mode === 'edit' ? $this->maintenance_quote_balance_after_edit($sourceQuote, 'saldo_maquinarias', $totals['total_maquinarias']) : $totals['total_maquinarias'],
-        'saldo_otros_costo' => $mode === 'edit' ? $this->maintenance_quote_balance_after_edit($sourceQuote, 'saldo_otros_costo', $totals['total_otros_costos']) : $totals['total_otros_costos'],
+        'saldo_obra' => $mode === 'edit' ? $this->maintenance_quote_balance_after_edit($sourceQuote, 'saldo_obra', $totals['total_mano_obra'], $usedBalances['saldo_obra'] ?? null) : $totals['total_mano_obra'],
+        'saldo_materiales' => $mode === 'edit' ? $this->maintenance_quote_balance_after_edit($sourceQuote, 'saldo_materiales', $totals['total_materiales'], $usedBalances['saldo_materiales'] ?? null) : $totals['total_materiales'],
+        'saldo_maquinarias' => $mode === 'edit' ? $this->maintenance_quote_balance_after_edit($sourceQuote, 'saldo_maquinarias', $totals['total_maquinarias'], $usedBalances['saldo_maquinarias'] ?? null) : $totals['total_maquinarias'],
+        'saldo_otros_costo' => $mode === 'edit' ? $this->maintenance_quote_balance_after_edit($sourceQuote, 'saldo_otros_costo', $totals['total_otros_costos'], $usedBalances['saldo_otros_costo'] ?? null) : $totals['total_otros_costos'],
         'observaciones' => wp_kses_post(wp_unslash((string) ($_POST['observaciones'] ?? ''))),
         'valides_oferta' => $this->maintenance_quote_number($_POST['valides_oferta'] ?? '0'),
         'duracion' => $this->maintenance_quote_number($_POST['duracion'] ?? '0'),
@@ -2151,8 +2152,44 @@ trait HandlesMaintenanceActions
     return $stored[0];
   }
 
+  /**
+   * @return array{saldo_obra:float,saldo_materiales:float,saldo_maquinarias:float,saldo_otros_costo:float}|array<string,float>
+   */
+  private function maintenance_quote_order_used_balances(\SCM\Support\SchemaInspector $schema, int $quoteId): array
+  {
+    $table = $this->db->table('jet_cct_ordenes');
+    if ($quoteId <= 0 || !$schema->tableExists($table)) {
+      return [];
+    }
+    $rows = $this->db->getResults(
+      "SELECT `categoria`, `valor`, `estado`, `cct_status` FROM `{$table}` WHERE TRIM(COALESCE(`id_cotizacion`, '')) = ?",
+      [(string) $quoteId]
+    );
+    $used = [
+      'saldo_obra' => 0.0,
+      'saldo_materiales' => 0.0,
+      'saldo_maquinarias' => 0.0,
+      'saldo_otros_costo' => 0.0,
+    ];
+    foreach ($rows as $row) {
+      $status = strtolower(trim((string) ($row['estado'] ?? '')));
+      $cctStatus = strtolower(trim((string) ($row['cct_status'] ?? '')));
+      if (in_array($status, ['eliminada', 'eliminado', 'anulada', 'anulado', 'cancelada', 'cancelado'], true)
+        || in_array($cctStatus, ['trash', 'deleted'], true)) {
+        continue;
+      }
+      $category = $this->maintenance_order_category((string) ($row['categoria'] ?? ''));
+      if ($category === '') {
+        continue;
+      }
+      $balanceField = $this->maintenance_order_balance_column($category);
+      $used[$balanceField] = ($used[$balanceField] ?? 0.0) + $this->maintenance_quote_number($row['valor'] ?? 0);
+    }
+    return $used;
+  }
+
   /** @param array<string,mixed> $sourceQuote */
-  private function maintenance_quote_balance_after_edit(array $sourceQuote, string $saldoField, float $newTotal): string
+  private function maintenance_quote_balance_after_edit(array $sourceQuote, string $saldoField, float $newTotal, ?float $usedOverride = null): string
   {
     $totalField = match ($saldoField) {
       'saldo_obra' => 'total_mano_obra',
@@ -2164,9 +2201,13 @@ trait HandlesMaintenanceActions
     if ($totalField === '') {
       return (string) (int) round($newTotal);
     }
-    $oldTotal = $this->maintenance_quote_number($sourceQuote[$totalField] ?? 0);
-    $oldBalance = $this->maintenance_quote_number($sourceQuote[$saldoField] ?? $oldTotal);
-    $used = max(0.0, $oldTotal - $oldBalance);
+    if ($usedOverride !== null) {
+      $used = max(0.0, $usedOverride);
+    } else {
+      $oldTotal = $this->maintenance_quote_number($sourceQuote[$totalField] ?? 0);
+      $oldBalance = $this->maintenance_quote_number($sourceQuote[$saldoField] ?? $oldTotal);
+      $used = max(0.0, $oldTotal - $oldBalance);
+    }
     return (string) max(0, (int) round($newTotal - $used));
   }
 

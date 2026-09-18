@@ -4841,7 +4841,9 @@
         }
         if (!isPublicPqr && caseCanCreateMaintenanceQuote(btn)) {
           quoteActionButtons.push(
-            '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-create-cotizacion data-cotizacion-mode="create" data-ticket-pk="' +
+            '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-create-cotizacion data-cotizacion-mode="create"' +
+            ((cotizacionUrl || cotizacionId) ? ' data-scm-clear-cotizacion-create-draft="1"' : "") +
+            ' data-ticket-pk="' +
             escHtml(calendarTicketPk || "") +
             '" data-ticket="' +
             escHtml(btn.dataset.ticket || "") +
