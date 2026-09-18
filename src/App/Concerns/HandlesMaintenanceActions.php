@@ -3882,6 +3882,17 @@ trait HandlesMaintenanceActions
     }
 
     if ($providerId > 0) {
+      $exists = (int) ($this->db->getVar("SELECT `_ID` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$providerId]) ?? 0);
+      if ($exists <= 0) {
+        $providerId = 0;
+      }
+    }
+
+    if ($providerId <= 0) {
+      $providerId = $this->maintenance_order_find_existing_provider_id($schema, $table, $providerPayload);
+    }
+
+    if ($providerId > 0) {
       $currentCompras = (int) ($this->db->getVar("SELECT COALESCE(`compras`, 0) FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$providerId]) ?? 0);
       $update = array_merge($providerPayload, [
         'compras' => (string) ($currentCompras + 1),
@@ -3905,6 +3916,51 @@ trait HandlesMaintenanceActions
     if (!empty($insert) && $this->db->insert($table, $insert)) {
       return (int) $this->db->lastInsertId();
     }
+    return 0;
+  }
+
+  /** @param array<string,string> $providerPayload */
+  private function maintenance_order_find_existing_provider_id(\SCM\Support\SchemaInspector $schema, string $table, array $providerPayload): int
+  {
+    $activeSql = $schema->columnExists($table, 'cct_status')
+      ? " AND (`cct_status` = 'publish' OR `cct_status` IS NULL OR `cct_status` = '')"
+      : '';
+
+    $identity = trim((string) ($providerPayload['identificacion_proveedor'] ?? ''));
+    if ($identity !== '' && $schema->columnExists($table, 'identificacion_proveedor')) {
+      $found = (int) ($this->db->getVar(
+        "SELECT `_ID` FROM `{$table}` WHERE TRIM(`identificacion_proveedor`) = ?{$activeSql} ORDER BY `_ID` ASC LIMIT 1",
+        [$identity]
+      ) ?? 0);
+      if ($found > 0) {
+        return $found;
+      }
+    }
+
+    $email = strtolower(trim((string) ($providerPayload['correo_proveedor'] ?? '')));
+    if ($email !== '' && $schema->columnExists($table, 'correo_proveedor')) {
+      $found = (int) ($this->db->getVar(
+        "SELECT `_ID` FROM `{$table}` WHERE LOWER(TRIM(`correo_proveedor`)) = ?{$activeSql} ORDER BY `_ID` ASC LIMIT 1",
+        [$email]
+      ) ?? 0);
+      if ($found > 0) {
+        return $found;
+      }
+    }
+
+    $phone = preg_replace('/\D+/', '', (string) ($providerPayload['celular_proveedor'] ?? '')) ?? '';
+    if ($phone !== '' && $schema->columnExists($table, 'celular_proveedor')) {
+      $rows = $this->db->getResults(
+        "SELECT `_ID`, `celular_proveedor` FROM `{$table}` WHERE `celular_proveedor` IS NOT NULL AND TRIM(`celular_proveedor`) <> ''{$activeSql} ORDER BY `_ID` ASC LIMIT 400"
+      );
+      foreach ($rows as $row) {
+        $candidatePhone = preg_replace('/\D+/', '', (string) ($row['celular_proveedor'] ?? '')) ?? '';
+        if ($candidatePhone !== '' && $candidatePhone === $phone) {
+          return (int) ($row['_ID'] ?? 0);
+        }
+      }
+    }
+
     return 0;
   }
 
