@@ -119,7 +119,9 @@ trait WorkflowCommandsConcern
         $observacionCotizacion !== '' ? $observacionCotizacion : 'Ninguna',
         $motivoCotizacion,
         $financiacionCotizacion,
-        $notifyTargets
+        $notifyTargets,
+        0,
+        false
       );
       if (($cotResult['ok'] ?? '0') !== '1') {
         return $cotResult;
@@ -287,7 +289,8 @@ trait WorkflowCommandsConcern
         $motivoCotizacion,
         $financiacionCotizacion,
         $notifyTargets,
-        $targetCotizacionId
+        $targetCotizacionId,
+        false
       );
       if (($cotResult['ok'] ?? '0') !== '1') {
         return $cotResult;
@@ -1082,10 +1085,52 @@ trait WorkflowCommandsConcern
     return in_array(trim($estadoCotizacion), ['Aprobada', 'Desaprobada'], true);
   }
 
+  private function insertCotizacionResponseTicketHistory(array $ticket, int $ticketPk, array $cotIds, string $estado, string $observacion, string $motivo, string $financiacion, int $userId, string $employeeId, string $userName, int $nowTs, string $nowMysql): bool
+  {
+    $histTable = $this->db->table('jet_cct_historial_del_ticket');
+    if (!$this->schema->tableExists($histTable)) {
+      return false;
+    }
+
+    $quoteLabel = '';
+    $cotIds = array_values(array_filter(array_map('strval', $cotIds), static fn(string $id): bool => trim($id) !== ''));
+    if (!empty($cotIds)) {
+      $quoteLabel = ' #' . implode(', #', $cotIds);
+    }
+
+    $detail = 'Respuesta de cotizacion de mantenimiento' . $quoteLabel . ': ' . $estado . '.';
+    $cleanObservation = trim(wp_strip_all_tags($observacion));
+    if ($cleanObservation !== '' && strcasecmp($cleanObservation, 'Ninguna') !== 0 && strcasecmp($cleanObservation, 'No aplica') !== 0) {
+      $detail .= ' Observacion: ' . $cleanObservation . '.';
+    }
+    $motivo = trim($motivo);
+    if ($estado === 'Desaprobada' && $motivo !== '' && strcasecmp($motivo, 'No aplica') !== 0) {
+      $detail .= ' Motivo: ' . $motivo . '.';
+    }
+    $financiacion = trim($financiacion);
+    if ($estado === 'Aprobada' && $financiacion !== '' && strcasecmp($financiacion, 'No aplica / sin respuesta') !== 0) {
+      $detail .= ' Financiacion: ' . $financiacion . '.';
+    }
+
+    return $this->insertHistorial(
+      $histTable,
+      $ticketPk,
+      $detail,
+      $userId,
+      $employeeId,
+      $userName,
+      $nowTs,
+      $nowMysql,
+      (string) ($ticket['estado'] ?? '__keep__'),
+      $estado,
+      '__keep__'
+    );
+  }
+
   /**
    * @return array<string,string>
    */
-  public function saveCotizacionResponse(int $ticketPk, string $estado, string $observacion, string $motivo, string $financiacion, array $notifyTargets = [], int $targetCotizacionId = 0): array
+  public function saveCotizacionResponse(int $ticketPk, string $estado, string $observacion, string $motivo, string $financiacion, array $notifyTargets = [], int $targetCotizacionId = 0, bool $writeTicketHistory = true): array
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
@@ -1163,13 +1208,18 @@ trait WorkflowCommandsConcern
     }
 
     $cotRow = $this->fetchCotizacion($cotTable, $cotIds[0]);
-    $this->insertHistorialInmuebleCotizacion($ticket, $estado, $observacion, $motivo, $nowTs, $nowMysql);
+    $ticketHistorySaved = $writeTicketHistory
+      ? $this->insertCotizacionResponseTicketHistory($ticket, $ticketPk, $cotIds, $estado, $observacion, $motivo, $financiacion, $userId, $employeeId, $userName, $nowTs, $nowMysql)
+      : false;
+    $propertyHistorySaved = $this->insertHistorialInmuebleCotizacion($ticket, $estado, $observacion, $motivo, $nowTs, $nowMysql);
     $sent = $this->notifyCotizacionResponse($ticket, is_array($cotRow) ? $cotRow : [], $estado, $observacion, $notifyTargets);
     return [
       'ok' => '1',
       'message' => 'Respuesta de cotizacion guardada.' . ($sent > 0 ? ' Correos programados en cola: ' . $sent . '.' : ' Sin correos programados.'),
       'cot_rows' => (string)$updated,
       'emails_sent' => (string)$sent,
+      'hist_ticket_saved' => $ticketHistorySaved ? '1' : '0',
+      'hist_inmueble_saved' => $propertyHistorySaved ? '1' : '0',
     ];
   }
 
