@@ -4687,11 +4687,14 @@ trait RendersDashboard
   /** @param array<string,mixed> $item @param array<int,string> $needles */
   private function cotizacion_first_matching_value(array $item, array $needles): string
   {
-    foreach ($item as $key => $value) {
-      $keyNorm = strtolower((string) $key);
-      foreach ($needles as $needle) {
+    foreach ($needles as $needle) {
+      foreach ($item as $key => $value) {
+        $keyNorm = strtolower((string) $key);
         if (strpos($keyNorm, $needle) !== false) {
-          return $this->cotizacion_clean_text($value);
+          $cleanValue = $this->cotizacion_clean_text($value);
+          if ($cleanValue !== '') {
+            return $cleanValue;
+          }
         }
       }
     }
