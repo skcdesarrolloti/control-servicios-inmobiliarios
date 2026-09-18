@@ -1225,6 +1225,9 @@ trait HandlesMaintenanceActions
         throw new \DomainException('Cotización no encontrada.');
       }
       $quote = $found;
+      if ($mode === 'edit' && strtolower(trim((string) ($quote['estado'] ?? ''))) === 'desaprobada') {
+        throw new \DomainException('No se puede editar una cotización desaprobada.');
+      }
       if ($ticketPk <= 0) {
         $ticketPk = (int) ($quote['id_ticket'] ?? 0);
       }

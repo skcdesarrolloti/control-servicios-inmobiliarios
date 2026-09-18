@@ -3863,6 +3863,7 @@ trait RendersDashboard
     $nativeCotizacionFuncionarioHtml = $this->render_native_cotizacion_mantenimiento_view($row, $orders, 'funcionario');
     $nativeCotizacionDestinatarioHtml = $this->render_native_cotizacion_mantenimiento_view($row, $orders, 'destinatario');
     $cotizacionSinResponder = in_array(strtolower($estado), ['', 'esperando respuesta'], true);
+    $cotizacionEditable = !in_array(strtolower(trim($estado)), ['desaprobada', 'desaprobado'], true);
     $seguimientoReparacionesDisponible = $id !== '' && $ticket !== '' && $cotizacionSinResponder && $enviada && $fechaEnvioTs > 0 && $diasCalendarioSinRespuesta > 10;
     $caseDescription = 'Cotizacion de mantenimiento #' . ($id !== '' ? $id : '-') . ($ticket !== '' ? ' relacionada con el ticket #' . $ticket . '.' : '.');
     if ($direccion !== '' && $direccion !== '-') {
@@ -3924,7 +3925,7 @@ trait RendersDashboard
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="totales" hidden><div class="scm-cotizacion-finance-grid"><div><span>Total mano de obra</span><strong>' . esc_html($totalObra) . '</strong></div><div><span>Total materiales</span><strong>' . esc_html($totalMateriales) . '</strong></div><div><span>Total equipos</span><strong>' . esc_html($totalMaquinarias) . '</strong></div><div><span>Total otros costos</span><strong>' . esc_html($totalOtros) . '</strong></div><div class="scm-cotizacion-finance-total"><span>Total cotizaci&oacute;n</span><strong>' . esc_html($totalCotizacion) . '</strong></div></div></div>'
       . '<div class="scm-cotizacion-actions">'
       . ($id !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-native data-cotizacion-id="' . esc_attr($id) . '">Ver cotizaci&oacute;n</button>' : '')
-      . ($id !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-edit-cotizacion data-cotizacion-mode="edit" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Editar cotizaci&oacute;n</button>' : '')
+      . ($id !== '' && $cotizacionEditable ? '<button type="button" class="scm-case-work-btn" data-scm-edit-cotizacion data-cotizacion-mode="edit" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Editar cotizaci&oacute;n</button>' : '')
       . $ticketCaseButton
       . ($cotizacionAprobada ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-view-cotizacion-orders>Ver &oacute;rdenes <span class="scm-action-count">' . esc_html((string) count($orders)) . '</span></button>' : '')
       . ($cotizacionSinResponder ? '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizaci&oacute;n</button>' : '')
