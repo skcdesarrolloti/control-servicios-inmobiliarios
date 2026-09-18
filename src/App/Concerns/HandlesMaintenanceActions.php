@@ -2291,17 +2291,16 @@ trait HandlesMaintenanceActions
     $ticketRef = trim((string) ($quoteData['id_ticket'] ?? $ticket['_ID'] ?? ''));
     $revisionId = trim((string) ($quoteData['id_revision'] ?? ''));
     $tipo = trim((string) ($quoteData['tipo_mantenimiento'] ?? 'Correctiva'));
+    $isPreventive = stripos($tipo, 'prevent') !== false;
+    $reportCategory = $isPreventive ? 'Revision preventiva' : 'Revision correctiva';
     $where = ['TRIM(COALESCE(`id_ticket`, "")) = ?'];
     $params = [$ticketRef];
     if ($revisionId !== '') {
-      $column = stripos($tipo, 'prevent') !== false ? 'id_revision_preventiva' : 'id_revision_correctiva';
+      $column = $isPreventive ? 'id_revision_preventiva' : 'id_revision_correctiva';
       $where[] = "TRIM(COALESCE(`{$column}`, '')) = ?";
       $params[] = $revisionId;
     }
-    $existing = $this->db->getVar("SELECT `_ID` FROM `{$table}` WHERE " . implode(' AND ', $where) . " LIMIT 1", $params);
-    if ((int) $existing > 0) {
-      return 0;
-    }
+    $existingReportId = (int) $this->db->getVar("SELECT `_ID` FROM `{$table}` WHERE " . implode(' AND ', $where) . " LIMIT 1", $params);
 
     $config = [];
     $configTable = $this->db->table('jet_cct_confi_sistema');
@@ -2313,7 +2312,7 @@ trait HandlesMaintenanceActions
     $fee = (float) (\SCM\Modules\TicketCompletion\CompletionPolicy::fee($config) ?? 0);
     $value = $fee > 0 ? $fee : 0.0;
     $actorName = trim((string) ($actor['name'] ?? Auth::user()));
-    $description = 'Cobro administrativo por cotización de mantenimiento #' . $quoteId . '.';
+    $description = 'Cobro administrativo por cotización de mantenimiento #' . $quoteId . ' asociada a ' . $reportCategory . '.';
     $payload = [
       'cct_status' => 'publish',
       'id_ticket' => $ticketRef,
@@ -2324,7 +2323,7 @@ trait HandlesMaintenanceActions
       'cct_modified' => $nowSql,
       'fecha' => $now,
       'fue_pagado' => 'No',
-      'categoria' => 'Cotización de mantenimiento',
+      'categoria' => $reportCategory,
       'descripcion' => $description,
       'valor' => (string) (int) round($value),
       'transporte' => '0',
@@ -2343,7 +2342,7 @@ trait HandlesMaintenanceActions
       'arrendatario' => trim((string) ($ticket['arrendatario'] ?? '')),
     ];
     if ($revisionId !== '') {
-      if (stripos($tipo, 'prevent') !== false) {
+      if ($isPreventive) {
         $payload['id_revision_preventiva'] = $revisionId;
       } else {
         $payload['id_revision_correctiva'] = $revisionId;
@@ -2351,6 +2350,14 @@ trait HandlesMaintenanceActions
     }
 
     $payload = $schema->filterTableData($table, $payload);
+    if ($existingReportId > 0) {
+      $reportUpdate = $payload;
+      unset($reportUpdate['cct_created'], $reportUpdate['fecha'], $reportUpdate['fue_pagado'], $reportUpdate['exportado'], $reportUpdate['cct_author_id'], $reportUpdate['id_empleado'], $reportUpdate['creador']);
+      if (empty($reportUpdate)) {
+        return $existingReportId;
+      }
+      return $this->db->update($table, $reportUpdate, ['_ID' => $existingReportId]) >= 0 ? $existingReportId : 0;
+    }
     if (empty($payload) || !$this->db->insert($table, $payload)) {
       return 0;
     }
