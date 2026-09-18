@@ -1,0 +1,37 @@
+{
+  "name": "scm_orden_mantenimiento_funcionario_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "description": "Aviso interno para que el funcionario configurado apruebe o desapruebe una orden de mantenimiento.",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Buen día, {{1}}.\n\nTienes una orden de mantenimiento #{{2}} pendiente por aprobar del caso #{{3}} por {{4}}.\n\nCategoría: {{5}}.\nProveedor: {{6}}.\nDirección: {{7}}.\n\nPuedes revisar y responder la orden desde el botón.\n\nAtentamente,\n{{8}}\nSKC SuCasa Inmobiliaria",
+      "example": {
+        "body_text": [[
+          "Royner Guardo",
+          "98",
+          "10676",
+          "$ 250.000",
+          "Materiales",
+          "Homecenter",
+          "Urbanización Simón Bolívar manzana 20 lote 7",
+          "Royner Guardo"
+        ]]
+      }
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver y responder orden",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "orden-publica.php?numero=98&expires=1790000000&sig=demo"
+          ]
+        }
+      ]
+    }
+  ]
+}

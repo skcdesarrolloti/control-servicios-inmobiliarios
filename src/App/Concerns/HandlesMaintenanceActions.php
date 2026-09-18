@@ -4188,7 +4188,7 @@ trait HandlesMaintenanceActions
     }
   }
 
-  /** @return array<int,array{name:string,email:string}> */
+  /** @return array<int,array{name:string,email:string,phone:string,id:string}> */
   private function maintenance_order_internal_email_recipients(string $action): array
   {
     $selectedIds = array_map('strval', $this->internalNotificationRecipientsForAction($action));
@@ -4205,15 +4205,43 @@ trait HandlesMaintenanceActions
         continue;
       }
       $recipients[] = [
+        'id' => $id,
         'name' => trim((string) ($funcionario['name'] ?? '')),
         'email' => $email,
+        'phone' => trim((string) ($funcionario['phone'] ?? '')),
       ];
     }
 
     return $this->maintenance_order_unique_email_recipients($recipients);
   }
 
-  /** @param array<int,array{name:string,email:string}> $recipients @return array<int,array{name:string,email:string}> */
+  /** @return array<int,array{name:string,phone:string,id:string}> */
+  private function maintenance_order_internal_whatsapp_recipients(string $action): array
+  {
+    $selectedIds = array_map('strval', $this->internalNotificationRecipientsForAction($action));
+    if ($selectedIds === []) {
+      return [];
+    }
+
+    $selected = array_fill_keys($selectedIds, true);
+    $recipients = [];
+    foreach ($this->internalNotificationFuncionarioOptions() as $funcionario) {
+      $id = trim((string) ($funcionario['id'] ?? ''));
+      $phone = trim((string) ($funcionario['phone'] ?? ''));
+      if ($id === '' || !isset($selected[$id]) || $phone === '') {
+        continue;
+      }
+      $recipients[] = [
+        'id' => $id,
+        'name' => trim((string) ($funcionario['name'] ?? 'Funcionario')),
+        'phone' => $phone,
+      ];
+    }
+
+    return $recipients;
+  }
+
+  /** @param array<int,array{name:string,email:string,phone?:string,id?:string}> $recipients @return array<int,array{name:string,email:string,phone:string,id:string}> */
   private function maintenance_order_unique_email_recipients(array $recipients): array
   {
     $seen = [];
@@ -4225,8 +4253,10 @@ trait HandlesMaintenanceActions
       }
       $seen[$email] = true;
       $out[] = [
+        'id' => trim((string) ($recipient['id'] ?? '')),
         'name' => trim((string) ($recipient['name'] ?? '')),
         'email' => $email,
+        'phone' => trim((string) ($recipient['phone'] ?? '')),
       ];
     }
     return $out;
@@ -4266,14 +4296,15 @@ trait HandlesMaintenanceActions
   /** @param array<string,mixed> $order @param array<string,mixed> $cotizacion @param array<string,string> $user */
   private function maintenance_order_enqueue_created_notifications(array $order, array $cotizacion, array $user, int $orderId): int
   {
-    $recipients = $this->maintenance_order_internal_email_recipients('orden_mantenimiento_creada');
-    if ($recipients === []) {
+    $emailRecipients = $this->maintenance_order_internal_email_recipients('orden_mantenimiento_creada');
+    $whatsappRecipients = $this->maintenance_order_internal_whatsapp_recipients('orden_mantenimiento_creada');
+    if ($emailRecipients === [] && $whatsappRecipients === []) {
       return 0;
     }
 
-    $emails = array_column($recipients, 'email');
     $category = trim((string) ($order['categoria'] ?? 'mantenimiento'));
     $ticket = $this->maintenance_order_first([$order['id_ticket'] ?? '', $cotizacion['id_ticket'] ?? '']);
+    $orderUrl = $this->maintenance_order_order_url($orderId);
     $subject = 'Orden de ' . strtolower($category) . ($ticket !== '' ? ' del caso #' . $ticket : '') . ' pendiente';
     $html = $this->maintenance_order_email_html('Orden de mantenimiento creada', [
       'Orden' => '#' . $orderId,
@@ -4287,18 +4318,107 @@ trait HandlesMaintenanceActions
       'Creada por' => trim((string) ($user['nombre'] ?? '-')),
     ], $orderId);
 
-    return (new \SCM\Support\EmailQueue($this->db))->enqueue($emails, $subject, $html, [
-      'source_module' => 'ordenes_mantenimiento',
-      'dedupe_key' => 'orden-mantenimiento-creada:' . $orderId,
-      'meta' => [
-        'event' => 'orden_mantenimiento_creada',
-        'id_orden' => $orderId,
+    $emailQueued = 0;
+    if ($emailRecipients !== []) {
+      $emailQueued = (new \SCM\Support\EmailQueue($this->db))->enqueue(array_column($emailRecipients, 'email'), $subject, $html, [
+        'source_module' => 'ordenes_mantenimiento',
+        'dedupe_key' => 'orden-mantenimiento-creada:' . $orderId,
+        'meta' => [
+          'event' => 'orden_mantenimiento_creada',
+          'id_orden' => $orderId,
+          'id_cotizacion' => trim((string) ($order['id_cotizacion'] ?? $cotizacion['_ID'] ?? '')),
+          'id_ticket' => $ticket,
+          'categoria' => $category,
+          'actor' => trim((string) ($user['nombre'] ?? '')),
+        ],
+      ]);
+    }
+
+    $whatsappQueued = $this->maintenance_order_enqueue_created_whatsapp(
+      $whatsappRecipients,
+      $order,
+      $cotizacion,
+      $user,
+      $orderId,
+      $orderUrl,
+      $category,
+      $ticket
+    );
+
+    return $emailQueued + $whatsappQueued;
+  }
+
+  /** @param array<int,array{name:string,phone?:string,id?:string,email?:string}> $recipients @param array<string,mixed> $order @param array<string,mixed> $cotizacion @param array<string,string> $user */
+  private function maintenance_order_enqueue_created_whatsapp(array $recipients, array $order, array $cotizacion, array $user, int $orderId, string $orderUrl, string $category, string $ticket): int
+  {
+    $buttonSuffix = $this->maintenance_quote_whatsapp_url_button_suffix($orderUrl);
+    $smsQueue = new \SCM\Support\SmsQueue($this->db);
+    $queued = 0;
+    $sentPhones = [];
+    $total = $this->format_cop_currency($order['valor'] ?? 0);
+    $provider = $this->maintenance_order_first([$order['proveedor'] ?? '', '-']);
+    $direction = $this->maintenance_order_first([$order['direccion'] ?? '', $cotizacion['direccion'] ?? '', '-']);
+    $actor = $this->maintenance_order_first([$user['nombre'] ?? '', 'SKC SuCasa Inmobiliaria']);
+
+    foreach ($recipients as $recipient) {
+      $phone = trim((string) ($recipient['phone'] ?? ''));
+      $phoneKey = preg_replace('/\D+/', '', $phone) ?? '';
+      if ($phoneKey === '' || isset($sentPhones[$phoneKey])) {
+        continue;
+      }
+      $sentPhones[$phoneKey] = true;
+      $name = trim((string) ($recipient['name'] ?? 'Funcionario'));
+      $message = "Buen día, {$name}.\n\n";
+      $message .= "Tienes una orden de mantenimiento #{$orderId} pendiente por aprobar" . ($ticket !== '' ? " del caso #{$ticket}" : '') . " por {$total}.\n\n";
+      $message .= "Categoría: " . ($category !== '' ? $category : '-') . ".\n";
+      $message .= "Proveedor: {$provider}.\n";
+      $message .= "Dirección: {$direction}.\n\n";
+      $message .= "Puedes revisar y responder la orden desde el botón.\n\n";
+      $message .= "Enlace directo: {$orderUrl}\n\n";
+      $message .= "Atentamente,\n{$actor}\nSKC SuCasa Inmobiliaria";
+      $ok = $smsQueue->enqueue($phone, $name, $message, [
+        'source_module' => 'ordenes_mantenimiento',
+        'campaign_tag' => 'ordenes_mantenimiento',
+        'categoria_mensaje' => 'informacion',
+        'id_orden' => (string) $orderId,
         'id_cotizacion' => trim((string) ($order['id_cotizacion'] ?? $cotizacion['_ID'] ?? '')),
         'id_ticket' => $ticket,
         'categoria' => $category,
-        'actor' => trim((string) ($user['nombre'] ?? '')),
-      ],
-    ]);
+        'order_url' => $orderUrl,
+        'button_url_mode' => 'dynamic_suffix',
+        'dedupe_key' => 'orden-mantenimiento-creada-whatsapp:' . $orderId,
+        'template_name' => 'scm_orden_mantenimiento_funcionario_v1',
+        'template_language' => 'es_CO',
+        'template_components' => [
+          [
+            'type' => 'body',
+            'parameters' => [
+              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($name)],
+              ['type' => 'text', 'text' => (string) $orderId],
+              ['type' => 'text', 'text' => $ticket !== '' ? $ticket : '-'],
+              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($total)],
+              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($category !== '' ? $category : '-')],
+              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($provider)],
+              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($direction)],
+              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($actor)],
+            ],
+          ],
+          [
+            'type' => 'button',
+            'sub_type' => 'url',
+            'index' => '0',
+            'parameters' => [
+              ['type' => 'text', 'text' => $buttonSuffix],
+            ],
+          ],
+        ],
+      ]);
+      if ($ok) {
+        $queued++;
+      }
+    }
+
+    return $queued;
   }
 
   /** @param array<string,mixed> $order @param array<string,string> $user */

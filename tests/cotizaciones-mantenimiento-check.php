@@ -19,7 +19,9 @@ $notificationDelivery = (string) file_get_contents($root . '/src/Modules/Servici
 $publicQuote = (string) file_get_contents($root . '/public/cotizacion-mantenimiento.php');
 $repairFollowupTemplate = (string) file_get_contents($root . '/docs/whatsapp-seguimiento-reparaciones-template.json');
 $quoteSendTemplate = (string) file_get_contents($root . '/docs/whatsapp-cotizacion-mantenimiento-envio-template.json');
+$orderOfficialTemplate = (string) file_get_contents($root . '/docs/whatsapp-orden-mantenimiento-funcionario-template.json');
 $storedFiles = (string) file_get_contents($root . '/src/Support/StoredFileService.php');
+$funcionarioOptions = (string) file_get_contents($root . '/src/Support/FuncionarioOptions.php');
 $genericTicketsUi = (string) file_get_contents($root . '/src/Views/GenericTicketsUiView.php');
 $historyPresentation = (string) file_get_contents($root . '/src/Modules/ServiciosInmobiliarios/Concerns/HistoryPresentationConcern.php');
 $mediaMigrator = (string) file_get_contents($root . '/bin/migrate-media-to-local-storage.php');
@@ -156,6 +158,7 @@ $checks = [
   'frontend validates quote order amount live' => str_contains($runtimeJs, 'validateOrderAmount') && str_contains($runtimeJs, 'data-scm-order-value-error') && str_contains($runtimeJs, 'confirmButton.disabled = isOver') && str_contains($adminCss, '.scm-cotizacion-order-balance.is-over') && str_contains($adminCss, '.scm-cotizacion-order-value-error'),
   'backend creates maintenance orders from approved quotes' => str_contains($handler, 'ajax_handler_cotizacion_order_save') && str_contains($handler, "jet_cct_ordenes") && str_contains($handler, 'maintenance_order_update_cotizacion_balance') && str_contains($handler, 'maintenance_order_insert_histories') && str_contains($handler, 'maintenance_order_save_provider'),
   'backend reuses existing maintenance order providers before creating duplicates' => str_contains($handler, 'maintenance_order_find_existing_provider_id') && str_contains($handler, 'identificacion_proveedor') && str_contains($handler, 'LOWER(TRIM(`correo_proveedor`))') && str_contains($handler, 'preg_replace') && str_contains($handler, 'celular_proveedor'),
+  'backend sends maintenance order approval link to configured officials by whatsapp' => str_contains($handler, 'maintenance_order_internal_whatsapp_recipients') && str_contains($handler, 'maintenance_order_enqueue_created_whatsapp') && str_contains($handler, 'scm_orden_mantenimiento_funcionario_v1') && str_contains($handler, 'orden-mantenimiento-creada-whatsapp') && str_contains($handler, 'button_url_mode') && str_contains($funcionarioOptions, "'phone'") && str_contains($orderOfficialTemplate, 'scm_orden_mantenimiento_funcionario_v1'),
   'native add order popup uses styled form classes' => str_contains($runtimeJs, 'scm-cotizacion-order-form') && str_contains($runtimeJs, 'scm-cotizacion-order-grid') && str_contains($adminCss, '.scm-cotizacion-order-form') && str_contains($adminCss, '.scm-cotizacion-order-grid'),
   'ticket response carries exact quote id when available' => str_contains($adminJs, 'name="id_cotizacion"') && str_contains($adminJs, 'caseBtn.dataset.cotizacionId'),
   'standalone quote response carries exact quote id' => str_contains($runtimeJs, 'fd.append(') && str_contains($runtimeJs, '"id_cotizacion"') && str_contains($runtimeJs, 'responseBtn.getAttribute("data-cotizacion-id")'),

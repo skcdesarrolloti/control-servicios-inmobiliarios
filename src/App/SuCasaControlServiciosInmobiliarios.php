@@ -408,7 +408,7 @@ final class SuCasaControlServiciosInmobiliarios
     return $out;
   }
 
-  /** @return array<int,array{id:string,label:string,name:string,email:string,cargo:string}> */
+  /** @return array<int,array{id:string,label:string,name:string,email:string,phone:string,cargo:string}> */
   private function internalNotificationFuncionarioOptions(): array
   {
     $out = [];
@@ -424,6 +424,7 @@ final class SuCasaControlServiciosInmobiliarios
       }
       $name = trim((string) ($row['name'] ?? ''));
       $email = trim((string) ($row['email'] ?? ''));
+      $phone = trim((string) ($row['phone'] ?? ''));
       $cargo = trim((string) ($row['cargo'] ?? ''));
       $employee = trim((string) ($row['employee_id'] ?? ''));
       $parts = [$name !== '' ? $name : ('Funcionario #' . $id), $cargo];
@@ -438,6 +439,7 @@ final class SuCasaControlServiciosInmobiliarios
         'label' => implode(' · ', $parts),
         'name' => $name !== '' ? $name : ('Funcionario #' . $id),
         'email' => $email,
+        'phone' => $phone,
         'cargo' => $cargo,
       ];
     }

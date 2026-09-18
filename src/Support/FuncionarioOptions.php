@@ -73,6 +73,7 @@ final class FuncionarioOptions
    *   name:string,
    *   employee_id:string,
    *   email:string,
+   *   phone:string,
    *   cargo:string,
    *   id_cargo:string
    * }>
@@ -94,6 +95,7 @@ final class FuncionarioOptions
 
     $nameColumn = $schema->detectFirstExistingColumn($table, ['nombre', 'empleado', 'nombre_empleado', 'nombre_funcionario']);
     $emailColumn = $schema->detectFirstExistingColumn($table, ['correo', 'correo_dian', 'email']);
+    $phoneColumn = $schema->detectFirstExistingColumn($table, ['celular', 'celular_empleado', 'telefono', 'whatsapp']);
     $cargoColumn = $schema->columnExists($table, 'id_cargo') ? 'id_cargo' : '';
     $activeColumn = $schema->detectFirstExistingColumn($table, ['activo', 'cct_status']);
     $cargoTable = $db->table('jet_cct_cargos');
@@ -126,6 +128,7 @@ final class FuncionarioOptions
       $employeeColumn !== '' ? "TRIM(COALESCE(f.`{$employeeColumn}`, '')) AS employee_id" : "'' AS employee_id",
       $nameColumn !== '' ? "TRIM(COALESCE(f.`{$nameColumn}`, '')) AS nombre" : "'' AS nombre",
       $emailColumn !== '' ? "TRIM(COALESCE(f.`{$emailColumn}`, '')) AS correo" : "'' AS correo",
+      $phoneColumn !== '' ? "TRIM(COALESCE(f.`{$phoneColumn}`, '')) AS celular" : "'' AS celular",
       $cargoColumn !== '' ? "TRIM(COALESCE(f.`{$cargoColumn}`, '')) AS id_cargo" : "'' AS id_cargo",
       $hasCargoNames ? "TRIM(COALESCE(c.`nombre_cargo`, '')) AS nombre_cargo" : "'' AS nombre_cargo",
     ];
@@ -168,6 +171,7 @@ final class FuncionarioOptions
         'name' => $displayName,
         'employee_id' => $employeeId,
         'email' => trim((string) ($row['correo'] ?? '')),
+        'phone' => trim((string) ($row['celular'] ?? '')),
         'cargo' => $cargo,
         'id_cargo' => $cargoId,
       ];
@@ -188,6 +192,7 @@ final class FuncionarioOptions
    *   name:string,
    *   employee_id:string,
    *   email:string,
+   *   phone:string,
    *   cargo:string,
    *   id_cargo:string
    * }>
