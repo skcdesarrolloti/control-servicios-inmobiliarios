@@ -196,6 +196,7 @@ $checks = [
   'repair followup enqueues shared email and whatsapp notifications' => str_contains($notificationDelivery, 'notifyRepairFollowupNotice') && str_contains($notificationDelivery, "'source_module' => 'seguimiento_reparaciones_cotizacion'") && str_contains($notificationDelivery, 'scm_seguimiento_reparaciones_v1') && str_contains($notificationDelivery, 'SmsQueue'),
   'repair followup whatsapp button sends dynamic suffix expected by Meta' => str_contains($notificationDelivery, '$buttonSuffix = $this->whatsappUrlButtonSuffix($noticeUrl)') && str_contains($notificationDelivery, "'button_url_mode' => 'dynamic_suffix'") && str_contains($notificationDelivery, "['type' => 'text', 'text' => \$buttonSuffix]"),
   'repair followup whatsapp template documents url placeholder without encoded braces' => str_contains($repairFollowupTemplate, 'https://sucasainmobiliaria.com.co/{{1}}') && !str_contains($repairFollowupTemplate, '%7B%7B1%7D%7D'),
+  'maintenance material quote rows stay responsive on narrow screens' => str_contains($adminCss, '@media (max-width: 680px)') && str_contains($adminCss, '[data-quote-repeater="materiales_soporte"] .scm-maint-quote-row') && str_contains($adminCss, 'grid-template-columns: minmax(0, 1fr) !important') && str_contains($adminCss, '.scm-maint-quote-generate') && str_contains($adminCss, 'width: calc(100vw - 16px) !important'),
 ];
 
 $failed = [];

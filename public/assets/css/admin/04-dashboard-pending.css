@@ -6834,6 +6834,12 @@
 }
 
 @media (max-width: 680px) {
+  .swal2-popup.scm-cotizacion-dialog {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    border-radius: 18px;
+  }
+
   .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-title {
     padding: 20px 66px 16px 18px;
     font-size: 18px;
@@ -6841,7 +6847,7 @@
 
   .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-body {
     max-height: 66vh;
-    padding: 18px;
+    padding: 14px;
   }
 
   .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-actions {
@@ -6881,6 +6887,46 @@
   .scm-maint-quote-row {
     width: 100%;
     grid-template-columns: 1fr;
+  }
+
+  [data-quote-repeater="materiales"] .scm-maint-quote-row,
+  [data-quote-repeater="materiales_soporte"] .scm-maint-quote-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .scm-maint-quote-form,
+  .scm-maint-quote-section,
+  .scm-maint-quote-rows,
+  .scm-maint-quote-row,
+  .scm-maint-quote-support-head,
+  .scm-maint-quote-support-total,
+  .scm-maint-quote-auto-item,
+  .scm-maint-quote-generate,
+  .scm-maint-quote-remove,
+  .scm-cotizacion-dialog-field,
+  .scm-cotizacion-dialog-field input,
+  .scm-cotizacion-dialog-field select,
+  .scm-cotizacion-dialog-field textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .scm-maint-quote-section,
+  .scm-maint-quote-row,
+  .scm-maint-quote-support-head {
+    padding: 10px;
+  }
+
+  .scm-maint-quote-auto-item,
+  .scm-maint-quote-support-total,
+  .scm-maint-quote-generate,
+  .scm-maint-quote-remove {
+    width: 100%;
+  }
+
+  .scm-maint-quote-generate,
+  .scm-maint-quote-remove {
+    justify-content: center;
   }
 
   .scm-maint-quote-image-thumb,
