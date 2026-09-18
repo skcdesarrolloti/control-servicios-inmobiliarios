@@ -13106,6 +13106,33 @@
       return '<div class="scm-maint-quote-warning"><strong>Atención:</strong> este caso ya tiene cotización activa. Al crear una nueva, el sistema marcará como <b>Desaprobada</b> la anterior: ' + items + ".</div>";
     }
 
+    function confirmMaintenanceQuoteReplacement(context) {
+      var quotes = context && Array.isArray(context.existing_quotes) ? context.existing_quotes : [];
+      if (!context || !context.will_disapprove_previous || !quotes.length || !window.Swal || typeof window.Swal.fire !== "function") {
+        return Promise.resolve(true);
+      }
+      var items = quotes.map(function (q) {
+        return "<li><strong>#" + escHtml(q.id || "") + "</strong> — " + escHtml(q.estado || "Sin estado") + "</li>";
+      }).join("");
+      return window.Swal.fire({
+        icon: "warning",
+        title: "Este caso ya tiene una cotización activa",
+        html: '<div class="scm-swal-text-left"><p>Si guardas una nueva cotización, la anterior quedará marcada como <strong>Desaprobada</strong>.</p><ul>' + items + '</ul><p>¿Deseas continuar?</p></div>',
+        showCancelButton: true,
+        confirmButtonText: "Sí, crear nueva",
+        cancelButtonText: "Cancelar",
+        buttonsStyling: false,
+        focusCancel: true,
+        customClass: {
+          popup: "scm-cotizacion-dialog",
+          confirmButton: "scm-cotizacion-dialog-confirm",
+          cancelButton: "scm-cotizacion-dialog-cancel",
+        },
+      }).then(function (result) {
+        return !!(result && result.isConfirmed);
+      });
+    }
+
     function maintenanceQuotePerturbationHtml(context) {
       var d = context.defaults || {};
       var p = context.perturbation_context || {};
@@ -14099,11 +14126,16 @@
       var mode = options.mode || button.getAttribute("data-cotizacion-mode") || (button.hasAttribute("data-scm-create-cotizacion") ? "create" : "edit");
       return loadMaintenanceQuoteContext(button, mode)
         .then(function (context) {
-          var draftKey = maintenanceQuoteDraftKey(context || {});
-          if (mode === "create" && button.hasAttribute("data-scm-clear-cotizacion-create-draft")) {
-            clearMaintenanceQuoteDraft(draftKey);
-          }
-          return window.Swal.fire({
+          return confirmMaintenanceQuoteReplacement(context).then(function (confirmedReplacement) {
+            if (!confirmedReplacement) {
+              if (options.onClose) options.onClose();
+              return false;
+            }
+            var draftKey = maintenanceQuoteDraftKey(context || {});
+            if (mode === "create" && button.hasAttribute("data-scm-clear-cotizacion-create-draft")) {
+              clearMaintenanceQuoteDraft(draftKey);
+            }
+            return window.Swal.fire({
             title: context.mode === "edit" ? "Editar cotización de mantenimiento" : (context.mode === "note" ? "Añadir nota de cotización" : "Añadir cotización de mantenimiento"),
             html: buildMaintenanceQuoteFormHtml(context),
             width: "min(1080px, 96vw)",
@@ -14155,12 +14187,6 @@
                 window.Swal.showValidationMessage("Completa el destinatario.");
                 return false;
               }
-              if (context && context.will_disapprove_previous) {
-                var accepted = window.confirm("Este caso ya tiene una cotización activa. Si guardas esta nueva cotización, la anterior quedará marcada como Desaprobada. ¿Deseas continuar?");
-                if (!accepted) {
-                  return false;
-                }
-              }
               saveMaintenanceQuoteDraft(form, draftKey, context || {});
               return submitCotizacionAction(formData, actionCotizacionSave, "No se pudo guardar la cotización.").then(function (saved) {
                 if (!saved) {
@@ -14179,6 +14205,7 @@
             }
             if (options.onClose) options.onClose(320);
             return true;
+          });
           });
         })
         .catch(function (err) {

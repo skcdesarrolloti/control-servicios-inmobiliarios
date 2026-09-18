@@ -5472,6 +5472,22 @@
   text-align: left;
 }
 
+.swal2-popup.scm-cotizacion-dialog .scm-swal-text-left {
+  text-align: left;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-swal-text-left p {
+  margin: 0 0 12px;
+}
+
+.swal2-popup.scm-cotizacion-dialog .scm-swal-text-left ul {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+
 .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-actions {
   width: 100%;
   justify-content: flex-end;
