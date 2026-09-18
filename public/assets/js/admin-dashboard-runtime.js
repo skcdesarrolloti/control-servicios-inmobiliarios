@@ -7642,18 +7642,46 @@
     bindInternalNotificationsSettings();
 
     function openActasGuideModal() {
-      var bridgeBase = "control-servicios-inmobiliarios/public/puente-funcionario.php";
-      var createActBase = "control-servicios-inmobiliarios/public/crear-acta.php";
+      var configuredBase = String(runtime.baseUrl || "").replace(/\/+$/, "");
+      var derivedBase = "";
+      try {
+        derivedBase = window.location.href.replace(/[?#].*$/, "").replace(/\/(?:index\.php)?$/, "");
+      } catch (_error) {
+        derivedBase = "";
+      }
+      var appBase = configuredBase || derivedBase || "https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public";
+      var bridgeBase = appBase + "/puente-funcionario.php";
+      var createActBase = appBase + "/crear-acta.php";
+      var bridgeUrl = function (query) {
+        return bridgeBase + "?" + query;
+      };
+      var linkField = function (label, description, url) {
+        return '<div class="scm-cotizacion-dialog-field is-wide"><span>' +
+          escHtml(label) +
+          '</span><small>' +
+          escHtml(description) +
+          '</small><code>' +
+          escHtml(url) +
+          "</code></div>";
+      };
       var html =
         '<div class="scm-cotizacion-response-form scm-actas-guide-modal">' +
-        '<p class="scm-cotizacion-dialog-intro">Hay dos usos nativos del acta. Comparten firma, OTP, PDF y notificaciones, pero no se deben confundir porque actualizan procesos distintos.</p>' +
+        '<p class="scm-cotizacion-dialog-intro">Enlaces completos para abrir funciones nativas desde WordPress. <strong>&lt;ID_INTERNO_CASO&gt;</strong> es el _ID interno del ticket y <strong>&lt;ID_COTIZACION&gt;</strong> es el _ID de la cotizaci&oacute;n.</p>' +
         '<div class="scm-cotizacion-response-grid">' +
-        '<div class="scm-cotizacion-dialog-field is-wide"><span>1. Acta directa del caso</span><strong>Soluci&oacute;n / cierre sin cotizaci&oacute;n aprobada</strong><small>Se usa desde el caso, en Complementarias &rarr; Acta de soluci&oacute;n y firma. Sirve cuando el trabajo se solucion&oacute; directamente o no depende de una cotizaci&oacute;n aprobada. Al firmarse cierra el caso y, si aplica, deja las cotizaciones pendientes como desaprobadas por soluci&oacute;n propia.</small><code>' + escHtml(bridgeBase + "?accion=acta_satisfaccion&ticket_pk=<ID_INTERNO_CASO>") + '</code></div>' +
-        '<div class="scm-cotizacion-dialog-field is-wide"><span>2. Acta por cotizaci&oacute;n aprobada</span><strong>Satisfacci&oacute;n al terminar el trabajo cotizado</strong><small>Se usa cuando ya existe una cotizaci&oacute;n aprobada y el trabajo/orden se finaliz&oacute;. Vincula el acta a esa cotizaci&oacute;n activa y no la desaprueba; la finaliza con el acta firmada.</small><code>' + escHtml(bridgeBase + "?accion=acta_cotizacion&id_cotizacion=<ID_COTIZACION>") + '</code><code>' + escHtml(createActBase + "?id_cotizacion=<ID_COTIZACION>&source_flow=approved_quote") + '</code></div>' +
-        '<div class="scm-cotizacion-dialog-field is-wide"><span>Autologin desde WordPress</span><strong>Agregar al enlace cuando el funcionario no tiene sesi&oacute;n</strong><small>Usa el mismo secreto configurado para actas. El puente elimina token e id_empleado antes de dejar al funcionario en la pantalla final.</small><code>' + escHtml("&id_empleado=<ID_EMPLEADO>&token=<ACTA_AUTOLOGIN_SECRET>") + '</code></div>' +
+        '<div class="scm-cotizacion-dialog-field is-wide"><span>Actas</span><strong>Dos procesos distintos</strong><small>Acta directa: soluci&oacute;n/cierre sin cotizaci&oacute;n aprobada. Acta por cotizaci&oacute;n: satisfacci&oacute;n al terminar el trabajo cotizado y aprobado.</small></div>' +
+        linkField("Acta directa del caso", "Abre Complementarias → Acta de solución y firma.", bridgeUrl("accion=acta_satisfaccion&ticket_pk=<ID_INTERNO_CASO>")) +
+        linkField("Acta por cotización aprobada", "Abre el sistema y crea el acta vinculada a esa cotización aprobada.", bridgeUrl("accion=acta_cotizacion&id_cotizacion=<ID_COTIZACION>")) +
+        linkField("Acta por cotización aprobada · directo", "Alternativa directa a crear-acta.php si ya hay sesión activa.", createActBase + "?id_cotizacion=<ID_COTIZACION>&source_flow=approved_quote") +
+        '<div class="scm-cotizacion-dialog-field is-wide"><span>Funciones puente para funcionarios</span><strong>Acciones disponibles desde WordPress</strong><small>Usa estos enlaces para migrar los botones externos al sistema nativo sin abrir pestañas innecesarias cuando el funcionario est&aacute; dentro del panel.</small></div>' +
+        linkField("Crear / gestionar revisión correctiva", "Abre la revisión correctiva del caso; si no existe, permite crearla.", bridgeUrl("accion=revision_correctiva&ticket_pk=<ID_INTERNO_CASO>")) +
+        linkField("Crear cotización de mantenimiento", "Abre el formulario nativo de nueva cotización para el caso.", bridgeUrl("accion=crear_cotizacion&ticket_pk=<ID_INTERNO_CASO>")) +
+        linkField("Editar cotización de mantenimiento", "Abre la cotización exacta en modo edición cuando su estado lo permita.", bridgeUrl("accion=editar_cotizacion&id_cotizacion=<ID_COTIZACION>")) +
+        linkField("Enviar cotización", "Abre el envío por correo/WhatsApp de la cotización exacta.", bridgeUrl("accion=enviar_cotizacion&id_cotizacion=<ID_COTIZACION>")) +
+        linkField("Crear orden de mantenimiento", "Abre la creación de orden para la cotización aprobada.", bridgeUrl("accion=crear_orden&id_cotizacion=<ID_COTIZACION>")) +
+        '<div class="scm-cotizacion-dialog-field is-wide"><span>Autologin desde WordPress</span><strong>Agregar al final si el funcionario no tiene sesi&oacute;n</strong><small>Usa el mismo secreto configurado para actas. El puente elimina token e id_empleado antes de dejar al funcionario en la pantalla final.</small><code>' + escHtml("&id_empleado=<ID_EMPLEADO>&token=<ACTA_AUTOLOGIN_SECRET>") + '</code></div>' +
         '</div></div>';
       if (!window.Swal) {
-        showToast("info", "Acta caso: accion=acta_satisfaccion. Acta cotización: accion=acta_cotizacion.");
+        showToast("info", "Enlaces puente: revisión, cotización, envío, orden y actas.");
         return;
       }
       window.Swal.fire({

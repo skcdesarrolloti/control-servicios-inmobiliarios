@@ -346,6 +346,7 @@ trait RendersDashboard
     $apiUrl = defined('SCM_BASE_URL') ? (SCM_BASE_URL . '/api.php') : '/api.php';
     $runtimeData = [
       'ajaxUrl'      => $apiUrl,
+      'baseUrl'      => rtrim((string) (defined('SCM_BASE_URL') ? SCM_BASE_URL : ''), '/'),
       'nonce'        => $nonce,
       'config'       => $config,
       'indicativos'  => $this->getIndicativoOptions(),
