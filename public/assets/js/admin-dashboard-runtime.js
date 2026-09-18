@@ -13182,13 +13182,7 @@
     }
 
     function maintenanceQuoteMaterialSupportItems(items) {
-      var rows = Array.isArray(items) ? items.filter(function (row) {
-        if (!row) return false;
-        return String(row.descripcion_materiales || row.unidad_materiales || "").trim()
-          || parseCotizacionOrderMoney(row.valor_unitario_materiales || 0) > 0
-          || parseCotizacionOrderMoney(row.valor_total_materiales || 0) > 0;
-      }) : [];
-      return rows.length ? rows : [{}];
+      return [{}];
     }
 
     function buildMaintenanceQuoteFormHtml(context) {
@@ -13457,6 +13451,21 @@
           '</article>';
       }).join("");
       renderMaintenanceQuoteGeneratedOfferAttachments(form);
+    }
+
+    function maintenanceQuoteHasSavedMaterialRows(form) {
+      if (!form) return false;
+      return Array.prototype.some.call(form.querySelectorAll('[data-quote-row="materiales"]'), function (row) {
+        var data = quoteRowToObject(row);
+        return String(data.provedor_materiales || data.proveedor_materiales || "").trim()
+          || parseCotizacionOrderMoney(data.valor_materiales || 0) > 0;
+      });
+    }
+
+    function resetMaterialSupportBuilderIfNoSavedMaterials(form) {
+      if (!maintenanceQuoteHasSavedMaterialRows(form)) {
+        resetMaterialSupportBuilder(form);
+      }
     }
 
     function appendMaterialRowFromGeneratedOffer(form, offer) {
@@ -13980,6 +13989,7 @@
             return offer.key !== key;
           }));
           form.querySelectorAll('[data-generated-material-offer-row="' + key + '"]').forEach(function (row) { row.remove(); });
+          resetMaterialSupportBuilderIfNoSavedMaterials(form);
           renderMaintenanceQuoteGeneratedMaterialOffers(form);
           syncMaintenanceQuoteTotals(form);
           return;
@@ -14007,6 +14017,7 @@
                 return offer.key !== materialKey;
               }));
             }
+            resetMaterialSupportBuilderIfNoSavedMaterials(form);
           }
           renderMaintenanceQuoteGeneratedMaterialOffers(form);
           syncMaintenanceQuoteTotals(form);
@@ -14038,6 +14049,7 @@
             setMaintenanceQuoteGeneratedMaterialOffers(form, maintenanceQuoteGeneratedMaterialOffers(form).filter(function (offer) {
               return offer.key !== generatedKey;
             }));
+            resetMaterialSupportBuilderIfNoSavedMaterials(form);
             renderMaintenanceQuoteGeneratedMaterialOffers(form);
             syncMaintenanceQuoteTotals(form);
             return;
