@@ -15539,6 +15539,150 @@
         });
     }
 
+    function bridgeSyntheticButton(attrs) {
+      var button = document.createElement("button");
+      Object.keys(attrs || {}).forEach(function (name) {
+        var value = attrs[name];
+        if (value === true) {
+          button.setAttribute(name, "");
+        } else if (value !== false && value !== null && typeof value !== "undefined") {
+          button.setAttribute(name, String(value));
+        }
+      });
+      return button;
+    }
+
+    function clearFuncionarioBridgeParams(params) {
+      [
+        "scm_bridge_action",
+        "scm_bridge_ticket_pk",
+        "scm_bridge_quote_id",
+      ].forEach(function (key) {
+        params.delete(key);
+      });
+      try {
+        window.history.replaceState({}, "", window.location.pathname + (params.toString() ? "?" + params.toString() : "") + window.location.hash);
+      } catch (_error) {}
+    }
+
+    function findVisibleCaseButtonByTicket(ticketPk) {
+      if (!ticketPk) return null;
+      var buttons = document.querySelectorAll(".scm-btn-case[data-ticket-pk]");
+      for (var i = 0; i < buttons.length; i += 1) {
+        if (String(buttons[i].getAttribute("data-ticket-pk") || "") === String(ticketPk)) {
+          return buttons[i];
+        }
+      }
+      return null;
+    }
+
+    function openCaseButtonActionFromBridge(ticketPk, selector, missingMessage) {
+      var attempts = 0;
+      var timer = window.setInterval(function () {
+        attempts += 1;
+        var caseBtn = findVisibleCaseButtonByTicket(ticketPk);
+        if (!caseBtn && attempts < 40) return;
+        window.clearInterval(timer);
+        if (!caseBtn || typeof window.scmOpenCase !== "function") {
+          showToast("error", "No se encontró el caso autorizado para abrir esta acción.");
+          return;
+        }
+        window.scmOpenCase(caseBtn);
+        window.setTimeout(function () {
+          var actionBtn = document.querySelector("#scm-app #scm-case-modal.open " + selector);
+          if (actionBtn) {
+            actionBtn.click();
+          } else {
+            showToast("error", missingMessage || "La acción no está disponible para este caso.");
+          }
+        }, 120);
+      }, 250);
+    }
+
+    function quoteActionButtonFromCard(card, selector, message) {
+      var button = card ? card.querySelector(selector) : null;
+      if (!button) {
+        showToast("error", message || "La acción no está disponible para esta cotización.");
+        return null;
+      }
+      return button;
+    }
+
+    function openQuoteActionFromBridge(action, quoteId) {
+      if (!quoteId) {
+        showToast("error", "Falta el identificador de la cotización.");
+        return;
+      }
+      loadCotizacionCardById(quoteId)
+        .then(function (card) {
+          if (action === "editar_cotizacion") {
+            var editBtn = quoteActionButtonFromCard(card, "[data-scm-edit-cotizacion]", "Esta cotización no se puede editar desde su estado actual.");
+            if (editBtn) {
+              openMaintenanceQuoteForm(editBtn, { mode: "edit" });
+            }
+            return;
+          }
+          if (action === "enviar_cotizacion") {
+            var sendBtn = quoteActionButtonFromCard(card, "[data-scm-send-cotizacion]", "Esta cotización no está disponible para enviar.");
+            if (sendBtn) {
+              openSendCotizacionModal(sendBtn);
+            }
+            return;
+          }
+          if (action === "crear_orden") {
+            var orderBtn = quoteActionButtonFromCard(card, "[data-scm-add-cotizacion-order]", "Esta cotización no permite crear orden en su estado actual.");
+            if (orderBtn) {
+              openCotizacionOrderFormModal(orderBtn);
+            }
+          }
+        })
+        .catch(function (err) {
+          showToast("error", err.message || "No se pudo cargar la cotización solicitada.");
+        });
+    }
+
+    function handleFuncionarioBridgeDeepLink() {
+      var params;
+      try { params = new URL(window.location.href).searchParams; } catch (_error) { return; }
+      var action = String(params.get("scm_bridge_action") || "").trim();
+      if (!action) return;
+      var ticketPk = String(params.get("scm_bridge_ticket_pk") || "").trim();
+      var quoteId = String(params.get("scm_bridge_quote_id") || "").trim();
+      clearFuncionarioBridgeParams(params);
+
+      if (action === "crear_cotizacion") {
+        if (!/^[1-9][0-9]*$/.test(ticketPk)) {
+          showToast("error", "Falta el caso interno para crear la cotización.");
+          return;
+        }
+        window.setTimeout(function () {
+          openMaintenanceQuoteForm(bridgeSyntheticButton({
+            "data-scm-create-cotizacion": true,
+            "data-cotizacion-mode": "create",
+            "data-ticket-pk": ticketPk,
+            "data-scm-clear-cotizacion-create-draft": "1",
+          }), { mode: "create" });
+        }, 200);
+        return;
+      }
+
+      if (action === "editar_cotizacion" || action === "enviar_cotizacion" || action === "crear_orden") {
+        window.setTimeout(function () { openQuoteActionFromBridge(action, quoteId); }, 250);
+        return;
+      }
+
+      if (action === "revision_correctiva") {
+        openCaseButtonActionFromBridge(ticketPk, "[data-scm-open-corrective-review]", "La revisión correctiva no está disponible para este caso.");
+        return;
+      }
+
+      if (action === "acta_satisfaccion") {
+        openCaseButtonActionFromBridge(ticketPk, "[data-scm-open-ticket-acta]", "El acta no está disponible para este caso.");
+      }
+    }
+
+    handleFuncionarioBridgeDeepLink();
+
     root.addEventListener("click", function (e) {
       var linkedTicketCaseBtn =
         e.target && e.target.closest

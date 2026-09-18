@@ -220,7 +220,6 @@ final class CompletionService
       'Consecuencia' => $this->firstTextFromRow($item, ['consecuencia']),
       'Nivel del daño' => $this->firstTextFromRow($item, ['nivel_dano', 'nivel_daño']),
       'Tiempo de atención' => $this->firstTextFromRow($item, ['tiempo_atencion']),
-      'Corresponde a' => $this->firstTextFromRow($item, ['a_quien_corresponde']),
     ];
     return $this->labelledText($parts);
   }
