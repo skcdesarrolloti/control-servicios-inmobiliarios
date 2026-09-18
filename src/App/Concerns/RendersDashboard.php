@@ -4193,12 +4193,12 @@ trait RendersDashboard
     $destinatario = $this->cotizacion_clean_text($row['destinatario'] ?? '');
     return '<section class="scm-cotizacion-native-section scm-public-quote-response"><h3>Responder cotización</h3>'
       . '<p>Selecciona tu respuesta para que el equipo de SKC SuCasa Inmobiliaria pueda continuar el proceso.</p>'
-      . '<form method="post" class="scm-public-quote-response-form">'
+      . '<form method="post" class="scm-public-quote-response-form" data-public-quote-response-form>'
       . '<input type="hidden" name="scm_public_quote_response" value="1">'
       . '<label><span>Nombre de quien responde</span><input type="text" name="responder_nombre" value="' . esc_attr($destinatario) . '" placeholder="Nombre completo"></label>'
-      . '<label><span>Respuesta *</span><select name="estado" required><option value="">Selecciona</option><option value="Aprobada">Aprobar cotización</option><option value="Desaprobada">Desaprobar cotización</option></select></label>'
-      . '<label><span>Motivo si desapruebas</span><select name="motivo"><option value="">No aplica</option><option value="Por costo">Por costo</option><option value="Ejecución por cuenta propia">Ejecución por cuenta propia</option></select></label>'
-      . '<label><span>Financiación si apruebas</span><select name="financiacion"><option value="">No aplica / sin respuesta</option><option value="Si">Sí</option><option value="No">No</option></select></label>'
+      . '<label><span>Respuesta *</span><select name="estado" required data-public-quote-response-state><option value="">Selecciona</option><option value="Aprobada">Aprobar cotización</option><option value="Desaprobada">Desaprobar cotización</option></select></label>'
+      . '<label data-public-quote-response-reject hidden><span>Motivo si desapruebas <em>*</em></span><select name="motivo" disabled><option value="">Selecciona motivo</option><option value="Por costo">Por costo</option><option value="Ejecución por cuenta propia">Ejecución por cuenta propia</option></select></label>'
+      . '<label data-public-quote-response-approve hidden><span>Financiación si apruebas</span><select name="financiacion" disabled><option value="">No aplica / sin respuesta</option><option value="Si">Sí</option><option value="No">No</option></select></label>'
       . '<label class="is-wide"><span>Observaciones</span><textarea name="observacion" rows="4" placeholder="Agrega observaciones si deseas complementar la respuesta."></textarea></label>'
       . '<button type="submit">Guardar respuesta</button>'
       . '</form></section>';

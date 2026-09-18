@@ -107,5 +107,43 @@ session_write_close();
     <?= $responseNotice ?>
     <?= (string) ($result['content'] ?? '') ?>
   </main>
+  <script>
+    (function () {
+      var forms = document.querySelectorAll("[data-public-quote-response-form]");
+      if (!forms.length) return;
+      forms.forEach(function (form) {
+        var state = form.querySelector("[data-public-quote-response-state]");
+        var rejectWrap = form.querySelector("[data-public-quote-response-reject]");
+        var approveWrap = form.querySelector("[data-public-quote-response-approve]");
+        var rejectSelect = rejectWrap ? rejectWrap.querySelector("select") : null;
+        var approveSelect = approveWrap ? approveWrap.querySelector("select") : null;
+        function sync() {
+          var value = state ? state.value : "";
+          var isApproved = value === "Aprobada";
+          var isRejected = value === "Desaprobada";
+          if (rejectWrap) rejectWrap.hidden = !isRejected;
+          if (approveWrap) approveWrap.hidden = !isApproved;
+          if (rejectSelect) {
+            rejectSelect.disabled = !isRejected;
+            rejectSelect.required = isRejected;
+            if (!isRejected) rejectSelect.value = "";
+          }
+          if (approveSelect) {
+            approveSelect.disabled = !isApproved;
+            if (!isApproved) approveSelect.value = "";
+          }
+        }
+        if (state) state.addEventListener("change", sync);
+        form.addEventListener("submit", function (event) {
+          sync();
+          if (rejectSelect && !rejectSelect.disabled && !rejectSelect.value) {
+            event.preventDefault();
+            rejectSelect.focus();
+          }
+        });
+        sync();
+      });
+    })();
+  </script>
 </body>
 </html>
