@@ -119,6 +119,66 @@ final class StoredFileService
     ];
   }
 
+  /** @return array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}|null */
+  public function storeExistingImagePath(string $path): ?array
+  {
+    $realPath = realpath($path);
+    if (!is_string($realPath) || $realPath === '' || !is_file($realPath) || !is_readable($realPath)) {
+      return null;
+    }
+    $bytes = @filesize($realPath);
+    if (!is_int($bytes) || $bytes < 1 || $bytes > $this->maxBytes || !$this->ensureDirectory() || !extension_loaded('gd')) {
+      return null;
+    }
+    $mime = $this->detectMime($realPath);
+    $source = match ($mime) {
+      'image/jpeg' => @imagecreatefromjpeg($realPath),
+      'image/png' => @imagecreatefrompng($realPath),
+      'image/webp' => @imagecreatefromwebp($realPath),
+      default => false,
+    };
+    if ($source === false) {
+      return null;
+    }
+
+    $width = imagesx($source);
+    $height = imagesy($source);
+    if ($width < 1 || $height < 1) {
+      imagedestroy($source);
+      return null;
+    }
+    $ratio = min(1, 1600 / $width, 1600 / $height);
+    $targetWidth = max(1, (int) round($width * $ratio));
+    $targetHeight = max(1, (int) round($height * $ratio));
+    $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
+    if ($canvas === false) {
+      imagedestroy($source);
+      return null;
+    }
+    $white = imagecolorallocate($canvas, 255, 255, 255);
+    if ($white !== false) {
+      imagefilledrectangle($canvas, 0, 0, $targetWidth, $targetHeight, $white);
+    }
+    imagecopyresampled($canvas, $source, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
+    imagedestroy($source);
+
+    $hash = @hash_file('sha256', $realPath);
+    $modifiedAt = @filemtime($realPath);
+    if (!is_string($hash) || !is_int($modifiedAt)) {
+      imagedestroy($canvas);
+      return null;
+    }
+    $name = substr($hash, 0, 24) . '_' . $modifiedAt . '.jpg';
+    $target = $this->directory . '/' . $name;
+    if (!is_file($target) && !imagejpeg($canvas, $target, 78)) {
+      imagedestroy($canvas);
+      return null;
+    }
+    imagedestroy($canvas);
+
+    return $this->storedImageDetails($name);
+  }
+
   /** @param array<int,array{name?:string,url?:string}> $files */
   public function deleteStoredImages(array $files): void
   {
@@ -174,6 +234,30 @@ final class StoredFileService
     }
     $path = $this->directory . '/' . $name;
     return is_file($path) ? $path : null;
+  }
+
+  /** @return array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}|null */
+  private function storedImageDetails(string $name): ?array
+  {
+    $path = $this->pathFor($name);
+    if ($path === null) {
+      return null;
+    }
+    $info = @getimagesize($path);
+    $hash = @hash_file('sha256', $path);
+    $bytes = @filesize($path);
+    if (!is_array($info) || !is_string($hash) || !is_int($bytes) || $bytes < 1) {
+      return null;
+    }
+    return [
+      'name' => basename($name),
+      'url' => $this->urlFor($name),
+      'mime' => (string) $info['mime'],
+      'width' => (int) $info[0],
+      'height' => (int) $info[1],
+      'bytes' => $bytes,
+      'sha256' => $hash,
+    ];
   }
 
   /** @param array<string,mixed> $file */

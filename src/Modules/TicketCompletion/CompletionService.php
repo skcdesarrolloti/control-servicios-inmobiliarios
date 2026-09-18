@@ -204,7 +204,7 @@ final class CompletionService
             $collect($nested);
             continue;
           }
-          if (is_array($nested) || is_string($nested)) {
+          if (is_array($nested) || is_scalar($nested)) {
             $collect($nested);
           }
         }
@@ -224,12 +224,12 @@ final class CompletionService
         $collect($json);
         return;
       }
-      foreach (preg_split('/[,\r\n]+/', $text) ?: [] as $part) {
+      foreach (preg_split('/[\s,]+/', $text) ?: [] as $part) {
         $ref = trim(strip_tags((string) $part));
         if ($ref === '' || strlen($ref) > 2048 || preg_match('/[\x00<>"\']/', $ref)) {
           continue;
         }
-        if (preg_match('/file\.php\?/i', $ref) || preg_match('/^[a-f0-9]{24}_[0-9]+\.jpg$/D', basename($ref))) {
+        if (ctype_digit($ref) || preg_match('/file\.php\?/i', $ref) || preg_match('/^[a-f0-9]{24}_[0-9]+\.jpg$/D', basename($ref))) {
           $refs[$ref] = $ref;
         }
       }
@@ -246,7 +246,13 @@ final class CompletionService
     }
     $storedFiles = StoredFileService::fromRuntime();
     $photos = [];
+    $attachmentIds = [];
     foreach ($refs as $ref) {
+      $ref = trim((string) $ref);
+      if (ctype_digit($ref)) {
+        $attachmentIds[(int) $ref] = (int) $ref;
+        continue;
+      }
       $name = $this->storedImageNameFromRef((string) $ref);
       if ($name === '' || isset($photos[$name])) {
         continue;
@@ -276,7 +282,121 @@ final class CompletionService
         break;
       }
     }
+    if (count($photos) < 4 && $attachmentIds !== []) {
+      foreach ($this->attachmentPhotoDescriptorsFromIds(array_values($attachmentIds), 4 - count($photos)) as $photo) {
+        $photos[$photo['name']] = $photo;
+        if (count($photos) >= 4) {
+          break;
+        }
+      }
+    }
     return array_values($photos);
+  }
+
+  /** @param int[] $ids @return array<int,array{name:string,mime:string,width:int,height:int,bytes:int,sha256:string}> */
+  private function attachmentPhotoDescriptorsFromIds(array $ids, int $limit): array
+  {
+    $ids = array_values(array_filter(array_unique(array_map('intval', $ids)), static fn(int $id): bool => $id > 0));
+    if ($ids === [] || $limit < 1) {
+      return [];
+    }
+    $posts = $this->repo->db->table('posts');
+    $postmeta = $this->repo->db->table('postmeta');
+    if (!$this->repo->schema->tableExists($posts) || !$this->repo->schema->tableExists($postmeta)) {
+      return [];
+    }
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $rows = $this->repo->db->getResults(
+      "SELECT p.ID, p.guid, p.post_mime_type, pm.meta_value AS attached_file
+       FROM `{$posts}` p
+       LEFT JOIN `{$postmeta}` pm ON pm.post_id = p.ID AND pm.meta_key = '_wp_attached_file'
+       WHERE p.ID IN ({$placeholders})",
+      $ids
+    );
+    $byId = [];
+    foreach ($rows as $row) {
+      $byId[(int) ($row['ID'] ?? 0)] = $row;
+    }
+    $storedFiles = StoredFileService::fromRuntime();
+    $photos = [];
+    foreach ($ids as $id) {
+      $path = isset($byId[$id]) ? $this->wordpressAttachmentPath($byId[$id]) : null;
+      if ($path === null) {
+        continue;
+      }
+      $stored = $storedFiles->storeExistingImagePath($path);
+      if ($stored === null || ($stored['mime'] ?? '') !== 'image/jpeg') {
+        continue;
+      }
+      if ((int) $stored['width'] < 1 || (int) $stored['width'] > 1600 || (int) $stored['height'] < 1 || (int) $stored['height'] > 1600 || (int) $stored['bytes'] < 100 || (int) $stored['bytes'] > 1500000) {
+        continue;
+      }
+      $photos[] = [
+        'name' => (string) $stored['name'],
+        'mime' => 'image/jpeg',
+        'width' => (int) $stored['width'],
+        'height' => (int) $stored['height'],
+        'bytes' => (int) $stored['bytes'],
+        'sha256' => (string) $stored['sha256'],
+      ];
+      if (count($photos) >= $limit) {
+        break;
+      }
+    }
+    return $photos;
+  }
+
+  /** @param array<string,mixed> $row */
+  private function wordpressAttachmentPath(array $row): ?string
+  {
+    $candidates = [];
+    $attachedFile = str_replace('\\', '/', trim((string) ($row['attached_file'] ?? '')));
+    if ($attachedFile !== '') {
+      if (preg_match('/^(?:[A-Za-z]:)?\//', $attachedFile)) {
+        $candidates[] = $attachedFile;
+      }
+      $relative = ltrim($attachedFile, '/');
+      $this->appendWordPressUploadCandidates($candidates, $relative);
+    }
+    $urlPath = (string) parse_url(trim((string) ($row['guid'] ?? '')), PHP_URL_PATH);
+    if ($urlPath !== '') {
+      $normalizedPath = str_replace('\\', '/', $urlPath);
+      if (preg_match('~/wp-content/uploads/(.+)$~i', $normalizedPath, $matches)) {
+        $this->appendWordPressUploadCandidates($candidates, (string) $matches[1]);
+      }
+      if (!empty($_SERVER['DOCUMENT_ROOT'])) {
+        $candidates[] = rtrim((string) $_SERVER['DOCUMENT_ROOT'], '/\\') . '/' . ltrim($normalizedPath, '/');
+      }
+    }
+    foreach (array_values(array_unique($candidates)) as $candidate) {
+      $path = realpath($candidate);
+      if (is_string($path) && is_file($path) && is_readable($path)) {
+        return $path;
+      }
+    }
+    return null;
+  }
+
+  /** @param array<int,string> $candidates */
+  private function appendWordPressUploadCandidates(array &$candidates, string $relative): void
+  {
+    $relative = ltrim(str_replace('\\', '/', $relative), '/');
+    if ($relative === '') {
+      return;
+    }
+    if (defined('WP_CONTENT_DIR')) {
+      $candidates[] = rtrim((string) WP_CONTENT_DIR, '/\\') . '/uploads/' . $relative;
+    }
+    if (defined('ABSPATH')) {
+      $candidates[] = rtrim((string) ABSPATH, '/\\') . '/wp-content/uploads/' . $relative;
+    }
+    if (defined('SCM_ROOT')) {
+      $candidates[] = rtrim(dirname((string) SCM_ROOT), '/\\') . '/wp-content/uploads/' . $relative;
+      $candidates[] = rtrim((string) SCM_ROOT, '/\\') . '/../wp-content/uploads/' . $relative;
+    }
+    if (!empty($_SERVER['DOCUMENT_ROOT'])) {
+      $candidates[] = rtrim((string) $_SERVER['DOCUMENT_ROOT'], '/\\') . '/wp-content/uploads/' . $relative;
+    }
   }
 
   private function storedImageNameFromRef(string $ref): string

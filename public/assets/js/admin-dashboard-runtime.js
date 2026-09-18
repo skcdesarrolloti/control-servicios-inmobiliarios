@@ -14852,7 +14852,8 @@
         });
     }
 
-    function openCotizacionActaFromCard(target) {
+    function openCotizacionActaFromCard(target, options) {
+      options = options || {};
       var card = target && target.matches && target.matches(".scm-cotizacion-card")
         ? target
         : (target && target.closest ? target.closest(".scm-cotizacion-card") : null);
@@ -14894,6 +14895,9 @@
       }
       caseButton.setAttribute("data-cot-estado", "Aprobada");
       window.scmOpenCase(caseButton);
+      if (options.closeCurrentSwal && window.Swal && window.Swal.isVisible && window.Swal.isVisible()) {
+        window.Swal.close();
+      }
       window.setTimeout(function () {
         var actionBtn =
           document.querySelector("#scm-app #scm-case-modal.open [data-scm-cotizacion-acta-button]") ||
@@ -15637,7 +15641,7 @@
                   : null;
                 if (quoteActaBtn) {
                   event.preventDefault();
-                  openCotizacionActaFromCard(quoteActaBtn);
+                  openCotizacionActaFromCard(quoteActaBtn, { closeCurrentSwal: true });
                   return;
                 }
                 var actionBtn = event.target && event.target.closest
