@@ -1828,7 +1828,9 @@ trait HandlesMaintenanceActions
       }
       if (isset($clean['cantidad_materiales'], $clean['valor_unitario_materiales'])) {
         $clean['valor_total_materiales'] = (string) ((int) $clean['cantidad_materiales'] * (int) $clean['valor_unitario_materiales']);
-        if (trim((string) ($clean['valor_materiales'] ?? '')) === '' || (int) ($clean['valor_materiales'] ?? 0) <= 0) {
+        if ((int) ($clean['valor_total_materiales'] ?? 0) <= 0 && (int) ($clean['valor_materiales'] ?? 0) > 0) {
+          $clean['valor_total_materiales'] = $clean['valor_materiales'];
+        } elseif (trim((string) ($clean['valor_materiales'] ?? '')) === '' || (int) ($clean['valor_materiales'] ?? 0) <= 0) {
           $clean['valor_materiales'] = $clean['valor_total_materiales'];
         }
       }
@@ -1863,13 +1865,7 @@ trait HandlesMaintenanceActions
   {
     $total = 0.0;
     foreach ($items as $item) {
-      $lineTotal = $this->maintenance_quote_number($item['valor_total_materiales'] ?? 0);
-      if ($lineTotal <= 0) {
-        $unit = $this->maintenance_quote_number($item['valor_unitario_materiales'] ?? 0);
-        $quantity = max(1.0, $this->maintenance_quote_number($item['cantidad_materiales'] ?? 1));
-        $lineTotal = $unit > 0 ? ($unit * $quantity) : $this->maintenance_quote_number($item['valor_materiales'] ?? 0);
-      }
-      $total += $lineTotal;
+      $total += $this->maintenance_quote_material_row_total($item);
     }
     return (float) (int) round($total);
   }
@@ -1919,7 +1915,7 @@ trait HandlesMaintenanceActions
     $seen = [];
     foreach ($items as $item) {
       $provider = $this->maintenance_quote_first([$item['provedor_materiales'] ?? '', $item['proveedor_materiales'] ?? '', $item['descripcion_materiales'] ?? '']);
-      $total = (int) round($this->maintenance_quote_number($item['valor_total_materiales'] ?? ($item['valor_materiales'] ?? 0)));
+      $total = $this->maintenance_quote_material_row_total($item);
       if ($provider === '' && $total <= 0) {
         continue;
       }
@@ -1930,7 +1926,7 @@ trait HandlesMaintenanceActions
     }
     foreach ($generatedRows as $row) {
       $provider = $this->maintenance_quote_first([$row['provedor_materiales'] ?? '', $row['proveedor_materiales'] ?? '']);
-      $total = (int) round($this->maintenance_quote_number($row['valor_total_materiales'] ?? ($row['valor_materiales'] ?? 0)));
+      $total = $this->maintenance_quote_material_row_total($row);
       $key = mb_strtolower($provider, 'UTF-8') . '|' . (string) $total;
       if ($provider === '' || $total <= 0 || isset($seen[$key])) {
         continue;
@@ -1939,6 +1935,18 @@ trait HandlesMaintenanceActions
       $out[] = $row;
     }
     return $out;
+  }
+
+  /** @param array<string,string> $item */
+  private function maintenance_quote_material_row_total(array $item): int
+  {
+    $lineTotal = $this->maintenance_quote_number($item['valor_total_materiales'] ?? 0);
+    if ($lineTotal <= 0) {
+      $unit = $this->maintenance_quote_number($item['valor_unitario_materiales'] ?? 0);
+      $quantity = max(1.0, $this->maintenance_quote_number($item['cantidad_materiales'] ?? 1));
+      $lineTotal = $unit > 0 ? ($unit * $quantity) : $this->maintenance_quote_number($item['valor_materiales'] ?? 0);
+    }
+    return (int) round($lineTotal);
   }
 
   private function maintenance_quote_clean($value): string

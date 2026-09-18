@@ -4703,7 +4703,10 @@ trait RendersDashboard
   {
     foreach (['valor_total_materiales', 'valor_total_item_mo', 'valor_total_mano', 'valor_total_otros_equi', 'valor_total_otros_costos', 'total'] as $key) {
       if (array_key_exists($key, $item) && trim((string) $item[$key]) !== '') {
-        return $this->cotizacion_clean_text($item[$key]);
+        $parsed = $this->cotizacion_parse_budget_number($item[$key]);
+        if ($parsed > 0) {
+          return $this->cotizacion_clean_text($item[$key]);
+        }
       }
     }
     foreach ([
