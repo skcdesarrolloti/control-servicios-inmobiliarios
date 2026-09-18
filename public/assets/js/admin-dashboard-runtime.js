@@ -14245,6 +14245,38 @@
         });
     }
 
+    function maintenanceQuoteSavedTicketPk(button, context) {
+      var fromButton = button && button.getAttribute ? button.getAttribute("data-ticket-pk") : "";
+      if (String(fromButton || "").trim()) {
+        return String(fromButton || "").trim();
+      }
+      var ticket = context && context.ticket ? context.ticket : {};
+      return String(
+        (context && context.ticket_pk) ||
+          ticket.ticket_pk ||
+          ticket._ID ||
+          ticket.id ||
+          "",
+      ).trim();
+    }
+
+    function refreshAfterMaintenanceQuoteSave(button, context) {
+      if (!root || typeof window.CustomEvent !== "function") {
+        return;
+      }
+      var ticketPk = maintenanceQuoteSavedTicketPk(button, context || {});
+      if (ticketPk && root.querySelector("#scm-case-modal.open")) {
+        root.dispatchEvent(new CustomEvent("scm:case-action-saved", {
+          detail: {
+            ticketPk: ticketPk,
+            fromNode: button || root,
+          },
+        }));
+        return;
+      }
+      root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+    }
+
     function openMaintenanceQuoteForm(button, options) {
       options = options || {};
       if (!ajaxUrl || !actionCotizacionFormContext || !actionCotizacionSave || !window.Swal) {
@@ -14332,6 +14364,7 @@
               return false;
             }
             if (options.onClose) options.onClose(320);
+            refreshAfterMaintenanceQuoteSave(button, context || {});
             return true;
           });
           });
