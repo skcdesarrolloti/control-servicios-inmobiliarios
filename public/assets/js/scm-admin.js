@@ -2350,7 +2350,7 @@
             message(json.data.message, false);
             scmNotify("success", json.data.message, "Revisión correctiva");
           }
-          if (operation !== "read") {
+          if (operation === "create" || operation === "update" || operation === "delete") {
             dispatchCaseActionSaved(root, caseBtn.dataset.ticketPk || "", sub);
           }
         })

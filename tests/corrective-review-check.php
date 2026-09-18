@@ -11,6 +11,11 @@ $maintenanceRows = file_get_contents($root . '/src/Modules/ServiciosInmobiliario
 $publicView = file_get_contents($root . '/src/Modules/CorrectiveReview/CorrectiveReviewPublicView.php');
 $js = file_get_contents($root . '/public/assets/js/scm-admin.js');
 $css = file_get_contents($root . '/public/assets/css/ticket-completion.css');
+$correctiveEditorStart = is_string($js) ? strpos($js, 'function openCorrectiveReviewEditor') : false;
+$correctiveEditorEnd = is_string($js) ? strpos($js, 'function openTicketResponseEditor') : false;
+$correctiveEditorJs = ($correctiveEditorStart !== false && $correctiveEditorEnd !== false && $correctiveEditorEnd > $correctiveEditorStart)
+  ? substr($js, $correctiveEditorStart, $correctiveEditorEnd - $correctiveEditorStart)
+  : '';
 
 $checks = [
   'trait exists and defines ajax handler' => is_string($trait) && str_contains($trait, 'ajax_handler_corrective_review'),
@@ -46,6 +51,7 @@ $checks = [
   'case modal changes corrective review button label when review exists' => is_string($js) && str_contains($js, 'hasCorrectiveReview') && str_contains($js, 'Gestionar revisi'),
   'corrective review modal exposes edit and delete actions' => is_string($js) && str_contains($js, 'data-corrective-edit-review') && str_contains($js, 'data-corrective-delete-review') && str_contains($js, 'data-corrective-review-edit'),
   'corrective review edit actions rebind to the current modal request handler' => is_string($js) && str_contains($js, '_scmCorrectiveClickHandler') && str_contains($js, 'removeEventListener("click", body._scmCorrectiveClickHandler)') && !str_contains($js, '_scmCorrectiveActionsBound'),
+  'corrective review edit does not dispatch saved refresh before showing form' => str_contains($correctiveEditorJs, 'operation === "create" || operation === "update" || operation === "delete"') && !str_contains($correctiveEditorJs, 'if (operation !== "read") {' . "\n" . '            dispatchCaseActionSaved'),
   'corrective review modal syncs dynamic affected area fields' => is_string($js) && str_contains($js, 'syncCorrectiveAreaFields') && str_contains($js, 'data-corrective-indice'),
   'corrective review form keeps padded action spacing' => is_string($css) && str_contains($css, '.scm-corrective-review form > .scm-acta-actions') && str_contains($css, 'padding-top: 14px'),
   'maintenance rows mark their source tab' => is_string($maintenanceRows) && str_contains($maintenanceRows, 'data-tab-key="mantenimiento"'),
