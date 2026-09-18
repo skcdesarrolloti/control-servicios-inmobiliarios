@@ -6579,6 +6579,18 @@
   margin-left: 8px;
 }
 
+.scm-maint-quote-conditions-box {
+  margin: 0 0 22px;
+  padding: 16px;
+  border: 1px dashed #bfdbfe;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.scm-maint-quote-conditions-box .scm-maint-quote-perturb-section-title {
+  margin-top: 0;
+}
+
 .scm-maint-quote-perturb-section-title {
   margin: 24px 0 12px;
   padding-bottom: 10px;
