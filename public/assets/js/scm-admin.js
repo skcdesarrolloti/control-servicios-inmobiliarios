@@ -4838,13 +4838,16 @@
               '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-repair-followup-notice>Seguimiento reparaciones</button>',
             );
           }
-        } else if (!isPublicPqr && caseCanCreateMaintenanceQuote(btn)) {
+        }
+        if (!isPublicPqr && caseCanCreateMaintenanceQuote(btn)) {
           quoteActionButtons.push(
             '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-create-cotizacion data-cotizacion-mode="create" data-ticket-pk="' +
             escHtml(calendarTicketPk || "") +
             '" data-ticket="' +
             escHtml(btn.dataset.ticket || "") +
-            '">A&ntilde;adir cotizaci&oacute;n</button>',
+            '">' +
+            ((cotizacionUrl || cotizacionId) ? "A&ntilde;adir nueva cotizaci&oacute;n" : "A&ntilde;adir cotizaci&oacute;n") +
+            "</button>",
           );
         }
         if (isPublicPqr && ticketUrl) {
