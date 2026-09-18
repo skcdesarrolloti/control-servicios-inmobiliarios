@@ -517,7 +517,9 @@ trait HandlesCorrectiveReviewActions
     }
     $contract = $this->correctiveReviewContract($ticket);
     $property = $this->correctiveReviewProperty($ticket, $contract);
-    $this->correctiveReviewValidateContext($ticket, $contract, $property);
+    // El contexto se usa también para leer/editar revisiones ya creadas. No debe
+    // bloquear el editor por desfaces históricos entre ticket/contrato/inmueble.
+    // La validación fuerte se mantiene en la creación, antes de guardar una nueva.
     return [
       'ticket' => $ticket,
       'contract' => $contract,
