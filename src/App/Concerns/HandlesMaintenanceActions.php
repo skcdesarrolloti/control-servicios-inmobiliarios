@@ -1973,6 +1973,55 @@ trait HandlesMaintenanceActions
     return $this->maintenance_order_money_value($value);
   }
 
+  /**
+   * @param array<string,mixed> $quote
+   * @return array{porcentaje_admon:string,iva:string,total_admon:string,iva_admon:string,total_admon_mas_iva:string,total:string}
+   */
+  private function maintenance_quote_send_totals(array $quote, $porcentajeRaw, $ivaRaw): array
+  {
+    $subtotal = 0.0;
+    foreach (['total_materiales', 'total_mano_obra', 'total_maquinarias', 'total_otros_costos'] as $field) {
+      $subtotal += $this->maintenance_quote_number($quote[$field] ?? 0);
+    }
+    if ($subtotal <= 0) {
+      $subtotal = $this->maintenance_quote_number($quote['total'] ?? 0);
+    }
+
+    $porcentajeText = trim((string) ($porcentajeRaw ?? ''));
+    if ($porcentajeText === '') {
+      $porcentajeText = trim((string) ($quote['porcentaje_admon'] ?? ''));
+    }
+    $ivaText = trim((string) ($ivaRaw ?? ''));
+    if ($ivaText === '') {
+      $ivaText = trim((string) ($quote['iva'] ?? ''));
+    }
+
+    $porcentaje = $porcentajeText === '' ? 10.0 : $this->maintenance_quote_number($porcentajeText);
+    $iva = $ivaText === '' ? 19.0 : $this->maintenance_quote_number($ivaText);
+    $porcentaje = max(0.0, min(100.0, $porcentaje));
+    $iva = max(0.0, min(100.0, $iva));
+
+    $totalAdmon = (int) round($subtotal * ($porcentaje / 100));
+    $ivaAdmon = (int) round($totalAdmon * ($iva / 100));
+    $totalAdmonMasIva = $totalAdmon + $ivaAdmon;
+    $total = (int) round($subtotal + $totalAdmonMasIva);
+
+    return [
+      'porcentaje_admon' => $this->maintenance_quote_decimal_text($porcentaje),
+      'iva' => $this->maintenance_quote_decimal_text($iva),
+      'total_admon' => (string) $totalAdmon,
+      'iva_admon' => (string) $ivaAdmon,
+      'total_admon_mas_iva' => (string) $totalAdmonMasIva,
+      'total' => (string) $total,
+    ];
+  }
+
+  private function maintenance_quote_decimal_text(float $value): string
+  {
+    $text = rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+    return $text === '' ? '0' : $text;
+  }
+
   /** @param array<mixed> $values */
   private function maintenance_quote_first(array $values): string
   {
@@ -2646,6 +2695,9 @@ trait HandlesMaintenanceActions
   public function ajax_handler_delete_cotizacion_mantenimiento(): void
   {
     $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento')) {
+      $this->jsonFail('No tienes permiso para eliminar cotizaciones.');
+    }
 
     $cotizacionId = (int) ($_POST['id_cotizacion'] ?? 0);
     $motivo = trim(sanitize_text_field(wp_unslash((string) ($_POST['motivo'] ?? ''))));
@@ -3213,6 +3265,12 @@ trait HandlesMaintenanceActions
       $rows = $this->attach_cotizacion_orders([$quote]);
       $quote = is_array($rows[0] ?? null) ? $rows[0] : $quote;
       $orders = is_array($quote['_scm_ordenes'] ?? null) ? $quote['_scm_ordenes'] : [];
+      $sendTotals = $this->maintenance_quote_send_totals(
+        $quote,
+        $_POST['porcentaje_admon'] ?? ($quote['porcentaje_admon'] ?? ''),
+        $_POST['iva'] ?? ($quote['iva'] ?? '')
+      );
+      $quote = array_merge($quote, $sendTotals);
       $pdf = $this->build_cotizacion_mantenimiento_pdf(array_merge($quote, [
         'destinatario' => $destinatario,
         'email_destinatario' => $email,
@@ -3226,7 +3284,7 @@ trait HandlesMaintenanceActions
       $actorName = trim((string) ($actor['name'] ?? Auth::user())) ?: 'SKC SuCasa Inmobiliaria';
       $actorEmail = trim((string) ($actor['email'] ?? ''));
       $ticketRef = trim((string) ($quote['id_ticket'] ?? ''));
-      $total = $this->format_cop_currency($quote['total'] ?? 0);
+      $total = $this->format_cop_currency($sendTotals['total'] ?? ($quote['total'] ?? 0));
       $contratoRef = trim((string) ($quote['contrato'] ?? $quote['id_contrato'] ?? ''));
       $direccionRef = $this->maintenance_quote_clean($quote['direccion'] ?? '');
       $subject = 'Cotización de mantenimiento #' . $cotizacionId . ($ticketRef !== '' ? ' del caso #' . $ticketRef : '');
@@ -3342,6 +3400,12 @@ trait HandlesMaintenanceActions
         'email_destinatario' => $email,
         'celular_destinatario' => $celular,
         'indicativo_destinarario' => $indicativo,
+        'porcentaje_admon' => $sendTotals['porcentaje_admon'],
+        'iva' => $sendTotals['iva'],
+        'total_admon' => $sendTotals['total_admon'],
+        'iva_admon' => $sendTotals['iva_admon'],
+        'total_admon_mas_iva' => $sendTotals['total_admon_mas_iva'],
+        'total' => $sendTotals['total'],
         'se_envio' => 'Si',
         'estado' => 'Esperando respuesta',
         'estado_respuesta_cotizacion_mantenimiento' => 'Esperando respuesta',

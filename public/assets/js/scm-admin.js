@@ -4690,6 +4690,8 @@
       if (body) {
         var runtime = parseRuntime(root) || {};
         var runtimeConfig = runtime.config || {};
+        var actionPermissions = runtime.actionPermissions || {};
+        var canManageMaintenanceQuote = actionPermissions.maintenanceQuoteManage !== false;
         var srcWrap = document.createElement("div");
         srcWrap.innerHTML = sourceHtml;
         var floatingActionWrap = srcWrap.querySelector(
@@ -4836,7 +4838,7 @@
           );
           var cotEstadoKey = String(btn.dataset.cotEstado || "");
           cotEstadoKey = cotEstadoKey.normalize ? cotEstadoKey.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : cotEstadoKey.toLowerCase();
-          if (cotizacionId && cotEstadoKey === "aprobada") {
+          if (canManageMaintenanceQuote && cotizacionId && cotEstadoKey === "aprobada") {
             quoteActionButtons.push(
               '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-ticket-acta data-scm-cotizacion-acta-button>Crear acta de cotizaci&oacute;n</button>',
             );
@@ -4847,7 +4849,7 @@
             );
           }
         }
-        if (!isPublicPqr && caseCanCreateMaintenanceQuote(btn)) {
+        if (!isPublicPqr && canManageMaintenanceQuote && caseCanCreateMaintenanceQuote(btn)) {
           quoteActionButtons.push(
             '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-create-cotizacion data-cotizacion-mode="create"' +
             ((cotizacionUrl || cotizacionId) ? ' data-scm-clear-cotizacion-create-draft="1"' : "") +

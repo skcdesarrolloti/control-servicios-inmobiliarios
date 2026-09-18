@@ -15305,6 +15305,52 @@
       });
     }
 
+    function parseCotizacionSendNumber(value) {
+      if (typeof value === "number") {
+        return isFinite(value) ? Math.max(0, value) : 0;
+      }
+      var text = String(value || "").trim();
+      if (!text) return 0;
+      text = text.replace(/[^\d,.\-]/g, "");
+      if (!text || text === "-") return 0;
+      var lastComma = text.lastIndexOf(",");
+      var lastDot = text.lastIndexOf(".");
+      if (lastComma !== -1 && lastDot !== -1) {
+        var decimal = lastComma > lastDot ? "," : ".";
+        var thousand = decimal === "," ? "." : ",";
+        text = text.split(thousand).join("");
+        text = text.replace(decimal, ".");
+      } else if (lastComma !== -1) {
+        var commaParts = text.split(",");
+        text = String(commaParts[commaParts.length - 1] || "").length <= 2
+          ? text.replace(/\./g, "").replace(",", ".")
+          : text.replace(/,/g, "");
+      } else if (lastDot !== -1) {
+        var dotParts = text.split(".");
+        if (String(dotParts[dotParts.length - 1] || "").length > 2) {
+          text = text.replace(/\./g, "");
+        }
+      }
+      var number = Number(text);
+      return isFinite(number) ? Math.max(0, number) : 0;
+    }
+
+    function calculateCotizacionSendTotals(subtotal, porcentajeAdmon, iva) {
+      var base = Math.max(0, parseCotizacionSendNumber(subtotal));
+      var adminPct = Math.min(100, Math.max(0, parseCotizacionSendNumber(porcentajeAdmon)));
+      var ivaPct = Math.min(100, Math.max(0, parseCotizacionSendNumber(iva)));
+      var totalAdmon = Math.round(base * (adminPct / 100));
+      var ivaAdmon = Math.round(totalAdmon * (ivaPct / 100));
+      return {
+        subtotal: base,
+        porcentajeAdmon: adminPct,
+        iva: ivaPct,
+        totalAdmon: totalAdmon,
+        ivaAdmon: ivaAdmon,
+        total: Math.round(base + totalAdmon + ivaAdmon),
+      };
+    }
+
     function openSendCotizacionModal(button, options) {
       options = options || {};
       var cotizacionId = button ? button.getAttribute("data-cotizacion-id") || "" : "";
@@ -15314,6 +15360,12 @@
       var celular = button ? button.getAttribute("data-celular-destinatario") || "" : "";
       var indicativo = button ? button.getAttribute("data-indicativo-destinatario") || "57" : "57";
       var total = button ? button.getAttribute("data-total-cotizacion") || "-" : "-";
+      var subtotal = parseCotizacionSendNumber(button ? button.getAttribute("data-subtotal-cotizacion") || "" : "");
+      if (subtotal <= 0) {
+        subtotal = parseCotizacionSendNumber(total);
+      }
+      var porcentajeAdmon = button ? button.getAttribute("data-porcentaje-admon") || "10" : "10";
+      var ivaCotizacion = button ? button.getAttribute("data-iva-cotizacion") || "19" : "19";
       if (!ajaxUrl || !actionSendCotizacion || !cotizacionId || !window.Swal) {
         showToast("error", "No se pudo abrir el envío de la cotización.");
         if (typeof options.onClose === "function") options.onClose();
@@ -15324,7 +15376,12 @@
         html:
           '<div class="scm-cotizacion-response-form"><p class="scm-cotizacion-dialog-intro">Se encolará el correo con el PDF adjunto y un WhatsApp con el PDF y botón seguro para ver y responder la cotización.</p>' +
           '<div class="scm-cotizacion-response-grid">' +
-          '<div class="scm-cotizacion-dialog-field"><span>Total</span><strong>' + escHtml(total || "-") + '</strong></div>' +
+          '<div class="scm-cotizacion-dialog-field"><span>Subtotal trabajos</span><strong id="swal-send-cot-subtotal">' + escHtml(formatCotizacionOrderCurrency(subtotal)) + '</strong></div>' +
+          '<label class="scm-cotizacion-dialog-field"><span>% Administración <em>*</em></span><input id="swal-send-cot-porcentaje-admon" type="number" inputmode="decimal" min="0" max="100" step="0.01" value="' + escHtml(porcentajeAdmon || "10") + '"></label>' +
+          '<label class="scm-cotizacion-dialog-field"><span>IVA administración <em>*</em></span><input id="swal-send-cot-iva" type="number" inputmode="decimal" min="0" max="100" step="0.01" value="' + escHtml(ivaCotizacion || "19") + '"></label>' +
+          '<div class="scm-cotizacion-dialog-field"><span>VR Administración</span><strong id="swal-send-cot-total-admon">$0</strong></div>' +
+          '<div class="scm-cotizacion-dialog-field"><span>VR IVA administración</span><strong id="swal-send-cot-iva-admon">$0</strong></div>' +
+          '<div class="scm-cotizacion-dialog-field"><span>Total a enviar</span><strong id="swal-send-cot-total">' + escHtml(total || "-") + '</strong></div>' +
           '<label class="scm-cotizacion-dialog-field"><span>Destinatario <em>*</em></span><input id="swal-send-cot-destinatario" type="text" value="' + escHtml(destinatario) + '" placeholder="Nombre del destinatario"></label>' +
           '<label class="scm-cotizacion-dialog-field"><span>Correo <em>*</em></span><input id="swal-send-cot-email" type="email" value="' + escHtml(email) + '" placeholder="correo@dominio.com"></label>' +
           '<label class="scm-cotizacion-dialog-field"><span>Indicativo</span><input id="swal-send-cot-indicativo" type="text" value="' + escHtml(indicativo || "57") + '" placeholder="57"></label>' +
@@ -15351,6 +15408,20 @@
         },
         didOpen: function () {
           var first = document.getElementById("swal-send-cot-destinatario");
+          var pct = document.getElementById("swal-send-cot-porcentaje-admon");
+          var iva = document.getElementById("swal-send-cot-iva");
+          var syncTotals = function () {
+            var calculated = calculateCotizacionSendTotals(subtotal, pct ? pct.value : "10", iva ? iva.value : "19");
+            var adminEl = document.getElementById("swal-send-cot-total-admon");
+            var ivaEl = document.getElementById("swal-send-cot-iva-admon");
+            var totalEl = document.getElementById("swal-send-cot-total");
+            if (adminEl) adminEl.textContent = formatCotizacionOrderCurrency(calculated.totalAdmon);
+            if (ivaEl) ivaEl.textContent = formatCotizacionOrderCurrency(calculated.ivaAdmon);
+            if (totalEl) totalEl.textContent = formatCotizacionOrderCurrency(calculated.total);
+          };
+          if (pct) pct.addEventListener("input", syncTotals);
+          if (iva) iva.addEventListener("input", syncTotals);
+          syncTotals();
           if (first) first.focus();
         },
         preConfirm: function () {
@@ -15358,9 +15429,13 @@
           var mail = document.getElementById("swal-send-cot-email");
           var ind = document.getElementById("swal-send-cot-indicativo");
           var cell = document.getElementById("swal-send-cot-celular");
+          var pct = document.getElementById("swal-send-cot-porcentaje-admon");
+          var iva = document.getElementById("swal-send-cot-iva");
           var destValue = dest ? dest.value.trim() : "";
           var mailValue = mail ? mail.value.trim() : "";
           var cellValue = cell ? cell.value.trim() : "";
+          var pctValue = pct ? pct.value.trim() : "10";
+          var ivaValue = iva ? iva.value.trim() : "19";
           if (!destValue) {
             window.Swal.showValidationMessage("Completa el destinatario.");
             return false;
@@ -15373,11 +15448,21 @@
             window.Swal.showValidationMessage("Completa un celular válido para WhatsApp.");
             return false;
           }
+          if (parseCotizacionSendNumber(pctValue) < 0 || parseCotizacionSendNumber(pctValue) > 100) {
+            window.Swal.showValidationMessage("El porcentaje de administración debe estar entre 0 y 100.");
+            return false;
+          }
+          if (parseCotizacionSendNumber(ivaValue) < 0 || parseCotizacionSendNumber(ivaValue) > 100) {
+            window.Swal.showValidationMessage("El IVA debe estar entre 0 y 100.");
+            return false;
+          }
           return {
             destinatario: destValue,
             email: mailValue,
             indicativo: ind ? ind.value.trim() : "57",
             celular: cellValue,
+            porcentajeAdmon: pctValue || "0",
+            iva: ivaValue || "0",
           };
         },
       }).then(function (res) {
@@ -15393,6 +15478,8 @@
         fd.append("email_destinatario", data.email || "");
         fd.append("indicativo_destinarario", data.indicativo || "57");
         fd.append("celular_destinatario", data.celular || "");
+        fd.append("porcentaje_admon", data.porcentajeAdmon || "0");
+        fd.append("iva", data.iva || "0");
         return submitCotizacionAction(
           fd,
           actionSendCotizacion,
