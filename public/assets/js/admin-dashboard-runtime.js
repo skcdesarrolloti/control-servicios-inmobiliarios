@@ -236,8 +236,33 @@
 
     function markStandaloneFunctionReady() {
       if (!funcionarioBridgeMode) return;
+      document.body.classList.remove("scm-standalone-function-error");
+      root.classList.remove("scm-standalone-function-error");
       document.body.classList.add("scm-standalone-function-ready");
       root.classList.add("scm-standalone-function-ready");
+    }
+
+    function showStandaloneFunctionFailure(message) {
+      if (!funcionarioBridgeMode) {
+        showToast("error", message || "No se pudo abrir la acción solicitada.");
+        return;
+      }
+      var status = document.querySelector(".scm-standalone-function-status");
+      if (status) {
+        status.setAttribute("role", "alert");
+        status.innerHTML =
+          '<div class="scm-standalone-function-error-card">' +
+          '<strong>No se pudo abrir esta función</strong>' +
+          '<p>' + escHtml(message || "La acción solicitada no está disponible para este caso o cotización.") + "</p>" +
+          '<a href="index.php">Volver al panel</a>' +
+          "</div>";
+      }
+      document.body.classList.add("scm-standalone-function-ready", "scm-standalone-function-error");
+      root.classList.add("scm-standalone-function-ready", "scm-standalone-function-error");
+    }
+
+    function standaloneCaseSubmodalOpened() {
+      return !!document.querySelector("#scm-app #scm-case-modal.open .scm-case-submodal.open");
     }
 
     var panelLoader = root.querySelector("[data-scm-panel-loader]");
@@ -15746,7 +15771,7 @@
         if (!caseBtn && attempts < 40) return;
         window.clearInterval(timer);
         if (!caseBtn || typeof window.scmOpenCase !== "function") {
-          showToast("error", "No se encontró el caso autorizado para abrir esta acción.");
+          showStandaloneFunctionFailure("No se encontró el caso autorizado para abrir esta acción.");
           return;
         }
         window.scmOpenCase(caseBtn);
@@ -15755,8 +15780,13 @@
           if (actionBtn) {
             markStandaloneFunctionReady();
             actionBtn.click();
+            window.setTimeout(function () {
+              if (funcionarioBridgeMode && !standaloneCaseSubmodalOpened()) {
+                showStandaloneFunctionFailure(missingMessage || "La acción no abrió el formulario esperado para este caso.");
+              }
+            }, 700);
           } else {
-            showToast("error", missingMessage || "La acción no está disponible para este caso.");
+            showStandaloneFunctionFailure(missingMessage || "La acción no está disponible para este caso.");
           }
         }, 120);
       }, 250);
@@ -15765,7 +15795,7 @@
     function quoteActionButtonFromCard(card, selector, message) {
       var button = card ? card.querySelector(selector) : null;
       if (!button) {
-        showToast("error", message || "La acción no está disponible para esta cotización.");
+        showStandaloneFunctionFailure(message || "La acción no está disponible para esta cotización.");
         return null;
       }
       return button;
@@ -15773,7 +15803,7 @@
 
     function openQuoteActionFromBridge(action, quoteId) {
       if (!quoteId) {
-        showToast("error", "Falta el identificador de la cotización.");
+        showStandaloneFunctionFailure("Falta el identificador de la cotización.");
         return;
       }
       loadCotizacionCardById(quoteId)
@@ -15808,10 +15838,12 @@
               markStandaloneFunctionReady();
               openCotizacionActaFromCard(actaBtn);
             }
+            return;
           }
+          showStandaloneFunctionFailure("La acción solicitada no está configurada para esta cotización.");
         })
         .catch(function (err) {
-          showToast("error", err.message || "No se pudo cargar la cotización solicitada.");
+          showStandaloneFunctionFailure(err.message || "No se pudo cargar la cotización solicitada.");
         });
     }
 
@@ -15826,7 +15858,7 @@
 
       if (action === "crear_cotizacion") {
         if (!/^[1-9][0-9]*$/.test(ticketPk)) {
-          showToast("error", "Falta el caso interno para crear la cotización.");
+          showStandaloneFunctionFailure("Falta el caso interno para crear la cotización.");
           return;
         }
         window.setTimeout(function () {
