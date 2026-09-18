@@ -618,6 +618,7 @@ trait RendersDashboard
         <?php if ($canManageInternalNotificationSettings): ?>
           <button class="scm-guide-btn scm-internal-notifications-shortcut" type="button" id="scm-open-internal-notifications">Notificaciones internas</button>
         <?php endif; ?>
+        <button class="scm-guide-btn" type="button" id="scm-open-actas-guide">Tipos de actas</button>
         <button class="scm-guide-btn" type="button" id="scm-open-guide"><i class="fas fa-book-open"></i> Ver gu&iacute;as</button>
       </div>
       <div class="scm-tabs scm-main-tabs">

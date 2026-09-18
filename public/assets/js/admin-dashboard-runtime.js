@@ -7641,6 +7641,48 @@
 
     bindInternalNotificationsSettings();
 
+    function openActasGuideModal() {
+      var bridgeBase = "control-servicios-inmobiliarios/public/puente-funcionario.php";
+      var createActBase = "control-servicios-inmobiliarios/public/crear-acta.php";
+      var html =
+        '<div class="scm-cotizacion-response-form scm-actas-guide-modal">' +
+        '<p class="scm-cotizacion-dialog-intro">Hay dos usos nativos del acta. Comparten firma, OTP, PDF y notificaciones, pero no se deben confundir porque actualizan procesos distintos.</p>' +
+        '<div class="scm-cotizacion-response-grid">' +
+        '<div class="scm-cotizacion-dialog-field is-wide"><span>1. Acta directa del caso</span><strong>Soluci&oacute;n / cierre sin cotizaci&oacute;n aprobada</strong><small>Se usa desde el caso, en Complementarias &rarr; Acta de soluci&oacute;n y firma. Sirve cuando el trabajo se solucion&oacute; directamente o no depende de una cotizaci&oacute;n aprobada. Al firmarse cierra el caso y, si aplica, deja las cotizaciones pendientes como desaprobadas por soluci&oacute;n propia.</small><code>' + escHtml(bridgeBase + "?accion=acta_satisfaccion&ticket_pk=<ID_INTERNO_CASO>") + '</code></div>' +
+        '<div class="scm-cotizacion-dialog-field is-wide"><span>2. Acta por cotizaci&oacute;n aprobada</span><strong>Satisfacci&oacute;n al terminar el trabajo cotizado</strong><small>Se usa cuando ya existe una cotizaci&oacute;n aprobada y el trabajo/orden se finaliz&oacute;. Vincula el acta a esa cotizaci&oacute;n activa y no la desaprueba; la finaliza con el acta firmada.</small><code>' + escHtml(bridgeBase + "?accion=acta_cotizacion&id_cotizacion=<ID_COTIZACION>") + '</code><code>' + escHtml(createActBase + "?id_cotizacion=<ID_COTIZACION>&source_flow=approved_quote") + '</code></div>' +
+        '<div class="scm-cotizacion-dialog-field is-wide"><span>Autologin desde WordPress</span><strong>Agregar al enlace cuando el funcionario no tiene sesi&oacute;n</strong><small>Usa el mismo secreto configurado para actas. El puente elimina token e id_empleado antes de dejar al funcionario en la pantalla final.</small><code>' + escHtml("&id_empleado=<ID_EMPLEADO>&token=<ACTA_AUTOLOGIN_SECRET>") + '</code></div>' +
+        '</div></div>';
+      if (!window.Swal) {
+        showToast("info", "Acta caso: accion=acta_satisfaccion. Acta cotización: accion=acta_cotizacion.");
+        return;
+      }
+      window.Swal.fire({
+        title: "Tipos de actas y enlaces",
+        html: html,
+        width: "min(900px, 96vw)",
+        showCloseButton: true,
+        confirmButtonText: "Entendido",
+        buttonsStyling: false,
+        focusConfirm: false,
+        customClass: {
+          popup: "scm-cotizacion-dialog scm-cotizacion-response-swal",
+          title: "scm-cotizacion-dialog-title",
+          htmlContainer: "scm-cotizacion-dialog-body",
+          actions: "scm-cotizacion-dialog-actions",
+          confirmButton: "scm-cotizacion-dialog-confirm",
+          closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+        },
+      });
+    }
+
+    var actasGuideBtn = root.querySelector("#scm-open-actas-guide");
+    if (actasGuideBtn) {
+      actasGuideBtn.addEventListener("click", function (event) {
+        event.preventDefault();
+        openActasGuideModal();
+      });
+    }
+
     var settingsModalPromises = {};
     root.addEventListener("click", function (event) {
       var button = event.target.closest(
