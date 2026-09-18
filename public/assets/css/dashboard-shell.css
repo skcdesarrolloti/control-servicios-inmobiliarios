@@ -125,6 +125,10 @@
           font-weight: 600;
         }
 
+        body.scm-standalone-function.scm-standalone-function-ready .scm-standalone-function-status {
+          display: none;
+        }
+
         body.scm-standalone-function #scm-app > .scm-guide-bar,
         body.scm-standalone-function #scm-app > .scm-tabs,
         body.scm-standalone-function #scm-app > .scm-tab-panel {
@@ -138,6 +142,106 @@
         body.scm-standalone-function #scm-app .scm-case-submodal.open,
         body.scm-standalone-function #scm-app .scm-panel-loader:not([hidden]) {
           pointer-events: auto !important;
+        }
+
+        body.scm-standalone-function #scm-app .scm-case-modal.open {
+          position: static !important;
+          inset: auto !important;
+          z-index: auto !important;
+          display: block !important;
+          min-height: 100dvh !important;
+          padding: 0 !important;
+          overflow: visible !important;
+          background: transparent !important;
+          -webkit-backdrop-filter: none !important;
+          backdrop-filter: none !important;
+        }
+
+        body.scm-standalone-function #scm-app .scm-case-modal.open > .scm-case-dialog {
+          width: 0 !important;
+          max-width: none !important;
+          max-height: 0 !important;
+          min-height: 0 !important;
+          margin: 0 !important;
+          overflow: visible !important;
+          border: 0 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          background: transparent !important;
+        }
+
+        body.scm-standalone-function #scm-app .scm-case-modal.open > .scm-case-dialog > .scm-case-head,
+        body.scm-standalone-function #scm-app .scm-case-modal.open > .scm-case-dialog > .scm-case-body {
+          max-height: 0 !important;
+          min-height: 0 !important;
+          height: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+
+        body.scm-standalone-function #scm-app .scm-case-submodal.open {
+          position: fixed !important;
+          inset: 0 !important;
+          z-index: 30 !important;
+          display: block !important;
+          min-height: 100dvh !important;
+          padding: 14px !important;
+          overflow: auto !important;
+          background:
+            radial-gradient(circle at 10% 0%, rgba(255, 122, 0, .12), transparent 26%),
+            linear-gradient(135deg, #eef4fb, #f8fbff) !important;
+          -webkit-backdrop-filter: none !important;
+          backdrop-filter: none !important;
+        }
+
+        body.scm-standalone-function #scm-app .scm-case-submodal.open > .scm-case-submodal-dialog {
+          width: min(1120px, calc(100vw - 28px)) !important;
+          max-width: none !important;
+          max-height: none !important;
+          min-height: calc(100dvh - 28px) !important;
+          margin: 0 auto !important;
+          border-radius: 18px !important;
+          box-shadow: 0 18px 50px rgba(15, 23, 42, .16) !important;
+        }
+
+        body.scm-standalone-function .swal2-container {
+          position: fixed !important;
+          inset: 0 !important;
+          z-index: 40 !important;
+          display: block !important;
+          min-height: 100dvh !important;
+          padding: 14px !important;
+          overflow: auto !important;
+          background:
+            radial-gradient(circle at 10% 0%, rgba(255, 122, 0, .12), transparent 26%),
+            linear-gradient(135deg, #eef4fb, #f8fbff) !important;
+          -webkit-backdrop-filter: none !important;
+          backdrop-filter: none !important;
+        }
+
+        body.scm-standalone-function .swal2-popup.scm-cotizacion-dialog {
+          width: min(1120px, calc(100vw - 28px)) !important;
+          max-width: none !important;
+          max-height: none !important;
+          min-height: calc(100dvh - 28px) !important;
+          margin: 0 auto !important;
+          border-radius: 18px !important;
+          box-shadow: 0 18px 50px rgba(15, 23, 42, .16) !important;
+        }
+
+        body.scm-standalone-function .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-body {
+          max-height: none !important;
+        }
+
+        body.scm-standalone-function .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-actions {
+          position: sticky !important;
+          bottom: 0 !important;
+          z-index: 2 !important;
+          background: rgba(255, 255, 255, .96) !important;
+          border-top: 1px solid #dbe6f3 !important;
         }
 
         body.scm-panel-loading {

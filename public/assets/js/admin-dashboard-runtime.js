@@ -233,6 +233,13 @@
       document.body.classList.add("scm-funcionario-bridge-mode");
       root.classList.add("scm-funcionario-bridge-mode");
     }
+
+    function markStandaloneFunctionReady() {
+      if (!funcionarioBridgeMode) return;
+      document.body.classList.add("scm-standalone-function-ready");
+      root.classList.add("scm-standalone-function-ready");
+    }
+
     var panelLoader = root.querySelector("[data-scm-panel-loader]");
     var panelLoaderTitle = panelLoader
       ? panelLoader.querySelector("[data-scm-panel-loader-title]")
@@ -15746,6 +15753,7 @@
         window.setTimeout(function () {
           var actionBtn = document.querySelector("#scm-app #scm-case-modal.open " + selector);
           if (actionBtn) {
+            markStandaloneFunctionReady();
             actionBtn.click();
           } else {
             showToast("error", missingMessage || "La acción no está disponible para este caso.");
@@ -15773,6 +15781,7 @@
           if (action === "editar_cotizacion") {
             var editBtn = quoteActionButtonFromCard(card, "[data-scm-edit-cotizacion]", "Esta cotización no se puede editar desde su estado actual.");
             if (editBtn) {
+              markStandaloneFunctionReady();
               openMaintenanceQuoteForm(editBtn, { mode: "edit" });
             }
             return;
@@ -15780,6 +15789,7 @@
           if (action === "enviar_cotizacion") {
             var sendBtn = quoteActionButtonFromCard(card, "[data-scm-send-cotizacion]", "Esta cotización no está disponible para enviar.");
             if (sendBtn) {
+              markStandaloneFunctionReady();
               openSendCotizacionModal(sendBtn);
             }
             return;
@@ -15787,6 +15797,7 @@
           if (action === "crear_orden") {
             var orderBtn = quoteActionButtonFromCard(card, "[data-scm-add-cotizacion-order]", "Esta cotización no permite crear orden en su estado actual.");
             if (orderBtn) {
+              markStandaloneFunctionReady();
               openCotizacionOrderFormModal(orderBtn);
             }
             return;
@@ -15794,6 +15805,7 @@
           if (action === "acta_cotizacion") {
             var actaBtn = quoteActionButtonFromCard(card, "[data-scm-create-cotizacion-acta]", "Esta cotización no permite crear acta en su estado actual.");
             if (actaBtn) {
+              markStandaloneFunctionReady();
               openCotizacionActaFromCard(actaBtn);
             }
           }
@@ -15818,6 +15830,7 @@
           return;
         }
         window.setTimeout(function () {
+          markStandaloneFunctionReady();
           openMaintenanceQuoteForm(bridgeSyntheticButton({
             "data-scm-create-cotizacion": true,
             "data-cotizacion-mode": "create",
