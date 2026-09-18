@@ -91,6 +91,55 @@
           padding: 1.25rem;
         }
 
+        body.scm-standalone-function {
+          min-height: 100dvh;
+          background:
+            radial-gradient(circle at 12% 0%, rgba(255, 122, 0, .12), transparent 28%),
+            linear-gradient(135deg, #eef4fb, #f8fbff);
+        }
+
+        body.scm-standalone-function .top-bar {
+          display: none;
+        }
+
+        body.scm-standalone-function .page-body {
+          min-height: 100dvh;
+          padding: 0;
+        }
+
+        body.scm-standalone-function .scm-standalone-function-status {
+          position: fixed;
+          inset: 0;
+          z-index: 1;
+          display: grid;
+          place-content: center;
+          gap: .35rem;
+          padding: 24px;
+          text-align: center;
+          color: #173d70;
+          font-weight: 800;
+        }
+
+        body.scm-standalone-function .scm-standalone-function-status small {
+          color: #64748b;
+          font-weight: 600;
+        }
+
+        body.scm-standalone-function #scm-app > .scm-guide-bar,
+        body.scm-standalone-function #scm-app > .scm-tabs,
+        body.scm-standalone-function #scm-app > .scm-tab-panel {
+          max-height: 0 !important;
+          overflow: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+
+        body.scm-standalone-function #scm-app .scm-case-modal.open,
+        body.scm-standalone-function #scm-app .scm-case-submodal.open,
+        body.scm-standalone-function #scm-app .scm-panel-loader:not([hidden]) {
+          pointer-events: auto !important;
+        }
+
         body.scm-panel-loading {
           overflow: hidden;
         }

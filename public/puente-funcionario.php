@@ -90,6 +90,7 @@ $tryEmployeeTokenLogin = static function (): bool {
 $targetQuery = [
   'scm_bridge_action' => $action,
   'scm_bridge' => '1',
+  'scm_standalone' => '1',
 ];
 if ($ticketPk > 0) {
   $targetQuery['scm_bridge_ticket_pk'] = $ticketPk;

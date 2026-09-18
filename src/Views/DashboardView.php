@@ -4,7 +4,7 @@ namespace SCM\Views;
 
 final class DashboardView
 {
-  public function render(string $baseUrl, string $user, string $panelHtml): void
+  public function render(string $baseUrl, string $user, string $panelHtml, bool $standaloneFunction = false): void
   {
 ?>
     <!DOCTYPE html>
@@ -13,14 +13,14 @@ final class DashboardView
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>Panel de Control — Servicios Inmobiliarios</title>
+      <title><?php echo $standaloneFunction ? 'Función protegida' : 'Panel de Control'; ?> — Servicios Inmobiliarios</title>
       <link rel="icon" href="<?php echo \esc_url(\system_image('portal_favicon_url', SCM_DEFAULT_PORTAL_FAVICON_URL)); ?>" sizes="32x32">
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
       <link rel="stylesheet" href="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/css/dashboard-shell.css?v=' . SCM_VERSION); ?>">
     </head>
 
-    <body>
+    <body<?php echo $standaloneFunction ? ' class="scm-standalone-function"' : ''; ?>>
       <div class="top-bar">
         <a class="brand" href="<?php echo htmlspecialchars($baseUrl . '/index.php', ENT_QUOTES, 'UTF-8'); ?>">
           <span class="brand-logo">
@@ -38,6 +38,12 @@ final class DashboardView
       </div>
 
       <div class="page-body">
+        <?php if ($standaloneFunction): ?>
+          <div class="scm-standalone-function-status" role="status" aria-live="polite">
+            <span>Abriendo función protegida…</span>
+            <small>Esta pantalla viene desde WordPress y no muestra el panel completo.</small>
+          </div>
+        <?php endif; ?>
         <?php echo $panelHtml; ?>
       </div>
     </body>

@@ -15708,6 +15708,7 @@
       [
         "scm_bridge_action",
         "scm_bridge",
+        "scm_standalone",
         "scm_bridge_ticket_pk",
         "scm_bridge_quote_id",
         "source_flow",

@@ -6,7 +6,42 @@
 require_once dirname(__DIR__) . '/bootstrap/app.php';
 
 $nextRaw = trim((string) ($_POST['next'] ?? $_GET['next'] ?? ''));
-$next = preg_match('/^crear-acta\.php\?ticket_pk=[1-9][0-9]{0,18}$/D', $nextRaw) ? $nextRaw : '';
+$safeNext = static function (string $raw): string {
+  $raw = trim($raw);
+  if ($raw === '' || preg_match('/[\x00-\x1F\x7F]/', $raw) || preg_match('/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i', $raw)) {
+    return '';
+  }
+  $path = (string) parse_url($raw, PHP_URL_PATH);
+  $queryRaw = (string) parse_url($raw, PHP_URL_QUERY);
+  parse_str($queryRaw, $query);
+  $digits = static fn(mixed $value): bool => preg_match('/^[1-9][0-9]{0,18}$/D', (string) $value) === 1;
+  if ($path === 'crear-acta.php') {
+    $out = [];
+    if (isset($query['ticket_pk']) && $digits($query['ticket_pk'])) { $out['ticket_pk'] = (string) $query['ticket_pk']; }
+    if (isset($query['id_cotizacion']) && $digits($query['id_cotizacion'])) { $out['id_cotizacion'] = (string) $query['id_cotizacion']; }
+    if (isset($query['act_id']) && $digits($query['act_id'])) { $out['act_id'] = (string) $query['act_id']; }
+    if (($query['source_flow'] ?? '') === 'approved_quote') { $out['source_flow'] = 'approved_quote'; }
+    return ($out['ticket_pk'] ?? $out['id_cotizacion'] ?? '') !== ''
+      ? 'crear-acta.php?' . http_build_query($out, '', '&', PHP_QUERY_RFC3986)
+      : '';
+  }
+  if ($path === 'index.php') {
+    $action = trim((string) ($query['scm_bridge_action'] ?? ''));
+    $allowedActions = ['revision_correctiva', 'crear_cotizacion', 'editar_cotizacion', 'enviar_cotizacion', 'crear_orden', 'acta_satisfaccion', 'acta_cotizacion'];
+    if (!in_array($action, $allowedActions, true)) {
+      return '';
+    }
+    $out = ['scm_bridge_action' => $action, 'scm_bridge' => '1', 'scm_standalone' => '1'];
+    if (isset($query['scm_bridge_ticket_pk']) && $digits($query['scm_bridge_ticket_pk'])) { $out['scm_bridge_ticket_pk'] = (string) $query['scm_bridge_ticket_pk']; }
+    if (isset($query['scm_bridge_quote_id']) && $digits($query['scm_bridge_quote_id'])) { $out['scm_bridge_quote_id'] = (string) $query['scm_bridge_quote_id']; }
+    if (isset($query['scmqt_cotizacion']) && $digits($query['scmqt_cotizacion'])) { $out['scmqt_cotizacion'] = (string) $query['scmqt_cotizacion']; }
+    if (isset($query['scm_tab']) && preg_match('/^[a-z0-9_-]{1,80}$/D', (string) $query['scm_tab'])) { $out['scm_tab'] = (string) $query['scm_tab']; }
+    if (($query['source_flow'] ?? '') === 'approved_quote') { $out['source_flow'] = 'approved_quote'; }
+    return 'index.php?' . http_build_query($out, '', '&', PHP_QUERY_RFC3986);
+  }
+  return '';
+};
+$next = $safeNext($nextRaw);
 $afterLogin = $next !== '' ? rtrim((string) SCM_BASE_URL, '/') . '/' . $next : SCM_BASE_URL . '/index.php';
 
 // Ya autenticado → panel

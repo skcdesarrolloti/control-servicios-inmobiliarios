@@ -11,7 +11,10 @@ $controller->requireAuth();
 $panelHtml = $controller->getPanelHtml();
 $user = \SCM\Core\Auth::user();
 $baseUrl = SCM_BASE_URL;
+$standaloneFunction = (string) ($_GET['scm_standalone'] ?? '') === '1'
+  || (string) ($_GET['scm_bridge'] ?? '') === '1'
+  || trim((string) ($_GET['scm_bridge_action'] ?? '')) !== '';
 
 $view = new \SCM\Views\DashboardView();
-$view->render($baseUrl, $user, $panelHtml);
+$view->render($baseUrl, $user, $panelHtml, $standaloneFunction);
 
