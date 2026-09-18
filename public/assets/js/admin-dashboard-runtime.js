@@ -7655,6 +7655,7 @@
       var bridgeUrl = function (query) {
         return bridgeBase + "?" + query;
       };
+      var autologinSuffix = "&id_empleado=<ID_EMPLEADO>&token=<ACTA_AUTOLOGIN_SECRET>";
       var linkField = function (label, description, url) {
         return '<div class="scm-cotizacion-dialog-field is-wide"><span>' +
           escHtml(label) +
@@ -7666,19 +7667,19 @@
       };
       var html =
         '<div class="scm-cotizacion-response-form scm-actas-guide-modal">' +
-        '<p class="scm-cotizacion-dialog-intro">Enlaces completos para abrir funciones nativas desde WordPress. <strong>&lt;ID_INTERNO_CASO&gt;</strong> es el _ID interno del ticket y <strong>&lt;ID_COTIZACION&gt;</strong> es el _ID de la cotizaci&oacute;n.</p>' +
+        '<p class="scm-cotizacion-dialog-intro">Enlaces completos para abrir funciones nativas desde WordPress. Todos pueden evitar login agregando el sufijo de autologin. <strong>&lt;ID_INTERNO_CASO&gt;</strong> es el _ID interno del ticket y <strong>&lt;ID_COTIZACION&gt;</strong> es el _ID de la cotizaci&oacute;n.</p>' +
         '<div class="scm-cotizacion-response-grid">' +
         '<div class="scm-cotizacion-dialog-field is-wide"><span>Actas</span><strong>Dos procesos distintos</strong><small>Acta directa: soluci&oacute;n/cierre sin cotizaci&oacute;n aprobada. Acta por cotizaci&oacute;n: satisfacci&oacute;n al terminar el trabajo cotizado y aprobado.</small></div>' +
         linkField("Acta directa del caso", "Abre Complementarias → Acta de solución y firma.", bridgeUrl("accion=acta_satisfaccion&ticket_pk=<ID_INTERNO_CASO>")) +
         linkField("Acta por cotización aprobada", "Abre el sistema y crea el acta vinculada a esa cotización aprobada.", bridgeUrl("accion=acta_cotizacion&id_cotizacion=<ID_COTIZACION>")) +
-        linkField("Acta por cotización aprobada · directo", "Alternativa directa a crear-acta.php si ya hay sesión activa.", createActBase + "?id_cotizacion=<ID_COTIZACION>&source_flow=approved_quote") +
+        linkField("Acta por cotización aprobada · directo", "Alternativa directa a crear-acta.php; también acepta el mismo autologin desde WordPress.", createActBase + "?id_cotizacion=<ID_COTIZACION>&source_flow=approved_quote") +
         '<div class="scm-cotizacion-dialog-field is-wide"><span>Funciones puente para funcionarios</span><strong>Acciones disponibles desde WordPress</strong><small>Usa estos enlaces para migrar los botones externos al sistema nativo sin abrir pestañas innecesarias cuando el funcionario est&aacute; dentro del panel.</small></div>' +
         linkField("Crear / gestionar revisión correctiva", "Abre la revisión correctiva del caso; si no existe, permite crearla.", bridgeUrl("accion=revision_correctiva&ticket_pk=<ID_INTERNO_CASO>")) +
         linkField("Crear cotización de mantenimiento", "Abre el formulario nativo de nueva cotización para el caso.", bridgeUrl("accion=crear_cotizacion&ticket_pk=<ID_INTERNO_CASO>")) +
         linkField("Editar cotización de mantenimiento", "Abre la cotización exacta en modo edición cuando su estado lo permita.", bridgeUrl("accion=editar_cotizacion&id_cotizacion=<ID_COTIZACION>")) +
         linkField("Enviar cotización", "Abre el envío por correo/WhatsApp de la cotización exacta.", bridgeUrl("accion=enviar_cotizacion&id_cotizacion=<ID_COTIZACION>")) +
         linkField("Crear orden de mantenimiento", "Abre la creación de orden para la cotización aprobada.", bridgeUrl("accion=crear_orden&id_cotizacion=<ID_COTIZACION>")) +
-        '<div class="scm-cotizacion-dialog-field is-wide"><span>Autologin desde WordPress</span><strong>Agregar al final si el funcionario no tiene sesi&oacute;n</strong><small>Usa el mismo secreto configurado para actas. El puente elimina token e id_empleado antes de dejar al funcionario en la pantalla final.</small><code>' + escHtml("&id_empleado=<ID_EMPLEADO>&token=<ACTA_AUTOLOGIN_SECRET>") + '</code></div>' +
+        '<div class="scm-cotizacion-dialog-field is-wide"><span>Autologin desde WordPress</span><strong>Agregar al final si el funcionario no tiene sesi&oacute;n</strong><small>Sirve para los enlaces del puente y tambi&eacute;n para crear-acta.php. El sistema elimina token e id_empleado antes de dejar al funcionario en la pantalla final.</small><code>' + escHtml(autologinSuffix) + '</code><small>Ejemplo:</small><code>' + escHtml(bridgeUrl("accion=crear_cotizacion&ticket_pk=<ID_INTERNO_CASO>") + autologinSuffix) + '</code></div>' +
         '</div></div>';
       if (!window.Swal) {
         showToast("info", "Enlaces puente: revisión, cotización, envío, orden y actas.");
