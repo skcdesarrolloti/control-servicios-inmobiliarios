@@ -139,7 +139,7 @@ final class CompletionView
     foreach ((array) ($values['photos'] ?? []) as $photoIndex => $photo) {
       if (!is_array($photo)) { continue; }
       $photoUrl = \SCM\Support\StoredFileService::fromRuntime()->urlFor((string) ($photo['name'] ?? ''));
-      $photosHtml .= '<figure data-acta-existing-photo><img src="' . self::e($photoUrl) . '" alt="Evidencia actual ' . ((int) $photoIndex + 1) . '" loading="lazy"><figcaption>Foto actual ' . ((int) $photoIndex + 1) . '</figcaption><button type="button" class="scm-acta-photo-remove" data-acta-remove-existing-photo aria-label="Quitar foto actual ' . ((int) $photoIndex + 1) . '"><span aria-hidden="true">×</span></button>';
+      $photosHtml .= '<figure data-acta-existing-photo><img src="' . self::e($photoUrl) . '" alt="Evidencia precargada ' . ((int) $photoIndex + 1) . '" loading="lazy"><figcaption>Evidencia precargada ' . ((int) $photoIndex + 1) . '</figcaption><button type="button" class="scm-acta-photo-remove" data-acta-remove-existing-photo aria-label="Quitar evidencia precargada ' . ((int) $photoIndex + 1) . '"><span aria-hidden="true">×</span></button>';
       foreach (['name', 'mime', 'width', 'height', 'bytes', 'sha256'] as $key) {
         $photosHtml .= '<input type="hidden" name="items[' . $index . '][photos][' . (int) $photoIndex . '][' . $key . ']" value="' . self::e($photo[$key] ?? '') . '">';
       }

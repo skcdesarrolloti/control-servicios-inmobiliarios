@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Modules\TicketCompletion;
 
 use SCM\Support\EmailTemplate;
+use SCM\Support\StoredFileService;
 
 final class CompletionService
 {
@@ -67,7 +68,7 @@ final class CompletionService
     ];
   }
 
-  /** @return array<int,array{damage:string,solution:string}> */
+  /** @return array<int,array{damage:string,solution:string,photos?:array<int,array{name:string,mime:string,width:int,height:int,bytes:int,sha256:string}>}> */
   private function suggestedItemsForTicket(array $ticket): array
   {
     $items = $this->suggestedItemsFromCorrectiveReview((string) ($ticket['id_revision_correctiva'] ?? ''));
@@ -83,7 +84,7 @@ final class CompletionService
     return [];
   }
 
-  /** @return array<int,array{damage:string,solution:string}> */
+  /** @return array<int,array{damage:string,solution:string,photos?:array<int,array{name:string,mime:string,width:int,height:int,bytes:int,sha256:string}>}> */
   private function suggestedItemsFromCorrectiveReview(string $rawIds): array
   {
     $rows = $this->linkedRowsByIds('jet_cct_revision_correctiva', $rawIds);
@@ -96,7 +97,11 @@ final class CompletionService
         }
         $damage = $this->correctiveDamageText($item);
         if ($damage !== '') {
-          $items[] = ['damage' => $damage, 'solution' => ''];
+          $items[] = [
+            'damage' => $damage,
+            'solution' => '',
+            'photos' => $this->actaPhotoDescriptorsFromRefs($this->storedImageRefsFromValue($item['registro_foto_dano'] ?? '')),
+          ];
         }
       }
       if ($stored === []) {
@@ -111,7 +116,11 @@ final class CompletionService
           'observaciones',
         ]);
         if ($damage !== '') {
-          $items[] = ['damage' => $damage, 'solution' => ''];
+          $items[] = [
+            'damage' => $damage,
+            'solution' => '',
+            'photos' => $this->actaPhotoDescriptorsFromRefs($this->rowEvidenceRefs($row)),
+          ];
         }
       }
     }
@@ -119,7 +128,7 @@ final class CompletionService
     return $this->uniqueSuggestedItems($items);
   }
 
-  /** @return array<int,array{damage:string,solution:string}> */
+  /** @return array<int,array{damage:string,solution:string,photos?:array<int,array{name:string,mime:string,width:int,height:int,bytes:int,sha256:string}>}> */
   private function suggestedItemsFromPreventiveReview(string $rawIds, array $ticket): array
   {
     $rows = $this->linkedRowsByIds('jet_cct_revision_preventiva', $rawIds);
@@ -144,7 +153,11 @@ final class CompletionService
         'area_afectada',
       ]);
       if ($damage !== '') {
-        $items[] = ['damage' => $damage, 'solution' => ''];
+        $items[] = [
+          'damage' => $damage,
+          'solution' => '',
+          'photos' => $this->actaPhotoDescriptorsFromRefs($this->rowEvidenceRefs($row)),
+        ];
       }
     }
 
@@ -157,11 +170,140 @@ final class CompletionService
         'observaciones',
       ]);
       if ($damage !== '') {
-        $items[] = ['damage' => $damage, 'solution' => ''];
+        $items[] = [
+          'damage' => $damage,
+          'solution' => '',
+          'photos' => $this->actaPhotoDescriptorsFromRefs($this->rowEvidenceRefs($ticket)),
+        ];
       }
     }
 
     return $this->uniqueSuggestedItems($items);
+  }
+
+  /** @param array<string,mixed> $row @return array<int,string> */
+  private function rowEvidenceRefs(array $row): array
+  {
+    $refs = [];
+    foreach (['registro_foto_dano', 'registro_foto_daño', 'evidencia', 'evidencias', 'imagen', 'imagenes', 'foto', 'fotos'] as $column) {
+      foreach ($this->storedImageRefsFromValue($row[$column] ?? '') as $ref) {
+        $refs[$ref] = $ref;
+      }
+    }
+    return array_values($refs);
+  }
+
+  /** @return array<int,string> */
+  private function storedImageRefsFromValue(mixed $value): array
+  {
+    $refs = [];
+    $collect = function (mixed $input) use (&$collect, &$refs): void {
+      if (is_array($input)) {
+        foreach ($input as $key => $nested) {
+          if (is_string($key) && in_array($key, ['url', 'archivo', 'media_archivo', 'imagen', 'imagenes', 'evidencia', 'registro_foto_dano', 'registro_foto_daño'], true)) {
+            $collect($nested);
+            continue;
+          }
+          if (is_array($nested) || is_string($nested)) {
+            $collect($nested);
+          }
+        }
+        return;
+      }
+      $text = html_entity_decode(trim((string) $input), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+      if ($text === '') {
+        return;
+      }
+      $decoded = @unserialize($text, ['allowed_classes' => false]);
+      if (is_array($decoded)) {
+        $collect($decoded);
+        return;
+      }
+      $json = json_decode($text, true);
+      if (is_array($json)) {
+        $collect($json);
+        return;
+      }
+      foreach (preg_split('/[,\r\n]+/', $text) ?: [] as $part) {
+        $ref = trim(strip_tags((string) $part));
+        if ($ref === '' || strlen($ref) > 2048 || preg_match('/[\x00<>"\']/', $ref)) {
+          continue;
+        }
+        if (preg_match('/file\.php\?/i', $ref) || preg_match('/^[a-f0-9]{24}_[0-9]+\.jpg$/D', basename($ref))) {
+          $refs[$ref] = $ref;
+        }
+      }
+    };
+    $collect($value);
+    return array_values($refs);
+  }
+
+  /** @param array<int,string> $refs @return array<int,array{name:string,mime:string,width:int,height:int,bytes:int,sha256:string}> */
+  private function actaPhotoDescriptorsFromRefs(array $refs): array
+  {
+    if ($refs === []) {
+      return [];
+    }
+    $storedFiles = StoredFileService::fromRuntime();
+    $photos = [];
+    foreach ($refs as $ref) {
+      $name = $this->storedImageNameFromRef((string) $ref);
+      if ($name === '' || isset($photos[$name])) {
+        continue;
+      }
+      $path = $storedFiles->pathFor($name);
+      if ($path === null) {
+        continue;
+      }
+      $info = @getimagesize($path);
+      $hash = @hash_file('sha256', $path);
+      $bytes = @filesize($path);
+      if (!is_array($info) || !is_string($hash) || !is_int($bytes) || ($info['mime'] ?? '') !== 'image/jpeg') {
+        continue;
+      }
+      if ((int) $info[0] < 1 || (int) $info[0] > 1600 || (int) $info[1] < 1 || (int) $info[1] > 1600 || $bytes < 100 || $bytes > 1500000) {
+        continue;
+      }
+      $photos[$name] = [
+        'name' => $name,
+        'mime' => 'image/jpeg',
+        'width' => (int) $info[0],
+        'height' => (int) $info[1],
+        'bytes' => $bytes,
+        'sha256' => $hash,
+      ];
+      if (count($photos) >= 4) {
+        break;
+      }
+    }
+    return array_values($photos);
+  }
+
+  private function storedImageNameFromRef(string $ref): string
+  {
+    $ref = html_entity_decode(trim($ref), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if ($ref === '') {
+      return '';
+    }
+    $basename = basename((string) parse_url($ref, PHP_URL_PATH));
+    if (preg_match('/^[a-f0-9]{24}_[0-9]+\.jpg$/D', $basename)) {
+      return $basename;
+    }
+    $query = (string) parse_url($ref, PHP_URL_QUERY);
+    if ($query !== '') {
+      parse_str($query, $params);
+      $name = basename((string) ($params['n'] ?? ''));
+      if (preg_match('/^[a-f0-9]{24}_[0-9]+\.jpg$/D', $name)) {
+        return $name;
+      }
+    }
+    if (preg_match('/[?&]n=([^&]+)/', $ref, $matches)) {
+      $name = basename(rawurldecode((string) ($matches[1] ?? '')));
+      if (preg_match('/^[a-f0-9]{24}_[0-9]+\.jpg$/D', $name)) {
+        return $name;
+      }
+    }
+    return '';
   }
 
   /** @return array<int,array<string,mixed>> */
@@ -281,11 +423,12 @@ final class CompletionService
     return in_array($value, ['si', '1', 'true', 'yes', 'con dano', 'con danos', 'con daño', 'con daños'], true);
   }
 
-  /** @param array<int,array{damage:string,solution:string}> $items @return array<int,array{damage:string,solution:string}> */
+  /** @param array<int,array{damage:string,solution:string,photos?:array<int,array{name:string,mime:string,width:int,height:int,bytes:int,sha256:string}>}> $items @return array<int,array{damage:string,solution:string,photos?:array<int,array{name:string,mime:string,width:int,height:int,bytes:int,sha256:string}>}> */
   private function uniqueSuggestedItems(array $items): array
   {
     $out = [];
     $seen = [];
+    $photoCount = 0;
     foreach ($items as $item) {
       $damage = $this->cleanSuggestionText($item['damage'] ?? '');
       if ($damage === '') {
@@ -296,7 +439,19 @@ final class CompletionService
         continue;
       }
       $seen[$key] = true;
-      $out[] = ['damage' => $damage, 'solution' => ''];
+      $photos = [];
+      foreach ((array) ($item['photos'] ?? []) as $photo) {
+        if (!is_array($photo) || $photoCount >= 12 || count($photos) >= 4) {
+          continue;
+        }
+        $photos[] = $photo;
+        $photoCount++;
+      }
+      $suggestion = ['damage' => $damage, 'solution' => ''];
+      if ($photos !== []) {
+        $suggestion['photos'] = $photos;
+      }
+      $out[] = $suggestion;
       if (count($out) >= 30) {
         break;
       }

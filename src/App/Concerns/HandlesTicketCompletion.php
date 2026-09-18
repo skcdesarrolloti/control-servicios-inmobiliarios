@@ -60,6 +60,59 @@ trait HandlesTicketCompletion
         $actId = (int) ($_POST['act_id'] ?? 0);
         $oldPhotoNames = [];
         $allowedPhotos = [];
+        $allowExistingPhoto = static function (array $photo) use (&$allowedPhotos): void {
+          $photoKey = implode('|', [
+            (string) ($photo['name'] ?? ''),
+            (string) ($photo['mime'] ?? ''),
+            (string) ($photo['width'] ?? ''),
+            (string) ($photo['height'] ?? ''),
+            (string) ($photo['bytes'] ?? ''),
+            (string) ($photo['sha256'] ?? ''),
+          ]);
+          $allowedPhotos[$photoKey] = $photo;
+        };
+        $verifiedExistingPhoto = function (array $postedPhoto): ?array {
+          $name = (string) ($postedPhoto['name'] ?? '');
+          if (!preg_match('/^[a-f0-9]{24}_[0-9]+\.jpg$/D', $name)) {
+            return null;
+          }
+          $path = $this->storedFiles()->pathFor($name);
+          if ($path === null) {
+            return null;
+          }
+          $info = @getimagesize($path);
+          $hash = @hash_file('sha256', $path);
+          $bytes = @filesize($path);
+          if (!is_array($info) || !is_string($hash) || !is_int($bytes) || ($info['mime'] ?? '') !== 'image/jpeg') {
+            return null;
+          }
+          if (
+            ($postedPhoto['mime'] ?? '') !== 'image/jpeg'
+            || (int) ($postedPhoto['width'] ?? 0) !== (int) $info[0]
+            || (int) ($postedPhoto['height'] ?? 0) !== (int) $info[1]
+            || (int) ($postedPhoto['bytes'] ?? 0) !== $bytes
+            || !hash_equals($hash, (string) ($postedPhoto['sha256'] ?? ''))
+          ) {
+            return null;
+          }
+          return [
+            'name' => $name,
+            'mime' => 'image/jpeg',
+            'width' => (int) $info[0],
+            'height' => (int) $info[1],
+            'bytes' => $bytes,
+            'sha256' => $hash,
+          ];
+        };
+        if ($operation === 'create') {
+          foreach ((array) ($service->context($ticketId, $sourceFlow)['suggested_items'] ?? []) as $suggestedItem) {
+            foreach ((array) ($suggestedItem['photos'] ?? []) as $suggestedPhoto) {
+              if (!is_array($suggestedPhoto)) { continue; }
+              $verifiedPhoto = $verifiedExistingPhoto($suggestedPhoto);
+              if ($verifiedPhoto !== null) { $allowExistingPhoto($verifiedPhoto); }
+            }
+          }
+        }
         if ($operation === 'update') {
           $existingAct = $repo->act($actId);
           if ((int) $existingAct['ticket_pk'] !== $ticketId || $existingAct['status'] !== 'pending') {
@@ -69,15 +122,7 @@ trait HandlesTicketCompletion
           foreach ((array) ($oldPayload['items'] ?? []) as $oldItem) {
             foreach ((array) ($oldItem['photos'] ?? []) as $oldPhoto) {
               if (!is_array($oldPhoto)) { continue; }
-              $photoKey = implode('|', [
-                (string) ($oldPhoto['name'] ?? ''),
-                (string) ($oldPhoto['mime'] ?? ''),
-                (string) ($oldPhoto['width'] ?? ''),
-                (string) ($oldPhoto['height'] ?? ''),
-                (string) ($oldPhoto['bytes'] ?? ''),
-                (string) ($oldPhoto['sha256'] ?? ''),
-              ]);
-              $allowedPhotos[$photoKey] = $oldPhoto;
+              $allowExistingPhoto($oldPhoto);
               if (trim((string) ($oldPhoto['name'] ?? '')) !== '') { $oldPhotoNames[] = (string) $oldPhoto['name']; }
             }
           }
@@ -92,7 +137,7 @@ trait HandlesTicketCompletion
         foreach ($items as $index => &$item) {
           if (!is_array($item)) { continue; }
           $keptPhotos = [];
-          if ($operation === 'update' && is_array($item['photos'] ?? null)) {
+          if (is_array($item['photos'] ?? null)) {
             foreach ($item['photos'] as $postedPhoto) {
               if (!is_array($postedPhoto)) { continue; }
               $photoKey = implode('|', [
