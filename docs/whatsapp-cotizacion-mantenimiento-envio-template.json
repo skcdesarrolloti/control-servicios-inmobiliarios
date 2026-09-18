@@ -12,9 +12,9 @@
     },
     {
       "type": "BODY",
-      "text": "Buen día, {{1}}.\n\nTe compartimos la cotización de mantenimiento #{{2}} del caso #{{3}} por {{4}}.\n\nPuedes ver el PDF adjunto y responder la cotización desde el botón.\n\nAtentamente,\n{{5}}\nSKC SuCasa Inmobiliaria",
+      "text": "Buen día, {{1}}.\n\nTe compartimos la cotización de mantenimiento #{{2}} del caso #{{3}} por {{4}}.\n\nContrato: #{{5}}.\nDirección: {{6}}.\n\nPuedes ver el PDF adjunto y responder la cotización desde el botón.\n\nAtentamente,\n{{7}}\nSKC SuCasa Inmobiliaria",
       "example": {
-        "body_text": [["María Pérez", "552", "10676", "$ 250.000", "Royner Guardo"]]
+        "body_text": [["María Pérez", "552", "10676", "$ 250.000", "2000", "Urbanización Simón Bolívar manzana 20 lote 7", "Royner Guardo"]]
       }
     },
     {

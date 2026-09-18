@@ -3227,10 +3227,13 @@ trait HandlesMaintenanceActions
       $actorEmail = trim((string) ($actor['email'] ?? ''));
       $ticketRef = trim((string) ($quote['id_ticket'] ?? ''));
       $total = $this->format_cop_currency($quote['total'] ?? 0);
+      $contratoRef = trim((string) ($quote['contrato'] ?? $quote['id_contrato'] ?? ''));
+      $direccionRef = $this->maintenance_quote_clean($quote['direccion'] ?? '');
       $subject = 'Cotización de mantenimiento #' . $cotizacionId . ($ticketRef !== '' ? ' del caso #' . $ticketRef : '');
 
       $content = '<p style="font-weight:600;margin:0 0 14px;">Apreciado(a) ' . \SCM\Support\EmailTemplate::e($destinatario) . ',</p>'
         . '<p style="line-height:1.65;margin:0 0 14px;">Te compartimos la cotización de mantenimiento <b>#' . \SCM\Support\EmailTemplate::e((string) $cotizacionId) . '</b>' . ($ticketRef !== '' ? ' asociada al caso <b>#' . \SCM\Support\EmailTemplate::e($ticketRef) . '</b>' : '') . '.</p>'
+        . '<p style="line-height:1.65;margin:0 0 14px;">Contrato: <b>#' . \SCM\Support\EmailTemplate::e($contratoRef !== '' ? $contratoRef : '-') . '</b><br>Dirección: <b>' . \SCM\Support\EmailTemplate::e($direccionRef !== '' ? $direccionRef : '-') . '</b></p>'
         . '<p style="line-height:1.65;margin:0 0 14px;">El valor total registrado es <b>' . \SCM\Support\EmailTemplate::e($total) . '</b>. Adjuntamos el PDF de la cotización y también puedes verla y responderla desde el botón seguro.</p>'
         . '<p style="line-height:1.65;margin:0;">Cordialmente,<br><b>' . \SCM\Support\EmailTemplate::e($actorName) . '</b><br>SKC SuCasa Inmobiliaria</p>';
       $html = \SCM\Support\EmailTemplate::render($subject, $content, [
@@ -3266,6 +3269,8 @@ trait HandlesMaintenanceActions
       $buttonSuffix = $this->maintenance_quote_whatsapp_url_button_suffix($quoteUrl);
       $message = "Buen día, {$destinatario}.\n\n";
       $message .= "Te compartimos la cotización de mantenimiento #{$cotizacionId}" . ($ticketRef !== '' ? " del caso #{$ticketRef}" : '') . " por {$total}.\n\n";
+      $message .= "Contrato: #" . ($contratoRef !== '' ? $contratoRef : '-') . ".\n";
+      $message .= "Dirección: " . ($direccionRef !== '' ? $direccionRef : '-') . ".\n\n";
       $message .= "Puedes ver el PDF adjunto y responder la cotización desde el botón.\n\n";
       $message .= "Enlace directo: {$quoteUrl}\n\n";
       $message .= "Atentamente,\n{$actorName}\nSKC SuCasa Inmobiliaria";
@@ -3301,6 +3306,8 @@ trait HandlesMaintenanceActions
               ['type' => 'text', 'text' => (string) $cotizacionId],
               ['type' => 'text', 'text' => $ticketRef !== '' ? $ticketRef : '-'],
               ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($total)],
+              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($contratoRef !== '' ? $contratoRef : '-')],
+              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($direccionRef !== '' ? $direccionRef : '-')],
               ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($actorName)],
             ],
           ],
