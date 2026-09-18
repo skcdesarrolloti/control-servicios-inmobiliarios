@@ -6725,6 +6725,7 @@
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
+  grid-column: 1 / -1;
   margin: 0 0 14px;
   padding: 13px 14px;
   border: 1px solid #fed7aa;

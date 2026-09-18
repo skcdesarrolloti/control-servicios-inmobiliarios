@@ -13900,14 +13900,24 @@
       return common[key] || common.general;
     }
 
-    function showMaintenanceQuoteGuide(form, key) {
+    function showMaintenanceQuoteGuide(form, key, anchor) {
       var panel = form ? form.querySelector("[data-quote-guide-panel]") : null;
       if (!panel) return;
       var typeSelect = form.querySelector("[data-quote-perturb-type-select]");
       var type = typeSelect ? String(typeSelect.value || "residencial") : "residencial";
       var guide = quotePerturbationGuideContent(key || "general", type);
+      var card = anchor && anchor.closest ? anchor.closest(".scm-maint-quote-criterion-card") : null;
+      var actions = anchor && anchor.closest ? anchor.closest(".scm-maint-quote-guide-actions") : null;
+      if (card && card.parentNode) {
+        card.insertAdjacentElement("afterend", panel);
+      } else if (actions && actions.parentNode) {
+        actions.insertAdjacentElement("afterend", panel);
+      }
       panel.hidden = false;
       panel.innerHTML = '<div><strong>' + escHtml(guide.title) + '</strong><p>' + escHtml(guide.body) + '</p></div><button type="button" aria-label="Cerrar guía" data-quote-guide-close>×</button>';
+      if (typeof panel.scrollIntoView === "function") {
+        panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
     }
 
     function syncMaintenanceQuotePerturbation(form, context) {
@@ -14110,7 +14120,7 @@
         var guideBtn = event.target && event.target.closest ? event.target.closest("[data-quote-guide-key]") : null;
         if (guideBtn) {
           event.preventDefault();
-          showMaintenanceQuoteGuide(form, guideBtn.getAttribute("data-quote-guide-key") || "general");
+          showMaintenanceQuoteGuide(form, guideBtn.getAttribute("data-quote-guide-key") || "general", guideBtn);
           return;
         }
         var guideClose = event.target && event.target.closest ? event.target.closest("[data-quote-guide-close]") : null;
