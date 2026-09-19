@@ -33,6 +33,9 @@ trait HandlesCorrectiveReviewActions
   public function ajax_handler_corrective_review(): void
   {
     $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('corrective_review_manage')) {
+      $this->jsonFail('No tienes permiso para gestionar revisiones correctivas.');
+    }
     $ticketId = (int) ($_POST['ticket_pk'] ?? 0);
     try {
       if (!$this->canAccessCorrectiveReview($ticketId)) {

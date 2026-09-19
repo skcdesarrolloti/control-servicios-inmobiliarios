@@ -263,6 +263,9 @@ trait RendersDashboard
     $webTicketStats = [];
     $dashboardAllowedTabs = $this->currentDashboardAllowedTabs();
     $dashboardPermissionConfig = $this->dashboardPermissionsConfig();
+    $dashboardAllowedActions = $this->currentDashboardAllowedActions();
+    $dashboardActionPermissionCatalog = $this->dashboardActionPermissionCatalog();
+    $dashboardActionPermissionConfig = $this->dashboardActionPermissionsConfig();
     $dashboardCargoOptions = $this->getDashboardCargoOptions();
     $dashboardFuncionarioCargoIds = FuncionarioOptions::panelCargoIds();
     $adminDuePopupCargoIds = $this->adminDuePopupCargoIdsConfig();
@@ -478,15 +481,22 @@ trait RendersDashboard
         'tabs' => $dashboardPermissionTabs,
         'cargos' => $dashboardCargoOptions,
         'permissions' => $dashboardPermissionConfig,
+        'actionCatalog' => $dashboardActionPermissionCatalog,
+        'actionPermissions' => $dashboardActionPermissionConfig,
+        'allowedActions' => $dashboardAllowedActions,
         'employeeCargoIds' => $dashboardFuncionarioCargoIds,
         'adminDuePopupCargoIds' => $adminDuePopupCargoIds,
       ],
       'actionPermissions' => [
-        'maintenanceQuoteManage' => $this->canAccessDashboardTab('cotizaciones_mantenimiento')
-          || $this->canAccessDashboardTab('abiertos')
-          || $this->canAccessDashboardTab('postergados')
-          || $this->canAccessDashboardTab('mis_tickets'),
-        'maintenanceQuoteDecide' => $this->canAccessDashboardTab('cotizaciones_mantenimiento'),
+        'actions' => array_fill_keys($dashboardAllowedActions, true),
+        'maintenanceQuoteManage' => (
+          $this->canUseDashboardAction('quote_manage')
+          || $this->canUseDashboardAction('quote_create')
+          || $this->canUseDashboardAction('quote_edit')
+          || $this->canUseDashboardAction('quote_send')
+          || $this->canUseDashboardAction('quote_order_create')
+        ),
+        'maintenanceQuoteDecide' => $this->canUseDashboardAction('quote_approve') || $this->canUseDashboardAction('quote_delete'),
       ],
       'duePopup' => [
         'enabled' => $this->shouldShowAdminDuePopup(),
@@ -1253,7 +1263,7 @@ trait RendersDashboard
 
       <?php echo \SCM\Views\GuideModalView::render(); ?>
       <?php if ($canManageDashboardPermissions): ?>
-        <?php echo $this->renderDashboardPermissionsModal($dashboardPermissionTabs, $dashboardCargoOptions, $dashboardPermissionConfig, $dashboardFuncionarioCargoIds, $adminDuePopupCargoIds); ?>
+        <?php echo $this->renderDashboardPermissionsModal($dashboardPermissionTabs, $dashboardCargoOptions, $dashboardPermissionConfig, $dashboardFuncionarioCargoIds, $adminDuePopupCargoIds, $dashboardActionPermissionCatalog, $dashboardActionPermissionConfig); ?>
       <?php endif; ?>
       <?php if ($canManagePublicPqrSettings): ?>
         <div id="scm-pqr-settings-modal" data-scm-lazy-settings="public-pqr" aria-hidden="true"></div>
@@ -1498,8 +1508,8 @@ trait RendersDashboard
     return (string) ob_get_clean();
   }
 
-  /** @param array<string,string> $tabs @param array<int,array<string,string>> $cargos @param array<string,array<int,string>> $permissions @param array<int,string> $employeeCargoIds @param array<int,string> $adminDuePopupCargoIds */
-  private function renderDashboardPermissionsModal(array $tabs, array $cargos, array $permissions, array $employeeCargoIds, array $adminDuePopupCargoIds): string
+  /** @param array<string,string> $tabs @param array<int,array<string,string>> $cargos @param array<string,array<int,string>> $permissions @param array<int,string> $employeeCargoIds @param array<int,string> $adminDuePopupCargoIds @param array<string,array{label:string,items:array<string,string>}> $actionCatalog @param array<string,array<int,string>> $actionPermissions */
+  private function renderDashboardPermissionsModal(array $tabs, array $cargos, array $permissions, array $employeeCargoIds, array $adminDuePopupCargoIds, array $actionCatalog = [], array $actionPermissions = []): string
   {
     $activityPermissionKeys = [
       'cotizaciones_mantenimiento',
@@ -1525,6 +1535,12 @@ trait RendersDashboard
       $cargoId = trim((string) $cargoId);
       if ($cargoId !== '') {
         $selectedAdminDuePopupCargoIds[$cargoId] = true;
+      }
+    }
+    $allActionKeys = [];
+    foreach ($actionCatalog as $group) {
+      foreach (array_keys((array) ($group['items'] ?? [])) as $actionKey) {
+        $allActionKeys[] = (string) $actionKey;
       }
     }
     ob_start();
@@ -1611,6 +1627,45 @@ trait RendersDashboard
               <?php endforeach; ?>
             </div>
           </section>
+          <?php if (!empty($actionCatalog)): ?>
+            <section class="scm-permission-employee-cargos scm-permission-action-cargos" aria-labelledby="scm-action-permissions-title">
+              <div class="scm-permission-employee-cargos-head">
+                <div>
+                  <h4 id="scm-action-permissions-title">Acciones y botones por cargo</h4>
+                  <p>Controla qu&eacute; botones funcionales puede usar cada cargo dentro del popup del caso, cotizaciones, &oacute;rdenes y actas.</p>
+                </div>
+                <small>Si un cargo no est&aacute; configurado aqu&iacute;, conserva todas las acciones para no romper el flujo actual.</small>
+              </div>
+              <div class="scm-permissions-cards scm-permissions-action-cards">
+                <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowedActions = array_key_exists($cargoId, $actionPermissions) ? (array) $actionPermissions[$cargoId] : $allActionKeys; $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); ?>
+                  <section class="scm-permission-card scm-permission-action-card" data-permission-cargo="<?php echo esc_attr($cargoId); ?>">
+                    <div class="scm-permission-card-head">
+                      <div>
+                        <h4><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?></h4>
+                        <p>Acciones permitidas<?php if ($cargoTotal !== ''): ?> · <?php echo esc_html($cargoTotal); ?> funcionario<?php echo $cargoTotal === '1' ? '' : 's'; ?><?php endif; ?></p>
+                      </div>
+                      <button type="button" class="scm-permission-select-all" data-scm-perm-all="<?php echo esc_attr($cargoId); ?>">Todo</button>
+                    </div>
+                    <div class="scm-permission-options">
+                      <?php foreach ($actionCatalog as $group): $items = (array) ($group['items'] ?? []); if (empty($items)) continue; ?>
+                        <div class="scm-permissions-option-group">
+                          <div class="scm-permissions-option-group-title"><?php echo esc_html((string) ($group['label'] ?? 'Acciones')); ?></div>
+                          <div class="scm-permissions-option-group-grid">
+                            <?php foreach ($items as $actionKey => $actionLabel): $isChecked = in_array((string) $actionKey, $allowedActions, true); ?>
+                              <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>">
+                                <input type="checkbox" name="action_permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr((string) $actionKey); ?>" <?php checked($isChecked); ?>>
+                                <span><?php echo esc_html((string) $actionLabel); ?></span>
+                              </label>
+                            <?php endforeach; ?>
+                          </div>
+                        </div>
+                      <?php endforeach; ?>
+                    </div>
+                  </section>
+                <?php endforeach; ?>
+              </div>
+            </section>
+          <?php endif; ?>
           <div class="scm-permissions-actions">
             <p class="scm-permissions-msg" id="scm-permissions-msg" aria-live="polite"></p>
             <button type="submit" class="scm-btn-primary btn btn-primary">Guardar permisos</button>
@@ -3823,6 +3878,7 @@ trait RendersDashboard
       : '<div class="scm-cotizacion-orders-summary"><span>Cotizaci&oacute;n #' . esc_html($id !== '' ? $id : '-') . '</span><strong>' . esc_html((string) count($orders)) . ' ' . (count($orders) === 1 ? 'orden registrada' : '&oacute;rdenes registradas') . '</strong></div><div class="scm-cotizacion-orders-list">';
     $orderDetailsHtml = '';
     $ordersHistoryHtml = empty($orders) ? '<p class="scm-case-history-empty">Sin &oacute;rdenes registradas para esta cotizaci&oacute;n.</p>' : '';
+    $canRespondMaintenanceOrder = $this->canUseDashboardAction('quote_order_respond');
     foreach ($orders as $orderIndex => $order) {
       $orderId = trim((string) ($order['_ID'] ?? ''));
       $orderKey = $orderId !== '' ? $orderId : 'item-' . (string) $orderIndex;
@@ -3847,7 +3903,7 @@ trait RendersDashboard
         . '<p class="scm-cotizacion-order-activity">' . esc_html($orderActivity !== '' ? $orderActivity : 'Sin actividad registrada.') . '</p>'
         . '<div class="scm-cotizacion-order-card-actions">'
         . '<button type="button" class="scm-cotizacion-order-view" data-scm-view-cotizacion-order="' . esc_attr($orderKey) . '" aria-label="Ver detalle de la orden ' . esc_attr($orderId !== '' ? '#' . $orderId : '') . '">Ver orden <span aria-hidden="true">&rarr;</span></button>'
-        . ($orderPending ? '<button type="button" class="scm-cotizacion-order-view scm-cotizacion-order-response" data-scm-respond-cotizacion-order' . $orderResponseAttrs . '>Responder orden</button>' : '')
+        . ($orderPending && $canRespondMaintenanceOrder ? '<button type="button" class="scm-cotizacion-order-view scm-cotizacion-order-response" data-scm-respond-cotizacion-order' . $orderResponseAttrs . '>Responder orden</button>' : '')
         . '</div>'
         . '</article>';
       $ordersHistoryHtml .= '<article class="scm-case-history-item"><div class="scm-case-history-meta"><strong>Orden #' . esc_html($orderId !== '' ? $orderId : '-') . '</strong><span>' . esc_html($orderState !== '' ? $orderState : '-') . '</span></div><div class="scm-case-history-detail"><p><strong>Proveedor:</strong> ' . esc_html($orderProvider !== '' ? $orderProvider : '-') . '</p><p><strong>Actividad:</strong> ' . esc_html($orderActivity !== '' ? $orderActivity : '-') . '</p><p><strong>Valor:</strong> ' . esc_html($this->format_cop_currency($order['valor'] ?? 0)) . '</p></div></article>';
@@ -3888,9 +3944,17 @@ trait RendersDashboard
       || $this->canAccessDashboardTab('abiertos')
       || $this->canAccessDashboardTab('postergados')
       || $this->canAccessDashboardTab('mis_tickets');
-    $canDecideMaintenanceQuote = $this->canAccessDashboardTab('cotizaciones_mantenimiento');
-    $cotizacionPuedeEnviarse = $id !== '' && $canManageMaintenanceQuote && $cotizacionEditable && !$enviada && $cotizacionSinResponder;
-    $seguimientoReparacionesDisponible = $id !== '' && $ticket !== '' && $cotizacionSinResponder && $enviada && $fechaEnvioTs > 0 && $diasCalendarioSinRespuesta > 10;
+    $canQuoteEdit = $canManageMaintenanceQuote && $this->canUseDashboardAction('quote_edit');
+    $canQuoteSend = $canManageMaintenanceQuote && $this->canUseDashboardAction('quote_send');
+    $canQuoteRespond = $canManageMaintenanceQuote && $this->canUseDashboardAction('quote_respond');
+    $canQuoteApprove = $this->canAccessDashboardTab('cotizaciones_mantenimiento') && $this->canUseDashboardAction('quote_approve');
+    $canQuoteDelete = $this->canAccessDashboardTab('cotizaciones_mantenimiento') && $this->canUseDashboardAction('quote_delete');
+    $canQuoteRepairFollowup = $canManageMaintenanceQuote && $this->canUseDashboardAction('quote_repair_followup');
+    $canQuoteOrderView = $canManageMaintenanceQuote && $this->canUseDashboardAction('quote_order_view');
+    $canQuoteOrderCreate = $canManageMaintenanceQuote && $this->canUseDashboardAction('quote_order_create');
+    $canQuoteActaCreate = $canManageMaintenanceQuote && $this->canUseDashboardAction('quote_acta_create');
+    $cotizacionPuedeEnviarse = $id !== '' && $canQuoteSend && $cotizacionEditable && !$enviada && $cotizacionSinResponder;
+    $seguimientoReparacionesDisponible = $id !== '' && $ticket !== '' && $canQuoteRepairFollowup && $cotizacionSinResponder && $enviada && $fechaEnvioTs > 0 && $diasCalendarioSinRespuesta > 10;
     $caseDescription = 'Cotizacion de mantenimiento #' . ($id !== '' ? $id : '-') . ($ticket !== '' ? ' relacionada con el ticket #' . $ticket . '.' : '.');
     if ($direccion !== '' && $direccion !== '-') {
       $caseDescription .= ' Direccion: ' . $direccion . '.';
@@ -3951,18 +4015,18 @@ trait RendersDashboard
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="totales" hidden><div class="scm-cotizacion-finance-grid"><div><span>Total mano de obra</span><strong>' . esc_html($totalObra) . '</strong></div><div><span>Total materiales</span><strong>' . esc_html($totalMateriales) . '</strong></div><div><span>Total equipos</span><strong>' . esc_html($totalMaquinarias) . '</strong></div><div><span>Total otros costos</span><strong>' . esc_html($totalOtros) . '</strong></div><div><span>Administraci&oacute;n' . ($porcentajeAdmon !== '' ? ' ' . esc_html($porcentajeAdmon) . '%' : '') . '</span><strong>' . esc_html($totalAdmon) . '</strong></div><div><span>IVA admon' . ($ivaAdmonPct !== '' ? ' ' . esc_html($ivaAdmonPct) . '%' : '') . '</span><strong>' . esc_html($ivaAdmon) . '</strong></div><div><span>Total admon + IVA</span><strong>' . esc_html($totalAdmonMasIva) . '</strong></div><div class="scm-cotizacion-finance-total"><span>Total cotizaci&oacute;n</span><strong>' . esc_html($totalCotizacion) . '</strong></div></div></div>'
       . '<div class="scm-cotizacion-actions">'
       . ($id !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-native data-cotizacion-id="' . esc_attr($id) . '">Ver cotizaci&oacute;n</button>' : '')
-      . ($id !== '' && $canManageMaintenanceQuote && $cotizacionEditable ? '<button type="button" class="scm-case-work-btn" data-scm-edit-cotizacion data-cotizacion-mode="edit" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Editar cotizaci&oacute;n</button>' : '')
+      . ($id !== '' && $canQuoteEdit && $cotizacionEditable ? '<button type="button" class="scm-case-work-btn" data-scm-edit-cotizacion data-cotizacion-mode="edit" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Editar cotizaci&oacute;n</button>' : '')
       . ($cotizacionPuedeEnviarse ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-send-cotizacion data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '" data-destinatario="' . esc_attr($destinatario !== '-' ? $destinatario : '') . '" data-email-destinatario="' . esc_attr($emailDestinatario) . '" data-celular-destinatario="' . esc_attr($contacto !== '-' ? $contacto : '') . '" data-indicativo-destinatario="' . esc_attr($indicativoDestinatario !== '' ? $indicativoDestinatario : '57') . '" data-subtotal-cotizacion="' . esc_attr((string) (int) round($subtotalCotizacionValue)) . '" data-total-cotizacion="' . esc_attr($totalCotizacion) . '" data-porcentaje-admon="' . esc_attr($porcentajeAdmon !== '' ? $porcentajeAdmon : '10') . '" data-iva-cotizacion="' . esc_attr($ivaAdmonPct !== '' ? $ivaAdmonPct : '19') . '" data-total-admon="' . esc_attr((string) (int) round($totalAdmonValue)) . '" data-iva-admon-valor="' . esc_attr((string) (int) round($ivaAdmonValue)) . '" data-total-admon-iva="' . esc_attr((string) (int) round($totalAdmonMasIvaValue)) . '">Enviar cotizaci&oacute;n</button>' : '')
       . $ticketCaseButton
-      . ($cotizacionAprobada && $canManageMaintenanceQuote ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-view-cotizacion-orders>Ver &oacute;rdenes <span class="scm-action-count">' . esc_html((string) count($orders)) . '</span></button>' : '')
-      . ($cotizacionPuedeResponder ? '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizaci&oacute;n</button>' : '')
-      . ($cotizacionSinResponder && $canDecideMaintenanceQuote ? '<button type="button" class="scm-case-work-btn scm-primary-action scm-cotizacion-approve-action" data-scm-approve-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Marcar como aprobada</button>' : '')
-      . ($cotizacionSinResponder && $canDecideMaintenanceQuote ? '<button type="button" class="scm-case-work-btn scm-danger-action scm-cotizacion-delete-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizaci&oacute;n</button>' : '')
+      . ($cotizacionAprobada && $canQuoteOrderView ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-view-cotizacion-orders>Ver &oacute;rdenes <span class="scm-action-count">' . esc_html((string) count($orders)) . '</span></button>' : '')
+      . ($cotizacionPuedeResponder && $canQuoteRespond ? '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizaci&oacute;n</button>' : '')
+      . ($cotizacionSinResponder && $canQuoteApprove ? '<button type="button" class="scm-case-work-btn scm-primary-action scm-cotizacion-approve-action" data-scm-approve-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Marcar como aprobada</button>' : '')
+      . ($cotizacionSinResponder && $canQuoteDelete ? '<button type="button" class="scm-case-work-btn scm-danger-action scm-cotizacion-delete-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizaci&oacute;n</button>' : '')
       . ($seguimientoReparacionesDisponible ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-repair-followup-notice data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '" data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '">Seguimiento reparaciones</button>' : '')
-      . ($cotizacionAprobada && $canManageMaintenanceQuote && !$hasActiveActa ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-add-cotizacion-order data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir orden</button>' : '')
-      . ($cotizacionAprobada && $canManageMaintenanceQuote && $hasActiveActa ? '<button type="button" class="scm-case-work-btn" disabled title="Esta cotizaci&oacute;n o caso ya tiene acta activa">Orden bloqueada por acta</button>' : '')
+      . ($cotizacionAprobada && $canQuoteOrderCreate && !$hasActiveActa ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-add-cotizacion-order data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir orden</button>' : '')
+      . ($cotizacionAprobada && $canQuoteOrderCreate && $hasActiveActa ? '<button type="button" class="scm-case-work-btn" disabled title="Esta cotizaci&oacute;n o caso ya tiene acta activa">Orden bloqueada por acta</button>' : '')
       . ($actaInfo['url'] !== '' ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-iframe data-iframe-url="' . esc_attr($actaInfo['url']) . '" data-iframe-title="Acta de satisfacci&oacute;n">Ver acta' . ($actaInfo['status'] === 'pending' ? ' pendiente' : '') . '</button>' : '')
-      . ($cotizacionAprobada && $canManageMaintenanceQuote && $actaInfo['url'] === '' ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-create-cotizacion-acta data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Crear acta de cotizaci&oacute;n</button>' : '')
+      . ($cotizacionAprobada && $canQuoteActaCreate && $actaInfo['url'] === '' ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-create-cotizacion-acta data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Crear acta de cotizaci&oacute;n</button>' : '')
       . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div>' . $orderDetailsHtml
       . '<template class="scm-cotizacion-native-source" data-scm-cotizacion-native-audience="funcionario">' . $nativeCotizacionFuncionarioHtml . '</template>'
       . '<template class="scm-cotizacion-native-source" data-scm-cotizacion-native-audience="destinatario">' . $nativeCotizacionDestinatarioHtml . '</template>'

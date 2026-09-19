@@ -7296,6 +7296,19 @@
           });
         return permissions;
       }
+      function collectActionPermissions() {
+        var permissions = {};
+        form
+          .querySelectorAll('input[type="checkbox"][name^="action_permissions["]')
+          .forEach(function (input) {
+            var match = input.name.match(/^action_permissions\[([^\]]+)\]/);
+            var cargo = match ? match[1] : "";
+            if (!cargo) return;
+            if (!permissions[cargo]) permissions[cargo] = [];
+            if (input.checked) permissions[cargo].push(input.value);
+          });
+        return permissions;
+      }
       function collectEmployeeCargoIds() {
         return Array.prototype.slice
           .call(form.querySelectorAll('input[type="checkbox"][name="employee_cargo_ids[]"]:checked'))
@@ -7391,6 +7404,7 @@
         fd.append("action", actionDashboardPermissionsSave);
         fd.append("nonce", nonce);
         fd.append("permissions", JSON.stringify(collectPermissions()));
+        fd.append("action_permissions", JSON.stringify(collectActionPermissions()));
         fd.append("employee_cargo_ids", JSON.stringify(collectEmployeeCargoIds()));
         fd.append("admin_due_popup_cargo_ids", JSON.stringify(collectAdminDuePopupCargoIds()));
         fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
@@ -7417,6 +7431,17 @@
                 permConfig.adminDuePopupCargoIds = json.data.admin_due_popup_cargo_ids;
                 duePopupConfig.cargoIds = json.data.admin_due_popup_cargo_ids;
                 duePopupConfig.enabled = json.data.admin_due_popup_cargo_ids.indexOf(String(permConfig.cargo || "")) !== -1;
+              }
+              if (json.data.action_permissions) {
+                permConfig.actionPermissions = json.data.action_permissions;
+              }
+              if (Array.isArray(json.data.allowed_actions)) {
+                permConfig.allowedActions = json.data.allowed_actions;
+                runtime.actionPermissions = runtime.actionPermissions || {};
+                runtime.actionPermissions.actions = {};
+                json.data.allowed_actions.forEach(function (action) {
+                  runtime.actionPermissions.actions[String(action || "")] = true;
+                });
               }
             }
             setMessage(

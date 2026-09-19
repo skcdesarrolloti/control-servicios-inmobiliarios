@@ -38,6 +38,16 @@ trait HandlesTicketCompletion
     $this->verifyCsrf();
     $ticketId = (int) ($_POST['ticket_pk'] ?? 0);
     try {
+      $sourceFlow = trim((string) ($_POST['source_flow'] ?? '')) === 'approved_quote'
+        ? ['flow' => 'approved_quote', 'quote_id' => trim((string) ($_POST['source_cotizacion_id'] ?? $_POST['id_cotizacion'] ?? ''))]
+        : [];
+      if (($sourceFlow['flow'] ?? '') === 'approved_quote') {
+        if (!$this->canUseDashboardAction('quote_acta_create')) {
+          $this->jsonFail('No tienes permiso para crear actas de cotización.');
+        }
+      } elseif (!$this->canUseDashboardAction('case_completion_act')) {
+        $this->jsonFail('No tienes permiso para gestionar actas del caso.');
+      }
       if (!$this->canAccessTicketCompletion($ticketId)) {
         http_response_code(403);
         $this->jsonFail('No tienes permiso para gestionar el acta de este ticket.');
@@ -47,9 +57,6 @@ trait HandlesTicketCompletion
       $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
       $operation = (string) ($_POST['operation'] ?? 'read');
       $actor = $this->ticketCompletionActor();
-      $sourceFlow = trim((string) ($_POST['source_flow'] ?? '')) === 'approved_quote'
-        ? ['flow' => 'approved_quote', 'quote_id' => trim((string) ($_POST['source_cotizacion_id'] ?? $_POST['id_cotizacion'] ?? ''))]
-        : [];
       $result = [];
       if (in_array($operation, ['create', 'update'], true)) {
         $input = $_POST;

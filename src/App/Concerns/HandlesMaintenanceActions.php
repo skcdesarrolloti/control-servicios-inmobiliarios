@@ -918,6 +918,12 @@ trait HandlesMaintenanceActions
 
     try {
       $mode = $this->maintenance_quote_mode($_POST['mode'] ?? 'create');
+      if ($mode === 'create' && !$this->canUseDashboardAction('quote_create')) {
+        $this->jsonFail('No tienes permiso para crear cotizaciones de mantenimiento.');
+      }
+      if (in_array($mode, ['edit', 'note'], true) && !$this->canUseDashboardAction('quote_edit')) {
+        $this->jsonFail('No tienes permiso para editar cotizaciones de mantenimiento.');
+      }
       $ticketPk = (int) ($_POST['ticket_pk'] ?? 0);
       $quoteId = (int) ($_POST['id_cotizacion'] ?? 0);
       $context = $this->maintenance_quote_form_context($mode, $ticketPk, $quoteId);
@@ -944,6 +950,12 @@ trait HandlesMaintenanceActions
     $pdo = $this->db->pdo();
     try {
       $mode = $this->maintenance_quote_mode($_POST['mode'] ?? 'create');
+      if ($mode === 'create' && !$this->canUseDashboardAction('quote_create')) {
+        $this->jsonFail('No tienes permiso para crear cotizaciones de mantenimiento.');
+      }
+      if (in_array($mode, ['edit', 'note'], true) && !$this->canUseDashboardAction('quote_edit')) {
+        $this->jsonFail('No tienes permiso para editar cotizaciones de mantenimiento.');
+      }
       $ticketPk = (int) ($_POST['ticket_pk'] ?? 0);
       $quoteId = (int) ($_POST['id_cotizacion'] ?? 0);
       $context = $this->maintenance_quote_form_context($mode, $ticketPk, $quoteId);
@@ -2695,7 +2707,7 @@ trait HandlesMaintenanceActions
   public function ajax_handler_delete_cotizacion_mantenimiento(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento')) {
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') || !$this->canUseDashboardAction('quote_delete')) {
       $this->jsonFail('No tienes permiso para eliminar cotizaciones.');
     }
 
@@ -2746,7 +2758,7 @@ trait HandlesMaintenanceActions
   public function ajax_handler_approve_cotizacion_mantenimiento(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento')) {
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') || !$this->canUseDashboardAction('quote_approve')) {
       $this->jsonFail('No tienes permiso para actualizar cotizaciones.');
     }
 
@@ -3013,7 +3025,7 @@ trait HandlesMaintenanceActions
   public function ajax_handler_cotizacion_order_response(): void
   {
     $this->verifyCsrf();
-    if (!$this->maintenance_order_can_manage()) {
+    if (!$this->maintenance_order_can_respond()) {
       $this->jsonFail('No tienes permiso para responder ordenes de mantenimiento.');
     }
 
@@ -3217,7 +3229,7 @@ trait HandlesMaintenanceActions
   public function ajax_handler_send_cotizacion_mantenimiento(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('abiertos') && !$this->canAccessDashboardTab('postergados') && !$this->canAccessDashboardTab('mis_tickets')) {
+    if ((!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('abiertos') && !$this->canAccessDashboardTab('postergados') && !$this->canAccessDashboardTab('mis_tickets')) || !$this->canUseDashboardAction('quote_send')) {
       $this->jsonFail('No tienes permiso para enviar cotizaciones de mantenimiento.');
     }
 
@@ -3658,10 +3670,22 @@ trait HandlesMaintenanceActions
 
   private function maintenance_order_can_manage(): bool
   {
-    return $this->canAccessDashboardTab('cotizaciones_mantenimiento')
+    return $this->canUseDashboardAction('quote_order_create') && (
+      $this->canAccessDashboardTab('cotizaciones_mantenimiento')
       || $this->canAccessDashboardTab('abiertos')
       || $this->canAccessDashboardTab('postergados')
-      || $this->canAccessDashboardTab('mis_tickets');
+      || $this->canAccessDashboardTab('mis_tickets')
+    );
+  }
+
+  private function maintenance_order_can_respond(): bool
+  {
+    return $this->canUseDashboardAction('quote_order_respond') && (
+      $this->canAccessDashboardTab('cotizaciones_mantenimiento')
+      || $this->canAccessDashboardTab('abiertos')
+      || $this->canAccessDashboardTab('postergados')
+      || $this->canAccessDashboardTab('mis_tickets')
+    );
   }
 
   /** @return array<string,mixed>|null */
@@ -4890,6 +4914,9 @@ trait HandlesMaintenanceActions
   public function ajax_handler_save_case_magnitude(): void
   {
     $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_edit_magnitude')) {
+      $this->jsonFail('No tienes permiso para editar la magnitud del caso.');
+    }
 
     $ticketPk = (int)($_POST['ticket_pk'] ?? 0);
     $magnitud = strtolower(trim(sanitize_text_field((string)($_POST['magnitud'] ?? ''))));
@@ -4988,6 +5015,9 @@ trait HandlesMaintenanceActions
   public function ajax_handler_trasladar_caso(): void
   {
     $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_transfer')) {
+      $this->jsonFail('No tienes permiso para trasladar casos.');
+    }
 
     $ticketPk    = (int) ($_POST['ticket_pk'] ?? 0);
     $newEmpId    = trim(sanitize_text_field(wp_unslash((string) ($_POST['new_empleado_id'] ?? ''))));

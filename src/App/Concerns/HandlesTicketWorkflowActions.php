@@ -263,6 +263,8 @@ trait HandlesTicketWorkflowActions
       'tabs' => $this->dashboardPermissionTabs(),
       'cargos' => $this->getDashboardCargoOptions(),
       'permissions' => $this->dashboardPermissionsConfig(),
+      'action_catalog' => $this->dashboardActionPermissionCatalog(),
+      'action_permissions' => $this->dashboardActionPermissionsConfig(),
       'employee_cargo_ids' => FuncionarioOptions::panelCargoIds(),
       'admin_due_popup_cargo_ids' => $this->adminDuePopupCargoIdsConfig(),
     ]);
@@ -283,6 +285,17 @@ trait HandlesTicketWorkflowActions
       return;
     }
     $permissions = $this->sanitizeDashboardPermissions(is_array($decoded) ? $decoded : []);
+    $actionPermissions = $this->dashboardActionPermissionsConfig();
+    if (array_key_exists('action_permissions', $_POST)) {
+      $rawActionPermissions = stripslashes((string) ($_POST['action_permissions'] ?? '{}'));
+      try {
+        $decodedActionPermissions = json_decode($rawActionPermissions, true, 512, JSON_THROW_ON_ERROR);
+      } catch (\JsonException $exception) {
+        $this->jsonFail('Los permisos de acciones enviados no son validos.');
+        return;
+      }
+      $actionPermissions = $this->sanitizeDashboardActionPermissions(is_array($decodedActionPermissions) ? $decodedActionPermissions : []);
+    }
     $rawEmployeeCargoIds = stripslashes((string) ($_POST['employee_cargo_ids'] ?? '[]'));
     try {
       $decodedEmployeeCargoIds = json_decode($rawEmployeeCargoIds, true, 512, JSON_THROW_ON_ERROR);
@@ -304,6 +317,7 @@ trait HandlesTicketWorkflowActions
     }
 
     \SCM\Core\App::settings()->set('dashboard_tab_permissions', $permissions, Auth::userId());
+    \SCM\Core\App::settings()->set('dashboard_action_permissions', $actionPermissions, Auth::userId());
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('admin_due_popup_cargo_ids', $adminDuePopupCargoIds, Auth::userId());
     \SCM\Core\App::settings()->refresh();
@@ -316,6 +330,8 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk([
       'message' => 'Permisos y funcionarios visibles guardados.',
       'permissions' => $permissions,
+      'action_permissions' => $actionPermissions,
+      'allowed_actions' => $this->currentDashboardAllowedActions(),
       'employee_cargo_ids' => $employeeCargoIds,
       'admin_due_popup_cargo_ids' => $adminDuePopupCargoIds,
       'calendar_allowed_employee_ids' => array_values(array_filter(array_map(
@@ -434,6 +450,9 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_seguimiento()
   {
     $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_followup')) {
+      $this->jsonFail('No tienes permiso para agregar seguimientos.');
+    }
 
     $ticketPk             = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $observacion          = trim(stripslashes((string) ($_POST['observacion'] ?? '')));
@@ -480,6 +499,9 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_nota()
   {
     $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_note')) {
+      $this->jsonFail('No tienes permiso para agregar notas.');
+    }
 
     $ticketPk    = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $observacion = trim(wp_kses_post(stripslashes((string) ($_POST['observacion'] ?? ''))));
@@ -510,6 +532,9 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_postpone_ticket()
   {
     $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_postpone')) {
+      $this->jsonFail('No tienes permiso para postergar tickets.');
+    }
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $observacion = trim(wp_kses_post(stripslashes((string) ($_POST['observacion'] ?? ''))));
@@ -662,6 +687,9 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_activate_ticket(): void
   {
     $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_activate')) {
+      $this->jsonFail('No tienes permiso para activar tickets.');
+    }
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $motivo = trim(wp_kses_post(stripslashes((string) ($_POST['motivo'] ?? ($_POST['observacion'] ?? '')))));
@@ -687,6 +715,9 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_ticket_response()
   {
     $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_respond')) {
+      $this->jsonFail('No tienes permiso para responder tickets.');
+    }
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $respuesta = trim(wp_kses_post(stripslashes((string) ($_POST['respuesta'] ?? ''))));
@@ -709,6 +740,9 @@ trait HandlesTicketWorkflowActions
     if ($respuesta === '') {
       $this->jsonFail('La respuesta no puede estar vacia.');
     }
+    if (in_array($estadoCotizacion, ['Aprobada', 'Desaprobada'], true) && !$this->canUseDashboardAction('quote_respond')) {
+      $this->jsonFail('No tienes permiso para responder cotizaciones.');
+    }
 
     $service = $this->get_seguimiento_service();
     $imagenes = $this->handleImageUploads('imagen', 10);
@@ -724,6 +758,9 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_cotizacion_response()
   {
     $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('quote_respond')) {
+      $this->jsonFail('No tienes permiso para responder cotizaciones.');
+    }
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $estado = trim(strip_tags(stripslashes((string) ($_POST['estado'] ?? ''))));
@@ -766,6 +803,9 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_repair_followup_notice(): void
   {
     $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('quote_repair_followup')) {
+      $this->jsonFail('No tienes permiso para generar seguimiento de reparaciones.');
+    }
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $cotizacionId = isset($_POST['id_cotizacion']) ? (int) $_POST['id_cotizacion'] : 0;
@@ -2484,6 +2524,9 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_close_ticket()
   {
     $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_close')) {
+      $this->jsonFail('No tienes permiso para cerrar tickets.');
+    }
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $observacion = trim(wp_kses_post(stripslashes((string) ($_POST['observacion'] ?? ($_POST['motivo'] ?? '')))));
@@ -2505,6 +2548,9 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_calendar_cita_notify(): void
   {
     $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_schedule')) {
+      $this->jsonFail('No tienes permiso para agendar citas del caso.');
+    }
 
     try {
     $rawAppointments = stripslashes((string) ($_POST['appointments'] ?? '[]'));

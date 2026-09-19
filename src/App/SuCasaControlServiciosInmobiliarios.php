@@ -470,6 +470,88 @@ final class SuCasaControlServiciosInmobiliarios
     return $this->sanitizeDashboardPermissions(is_array($raw) ? $raw : []);
   }
 
+  /** @return array<string,array{label:string,items:array<string,string>}> */
+  private function dashboardActionPermissionCatalog(): array
+  {
+    return [
+      'casos' => [
+        'label' => 'Acciones del caso',
+        'items' => [
+          'case_followup' => 'Agregar seguimiento',
+          'case_schedule' => 'Agendar cita del caso',
+          'case_note' => 'Agregar nota',
+          'case_postpone' => 'Postergar ticket',
+          'case_respond' => 'Responder ticket',
+          'case_transfer' => 'Trasladar caso',
+          'case_activate' => 'Activar ticket',
+          'case_close' => 'Cerrar ticket',
+          'case_edit_magnitude' => 'Editar magnitud del caso',
+          'case_completion_act' => 'Acta de solución y firma',
+          'corrective_review_manage' => 'Gestionar revisión correctiva',
+        ],
+      ],
+      'cotizaciones' => [
+        'label' => 'Cotizaciones de mantenimiento',
+        'items' => [
+          'quote_manage' => 'Gestionar cotizaciones del caso',
+          'quote_create' => 'Añadir cotización',
+          'quote_edit' => 'Editar cotización',
+          'quote_send' => 'Enviar cotización',
+          'quote_respond' => 'Responder cotización',
+          'quote_approve' => 'Marcar cotización como aprobada',
+          'quote_delete' => 'Eliminar/desaprobar cotización',
+          'quote_repair_followup' => 'Seguimiento de reparaciones',
+          'quote_order_view' => 'Ver órdenes de cotización',
+          'quote_order_create' => 'Añadir orden de mantenimiento',
+          'quote_order_respond' => 'Responder orden de mantenimiento',
+          'quote_acta_create' => 'Crear acta de cotización',
+        ],
+      ],
+    ];
+  }
+
+  /** @return array<int,string> */
+  private function dashboardActionPermissionKeys(): array
+  {
+    $keys = [];
+    foreach ($this->dashboardActionPermissionCatalog() as $group) {
+      foreach (array_keys((array) ($group['items'] ?? [])) as $key) {
+        $keys[] = (string) $key;
+      }
+    }
+    return $keys;
+  }
+
+  /** @return array<string,array<int,string>> */
+  private function dashboardActionPermissionsConfig(): array
+  {
+    $raw = \SCM\Core\App::settings()->get('dashboard_action_permissions', []);
+    return $this->sanitizeDashboardActionPermissions(is_array($raw) ? $raw : []);
+  }
+
+  /** @param array<mixed> $raw @return array<string,array<int,string>> */
+  private function sanitizeDashboardActionPermissions(array $raw): array
+  {
+    $validActions = $this->dashboardActionPermissionKeys();
+    $out = [];
+    foreach ($raw as $cargo => $actions) {
+      $cargoKey = trim((string) $cargo);
+      if ($cargoKey === '') {
+        continue;
+      }
+      $selected = [];
+      foreach ((array) $actions as $action) {
+        $actionKey = preg_replace('/[^a-z0-9_]/', '', strtolower((string) $action)) ?: '';
+        if ($actionKey !== '' && in_array($actionKey, $validActions, true)) {
+          $selected[$actionKey] = $actionKey;
+        }
+      }
+      $out[$cargoKey] = array_values($selected);
+    }
+    ksort($out);
+    return $out;
+  }
+
   /** @return array<int,string> */
   private function adminDuePopupCargoIdsConfig(): array
   {
@@ -570,6 +652,24 @@ final class SuCasaControlServiciosInmobiliarios
   {
     $tab = preg_replace('/[^a-z0-9_]/', '', strtolower($tab)) ?: '';
     return $tab !== '' && in_array($tab, $this->currentDashboardAllowedTabs(), true);
+  }
+
+  /** @return array<int,string> */
+  private function currentDashboardAllowedActions(): array
+  {
+    $cargo = Auth::userCargo();
+    $permissions = $this->dashboardActionPermissionsConfig();
+    $allActions = $this->dashboardActionPermissionKeys();
+    if ($cargo === '' || !array_key_exists($cargo, $permissions)) {
+      return $allActions;
+    }
+    return !empty($permissions[$cargo]) ? $permissions[$cargo] : [];
+  }
+
+  private function canUseDashboardAction(string $action): bool
+  {
+    $action = preg_replace('/[^a-z0-9_]/', '', strtolower($action)) ?: '';
+    return $action !== '' && in_array($action, $this->currentDashboardAllowedActions(), true);
   }
 
   /** @return array<int,array<string,string>> */
