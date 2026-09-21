@@ -1945,6 +1945,24 @@
             selectedDay = btn.getAttribute("data-scm-calendar-day") || selectedDay;
             renderCalendarGrid();
             renderSelectedDay();
+            if (isDueCalendar) return;
+            if (allowedEmployees.length) {
+              openCreateEventPopup("single");
+              return;
+            }
+            withPanelLoader(
+              function () {
+                return calendarBootstrapPromise || loadFuncionariosFallback();
+              },
+              "Cargando funcionarios",
+              "Estamos consultando los funcionarios disponibles.",
+            ).then(function () {
+              if (!allowedEmployees.length) {
+                showToast("error", "No fue posible cargar funcionarios para crear el evento.");
+                return;
+              }
+              openCreateEventPopup("single");
+            });
           });
         });
       }
@@ -3214,14 +3232,11 @@
         var employeesControl = mode === "multiple"
           ? employeeMultiPickerHtml(preselectedEmployee)
           : '<select class="select select-bordered select-sm scm-select" name="empleados" required><option value="">Selecciona funcionario</option>' + employeeOptions + "</select>";
-        var ticketFieldsHtml = mode === "single"
-          ? '<div class="scm-calendar-ticket-inline scm-calendar-field-full">' +
-            '<label class="scm-seg-field"><span>Relacionado con ticket</span><select class="select select-bordered select-sm scm-select" name="relacionado_ticket" data-calendar-related-ticket><option value="">Selecciona una opci&oacute;n</option><option value="si">S&iacute;, est&aacute; relacionado</option><option value="no">No, evento libre</option></select></label>' +
-            '<label class="scm-seg-field" data-calendar-ticket-field hidden><span>Ticket relacionado</span><select class="select select-bordered select-sm scm-select scm-calendar-ticket-select" name="id_ticket" data-calendar-ticket-select><option value="">Selecciona funcionario para cargar tickets</option></select><small>Busca y escoge el ticket; se autocompleta t&iacute;tulo y direcci&oacute;n.</small></label>' +
-            "</div>" +
-            '<label class="scm-seg-field" data-calendar-cita-field hidden><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="">Selecciona si es cita</option><option value="si">Si</option><option value="no">No</option></select></label>' +
-            '<label class="scm-seg-field scm-calendar-ticket-state" data-calendar-admin-state hidden><span>Estado administrativo</span><select class="select select-bordered select-sm scm-select" name="estado_administrativo"><option value="">Selecciona estado administrativo</option>' + estadoAdministrativoOptionsHtml() + '</select></label>'
-          : "";
+        var ticketFieldsHtml = "";
+        var locationFieldsHtml = '<div class="scm-calendar-location-fields scm-calendar-field-full">' +
+          '<label class="scm-seg-field"><span>Tipo de ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="contrato">Contrato de arrendamiento</option><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option></select></label>' +
+          '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Contrato #, inmueble o direcci&oacute;n"></label>' +
+          "</div>";
         var html = '<form class="scm-calendar-popup-form" autocomplete="off">' +
           '<div class="scm-calendar-popup-grid">' +
           '<label class="scm-seg-field"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required placeholder="Ej: Cita revisi&oacute;n preventiva"></label>' +
@@ -3239,7 +3254,7 @@
           '<div class="scm-calendar-custom-dates" data-calendar-custom-dates hidden><div data-calendar-custom-rows></div><button type="button" class="scm-case-work-btn" data-calendar-add-custom-date>Agregar fecha personalizada</button></div>' +
           '</div></div>' +
           ticketFieldsHtml +
-          '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" placeholder="Direcci&oacute;n o lugar"></label>' +
+          locationFieldsHtml +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required></textarea></label>' +
           '</div><div class="scm-calendar-popup-agenda"><h4>' + (mode === "multiple" ? "Agenda por funcionario" : "Agenda del funcionario") + '</h4><div data-scm-calendar-popup-agenda>' + popupEmployeeAgendaHtml(preselectedEmployee) + '</div></div></form>';
         if (!window.Swal || typeof window.Swal.fire !== "function") {
@@ -3268,6 +3283,7 @@
             var dateInput = popup.querySelector('[name="fecha"]');
             var startInput = popup.querySelector('[name="hora_inicio"]');
             var endInput = popup.querySelector('[name="hora_fin"]');
+            var locationTypeSelect = popup.querySelector("[data-calendar-location-type]");
             var recurrenceToggle = popup.querySelector("[data-calendar-recurrence-toggle]");
             var recurrenceBody = popup.querySelector("[data-calendar-recurrence-body]");
             var recurrenceType = popup.querySelector("[data-calendar-recurrence-type]");
@@ -3320,6 +3336,25 @@
             }
             function isTicketRelated() {
               return relatedTicketSelect && relatedTicketSelect.value === "si";
+            }
+            function applyLocationType(force) {
+              if (!locationTypeSelect || !locationInput) return;
+              var type = String(locationTypeSelect.value || "contrato");
+              var quickLocations = {
+                oficina_corredor: "Oficina Corredor",
+                oficina_manga: "Oficina Manga",
+              };
+              if (quickLocations[type]) {
+                locationInput.value = quickLocations[type];
+                locationInput.readOnly = true;
+                locationInput.setAttribute("data-auto-calendar-location", "1");
+                return;
+              }
+              locationInput.readOnly = false;
+              locationInput.placeholder = "Contrato #, inmueble o dirección";
+              if (force && locationInput.getAttribute("data-auto-calendar-location") === "1") {
+                locationInput.value = "";
+              }
             }
             function maybeAutofillTitleAndLocation(force) {
               var categoryName = categoryNameFromSelect(categorySelect);
@@ -3502,6 +3537,11 @@
                 locationInput.setAttribute("data-auto-calendar-location", "0");
               });
             }
+            if (locationTypeSelect) {
+              locationTypeSelect.addEventListener("change", function () {
+                applyLocationType(true);
+              });
+            }
             [categorySelect, dateInput, startInput, endInput].forEach(function (field) {
               if (field) field.addEventListener("change", function () {
                 maybeAutofillTitleAndLocation(false);
@@ -3530,6 +3570,7 @@
             refreshAgenda();
             refreshTickets();
             applyRelatedTicketVisibility();
+            applyLocationType(false);
             refreshRecurrenceUi();
             maybeAutofillTitleAndLocation(false);
             maybeAutofillPreventiveDescription();
