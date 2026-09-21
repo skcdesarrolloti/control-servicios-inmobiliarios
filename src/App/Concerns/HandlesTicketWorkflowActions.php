@@ -895,7 +895,8 @@ trait HandlesTicketWorkflowActions
 
     $this->contractTerminationInsertPropertyHistory($ticket, $term, $responseText, $actaUrl, $creatorName);
     $this->contractTerminationMarkResponded($solicitudId, $actaUrl, $term);
-    $extraQueued = $this->notifyContractTerminationActa($ticket, $term, $responseText, $actaUrl, $notifyRecipients, $creatorSignature);
+    $creatorWhatsappSignature = $this->contractTerminationCreatorSignatureInline($creatorName, $creatorDetails);
+    $extraQueued = $this->notifyContractTerminationActa($ticket, $term, $responseText, $actaUrl, $notifyRecipients, $creatorWhatsappSignature);
     $result['acta_url'] = $actaUrl;
     $result['acta_title'] = (string) ($acta['title'] ?? '');
     $result['termination_email_queued'] = (string) ($extraQueued['email'] ?? 0);
@@ -3454,6 +3455,19 @@ trait HandlesTicketWorkflowActions
       }
     }
     return implode("\n", $lines);
+  }
+
+  private function contractTerminationCreatorSignatureInline(string $creatorName, string $creatorDetails): string
+  {
+    $parts = [$creatorName];
+    foreach (explode('|', $creatorDetails) as $part) {
+      $part = trim($part);
+      if ($part !== '' && !in_array($part, $parts, true)) {
+        $parts[] = $part;
+      }
+    }
+    $signature = preg_replace('/\s+/', ' ', implode(' - ', $parts));
+    return trim(is_string($signature) ? $signature : $creatorName);
   }
 
   /** @param array<string,mixed> $ticket */
