@@ -3134,8 +3134,7 @@ trait HandlesTicketWorkflowActions
         $merged[$column] = $value;
       }
     }
-    $contractRef = $this->contractTerminationFirstText([$merged, $solicitud, $ticket], ['id_contrato', 'contrato']);
-    $contract = $this->adminDueContractByReference($contractRef);
+    $contract = $this->contractTerminationContractByContext($merged, $solicitud, $ticket);
     if ($contract !== []) {
       foreach ([
         'fin_contrato', 'inicio_contrato', 'id_contrato_arrendamiento', 'id_inmueble',
@@ -3144,7 +3143,7 @@ trait HandlesTicketWorkflowActions
       ] as $column) {
         $current = trim((string) ($merged[$column] ?? ''));
         $value = trim((string) ($contract[$column] ?? ''));
-        if ($current === '' && $value !== '') {
+        if ($value !== '' && ($current === '' || in_array($column, ['fin_contrato', 'inicio_contrato'], true))) {
           $merged[$column] = $value;
         }
       }
@@ -3165,6 +3164,98 @@ trait HandlesTicketWorkflowActions
       $merged['celular_solicitante'] = trim((string) $merged['celular_arrendatario']);
     }
     return $merged;
+  }
+
+  /** @param array<string,mixed> ...$rows @return array<string,mixed> */
+  private function contractTerminationContractByContext(array ...$rows): array
+  {
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+    $contractRefs = $this->contractTerminationUniqueRefs($rows, ['contrato', 'id_contrato', 'id_contrato_arrendamiento']);
+    $propertyRefs = $this->contractTerminationUniqueRefs($rows, ['id_inmueble', 'inmueble']);
+    if ($contractRefs === [] && $propertyRefs === []) {
+      return [];
+    }
+    $where = [];
+    $args = [];
+    foreach (['contrato', 'id_contrato', 'id_contrato_arrendamiento'] as $column) {
+      if ($contractRefs !== [] && $this->column_exists($table, $column)) {
+        $where[] = "`{$column}` IN (" . implode(', ', array_fill(0, count($contractRefs), '?')) . ')';
+        array_push($args, ...$contractRefs);
+      }
+    }
+    $numericRefs = array_values(array_filter($contractRefs, static fn(string $value): bool => ctype_digit($value)));
+    if ($numericRefs !== [] && $this->column_exists($table, '_ID')) {
+      $where[] = "`_ID` IN (" . implode(', ', array_fill(0, count($numericRefs), '?')) . ')';
+      array_push($args, ...array_map('intval', $numericRefs));
+    }
+    foreach (['id_inmueble', 'inmueble'] as $column) {
+      if ($propertyRefs !== [] && $this->column_exists($table, $column)) {
+        $where[] = "`{$column}` IN (" . implode(', ', array_fill(0, count($propertyRefs), '?')) . ')';
+        array_push($args, ...$propertyRefs);
+      }
+    }
+    if ($where === []) {
+      return [];
+    }
+    $candidates = $this->db->getResults("SELECT * FROM `{$table}` WHERE " . implode(' OR ', $where) . ' LIMIT 50', $args);
+    if (!is_array($candidates) || $candidates === []) {
+      return [];
+    }
+    $best = [];
+    $bestScore = -1;
+    foreach ($candidates as $candidate) {
+      if (!is_array($candidate)) {
+        continue;
+      }
+      $score = $this->contractTerminationContractScore($candidate, $contractRefs, $propertyRefs);
+      if ($score > $bestScore) {
+        $best = $candidate;
+        $bestScore = $score;
+      }
+    }
+    return $bestScore > 0 ? $best : [];
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @param string[] $columns @return string[] */
+  private function contractTerminationUniqueRefs(array $rows, array $columns): array
+  {
+    $refs = [];
+    foreach ($rows as $row) {
+      foreach ($columns as $column) {
+        foreach (preg_split('/[,\|]+/', (string) ($row[$column] ?? '')) ?: [] as $value) {
+          $value = trim(ltrim(trim($value), '#'));
+          if ($value !== '' && $value !== '-') {
+            $refs[$value] = $value;
+          }
+        }
+      }
+    }
+    return array_values($refs);
+  }
+
+  /** @param array<string,mixed> $candidate @param string[] $contractRefs @param string[] $propertyRefs */
+  private function contractTerminationContractScore(array $candidate, array $contractRefs, array $propertyRefs): int
+  {
+    $score = 0;
+    foreach (['contrato' => 90, 'id_contrato_arrendamiento' => 90, 'id_contrato' => 70, '_ID' => 50] as $column => $points) {
+      $value = trim((string) ($candidate[$column] ?? ''));
+      if ($value !== '' && in_array($value, $contractRefs, true)) {
+        $score += $points;
+      }
+    }
+    foreach (['id_inmueble', 'inmueble'] as $column) {
+      $value = trim((string) ($candidate[$column] ?? ''));
+      if ($value !== '' && in_array($value, $propertyRefs, true)) {
+        $score += 200;
+      }
+    }
+    if ($this->contractTerminationTimestamp($candidate['fin_contrato'] ?? '') > 0) {
+      $score += 5;
+    }
+    return $score;
   }
 
   /** @param array<string,mixed> $solicitud @return array<string,mixed> */
@@ -3387,17 +3478,6 @@ trait HandlesTicketWorkflowActions
     }
     $pdf->footerLabel('SKC SuCasa Inmobiliaria - Terminación de contrato');
     $pdf->actaHeader($title, 'Ticket #' . $logicalTicket . ' · Contrato #' . $contract . ' · Inmueble ' . $property, $term === 'dentro' ? 'Dentro de término' : 'Fuera de término');
-    $pdf->sectionTitle('Datos de la solicitud');
-    $pdf->detailGrid([
-      ['Ticket', '#' . $logicalTicket],
-      ['Contrato', '#' . $contract],
-      ['Inmueble', $property],
-      ['Dirección', $this->contractTerminationFirstText([$ticket], ['direccion']) ?: '-'],
-      ['Solicitante', $this->contractTerminationFirstText([$ticket], ['solicitante', 'arrendatario', 'propietario']) ?: '-'],
-      ['Fecha solicitud', $this->contractTerminationHumanDate($requestDate)],
-      ['Fecha terminación / entrega', $this->contractTerminationHumanDate($endDate)],
-      ['Clasificación', $term === 'dentro' ? 'Dentro de término' : 'Fuera de término'],
-    ]);
     $pdf->sectionTitle('Respuesta emitida');
     foreach (preg_split('/\n{2,}/', $responseText) ?: [] as $paragraph) {
       $paragraph = trim($paragraph);
