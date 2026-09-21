@@ -2721,9 +2721,7 @@
 }
 
 .swal2-popup .scm-calendar-contract-controls {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(210px, 0.9fr) minmax(240px, 1.1fr);
+  display: block;
 }
 
 .swal2-popup .scm-calendar-contract-picker small {

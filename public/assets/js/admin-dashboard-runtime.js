@@ -2461,17 +2461,6 @@
         return option ? String(option.textContent || "").trim() : "";
       }
 
-      function buildCalendarTitle(categoryName, ticket) {
-        categoryName = String(categoryName || "").trim();
-        if (ticket) {
-          var contrato = String(ticket.contrato || "").trim();
-          if (contrato) return "Contrato #" + contrato + " - " + (categoryName || "Actividad");
-          var ticketId = String(ticket._ID || ticket.id_ticket || ticket.id || "").trim();
-          return "Ticket #" + ticketId + " - " + (categoryName || String(ticket.solicitante || "Actividad").trim());
-        }
-        return "";
-      }
-
       function validateCalendarEventTimes(dateValue, startValue, endValue) {
         if (!dateValue || !startValue || !endValue) return "Debes ingresar fecha, hora de inicio y hora de fin.";
         var start = new Date(dateValue + "T" + startValue);
@@ -3299,12 +3288,13 @@
           '<div class="scm-calendar-location-fields">' +
           '<label class="scm-seg-field"><span>Tipo de ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="contrato">Contrato de arrendamiento</option><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option></select></label>' +
           '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Direcci&oacute;n del contrato"></label>' +
-          '<div class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Contrato de arrendamiento</span><div class="scm-calendar-contract-controls"><input class="input input-bordered input-sm scm-input" type="search" data-calendar-contract-search placeholder="Buscar contrato, inmueble o direcci&oacute;n" aria-label="Buscar contrato"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select aria-label="Contrato de arrendamiento"><option value="">Cargando contratos...</option></select></div><small data-calendar-contract-status>Selecciona un contrato para cargar la ubicaci&oacute;n.</small></div>' +
+          '<div class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Contrato de arrendamiento</span><div class="scm-calendar-contract-controls"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select aria-label="Contrato de arrendamiento"><option value="">Cargando contratos...</option></select></div><small data-calendar-contract-status>Busca y selecciona el contrato dentro del listado.</small></div>' +
           "</div></section>";
         var html = '<form class="scm-calendar-popup-form" autocomplete="off">' +
           '<div class="scm-calendar-popup-grid">' +
           '<label class="scm-seg-field"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required placeholder="Ej: Cita revisi&oacute;n preventiva"></label>' +
           '<label class="scm-seg-field"><span>Categor&iacute;a</span><select class="select select-bordered select-sm scm-select" name="id_categoria" required><option value="">Selecciona categor&iacute;a</option>' + categoryOptions + '</select></label>' +
+          locationFieldsHtml +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Funcionario(s)</span>' + employeesControl + '</label>' +
           '<label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + escHtml(selectedDay || toDateKey(new Date())) + '"></label>' +
           '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required></label>' +
@@ -3318,7 +3308,6 @@
           '<div class="scm-calendar-custom-dates" data-calendar-custom-dates hidden><div data-calendar-custom-rows></div><button type="button" class="scm-case-work-btn" data-calendar-add-custom-date>Agregar fecha personalizada</button></div>' +
           '</div></div>' +
           ticketFieldsHtml +
-          locationFieldsHtml +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required></textarea></label>' +
           '</div><div class="scm-calendar-popup-agenda"><h4>' + (mode === "multiple" ? "Agenda por funcionario" : "Agenda del funcionario") + '</h4><div data-scm-calendar-popup-agenda>' + popupEmployeeAgendaHtml(preselectedEmployee) + '</div></div></form>';
         if (!window.Swal || typeof window.Swal.fire !== "function") {
@@ -3349,7 +3338,6 @@
             var endInput = popup.querySelector('[name="hora_fin"]');
             var locationTypeSelect = popup.querySelector("[data-calendar-location-type]");
             var contractWrap = popup.querySelector("[data-calendar-contract-wrap]");
-            var contractSearch = popup.querySelector("[data-calendar-contract-search]");
             var contractSelect = popup.querySelector("[data-calendar-contract-select]");
             var contractStatus = popup.querySelector("[data-calendar-contract-status]");
             var recurrenceToggle = popup.querySelector("[data-calendar-recurrence-toggle]");
@@ -3360,7 +3348,6 @@
             var customDatesWrap = popup.querySelector("[data-calendar-custom-dates]");
             var customRows = popup.querySelector("[data-calendar-custom-rows]");
             var addCustomDateBtn = popup.querySelector("[data-calendar-add-custom-date]");
-            var titleInput = popup.querySelector('[name="titulo"]');
             var locationInput = popup.querySelector('[name="ubicacion"]');
             var descriptionInput = popup.querySelector('[name="descripcion"]');
             var relatedTicketSelect = popup.querySelector("[data-calendar-related-ticket]");
@@ -3372,7 +3359,6 @@
             var adminStateSelect = popup.querySelector('[name="estado_administrativo"]');
             var currentTicketRows = [];
             var currentContractRows = [];
-            var contractSearchTimer = null;
             function canUseSelect2() {
               return !!(window.jQuery && window.jQuery.fn && window.jQuery.fn.select2);
             }
@@ -3416,6 +3402,44 @@
               contractStatus.textContent = message || "";
               contractStatus.classList.toggle("is-error", !!isError);
             }
+            function destroyContractSelect2() {
+              if (!contractSelect || !canUseSelect2()) return;
+              var $contract = window.jQuery(contractSelect);
+              if ($contract.data("select2")) {
+                $contract.select2("destroy");
+              }
+            }
+            function initContractSelect2() {
+              if (!contractSelect || !canUseSelect2()) return;
+              var $contract = window.jQuery(contractSelect);
+              if ($contract.data("select2")) return;
+              $contract.select2({
+                width: "100%",
+                dropdownParent: window.jQuery(popup),
+                placeholder: "Buscar contrato, inmueble o dirección",
+                allowClear: true,
+                ajax: {
+                  delay: 250,
+                  transport: function (params, success, failure) {
+                    loadCalendarContracts(params && params.data ? params.data.term : "").then(function (rows) {
+                      currentContractRows = rows || [];
+                      success({
+                        results: currentContractRows.map(function (row) {
+                          return {
+                            id: calendarContractValue(row, ["id", "_ID", "contrato"]),
+                            text: calendarContractLabel(row),
+                          };
+                        }).filter(function (row) { return row.id; }),
+                      });
+                    }).catch(failure);
+                    return { abort: function () {} };
+                  },
+                  processResults: function (data) {
+                    return data || { results: [] };
+                  },
+                },
+              });
+            }
             function applySelectedContract(force) {
               var row = selectedContract();
               if (!row) {
@@ -3431,18 +3455,11 @@
                 locationInput.value = location;
                 locationInput.setAttribute("data-auto-calendar-location", "1");
               }
-              if (titleInput) {
-                var contractNumber = calendarContractValue(row, ["contrato", "id"]);
-                var title = "Contrato #" + (contractNumber || "-") + " - " + (categoryNameFromSelect(categorySelect) || "Actividad");
-                if (force || !titleInput.value || titleInput.getAttribute("data-auto-calendar-title") === "1") {
-                  titleInput.value = title;
-                  titleInput.setAttribute("data-auto-calendar-title", "1");
-                }
-              }
               setContractStatus(calendarContractLabel(row), false);
             }
             function refreshContractOptions(query, selectedValue) {
               if (!contractSelect) return Promise.resolve();
+              destroyContractSelect2();
               contractSelect.disabled = true;
               renderCalendarContractSelector(contractSelect, [], selectedValue);
               setContractStatus("Cargando contratos...", false);
@@ -3450,16 +3467,18 @@
                 currentContractRows = rows || [];
                 renderCalendarContractSelector(contractSelect, currentContractRows, selectedValue);
                 contractSelect.disabled = false;
+                initContractSelect2();
                 if (!currentContractRows.length) {
                   setContractStatus("No se encontraron contratos con ese filtro.", true);
                 } else {
-                  setContractStatus("Selecciona un contrato para cargar la ubicación.", false);
+                  setContractStatus("Busca y selecciona el contrato dentro del listado.", false);
                 }
                 applySelectedContract(false);
               }).catch(function (err) {
                 currentContractRows = [];
                 renderCalendarContractSelector(contractSelect, [], "");
                 contractSelect.disabled = false;
+                initContractSelect2();
                 setContractStatus((err && err.message) || "No se pudieron cargar los contratos.", true);
               });
             }
@@ -3487,28 +3506,14 @@
                 locationInput.value = "";
               }
               if (!currentContractRows.length) {
-                refreshContractOptions(contractSearch ? contractSearch.value : "");
+                refreshContractOptions("");
               } else {
+                initContractSelect2();
                 applySelectedContract(false);
               }
             }
             function maybeAutofillTitleAndLocation(force) {
-              var categoryName = categoryNameFromSelect(categorySelect);
               var ticket = isTicketRelated() ? selectedTicket() : null;
-              if (titleInput) {
-                var title = buildCalendarTitle(categoryName, ticket);
-                if (!title && locationTypeSelect && locationTypeSelect.value === "contrato") {
-                  var contract = selectedContract();
-                  if (contract) {
-                    var contractNumber = calendarContractValue(contract, ["contrato", "id"]);
-                    title = "Contrato #" + (contractNumber || "-") + " - " + (categoryName || "Actividad");
-                  }
-                }
-                if (title && (force || !titleInput.value || titleInput.getAttribute("data-auto-calendar-title") === "1")) {
-                  titleInput.value = title;
-                  titleInput.setAttribute("data-auto-calendar-title", "1");
-                }
-              }
               if (locationInput && ticket && ticket.direccion && (force || !locationInput.value || locationInput.getAttribute("data-auto-calendar-location") === "1")) {
                 locationInput.value = ticket.direccion;
                 locationInput.setAttribute("data-auto-calendar-location", "1");
@@ -3670,11 +3675,6 @@
             if (adminStateSelect) {
               adminStateSelect.addEventListener("change", applyCitaAdminState);
             }
-            if (titleInput) {
-              titleInput.addEventListener("input", function () {
-                titleInput.setAttribute("data-auto-calendar-title", "0");
-              });
-            }
             if (locationInput) {
               locationInput.addEventListener("input", function () {
                 locationInput.setAttribute("data-auto-calendar-location", "0");
@@ -3688,16 +3688,14 @@
             if (contractSelect) {
               contractSelect.addEventListener("change", function () {
                 applySelectedContract(true);
-                maybeAutofillTitleAndLocation(true);
               });
-            }
-            if (contractSearch) {
-              contractSearch.addEventListener("input", function () {
-                if (contractSearchTimer) window.clearTimeout(contractSearchTimer);
-                contractSearchTimer = window.setTimeout(function () {
-                  refreshContractOptions(contractSearch.value, "");
-                }, 280);
-              });
+              if (canUseSelect2()) {
+                window.jQuery(contractSelect).on("select2:select", function () {
+                  applySelectedContract(true);
+                }).on("select2:clear", function () {
+                  applySelectedContract(true);
+                });
+              }
             }
             [categorySelect, dateInput, startInput, endInput].forEach(function (field) {
               if (field) field.addEventListener("change", function () {
@@ -3735,12 +3733,14 @@
           willClose: function () {
             if (!(window.jQuery && window.jQuery.fn && window.jQuery.fn.select2)) return;
             var popup = window.Swal.getPopup();
-            var select = popup ? popup.querySelector("[data-calendar-ticket-select]") : null;
-            if (!select) return;
-            var $select = window.jQuery(select);
-            if ($select.data("select2")) {
-              $select.select2("destroy");
-            }
+            ["[data-calendar-ticket-select]", "[data-calendar-contract-select]"].forEach(function (selector) {
+              var select = popup ? popup.querySelector(selector) : null;
+              if (!select) return;
+              var $select = window.jQuery(select);
+              if ($select.data("select2")) {
+                $select.select2("destroy");
+              }
+            });
           },
           preConfirm: function () {
             var popup = window.Swal.getPopup();
