@@ -3569,6 +3569,12 @@ body.scm-modal-open {
   padding: 10px 11px;
 }
 
+.swal2-html-container .scm-contract-termination-form input[readonly] {
+  background: #eef4fb;
+  color: #475569;
+  cursor: default;
+}
+
 .swal2-html-container .scm-contract-termination-checks {
   display: grid;
   gap: 8px;

@@ -832,9 +832,7 @@ trait HandlesTicketWorkflowActions
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $solicitudId = isset($_POST['solicitud_id']) ? (int) $_POST['solicitud_id'] : 0;
     $term = sanitize_key((string) ($_POST['termino'] ?? ''));
-    $requestDate = trim(sanitize_text_field(wp_unslash((string) ($_POST['fecha_solicitud'] ?? ''))));
     $endDate = trim(sanitize_text_field(wp_unslash((string) ($_POST['fecha_terminacion'] ?? ''))));
-    $observacion = trim(wp_kses_post(wp_unslash((string) ($_POST['observacion'] ?? ''))));
     $notifyRecipients = $this->parse_notify_recipients($_POST['notify_recipients'] ?? []);
     if (isset($_POST['notify_recipients_present']) && empty($notifyRecipients)) {
       $notifyRecipients = ['none'];
@@ -862,11 +860,13 @@ trait HandlesTicketWorkflowActions
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
     $creator = $this->calendarCitaCreatorContact();
     $creatorName = trim((string) ($creator['name'] ?? '')) ?: (Auth::user() ?: 'Funcionario de SKC SuCasa Inmobiliaria');
+    $requestTs = $this->adminDueFirstTimestamp($ticket, ['solicitud_fecha', 'fecha', 'solicitud_created', 'cct_created']);
+    $requestDate = $requestTs > 0 ? date('Y-m-d', $requestTs) : '';
     if ($endDate === '') {
       $finContratoTs = $this->contractTerminationTimestamp($ticket['fin_contrato'] ?? '');
       $endDate = $finContratoTs > 0 ? date('Y-m-d', $finContratoTs) : '';
     }
-    $responseText = $this->contractTerminationResponseText($ticket, $term, $requestDate, $endDate, $observacion, $creatorName);
+    $responseText = $this->contractTerminationResponseText($ticket, $term, $requestDate, $endDate, $creatorName);
 
     try {
       $acta = $this->generateContractTerminationActa($ticket, $term, $responseText, $requestDate, $endDate, $creatorName);
@@ -3423,7 +3423,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $ticket */
-  private function contractTerminationResponseText(array $ticket, string $term, string $requestDate, string $endDate, string $observacion, string $creatorName): string
+  private function contractTerminationResponseText(array $ticket, string $term, string $requestDate, string $endDate, string $creatorName): string
   {
     $recipient = $this->contractTerminationFirstText([$ticket], ['solicitante', 'arrendatario', 'propietario']) ?: 'cliente';
     $address = $this->contractTerminationFirstText([$ticket], ['direccion']) ?: 'el inmueble relacionado';
@@ -3446,9 +3446,6 @@ trait HandlesTicketWorkflowActions
       $text .= "SKC SuCasa Inmobiliaria, en calidad de administradora del inmueble ubicado en {$address}, da respuesta a la comunicación recibida el {$requestLabel}, mediante la cual manifiesta su intención de dar por terminado el contrato de arrendamiento #{$contract}.\n\n";
       $text .= "La solicitud se encuentra fuera de término frente a las condiciones del contrato. Por lo anterior, la terminación anticipada no es viable en los términos planteados y podrá generar a su cargo la sanción contractual equivalente al valor de tres (3) cánones de arrendamiento vigentes, o la continuidad hasta la fecha estipulada contractualmente.\n\n";
       $text .= "Sin perjuicio de lo anterior, se dará traslado al área comercial para intentar, sin compromiso de nuestra parte, conseguir un posible nuevo arrendatario que permita estudiar una cesión del contrato. En caso de lograrse, se informará oportunamente.";
-    }
-    if ($observacion !== '') {
-      $text .= "\n\nObservación adicional: " . trim(strip_tags($observacion));
     }
     $text .= "\n\nAtentamente,\n{$creatorName}\nSKC SuCasa Inmobiliaria";
     return $text;

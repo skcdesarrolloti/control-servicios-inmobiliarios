@@ -11370,7 +11370,6 @@
         showToast("warning", "No se encontró la solicitud seleccionada.");
         return;
       }
-      var recommendedTerm = row.term_recommended === "fuera" ? "fuera" : "dentro";
       var html = '<form class="scm-contract-termination-form" data-scm-contract-termination-form>' +
         '<div class="scm-contract-termination-case">' +
           '<strong>' + escHtml(row.titulo || "Ticket") + '</strong><span>' + escHtml(row.asunto || "Solicitud de terminación") + "</span>" +
@@ -11378,11 +11377,10 @@
         "</div>" +
         contractTerminationTermBadge(row, false) +
         '<div class="scm-contract-termination-form-grid">' +
-          '<label><span>Clasificación</span><select name="termino"><option value="dentro"' + (recommendedTerm === "dentro" ? " selected" : "") + '>Dentro de término</option><option value="fuera"' + (recommendedTerm === "fuera" ? " selected" : "") + '>Fuera de término</option></select></label>' +
-          '<label><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || "") + '"></label>' +
+          '<label><span>Clasificación</span><select name="termino" required><option value="" selected disabled>Selecciona clasificación</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label>' +
+          '<label><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || "") + '" readonly aria-readonly="true"></label>' +
           '<label><span>Fecha terminación / entrega</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || "") + '"></label>' +
         "</div>" +
-        '<label class="scm-contract-termination-observation"><span>Observación adicional</span><textarea name="observacion" rows="3" placeholder="Opcional"></textarea></label>' +
         '<div><span class="scm-contract-termination-label">Notificar a</span>' + contractTerminationRecipientChecks(row) + "</div>" +
       "</form>";
       window.Swal.fire({
@@ -11424,11 +11422,14 @@
             window.Swal.showValidationMessage("Selecciona a quién notificar o marca No notificar.");
             return false;
           }
+          var term = form.querySelector("[name='termino']");
+          if (!term || !term.value) {
+            window.Swal.showValidationMessage("Selecciona la clasificación de la solicitud.");
+            return false;
+          }
           return {
-            termino: form.querySelector("[name='termino']").value,
-            fecha_solicitud: form.querySelector("[name='fecha_solicitud']").value,
+            termino: term.value,
             fecha_terminacion: form.querySelector("[name='fecha_terminacion']").value,
-            observacion: form.querySelector("[name='observacion']").value,
             notify: checked.map(function (input) { return input.value; }),
           };
         },
@@ -11438,10 +11439,8 @@
         return dashboardFormAction(actionContractTerminationRespond, function (fd) {
           fd.append("ticket_pk", String(row.ticket_pk || ""));
           fd.append("solicitud_id", String(row.solicitud_id || ""));
-          fd.append("termino", value.termino || "dentro");
-          fd.append("fecha_solicitud", value.fecha_solicitud || "");
+          fd.append("termino", value.termino || "");
           fd.append("fecha_terminacion", value.fecha_terminacion || "");
-          fd.append("observacion", value.observacion || "");
           fd.append("notify_recipients_present", "1");
           (value.notify || []).forEach(function (target) {
             fd.append("notify_recipients[]", target);
