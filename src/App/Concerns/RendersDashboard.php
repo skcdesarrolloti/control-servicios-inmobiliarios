@@ -449,6 +449,8 @@ trait RendersDashboard
         'dashboard_completed_activities' => self::AJAX_DASHBOARD_COMPLETED_ACTIVITIES,
         'property_history_report' => self::AJAX_PROPERTY_HISTORY_REPORT,
         'property_history_pdf' => self::AJAX_PROPERTY_HISTORY_PDF,
+        'contract_termination_requests' => self::AJAX_CONTRACT_TERMINATION_REQUESTS,
+        'contract_termination_respond' => self::AJAX_CONTRACT_TERMINATION_RESPOND,
         'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
@@ -688,6 +690,7 @@ trait RendersDashboard
               <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-due">Vencimientos</button>
               <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-completed">Actividades realizadas</button>
               <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-property-history">Historial inmueble</button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-contract-termination">Terminaciones</button>
             </div>
             <div class="scm-calendar-section-panel active" id="scm-home-calendar-section-mine" data-calendar-section-panel>
               <?php echo $this->render_calendario_actividades_panel($config, [
@@ -784,6 +787,21 @@ trait RendersDashboard
                 </form>
                 <div class="scm-property-history-status" data-scm-property-history-status>Ingresa un contrato o un c&oacute;digo web/inmueble para consultar.</div>
                 <div class="scm-property-history-results" data-scm-property-history-results></div>
+              </section>
+            </div>
+            <div class="scm-calendar-section-panel" id="scm-home-calendar-section-contract-termination" data-calendar-section-panel>
+              <section class="scm-contract-termination-panel" data-scm-contract-termination-panel aria-live="polite">
+                <div class="scm-contract-termination-head">
+                  <div>
+                    <span class="scm-calendar-action-kicker">Contratos</span>
+                    <h3>Solicitudes de terminaci&oacute;n de contrato</h3>
+                    <p>Responde si la solicitud est&aacute; dentro o fuera de t&eacute;rmino, elige destinatarios y cierra el ticket con acta.</p>
+                  </div>
+                  <button type="button" class="scm-case-work-btn" data-scm-contract-termination-refresh>Actualizar</button>
+                </div>
+                <div class="scm-contract-termination-status" data-scm-contract-termination-status>Cargando solicitudes pendientes...</div>
+                <div class="scm-contract-termination-summary" data-scm-contract-termination-summary></div>
+                <div class="scm-contract-termination-list" data-scm-contract-termination-list></div>
               </section>
             </div>
           </section>

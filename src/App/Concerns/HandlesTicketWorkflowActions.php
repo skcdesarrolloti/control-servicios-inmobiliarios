@@ -800,6 +800,97 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk($result);
   }
 
+  public function ajax_handler_contract_termination_requests(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessContractTerminationRequests()) {
+      $this->jsonFail('No tienes permiso para ver solicitudes de terminación de contrato.');
+    }
+
+    try {
+      $items = $this->contractTerminationRequestItems(150);
+    } catch (\Throwable $exception) {
+      error_log('[contract_termination_requests] ' . $exception->getMessage());
+      $this->jsonFail('No se pudieron cargar las solicitudes de terminación.');
+    }
+
+    $this->jsonOk([
+      'items' => $items,
+      'count' => count($items),
+      'generated_at' => date('d/m/Y H:i'),
+    ]);
+  }
+
+  public function ajax_handler_contract_termination_respond(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_respond')) {
+      $this->jsonFail('No tienes permiso para responder tickets.');
+    }
+
+    $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
+    $term = sanitize_key((string) ($_POST['termino'] ?? ''));
+    $requestDate = trim(sanitize_text_field(wp_unslash((string) ($_POST['fecha_solicitud'] ?? ''))));
+    $endDate = trim(sanitize_text_field(wp_unslash((string) ($_POST['fecha_terminacion'] ?? ''))));
+    $observacion = trim(wp_kses_post(wp_unslash((string) ($_POST['observacion'] ?? ''))));
+    $notifyRecipients = $this->parse_notify_recipients($_POST['notify_recipients'] ?? []);
+    if (isset($_POST['notify_recipients_present']) && empty($notifyRecipients)) {
+      $notifyRecipients = ['none'];
+    }
+
+    if ($ticketPk <= 0) {
+      $this->jsonFail('Ticket inválido.');
+    }
+    if (!in_array($term, ['dentro', 'fuera'], true)) {
+      $this->jsonFail('Selecciona si la solicitud está dentro o fuera de término.');
+    }
+
+    $ticket = $this->contractTerminationTicketByPk($ticketPk);
+    if ($ticket === []) {
+      $this->jsonFail('No se encontró el ticket de terminación.');
+    }
+    if (!$this->isContractTerminationTicket($ticket)) {
+      $this->jsonFail('El ticket seleccionado no parece ser una solicitud de terminación de contrato.');
+    }
+
+    $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
+    $creator = $this->calendarCitaCreatorContact();
+    $creatorName = trim((string) ($creator['name'] ?? '')) ?: (Auth::user() ?: 'Funcionario de SKC SuCasa Inmobiliaria');
+    $responseText = $this->contractTerminationResponseText($ticket, $term, $requestDate, $endDate, $observacion, $creatorName);
+
+    try {
+      $acta = $this->generateContractTerminationActa($ticket, $term, $responseText, $requestDate, $endDate, $creatorName);
+    } catch (\Throwable $exception) {
+      error_log('[contract_termination_acta] ' . $exception->getMessage());
+      $this->jsonFail('No se pudo generar el acta de terminación: ' . $exception->getMessage());
+    }
+
+    $documentos = [];
+    $actaUrl = trim((string) ($acta['url'] ?? ''));
+    if ($actaUrl !== '') {
+      $documentos[] = [
+        'nombre_archivo' => (string) ($acta['title'] ?? 'Acta de respuesta terminación de contrato'),
+        'media_archivo' => $actaUrl,
+        'archivo' => $actaUrl,
+      ];
+    }
+
+    $service = $this->get_seguimiento_service();
+    $result = $service->saveTicketResponse($ticketPk, $responseText, '__keep__', true, $notifyRecipients, [], $documentos);
+    if (($result['ok'] ?? '0') !== '1') {
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta de terminación.'));
+    }
+
+    $extraQueued = $this->notifyContractTerminationActa($ticket, $term, $responseText, $actaUrl, $notifyRecipients, $creatorName);
+    $result['acta_url'] = $actaUrl;
+    $result['acta_title'] = (string) ($acta['title'] ?? '');
+    $result['termination_email_queued'] = (string) ($extraQueued['email'] ?? 0);
+    $result['termination_whatsapp_queued'] = (string) ($extraQueued['whatsapp'] ?? 0);
+    $result['message'] = 'Solicitud respondida, acta generada y ticket cerrado.';
+
+    $this->jsonOk($result);
+  }
+
   public function ajax_handler_repair_followup_notice(): void
   {
     $this->verifyCsrf();
@@ -893,6 +984,8 @@ trait HandlesTicketWorkflowActions
       !$this->canAccessDashboardTab('cotizaciones_mantenimiento')
       && !$this->canAccessDashboardTab('preventivas_pendientes')
       && !$this->canAccessDashboardTab('servicios_publicos_pendientes')
+      && !$this->canAccessDashboardTab('contractual')
+      && !$this->canUseDashboardAction('case_respond')
     ) {
       $this->jsonFail('No tienes permiso para ver vencimientos administrativos.');
     }
@@ -922,6 +1015,8 @@ trait HandlesTicketWorkflowActions
       !$this->canAccessDashboardTab('cotizaciones_mantenimiento')
       && !$this->canAccessDashboardTab('preventivas_pendientes')
       && !$this->canAccessDashboardTab('servicios_publicos_pendientes')
+      && !$this->canAccessDashboardTab('contractual')
+      && !$this->canUseDashboardAction('case_respond')
     ) {
       $this->jsonFail('No tienes permiso para ver vencimientos administrativos.');
     }
@@ -1099,6 +1194,18 @@ trait HandlesTicketWorkflowActions
         'servicios_publicos_pendientes',
         $this->adminDueServiciosPublicosItems($fromTs, $toTs)
       );
+    }
+
+    if ($this->canAccessDashboardTab('contractual') || $this->canUseDashboardAction('case_respond')) {
+      $count = $this->contractTerminationPendingCount();
+      $groups[] = [
+        'type' => 'terminacion_contrato_pendiente',
+        'label' => 'Terminaciones de contrato pendientes',
+        'target_tab' => 'contract_termination',
+        'count' => $count,
+        'vencidos' => $count,
+        'hoy' => 0,
+      ];
     }
 
     return $groups;
@@ -1760,6 +1867,7 @@ trait HandlesTicketWorkflowActions
       'ticket_preventiva_sin_cita' => 0,
       'preventiva_cita_sin_realizar' => 0,
       'servicios_publicos_pendientes' => 0,
+      'terminacion_contrato_pendiente' => 0,
     ];
     foreach ($items as $item) {
       $type = (string) ($item['tipo_vencimiento'] ?? '');
@@ -2858,6 +2966,457 @@ trait HandlesTicketWorkflowActions
     );
 
     return is_array($row) ? $row : [];
+  }
+
+  private function canAccessContractTerminationRequests(): bool
+  {
+    return $this->canUseDashboardAction('case_respond')
+      || $this->canAccessDashboardTab('contractual')
+      || $this->canAccessDashboardTab('mis_tickets')
+      || $this->canAccessDashboardTab('abiertos');
+  }
+
+  /** @return array<int,array<string,mixed>> */
+  private function contractTerminationRequestItems(int $limit = 150): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+    $select = $this->contractTerminationTicketSelect($table);
+    if ($select === []) {
+      return [];
+    }
+    [$whereSql, $args] = $this->contractTerminationWhereSql($table, 't');
+    if ($whereSql === '') {
+      return [];
+    }
+    $limit = max(1, min(300, $limit));
+    $rows = $this->db->getResults(
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` t WHERE {$whereSql} " . $this->contractTerminationOrderSql($table, 't') . ' LIMIT ' . $limit,
+      $args
+    );
+
+    return array_values(array_map(fn(array $row): array => $this->contractTerminationListItem($row), $rows));
+  }
+
+  private function contractTerminationPendingCount(): int
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->table_exists($table)) {
+      return 0;
+    }
+    [$whereSql, $args] = $this->contractTerminationWhereSql($table, 't');
+    if ($whereSql === '') {
+      return 0;
+    }
+    try {
+      return (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` t WHERE {$whereSql}", $args);
+    } catch (\Throwable $exception) {
+      error_log('[contract_termination_pending_count] ' . $exception->getMessage());
+      return 0;
+    }
+  }
+
+  /** @return array<string,mixed> */
+  private function contractTerminationTicketByPk(int $ticketPk): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if ($ticketPk <= 0 || !$this->table_exists($table)) {
+      return [];
+    }
+    $select = $this->contractTerminationTicketSelect($table);
+    if ($select === []) {
+      return [];
+    }
+    $row = $this->db->getRow(
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` t WHERE t.`_ID` = ? LIMIT 1",
+      [$ticketPk]
+    );
+    return is_array($row) ? $row : [];
+  }
+
+  /** @return string[] */
+  private function contractTerminationTicketSelect(string $table): array
+  {
+    $columns = [
+      '_ID', 'id_ticket', 'tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion', 'estado', 'estado_administrativo',
+      'id_contrato', 'contrato', 'id_inmueble', 'inmueble', 'direccion', 'barrio', 'ciudad',
+      'solicitante', 'solicitante_tipo', 'correo_solicitante', 'celular_solicitante',
+      'arrendatario', 'correo_arrendatario', 'celular_arrendatario',
+      'propietario', 'correo_propietario', 'celular_propietario',
+      'empleado', 'nombre_empleado', 'id_empleado', 'correo_empleado', 'celular_empleado',
+      'fecha', 'fecha_actualizacion', 'cct_created', 'cct_modified',
+    ];
+    $select = [];
+    foreach ($columns as $column) {
+      if ($this->column_exists($table, $column)) {
+        $select[] = "t.`{$column}`";
+      }
+    }
+    return $select;
+  }
+
+  /** @return array{0:string,1:array<int,mixed>} */
+  private function contractTerminationWhereSql(string $table, string $alias): array
+  {
+    $p = trim($alias) !== '' ? trim($alias) . '.' : '';
+    $textColumns = [];
+    foreach (['tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion'] as $column) {
+      if ($this->column_exists($table, $column)) {
+        $textColumns[] = $column;
+      }
+    }
+    if ($textColumns === []) {
+      return ['', []];
+    }
+
+    $terms = ['terminacion', 'terminación', 'terminar', 'finalizacion', 'finalización', 'desocupacion', 'desocupación'];
+    $parts = [];
+    $args = [];
+    foreach ($textColumns as $column) {
+      foreach ($terms as $term) {
+        $parts[] = "LOWER(COALESCE({$p}`{$column}`, '')) LIKE ?";
+        $args[] = '%' . $term . '%';
+      }
+    }
+    $openSql = $this->adminDueOpenTicketWhereSql($alias);
+    return ['(' . implode(' OR ', $parts) . ') AND ' . $openSql, $args];
+  }
+
+  private function contractTerminationOrderSql(string $table, string $alias): string
+  {
+    $p = trim($alias) !== '' ? trim($alias) . '.' : '';
+    $parts = [];
+    foreach (['fecha', 'fecha_actualizacion', 'cct_created', 'cct_modified', '_ID'] as $column) {
+      if ($this->column_exists($table, $column)) {
+        if (in_array($column, ['fecha', '_ID'], true)) {
+          $parts[] = "{$p}`{$column}` DESC";
+        } else {
+          $parts[] = "COALESCE(UNIX_TIMESTAMP({$p}`{$column}`), 0) DESC";
+        }
+      }
+    }
+    return $parts !== [] ? 'ORDER BY ' . implode(', ', $parts) : '';
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function isContractTerminationTicket(array $ticket): bool
+  {
+    $haystack = strtolower($this->contractTerminationFirstText([$ticket], ['tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion']));
+    return $haystack !== '' && (
+      strpos($haystack, 'terminacion') !== false
+      || strpos($haystack, 'terminación') !== false
+      || strpos($haystack, 'desocupacion') !== false
+      || strpos($haystack, 'desocupación') !== false
+    );
+  }
+
+  /** @param array<string,mixed> $row @return array<string,mixed> */
+  private function contractTerminationListItem(array $row): array
+  {
+    $createdTs = $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
+    $ticketPk = trim((string) ($row['_ID'] ?? ''));
+    $logicalTicket = $this->contractTerminationFirstText([$row], ['id_ticket', '_ID']);
+    $subject = $this->contractTerminationFirstText([$row], ['asunto', 'tema_ayuda', 'tipo_pqrs']) ?: 'Solicitud de terminación de contrato';
+    return [
+      'ticket_pk' => $ticketPk,
+      'id_ticket' => $logicalTicket,
+      'titulo' => 'Ticket #' . ($logicalTicket !== '' ? $logicalTicket : $ticketPk),
+      'asunto' => $subject,
+      'estado' => $this->contractTerminationFirstText([$row], ['estado']) ?: '-',
+      'estado_administrativo' => $this->contractTerminationFirstText([$row], ['estado_administrativo']) ?: '-',
+      'contrato' => $this->contractTerminationFirstText([$row], ['contrato', 'id_contrato']) ?: '-',
+      'inmueble' => $this->contractTerminationFirstText([$row], ['inmueble', 'id_inmueble']) ?: '-',
+      'direccion' => $this->contractTerminationFirstText([$row], ['direccion']) ?: '-',
+      'solicitante' => $this->contractTerminationFirstText([$row], ['solicitante', 'arrendatario', 'propietario']) ?: '-',
+      'creado' => $createdTs > 0 ? date('d/m/Y H:i', $createdTs) : '-',
+      'fecha_solicitud' => $createdTs > 0 ? date('Y-m-d', $createdTs) : date('Y-m-d'),
+      'recipients' => $this->contractTerminationRecipientOptions($row),
+    ];
+  }
+
+  /** @param array<string,mixed> $ticket @return array<int,array<string,string|bool>> */
+  private function contractTerminationRecipientOptions(array $ticket): array
+  {
+    $options = [];
+    $map = [
+      'solicitante' => ['Solicitante', ['solicitante'], ['correo_solicitante'], ['celular_solicitante']],
+      'arrendatario' => ['Arrendatario', ['arrendatario'], ['correo_arrendatario'], ['celular_arrendatario']],
+      'propietario' => ['Propietario', ['propietario'], ['correo_propietario'], ['celular_propietario']],
+      'empleado' => ['Funcionario asignado', ['nombre_empleado', 'empleado', 'id_empleado'], ['correo_empleado'], ['celular_empleado']],
+    ];
+    foreach ($map as $value => $config) {
+      [$label, $nameCols, $emailCols, $phoneCols] = $config;
+      $name = $this->contractTerminationFirstText([$ticket], $nameCols);
+      $email = $this->contractTerminationFirstText([$ticket], $emailCols);
+      $phone = $this->contractTerminationFirstText([$ticket], $phoneCols);
+      $options[] = [
+        'value' => $value,
+        'label' => $label,
+        'name' => $name,
+        'email' => $email,
+        'phone' => $phone,
+        'available' => $email !== '' || $phone !== '',
+      ];
+    }
+    $adminEmails = \SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, 'terminacion_contrato');
+    $options[] = [
+      'value' => 'admin',
+      'label' => 'Notificaciones internas',
+      'name' => count($adminEmails) . ' destinatario(s)',
+      'email' => implode(', ', $adminEmails),
+      'phone' => '',
+      'available' => count($adminEmails) > 0,
+    ];
+    return $options;
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @param string[] $columns */
+  private function contractTerminationFirstText(array $rows, array $columns): string
+  {
+    foreach ($rows as $row) {
+      foreach ($columns as $column) {
+        $value = trim((string) ($row[$column] ?? ''));
+        if ($value !== '') {
+          return $value;
+        }
+      }
+    }
+    return '';
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function contractTerminationResponseText(array $ticket, string $term, string $requestDate, string $endDate, string $observacion, string $creatorName): string
+  {
+    $recipient = $this->contractTerminationFirstText([$ticket], ['solicitante', 'arrendatario', 'propietario']) ?: 'cliente';
+    $address = $this->contractTerminationFirstText([$ticket], ['direccion']) ?: 'el inmueble relacionado';
+    $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: '-';
+    $requestLabel = $this->contractTerminationHumanDate($requestDate);
+    $endLabel = $this->contractTerminationHumanDate($endDate);
+
+    if ($term === 'dentro') {
+      $text = "Cartagena de Indias D.T. y C., " . date('d/m/Y') . "\n\n";
+      $text .= "Señor(a): {$recipient}\nCiudad\n\n";
+      $text .= "SKC SuCasa Inmobiliaria, en calidad de administradora del inmueble ubicado en {$address}, da respuesta a su solicitud de terminación del contrato de arrendamiento #{$contract}. ";
+      $text .= "De acuerdo con la comunicación recibida el {$requestLabel}, la solicitud fue presentada dentro del término establecido, con no menos de tres (3) meses de antelación cuando aplique.\n\n";
+      $text .= "En consecuencia, el contrato finalizará el día {$endLabel}, fecha en la cual deberá realizarse la entrega material del inmueble.\n\n";
+      $text .= "Para la entrega debe contactar al coordinador de mantenimiento y presentar, con quince (15) días de anticipación, los últimos recibos de servicios públicos cancelados, paz y salvo de canon de arrendamiento, expensas de administración y cualquier otro valor pendiente. También deberá permitir la revisión previa del inmueble para determinar reparaciones o detalles necesarios para la entrega.\n\n";
+      $text .= "Le recordamos que el inmueble debe entregarse en las mismas condiciones en que fue recibido, conforme al inventario que hace parte del contrato de arrendamiento.";
+    } else {
+      $text = "Cartagena de Indias D.T. y C., " . date('d/m/Y') . "\n\n";
+      $text .= "Señor(a): {$recipient}\nCiudad\n\n";
+      $text .= "Cordial saludo.\n\n";
+      $text .= "SKC SuCasa Inmobiliaria, en calidad de administradora del inmueble ubicado en {$address}, da respuesta a la comunicación recibida el {$requestLabel}, mediante la cual manifiesta su intención de dar por terminado el contrato de arrendamiento #{$contract}.\n\n";
+      $text .= "La solicitud se encuentra fuera de término frente a las condiciones del contrato. Por lo anterior, la terminación anticipada no es viable en los términos planteados y podrá generar a su cargo la sanción contractual equivalente al valor de tres (3) cánones de arrendamiento vigentes, o la continuidad hasta la fecha estipulada contractualmente.\n\n";
+      $text .= "Sin perjuicio de lo anterior, se dará traslado al área comercial para intentar, sin compromiso de nuestra parte, conseguir un posible nuevo arrendatario que permita estudiar una cesión del contrato. En caso de lograrse, se informará oportunamente.";
+    }
+    if ($observacion !== '') {
+      $text .= "\n\nObservación adicional: " . trim(strip_tags($observacion));
+    }
+    $text .= "\n\nAtentamente,\n{$creatorName}\nSKC SuCasa Inmobiliaria";
+    return $text;
+  }
+
+  /** @param array<string,mixed> $ticket @return array{title:string,url:string,path:string} */
+  private function generateContractTerminationActa(array $ticket, string $term, string $responseText, string $requestDate, string $endDate, string $creatorName): array
+  {
+    if (!defined('SCM_UPLOAD_PATH')) {
+      throw new \RuntimeException('No está configurada la ruta de almacenamiento.');
+    }
+    $ticketPk = (int) ($ticket['_ID'] ?? 0);
+    $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
+    $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: '-';
+    $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
+    $title = $term === 'dentro'
+      ? 'Acta de terminación dentro de término'
+      : 'Acta de terminación fuera de término';
+    $safeName = 'acta-terminacion-contrato-' . preg_replace('/[^0-9a-z-]+/', '-', strtolower($logicalTicket . '-' . $term . '-' . date('YmdHis'))) . '.pdf';
+    $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . $safeName;
+
+    $pdf = new \SCM\Support\SimplePdf();
+    $pdf->layout(42, 42, 44);
+    $membrete = defined('SCM_RESOURCES_PATH') ? SCM_RESOURCES_PATH . '/assets/membrete-sucasa.jpg' : '';
+    if ($membrete !== '' && is_file($membrete)) {
+      $pdf->backgroundImage($membrete);
+    }
+    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Terminación de contrato');
+    $pdf->actaHeader($title, 'Ticket #' . $logicalTicket . ' · Contrato #' . $contract . ' · Inmueble ' . $property, $term === 'dentro' ? 'Dentro de término' : 'Fuera de término');
+    $pdf->sectionTitle('Datos de la solicitud');
+    $pdf->detailGrid([
+      ['Ticket', '#' . $logicalTicket],
+      ['Contrato', '#' . $contract],
+      ['Inmueble', $property],
+      ['Dirección', $this->contractTerminationFirstText([$ticket], ['direccion']) ?: '-'],
+      ['Solicitante', $this->contractTerminationFirstText([$ticket], ['solicitante', 'arrendatario', 'propietario']) ?: '-'],
+      ['Fecha solicitud', $this->contractTerminationHumanDate($requestDate)],
+      ['Fecha terminación / entrega', $this->contractTerminationHumanDate($endDate)],
+      ['Clasificación', $term === 'dentro' ? 'Dentro de término' : 'Fuera de término'],
+    ]);
+    $pdf->sectionTitle('Respuesta emitida');
+    foreach (preg_split('/\n{2,}/', $responseText) ?: [] as $paragraph) {
+      $paragraph = trim($paragraph);
+      if ($paragraph !== '') {
+        $pdf->paragraph($paragraph, 8);
+      }
+    }
+    $pdf->signatureBlock('Realizado por', $creatorName, 'SKC SuCasa Inmobiliaria');
+    $pdf->save($path);
+
+    return [
+      'title' => $title . ' - Ticket #' . $logicalTicket,
+      'url' => \SCM\Support\StoredFileService::fromRuntime()->urlFor($safeName),
+      'path' => $path,
+    ];
+  }
+
+  /** @param array<string,mixed> $ticket @param string[] $notifyTargets @return array{email:int,whatsapp:int} */
+  private function notifyContractTerminationActa(array $ticket, string $term, string $responseText, string $actaUrl, array $notifyTargets, string $creatorName): array
+  {
+    $targets = array_values(array_unique($notifyTargets));
+    if ($actaUrl === '' || in_array('none', $targets, true) || $targets === []) {
+      return ['email' => 0, 'whatsapp' => 0];
+    }
+    $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: '-';
+    $subject = 'Respuesta solicitud de terminación de contrato - Ticket #' . $logicalTicket;
+    $status = $term === 'dentro' ? 'dentro de término' : 'fuera de término';
+    $emailRecipients = $this->contractTerminationNotificationEmails($ticket, $targets);
+    $html = \SCM\Support\EmailTemplate::render('Respuesta solicitud de terminación de contrato', nl2br(\SCM\Support\EmailTemplate::e($responseText)), [
+      'buttons' => [['url' => $actaUrl, 'label' => 'Ver acta generada']],
+    ]);
+    $emailQueued = $emailRecipients !== []
+      ? (new \SCM\Support\EmailQueue($this->db))->enqueue(array_values($emailRecipients), $subject, $html, [
+        'source_module' => 'terminacion_contrato',
+        'destination_name' => '',
+        'dedupe_key' => 'terminacion_contrato:' . $logicalTicket . ':' . $term,
+        'meta' => ['id_ticket' => $logicalTicket, 'acta_url' => $actaUrl, 'termino' => $status],
+      ])
+      : 0;
+
+    $whatsappQueued = 0;
+    foreach ($this->contractTerminationNotificationPhones($ticket, $targets) as $recipient) {
+      try {
+        $phone = (string) ($recipient['phone'] ?? '');
+        $name = (string) ($recipient['name'] ?? 'cliente');
+        $buttonSuffix = $this->contractTerminationWhatsappButtonSuffix($actaUrl);
+        $message = "Buen dia, {$name}.\n\nSe emitio respuesta a la solicitud de terminacion de contrato del ticket #{$logicalTicket}. La solicitud fue clasificada como {$status}.\n\nPuedes consultar el acta en el boton.\n\nAtentamente,\n{$creatorName}\nSKC SuCasa Inmobiliaria";
+        $smsQueue = new \SCM\Support\SmsQueue($this->db);
+        $ok = $smsQueue->enqueue($phone, $name, $message, [
+          'source_module' => 'terminacion_contrato',
+          'campaign_tag' => 'terminacion_contrato',
+          'categoria_mensaje' => 'informacion',
+          'id_ticket' => $logicalTicket,
+          'acta_url' => $actaUrl,
+          'button_url_mode' => 'dynamic_suffix',
+          'dedupe_key' => 'terminacion_contrato:' . $logicalTicket . ':' . $term,
+          'template_name' => 'scm_terminacion_contrato_respuesta_v1',
+          'template_language' => 'es_CO',
+          'template_components' => [
+            [
+              'type' => 'body',
+              'parameters' => [
+                ['type' => 'text', 'text' => $name],
+                ['type' => 'text', 'text' => $logicalTicket],
+                ['type' => 'text', 'text' => $status],
+                ['type' => 'text', 'text' => $creatorName],
+              ],
+            ],
+            [
+              'type' => 'button',
+              'sub_type' => 'url',
+              'index' => '0',
+              'parameters' => [['type' => 'text', 'text' => $buttonSuffix]],
+            ],
+          ],
+        ]);
+        if ($ok) {
+          $whatsappQueued++;
+        }
+      } catch (\Throwable $exception) {
+        error_log('[contract_termination_whatsapp] ' . $exception->getMessage());
+      }
+    }
+
+    return ['email' => $emailQueued, 'whatsapp' => $whatsappQueued];
+  }
+
+  /** @param array<string,mixed> $ticket @param string[] $targets @return array<string,string> */
+  private function contractTerminationNotificationEmails(array $ticket, array $targets): array
+  {
+    $emails = [];
+    $map = [
+      'solicitante' => ['correo_solicitante'],
+      'arrendatario' => ['correo_arrendatario'],
+      'propietario' => ['correo_propietario'],
+      'empleado' => ['correo_empleado'],
+    ];
+    foreach ($targets as $target) {
+      if ($target === 'admin') {
+        foreach (\SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, 'terminacion_contrato') as $email) {
+          $emails[strtolower($email)] = $email;
+        }
+        continue;
+      }
+      foreach ($map[$target] ?? [] as $column) {
+        $email = trim((string) ($ticket[$column] ?? ''));
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+          $emails[strtolower($email)] = $email;
+        }
+      }
+    }
+    return $emails;
+  }
+
+  /** @param array<string,mixed> $ticket @param string[] $targets @return array<int,array{name:string,phone:string}> */
+  private function contractTerminationNotificationPhones(array $ticket, array $targets): array
+  {
+    $out = [];
+    $map = [
+      'solicitante' => [['solicitante'], ['celular_solicitante']],
+      'arrendatario' => [['arrendatario'], ['celular_arrendatario']],
+      'propietario' => [['propietario'], ['celular_propietario']],
+      'empleado' => [['nombre_empleado', 'empleado'], ['celular_empleado']],
+    ];
+    $seen = [];
+    foreach ($targets as $target) {
+      if (!isset($map[$target])) {
+        continue;
+      }
+      [$nameCols, $phoneCols] = $map[$target];
+      $phone = $this->contractTerminationFirstText([$ticket], $phoneCols);
+      if ($phone === '') {
+        continue;
+      }
+      $key = preg_replace('/\D+/', '', $phone);
+      if ($key === '' || isset($seen[$key])) {
+        continue;
+      }
+      $seen[$key] = true;
+      $out[] = [
+        'name' => $this->contractTerminationFirstText([$ticket], $nameCols) ?: 'cliente',
+        'phone' => $phone,
+      ];
+    }
+    return $out;
+  }
+
+  private function contractTerminationHumanDate(string $date): string
+  {
+    $date = trim($date);
+    $ts = $date !== '' ? strtotime($date . ' 00:00:00') : false;
+    return $ts !== false && $ts > 0 ? date('d/m/Y', (int) $ts) : 'según lo informado';
+  }
+
+  private function contractTerminationWhatsappButtonSuffix(string $url): string
+  {
+    $parts = parse_url($url);
+    if (!is_array($parts)) {
+      return $url;
+    }
+    $path = (string) ($parts['path'] ?? '');
+    $query = isset($parts['query']) ? ('?' . (string) $parts['query']) : '';
+    $suffix = ltrim($path . $query, '/');
+    return $suffix !== '' ? $suffix : $url;
   }
 
   /** @return array{name:string,phone:string,id_empleado:string} */

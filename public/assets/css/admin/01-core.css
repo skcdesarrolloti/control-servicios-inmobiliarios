@@ -3307,6 +3307,240 @@ body.scm-modal-open {
   box-shadow: var(--scm-shadow-sm);
 }
 
+#scm-app .scm-contract-termination-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--scm-border);
+  border-radius: var(--scm-r-lg);
+  background: var(--scm-surface);
+  box-shadow: var(--scm-shadow-sm);
+}
+
+#scm-app .scm-contract-termination-head {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+#scm-app .scm-contract-termination-head h3 {
+  margin: 0;
+  color: var(--scm-text-main);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+#scm-app .scm-contract-termination-head p {
+  margin: 5px 0 0;
+  color: var(--scm-text-muted);
+  font-size: 13px;
+}
+
+#scm-app .scm-contract-termination-status {
+  padding: 10px 12px;
+  border: 1px solid var(--scm-border);
+  border-radius: 8px;
+  background: var(--scm-surface-soft);
+  color: var(--scm-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#scm-app .scm-contract-termination-status.is-error {
+  border-color: #fecaca;
+  background: #fff7f7;
+  color: #b91c1c;
+}
+
+#scm-app .scm-contract-termination-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+}
+
+#scm-app .scm-contract-termination-summary > div {
+  min-height: 72px;
+  padding: 12px;
+  border: 1px solid var(--scm-border);
+  border-radius: 8px;
+  background: var(--scm-surface-soft);
+}
+
+#scm-app .scm-contract-termination-summary span {
+  display: block;
+  color: var(--scm-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-contract-termination-summary strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--scm-navy);
+  font-size: 22px;
+  line-height: 1;
+}
+
+#scm-app .scm-contract-termination-list {
+  display: flex;
+  max-height: 560px;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+#scm-app .scm-contract-termination-row {
+  align-items: center;
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--scm-border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+#scm-app .scm-contract-termination-date span,
+#scm-app .scm-contract-termination-main small {
+  display: block;
+  color: var(--scm-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+#scm-app .scm-contract-termination-date strong,
+#scm-app .scm-contract-termination-main strong,
+#scm-app .scm-contract-termination-main span {
+  display: block;
+}
+
+#scm-app .scm-contract-termination-date strong,
+#scm-app .scm-contract-termination-main strong {
+  color: var(--scm-text-main);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+#scm-app .scm-contract-termination-main span {
+  margin-top: 4px;
+  color: var(--scm-text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+#scm-app .scm-contract-termination-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.swal2-popup.scm-contract-termination-swal .swal2-html-container {
+  margin: 0;
+  text-align: left;
+}
+
+.swal2-html-container .scm-contract-termination-form {
+  display: grid;
+  gap: 14px;
+}
+
+.swal2-html-container .scm-contract-termination-case {
+  padding: 12px;
+  border: 1px solid #d9e4f2;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.swal2-html-container .scm-contract-termination-case strong,
+.swal2-html-container .scm-contract-termination-case span,
+.swal2-html-container .scm-contract-termination-case small {
+  display: block;
+}
+
+.swal2-html-container .scm-contract-termination-case strong {
+  color: #0b1f3a;
+  font-size: 13px;
+}
+
+.swal2-html-container .scm-contract-termination-case span,
+.swal2-html-container .scm-contract-termination-case small {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.swal2-html-container .scm-contract-termination-form-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.swal2-html-container .scm-contract-termination-form label {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.swal2-html-container .scm-contract-termination-form label > span,
+.swal2-html-container .scm-contract-termination-label {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.swal2-html-container .scm-contract-termination-form input,
+.swal2-html-container .scm-contract-termination-form select,
+.swal2-html-container .scm-contract-termination-form textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0b1f3a;
+  font: inherit;
+  font-size: 13px;
+  padding: 10px 11px;
+}
+
+.swal2-html-container .scm-contract-termination-preview textarea {
+  min-height: 190px;
+  resize: vertical;
+}
+
+.swal2-html-container .scm-contract-termination-checks {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 7px;
+}
+
+.swal2-html-container .scm-contract-termination-checks label {
+  align-items: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
+  padding: 10px;
+  border: 1px solid #d9e4f2;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.swal2-html-container .scm-contract-termination-checks label.is-disabled {
+  opacity: .55;
+}
+
+.swal2-html-container .scm-contract-termination-checks small {
+  grid-column: 2;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 #scm-app .scm-property-history-head {
   align-items: flex-start;
   display: flex;
