@@ -3425,6 +3425,9 @@ trait HandlesTicketWorkflowActions
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: '-';
     $subject = 'Respuesta solicitud de terminación de contrato - Ticket #' . $logicalTicket;
     $status = $term === 'dentro' ? 'dentro de término' : 'fuera de término';
+    $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: '-';
+    $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
+    $address = $this->contractTerminationFirstText([$ticket], ['direccion']) ?: 'dirección registrada';
     $emailRecipients = $this->contractTerminationNotificationEmails($ticket, $targets);
     $html = \SCM\Support\EmailTemplate::render('Respuesta solicitud de terminación de contrato', nl2br(\SCM\Support\EmailTemplate::e($responseText)), [
       'buttons' => [['url' => $actaUrl, 'label' => 'Ver acta generada']],
@@ -3444,7 +3447,7 @@ trait HandlesTicketWorkflowActions
         $phone = (string) ($recipient['phone'] ?? '');
         $name = (string) ($recipient['name'] ?? 'cliente');
         $buttonSuffix = $this->contractTerminationWhatsappButtonSuffix($actaUrl);
-        $message = "Buen dia, {$name}.\n\nSe emitio respuesta a la solicitud de terminacion de contrato del ticket #{$logicalTicket}. La solicitud fue clasificada como {$status}.\n\nPuedes consultar el acta en el boton.\n\nAtentamente,\n{$creatorName}\nSKC SuCasa Inmobiliaria";
+        $message = "Buen dia, {$name}.\n\nSKC SuCasa Inmobiliaria emitio respuesta a la solicitud de terminacion del contrato #{$contract}, inmueble {$property}, direccion {$address}, asociada al ticket #{$logicalTicket}.\n\nLa solicitud fue clasificada como {$status}. Puedes consultar el acta en el boton.\n\nAtentamente,\n{$creatorName}\nSKC SuCasa Inmobiliaria";
         $smsQueue = new \SCM\Support\SmsQueue($this->db);
         $ok = $smsQueue->enqueue($phone, $name, $message, [
           'source_module' => 'terminacion_contrato',
@@ -3454,13 +3457,16 @@ trait HandlesTicketWorkflowActions
           'acta_url' => $actaUrl,
           'button_url_mode' => 'dynamic_suffix',
           'dedupe_key' => 'terminacion_contrato:' . $logicalTicket . ':' . $term,
-          'template_name' => 'scm_terminacion_contrato_respuesta_v1',
+          'template_name' => 'scm_terminacion_contrato_respuesta_v2',
           'template_language' => 'es_CO',
           'template_components' => [
             [
               'type' => 'body',
               'parameters' => [
                 ['type' => 'text', 'text' => $name],
+                ['type' => 'text', 'text' => $contract],
+                ['type' => 'text', 'text' => $property],
+                ['type' => 'text', 'text' => $address],
                 ['type' => 'text', 'text' => $logicalTicket],
                 ['type' => 'text', 'text' => $status],
                 ['type' => 'text', 'text' => $creatorName],
