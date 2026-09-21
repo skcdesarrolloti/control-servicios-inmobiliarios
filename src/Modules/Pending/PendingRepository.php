@@ -313,6 +313,20 @@ final class PendingRepository
       }
     }
 
+    $query = trim((string) ($filters['query'] ?? ''));
+    if ($query !== '') {
+      $parts = [];
+      foreach (['_ID', 'contrato', 'inmueble', 'id_inmueble', 'direccion', 'propietario', 'arrendatario', 'estado'] as $column) {
+        if ($this->schema()->columnExists($table, $column)) {
+          $parts[] = $column === '_ID' ? "CAST(`_ID` AS CHAR) LIKE ?" : "COALESCE(`{$column}`, '') LIKE ?";
+          $args[] = '%' . $this->db->escapeLike($query) . '%';
+        }
+      }
+      if (!empty($parts)) {
+        $where[] = '(' . implode(' OR ', $parts) . ')';
+      }
+    }
+
     if (empty($where)) {
       $where[] = '1=1';
     }

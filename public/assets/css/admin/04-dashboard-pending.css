@@ -2684,11 +2684,26 @@
   display: grid;
   gap: 13px;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(210px, 0.75fr) minmax(0, 1.45fr);
+  grid-template-columns: minmax(190px, 0.75fr) minmax(260px, 1.25fr) minmax(240px, 1fr);
 }
 
 .swal2-popup .scm-calendar-location-fields .scm-seg-field {
   min-width: 0;
+}
+
+.swal2-popup .scm-calendar-contract-picker {
+  gap: 8px;
+}
+
+.swal2-popup .scm-calendar-contract-picker small {
+  color: #5f728c;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.swal2-popup .scm-calendar-contract-picker small.is-error {
+  color: #b42318;
 }
 
 .swal2-popup .scm-calendar-ticket-inline {

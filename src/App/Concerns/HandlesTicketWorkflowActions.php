@@ -2283,8 +2283,9 @@ trait HandlesTicketWorkflowActions
   {
     $controller = $this->get_pending_controller();
     $payload = $controller->buildContratosArrendamientoPayload($_POST);
+    $items = (array)($payload['items'] ?? []);
     $view = new \SCM\Modules\Pending\PendingView();
-    $table = $view->renderContratosArrendamientoTable((array)($payload['items'] ?? []));
+    $table = $view->renderContratosArrendamientoTable($items);
     $pagination = $view->renderContratosPagination((array)($payload['pagination'] ?? []));
     $this->jsonOk([
       'bucket' => (string)($payload['bucket'] ?? ''),
@@ -2292,7 +2293,57 @@ trait HandlesTicketWorkflowActions
       'table_html' => $table,
       'pagination_html' => $pagination,
       'count' => (string)($payload['count'] ?? 0),
+      'items' => $this->contratosArrendamientoPickerItems($items),
     ]);
+  }
+
+  /** @param array<int,array<string,mixed>> $items @return array<int,array<string,string>> */
+  private function contratosArrendamientoPickerItems(array $items): array
+  {
+    $out = [];
+    foreach ($items as $row) {
+      $row = (array) $row;
+      $id = trim((string) ($row['_ID'] ?? ''));
+      $contract = trim((string) ($row['contrato'] ?? ''));
+      $property = trim((string) (($row['inmueble'] ?? '') ?: ($row['id_inmueble'] ?? '')));
+      $address = trim((string) ($row['direccion'] ?? ''));
+      $tenant = trim((string) ($row['arrendatario'] ?? ''));
+      $owner = trim((string) ($row['propietario'] ?? ''));
+      $state = trim((string) ($row['estado'] ?? ''));
+      if ($id === '' && $contract === '' && $property === '') {
+        continue;
+      }
+
+      $parts = [];
+      $parts[] = 'Contrato #' . ($contract !== '' ? $contract : $id);
+      if ($property !== '') {
+        $parts[] = 'Inmueble #' . $property;
+      }
+      if ($tenant !== '') {
+        $parts[] = $tenant;
+      } elseif ($owner !== '') {
+        $parts[] = $owner;
+      }
+
+      $location = $address;
+      if ($location === '') {
+        $location = implode(' - ', array_slice($parts, 0, 2));
+      }
+
+      $out[] = [
+        'id' => $id !== '' ? $id : ($contract !== '' ? $contract : $property),
+        'contrato' => $contract,
+        'inmueble' => $property,
+        'direccion' => $address,
+        'arrendatario' => $tenant,
+        'propietario' => $owner,
+        'estado' => $state,
+        'label' => implode(' - ', $parts),
+        'location' => $location,
+      ];
+    }
+
+    return $out;
   }
 
   public function ajax_handler_revision_servicios_publicos(): void

@@ -128,6 +128,7 @@ final class PendingController
     return [
       'page' => $clean($input['sca_page'] ?? '1'),
       'per_page' => $clean($input['sca_per_page'] ?? '30'),
+      'query' => $clean($input['sca_query'] ?? $input['calendar_query'] ?? ''),
       'contrato' => $clean($input['sca_contrato'] ?? ''),
       'inmueble' => $clean($input['sca_inmueble'] ?? ''),
       'direccion' => $clean($input['sca_direccion'] ?? ''),
