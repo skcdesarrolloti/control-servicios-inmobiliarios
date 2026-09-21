@@ -156,14 +156,14 @@ try {
       if ($staff) {
         $quoteId = (int) ($payload['source']['quote_id'] ?? 0);
         if ($quoteId > 0) {
-          $supportLinks = '<a class="scm-acta-button scm-acta-secondary" href="' . $escape('ticket-acta.php?id=' . $id . '&download=quote_pdf') . '">PDF cotización</a>';
+          $supportLinks = '<a class="scm-acta-button scm-acta-secondary" href="' . $escape('ticket-acta.php?id=' . $id . '&download=quote_pdf') . '">Descargar soporte de cotización</a>';
           foreach ($maintenanceApp->maintenance_orders_for_quote($quoteId) as $order) {
             $orderId = (int) ($order['_ID'] ?? 0);
             if ($orderId > 0) {
-              $supportLinks .= '<a class="scm-acta-button scm-acta-secondary" href="' . $escape('ticket-acta.php?id=' . $id . '&download=order_pdf&order_id=' . $orderId) . '">PDF orden #' . $escape((string) $orderId) . ' para cartera</a>';
+              $supportLinks .= '<a class="scm-acta-button scm-acta-secondary" href="' . $escape('ticket-acta.php?id=' . $id . '&download=order_pdf&order_id=' . $orderId) . '">Descargar soporte de orden #' . $escape((string) $orderId) . ' para cartera</a>';
             }
           }
-          $content = '<div class="scm-acta scm-acta-print"><p class="scm-acta-notice"><strong>Soportes de cotización vinculada.</strong> Descarga la cotización y las órdenes para cartera sin salir de la vista de funcionario.</p><div class="scm-acta-thanks-actions">' . $supportLinks . '</div></div>' . $content;
+          $content = '<div class="scm-acta scm-acta-print"><p class="scm-acta-notice"><strong>Soportes PDF vinculados.</strong> Descarga la cotización y las órdenes como soporte para cartera sin salir de la vista de funcionario.</p><div class="scm-acta-thanks-actions">' . $supportLinks . '</div></div>' . $content;
         }
       }
       $delivery = json_decode((string) ($repo->act($id)['delivery_json'] ?? ''), true) ?: [];

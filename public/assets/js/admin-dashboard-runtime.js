@@ -15178,7 +15178,7 @@
         .finally(function () {
           if (button) {
             button.disabled = false;
-            button.textContent = originalText || "PDF cartera";
+            button.textContent = originalText || "Soporte de pago";
           }
         });
     }
