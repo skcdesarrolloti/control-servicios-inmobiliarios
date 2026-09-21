@@ -860,16 +860,18 @@ trait HandlesTicketWorkflowActions
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
     $creator = $this->calendarCitaCreatorContact();
     $creatorName = trim((string) ($creator['name'] ?? '')) ?: (Auth::user() ?: 'Funcionario de SKC SuCasa Inmobiliaria');
+    $creatorDetails = $this->contractTerminationCreatorSignatureDetails($creator);
+    $creatorSignature = $this->contractTerminationCreatorSignatureText($creatorName, $creatorDetails);
     $requestTs = $this->adminDueFirstTimestamp($ticket, ['solicitud_fecha', 'fecha', 'solicitud_created', 'cct_created']);
     $requestDate = $requestTs > 0 ? date('Y-m-d', $requestTs) : '';
     if ($endDate === '') {
       $finContratoTs = $this->contractTerminationTimestamp($ticket['fin_contrato'] ?? '');
       $endDate = $finContratoTs > 0 ? date('Y-m-d', $finContratoTs) : '';
     }
-    $responseText = $this->contractTerminationResponseText($ticket, $term, $requestDate, $endDate, $creatorName);
+    $responseText = $this->contractTerminationResponseText($ticket, $term, $requestDate, $endDate, $creatorSignature);
 
     try {
-      $acta = $this->generateContractTerminationActa($ticket, $term, $responseText, $requestDate, $endDate, $creatorName);
+      $acta = $this->generateContractTerminationActa($ticket, $term, $responseText, $requestDate, $endDate, $creatorName, $creatorDetails);
     } catch (\Throwable $exception) {
       error_log('[contract_termination_acta] ' . $exception->getMessage());
       $this->jsonFail('No se pudo generar el acta de terminación: ' . $exception->getMessage());
@@ -886,13 +888,14 @@ trait HandlesTicketWorkflowActions
     }
 
     $service = $this->get_seguimiento_service();
-    $result = $service->saveTicketResponse($ticketPk, $responseText, '__keep__', true, ['none'], [], $documentos);
+    $result = $service->saveTicketResponse($ticketPk, $responseText, 'Finalizado', true, ['none'], [], $documentos);
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta de terminación.'));
     }
 
+    $this->contractTerminationInsertPropertyHistory($ticket, $term, $responseText, $actaUrl, $creatorName);
     $this->contractTerminationMarkResponded($solicitudId, $actaUrl, $term);
-    $extraQueued = $this->notifyContractTerminationActa($ticket, $term, $responseText, $actaUrl, $notifyRecipients, $creatorName);
+    $extraQueued = $this->notifyContractTerminationActa($ticket, $term, $responseText, $actaUrl, $notifyRecipients, $creatorSignature);
     $result['acta_url'] = $actaUrl;
     $result['acta_title'] = (string) ($acta['title'] ?? '');
     $result['termination_email_queued'] = (string) ($extraQueued['email'] ?? 0);
@@ -3059,7 +3062,7 @@ trait HandlesTicketWorkflowActions
   {
     $columns = [
       '_ID', 'id_ticket', 'tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion', 'estado', 'estado_administrativo',
-      'id_contrato', 'contrato', 'id_inmueble', 'inmueble', 'direccion', 'barrio', 'ciudad',
+      'id_contrato', 'contrato', 'id_inmueble', 'id_inmueble_data', 'codigo_inmueble_web', 'inmueble', 'direccion', 'barrio', 'ciudad',
       'solicitante', 'solicitante_tipo', 'correo_solicitante', 'celular_solicitante',
       'arrendatario', 'correo_arrendatario', 'celular_arrendatario',
       'propietario', 'correo_propietario', 'celular_propietario',
@@ -3126,6 +3129,7 @@ trait HandlesTicketWorkflowActions
 
     foreach ([
       'id_contrato', 'contrato', 'id_inmueble', 'inmueble', 'direccion', 'barrio',
+      'id_inmueble_data', 'codigo_inmueble_web',
       'id_arrendatario', 'arrendatario', 'documento_arrendatario',
       'correo_arrendatario', 'celular_arrendatario', 'fin_contrato',
     ] as $column) {
@@ -3138,7 +3142,7 @@ trait HandlesTicketWorkflowActions
     if ($contract !== []) {
       foreach ([
         'fin_contrato', 'inicio_contrato', 'id_contrato_arrendamiento', 'id_inmueble',
-        'inmueble', 'direccion', 'barrio', 'ciudad', 'arrendatario', 'correo_arrendatario',
+        'id_inmueble_data', 'codigo_inmueble_web', 'inmueble', 'direccion', 'barrio', 'ciudad', 'arrendatario', 'correo_arrendatario',
         'celular_arrendatario', 'propietario', 'correo_propietario', 'celular_propietario',
       ] as $column) {
         $current = trim((string) ($merged[$column] ?? ''));
@@ -3424,8 +3428,36 @@ trait HandlesTicketWorkflowActions
     return '';
   }
 
+  /** @param array<string,mixed> $creator */
+  private function contractTerminationCreatorSignatureDetails(array $creator): string
+  {
+    $parts = [];
+    $cargo = trim((string) ($creator['cargo'] ?? ''));
+    $phone = trim((string) ($creator['phone'] ?? ''));
+    if ($cargo !== '') {
+      $parts[] = $cargo;
+    }
+    if ($phone !== '') {
+      $parts[] = 'Cel. ' . $phone;
+    }
+    $parts[] = 'SKC SuCasa Inmobiliaria';
+    return implode(' | ', array_values(array_unique($parts)));
+  }
+
+  private function contractTerminationCreatorSignatureText(string $creatorName, string $creatorDetails): string
+  {
+    $lines = [$creatorName];
+    foreach (explode('|', $creatorDetails) as $part) {
+      $part = trim($part);
+      if ($part !== '' && !in_array($part, $lines, true)) {
+        $lines[] = $part;
+      }
+    }
+    return implode("\n", $lines);
+  }
+
   /** @param array<string,mixed> $ticket */
-  private function contractTerminationResponseText(array $ticket, string $term, string $requestDate, string $endDate, string $creatorName): string
+  private function contractTerminationResponseText(array $ticket, string $term, string $requestDate, string $endDate, string $creatorSignature): string
   {
     $recipient = $this->contractTerminationFirstText([$ticket], ['solicitante', 'arrendatario', 'propietario']) ?: 'cliente';
     $address = $this->contractTerminationFirstText([$ticket], ['direccion']) ?: 'el inmueble relacionado';
@@ -3449,12 +3481,12 @@ trait HandlesTicketWorkflowActions
       $text .= "La solicitud se encuentra fuera de término frente a las condiciones del contrato. Por lo anterior, la terminación anticipada no es viable en los términos planteados y podrá generar a su cargo la sanción contractual equivalente al valor de tres (3) cánones de arrendamiento vigentes, o la continuidad hasta la fecha estipulada contractualmente.\n\n";
       $text .= "Sin perjuicio de lo anterior, se dará traslado al área comercial para intentar, sin compromiso de nuestra parte, conseguir un posible nuevo arrendatario que permita estudiar una cesión del contrato. En caso de lograrse, se informará oportunamente.";
     }
-    $text .= "\n\nAtentamente,\n{$creatorName}\nSKC SuCasa Inmobiliaria";
+    $text .= "\n\nAtentamente,\n{$creatorSignature}";
     return $text;
   }
 
   /** @param array<string,mixed> $ticket @return array{title:string,url:string,path:string} */
-  private function generateContractTerminationActa(array $ticket, string $term, string $responseText, string $requestDate, string $endDate, string $creatorName): array
+  private function generateContractTerminationActa(array $ticket, string $term, string $responseText, string $requestDate, string $endDate, string $creatorName, string $creatorDetails): array
   {
     if (!defined('SCM_UPLOAD_PATH')) {
       throw new \RuntimeException('No está configurada la ruta de almacenamiento.');
@@ -3466,7 +3498,7 @@ trait HandlesTicketWorkflowActions
     $title = $term === 'dentro'
       ? 'Acta de terminación dentro de término'
       : 'Acta de terminación fuera de término';
-    $safeName = 'acta-terminacion-contrato-' . preg_replace('/[^0-9a-z-]+/', '-', strtolower($logicalTicket . '-' . $term . '-' . date('YmdHis'))) . '.pdf';
+    $safeName = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
     $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . $safeName;
 
     $pdf = new \SCM\Support\SimplePdf();
@@ -3484,7 +3516,7 @@ trait HandlesTicketWorkflowActions
         $pdf->paragraph($paragraph, 8);
       }
     }
-    $pdf->signatureBlock('Realizado por', $creatorName, 'SKC SuCasa Inmobiliaria');
+    $pdf->signatureBlock('Realizado por', $creatorName, $creatorDetails !== '' ? $creatorDetails : 'SKC SuCasa Inmobiliaria');
     $pdf->save($path);
 
     return [
@@ -3494,8 +3526,76 @@ trait HandlesTicketWorkflowActions
     ];
   }
 
+  /** @param array<string,mixed> $ticket */
+  private function contractTerminationInsertPropertyHistory(array $ticket, string $term, string $responseText, string $actaUrl, string $creatorName): void
+  {
+    $histTable = $this->db->table('jet_cct_historial_del_inmueble');
+    $schema = new \SCM\Support\SchemaInspector($this->db);
+    if (!$schema->tableExists($histTable)) {
+      return;
+    }
+
+    $nowTs = time();
+    $nowMysql = date('Y-m-d H:i:s', $nowTs);
+    $userId = Auth::userId();
+    $employeeId = (string) $userId;
+    $funcTable = $this->db->table('jet_cct_funcionarios');
+    if ($userId > 0 && $this->table_exists($funcTable)) {
+      $func = $this->db->getRow("SELECT * FROM `{$funcTable}` WHERE `_ID` = ? LIMIT 1", [$userId]);
+      if (is_array($func) && trim((string) ($func['id_empleado'] ?? '')) !== '') {
+        $employeeId = trim((string) $func['id_empleado']);
+      }
+    }
+
+    $status = $term === 'dentro' ? 'dentro de término' : 'fuera de término';
+    $title = $term === 'dentro' ? 'Respuesta dentro de término' : 'Respuesta fuera de término';
+    $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']);
+    $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']);
+    $property = $this->contractTerminationFirstText([$ticket], ['codigo_inmueble_web', 'codigo', 'id_inmueble', 'inmueble']);
+    $propertyData = $this->contractTerminationFirstText([$ticket], ['id_inmueble_data', 'inmueble']);
+    $detail = 'Se emitió respuesta a la solicitud de terminación de contrato clasificada como ' . $status . '.';
+    if ($contract !== '') {
+      $detail .= ' Contrato #' . $contract . '.';
+    }
+    if ($actaUrl !== '') {
+      $detail .= ' Acta generada y anexada al caso.';
+    }
+
+    $payload = [
+      'cct_status' => 'publish',
+      'cct_author_id' => $employeeId,
+      'cct_created' => $nowMysql,
+      'cct_modified' => $nowMysql,
+      'id_empleado' => $employeeId,
+      'id_inmueble' => $property,
+      'id_inmueble_data' => $propertyData !== '' ? $propertyData : $property,
+      'fecha' => $nowTs,
+      'tipo_de_reporte_his' => $title,
+      'tipo_reporte' => $title,
+      'observacion_his' => $detail,
+      'observacion' => $detail,
+      'respuesta' => $responseText,
+      'funcionario' => $creatorName,
+      'id_ticket' => $logicalTicket !== '' ? $logicalTicket : $this->contractTerminationFirstText([$ticket], ['_ID']),
+      'contrato' => $contract,
+      'id_contrato' => $contract,
+    ];
+    if ($actaUrl !== '') {
+      $payload['archivos'] = serialize([[
+        'nombre_archivo' => 'Acta de terminación ' . $status,
+        'media_archivo' => $actaUrl,
+        'archivo' => $actaUrl,
+      ]]);
+    }
+
+    $payload = $schema->filterTableData($histTable, $payload);
+    if (!empty($payload)) {
+      $this->db->insert($histTable, $payload);
+    }
+  }
+
   /** @param array<string,mixed> $ticket @param string[] $notifyTargets @return array{email:int,whatsapp:int} */
-  private function notifyContractTerminationActa(array $ticket, string $term, string $responseText, string $actaUrl, array $notifyTargets, string $creatorName): array
+  private function notifyContractTerminationActa(array $ticket, string $term, string $responseText, string $actaUrl, array $notifyTargets, string $creatorSignature): array
   {
     $targets = array_values(array_unique($notifyTargets));
     if ($actaUrl === '' || in_array('none', $targets, true) || $targets === []) {
@@ -3526,7 +3626,7 @@ trait HandlesTicketWorkflowActions
         $phone = (string) ($recipient['phone'] ?? '');
         $name = (string) ($recipient['name'] ?? 'cliente');
         $buttonSuffix = $this->contractTerminationWhatsappButtonSuffix($actaUrl);
-        $message = "Buen dia, {$name}.\n\nSKC SuCasa Inmobiliaria emitio respuesta a la solicitud de terminacion del contrato #{$contract}, inmueble {$property}, direccion {$address}, asociada al ticket #{$logicalTicket}.\n\nLa solicitud fue clasificada como {$status}. Puedes consultar el acta en el boton.\n\nAtentamente,\n{$creatorName}\nSKC SuCasa Inmobiliaria";
+        $message = "Buen dia, {$name}.\n\nSKC SuCasa Inmobiliaria emitio respuesta a la solicitud de terminacion del contrato #{$contract}, inmueble {$property}, direccion {$address}, asociada al ticket #{$logicalTicket}.\n\nLa solicitud fue clasificada como {$status}. Puedes consultar el acta en el boton.\n\nAtentamente,\n{$creatorSignature}";
         $smsQueue = new \SCM\Support\SmsQueue($this->db);
         $ok = $smsQueue->enqueue($phone, $name, $message, [
           'source_module' => 'terminacion_contrato',
@@ -3548,7 +3648,7 @@ trait HandlesTicketWorkflowActions
                 ['type' => 'text', 'text' => $address],
                 ['type' => 'text', 'text' => $logicalTicket],
                 ['type' => 'text', 'text' => $status],
-                ['type' => 'text', 'text' => $creatorName],
+                ['type' => 'text', 'text' => $creatorSignature],
               ],
             ],
             [
@@ -3697,50 +3797,63 @@ trait HandlesTicketWorkflowActions
     return $suffix !== '' ? $suffix : $url;
   }
 
-  /** @return array{name:string,phone:string,id_empleado:string} */
+  /** @return array{name:string,phone:string,id_empleado:string,cargo:string,email:string} */
   private function calendarCitaFuncionarioRow(string $lookup, string $mode): array
   {
     $table = $this->db->table('jet_cct_funcionarios');
     if (!$this->table_exists($table)) {
-      return ['name' => '', 'phone' => '', 'id_empleado' => ''];
+      return ['name' => '', 'phone' => '', 'id_empleado' => '', 'cargo' => '', 'email' => ''];
     }
 
     $nameColumn = $this->detect_first_existing_column($table, ['nombre', 'empleado', 'nombre_empleado', 'nombre_funcionario']);
     $phoneColumn = $this->detect_first_existing_column($table, ['celular_empleado', 'celular', 'telefono', 'whatsapp', 'phone']);
+    $emailColumn = $this->detect_first_existing_column($table, ['correo', 'correo_empleado', 'email']);
+    $roleColumn = $this->detect_first_existing_column($table, ['rol', 'cargo']);
+    $cargoColumn = $this->column_exists($table, 'id_cargo') ? 'id_cargo' : '';
+    $cargoTable = $this->db->table('jet_cct_cargos');
+    $hasCargoNames = $cargoColumn !== ''
+      && $this->table_exists($cargoTable)
+      && $this->column_exists($cargoTable, 'nombre_cargo');
     $select = [];
-    $select[] = $nameColumn !== '' ? "TRIM(COALESCE(`{$nameColumn}`, '')) AS nombre" : "'' AS nombre";
-    $select[] = $phoneColumn !== '' ? "TRIM(COALESCE(`{$phoneColumn}`, '')) AS telefono" : "'' AS telefono";
-    $select[] = $this->column_exists($table, 'id_empleado') ? "TRIM(COALESCE(`id_empleado`, '')) AS id_empleado" : "'' AS id_empleado";
+    $select[] = $nameColumn !== '' ? "TRIM(COALESCE(f.`{$nameColumn}`, '')) AS nombre" : "'' AS nombre";
+    $select[] = $phoneColumn !== '' ? "TRIM(COALESCE(f.`{$phoneColumn}`, '')) AS telefono" : "'' AS telefono";
+    $select[] = $emailColumn !== '' ? "TRIM(COALESCE(f.`{$emailColumn}`, '')) AS correo" : "'' AS correo";
+    $select[] = $this->column_exists($table, 'id_empleado') ? "TRIM(COALESCE(f.`id_empleado`, '')) AS id_empleado" : "'' AS id_empleado";
+    $select[] = $roleColumn !== '' ? "TRIM(COALESCE(f.`{$roleColumn}`, '')) AS rol" : "'' AS rol";
+    $select[] = $hasCargoNames ? "TRIM(COALESCE(c.`nombre_cargo`, '')) AS nombre_cargo" : "'' AS nombre_cargo";
 
     $whereColumn = $mode === 'internal' ? '_ID' : 'id_empleado';
     if (!$this->column_exists($table, $whereColumn)) {
-      return ['name' => '', 'phone' => '', 'id_empleado' => ''];
+      return ['name' => '', 'phone' => '', 'id_empleado' => '', 'cargo' => '', 'email' => ''];
     }
 
     if (ctype_digit($lookup)) {
-      $whereSql = "CAST(`{$whereColumn}` AS UNSIGNED) = ?";
+      $whereSql = "CAST(f.`{$whereColumn}` AS UNSIGNED) = ?";
       $whereArgs = [(int) $lookup];
     } else {
-      $whereSql = "CONVERT(TRIM(COALESCE(`{$whereColumn}`, '')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci";
+      $whereSql = "CONVERT(TRIM(COALESCE(f.`{$whereColumn}`, '')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci";
       $whereArgs = [$lookup];
     }
+    $join = $hasCargoNames ? " LEFT JOIN `{$cargoTable}` c ON CAST(c.`_ID` AS CHAR) = TRIM(COALESCE(f.`{$cargoColumn}`, ''))" : '';
 
     $row = $this->db->getRow(
-      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE {$whereSql} LIMIT 1",
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` f{$join} WHERE {$whereSql} LIMIT 1",
       $whereArgs
     );
     if (!is_array($row)) {
-      return ['name' => '', 'phone' => '', 'id_empleado' => ''];
+      return ['name' => '', 'phone' => '', 'id_empleado' => '', 'cargo' => '', 'email' => ''];
     }
 
     return [
       'name' => trim((string) ($row['nombre'] ?? '')),
       'phone' => trim((string) ($row['telefono'] ?? '')),
       'id_empleado' => trim((string) ($row['id_empleado'] ?? '')),
+      'cargo' => $this->contractTerminationFirstText([$row], ['nombre_cargo', 'rol']),
+      'email' => trim((string) ($row['correo'] ?? '')),
     ];
   }
 
-  /** @return array{name:string,phone:string} */
+  /** @return array{name:string,phone:string,cargo:string,email:string} */
   private function calendarCitaCreatorContact(): array
   {
     $creator = $this->calendarCitaFuncionarioRow((string) Auth::userId(), 'internal');
@@ -3751,6 +3864,8 @@ trait HandlesTicketWorkflowActions
     return [
       'name' => $name !== '' ? $name : 'Funcionario de Su Casa',
       'phone' => trim((string) ($creator['phone'] ?? '')),
+      'cargo' => trim((string) ($creator['cargo'] ?? '')),
+      'email' => trim((string) ($creator['email'] ?? '')),
     ];
   }
 

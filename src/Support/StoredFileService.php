@@ -229,11 +229,17 @@ final class StoredFileService
   public function pathFor(string $name): ?string
   {
     $name = basename($name);
-    if ($name === '' || preg_match('/^[a-f0-9]{24}_[0-9]+\.[a-z0-9]{1,8}$/', $name) !== 1) {
+    if ($name === '' || !$this->isAllowedStoredName($name)) {
       return null;
     }
     $path = $this->directory . '/' . $name;
     return is_file($path) ? $path : null;
+  }
+
+  private function isAllowedStoredName(string $name): bool
+  {
+    return preg_match('/^[a-f0-9]{24}_[0-9]+\.[a-z0-9]{1,8}$/', $name) === 1
+      || preg_match('/^acta-terminacion-contrato-[a-z0-9-]+\.pdf$/', $name) === 1;
   }
 
   /** @return array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}|null */
