@@ -567,6 +567,7 @@
     var compactMode = compact === true || compact === "1";
     var previouslyFocused = document.activeElement;
     overlay.className = "scm-iframe-overlay" + (compactMode ? " scm-iframe-overlay-compact" : "");
+    overlay.style.zIndex = "2147483000";
     overlay.innerHTML =
       '<div class="scm-iframe-box" role="dialog" aria-modal="true" aria-label="' + escHtml(title || "Detalle") + '">' +
       '<div class="scm-iframe-toolbar">' +
@@ -581,7 +582,7 @@
       '<div class="scm-iframe-loader"><div class="scm-iframe-spinner"></div></div>' +
       '<iframe class="scm-iframe-frame" src="" allowfullscreen></iframe>' +
       "</div>";
-    document.body.appendChild(overlay);
+    document.documentElement.appendChild(overlay);
     var iframeEl = overlay.querySelector(".scm-iframe-frame");
     var loaderEl = overlay.querySelector(".scm-iframe-loader");
     var openTabLink = overlay.querySelector(".scm-iframe-open-tab");
