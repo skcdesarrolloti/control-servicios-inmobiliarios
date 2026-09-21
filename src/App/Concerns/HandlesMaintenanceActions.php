@@ -5033,13 +5033,13 @@ trait HandlesMaintenanceActions
       'Estado: ' . $state
     );
     $pdf->heading('Resumen para pago');
+    $pdf->amountHighlight('Valor solicitado para pago', $value, 'Monto principal del soporte para revisión de cartera.');
     $pdf->table(['Campo', 'Información'], [
       ['Orden', '#' . $orderId],
       ['Estado', $state],
       ['Fecha de creación', $date],
       ['Categoría', $category],
       ['Concepto', $concept],
-      ['Valor solicitado', $value],
     ], [0.32, 0.68], 8, [1]);
 
     $pdf->heading('Referencias del caso');

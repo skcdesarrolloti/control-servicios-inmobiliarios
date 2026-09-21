@@ -418,6 +418,31 @@ final class SimplePdf
     $this->y += $height;
   }
 
+  public function amountHighlight(string $label, string $value, string $hint = ''): void
+  {
+    $label = trim($label) !== '' ? trim($label) : 'Valor';
+    $value = trim($value) !== '' ? trim($value) : '$0';
+    $hintLines = trim($hint) !== '' ? $this->wrap($hint, $this->contentWidth - 28, 8) : [];
+    $height = $hintLines !== [] ? 74.0 : 58.0;
+    $this->ensureSpace($height + 12);
+    $this->fill(6, 29, 73);
+    $this->rect($this->margin, $this->y, $this->contentWidth, $height);
+    $this->fill(245, 145, 32);
+    $this->rect($this->margin, $this->y, 6, $height);
+    $this->fill(219, 234, 254);
+    $this->text($this->margin + 18, $this->y + 18, strtoupper($label), 8, 'F2');
+    $this->fill(255, 255, 255);
+    $this->textRight($this->margin + $this->contentWidth - 18, $this->y + 33, $value, 22, 'F2');
+    if ($hintLines !== []) {
+      $this->fill(219, 234, 254);
+      foreach ($hintLines as $idx => $line) {
+        $this->text($this->margin + 18, $this->y + 47 + ($idx * 11), $line, 8, 'F1');
+      }
+    }
+    $this->fill(13, 33, 58);
+    $this->y += $height + 12;
+  }
+
   public function line(string $text, int $size = 8, string $font = 'F1'): void
   {
     $this->ensureSpace(max(72, $size + 8));
