@@ -11275,6 +11275,21 @@
       "</div>";
     }
 
+    function contractTerminationTermBadge(row, compact) {
+      row = row || {};
+      var status = row.term_status || "unknown";
+      var label = row.term_label || "Sin cálculo de término";
+      var hint = row.term_hint || "";
+      var dates = [];
+      if (row.fin_contrato_label) dates.push("Fin: " + row.fin_contrato_label);
+      if (row.fecha_limite_label) dates.push("Límite: " + row.fecha_limite_label);
+      return '<div class="scm-contract-termination-term is-' + escHtml(status) + (compact ? " is-compact" : "") + '">' +
+        '<strong>' + escHtml(label) + "</strong>" +
+        (hint ? '<span>' + escHtml(hint) + "</span>" : "") +
+        (dates.length ? '<small>' + escHtml(dates.join(" · ")) + "</small>" : "") +
+      "</div>";
+    }
+
     function renderContractTermination(data) {
       var panel = root.querySelector("[data-scm-contract-termination-panel]");
       if (!panel) return;
@@ -11313,6 +11328,7 @@
             '<strong>' + escHtml(row.titulo || "Ticket") + " · " + escHtml(row.asunto || "Solicitud de terminación") + "</strong>" +
             '<span>' + escHtml(meta.join(" · ") || "Sin datos de inmueble") + "</span>" +
             '<small>' + escHtml(row.solicitante || "-") + " · Solicitud: " + escHtml(row.estado_solicitud || "-") + " · Caso: " + escHtml(row.estado || "-") + " / " + escHtml(row.estado_administrativo || "-") + "</small>" +
+            contractTerminationTermBadge(row, true) +
           "</div>" +
           '<div class="scm-contract-termination-actions">' +
             '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-contract-termination-respond data-solicitud-id="' + escHtml(row.solicitud_id || "") + '" data-ticket-pk="' + escHtml(row.ticket_pk || "") + '">Responder</button>' +
@@ -11354,15 +11370,17 @@
         showToast("warning", "No se encontró la solicitud seleccionada.");
         return;
       }
+      var recommendedTerm = row.term_recommended === "fuera" ? "fuera" : "dentro";
       var html = '<form class="scm-contract-termination-form" data-scm-contract-termination-form>' +
         '<div class="scm-contract-termination-case">' +
           '<strong>' + escHtml(row.titulo || "Ticket") + '</strong><span>' + escHtml(row.asunto || "Solicitud de terminación") + "</span>" +
           '<small>' + escHtml([row.contrato ? "Contrato #" + row.contrato : "", row.inmueble ? "Inmueble " + row.inmueble : "", row.direccion || ""].filter(Boolean).join(" · ")) + "</small>" +
         "</div>" +
+        contractTerminationTermBadge(row, false) +
         '<div class="scm-contract-termination-form-grid">' +
-          '<label><span>Clasificación</span><select name="termino"><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label>' +
+          '<label><span>Clasificación</span><select name="termino"><option value="dentro"' + (recommendedTerm === "dentro" ? " selected" : "") + '>Dentro de término</option><option value="fuera"' + (recommendedTerm === "fuera" ? " selected" : "") + '>Fuera de término</option></select></label>' +
           '<label><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || "") + '"></label>' +
-          '<label><span>Fecha terminación / entrega</span><input type="date" name="fecha_terminacion"></label>' +
+          '<label><span>Fecha terminación / entrega</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || "") + '"></label>' +
         "</div>" +
         '<label class="scm-contract-termination-observation"><span>Observación adicional</span><textarea name="observacion" rows="3" placeholder="Opcional"></textarea></label>' +
         '<div><span class="scm-contract-termination-label">Notificar a</span>' + contractTerminationRecipientChecks(row) + "</div>" +

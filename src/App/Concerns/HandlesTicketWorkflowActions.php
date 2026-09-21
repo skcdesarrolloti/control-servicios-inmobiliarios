@@ -862,6 +862,10 @@ trait HandlesTicketWorkflowActions
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
     $creator = $this->calendarCitaCreatorContact();
     $creatorName = trim((string) ($creator['name'] ?? '')) ?: (Auth::user() ?: 'Funcionario de SKC SuCasa Inmobiliaria');
+    if ($endDate === '') {
+      $finContratoTs = $this->contractTerminationTimestamp($ticket['fin_contrato'] ?? '');
+      $endDate = $finContratoTs > 0 ? date('Y-m-d', $finContratoTs) : '';
+    }
     $responseText = $this->contractTerminationResponseText($ticket, $term, $requestDate, $endDate, $observacion, $creatorName);
 
     try {
@@ -3123,11 +3127,32 @@ trait HandlesTicketWorkflowActions
     foreach ([
       'id_contrato', 'contrato', 'id_inmueble', 'inmueble', 'direccion', 'barrio',
       'id_arrendatario', 'arrendatario', 'documento_arrendatario',
-      'correo_arrendatario', 'celular_arrendatario',
+      'correo_arrendatario', 'celular_arrendatario', 'fin_contrato',
     ] as $column) {
       $value = trim((string) ($solicitud[$column] ?? ''));
       if ($value !== '') {
         $merged[$column] = $value;
+      }
+    }
+    $contractRef = $this->contractTerminationFirstText([$merged, $solicitud, $ticket], ['id_contrato', 'contrato']);
+    $contract = $this->adminDueContractByReference($contractRef);
+    if ($contract !== []) {
+      foreach ([
+        'fin_contrato', 'inicio_contrato', 'id_contrato_arrendamiento', 'id_inmueble',
+        'inmueble', 'direccion', 'barrio', 'ciudad', 'arrendatario', 'correo_arrendatario',
+        'celular_arrendatario', 'propietario', 'correo_propietario', 'celular_propietario',
+      ] as $column) {
+        $current = trim((string) ($merged[$column] ?? ''));
+        $value = trim((string) ($contract[$column] ?? ''));
+        if ($current === '' && $value !== '') {
+          $merged[$column] = $value;
+        }
+      }
+      if (trim((string) ($merged['contrato'] ?? '')) === '') {
+        $merged['contrato'] = $this->contractTerminationFirstText([$contract], ['contrato', 'id_contrato', 'id_contrato_arrendamiento', '_ID']);
+      }
+      if (trim((string) ($merged['id_contrato'] ?? '')) === '') {
+        $merged['id_contrato'] = $this->contractTerminationFirstText([$contract], ['_ID', 'id_contrato', 'id_contrato_arrendamiento']);
       }
     }
     if (trim((string) ($merged['solicitante'] ?? '')) === '' && trim((string) ($merged['arrendatario'] ?? '')) !== '') {
@@ -3230,6 +3255,7 @@ trait HandlesTicketWorkflowActions
     $ticketPk = trim((string) ($row['ticket_pk'] ?? $row['_ID'] ?? ''));
     $logicalTicket = $this->contractTerminationFirstText([$row], ['id_ticket']);
     $subject = $this->contractTerminationFirstText([$row], ['asunto', 'tema_ayuda', 'tipo_pqrs']) ?: 'Solicitud de terminación de contrato';
+    $termInfo = $this->contractTerminationTermInfo($row, $createdTs);
     return [
       'solicitud_id' => $solicitudId,
       'ticket_pk' => $ticketPk,
@@ -3245,6 +3271,14 @@ trait HandlesTicketWorkflowActions
       'solicitante' => $this->contractTerminationFirstText([$row], ['solicitante', 'arrendatario', 'propietario']) ?: '-',
       'creado' => $createdTs > 0 ? date('d/m/Y H:i', $createdTs) : '-',
       'fecha_solicitud' => $createdTs > 0 ? date('Y-m-d', $createdTs) : date('Y-m-d'),
+      'fin_contrato' => $termInfo['fin_contrato'],
+      'fin_contrato_label' => $termInfo['fin_contrato_label'],
+      'fecha_limite_terminacion' => $termInfo['fecha_limite_terminacion'],
+      'fecha_limite_label' => $termInfo['fecha_limite_label'],
+      'term_status' => $termInfo['term_status'],
+      'term_label' => $termInfo['term_label'],
+      'term_hint' => $termInfo['term_hint'],
+      'term_recommended' => $termInfo['term_recommended'],
       'recipients' => $this->contractTerminationRecipientOptions($row),
     ];
   }
@@ -3512,6 +3546,58 @@ trait HandlesTicketWorkflowActions
     $date = trim($date);
     $ts = $date !== '' ? strtotime($date . ' 00:00:00') : false;
     return $ts !== false && $ts > 0 ? date('d/m/Y', (int) $ts) : 'según lo informado';
+  }
+
+  /** @param array<string,mixed> $row @return array<string,string> */
+  private function contractTerminationTermInfo(array $row, int $requestTs): array
+  {
+    $finTs = $this->contractTerminationTimestamp($row['fin_contrato'] ?? '');
+    $base = [
+      'fin_contrato' => $finTs > 0 ? date('Y-m-d', $finTs) : '',
+      'fin_contrato_label' => $finTs > 0 ? date('d/m/Y', $finTs) : '',
+      'fecha_limite_terminacion' => '',
+      'fecha_limite_label' => '',
+      'term_status' => 'unknown',
+      'term_label' => 'Sin fecha fin de contrato',
+      'term_hint' => 'No se encontró fin_contrato para calcular el término.',
+      'term_recommended' => 'dentro',
+    ];
+    if ($finTs <= 0) {
+      return $base;
+    }
+    $limitTs = strtotime('-3 months', $finTs);
+    $limitTs = $limitTs !== false ? (int) $limitTs : 0;
+    $base['fecha_limite_terminacion'] = $limitTs > 0 ? date('Y-m-d', $limitTs) : '';
+    $base['fecha_limite_label'] = $limitTs > 0 ? date('d/m/Y', $limitTs) : '';
+    if ($requestTs <= 0 || $limitTs <= 0) {
+      $base['term_label'] = 'Sin fecha de solicitud';
+      $base['term_hint'] = 'No se pudo calcular contra la fecha de solicitud.';
+      return $base;
+    }
+    $inside = date('Y-m-d', $requestTs) <= date('Y-m-d', $limitTs);
+    $base['term_status'] = $inside ? 'dentro' : 'fuera';
+    $base['term_label'] = $inside ? 'Dentro de término' : 'Fuera de término';
+    $base['term_hint'] = $inside
+      ? 'Solicitud recibida antes o el ' . $base['fecha_limite_label'] . '.'
+      : 'Debía recibirse máximo el ' . $base['fecha_limite_label'] . '.';
+    $base['term_recommended'] = $inside ? 'dentro' : 'fuera';
+    return $base;
+  }
+
+  private function contractTerminationTimestamp($value): int
+  {
+    if ($value === null || $value === '') {
+      return 0;
+    }
+    if (is_numeric($value)) {
+      $ts = (int) $value;
+      if ($ts > 9999999999) {
+        $ts = (int) floor($ts / 1000);
+      }
+      return $ts > 0 ? $ts : 0;
+    }
+    $ts = strtotime((string) $value);
+    return $ts === false ? 0 : (int) $ts;
   }
 
   private function contractTerminationWhatsappButtonSuffix(string $url): string
