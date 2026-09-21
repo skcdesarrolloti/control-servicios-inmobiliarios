@@ -830,6 +830,7 @@ trait HandlesTicketWorkflowActions
     }
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
+    $solicitudId = isset($_POST['solicitud_id']) ? (int) $_POST['solicitud_id'] : 0;
     $term = sanitize_key((string) ($_POST['termino'] ?? ''));
     $requestDate = trim(sanitize_text_field(wp_unslash((string) ($_POST['fecha_solicitud'] ?? ''))));
     $endDate = trim(sanitize_text_field(wp_unslash((string) ($_POST['fecha_terminacion'] ?? ''))));
@@ -881,7 +882,7 @@ trait HandlesTicketWorkflowActions
     }
 
     $service = $this->get_seguimiento_service();
-    $result = $service->saveTicketResponse($ticketPk, $responseText, '__keep__', true, $notifyRecipients, [], $documentos);
+    $result = $service->saveTicketResponse($ticketPk, $responseText, '__keep__', true, ['none'], [], $documentos);
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta de terminación.'));
     }
@@ -3253,10 +3254,8 @@ trait HandlesTicketWorkflowActions
   {
     $options = [];
     $map = [
-      'solicitante' => ['Solicitante', ['solicitante'], ['correo_solicitante'], ['celular_solicitante']],
       'arrendatario' => ['Arrendatario', ['arrendatario'], ['correo_arrendatario'], ['celular_arrendatario']],
       'propietario' => ['Propietario', ['propietario'], ['correo_propietario'], ['celular_propietario']],
-      'empleado' => ['Funcionario asignado', ['nombre_empleado', 'empleado', 'id_empleado'], ['correo_empleado'], ['celular_empleado']],
     ];
     foreach ($map as $value => $config) {
       [$label, $nameCols, $emailCols, $phoneCols] = $config;
@@ -3275,8 +3274,8 @@ trait HandlesTicketWorkflowActions
     $adminEmails = \SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, 'terminacion_contrato');
     $options[] = [
       'value' => 'admin',
-      'label' => 'Notificaciones internas',
-      'name' => count($adminEmails) . ' destinatario(s)',
+      'label' => 'Funcionario configurado',
+      'name' => count($adminEmails) . ' destinatario(s) interno(s)',
       'email' => implode(', ', $adminEmails),
       'phone' => '',
       'available' => count($adminEmails) > 0,
@@ -3457,10 +3456,8 @@ trait HandlesTicketWorkflowActions
   {
     $emails = [];
     $map = [
-      'solicitante' => ['correo_solicitante'],
       'arrendatario' => ['correo_arrendatario'],
       'propietario' => ['correo_propietario'],
-      'empleado' => ['correo_empleado'],
     ];
     foreach ($targets as $target) {
       if ($target === 'admin') {
@@ -3484,10 +3481,8 @@ trait HandlesTicketWorkflowActions
   {
     $out = [];
     $map = [
-      'solicitante' => [['solicitante'], ['celular_solicitante']],
       'arrendatario' => [['arrendatario'], ['celular_arrendatario']],
       'propietario' => [['propietario'], ['celular_propietario']],
-      'empleado' => [['nombre_empleado', 'empleado'], ['celular_empleado']],
     ];
     $seen = [];
     foreach ($targets as $target) {

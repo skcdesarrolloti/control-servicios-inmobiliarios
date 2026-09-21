@@ -11285,19 +11285,19 @@
       var endLabel = endDate || "la fecha acordada";
       var text = "";
       if (term === "dentro") {
-        text = "Señor(a) " + recipient + "\\n\\n" +
+        text = "Señor(a) " + recipient + "\n\n" +
           "SKC SuCasa Inmobiliaria da respuesta a su solicitud de terminación del contrato de arrendamiento #" + contract + ", asociado al inmueble ubicado en " + address + ". " +
-          "De acuerdo con la comunicación recibida el " + requestLabel + ", la solicitud fue presentada dentro del término establecido.\\n\\n" +
+          "De acuerdo con la comunicación recibida el " + requestLabel + ", la solicitud fue presentada dentro del término establecido.\n\n" +
           "El contrato finalizará el día " + endLabel + ", fecha en la cual deberá realizarse la entrega material del inmueble. Para la entrega debe presentar recibos de servicios públicos cancelados, paz y salvo de valores pendientes y permitir la revisión previa del inmueble.";
       } else {
-        text = "Señor(a) " + recipient + "\\n\\n" +
-          "SKC SuCasa Inmobiliaria da respuesta a su comunicación recibida el " + requestLabel + ", mediante la cual manifiesta su intención de terminar el contrato de arrendamiento #" + contract + ".\\n\\n" +
+        text = "Señor(a) " + recipient + "\n\n" +
+          "SKC SuCasa Inmobiliaria da respuesta a su comunicación recibida el " + requestLabel + ", mediante la cual manifiesta su intención de terminar el contrato de arrendamiento #" + contract + ".\n\n" +
           "La solicitud se encuentra fuera de término frente a las condiciones del contrato. Por lo anterior, la terminación anticipada no es viable en los términos planteados y podrá generar la sanción contractual aplicable o la continuidad hasta la fecha estipulada.";
       }
       if (observation) {
-        text += "\\n\\nObservación adicional: " + observation;
+        text += "\n\nObservación adicional: " + observation;
       }
-      text += "\\n\\nAtentamente,\\nSKC SuCasa Inmobiliaria";
+      text += "\n\nAtentamente,\nSKC SuCasa Inmobiliaria";
       return text;
     }
 
@@ -11393,7 +11393,8 @@
         "</div>" +
         '<label class="scm-contract-termination-observation"><span>Observación adicional</span><textarea name="observacion" rows="3" placeholder="Opcional"></textarea></label>' +
         '<div><span class="scm-contract-termination-label">Notificar a</span>' + contractTerminationRecipientChecks(row) + "</div>" +
-        '<label class="scm-contract-termination-preview"><span>Plantilla de respuesta</span><textarea readonly rows="10">' + escHtml(initialTemplate) + "</textarea></label>" +
+        '<div class="scm-contract-termination-delivery-note"><strong>Correo:</strong> envía la respuesta con botón para abrir el acta generada. <strong>WhatsApp:</strong> usa la plantilla oficial <code>scm_terminacion_contrato_respuesta_v1</code> con botón al acta.</div>' +
+        '<label class="scm-contract-termination-preview"><span>Vista previa de la respuesta</span><textarea readonly rows="10">' + escHtml(initialTemplate) + "</textarea></label>" +
       "</form>";
       window.Swal.fire({
         title: "Responder terminación",

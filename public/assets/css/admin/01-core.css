@@ -3512,6 +3512,27 @@ body.scm-modal-open {
   resize: vertical;
 }
 
+.swal2-html-container .scm-contract-termination-delivery-note {
+  border: 1px solid #f8c66a;
+  border-radius: 8px;
+  background: #fff8e7;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.swal2-html-container .scm-contract-termination-delivery-note strong {
+  color: #0b1f3a;
+}
+
+.swal2-html-container .scm-contract-termination-delivery-note code {
+  color: #b45309;
+  font-weight: 900;
+}
+
 .swal2-html-container .scm-contract-termination-checks {
   display: grid;
   gap: 8px;

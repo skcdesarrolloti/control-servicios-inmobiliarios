@@ -294,6 +294,16 @@ final class SuCasaControlServiciosInmobiliarios
           ],
         ],
       ],
+      'contratos' => [
+        'label' => 'Contratos',
+        'items' => [
+          'terminacion_contrato' => [
+            'label' => 'Solicitudes de terminación de contrato',
+            'description' => 'Cuando se responde una solicitud de terminación, se genera acta y se cierra el caso.',
+            'channel' => 'Email interno en cola',
+          ],
+        ],
+      ],
       'cartas_aumento' => [
         'label' => 'Cartas de aumento',
         'items' => [
