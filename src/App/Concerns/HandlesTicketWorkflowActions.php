@@ -3087,7 +3087,7 @@ trait HandlesTicketWorkflowActions
       return ['1 = 1', []];
     }
     return [
-      "LOWER(TRIM(COALESCE({$p}`estado`, ''))) NOT IN ('respondida', 'respondido', 'cerrada', 'cerrado', 'finalizada', 'finalizado', 'anulada', 'anulado')",
+      "LOWER(TRIM(COALESCE({$p}`estado`, ''))) NOT IN ('respondida', 'respondido', 'dentro de término', 'dentro de termino', 'fuera de término', 'fuera de termino', 'cerrada', 'cerrado', 'finalizada', 'finalizado', 'anulada', 'anulado')",
       [],
     ];
   }
@@ -3306,7 +3306,7 @@ trait HandlesTicketWorkflowActions
     }
     $data = [];
     if ($this->column_exists($table, 'estado')) {
-      $data['estado'] = 'Respondida';
+      $data['estado'] = $term === 'fuera' ? 'Fuera de término' : 'Dentro de término';
     }
     if ($actaUrl !== '' && $this->column_exists($table, 'carta_url')) {
       $data['carta_url'] = $actaUrl;
