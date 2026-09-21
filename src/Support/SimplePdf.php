@@ -445,8 +445,13 @@ final class SimplePdf
     $lines = $this->wrap($text, $this->contentWidth, $size);
     $this->ensureSpace(max(18, count($lines) * ($size + 6)));
     $this->fill(25, 43, 69);
-    foreach ($lines as $line) {
-      $this->text($this->margin, $this->y, $line, $size, 'F1');
+    $lastLineIndex = count($lines) - 1;
+    foreach ($lines as $index => $line) {
+      if ($index < $lastLineIndex && $this->canJustify($line, $this->contentWidth, $size)) {
+        $this->textJustified($this->margin, $this->y, $line, $this->contentWidth, $size, 'F1');
+      } else {
+        $this->text($this->margin, $this->y, $line, $size, 'F1');
+      }
       $this->y += $size + 6;
     }
     $this->y += 8;
@@ -618,7 +623,7 @@ final class SimplePdf
     if ($text === '') {
       return [''];
     }
-    $maxChars = max(8, (int) floor($width / max(1, $size * 0.56)));
+    $maxChars = max(8, (int) floor($width / max(1, $size * 0.48)));
     $words = explode(' ', $text);
     $lines = [];
     $line = '';
@@ -642,8 +647,7 @@ final class SimplePdf
         continue;
       }
       $candidate = $line === '' ? $word : ($line . ' ' . $word);
-      $length = function_exists('mb_strlen') ? mb_strlen($candidate, 'UTF-8') : strlen($candidate);
-      if ($length > $maxChars && $line !== '') {
+      if ($this->textWidth($candidate, $size) > $width && $line !== '') {
         $lines[] = $line;
         $line = $word;
       } else {
@@ -667,6 +671,51 @@ final class SimplePdf
     $length = function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
     $estimatedWidth = $length * $size * 0.52;
     $this->text(max($this->margin, $rightX - $estimatedWidth), $topY, $text, $size, $font);
+  }
+
+  private function textJustified(float $x, float $topY, string $text, float $width, int $size, string $font): void
+  {
+    $words = $this->words($text);
+    $gaps = count($words) - 1;
+    if ($gaps < 1) {
+      $this->text($x, $topY, $text, $size, $font);
+      return;
+    }
+
+    $wordsWidth = array_sum(array_map(fn(string $word): float => $this->textWidth($word, $size), $words));
+    $gapWidth = max($size * 0.22, ($width - $wordsWidth) / $gaps);
+    $cursorX = $x;
+    foreach ($words as $word) {
+      $this->text($cursorX, $topY, $word, $size, $font);
+      $cursorX += $this->textWidth($word, $size) + $gapWidth;
+    }
+  }
+
+  private function canJustify(string $text, float $width, int $size): bool
+  {
+    $words = $this->words($text);
+    if (count($words) < 3) {
+      return false;
+    }
+    $wordsWidth = array_sum(array_map(fn(string $word): float => $this->textWidth($word, $size), $words));
+    if ($wordsWidth <= 0 || $wordsWidth >= $width) {
+      return false;
+    }
+    $gapWidth = ($width - $wordsWidth) / (count($words) - 1);
+    return $gapWidth <= $size * 2.4 && ($wordsWidth / $width) >= 0.45;
+  }
+
+  /** @return string[] */
+  private function words(string $text): array
+  {
+    $words = preg_split('/\s+/', trim($text)) ?: [];
+    return array_values(array_filter($words, static fn(string $word): bool => $word !== ''));
+  }
+
+  private function textWidth(string $text, int $size): float
+  {
+    $length = function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
+    return $length * $size * 0.52;
   }
 
   private function rect(float $x, float $topY, float $w, float $h): void
