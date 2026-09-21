@@ -2352,7 +2352,7 @@
   color: #fff !important;
   font-size: 25px !important;
   font-weight: 950 !important;
-  letter-spacing: -0.45px;
+  letter-spacing: 0;
   margin: 0 !important;
   padding: 22px 28px 18px !important;
   text-align: left !important;
@@ -2679,12 +2679,36 @@
   grid-column: 1 / -1;
 }
 
+.swal2-popup .scm-calendar-location-section {
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  border: 1px solid #dbe6f2;
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  padding: 12px !important;
+}
+
+.swal2-popup .scm-calendar-section-heading {
+  align-items: center;
+  border-bottom: 1px solid #e6edf5;
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 9px;
+}
+
+.swal2-popup .scm-calendar-section-heading span {
+  color: #263a55;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
 .swal2-popup .scm-calendar-location-fields {
   align-items: start;
   display: grid;
-  gap: 13px;
-  grid-column: 1 / -1;
-  grid-template-columns: minmax(190px, 0.75fr) minmax(260px, 1.25fr) minmax(240px, 1fr);
+  gap: 12px;
+  grid-template-columns: minmax(190px, 0.75fr) minmax(0, 1.25fr);
 }
 
 .swal2-popup .scm-calendar-location-fields .scm-seg-field {
@@ -2692,7 +2716,14 @@
 }
 
 .swal2-popup .scm-calendar-contract-picker {
-  gap: 8px;
+  gap: 8px !important;
+  grid-column: 1 / -1;
+}
+
+.swal2-popup .scm-calendar-contract-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(210px, 0.9fr) minmax(240px, 1.1fr);
 }
 
 .swal2-popup .scm-calendar-contract-picker small {
@@ -4133,6 +4164,17 @@
   }
 }
 
+@media (max-width: 1100px) {
+  .swal2-popup .scm-calendar-popup-form {
+    grid-template-columns: 1fr;
+  }
+
+  .swal2-popup .scm-calendar-popup-agenda {
+    max-height: 260px;
+    position: static;
+  }
+}
+
 @media (max-width: 720px) {
   #scm-app .scm-calendar-card-head,
   #scm-app .scm-calendar-head-actions {
@@ -4165,6 +4207,7 @@
   }
 
   .swal2-popup .scm-calendar-location-fields,
+  .swal2-popup .scm-calendar-contract-controls,
   .swal2-popup .scm-calendar-ticket-inline {
     grid-template-columns: 1fr;
   }

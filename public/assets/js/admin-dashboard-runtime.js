@@ -3294,11 +3294,13 @@
           ? employeeMultiPickerHtml(preselectedEmployee)
           : '<select class="select select-bordered select-sm scm-select" name="empleados" required><option value="">Selecciona funcionario</option>' + employeeOptions + "</select>";
         var ticketFieldsHtml = "";
-        var locationFieldsHtml = '<div class="scm-calendar-location-fields scm-calendar-field-full">' +
+        var locationFieldsHtml = '<section class="scm-calendar-location-section scm-calendar-field-full">' +
+          '<div class="scm-calendar-section-heading"><span>Ubicaci&oacute;n del evento</span></div>' +
+          '<div class="scm-calendar-location-fields">' +
           '<label class="scm-seg-field"><span>Tipo de ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="contrato">Contrato de arrendamiento</option><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option></select></label>' +
-          '<label class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Contrato de arrendamiento</span><input class="input input-bordered input-sm scm-input" type="search" data-calendar-contract-search placeholder="Buscar contrato, inmueble o direcci&oacute;n"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select><option value="">Cargando contratos...</option></select><small data-calendar-contract-status>Selecciona un contrato para cargar la ubicaci&oacute;n.</small></label>' +
-          '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Contrato #, inmueble o direcci&oacute;n"></label>' +
-          "</div>";
+          '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Direcci&oacute;n del contrato"></label>' +
+          '<div class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Contrato de arrendamiento</span><div class="scm-calendar-contract-controls"><input class="input input-bordered input-sm scm-input" type="search" data-calendar-contract-search placeholder="Buscar contrato, inmueble o direcci&oacute;n" aria-label="Buscar contrato"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select aria-label="Contrato de arrendamiento"><option value="">Cargando contratos...</option></select></div><small data-calendar-contract-status>Selecciona un contrato para cargar la ubicaci&oacute;n.</small></div>' +
+          "</div></section>";
         var html = '<form class="scm-calendar-popup-form" autocomplete="off">' +
           '<div class="scm-calendar-popup-grid">' +
           '<label class="scm-seg-field"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required placeholder="Ej: Cita revisi&oacute;n preventiva"></label>' +
