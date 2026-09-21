@@ -197,38 +197,27 @@ final class SimplePdf
 
   public function actaHeader(string $title, string $recordLine, string $status): void
   {
-    $this->ensureSpace(124);
-    $startY = $this->y;
-    $logoW = 92.0;
-    $logoH = 42.0;
-    $this->fill(16, 38, 74);
-    $this->rect($this->margin, $startY, $logoW, $logoH);
-    $this->fill(245, 145, 32);
-    $this->rect($this->margin + 12, $startY + 18, 8, 12);
-    $this->rect($this->margin + 22, $startY + 12, 6, 18);
-    $this->rect($this->margin + 30, $startY + 22, 7, 8);
-    $this->fill(255, 255, 255);
-    $this->text($this->margin + 42, $startY + 17, 'SuCasa', 10, 'F2');
-    $this->text($this->margin + 42, $startY + 29, 'INMOBILIARIA', 5, 'F2');
-
-    $textX = $this->margin + $logoW + 14;
-    $textWidth = $this->contentWidth - $logoW - 14;
+    if ($this->backgroundImagePath !== null && $this->y < 148.0) {
+      $this->y = 148.0;
+    }
+    $this->ensureSpace(112);
     $this->fill(6, 29, 73);
-    foreach ($this->wrap('SKC SuCasa Inmobiliaria - NIT 900623242-4', $textWidth, 7) as $line) {
-      $this->text($textX, $this->y + 8, $line, 7, 'F2');
-      $this->y += 10;
+    foreach ($this->wrap('SKC SuCasa Inmobiliaria - NIT 900623242-4', $this->contentWidth, 8) as $line) {
+      $this->text($this->margin, $this->y, $line, 8, 'F2');
+      $this->y += 12;
     }
-    foreach ($this->wrap($title, $textWidth, 16) as $line) {
-      $this->text($textX, $this->y + 14, $line, 16, 'F2');
-      $this->y += 21;
+    $this->y += 4;
+    foreach ($this->wrap($title, $this->contentWidth, 17) as $line) {
+      $this->text($this->margin, $this->y, $line, 17, 'F2');
+      $this->y += 23;
     }
-    $this->y = max($startY + $logoH + 16, $this->y + 8);
+    $this->y += 2;
     $this->fill(25, 43, 69);
     foreach ($this->wrap($recordLine, $this->contentWidth, 8) as $line) {
       $this->text($this->margin, $this->y, $line, 8, 'F1');
       $this->y += 12;
     }
-    $this->y += 7;
+    $this->y += 8;
     $this->statusPill($status);
     $this->fill(245, 145, 32);
     $this->rect($this->margin, $this->y + 4, $this->contentWidth, 2);
@@ -559,7 +548,7 @@ final class SimplePdf
   {
     $this->finishPage();
     $this->content = '';
-    $this->y = $this->topMargin;
+    $this->y = $this->backgroundImagePath !== null ? max($this->topMargin, 148.0) : $this->topMargin;
   }
 
   private function finishPage(): void
