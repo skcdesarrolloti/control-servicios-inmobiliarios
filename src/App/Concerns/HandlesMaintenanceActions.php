@@ -3117,7 +3117,22 @@ trait HandlesMaintenanceActions
    */
   public function public_cotizacion_order_funcionarios(): array
   {
-    return \SCM\Support\FuncionarioOptions::panelFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db));
+    $rows = \SCM\Support\FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db));
+    $out = [];
+    foreach ($rows as $row) {
+      $cargo = strtolower(trim(str_replace(
+        ['á', 'é', 'í', 'ó', 'ú', 'Á', 'É', 'Í', 'Ó', 'Ú'],
+        ['a', 'e', 'i', 'o', 'u', 'a', 'e', 'i', 'o', 'u'],
+        (string) ($row['cargo'] ?? '')
+      )));
+      if ($cargo === '') {
+        continue;
+      }
+      if (str_contains($cargo, 'gerenc') || str_contains($cargo, 'desarrollo')) {
+        $out[] = $row;
+      }
+    }
+    return $out;
   }
 
   /** @return array{message:string,id_orden:string,estado:string,notifications_queued:int} */
