@@ -15121,7 +15121,7 @@
     function downloadCotizacionOrderPdf(orderId, button) {
       orderId = String(orderId || "").trim();
       if (!ajaxUrl || !actionCotizacionOrderPdf || !orderId) {
-        showToast("error", "No se pudo generar el PDF de la orden.");
+        showToast("error", !orderId ? "No se encontró el número de la orden." : "Actualiza la página para cargar el generador de soportes de pago.");
         return;
       }
       var originalText = button ? button.textContent : "";
@@ -15520,6 +15520,7 @@
                 : null;
             if (pdfButton) {
               event.preventDefault();
+              event.stopPropagation();
               downloadCotizacionOrderPdf(pdfButton.getAttribute("data-order-id") || "", pdfButton);
               return;
             }
@@ -15895,6 +15896,7 @@
                 : null;
             if (pdfButton) {
               event.preventDefault();
+              event.stopPropagation();
               downloadCotizacionOrderPdf(pdfButton.getAttribute("data-order-id") || "", pdfButton);
               return;
             }
@@ -16394,6 +16396,20 @@
     }
 
     handleFuncionarioBridgeDeepLink();
+
+    if (!document.documentElement.dataset.scmOrderPdfListener) {
+      document.documentElement.dataset.scmOrderPdfListener = "1";
+      document.addEventListener("click", function (event) {
+        var pdfButton =
+          event.target && event.target.closest
+            ? event.target.closest("[data-scm-cotizacion-order-pdf]")
+            : null;
+        if (!pdfButton) return;
+        event.preventDefault();
+        event.stopPropagation();
+        downloadCotizacionOrderPdf(pdfButton.getAttribute("data-order-id") || "", pdfButton);
+      });
+    }
 
     root.addEventListener("click", function (e) {
       var linkedTicketCaseBtn =

@@ -3246,7 +3246,7 @@ trait HandlesMaintenanceActions
   public function ajax_handler_cotizacion_order_pdf(): void
   {
     $this->verifyCsrf();
-    if ((!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('abiertos') && !$this->canAccessDashboardTab('postergados') && !$this->canAccessDashboardTab('mis_tickets')) || !$this->canUseDashboardAction('quote_order_view')) {
+    if (!$this->maintenance_order_can_view()) {
       $this->jsonFail('No tienes permiso para generar el PDF de la orden.');
     }
 
@@ -3771,6 +3771,23 @@ trait HandlesMaintenanceActions
       || $this->canAccessDashboardTab('abiertos')
       || $this->canAccessDashboardTab('postergados')
       || $this->canAccessDashboardTab('mis_tickets')
+    );
+  }
+
+  private function maintenance_order_can_view(): bool
+  {
+    return (
+      $this->canUseDashboardAction('quote_order_view')
+      || $this->canUseDashboardAction('quote_order_create')
+      || $this->canUseDashboardAction('quote_order_respond')
+    ) && (
+      $this->canAccessDashboardTab('cotizaciones_mantenimiento')
+      || $this->canAccessDashboardTab('abiertos')
+      || $this->canAccessDashboardTab('postergados')
+      || $this->canAccessDashboardTab('mis_tickets')
+      || $this->canAccessDashboardTab('preventivas_pendientes')
+      || $this->canAccessDashboardTab('servicios_publicos_pendientes')
+      || $this->canAccessDashboardTab('actas_satisfaccion')
     );
   }
 
