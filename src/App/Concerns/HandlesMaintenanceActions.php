@@ -3112,18 +3112,38 @@ trait HandlesMaintenanceActions
     return hash_equals($expected, trim($signature));
   }
 
+  /**
+   * @return array<int,array{id:string,label:string,name:string,employee_id:string,email:string,phone:string,cargo:string,id_cargo:string}>
+   */
+  public function public_cotizacion_order_funcionarios(): array
+  {
+    return \SCM\Support\FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db));
+  }
+
   /** @return array{message:string,id_orden:string,estado:string,notifications_queued:int} */
-  public function public_respond_cotizacion_order(int $orderId, string $estadoRaw, string $observacionRaw, string $responderNameRaw): array
+  public function public_respond_cotizacion_order(int $orderId, string $estadoRaw, string $observacionRaw, string $responderEmployeeIdRaw): array
   {
     $estado = $this->maintenance_order_response_state($estadoRaw);
     if ($estado === '') {
       throw new \DomainException('Selecciona si la orden fue aprobada o desaprobada.');
     }
 
-    $responderName = $this->maintenance_order_clean($responderNameRaw);
-    if ($responderName === '') {
-      throw new \DomainException('Escribe el nombre de quien responde la orden.');
+    $responderEmployeeId = trim((string) $responderEmployeeIdRaw);
+    if ($responderEmployeeId === '') {
+      throw new \DomainException('Selecciona el funcionario que responde la orden.');
     }
+    $responder = null;
+    foreach ($this->public_cotizacion_order_funcionarios() as $funcionario) {
+      if (trim((string) ($funcionario['id'] ?? '')) === $responderEmployeeId) {
+        $responder = $funcionario;
+        break;
+      }
+    }
+    if (!is_array($responder)) {
+      throw new \DomainException('El funcionario seleccionado no existe o no está activo.');
+    }
+    $responderName = $this->maintenance_order_clean($responder['name'] ?? $responder['label'] ?? '');
+    $employeeId = trim((string) ($responder['employee_id'] ?? $responder['id'] ?? ''));
 
     $schema = new \SCM\Support\SchemaInspector($this->db);
     $ordersTable = $this->db->table('jet_cct_ordenes');
@@ -3146,14 +3166,14 @@ trait HandlesMaintenanceActions
     $observacion = $this->maintenance_order_clean($observacionRaw);
     $user = [
       'nombre' => $responderName,
-      'email' => '',
-      'celular' => '',
+      'email' => trim((string) ($responder['email'] ?? '')),
+      'celular' => trim((string) ($responder['phone'] ?? '')),
     ];
 
     $update = [
       'estado' => $estado,
       'autorizador' => $responderName,
-      'id_autorizador' => '',
+      'id_autorizador' => $employeeId,
       'cct_modified' => $nowMysql,
     ];
     $update = $schema->filterTableData($ordersTable, $update);
@@ -3163,7 +3183,7 @@ trait HandlesMaintenanceActions
     $this->db->update($ordersTable, $update, ['_ID' => $orderId]);
 
     $updatedOrder = array_merge($order, $update);
-    $this->maintenance_order_insert_response_histories($schema, $updatedOrder, $estado, $observacion, $user, '', $now, $nowMysql);
+    $this->maintenance_order_insert_response_histories($schema, $updatedOrder, $estado, $observacion, $user, $employeeId, $now, $nowMysql);
     $queued = $this->maintenance_order_enqueue_response_notifications($updatedOrder, $estado, $observacion, $user, $orderId);
 
     return [

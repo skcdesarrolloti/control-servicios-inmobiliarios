@@ -76,7 +76,7 @@ try {
       $orderId,
       is_string($_POST['estado'] ?? null) ? $_POST['estado'] : '',
       is_string($_POST['observacion'] ?? null) ? $_POST['observacion'] : '',
-      is_string($_POST['responde'] ?? null) ? $_POST['responde'] : ''
+      is_string($_POST['id_funcionario'] ?? null) ? $_POST['id_funcionario'] : ''
     );
     $redirect = 'orden-publica.php?' . http_build_query([
       'numero' => $orderId,
@@ -132,10 +132,21 @@ try {
   $activity = trim((string) ($order['actividad'] ?? ''));
   $form = '';
   if ($pending) {
+    $funcionarios = $app->public_cotizacion_order_funcionarios();
+    $funcionarioOptions = '<option value="">Selecciona el funcionario que responde</option>';
+    foreach ($funcionarios as $funcionario) {
+      $id = trim((string) ($funcionario['id'] ?? ''));
+      $label = trim((string) ($funcionario['label'] ?? $funcionario['name'] ?? $id));
+      if ($id === '') {
+        continue;
+      }
+      $cargo = trim((string) ($funcionario['cargo'] ?? ''));
+      $funcionarioOptions .= '<option value="' . $escape($id) . '">' . $escape($label . ($cargo !== '' ? ' · ' . $cargo : '')) . '</option>';
+    }
     $form = '<section class="scm-order-public-card scm-order-public-form-card"><h2>Responder orden</h2><p>Si estás conforme con esta orden, apruébala. Si no corresponde, desapruébala y deja una observación para el equipo.</p>'
       . '<form method="post">'
       . '<input type="hidden" name="_csrf_token" value="' . $escape($csrf) . '">'
-      . '<label>Nombre de quien responde *<input name="responde" maxlength="160" required autocomplete="name" placeholder="Nombre completo"></label>'
+      . '<label>Funcionario que responde *<select name="id_funcionario" required>' . $funcionarioOptions . '</select></label>'
       . '<label>Respuesta *<select name="estado" required><option value="">Selecciona una respuesta</option><option value="Aprobada">Aprobar orden</option><option value="Desaprobada">Desaprobar orden</option></select></label>'
       . '<label>Observación interna<textarea name="observacion" rows="4" maxlength="1200" placeholder="Opcional, pero recomendado si desapruebas"></textarea></label>'
       . '<div class="scm-order-public-actions"><button type="submit" class="scm-order-public-button">Guardar respuesta</button></div>'
