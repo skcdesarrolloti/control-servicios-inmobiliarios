@@ -49,7 +49,7 @@ final class CompletionView
     $sourceQuoteId = (string) ($sourceFlow['quote_id'] ?? '');
     $hasAdministrativeReport = $sourceName !== 'approved_quote';
     $sourceNotice = $sourceName === 'approved_quote' && trim($sourceQuoteId) !== ''
-      ? 'Esta acta quedará asociada a la cotización aprobada #' . trim($sourceQuoteId) . '. Al firmarse cerrará el caso y marcará la cotización como trabajo finalizado, sin generar reporte administrativo nuevo.'
+      ? 'Esta acta quedará asociada a la cotización aprobada #' . trim($sourceQuoteId) . '. Al firmarse cerrará el caso y registrará el trabajo finalizado sin cambiar el estado de la cotización ni generar reporte administrativo nuevo.'
       : '';
     ob_start(); ?>
     <section class="scm-acta">

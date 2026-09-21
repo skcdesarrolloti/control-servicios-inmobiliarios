@@ -311,7 +311,7 @@ $requestCode($approvedQuoteActRow);
 $approvedQuoteSigned = $service->sign((int) $approvedQuoteActRow['id'], $service->token($approvedQuoteActRow), $signInput($approvedQuoteActRow), '127.0.0.1', 'QA');
 $assert(empty($approvedQuoteSigned['report_id']) && (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 1, 'approved quote act does not create a new administrative report');
 $approvedQuoteRow = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7013');
-$assert($approvedQuoteRow['estado'] === 'Finalizado' && (int) $approvedQuoteRow['id_acta_satisfaccion'] === (int) $approvedQuoteSigned['legacy_act_id'], 'approved quote act finalizes quote and links the signed satisfaction act');
+$assert($approvedQuoteRow['estado'] === 'Aprobada' && (int) $approvedQuoteRow['id_acta_satisfaccion'] === (int) $approvedQuoteSigned['legacy_act_id'], 'approved quote act keeps quote state and links the signed satisfaction act');
 $approvedTicket = $repo->ticket(13);
 $assert($approvedTicket['estado'] === 'Cerrado' && $approvedTicket['estado_administrativo'] === 'Finalizado' && ($approvedTicket['estado_cotizacion_mantenimiento'] ?? '') !== 'Desaprobada', 'approved quote act closes ticket without disapproving the approved quote');
 $approvedPropertyHistory = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_historial_del_inmueble') . '` WHERE id_ticket = ? ORDER BY _ID DESC LIMIT 1', ['9013']);

@@ -202,8 +202,8 @@ final class CompletionRepository
 
   /**
    * La firma de un acta originada en una cotización ya aprobada confirma el
-   * trabajo realizado. No cambia la aprobación de la cotización: solo la deja
-   * cerrada como trabajo finalizado y vinculada al acta legacy firmada.
+   * trabajo realizado. No cambia el estado/aprobación de la cotización: solo
+   * registra el trabajo finalizado y la vincula al acta legacy firmada.
    *
    * @return string[] Identificadores de las cotizaciones encontradas.
    */
@@ -241,7 +241,6 @@ final class CompletionRepository
 
     $update = $this->schema->filterTableData($table, [
       'estado_trabajo' => 'Trabajo finalizado',
-      'estado' => 'Finalizado',
       'id_acta_satisfaccion' => $legacyActId,
       'final_trabajo' => $signedAt,
       'fecha_actualizacion' => $signedAt,
