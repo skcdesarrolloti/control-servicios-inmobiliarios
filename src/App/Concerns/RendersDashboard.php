@@ -386,6 +386,7 @@ trait RendersDashboard
         'cotizacion_order_save' => self::AJAX_COTIZACION_ORDER_SAVE,
         'cotizacion_order_response' => self::AJAX_COTIZACION_ORDER_RESPONSE,
         'cotizacion_pdf' => self::AJAX_COTIZACION_MANTENIMIENTO_PDF,
+        'cotizacion_order_pdf' => self::AJAX_COTIZACION_ORDER_PDF,
         'send_cotizacion' => self::AJAX_SEND_COTIZACION_MANTENIMIENTO,
         'activate_ticket' => self::AJAX_ACTIVATE_TICKET,
         'cotizacion_response' => self::AJAX_COTIZACION_RESPONSE,
@@ -3903,6 +3904,7 @@ trait RendersDashboard
         . '<p class="scm-cotizacion-order-activity">' . esc_html($orderActivity !== '' ? $orderActivity : 'Sin actividad registrada.') . '</p>'
         . '<div class="scm-cotizacion-order-card-actions">'
         . '<button type="button" class="scm-cotizacion-order-view" data-scm-view-cotizacion-order="' . esc_attr($orderKey) . '" aria-label="Ver detalle de la orden ' . esc_attr($orderId !== '' ? '#' . $orderId : '') . '">Ver orden <span aria-hidden="true">&rarr;</span></button>'
+        . ($orderId !== '' ? '<button type="button" class="scm-cotizacion-order-view" data-scm-cotizacion-order-pdf data-order-id="' . esc_attr($orderId) . '">PDF cartera</button>' : '')
         . ($orderPending && $canRespondMaintenanceOrder ? '<button type="button" class="scm-cotizacion-order-view scm-cotizacion-order-response" data-scm-respond-cotizacion-order' . $orderResponseAttrs . '>Responder orden</button>' : '')
         . '</div>'
         . '</article>';
@@ -4090,15 +4092,21 @@ trait RendersDashboard
     $html .= $detailItem('Creada', $createdTs > 0 ? date('d/m/Y h:i a', $createdTs) : '-');
     $html .= $detailItem('Última actualización', $modifiedTs > 0 ? date('d/m/Y h:i a', $modifiedTs) : '-');
     $html .= '</div></section></div>';
+    $detailActions = '';
+    if ($orderId !== '') {
+      $detailActions .= '<button type="button" class="scm-cotizacion-order-view" data-scm-cotizacion-order-pdf data-order-id="' . esc_attr($orderId) . '">PDF cartera</button>';
+    }
     if ($isPending) {
-      $html .= '<div class="scm-cotizacion-order-detail-actions">'
-        . '<button type="button" class="scm-cotizacion-order-view scm-cotizacion-order-response" data-scm-respond-cotizacion-order'
+      $detailActions .= '<button type="button" class="scm-cotizacion-order-view scm-cotizacion-order-response" data-scm-respond-cotizacion-order'
         . ' data-order-id="' . esc_attr($orderId) . '"'
         . ' data-order-number="' . esc_attr($orderId !== '' ? $orderId : '-') . '"'
         . ' data-order-category="' . esc_attr($value('categoria', '')) . '"'
         . ' data-order-provider="' . esc_attr($value('proveedor', '')) . '"'
         . ' data-order-value="' . esc_attr($this->format_cop_currency($order['valor'] ?? 0)) . '">Responder orden</button>'
-        . '</div>';
+        ;
+    }
+    if ($detailActions !== '') {
+      $html .= '<div class="scm-cotizacion-order-detail-actions">' . $detailActions . '</div>';
     }
 
     return $html;

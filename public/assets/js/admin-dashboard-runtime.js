@@ -152,6 +152,7 @@
     var actionCotizacionOrderSave = actions.cotizacion_order_save || "";
     var actionCotizacionOrderResponse = actions.cotizacion_order_response || "";
     var actionCotizacionPdf = actions.cotizacion_pdf || "";
+    var actionCotizacionOrderPdf = actions.cotizacion_order_pdf || "";
     var actionSendCotizacion = actions.send_cotizacion || "";
     var actionActivateTicket = actions.activate_ticket || "";
     var actionCloseTicket = actions.close_ticket || "";
@@ -15117,6 +15118,71 @@
         });
     }
 
+    function downloadCotizacionOrderPdf(orderId, button) {
+      orderId = String(orderId || "").trim();
+      if (!ajaxUrl || !actionCotizacionOrderPdf || !orderId) {
+        showToast("error", "No se pudo generar el PDF de la orden.");
+        return;
+      }
+      var originalText = button ? button.textContent : "";
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Generando...";
+      }
+      var formData = new FormData();
+      formData.append("action", actionCotizacionOrderPdf);
+      formData.append("nonce", nonce);
+      formData.append("id_orden", orderId);
+      fetch(ajaxUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin",
+      })
+        .then(function (response) {
+          var contentType = response.headers.get("content-type") || "";
+          if (!response.ok || contentType.indexOf("application/pdf") === -1) {
+            return response.text().then(function (text) {
+              var message = "No se pudo generar el PDF de la orden.";
+              try {
+                var json = JSON.parse(text);
+                message =
+                  (json && json.data && json.data.message) ||
+                  json.message ||
+                  message;
+              } catch (ignore) {
+                if (text) {
+                  message = text.replace(/<[^>]+>/g, " ").trim() || message;
+                }
+              }
+              throw new Error(message);
+            });
+          }
+          return response.blob();
+        })
+        .then(function (blob) {
+          var url = URL.createObjectURL(blob);
+          var link = document.createElement("a");
+          link.href = url;
+          link.download = "orden-mantenimiento-" + orderId + "-cartera.pdf";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(function () {
+            URL.revokeObjectURL(url);
+          }, 1500);
+          showToast("success", "PDF para cartera generado.");
+        })
+        .catch(function (err) {
+          showToast("error", err.message || "No se pudo generar el PDF de la orden.");
+        })
+        .finally(function () {
+          if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "PDF cartera";
+          }
+        });
+    }
+
     var cotizacionCardCache = {};
 
     function findCotizacionCardById(scope, cotizacionId) {
@@ -15448,6 +15514,15 @@
           var popup = window.Swal.getPopup();
           if (!popup) return;
           popup.addEventListener("click", function (event) {
+            var pdfButton =
+              event.target && event.target.closest
+                ? event.target.closest("[data-scm-cotizacion-order-pdf]")
+                : null;
+            if (pdfButton) {
+              event.preventDefault();
+              downloadCotizacionOrderPdf(pdfButton.getAttribute("data-order-id") || "", pdfButton);
+              return;
+            }
             var responseButton =
               event.target && event.target.closest
                 ? event.target.closest("[data-scm-respond-cotizacion-order]")
@@ -15814,6 +15889,15 @@
           var popup = window.Swal.getPopup();
           if (!popup) return;
           popup.addEventListener("click", function (event) {
+            var pdfButton =
+              event.target && event.target.closest
+                ? event.target.closest("[data-scm-cotizacion-order-pdf]")
+                : null;
+            if (pdfButton) {
+              event.preventDefault();
+              downloadCotizacionOrderPdf(pdfButton.getAttribute("data-order-id") || "", pdfButton);
+              return;
+            }
             var responseButton =
               event.target && event.target.closest
                 ? event.target.closest("[data-scm-respond-cotizacion-order]")

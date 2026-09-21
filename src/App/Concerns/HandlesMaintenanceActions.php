@@ -3221,32 +3221,15 @@ trait HandlesMaintenanceActions
       $this->jsonFail('Cotizacion invalida.');
     }
 
-    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
-    if (!$this->table_exists($table)) {
-      $this->jsonFail('La tabla de cotizaciones no esta disponible.');
-    }
-
-    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
-    if (!is_array($row)) {
-      $this->jsonFail('Cotizacion no encontrada.');
-    }
-
-    $rows = $this->attach_cotizacion_orders([$row]);
-    $row = is_array($rows[0] ?? null) ? $rows[0] : $row;
-    $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
     $audience = strtolower(trim(sanitize_text_field((string) ($_POST['audience'] ?? 'funcionario'))));
     if (!in_array($audience, ['funcionario', 'destinatario'], true)) {
       $audience = 'funcionario';
     }
-    $pdf = $this->build_cotizacion_mantenimiento_pdf($row, $orders, $audience);
-
-    $basename = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
-    $dir = (string) SCM_STORAGE_PATH . '/tmp';
-    if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
-      $this->jsonFail('No se pudo preparar el PDF.');
+    try {
+      $bytes = $this->maintenance_quote_pdf_bytes($cotizacionId, $audience);
+    } catch (\DomainException $error) {
+      $this->jsonFail($error->getMessage());
     }
-    $path = $dir . '/' . $basename;
-    $pdf->save($path);
 
     if (ob_get_level() > 0) {
       ob_end_clean();
@@ -3254,11 +3237,89 @@ trait HandlesMaintenanceActions
     header_remove('Content-Type');
     header('Content-Type: application/pdf');
     header('Content-Disposition: attachment; filename="cotizacion-mantenimiento-' . $cotizacionId . '-' . $audience . '.pdf"');
-    header('Content-Length: ' . (string) filesize($path));
+    header('Content-Length: ' . (string) strlen($bytes));
     header('Cache-Control: private, max-age=0, must-revalidate');
-    readfile($path);
-    @unlink($path);
+    echo $bytes;
     exit;
+  }
+
+  public function ajax_handler_cotizacion_order_pdf(): void
+  {
+    $this->verifyCsrf();
+    if ((!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('abiertos') && !$this->canAccessDashboardTab('postergados') && !$this->canAccessDashboardTab('mis_tickets')) || !$this->canUseDashboardAction('quote_order_view')) {
+      $this->jsonFail('No tienes permiso para generar el PDF de la orden.');
+    }
+
+    $orderId = (int) ($_POST['id_orden'] ?? $_POST['order_id'] ?? 0);
+    if ($orderId <= 0) {
+      $this->jsonFail('Orden inválida.');
+    }
+
+    try {
+      $bytes = $this->maintenance_order_pdf_bytes($orderId);
+    } catch (\DomainException $error) {
+      $this->jsonFail($error->getMessage());
+    }
+
+    if (ob_get_level() > 0) {
+      ob_end_clean();
+    }
+    header_remove('Content-Type');
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="orden-mantenimiento-' . $orderId . '-cartera.pdf"');
+    header('Content-Length: ' . (string) strlen($bytes));
+    header('Cache-Control: private, max-age=0, must-revalidate');
+    echo $bytes;
+    exit;
+  }
+
+  public function maintenance_quote_pdf_bytes(int $cotizacionId, string $audience = 'funcionario'): string
+  {
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($table)) {
+      throw new \DomainException('La tabla de cotizaciones no esta disponible.');
+    }
+
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
+    if (!is_array($row)) {
+      throw new \DomainException('Cotizacion no encontrada.');
+    }
+
+    $rows = $this->attach_cotizacion_orders([$row]);
+    $row = is_array($rows[0] ?? null) ? $rows[0] : $row;
+    $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
+    $audience = strtolower(trim($audience));
+    if (!in_array($audience, ['funcionario', 'destinatario'], true)) {
+      $audience = 'funcionario';
+    }
+    $pdf = $this->build_cotizacion_mantenimiento_pdf($row, $orders, $audience);
+    return $pdf->bytes();
+  }
+
+  public function maintenance_order_pdf_bytes(int $orderId): string
+  {
+    $ordersTable = $this->db->table('jet_cct_ordenes');
+    if (!$this->table_exists($ordersTable)) {
+      throw new \DomainException('La tabla de órdenes no está disponible.');
+    }
+    $order = $this->db->getRow("SELECT * FROM `{$ordersTable}` WHERE `_ID` = ? LIMIT 1", [$orderId]);
+    if (!is_array($order)) {
+      throw new \DomainException('Orden no encontrada.');
+    }
+    return $this->build_cotizacion_order_pdf($order)->bytes();
+  }
+
+  /** @return array<int,array<string,mixed>> */
+  public function maintenance_orders_for_quote(int $quoteId): array
+  {
+    if ($quoteId <= 0) {
+      return [];
+    }
+    $ordersTable = $this->db->table('jet_cct_ordenes');
+    if (!$this->table_exists($ordersTable)) {
+      return [];
+    }
+    return $this->db->getResults("SELECT * FROM `{$ordersTable}` WHERE TRIM(COALESCE(`id_cotizacion`, '')) = ? ORDER BY `_ID` ASC", [(string) $quoteId]);
   }
 
   public function ajax_handler_send_cotizacion_mantenimiento(): void
@@ -4920,6 +4981,92 @@ trait HandlesMaintenanceActions
     $pdf->signatureBlock('Responsable de cotización', $responsableCotizacion['nombre'] !== '' ? $responsableCotizacion['nombre'] : 'Control Servicios Inmobiliarios', trim(($responsableCotizacion['cargo'] !== '' ? $responsableCotizacion['cargo'] : 'Responsable de cotización') . ' | Email: ' . ($responsableCotizacion['email'] !== '' ? $responsableCotizacion['email'] : '-') . ' | Cel. ' . ($responsableCotizacion['celular'] !== '' ? $responsableCotizacion['celular'] : '-'), ' |'));
     $pdf->signatureBlock('Elaboró la cotización', $creador !== '' ? $creador : 'Control Servicios Inmobiliarios', trim('Email: ' . ($creadorEmail !== '' ? $creadorEmail : '-') . ' | Cel. ' . ($creadorCelular !== '' ? $creadorCelular : '-'), ' |'));
     $pdf->signatureBlock('Empresa', 'SKC SuCasa Inmobiliaria', 'NIT 900623242-4 | Cartagena de Indias - Colombia');
+
+    return $pdf;
+  }
+
+  /** @param array<string,mixed> $order */
+  private function build_cotizacion_order_pdf(array $order): \SCM\Support\SimplePdf
+  {
+    $pdf = new \SCM\Support\SimplePdf();
+    $letterhead = dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg';
+    $pdf->backgroundImage($letterhead);
+    $pdf->layout(58, 166, 116);
+    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Orden de mantenimiento para cartera');
+
+    $clean = fn(string $key, string $fallback = '-'): string => $this->maintenance_order_clean($order[$key] ?? '') !== ''
+      ? $this->maintenance_order_clean($order[$key] ?? '')
+      : $fallback;
+    $dateTs = (int) ($order['fecha'] ?? 0);
+    if ($dateTs <= 0) {
+      $dateTs = strtotime((string) ($order['cct_created'] ?? '')) ?: 0;
+    }
+    $date = $dateTs > 0 ? date('d/m/Y H:i', $dateTs) : '-';
+    $orderId = $clean('_ID');
+    $state = $clean('estado', 'Sin estado');
+    $value = $this->format_cop_currency($order['valor'] ?? 0);
+    $provider = $clean('proveedor');
+    $category = $clean('categoria');
+    $activity = $clean('actividad', 'Sin actividad registrada.');
+    $concept = $clean('concepto', $activity);
+
+    $pdf->actaHeader(
+      'Orden de mantenimiento para cartera #' . ($orderId !== '-' ? $orderId : ''),
+      'Documento interno para solicitud y trazabilidad de pago',
+      'Estado: ' . $state
+    );
+    $pdf->heading('Resumen para pago');
+    $pdf->table(['Campo', 'Información'], [
+      ['Orden', '#' . $orderId],
+      ['Estado', $state],
+      ['Fecha de creación', $date],
+      ['Categoría', $category],
+      ['Concepto', $concept],
+      ['Valor solicitado', $value],
+    ], [0.32, 0.68], 8, [1]);
+
+    $pdf->heading('Referencias del caso');
+    $pdf->table(['Campo', 'Información'], [
+      ['Cotización', '#' . $clean('id_cotizacion')],
+      ['Ticket', '#' . $clean('id_ticket')],
+      ['Contrato', '#' . $clean('contrato', $clean('id_contrato'))],
+      ['Inmueble', $clean('inmueble', $clean('id_inmueble'))],
+      ['Sucursal', $clean('sucursal')],
+      ['Dirección', $clean('direccion')],
+    ], [0.32, 0.68], 8);
+
+    $pdf->heading('Proveedor');
+    $pdf->table(['Campo', 'Información'], [
+      ['Nombre', $provider],
+      ['Identificación', trim($clean('tipo_identificacion_proveedor', '') . ' ' . $clean('identificacion_proveedor', '')) ?: '-'],
+      ['Correo', $clean('correo_proveedor')],
+      ['Celular', $clean('celular_proveedor')],
+      ['Dirección', $clean('direccion_proveedor')],
+    ], [0.32, 0.68], 8);
+
+    $pdf->heading('Datos bancarios para cartera');
+    $pdf->table(['Campo', 'Información'], [
+      ['Titular de cuenta', $clean('titular_proveedor')],
+      ['Identificación titular', $clean('identificacion_cuenta_proveedor')],
+      ['Banco', $clean('banco_proveedor')],
+      ['Tipo de cuenta', $clean('tipo_cuenta_proveedor')],
+      ['Número de cuenta', $clean('cuenta_proveedor')],
+      ['Correo de pago', $clean('correo_pago_proveedor')],
+    ], [0.32, 0.68], 8);
+
+    $pdf->heading('Actividad autorizada');
+    $pdf->callout('Actividad', $activity, 8);
+    $pdf->heading('Responsables y trazabilidad');
+    $pdf->table(['Campo', 'Información'], [
+      ['Creador', $clean('creador')],
+      ['Coordinador', $clean('coordinador')],
+      ['Autorizador', $clean('autorizador')],
+      ['Actualización', $clean('cct_modified')],
+    ], [0.32, 0.68], 8);
+    $pdf->spacer(8);
+    $pdf->signatureBlock('Solicita / registra', $clean('creador', 'Control Servicios Inmobiliarios'), 'SKC SuCasa Inmobiliaria');
+    $pdf->signatureBlock('Autorización interna', $clean('autorizador', 'Pendiente / según respuesta de orden'), 'Validar estado antes de pago');
+    $pdf->signatureBlock('Cartera', 'Recibido para gestión de pago', 'Espacio de control interno');
 
     return $pdf;
   }

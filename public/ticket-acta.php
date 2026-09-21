@@ -25,6 +25,7 @@ $staff = $token === '';
 $repo = new CompletionRepository(App::db());
 $service = new CompletionService($repo, SCM_APP_SECRET, SCM_BASE_URL);
 $view = new CompletionView();
+$maintenanceApp = new \SCM\App\SuCasaControlServiciosInmobiliarios(App::db());
 $jsonRequest = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
 $jsonResult = null;
 $showPrint = false;
@@ -46,7 +47,7 @@ try {
     \SCM\Core\Auth::requireLogin('login.php');
     $repo->requireSchema();
     $act = $repo->act($id);
-    if (!(new \SCM\App\SuCasaControlServiciosInmobiliarios(App::db()))->canAccessTicketCompletion((int) $act['ticket_pk'])) {
+    if (!$maintenanceApp->canAccessTicketCompletion((int) $act['ticket_pk'])) {
       http_response_code(403);
       throw new DomainException('No tienes acceso a esta acta.');
     }
@@ -88,6 +89,40 @@ try {
     }
   }
   $payload = $service->payload($act);
+  if ($staff && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && is_string($_GET['download'] ?? null) && $_GET['download'] !== '') {
+    if ($act['status'] !== 'signed') {
+      throw new DomainException('Los soportes solo se pueden descargar cuando el acta esté firmada.');
+    }
+    $quoteId = (int) ($payload['source']['quote_id'] ?? 0);
+    if ($quoteId <= 0) {
+      throw new DomainException('Esta acta no está vinculada a una cotización de mantenimiento.');
+    }
+    $download = (string) $_GET['download'];
+    if ($download === 'quote_pdf') {
+      $bytes = $maintenanceApp->maintenance_quote_pdf_bytes($quoteId, 'funcionario');
+      header('Content-Type: application/pdf');
+      header('Content-Disposition: attachment; filename="cotizacion-mantenimiento-' . $quoteId . '-funcionario.pdf"');
+      header('Content-Length: ' . strlen($bytes));
+      session_write_close();
+      echo $bytes;
+      exit;
+    }
+    if ($download === 'order_pdf') {
+      $orderId = (int) ($_GET['order_id'] ?? 0);
+      $allowedOrderIds = array_map(static fn(array $order): int => (int) ($order['_ID'] ?? 0), $maintenanceApp->maintenance_orders_for_quote($quoteId));
+      if ($orderId <= 0 || !in_array($orderId, $allowedOrderIds, true)) {
+        throw new DomainException('La orden solicitada no pertenece a la cotización vinculada a esta acta.');
+      }
+      $bytes = $maintenanceApp->maintenance_order_pdf_bytes($orderId);
+      header('Content-Type: application/pdf');
+      header('Content-Disposition: attachment; filename="orden-mantenimiento-' . $orderId . '-cartera.pdf"');
+      header('Content-Length: ' . strlen($bytes));
+      session_write_close();
+      echo $bytes;
+      exit;
+    }
+    throw new DomainException('Soporte no disponible.');
+  }
   if (($_GET['format'] ?? '') === 'pdf' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     if (!$staff && ($_GET['audience'] ?? '') === 'staff') { throw new DomainException('La copia interna requiere sesión de funcionario.'); }
     if ($act['status'] !== 'signed') { throw new DomainException('El PDF solo se puede descargar cuando el acta esté firmada.'); }
@@ -118,6 +153,19 @@ try {
       $showPrint = true;
       $pdfUrl = 'ticket-acta.php?id=' . $id . ($staff ? '' : '&token=' . rawurlencode($token)) . '&format=pdf';
       $content = '<div class="scm-acta scm-acta-print"><a class="scm-acta-button" href="' . $escape($pdfUrl) . '">Descargar PDF firmado</a></div>' . $content;
+      if ($staff) {
+        $quoteId = (int) ($payload['source']['quote_id'] ?? 0);
+        if ($quoteId > 0) {
+          $supportLinks = '<a class="scm-acta-button scm-acta-secondary" href="' . $escape('ticket-acta.php?id=' . $id . '&download=quote_pdf') . '">PDF cotización</a>';
+          foreach ($maintenanceApp->maintenance_orders_for_quote($quoteId) as $order) {
+            $orderId = (int) ($order['_ID'] ?? 0);
+            if ($orderId > 0) {
+              $supportLinks .= '<a class="scm-acta-button scm-acta-secondary" href="' . $escape('ticket-acta.php?id=' . $id . '&download=order_pdf&order_id=' . $orderId) . '">PDF orden #' . $escape((string) $orderId) . ' para cartera</a>';
+            }
+          }
+          $content = '<div class="scm-acta scm-acta-print"><p class="scm-acta-notice"><strong>Soportes de cotización vinculada.</strong> Descarga la cotización y las órdenes para cartera sin salir de la vista de funcionario.</p><div class="scm-acta-thanks-actions">' . $supportLinks . '</div></div>' . $content;
+        }
+      }
       $delivery = json_decode((string) ($repo->act($id)['delivery_json'] ?? ''), true) ?: [];
       $pendingCopy = false;
       foreach ($payload['channels'] ?? ['email'] as $channel) { $pendingCopy = $pendingCopy || empty($delivery['signed_receipt'][$channel]['queued']); }

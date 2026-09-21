@@ -65,6 +65,7 @@ $assert(str_contains($viewPhp, 'data-acta-archive') && str_contains($viewPhp, 'd
 $assert(str_contains($handlerPhp, "['resend', 'cancel', 'archive', 'delete']") && str_contains($handlerPhp, '$service->deleteRetired($id, $actor, $this->canDeleteAnyTicketCompletionActs())'), 'case act endpoint accepts archive and administrative delete operations');
 $publicActPhp = (string) file_get_contents(dirname(__DIR__) . '/public/ticket-acta.php');
 $assert(str_contains($publicActPhp, "El PDF solo se puede descargar cuando el acta esté firmada") && str_contains($publicActPhp, 'scm-acta-page--print-locked'), 'act public route blocks download and print output until signature');
+$assert(str_contains($publicActPhp, "download=quote_pdf") && str_contains($publicActPhp, "download=order_pdf") && str_contains($publicActPhp, "maintenance_order_pdf_bytes") && str_contains($publicActPhp, "maintenance_orders_for_quote"), 'signed staff act view exposes protected quote and order PDF downloads');
 $assert(str_contains($publicActPhp, "OTP_REQUIRED") && str_contains($publicActPhp, "OTP_INVALID") && str_contains($publicActPhp, "OTP_LIMIT"), 'act public signing route returns specific verification error codes');
 $actCss = (string) file_get_contents(dirname(__DIR__) . '/public/assets/css/ticket-completion.css');
 $assert(str_contains($actCss, '.scm-acta-logo') && str_contains($actCss, '#10264a') && str_contains($actCss, 'drop-shadow') && str_contains($actCss, '.scm-acta-page--print-locked'), 'act logo renders on a high-contrast brand surface and pending print is blocked');
@@ -94,7 +95,7 @@ require dirname(__DIR__) . '/bootstrap/app.php';
 set_exception_handler(static function (Throwable $error): void { fwrite(STDERR, $error->getMessage() . "\n" . $error->getTraceAsString() . "\n"); exit(1); });
 $prefix = 'scmqa_' . bin2hex(random_bytes(5)) . '_';
 $db = new Database(\SCM\Core\App::db()->pdo(), $prefix);
-$tables = ['jet_cct_tickets', 'jet_cct_actas_de_satisfaccion', 'jet_cct_reportes_administrativos', 'jet_cct_historial_del_ticket', 'jet_cct_confi_sistema', 'jet_cct_copropiedades', 'jet_cct_cotizacion_mantenimiento'];
+$tables = ['jet_cct_tickets', 'jet_cct_actas_de_satisfaccion', 'jet_cct_reportes_administrativos', 'jet_cct_historial_del_ticket', 'jet_cct_historial_del_inmueble', 'jet_cct_confi_sistema', 'jet_cct_copropiedades', 'jet_cct_cotizacion_mantenimiento'];
 foreach ($tables as $name) {
   $source = \SCM\Core\App::db()->table($name);
   $db->pdo()->exec('CREATE TEMPORARY TABLE `' . $db->table($name) . '` LIKE `' . $source . '`');
@@ -145,7 +146,7 @@ $db->insert($db->table('jet_cct_cotizacion_mantenimiento'), $repo->schema->filte
 ]));
 $db->update($db->table('jet_cct_tickets'), ['id_cotizacion_mantenimiento' => '7001'], ['_ID' => 1]);
 $createPanel = (new View())->panel($service->context(1), $service);
-$assert(str_contains($createPanel, 'data-acta-photo-paste') && str_contains($createPanel, 'Máximo 4 fotos por daño y 12 en toda el acta'), 'act form explains limits and exposes the clipboard paste target');
+$assert(str_contains($createPanel, 'data-acta-photo-paste') && str_contains($createPanel, 'Máximo 4 fotos de solución por daño y 12 fotos en toda el acta'), 'act form explains solution evidence limits and exposes the clipboard paste target');
 $assert(str_contains($createPanel, 'type="hidden" name="transport" value="8000" data-acta-transport') && str_contains($createPanel, 'class="scm-acta-readonly-value"'), 'act form shows fixed configured transport without an editable number control');
 $createdWithTamperedTransport = $service->create(1, array_replace($input, ['transport' => '1']), $actor);
 $tamperedPayload = $service->payload($repo->act($createdWithTamperedTransport['act_id']));
@@ -255,6 +256,8 @@ $assert($signed['status'] === 'signed' && $repo->ticket(1)['estado'] === 'Cerrad
 $signedQuote = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7001');
 $assert($signedQuote['estado'] === 'Desaprobada' && $signedQuote['motivo'] === 'Ejecucción por cuenta propia', 'signature disapproves linked maintenance quote as work executed without approval');
 $assert($repo->ticket(1)['estado_cotizacion_mantenimiento'] === 'Desaprobada' && $repo->ticket(1)['estado_respuesta_cotizacion_mantenimiento'] === 'Desaprobada', 'signature synchronizes maintenance quote state on ticket');
+$propertyHistory = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_historial_del_inmueble') . '` WHERE id_ticket = ? ORDER BY _ID DESC LIMIT 1', ['9001']);
+$assert(is_array($propertyHistory) && ($propertyHistory['tipo_reporte'] ?? '') === 'Acta de satisfacción' && str_contains((string) ($propertyHistory['observacion'] ?? ''), 'Acta de satisfacción') && str_contains((string) ($propertyHistory['observacion'] ?? ''), 'Caso cerrado'), 'signing an act stores the closure in the property history');
 $assert(str_starts_with($signed['signed_pdf'], '%PDF-1.4') && hash('sha256', $signed['signed_pdf']) === $signed['pdf_hash'], 'immutable signed PDF saved with closure');
 $assert(str_contains($signed['signed_pdf'], '/Subtype /Image'), 'signed PDF embeds immutable photographic evidence');
 $assert(str_contains($signed['signed_pdf'], 'Evidencias de la soluci'), 'signed PDF labels uploaded photographic evidence by solution');
@@ -311,6 +314,8 @@ $approvedQuoteRow = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_cotizaci
 $assert($approvedQuoteRow['estado'] === 'Finalizado' && (int) $approvedQuoteRow['id_acta_satisfaccion'] === (int) $approvedQuoteSigned['legacy_act_id'], 'approved quote act finalizes quote and links the signed satisfaction act');
 $approvedTicket = $repo->ticket(13);
 $assert($approvedTicket['estado'] === 'Cerrado' && $approvedTicket['estado_administrativo'] === 'Finalizado' && ($approvedTicket['estado_cotizacion_mantenimiento'] ?? '') !== 'Desaprobada', 'approved quote act closes ticket without disapproving the approved quote');
+$approvedPropertyHistory = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_historial_del_inmueble') . '` WHERE id_ticket = ? ORDER BY _ID DESC LIMIT 1', ['9013']);
+$assert(is_array($approvedPropertyHistory) && str_contains((string) ($approvedPropertyHistory['observacion'] ?? ''), 'cotizado y aprobado') && str_contains((string) ($approvedPropertyHistory['observacion'] ?? ''), '#7013'), 'approved quote act also records property history linked to the quote');
 $seedTicket(11);
 $signedDeletable = $service->create(11, $deleteInput, $actor);
 $signedDeletableAct = $repo->act((int) $signedDeletable['act_id']);

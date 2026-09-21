@@ -1135,6 +1135,7 @@ final class CompletionService
         $ticketUpdate['fecha_respuesta_cotizacion_mantenimiento'] = $now;
       }
       $this->repo->updateTicket((int) $act['ticket_pk'], $ticketUpdate);
+      $this->insertSignedActPropertyHistory($act, $ticket, $payload, $signature, $reportId, $legacyId, $quoteIds, $isApprovedQuoteFlow, $now);
       $quoteAudit = $quoteIds === []
         ? ''
         : ($isApprovedQuoteFlow
@@ -1151,6 +1152,78 @@ final class CompletionService
     try { $signed['receipt'] = $this->notify($signed, true); }
     catch (\Throwable) { $signed['receipt'] = ['queued' => false, 'message' => 'Acta firmada y caso cerrado; no se pudo encolar la copia. Solicita su reenvío a la inmobiliaria.']; }
     return $signed;
+  }
+
+  /**
+   * @param array<string,mixed> $act
+   * @param array<string,mixed> $ticket
+   * @param array<string,mixed> $payload
+   * @param array<string,mixed> $signature
+   * @param string[] $quoteIds
+   */
+  private function insertSignedActPropertyHistory(array $act, array $ticket, array $payload, array $signature, ?int $reportId, int $legacyId, array $quoteIds, bool $isApprovedQuoteFlow, int $now): void
+  {
+    $table = $this->repo->db->table('jet_cct_historial_del_inmueble');
+    if (!$this->repo->schema->tableExists($table)) {
+      return;
+    }
+
+    $report = is_array($payload['report'] ?? null) ? $payload['report'] : [];
+    $firstNonEmpty = static function (array $values): string {
+      foreach ($values as $value) {
+        $text = trim((string) $value);
+        if ($text !== '') {
+          return $text;
+        }
+      }
+      return '';
+    };
+    $propertyId = $firstNonEmpty([$report['id_inmueble'] ?? '', $payload['property'] ?? '', $ticket['inmueble'] ?? '', $ticket['id_inmueble'] ?? '']);
+    $propertyDataId = $firstNonEmpty([$ticket['id_inmueble_data'] ?? '', $report['id_inmueble'] ?? '', $propertyId]);
+    if ($propertyId === '' && $propertyDataId === '') {
+      return;
+    }
+
+    $ticketRef = $firstNonEmpty([$payload['ticket_number'] ?? '', $ticket['id_ticket'] ?? '', $act['ticket_pk'] ?? '']);
+    $actorName = trim((string) ($payload['actor']['name'] ?? ''));
+    $actorEmployeeId = trim((string) ($payload['actor']['employee_id'] ?? ''));
+    $signerName = trim((string) ($signature['name'] ?? $payload['signer']['name'] ?? ''));
+    $sourceQuoteId = trim((string) ($payload['source']['quote_id'] ?? ''));
+    $historyQuoteIds = $quoteIds !== [] ? $quoteIds : ($sourceQuoteId !== '' ? [$sourceQuoteId] : []);
+    $quoteText = $quoteIds !== []
+      ? ' Cotización(es) relacionada(s): #' . implode(', #', $quoteIds) . '.'
+      : ($sourceQuoteId !== '' ? ' Cotización relacionada: #' . $sourceQuoteId . '.' : '');
+    $flowText = $isApprovedQuoteFlow
+      ? 'El acta corresponde a la satisfacción del trabajo cotizado y aprobado.'
+      : 'El acta corresponde al cierre directo del caso sin cotización aprobada.';
+    $detail = 'Acta de satisfacción #' . (int) $act['id'] . ' firmada por ' . ($signerName !== '' ? $signerName : 'destinatario') . '. Caso cerrado. ' . $flowText . $quoteText
+      . ($legacyId > 0 ? ' Registro de acta #' . $legacyId . '.' : '')
+      . ($reportId ? ' Reporte administrativo #' . $reportId . ' registrado.' : ' Sin reporte administrativo nuevo por estar asociado a cotización aprobada.')
+      . ' Ver acta: ' . $this->viewUrl((int) $act['id']);
+    $nowMysql = date('Y-m-d H:i:s', $now);
+    $payloadRow = [
+      'cct_status' => 'publish',
+      'cct_author_id' => $actorEmployeeId,
+      'cct_created' => $nowMysql,
+      'cct_modified' => $nowMysql,
+      'id_ticket' => $ticketRef,
+      'id_inmueble' => $propertyId,
+      'id_inmueble_data' => $propertyDataId,
+      'id_empleado' => $actorEmployeeId,
+      'fecha' => $now,
+      'tipo_reporte' => 'Acta de satisfacción',
+      'tipo_de_reporte_his' => 'Acta de satisfacción',
+      'observacion' => $detail,
+      'observacion_his' => $detail,
+      'funcionario' => $actorName,
+      'reporte_realizado_por_his' => $actorName,
+      'id_acta_satisfaccion' => (string) $legacyId,
+      'id_cotizacion_mantenimiento' => implode(',', $historyQuoteIds),
+    ];
+    $payloadRow = $this->repo->schema->filterTableData($table, $payloadRow);
+    if ($payloadRow !== []) {
+      $this->repo->db->insert($table, $payloadRow);
+    }
   }
 
   public function pdf(array $act, bool $staff = false): string
