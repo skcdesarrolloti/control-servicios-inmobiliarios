@@ -4588,12 +4588,9 @@ trait HandlesMaintenanceActions
   private function maintenance_order_enqueue_response_notifications(array $order, string $estado, string $observacion, array $user, int $orderId): int
   {
     $recipients = $this->maintenance_order_internal_email_recipients('respuesta_orden_mantenimiento');
-    $creatorEmail = trim((string) ($order['email_creador'] ?? ''));
-    if ($creatorEmail !== '' && filter_var($creatorEmail, FILTER_VALIDATE_EMAIL)) {
-      $recipients[] = [
-        'name' => trim((string) ($order['creador'] ?? '')),
-        'email' => $creatorEmail,
-      ];
+    $creatorRecipient = $this->maintenance_order_creator_email_recipient($order);
+    if ($creatorRecipient !== null) {
+      $recipients[] = $creatorRecipient;
     }
     $recipients = $this->maintenance_order_unique_email_recipients($recipients);
     if ($recipients === []) {
@@ -4629,6 +4626,84 @@ trait HandlesMaintenanceActions
         'actor' => trim((string) ($user['nombre'] ?? '')),
       ],
     ]);
+  }
+
+  /** @param array<string,mixed> $order @return array{name:string,email:string,phone:string}|null */
+  private function maintenance_order_creator_email_recipient(array $order): ?array
+  {
+    $creatorName = trim((string) ($order['creador'] ?? ''));
+    $creatorEmail = trim((string) ($order['email_creador'] ?? ''));
+    $creatorPhone = trim((string) ($order['celular_creador'] ?? ''));
+    if ($creatorEmail !== '' && filter_var($creatorEmail, FILTER_VALIDATE_EMAIL)) {
+      return [
+        'name' => $creatorName,
+        'email' => $creatorEmail,
+        'phone' => $creatorPhone,
+      ];
+    }
+
+    $ids = [];
+    foreach (['id_empleado', 'cct_author_id', 'id_creador'] as $field) {
+      $id = trim((string) ($order[$field] ?? ''));
+      if ($id !== '') {
+        $ids[$id] = $id;
+      }
+    }
+    if ($ids === []) {
+      return null;
+    }
+
+    $schema = new \SCM\Support\SchemaInspector($this->db);
+    $funcTable = $this->db->table('jet_cct_funcionarios');
+    if (!$schema->tableExists($funcTable)) {
+      return null;
+    }
+
+    $where = [];
+    $args = [];
+    foreach (array_values($ids) as $id) {
+      if ($schema->columnExists($funcTable, 'id_empleado')) {
+        $where[] = "TRIM(COALESCE(`id_empleado`, '')) = ?";
+        $args[] = $id;
+      }
+      if ($schema->columnExists($funcTable, '_ID')) {
+        $where[] = "CAST(`_ID` AS CHAR) = ?";
+        $args[] = $id;
+      }
+    }
+    if ($where === []) {
+      return null;
+    }
+
+    $nameColumn = $schema->detectFirstExistingColumn($funcTable, ['nombre', 'empleado', 'nombre_empleado', 'nombre_funcionario']);
+    $emailColumn = $schema->detectFirstExistingColumn($funcTable, ['correo', 'correo_dian', 'email']);
+    $phoneColumn = $schema->detectFirstExistingColumn($funcTable, ['celular', 'celular_empleado', 'telefono', 'whatsapp']);
+    if ($emailColumn === '') {
+      return null;
+    }
+
+    $row = $this->db->getRow(
+      'SELECT '
+      . ($nameColumn !== '' ? "TRIM(COALESCE(`{$nameColumn}`, ''))" : "''") . ' AS nombre, '
+      . "TRIM(COALESCE(`{$emailColumn}`, '')) AS correo, "
+      . ($phoneColumn !== '' ? "TRIM(COALESCE(`{$phoneColumn}`, ''))" : "''") . ' AS celular '
+      . "FROM `{$funcTable}` WHERE (" . implode(' OR ', $where) . ') LIMIT 1',
+      $args
+    );
+    if (!is_array($row)) {
+      return null;
+    }
+
+    $email = trim((string) ($row['correo'] ?? ''));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      return null;
+    }
+
+    return [
+      'name' => trim((string) ($row['nombre'] ?? '')) ?: $creatorName,
+      'email' => $email,
+      'phone' => trim((string) ($row['celular'] ?? '')) ?: $creatorPhone,
+    ];
   }
 
   /** @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders */
