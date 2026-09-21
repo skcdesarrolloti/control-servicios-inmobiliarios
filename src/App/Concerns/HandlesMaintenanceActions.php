@@ -3117,7 +3117,7 @@ trait HandlesMaintenanceActions
    */
   public function public_cotizacion_order_funcionarios(): array
   {
-    return \SCM\Support\FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db));
+    return \SCM\Support\FuncionarioOptions::panelFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db));
   }
 
   /** @return array{message:string,id_orden:string,estado:string,notifications_queued:int} */
