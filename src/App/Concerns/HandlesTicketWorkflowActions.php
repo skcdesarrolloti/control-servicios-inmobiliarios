@@ -719,6 +719,7 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail('No tienes permiso para responder tickets.');
     }
 
+    $solicitudId = isset($_POST['solicitud_id']) ? (int) $_POST['solicitud_id'] : 0;
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $respuesta = trim(wp_kses_post(stripslashes((string) ($_POST['respuesta'] ?? ''))));
     $estadoAdministrativo = trim(strip_tags(stripslashes((string) ($_POST['estado_administrativo'] ?? '__keep__'))));
@@ -838,19 +839,23 @@ trait HandlesTicketWorkflowActions
       $notifyRecipients = ['none'];
     }
 
-    if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket inválido.');
+    if ($solicitudId <= 0 && $ticketPk <= 0) {
+      $this->jsonFail('Solicitud o ticket inválido.');
     }
     if (!in_array($term, ['dentro', 'fuera'], true)) {
       $this->jsonFail('Selecciona si la solicitud está dentro o fuera de término.');
     }
 
-    $ticket = $this->contractTerminationTicketByPk($ticketPk);
+    $ticket = $solicitudId > 0
+      ? $this->contractTerminationSolicitudById($solicitudId)
+      : $this->contractTerminationTicketByPk($ticketPk);
     if ($ticket === []) {
-      $this->jsonFail('No se encontró el ticket de terminación.');
+      $this->jsonFail('No se encontró la solicitud de terminación.');
     }
-    if (!$this->isContractTerminationTicket($ticket)) {
-      $this->jsonFail('El ticket seleccionado no parece ser una solicitud de terminación de contrato.');
+    $ticketPk = (int) ($ticket['ticket_pk'] ?? $ticket['_ID'] ?? $ticketPk);
+    $solicitudId = (int) ($ticket['solicitud_id'] ?? $solicitudId);
+    if ($ticketPk <= 0) {
+      $this->jsonFail('La solicitud no tiene un caso vinculado válido.');
     }
 
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
@@ -881,6 +886,7 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta de terminación.'));
     }
 
+    $this->contractTerminationMarkResponded($solicitudId, $actaUrl, $term);
     $extraQueued = $this->notifyContractTerminationActa($ticket, $term, $responseText, $actaUrl, $notifyRecipients, $creatorName);
     $result['acta_url'] = $actaUrl;
     $result['acta_title'] = (string) ($acta['title'] ?? '');
@@ -2979,12 +2985,8 @@ trait HandlesTicketWorkflowActions
   /** @return array<int,array<string,mixed>> */
   private function contractTerminationRequestItems(int $limit = 150): array
   {
-    $table = $this->db->table('jet_cct_tickets');
+    $table = $this->db->table('jet_cct_solicitudes_terminacion_contrato');
     if (!$this->table_exists($table)) {
-      return [];
-    }
-    $select = $this->contractTerminationTicketSelect($table);
-    if ($select === []) {
       return [];
     }
     [$whereSql, $args] = $this->contractTerminationWhereSql($table, 't');
@@ -2993,16 +2995,16 @@ trait HandlesTicketWorkflowActions
     }
     $limit = max(1, min(300, $limit));
     $rows = $this->db->getResults(
-      'SELECT ' . implode(', ', $select) . " FROM `{$table}` t WHERE {$whereSql} " . $this->contractTerminationOrderSql($table, 't') . ' LIMIT ' . $limit,
+      "SELECT t.* FROM `{$table}` t WHERE {$whereSql} " . $this->contractTerminationOrderSql($table, 't') . ' LIMIT ' . $limit,
       $args
     );
 
-    return array_values(array_map(fn(array $row): array => $this->contractTerminationListItem($row), $rows));
+    return array_values(array_map(fn(array $row): array => $this->contractTerminationListItem($this->contractTerminationMergeSolicitudTicket($row)), $rows));
   }
 
   private function contractTerminationPendingCount(): int
   {
-    $table = $this->db->table('jet_cct_tickets');
+    $table = $this->db->table('jet_cct_solicitudes_terminacion_contrato');
     if (!$this->table_exists($table)) {
       return 0;
     }
@@ -3036,6 +3038,17 @@ trait HandlesTicketWorkflowActions
     return is_array($row) ? $row : [];
   }
 
+  /** @return array<string,mixed> */
+  private function contractTerminationSolicitudById(int $solicitudId): array
+  {
+    $table = $this->db->table('jet_cct_solicitudes_terminacion_contrato');
+    if ($solicitudId <= 0 || !$this->table_exists($table)) {
+      return [];
+    }
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$solicitudId]);
+    return is_array($row) ? $this->contractTerminationMergeSolicitudTicket($row) : [];
+  }
+
   /** @return string[] */
   private function contractTerminationTicketSelect(string $table): array
   {
@@ -3061,34 +3074,20 @@ trait HandlesTicketWorkflowActions
   private function contractTerminationWhereSql(string $table, string $alias): array
   {
     $p = trim($alias) !== '' ? trim($alias) . '.' : '';
-    $textColumns = [];
-    foreach (['tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion'] as $column) {
-      if ($this->column_exists($table, $column)) {
-        $textColumns[] = $column;
-      }
+    if (!$this->column_exists($table, 'estado')) {
+      return ['1 = 1', []];
     }
-    if ($textColumns === []) {
-      return ['', []];
-    }
-
-    $terms = ['terminacion', 'terminación', 'terminar', 'finalizacion', 'finalización', 'desocupacion', 'desocupación'];
-    $parts = [];
-    $args = [];
-    foreach ($textColumns as $column) {
-      foreach ($terms as $term) {
-        $parts[] = "LOWER(COALESCE({$p}`{$column}`, '')) LIKE ?";
-        $args[] = '%' . $term . '%';
-      }
-    }
-    $openSql = $this->adminDueOpenTicketWhereSql($alias);
-    return ['(' . implode(' OR ', $parts) . ') AND ' . $openSql, $args];
+    return [
+      "LOWER(TRIM(COALESCE({$p}`estado`, ''))) NOT IN ('respondida', 'respondido', 'cerrada', 'cerrado', 'finalizada', 'finalizado', 'anulada', 'anulado')",
+      [],
+    ];
   }
 
   private function contractTerminationOrderSql(string $table, string $alias): string
   {
     $p = trim($alias) !== '' ? trim($alias) . '.' : '';
     $parts = [];
-    foreach (['fecha', 'fecha_actualizacion', 'cct_created', 'cct_modified', '_ID'] as $column) {
+    foreach (['fecha', 'cct_created', 'cct_modified', '_ID'] as $column) {
       if ($this->column_exists($table, $column)) {
         if (in_array($column, ['fecha', '_ID'], true)) {
           $parts[] = "{$p}`{$column}` DESC";
@@ -3098,6 +3097,116 @@ trait HandlesTicketWorkflowActions
       }
     }
     return $parts !== [] ? 'ORDER BY ' . implode(', ', $parts) : '';
+  }
+
+  /** @param array<string,mixed> $solicitud @return array<string,mixed> */
+  private function contractTerminationMergeSolicitudTicket(array $solicitud): array
+  {
+    $ticket = $this->contractTerminationTicketForSolicitud($solicitud);
+    $merged = is_array($ticket) ? $ticket : [];
+    $solicitudId = (int) ($solicitud['_ID'] ?? 0);
+    $ticketPk = (int) ($ticket['_ID'] ?? 0);
+    $logicalTicket = $this->contractTerminationFirstText([$ticket, $solicitud], ['id_ticket']);
+
+    $merged['solicitud_id'] = $solicitudId;
+    $merged['solicitud_estado'] = trim((string) ($solicitud['estado'] ?? ''));
+    $merged['solicitud_fecha'] = $solicitud['fecha'] ?? '';
+    $merged['solicitud_created'] = $solicitud['cct_created'] ?? '';
+    $merged['motivo'] = trim((string) ($solicitud['motivo'] ?? ''));
+    $merged['ticket_pk'] = $ticketPk;
+    $merged['id_ticket'] = $logicalTicket;
+    $merged['asunto'] = $this->contractTerminationFirstText([$ticket], ['asunto', 'tema_ayuda', 'tipo_pqrs']) ?: 'Solicitud de terminación de contrato';
+    $merged['estado'] = $this->contractTerminationFirstText([$ticket], ['estado']) ?: $this->contractTerminationFirstText([$solicitud], ['estado']);
+    $merged['estado_administrativo'] = $this->contractTerminationFirstText([$ticket], ['estado_administrativo']);
+
+    foreach ([
+      'id_contrato', 'contrato', 'id_inmueble', 'inmueble', 'direccion', 'barrio',
+      'id_arrendatario', 'arrendatario', 'documento_arrendatario',
+      'correo_arrendatario', 'celular_arrendatario',
+    ] as $column) {
+      $value = trim((string) ($solicitud[$column] ?? ''));
+      if ($value !== '') {
+        $merged[$column] = $value;
+      }
+    }
+    if (trim((string) ($merged['solicitante'] ?? '')) === '' && trim((string) ($merged['arrendatario'] ?? '')) !== '') {
+      $merged['solicitante'] = trim((string) $merged['arrendatario']);
+    }
+    if (trim((string) ($merged['correo_solicitante'] ?? '')) === '' && trim((string) ($merged['correo_arrendatario'] ?? '')) !== '') {
+      $merged['correo_solicitante'] = trim((string) $merged['correo_arrendatario']);
+    }
+    if (trim((string) ($merged['celular_solicitante'] ?? '')) === '' && trim((string) ($merged['celular_arrendatario'] ?? '')) !== '') {
+      $merged['celular_solicitante'] = trim((string) $merged['celular_arrendatario']);
+    }
+    return $merged;
+  }
+
+  /** @param array<string,mixed> $solicitud @return array<string,mixed> */
+  private function contractTerminationTicketForSolicitud(array $solicitud): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+    $ticketRef = trim((string) ($solicitud['id_ticket'] ?? ''));
+    if ($ticketRef === '') {
+      return [];
+    }
+    $select = $this->contractTerminationTicketSelect($table);
+    if ($select === []) {
+      return [];
+    }
+    $where = [];
+    $args = [];
+    if ($this->column_exists($table, '_ID') && ctype_digit($ticketRef)) {
+      $where[] = 't.`_ID` = ?';
+      $args[] = (int) $ticketRef;
+    }
+    if ($this->column_exists($table, 'id_ticket')) {
+      $where[] = "TRIM(COALESCE(t.`id_ticket`, '')) = ?";
+      $args[] = $ticketRef;
+    }
+    if ($where === []) {
+      return [];
+    }
+    $row = $this->db->getRow(
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` t WHERE (" . implode(' OR ', $where) . ') LIMIT 1',
+      $args
+    );
+    return is_array($row) ? $row : [];
+  }
+
+  private function contractTerminationMarkResponded(int $solicitudId, string $actaUrl, string $term): void
+  {
+    $table = $this->db->table('jet_cct_solicitudes_terminacion_contrato');
+    if ($solicitudId <= 0 || !$this->table_exists($table)) {
+      return;
+    }
+    $data = [];
+    if ($this->column_exists($table, 'estado')) {
+      $data['estado'] = 'Respondida';
+    }
+    if ($actaUrl !== '' && $this->column_exists($table, 'carta_url')) {
+      $data['carta_url'] = $actaUrl;
+    }
+    if ($actaUrl !== '' && $this->column_exists($table, 'carta_archivo')) {
+      $data['carta_archivo'] = serialize([
+        'tipo_respuesta' => $term === 'fuera' ? 'Fuera de término' : 'Dentro de término',
+        'url' => $actaUrl,
+        'fecha_respuesta' => date('Y-m-d H:i:s'),
+      ]);
+    }
+    if ($this->column_exists($table, 'cct_modified')) {
+      $data['cct_modified'] = date('Y-m-d H:i:s');
+    }
+    if ($data === []) {
+      return;
+    }
+    try {
+      $this->db->update($table, $data, ['_ID' => $solicitudId]);
+    } catch (\Throwable $exception) {
+      error_log('[contract_termination_mark_responded] ' . $exception->getMessage());
+    }
   }
 
   /** @param array<string,mixed> $ticket */
@@ -3115,16 +3224,19 @@ trait HandlesTicketWorkflowActions
   /** @param array<string,mixed> $row @return array<string,mixed> */
   private function contractTerminationListItem(array $row): array
   {
-    $createdTs = $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
-    $ticketPk = trim((string) ($row['_ID'] ?? ''));
-    $logicalTicket = $this->contractTerminationFirstText([$row], ['id_ticket', '_ID']);
+    $createdTs = $this->adminDueFirstTimestamp($row, ['solicitud_fecha', 'fecha', 'solicitud_created', 'cct_created']);
+    $solicitudId = trim((string) ($row['solicitud_id'] ?? ''));
+    $ticketPk = trim((string) ($row['ticket_pk'] ?? $row['_ID'] ?? ''));
+    $logicalTicket = $this->contractTerminationFirstText([$row], ['id_ticket']);
     $subject = $this->contractTerminationFirstText([$row], ['asunto', 'tema_ayuda', 'tipo_pqrs']) ?: 'Solicitud de terminación de contrato';
     return [
+      'solicitud_id' => $solicitudId,
       'ticket_pk' => $ticketPk,
       'id_ticket' => $logicalTicket,
       'titulo' => 'Ticket #' . ($logicalTicket !== '' ? $logicalTicket : $ticketPk),
       'asunto' => $subject,
       'estado' => $this->contractTerminationFirstText([$row], ['estado']) ?: '-',
+      'estado_solicitud' => $this->contractTerminationFirstText([$row], ['solicitud_estado']) ?: '-',
       'estado_administrativo' => $this->contractTerminationFirstText([$row], ['estado_administrativo']) ?: '-',
       'contrato' => $this->contractTerminationFirstText([$row], ['contrato', 'id_contrato']) ?: '-',
       'inmueble' => $this->contractTerminationFirstText([$row], ['inmueble', 'id_inmueble']) ?: '-',

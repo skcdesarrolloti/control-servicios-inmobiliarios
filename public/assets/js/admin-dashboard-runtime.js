@@ -484,7 +484,7 @@
       if (type === "ticket_preventiva_sin_cita") return "Tickets sin cita preventiva";
       if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
       if (type === "servicios_publicos_pendientes") return "Servicios públicos pendientes";
-      if (type === "terminacion_contrato_pendiente") return "Terminaciones de contrato";
+      if (type === "terminacion_contrato_pendiente") return "Solicitudes de terminación de contrato";
       if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
       if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
       return type || "Vencimientos";
@@ -11310,7 +11310,7 @@
       var rows = Array.isArray(data && data.items) ? data.items : [];
       contractTerminationRowsByPk = {};
       rows.forEach(function (row) {
-        if (row && row.ticket_pk) contractTerminationRowsByPk[String(row.ticket_pk)] = row;
+        if (row && row.solicitud_id) contractTerminationRowsByPk[String(row.solicitud_id)] = row;
       });
       if (status) {
         status.classList.remove("is-error");
@@ -11338,10 +11338,10 @@
           '<div class="scm-contract-termination-main">' +
             '<strong>' + escHtml(row.titulo || "Ticket") + " · " + escHtml(row.asunto || "Solicitud de terminación") + "</strong>" +
             '<span>' + escHtml(meta.join(" · ") || "Sin datos de inmueble") + "</span>" +
-            '<small>' + escHtml(row.solicitante || "-") + " · " + escHtml(row.estado || "-") + " / " + escHtml(row.estado_administrativo || "-") + "</small>" +
+            '<small>' + escHtml(row.solicitante || "-") + " · Solicitud: " + escHtml(row.estado_solicitud || "-") + " · Caso: " + escHtml(row.estado || "-") + " / " + escHtml(row.estado_administrativo || "-") + "</small>" +
           "</div>" +
           '<div class="scm-contract-termination-actions">' +
-            '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-contract-termination-respond data-ticket-pk="' + escHtml(row.ticket_pk || "") + '">Responder</button>' +
+            '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-contract-termination-respond data-solicitud-id="' + escHtml(row.solicitud_id || "") + '" data-ticket-pk="' + escHtml(row.ticket_pk || "") + '">Responder</button>' +
           "</div>" +
         "</article>";
       }).join("");
@@ -11374,8 +11374,8 @@
         });
     }
 
-    function openContractTerminationResponse(ticketPk) {
-      var row = contractTerminationRowsByPk[String(ticketPk || "")];
+    function openContractTerminationResponse(solicitudId) {
+      var row = contractTerminationRowsByPk[String(solicitudId || "")];
       if (!row || !window.Swal || typeof window.Swal.fire !== "function") {
         showToast("warning", "No se encontró la solicitud seleccionada.");
         return;
@@ -11457,6 +11457,7 @@
         var value = result.value;
         return dashboardFormAction(actionContractTerminationRespond, function (fd) {
           fd.append("ticket_pk", String(row.ticket_pk || ""));
+          fd.append("solicitud_id", String(row.solicitud_id || ""));
           fd.append("termino", value.termino || "dentro");
           fd.append("fecha_solicitud", value.fecha_solicitud || "");
           fd.append("fecha_terminacion", value.fecha_terminacion || "");
@@ -17499,7 +17500,7 @@
       var contractTerminationRespond = event.target.closest("[data-scm-contract-termination-respond]");
       if (contractTerminationRespond) {
         event.preventDefault();
-        openContractTerminationResponse(contractTerminationRespond.getAttribute("data-ticket-pk") || "");
+        openContractTerminationResponse(contractTerminationRespond.getAttribute("data-solicitud-id") || "");
         return;
       }
 

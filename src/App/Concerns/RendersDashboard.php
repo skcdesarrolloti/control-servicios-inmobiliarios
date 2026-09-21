@@ -690,7 +690,7 @@ trait RendersDashboard
               <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-due">Vencimientos</button>
               <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-completed">Actividades realizadas</button>
               <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-property-history">Historial inmueble</button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-contract-termination">Terminaciones</button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-contract-termination">Solicitudes de terminaci&oacute;n de contrato</button>
             </div>
             <div class="scm-calendar-section-panel active" id="scm-home-calendar-section-mine" data-calendar-section-panel>
               <?php echo $this->render_calendario_actividades_panel($config, [
