@@ -5700,10 +5700,24 @@
   font-weight: 800;
 }
 
+.scm-cotizacion-order-balance > div {
+  min-width: 0;
+}
+
+.scm-cotizacion-order-balance > div:last-child {
+  text-align: right;
+}
+
 .scm-cotizacion-order-balance strong {
+  display: block;
+  margin-top: 3px;
   color: #166534;
   font-size: 18px;
   font-weight: 900;
+}
+
+.scm-cotizacion-order-balance.has-live-value {
+  box-shadow: 0 12px 26px rgba(22, 163, 74, 0.12);
 }
 
 .scm-cotizacion-order-balance.is-over {

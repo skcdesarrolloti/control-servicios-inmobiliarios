@@ -14442,6 +14442,13 @@
       return isFinite(number) ? Math.max(0, number) : 0;
     }
 
+    function formatCotizacionOrderMoneyField(field) {
+      if (!field) return 0;
+      var amount = parseCotizacionOrderMoney(field.value);
+      field.value = amount > 0 ? formatCotizacionOrderCurrency(amount) : "";
+      return amount;
+    }
+
     function cotizacionOrderDefaultActivity(category) {
       if (category === "Materiales") {
         return "MATERIAL PARA REALIZAR TRABAJOS CORRESPONDIENTES";
@@ -14639,6 +14646,7 @@
       function validateOrderAmount(showEmpty) {
         var balance = currentOrderBalance();
         var amount = parseCotizacionOrderMoney(valueField ? valueField.value : "");
+        var remaining = Math.max(0, balance.value - amount);
         var isOver = amount > balance.value;
         if (valueField) {
           valueField.classList.toggle("is-invalid", isOver);
@@ -14646,6 +14654,12 @@
         }
         if (balanceBox) {
           balanceBox.classList.toggle("is-over", isOver);
+          balanceBox.classList.toggle("has-live-value", amount > 0);
+          balanceBox.innerHTML =
+            '<div><span>Saldo disponible de ' + escHtml(balance.category) + '</span><strong>' + escHtml(balance.label) + "</strong></div>" +
+            '<div><span>' + (isOver ? "Exceso sobre el saldo" : "Saldo restante") + '</span><strong>' +
+            escHtml(formatCotizacionOrderCurrency(isOver ? amount - balance.value : remaining)) +
+            "</strong></div>";
         }
         if (valueError) {
           valueError.textContent = isOver
@@ -14664,7 +14678,9 @@
         var selected = balance.category;
         if (activity) activity.value = cotizacionOrderDefaultActivity(selected);
         if (balanceBox) {
-          balanceBox.innerHTML = '<span>Saldo disponible de ' + escHtml(selected) + '</span><strong>' + escHtml(balance.label) + "</strong>";
+          balanceBox.innerHTML =
+            '<div><span>Saldo disponible de ' + escHtml(selected) + '</span><strong>' + escHtml(balance.label) + "</strong></div>" +
+            '<div><span>Saldo restante</span><strong>' + escHtml(balance.label) + "</strong></div>";
         }
         validateOrderAmount(false);
       }
@@ -14690,9 +14706,11 @@
       if (category) category.addEventListener("change", updateBalance);
       if (valueField) {
         valueField.addEventListener("input", function () {
+          formatCotizacionOrderMoneyField(valueField);
           validateOrderAmount(false);
         });
         valueField.addEventListener("blur", function () {
+          formatCotizacionOrderMoneyField(valueField);
           validateOrderAmount(true);
         });
       }
