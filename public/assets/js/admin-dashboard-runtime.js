@@ -11275,32 +11275,6 @@
       "</div>";
     }
 
-    function contractTerminationTemplate(row, term, requestDate, endDate, observation) {
-      row = row || {};
-      term = term === "fuera" ? "fuera" : "dentro";
-      var recipient = row.solicitante && row.solicitante !== "-" ? row.solicitante : "cliente";
-      var address = row.direccion && row.direccion !== "-" ? row.direccion : "el inmueble relacionado";
-      var contract = row.contrato && row.contrato !== "-" ? row.contrato : "-";
-      var requestLabel = requestDate || "la fecha registrada";
-      var endLabel = endDate || "la fecha acordada";
-      var text = "";
-      if (term === "dentro") {
-        text = "Señor(a) " + recipient + "\n\n" +
-          "SKC SuCasa Inmobiliaria da respuesta a su solicitud de terminación del contrato de arrendamiento #" + contract + ", asociado al inmueble ubicado en " + address + ". " +
-          "De acuerdo con la comunicación recibida el " + requestLabel + ", la solicitud fue presentada dentro del término establecido.\n\n" +
-          "El contrato finalizará el día " + endLabel + ", fecha en la cual deberá realizarse la entrega material del inmueble. Para la entrega debe presentar recibos de servicios públicos cancelados, paz y salvo de valores pendientes y permitir la revisión previa del inmueble.";
-      } else {
-        text = "Señor(a) " + recipient + "\n\n" +
-          "SKC SuCasa Inmobiliaria da respuesta a su comunicación recibida el " + requestLabel + ", mediante la cual manifiesta su intención de terminar el contrato de arrendamiento #" + contract + ".\n\n" +
-          "La solicitud se encuentra fuera de término frente a las condiciones del contrato. Por lo anterior, la terminación anticipada no es viable en los términos planteados y podrá generar la sanción contractual aplicable o la continuidad hasta la fecha estipulada.";
-      }
-      if (observation) {
-        text += "\n\nObservación adicional: " + observation;
-      }
-      text += "\n\nAtentamente,\nSKC SuCasa Inmobiliaria";
-      return text;
-    }
-
     function renderContractTermination(data) {
       var panel = root.querySelector("[data-scm-contract-termination-panel]");
       if (!panel) return;
@@ -11380,7 +11354,6 @@
         showToast("warning", "No se encontró la solicitud seleccionada.");
         return;
       }
-      var initialTemplate = contractTerminationTemplate(row, "dentro", row.fecha_solicitud || "", "", "");
       var html = '<form class="scm-contract-termination-form" data-scm-contract-termination-form>' +
         '<div class="scm-contract-termination-case">' +
           '<strong>' + escHtml(row.titulo || "Ticket") + '</strong><span>' + escHtml(row.asunto || "Solicitud de terminación") + "</span>" +
@@ -11393,8 +11366,6 @@
         "</div>" +
         '<label class="scm-contract-termination-observation"><span>Observación adicional</span><textarea name="observacion" rows="3" placeholder="Opcional"></textarea></label>' +
         '<div><span class="scm-contract-termination-label">Notificar a</span>' + contractTerminationRecipientChecks(row) + "</div>" +
-        '<div class="scm-contract-termination-delivery-note"><strong>Correo:</strong> envía la respuesta con botón para abrir el acta generada. <strong>WhatsApp:</strong> usa la plantilla oficial <code>scm_terminacion_contrato_respuesta_v1</code> con botón al acta.</div>' +
-        '<label class="scm-contract-termination-preview"><span>Vista previa de la respuesta</span><textarea readonly rows="10">' + escHtml(initialTemplate) + "</textarea></label>" +
       "</form>";
       window.Swal.fire({
         title: "Responder terminación",
@@ -11413,15 +11384,6 @@
           var popup = window.Swal.getPopup();
           var form = popup ? popup.querySelector("[data-scm-contract-termination-form]") : null;
           if (!form) return;
-          function updatePreview() {
-            var term = form.querySelector("[name='termino']") ? form.querySelector("[name='termino']").value : "dentro";
-            var requestDate = form.querySelector("[name='fecha_solicitud']") ? form.querySelector("[name='fecha_solicitud']").value : "";
-            var endDate = form.querySelector("[name='fecha_terminacion']") ? form.querySelector("[name='fecha_terminacion']").value : "";
-            var observation = form.querySelector("[name='observacion']") ? form.querySelector("[name='observacion']").value : "";
-            var preview = form.querySelector(".scm-contract-termination-preview textarea");
-            if (preview) preview.value = contractTerminationTemplate(row, term, requestDate, endDate, observation);
-          }
-          form.addEventListener("input", updatePreview);
           form.addEventListener("change", function (event) {
             if (event.target && event.target.name === "notify_recipients[]") {
               var none = form.querySelector('input[name="notify_recipients[]"][value="none"]');
@@ -11433,7 +11395,6 @@
                 none.checked = false;
               }
             }
-            updatePreview();
           });
         },
         preConfirm: function () {
