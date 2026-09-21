@@ -11317,12 +11317,15 @@
       }
       list.innerHTML = rows.map(function (row) {
         row = row || {};
+        var caseData = row.case || {};
+        var sourceHtml = String(caseData.case_source_html || "").trim();
+        var canOpenCase = sourceHtml !== "";
         var meta = [
           row.contrato && row.contrato !== "-" ? "Contrato #" + row.contrato : "",
           row.inmueble && row.inmueble !== "-" ? "Inmueble " + row.inmueble : "",
           row.direccion && row.direccion !== "-" ? row.direccion : "",
         ].filter(Boolean);
-        return '<article class="scm-contract-termination-row">' +
+        return '<article class="scm-contract-termination-row scm-ticket-card">' +
           '<div class="scm-contract-termination-date"><span>Creado</span><strong>' + escHtml(row.creado || "-") + "</strong></div>" +
           '<div class="scm-contract-termination-main">' +
             '<strong>' + escHtml(row.titulo || "Ticket") + " · " + escHtml(row.asunto || "Solicitud de terminación") + "</strong>" +
@@ -11331,8 +11334,9 @@
             contractTerminationTermBadge(row, true) +
           "</div>" +
           '<div class="scm-contract-termination-actions">' +
+            (canOpenCase ? '<button type="button" class="scm-case-work-btn" data-scm-contract-termination-open-case data-scm-due-case-loaded="1" data-due-type="terminacion_contrato_pendiente"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso</button>') +
             '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-contract-termination-respond data-solicitud-id="' + escHtml(row.solicitud_id || "") + '" data-ticket-pk="' + escHtml(row.ticket_pk || "") + '">Responder</button>' +
-          "</div>" +
+          '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div>" +
         "</article>";
       }).join("");
       panel.setAttribute("data-scm-loaded", "1");
@@ -17480,6 +17484,13 @@
       if (contractTerminationRespond) {
         event.preventDefault();
         openContractTerminationResponse(contractTerminationRespond.getAttribute("data-solicitud-id") || "");
+        return;
+      }
+
+      var contractTerminationCase = event.target.closest("[data-scm-contract-termination-open-case]");
+      if (contractTerminationCase) {
+        event.preventDefault();
+        dashboardOpenDueCase(contractTerminationCase);
         return;
       }
 

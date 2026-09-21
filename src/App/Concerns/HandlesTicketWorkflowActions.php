@@ -3347,6 +3347,7 @@ trait HandlesTicketWorkflowActions
     $logicalTicket = $this->contractTerminationFirstText([$row], ['id_ticket']);
     $subject = $this->contractTerminationFirstText([$row], ['asunto', 'tema_ayuda', 'tipo_pqrs']) ?: 'Solicitud de terminación de contrato';
     $termInfo = $this->contractTerminationTermInfo($row, $createdTs);
+    $case = ctype_digit($ticketPk) ? $this->adminDueNativeTicketCasePayload((int) $ticketPk, $this->adminDueStatusBucket($row)) : [];
     return [
       'solicitud_id' => $solicitudId,
       'ticket_pk' => $ticketPk,
@@ -3371,6 +3372,7 @@ trait HandlesTicketWorkflowActions
       'term_hint' => $termInfo['term_hint'],
       'term_recommended' => $termInfo['term_recommended'],
       'recipients' => $this->contractTerminationRecipientOptions($row),
+      'case' => $case,
     ];
   }
 
@@ -3534,7 +3536,7 @@ trait HandlesTicketWorkflowActions
           'acta_url' => $actaUrl,
           'button_url_mode' => 'dynamic_suffix',
           'dedupe_key' => 'terminacion_contrato:' . $logicalTicket . ':' . $term,
-          'template_name' => 'scm_terminacion_contrato_respuesta_v2',
+          'template_name' => 'scm_terminacion_contrato_respuesta_v3',
           'template_language' => 'es_CO',
           'template_components' => [
             [

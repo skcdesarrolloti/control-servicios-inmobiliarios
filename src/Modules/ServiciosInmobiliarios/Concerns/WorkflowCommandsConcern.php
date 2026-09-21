@@ -246,7 +246,7 @@ trait WorkflowCommandsConcern
     if ($estadoAdministrativo !== '' && $estadoAdministrativo !== '__keep__') {
       $ticketUpdate['estado_administrativo'] = $estadoAdministrativo;
     }
-    if ($generatedNoAccessNotice !== null) {
+    if (!empty($documentos)) {
       $ticketDocs = $this->ticketDocumentsFromRaw($ticket['archivos'] ?? '');
       foreach ($documentos as $doc) {
         $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
@@ -260,6 +260,8 @@ trait WorkflowCommandsConcern
         ];
       }
       $ticketUpdate['archivos'] = serialize($this->uniqueTicketDocuments($ticketDocs));
+    }
+    if ($generatedNoAccessNotice !== null) {
       $noticeUrl = trim((string) ($generatedNoAccessNotice['url'] ?? ''));
       $ticketUpdate['acta_no_acceso_preventiva'] = $noticeUrl;
       $ticketUpdate['pdf_no_acceso_preventiva'] = $noticeUrl;

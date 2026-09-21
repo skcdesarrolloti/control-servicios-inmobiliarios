@@ -3496,6 +3496,8 @@ body.scm-modal-open {
 
 #scm-app .scm-contract-termination-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: flex-end;
 }
 
