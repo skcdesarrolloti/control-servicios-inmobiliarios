@@ -14,20 +14,9 @@ trait HandlesRentIncreaseLetters
     return new RentIncreaseService($this->db);
   }
 
-  /** @param array<string,mixed> $internalNotificationConfig */
-  private function renderRentIncreaseLettersPanel(array $internalNotificationConfig = []): string
+  private function renderRentIncreaseLettersPanel(): string
   {
-    return (new RentIncreaseView())->renderPanel($internalNotificationConfig);
-  }
-
-  /** @return array{can_manage:bool,settings:array<string,array<int,string>>,funcionarios:array<int,array<string,string>>} */
-  private function rentIncreaseInternalNotificationConfig(bool $canManage): array
-  {
-    return [
-      'can_manage' => $canManage,
-      'settings' => $canManage ? $this->internalNotificationSettingsConfig() : [],
-      'funcionarios' => $canManage ? $this->internalNotificationFuncionarioOptions() : [],
-    ];
+    return (new RentIncreaseView())->renderPanel();
   }
 
   public function ajax_handler_rent_increase_letters_list(): void
