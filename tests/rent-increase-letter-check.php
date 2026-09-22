@@ -57,3 +57,14 @@ $moneyMethod->setAccessible(true);
 $assert((string) $moneyMethod->invoke($view, '500.000') === '$500.000', 'table formats Colombian thousands as pesos');
 $assert((string) $moneyMethod->invoke($view, '1.250.000') === '$1.250.000', 'table keeps million values in pesos');
 $assert((string) $moneyMethod->invoke($view, 'No aplica') === 'No aplica', 'table keeps non-money administration values readable');
+
+$tableHtml = $view->renderTable([[
+  'contrato' => 'TEST-1',
+  'inmueble' => '100',
+  'valor_canon' => '1.048.400',
+  'valor_administracion' => '251.600',
+  'direccion' => 'Direccion',
+  'propietario' => 'Propietario',
+  'arrendatario' => 'Arrendatario',
+]], 'contracts');
+$assert(!str_contains($tableHtml, '<small>-</small>'), 'table hides empty increment date dash below money values');

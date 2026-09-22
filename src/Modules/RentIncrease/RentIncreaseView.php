@@ -98,8 +98,8 @@ final class RentIncreaseView
       $html .= '<tr>';
       $html .= '<td><span class="scm-ticket-badge">' . esc_html((string) ($row['contrato'] ?? $row['_ID'] ?? '-')) . '</span></td>';
       $html .= '<td><span class="scm-inmueble-badge">' . esc_html((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '-')) . '</span></td>';
-      $html .= '<td>' . esc_html($this->money($row['valor_canon'] ?? '')) . '<small>' . esc_html($this->dateText($row['fecha_incremento_canon'] ?? null)) . '</small></td>';
-      $html .= '<td>' . esc_html($this->money($row['valor_administracion'] ?? '')) . '<small>' . esc_html($this->dateText($row['fecha_incremento_admin'] ?? null)) . '</small></td>';
+      $html .= '<td>' . esc_html($this->money($row['valor_canon'] ?? '')) . $this->dateSmall($row['fecha_incremento_canon'] ?? null) . '</td>';
+      $html .= '<td>' . esc_html($this->money($row['valor_administracion'] ?? '')) . $this->dateSmall($row['fecha_incremento_admin'] ?? null) . '</td>';
       $html .= '<td style="max-width:220px;">' . esc_html((string) ($row['direccion'] ?? '-')) . '</td>';
       $html .= '<td>' . esc_html((string) ($row['propietario'] ?? '-')) . '</td>';
       $html .= '<td>' . esc_html((string) ($row['arrendatario'] ?? '-')) . '</td>';
@@ -206,6 +206,12 @@ final class RentIncreaseView
     }
     $ts = is_numeric($value) ? (int) $value : strtotime((string) $value);
     return $ts > 0 ? date('d/m/Y', $ts) : '-';
+  }
+
+  private function dateSmall($value): string
+  {
+    $date = $this->dateText($value);
+    return $date === '' || $date === '-' ? '' : '<small>' . esc_html($date) . '</small>';
   }
 
   private function monthName(int $month): string
