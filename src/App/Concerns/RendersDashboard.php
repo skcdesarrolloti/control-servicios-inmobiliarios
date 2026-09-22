@@ -124,7 +124,7 @@ trait RendersDashboard
     $reportesAdministrativosPendientesHtml = $pendingController->renderReportesAdministrativosShell($filterOptions);
     $actasSatisfaccionHtml = $this->render_ticket_completion_acts_shell($_GET);
     $contratosArrendamientoHtml = $pendingController->renderContratosArrendamientoTab();
-    $cartasAumentoHtml = $this->renderRentIncreaseLettersPanel();
+    $cartasAumentoHtml = '';
     $dashboardPermissionTabs = $this->dashboardPermissionTabs();
     $tabMap = [
       'inicio' => 'scm-panel-inicio',
@@ -272,6 +272,7 @@ trait RendersDashboard
     $canManageDashboardPermissions = $this->canManageDashboardPermissions();
     $canManagePublicPqrSettings = $this->canManagePublicPqrSettings();
     $canManageInternalNotificationSettings = $this->canManageInternalNotificationSettings();
+    $cartasAumentoHtml = $this->renderRentIncreaseLettersPanel($this->rentIncreaseInternalNotificationConfig($canManageInternalNotificationSettings));
     $allowedAdministrativeActivityTabs = [];
     foreach (array_keys($administrativeActivityTabs) as $activityTabKey) {
       if (in_array($activityTabKey, $dashboardAllowedTabs, true)) {
@@ -1478,6 +1479,9 @@ trait RendersDashboard
 
     $groupsHtml = '';
     foreach ($catalog as $groupKey => $group) {
+      if ((string) $groupKey === 'cartas_aumento') {
+        continue;
+      }
       $groupsHtml .= '<section class="scm-internal-notif-group" data-internal-notif-group="' . esc_attr((string) $groupKey) . '">';
       $groupsHtml .= '<h4>' . esc_html((string) ($group['label'] ?? $groupKey)) . '</h4>';
       foreach ((array) ($group['items'] ?? []) as $actionKey => $item) {

@@ -10460,6 +10460,27 @@
   padding: 2px 5px;
 }
 
+#scm-app .scm-rent-increase-internal .scm-internal-notif-action-head p {
+  margin: 4px 0 0;
+  color: #53687f;
+  font-size: 12px;
+}
+
+#scm-app .scm-rent-increase-internal .scm-internal-notif-actions {
+  padding: 0;
+}
+
+#scm-app [data-rent-increase-internal-message] {
+  color: #166534;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
+#scm-app [data-rent-increase-internal-message].error {
+  color: #b91c1c;
+}
+
 #scm-app .scm-rent-increase-section {
   display: none;
 }

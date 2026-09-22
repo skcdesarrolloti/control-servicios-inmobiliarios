@@ -356,7 +356,17 @@ trait HandlesTicketWorkflowActions
       return;
     }
 
-    $settings = $this->sanitizeInternalNotificationSettings(is_array($decoded) ? $decoded : []);
+    $incomingSettings = $this->sanitizeInternalNotificationSettings(is_array($decoded) ? $decoded : []);
+    $merge = in_array(strtolower(trim((string) ($_POST['merge'] ?? ''))), ['1', 'true', 'si', 'sí', 'yes'], true);
+    if ($merge) {
+      $settings = $this->internalNotificationSettingsConfig();
+      foreach ($incomingSettings as $action => $ids) {
+        $settings[$action] = $ids;
+      }
+      ksort($settings);
+    } else {
+      $settings = $incomingSettings;
+    }
     \SCM\Core\App::settings()->set('internal_admin_notifications', $settings, Auth::userId());
     \SCM\Core\App::settings()->refresh();
 

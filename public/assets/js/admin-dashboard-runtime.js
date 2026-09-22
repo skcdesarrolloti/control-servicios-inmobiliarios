@@ -13240,6 +13240,49 @@
         return;
       }
 
+      function initRentIncreaseInternalSelects() {
+        if (!(window.jQuery && window.jQuery.fn && window.jQuery.fn.select2)) {
+          return;
+        }
+        var $ = window.jQuery;
+        wrap.querySelectorAll("[data-rent-increase-internal] select.scm-select").forEach(function (selectEl) {
+          var $select = $(selectEl);
+          if ($select.data("select2")) {
+            return;
+          }
+          $select.select2({
+            width: "100%",
+            closeOnSelect: false,
+            dropdownParent: $(wrap),
+            placeholder: "Buscar funcionarios...",
+          });
+        });
+      }
+
+      function setRentIncreaseInternalMessage(text, isError) {
+        var msg = wrap.querySelector("[data-rent-increase-internal-message]");
+        if (!msg) return;
+        msg.textContent = text || "";
+        msg.classList.toggle("error", !!isError);
+      }
+
+      function collectRentIncreaseInternalSettings(form) {
+        var settings = {};
+        form.querySelectorAll('select[name^="settings["]').forEach(function (select) {
+          var match = select.name.match(/^settings\[([^\]]+)\]/);
+          var action = match ? match[1] : "";
+          if (!action) return;
+          settings[action] = Array.prototype.slice.call(select.selectedOptions || [])
+            .map(function (option) {
+              return option.value;
+            })
+            .filter(Boolean);
+        });
+        return settings;
+      }
+
+      initRentIncreaseInternalSelects();
+
       function activeSection() {
         return wrap.querySelector(".scm-rent-increase-section.active");
       }
@@ -13424,6 +13467,44 @@
       });
 
       wrap.addEventListener("submit", function (e) {
+        var internalForm = e.target.closest("[data-rent-increase-internal-form]");
+        if (internalForm) {
+          e.preventDefault();
+          if (!actionInternalNotificationsSave) {
+            setRentIncreaseInternalMessage("No esta disponible la accion de guardado.", true);
+            return;
+          }
+          var internalSubmit = internalForm.querySelector('button[type="submit"]');
+          if (internalSubmit) internalSubmit.disabled = true;
+          setRentIncreaseInternalMessage("Guardando destinatarios...", false);
+          var fd = new FormData();
+          fd.append("action", actionInternalNotificationsSave);
+          fd.append("nonce", nonce);
+          fd.append("merge", "1");
+          fd.append("settings", JSON.stringify(collectRentIncreaseInternalSettings(internalForm)));
+          fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+            .then(function (response) {
+              return response.json();
+            })
+            .then(function (json) {
+              if (!json || !json.success) {
+                throw new Error(
+                  (json && json.data && json.data.message) ||
+                    "No se pudieron guardar los destinatarios internos.",
+                );
+              }
+              setRentIncreaseInternalMessage("Destinatarios internos guardados.", false);
+              showToast("success", "Destinatarios internos guardados.");
+            })
+            .catch(function (err) {
+              setRentIncreaseInternalMessage(err && err.message ? err.message : "No se pudo guardar.", true);
+              showToast("error", err && err.message ? err.message : "No se pudo guardar.");
+            })
+            .finally(function () {
+              if (internalSubmit) internalSubmit.disabled = false;
+            });
+          return;
+        }
         var form = e.target.closest("[data-rent-increase-create-form]");
         if (!form) return;
         e.preventDefault();

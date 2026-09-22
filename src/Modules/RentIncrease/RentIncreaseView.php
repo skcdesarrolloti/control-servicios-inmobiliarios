@@ -6,7 +6,8 @@ namespace SCM\Modules\RentIncrease;
 
 final class RentIncreaseView
 {
-  public function renderPanel(): string
+  /** @param array<string,mixed> $internalNotificationConfig */
+  public function renderPanel(array $internalNotificationConfig = []): string
   {
     ob_start();
 ?>
@@ -25,6 +26,7 @@ final class RentIncreaseView
         <strong>Firmas institucionales</strong>
         <span>La carta toma el coordinador contractual desde el funcionario activo con cargo contractual en <code>jet_cct_funcionarios</code>. El representante legal sale del funcionario activo con cargo <code>Gerente General</code>; la imagen de firma se lee de su campo de firma.</span>
       </aside>
+      <?php echo $this->renderInternalNotificationCard($internalNotificationConfig); ?>
       <div class="scm-status-subtabs scm-rent-increase-tabs" role="tablist" aria-label="Cartas de aumento">
         <button type="button" class="scm-status-topic-tab active" data-rent-increase-tab="contracts">Contratos</button>
         <button type="button" class="scm-status-topic-tab" data-rent-increase-tab="canon">Aumentos en canon</button>
@@ -48,6 +50,83 @@ final class RentIncreaseView
         </section>
       </div>
     </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<string,mixed> $config */
+  private function renderInternalNotificationCard(array $config): string
+  {
+    if (empty($config['can_manage'])) {
+      return '';
+    }
+    $settings = is_array($config['settings'] ?? null) ? $config['settings'] : [];
+    $funcionarios = is_array($config['funcionarios'] ?? null) ? $config['funcionarios'] : [];
+    $actions = [
+      'carta_aumento_canon' => [
+        'label' => 'Aumento de canon',
+        'description' => 'Se avisa cuando se genera una carta de aumento de canon.',
+      ],
+      'carta_aumento_administracion' => [
+        'label' => 'Aumento de administración',
+        'description' => 'Se avisa cuando se genera una carta de aumento de administración.',
+      ],
+    ];
+    $buildOptions = static function (array $selectedIds) use ($funcionarios): string {
+      $selected = [];
+      foreach ($selectedIds as $selectedId) {
+        $id = trim((string) ((int) $selectedId));
+        if ($id !== '' && $id !== '0') {
+          $selected[$id] = true;
+        }
+      }
+      $html = '';
+      foreach ($funcionarios as $funcionario) {
+        $id = trim((string) ($funcionario['id'] ?? ''));
+        if ($id === '') {
+          continue;
+        }
+        $label = trim((string) ($funcionario['label'] ?? $id));
+        $html .= '<option value="' . esc_attr($id) . '"' . (isset($selected[$id]) ? ' selected' : '') . '>' . esc_html($label) . '</option>';
+      }
+      return $html;
+    };
+
+    ob_start();
+?>
+    <section class="scm-rent-increase-internal scm-internal-notif-group" data-rent-increase-internal>
+      <div class="scm-internal-notif-action-head">
+        <div>
+          <h4>Notificaciones internas de cartas de aumento</h4>
+          <p>Estos destinatarios quedan configurados en Actividades administrativas para los avisos internos de canon y administración.</p>
+        </div>
+        <small data-rent-increase-internal-message aria-live="polite"></small>
+      </div>
+      <?php if ($funcionarios === []): ?>
+        <p class="scm-pqr-config-empty">No hay funcionarios activos disponibles para configurar.</p>
+      <?php else: ?>
+        <form class="scm-rent-increase-internal-form" data-rent-increase-internal-form autocomplete="off">
+          <div class="scm-internal-notif-grid">
+            <?php foreach ($actions as $action => $meta): ?>
+              <?php $selectedIds = is_array($settings[$action] ?? null) ? $settings[$action] : []; ?>
+              <div class="scm-internal-notif-action">
+                <div class="scm-internal-notif-action-head">
+                  <strong><?php echo esc_html($meta['label']); ?></strong>
+                  <span>Email interno en cola</span>
+                </div>
+                <p><?php echo esc_html($meta['description']); ?></p>
+                <select name="settings[<?php echo esc_attr($action); ?>][]" class="select select-bordered select-sm scm-select" multiple size="4">
+                  <?php echo $buildOptions($selectedIds); ?>
+                </select>
+              </div>
+            <?php endforeach; ?>
+          </div>
+          <div class="scm-pqr-config-actions scm-internal-notif-actions">
+            <button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Guardar destinatarios internos</button>
+          </div>
+        </form>
+      <?php endif; ?>
+    </section>
 <?php
     return (string) ob_get_clean();
   }
