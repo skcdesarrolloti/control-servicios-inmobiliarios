@@ -76,3 +76,10 @@ $assert(
   str_starts_with($normalizedUrl, rtrim((string) SCM_BASE_URL, '/') . '/file.php?n=abc_123.pdf&s=firma'),
   'stored file URLs are rebuilt against the app base URL'
 );
+
+$physicalUploadPath = '/home/u350704768/domains/sucasainmobiliaria.com.co/public_html/wp-content/uploads/jet-form-builder/572f60a71fb8edf421a6f0f4d5d93fbf/3d268d1ef2c2d2b47e0a97194edf7116/2026/08/Carta-de-aumento-de-canon-CULTURA-CARIBE-SAS.pdf';
+$normalizedUploadUrl = (string) $normalizeUrl->invoke($service, $physicalUploadPath);
+$assert(
+  $normalizedUploadUrl === 'https://sucasainmobiliaria.com.co/wp-content/uploads/jet-form-builder/572f60a71fb8edf421a6f0f4d5d93fbf/3d268d1ef2c2d2b47e0a97194edf7116/2026/08/Carta-de-aumento-de-canon-CULTURA-CARIBE-SAS.pdf',
+  'server upload paths are converted to public WordPress upload URLs'
+);

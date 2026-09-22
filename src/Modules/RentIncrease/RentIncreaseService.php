@@ -34,7 +34,7 @@ final class RentIncreaseService
   public function letters(array $filters, string $type): array
   {
     $type = $type === 'administracion' ? 'administracion' : 'canon';
-    return $this->contracts($filters, $type);
+    return $this->letterRows($filters, $type);
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
@@ -179,6 +179,153 @@ final class RentIncreaseService
     return ['rows' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'total_pages' => $totalPages];
   }
 
+  /** @param array<string,mixed> $filters @return array{rows:array<int,array<string,mixed>>,total:int,page:int,per_page:int,total_pages:int} */
+  private function letterRows(array $filters, string $type): array
+  {
+    $table = $this->db->table('jet_cct_cartas_aumento');
+    if (!$this->schema->tableExists($table)) {
+      return ['rows' => [], 'total' => 0, 'page' => 1, 'per_page' => 20, 'total_pages' => 1];
+    }
+
+    $page = max(1, (int) ($filters['page'] ?? 1));
+    $perPage = max(10, min(100, (int) ($filters['per_page'] ?? 20)));
+    $where = [];
+    $args = [];
+    $join = '';
+    $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    $canJoinContract = $this->schema->columnExists($table, 'id_contrato')
+      && $this->schema->tableExists($contractTable)
+      && $this->schema->columnExists($contractTable, '_ID');
+
+    if ($canJoinContract) {
+      $join = " LEFT JOIN `{$contractTable}` c ON CAST(c.`_ID` AS CHAR) = TRIM(COALESCE(l.`id_contrato`, ''))";
+    }
+
+    if ($this->schema->columnExists($table, 'tipo_carta')) {
+      if ($type === 'canon') {
+        $where[] = "LOWER(TRIM(COALESCE(l.`tipo_carta`, ''))) = ?";
+        $args[] = 'aumento de canon';
+      } else {
+        $where[] = "LOWER(TRIM(COALESCE(l.`tipo_carta`, ''))) IN (?, ?)";
+        $args[] = 'aumento de administracion';
+        $args[] = 'aumento de administración';
+      }
+    }
+
+    foreach ([
+      'contrato' => ['contrato'],
+      'inmueble' => ['inmueble', 'id_inmueble'],
+      'propietario' => ['propietario', 'id_propietario'],
+      'arrendatario' => ['arrendatario', 'id_arrendatario'],
+    ] as $key => $columns) {
+      $value = trim((string) ($filters[$key] ?? ''));
+      if ($value === '') {
+        continue;
+      }
+      $parts = [];
+      foreach ($columns as $column) {
+        if ($this->schema->columnExists($table, $column)) {
+          $parts[] = "COALESCE(l.`{$column}`, '') LIKE ?";
+          $args[] = '%' . $this->db->escapeLike($value) . '%';
+        }
+        if ($canJoinContract && $this->schema->columnExists($contractTable, $column)) {
+          $parts[] = "COALESCE(c.`{$column}`, '') LIKE ?";
+          $args[] = '%' . $this->db->escapeLike($value) . '%';
+        }
+      }
+      if ($parts !== []) {
+        $where[] = '(' . implode(' OR ', $parts) . ')';
+      }
+    }
+
+    $dateColumn = $this->schema->columnExists($table, 'fecha')
+      ? 'fecha'
+      : ($this->schema->columnExists($table, 'cct_created') ? 'cct_created' : '');
+    foreach ($type === 'canon' ? ['canon_from' => '>=', 'canon_to' => '<='] : ['admin_from' => '>=', 'admin_to' => '<='] as $key => $op) {
+      $ts = $this->parseDate((string) ($filters[$key] ?? ''));
+      if ($ts <= 0 || $dateColumn === '') {
+        continue;
+      }
+      if ($dateColumn === 'fecha') {
+        $where[] = "CAST(COALESCE(l.`fecha`, 0) AS UNSIGNED) {$op} ?";
+        $args[] = $ts;
+      } else {
+        $where[] = "DATE(l.`cct_created`) {$op} ?";
+        $args[] = date('Y-m-d', $ts);
+      }
+    }
+
+    $month = max(0, min(12, (int) ($filters['month'] ?? 0)));
+    if ($month > 0 && $canJoinContract && $this->schema->columnExists($contractTable, 'fin_contrato')) {
+      $where[] = "MONTH(FROM_UNIXTIME(CAST(COALESCE(c.`fin_contrato`, 0) AS UNSIGNED))) = ?";
+      $args[] = $month;
+    }
+
+    $whereSql = $where !== [] ? implode(' AND ', $where) : '1=1';
+    $total = (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` l{$join} WHERE {$whereSql}", $args);
+    $totalPages = max(1, (int) ceil($total / $perPage));
+    $page = min($page, $totalPages);
+    $offset = max(0, ($page - 1) * $perPage);
+    $order = $this->schema->columnExists($table, 'fecha')
+      ? "CAST(COALESCE(l.`fecha`, 0) AS UNSIGNED) DESC, l.`_ID` DESC"
+      : ($this->schema->columnExists($table, 'cct_created') ? "l.`cct_created` DESC, l.`_ID` DESC" : "l.`_ID` DESC");
+
+    $letters = $this->db->getResults(
+      "SELECT l.* FROM `{$table}` l{$join} WHERE {$whereSql} ORDER BY {$order} LIMIT ? OFFSET ?",
+      array_merge($args, [$perPage, $offset])
+    );
+    $rows = [];
+    foreach ($letters as $letter) {
+      $contract = null;
+      $contractId = (int) ($letter['id_contrato'] ?? 0);
+      if ($contractId > 0) {
+        $contract = $this->contractById($contractId);
+      }
+      $rows[] = $this->letterRowForTable((array) $letter, $contract, $type);
+    }
+
+    return ['rows' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'total_pages' => $totalPages];
+  }
+
+  /** @param array<string,mixed> $letter @param array<string,mixed>|null $contract @return array<string,mixed> */
+  private function letterRowForTable(array $letter, ?array $contract, string $type): array
+  {
+    $contract = $contract ?? [];
+    $letterId = (int) ($letter['_ID'] ?? 0);
+    $url = $this->normalizeStoredFileUrl((string) ($letter['carta_pdf'] ?? ''));
+    $date = $letter['fecha'] ?? ($letter['cct_created'] ?? null);
+    $row = [
+      '_ID' => $contract['_ID'] ?? ($letter['id_contrato'] ?? $letterId),
+      'contrato' => $this->firstNonEmpty([$letter['contrato'] ?? '', $contract['contrato'] ?? '', $letter['id_contrato'] ?? '', $letterId]),
+      'inmueble' => $this->firstNonEmpty([$letter['inmueble'] ?? '', $contract['inmueble'] ?? '', $letter['id_inmueble'] ?? '', $contract['id_inmueble'] ?? '']),
+      'id_inmueble' => $this->firstNonEmpty([$letter['id_inmueble'] ?? '', $contract['id_inmueble'] ?? '', $letter['inmueble'] ?? '', $contract['inmueble'] ?? '']),
+      'direccion' => $this->firstNonEmpty([$letter['direccion'] ?? '', $contract['direccion'] ?? '']),
+      'propietario' => $this->firstNonEmpty([$letter['propietario'] ?? '', $contract['propietario'] ?? '']),
+      'arrendatario' => $this->firstNonEmpty([$letter['arrendatario'] ?? '', $contract['arrendatario'] ?? '']),
+      'valor_canon' => $this->firstNonEmpty([$letter['canon'] ?? '', $letter['valor_canon'] ?? '', $contract['valor_canon'] ?? '']),
+      'valor_administracion' => $this->firstNonEmpty([$letter['administracion'] ?? '', $letter['valor_administracion'] ?? '', $contract['valor_administracion'] ?? '']),
+      'inicio_contrato' => $contract['inicio_contrato'] ?? '',
+      'fin_contrato' => $contract['fin_contrato'] ?? '',
+      'id_carta_aumento_canon' => '',
+      'carta_aumento_canon' => '',
+      'fecha_incremento_canon' => null,
+      'id_carta_aumento_admin' => '',
+      'carta_aumento_admin' => '',
+      'fecha_incremento_admin' => null,
+    ];
+
+    if ($type === 'canon') {
+      $row['id_carta_aumento_canon'] = $letterId;
+      $row['carta_aumento_canon'] = $url;
+      $row['fecha_incremento_canon'] = $date;
+    } else {
+      $row['id_carta_aumento_admin'] = $letterId;
+      $row['carta_aumento_admin'] = $url;
+      $row['fecha_incremento_admin'] = $date;
+    }
+    return $row;
+  }
+
   /** @param array<int,array<string,mixed>> $rows @return array<int,array<string,mixed>> */
   private function hydrateLetterUrls(array $rows, string $scope): array
   {
@@ -210,6 +357,10 @@ final class RentIncreaseService
     if ($url === '') {
       return '';
     }
+    $uploadUrl = $this->publicUploadUrlFromStoredPath($url);
+    if ($uploadUrl !== '') {
+      return $uploadUrl;
+    }
     $query = [];
     $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
     $rawQuery = (string) (parse_url($url, PHP_URL_QUERY) ?? '');
@@ -225,6 +376,44 @@ final class RentIncreaseService
       return rtrim((string) SCM_BASE_URL, '/') . '/file.php?n=' . rawurlencode($name) . '&s=' . rawurlencode($signature);
     }
     return filter_var($url, FILTER_VALIDATE_URL) ? $url : '';
+  }
+
+  private function publicUploadUrlFromStoredPath(string $value): string
+  {
+    $path = str_replace('\\', '/', trim($value));
+    if ($path === '' || preg_match('#^https?://#i', $path) === 1) {
+      return '';
+    }
+    $domain = '';
+    if (preg_match('#/domains/([^/]+)/public_html/(wp-content/uploads/.+)$#i', $path, $matches) === 1) {
+      $domain = trim((string) $matches[1]);
+      $relative = (string) $matches[2];
+    } else {
+      $pos = stripos($path, '/wp-content/uploads/');
+      if ($pos === false) {
+        return '';
+      }
+      $relative = ltrim(substr($path, $pos), '/');
+    }
+    $origin = $domain !== '' ? 'https://' . $domain : $this->appOrigin();
+    return rtrim($origin, '/') . '/' . $this->encodeUrlPath($relative);
+  }
+
+  private function appOrigin(): string
+  {
+    $base = defined('SCM_BASE_URL') ? (string) SCM_BASE_URL : 'https://sucasainmobiliaria.com.co';
+    $parts = parse_url($base);
+    $scheme = (string) ($parts['scheme'] ?? 'https');
+    $host = (string) ($parts['host'] ?? 'sucasainmobiliaria.com.co');
+    return $scheme . '://' . $host;
+  }
+
+  private function encodeUrlPath(string $path): string
+  {
+    $segments = array_map(static function (string $segment): string {
+      return rawurlencode(rawurldecode($segment));
+    }, explode('/', ltrim($path, '/')));
+    return implode('/', $segments);
   }
 
   /** @return array<string,mixed>|null */
