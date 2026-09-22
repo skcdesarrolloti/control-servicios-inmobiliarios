@@ -21,10 +21,6 @@ final class RentIncreaseView
           <div class="scm-pending-count-label">registros filtrados</div>
         </div>
       </div>
-      <aside class="scm-rent-increase-note">
-        <strong>Firmas institucionales</strong>
-        <span>La carta toma el coordinador contractual desde el funcionario activo con cargo contractual en <code>jet_cct_funcionarios</code>. El representante legal sale del funcionario activo con cargo <code>Gerente General</code>; la imagen de firma se lee de su campo de firma.</span>
-      </aside>
       <div class="scm-status-subtabs scm-rent-increase-tabs" role="tablist" aria-label="Cartas de aumento">
         <button type="button" class="scm-status-topic-tab active" data-rent-increase-tab="contracts">Contratos</button>
         <button type="button" class="scm-status-topic-tab" data-rent-increase-tab="canon">Aumentos en canon</button>

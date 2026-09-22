@@ -172,8 +172,59 @@ final class RentIncreaseService
       "SELECT " . implode(', ', $select) . " FROM `{$table}` WHERE {$whereSql} ORDER BY `_ID` DESC LIMIT ? OFFSET ?",
       array_merge($args, [$perPage, $offset])
     );
+    if (in_array($scope, ['canon', 'administracion'], true)) {
+      $rows = $this->hydrateLetterUrls($rows, $scope);
+    }
 
     return ['rows' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'total_pages' => $totalPages];
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @return array<int,array<string,mixed>> */
+  private function hydrateLetterUrls(array $rows, string $scope): array
+  {
+    $idField = $scope === 'canon' ? 'id_carta_aumento_canon' : 'id_carta_aumento_admin';
+    $urlField = $scope === 'canon' ? 'carta_aumento_canon' : 'carta_aumento_admin';
+    foreach ($rows as &$row) {
+      $letterId = (int) ($row[$idField] ?? 0);
+      $fromLetter = $letterId > 0 ? $this->letterPdfUrl($letterId) : '';
+      $fromContract = $this->normalizeStoredFileUrl((string) ($row[$urlField] ?? ''));
+      $row[$urlField] = $fromLetter !== '' ? $fromLetter : $fromContract;
+    }
+    unset($row);
+    return $rows;
+  }
+
+  private function letterPdfUrl(int $letterId): string
+  {
+    $table = $this->db->table('jet_cct_cartas_aumento');
+    if ($letterId <= 0 || !$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'carta_pdf')) {
+      return '';
+    }
+    $url = (string) $this->db->getVar("SELECT `carta_pdf` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$letterId]);
+    return $this->normalizeStoredFileUrl($url);
+  }
+
+  private function normalizeStoredFileUrl(string $url): string
+  {
+    $url = trim(html_entity_decode($url, ENT_QUOTES, 'UTF-8'));
+    if ($url === '') {
+      return '';
+    }
+    $query = [];
+    $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+    $rawQuery = (string) (parse_url($url, PHP_URL_QUERY) ?? '');
+    if ($rawQuery !== '') {
+      parse_str($rawQuery, $query);
+    } elseif (str_starts_with($url, 'file.php?')) {
+      parse_str(substr($url, strlen('file.php?')), $query);
+      $path = '/file.php';
+    }
+    $name = basename((string) ($query['n'] ?? ''));
+    $signature = trim((string) ($query['s'] ?? ''));
+    if ($name !== '' && $signature !== '' && (str_ends_with(strtolower($path), '/file.php') || str_starts_with($url, 'file.php?'))) {
+      return rtrim((string) SCM_BASE_URL, '/') . '/file.php?n=' . rawurlencode($name) . '&s=' . rawurlencode($signature);
+    }
+    return filter_var($url, FILTER_VALIDATE_URL) ? $url : '';
   }
 
   /** @return array<string,mixed>|null */

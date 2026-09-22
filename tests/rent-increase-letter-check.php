@@ -68,3 +68,11 @@ $tableHtml = $view->renderTable([[
   'arrendatario' => 'Arrendatario',
 ]], 'contracts');
 $assert(!str_contains($tableHtml, '<small>-</small>'), 'table hides empty increment date dash below money values');
+
+$normalizeUrl = new ReflectionMethod($service, 'normalizeStoredFileUrl');
+$normalizeUrl->setAccessible(true);
+$normalizedUrl = (string) $normalizeUrl->invoke($service, 'https://sucasainmobiliaria.com.co/file.php?n=abc_123.pdf&s=firma');
+$assert(
+  str_starts_with($normalizedUrl, rtrim((string) SCM_BASE_URL, '/') . '/file.php?n=abc_123.pdf&s=firma'),
+  'stored file URLs are rebuilt against the app base URL'
+);
