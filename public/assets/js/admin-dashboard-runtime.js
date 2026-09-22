@@ -17513,11 +17513,6 @@
 
     root.querySelectorAll(".scm-tab[data-tab]").forEach(function (tab) {
       tab.addEventListener("click", function () {
-        if ((tab.getAttribute("data-tab") || "") === "scm-panel-actividades-administrativas") {
-          window.setTimeout(function () {
-            maybeShowDashboardDuePopup("administrative");
-          }, 120);
-        }
         window.setTimeout(loadActiveLazyPanelWithFeedback, 0);
       });
     });

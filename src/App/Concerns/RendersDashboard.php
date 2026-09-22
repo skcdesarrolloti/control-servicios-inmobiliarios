@@ -1637,7 +1637,7 @@ trait RendersDashboard
             <div class="scm-permission-employee-cargos-head">
               <div>
                 <h4 id="scm-due-popup-cargos-title">Popup de vencimientos administrativos</h4>
-                <p>El aviso se mostrar&aacute; al entrar al panel y al abrir Actividades administrativas solo para los cargos seleccionados.</p>
+                <p>El aviso se mostrar&aacute; al entrar al panel solo para los cargos seleccionados.</p>
               </div>
               <small>Si no marcas ning&uacute;n cargo, el aviso no se mostrar&aacute; autom&aacute;ticamente.</small>
             </div>
