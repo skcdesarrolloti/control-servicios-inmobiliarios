@@ -10561,30 +10561,31 @@
 #scm-app .scm-rent-increase .scm-page-controls {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px;
+  gap: 14px;
+  padding: 12px;
   border: 1px solid #d7e3ef;
-  border-radius: 12px;
+  border-radius: 14px;
   background: #fff;
   box-shadow: 0 8px 22px rgba(15, 39, 69, 0.08);
 }
 
 #scm-app .scm-rent-increase .scm-page-info {
   color: #17304f;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
   white-space: nowrap;
 }
 
 #scm-app .scm-rent-increase .scm-page-btn-rent-increase {
-  min-height: 34px;
-  padding: 0 14px;
+  min-height: 42px;
+  min-width: 112px;
+  padding: 0 18px;
   border: 1px solid #c7d8e8;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #061d49;
   color: #fff;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
 }
 

@@ -31,7 +31,7 @@ trait HandlesRentIncreaseLetters
     }
     $filters = [
       'page' => max(1, (int) ($_POST['page'] ?? 1)),
-      'per_page' => max(10, min(100, (int) ($_POST['per_page'] ?? 30))),
+      'per_page' => max(10, min(100, (int) ($_POST['per_page'] ?? 20))),
       'canon_from' => trim(sanitize_text_field(wp_unslash((string) ($_POST['canon_from'] ?? '')))),
       'canon_to' => trim(sanitize_text_field(wp_unslash((string) ($_POST['canon_to'] ?? '')))),
       'admin_from' => trim(sanitize_text_field(wp_unslash((string) ($_POST['admin_from'] ?? '')))),

@@ -67,7 +67,7 @@ final class RentIncreaseView
           <div class="scm-field"><label>Desde administración</label><input name="admin_from" type="date"></div>
           <div class="scm-field"><label>Hasta administración</label><input name="admin_to" type="date"></div>
           <div class="scm-field"><label>Mes fin contrato</label><select name="month"><option value="0">Todos</option><?php for ($m = 1; $m <= 12; $m++): ?><option value="<?php echo esc_attr((string) $m); ?>"><?php echo esc_html($this->monthName($m)); ?></option><?php endfor; ?></select></div>
-          <div class="scm-field"><label>Por página</label><select name="per_page"><option value="30">30</option><option value="60">60</option><option value="100">100</option></select></div>
+          <div class="scm-field"><label>Por página</label><select name="per_page"><option value="20">20</option><option value="30">30</option><option value="60">60</option><option value="100">100</option></select></div>
           <div class="scm-field"><label>Propietario</label><input name="propietario" type="text" placeholder="Nombre"></div>
           <div class="scm-field"><label>Arrendatario</label><input name="arrendatario" type="text" placeholder="Nombre"></div>
           <div class="scm-field"><label>Contrato</label><input name="contrato" type="text" placeholder="Código"></div>
