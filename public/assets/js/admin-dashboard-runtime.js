@@ -13304,6 +13304,52 @@
         return text || "0";
       }
 
+      function formatRentIncreaseMoney(value) {
+        var amount = Math.max(0, Math.round(Number(value) || 0));
+        return "$ " + amount.toLocaleString("es-CO");
+      }
+
+      function parseRentIncreasePercent(value) {
+        var normalized = String(value || "")
+          .replace("%", "")
+          .replace(",", ".")
+          .replace(/[^\d.-]/g, "");
+        var parsed = parseFloat(normalized);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+
+      function initCanonLiveCalculation(form, currentCanon) {
+        var incrementInput = form.querySelector("[data-rent-increase-percent]");
+        var canonInput = form.querySelector("[data-rent-increase-canon-result]");
+        var currentOutput = form.querySelector("[data-rent-increase-current-canon]");
+        var increaseOutput = form.querySelector("[data-rent-increase-increase-value]");
+        if (!incrementInput || !canonInput) {
+          return;
+        }
+        var base = Math.max(0, Math.round(Number(currentCanon) || 0));
+        if (currentOutput) {
+          currentOutput.textContent = formatRentIncreaseMoney(base);
+        }
+        function syncCanon() {
+          var percent = parseRentIncreasePercent(incrementInput.value);
+          var nextValue = Math.round(base * (1 + percent / 100));
+          var increaseValue = Math.max(0, nextValue - base);
+          canonInput.value = formatRentIncreaseMoney(nextValue);
+          canonInput.setAttribute("data-raw-value", String(nextValue));
+          if (increaseOutput) {
+            increaseOutput.textContent = formatRentIncreaseMoney(increaseValue);
+          }
+        }
+        incrementInput.addEventListener("input", syncCanon);
+        canonInput.addEventListener("focus", function () {
+          canonInput.value = moneyValue(canonInput.value);
+        });
+        canonInput.addEventListener("blur", function () {
+          canonInput.value = formatRentIncreaseMoney(moneyValue(canonInput.value));
+        });
+        syncCanon();
+      }
+
       function openRentIncreaseModal(button) {
         var modal = wrap.querySelector("[data-rent-increase-modal]");
         var body = wrap.querySelector("[data-rent-increase-form-wrap]");
@@ -13316,6 +13362,7 @@
         var current = type === "canon"
           ? moneyValue(button.getAttribute("data-canon") || "")
           : moneyValue(button.getAttribute("data-administration") || "");
+        var currentFormatted = formatRentIncreaseMoney(current);
         if (title) title.textContent = label;
         if (subtitle) {
           subtitle.textContent =
@@ -13336,12 +13383,16 @@
           '<label class="scm-cotizacion-dialog-field"><span>Fecha <em>*</em></span><input type="date" name="fecha" value="' + escHtml(today) + '" required></label>' +
           '<label class="scm-cotizacion-dialog-field"><span>Ciudad</span><input name="ciudad" value="Cartagena de Indias"></label>' +
           (type === "canon"
-            ? '<label class="scm-cotizacion-dialog-field"><span>Incremento <em>*</em></span><input name="incremento" placeholder="Ej. 9,28%" required></label><label class="scm-cotizacion-dialog-field"><span>Canon incrementado <em>*</em></span><input name="canon" type="number" inputmode="numeric" min="1" step="1" value="' + escHtml(current) + '" required></label>'
-            : '<label class="scm-cotizacion-dialog-field"><span>Administración incrementada <em>*</em></span><input name="administracion" type="number" inputmode="numeric" min="1" step="1" value="' + escHtml(current) + '" required></label><label class="scm-cotizacion-dialog-field"><span>Vigencia del aumento <em>*</em></span><input name="vigencia_aumento" type="date" value="' + escHtml(today) + '" required></label><label class="scm-cotizacion-dialog-field"><span>¿Tiene retroactivos?</span><select name="tiene_retroactivos"><option value="No">No</option><option value="Si">Sí</option></select></label><label class="scm-cotizacion-dialog-field"><span>Retroactivo administración</span><input name="retroactivo_administracion" type="number" inputmode="numeric" min="0" step="1" value="0"></label><label class="scm-cotizacion-dialog-field"><span>Mes inicio</span><input name="mes_inicio" type="date"></label><label class="scm-cotizacion-dialog-field"><span>Mes final</span><input name="mes_final" type="date"></label>') +
+            ? '<div class="scm-rent-increase-calculation"><span>Canon actual</span><strong data-rent-increase-current-canon>' + escHtml(currentFormatted) + '</strong><small>Aumento calculado: <b data-rent-increase-increase-value>$ 0</b></small></div><label class="scm-cotizacion-dialog-field"><span>Incremento <em>*</em></span><input name="incremento" data-rent-increase-percent placeholder="Ej. 9,28%" required></label><label class="scm-cotizacion-dialog-field"><span>Canon incrementado <em>*</em></span><input name="canon" data-rent-increase-canon-result type="text" inputmode="numeric" value="' + escHtml(currentFormatted) + '" required></label>'
+            : '<label class="scm-cotizacion-dialog-field"><span>Administración actual</span><input value="' + escHtml(currentFormatted) + '" readonly></label><label class="scm-cotizacion-dialog-field"><span>Administración incrementada <em>*</em></span><input name="administracion" type="text" inputmode="numeric" value="' + escHtml(currentFormatted) + '" required></label><label class="scm-cotizacion-dialog-field"><span>Vigencia del aumento <em>*</em></span><input name="vigencia_aumento" type="date" value="' + escHtml(today) + '" required></label><label class="scm-cotizacion-dialog-field"><span>¿Tiene retroactivos?</span><select name="tiene_retroactivos"><option value="No">No</option><option value="Si">Sí</option></select></label><label class="scm-cotizacion-dialog-field"><span>Retroactivo administración</span><input name="retroactivo_administracion" type="text" inputmode="numeric" value="$ 0"></label><label class="scm-cotizacion-dialog-field"><span>Mes inicio</span><input name="mes_inicio" type="date"></label><label class="scm-cotizacion-dialog-field"><span>Mes final</span><input name="mes_final" type="date"></label>') +
           '</div></section>' +
           '<div class="scm-public-services-review-error" role="alert" aria-live="assertive" hidden></div>' +
           '<div class="scm-public-services-review-actions"><button type="button" class="scm-btn-secondary" data-rent-increase-close>Cancelar</button><button type="submit" class="scm-btn-primary" data-rent-increase-submit>Generar carta y notificar</button></div>' +
           '</form>';
+        var createForm = body.querySelector("[data-rent-increase-create-form]");
+        if (type === "canon" && createForm) {
+          initCanonLiveCalculation(createForm, current);
+        }
         modal.hidden = false;
         modal.setAttribute("aria-hidden", "false");
         window.setTimeout(function () {

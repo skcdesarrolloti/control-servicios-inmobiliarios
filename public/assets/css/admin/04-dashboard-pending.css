@@ -10471,25 +10471,60 @@
 
 #scm-app .scm-rent-increase [data-rent-increase-form-wrap] {
   overflow-y: auto;
-  padding: 22px 22px 0;
+  padding: 30px 30px 24px;
 }
 
 #scm-app .scm-rent-increase .scm-rent-increase-create-form {
   display: grid;
-  gap: 16px;
+  gap: 20px;
 }
 
 #scm-app .scm-rent-increase .scm-maint-quote-section {
   margin: 0;
-  padding: 20px;
-  border-radius: 16px;
+  padding: 24px;
+  border-radius: 18px;
 }
 
 #scm-app .scm-rent-increase .scm-public-services-review-actions {
-  margin: 0 -22px;
-  padding: 16px 22px 0;
+  margin: 4px -30px -24px;
+  padding: 18px 30px 24px;
   border-top: 1px solid #d9e6f4;
   background: #f8fbff;
+}
+
+#scm-app .scm-rent-increase-calculation {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-height: 64px;
+  padding: 14px 16px;
+  border: 1px solid #c9d9ea;
+  border-left: 5px solid #f59120;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-rent-increase-calculation span {
+  color: #40546c;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-rent-increase-calculation strong {
+  color: #061d49;
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+#scm-app .scm-rent-increase-calculation small {
+  color: #526982;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#scm-app .scm-rent-increase-calculation b {
+  color: #0f766e;
 }
 
 #scm-app .scm-rent-increase-table thead tr {
@@ -10653,16 +10688,16 @@
   }
 
   #scm-app .scm-rent-increase [data-rent-increase-form-wrap] {
-    padding: 16px 16px 0;
+    padding: 18px 18px 18px;
   }
 
   #scm-app .scm-rent-increase .scm-maint-quote-section {
-    padding: 16px;
+    padding: 18px;
   }
 
   #scm-app .scm-rent-increase .scm-public-services-review-actions {
-    margin: 0 -16px;
-    padding: 14px 16px 0;
+    margin: 2px -18px -18px;
+    padding: 16px 18px 18px;
   }
 
   #scm-app .scm-rent-increase .scm-page-controls {
