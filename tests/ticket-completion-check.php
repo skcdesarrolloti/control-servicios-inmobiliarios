@@ -57,6 +57,7 @@ $adminJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/scm-
 $assert(str_contains($adminJs, 'data-acta-remove-photo') && str_contains($adminJs, 'form.addEventListener("paste"'), 'act photo UI supports individual removal and pasted clipboard images');
 $assert(str_contains($adminJs, 'MAX_PHOTOS_PER_DAMAGE = 4') && str_contains($adminJs, 'MAX_PHOTOS_PER_ACT = 12'), 'act photo UI enforces visible client limits');
 $assert(str_contains($adminJs, 'request("archive", fd)') && str_contains($adminJs, 'request("delete", fd)') && str_contains($adminJs, 'event.stopPropagation()'), 'case act popup handles archive and delete without bubbling to dashboard listeners');
+$assert(str_contains($adminJs, 'sub.dataset.scmActaDashboardUrl = json.data.redirect_url') && !str_contains($adminJs, 'window.location.assign(json.data.redirect_url)'), 'case act popup stays open after creating direct or approved quote acts');
 $inlineJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/admin-dashboard-inline.js');
 $assert(str_contains($inlineJs, 'data-acta-delete') && str_contains($inlineJs, 'Escribe ELIMINAR para confirmar'), 'act dashboard supports explicit permanent delete confirmation');
 $viewPhp = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/TicketCompletion/CompletionView.php');
