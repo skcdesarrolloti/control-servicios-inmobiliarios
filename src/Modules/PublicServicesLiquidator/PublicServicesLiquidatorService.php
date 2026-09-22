@@ -355,6 +355,7 @@ final class PublicServicesLiquidatorService
     }
 
     $subject = 'Orden de reembolso de servicios publicos contrato #' . (string) ($contract['contrato'] ?? '');
+    $batchKey = date('YmdHis') . '_' . bin2hex(random_bytes(4));
     $buttons = [];
     $attachments = [];
     foreach ($documents as $document) {
@@ -370,7 +371,7 @@ final class PublicServicesLiquidatorService
         $emailQueued += $queue->enqueue((string) $recipient['email'], $subject, $html, [
           'source_module' => 'liquidador_servicios_publicos',
           'destination_name' => (string) $recipient['name'],
-          'dedupe_key' => 'liquidador_servicios_' . (int) ($contract['_ID'] ?? 0) . '_' . date('YmdHis'),
+          'dedupe_key' => 'liquidador_servicios_' . (int) ($contract['_ID'] ?? 0) . '_' . $batchKey,
           'payload' => ['attachments' => $attachments, 'reply_to' => (string) ($context['realizado_por_correo'] ?? '')],
           'meta' => ['contract_id' => (int) ($contract['_ID'] ?? 0), 'recipient_role' => (string) $recipient['role'], 'documents' => $buttons],
         ]);
@@ -385,7 +386,7 @@ final class PublicServicesLiquidatorService
           $message = $this->whatsappMessage($context, $document);
           $ok = $sms->enqueue((string) $recipient['phone'], (string) $recipient['name'], $message, [
             'source_module' => 'liquidador_servicios_publicos',
-            'dedupe_key' => 'liquidador_servicios_wa_' . (int) ($contract['_ID'] ?? 0) . '_' . (string) ($document['key'] ?? ''),
+            'dedupe_key' => 'liquidador_servicios_wa_' . (int) ($contract['_ID'] ?? 0) . '_' . (string) ($document['key'] ?? '') . '_' . $batchKey,
             'template_name' => 'scm_liquidador_servicios_reembolso_v1',
             'template_language' => 'es_CO',
             'template_components' => [
@@ -408,6 +409,7 @@ final class PublicServicesLiquidatorService
                   ['type' => 'text', 'text' => $this->waText((string) ($context['inmueble'] ?? $context['id_inmueble'] ?? '-'))],
                   ['type' => 'text', 'text' => $this->waText((string) ($context['periodo'] ?? '-'))],
                   ['type' => 'text', 'text' => $this->waText((string) ($document['url'] ?? ''))],
+                  ['type' => 'text', 'text' => $this->waText($this->signatureLine($context))],
                 ],
               ],
             ],
@@ -429,18 +431,29 @@ final class PublicServicesLiquidatorService
     $name = trim((string) ($recipient['name'] ?? '')) ?: 'Usuario';
     $services = implode(', ', array_map(static fn(array $service): string => (string) ($service['label'] ?? ''), (array) ($calculation['services'] ?? [])));
     return '<p style="margin:0 0 16px;font-weight:600;">Apreciado(a) ' . EmailTemplate::e($name) . ':</p>'
+      . '<p style="margin:0 0 14px;line-height:1.65;">Cordial saludo.</p>'
       . '<p style="margin:0 0 14px;line-height:1.65;">Compartimos la orden de reembolso de servicios publicos del contrato <b>#' . EmailTemplate::e((string) ($context['contrato'] ?? '')) . '</b>, inmueble <b>#' . EmailTemplate::e((string) ($context['inmueble'] ?? $context['id_inmueble'] ?? '')) . '</b>.</p>'
       . '<p style="margin:0 0 14px;line-height:1.65;"><b>Servicios liquidados:</b> ' . EmailTemplate::e($services) . '. <b>Periodo:</b> ' . EmailTemplate::e((string) ($context['periodo'] ?? '')) . '.</p>'
-      . '<p style="margin:0;line-height:1.65;">Las ordenes PDF se adjuntan al correo y quedan disponibles en los botones de consulta.</p>';
+      . '<p style="margin:0 0 14px;line-height:1.65;">Las ordenes PDF se adjuntan al correo y quedan disponibles en los botones de consulta.</p>'
+      . '<p style="margin:22px 0 0;line-height:1.65;">Atentamente,<br><b>' . EmailTemplate::e($this->signatureLine($context)) . '</b><br>SKC SuCasa Inmobiliaria</p>';
   }
 
   /** @param array<string,mixed> $context @param array<string,mixed> $document */
   private function whatsappMessage(array $context, array $document): string
   {
-    return 'Orden de reembolso de servicios publicos del contrato #' . (string) ($context['contrato'] ?? '')
+    return 'Buen dia. Orden de reembolso de servicios publicos del contrato #' . (string) ($context['contrato'] ?? '')
       . ', inmueble #' . (string) ($context['inmueble'] ?? $context['id_inmueble'] ?? '')
       . ', periodo ' . (string) ($context['periodo'] ?? '')
-      . '. Documento: ' . (string) ($document['url'] ?? '');
+      . '. Documento: ' . (string) ($document['url'] ?? '')
+      . "\n\nAtentamente,\n" . $this->signatureLine($context) . "\nSKC SuCasa Inmobiliaria";
+  }
+
+  /** @param array<string,mixed> $context */
+  private function signatureLine(array $context): string
+  {
+    $name = trim((string) ($context['realizado_por'] ?? 'Control Servicios Inmobiliarios'));
+    $phone = trim((string) ($context['realizado_por_telefono'] ?? ''));
+    return trim($name . ($phone !== '' ? ' - ' . $phone : ''));
   }
 
   /** @param array<int,array<string,string>> $recipients @return array<int,array<string,string>> */

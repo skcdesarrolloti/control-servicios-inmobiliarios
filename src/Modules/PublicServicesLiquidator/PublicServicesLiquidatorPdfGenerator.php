@@ -107,7 +107,7 @@ final class PublicServicesLiquidatorPdfGenerator
 
     $pdf->paragraph('Esta orden se genera con base en las lecturas, fechas y valores registrados por el funcionario en el liquidador de servicios publicos. La validacion documental de la factura y los soportes de pago permanece a cargo del area responsable.', 8);
     $pdf->signatureBlock(
-      'Orden generada por',
+      'Atentamente',
       $this->value($context, 'realizado_por', 'Control Servicios Inmobiliarios'),
       $this->signatureDetails([
         $this->value($context, 'realizado_por_cargo', ''),
@@ -115,6 +115,7 @@ final class PublicServicesLiquidatorPdfGenerator
         $this->value($context, 'realizado_por_correo', ''),
       ])
     );
+    $pdf->signatureBlock('Empresa', 'SKC SuCasa Inmobiliaria', 'NIT 900623242-4 | Cartagena de Indias - Colombia');
 
     $basename = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
     $path = (string) SCM_UPLOAD_PATH . '/' . $basename;

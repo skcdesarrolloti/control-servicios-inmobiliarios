@@ -1,0 +1,21 @@
+{
+  "name": "scm_liquidador_servicios_reembolso_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "DOCUMENT",
+      "example": {
+        "header_handle": ["orden-reembolso-servicios-ejemplo.pdf"]
+      }
+    },
+    {
+      "type": "BODY",
+      "text": "Buen dia, {{1}}.\n\nCompartimos {{2}} del contrato #{{3}}, inmueble #{{4}}, correspondiente al periodo {{5}}.\n\nPuedes consultar el PDF adjunto. Enlace de respaldo: {{6}}\n\nAtentamente,\n{{7}}\nSKC SuCasa Inmobiliaria.",
+      "example": {
+        "body_text": [["Maria Perez", "Orden de reembolso - Agua", "840", "105370", "septiembre de 2026", "https://sucasainmobiliaria.com.co/file.php?n=orden.pdf&s=abc123", "Julian Maturana Ortega - 3145965047"]]
+      }
+    }
+  ]
+}

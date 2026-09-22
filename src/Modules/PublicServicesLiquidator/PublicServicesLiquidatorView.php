@@ -118,11 +118,11 @@ final class PublicServicesLiquidatorView
           </article>
           <article>
             <strong>Plantilla WhatsApp</strong>
-            <p>Crear en Meta la plantilla <code>scm_liquidador_servicios_reembolso_v1</code>, idioma <code>es_CO</code>, encabezado documento y cuerpo: Hola {{1}}, compartimos {{2}} del contrato {{3}}, inmueble {{4}}, periodo {{5}}. Documento: {{6}}.</p>
+            <p>Crear en Meta la plantilla <code>scm_liquidador_servicios_reembolso_v1</code>, idioma <code>es_CO</code>, encabezado documento y cuerpo: Buen dia, {{1}}. Compartimos {{2}} del contrato {{3}}, inmueble {{4}}, periodo {{5}}. Documento: {{6}}. Atentamente, {{7}}. SKC SuCasa Inmobiliaria.</p>
           </article>
           <article>
             <strong>Correo</strong>
-            <p>El correo usa la plantilla HTML interna y adjunta las ordenes PDF. No requiere plantilla externa; solo debe estar activo el worker de <code>shared-notifications</code>.</p>
+            <p>El correo usa la plantilla HTML interna, saluda al destinatario, incluye contrato/inmueble/periodo, adjunta las ordenes PDF y cierra con Atentamente, firma del funcionario y SKC SuCasa Inmobiliaria.</p>
           </article>
         </div>
       </section>
