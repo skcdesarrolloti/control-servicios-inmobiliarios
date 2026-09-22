@@ -7,6 +7,7 @@ require dirname(__DIR__) . '/bootstrap/app.php';
 use SCM\Core\App;
 use SCM\Modules\RentIncrease\RentIncreasePdfGenerator;
 use SCM\Modules\RentIncrease\RentIncreaseService;
+use SCM\Modules\RentIncrease\RentIncreaseView;
 
 $assert = static function (bool $condition, string $message): void {
   if (!$condition) {
@@ -49,3 +50,10 @@ $content = (string) file_get_contents((string) $document['path']);
 $assert(str_contains($content, 'CATORCE MILLONES SEISCIENTOS'), 'generated PDF stores amount words before numeric pesos');
 $assert(str_contains($content, '$' . chr(160) . '14.620.525'), 'generated PDF keeps numeric pesos together');
 $assert(preg_match('/cl.usula cuarta/i', $content) === 1, 'generated PDF uses clause-fourth canon text');
+
+$view = new RentIncreaseView();
+$moneyMethod = new ReflectionMethod($view, 'money');
+$moneyMethod->setAccessible(true);
+$assert((string) $moneyMethod->invoke($view, '500.000') === '$500.000', 'table formats Colombian thousands as pesos');
+$assert((string) $moneyMethod->invoke($view, '1.250.000') === '$1.250.000', 'table keeps million values in pesos');
+$assert((string) $moneyMethod->invoke($view, 'No aplica') === 'No aplica', 'table keeps non-money administration values readable');

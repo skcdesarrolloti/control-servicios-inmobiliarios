@@ -163,8 +163,40 @@ final class RentIncreaseView
     if ($value === '') {
       return '-';
     }
-    $num = preg_replace('/[^\d.]/', '', $value) ?? '';
-    return $num !== '' && is_numeric($num) ? '$' . number_format((float) $num, 0, ',', '.') : $value;
+    if (preg_match('/no\s*aplica/i', $value) === 1) {
+      return 'No aplica';
+    }
+    $normalized = preg_replace('/[^\d,.-]/', '', $value) ?? '';
+    if ($normalized === '' || preg_match('/\d/', $normalized) !== 1) {
+      return $value;
+    }
+    $negative = str_starts_with($normalized, '-');
+    $normalized = trim($normalized, '-');
+    if (str_contains($normalized, ',') && str_contains($normalized, '.')) {
+      $normalized = str_replace('.', '', $normalized);
+      $normalized = preg_replace('/,\d+$/', '', $normalized) ?? $normalized;
+    } elseif (str_contains($normalized, '.')) {
+      $parts = explode('.', $normalized);
+      $last = end($parts);
+      $normalized = strlen((string) $last) === 3
+        ? str_replace('.', '', $normalized)
+        : (preg_replace('/\.\d+$/', '', $normalized) ?? $normalized);
+    } elseif (str_contains($normalized, ',')) {
+      $parts = explode(',', $normalized);
+      $last = end($parts);
+      $normalized = strlen((string) $last) === 3
+        ? str_replace(',', '', $normalized)
+        : (preg_replace('/,\d+$/', '', $normalized) ?? $normalized);
+    }
+    $digits = preg_replace('/\D/', '', $normalized) ?? '';
+    if ($digits === '') {
+      return $value;
+    }
+    $amount = (int) $digits;
+    if ($negative) {
+      $amount *= -1;
+    }
+    return '$' . number_format($amount, 0, ',', '.');
   }
 
   private function dateText($value): string
