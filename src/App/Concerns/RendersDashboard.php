@@ -183,6 +183,10 @@ trait RendersDashboard
       'servicios_publicos_pendientes' => 'scm-panel-servicios-publicos-pendientes',
       'servicios-publicos-pendientes' => 'scm-panel-servicios-publicos-pendientes',
       'scm-panel-servicios-publicos-pendientes' => 'scm-panel-servicios-publicos-pendientes',
+      'liquidador_servicios_publicos' => 'scm-panel-liquidador-servicios-publicos',
+      'liquidador-servicios-publicos' => 'scm-panel-liquidador-servicios-publicos',
+      'liquidador de servicios publicos' => 'scm-panel-liquidador-servicios-publicos',
+      'scm-panel-liquidador-servicios-publicos' => 'scm-panel-liquidador-servicios-publicos',
       'reportes_administrativos_pendientes' => 'scm-panel-reportes-administrativos-pendientes',
       'reportes-administrativos-pendientes' => 'scm-panel-reportes-administrativos-pendientes',
       'scm-panel-reportes-administrativos-pendientes' => 'scm-panel-reportes-administrativos-pendientes',
@@ -220,6 +224,10 @@ trait RendersDashboard
       'servicios_publicos_pendientes' => [
         'panel' => 'scm-panel-servicios-publicos-pendientes',
         'label' => $dashboardPermissionTabs['servicios_publicos_pendientes'] ?? 'Servicios Publicos Pendientes',
+      ],
+      'liquidador_servicios_publicos' => [
+        'panel' => 'scm-panel-liquidador-servicios-publicos',
+        'label' => $dashboardPermissionTabs['liquidador_servicios_publicos'] ?? 'Liquidador de servicios publicos',
       ],
       'reportes_administrativos_pendientes' => [
         'panel' => 'scm-panel-reportes-administrativos-pendientes',
@@ -273,6 +281,7 @@ trait RendersDashboard
     $canManagePublicPqrSettings = $this->canManagePublicPqrSettings();
     $canManageInternalNotificationSettings = $this->canManageInternalNotificationSettings();
     $cartasAumentoHtml = $this->renderRentIncreaseLettersPanel();
+    $liquidadorServiciosPublicosHtml = $this->renderPublicServicesLiquidatorPanel();
     $allowedAdministrativeActivityTabs = [];
     foreach (array_keys($administrativeActivityTabs) as $activityTabKey) {
       if (in_array($activityTabKey, $dashboardAllowedTabs, true)) {
@@ -403,6 +412,9 @@ trait RendersDashboard
         'preventivas_pendientes' => self::AJAX_PREVENTIVAS_PENDIENTES,
         'servicios_publicos_pendientes' => self::AJAX_SERVICIOS_PUBLICOS_PENDIENTES,
         'revision_servicios_publicos' => self::AJAX_REVISION_SERVICIOS_PUBLICOS,
+        'public_services_liquidator_search' => self::AJAX_PUBLIC_SERVICES_LIQUIDATOR_SEARCH,
+        'public_services_liquidator_calculate' => self::AJAX_PUBLIC_SERVICES_LIQUIDATOR_CALCULATE,
+        'public_services_liquidator_generate' => self::AJAX_PUBLIC_SERVICES_LIQUIDATOR_GENERATE,
         'reportes_administrativos_pendientes' => self::AJAX_REPORTES_ADMINISTRATIVOS_PENDIENTES,
         'admin_due_calendar' => self::AJAX_ADMIN_DUE_CALENDAR,
         'admin_due_case' => self::AJAX_ADMIN_DUE_CASE,
@@ -1133,6 +1145,12 @@ trait RendersDashboard
           <?php if (in_array('servicios_publicos_pendientes', $allowedAdministrativeActivityTabs, true)): ?>
             <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'servicios_publicos_pendientes' ? ' active' : ''; ?>" id="scm-panel-servicios-publicos-pendientes" data-permission-tab="servicios_publicos_pendientes" data-admin-activity-panel="servicios_publicos_pendientes" data-scm-loaded="0">
               <?php echo $serviciosPublicosPendientesHtml; ?>
+            </div>
+          <?php endif; ?>
+
+          <?php if (in_array('liquidador_servicios_publicos', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'liquidador_servicios_publicos' ? ' active' : ''; ?>" id="scm-panel-liquidador-servicios-publicos" data-permission-tab="liquidador_servicios_publicos" data-admin-activity-panel="liquidador_servicios_publicos">
+              <?php echo $liquidadorServiciosPublicosHtml; ?>
             </div>
           <?php endif; ?>
 

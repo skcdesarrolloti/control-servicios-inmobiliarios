@@ -3,6 +3,228 @@
   display: none !important;
 }
 
+#scm-app .scm-psl-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.7fr);
+  gap: 16px;
+  align-items: start;
+}
+
+#scm-app .scm-psl .scm-field--button {
+  align-self: end;
+}
+
+#scm-app .scm-psl-results {
+  margin-top: 14px;
+}
+
+#scm-app .scm-psl-contract-table td small {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
+#scm-app .scm-psl-selected {
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+}
+
+#scm-app .scm-psl-selected strong {
+  color: #0f2f57;
+}
+
+#scm-app .scm-psl-selected span {
+  font-size: 12px;
+}
+
+#scm-app .scm-psl-checks {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  min-height: 36px;
+}
+
+#scm-app .scm-psl-checks label {
+  align-items: center;
+  color: #334155;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+}
+
+#scm-app .scm-psl-services {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+#scm-app .scm-psl-service {
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+#scm-app .scm-psl-service > header {
+  align-items: center;
+  background: #f1f5f9;
+  border-bottom: 1px solid #dbe4f0;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+#scm-app .scm-psl-service > header label {
+  align-items: center;
+  color: #0f2f57;
+  display: inline-flex;
+  font-weight: 800;
+  gap: 8px;
+}
+
+#scm-app .scm-psl-service > header span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#scm-app .scm-psl-service > .scm-grid,
+#scm-app .scm-psl-fixed {
+  padding: 12px;
+}
+
+#scm-app .scm-psl-fixed {
+  border-top: 1px solid #edf2f7;
+}
+
+#scm-app .scm-psl-fixed > strong {
+  color: #0f2f57;
+  display: block;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+#scm-app .scm-psl-summary-total {
+  align-items: center;
+  background: #0f2f57;
+  border-radius: 8px;
+  color: #dbeafe;
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0 14px;
+  padding: 14px 16px;
+}
+
+#scm-app .scm-psl-summary-total strong {
+  color: #fff;
+  font-size: 22px;
+}
+
+#scm-app .scm-psl-summary-grid,
+#scm-app .scm-psl-guide-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#scm-app .scm-psl-summary-card,
+#scm-app .scm-psl-guide article {
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+}
+
+#scm-app .scm-psl-summary-card h4 {
+  color: #0f2f57;
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+#scm-app .scm-psl-summary-amount {
+  color: #0f766e;
+  font-size: 20px;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+
+#scm-app .scm-psl-summary-card dl {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: 0;
+}
+
+#scm-app .scm-psl-summary-card dt,
+#scm-app .scm-psl-summary-card dd {
+  font-size: 12px;
+  margin: 0;
+}
+
+#scm-app .scm-psl-summary-card dt {
+  color: #64748b;
+}
+
+#scm-app .scm-psl-summary-card dd {
+  color: #0f172a;
+  font-weight: 800;
+  text-align: right;
+}
+
+#scm-app .scm-psl-documents {
+  align-items: center;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+#scm-app .scm-psl-queued {
+  color: #475569;
+  font-size: 12px;
+  margin: 12px 0 0;
+}
+
+#scm-app .scm-psl-guide article strong {
+  color: #0f2f57;
+  display: block;
+  margin-bottom: 8px;
+}
+
+#scm-app .scm-psl-guide article p {
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+#scm-app .scm-psl-guide code {
+  background: #f1f5f9;
+  border-radius: 4px;
+  color: #0f2f57;
+  padding: 1px 4px;
+}
+
+@media (max-width: 980px) {
+  #scm-app .scm-psl-layout,
+  #scm-app .scm-psl-summary-grid,
+  #scm-app .scm-psl-guide-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Revision nativa de servicios publicos */
 #scm-app .scm-public-services-unconfigured {
   margin-top: 24px;

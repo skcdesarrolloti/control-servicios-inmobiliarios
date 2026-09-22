@@ -172,6 +172,12 @@
       actions.servicios_publicos_pendientes || "";
     var actionRevisionServiciosPublicos =
       actions.revision_servicios_publicos || "";
+    var actionPublicServicesLiquidatorSearch =
+      actions.public_services_liquidator_search || "";
+    var actionPublicServicesLiquidatorCalculate =
+      actions.public_services_liquidator_calculate || "";
+    var actionPublicServicesLiquidatorGenerate =
+      actions.public_services_liquidator_generate || "";
     var actionContratosArrendamientoFallback =
       actions.preventivas_pendientes || "";
     var actionCrearTicketAdministrativo =
@@ -9134,6 +9140,9 @@
       if (panelId === "scm-panel-servicios-publicos-pendientes") {
         return "servicios_publicos_pendientes";
       }
+      if (panelId === "scm-panel-liquidador-servicios-publicos") {
+        return "liquidador_servicios_publicos";
+      }
       if (panelId === "scm-panel-reportes-administrativos-pendientes") {
         return "reportes_administrativos_pendientes";
       }
@@ -9237,6 +9246,194 @@
           }
           panel.setAttribute("data-scm-loading", "0");
         });
+    }
+
+    function pslMoney(value) {
+      var number = Number(value || 0);
+      try {
+        return new Intl.NumberFormat("es-CO", {
+          style: "currency",
+          currency: "COP",
+          maximumFractionDigits: 0,
+        }).format(number);
+      } catch (err) {
+        return "$" + Math.round(number).toString();
+      }
+    }
+
+    function pslSetLoading(panel, active) {
+      var spinner = panel ? panel.querySelector("[data-psl-spinner]") : null;
+      if (spinner) {
+        spinner.classList.toggle("active", !!active);
+      }
+      if (panel) {
+        panel.setAttribute("data-scm-loading", active ? "1" : "0");
+      }
+    }
+
+    function pslPost(panel, action, formData) {
+      if (!ajaxUrl || !action) {
+        return Promise.reject(new Error("Accion no configurada."));
+      }
+      formData.append("action", action);
+      formData.append("nonce", nonce);
+      pslSetLoading(panel, true);
+      return fetch(ajaxUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin",
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (json) {
+          if (!json || !json.success) {
+            throw new Error(
+              (json && json.data && json.data.message) ||
+                "No se pudo completar la accion.",
+            );
+          }
+          return json.data || {};
+        })
+        .finally(function () {
+          pslSetLoading(panel, false);
+        });
+    }
+
+    function pslApplyContract(panel, contract) {
+      if (!panel || !contract) return;
+      var form = panel.querySelector("[data-public-services-liquidator-form]");
+      if (!form) return;
+      var hidden = form.querySelector("[data-psl-contract-id]");
+      if (hidden) hidden.value = String(contract.id || "");
+      var selected = panel.querySelector("[data-psl-selected]");
+      if (selected) {
+        selected.innerHTML =
+          "<strong>Contrato #" +
+          escHtml(contract.contrato || contract.id || "") +
+          "</strong><span>" +
+          escHtml(contract.inmueble || "") +
+          " · " +
+          escHtml(contract.direccion || "") +
+          " · Propietario: " +
+          escHtml(contract.propietario || "-") +
+          " · Inquilino: " +
+          escHtml(contract.arrendatario || "-") +
+          "</span>";
+      }
+      var services = contract.services || {};
+      panel.querySelectorAll("[data-psl-service]").forEach(function (section) {
+        var key = section.getAttribute("data-psl-service") || "";
+        var service = services[key] || null;
+        var checkbox = section.querySelector("[data-psl-service-enabled]");
+        if (checkbox) checkbox.checked = !!service;
+        var account = section.querySelector("[data-psl-account]");
+        var meter = section.querySelector("[data-psl-meter]");
+        if (account) account.value = service && service.account ? service.account : "";
+        if (meter) meter.value = service && service.meter ? service.meter : "";
+        section.classList.toggle("is-enabled", !!service);
+      });
+      showToast("success", "Contrato cargado en el liquidador.");
+    }
+
+    function pslRenderResult(panel, data) {
+      var summary = panel ? panel.querySelector("[data-psl-summary]") : null;
+      if (summary && typeof data.summary_html === "string") {
+        summary.innerHTML = data.summary_html;
+      }
+      var total = panel ? panel.querySelector("[data-psl-total]") : null;
+      if (total) {
+        total.textContent = pslMoney(data.total_reembolso || 0);
+      }
+    }
+
+    function pslSubmit(panel, mode) {
+      var form = panel ? panel.querySelector("[data-public-services-liquidator-form]") : null;
+      if (!form) return Promise.resolve();
+      var contractId = (form.querySelector("[data-psl-contract-id]") || {}).value || "";
+      if (!contractId) {
+        showToast("warning", "Selecciona primero un contrato.");
+        return Promise.resolve();
+      }
+      var fd = new FormData(form);
+      var action =
+        mode === "generate"
+          ? actionPublicServicesLiquidatorGenerate
+          : actionPublicServicesLiquidatorCalculate;
+      return pslPost(panel, action, fd)
+        .then(function (data) {
+          pslRenderResult(panel, data);
+          if (mode === "generate") {
+            showToast(
+              "success",
+              data.message || "Ordenes de reembolso generadas.",
+            );
+          } else {
+            showToast("success", "Liquidacion calculada.");
+          }
+        })
+        .catch(function (err) {
+          showToast(
+            "error",
+            err && err.message ? err.message : "No se pudo calcular.",
+          );
+        });
+    }
+
+    function pslBindPanel(panel) {
+      if (!panel || panel.getAttribute("data-psl-bound") === "1") return;
+      panel.setAttribute("data-psl-bound", "1");
+      var searchForm = panel.querySelector("[data-public-services-liquidator-search]");
+      if (searchForm) {
+        searchForm.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var fd = new FormData(searchForm);
+          pslPost(panel, actionPublicServicesLiquidatorSearch, fd)
+            .then(function (data) {
+              var results = panel.querySelector("[data-psl-results]");
+              if (results && typeof data.html === "string") {
+                results.innerHTML = data.html;
+              }
+            })
+            .catch(function (err) {
+              showToast(
+                "error",
+                err && err.message ? err.message : "No se pudo buscar contratos.",
+              );
+            });
+        });
+      }
+      panel.addEventListener("click", function (event) {
+        var select = event.target.closest("[data-psl-select-contract]");
+        if (select) {
+          event.preventDefault();
+          try {
+            pslApplyContract(panel, JSON.parse(select.getAttribute("data-contract") || "{}"));
+          } catch (err) {
+            showToast("error", "No se pudo leer el contrato seleccionado.");
+          }
+          return;
+        }
+        var calculate = event.target.closest("[data-psl-calculate]");
+        if (calculate) {
+          event.preventDefault();
+          pslSubmit(panel, "calculate");
+          return;
+        }
+        var generate = event.target.closest("[data-psl-generate]");
+        if (generate) {
+          event.preventDefault();
+          pslSubmit(panel, "generate");
+        }
+      });
+      panel.addEventListener("change", function (event) {
+        var checkbox = event.target.closest("[data-psl-service-enabled]");
+        if (!checkbox) return;
+        var section = checkbox.closest("[data-psl-service]");
+        if (section) {
+          section.classList.toggle("is-enabled", checkbox.checked);
+        }
+      });
     }
 
     function refreshAfterContractReceived(button) {
@@ -17351,6 +17548,13 @@
           administrativeKey === "servicios_publicos_pendientes"
         ) {
           return loadPendingFormOnce(activeAdministrativePanel, "#rsp_form");
+        }
+        if (
+          activeAdministrativePanel &&
+          administrativeKey === "liquidador_servicios_publicos"
+        ) {
+          pslBindPanel(activeAdministrativePanel);
+          return Promise.resolve();
         }
         if (
           activeAdministrativePanel &&

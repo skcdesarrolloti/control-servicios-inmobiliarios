@@ -17,6 +17,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesCollectionManagement;
   use \SCM\App\Concerns\HandlesCanonInsuranceAudits;
   use \SCM\App\Concerns\HandlesRentIncreaseLetters;
+  use \SCM\App\Concerns\HandlesPublicServicesLiquidator;
   use \SCM\App\Concerns\HandlesPropertyHistoryActions;
   use \SCM\App\Concerns\RendersPublicPqr;
   use \SCM\App\Concerns\RendersDashboard;
@@ -57,6 +58,9 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_PREVENTIVAS_PENDIENTES = 'scm_preventivas_pendientes';
   const AJAX_SERVICIOS_PUBLICOS_PENDIENTES = 'scm_servicios_publicos_pendientes';
   const AJAX_REVISION_SERVICIOS_PUBLICOS = 'scm_revision_servicios_publicos';
+  const AJAX_PUBLIC_SERVICES_LIQUIDATOR_SEARCH = 'scm_liquidador_servicios_publicos_buscar';
+  const AJAX_PUBLIC_SERVICES_LIQUIDATOR_CALCULATE = 'scm_liquidador_servicios_publicos_calcular';
+  const AJAX_PUBLIC_SERVICES_LIQUIDATOR_GENERATE = 'scm_liquidador_servicios_publicos_generar';
   const AJAX_REPORTES_ADMINISTRATIVOS_PENDIENTES = 'scm_reportes_administrativos_pendientes';
   const AJAX_ADMIN_DUE_CALENDAR = 'scm_admin_due_calendar';
   const AJAX_ADMIN_DUE_CASE = 'scm_admin_due_case';
@@ -188,6 +192,7 @@ final class SuCasaControlServiciosInmobiliarios
       'preventivas_pendientes' => 'Preventivas Pendientes',
       'contratos_arrendamiento' => 'Contratos de arrendamiento',
       'servicios_publicos_pendientes' => 'Servicios Publicos Pendientes',
+      'liquidador_servicios_publicos' => 'Liquidador de servicios publicos',
       'reportes_administrativos_pendientes' => 'Reportes Administrativos',
       'auditoria_canon_aseguradoras' => 'Auditoría de canon y aseguradoras',
       'cartas_aumento' => 'Cartas de aumento',
@@ -291,6 +296,11 @@ final class SuCasaControlServiciosInmobiliarios
             'label' => 'Acta de servicios públicos',
             'description' => 'Cuando se genera una revisión nativa de servicios públicos y sus actas.',
             'channel' => 'Email interno',
+          ],
+          'liquidador_servicios_publicos' => [
+            'label' => 'Liquidador de servicios públicos',
+            'description' => 'Cuando se generan ordenes de reembolso desde el liquidador de servicios publicos.',
+            'channel' => 'Email interno en cola',
           ],
         ],
       ],
@@ -685,6 +695,9 @@ final class SuCasaControlServiciosInmobiliarios
           break;
         }
       }
+    }
+    if (isset($selected['servicios_publicos_pendientes']) && !isset($selected['liquidador_servicios_publicos'])) {
+      $selected['liquidador_servicios_publicos'] = 'liquidador_servicios_publicos';
     }
     return array_values($selected);
   }
