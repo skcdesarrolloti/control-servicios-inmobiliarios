@@ -658,13 +658,35 @@ final class SuCasaControlServiciosInmobiliarios
     if ($cargo === '' || !array_key_exists($cargo, $permissions)) {
       return $allTabs;
     }
-    return !empty($permissions[$cargo]) ? $permissions[$cargo] : ['mis_tickets'];
+    $allowed = !empty($permissions[$cargo]) ? $permissions[$cargo] : ['mis_tickets'];
+    return $this->dashboardPermissionCompatibilityTabs($allowed);
   }
 
   private function canAccessDashboardTab(string $tab): bool
   {
     $tab = preg_replace('/[^a-z0-9_]/', '', strtolower($tab)) ?: '';
     return $tab !== '' && in_array($tab, $this->currentDashboardAllowedTabs(), true);
+  }
+
+  /** @param array<int,string> $allowed @return array<int,string> */
+  private function dashboardPermissionCompatibilityTabs(array $allowed): array
+  {
+    $selected = [];
+    foreach ($allowed as $tab) {
+      $tabKey = preg_replace('/[^a-z0-9_]/', '', strtolower((string) $tab)) ?: '';
+      if ($tabKey !== '') {
+        $selected[$tabKey] = $tabKey;
+      }
+    }
+    if (!isset($selected['cartas_aumento'])) {
+      foreach (['contratos_arrendamiento', 'auditoria_canon_aseguradoras', 'reportes_administrativos_pendientes', 'notificaciones'] as $relatedTab) {
+        if (isset($selected[$relatedTab])) {
+          $selected['cartas_aumento'] = 'cartas_aumento';
+          break;
+        }
+      }
+    }
+    return array_values($selected);
   }
 
   /** @return array<int,string> */
