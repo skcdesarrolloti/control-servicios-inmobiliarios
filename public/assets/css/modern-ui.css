@@ -1163,20 +1163,74 @@
 }
 
 /* ==========================================================================
+   BARRA DE ESTADOS DE TICKETS (Abiertos, Mis Tickets, Postergados, Cerrados)
+   ========================================================================== */
+
+#scm-app .scm-ticket-status-nav {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  padding: 0.5rem 0.65rem !important;
+  margin-top: 0.75rem !important;
+  margin-bottom: 1.25rem !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 30, 54, 0.04) !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+#scm-app .scm-ticket-status-nav .scm-status-nav-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  padding: 0.5rem 1rem !important;
+  border-radius: 0.75rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-ticket-status-nav .scm-status-nav-pill:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+#scm-app .scm-ticket-status-nav .scm-status-nav-pill.active {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+  box-shadow: 0 2px 6px rgba(15, 30, 54, 0.15) !important;
+}
+
+#scm-app .scm-ticket-status-nav .scm-status-nav-pill .material-symbols-outlined {
+  font-size: 18px !important;
+}
+
+/* ==========================================================================
    SUBTABS DE TICKETS (Mantenimiento, Preventiva, Entrega, etc.)
    ========================================================================== */
 
-#scm-app .scm-open-subtabs {
+#scm-app .scm-open-subtabs,
+#scm-app .scm-status-subtabs {
   background: transparent !important;
   border: none !important;
   padding: 0.25rem 0 1rem 0 !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  gap: 0.75rem !important;
+  flex-wrap: wrap !important;
+  gap: 0.5rem !important;
 }
 
-#scm-app .scm-open-subtabs .scm-open-topic-tab {
+#scm-app .scm-open-subtabs .scm-open-topic-tab,
+#scm-app .scm-status-subtabs .scm-status-topic-tab {
   background: #ffffff !important;
   color: #475569 !important;
   border: 1px solid #e2e8f0 !important;
@@ -1188,19 +1242,60 @@
   display: inline-flex !important;
   align-items: center !important;
   gap: 0.4rem !important;
+  cursor: pointer !important;
 }
 
-#scm-app .scm-open-subtabs .scm-open-topic-tab:hover {
+#scm-app .scm-open-subtabs .scm-open-topic-tab:hover,
+#scm-app .scm-status-subtabs .scm-status-topic-tab:hover {
   background: #f1f5f9 !important;
   color: #0f172a !important;
   border-color: #cbd5e1 !important;
 }
 
-#scm-app .scm-open-subtabs .scm-open-topic-tab.active {
+#scm-app .scm-open-subtabs .scm-open-topic-tab.active,
+#scm-app .scm-status-subtabs .scm-status-topic-tab.active {
   background: #0f1e36 !important;
   color: #ffffff !important;
   border-color: #0f1e36 !important;
   box-shadow: 0 2px 4px rgba(15, 30, 54, 0.12) !important;
+}
+
+#scm-app .scm-status-topic-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 1rem !important;
+  margin-bottom: 1.25rem !important;
+  padding-bottom: 0.75rem !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+#scm-app .scm-status-topic-head h3 {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  margin: 0 !important;
+  letter-spacing: -0.02em !important;
+}
+
+#scm-app .scm-status-topic-head p {
+  font-size: 0.8125rem !important;
+  color: #64748b !important;
+  margin: 0.2rem 0 0 0 !important;
+}
+
+#scm-app .scm-status-topic-head .scm-status-count {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  color: #0f1e36 !important;
+  background: #eff4ff !important;
+  border: 1px solid #cbdbf5 !important;
+  padding: 0.35rem 0.85rem !important;
+  border-radius: 9999px !important;
 }
 
 #scm-app .scm-sync-status {

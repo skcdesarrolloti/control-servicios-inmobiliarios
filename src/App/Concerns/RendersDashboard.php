@@ -660,26 +660,62 @@ trait RendersDashboard
           <span data-scm-panel-loader-detail>Espera un momento mientras consultamos los datos.</span>
         </div>
       </div>
-      <div class="scm-mesa-operativa-banner">
-        <div class="scm-mesa-title-wrap">
-          <div class="scm-mesa-icon-circle">
-            <span class="material-symbols-outlined text-[24px]">assignment</span>
+      <?php
+      $isTicketTabActive = in_array($initialTab, [
+        'scm-panel-abiertos',
+        'scm-panel-mis-tickets',
+        'scm-panel-postergados',
+        'scm-panel-cerrados',
+      ], true);
+      ?>
+      <div class="scm-tickets-header-wrap" id="scm-tickets-header-wrap"<?php echo !$isTicketTabActive ? ' style="display:none;"' : ''; ?>>
+        <div class="scm-mesa-operativa-banner">
+          <div class="scm-mesa-title-wrap">
+            <div class="scm-mesa-icon-circle">
+              <span class="material-symbols-outlined text-[24px]">assignment</span>
+            </div>
+            <div>
+              <h2 class="scm-mesa-title">Mesa Operativa de Casos</h2>
+              <div class="scm-mesa-subtitle">CONTROL DE MANTENIMIENTOS &amp; TICKETS</div>
+            </div>
           </div>
-          <div>
-            <h2 class="scm-mesa-title">Mesa Operativa de Casos</h2>
-            <div class="scm-mesa-subtitle">CONTROL DE MANTENIMIENTOS &amp; TICKETS</div>
+          <div class="scm-guide-bar scm-mesa-quick-actions">
+            <?php if ($canManageDashboardPermissions): ?>
+              <button class="scm-guide-btn scm-permissions-btn" type="button" id="scm-open-permissions"><span class="material-symbols-outlined text-[16px]">lock</span> Permisos</button>
+              <button class="scm-guide-btn scm-due-settings-shortcut" type="button" data-scm-open-due-settings><span class="material-symbols-outlined text-[16px]">calendar_month</span> Vencimientos</button>
+            <?php endif; ?>
+            <?php if ($canManagePublicPqrSettings || $canManageInternalNotificationSettings): ?>
+              <button class="scm-guide-btn scm-internal-notifications-shortcut" type="button" id="scm-open-internal-notifications"><span class="material-symbols-outlined text-[16px]">notifications</span> Notificaciones</button>
+            <?php endif; ?>
+            <button class="scm-guide-btn" type="button" id="scm-open-actas-guide"><span class="material-symbols-outlined text-[16px]">description</span> Tipos de actas</button>
+            <button class="scm-guide-btn" type="button" id="scm-open-guide"><span class="material-symbols-outlined text-[16px]">menu_book</span> Gu&iacute;as</button>
           </div>
         </div>
-        <div class="scm-guide-bar scm-mesa-quick-actions">
-          <?php if ($canManageDashboardPermissions): ?>
-            <button class="scm-guide-btn scm-permissions-btn" type="button" id="scm-open-permissions"><span class="material-symbols-outlined text-[16px]">lock</span> Permisos</button>
-            <button class="scm-guide-btn scm-due-settings-shortcut" type="button" data-scm-open-due-settings><span class="material-symbols-outlined text-[16px]">calendar_month</span> Vencimientos</button>
+        <div class="scm-ticket-status-nav" id="scm-ticket-status-nav" role="tablist" aria-label="Vistas de tickets">
+          <?php if (in_array('abiertos', $dashboardAllowedTabs, true)): ?>
+            <button class="scm-status-nav-pill<?php echo $initialTab === 'scm-panel-abiertos' ? ' active' : ''; ?>" type="button" data-ticket-status-target="scm-panel-abiertos">
+              <span class="material-symbols-outlined text-[18px]">inbox</span>
+              <span>Tickets Abiertos</span>
+            </button>
           <?php endif; ?>
-          <?php if ($canManagePublicPqrSettings || $canManageInternalNotificationSettings): ?>
-            <button class="scm-guide-btn scm-internal-notifications-shortcut" type="button" id="scm-open-internal-notifications"><span class="material-symbols-outlined text-[16px]">notifications</span> Notificaciones</button>
+          <?php if (in_array('mis_tickets', $dashboardAllowedTabs, true)): ?>
+            <button class="scm-status-nav-pill<?php echo $initialTab === 'scm-panel-mis-tickets' ? ' active' : ''; ?>" type="button" data-ticket-status-target="scm-panel-mis-tickets">
+              <span class="material-symbols-outlined text-[18px]">assignment_ind</span>
+              <span>Mis Tickets</span>
+            </button>
           <?php endif; ?>
-          <button class="scm-guide-btn" type="button" id="scm-open-actas-guide"><span class="material-symbols-outlined text-[16px]">description</span> Tipos de actas</button>
-          <button class="scm-guide-btn" type="button" id="scm-open-guide"><span class="material-symbols-outlined text-[16px]">menu_book</span> Gu&iacute;as</button>
+          <?php if (in_array('postergados', $dashboardAllowedTabs, true)): ?>
+            <button class="scm-status-nav-pill<?php echo $initialTab === 'scm-panel-postergados' ? ' active' : ''; ?>" type="button" data-ticket-status-target="scm-panel-postergados">
+              <span class="material-symbols-outlined text-[18px]">hourglass_empty</span>
+              <span>Tickets Postergados</span>
+            </button>
+          <?php endif; ?>
+          <?php if (in_array('cerrados', $dashboardAllowedTabs, true)): ?>
+            <button class="scm-status-nav-pill<?php echo $initialTab === 'scm-panel-cerrados' ? ' active' : ''; ?>" type="button" data-ticket-status-target="scm-panel-cerrados">
+              <span class="material-symbols-outlined text-[18px]">task_alt</span>
+              <span>Tickets Cerrados</span>
+            </button>
+          <?php endif; ?>
         </div>
       </div>
       <div class="scm-tabs scm-main-tabs">

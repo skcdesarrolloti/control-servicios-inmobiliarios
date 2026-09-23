@@ -48,10 +48,18 @@ $faviconUrl = function_exists('system_image')
 $isStandalone = !empty($standalone_function);
 
 // Determinar pestaña activa si no fue provista explícitamente
-if (empty($current_page)) {
+if (empty($current_page) || $current_page === 'tickets') {
   $tabParam = mb_strtolower(trim((string)($_GET['scm_tab'] ?? ($_GET['tab'] ?? ''))), 'UTF-8');
-  if (in_array($tabParam, ['tickets', 'abiertos', 'mis_tickets', 'cerrados', 'postergados', 'scm-panel-abiertos', 'scm-panel-mis-tickets'], true)) {
-    $current_page = 'tickets';
+  if (in_array($tabParam, ['abiertos', 'scm-panel-abiertos'], true)) {
+    $current_page = 'abiertos';
+  } elseif (in_array($tabParam, ['mis_tickets', 'mis-tickets', 'scm-panel-mis-tickets'], true)) {
+    $current_page = 'mis_tickets';
+  } elseif (in_array($tabParam, ['postergados', 'scm-panel-postergados'], true)) {
+    $current_page = 'postergados';
+  } elseif (in_array($tabParam, ['cerrados', 'scm-panel-cerrados'], true)) {
+    $current_page = 'cerrados';
+  } elseif (in_array($tabParam, ['tickets', 'ticket', 'casos'], true)) {
+    $current_page = 'abiertos';
   } elseif (in_array($tabParam, ['vencimientos', 'due', 'due_calendar'], true)) {
     $current_page = 'vencimientos';
   } elseif (in_array($tabParam, ['administrativas', 'actividades_administrativas', 'scm-panel-actividades-administrativas', 'notificaciones', 'cotizaciones_mantenimiento'], true)) {
@@ -65,7 +73,7 @@ if (empty($current_page)) {
   } elseif (in_array($tabParam, ['inicio', 'home', 'resumen', 'scm-panel-inicio'], true)) {
     $current_page = 'inicio';
   } else {
-    $current_page = 'tickets';
+    $current_page = 'abiertos';
   }
 }
 
@@ -85,20 +93,51 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 };
 
 // Orden solicitado:
-// 1. Gestión de Casos & Tickets
+// 1. Gestión de Casos & Tickets (Dropdown con Abiertos, Mis Tickets, Postergados, Cerrados)
 // 2. Vencimientos
 // 3. Actividades Administrativas (Dropdown con Actividades Administrativas, Liquidación y Contratos)
 // 4. Métricas y Dashboard
 // 5. Inicio (Mi Calendario, Historial, etc.)
 $rawNavItems = [
   'tickets' => [
-    'type' => 'link',
+    'type' => 'dropdown',
     'key' => 'tickets',
     'label' => 'Gestión de Casos & Tickets',
-    'panel_id' => 'scm-panel-abiertos',
-    'url' => $baseUrl . '/index.php?tab=abiertos',
     'icon' => 'confirmation_number',
-    'perms' => ['abiertos', 'mis_tickets', 'cerrados', 'postergados'],
+    'children' => [
+      'abiertos' => [
+        'key' => 'abiertos',
+        'label' => 'Tickets Abiertos',
+        'panel_id' => 'scm-panel-abiertos',
+        'url' => $baseUrl . '/index.php?tab=abiertos',
+        'icon' => 'inbox',
+        'perms' => ['abiertos'],
+      ],
+      'mis_tickets' => [
+        'key' => 'mis_tickets',
+        'label' => 'Mis Tickets',
+        'panel_id' => 'scm-panel-mis-tickets',
+        'url' => $baseUrl . '/index.php?tab=mis_tickets',
+        'icon' => 'assignment_ind',
+        'perms' => ['mis_tickets'],
+      ],
+      'postergados' => [
+        'key' => 'postergados',
+        'label' => 'Tickets Postergados',
+        'panel_id' => 'scm-panel-postergados',
+        'url' => $baseUrl . '/index.php?tab=postergados',
+        'icon' => 'hourglass_empty',
+        'perms' => ['postergados'],
+      ],
+      'cerrados' => [
+        'key' => 'cerrados',
+        'label' => 'Tickets Cerrados',
+        'panel_id' => 'scm-panel-cerrados',
+        'url' => $baseUrl . '/index.php?tab=cerrados',
+        'icon' => 'task_alt',
+        'perms' => ['cerrados'],
+      ],
+    ],
   ],
   'vencimientos' => [
     'type' => 'link',
@@ -496,7 +535,9 @@ foreach ($rawNavItems as $k => $item) {
               </div>
               <a
                 href="<?php echo htmlspecialchars($baseUrl . '/index.php?tab=mis_tickets', ENT_QUOTES, 'UTF-8'); ?>"
-                class="flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                data-panel-target="scm-panel-mis-tickets"
+                data-tab-key="mis_tickets"
+                class="nav-tab-pill flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
                 role="menuitem"
               >
                 <span class="material-symbols-outlined text-[16px] text-slate-500">assignment_ind</span>
