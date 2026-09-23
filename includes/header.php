@@ -109,12 +109,22 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 };
 
 // Orden solicitado:
-// 1. Gestión de Casos & Tickets (Dropdown con Abiertos, Mis Tickets, Postergados, Cerrados)
-// 2. Vencimientos
-// 3. Actividades Administrativas (Dropdown con todas las actividades administrativas)
-// 4. Métricas y Dashboard
-// 5. Inicio (Mi Calendario, Historial, etc.)
+// 1. Inicio (Mi Calendario, Historial, etc.)
+// 2. Gestión de Casos & Tickets (Dropdown con Abiertos, Mis Tickets, Postergados, Cerrados)
+// 3. Vencimientos
+// 4. Actividades Administrativas (Dropdown con todas las actividades administrativas)
+// 5. Métricas y Dashboard
 $rawNavItems = [
+  'inicio' => [
+    'type' => 'link',
+    'key' => 'inicio',
+    'label' => 'Inicio',
+    'panel_id' => 'scm-panel-inicio',
+    'subtab' => 'mine',
+    'url' => $baseUrl . '/index.php?tab=inicio',
+    'icon' => 'home',
+    'perms' => [],
+  ],
   'tickets' => [
     'type' => 'dropdown',
     'key' => 'tickets',
@@ -166,99 +176,23 @@ $rawNavItems = [
     'perms' => ['calendario_actividades', 'reportes_administrativos_pendientes', 'abiertos'],
   ],
   'administrativas' => [
-    'type' => 'dropdown',
-    'key' => 'administrativas',
+    'type' => 'link',
+    'key' => 'actividades_administrativas',
     'label' => 'Actividades Administrativas',
+    'panel_id' => 'scm-panel-actividades-administrativas',
+    'url' => $baseUrl . '/index.php?tab=actividades_administrativas',
     'icon' => 'folder_shared',
-    'children' => [
-      'actividades_administrativas' => [
-        'key' => 'actividades_administrativas',
-        'label' => 'Todas las Actividades',
-        'panel_id' => 'scm-panel-actividades-administrativas',
-        'url' => $baseUrl . '/index.php?tab=actividades_administrativas',
-        'icon' => 'folder_shared',
-        'perms' => ['reportes_administrativos_pendientes', 'notificaciones', 'gestiones_cobro', 'auditoria_canon_aseguradoras', 'cartas_aumento'],
-      ],
-      'notificaciones' => [
-        'key' => 'notificaciones',
-        'label' => 'Notificaciones',
-        'panel_id' => 'scm-panel-admin-notificaciones',
-        'url' => $baseUrl . '/index.php?tab=notificaciones',
-        'icon' => 'notifications',
-        'perms' => ['notificaciones'],
-      ],
-      'cotizaciones_mantenimiento' => [
-        'key' => 'cotizaciones_mantenimiento',
-        'label' => 'Cotizaciones de Mantenimiento',
-        'panel_id' => 'scm-panel-cotizaciones-mantenimiento',
-        'url' => $baseUrl . '/index.php?tab=cotizaciones_mantenimiento',
-        'icon' => 'request_quote',
-        'perms' => ['cotizaciones_mantenimiento'],
-      ],
-      'actas_satisfaccion' => [
-        'key' => 'actas_satisfaccion',
-        'label' => 'Actas de Satisfacción',
-        'panel_id' => 'scm-panel-actas-satisfaccion',
-        'url' => $baseUrl . '/index.php?tab=actas_satisfaccion',
-        'icon' => 'assignment_turned_in',
-        'perms' => ['actas_satisfaccion'],
-      ],
-      'preventivas_pendientes' => [
-        'key' => 'preventivas_pendientes',
-        'label' => 'Preventivas Pendientes',
-        'panel_id' => 'scm-panel-preventivas-pendientes',
-        'url' => $baseUrl . '/index.php?tab=preventivas_pendientes',
-        'icon' => 'pending_actions',
-        'perms' => ['preventivas_pendientes'],
-      ],
-      'servicios_publicos_pendientes' => [
-        'key' => 'servicios_publicos_pendientes',
-        'label' => 'Servicios Públicos Pendientes',
-        'panel_id' => 'scm-panel-servicios-publicos-pendientes',
-        'url' => $baseUrl . '/index.php?tab=servicios_publicos_pendientes',
-        'icon' => 'receipt_long',
-        'perms' => ['servicios_publicos_pendientes'],
-      ],
-      'liquidacion' => [
-        'key' => 'liquidacion',
-        'label' => 'Liquidación de Servicios',
-        'panel_id' => 'scm-panel-liquidador-servicios-publicos',
-        'url' => $baseUrl . '/index.php?tab=liquidador_servicios_publicos',
-        'icon' => 'calculate',
-        'perms' => ['liquidador_servicios_publicos', 'servicios_publicos_pendientes'],
-      ],
-      'contratos' => [
-        'key' => 'contratos',
-        'label' => 'Contratos de Arrendamiento',
-        'panel_id' => 'scm-panel-contratos-arrendamiento',
-        'url' => $baseUrl . '/index.php?tab=contratos',
-        'icon' => 'description',
-        'perms' => ['contratos_arrendamiento'],
-      ],
-      'reportes_administrativos_pendientes' => [
-        'key' => 'reportes_administrativos_pendientes',
-        'label' => 'Reportes Administrativos',
-        'panel_id' => 'scm-panel-reportes-administrativos-pendientes',
-        'url' => $baseUrl . '/index.php?tab=reportes_administrativos_pendientes',
-        'icon' => 'summarize',
-        'perms' => ['reportes_administrativos_pendientes'],
-      ],
-      'auditoria_canon_aseguradoras' => [
-        'key' => 'auditoria_canon_aseguradoras',
-        'label' => 'Auditoría de Canon y Aseguradoras',
-        'panel_id' => 'scm-panel-auditoria-canon-aseguradoras',
-        'url' => $baseUrl . '/index.php?tab=auditoria_canon_aseguradoras',
-        'icon' => 'verified_user',
-        'perms' => ['auditoria_canon_aseguradoras'],
-      ],
-      'cartas_aumento' => [
-        'key' => 'cartas_aumento',
-        'label' => 'Cartas de Aumento',
-        'panel_id' => 'scm-panel-cartas-aumento',
-        'url' => $baseUrl . '/index.php?tab=cartas_aumento',
-        'icon' => 'mail',
-        'perms' => ['cartas_aumento'],
-      ],
+    'perms' => [
+      'notificaciones',
+      'gestiones_cobro',
+      'cotizaciones_mantenimiento',
+      'actas_satisfaccion',
+      'preventivas_pendientes',
+      'servicios_publicos_pendientes',
+      'liquidador_servicios_publicos',
+      'reportes_administrativos_pendientes',
+      'auditoria_canon_aseguradoras',
+      'cartas_aumento',
     ],
   ],
   'dashboard' => [
@@ -269,16 +203,6 @@ $rawNavItems = [
     'url' => $baseUrl . '/index.php?tab=metricas',
     'icon' => 'query_stats',
     'perms' => ['metricas'],
-  ],
-  'inicio' => [
-    'type' => 'link',
-    'key' => 'inicio',
-    'label' => 'Inicio',
-    'panel_id' => 'scm-panel-inicio',
-    'subtab' => 'mine',
-    'url' => $baseUrl . '/index.php?tab=inicio',
-    'icon' => 'home',
-    'perms' => [],
   ],
 ];
 
@@ -553,17 +477,77 @@ foreach ($rawNavItems as $k => $item) {
             <span class="hidden md:inline">Nuevo Ticket</span>
           </button>
 
-          <!-- Botón Configuración / Permisos -->
-          <button
-            type="button"
-            id="btn-global-configuracion"
-            onclick="window.dispatchEvent(new CustomEvent('scm:open-configuracion'))"
-            title="Configuración operativa"
-            class="p-2 sm:px-3 sm:py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-colors flex items-center gap-1 text-xs sm:text-sm font-medium"
-          >
-            <span class="material-symbols-outlined text-[20px]">settings</span>
-            <span class="hidden xl:inline">Configuración</span>
-          </button>
+          <!-- Menú Desplegable Configuración Operativa -->
+          <div class="relative" id="global-config-menu-container">
+            <button
+              type="button"
+              id="btn-global-configuracion"
+              title="Configuración operativa"
+              class="p-2 sm:px-3 sm:py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-colors flex items-center gap-1 text-xs sm:text-sm font-medium focus:outline-none"
+              aria-haspopup="true"
+              aria-expanded="false"
+            >
+              <span class="material-symbols-outlined text-[20px]">settings</span>
+              <span class="hidden xl:inline">Configuración</span>
+              <span class="material-symbols-outlined text-[16px] text-slate-400">expand_more</span>
+            </button>
+            <div
+              id="global-config-dropdown-menu"
+              class="hidden absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200/90 py-1.5 z-50 drop-shadow-xl"
+              role="menu"
+            >
+              <div class="px-3.5 py-1.5 border-b border-slate-100">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Configuración Operativa</p>
+              </div>
+              <div class="p-1 flex flex-col gap-0.5">
+                <button
+                  type="button"
+                  data-scm-config-action="permissions"
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">lock</span>
+                  <span>Permisos del Panel</span>
+                </button>
+                <button
+                  type="button"
+                  data-scm-config-action="due-settings"
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">calendar_month</span>
+                  <span>Configurar Vencimientos</span>
+                </button>
+                <button
+                  type="button"
+                  data-scm-config-action="notifications"
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">notifications</span>
+                  <span>Notificaciones Internas</span>
+                </button>
+                <button
+                  type="button"
+                  data-scm-config-action="actas-guide"
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">description</span>
+                  <span>Tipos de Actas</span>
+                </button>
+                <button
+                  type="button"
+                  data-scm-config-action="guide"
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">menu_book</span>
+                  <span>Guías del Sistema</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
           <!-- Notificaciones con Indicador Activo -->
           <div class="relative">

@@ -1838,4 +1838,472 @@
   border-color: #94a3b8 !important;
 }
 
+/* ========================================================== */
+/* CONFIGURACIÓN OPERATIVA HEADER DROPDOWN                    */
+/* ========================================================== */
+#global-config-menu-container {
+  position: relative;
+}
 
+#global-config-dropdown-menu {
+  min-width: 250px;
+  background: #ffffff;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+  border: 1px solid #e2e8f0;
+  z-index: 60;
+}
+
+#global-config-dropdown-menu button {
+  cursor: pointer;
+  outline: none;
+}
+
+/* ========================================================== */
+/* ACTIVIDADES ADMINISTRATIVAS PLEGABLE TOOLBAR              */
+/* ========================================================== */
+#scm-app .scm-admin-activity-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 1rem !important;
+  padding: 0.875rem 1.25rem !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  margin-bottom: 1.25rem !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+}
+
+#scm-app .scm-admin-activity-header-info {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.875rem !important;
+}
+
+#scm-app .scm-admin-activity-icon-badge {
+  width: 2.75rem !important;
+  height: 2.75rem !important;
+  border-radius: 0.75rem !important;
+  background: #eff6ff !important;
+  color: #1e40af !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  border: 1px solid #dbeafe !important;
+}
+
+#scm-app .scm-admin-activity-subtitle {
+  display: block !important;
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #64748b !important;
+  line-height: 1 !important;
+  margin-bottom: 0.25rem !important;
+}
+
+#scm-app .scm-admin-activity-title {
+  font-size: 1.0625rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  margin: 0 !important;
+  line-height: 1.2 !important;
+}
+
+#scm-app .scm-admin-plegable-container {
+  position: relative !important;
+}
+
+#scm-app .scm-admin-plegable-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.625rem !important;
+  padding: 0.55rem 1rem !important;
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0.75rem !important;
+  color: #0f172a !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+}
+
+#scm-app .scm-admin-plegable-btn:hover {
+  background: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+}
+
+#scm-app .scm-admin-plegable-btn[aria-expanded="true"] .scm-plegable-chevron {
+  transform: rotate(180deg) !important;
+}
+
+#scm-app .scm-plegable-chevron {
+  transition: transform 0.2s ease !important;
+}
+
+#scm-app .scm-admin-plegable-menu {
+  position: absolute !important;
+  right: 0 !important;
+  top: calc(100% + 0.5rem) !important;
+  min-width: 300px !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.875rem !important;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.08) !important;
+  z-index: 50 !important;
+  overflow: hidden !important;
+}
+
+#scm-app .scm-admin-plegable-header {
+  padding: 0.625rem 0.875rem !important;
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  color: #475569 !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+#scm-app .scm-admin-plegable-list {
+  padding: 0.375rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.2rem !important;
+  max-height: 380px !important;
+  overflow-y: auto !important;
+}
+
+#scm-app .scm-admin-plegable-item {
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.625rem !important;
+  padding: 0.55rem 0.75rem !important;
+  border-radius: 0.5rem !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: #334155 !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+#scm-app .scm-admin-plegable-item:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+#scm-app .scm-admin-plegable-item.active {
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #1e40af !important;
+  font-weight: 600 !important;
+}
+
+#scm-app .scm-plegable-item-icon {
+  font-size: 1.125rem !important;
+  color: #64748b !important;
+}
+
+#scm-app .scm-admin-plegable-item.active .scm-plegable-item-icon {
+  color: #1e40af !important;
+}
+
+/* ==========================================================================
+   STITCH UI - MODERNIZACIÓN COMPLETA (KPIS, FILTROS Y TARJETAS)
+   ========================================================================== */
+
+/* 1. Neutralizar barras de gradiente superiores heredadas de 01-core.css */
+#scm-app .scm-kpi::before,
+#scm-app .scm-ticket-card::before,
+#scm-app .scm-filter-card::before {
+  display: none !important;
+  content: none !important;
+}
+
+/* 2. KPIs Stitch UI */
+#scm-app .scm-kpis-stitch {
+  display: grid !important;
+  grid-template-columns: repeat(9, minmax(0, 1fr)) !important;
+  gap: 0.65rem !important;
+  margin-bottom: 1.25rem !important;
+}
+
+@media (max-width: 1400px) {
+  #scm-app .scm-kpis-stitch {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  #scm-app .scm-kpis-stitch {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 540px) {
+  #scm-app .scm-kpis-stitch {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+#scm-app .scm-kpis-stitch .scm-kpi {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.75rem !important;
+  padding: 0.85rem 1rem 0.75rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  min-height: 5.25rem !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 30, 54, 0.04) !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  position: relative !important;
+  overflow: hidden !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#scm-app .scm-kpis-stitch .scm-kpi:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 6px -1px rgba(15, 30, 54, 0.08) !important;
+  border-color: #cbd5e1 !important;
+}
+
+#scm-app .scm-kpis-stitch .scm-kpi-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  margin-bottom: 0.4rem !important;
+}
+
+#scm-app .scm-kpis-stitch .scm-kpi-label {
+  font-size: 0.625rem !important;
+  font-weight: 700 !important;
+  color: #64748b !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  margin: 0 !important;
+  line-height: 1.2 !important;
+}
+
+#scm-app .scm-kpis-stitch .scm-kpi-icon {
+  font-size: 15px !important;
+  color: #94a3b8 !important;
+}
+
+#scm-app .scm-kpis-stitch .scm-kpi-value-row {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 0.35rem !important;
+}
+
+#scm-app .scm-kpis-stitch .scm-kpi-value {
+  font-size: 1.65rem !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  line-height: 1 !important;
+  letter-spacing: -0.03em !important;
+}
+
+#scm-app .scm-kpis-stitch .scm-kpi-indicator {
+  width: 36px !important;
+  height: 3.5px !important;
+  border-radius: 9999px !important;
+  margin-top: 0.5rem !important;
+}
+
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-total { background-color: #0f1e36 !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-con-cotz { background-color: #10b981 !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-sin-cotz { background-color: #f59e0b !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-con-prev { background-color: #3b82f6 !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-sin-prev { background-color: #38bdf8 !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-critico { background-color: #ef4444 !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-alto { background-color: #92400e !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-medio { background-color: #64748b !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-bajo { background-color: #06b6d4 !important; }
+
+/* 3. Panel de Filtros Stitch UI */
+#scm-app .scm-filter-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  padding: 1.25rem 1.5rem !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 30, 54, 0.04) !important;
+  margin-bottom: 1.25rem !important;
+}
+
+#scm-app #scm-filter-grid.scm-grid {
+  display: grid !important;
+  gap: 0.85rem !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  transition: all 0.25s ease !important;
+}
+
+@media (max-width: 1200px) {
+  #scm-app #scm-filter-grid.scm-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  #scm-app #scm-filter-grid.scm-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  #scm-app #scm-filter-grid.scm-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+#scm-app .scm-filter-card .scm-field label {
+  font-size: 0.625rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #64748b !important;
+  margin-bottom: 0.3rem !important;
+  display: block !important;
+}
+
+#scm-app .scm-filter-card .scm-field input,
+#scm-app .scm-filter-card .scm-field select {
+  width: 100% !important;
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.5rem !important;
+  padding: 0.4rem 0.65rem !important;
+  font-size: 0.75rem !important;
+  color: #1e293b !important;
+  outline: none !important;
+  height: 2.25rem !important;
+  transition: all 0.15s ease !important;
+}
+
+#scm-app .scm-filter-card .scm-field input:focus,
+#scm-app .scm-filter-card .scm-field select:focus {
+  background-color: #ffffff !important;
+  border-color: #94a3b8 !important;
+  box-shadow: 0 0 0 2px rgba(15, 30, 54, 0.08) !important;
+}
+
+#scm-app .scm-filter-card .scm-field input::placeholder {
+  color: #94a3b8 !important;
+}
+
+#scm-app .scm-date-range-control {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+}
+
+#scm-app .scm-date-range-part {
+  flex: 1 1 0% !important;
+}
+
+#scm-app .scm-date-range-part input {
+  height: 2.25rem !important;
+  font-size: 0.75rem !important;
+  padding: 0.25rem 0.5rem !important;
+}
+
+#scm-app .scm-date-range-separator {
+  color: #94a3b8 !important;
+  font-size: 0.75rem !important;
+}
+
+/* 4. Botones de Acción de Filtros */
+#scm-app .scm-filter-card .scm-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 0.75rem !important;
+  margin-top: 1.25rem !important;
+  padding-top: 1rem !important;
+  border-top: 1px solid #f1f5f9 !important;
+}
+
+#scm-app .scm-filter-card .scm-btn-primary {
+  background-color: #854d0e !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 0.5rem !important;
+  padding: 0.5rem 1.15rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  box-shadow: 0 1px 2px rgba(133, 77, 14, 0.2) !important;
+  cursor: pointer !important;
+  transition: background-color 0.15s ease !important;
+}
+
+#scm-app .scm-filter-card .scm-btn-primary:hover {
+  background-color: #713f12 !important;
+}
+
+#scm-app .scm-filter-card .scm-btn-secondary {
+  background-color: #ffffff !important;
+  color: #334155 !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0.5rem !important;
+  padding: 0.5rem 1rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+#scm-app .scm-filter-card .scm-btn-secondary:hover {
+  background-color: #f8fafc !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+/* 5. Tarjetas de Tickets: Borde superior exacto según urgencia */
+#scm-app .scm-ticket-card.scm-card-urgency--critico { border-top: 4px solid #ef4444 !important; }
+#scm-app .scm-ticket-card.scm-card-urgency--alto { border-top: 4px solid #f59e0b !important; }
+#scm-app .scm-ticket-card.scm-card-urgency--medio { border-top: 4px solid #3b82f6 !important; }
+#scm-app .scm-ticket-card.scm-card-urgency--bajo { border-top: 4px solid #10b981 !important; }
+
+/* 6. Píldoras de urgencia en encabezado de tarjeta */
+#scm-app .scm-urgency-critico {
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fecaca !important;
+}
+
+#scm-app .scm-urgency-alto {
+  background: #fffbeb !important;
+  color: #d97706 !important;
+  border: 1px solid #fde68a !important;
+}
+
+#scm-app .scm-urgency-medio {
+  background: #eff6ff !important;
+  color: #2563eb !important;
+  border: 1px solid #bfdbfe !important;
+}
+
+#scm-app .scm-urgency-bajo {
+  background: #f0fdf4 !important;
+  color: #16a34a !important;
+  border: 1px solid #bbf7d0 !important;
+}

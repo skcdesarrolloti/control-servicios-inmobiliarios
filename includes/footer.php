@@ -48,25 +48,70 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
     (function () {
       'use strict';
 
-      // 1. Menú desplegable de perfil de usuario
+      // 1. Menú desplegable de perfil de usuario y configuración
       const profileBtn = document.getElementById('user-profile-button');
       const dropdownMenu = document.getElementById('user-dropdown-menu');
+      const configBtn = document.getElementById('btn-global-configuracion');
+      const configDropdown = document.getElementById('global-config-dropdown-menu');
 
       if (profileBtn && dropdownMenu) {
         profileBtn.addEventListener('click', function (e) {
           e.stopPropagation();
+          if (configDropdown) configDropdown.classList.add('hidden');
           const isHidden = dropdownMenu.classList.contains('hidden');
           dropdownMenu.classList.toggle('hidden', !isHidden);
           profileBtn.setAttribute('aria-expanded', String(isHidden));
         });
+      }
 
-        document.addEventListener('click', function (e) {
-          if (!dropdownMenu.contains(e.target) && !profileBtn.contains(e.target)) {
-            dropdownMenu.classList.add('hidden');
-            profileBtn.setAttribute('aria-expanded', 'false');
+      if (configBtn && configDropdown) {
+        configBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (dropdownMenu) dropdownMenu.classList.add('hidden');
+          const isHidden = configDropdown.classList.contains('hidden');
+          configDropdown.classList.toggle('hidden', !isHidden);
+          configBtn.setAttribute('aria-expanded', String(isHidden));
+        });
+
+        configDropdown.addEventListener('click', function (e) {
+          const actionBtn = e.target.closest('[data-scm-config-action]');
+          if (!actionBtn) return;
+          const action = actionBtn.getAttribute('data-scm-config-action');
+          configDropdown.classList.add('hidden');
+          configBtn.setAttribute('aria-expanded', 'false');
+
+          if (action === 'permissions') {
+            const el = document.getElementById('scm-open-permissions');
+            if (el) el.click();
+            else window.dispatchEvent(new CustomEvent('scm:open-configuracion'));
+          } else if (action === 'due-settings') {
+            const el = document.querySelector('[data-scm-open-due-settings]');
+            if (el) el.click();
+          } else if (action === 'notifications') {
+            const el = document.getElementById('scm-open-internal-notifications') || document.getElementById('scm-open-pqr-settings');
+            if (el) el.click();
+            else window.dispatchEvent(new CustomEvent('scm:open-notificaciones'));
+          } else if (action === 'actas-guide') {
+            const el = document.getElementById('scm-open-actas-guide');
+            if (el) el.click();
+          } else if (action === 'guide') {
+            const el = document.getElementById('scm-open-guide');
+            if (el) el.click();
+            else window.dispatchEvent(new CustomEvent('scm:open-guia'));
           }
         });
       }
+
+      document.addEventListener('click', function (e) {
+        if (dropdownMenu && !dropdownMenu.contains(e.target) && profileBtn && !profileBtn.contains(e.target)) {
+          dropdownMenu.classList.add('hidden');
+          if (profileBtn) profileBtn.setAttribute('aria-expanded', 'false');
+        }
+        if (configDropdown && !configDropdown.contains(e.target) && configBtn && !configBtn.contains(e.target)) {
+          configDropdown.classList.add('hidden');
+          if (configBtn) configBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
 
       // 2. Atajo global de búsqueda: Cmd+K o Ctrl+K
       const searchInput = document.getElementById('global-search-input');
@@ -240,6 +285,71 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
         });
       });
 
+      // 3c. Plegable de Actividades Administrativas
+      const plegableContainer = document.getElementById('scm-admin-plegable-container');
+      const plegableTrigger = document.getElementById('scm-admin-plegable-trigger');
+      const plegableMenu = document.getElementById('scm-admin-plegable-menu');
+      const currentActivityLabel = document.getElementById('scm-current-activity-label');
+
+      if (plegableTrigger && plegableMenu) {
+        plegableTrigger.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const isHidden = plegableMenu.classList.contains('hidden');
+          plegableMenu.classList.toggle('hidden', !isHidden);
+          plegableTrigger.setAttribute('aria-expanded', String(isHidden));
+        });
+
+        document.addEventListener('click', function (e) {
+          if (plegableContainer && !plegableContainer.contains(e.target)) {
+            plegableMenu.classList.add('hidden');
+            plegableTrigger.setAttribute('aria-expanded', 'false');
+          }
+        });
+
+        plegableMenu.addEventListener('click', function (e) {
+          const item = e.target.closest('.scm-admin-plegable-item');
+          if (!item) return;
+
+          const label = item.getAttribute('data-admin-activity-label') || item.textContent.trim();
+          if (currentActivityLabel) {
+            currentActivityLabel.textContent = label;
+          }
+
+          plegableMenu.querySelectorAll('.scm-plegable-check').forEach(function (chk) {
+            chk.classList.add('hidden');
+          });
+          const itemCheck = item.querySelector('.scm-plegable-check');
+          if (itemCheck) itemCheck.classList.remove('hidden');
+
+          plegableMenu.classList.add('hidden');
+          plegableTrigger.setAttribute('aria-expanded', 'false');
+        });
+      }
+
+      // Sincronizar título cuando una actividad administrativa se active desde cualquier origen
+      document.addEventListener('click', function (e) {
+        const tab = e.target.closest('.scm-admin-activity-tab');
+        if (tab && currentActivityLabel) {
+          const label = tab.getAttribute('data-admin-activity-label') || tab.textContent.trim();
+          if (label) {
+            currentActivityLabel.textContent = label;
+          }
+          if (plegableMenu) {
+            plegableMenu.querySelectorAll('.scm-plegable-check').forEach(function (chk) {
+              chk.classList.add('hidden');
+            });
+            const key = tab.getAttribute('data-admin-activity-key');
+            if (key) {
+              const matchedItem = plegableMenu.querySelector('.scm-admin-activity-tab[data-admin-activity-key="' + key + '"]');
+              if (matchedItem) {
+                const chk = matchedItem.querySelector('.scm-plegable-check');
+                if (chk) chk.classList.remove('hidden');
+              }
+            }
+          }
+        }
+      });
+
       // 4. Conexión de eventos rápidos del Header con los disparadores nativos existentes
       window.addEventListener('scm:open-nuevo-ticket', function () {
         // Disparar modal de creación de ticket o abrir formulario administrativo
@@ -284,6 +394,24 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           const query = this.value.trim().toLowerCase();
           // Despachar evento para que cualquier vista activa pueda auto-filtrar en tiempo real
           window.dispatchEvent(new CustomEvent('scm:global-search', { detail: { query: query } }));
+        });
+      }
+
+      // 6. Colapsar / Expandir panel de filtros avanzados
+      const filterCollapseBtn = document.getElementById('scm-filter-collapse-toggle');
+      const filterGrid = document.getElementById('scm-filter-grid');
+      if (filterCollapseBtn && filterGrid) {
+        filterCollapseBtn.addEventListener('click', function () {
+          const isCollapsed = filterGrid.classList.contains('hidden');
+          filterGrid.classList.toggle('hidden', !isCollapsed);
+          const icon = filterCollapseBtn.querySelector('.material-symbols-outlined');
+          const text = filterCollapseBtn.querySelector('.scm-filter-collapse-text');
+          if (icon) {
+            icon.textContent = isCollapsed ? 'expand_less' : 'expand_more';
+          }
+          if (text) {
+            text.textContent = isCollapsed ? 'Colapsar panel' : 'Mostrar panel';
+          }
         });
       }
 
