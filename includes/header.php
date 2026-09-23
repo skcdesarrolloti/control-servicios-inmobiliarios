@@ -62,12 +62,28 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'abiertos';
   } elseif (in_array($tabParam, ['vencimientos', 'due', 'due_calendar'], true)) {
     $current_page = 'vencimientos';
-  } elseif (in_array($tabParam, ['administrativas', 'actividades_administrativas', 'scm-panel-actividades-administrativas', 'notificaciones', 'cotizaciones_mantenimiento'], true)) {
-    $current_page = 'actividades_administrativas';
+  } elseif (in_array($tabParam, ['notificaciones', 'scm-panel-admin-notificaciones'], true)) {
+    $current_page = 'notificaciones';
+  } elseif (in_array($tabParam, ['cotizaciones_mantenimiento', 'cotizaciones', 'scm-panel-cotizaciones-mantenimiento'], true)) {
+    $current_page = 'cotizaciones_mantenimiento';
+  } elseif (in_array($tabParam, ['actas_satisfaccion', 'actas', 'scm-panel-actas-satisfaccion'], true)) {
+    $current_page = 'actas_satisfaccion';
+  } elseif (in_array($tabParam, ['preventivas_pendientes', 'scm-panel-preventivas-pendientes'], true)) {
+    $current_page = 'preventivas_pendientes';
+  } elseif (in_array($tabParam, ['servicios_publicos_pendientes', 'scm-panel-servicios-publicos-pendientes'], true)) {
+    $current_page = 'servicios_publicos_pendientes';
+  } elseif (in_array($tabParam, ['reportes_administrativos_pendientes', 'reportes', 'scm-panel-reportes-administrativos-pendientes'], true)) {
+    $current_page = 'reportes_administrativos_pendientes';
+  } elseif (in_array($tabParam, ['auditoria_canon_aseguradoras', 'auditoria', 'scm-panel-auditoria-canon-aseguradoras'], true)) {
+    $current_page = 'auditoria_canon_aseguradoras';
+  } elseif (in_array($tabParam, ['cartas_aumento', 'scm-panel-cartas-aumento'], true)) {
+    $current_page = 'cartas_aumento';
   } elseif (in_array($tabParam, ['liquidacion', 'liquidador', 'liquidador_servicios_publicos', 'scm-panel-liquidador-servicios-publicos'], true)) {
     $current_page = 'liquidacion';
   } elseif (in_array($tabParam, ['contratos', 'contratos-arrendamiento', 'contratos_arrendamiento', 'scm-panel-contratos-arrendamiento'], true)) {
     $current_page = 'contratos';
+  } elseif (in_array($tabParam, ['administrativas', 'actividades_administrativas', 'scm-panel-actividades-administrativas', 'gestiones_cobro'], true)) {
+    $current_page = 'actividades_administrativas';
   } elseif (in_array($tabParam, ['metricas', 'dashboard', 'scm-panel-metricas'], true)) {
     $current_page = 'dashboard';
   } elseif (in_array($tabParam, ['inicio', 'home', 'resumen', 'scm-panel-inicio'], true)) {
@@ -95,7 +111,7 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 // Orden solicitado:
 // 1. Gestión de Casos & Tickets (Dropdown con Abiertos, Mis Tickets, Postergados, Cerrados)
 // 2. Vencimientos
-// 3. Actividades Administrativas (Dropdown con Actividades Administrativas, Liquidación y Contratos)
+// 3. Actividades Administrativas (Dropdown con todas las actividades administrativas)
 // 4. Métricas y Dashboard
 // 5. Inicio (Mi Calendario, Historial, etc.)
 $rawNavItems = [
@@ -157,11 +173,51 @@ $rawNavItems = [
     'children' => [
       'actividades_administrativas' => [
         'key' => 'actividades_administrativas',
-        'label' => 'Actividades Administrativas',
+        'label' => 'Todas las Actividades',
         'panel_id' => 'scm-panel-actividades-administrativas',
         'url' => $baseUrl . '/index.php?tab=actividades_administrativas',
         'icon' => 'folder_shared',
         'perms' => ['reportes_administrativos_pendientes', 'notificaciones', 'gestiones_cobro', 'auditoria_canon_aseguradoras', 'cartas_aumento'],
+      ],
+      'notificaciones' => [
+        'key' => 'notificaciones',
+        'label' => 'Notificaciones',
+        'panel_id' => 'scm-panel-admin-notificaciones',
+        'url' => $baseUrl . '/index.php?tab=notificaciones',
+        'icon' => 'notifications',
+        'perms' => ['notificaciones'],
+      ],
+      'cotizaciones_mantenimiento' => [
+        'key' => 'cotizaciones_mantenimiento',
+        'label' => 'Cotizaciones de Mantenimiento',
+        'panel_id' => 'scm-panel-cotizaciones-mantenimiento',
+        'url' => $baseUrl . '/index.php?tab=cotizaciones_mantenimiento',
+        'icon' => 'request_quote',
+        'perms' => ['cotizaciones_mantenimiento'],
+      ],
+      'actas_satisfaccion' => [
+        'key' => 'actas_satisfaccion',
+        'label' => 'Actas de Satisfacción',
+        'panel_id' => 'scm-panel-actas-satisfaccion',
+        'url' => $baseUrl . '/index.php?tab=actas_satisfaccion',
+        'icon' => 'assignment_turned_in',
+        'perms' => ['actas_satisfaccion'],
+      ],
+      'preventivas_pendientes' => [
+        'key' => 'preventivas_pendientes',
+        'label' => 'Preventivas Pendientes',
+        'panel_id' => 'scm-panel-preventivas-pendientes',
+        'url' => $baseUrl . '/index.php?tab=preventivas_pendientes',
+        'icon' => 'pending_actions',
+        'perms' => ['preventivas_pendientes'],
+      ],
+      'servicios_publicos_pendientes' => [
+        'key' => 'servicios_publicos_pendientes',
+        'label' => 'Servicios Públicos Pendientes',
+        'panel_id' => 'scm-panel-servicios-publicos-pendientes',
+        'url' => $baseUrl . '/index.php?tab=servicios_publicos_pendientes',
+        'icon' => 'receipt_long',
+        'perms' => ['servicios_publicos_pendientes'],
       ],
       'liquidacion' => [
         'key' => 'liquidacion',
@@ -178,6 +234,30 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=contratos',
         'icon' => 'description',
         'perms' => ['contratos_arrendamiento'],
+      ],
+      'reportes_administrativos_pendientes' => [
+        'key' => 'reportes_administrativos_pendientes',
+        'label' => 'Reportes Administrativos',
+        'panel_id' => 'scm-panel-reportes-administrativos-pendientes',
+        'url' => $baseUrl . '/index.php?tab=reportes_administrativos_pendientes',
+        'icon' => 'summarize',
+        'perms' => ['reportes_administrativos_pendientes'],
+      ],
+      'auditoria_canon_aseguradoras' => [
+        'key' => 'auditoria_canon_aseguradoras',
+        'label' => 'Auditoría de Canon y Aseguradoras',
+        'panel_id' => 'scm-panel-auditoria-canon-aseguradoras',
+        'url' => $baseUrl . '/index.php?tab=auditoria_canon_aseguradoras',
+        'icon' => 'verified_user',
+        'perms' => ['auditoria_canon_aseguradoras'],
+      ],
+      'cartas_aumento' => [
+        'key' => 'cartas_aumento',
+        'label' => 'Cartas de Aumento',
+        'panel_id' => 'scm-panel-cartas-aumento',
+        'url' => $baseUrl . '/index.php?tab=cartas_aumento',
+        'icon' => 'mail',
+        'perms' => ['cartas_aumento'],
       ],
     ],
   ],
@@ -423,7 +503,7 @@ foreach ($rawNavItems as $k => $item) {
   <!-- HEADER MAESTRO FIJO (APP SHELL)             -->
   <!-- ========================================== -->
   <header class="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-[0_1px_8px_rgba(15,30,54,0.04)]">
-    <div class="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="w-full px-4 sm:px-6 lg:px-8">
 
       <!-- Fila 1: Marca, Búsqueda Global y Perfil (Altura 64px) -->
       <div class="h-16 flex items-center justify-between gap-4">
@@ -638,7 +718,7 @@ foreach ($rawNavItems as $k => $item) {
   <!-- ========================================== -->
   <!-- CONTENEDOR PRINCIPAL DEL LAYOUT             -->
   <!-- ========================================== -->
-  <main class="flex-1 w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-12 transition-all">
+  <main class="flex-1 w-full px-4 sm:px-6 lg:px-8 pt-32 pb-12 transition-all">
 
     <?php if ($isStandalone): ?>
       <div class="mb-4 p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-center justify-between" role="status">

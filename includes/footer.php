@@ -15,7 +15,7 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
   <!-- FOOTER MAESTRO INSTITUCIONAL                -->
   <!-- ========================================== -->
   <footer class="mt-auto border-t border-slate-200/80 bg-white/70 backdrop-blur-xs py-5">
-    <div class="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+    <div class="w-full px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
       
       <!-- Marca y Derechos -->
       <div class="flex items-center gap-2">
@@ -92,9 +92,15 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           if (scmApp && panelTarget) {
             let nativeTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab[data-tab="' + panelTarget + '"]');
             let adminSubTarget = null;
-            if (!nativeTabBtn && panelTarget === 'scm-panel-liquidador-servicios-publicos') {
-              nativeTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-actividades-administrativas"]');
-              adminSubTarget = 'scm-panel-liquidador-servicios-publicos';
+            if (!nativeTabBtn) {
+              const subBtn = scmApp.querySelector('[data-admin-activity-target="' + panelTarget + '"]');
+              if (subBtn) {
+                nativeTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-actividades-administrativas"]');
+                adminSubTarget = panelTarget;
+              } else if (panelTarget === 'scm-panel-liquidador-servicios-publicos') {
+                nativeTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-actividades-administrativas"]');
+                adminSubTarget = 'scm-panel-liquidador-servicios-publicos';
+              }
             }
 
             if (nativeTabBtn) {

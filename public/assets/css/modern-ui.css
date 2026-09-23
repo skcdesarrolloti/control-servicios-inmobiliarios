@@ -52,9 +52,14 @@
   display: none !important;
 }
 
-/* Contenedor principal del panel */
-.scm-modern-panel-wrapper {
-  width: 100%;
+/* Contenedor principal del panel a ancho completo */
+.scm-modern-panel-wrapper,
+#scm-app.scm-wrap,
+#scm-app .scm-tab-panel,
+#scm-app .scm-admin-activities,
+#scm-app .scm-home-panel {
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 #scm-app.scm-wrap {
@@ -1219,7 +1224,8 @@
    ========================================================================== */
 
 #scm-app .scm-open-subtabs,
-#scm-app .scm-status-subtabs {
+#scm-app .scm-status-subtabs,
+#scm-app .scm-admin-activity-subtabs {
   background: transparent !important;
   border: none !important;
   padding: 0.25rem 0 1rem 0 !important;
@@ -1227,10 +1233,13 @@
   align-items: center !important;
   flex-wrap: wrap !important;
   gap: 0.5rem !important;
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 #scm-app .scm-open-subtabs .scm-open-topic-tab,
-#scm-app .scm-status-subtabs .scm-status-topic-tab {
+#scm-app .scm-status-subtabs .scm-status-topic-tab,
+#scm-app .scm-admin-activity-subtabs .scm-admin-activity-tab {
   background: #ffffff !important;
   color: #475569 !important;
   border: 1px solid #e2e8f0 !important;
@@ -1243,17 +1252,22 @@
   align-items: center !important;
   gap: 0.4rem !important;
   cursor: pointer !important;
+  white-space: nowrap !important;
+  min-height: auto !important;
+  line-height: 1.4 !important;
 }
 
 #scm-app .scm-open-subtabs .scm-open-topic-tab:hover,
-#scm-app .scm-status-subtabs .scm-status-topic-tab:hover {
+#scm-app .scm-status-subtabs .scm-status-topic-tab:hover,
+#scm-app .scm-admin-activity-subtabs .scm-admin-activity-tab:hover {
   background: #f1f5f9 !important;
   color: #0f172a !important;
   border-color: #cbd5e1 !important;
 }
 
 #scm-app .scm-open-subtabs .scm-open-topic-tab.active,
-#scm-app .scm-status-subtabs .scm-status-topic-tab.active {
+#scm-app .scm-status-subtabs .scm-status-topic-tab.active,
+#scm-app .scm-admin-activity-subtabs .scm-admin-activity-tab.active {
   background: #0f1e36 !important;
   color: #ffffff !important;
   border-color: #0f1e36 !important;
