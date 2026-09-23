@@ -51,7 +51,7 @@ $isStandalone = !empty($standalone_function);
 if (empty($current_page)) {
   $tabParam = mb_strtolower(trim((string)($_GET['scm_tab'] ?? ($_GET['tab'] ?? ''))), 'UTF-8');
   if (in_array($tabParam, ['metricas', 'dashboard', 'scm-panel-metricas'], true)) {
-    $current_page = 'metricas';
+    $current_page = 'dashboard';
   } elseif (in_array($tabParam, ['contratos', 'contratos-arrendamiento', 'contratos_arrendamiento', 'scm-panel-contratos-arrendamiento'], true)) {
     $current_page = 'contratos';
   } elseif (in_array($tabParam, ['tickets', 'abiertos', 'mis_tickets', 'cerrados', 'scm-panel-abiertos', 'scm-panel-mis-tickets'], true)) {
@@ -222,13 +222,18 @@ $navTabs = [
       <!-- Fila 1: Marca, Búsqueda Global y Perfil (Altura 64px) -->
       <div class="h-16 flex items-center justify-between gap-4">
 
-        <!-- Logotipo Oficial SuCasa & Branding Corporativo -->
+        <!-- Logotipo Oficial SuCasa & Branding Corporativo (Alto Contraste Stitch UI) -->
         <div class="flex items-center gap-3 shrink-0">
-          <a href="<?php echo htmlspecialchars($baseUrl . '/index.php', ENT_QUOTES, 'UTF-8'); ?>" class="flex items-center gap-3 group focus:outline-none focus:ring-2 focus:ring-[#0f1e36] rounded-lg p-1 transition-all">
-            <img src="<?php echo htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="SKC SuCasa Inmobiliaria" class="h-9 w-auto object-contain transition-transform group-hover:scale-105">
-            <div class="hidden sm:flex flex-col">
-              <span class="text-base font-bold tracking-tight text-slate-900 leading-tight">SKC SuCasa</span>
-              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-tight">Control Inmobiliario</span>
+          <a href="<?php echo htmlspecialchars($baseUrl . '/index.php', ENT_QUOTES, 'UTF-8'); ?>" class="flex items-center gap-3 group focus:outline-none focus:ring-2 focus:ring-[#0f1e36] rounded-xl p-1 transition-all" title="SKC SuCasa Inmobiliaria — Control Operativo">
+            <div class="w-9 h-9 rounded-xl bg-[#1e3a8a] flex items-center justify-center shrink-0 shadow-sm group-hover:bg-[#162846] transition-colors">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3L2 12H6V20H10V14H14V20H18V12H22L12 3Z" fill="#38bdf8"/>
+                <path d="M12 7L7 11.5V18H9V13H15V18H17V11.5L12 7Z" fill="#ffffff"/>
+              </svg>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-[17px] font-extrabold tracking-tight text-[#0f172a] leading-none">SuCasa</span>
+              <span class="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-none mt-1">Control Inmobiliario</span>
             </div>
           </a>
         </div>

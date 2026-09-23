@@ -314,7 +314,7 @@ trait RendersDashboard
       }
     }
     if ($initialTab === '') {
-      $initialTab = 'scm-panel-inicio';
+      $initialTab = in_array('metricas', $dashboardAllowedTabs, true) ? 'scm-panel-metricas' : 'scm-panel-inicio';
     }
     if ($initialAdministrativeActivityKey === '' || !in_array($initialAdministrativeActivityKey, $allowedAdministrativeActivityTabs, true)) {
       $initialAdministrativeActivityKey = (string) ($allowedAdministrativeActivityTabs[0] ?? '');
@@ -621,8 +621,9 @@ trait RendersDashboard
     $damageJsUrl  = self::h($assetBaseUrl . $damageJsRel  . '?v=' . rawurlencode($damageJsVer));
 
     ob_start();
-  ?>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" media="all">
+?>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="all">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" media="all">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" media="all">
     <link rel="stylesheet" href="<?php echo $cssUrl; ?>" media="all">
     <link rel="stylesheet" href="<?php echo $damageCssUrl; ?>" media="all">
@@ -1460,12 +1461,20 @@ trait RendersDashboard
         <div class="scm-case-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-case-title">
           <button class="scm-case-close" type="button" aria-label="Cerrar vista del caso" onclick="scmCloseCase(this)">&times;</button>
           <div class="scm-case-head">
-            <div>
+            <div class="scm-case-breadcrumb">
+              <span class="material-symbols-outlined text-[16px]">folder_managed</span>
+              <span>Casos &amp; Tickets</span>
+              <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+              <span id="scm-case-breadcrumb-dept">Servicios Inmobiliarios</span>
+              <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+              <span class="scm-case-breadcrumb-num" id="scm-case-breadcrumb-num">#...</span>
+            </div>
+            <div class="scm-case-head-main">
+              <div class="scm-case-head-meta" id="scm-case-meta"></div>
               <h3 id="scm-case-title">Vista del caso</h3>
-              <p id="scm-case-subtitle">Ticket de servicios inmobiliarios</p>
+              <div id="scm-case-subtitle"></div>
             </div>
             <div class="scm-case-head-actions" id="scm-case-head-actions"></div>
-            <div class="scm-case-head-meta" id="scm-case-meta"></div>
           </div>
           <div class="scm-case-body" id="scm-case-body"></div>
         </div>
