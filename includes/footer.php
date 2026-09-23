@@ -131,13 +131,13 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
         pill.addEventListener('click', function (e) {
           const panelTarget = this.getAttribute('data-panel-target');
           const subtabTarget = this.getAttribute('data-subtab-target');
+          let adminSubTarget = this.getAttribute('data-admin-sub-target') || null;
 
           // Si el panel principal #scm-app existe en esta página, realizamos cambio reactivo sin recarga
           const scmApp = document.getElementById('scm-app');
           if (scmApp && panelTarget) {
             let nativeTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab[data-tab="' + panelTarget + '"]');
-            let adminSubTarget = null;
-            if (!nativeTabBtn) {
+            if (!adminSubTarget && !nativeTabBtn) {
               const subBtn = scmApp.querySelector('[data-admin-activity-target="' + panelTarget + '"]');
               if (subBtn) {
                 nativeTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-actividades-administrativas"]');
@@ -154,6 +154,16 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
 
               if (adminSubTarget) {
                 setTimeout(function () {
+                  const parentAdminPanel = scmApp.querySelector('#scm-panel-actividades-administrativas');
+                  if (parentAdminPanel) {
+                    parentAdminPanel.querySelectorAll('.scm-admin-activity-panel').forEach(function (panel) {
+                      panel.classList.toggle('active', panel.id === adminSubTarget);
+                    });
+                    parentAdminPanel.querySelectorAll('.scm-admin-activity-tab').forEach(function (btn) {
+                      const tTarget = btn.getAttribute('data-admin-activity-target');
+                      btn.classList.toggle('active', tTarget === adminSubTarget);
+                    });
+                  }
                   const subBtn = document.querySelector('[data-admin-activity-target="' + adminSubTarget + '"]');
                   if (subBtn) subBtn.click();
                 }, 120);
@@ -283,71 +293,6 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
             window.history.pushState({}, '', url.toString());
           }
         });
-      });
-
-      // 3c. Plegable de Actividades Administrativas
-      const plegableContainer = document.getElementById('scm-admin-plegable-container');
-      const plegableTrigger = document.getElementById('scm-admin-plegable-trigger');
-      const plegableMenu = document.getElementById('scm-admin-plegable-menu');
-      const currentActivityLabel = document.getElementById('scm-current-activity-label');
-
-      if (plegableTrigger && plegableMenu) {
-        plegableTrigger.addEventListener('click', function (e) {
-          e.stopPropagation();
-          const isHidden = plegableMenu.classList.contains('hidden');
-          plegableMenu.classList.toggle('hidden', !isHidden);
-          plegableTrigger.setAttribute('aria-expanded', String(isHidden));
-        });
-
-        document.addEventListener('click', function (e) {
-          if (plegableContainer && !plegableContainer.contains(e.target)) {
-            plegableMenu.classList.add('hidden');
-            plegableTrigger.setAttribute('aria-expanded', 'false');
-          }
-        });
-
-        plegableMenu.addEventListener('click', function (e) {
-          const item = e.target.closest('.scm-admin-plegable-item');
-          if (!item) return;
-
-          const label = item.getAttribute('data-admin-activity-label') || item.textContent.trim();
-          if (currentActivityLabel) {
-            currentActivityLabel.textContent = label;
-          }
-
-          plegableMenu.querySelectorAll('.scm-plegable-check').forEach(function (chk) {
-            chk.classList.add('hidden');
-          });
-          const itemCheck = item.querySelector('.scm-plegable-check');
-          if (itemCheck) itemCheck.classList.remove('hidden');
-
-          plegableMenu.classList.add('hidden');
-          plegableTrigger.setAttribute('aria-expanded', 'false');
-        });
-      }
-
-      // Sincronizar título cuando una actividad administrativa se active desde cualquier origen
-      document.addEventListener('click', function (e) {
-        const tab = e.target.closest('.scm-admin-activity-tab');
-        if (tab && currentActivityLabel) {
-          const label = tab.getAttribute('data-admin-activity-label') || tab.textContent.trim();
-          if (label) {
-            currentActivityLabel.textContent = label;
-          }
-          if (plegableMenu) {
-            plegableMenu.querySelectorAll('.scm-plegable-check').forEach(function (chk) {
-              chk.classList.add('hidden');
-            });
-            const key = tab.getAttribute('data-admin-activity-key');
-            if (key) {
-              const matchedItem = plegableMenu.querySelector('.scm-admin-activity-tab[data-admin-activity-key="' + key + '"]');
-              if (matchedItem) {
-                const chk = matchedItem.querySelector('.scm-plegable-check');
-                if (chk) chk.classList.remove('hidden');
-              }
-            }
-          }
-        }
       });
 
       // 4. Conexión de eventos rápidos del Header con los disparadores nativos existentes
