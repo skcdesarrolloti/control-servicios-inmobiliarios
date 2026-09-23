@@ -1,7 +1,45 @@
 /* ==========================================================================
    SKC SuCasa Inmobiliaria — Modern UI Overrides & Compatibility Layer
-   Tokens: Brand Navy #0f1e36, Surface #f8f9ff, Border #e2e8f0
+   Tokens: Brand Navy #0f1e36, Surface #f8f9ff, Border #e2e8f0, Accent #1e3a8a
    ========================================================================== */
+
+/* Enforce Material Symbols Outlined font ligature rendering universally */
+.material-symbols-outlined,
+[class*="material-symbols-"] {
+  font-family: 'Material Symbols Outlined' !important;
+  font-weight: normal !important;
+  font-style: normal !important;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga' 1 !important;
+  font-feature-settings: 'liga' 1 !important;
+  -webkit-font-smoothing: antialiased;
+  vertical-align: middle;
+}
+
+/* Theme variables overriding legacy orange */
+:root,
+#scm-app {
+  --scm-accent: #0f1e36 !important;
+  --scm-accent-2: #1e3a8a !important;
+  --scm-accent-glow: rgba(15, 30, 54, 0.15) !important;
+  --scm-primary: #0f1e36 !important;
+  --scm-primary-hover: #162846 !important;
+}
+
+/* Active tab indicators - replace legacy orange with Navy */
+#scm-app .scm-status-topic-tab.active,
+#scm-app .scm-calendar-section-tab.active {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+}
 
 /* Ocultar visualmente la barra de pestañas obsoleta del panel interno,
    manteniéndola en el DOM para que el puente JS entre píldoras y pestañas nativas funcione */
@@ -165,9 +203,9 @@
   position: fixed !important;
   inset: 0 !important;
   z-index: 100 !important;
-  background: rgba(15, 30, 54, 0.45) !important;
-  backdrop-filter: blur(4px) !important;
-  -webkit-backdrop-filter: blur(4px) !important;
+  background: rgba(15, 30, 54, 0.55) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
   overflow-y: auto !important;
   padding: 1.5rem 1rem !important;
   display: none;
@@ -179,7 +217,8 @@
   display: flex !important;
 }
 
-#scm-app .scm-case-dialog {
+#scm-app .scm-case-dialog,
+#scm-app .scm-case-modal.open .scm-case-dialog {
   max-width: 1400px !important;
   width: 100% !important;
   background: #f8f9ff !important;
@@ -207,9 +246,9 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  background: #f1f5f9 !important;
+  background: #eff4ff !important;
   color: #475569 !important;
-  border: 1px solid #e2e8f0 !important;
+  border: 1px solid #dce9ff !important;
   border-radius: 9999px !important;
   font-size: 1.25rem !important;
   line-height: 1 !important;
@@ -224,10 +263,37 @@
 }
 
 /* Cabecera del caso */
-#scm-app .scm-case-head {
+#scm-app .scm-case-head,
+#scm-app .scm-case-modal.open .scm-case-head {
   background: #ffffff !important;
   border-bottom: 1px solid #e2e8f0 !important;
   padding: 1.75rem 2rem 1.5rem 2rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.85rem !important;
+}
+
+#scm-app .scm-case-breadcrumb {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  color: #64748b !important;
+}
+
+#scm-app .scm-case-breadcrumb-num {
+  font-weight: 700 !important;
+  color: #0f1e36 !important;
+  background: #eff4ff !important;
+  padding: 0.15rem 0.5rem !important;
+  border-radius: 0.35rem !important;
+}
+
+#scm-app .scm-case-head-main {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.4rem !important;
 }
 
 #scm-app #scm-case-title {
@@ -235,41 +301,285 @@
   font-weight: 700 !important;
   color: #0f172a !important;
   letter-spacing: -0.025em !important;
-  margin-bottom: 0.25rem !important;
+  margin: 0 !important;
+  line-height: 1.25 !important;
+}
+
+#scm-app #scm-case-title .scm-case-title-num {
+  color: #1e3a8a !important;
 }
 
 #scm-app #scm-case-subtitle {
-  font-size: 0.875rem !important;
+  font-size: 0.8125rem !important;
   color: #64748b !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 1.25rem !important;
+  align-items: center !important;
+  margin: 0 !important;
+}
+
+#scm-app #scm-case-subtitle .scm-meta-bit {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+}
+
+#scm-app #scm-case-subtitle .scm-meta-bit .material-symbols-outlined {
+  font-size: 16px !important;
+  color: #94a3b8 !important;
 }
 
 #scm-app .scm-case-head-meta {
   display: flex !important;
   flex-wrap: wrap !important;
   gap: 0.5rem !important;
-  margin-top: 0.75rem !important;
+  margin: 0 !important;
 }
 
-/* Estructura asimétrica 2 Columnas (8 cols izq, 4 cols der) */
+#scm-app .scm-chip-primary {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+}
+
+#scm-app .scm-chip-info {
+  background: #eff4ff !important;
+  color: #1e3a8a !important;
+  border: 1px solid #dce9ff !important;
+}
+
+#scm-app .scm-chip-warning {
+  background: #fff7ed !important;
+  color: #c2410c !important;
+  border: 1px solid #fed7aa !important;
+}
+
+#scm-app .scm-chip-secondary {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+#scm-app .scm-chip-muted {
+  background: #f8fafc !important;
+  color: #64748b !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+#scm-app .scm-chip-dot {
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 9999px !important;
+  background: currentColor !important;
+}
+
+#scm-app .scm-case-head-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.5rem !important;
+  align-items: center !important;
+  padding-top: 0.5rem !important;
+  border-top: 1px solid #f1f5f9 !important;
+}
+
+#scm-app .scm-case-side-link {
+  background: #eff4ff !important;
+  color: #0f1e36 !important;
+  border: 1px solid #dce9ff !important;
+  border-radius: 0.5rem !important;
+  padding: 0.45rem 0.95rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.04) !important;
+}
+
+#scm-app .scm-case-side-link:hover {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+}
+
+/* ==========================================================================
+   ESTRUCTURA ASIMÉTRICA 2 COLUMNAS (Principal Izquierda, Sidebar Derecha)
+   ========================================================================== */
+
+#scm-app .scm-case-body,
+#scm-app .scm-case-modal.open .scm-case-body {
+  padding: 0 !important;
+  background: #f8f9ff !important;
+}
+
+#scm-app .scm-case-modal.open .scm-case-layout,
 #scm-app .scm-case-layout {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) 380px !important;
   gap: 1.5rem !important;
   align-items: start !important;
-  padding: 1.5rem 2rem 2rem 2rem !important;
+  padding: 1.75rem 2rem 2.5rem 2rem !important;
 }
 
-@media (max-width: 1024px) {
-  #scm-app .scm-case-layout {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-/* Columna Principal */
+#scm-app .scm-case-modal.open .scm-case-layout > .scm-case-main,
 #scm-app .scm-case-main {
+  order: 1 !important;
+  grid-column: 1 !important;
+  min-width: 0 !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 1.25rem !important;
+}
+
+#scm-app .scm-case-modal.open .scm-case-layout > .scm-case-sidebar,
+#scm-app .scm-case-sidebar {
+  order: 2 !important;
+  grid-column: 2 !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1.25rem !important;
+}
+
+@media (max-width: 1024px) {
+  #scm-app .scm-case-modal.open .scm-case-layout,
+  #scm-app .scm-case-layout {
+    grid-template-columns: 1fr !important;
+  }
+  #scm-app .scm-case-modal.open .scm-case-layout > .scm-case-main,
+  #scm-app .scm-case-main {
+    order: 1 !important;
+    grid-column: 1 !important;
+  }
+  #scm-app .scm-case-modal.open .scm-case-layout > .scm-case-sidebar,
+  #scm-app .scm-case-sidebar {
+    order: 2 !important;
+    grid-column: 1 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  #scm-app .scm-case-modal.open .scm-case-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+    padding: 1rem !important;
+  }
+  #scm-app .scm-case-head-actions {
+    width: calc(100vw - 16px) !important;
+  }
+}
+
+/* ==========================================================================
+   TARJETAS DE LA COLUMNA PRINCIPAL
+   ========================================================================== */
+
+#scm-app .scm-case-description {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  padding: 1.5rem !important;
+  margin-bottom: 0 !important;
+  box-shadow: 0 1px 3px rgba(15, 30, 54, 0.04) !important;
+}
+
+#scm-app .scm-case-description > strong {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  letter-spacing: -0.01em !important;
+  color: #0f1e36 !important;
+  margin-bottom: 0.85rem !important;
+}
+
+#scm-app .scm-case-description-content {
+  background: #eff4ff !important;
+  border: 1px solid #dce9ff !important;
+  border-radius: 0.75rem !important;
+  padding: 1.15rem 1.25rem !important;
+  font-size: 0.9375rem !important;
+  line-height: 1.6 !important;
+  color: #0b1c30 !important;
+}
+
+/* Adjuntos y Evidencias Multimedia */
+#scm-app .scm-case-documents-section {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  padding: 1.5rem !important;
+  margin-bottom: 0 !important;
+  box-shadow: 0 1px 3px rgba(15, 30, 54, 0.04) !important;
+}
+
+#scm-app .scm-case-documents-section h4 {
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  color: #0f1e36 !important;
+  margin-bottom: 1rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+#scm-app .scm-case-history-img,
+#scm-app .scm-case-document-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+  gap: 0.85rem !important;
+}
+
+#scm-app .scm-case-history-img .scm-case-attachment-image-btn {
+  position: relative !important;
+  border-radius: 0.75rem !important;
+  overflow: hidden !important;
+  background: #eff4ff !important;
+  border: 1px solid #dce9ff !important;
+  display: block !important;
+  width: 100% !important;
+  aspect-ratio: 16/9 !important;
+  transition: all 0.25s ease !important;
+}
+
+#scm-app .scm-case-history-img .scm-case-attachment-image-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 16px -4px rgba(15, 30, 54, 0.12) !important;
+}
+
+#scm-app .scm-case-history-img .scm-record-img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
+#scm-app .scm-case-document-link {
+  min-height: 48px !important;
+  background: #eff4ff !important;
+  color: #0f1e36 !important;
+  border: 1px solid #dce9ff !important;
+  border-radius: 0.75rem !important;
+  padding: 0.65rem 1rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-case-document-link:hover {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px -1px rgba(15, 30, 54, 0.1) !important;
 }
 
 /* Matriz de Acciones Operativas */
@@ -277,24 +587,35 @@
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 1rem !important;
-  padding: 1.25rem !important;
+  padding: 1.5rem !important;
+  margin-bottom: 0 !important;
   box-shadow: 0 1px 3px rgba(15, 30, 54, 0.04) !important;
 }
 
 #scm-app .scm-case-work-actions h4 {
-  font-size: 0.875rem !important;
+  font-size: 1rem !important;
   font-weight: 700 !important;
   color: #0f1e36 !important;
-  margin-bottom: 0.85rem !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.03em !important;
+  margin-bottom: 1.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
 }
 
-#scm-app .scm-case-work-group {
+#scm-app .scm-case-work-group h5 {
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #64748b !important;
+  margin-bottom: 0.65rem !important;
+}
+
+#scm-app .scm-case-work-action-list {
   display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;
-  gap: 0.65rem !important;
-  margin-bottom: 0.75rem !important;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+  gap: 0.75rem !important;
+  margin-bottom: 1.25rem !important;
 }
 
 #scm-app .scm-case-work-btn {
@@ -308,6 +629,32 @@
   text-align: left !important;
   cursor: pointer !important;
   transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+}
+
+#scm-app .scm-case-work-btn .scm-btn-icon {
+  font-size: 20px !important;
+  color: #0f1e36 !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.2s ease !important;
+}
+
+#scm-app .scm-case-work-btn[data-scm-open-ticket-acta]:not(:has(.scm-btn-icon))::before {
+  content: 'draw';
+  font-family: 'Material Symbols Outlined' !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  margin-right: 0.5rem !important;
+}
+
+#scm-app .scm-case-work-btn[data-scm-create-cotizacion]:not(:has(.scm-btn-icon))::before {
+  content: 'request_quote';
+  font-family: 'Material Symbols Outlined' !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  margin-right: 0.5rem !important;
 }
 
 #scm-app .scm-case-work-btn:hover {
@@ -318,34 +665,339 @@
   box-shadow: 0 4px 6px -1px rgba(15, 30, 54, 0.1) !important;
 }
 
-/* Barra Lateral Contextual */
-#scm-app .scm-case-sidebar {
+#scm-app .scm-case-work-btn:hover .scm-btn-icon,
+#scm-app .scm-case-work-btn:hover .scm-btn-sub {
+  color: #dce9ff !important;
+  transform: scale(1.05) !important;
+}
+
+#scm-app .scm-case-work-btn .scm-btn-text {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+}
+
+#scm-app .scm-case-work-btn .scm-btn-label {
+  font-weight: 600 !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#scm-app .scm-case-work-btn .scm-btn-sub {
+  font-size: 0.6875rem !important;
+  font-weight: 400 !important;
+  color: #64748b !important;
+  line-height: 1.2 !important;
+  margin-top: 0.15rem !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Historial / Bitácora / Secciones de Registro */
+#scm-app .scm-case-history,
+#scm-app .scm-record-section,
+#scm-app .scm-modal-timeline-only {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  padding: 1.5rem !important;
+  margin-bottom: 0 !important;
+  box-shadow: 0 1px 3px rgba(15, 30, 54, 0.04) !important;
+}
+
+#scm-app .scm-case-history h4,
+#scm-app .scm-record-section h4 {
+  font-size: 0.9375rem !important;
+  font-weight: 700 !important;
+  color: #0f1e36 !important;
+  margin-bottom: 1rem !important;
+}
+
+/* ==========================================================================
+   TARJETAS DE LA BARRA LATERAL (STITCH SIDEBAR CARDS)
+   ========================================================================== */
+
+#scm-app .scm-sidebar-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  padding: 1.25rem !important;
+  box-shadow: 0 1px 3px rgba(15, 30, 54, 0.04) !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 1rem !important;
 }
 
-#scm-app .scm-case-sidebar h4 {
+#scm-app .scm-sidebar-card-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  color: #0f1e36 !important;
+}
+
+#scm-app .scm-sidebar-card-title {
   font-size: 0.75rem !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
+  color: #44474d !important;
+}
+
+#scm-app .scm-status-box {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0.75rem 1rem !important;
+  background: #eff4ff !important;
+  border-radius: 0.75rem !important;
+  border: 1px solid #dce9ff !important;
+}
+
+#scm-app .scm-status-info {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#scm-app .scm-status-sub {
+  font-size: 0.6875rem !important;
+  font-weight: 500 !important;
   color: #64748b !important;
-  margin-bottom: 0.25rem !important;
+}
+
+#scm-app .scm-status-main {
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  color: #0f1e36 !important;
+}
+
+#scm-app .scm-sla-widget {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.35rem !important;
+}
+
+#scm-app .scm-sla-info {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-size: 0.75rem !important;
+  color: #64748b !important;
+}
+
+#scm-app .scm-sla-info strong {
+  color: #0f1e36 !important;
+  font-weight: 600 !important;
+}
+
+#scm-app .scm-sla-bar {
+  width: 100% !important;
+  height: 0.5rem !important;
+  border-radius: 9999px !important;
+  background: #e2e8f0 !important;
+  overflow: hidden !important;
+}
+
+#scm-app .scm-sla-bar-fill {
+  height: 100% !important;
+  background: #0f1e36 !important;
+  border-radius: 9999px !important;
+  transition: width 0.3s ease !important;
+}
+
+#scm-app .scm-sla-detail {
+  font-size: 0.6875rem !important;
+  color: #64748b !important;
+}
+
+#scm-app .scm-stakeholder-item {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.5rem !important;
+  padding: 0.85rem !important;
+  border-radius: 0.75rem !important;
+  background: #eff4ff !important;
+  border: 1px solid #dce9ff !important;
+}
+
+#scm-app .scm-stakeholder-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+#scm-app .scm-stakeholder-role {
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  color: #64748b !important;
+}
+
+#scm-app .scm-stakeholder-body {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+}
+
+#scm-app .scm-avatar-circle {
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  border-radius: 9999px !important;
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+#scm-app .scm-stakeholder-details {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+}
+
+#scm-app .scm-stakeholder-name {
+  font-size: 0.875rem !important;
+  font-weight: 700 !important;
+  color: #0b1c30 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#scm-app .scm-stakeholder-sub {
+  font-size: 0.75rem !important;
+  color: #64748b !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#scm-app .scm-stakeholder-actions {
+  display: flex !important;
+  gap: 0.5rem !important;
+  margin-top: 0.25rem !important;
+}
+
+#scm-app .scm-stakeholder-btn {
+  flex: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.35rem !important;
+  padding: 0.35rem 0.5rem !important;
+  background: #ffffff !important;
+  color: #0f1e36 !important;
+  border: 1px solid #dce9ff !important;
+  border-radius: 0.5rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-stakeholder-btn:hover {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+}
+
+#scm-app .scm-property-specs {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.4rem !important;
+}
+
+#scm-app .scm-spec-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0.35rem 0 !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  font-size: 0.8125rem !important;
+}
+
+#scm-app .scm-spec-row:last-child {
+  border-bottom: none !important;
+}
+
+#scm-app .scm-spec-label {
+  color: #64748b !important;
+}
+
+#scm-app .scm-spec-value {
+  color: #0b1c30 !important;
+  font-weight: 600 !important;
+}
+
+#scm-app .scm-spec-value.scm-highlight {
+  color: #0f1e36 !important;
+  background: #eff4ff !important;
+  padding: 0.15rem 0.45rem !important;
+  border-radius: 0.35rem !important;
+}
+
+#scm-app .scm-case-map-preview-btn {
+  width: 100% !important;
+  padding: 0.6rem !important;
+  border-radius: 0.65rem !important;
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.4rem !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-case-map-preview-btn:hover {
+  background: #162846 !important;
+  box-shadow: 0 4px 6px -1px rgba(15, 30, 54, 0.15) !important;
+}
+
+#scm-app .scm-sidebar-more-details {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.75rem !important;
+  background: #ffffff !important;
+  overflow: hidden !important;
+}
+
+#scm-app .scm-sidebar-more-summary {
+  padding: 0.65rem 0.85rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  background: #f8f9ff !important;
+}
+
+#scm-app .scm-sidebar-more-details[open] .scm-sidebar-more-summary {
+  border-bottom: 1px solid #e2e8f0 !important;
 }
 
 #scm-app .scm-case-sidebar-list {
   display: flex !important;
   flex-direction: column !important;
-  gap: 0.6rem !important;
+  gap: 0.5rem !important;
+  padding: 0.75rem !important;
 }
 
 #scm-app .scm-case-side-item {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 0.75rem !important;
-  padding: 0.75rem 1rem !important;
-  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.02) !important;
+  border-radius: 0.5rem !important;
+  padding: 0.5rem 0.75rem !important;
 }
 
 #scm-app .scm-case-side-label {
@@ -355,12 +1007,12 @@
   text-transform: uppercase !important;
   letter-spacing: 0.04em !important;
   color: #64748b !important;
-  margin-bottom: 0.2rem !important;
+  margin-bottom: 0.15rem !important;
 }
 
 #scm-app .scm-case-side-value {
   display: block !important;
-  font-size: 0.875rem !important;
+  font-size: 0.8125rem !important;
   font-weight: 600 !important;
   color: #0f172a !important;
 }

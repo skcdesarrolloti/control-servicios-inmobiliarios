@@ -4634,15 +4634,36 @@
         summaryItems.push({ label: label, value: value });
       }
 
+      var ticketNumStr = btn.dataset.ticket || btn.dataset.ticketPk || "-";
+      var breadcrumbNum = modal.querySelector("#scm-case-breadcrumb-num");
+      var breadcrumbDept = modal.querySelector("#scm-case-breadcrumb-dept");
+      if (breadcrumbNum) {
+        breadcrumbNum.textContent = "#" + ticketNumStr;
+      }
+      if (breadcrumbDept) {
+        breadcrumbDept.textContent = btn.dataset.departamento || (isPublicPqr ? "Solicitud Web" : "Mantenimiento");
+      }
+
       if (title) {
-        title.textContent =
-          (isPublicPqr ? "Solicitud #" : "Caso #") +
-          (btn.dataset.ticket || btn.dataset.ticketPk || "-");
+        var asuntoText = btn.dataset.asunto || (isPublicPqr ? "Solicitud creada desde un portal web" : "Ticket de servicios inmobiliarios");
+        title.innerHTML = '<span class="scm-case-title-num">' + (isPublicPqr ? "Solicitud #" : "Ticket #") + escHtml(ticketNumStr) + '</span>: ' + escHtml(asuntoText);
       }
       if (subtitle) {
-        subtitle.textContent =
-          btn.dataset.asunto ||
-          (isPublicPqr ? "Solicitud creada desde un portal web" : "Ticket de servicios inmobiliarios");
+        var creadoDate = btn.dataset.creado || "";
+        var dirText = btn.dataset.direccion || "";
+        var barrioText = btn.dataset.barrio || "";
+        var contratoText = btn.dataset.contrato || "";
+        var subParts = [];
+        if (creadoDate) {
+          subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">calendar_today</span> ' + escHtml(creadoDate) + '</span>');
+        }
+        if (dirText || barrioText) {
+          subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">domain</span> Inmueble: ' + escHtml((barrioText ? barrioText + " • " : "") + (dirText || "")) + '</span>');
+        }
+        if (contratoText) {
+          subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">description</span> Contrato #' + escHtml(contratoText) + '</span>');
+        }
+        subtitle.innerHTML = subParts.join("");
       }
       modal.dataset.ticketPk = btn.dataset.ticketPk || "";
       modal.dataset.caseKind = isPublicPqr ? "public-pqr" : "";
@@ -4652,6 +4673,28 @@
       modal.dataset.direccion = btn.dataset.direccion || "";
       if (meta) {
         meta.innerHTML = "";
+        var estadoVal = btn.dataset.estado || "";
+        var adminVal = btn.dataset.admin || "";
+        var prioridadVal = btn.dataset.prioridad || "";
+        var totalVal = btn.dataset.total || "";
+        var metaChips = [];
+        if (ticketNumStr && ticketNumStr !== "-") {
+          metaChips.push('<span class="scm-chip scm-chip-primary">' + (isPublicPqr ? "Solicitud #" : "Ticket #") + escHtml(ticketNumStr) + '</span>');
+        }
+        if (estadoVal && estadoVal !== "-") {
+          metaChips.push('<span class="scm-chip scm-chip-info"><span class="scm-chip-dot"></span>' + escHtml(estadoVal) + '</span>');
+        }
+        if (prioridadVal && prioridadVal !== "-") {
+          metaChips.push('<span class="scm-chip scm-chip-warning"><span class="material-symbols-outlined text-[14px]">bolt</span> Prioridad ' + escHtml(prioridadVal) + '</span>');
+        }
+        if (adminVal && adminVal !== "-") {
+          metaChips.push('<span class="scm-chip scm-chip-secondary">' + escHtml(adminVal) + '</span>');
+        }
+        if (totalVal && totalVal !== "-") {
+          metaChips.push('<span class="scm-chip scm-chip-muted"><span class="material-symbols-outlined text-[14px]">schedule</span> SLA: ' + escHtml(totalVal) + '</span>');
+        }
+        meta.innerHTML = metaChips.join("");
+
         collectSummary("Estado", btn.dataset.estado || "");
         collectSummary("Estado administrativo", btn.dataset.admin || "");
         if (isPublicPqr) {
@@ -4764,48 +4807,48 @@
           mainActionButtons.push(
             '<button type="button" class="scm-case-work-btn" data-scm-open-pqr-transfer-from-case data-ticket-pk="' +
             escHtml(btn.dataset.ticketPk || "") +
-            '">Trasladar solicitud</button>',
+            '"><span class="material-symbols-outlined scm-btn-icon">swap_horiz</span><div class="scm-btn-text"><span class="scm-btn-label">Trasladar solicitud</span><span class="scm-btn-sub">Reasignar área</span></div></button>',
           );
         }
         if (isPublicPqr) {
           mainActionButtons.push(
-            '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>',
+            '<button type="button" class="scm-case-work-btn" data-scm-open-note><span class="material-symbols-outlined scm-btn-icon">note_add</span><div class="scm-btn-text"><span class="scm-btn-label">Agregar nota</span><span class="scm-btn-sub">Uso interno administrativo</span></div></button>',
           );
           if (statusBucket !== "cerrados") {
             mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar solicitud</button>',
-              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder solicitud</button>',
-              '<button type="button" class="scm-case-work-btn" data-scm-close-ticket>Cerrar solicitud</button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket><span class="material-symbols-outlined scm-btn-icon">schedule_send</span><div class="scm-btn-text"><span class="scm-btn-label">Postergar solicitud</span><span class="scm-btn-sub">En espera de repuesto</span></div></button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response><span class="material-symbols-outlined scm-btn-icon">reply</span><div class="scm-btn-text"><span class="scm-btn-label">Responder solicitud</span><span class="scm-btn-sub">Notificar al cliente</span></div></button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-close-ticket><span class="material-symbols-outlined scm-btn-icon">check_circle</span><div class="scm-btn-text"><span class="scm-btn-label">Cerrar solicitud</span><span class="scm-btn-sub">Finalizar gestión</span></div></button>',
             );
           }
           if (statusBucket === "postergados" || statusBucket === "cerrados") {
             mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket>Activar solicitud</button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket><span class="material-symbols-outlined scm-btn-icon">play_arrow</span><div class="scm-btn-text"><span class="scm-btn-label">Activar solicitud</span><span class="scm-btn-sub">Reanudar caso</span></div></button>',
             );
           }
         }
         if (!isPublicPqr && seguimientoWrap) {
           if (canUseDashboardAction("case_followup")) {
             mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-section="scm-sec-seguimiento">Agregar seguimiento</button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-open-section="scm-sec-seguimiento"><span class="material-symbols-outlined scm-btn-icon">add_comment</span><div class="scm-btn-text"><span class="scm-btn-label">Agregar seguimiento</span><span class="scm-btn-sub">Registrar avance técnico</span></div></button>',
             );
           }
         }
         if (!isPublicPqr) {
           complementaryActionButtons.push(
-            '<button type="button" class="scm-case-work-btn" data-scm-view-contacts>Ver contactos</button>',
-            '<button type="button" class="scm-case-work-btn" data-scm-view-property-map>Ubicaci&oacute;n del inmueble</button>',
+            '<button type="button" class="scm-case-work-btn" data-scm-view-contacts><span class="material-symbols-outlined scm-btn-icon">contacts</span><div class="scm-btn-text"><span class="scm-btn-label">Ver contactos</span><span class="scm-btn-sub">Directorio de partes</span></div></button>',
+            '<button type="button" class="scm-case-work-btn" data-scm-view-property-map><span class="material-symbols-outlined scm-btn-icon">map</span><div class="scm-btn-text"><span class="scm-btn-label">Ubicación GPS</span><span class="scm-btn-sub">Mapa del inmueble</span></div></button>',
           );
           if (String(btn.dataset.empleadoId || "").trim()) {
             complementaryActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-employee>Ver calendario del funcionario</button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-employee><span class="material-symbols-outlined scm-btn-icon">calendar_month</span><div class="scm-btn-text"><span class="scm-btn-label">Calendario funcionario</span><span class="scm-btn-sub">Disponibilidad técnica</span></div></button>',
             );
           }
           if (canUseDashboardAction("case_edit_magnitude")) {
             complementaryActionButtons.push(
               '<button type="button" class="scm-case-work-btn" data-scm-edit-case-magnitude data-ticket-pk="' +
               escHtml(btn.dataset.ticketPk || "") +
-              '">Editar magnitud caso</button>',
+              '"><span class="material-symbols-outlined scm-btn-icon">tune</span><div class="scm-btn-text"><span class="scm-btn-label">Editar magnitud</span><span class="scm-btn-sub">Modificar severidad</span></div></button>',
             );
           }
           if (canUseDashboardAction("case_completion_act")) {
@@ -4816,26 +4859,26 @@
           if (calendarTicketPk) {
             if (canUseDashboardAction("case_schedule")) {
               mainActionButtons.push(
-                '<button type="button" class="scm-case-work-btn" data-scm-calendar-create-case>Agendar cita del caso</button>',
+                '<button type="button" class="scm-case-work-btn" data-scm-calendar-create-case><span class="material-symbols-outlined scm-btn-icon">event_available</span><div class="scm-btn-text"><span class="scm-btn-label">Agendar cita</span><span class="scm-btn-sub">Visita técnica</span></div></button>',
               );
             }
           }
           if (canUseDashboardAction("case_note")) {
             mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-open-note><span class="material-symbols-outlined scm-btn-icon">note_add</span><div class="scm-btn-text"><span class="scm-btn-label">Agregar nota</span><span class="scm-btn-sub">Uso administrativo</span></div></button>',
             );
           }
           if (canUseDashboardAction("case_postpone")) {
             mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar ticket</button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket><span class="material-symbols-outlined scm-btn-icon">schedule_send</span><div class="scm-btn-text"><span class="scm-btn-label">Postergar ticket</span><span class="scm-btn-sub">En espera de repuesto</span></div></button>',
             );
           }
           if (statusBucket !== "cerrados" && isMaintenanceForActions) {
             if (canUseDashboardAction("corrective_review_manage")) {
               complementaryActionButtons.push(
-                '<button type="button" class="scm-case-work-btn" data-scm-open-corrective-review>' +
+                '<button type="button" class="scm-case-work-btn" data-scm-open-corrective-review><span class="material-symbols-outlined scm-btn-icon">fact_check</span><div class="scm-btn-text"><span class="scm-btn-label">' +
                   (hasCorrectiveReview ? "Gestionar revisi&oacute;n correctiva" : "Crear revisi&oacute;n correctiva") +
-                  "</button>",
+                  '</span><span class="scm-btn-sub">Diagnóstico detallado</span></div></button>',
               );
             }
           }
@@ -4843,19 +4886,19 @@
         if (!isPublicPqr && (statusBucket === "postergados" || statusBucket === "cerrados")) {
           if (canUseDashboardAction("case_activate")) {
             mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket>Activar ticket</button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket><span class="material-symbols-outlined scm-btn-icon">play_arrow</span><div class="scm-btn-text"><span class="scm-btn-label">Activar ticket</span><span class="scm-btn-sub">Reanudar gestión</span></div></button>',
             );
           }
         }
         if (!isPublicPqr) {
           if (canUseDashboardAction("case_respond")) {
             mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder ticket</button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response><span class="material-symbols-outlined scm-btn-icon">reply</span><div class="scm-btn-text"><span class="scm-btn-label">Responder ticket</span><span class="scm-btn-sub">Notificar al cliente</span></div></button>',
             );
           }
           if (canUseDashboardAction("case_transfer")) {
             mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar><span class="material-symbols-outlined scm-btn-icon">swap_horiz</span><div class="scm-btn-text"><span class="scm-btn-label">Trasladar caso</span><span class="scm-btn-sub">Reasignar área</span></div></button>',
             );
           }
         }
@@ -4868,7 +4911,7 @@
               escHtml(btn.dataset.ticket || "") +
               '" data-cotizacion-id="' +
               escHtml(cotizacionId) +
-              '">Gestionar cotizaciones del caso</button>',
+              '"><span class="material-symbols-outlined scm-btn-icon">receipt_long</span><div class="scm-btn-text"><span class="scm-btn-label">Gestionar cotizaciones</span><span class="scm-btn-sub">Costos y proveedores</span></div></button>',
             );
           }
           var cotEstadoKey = String(btn.dataset.cotEstado || "");
@@ -4880,7 +4923,7 @@
           }
           if (canUseDashboardAction("quote_repair_followup") && caseCanGenerateRepairFollowup(btn)) {
             quoteActionButtons.push(
-              '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-repair-followup-notice>Seguimiento reparaciones</button>',
+              '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-repair-followup-notice><span class="material-symbols-outlined scm-btn-icon">engineering</span><div class="scm-btn-text"><span class="scm-btn-label">Seguimiento reparaciones</span><span class="scm-btn-sub">Control de ejecución</span></div></button>',
             );
           }
         }
@@ -4903,12 +4946,11 @@
             (isPublicPqr ? ' data-scm-compact-iframe' : '') +
             ' data-iframe-url="' +
             escHtml(ticketUrl) +
-            '" data-iframe-title="Solicitud">Abrir solicitud original' +
-            "</button>",
+            '" data-iframe-title="Solicitud"><span class="material-symbols-outlined scm-btn-icon">open_in_new</span><div class="scm-btn-text"><span class="scm-btn-label">Solicitud original</span><span class="scm-btn-sub">Abrir expediente</span></div></button>',
           );
         }
         var caseActionsHtml =
-          '<section class="scm-case-work-actions"><h4>' +
+          '<section class="scm-case-work-actions"><h4><span class="material-symbols-outlined text-[20px]">tune</span> ' +
           (isPublicPqr ? "Acciones de la solicitud" : "Acciones del caso") +
           "</h4>" +
           renderActionGroup(isPublicPqr ? "Gestión de la solicitud" : "Gestión del caso", mainActionButtons, "is-main") +
@@ -4924,107 +4966,139 @@
         }
         sourceHtml = srcWrap.innerHTML;
 
+        var estadoVal = btn.dataset.estado || "En gestión";
+        var adminVal = btn.dataset.admin || "Normal";
+        var totalVal = btn.dataset.total || "En curso";
+        var etapaVal = btn.dataset.etapa || "Diagnóstico";
+        var etapaTiempoVal = btn.dataset.etapaTiempo || "";
+        var empleadoVal = btn.dataset.empleado || "Sin asignar";
+        var empleadoIdVal = (btn.dataset.empleadoId || "").trim();
+        var solicitanteVal = isPublicPqr ? (btn.dataset.solicitante || "") : (btn.dataset.arrendatario || "");
+        var celularVal = (btn.dataset.celularSolicitante || "").trim();
+        var correoVal = (btn.dataset.correoSolicitante || "").trim();
+        var propietarioVal = (btn.dataset.propietario || "").trim();
+        var inmuebleIdVal = btn.dataset.inmueble || "-";
+        var webIdVal = btn.dataset.idInmuebleWeb || "-";
+        var barrioVal = btn.dataset.barrio || "-";
+        var direccionVal = btn.dataset.direccion || "-";
+        var contratoIdVal = btn.dataset.contrato || "-";
+
         var sidebarHtml = '<aside class="scm-case-sidebar">';
-        sidebarHtml += isPublicPqr ? "<h4>Resumen de la solicitud</h4>" : "<h4>Resumen del caso</h4>";
-        sidebarHtml += '<div class="scm-case-sidebar-list">';
-        summaryItems.forEach(function (item) {
-          sidebarHtml +=
-            '<div class="scm-case-side-item"><span class="scm-case-side-label">' +
-            escHtml(item.label) +
-            '</span><span class="scm-case-side-value">' +
-            escHtml(item.value) +
-            "</span></div>";
-        });
+
+        // Card 1: Estado & Cumplimiento
+        sidebarHtml += '<div class="scm-sidebar-card">';
+        sidebarHtml += '<div class="scm-sidebar-card-head"><span class="scm-sidebar-card-title">Estado &amp; Cumplimiento</span><span class="material-symbols-outlined text-[20px]">donut_large</span></div>';
+        sidebarHtml += '<div class="scm-status-box"><div class="scm-status-info"><span class="scm-status-sub">Estado Operativo</span><strong class="scm-status-main">' + escHtml(estadoVal) + '</strong></div><span class="scm-chip scm-chip-primary">' + escHtml(adminVal) + '</span></div>';
+        sidebarHtml += '<div class="scm-sla-widget"><div class="scm-sla-info"><span>Tiempo de Gestión</span><strong>' + escHtml(totalVal) + '</strong></div>';
+        sidebarHtml += '<div class="scm-sla-bar"><div class="scm-sla-bar-fill" style="width: 65%;"></div></div>';
+        if (etapaVal && etapaVal !== "-") {
+          sidebarHtml += '<div class="scm-sla-detail"><span>Etapa: <strong>' + escHtml(etapaVal) + '</strong>' + (etapaTiempoVal ? ' (' + escHtml(etapaTiempoVal) + ')' : '') + '</span></div>';
+        }
+        sidebarHtml += '</div>';
+
         if (!isPublicPqr) {
-          var sideMagnitude = normalizeMagnitudeKey(
-            btn.dataset.magnitudCaso || "",
-          );
-          sidebarHtml +=
-            '<div class="scm-case-side-item"><span class="scm-case-side-label">Magnitud del caso</span><span data-scm-case-magnitude-badge>' +
-            renderMagnitudeBadge(sideMagnitude) +
-            "</span></div>";
-          sidebarHtml +=
-            '<div class="scm-case-side-item scm-case-magnitude-editor">' +
-            '<span class="scm-case-side-label">Editar caso</span>' +
-            '<button type="button" class="btn btn-outline btn-sm scm-edit-case-magnitude" data-scm-edit-case-magnitude data-ticket-pk="' +
-            escHtml(btn.dataset.ticketPk || "") +
-            '">Editar magnitud caso</button>' +
-            "</div>";
+          var sideMagnitude = normalizeMagnitudeKey(btn.dataset.magnitudCaso || "");
+          sidebarHtml += '<div class="flex items-center justify-between pt-1 border-t border-slate-100"><span class="scm-spec-label text-xs">Magnitud:</span><span data-scm-case-magnitude-badge>' + renderMagnitudeBadge(sideMagnitude) + '</span></div>';
+          if (canUseDashboardAction("case_edit_magnitude")) {
+            sidebarHtml += '<button type="button" class="btn btn-outline btn-sm w-full text-xs" data-scm-edit-case-magnitude data-ticket-pk="' + escHtml(btn.dataset.ticketPk || "") + '">Editar magnitud caso</button>';
+          }
           if (isPreventivaCase(btn)) {
-            var noAccessSideCount = Math.max(
-              0,
-              parseInt(btn.dataset.preventivaNoAccessCount || "0", 10) || 0,
-            );
-            sidebarHtml +=
-              '<div class="scm-case-side-item scm-case-side-no-access">' +
-              '<span class="scm-case-side-label">Constancias preventivas</span>' +
-              '<span class="scm-case-side-value">' +
-              escHtml(String(noAccessSideCount)) +
-              (noAccessSideCount === 1 ? " comunicaci&oacute;n" : " comunicaciones") +
-              "</span>" +
-              '<small>Pr&oacute;xima #' +
-              escHtml(String(noAccessSideCount + 1)) +
-              "</small></div>";
+            var noAccessSideCount = Math.max(0, parseInt(btn.dataset.preventivaNoAccessCount || "0", 10) || 0);
+            sidebarHtml += '<div class="scm-case-side-item scm-case-side-no-access"><span class="scm-case-side-label">Constancias preventivas</span><span class="scm-case-side-value">' + escHtml(String(noAccessSideCount)) + (noAccessSideCount === 1 ? " comunicación" : " comunicaciones") + '</span><small>Próxima #' + escHtml(String(noAccessSideCount + 1)) + '</small></div>';
           }
         }
+        sidebarHtml += '</div>';
+
+        // Card 2: Partes Interesadas
+        sidebarHtml += '<div class="scm-sidebar-card">';
+        sidebarHtml += '<div class="scm-sidebar-card-head"><span class="scm-sidebar-card-title">Partes Interesadas</span><span class="material-symbols-outlined text-[20px]">group</span></div>';
+
+        // Responsable
+        sidebarHtml += '<div class="scm-stakeholder-item">';
+        sidebarHtml += '<div class="scm-stakeholder-head"><span class="scm-stakeholder-role">Responsable Asignado</span><span class="material-symbols-outlined text-[#0e996b] text-[16px]">verified_user</span></div>';
+        sidebarHtml += '<div class="scm-stakeholder-body"><div class="scm-avatar-circle"><span class="material-symbols-outlined text-[18px]">person</span></div><div class="scm-stakeholder-details"><strong class="scm-stakeholder-name">' + escHtml(empleadoVal) + '</strong><span class="scm-stakeholder-sub">' + escHtml(btn.dataset.departamento || "Funcionario Asignado") + '</span></div></div>';
+        if (empleadoIdVal) {
+          sidebarHtml += '<div class="scm-stakeholder-actions"><button type="button" class="scm-stakeholder-btn" data-scm-calendar-view-employee><span class="material-symbols-outlined text-[14px]">calendar_month</span> Ver agenda</button></div>';
+        }
+        sidebarHtml += '</div>';
+
+        // Inquilino / Solicitante
+        if (solicitanteVal) {
+          sidebarHtml += '<div class="scm-stakeholder-item">';
+          sidebarHtml += '<div class="scm-stakeholder-head"><span class="scm-stakeholder-role">' + (isPublicPqr ? 'Solicitante' : 'Arrendatario (Inquilino)') + '</span><span class="scm-chip scm-chip-secondary text-[10px]">Inquilino</span></div>';
+          sidebarHtml += '<div class="scm-stakeholder-body"><div class="scm-stakeholder-details"><strong class="scm-stakeholder-name">' + escHtml(solicitanteVal) + '</strong>' + (celularVal ? '<span class="scm-stakeholder-sub">' + escHtml(celularVal) + '</span>' : '') + (correoVal ? '<span class="scm-stakeholder-sub">' + escHtml(correoVal) + '</span>' : '') + '</div></div>';
+          if (celularVal) {
+            var rawDigits = celularVal.replace(/\D/g, "");
+            sidebarHtml += '<div class="scm-stakeholder-actions"><a class="scm-stakeholder-btn" href="tel:' + escHtml(rawDigits) + '"><span class="material-symbols-outlined text-[14px]">call</span> Llamar</a><a class="scm-stakeholder-btn" href="https://wa.me/57' + escHtml(rawDigits) + '" target="_blank" rel="noopener"><span class="material-symbols-outlined text-[14px]">chat</span> WhatsApp</a></div>';
+          }
+          sidebarHtml += '</div>';
+        }
+
+        // Propietario
+        if (propietarioVal) {
+          sidebarHtml += '<div class="scm-stakeholder-item">';
+          sidebarHtml += '<div class="scm-stakeholder-head"><span class="scm-stakeholder-role">Propietario del Inmueble</span><span class="scm-chip scm-chip-warning text-[10px]">Propietario</span></div>';
+          sidebarHtml += '<div class="scm-stakeholder-body"><div class="scm-stakeholder-details"><strong class="scm-stakeholder-name">' + escHtml(propietarioVal) + '</strong></div></div>';
+          sidebarHtml += '<div class="scm-stakeholder-actions"><button type="button" class="scm-stakeholder-btn" data-scm-view-contacts><span class="material-symbols-outlined text-[14px]">notifications_active</span> Contactar</button></div>';
+          sidebarHtml += '</div>';
+        }
+        sidebarHtml += '</div>';
+
+        // Card 3: Ficha Técnica de Inmueble
+        sidebarHtml += '<div class="scm-sidebar-card">';
+        sidebarHtml += '<div class="scm-sidebar-card-head"><span class="scm-sidebar-card-title">Ficha Técnica de Inmueble</span><span class="material-symbols-outlined text-[20px]">home_work</span></div>';
+        sidebarHtml += '<div class="scm-property-specs">';
+        sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Inmueble ID:</span><strong class="scm-spec-value">#' + escHtml(inmuebleIdVal) + '</strong></div>';
+        sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Código Web:</span><strong class="scm-spec-value">' + escHtml(webIdVal) + '</strong></div>';
+        sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Barrio / Sector:</span><strong class="scm-spec-value">' + escHtml(barrioVal) + '</strong></div>';
+        sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Dirección:</span><strong class="scm-spec-value text-right">' + escHtml(direccionVal) + '</strong></div>';
+        sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Contrato Asociado:</span><strong class="scm-spec-value scm-highlight">#' + escHtml(contratoIdVal) + '</strong></div>';
+        sidebarHtml += '</div>';
+        sidebarHtml += '<div class="scm-property-map-widget"><button type="button" class="scm-case-map-preview-btn" data-scm-view-property-map><span class="material-symbols-outlined text-[16px]">pin_drop</span><span>Ver en mapa satelital</span></button></div>';
+        sidebarHtml += '</div>';
+
+        // Entrega specifics
         var tabKeySide = (btn.dataset.tabKey || "").trim();
         var consultorEntrega = (btn.dataset.consultorEntrega || "").trim();
-        var consultorCelular = (
-          btn.dataset.consultorEntregaCelular || ""
-        ).trim();
+        var consultorCelular = (btn.dataset.consultorEntregaCelular || "").trim();
         var consultorCorreo = (btn.dataset.consultorEntregaCorreo || "").trim();
-        if (
-          tabKeySide === "entrega" &&
-          (consultorEntrega || consultorCelular || consultorCorreo)
-        ) {
-          sidebarHtml +=
-            '<div class="scm-case-side-item"><span class="scm-case-side-label scm-label-section">Consultor/a de entrega</span></div>';
-          if (consultorEntrega) {
-            sidebarHtml +=
-              '<div class="scm-case-side-item"><span class="scm-case-side-label">Nombre</span><span class="scm-case-side-value">' +
-              escHtml(consultorEntrega) +
-              "</span></div>";
-          }
-          if (consultorCelular) {
-            sidebarHtml +=
-              '<div class="scm-case-side-item"><span class="scm-case-side-label">Celular</span><span class="scm-case-side-value">' +
-              escHtml(consultorCelular) +
-              "</span></div>";
-          }
-          if (consultorCorreo) {
-            sidebarHtml +=
-              '<div class="scm-case-side-item"><span class="scm-case-side-label">Correo</span><span class="scm-case-side-value">' +
-              escHtml(consultorCorreo) +
-              "</span></div>";
-          }
+        if (tabKeySide === "entrega" && (consultorEntrega || consultorCelular || consultorCorreo)) {
+          sidebarHtml += '<div class="scm-sidebar-card"><div class="scm-sidebar-card-head"><span class="scm-sidebar-card-title">Consultor/a de Entrega</span><span class="material-symbols-outlined text-[20px]">assignment_ind</span></div><div class="scm-property-specs">';
+          if (consultorEntrega) sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Nombre:</span><strong class="scm-spec-value">' + escHtml(consultorEntrega) + '</strong></div>';
+          if (consultorCelular) sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Celular:</span><strong class="scm-spec-value">' + escHtml(consultorCelular) + '</strong></div>';
+          if (consultorCorreo) sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Correo:</span><strong class="scm-spec-value">' + escHtml(consultorCorreo) + '</strong></div>';
+          sidebarHtml += '</div></div>';
         }
+
         var ubicLlaves = (btn.dataset.ubicacionLlaves || "").trim();
         var personaLlaves = (btn.dataset.personaLlaves || "").trim();
         var contactoLlaves = (btn.dataset.contactoLlaves || "").trim();
-        if (
-          tabKeySide === "entrega" &&
-          (ubicLlaves || personaLlaves || contactoLlaves)
-        ) {
-          sidebarHtml +=
-            '<div class="scm-case-side-item">' +
-            '<span class="scm-case-side-label">Llaves</span>' +
-            '<button type="button" class="btn btn-outline btn-sm" data-scm-open-llaves>Ver llaves</button>' +
-            "</div>";
+        if (tabKeySide === "entrega" && (ubicLlaves || personaLlaves || contactoLlaves)) {
+          sidebarHtml += '<div class="scm-sidebar-card"><div class="scm-sidebar-card-head"><span class="scm-sidebar-card-title">Llaves del Inmueble</span><span class="material-symbols-outlined text-[20px]">key</span></div>';
+          sidebarHtml += '<button type="button" class="btn btn-outline btn-sm w-full" data-scm-open-llaves>Ver llaves registradas</button></div>';
         }
-        sidebarHtml += "</div></aside>";
+
+        sidebarHtml += '<details class="scm-sidebar-more-details"><summary class="scm-sidebar-more-summary">Ver todos los campos del caso (' + summaryItems.length + ')</summary><div class="scm-case-sidebar-list">';
+        summaryItems.forEach(function (item) {
+          sidebarHtml += '<div class="scm-case-side-item"><span class="scm-case-side-label">' + escHtml(item.label) + '</span><span class="scm-case-side-value">' + escHtml(item.value) + '</span></div>';
+        });
+        sidebarHtml += '</div></details>';
+
+        sidebarHtml += '</aside>';
+
         if (headActions) {
           headActions.innerHTML = "";
           if (hasPerturbacionValue((btn.dataset.perturbacion || "").trim())) {
             headActions.innerHTML +=
-              '<button type="button" class="scm-case-side-link" data-scm-open-perturbacion>Ver perturbaci&oacute;n</button>';
+              '<button type="button" class="scm-case-side-link" data-scm-open-perturbacion><span class="material-symbols-outlined text-[16px]">warning</span> Ver perturbación</button>';
           }
           if ((btn.dataset.idRevisionCorrectiva || "").trim()) {
             headActions.innerHTML +=
-              '<button type="button" class="scm-case-side-link" data-scm-open-damage="correctiva">Magnitud da&ntilde;os correctiva</button>';
+              '<button type="button" class="scm-case-side-link" data-scm-open-damage="correctiva"><span class="material-symbols-outlined text-[16px]">home_repair_service</span> Magnitud correctiva</button>';
           }
           if ((btn.dataset.idRevisionPreventiva || "").trim()) {
             headActions.innerHTML +=
-              '<button type="button" class="scm-case-side-link" data-scm-open-damage="preventiva">Magnitud da&ntilde;os preventiva</button>';
+              '<button type="button" class="scm-case-side-link" data-scm-open-damage="preventiva"><span class="material-symbols-outlined text-[16px]">shield</span> Magnitud preventiva</button>';
           }
           topActionButtons.forEach(function (rawBtn) {
             var sectionId = rawBtn.getAttribute("data-scm-open-section") || "";
@@ -5032,16 +5106,20 @@
             if (!sectionId) {
               return;
             }
+            var iconName = "description";
+            if (sectionId === "scm-sec-inmueble") iconName = "apartment";
+            else if (sectionId === "scm-sec-hist-inmueble") iconName = "history";
+            else if (sectionId === "scm-sec-contrato") iconName = "description";
             headActions.innerHTML +=
               '<button type="button" class="scm-case-side-link" data-scm-open-section="' +
               escHtml(sectionId) +
-              '">' +
+              '"><span class="material-symbols-outlined text-[16px]">' + iconName + '</span> ' +
               escHtml(label) +
               "</button>";
           });
           if (timelineHtml) {
             headActions.innerHTML +=
-              '<button type="button" class="scm-case-side-link scm-case-timeline-head-btn" data-scm-open-timeline>Ver l&iacute;nea de tiempo</button>';
+              '<button type="button" class="scm-case-side-link scm-case-timeline-head-btn" data-scm-open-timeline><span class="material-symbols-outlined text-[16px]">timeline</span> Línea de tiempo</button>';
           }
           var tabKeyHead = (btn.dataset.tabKey || "").trim();
           var idEstudioHead = (btn.dataset.idEstudioAseguradora || "").trim();
@@ -5053,29 +5131,30 @@
             headActions.innerHTML +=
               '<a href="https://sucasainmobiliaria.com.co/estudio-aseguradora/?id_estudio=' +
               encodeURIComponent(idEstudioHead) +
-              '" class="scm-case-side-link" target="_blank" rel="noopener">Ver asegurable</a>';
+              '" class="scm-case-side-link" target="_blank" rel="noopener"><span class="material-symbols-outlined text-[16px]">verified</span> Ver asegurable</a>';
           }
           if (tabKeyHead === "entrega" && anexosHead) {
             headActions.innerHTML +=
               '<a href="' +
               escHtml(anexosHead) +
-              '" class="scm-case-side-link" target="_blank" rel="noopener">Ver documentos</a>';
+              '" class="scm-case-side-link" target="_blank" rel="noopener"><span class="material-symbols-outlined text-[16px]">folder</span> Ver documentos</a>';
           }
           if (
             tabKeyHead === "entrega" &&
             (ubicLlavesHead || personaLlavesHead || contactoLlavesHead)
           ) {
             headActions.innerHTML +=
-              '<button type="button" class="scm-case-side-link" data-scm-open-llaves>Ver llaves</button>';
+              '<button type="button" class="scm-case-side-link" data-scm-open-llaves><span class="material-symbols-outlined text-[16px]">key</span> Ver llaves</button>';
           }
         }
 
         body.innerHTML =
           '<div class="scm-case-layout">' +
-          sidebarHtml +
           '<section class="scm-case-main">' +
           sourceHtml +
-          "</section></div>";
+          "</section>" +
+          sidebarHtml +
+          "</div>";
         initCotizacionResponseFields(body);
       }
 
