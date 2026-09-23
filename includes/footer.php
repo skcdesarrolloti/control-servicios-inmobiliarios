@@ -90,23 +90,41 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           // Si el panel principal #scm-app existe en esta página, realizamos cambio reactivo sin recarga
           const scmApp = document.getElementById('scm-app');
           if (scmApp && panelTarget) {
-            const nativeTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab[data-tab="' + panelTarget + '"]');
+            let nativeTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab[data-tab="' + panelTarget + '"]');
+            let adminSubTarget = null;
+            if (!nativeTabBtn && panelTarget === 'scm-panel-liquidador-servicios-publicos') {
+              nativeTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-actividades-administrativas"]');
+              adminSubTarget = 'scm-panel-liquidador-servicios-publicos';
+            }
+
             if (nativeTabBtn) {
               e.preventDefault();
               nativeTabBtn.click();
+
+              if (adminSubTarget) {
+                setTimeout(function () {
+                  const subBtn = document.querySelector('[data-admin-activity-target="' + adminSubTarget + '"]');
+                  if (subBtn) subBtn.click();
+                }, 120);
+              }
 
               // Si tiene subtab especificado (ej. vencimientos dentro de inicio)
               if (subtabTarget) {
                 setTimeout(function () {
                   const subtabBtn = document.querySelector('[data-calendar-section-target="scm-home-calendar-section-' + subtabTarget + '"]');
                   if (subtabBtn) subtabBtn.click();
-                }, 100);
+                }, 120);
               }
 
               // Actualizar estilo visual activo de las píldoras
+              const parentDropdown = this.closest('[data-scm-nav-dropdown]');
               navPills.forEach(function (p) {
-                p.classList.remove('bg-[#0f1e36]', 'text-white', 'font-semibold', 'shadow-xs');
-                p.classList.add('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100', 'font-medium');
+                p.classList.remove('bg-[#0f1e36]', 'text-white', 'font-semibold', 'shadow-xs', 'bg-slate-100');
+                if (p.classList.contains('nav-tab-dropdown-item')) {
+                  p.classList.add('text-slate-700', 'font-medium');
+                } else {
+                  p.classList.add('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100', 'font-medium');
+                }
                 const icon = p.querySelector('.material-symbols-outlined');
                 if (icon) {
                   icon.classList.remove('text-white');
@@ -115,8 +133,24 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
                 p.removeAttribute('aria-current');
               });
 
-              this.classList.add('bg-[#0f1e36]', 'text-white', 'font-semibold', 'shadow-xs');
-              this.classList.remove('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100', 'font-medium');
+              if (parentDropdown) {
+                const dropBtn = parentDropdown.querySelector('.nav-tab-dropdown-btn');
+                if (dropBtn) {
+                  dropBtn.classList.add('bg-[#0f1e36]', 'text-white', 'font-semibold', 'shadow-xs');
+                  dropBtn.classList.remove('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100', 'font-medium');
+                  const dropBtnIcon = dropBtn.querySelector('.material-symbols-outlined');
+                  if (dropBtnIcon) {
+                    dropBtnIcon.classList.add('text-white');
+                    dropBtnIcon.classList.remove('text-slate-500');
+                  }
+                }
+                this.classList.add('bg-[#0f1e36]', 'text-white', 'font-semibold');
+                this.classList.remove('text-slate-700');
+              } else {
+                this.classList.add('bg-[#0f1e36]', 'text-white', 'font-semibold', 'shadow-xs');
+                this.classList.remove('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100', 'font-medium');
+              }
+
               const activeIcon = this.querySelector('.material-symbols-outlined');
               if (activeIcon) {
                 activeIcon.classList.add('text-white');
@@ -132,6 +166,70 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
                 window.history.pushState({}, '', url.toString());
               }
             }
+          }
+        });
+      });
+
+      // 3b. Puente de sincronización para botones de estado de tickets (.scm-status-nav-pill)
+      const ticketStatusPills = document.querySelectorAll('[data-ticket-status-target]');
+      ticketStatusPills.forEach(function (pill) {
+        pill.addEventListener('click', function (e) {
+          e.preventDefault();
+          const target = this.getAttribute('data-ticket-status-target');
+          const scmApp = document.getElementById('scm-app');
+          if (scmApp && target) {
+            const nativeTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab[data-tab="' + target + '"]');
+            if (nativeTabBtn) {
+              nativeTabBtn.click();
+            }
+          }
+
+          // Encontrar píldora correspondiente en el dropdown del Header y activar
+          const headerChild = document.querySelector('.nav-tab-dropdown-item[data-panel-target="' + target + '"]');
+          if (headerChild) {
+            navPills.forEach(function (p) {
+              p.classList.remove('bg-[#0f1e36]', 'text-white', 'font-semibold', 'shadow-xs', 'bg-slate-100');
+              if (p.classList.contains('nav-tab-dropdown-item')) {
+                p.classList.add('text-slate-700', 'font-medium');
+              } else {
+                p.classList.add('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100', 'font-medium');
+              }
+              const icon = p.querySelector('.material-symbols-outlined');
+              if (icon) {
+                icon.classList.remove('text-white');
+                icon.classList.add('text-slate-500');
+              }
+              p.removeAttribute('aria-current');
+            });
+
+            const parentDropdown = headerChild.closest('[data-scm-nav-dropdown]');
+            if (parentDropdown) {
+              const dropBtn = parentDropdown.querySelector('.nav-tab-dropdown-btn');
+              if (dropBtn) {
+                dropBtn.classList.add('bg-[#0f1e36]', 'text-white', 'font-semibold', 'shadow-xs');
+                dropBtn.classList.remove('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100', 'font-medium');
+                const dropBtnIcon = dropBtn.querySelector('.material-symbols-outlined');
+                if (dropBtnIcon) {
+                  dropBtnIcon.classList.add('text-white');
+                  dropBtnIcon.classList.remove('text-slate-500');
+                }
+              }
+              headerChild.classList.add('bg-[#0f1e36]', 'text-white', 'font-semibold');
+              headerChild.classList.remove('text-slate-700');
+            }
+            const activeIcon = headerChild.querySelector('.material-symbols-outlined');
+            if (activeIcon) {
+              activeIcon.classList.add('text-white');
+              activeIcon.classList.remove('text-slate-500');
+            }
+            headerChild.setAttribute('aria-current', 'page');
+          }
+
+          if (window.history && window.history.pushState && target) {
+            const url = new URL(window.location.href);
+            const tabKey = target.replace('scm-panel-', '');
+            url.searchParams.set('tab', tabKey);
+            window.history.pushState({}, '', url.toString());
           }
         });
       });

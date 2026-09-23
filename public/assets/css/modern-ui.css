@@ -1074,3 +1074,754 @@
   transition: all 0.25s ease !important;
 }
 
+/* ==========================================================================
+   MESA OPERATIVA DE CASOS — BANNER & ENCABEZADOS (STITCH UI)
+   ========================================================================== */
+
+#scm-app .scm-mesa-operativa-banner {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 1rem !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  padding: 1.15rem 1.5rem !important;
+  margin-bottom: 1.25rem !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 30, 54, 0.04) !important;
+}
+
+#scm-app .scm-mesa-title-wrap {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.85rem !important;
+}
+
+#scm-app .scm-mesa-icon-circle {
+  width: 2.75rem !important;
+  height: 2.75rem !important;
+  border-radius: 0.75rem !important;
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  box-shadow: 0 2px 4px rgba(15, 30, 54, 0.12) !important;
+}
+
+#scm-app .scm-mesa-title {
+  font-size: 1.25rem !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+}
+
+#scm-app .scm-mesa-subtitle {
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  color: #64748b !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  margin-top: 0.15rem !important;
+}
+
+#scm-app .scm-mesa-quick-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  flex-wrap: wrap !important;
+  margin-bottom: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+#scm-app .scm-mesa-quick-actions .scm-guide-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  background: #ffffff !important;
+  color: #334155 !important;
+  border: 1px solid #e2e8f0 !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  padding: 0.4rem 0.85rem !important;
+  border-radius: 9999px !important;
+  transition: all 0.15s ease !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.03) !important;
+}
+
+#scm-app .scm-mesa-quick-actions .scm-guide-btn:hover {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+}
+
+/* ==========================================================================
+   BARRA DE ESTADOS DE TICKETS (Abiertos, Mis Tickets, Postergados, Cerrados)
+   ========================================================================== */
+
+#scm-app .scm-ticket-status-nav {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  padding: 0.5rem 0.65rem !important;
+  margin-top: 0.75rem !important;
+  margin-bottom: 1.25rem !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 30, 54, 0.04) !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+#scm-app .scm-ticket-status-nav .scm-status-nav-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  padding: 0.5rem 1rem !important;
+  border-radius: 0.75rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-ticket-status-nav .scm-status-nav-pill:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+#scm-app .scm-ticket-status-nav .scm-status-nav-pill.active {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+  box-shadow: 0 2px 6px rgba(15, 30, 54, 0.15) !important;
+}
+
+#scm-app .scm-ticket-status-nav .scm-status-nav-pill .material-symbols-outlined {
+  font-size: 18px !important;
+}
+
+/* ==========================================================================
+   SUBTABS DE TICKETS (Mantenimiento, Preventiva, Entrega, etc.)
+   ========================================================================== */
+
+#scm-app .scm-open-subtabs,
+#scm-app .scm-status-subtabs {
+  background: transparent !important;
+  border: none !important;
+  padding: 0.25rem 0 1rem 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 0.5rem !important;
+}
+
+#scm-app .scm-open-subtabs .scm-open-topic-tab,
+#scm-app .scm-status-subtabs .scm-status-topic-tab {
+  background: #ffffff !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 9999px !important;
+  padding: 0.45rem 1rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  transition: all 0.15s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  cursor: pointer !important;
+}
+
+#scm-app .scm-open-subtabs .scm-open-topic-tab:hover,
+#scm-app .scm-status-subtabs .scm-status-topic-tab:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+#scm-app .scm-open-subtabs .scm-open-topic-tab.active,
+#scm-app .scm-status-subtabs .scm-status-topic-tab.active {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+  box-shadow: 0 2px 4px rgba(15, 30, 54, 0.12) !important;
+}
+
+#scm-app .scm-status-topic-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 1rem !important;
+  margin-bottom: 1.25rem !important;
+  padding-bottom: 0.75rem !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+#scm-app .scm-status-topic-head h3 {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  margin: 0 !important;
+  letter-spacing: -0.02em !important;
+}
+
+#scm-app .scm-status-topic-head p {
+  font-size: 0.8125rem !important;
+  color: #64748b !important;
+  margin: 0.2rem 0 0 0 !important;
+}
+
+#scm-app .scm-status-topic-head .scm-status-count {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  color: #0f1e36 !important;
+  background: #eff4ff !important;
+  border: 1px solid #cbdbf5 !important;
+  padding: 0.35rem 0.85rem !important;
+  border-radius: 9999px !important;
+}
+
+#scm-app .scm-sync-status {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  color: #64748b !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 9999px !important;
+  padding: 0.35rem 0.85rem !important;
+}
+
+/* ==========================================================================
+   KPIS GRID & CARDS (9 COLUMNAS CON BORDES INFERIORES POR CATEGORÍA)
+   ========================================================================== */
+
+#scm-app .scm-kpis {
+  display: grid !important;
+  grid-template-columns: repeat(9, minmax(0, 1fr)) !important;
+  gap: 0.65rem !important;
+  margin-bottom: 1.25rem !important;
+}
+
+@media (max-width: 1400px) {
+  #scm-app .scm-kpis {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  #scm-app .scm-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  #scm-app .scm-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+#scm-app .scm-kpi {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.75rem !important;
+  padding: 0.85rem 1rem !important;
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  min-height: 5.5rem !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.03) !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+#scm-app .scm-kpi:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 6px -1px rgba(15, 30, 54, 0.08) !important;
+}
+
+#scm-app .scm-kpi .scm-kpi-label {
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  color: #64748b !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  margin-bottom: 0.35rem !important;
+}
+
+#scm-app .scm-kpi .scm-kpi-value {
+  font-size: 1.65rem !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1 !important;
+}
+
+/* Bordes inferiores característicos de cada KPI según Stitch UI */
+#scm-app .scm-kpis .scm-kpi:nth-child(1) { border-bottom: 3.5px solid #0f1e36 !important; } /* Total */
+#scm-app .scm-kpis .scm-kpi:nth-child(2) { border-bottom: 3.5px solid #10b981 !important; } /* Con Cotiz */
+#scm-app .scm-kpis .scm-kpi:nth-child(3) { border-bottom: 3.5px solid #f97316 !important; } /* Sin Cotiz */
+#scm-app .scm-kpis .scm-kpi:nth-child(4) { border-bottom: 3.5px solid #38bdf8 !important; } /* Con Revisión */
+#scm-app .scm-kpis .scm-kpi:nth-child(5) { border-bottom: 3.5px solid #94a3b8 !important; } /* Sin Revisión */
+#scm-app .scm-kpis .scm-kpi:nth-child(6) { border-bottom: 3.5px solid #ef4444 !important; } /* Críticos */
+#scm-app .scm-kpis .scm-kpi:nth-child(7) { border-bottom: 3.5px solid #d97706 !important; } /* Altos */
+#scm-app .scm-kpis .scm-kpi:nth-child(8) { border-bottom: 3.5px solid #64748b !important; } /* Medios */
+#scm-app .scm-kpis .scm-kpi:nth-child(9) { border-bottom: 3.5px solid #cbd5e1 !important; } /* Bajos */
+
+/* ==========================================================================
+   ENCABEZADO DE SECCIÓN "CASOS EN GESTIÓN ACTIVA"
+   ========================================================================== */
+
+#scm-app .scm-cases-section-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 1rem !important;
+  margin-top: 1.5rem !important;
+  margin-bottom: 1.15rem !important;
+  flex-wrap: wrap !important;
+}
+
+#scm-app .scm-cases-title-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+}
+
+#scm-app .scm-cases-section-title {
+  font-size: 1.2rem !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.01em !important;
+  margin: 0 !important;
+}
+
+#scm-app .scm-cases-count-pill {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  padding: 0.2rem 0.65rem !important;
+  border-radius: 9999px !important;
+}
+
+#scm-app .scm-cases-sort-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  font-size: 0.8125rem !important;
+  color: #64748b !important;
+}
+
+#scm-app .scm-cases-sort-select {
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0.5rem !important;
+  padding: 0.35rem 0.85rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+  background: #ffffff !important;
+}
+
+/* ==========================================================================
+   GRILLA DE 4 COLUMNAS PARA TARJETAS DE CASOS (STITCH UI DESIGN)
+   ========================================================================== */
+
+#scm-app .scm-ticket-cards {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 1.25rem !important;
+  width: 100% !important;
+}
+
+@media (max-width: 1380px) {
+  #scm-app .scm-ticket-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  #scm-app .scm-ticket-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  #scm-app .scm-ticket-cards {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ==========================================================================
+   TARJETA MODERNA DE TICKET / CASO (STITCH UI)
+   ========================================================================== */
+
+#scm-app .scm-ticket-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  padding: 1.25rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.65rem !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 30, 54, 0.04), 0 1px 2px -1px rgba(15, 30, 54, 0.02) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#scm-app .scm-ticket-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 10px 25px -5px rgba(15, 30, 54, 0.08), 0 8px 10px -6px rgba(15, 30, 54, 0.04) !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Bordes superiores por urgencia */
+#scm-app .scm-ticket-card.scm-card-urgency--critico { border-top: 3.5px solid #ef4444 !important; }
+#scm-app .scm-ticket-card.scm-card-urgency--alto { border-top: 3.5px solid #f59e0b !important; }
+#scm-app .scm-ticket-card.scm-card-urgency--medio { border-top: 3.5px solid #3b82f6 !important; }
+#scm-app .scm-ticket-card.scm-card-urgency--bajo { border-top: 3.5px solid #10b981 !important; }
+
+/* Fila Superior de la Tarjeta */
+#scm-app .scm-ticket-card-top {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.5rem !important;
+}
+
+#scm-app .scm-ticket-top-badges {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+}
+
+#scm-app .scm-ticket-id-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  color: #1e40af !important;
+  background: #eff6ff !important;
+  border: 1px solid #dbeafe !important;
+  padding: 0.2rem 0.55rem !important;
+  border-radius: 0.375rem !important;
+  letter-spacing: -0.01em !important;
+}
+
+#scm-app .scm-card-urgency {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.25rem !important;
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  padding: 0.2rem 0.6rem !important;
+  border-radius: 9999px !important;
+}
+
+#scm-app .scm-urgency--critico,
+#scm-app .scm-urgency-critico {
+  background: #fff1f2 !important;
+  color: #be123c !important;
+  border: 1px solid #fecdd3 !important;
+}
+
+#scm-app .scm-urgency--alto,
+#scm-app .scm-urgency-alto {
+  background: #fffbeb !important;
+  color: #b45309 !important;
+  border: 1px solid #fde68a !important;
+}
+
+#scm-app .scm-urgency--medio,
+#scm-app .scm-urgency-medio {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #bfdbfe !important;
+}
+
+#scm-app .scm-urgency--bajo,
+#scm-app .scm-urgency-bajo {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+#scm-app .scm-ticket-rel-time,
+#scm-app .scm-ticket-time-ago {
+  font-size: 0.6875rem !important;
+  font-weight: 500 !important;
+  color: #94a3b8 !important;
+  white-space: nowrap !important;
+}
+
+/* Kicker & Título */
+#scm-app .scm-ticket-kicker {
+  font-size: 0.6875rem !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  color: #b45309 !important;
+  margin-top: 0.15rem !important;
+}
+
+#scm-app .scm-ticket-title {
+  font-size: 0.9375rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  line-height: 1.35 !important;
+  margin: 0 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  min-height: 2.5rem !important;
+}
+
+/* Lista de Metadatos */
+#scm-app .scm-ticket-meta-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.35rem !important;
+  padding: 0.65rem 0 !important;
+  border-top: 1px solid #f1f5f9 !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  font-size: 0.8125rem !important;
+}
+
+#scm-app .scm-ticket-meta-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.5rem !important;
+}
+
+#scm-app .scm-ticket-meta-label {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  color: #64748b !important;
+  font-size: 0.75rem !important;
+}
+
+#scm-app .scm-ticket-meta-label .material-symbols-outlined {
+  font-size: 15px !important;
+  color: #94a3b8 !important;
+}
+
+#scm-app .scm-ticket-meta-value {
+  font-weight: 600 !important;
+  color: #0f172a !important;
+  font-size: 0.75rem !important;
+  text-align: right !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 60% !important;
+}
+
+/* Fila de Funcionario Asignado y SLA */
+#scm-app .scm-ticket-stakeholder-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.5rem !important;
+  padding: 0.25rem 0 !important;
+}
+
+#scm-app .scm-ticket-assignee {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  min-width: 0 !important;
+}
+
+#scm-app .scm-ticket-avatar {
+  width: 1.85rem !important;
+  height: 1.85rem !important;
+  border-radius: 9999px !important;
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.1) !important;
+}
+
+#scm-app .scm-ticket-assignee-info {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+}
+
+#scm-app .scm-ticket-assignee-name {
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+}
+
+#scm-app .scm-ticket-assignee-role {
+  font-size: 0.625rem !important;
+  font-weight: 500 !important;
+  color: #94a3b8 !important;
+}
+
+/* Badges SLA */
+#scm-app .scm-card-sla {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.25rem !important;
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  padding: 0.2rem 0.6rem !important;
+  border-radius: 9999px !important;
+  white-space: nowrap !important;
+}
+
+#scm-app .scm-sla--vencido,
+#scm-app .scm-sla-badge {
+  background: #fff1f2 !important;
+  color: #be123c !important;
+  border: 1px solid #fecdd3 !important;
+}
+
+#scm-app .scm-sla--riesgo {
+  background: #fffbeb !important;
+  color: #b45309 !important;
+  border: 1px solid #fde68a !important;
+}
+
+#scm-app .scm-sla--bien,
+#scm-app .scm-sla-ok {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+/* Chips de Estado y Cotización */
+#scm-app .scm-ticket-chips-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.5rem !important;
+  padding: 0.2rem 0 !important;
+}
+
+#scm-app .scm-ticket-status-label {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+}
+
+#scm-app .scm-ticket-status-label .badge {
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+  padding: 0.15rem 0.5rem !important;
+  border-radius: 9999px !important;
+}
+
+#scm-app .scm-card-chip {
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+  padding: 0.15rem 0.55rem !important;
+  border-radius: 9999px !important;
+  white-space: nowrap !important;
+}
+
+#scm-app .scm-chip-success {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+#scm-app .scm-chip-muted {
+  background: #fff7ed !important;
+  color: #c2410c !important;
+  border: 1px solid #ffedd5 !important;
+}
+
+/* Footer de la Tarjeta con Botón Principal "Ver Detalle" */
+#scm-app .scm-ticket-card-footer {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  margin-top: auto !important;
+  padding-top: 0.5rem !important;
+}
+
+#scm-app .scm-btn-ver-detalle {
+  flex: 1 1 0% !important;
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 0.625rem !important;
+  padding: 0.55rem 0.85rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.4rem !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.08) !important;
+  cursor: pointer !important;
+}
+
+#scm-app .scm-btn-ver-detalle:hover {
+  background: #162846 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 6px -1px rgba(15, 30, 54, 0.15) !important;
+}
+
+#scm-app .scm-btn-card-calendar {
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #475569 !important;
+  border-radius: 0.625rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+  transition: all 0.15s ease !important;
+  cursor: pointer !important;
+}
+
+#scm-app .scm-btn-card-calendar:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+
+

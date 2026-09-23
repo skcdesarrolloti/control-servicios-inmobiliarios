@@ -660,6 +660,17 @@ final class SuCasaControlServiciosInmobiliarios
   }
 
   /** @return array<int,string> */
+  public function currentAllowedTabs(): array
+  {
+    return $this->currentDashboardAllowedTabs();
+  }
+
+  public function userCanAccessTab(string $tab): bool
+  {
+    return $this->canAccessDashboardTab($tab);
+  }
+
+  /** @return array<int,string> */
   private function currentDashboardAllowedTabs(): array
   {
     $cargo = Auth::userCargo();
@@ -698,6 +709,9 @@ final class SuCasaControlServiciosInmobiliarios
     }
     if (isset($selected['servicios_publicos_pendientes']) && !isset($selected['liquidador_servicios_publicos'])) {
       $selected['liquidador_servicios_publicos'] = 'liquidador_servicios_publicos';
+    }
+    if (!isset($selected['calendario_actividades'])) {
+      $selected['calendario_actividades'] = 'calendario_actividades';
     }
     return array_values($selected);
   }

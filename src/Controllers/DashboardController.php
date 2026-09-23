@@ -23,4 +23,10 @@ final class DashboardController
   {
     return $this->app->renderPanel();
   }
+
+  /** @return array<int,string> */
+  public function getAllowedTabs(): array
+  {
+    return $this->app->currentAllowedTabs();
+  }
 }

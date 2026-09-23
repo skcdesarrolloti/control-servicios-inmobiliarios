@@ -452,6 +452,24 @@
         panel.classList.toggle("active", panel.id === target);
       });
 
+      var ticketHeaderWrap = root.querySelector("#scm-tickets-header-wrap");
+      var ticketStatusNav = root.querySelector("#scm-ticket-status-nav, .scm-ticket-status-nav");
+      var isTicketPanel = [
+        "scm-panel-abiertos",
+        "scm-panel-mis-tickets",
+        "scm-panel-postergados",
+        "scm-panel-cerrados"
+      ].indexOf(target) !== -1;
+
+      if (ticketHeaderWrap) {
+        ticketHeaderWrap.style.display = isTicketPanel ? "" : "none";
+      }
+      if (ticketStatusNav) {
+        ticketStatusNav.querySelectorAll("[data-ticket-status-target]").forEach(function (pill) {
+          pill.classList.toggle("active", pill.getAttribute("data-ticket-status-target") === target);
+        });
+      }
+
       return true;
     }
 
@@ -476,6 +494,19 @@
       tab.addEventListener("click", function () {
         activateOpenTopic(tab.getAttribute("data-open-target") || "");
         preloadFuncionariosForActivePanel();
+      });
+    });
+
+    root.querySelectorAll("[data-ticket-status-target]").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        var targetPanel = this.getAttribute("data-ticket-status-target");
+        var nativeTabBtn = root.querySelector('.scm-main-tabs .scm-tab[data-tab="' + targetPanel + '"]');
+        if (nativeTabBtn) {
+          nativeTabBtn.click();
+        } else {
+          activateTab(targetPanel);
+        }
       });
     });
 

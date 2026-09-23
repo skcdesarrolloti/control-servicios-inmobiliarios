@@ -4,11 +4,12 @@ namespace SCM\Views;
 
 final class DashboardView
 {
-  public function render(string $baseUrl, string $user, string $panelHtml, bool $standaloneFunction = false): void
+  public function render(string $baseUrl, string $user, string $panelHtml, bool $standaloneFunction = false, ?array $allowedTabs = null): void
   {
     $base_url = $baseUrl;
     $user_name = $user;
     $standalone_function = $standaloneFunction;
+    $allowed_tabs = $allowedTabs;
     $body_class = $standaloneFunction ? 'scm-standalone-function' : '';
     $page_title = $standaloneFunction ? 'Función protegida — SKC SuCasa Inmobiliaria' : 'Panel de Control — SKC SuCasa Inmobiliaria';
 

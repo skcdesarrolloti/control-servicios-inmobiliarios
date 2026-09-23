@@ -131,6 +131,14 @@ trait RendersDashboard
       'home' => 'scm-panel-inicio',
       'resumen' => 'scm-panel-inicio',
       'scm-panel-inicio' => 'scm-panel-inicio',
+      'vencimientos' => 'scm-panel-inicio',
+      'vencimiento' => 'scm-panel-inicio',
+      'tickets' => 'scm-panel-abiertos',
+      'ticket' => 'scm-panel-abiertos',
+      'casos' => 'scm-panel-abiertos',
+      'historial' => 'scm-panel-inicio',
+      'historial_inmueble' => 'scm-panel-inicio',
+      'actividades_realizadas' => 'scm-panel-inicio',
       'abiertos' => 'scm-panel-abiertos',
       'abierto' => 'scm-panel-abiertos',
       'scm-panel-abiertos' => 'scm-panel-abiertos',
@@ -314,7 +322,17 @@ trait RendersDashboard
       }
     }
     if ($initialTab === '') {
-      $initialTab = in_array('metricas', $dashboardAllowedTabs, true) ? 'scm-panel-metricas' : 'scm-panel-inicio';
+      if (in_array('abiertos', $dashboardAllowedTabs, true)) {
+        $initialTab = 'scm-panel-abiertos';
+      } elseif (in_array('mis_tickets', $dashboardAllowedTabs, true)) {
+        $initialTab = 'scm-panel-mis-tickets';
+      } elseif (in_array('calendario_actividades', $dashboardAllowedTabs, true)) {
+        $initialTab = 'scm-panel-inicio';
+      } elseif (in_array('metricas', $dashboardAllowedTabs, true)) {
+        $initialTab = 'scm-panel-metricas';
+      } else {
+        $initialTab = 'scm-panel-inicio';
+      }
     }
     if ($initialAdministrativeActivityKey === '' || !in_array($initialAdministrativeActivityKey, $allowedAdministrativeActivityTabs, true)) {
       $initialAdministrativeActivityKey = (string) ($allowedAdministrativeActivityTabs[0] ?? '');
@@ -635,26 +653,70 @@ trait RendersDashboard
       <div class="scm-panel-loader" data-scm-panel-loader hidden aria-hidden="true">
         <div class="scm-panel-loader-card" role="status" aria-live="polite" aria-atomic="true">
           <span class="scm-panel-loader-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M21 12a9 9 0 0 0-9-9"></path></svg>
+            <svg viewBox="0 0 24 24" width="32" height="32" style="width:32px;height:32px;fill:none;stroke:#0f1e36;stroke-width:2.5;stroke-linecap:round;"><circle cx="12" cy="12" r="9" style="opacity:0.25;fill:none;stroke:currentColor;"></circle><path d="M21 12a9 9 0 0 0-9-9" style="fill:none;stroke:currentColor;"></path></svg>
           </span>
           <span class="scm-panel-loader-kicker">Preparando la vista</span>
           <strong data-scm-panel-loader-title>Cargando informaci&oacute;n</strong>
           <span data-scm-panel-loader-detail>Espera un momento mientras consultamos los datos.</span>
         </div>
       </div>
-      <div class="scm-guide-bar">
-        <?php if ($canManageDashboardPermissions): ?>
-          <button class="scm-guide-btn scm-permissions-btn" type="button" id="scm-open-permissions">Configurar permisos</button>
-          <button class="scm-guide-btn scm-due-settings-shortcut" type="button" data-scm-open-due-settings>Configurar vencimientos</button>
-        <?php endif; ?>
-        <?php if ($canManagePublicPqrSettings): ?>
-          <button class="scm-guide-btn scm-pqr-settings-shortcut" type="button" id="scm-open-pqr-settings">Configurar notificaciones</button>
-        <?php endif; ?>
-        <?php if ($canManageInternalNotificationSettings): ?>
-          <button class="scm-guide-btn scm-internal-notifications-shortcut" type="button" id="scm-open-internal-notifications">Notificaciones internas</button>
-        <?php endif; ?>
-        <button class="scm-guide-btn" type="button" id="scm-open-actas-guide">Tipos de actas</button>
-        <button class="scm-guide-btn" type="button" id="scm-open-guide"><i class="fas fa-book-open"></i> Ver gu&iacute;as</button>
+      <?php
+      $isTicketTabActive = in_array($initialTab, [
+        'scm-panel-abiertos',
+        'scm-panel-mis-tickets',
+        'scm-panel-postergados',
+        'scm-panel-cerrados',
+      ], true);
+      ?>
+      <div class="scm-tickets-header-wrap" id="scm-tickets-header-wrap"<?php echo !$isTicketTabActive ? ' style="display:none;"' : ''; ?>>
+        <div class="scm-mesa-operativa-banner">
+          <div class="scm-mesa-title-wrap">
+            <div class="scm-mesa-icon-circle">
+              <span class="material-symbols-outlined text-[24px]">assignment</span>
+            </div>
+            <div>
+              <h2 class="scm-mesa-title">Mesa Operativa de Casos</h2>
+              <div class="scm-mesa-subtitle">CONTROL DE MANTENIMIENTOS &amp; TICKETS</div>
+            </div>
+          </div>
+          <div class="scm-guide-bar scm-mesa-quick-actions">
+            <?php if ($canManageDashboardPermissions): ?>
+              <button class="scm-guide-btn scm-permissions-btn" type="button" id="scm-open-permissions"><span class="material-symbols-outlined text-[16px]">lock</span> Permisos</button>
+              <button class="scm-guide-btn scm-due-settings-shortcut" type="button" data-scm-open-due-settings><span class="material-symbols-outlined text-[16px]">calendar_month</span> Vencimientos</button>
+            <?php endif; ?>
+            <?php if ($canManagePublicPqrSettings || $canManageInternalNotificationSettings): ?>
+              <button class="scm-guide-btn scm-internal-notifications-shortcut" type="button" id="scm-open-internal-notifications"><span class="material-symbols-outlined text-[16px]">notifications</span> Notificaciones</button>
+            <?php endif; ?>
+            <button class="scm-guide-btn" type="button" id="scm-open-actas-guide"><span class="material-symbols-outlined text-[16px]">description</span> Tipos de actas</button>
+            <button class="scm-guide-btn" type="button" id="scm-open-guide"><span class="material-symbols-outlined text-[16px]">menu_book</span> Gu&iacute;as</button>
+          </div>
+        </div>
+        <div class="scm-ticket-status-nav" id="scm-ticket-status-nav" role="tablist" aria-label="Vistas de tickets">
+          <?php if (in_array('abiertos', $dashboardAllowedTabs, true)): ?>
+            <button class="scm-status-nav-pill<?php echo $initialTab === 'scm-panel-abiertos' ? ' active' : ''; ?>" type="button" data-ticket-status-target="scm-panel-abiertos">
+              <span class="material-symbols-outlined text-[18px]">inbox</span>
+              <span>Tickets Abiertos</span>
+            </button>
+          <?php endif; ?>
+          <?php if (in_array('mis_tickets', $dashboardAllowedTabs, true)): ?>
+            <button class="scm-status-nav-pill<?php echo $initialTab === 'scm-panel-mis-tickets' ? ' active' : ''; ?>" type="button" data-ticket-status-target="scm-panel-mis-tickets">
+              <span class="material-symbols-outlined text-[18px]">assignment_ind</span>
+              <span>Mis Tickets</span>
+            </button>
+          <?php endif; ?>
+          <?php if (in_array('postergados', $dashboardAllowedTabs, true)): ?>
+            <button class="scm-status-nav-pill<?php echo $initialTab === 'scm-panel-postergados' ? ' active' : ''; ?>" type="button" data-ticket-status-target="scm-panel-postergados">
+              <span class="material-symbols-outlined text-[18px]">hourglass_empty</span>
+              <span>Tickets Postergados</span>
+            </button>
+          <?php endif; ?>
+          <?php if (in_array('cerrados', $dashboardAllowedTabs, true)): ?>
+            <button class="scm-status-nav-pill<?php echo $initialTab === 'scm-panel-cerrados' ? ' active' : ''; ?>" type="button" data-ticket-status-target="scm-panel-cerrados">
+              <span class="material-symbols-outlined text-[18px]">task_alt</span>
+              <span>Tickets Cerrados</span>
+            </button>
+          <?php endif; ?>
+        </div>
       </div>
       <div class="scm-tabs scm-main-tabs">
         <button class="scm-tab<?php echo $initialTab === 'scm-panel-inicio' ? ' active' : ''; ?>" data-tab="scm-panel-inicio" type="button"><i class="fas fa-house" aria-hidden="true"></i> Inicio</button>
@@ -696,17 +758,26 @@ trait RendersDashboard
           <button type="button" data-scm-home-retry hidden>Reintentar</button>
         </div>
 
+        <?php
+        $activeHomeSection = ($tabKey === 'vencimientos' || $tabKey === 'vencimiento')
+          ? 'scm-home-calendar-section-due'
+          : (($tabKey === 'historial' || $tabKey === 'historial_inmueble')
+            ? 'scm-home-calendar-section-property-history'
+            : (($tabKey === 'actividades_realizadas')
+              ? 'scm-home-calendar-section-completed'
+              : 'scm-home-calendar-section-mine'));
+        ?>
         <?php if ($canAccessAdministrativeCalendar): ?>
           <section class="scm-home-calendar" aria-labelledby="scm-home-calendar-title" data-calendar-sections>
             <div class="scm-calendar-section-tabs" role="tablist" aria-label="Calendarios administrativos">
-              <button class="scm-status-topic-tab scm-calendar-section-tab active" type="button" data-calendar-section-target="scm-home-calendar-section-mine">Mi calendario</button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-team">Calendario equipo</button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-due">Vencimientos</button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-completed">Actividades realizadas</button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-property-history">Historial inmueble</button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab" type="button" data-calendar-section-target="scm-home-calendar-section-contract-termination">Solicitudes de terminaci&oacute;n de contrato</button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-mine' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-mine">Mi calendario</button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-team' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-team">Calendario equipo</button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-due' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-due">Vencimientos</button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-completed' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-completed">Actividades realizadas</button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-property-history' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-property-history">Historial inmueble</button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-termination' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contract-termination">Solicitudes de terminaci&oacute;n de contrato</button>
             </div>
-            <div class="scm-calendar-section-panel active" id="scm-home-calendar-section-mine" data-calendar-section-panel>
+            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-mine' ? ' active' : ''; ?>" id="scm-home-calendar-section-mine" data-calendar-section-panel>
               <?php echo $this->render_calendario_actividades_panel($config, [
                 'mode' => 'personal',
                 'variant' => 'home',
@@ -716,7 +787,7 @@ trait RendersDashboard
                 'show_report_action' => false,
               ]); ?>
             </div>
-            <div class="scm-calendar-section-panel" id="scm-home-calendar-section-team" data-calendar-section-panel>
+            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-team' ? ' active' : ''; ?>" id="scm-home-calendar-section-team" data-calendar-section-panel>
               <?php echo $this->render_calendario_actividades_panel($config, [
                 'mode' => 'team',
                 'variant' => 'home',
@@ -724,7 +795,7 @@ trait RendersDashboard
                 'description' => 'Cambia el funcionario para revisar la disponibilidad y agenda de otras personas.',
               ]); ?>
             </div>
-            <div class="scm-calendar-section-panel" id="scm-home-calendar-section-due" data-calendar-section-panel>
+            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-due' ? ' active' : ''; ?>" id="scm-home-calendar-section-due" data-calendar-section-panel>
               <?php echo $this->render_calendario_actividades_panel($config, [
                 'mode' => 'due',
                 'view' => 'pending',
@@ -736,7 +807,7 @@ trait RendersDashboard
                 'show_pending_action' => false,
               ]); ?>
             </div>
-            <div class="scm-calendar-section-panel" id="scm-home-calendar-section-completed" data-calendar-section-panel>
+            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-completed' ? ' active' : ''; ?>" id="scm-home-calendar-section-completed" data-calendar-section-panel>
               <section class="scm-completed-activities-panel" data-scm-completed-activities-panel aria-live="polite">
                 <div class="scm-completed-activities-head">
                   <div>
@@ -778,7 +849,7 @@ trait RendersDashboard
                 </div>
               </section>
             </div>
-            <div class="scm-calendar-section-panel" id="scm-home-calendar-section-property-history" data-calendar-section-panel>
+            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-property-history' ? ' active' : ''; ?>" id="scm-home-calendar-section-property-history" data-calendar-section-panel>
               <section class="scm-property-history-panel" data-scm-property-history-panel aria-live="polite">
                 <div class="scm-property-history-head">
                   <div>
@@ -803,7 +874,7 @@ trait RendersDashboard
                 <div class="scm-property-history-results" data-scm-property-history-results></div>
               </section>
             </div>
-            <div class="scm-calendar-section-panel" id="scm-home-calendar-section-contract-termination" data-calendar-section-panel>
+            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-termination' ? ' active' : ''; ?>" id="scm-home-calendar-section-contract-termination" data-calendar-section-panel>
               <section class="scm-contract-termination-panel" data-scm-contract-termination-panel aria-live="polite">
                 <div class="scm-contract-termination-head">
                   <div>
@@ -824,10 +895,16 @@ trait RendersDashboard
 
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-abiertos' ? ' active' : ''; ?>" id="scm-panel-abiertos" data-permission-tab="abiertos">
         <div class="scm-status-bucket scm-open-bucket" data-open-bucket="abiertos">
-          <div class="scm-status-subtabs scm-open-subtabs" role="tablist" aria-label="Tickets abiertos">
-            <?php foreach ($openTopicDefs as $openTopicKey => $openTopicDef): ?>
-              <button class="scm-status-topic-tab scm-open-topic-tab<?php echo $activeOpenTopic === $openTopicKey ? ' active' : ''; ?>" type="button" data-open-target="<?php echo esc_attr($openTopicKey); ?>"><?php echo esc_html((string)($openTopicDef['label'] ?? $openTopicKey)); ?></button>
-            <?php endforeach; ?>
+          <div class="scm-status-subtabs scm-open-subtabs flex items-center justify-between" role="tablist" aria-label="Tickets abiertos">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <?php foreach ($openTopicDefs as $openTopicKey => $openTopicDef): ?>
+                <button class="scm-status-topic-tab scm-open-topic-tab<?php echo $activeOpenTopic === $openTopicKey ? ' active' : ''; ?>" type="button" data-open-target="<?php echo esc_attr($openTopicKey); ?>"><?php echo esc_html((string)($openTopicDef['label'] ?? $openTopicKey)); ?></button>
+              <?php endforeach; ?>
+            </div>
+            <div class="scm-sync-status hidden md:flex items-center gap-2 text-xs text-slate-500 font-medium px-2 py-1 bg-slate-50 border border-slate-200/60 rounded-full">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+              <span>Sincronizado vía SIMI Inmobiliaria</span>
+            </div>
           </div>
 
       <div class="scm-open-topic-panel<?php echo $activeOpenTopic === 'mant' ? ' active' : ''; ?>" id="scm-panel-mant" data-open-topic="mant" data-scm-loaded="<?php echo $hydrateMaintenanceRows ? '1' : '0'; ?>">
@@ -962,6 +1039,17 @@ trait RendersDashboard
               <span class="scm-spinner" id="scm-spinner"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
             </div>
           </form>
+        </div>
+
+        <div class="scm-cases-section-head">
+          <div class="scm-cases-section-title-wrap">
+            <h3 class="scm-cases-section-title">Casos en Gestión Activa</h3>
+            <span class="scm-cases-count-badge">Mostrando tickets registrados</span>
+          </div>
+          <div class="scm-cases-sort-wrap">
+            <span class="scm-cases-sort-label">Ordenar por:</span>
+            <span class="scm-cases-sort-badge"><span class="material-symbols-outlined text-[15px]">swap_vert</span> Mayor Urgencia (SLA)</span>
+          </div>
         </div>
 
         <div class="scm-cards-wrap">
