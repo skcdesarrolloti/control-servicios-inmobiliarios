@@ -218,14 +218,19 @@ trait TableRowsConcern
       }
 
       $urgencyNorm = strtolower(trim($prioridad !== '' ? $prioridad : $magnitudCaso));
+      $cardUrgencyClass = 'scm-card-urgency--bajo';
       if (str_contains($urgencyNorm, 'crit') || str_contains($urgencyNorm, 'urgente')) {
         $urgencyPill = '<span class="scm-card-urgency scm-urgency-critico"><span class="material-symbols-outlined text-[13px]">local_fire_department</span> Crítico</span>';
+        $cardUrgencyClass = 'scm-card-urgency--critico';
       } elseif (str_contains($urgencyNorm, 'alt')) {
         $urgencyPill = '<span class="scm-card-urgency scm-urgency-alto"><span class="material-symbols-outlined text-[13px]">warning</span> Alto</span>';
+        $cardUrgencyClass = 'scm-card-urgency--alto';
       } elseif (str_contains($urgencyNorm, 'med')) {
-        $urgencyPill = '<span class="scm-card-urgency scm-urgency-medio"><span class="material-symbols-outlined text-[13px]">schedule</span> Medio</span>';
+        $urgencyPill = '<span class="scm-card-urgency scm-urgency-medio"><span class="material-symbols-outlined text-[13px]">info</span> Medio</span>';
+        $cardUrgencyClass = 'scm-card-urgency--medio';
       } else {
         $urgencyPill = '<span class="scm-card-urgency scm-urgency-bajo"><span class="material-symbols-outlined text-[13px]">check</span> Bajo</span>';
+        $cardUrgencyClass = 'scm-card-urgency--bajo';
       }
 
       $assigneeName = $employee !== '' ? $employee : 'Sin asignar';
@@ -252,10 +257,10 @@ trait TableRowsConcern
         $thirdPartyLabel = 'Propietario';
       }
 
-      $html .= '<article class="scm-ticket-card card" data-pk="' . esc_attr((string) $ticketPk) . '">';
+      $html .= '<article class="scm-ticket-card card ' . esc_attr($cardUrgencyClass) . '" data-pk="' . esc_attr((string) $ticketPk) . '">';
       $html .= '<div class="scm-ticket-card-top">';
       $html .= '<div class="scm-ticket-top-badges">';
-      $html .= '<span class="scm-ticket-badge badge badge-primary">#' . esc_html($idTicket) . '</span>';
+      $html .= '<span class="scm-ticket-id-badge">#' . esc_html($idTicket) . '</span>';
       $html .= $urgencyPill;
       $html .= '</div>';
       $html .= '<span class="scm-ticket-time-ago">' . esc_html($timeAgo) . '</span>';

@@ -397,6 +397,24 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
         });
       }
 
+      // 6. Colapsar / Expandir panel de filtros avanzados
+      const filterCollapseBtn = document.getElementById('scm-filter-collapse-toggle');
+      const filterGrid = document.getElementById('scm-filter-grid');
+      if (filterCollapseBtn && filterGrid) {
+        filterCollapseBtn.addEventListener('click', function () {
+          const isCollapsed = filterGrid.classList.contains('hidden');
+          filterGrid.classList.toggle('hidden', !isCollapsed);
+          const icon = filterCollapseBtn.querySelector('.material-symbols-outlined');
+          const text = filterCollapseBtn.querySelector('.scm-filter-collapse-text');
+          if (icon) {
+            icon.textContent = isCollapsed ? 'expand_less' : 'expand_more';
+          }
+          if (text) {
+            text.textContent = isCollapsed ? 'Colapsar panel' : 'Mostrar panel';
+          }
+        });
+      }
+
     })();
   </script>
 </body>

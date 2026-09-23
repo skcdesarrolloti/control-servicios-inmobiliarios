@@ -908,120 +908,185 @@ trait RendersDashboard
           </div>
 
       <div class="scm-open-topic-panel<?php echo $activeOpenTopic === 'mant' ? ' active' : ''; ?>" id="scm-panel-mant" data-open-topic="mant" data-scm-loaded="<?php echo $hydrateMaintenanceRows ? '1' : '0'; ?>">
-        <div class="scm-kpis scm-kpis-daisy">
-          <div class="scm-kpi">
-            <div class="scm-kpi-label">Total</div>
-            <div class="scm-kpi-value" id="scm-kpi-total"><?php echo esc_html((string)($stats['total'] ?? 0)); ?></div>
+        <div class="scm-kpis scm-kpis-stitch">
+          <div class="scm-kpi" data-kpi="total">
+            <div class="scm-kpi-header">
+              <span class="scm-kpi-label">TOTAL</span>
+              <span class="material-symbols-outlined scm-kpi-icon">inbox</span>
+            </div>
+            <div class="scm-kpi-value-row">
+              <span class="scm-kpi-value" id="scm-kpi-total"><?php echo esc_html((string)($stats['total'] ?? 0)); ?></span>
+            </div>
+            <div class="scm-kpi-indicator scm-kpi-indicator-total"></div>
           </div>
-          <div class="scm-kpi">
-            <div class="scm-kpi-label">Con cotizaci&oacute;n</div>
-            <div class="scm-kpi-value" id="scm-kpi-con-cotz"><?php echo esc_html((string)($stats['con_cotizacion'] ?? 0)); ?></div>
+          <div class="scm-kpi" data-kpi="con-cotz">
+            <div class="scm-kpi-header">
+              <span class="scm-kpi-label">CON COTIZ.</span>
+              <span class="material-symbols-outlined scm-kpi-icon text-emerald-500">receipt_long</span>
+            </div>
+            <div class="scm-kpi-value-row">
+              <span class="scm-kpi-value text-emerald-700" id="scm-kpi-con-cotz"><?php echo esc_html((string)($stats['con_cotizacion'] ?? 0)); ?></span>
+            </div>
+            <div class="scm-kpi-indicator scm-kpi-indicator-con-cotz"></div>
           </div>
-          <div class="scm-kpi">
-            <div class="scm-kpi-label">Sin cotizaci&oacute;n</div>
-            <div class="scm-kpi-value" id="scm-kpi-sin-cotz"><?php echo esc_html((string)($stats['sin_cotizacion'] ?? 0)); ?></div>
+          <div class="scm-kpi" data-kpi="sin-cotz">
+            <div class="scm-kpi-header">
+              <span class="scm-kpi-label">SIN COTIZ.</span>
+              <span class="material-symbols-outlined scm-kpi-icon text-amber-500">note_add</span>
+            </div>
+            <div class="scm-kpi-value-row">
+              <span class="scm-kpi-value text-amber-700" id="scm-kpi-sin-cotz"><?php echo esc_html((string)($stats['sin_cotizacion'] ?? 0)); ?></span>
+            </div>
+            <div class="scm-kpi-indicator scm-kpi-indicator-sin-cotz"></div>
           </div>
-          <div class="scm-kpi">
-            <div class="scm-kpi-label">Con revisi&oacute;n</div>
-            <div class="scm-kpi-value" id="scm-kpi-con-prev"><?php echo esc_html((string)($stats['con_revision'] ?? 0)); ?></div>
+          <div class="scm-kpi" data-kpi="con-prev">
+            <div class="scm-kpi-header">
+              <span class="scm-kpi-label">CON REVISIÓN</span>
+              <span class="material-symbols-outlined scm-kpi-icon text-blue-500">fact_check</span>
+            </div>
+            <div class="scm-kpi-value-row">
+              <span class="scm-kpi-value text-blue-700" id="scm-kpi-con-prev"><?php echo esc_html((string)($stats['con_revision'] ?? 0)); ?></span>
+            </div>
+            <div class="scm-kpi-indicator scm-kpi-indicator-con-prev"></div>
           </div>
-          <div class="scm-kpi">
-            <div class="scm-kpi-label">Sin revisi&oacute;n</div>
-            <div class="scm-kpi-value" id="scm-kpi-sin-prev"><?php echo esc_html((string)($stats['sin_revision'] ?? 0)); ?></div>
+          <div class="scm-kpi" data-kpi="sin-prev">
+            <div class="scm-kpi-header">
+              <span class="scm-kpi-label">SIN REVISIÓN</span>
+              <span class="material-symbols-outlined scm-kpi-icon text-slate-400">visibility_off</span>
+            </div>
+            <div class="scm-kpi-value-row">
+              <span class="scm-kpi-value text-slate-700" id="scm-kpi-sin-prev"><?php echo esc_html((string)($stats['sin_revision'] ?? 0)); ?></span>
+            </div>
+            <div class="scm-kpi-indicator scm-kpi-indicator-sin-prev"></div>
           </div>
 
-          <div class="scm-kpi scm-kpi-magnitud scm-kpi-critico">
-            <div class="scm-kpi-label">Cr&iacute;ticos</div>
-            <div class="scm-kpi-value" id="scm-kpi-magnitud-critico"><?php echo esc_html((string)($stats['magnitud_critico'] ?? 0)); ?></div>
+          <div class="scm-kpi scm-kpi-magnitud scm-kpi-critico" data-kpi="critico">
+            <div class="scm-kpi-header">
+              <span class="scm-kpi-label text-rose-600">CRÍTICOS</span>
+              <span class="material-symbols-outlined scm-kpi-icon text-rose-500">local_fire_department</span>
+            </div>
+            <div class="scm-kpi-value-row flex items-baseline gap-1.5">
+              <span class="scm-kpi-value text-rose-600" id="scm-kpi-magnitud-critico"><?php echo esc_html((string)($stats['magnitud_critico'] ?? 0)); ?></span>
+              <span class="text-[10px] font-bold text-rose-500 uppercase tracking-wider">SLA</span>
+            </div>
+            <div class="scm-kpi-indicator scm-kpi-indicator-critico"></div>
           </div>
-          <div class="scm-kpi scm-kpi-magnitud scm-kpi-alto">
-            <div class="scm-kpi-label">Altos</div>
-            <div class="scm-kpi-value" id="scm-kpi-magnitud-alto"><?php echo esc_html((string)($stats['magnitud_alto'] ?? 0)); ?></div>
+          <div class="scm-kpi scm-kpi-magnitud scm-kpi-alto" data-kpi="alto">
+            <div class="scm-kpi-header">
+              <span class="scm-kpi-label text-amber-600">ALTOS</span>
+              <span class="material-symbols-outlined scm-kpi-icon text-amber-500">warning</span>
+            </div>
+            <div class="scm-kpi-value-row">
+              <span class="scm-kpi-value text-amber-600" id="scm-kpi-magnitud-alto"><?php echo esc_html((string)($stats['magnitud_alto'] ?? 0)); ?></span>
+            </div>
+            <div class="scm-kpi-indicator scm-kpi-indicator-alto"></div>
           </div>
-          <div class="scm-kpi scm-kpi-magnitud scm-kpi-medio">
-            <div class="scm-kpi-label">Medios</div>
-            <div class="scm-kpi-value" id="scm-kpi-magnitud-medio"><?php echo esc_html((string)($stats['magnitud_medio'] ?? 0)); ?></div>
+          <div class="scm-kpi scm-kpi-magnitud scm-kpi-medio" data-kpi="medio">
+            <div class="scm-kpi-header">
+              <span class="scm-kpi-label text-blue-600">MEDIOS</span>
+              <span class="material-symbols-outlined scm-kpi-icon text-blue-400">info</span>
+            </div>
+            <div class="scm-kpi-value-row">
+              <span class="scm-kpi-value text-blue-600" id="scm-kpi-magnitud-medio"><?php echo esc_html((string)($stats['magnitud_medio'] ?? 0)); ?></span>
+            </div>
+            <div class="scm-kpi-indicator scm-kpi-indicator-medio"></div>
           </div>
-          <div class="scm-kpi scm-kpi-magnitud scm-kpi-bajo">
-            <div class="scm-kpi-label">Bajos</div>
-            <div class="scm-kpi-value" id="scm-kpi-magnitud-bajo"><?php echo esc_html((string)($stats['magnitud_bajo'] ?? 0)); ?></div>
+          <div class="scm-kpi scm-kpi-magnitud scm-kpi-bajo" data-kpi="bajo">
+            <div class="scm-kpi-header">
+              <span class="scm-kpi-label text-emerald-600">BAJOS</span>
+              <span class="material-symbols-outlined scm-kpi-icon text-emerald-500">check_circle</span>
+            </div>
+            <div class="scm-kpi-value-row">
+              <span class="scm-kpi-value text-emerald-600" id="scm-kpi-magnitud-bajo"><?php echo esc_html((string)($stats['magnitud_bajo'] ?? 0)); ?></span>
+            </div>
+            <div class="scm-kpi-indicator scm-kpi-indicator-bajo"></div>
           </div>
         </div>
 
         <div class="scm-filter-card card">
-          <h3>Filtros</h3>
+          <div class="scm-filter-header flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2.5">
+              <span class="material-symbols-outlined text-[20px] text-slate-700">tune</span>
+              <h3 class="text-sm font-bold text-slate-800 m-0">Filtros Avanzados de Casos</h3>
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">16 Criterios</span>
+            </div>
+            <button type="button" class="scm-filter-collapse-btn flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 font-medium" id="scm-filter-collapse-toggle">
+              <span id="scm-filter-collapse-label">Colapsar panel</span>
+              <span class="material-symbols-outlined text-[16px] transition-transform" id="scm-filter-collapse-icon">expand_less</span>
+            </button>
+          </div>
           <form id="scm-form" autocomplete="off">
             <input type="hidden" id="scm_page" name="scm_page" value="<?php echo esc_attr((string)($params['fPage'] ?? 1)); ?>">
-            <div class="scm-grid">
-              <div class="scm-field"><label for="scm_estado">Estado</label><select id="scm_estado" name="scm_estado" class="select select-bordered select-sm scm-select">
+            <div class="scm-grid" id="scm-filter-grid">
+              <div class="scm-field"><label for="scm_estado">ESTADO</label><select id="scm_estado" name="scm_estado" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions['estado'] ?? []) as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected(($params['fEstado'] ?? ''), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?>
                 </select></div>
-              <div class="scm-field"><label for="scm_estado_admin">Estado administrativo</label><select id="scm_estado_admin" name="scm_estado_admin" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_estado_admin">ESTADO ADMINISTRATIVO</label><select id="scm_estado_admin" name="scm_estado_admin" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["estado_admin"] ?? []) as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected(($params["fEstadoAdmin"] ?? ""), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?>
                 </select></div>
-              <div class="scm-field"><label for="scm_origen">Origen</label><select id="scm_origen" name="scm_origen" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_origen">ORIGEN DE SOLICITUD</label><select id="scm_origen" name="scm_origen" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option>
                   <option value="web" <?php selected(($params['fOrigen'] ?? ''), 'web'); ?>>Guardian</option>
                   <option value="interno" <?php selected(($params['fOrigen'] ?? ''), 'interno'); ?>>No Guardian</option>
                 </select></div>
-              <div class="scm-field"><label for="scm_id_empleado">Funcionario</label><select id="scm_id_empleado" name="scm_id_empleado" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_id_empleado">FUNCIONARIO ASIGNADO</label><select id="scm_id_empleado" name="scm_id_empleado" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["funcionarios"] ?? []) as $func): $fId = trim((string)($func["id"] ?? ""));
                                                     if ($fId === "") continue; ?>
                     <option value="<?php echo esc_attr($fId); ?>" <?php selected(($params["fEmpleado"] ?? ""), $fId); ?>><?php echo esc_html((string)($func["label"] ?? $fId)); ?></option>
                   <?php endforeach; ?>
                 </select></div>
-              <div class="scm-field"><label for="scm_inmueble">Inmueble SIMI</label><input id="scm_inmueble" name="scm_inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params['fInmueble'] ?? '')); ?>"></div>
-              <div class="scm-field"><label for="scm_contrato">Contrato</label><input id="scm_contrato" name="scm_contrato" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fContrato"] ?? "")); ?>"></div>
-              <div class="scm-field"><label for="scm_caso"># caso</label><input id="scm_caso" name="scm_caso" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fCaso"] ?? "")); ?>" placeholder="Ej: 10368"></div>
-              <div class="scm-field"><label for="scm_asunto">Asunto</label><input id="scm_asunto" name="scm_asunto" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fAsunto"] ?? "")); ?>"></div>
-              <div class="scm-field"><label for="scm_arrendatario">Arrendatario</label><input id="scm_arrendatario" name="scm_arrendatario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fArrendatario"] ?? "")); ?>"></div>
-              <div class="scm-field"><label for="scm_propietario">Propietario</label><input id="scm_propietario" name="scm_propietario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fPropietario"] ?? "")); ?>"></div>
-              <div class="scm-field"><label for="scm_barrio">Barrio</label><select id="scm_barrio" name="scm_barrio" class="select select-bordered select-sm scm-select">
-                  <option value="">Todos</option><?php foreach (($filterOptions["barrios"] ?? []) as $barrioOpt): ?><option value="<?php echo esc_attr((string)$barrioOpt); ?>" <?php selected((string)($params["fBarrio"] ?? ""), (string)$barrioOpt); ?>><?php echo esc_html((string)$barrioOpt); ?></option><?php endforeach; ?>
+              <div class="scm-field"><label for="scm_inmueble">INMUEBLE SIMI</label><input id="scm_inmueble" name="scm_inmueble" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params['fInmueble'] ?? '')); ?>" placeholder="Ej: 10626"></div>
+              <div class="scm-field"><label for="scm_contrato">CONTRATO</label><input id="scm_contrato" name="scm_contrato" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fContrato"] ?? "")); ?>" placeholder="#562, #797..."></div>
+              <div class="scm-field"><label for="scm_caso"># CASO</label><input id="scm_caso" name="scm_caso" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fCaso"] ?? "")); ?>" placeholder="Ej: 10368"></div>
+              <div class="scm-field"><label for="scm_asunto">ASUNTO / DESCRIPCIÓN</label><input id="scm_asunto" name="scm_asunto" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fAsunto"] ?? "")); ?>" placeholder="Filtraciones, pintura..."></div>
+              <div class="scm-field"><label for="scm_arrendatario">ARRENDATARIO</label><input id="scm_arrendatario" name="scm_arrendatario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fArrendatario"] ?? "")); ?>" placeholder="Nombre inquilino"></div>
+              <div class="scm-field"><label for="scm_propietario">PROPIETARIO</label><input id="scm_propietario" name="scm_propietario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string)($params["fPropietario"] ?? "")); ?>" placeholder="Nombre dueño"></div>
+              <div class="scm-field"><label for="scm_barrio">BARRIO / SECTOR</label><select id="scm_barrio" name="scm_barrio" class="select select-bordered select-sm scm-select">
+                  <option value="">Todos los sectores</option><?php foreach (($filterOptions["barrios"] ?? []) as $barrioOpt): ?><option value="<?php echo esc_attr((string)$barrioOpt); ?>" <?php selected((string)($params["fBarrio"] ?? ""), (string)$barrioOpt); ?>><?php echo esc_html((string)$barrioOpt); ?></option><?php endforeach; ?>
                 </select></div>
-              <div class="scm-field scm-date-range-field"><label id="scm_fecha_rango_label">Fecha</label><div class="scm-date-range-control" role="group" aria-labelledby="scm_fecha_rango_label"><div class="scm-date-range-part"><span>Desde</span><input id="scm_fecha_desde" name="scm_fecha_desde" type="date" value="<?php echo esc_attr((string)($params["fFechaDesde"] ?? "")); ?>" aria-label="Fecha desde"></div><span class="scm-date-range-separator" aria-hidden="true">&rarr;</span><div class="scm-date-range-part"><span>Hasta</span><input id="scm_fecha_hasta" name="scm_fecha_hasta" type="date" value="<?php echo esc_attr((string)($params["fFechaHasta"] ?? "")); ?>" aria-label="Fecha hasta"></div></div></div>
+              <div class="scm-field scm-date-range-field"><label id="scm_fecha_rango_label">RANGO DE FECHA</label><div class="scm-date-range-control" role="group" aria-labelledby="scm_fecha_rango_label"><div class="scm-date-range-part"><input id="scm_fecha_desde" name="scm_fecha_desde" type="date" value="<?php echo esc_attr((string)($params["fFechaDesde"] ?? "")); ?>" aria-label="Fecha desde"></div><span class="scm-date-range-separator" aria-hidden="true">&rarr;</span><div class="scm-date-range-part"><input id="scm_fecha_hasta" name="scm_fecha_hasta" type="date" value="<?php echo esc_attr((string)($params["fFechaHasta"] ?? "")); ?>" aria-label="Fecha hasta"></div></div></div>
 
-              <div class="scm-field"><label for="scm_cotizacion">Cotizaci&oacute;n</label><select id="scm_cotizacion" name="scm_cotizacion" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_cotizacion">COTIZACIÓN</label><select id="scm_cotizacion" name="scm_cotizacion" class="select select-bordered select-sm scm-select">
                   <option value="">Todas</option>
                   <option value="has" <?php selected(($params['fCotizacion'] ?? ''), 'has'); ?>>Con cotizaci&oacute;n</option>
                   <option value="none" <?php selected(($params['fCotizacion'] ?? ''), 'none'); ?>>Sin cotizaci&oacute;n</option>
                 </select></div>
-              <div class="scm-field scm-cotizacion-dependent" data-cotizacion-dependent-for="scm_cotizacion"><label for="scm_cotizacion_estado">Estado cotizaci&oacute;n</label><select id="scm_cotizacion_estado" name="scm_cotizacion_estado" class="select select-bordered select-sm scm-select">
+              <div class="scm-field scm-cotizacion-dependent" data-cotizacion-dependent-for="scm_cotizacion"><label for="scm_cotizacion_estado">ESTADO COTIZACIÓN</label><select id="scm_cotizacion_estado" name="scm_cotizacion_estado" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["cotizacion_estado"] ?? []) as $cotEstadoOpt): ?><option value="<?php echo esc_attr((string)$cotEstadoOpt); ?>" <?php selected((string)($params["fCotizacionEstado"] ?? ""), (string)$cotEstadoOpt); ?>><?php echo esc_html((string)$cotEstadoOpt); ?></option><?php endforeach; ?>
                 </select></div>
-              <div class="scm-field scm-cotizacion-dependent" data-cotizacion-dependent-for="scm_cotizacion"><label for="scm_cotizacion_enviada">Fue enviada</label><select id="scm_cotizacion_enviada" name="scm_cotizacion_enviada" class="select select-bordered select-sm scm-select">
+              <div class="scm-field scm-cotizacion-dependent" data-cotizacion-dependent-for="scm_cotizacion"><label for="scm_cotizacion_enviada">FUE ENVIADA</label><select id="scm_cotizacion_enviada" name="scm_cotizacion_enviada" class="select select-bordered select-sm scm-select">
                   <option value="">Todas</option>
                   <option value="si" <?php selected(($params['fCotizacionEnviada'] ?? ''), 'si'); ?>>S&iacute;</option>
                   <option value="no" <?php selected(($params['fCotizacionEnviada'] ?? ''), 'no'); ?>>No</option>
                 </select></div>
-              <div class="scm-field"><label for="scm_perturbacion">Perturbaci&oacute;n</label><select id="scm_perturbacion" name="scm_perturbacion" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_perturbacion">PERTURBACIÓN</label><select id="scm_perturbacion" name="scm_perturbacion" class="select select-bordered select-sm scm-select">
                   <option value="">Todas</option>
                   <option value="has" <?php selected(strtolower((string) ($params['fPerturbacion'] ?? '')), 'has'); ?>>Con perturbaci&oacute;n</option>
                   <option value="none" <?php selected(strtolower((string) ($params['fPerturbacion'] ?? '')), 'none'); ?>>Sin perturbaci&oacute;n</option>
                 </select></div>
-              <div class="scm-field"><label for="scm_revision">Revisi&oacute;n</label><select id="scm_revision" name="scm_revision" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_revision">REVISIÓN</label><select id="scm_revision" name="scm_revision" class="select select-bordered select-sm scm-select">
                   <option value="">Todas</option>
                   <option value="has" <?php selected(($params['fRevision'] ?? ''), 'has'); ?>>Con revisi&oacute;n</option>
                   <option value="none" <?php selected(($params['fRevision'] ?? ''), 'none'); ?>>Sin revisi&oacute;n</option>
                 </select></div>
-              <div class="scm-field"><label for="scm_atraso">Atraso desde creaci&oacute;n</label><select id="scm_atraso" name="scm_atraso" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_atraso">ATRASO DESDE CREACIÓN</label><select id="scm_atraso" name="scm_atraso" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option>
                   <option value="3" <?php selected(($params['fAtraso'] ?? ''), '3'); ?>>+3 d&iacute;as</option>
                   <option value="5" <?php selected(($params['fAtraso'] ?? ''), '5'); ?>>+5 d&iacute;as</option>
                   <option value="10" <?php selected(($params['fAtraso'] ?? ''), '10'); ?>>+10 d&iacute;as</option>
                 </select></div>
-              <div class="scm-field"><label for="scm_sin_actualizar">Sin actualizar desde gesti&oacute;n</label><select id="scm_sin_actualizar" name="scm_sin_actualizar" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_sin_actualizar">SIN ACTUALIZAR DESDE GESTIÓN</label><select id="scm_sin_actualizar" name="scm_sin_actualizar" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option>
                   <option value="1" <?php selected(($params['fSinActualizar'] ?? ''), '1'); ?>>+1 d&iacute;a</option>
                   <option value="3" <?php selected(($params['fSinActualizar'] ?? ''), '3'); ?>>+3 d&iacute;as</option>
                   <option value="7" <?php selected(($params['fSinActualizar'] ?? ''), '7'); ?>>+7 d&iacute;as</option>
                 </select></div>
-              <div class="scm-field"><label for="scm_tuvo_seguimiento">Tuvo seguimiento</label><select id="scm_tuvo_seguimiento" name="scm_tuvo_seguimiento" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_tuvo_seguimiento">TUVO SEGUIMIENTO</label><select id="scm_tuvo_seguimiento" name="scm_tuvo_seguimiento" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option>
                   <option value="Si" <?php selected(($params['fTuvoSeguimiento'] ?? ''), 'Si'); ?>>Si</option>
                   <option value="No" <?php selected(($params['fTuvoSeguimiento'] ?? ''), 'No'); ?>>No</option>
                 </select></div>
-              <div class="scm-field"><label for="scm_magnitud_caso">Magnitud caso</label><select id="scm_magnitud_caso" name="scm_magnitud_caso" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_magnitud_caso">MAGNITUD / SEVERIDAD</label><select id="scm_magnitud_caso" name="scm_magnitud_caso" class="select select-bordered select-sm scm-select">
                   <option value="">Todas las magnitudes</option>
                   <option value="critico" <?php selected(($params['fMagnitudCaso'] ?? ''), 'critico'); ?>>Cr&iacute;tico</option>
                   <option value="alto" <?php selected(($params['fMagnitudCaso'] ?? ''), 'alto'); ?>>Alto</option>
@@ -1029,26 +1094,48 @@ trait RendersDashboard
                   <option value="bajo" <?php selected(($params['fMagnitudCaso'] ?? ''), 'bajo'); ?>>Bajo</option>
                 </select></div>
             </div>
-            <div class="scm-actions">
-              <button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button>
-              <?php if ($canManageDashboardPermissions): ?>
-                <button class="scm-btn-secondary btn btn-outline" type="button" data-scm-export-cases data-scm-export-topic="mantenimiento"><i class="fas fa-file-excel" aria-hidden="true"></i> Exportar Excel</button>
-              <?php endif; ?>
-              <button class="scm-btn-secondary btn btn-outline scm-classify-magnitude" type="button" data-revision-type="correctiva">Calcular magnitud da&ntilde;o</button>
-              <button class="scm-btn-secondary btn btn-outline" type="button" id="scm-clear">Limpiar</button>
-              <span class="scm-spinner" id="scm-spinner"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
+            <div class="scm-actions flex items-center justify-between flex-wrap gap-3 mt-4 pt-3 border-t border-slate-100">
+              <div class="flex items-center gap-2.5 flex-wrap">
+                <button class="scm-btn-primary btn font-semibold text-xs sm:text-sm shadow-xs flex items-center gap-1.5" type="submit">
+                  <span class="material-symbols-outlined text-[16px]">search</span>
+                  <span>Filtrar Casos</span>
+                </button>
+                <?php if ($canManageDashboardPermissions): ?>
+                  <button class="scm-btn-secondary btn btn-outline font-medium text-xs sm:text-sm flex items-center gap-1.5" type="button" data-scm-export-cases data-scm-export-topic="mantenimiento">
+                    <span class="material-symbols-outlined text-[16px]">description</span>
+                    <span>Exportar Excel</span>
+                  </button>
+                <?php endif; ?>
+                <button class="scm-btn-secondary btn btn-outline scm-classify-magnitude font-medium text-xs sm:text-sm flex items-center gap-1.5" type="button" data-revision-type="correctiva">
+                  <span class="material-symbols-outlined text-[16px]">calculate</span>
+                  <span>Calcular magnitud daño</span>
+                </button>
+              </div>
+              <div>
+                <button class="text-xs text-slate-500 hover:text-slate-800 font-semibold underline-offset-4 hover:underline transition-colors cursor-pointer" type="button" id="scm-clear">
+                  Limpiar filtros
+                </button>
+                <span class="scm-spinner" id="scm-spinner"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
+              </div>
             </div>
           </form>
         </div>
 
-        <div class="scm-cases-section-head">
-          <div class="scm-cases-section-title-wrap">
-            <h3 class="scm-cases-section-title">Casos en Gestión Activa</h3>
-            <span class="scm-cases-count-badge">Mostrando tickets registrados</span>
+        <div class="scm-cases-section-head flex items-center justify-between my-5">
+          <div class="scm-cases-section-title-wrap flex items-center gap-2.5">
+            <h3 class="scm-cases-section-title text-base sm:text-lg font-bold text-slate-900 m-0">Casos en Gestión Activa</h3>
+            <?php
+              $visibleCasesCount = count((array)($result['rows'] ?? []));
+              $totalCasesCount = (int)($stats['total'] ?? $visibleCasesCount);
+              $countBadgeText = $totalCasesCount > 0 ? ('Mostrando ' . ($visibleCasesCount > 0 ? $visibleCasesCount : min(12, $totalCasesCount)) . ' de ' . $totalCasesCount) : 'Sin tickets registrados';
+            ?>
+            <span class="scm-cases-count-badge text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200" id="scm-cases-count-badge"><?php echo esc_html($countBadgeText); ?></span>
           </div>
-          <div class="scm-cases-sort-wrap">
-            <span class="scm-cases-sort-label">Ordenar por:</span>
-            <span class="scm-cases-sort-badge"><span class="material-symbols-outlined text-[15px]">swap_vert</span> Mayor Urgencia (SLA)</span>
+          <div class="scm-cases-sort-wrap flex items-center gap-1.5 text-xs text-slate-500">
+            <span class="scm-cases-sort-label font-medium">Ordenar por:</span>
+            <span class="scm-cases-sort-badge flex items-center gap-1 font-semibold text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded-lg shadow-2xs">
+              <span class="material-symbols-outlined text-[15px] text-slate-500">swap_vert</span> Mayor Urgencia (SLA)
+            </span>
           </div>
         </div>
 
@@ -1857,13 +1944,15 @@ trait RendersDashboard
   private function renderDashboardPermissionsModal(array $tabs, array $cargos, array $permissions, array $employeeCargoIds, array $adminDuePopupCargoIds, array $actionCatalog = [], array $actionPermissions = []): string
   {
     $activityPermissionKeys = [
+      'notificaciones',
+      'gestiones_cobro',
       'cotizaciones_mantenimiento',
       'actas_satisfaccion',
-      'calendario_actividades',
-      'notificaciones',
       'preventivas_pendientes',
       'servicios_publicos_pendientes',
+      'liquidador_servicios_publicos',
       'reportes_administrativos_pendientes',
+      'auditoria_canon_aseguradoras',
       'cartas_aumento',
     ];
     $mainPermissionTabs = array_diff_key($tabs, array_flip($activityPermissionKeys));
@@ -1923,7 +2012,8 @@ trait RendersDashboard
                   <?php endforeach; ?>
                   <?php if (!empty($activityPermissionTabs)): ?>
                     <div class="scm-permissions-option-group">
-                      <div class="scm-permissions-option-group-title">Actividades administrativas</div>
+                      <div class="scm-permissions-option-group-title">Actividades administrativas (Opciones del Desplegable)</div>
+                      <small style="display:block;margin-bottom:8px;font-size:11px;color:#64748b;">Marca las actividades que este cargo podr&aacute; ver y seleccionar dentro del men&uacute; desplegable interno de Actividades Administrativas.</small>
                       <div class="scm-permissions-option-group-grid">
                         <?php foreach ($activityPermissionTabs as $tabKey => $tabLabel): $isChecked = in_array($tabKey, $allowed, true); ?>
                           <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>">
