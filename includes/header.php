@@ -50,6 +50,8 @@ $isStandalone = !empty($standalone_function);
 // Determinar pestaña activa si no fue provista explícitamente
 if (empty($current_page) || $current_page === 'tickets') {
   $tabParam = mb_strtolower(trim((string)($_GET['scm_tab'] ?? ($_GET['tab'] ?? ''))), 'UTF-8');
+  $subtabParam = mb_strtolower(trim((string)($_GET['scm_subtab'] ?? ($_GET['subtab'] ?? ''))), 'UTF-8');
+
   if (in_array($tabParam, ['abiertos', 'scm-panel-abiertos'], true)) {
     $current_page = 'abiertos';
   } elseif (in_array($tabParam, ['mis_tickets', 'mis-tickets', 'scm-panel-mis-tickets'], true)) {
@@ -60,10 +62,22 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'cerrados';
   } elseif (in_array($tabParam, ['tickets', 'ticket', 'casos'], true)) {
     $current_page = 'abiertos';
-  } elseif (in_array($tabParam, ['vencimientos', 'due', 'due_calendar'], true)) {
-    $current_page = 'vencimientos';
+  } elseif (in_array($tabParam, ['vencimientos', 'due', 'due_calendar'], true) || ($tabParam === 'inicio' && $subtabParam === 'due')) {
+    $current_page = 'due';
+  } elseif ($tabParam === 'inicio' && $subtabParam === 'team') {
+    $current_page = 'team';
+  } elseif (in_array($tabParam, ['actividades_realizadas'], true) || ($tabParam === 'inicio' && in_array($subtabParam, ['done', 'completed'], true))) {
+    $current_page = 'done';
+  } elseif (in_array($tabParam, ['historial', 'historial_inmueble'], true) || ($tabParam === 'inicio' && in_array($subtabParam, ['property_history', 'property-history'], true))) {
+    $current_page = 'property_history';
+  } elseif (in_array($tabParam, ['terminacion_contrato', 'terminacion'], true) || ($tabParam === 'inicio' && in_array($subtabParam, ['contract_terminations', 'contract-termination'], true))) {
+    $current_page = 'contract_termination';
+  } elseif (in_array($tabParam, ['inicio', 'home', 'resumen', 'scm-panel-inicio'], true)) {
+    $current_page = 'mine';
   } elseif (in_array($tabParam, ['notificaciones', 'scm-panel-admin-notificaciones'], true)) {
     $current_page = 'notificaciones';
+  } elseif (in_array($tabParam, ['gestiones_cobro', 'scm-panel-gestiones-cobro'], true)) {
+    $current_page = 'gestiones_cobro';
   } elseif (in_array($tabParam, ['cotizaciones_mantenimiento', 'cotizaciones', 'scm-panel-cotizaciones-mantenimiento'], true)) {
     $current_page = 'cotizaciones_mantenimiento';
   } elseif (in_array($tabParam, ['actas_satisfaccion', 'actas', 'scm-panel-actas-satisfaccion'], true)) {
@@ -79,15 +93,13 @@ if (empty($current_page) || $current_page === 'tickets') {
   } elseif (in_array($tabParam, ['cartas_aumento', 'scm-panel-cartas-aumento'], true)) {
     $current_page = 'cartas_aumento';
   } elseif (in_array($tabParam, ['liquidacion', 'liquidador', 'liquidador_servicios_publicos', 'scm-panel-liquidador-servicios-publicos'], true)) {
-    $current_page = 'liquidacion';
+    $current_page = 'liquidador_servicios_publicos';
   } elseif (in_array($tabParam, ['contratos', 'contratos-arrendamiento', 'contratos_arrendamiento', 'scm-panel-contratos-arrendamiento'], true)) {
     $current_page = 'contratos';
-  } elseif (in_array($tabParam, ['administrativas', 'actividades_administrativas', 'scm-panel-actividades-administrativas', 'gestiones_cobro'], true)) {
-    $current_page = 'actividades_administrativas';
+  } elseif (in_array($tabParam, ['administrativas', 'actividades_administrativas', 'scm-panel-actividades-administrativas'], true)) {
+    $current_page = 'notificaciones';
   } elseif (in_array($tabParam, ['metricas', 'dashboard', 'scm-panel-metricas'], true)) {
     $current_page = 'dashboard';
-  } elseif (in_array($tabParam, ['inicio', 'home', 'resumen', 'scm-panel-inicio'], true)) {
-    $current_page = 'inicio';
   } else {
     $current_page = 'abiertos';
   }
@@ -109,21 +121,72 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 };
 
 // Orden solicitado:
-// 1. Inicio (Mi Calendario, Historial, etc.)
-// 2. Gestión de Casos & Tickets (Dropdown con Abiertos, Mis Tickets, Postergados, Cerrados)
-// 3. Vencimientos
-// 4. Actividades Administrativas (Dropdown con todas las actividades administrativas)
-// 5. Métricas y Dashboard
+// 1. Inicio (Dropdown: Mi Calendario, Calendario Equipo, Vencimientos, Actividades Realizadas, Historial Inmueble, Solicitudes Terminación)
+// 2. Gestión de Casos & Tickets (Dropdown: Tickets Abiertos, Mis Tickets, Tickets Postergados, Tickets Cerrados)
+// 3. Actividades Administrativas (Dropdown: Notificaciones, Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
+// 4. Métricas y Dashboard
 $rawNavItems = [
   'inicio' => [
-    'type' => 'link',
+    'type' => 'dropdown',
     'key' => 'inicio',
     'label' => 'Inicio',
-    'panel_id' => 'scm-panel-inicio',
-    'subtab' => 'mine',
-    'url' => $baseUrl . '/index.php?tab=inicio',
     'icon' => 'home',
-    'perms' => [],
+    'children' => [
+      'mine' => [
+        'key' => 'mine',
+        'label' => 'Mi calendario',
+        'panel_id' => 'scm-panel-inicio',
+        'subtab' => 'mine',
+        'url' => $baseUrl . '/index.php?tab=inicio&subtab=mine',
+        'icon' => 'calendar_today',
+        'perms' => ['calendario_actividades', 'abiertos'],
+      ],
+      'team' => [
+        'key' => 'team',
+        'label' => 'Calendario equipo',
+        'panel_id' => 'scm-panel-inicio',
+        'subtab' => 'team',
+        'url' => $baseUrl . '/index.php?tab=inicio&subtab=team',
+        'icon' => 'groups',
+        'perms' => ['calendario_actividades', 'abiertos'],
+      ],
+      'due' => [
+        'key' => 'due',
+        'label' => 'Vencimientos',
+        'panel_id' => 'scm-panel-inicio',
+        'subtab' => 'due',
+        'url' => $baseUrl . '/index.php?tab=vencimientos',
+        'icon' => 'calendar_month',
+        'perms' => ['calendario_actividades', 'reportes_administrativos_pendientes', 'abiertos'],
+      ],
+      'done' => [
+        'key' => 'done',
+        'label' => 'Actividades realizadas',
+        'panel_id' => 'scm-panel-inicio',
+        'subtab' => 'completed',
+        'url' => $baseUrl . '/index.php?tab=actividades_realizadas',
+        'icon' => 'task_alt',
+        'perms' => ['calendario_actividades', 'abiertos'],
+      ],
+      'property_history' => [
+        'key' => 'property_history',
+        'label' => 'Historial inmueble',
+        'panel_id' => 'scm-panel-inicio',
+        'subtab' => 'property-history',
+        'url' => $baseUrl . '/index.php?tab=historial_inmueble',
+        'icon' => 'history',
+        'perms' => ['calendario_actividades', 'abiertos'],
+      ],
+      'contract_termination' => [
+        'key' => 'contract_termination',
+        'label' => 'Solicitudes de terminación de contrato',
+        'panel_id' => 'scm-panel-inicio',
+        'subtab' => 'contract-termination',
+        'url' => $baseUrl . '/index.php?tab=terminacion_contrato',
+        'icon' => 'assignment_late',
+        'perms' => ['calendario_actividades', 'abiertos'],
+      ],
+    ],
   ],
   'tickets' => [
     'type' => 'dropdown',
@@ -165,34 +228,112 @@ $rawNavItems = [
       ],
     ],
   ],
-  'vencimientos' => [
-    'type' => 'link',
-    'key' => 'vencimientos',
-    'label' => 'Vencimientos',
-    'panel_id' => 'scm-panel-inicio',
-    'subtab' => 'due',
-    'url' => $baseUrl . '/index.php?tab=vencimientos',
-    'icon' => 'calendar_month',
-    'perms' => ['calendario_actividades', 'reportes_administrativos_pendientes', 'abiertos'],
-  ],
   'administrativas' => [
-    'type' => 'link',
-    'key' => 'actividades_administrativas',
+    'type' => 'dropdown',
+    'key' => 'administrativas',
     'label' => 'Actividades Administrativas',
-    'panel_id' => 'scm-panel-actividades-administrativas',
-    'url' => $baseUrl . '/index.php?tab=actividades_administrativas',
     'icon' => 'folder_shared',
-    'perms' => [
-      'notificaciones',
-      'gestiones_cobro',
-      'cotizaciones_mantenimiento',
-      'actas_satisfaccion',
-      'preventivas_pendientes',
-      'servicios_publicos_pendientes',
-      'liquidador_servicios_publicos',
-      'reportes_administrativos_pendientes',
-      'auditoria_canon_aseguradoras',
-      'cartas_aumento',
+    'children' => [
+      'notificaciones' => [
+        'key' => 'notificaciones',
+        'label' => 'Notificaciones',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-admin-notificaciones',
+        'admin_activity_key' => 'notificaciones',
+        'url' => $baseUrl . '/index.php?tab=notificaciones',
+        'icon' => 'notifications',
+        'perms' => ['notificaciones'],
+      ],
+      'gestiones_cobro' => [
+        'key' => 'gestiones_cobro',
+        'label' => 'Gestiones de Cobro',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-gestiones-cobro',
+        'admin_activity_key' => 'gestiones_cobro',
+        'url' => $baseUrl . '/index.php?tab=gestiones_cobro',
+        'icon' => 'payments',
+        'perms' => ['gestiones_cobro'],
+      ],
+      'cotizaciones_mantenimiento' => [
+        'key' => 'cotizaciones_mantenimiento',
+        'label' => 'Cotizaciones de Mantenimiento',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-cotizaciones-mantenimiento',
+        'admin_activity_key' => 'cotizaciones_mantenimiento',
+        'url' => $baseUrl . '/index.php?tab=cotizaciones_mantenimiento',
+        'icon' => 'request_quote',
+        'perms' => ['cotizaciones_mantenimiento'],
+      ],
+      'actas_satisfaccion' => [
+        'key' => 'actas_satisfaccion',
+        'label' => 'Actas de Satisfacción',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-actas-satisfaccion',
+        'admin_activity_key' => 'actas_satisfaccion',
+        'url' => $baseUrl . '/index.php?tab=actas_satisfaccion',
+        'icon' => 'assignment_turned_in',
+        'perms' => ['actas_satisfaccion'],
+      ],
+      'preventivas_pendientes' => [
+        'key' => 'preventivas_pendientes',
+        'label' => 'Preventivas Pendientes',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-preventivas-pendientes',
+        'admin_activity_key' => 'preventivas_pendientes',
+        'url' => $baseUrl . '/index.php?tab=preventivas_pendientes',
+        'icon' => 'pending_actions',
+        'perms' => ['preventivas_pendientes'],
+      ],
+      'servicios_publicos_pendientes' => [
+        'key' => 'servicios_publicos_pendientes',
+        'label' => 'Servicios Públicos Pendientes',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-servicios-publicos-pendientes',
+        'admin_activity_key' => 'servicios_publicos_pendientes',
+        'url' => $baseUrl . '/index.php?tab=servicios_publicos_pendientes',
+        'icon' => 'receipt_long',
+        'perms' => ['servicios_publicos_pendientes'],
+      ],
+      'liquidador_servicios_publicos' => [
+        'key' => 'liquidador_servicios_publicos',
+        'label' => 'Liquidación de Servicios',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-liquidador-servicios-publicos',
+        'admin_activity_key' => 'liquidador_servicios_publicos',
+        'url' => $baseUrl . '/index.php?tab=liquidador_servicios_publicos',
+        'icon' => 'calculate',
+        'perms' => ['liquidador_servicios_publicos', 'servicios_publicos_pendientes'],
+      ],
+      'reportes_administrativos_pendientes' => [
+        'key' => 'reportes_administrativos_pendientes',
+        'label' => 'Reportes Administrativos',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-reportes-administrativos-pendientes',
+        'admin_activity_key' => 'reportes_administrativos_pendientes',
+        'url' => $baseUrl . '/index.php?tab=reportes_administrativos_pendientes',
+        'icon' => 'summarize',
+        'perms' => ['reportes_administrativos_pendientes'],
+      ],
+      'auditoria_canon_aseguradoras' => [
+        'key' => 'auditoria_canon_aseguradoras',
+        'label' => 'Auditoría Canon y Aseguradoras',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-auditoria-canon-aseguradoras',
+        'admin_activity_key' => 'auditoria_canon_aseguradoras',
+        'url' => $baseUrl . '/index.php?tab=auditoria_canon_aseguradoras',
+        'icon' => 'verified_user',
+        'perms' => ['auditoria_canon_aseguradoras'],
+      ],
+      'cartas_aumento' => [
+        'key' => 'cartas_aumento',
+        'label' => 'Cartas de Aumento',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-cartas-aumento',
+        'admin_activity_key' => 'cartas_aumento',
+        'url' => $baseUrl . '/index.php?tab=cartas_aumento',
+        'icon' => 'mail',
+        'perms' => ['cartas_aumento'],
+      ],
     ],
   ],
   'dashboard' => [
@@ -663,6 +804,9 @@ foreach ($rawNavItems as $k => $item) {
                         href="<?php echo htmlspecialchars($child['url'], ENT_QUOTES, 'UTF-8'); ?>"
                         data-tab-key="<?php echo htmlspecialchars($childKey, ENT_QUOTES, 'UTF-8'); ?>"
                         data-panel-target="<?php echo htmlspecialchars($child['panel_id'], ENT_QUOTES, 'UTF-8'); ?>"
+                        <?php if (!empty($child['subtab'])): ?>data-subtab-target="<?php echo htmlspecialchars($child['subtab'], ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>
+                        <?php if (!empty($child['admin_sub_target'])): ?>data-admin-sub-target="<?php echo htmlspecialchars($child['admin_sub_target'], ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>
+                        <?php if (!empty($child['admin_activity_key'])): ?>data-admin-activity-key="<?php echo htmlspecialchars($child['admin_activity_key'], ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>
                         class="nav-tab-pill nav-tab-dropdown-item flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all whitespace-nowrap <?php echo $subClass; ?>"
                         <?php if ($isSubActive): ?>aria-current="page"<?php endif; ?>
                       >

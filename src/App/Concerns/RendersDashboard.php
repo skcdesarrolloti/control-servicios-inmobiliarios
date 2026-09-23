@@ -138,7 +138,19 @@ trait RendersDashboard
       'casos' => 'scm-panel-abiertos',
       'historial' => 'scm-panel-inicio',
       'historial_inmueble' => 'scm-panel-inicio',
+      'property_history' => 'scm-panel-inicio',
+      'property-history' => 'scm-panel-inicio',
       'actividades_realizadas' => 'scm-panel-inicio',
+      'completed' => 'scm-panel-inicio',
+      'mi_calendario' => 'scm-panel-inicio',
+      'mine' => 'scm-panel-inicio',
+      'calendario_equipo' => 'scm-panel-inicio',
+      'team' => 'scm-panel-inicio',
+      'due' => 'scm-panel-inicio',
+      'contract_termination' => 'scm-panel-inicio',
+      'contract-termination' => 'scm-panel-inicio',
+      'contrato_terminacion' => 'scm-panel-inicio',
+      'solicitudes_terminacion' => 'scm-panel-inicio',
       'abiertos' => 'scm-panel-abiertos',
       'abierto' => 'scm-panel-abiertos',
       'scm-panel-abiertos' => 'scm-panel-abiertos',
@@ -734,24 +746,7 @@ trait RendersDashboard
         <?php endforeach; ?>
       </div>
 
-      <section class="scm-tab-panel scm-home-panel<?php echo $initialTab === 'scm-panel-inicio' ? ' active' : ''; ?>" id="scm-panel-inicio" data-scm-loaded="0" aria-busy="true" aria-labelledby="scm-home-title">
-        <div class="scm-home-hero">
-          <div class="scm-home-hero-copy">
-            <span class="scm-home-eyebrow">Resumen operativo</span>
-            <h1 id="scm-home-title"><?php echo $homeFirstName !== '' ? 'Hola, ' . esc_html($homeFirstName) : 'Hola'; ?></h1>
-            <p>Consulta lo más importante del día y entra directamente al proceso que necesitas.</p>
-          </div>
-          <?php if (in_array('abiertos', $dashboardAllowedTabs, true)): ?>
-            <button class="scm-home-primary-action" type="button" data-scm-home-target="scm-panel-abiertos">
-              Ver tickets abiertos <i class="fas fa-arrow-right" aria-hidden="true"></i>
-            </button>
-          <?php elseif (in_array('metricas', $dashboardAllowedTabs, true)): ?>
-            <button class="scm-home-primary-action" type="button" data-scm-home-target="scm-panel-metricas">
-              Ver métricas <i class="fas fa-arrow-right" aria-hidden="true"></i>
-            </button>
-          <?php endif; ?>
-        </div>
-
+      <section class="scm-tab-panel scm-home-panel<?php echo $initialTab === 'scm-panel-inicio' ? ' active' : ''; ?>" id="scm-panel-inicio" data-scm-loaded="0" aria-busy="true" aria-label="Inicio">
         <div class="scm-home-status" data-scm-home-status role="status" aria-live="polite">
           <span class="scm-home-status-spinner" aria-hidden="true"></span>
           <span data-scm-home-status-text>Cargando el resumen&hellip;</span>
@@ -759,13 +754,21 @@ trait RendersDashboard
         </div>
 
         <?php
-        $activeHomeSection = ($tabKey === 'vencimientos' || $tabKey === 'vencimiento')
-          ? 'scm-home-calendar-section-due'
-          : (($tabKey === 'historial' || $tabKey === 'historial_inmueble')
-            ? 'scm-home-calendar-section-property-history'
-            : (($tabKey === 'actividades_realizadas')
-              ? 'scm-home-calendar-section-completed'
-              : 'scm-home-calendar-section-mine'));
+        $subtabReq = mb_strtolower(trim((string)($_GET['subtab'] ?? '')), 'UTF-8');
+        $activeHomeSection = 'scm-home-calendar-section-mine';
+        if ($subtabReq === 'due' || $tabKey === 'vencimientos' || $tabKey === 'vencimiento') {
+          $activeHomeSection = 'scm-home-calendar-section-due';
+        } elseif ($subtabReq === 'property-history' || $subtabReq === 'property_history' || $tabKey === 'historial' || $tabKey === 'historial_inmueble') {
+          $activeHomeSection = 'scm-home-calendar-section-property-history';
+        } elseif ($subtabReq === 'completed' || $subtabReq === 'done' || $tabKey === 'actividades_realizadas') {
+          $activeHomeSection = 'scm-home-calendar-section-completed';
+        } elseif ($subtabReq === 'team' || $tabKey === 'calendario_equipo') {
+          $activeHomeSection = 'scm-home-calendar-section-team';
+        } elseif ($subtabReq === 'contract-termination' || $subtabReq === 'contract_termination' || in_array($tabKey, ['contract_termination', 'contrato_terminacion', 'solicitudes_terminacion'], true)) {
+          $activeHomeSection = 'scm-home-calendar-section-contract-termination';
+        } elseif ($subtabReq === 'mine' || $tabKey === 'mi_calendario') {
+          $activeHomeSection = 'scm-home-calendar-section-mine';
+        }
         ?>
         <?php if ($canAccessAdministrativeCalendar): ?>
           <section class="scm-home-calendar" aria-labelledby="scm-home-calendar-title" data-calendar-sections>
@@ -1280,76 +1283,22 @@ trait RendersDashboard
 
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-actividades-administrativas' ? ' active' : ''; ?>" id="scm-panel-actividades-administrativas" data-permission-tab="actividades_administrativas">
         <div class="scm-admin-activities">
-          <!-- Toolbar Plegable de Actividades Administrativas (Reemplaza las pestañas por menú desplegable limpio) -->
-          <div class="scm-admin-activity-toolbar">
-            <div class="scm-admin-activity-header-info">
-              <div class="scm-admin-activity-icon-badge">
-                <span class="material-symbols-outlined text-[22px]">folder_shared</span>
-              </div>
-              <div>
-                <span class="scm-admin-activity-subtitle">Actividad Administrativa</span>
-                <h3 class="scm-admin-activity-title" id="scm-current-activity-label">
-                  <?php echo esc_html((string)($administrativeActivityTabs[$initialAdministrativeActivityKey]['label'] ?? 'Actividades Administrativas')); ?>
-                </h3>
-              </div>
-            </div>
-
-            <!-- Plegable Selector de Actividades -->
-            <div class="scm-admin-plegable-container relative" id="scm-admin-plegable-container">
+          <!-- Hidden bridge for runtime JS compatibility; navigation is handled from the header navbar dropdown -->
+          <div class="scm-admin-activity-tabs-bridge" style="display:none !important;" aria-hidden="true">
+            <?php foreach ($administrativeActivityTabs as $activityTabKey => $activityDef): ?>
+              <?php if (!in_array($activityTabKey, $allowedAdministrativeActivityTabs, true)) continue; ?>
+              <?php 
+                $activityPanelId = (string)($activityDef['panel'] ?? '');
+                $isActiveActivity = ($initialAdministrativeActivityKey === $activityTabKey);
+              ?>
               <button
+                class="scm-admin-activity-tab<?php echo $isActiveActivity ? ' active' : ''; ?>"
                 type="button"
-                id="scm-admin-plegable-trigger"
-                class="scm-admin-plegable-btn"
-                aria-haspopup="true"
-                aria-expanded="false"
-              >
-                <span class="material-symbols-outlined text-[18px] text-[#0f1e36]">filter_list</span>
-                <span class="scm-admin-plegable-btn-text" id="scm-admin-plegable-btn-text">
-                  Cambiar Actividad
-                </span>
-                <span class="material-symbols-outlined text-[18px] text-slate-400 scm-plegable-chevron">expand_more</span>
-              </button>
-
-              <div class="scm-admin-plegable-menu hidden" id="scm-admin-plegable-menu" role="menu">
-                <div class="scm-admin-plegable-header">
-                  <span>Todas las Actividades</span>
-                  <span class="text-[11px] text-slate-400 font-normal">Seleccione una opción</span>
-                </div>
-                <div class="scm-admin-plegable-list" role="tablist">
-                  <?php foreach ($administrativeActivityTabs as $activityTabKey => $activityDef): ?>
-                    <?php if (!in_array($activityTabKey, $allowedAdministrativeActivityTabs, true)) continue; ?>
-                    <?php 
-                      $activityPanelId = (string)($activityDef['panel'] ?? '');
-                      $isActiveActivity = ($initialAdministrativeActivityKey === $activityTabKey);
-                      $actIcon = 'folder';
-                      switch ($activityTabKey) {
-                        case 'notificaciones': $actIcon = 'notifications'; break;
-                        case 'gestiones_cobro': $actIcon = 'payments'; break;
-                        case 'cotizaciones_mantenimiento': $actIcon = 'request_quote'; break;
-                        case 'actas_satisfaccion': $actIcon = 'assignment_turned_in'; break;
-                        case 'preventivas_pendientes': $actIcon = 'pending_actions'; break;
-                        case 'servicios_publicos_pendientes': $actIcon = 'receipt_long'; break;
-                        case 'liquidador_servicios_publicos': $actIcon = 'calculate'; break;
-                        case 'reportes_administrativos_pendientes': $actIcon = 'summarize'; break;
-                        case 'auditoria_canon_aseguradoras': $actIcon = 'verified_user'; break;
-                        case 'cartas_aumento': $actIcon = 'mail'; break;
-                      }
-                    ?>
-                    <button
-                      class="scm-admin-activity-tab scm-admin-plegable-item<?php echo $isActiveActivity ? ' active' : ''; ?>"
-                      type="button"
-                      data-admin-activity-key="<?php echo esc_attr($activityTabKey); ?>"
-                      data-admin-activity-target="<?php echo esc_attr($activityPanelId); ?>"
-                      data-admin-activity-label="<?php echo esc_attr((string)($activityDef['label'] ?? $activityTabKey)); ?>"
-                    >
-                      <span class="material-symbols-outlined text-[18px] scm-plegable-item-icon"><?php echo $actIcon; ?></span>
-                      <span class="scm-plegable-item-text"><?php echo esc_html((string)($activityDef['label'] ?? $activityTabKey)); ?></span>
-                      <span class="material-symbols-outlined text-[16px] text-emerald-600 ml-auto scm-plegable-check<?php echo $isActiveActivity ? '' : ' hidden'; ?>">check</span>
-                    </button>
-                  <?php endforeach; ?>
-                </div>
-              </div>
-            </div>
+                data-admin-activity-key="<?php echo esc_attr($activityTabKey); ?>"
+                data-admin-activity-target="<?php echo esc_attr($activityPanelId); ?>"
+                data-admin-activity-label="<?php echo esc_attr((string)($activityDef['label'] ?? $activityTabKey)); ?>"
+              ><?php echo esc_html((string)($activityDef['label'] ?? $activityTabKey)); ?></button>
+            <?php endforeach; ?>
           </div>
 
           <?php if (in_array('notificaciones', $allowedAdministrativeActivityTabs, true)): ?>
