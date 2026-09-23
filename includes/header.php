@@ -50,63 +50,138 @@ $isStandalone = !empty($standalone_function);
 // Determinar pestaña activa si no fue provista explícitamente
 if (empty($current_page)) {
   $tabParam = mb_strtolower(trim((string)($_GET['scm_tab'] ?? ($_GET['tab'] ?? ''))), 'UTF-8');
-  if (in_array($tabParam, ['metricas', 'dashboard', 'scm-panel-metricas'], true)) {
-    $current_page = 'dashboard';
-  } elseif (in_array($tabParam, ['contratos', 'contratos-arrendamiento', 'contratos_arrendamiento', 'scm-panel-contratos-arrendamiento'], true)) {
-    $current_page = 'contratos';
-  } elseif (in_array($tabParam, ['tickets', 'abiertos', 'mis_tickets', 'cerrados', 'scm-panel-abiertos', 'scm-panel-mis-tickets'], true)) {
+  if (in_array($tabParam, ['tickets', 'abiertos', 'mis_tickets', 'cerrados', 'postergados', 'scm-panel-abiertos', 'scm-panel-mis-tickets'], true)) {
     $current_page = 'tickets';
-  } elseif (in_array($tabParam, ['liquidacion', 'liquidador', 'liquidador_servicios_publicos', 'scm-panel-liquidador-servicios-publicos'], true)) {
-    $current_page = 'liquidacion';
-  } elseif (in_array($tabParam, ['administrativas', 'actividades_administrativas', 'scm-panel-actividades-administrativas', 'notificaciones', 'cotizaciones_mantenimiento'], true)) {
-    $current_page = 'administrativas';
   } elseif (in_array($tabParam, ['vencimientos', 'due', 'due_calendar'], true)) {
     $current_page = 'vencimientos';
-  } else {
+  } elseif (in_array($tabParam, ['administrativas', 'actividades_administrativas', 'scm-panel-actividades-administrativas', 'notificaciones', 'cotizaciones_mantenimiento'], true)) {
+    $current_page = 'actividades_administrativas';
+  } elseif (in_array($tabParam, ['liquidacion', 'liquidador', 'liquidador_servicios_publicos', 'scm-panel-liquidador-servicios-publicos'], true)) {
+    $current_page = 'liquidacion';
+  } elseif (in_array($tabParam, ['contratos', 'contratos-arrendamiento', 'contratos_arrendamiento', 'scm-panel-contratos-arrendamiento'], true)) {
+    $current_page = 'contratos';
+  } elseif (in_array($tabParam, ['metricas', 'dashboard', 'scm-panel-metricas'], true)) {
     $current_page = 'dashboard';
+  } elseif (in_array($tabParam, ['inicio', 'home', 'resumen', 'scm-panel-inicio'], true)) {
+    $current_page = 'inicio';
+  } else {
+    $current_page = 'tickets';
   }
 }
 
-// Configuración de las pestañas principales
-$navTabs = [
-  'dashboard' => [
-    'label' => 'Métricas y Dashboard',
-    'panel_id' => 'scm-panel-metricas',
-    'url' => $baseUrl . '/index.php?tab=metricas',
-    'icon' => 'query_stats',
-  ],
-  'contratos' => [
-    'label' => 'Contratos de Arrendamiento',
-    'panel_id' => 'scm-panel-contratos-arrendamiento',
-    'url' => $baseUrl . '/index.php?tab=contratos',
-    'icon' => 'description',
-  ],
+// Configuración y verificación de permisos para pestañas
+$allowedTabsList = isset($allowed_tabs) && is_array($allowed_tabs) ? $allowed_tabs : null;
+
+$checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
+  if ($allowedTabsList === null || empty($perms)) {
+    return true;
+  }
+  foreach ($perms as $p) {
+    if (in_array($p, $allowedTabsList, true)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+// Orden solicitado:
+// 1. Gestión de Casos & Tickets
+// 2. Vencimientos
+// 3. Actividades Administrativas (Dropdown con Actividades Administrativas, Liquidación y Contratos)
+// 4. Métricas y Dashboard
+// 5. Inicio (Mi Calendario, Historial, etc.)
+$rawNavItems = [
   'tickets' => [
+    'type' => 'link',
+    'key' => 'tickets',
     'label' => 'Gestión de Casos & Tickets',
     'panel_id' => 'scm-panel-abiertos',
     'url' => $baseUrl . '/index.php?tab=abiertos',
     'icon' => 'confirmation_number',
-  ],
-  'liquidacion' => [
-    'label' => 'Liquidación de Servicios',
-    'panel_id' => 'scm-panel-liquidador-servicios-publicos',
-    'url' => $baseUrl . '/index.php?tab=liquidador_servicios_publicos',
-    'icon' => 'calculate',
-  ],
-  'administrativas' => [
-    'label' => 'Actividades Administrativas',
-    'panel_id' => 'scm-panel-actividades-administrativas',
-    'url' => $baseUrl . '/index.php?tab=actividades_administrativas',
-    'icon' => 'folder_shared',
+    'perms' => ['abiertos', 'mis_tickets', 'cerrados', 'postergados'],
   ],
   'vencimientos' => [
+    'type' => 'link',
+    'key' => 'vencimientos',
     'label' => 'Vencimientos',
     'panel_id' => 'scm-panel-inicio',
-    'subtab' => 'vencimientos',
+    'subtab' => 'due',
     'url' => $baseUrl . '/index.php?tab=vencimientos',
     'icon' => 'calendar_month',
+    'perms' => ['calendario_actividades', 'reportes_administrativos_pendientes', 'abiertos'],
+  ],
+  'administrativas' => [
+    'type' => 'dropdown',
+    'key' => 'administrativas',
+    'label' => 'Actividades Administrativas',
+    'icon' => 'folder_shared',
+    'children' => [
+      'actividades_administrativas' => [
+        'key' => 'actividades_administrativas',
+        'label' => 'Actividades Administrativas',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'url' => $baseUrl . '/index.php?tab=actividades_administrativas',
+        'icon' => 'folder_shared',
+        'perms' => ['reportes_administrativos_pendientes', 'notificaciones', 'gestiones_cobro', 'auditoria_canon_aseguradoras', 'cartas_aumento'],
+      ],
+      'liquidacion' => [
+        'key' => 'liquidacion',
+        'label' => 'Liquidación de Servicios',
+        'panel_id' => 'scm-panel-liquidador-servicios-publicos',
+        'url' => $baseUrl . '/index.php?tab=liquidador_servicios_publicos',
+        'icon' => 'calculate',
+        'perms' => ['liquidador_servicios_publicos', 'servicios_publicos_pendientes'],
+      ],
+      'contratos' => [
+        'key' => 'contratos',
+        'label' => 'Contratos de Arrendamiento',
+        'panel_id' => 'scm-panel-contratos-arrendamiento',
+        'url' => $baseUrl . '/index.php?tab=contratos',
+        'icon' => 'description',
+        'perms' => ['contratos_arrendamiento'],
+      ],
+    ],
+  ],
+  'dashboard' => [
+    'type' => 'link',
+    'key' => 'dashboard',
+    'label' => 'Métricas y Dashboard',
+    'panel_id' => 'scm-panel-metricas',
+    'url' => $baseUrl . '/index.php?tab=metricas',
+    'icon' => 'query_stats',
+    'perms' => ['metricas'],
+  ],
+  'inicio' => [
+    'type' => 'link',
+    'key' => 'inicio',
+    'label' => 'Inicio',
+    'panel_id' => 'scm-panel-inicio',
+    'subtab' => 'mine',
+    'url' => $baseUrl . '/index.php?tab=inicio',
+    'icon' => 'home',
+    'perms' => [],
   ],
 ];
+
+$filteredNavItems = [];
+foreach ($rawNavItems as $k => $item) {
+  if ($item['type'] === 'link') {
+    if ($checkTabPerm($item['perms'])) {
+      $filteredNavItems[$k] = $item;
+    }
+  } elseif ($item['type'] === 'dropdown') {
+    $allowedChildren = [];
+    foreach ($item['children'] as $ck => $child) {
+      if ($checkTabPerm($child['perms'])) {
+        $allowedChildren[$ck] = $child;
+      }
+    }
+    if (!empty($allowedChildren)) {
+      $item['children'] = $allowedChildren;
+      $filteredNavItems[$k] = $item;
+    }
+  }
+}
 ?>
 <!DOCTYPE html>
 <html lang="es" class="h-full bg-[#f8f9ff]">
@@ -121,7 +196,8 @@ $navTabs = [
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 
   <!-- Tailwind CSS CDN con Tokens de Diseño Stitch UI -->
@@ -183,15 +259,102 @@ $navTabs = [
   </script>
 
   <style>
+    @font-face {
+      font-family: 'Material Symbols Outlined';
+      font-style: normal;
+      font-weight: 100 700;
+      src: url(https://fonts.gstatic.com/s/materialsymbolsoutlined/v374/kJF1BvYX7BgnkSrUwT8OhrdQw4oELdPIeeII9v6oDMzByHX9rA6RzaxHMPdY43zj-jCxv3fzvRNU22ZXGJpEpjC_1v-p_4MrImHCIJIZrDCvHOej.woff2) format('woff2');
+      font-display: swap;
+    }
+
     body {
       font-family: 'Plus Jakarta Sans', sans-serif;
       background-color: #f8f9ff;
       color: #0b1c30;
     }
-    .material-symbols-outlined {
-      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+
+    .material-symbols-outlined,
+    [class*="material-symbols-"],
+    #scm-app .material-symbols-outlined,
+    #scm-app [class*="material-symbols-"] {
+      font-family: 'Material Symbols Outlined' !important;
+      font-weight: normal !important;
+      font-style: normal !important;
+      font-size: 20px;
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-feature-settings: 'liga' 1 !important;
+      font-feature-settings: 'liga' 1 !important;
+      -webkit-font-smoothing: antialiased;
       vertical-align: middle;
     }
+
+    /* Loader moderno inmediato para evitar círculos negros */
+    .scm-panel-loader {
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 999999 !important;
+      display: grid !important;
+      place-items: center !important;
+      min-height: 100vh !important;
+      background: rgba(15, 30, 54, 0.5) !important;
+      -webkit-backdrop-filter: blur(4px) !important;
+      backdrop-filter: blur(4px) !important;
+      transition: opacity 0.2s ease !important;
+    }
+    .scm-panel-loader[hidden] {
+      display: none !important;
+    }
+    .scm-panel-loader-card {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      width: min(90vw, 360px) !important;
+      padding: 28px 24px !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 1.25rem !important;
+      background: #ffffff !important;
+      color: #0f172a !important;
+      text-align: center !important;
+      box-shadow: 0 20px 40px -10px rgba(15, 30, 54, 0.2) !important;
+    }
+    .scm-panel-loader-icon {
+      display: grid !important;
+      place-items: center !important;
+      width: 52px !important;
+      height: 52px !important;
+      margin-bottom: 14px !important;
+      border-radius: 1rem !important;
+      background: #eff4ff !important;
+      color: #0f1e36 !important;
+    }
+    .scm-panel-loader-icon svg {
+      width: 32px !important;
+      height: 32px !important;
+      fill: none !important;
+      stroke: currentColor !important;
+      stroke-linecap: round !important;
+      stroke-width: 2.5 !important;
+      animation: scm-spin 0.8s linear infinite !important;
+    }
+    .scm-panel-loader-icon circle {
+      opacity: 0.2 !important;
+      fill: none !important;
+      stroke: currentColor !important;
+    }
+    .scm-panel-loader-icon path {
+      fill: none !important;
+      stroke: currentColor !important;
+    }
+    @keyframes scm-spin {
+      to { transform: rotate(360deg); }
+    }
+
     /* Estilo sutil de scrollbars para mantener diseño limpio */
     ::-webkit-scrollbar {
       width: 6px;
@@ -208,7 +371,11 @@ $navTabs = [
       background: #94a3b8;
     }
   </style>
-  <link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/modern-ui.css?v=' . (defined('SCM_VERSION') ? SCM_VERSION : '2.0.0'), ENT_QUOTES, 'UTF-8'); ?>">
+  <?php
+  $modernUiCssPath = dirname(__DIR__) . '/public/assets/css/modern-ui.css';
+  $modernUiCssVer = (defined('SCM_VERSION') ? SCM_VERSION : '2.0.0') . '-' . (file_exists($modernUiCssPath) ? (string) filemtime($modernUiCssPath) : '0');
+  ?>
+  <link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/modern-ui.css?v=' . $modernUiCssVer, ENT_QUOTES, 'UTF-8'); ?>">
 </head>
 
 <body class="min-h-full flex flex-col bg-[#f8f9ff] text-on-surface antialiased <?php echo $isStandalone ? 'scm-standalone-mode' : ''; ?>">
@@ -357,26 +524,69 @@ $navTabs = [
       </div>
 
       <!-- Fila 2: Subnavegación Horizontal por Píldoras (Altura 48px) -->
-      <div class="h-12 flex items-center overflow-x-auto no-scrollbar border-t border-slate-100">
+      <div class="h-12 flex items-center overflow-x-visible no-scrollbar border-t border-slate-100">
         <nav class="flex items-center gap-1.5 py-1" aria-label="Pestañas principales del sistema">
-          <?php foreach ($navTabs as $tabKey => $tab): ?>
-            <?php
-            $isActive = ($current_page === $tabKey);
-            $activeClass = $isActive
-              ? 'bg-[#0f1e36] text-white font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium';
-            ?>
-            <a
-              href="<?php echo htmlspecialchars($tab['url'], ENT_QUOTES, 'UTF-8'); ?>"
-              data-tab-key="<?php echo htmlspecialchars($tabKey, ENT_QUOTES, 'UTF-8'); ?>"
-              data-panel-target="<?php echo htmlspecialchars($tab['panel_id'], ENT_QUOTES, 'UTF-8'); ?>"
-              <?php if (isset($tab['subtab'])): ?>data-subtab-target="<?php echo htmlspecialchars($tab['subtab'], ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>
-              class="nav-tab-pill flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-all whitespace-nowrap <?php echo $activeClass; ?>"
-              <?php if ($isActive): ?>aria-current="page"<?php endif; ?>
-            >
-              <span class="material-symbols-outlined text-[16px] <?php echo $isActive ? 'text-white' : 'text-slate-500'; ?>"><?php echo htmlspecialchars($tab['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
-              <span><?php echo htmlspecialchars($tab['label'], ENT_QUOTES, 'UTF-8'); ?></span>
-            </a>
+          <?php foreach ($filteredNavItems as $tabKey => $tab): ?>
+            <?php if ($tab['type'] === 'dropdown'): ?>
+              <?php
+              $isChildActive = in_array($current_page, array_keys($tab['children']), true);
+              $parentClass = $isChildActive
+                ? 'bg-[#0f1e36] text-white font-semibold shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium';
+              ?>
+              <div class="relative group" data-scm-nav-dropdown>
+                <button
+                  type="button"
+                  class="nav-tab-pill nav-tab-dropdown-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-all whitespace-nowrap <?php echo $parentClass; ?>"
+                  aria-haspopup="true"
+                  aria-expanded="<?php echo $isChildActive ? 'true' : 'false'; ?>"
+                >
+                  <span class="material-symbols-outlined text-[16px] <?php echo $isChildActive ? 'text-white' : 'text-slate-500'; ?>"><?php echo htmlspecialchars($tab['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
+                  <span><?php echo htmlspecialchars($tab['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+                  <span class="material-symbols-outlined text-[15px] <?php echo $isChildActive ? 'text-white' : 'text-slate-400'; ?> transition-transform group-hover:rotate-180">expand_more</span>
+                </button>
+                <div class="absolute left-0 top-full pt-1.5 hidden group-hover:block group-focus-within:block z-50 min-w-[240px] drop-shadow-xl" data-scm-dropdown-menu>
+                  <div class="bg-white rounded-xl shadow-lg border border-slate-200/90 py-1.5 px-1.5 flex flex-col gap-0.5">
+                    <?php foreach ($tab['children'] as $childKey => $child): ?>
+                      <?php
+                      $isSubActive = ($current_page === $childKey);
+                      $subClass = $isSubActive
+                        ? 'bg-[#0f1e36] text-white font-semibold'
+                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium';
+                      ?>
+                      <a
+                        href="<?php echo htmlspecialchars($child['url'], ENT_QUOTES, 'UTF-8'); ?>"
+                        data-tab-key="<?php echo htmlspecialchars($childKey, ENT_QUOTES, 'UTF-8'); ?>"
+                        data-panel-target="<?php echo htmlspecialchars($child['panel_id'], ENT_QUOTES, 'UTF-8'); ?>"
+                        class="nav-tab-pill nav-tab-dropdown-item flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all whitespace-nowrap <?php echo $subClass; ?>"
+                        <?php if ($isSubActive): ?>aria-current="page"<?php endif; ?>
+                      >
+                        <span class="material-symbols-outlined text-[16px] <?php echo $isSubActive ? 'text-white' : 'text-slate-500'; ?>"><?php echo htmlspecialchars($child['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
+                        <span><?php echo htmlspecialchars($child['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+                      </a>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+              </div>
+            <?php else: ?>
+              <?php
+              $isActive = ($current_page === $tabKey);
+              $activeClass = $isActive
+                ? 'bg-[#0f1e36] text-white font-semibold shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium';
+              ?>
+              <a
+                href="<?php echo htmlspecialchars($tab['url'], ENT_QUOTES, 'UTF-8'); ?>"
+                data-tab-key="<?php echo htmlspecialchars($tabKey, ENT_QUOTES, 'UTF-8'); ?>"
+                data-panel-target="<?php echo htmlspecialchars($tab['panel_id'], ENT_QUOTES, 'UTF-8'); ?>"
+                <?php if (isset($tab['subtab'])): ?>data-subtab-target="<?php echo htmlspecialchars($tab['subtab'], ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>
+                class="nav-tab-pill flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-all whitespace-nowrap <?php echo $activeClass; ?>"
+                <?php if ($isActive): ?>aria-current="page"<?php endif; ?>
+              >
+                <span class="material-symbols-outlined text-[16px] <?php echo $isActive ? 'text-white' : 'text-slate-500'; ?>"><?php echo htmlspecialchars($tab['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
+                <span><?php echo htmlspecialchars($tab['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+              </a>
+            <?php endif; ?>
           <?php endforeach; ?>
         </nav>
       </div>

@@ -203,40 +203,96 @@ trait TableRowsConcern
       $caseSource .= $this->renderRecordSection('Historial del inmueble', $historialInmuebleItems, 'scm-sec-hist-inmueble');
       $caseSource .= '</div>';
 
+      $timeAgo = 'Reciente';
+      if ($createdTs > 0) {
+        $diff = time() - $createdTs;
+        if ($diff < 3600) {
+          $timeAgo = 'Hace ' . max(1, (int) floor($diff / 60)) . ' min';
+        } elseif ($diff < 86400) {
+          $timeAgo = 'Hace ' . (int) floor($diff / 3600) . ' horas';
+        } elseif ($diff < 172800) {
+          $timeAgo = 'Ayer';
+        } else {
+          $timeAgo = 'Hace ' . (int) floor($diff / 86400) . ' días';
+        }
+      }
+
+      $urgencyNorm = strtolower(trim($prioridad !== '' ? $prioridad : $magnitudCaso));
+      if (str_contains($urgencyNorm, 'crit') || str_contains($urgencyNorm, 'urgente')) {
+        $urgencyPill = '<span class="scm-card-urgency scm-urgency-critico"><span class="material-symbols-outlined text-[13px]">local_fire_department</span> Crítico</span>';
+      } elseif (str_contains($urgencyNorm, 'alt')) {
+        $urgencyPill = '<span class="scm-card-urgency scm-urgency-alto"><span class="material-symbols-outlined text-[13px]">warning</span> Alto</span>';
+      } elseif (str_contains($urgencyNorm, 'med')) {
+        $urgencyPill = '<span class="scm-card-urgency scm-urgency-medio"><span class="material-symbols-outlined text-[13px]">schedule</span> Medio</span>';
+      } else {
+        $urgencyPill = '<span class="scm-card-urgency scm-urgency-bajo"><span class="material-symbols-outlined text-[13px]">check</span> Bajo</span>';
+      }
+
+      $assigneeName = $employee !== '' ? $employee : 'Sin asignar';
+      $initials = 'SA';
+      if ($assigneeName !== 'Sin asignar') {
+        $nameParts = preg_split('/\s+/', trim($assigneeName));
+        $initials = strtoupper(substr($nameParts[0] ?? '', 0, 1) . substr($nameParts[1] ?? '', 0, 1));
+      }
+
+      $slaPill = '';
+      if ($tiempoSinActualizar !== '' && $tiempoSinActualizar !== '-') {
+        $slaPill = '<span class="scm-card-sla scm-sla-badge"><span class="material-symbols-outlined text-[13px]">schedule</span> ' . esc_html($tiempoSinActualizar) . ' SLA</span>';
+      } else {
+        $slaPill = '<span class="scm-card-sla scm-sla-ok"><span class="material-symbols-outlined text-[13px]">verified</span> Al día</span>';
+      }
+
+      $cotChip = ($idCotz !== '')
+        ? '<span class="scm-card-chip scm-chip-success">Con Cotización</span>'
+        : '<span class="scm-card-chip scm-chip-muted">Sin Cotización</span>';
+
+      $thirdPartyLabel = 'Inquilino';
+      $thirdPartyValue = $arrendatario !== '' ? $arrendatario : ($propietario !== '' ? $propietario : '');
+      if ($arrendatario === '' && $propietario !== '') {
+        $thirdPartyLabel = 'Propietario';
+      }
+
       $html .= '<article class="scm-ticket-card card" data-pk="' . esc_attr((string) $ticketPk) . '">';
-      $html .= '<header class="scm-ticket-card-head">';
+      $html .= '<div class="scm-ticket-card-top">';
+      $html .= '<div class="scm-ticket-top-badges">';
       $html .= '<span class="scm-ticket-badge badge badge-primary">#' . esc_html($idTicket) . '</span>';
-      $html .= '<h3>' . esc_html($temaLabel) . '</h3>';
-      $html .= '</header>';
-      $html .= '<p class="scm-ticket-card-asunto"><span>Asunto</span><strong>' . esc_html($asuntoLabel) . '</strong></p>';
-      $html .= '<p class="scm-ticket-card-contract">Contrato <strong>' . esc_html($contractLabel) . '</strong></p>';
-      $html .= '<p class="scm-ticket-card-property">Inmueble <strong>' . esc_html($inmuebleLabel) . '</strong></p>';
-      $html .= '<p class="scm-ticket-card-barrio">Barrio <strong>' . esc_html($barrioLabel) . '</strong></p>';
-      $html .= '<p class="scm-ticket-card-address">Dirección <strong>' . esc_html($direccion !== '' ? $direccion : '-') . '</strong></p>';
-      if ($propietario !== '') {
-        $html .= '<p class="scm-ticket-card-owner">Propietario <strong>' . esc_html($propietario) . '</strong></p>';
-      }
-      if ($arrendatario !== '') {
-        $html .= '<p class="scm-ticket-card-tenant">Arrendatario <strong>' . esc_html($arrendatario) . '</strong></p>';
-      }
-      $html .= '<p class="scm-ticket-card-employee">Asignado a <strong>' . esc_html($employee !== '' ? $employee : '-') . '</strong></p>';
-      if ($statusBucket !== 'cerrados') {
-        $html .= '<p class="scm-ticket-card-execution">En ejecución <strong>' . esc_html($tiempoEjecucion) . '</strong></p>';
-        $html .= '<p class="scm-ticket-card-stale">Sin actualizar <strong>' . esc_html($tiempoSinActualizar) . '</strong></p>';
-      }
-      $html .= '<div class="scm-ticket-card-states">';
-      $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Estado</span>' . $estadoBadge . '</div>';
-      $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Estado administrativo</span>' . $estadoAdminBadge . '</div>';
-      $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Magnitud caso</span>' . $magnitudCasoBadge . '</div>';
-      $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Perturbaci&oacute;n</span>' . $perturbacionBadge . '</div>';
-      $html .= '<div class="scm-ticket-card-state"><span class="scm-ticket-card-state-label">Origen</span>' . $origenBadge . '</div>';
+      $html .= $urgencyPill;
       $html .= '</div>';
-      $html .= '<p class="scm-ticket-card-barrio">Area afectada <strong>' . esc_html($areaAfectadaLabel) . '</strong></p>';
+      $html .= '<span class="scm-ticket-time-ago">' . esc_html($timeAgo) . '</span>';
+      $html .= '</div>';
+
+      $html .= '<div class="scm-ticket-kicker">' . esc_html(mb_strtoupper($temaLabel, 'UTF-8')) . '</div>';
+      $html .= '<h3 class="scm-ticket-title">' . esc_html($asuntoLabel) . '</h3>';
+
+      $html .= '<div class="scm-ticket-meta-list">';
+      $html .= '<div class="scm-ticket-meta-row"><span class="scm-ticket-meta-label"><span class="material-symbols-outlined text-[15px]">description</span> Contrato:</span><strong class="scm-ticket-meta-value">' . esc_html($contractLabel) . '</strong></div>';
+      $html .= '<div class="scm-ticket-meta-row"><span class="scm-ticket-meta-label"><span class="material-symbols-outlined text-[15px]">domain</span> Inmueble:</span><strong class="scm-ticket-meta-value">' . esc_html($inmuebleLabel) . '</strong></div>';
+      if ($thirdPartyValue !== '') {
+        $html .= '<div class="scm-ticket-meta-row"><span class="scm-ticket-meta-label"><span class="material-symbols-outlined text-[15px]">person</span> ' . esc_html($thirdPartyLabel) . ':</span><strong class="scm-ticket-meta-value">' . esc_html($thirdPartyValue) . '</strong></div>';
+      }
+      $html .= '</div>';
+
+      $html .= '<div class="scm-ticket-stakeholder-row">';
+      $html .= '<div class="scm-ticket-assignee">';
+      $html .= '<div class="scm-ticket-avatar">' . esc_html($initials) . '</div>';
+      $html .= '<div class="scm-ticket-assignee-info">';
+      $html .= '<strong class="scm-ticket-assignee-name">' . esc_html($assigneeName) . '</strong>';
+      $html .= '<span class="scm-ticket-assignee-role">Asignado</span>';
+      $html .= '</div>';
+      $html .= '</div>';
+      $html .= '<div class="scm-ticket-sla-wrap">' . $slaPill . '</div>';
+      $html .= '</div>';
+
+      $html .= '<div class="scm-ticket-chips-row">';
+      $html .= '<div class="scm-ticket-status-label"><span>Estado:</span> ' . $estadoBadge . '</div>';
+      $html .= '<div class="scm-ticket-extra-chips">' . $cotChip . '</div>';
+      $html .= '</div>';
+
       $html .= '<div class="scm-ticket-card-footer">';
       if ($statusBucket !== '') {
         $html .= '<button class="btn btn-outline btn-sm scm-activate-ticket-btn" type="button" data-scm-activate-ticket>Activar ticket</button>';
       }
-      $html .= '<button class="scm-btn-case btn btn-primary btn-sm"'
+      $html .= '<button class="scm-btn-case btn btn-primary btn-sm scm-btn-ver-detalle"'
         . ' data-ticket="' . esc_attr($idTicket) . '"'
         . ' data-ticket-pk="' . esc_attr((string) $ticketPk) . '"'
         . ' data-asunto="' . esc_attr($asuntoLabel) . '"'
@@ -283,7 +339,8 @@ trait TableRowsConcern
         . ' data-preventiva-no-access-count="' . esc_attr((string) $preventivaNoAccessCount) . '"'
         . ' data-tab-key="mantenimiento"'
         . ($statusBucket !== '' ? ' data-status-bucket="' . esc_attr($statusBucket) . '"' : '')
-        . ' onclick="scmOpenCase(this)" type="button">Ver caso</button>';
+        . ' onclick="scmOpenCase(this)" type="button"><span>Ver Detalle</span><span class="material-symbols-outlined text-[16px]">arrow_forward</span></button>';
+      $html .= '<button class="btn btn-outline btn-sm scm-btn-card-calendar" type="button" title="Agendar o ver detalle" onclick="scmOpenCase(this)" data-ticket="' . esc_attr($idTicket) . '" data-ticket-pk="' . esc_attr((string) $ticketPk) . '"><span class="material-symbols-outlined text-[18px]">event_available</span></button>';
       $html .= '</div>';
       $html .= '<div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div>';
       $html .= '</article>';
