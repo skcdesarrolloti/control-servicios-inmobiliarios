@@ -1654,7 +1654,7 @@
     if (title) {
       title.textContent = isPublicPqr
         ? "Agregar nota a la solicitud"
-        : "Agregar nota al ticket";
+        : "Agregar nota al caso";
     }
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
@@ -1666,7 +1666,7 @@
         '<label class="scm-seg-field"><span>Nota</span><textarea name="observacion" rows="6" required placeholder="' +
         (isPublicPqr
           ? "Escribe una nota interna para la solicitud..."
-          : "Escribe una nota interna para el ticket...") +
+          : "Escribe una nota interna para el caso...") +
         '"></textarea></label>' +
         '<div class="scm-seg-actions">' +
         '<button type="submit" class="scm-btn-primary">Guardar nota</button>' +
@@ -1690,7 +1690,7 @@
     var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
 
     if (title) {
-      title.textContent = isPublicPqr ? "Postergar solicitud" : "Postergar ticket";
+      title.textContent = isPublicPqr ? "Postergar solicitud" : "Postergar caso";
     }
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
@@ -1700,12 +1700,12 @@
         escHtml(ticketPk) +
         '">' +
         '<p class="scm-muted">Esta acci&oacute;n mantendr&aacute; ' +
-        (isPublicPqr ? "la solicitud" : "el ticket") +
+        (isPublicPqr ? "la solicitud" : "el caso") +
         ' abierta y marcar&aacute; el estado administrativo como Postergado.</p>' +
         '<label class="scm-seg-field"><span>Motivo de postergaci&oacute;n</span><textarea name="observacion" rows="6" required placeholder="' +
         (isPublicPqr
           ? "Describe por qu&eacute; se posterga la solicitud..."
-          : "Describe por qu&eacute; se posterga el ticket...") +
+          : "Describe por qu&eacute; se posterga el caso...") +
         '"></textarea></label>' +
         '<label class="scm-seg-field"><span>Imagenes / Evidencias (opcional)</span><input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
         renderPasteEvidenceBox("evidencia[]") +
@@ -2793,7 +2793,7 @@
     var isPreventiva = !isPublicPqr && isPreventivaCase(caseBtn);
     var noAccessCount = Math.max(0, parseInt(caseBtn.dataset.preventivaNoAccessCount || "0", 10) || 0);
     var nextNoAccessCount = noAccessCount + 1;
-    if (title) title.textContent = isPublicPqr ? "Responder solicitud" : "Responder ticket";
+    if (title) title.textContent = isPublicPqr ? "Responder solicitud" : "Responder caso";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
       body.innerHTML =
@@ -4589,6 +4589,163 @@
     sub.setAttribute("aria-hidden", "false");
   }
 
+  function initCaseComposer(modal, caseBtn) {
+    var composer = modal.querySelector("[data-scm-composer]");
+    if (!composer || !caseBtn) return;
+
+    var tabs = composer.querySelectorAll("[data-composer-tab]");
+    var visBadge = composer.querySelector("[data-scm-composer-visibility]");
+    var input = composer.querySelector("[data-scm-composer-input]");
+    var fileInput = composer.querySelector("[data-scm-composer-files]");
+    var preview = composer.querySelector("[data-scm-composer-preview]");
+    var discardBtn = composer.querySelector("[data-scm-composer-discard]");
+    var submitBtn = composer.querySelector("[data-scm-composer-submit]");
+    var submitLabel = composer.querySelector("[data-scm-composer-submit-label]");
+    var cannedBtn = composer.querySelector("[data-scm-composer-canned]");
+    var templateBtn = composer.querySelector("[data-scm-composer-template]");
+
+    var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
+    var recipient = (isPublicPqr ? caseBtn.dataset.solicitante : caseBtn.dataset.arrendatario) || "Inquilino / Solicitante";
+    var mode = "reply";
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        tabs.forEach(function (t) { t.classList.remove("active"); });
+        tab.classList.add("active");
+        mode = tab.getAttribute("data-composer-tab") || "reply";
+
+        if (mode === "reply") {
+          if (visBadge) {
+            visBadge.className = "scm-composer-visibility scm-composer-visibility-public";
+            visBadge.innerHTML = '<span class="material-symbols-outlined text-[15px]">visibility</span><span>Visible para: <strong>' + escHtml(recipient) + '</strong></span>';
+          }
+          if (input) input.placeholder = "Escriba una actualización para el inquilino o detalle la respuesta...";
+          if (submitLabel) submitLabel.textContent = "Publicar Actualización";
+        } else {
+          if (visBadge) {
+            visBadge.className = "scm-composer-visibility scm-composer-visibility-internal";
+            visBadge.innerHTML = '<span class="material-symbols-outlined text-[15px]">lock</span><span>Solo visible internamente</span>';
+          }
+          if (input) input.placeholder = "Escriba una nota interna o diagnóstico para el equipo técnico...";
+          if (submitLabel) submitLabel.textContent = "Guardar Nota Interna";
+        }
+      });
+    });
+
+    if (discardBtn) {
+      discardBtn.addEventListener("click", function () {
+        if (input) input.value = "";
+        if (fileInput) fileInput.value = "";
+        if (preview) {
+          preview.innerHTML = "";
+          preview.style.display = "none";
+        }
+      });
+    }
+
+    if (templateBtn) {
+      templateBtn.addEventListener("click", function () {
+        var checklist = "📋 DIAGNÓSTICO TÉCNICO:\n• Problema identificado:\n• Causa raíz:\n• Solución técnica propuesta:\n• Materiales requeridos:";
+        if (input) {
+          if (input.value.trim()) {
+            input.value += "\n\n" + checklist;
+          } else {
+            input.value = checklist;
+          }
+          input.focus();
+        }
+      });
+    }
+
+    if (cannedBtn) {
+      cannedBtn.addEventListener("click", function () {
+        var canned = "Estimado/a " + recipient + ", le informamos que su caso se encuentra en trámite activo con nuestro equipo técnico. Nos comunicaremos nuevamente con el avance correspondiente.";
+        if (input) {
+          if (input.value.trim()) {
+            input.value += "\n\n" + canned;
+          } else {
+            input.value = canned;
+          }
+          input.focus();
+        }
+      });
+    }
+
+    if (fileInput && preview) {
+      fileInput.addEventListener("change", function () {
+        if (!fileInput.files || !fileInput.files.length) return;
+        preview.innerHTML = "";
+        preview.style.display = "flex";
+        Array.prototype.forEach.call(fileInput.files, function (file) {
+          var chip = document.createElement("span");
+          chip.className = "scm-composer-file-chip";
+          chip.innerHTML = '<span class="material-symbols-outlined text-[14px]">attach_file</span><span class="scm-chip-text">' + escHtml(file.name) + '</span>';
+          preview.appendChild(chip);
+        });
+      });
+    }
+
+    if (submitBtn) {
+      submitBtn.addEventListener("click", function () {
+        var text = (input ? input.value : "").trim();
+        if (!text) {
+          if (input) input.focus();
+          if (typeof scmNotify === "function") {
+            scmNotify("warning", "Por favor escriba una actualización antes de publicar.");
+          }
+          return;
+        }
+
+        if (mode === "reply") {
+          openTicketResponseEditor(modal, caseBtn);
+          var sub = modal.querySelector(".scm-case-submodal.open");
+          if (sub) {
+            var subInput = sub.querySelector('textarea[name="respuesta"]');
+            if (subInput) {
+              subInput.value = text;
+              subInput.focus();
+            }
+          }
+        } else {
+          openCaseNoteEditor(modal, caseBtn);
+          var subNote = modal.querySelector(".scm-case-submodal.open");
+          if (subNote) {
+            var subNoteInput = subNote.querySelector('textarea[name="observacion"]');
+            if (subNoteInput) {
+              subNoteInput.value = text;
+              subNoteInput.focus();
+            }
+          }
+        }
+      });
+    }
+
+    var filterSelect = modal.querySelector("[data-scm-timeline-filter]");
+    if (filterSelect) {
+      filterSelect.addEventListener("change", function () {
+        var filterVal = filterSelect.value;
+        var historyItems = modal.querySelectorAll(".scm-case-history-item, .scm-case-record-card");
+        historyItems.forEach(function (item) {
+          if (filterVal === "all") {
+            item.style.display = "";
+          } else if (filterVal === "internal") {
+            var itemText = (item.textContent || "").toLowerCase();
+            var isInternal = itemText.indexOf("nota") !== -1 || itemText.indexOf("interno") !== -1 || itemText.indexOf("seguimiento") !== -1;
+            item.style.display = isInternal ? "" : "none";
+          } else if (filterVal === "public") {
+            var itemText = (item.textContent || "").toLowerCase();
+            var isPublic = itemText.indexOf("respuesta") !== -1 || itemText.indexOf("solicitud") !== -1 || itemText.indexOf("cliente") !== -1;
+            item.style.display = isPublic ? "" : "none";
+          } else if (filterVal === "activity") {
+            var itemText = (item.textContent || "").toLowerCase();
+            var isAct = itemText.indexOf("acta") !== -1 || itemText.indexOf("cita") !== -1 || itemText.indexOf("estado") !== -1 || itemText.indexOf("agend") !== -1;
+            item.style.display = isAct ? "" : "none";
+          }
+        });
+      });
+    }
+  }
+
   window.scmCloseCase = function (trigger) {
     var modal = null;
     if (trigger && trigger.closest) {
@@ -4676,8 +4833,8 @@
       }
 
       if (title) {
-        var asuntoText = btn.dataset.asunto || (isPublicPqr ? "Solicitud creada desde un portal web" : "Ticket de servicios inmobiliarios");
-        title.innerHTML = '<span class="scm-case-title-num">' + (isPublicPqr ? "Solicitud #" : "Ticket #") + escHtml(ticketNumStr) + '</span>: ' + escHtml(asuntoText);
+        var asuntoText = btn.dataset.asunto || (isPublicPqr ? "Solicitud creada desde un portal web" : "Caso de servicios inmobiliarios");
+        title.innerHTML = '<span class="scm-case-title-num">' + (isPublicPqr ? "Solicitud #" : "Caso #") + escHtml(ticketNumStr) + '</span>: ' + escHtml(asuntoText);
       }
       if (subtitle) {
         var creadoDate = btn.dataset.creado || "";
@@ -4710,7 +4867,7 @@
         var totalVal = btn.dataset.total || "";
         var metaChips = [];
         if (ticketNumStr && ticketNumStr !== "-") {
-          metaChips.push('<span class="scm-chip scm-chip-primary">' + (isPublicPqr ? "Solicitud #" : "Ticket #") + escHtml(ticketNumStr) + '</span>');
+          metaChips.push('<span class="scm-chip scm-chip-primary">' + (isPublicPqr ? "Solicitud #" : "Caso #") + escHtml(ticketNumStr) + '</span>');
         }
         if (estadoVal && estadoVal !== "-") {
           metaChips.push('<span class="scm-chip scm-chip-info"><span class="scm-chip-dot"></span>' + escHtml(estadoVal) + '</span>');
@@ -4830,17 +4987,6 @@
           );
         }
 
-        if (
-          isPublicPqr &&
-          card &&
-          card.querySelector("[data-scm-open-pqr-transfer]")
-        ) {
-          mainActionButtons.push(
-            '<button type="button" class="scm-case-work-btn" data-scm-open-pqr-transfer-from-case data-ticket-pk="' +
-            escHtml(btn.dataset.ticketPk || "") +
-            '"><span class="material-symbols-outlined scm-btn-icon">swap_horiz</span><div class="scm-btn-text"><span class="scm-btn-label">Trasladar solicitud</span><span class="scm-btn-sub">Reasignar área</span></div></button>',
-          );
-        }
         if (isPublicPqr) {
           mainActionButtons.push(
             '<button type="button" class="scm-case-work-btn" data-scm-open-note><span class="material-symbols-outlined scm-btn-icon">note_add</span><div class="scm-btn-text"><span class="scm-btn-label">Agregar nota</span><span class="scm-btn-sub">Uso interno administrativo</span></div></button>',
@@ -4901,7 +5047,7 @@
           }
           if (canUseDashboardAction("case_postpone")) {
             mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket><span class="material-symbols-outlined scm-btn-icon">schedule_send</span><div class="scm-btn-text"><span class="scm-btn-label">Postergar ticket</span><span class="scm-btn-sub">En espera de repuesto</span></div></button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket><span class="material-symbols-outlined scm-btn-icon">schedule_send</span><div class="scm-btn-text"><span class="scm-btn-label">Postergar caso</span><span class="scm-btn-sub">En espera de repuesto</span></div></button>',
             );
           }
           if (statusBucket !== "cerrados" && isMaintenanceForActions) {
@@ -4917,19 +5063,14 @@
         if (!isPublicPqr && (statusBucket === "postergados" || statusBucket === "cerrados")) {
           if (canUseDashboardAction("case_activate")) {
             mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket><span class="material-symbols-outlined scm-btn-icon">play_arrow</span><div class="scm-btn-text"><span class="scm-btn-label">Activar ticket</span><span class="scm-btn-sub">Reanudar gestión</span></div></button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket><span class="material-symbols-outlined scm-btn-icon">play_arrow</span><div class="scm-btn-text"><span class="scm-btn-label">Activar caso</span><span class="scm-btn-sub">Reanudar gestión</span></div></button>',
             );
           }
         }
         if (!isPublicPqr) {
           if (canUseDashboardAction("case_respond")) {
             mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response><span class="material-symbols-outlined scm-btn-icon">reply</span><div class="scm-btn-text"><span class="scm-btn-label">Responder ticket</span><span class="scm-btn-sub">Notificar al cliente</span></div></button>',
-            );
-          }
-          if (canUseDashboardAction("case_transfer")) {
-            mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar><span class="material-symbols-outlined scm-btn-icon">swap_horiz</span><div class="scm-btn-text"><span class="scm-btn-label">Trasladar caso</span><span class="scm-btn-sub">Reasignar área</span></div></button>',
+              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response><span class="material-symbols-outlined scm-btn-icon">reply</span><div class="scm-btn-text"><span class="scm-btn-label">Responder caso</span><span class="scm-btn-sub">Notificar al cliente</span></div></button>',
             );
           }
         }
@@ -4980,23 +5121,6 @@
             '" data-iframe-title="Solicitud"><span class="material-symbols-outlined scm-btn-icon">open_in_new</span><div class="scm-btn-text"><span class="scm-btn-label">Solicitud original</span><span class="scm-btn-sub">Abrir expediente</span></div></button>',
           );
         }
-        var caseActionsHtml =
-          '<section class="scm-case-work-actions"><h4><span class="material-symbols-outlined text-[20px]">tune</span> ' +
-          (isPublicPqr ? "Acciones de la solicitud" : "Acciones del caso") +
-          "</h4>" +
-          renderActionGroup(isPublicPqr ? "Gestión de la solicitud" : "Gestión del caso", mainActionButtons, "is-main") +
-          renderActionGroup("Complementarias", complementaryActionButtons, "is-secondary") +
-          renderActionGroup("Cotización", quoteActionButtons, "is-quote") +
-          "</section>";
-
-        var firstHistoryAfterAttachments = srcWrap.querySelector(".scm-case-history:not(.scm-case-documents-section)");
-        if (firstHistoryAfterAttachments) {
-          firstHistoryAfterAttachments.insertAdjacentHTML("beforebegin", caseActionsHtml);
-        } else {
-          srcWrap.insertAdjacentHTML("beforeend", caseActionsHtml);
-        }
-        sourceHtml = srcWrap.innerHTML;
-
         var estadoVal = btn.dataset.estado || "En gestión";
         var adminVal = btn.dataset.admin || "Normal";
         var totalVal = btn.dataset.total || "En curso";
@@ -5013,6 +5137,88 @@
         var barrioVal = btn.dataset.barrio || "-";
         var direccionVal = btn.dataset.direccion || "-";
         var contratoIdVal = btn.dataset.contrato || "-";
+
+        var caseActionsHtml =
+          '<section class="scm-case-work-actions"><h4><span class="material-symbols-outlined text-[20px]">tune</span> ' +
+          (isPublicPqr ? "Acciones de la solicitud" : "Acciones del caso") +
+          "</h4>" +
+          renderActionGroup(isPublicPqr ? "Gestión de la solicitud" : "Gestión del caso", mainActionButtons, "is-main") +
+          renderActionGroup("Complementarias", complementaryActionButtons, "is-secondary") +
+          renderActionGroup("Cotización", quoteActionButtons, "is-quote") +
+          "</section>";
+
+        var recipientName = solicitanteVal || (isPublicPqr ? "Solicitante" : "Inquilino / Solicitante");
+        var composerHtml =
+          '<section class="scm-case-composer-card" data-scm-composer>' +
+            '<div class="scm-case-composer-header">' +
+              '<div class="scm-case-composer-tabs" role="tablist">' +
+                '<button type="button" class="scm-composer-tab active" data-composer-tab="reply">' +
+                  '<span class="material-symbols-outlined text-[16px]">reply</span>' +
+                  '<span>Respuesta a Cliente</span>' +
+                '</button>' +
+                '<button type="button" class="scm-composer-tab" data-composer-tab="note">' +
+                  '<span class="material-symbols-outlined text-[16px]">lock</span>' +
+                  '<span>Nota Interna (Privada)</span>' +
+                '</button>' +
+              '</div>' +
+              '<div class="scm-composer-visibility scm-composer-visibility-public" data-scm-composer-visibility>' +
+                '<span class="material-symbols-outlined text-[15px]">visibility</span>' +
+                '<span>Visible para: <strong data-scm-composer-recipient>' + escHtml(recipientName) + '</strong></span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="scm-case-composer-body">' +
+              '<textarea class="scm-composer-textarea" rows="3" placeholder="Escriba una actualización para el inquilino o detalle la respuesta..." data-scm-composer-input></textarea>' +
+              '<div class="scm-composer-file-preview" data-scm-composer-preview style="display:none;"></div>' +
+            '</div>' +
+            '<div class="scm-case-composer-footer">' +
+              '<div class="scm-composer-tools">' +
+                '<label class="scm-composer-tool-btn" title="Adjuntar archivo o imagen">' +
+                  '<input type="file" multiple accept="image/*,application/pdf" class="scm-composer-file-input" style="display:none;" data-scm-composer-files>' +
+                  '<span class="material-symbols-outlined text-[18px]">attach_file</span>' +
+                '</label>' +
+                '<button type="button" class="scm-composer-tool-btn" title="Plantillas y respuestas rápidas" data-scm-composer-canned>' +
+                  '<span class="material-symbols-outlined text-[18px]">chat</span>' +
+                '</button>' +
+                '<button type="button" class="scm-composer-tool-btn" title="Insertar checklist diagnóstico" data-scm-composer-template>' +
+                  '<span class="material-symbols-outlined text-[18px]">checklist</span>' +
+                '</button>' +
+              '</div>' +
+              '<div class="scm-composer-actions">' +
+                '<button type="button" class="scm-composer-btn-discard" data-scm-composer-discard>Descartar</button>' +
+                '<button type="button" class="scm-composer-btn-submit" data-scm-composer-submit>' +
+                  '<span class="material-symbols-outlined text-[16px]">send</span>' +
+                  '<span data-scm-composer-submit-label>Publicar Actualización</span>' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+          '</section>';
+
+        var timelineHeaderHtml =
+          '<div class="scm-case-timeline-head">' +
+            '<div class="scm-case-timeline-title">' +
+              '<span class="material-symbols-outlined text-[20px] text-blue-600">trending_up</span>' +
+              '<h4>Historial de Actividad &amp; Seguimiento</h4>' +
+            '</div>' +
+            '<div class="scm-case-timeline-filter">' +
+              '<label class="scm-timeline-filter-label">' +
+                '<span>Filtrar por:</span>' +
+                '<select class="scm-timeline-filter-select" data-scm-timeline-filter>' +
+                  '<option value="all">Todo el historial</option>' +
+                  '<option value="public">Solo respuestas a cliente</option>' +
+                  '<option value="internal">Solo notas internas</option>' +
+                  '<option value="activity">Solo actividades</option>' +
+                '</select>' +
+              '</label>' +
+            '</div>' +
+          '</div>';
+
+        var firstHistoryAfterAttachments = srcWrap.querySelector(".scm-case-history:not(.scm-case-documents-section)");
+        if (firstHistoryAfterAttachments) {
+          firstHistoryAfterAttachments.insertAdjacentHTML("beforebegin", caseActionsHtml + composerHtml + timelineHeaderHtml);
+        } else {
+          srcWrap.insertAdjacentHTML("beforeend", caseActionsHtml + composerHtml + timelineHeaderHtml);
+        }
+        sourceHtml = srcWrap.innerHTML;
 
         var sidebarHtml = '<aside class="scm-case-sidebar">';
 
@@ -5048,9 +5254,20 @@
         sidebarHtml += '<div class="scm-stakeholder-item">';
         sidebarHtml += '<div class="scm-stakeholder-head"><span class="scm-stakeholder-role">Responsable Asignado</span><span class="material-symbols-outlined text-[#0e996b] text-[16px]">verified_user</span></div>';
         sidebarHtml += '<div class="scm-stakeholder-body"><div class="scm-avatar-circle"><span class="material-symbols-outlined text-[18px]">person</span></div><div class="scm-stakeholder-details"><strong class="scm-stakeholder-name">' + escHtml(empleadoVal) + '</strong><span class="scm-stakeholder-sub">' + escHtml(btn.dataset.departamento || "Funcionario Asignado") + '</span></div></div>';
+        sidebarHtml += '<div class="scm-stakeholder-actions">';
         if (empleadoIdVal) {
-          sidebarHtml += '<div class="scm-stakeholder-actions"><button type="button" class="scm-stakeholder-btn" data-scm-calendar-view-employee><span class="material-symbols-outlined text-[14px]">calendar_month</span> Ver agenda</button></div>';
+          sidebarHtml += '<button type="button" class="scm-stakeholder-btn" data-scm-calendar-view-employee><span class="material-symbols-outlined text-[14px]">calendar_month</span> Ver agenda</button>';
         }
+        if (isPublicPqr) {
+          if (card && card.querySelector("[data-scm-open-pqr-transfer]")) {
+            sidebarHtml += '<button type="button" class="scm-stakeholder-btn scm-stakeholder-btn-transfer" data-scm-open-pqr-transfer-from-case data-ticket-pk="' + escHtml(btn.dataset.ticketPk || "") + '"><span class="material-symbols-outlined text-[14px]">swap_horiz</span> Trasladar caso</button>';
+          }
+        } else {
+          if (canUseDashboardAction("case_transfer")) {
+            sidebarHtml += '<button type="button" class="scm-stakeholder-btn scm-stakeholder-btn-transfer" data-scm-open-trasladar><span class="material-symbols-outlined text-[14px]">swap_horiz</span> Trasladar caso</button>';
+          }
+        }
+        sidebarHtml += '</div>';
         sidebarHtml += '</div>';
 
         // Inquilino / Solicitante
@@ -5187,6 +5404,7 @@
           sidebarHtml +
           "</div>";
         initCotizacionResponseFields(body);
+        initCaseComposer(modal, btn);
       }
 
       modal.classList.add("open");

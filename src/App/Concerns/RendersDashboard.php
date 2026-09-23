@@ -312,6 +312,7 @@ trait RendersDashboard
     $canAccessAdministrativeActivities = !empty($allowedAdministrativeActivityTabs);
 
     $dashboardPanelToTab = [
+      'scm-panel-inicio' => 'calendario_actividades',
       'scm-panel-abiertos' => 'abiertos',
       'scm-panel-postergados' => 'postergados',
       'scm-panel-cerrados' => 'cerrados',
@@ -334,12 +335,12 @@ trait RendersDashboard
       }
     }
     if ($initialTab === '') {
-      if (in_array('abiertos', $dashboardAllowedTabs, true)) {
+      if (in_array('calendario_actividades', $dashboardAllowedTabs, true)) {
+        $initialTab = 'scm-panel-inicio';
+      } elseif (in_array('abiertos', $dashboardAllowedTabs, true)) {
         $initialTab = 'scm-panel-abiertos';
       } elseif (in_array('mis_tickets', $dashboardAllowedTabs, true)) {
         $initialTab = 'scm-panel-mis-tickets';
-      } elseif (in_array('calendario_actividades', $dashboardAllowedTabs, true)) {
-        $initialTab = 'scm-panel-inicio';
       } elseif (in_array('metricas', $dashboardAllowedTabs, true)) {
         $initialTab = 'scm-panel-metricas';
       } else {
@@ -703,29 +704,29 @@ trait RendersDashboard
             <button class="scm-guide-btn" type="button" id="scm-open-guide"><span class="material-symbols-outlined text-[16px]">menu_book</span> Gu&iacute;as</button>
           </div>
         </div>
-        <div class="scm-ticket-status-nav" id="scm-ticket-status-nav" role="tablist" aria-label="Vistas de tickets">
+        <div class="scm-ticket-status-nav" id="scm-ticket-status-nav" role="tablist" aria-label="Vistas de casos">
           <?php if (in_array('abiertos', $dashboardAllowedTabs, true)): ?>
             <button class="scm-status-nav-pill<?php echo $initialTab === 'scm-panel-abiertos' ? ' active' : ''; ?>" type="button" data-ticket-status-target="scm-panel-abiertos">
               <span class="material-symbols-outlined text-[18px]">inbox</span>
-              <span>Tickets Abiertos</span>
+              <span>Casos Abiertos</span>
             </button>
           <?php endif; ?>
           <?php if (in_array('mis_tickets', $dashboardAllowedTabs, true)): ?>
             <button class="scm-status-nav-pill<?php echo $initialTab === 'scm-panel-mis-tickets' ? ' active' : ''; ?>" type="button" data-ticket-status-target="scm-panel-mis-tickets">
               <span class="material-symbols-outlined text-[18px]">assignment_ind</span>
-              <span>Mis Tickets</span>
+              <span>Mis Casos</span>
             </button>
           <?php endif; ?>
           <?php if (in_array('postergados', $dashboardAllowedTabs, true)): ?>
             <button class="scm-status-nav-pill<?php echo $initialTab === 'scm-panel-postergados' ? ' active' : ''; ?>" type="button" data-ticket-status-target="scm-panel-postergados">
               <span class="material-symbols-outlined text-[18px]">hourglass_empty</span>
-              <span>Tickets Postergados</span>
+              <span>Casos Postergados</span>
             </button>
           <?php endif; ?>
           <?php if (in_array('cerrados', $dashboardAllowedTabs, true)): ?>
             <button class="scm-status-nav-pill<?php echo $initialTab === 'scm-panel-cerrados' ? ' active' : ''; ?>" type="button" data-ticket-status-target="scm-panel-cerrados">
               <span class="material-symbols-outlined text-[18px]">task_alt</span>
-              <span>Tickets Cerrados</span>
+              <span>Casos Cerrados</span>
             </button>
           <?php endif; ?>
         </div>
@@ -1651,7 +1652,7 @@ trait RendersDashboard
           <div class="scm-case-head">
             <div class="scm-case-breadcrumb">
               <span class="material-symbols-outlined text-[16px]">folder_managed</span>
-              <span>Casos &amp; Tickets</span>
+              <span>Casos</span>
               <span class="material-symbols-outlined text-[14px]">chevron_right</span>
               <span id="scm-case-breadcrumb-dept">Servicios Inmobiliarios</span>
               <span class="material-symbols-outlined text-[14px]">chevron_right</span>

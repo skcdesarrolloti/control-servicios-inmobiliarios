@@ -245,6 +245,7 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
             if (nativeTabBtn) {
               e.preventDefault();
               nativeTabBtn.click();
+              window.scrollTo({ top: 0, behavior: 'instant' });
 
               if (adminSubTarget) {
                 setTimeout(function () {

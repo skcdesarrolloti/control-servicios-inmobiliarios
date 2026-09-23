@@ -11944,9 +11944,6 @@
           if (pagination) {
             pagination.innerHTML = d.pagination || "";
           }
-          if (tbody) {
-            tbody.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
 
           updateKPI("scm-kpi-total", d.kpi_total || "0");
           updateKPI("scm-kpi-sin-cotz", d.kpi_sin_cotz || "0");

@@ -2172,3 +2172,335 @@ body,
 .scm-dropdown-chevron {
   transition: transform 0.2s ease !important;
 }
+
+/* ==========================================================================
+   COMPOSER DE ACTUALIZACIÓN & SEGUIMIENTO (STITCH UI CASE COMPOSER)
+   ========================================================================== */
+#scm-app .scm-case-composer-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  padding: 1.25rem !important;
+  box-shadow: 0 1px 3px rgba(15, 30, 54, 0.04) !important;
+  margin-bottom: 1.25rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.85rem !important;
+}
+
+#scm-app .scm-case-composer-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.75rem !important;
+  flex-wrap: wrap !important;
+}
+
+#scm-app .scm-case-composer-tabs {
+  display: flex !important;
+  gap: 0.5rem !important;
+}
+
+#scm-app .scm-composer-tab {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  padding: 0.45rem 0.85rem !important;
+  border-radius: 0.65rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #f8f9ff !important;
+  color: #475569 !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-composer-tab:hover {
+  color: #0f1e36 !important;
+  background: #eff4ff !important;
+  border-color: #cbd5e1 !important;
+}
+
+#scm-app .scm-composer-tab.active {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+  box-shadow: 0 2px 4px rgba(15, 30, 54, 0.1) !important;
+}
+
+#scm-app .scm-composer-visibility {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  padding: 0.35rem 0.75rem !important;
+  border-radius: 9999px !important;
+}
+
+#scm-app .scm-composer-visibility-public {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #bfdbfe !important;
+}
+
+#scm-app .scm-composer-visibility-internal {
+  background: #fefce8 !important;
+  color: #a16207 !important;
+  border: 1px solid #fef08a !important;
+}
+
+#scm-app .scm-case-composer-body {
+  position: relative !important;
+}
+
+#scm-app .scm-composer-textarea {
+  width: 100% !important;
+  min-height: 84px !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0.75rem !important;
+  padding: 0.75rem 0.85rem !important;
+  font-size: 0.875rem !important;
+  font-family: 'Poppins', sans-serif !important;
+  color: #0f1e36 !important;
+  resize: vertical !important;
+  outline: none !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+#scm-app .scm-composer-textarea:focus {
+  border-color: #1e3a8a !important;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1) !important;
+}
+
+#scm-app .scm-composer-file-preview {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.5rem !important;
+  margin-top: 0.5rem !important;
+}
+
+#scm-app .scm-composer-file-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  background: #eff4ff !important;
+  border: 1px solid #dce9ff !important;
+  border-radius: 0.5rem !important;
+  padding: 0.25rem 0.6rem !important;
+  font-size: 0.75rem !important;
+  color: #0f1e36 !important;
+  font-weight: 500 !important;
+}
+
+#scm-app .scm-case-composer-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.75rem !important;
+  flex-wrap: wrap !important;
+}
+
+#scm-app .scm-composer-tools {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+}
+
+#scm-app .scm-composer-tool-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 0.5rem !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #ffffff !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-composer-tool-btn:hover {
+  background: #eff4ff !important;
+  color: #0f1e36 !important;
+  border-color: #cbd5e1 !important;
+}
+
+#scm-app .scm-composer-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.6rem !important;
+}
+
+#scm-app .scm-composer-btn-discard {
+  padding: 0.5rem 1rem !important;
+  border-radius: 0.65rem !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #ffffff !important;
+  color: #64748b !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-composer-btn-discard:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+#scm-app .scm-composer-btn-submit {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  padding: 0.5rem 1.15rem !important;
+  border-radius: 0.65rem !important;
+  border: 1px solid #1e3a8a !important;
+  background: #1e3a8a !important;
+  color: #ffffff !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.08) !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-composer-btn-submit:hover {
+  background: #0f1e36 !important;
+  border-color: #0f1e36 !important;
+  box-shadow: 0 4px 6px -1px rgba(15, 30, 54, 0.15) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ==========================================================================
+   LÍNEA DE TIEMPO CONECTADA (STITCH ACTIVITY & TRACKING TIMELINE)
+   ========================================================================== */
+#scm-app .scm-case-timeline-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 1rem !important;
+  flex-wrap: wrap !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 1rem !important;
+  padding: 1rem 1.25rem !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 1px 3px rgba(15, 30, 54, 0.04) !important;
+}
+
+#scm-app .scm-case-timeline-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  color: #0f1e36 !important;
+}
+
+#scm-app .scm-case-timeline-title h4 {
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  color: #0f1e36 !important;
+  margin: 0 !important;
+}
+
+#scm-app .scm-case-timeline-filter {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}
+
+#scm-app .scm-timeline-filter-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  font-size: 0.8125rem !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+}
+
+#scm-app .scm-timeline-filter-select {
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0.5rem !important;
+  padding: 0.35rem 0.65rem !important;
+  font-size: 0.8125rem !important;
+  background: #ffffff !important;
+  color: #0f1e36 !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  outline: none !important;
+  transition: border-color 0.2s ease !important;
+}
+
+#scm-app .scm-timeline-filter-select:focus {
+  border-color: #1e3a8a !important;
+}
+
+/* Conector vertical continuo */
+#scm-app .scm-case-history-list {
+  position: relative !important;
+  padding-left: 1.75rem !important;
+  margin-left: 0.5rem !important;
+}
+
+#scm-app .scm-case-history-list::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 1rem !important;
+  bottom: 1rem !important;
+  left: 0.45rem !important;
+  width: 2px !important;
+  background: #e2e8f0 !important;
+}
+
+/* Tarjetas de eventos de la línea de tiempo */
+#scm-app .scm-case-history-item,
+#scm-app .scm-case-record-card {
+  position: relative !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.875rem !important;
+  padding: 1.15rem 1.25rem !important;
+  margin-bottom: 1rem !important;
+  box-shadow: 0 1px 3px rgba(15, 30, 54, 0.04) !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-case-history-item::before,
+#scm-app .scm-case-record-card::before {
+  content: '' !important;
+  position: absolute !important;
+  left: -1.55rem !important;
+  top: 1.25rem !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+  background: #2563eb !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 0 0 2px #dbeafe !important;
+  z-index: 2 !important;
+}
+
+#scm-app .scm-case-history-item:hover,
+#scm-app .scm-case-record-card:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 12px -2px rgba(15, 30, 54, 0.08) !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Botón de trasladar en sección de responsable asignado */
+#scm-app .scm-stakeholder-btn-transfer {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #bfdbfe !important;
+  font-weight: 600 !important;
+}
+
+#scm-app .scm-stakeholder-btn-transfer:hover {
+  background: #1d4ed8 !important;
+  color: #ffffff !important;
+  border-color: #1d4ed8 !important;
+}

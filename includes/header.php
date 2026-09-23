@@ -72,8 +72,10 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'property_history';
   } elseif (in_array($tabParam, ['terminacion_contrato', 'terminacion'], true) || ($tabParam === 'inicio' && in_array($subtabParam, ['contract_terminations', 'contract-termination'], true))) {
     $current_page = 'contract_termination';
-  } elseif (in_array($tabParam, ['inicio', 'home', 'resumen', 'scm-panel-inicio'], true)) {
+  } elseif ($tabParam === 'inicio' && $subtabParam === 'mine') {
     $current_page = 'mine';
+  } elseif (in_array($tabParam, ['inicio', 'home', 'resumen', 'scm-panel-inicio'], true)) {
+    $current_page = 'inicio';
   } elseif (in_array($tabParam, ['notificaciones', 'scm-panel-admin-notificaciones'], true)) {
     $current_page = 'notificaciones';
   } elseif (in_array($tabParam, ['gestiones_cobro', 'scm-panel-gestiones-cobro'], true)) {
@@ -101,7 +103,7 @@ if (empty($current_page) || $current_page === 'tickets') {
   } elseif (in_array($tabParam, ['metricas', 'dashboard', 'scm-panel-metricas'], true)) {
     $current_page = 'dashboard';
   } else {
-    $current_page = 'abiertos';
+    $current_page = empty($tabParam) ? 'inicio' : 'abiertos';
   }
 }
 
@@ -132,6 +134,15 @@ $rawNavItems = [
     'label' => 'Inicio',
     'icon' => 'home',
     'children' => [
+      'inicio' => [
+        'key' => 'inicio',
+        'label' => 'Inicio (Resumen general)',
+        'panel_id' => 'scm-panel-inicio',
+        'subtab' => 'mine',
+        'url' => $baseUrl . '/index.php?tab=inicio',
+        'icon' => 'dashboard',
+        'perms' => ['calendario_actividades', 'abiertos'],
+      ],
       'mine' => [
         'key' => 'mine',
         'label' => 'Mi calendario',
@@ -191,12 +202,12 @@ $rawNavItems = [
   'tickets' => [
     'type' => 'dropdown',
     'key' => 'tickets',
-    'label' => 'Gestión de Casos & Tickets',
+    'label' => 'Gestión de Casos',
     'icon' => 'confirmation_number',
     'children' => [
       'abiertos' => [
         'key' => 'abiertos',
-        'label' => 'Tickets Abiertos',
+        'label' => 'Casos Abiertos',
         'panel_id' => 'scm-panel-abiertos',
         'url' => $baseUrl . '/index.php?tab=abiertos',
         'icon' => 'inbox',
@@ -204,7 +215,7 @@ $rawNavItems = [
       ],
       'mis_tickets' => [
         'key' => 'mis_tickets',
-        'label' => 'Mis Tickets',
+        'label' => 'Mis Casos',
         'panel_id' => 'scm-panel-mis-tickets',
         'url' => $baseUrl . '/index.php?tab=mis_tickets',
         'icon' => 'assignment_ind',
@@ -212,7 +223,7 @@ $rawNavItems = [
       ],
       'postergados' => [
         'key' => 'postergados',
-        'label' => 'Tickets Postergados',
+        'label' => 'Casos Postergados',
         'panel_id' => 'scm-panel-postergados',
         'url' => $baseUrl . '/index.php?tab=postergados',
         'icon' => 'hourglass_empty',
@@ -220,7 +231,7 @@ $rawNavItems = [
       ],
       'cerrados' => [
         'key' => 'cerrados',
-        'label' => 'Tickets Cerrados',
+        'label' => 'Casos Cerrados',
         'panel_id' => 'scm-panel-cerrados',
         'url' => $baseUrl . '/index.php?tab=cerrados',
         'icon' => 'task_alt',
@@ -607,7 +618,7 @@ foreach ($rawNavItems as $k => $item) {
         <!-- Acciones Rápidas & Perfil de Funcionario -->
         <div class="flex items-center gap-2 sm:gap-3 shrink-0">
 
-          <!-- Botón de Acción Principal: + Nuevo Ticket -->
+          <!-- Botón de Acción Principal: + Nuevo Caso -->
           <button
             type="button"
             id="btn-global-nuevo-ticket"
@@ -615,7 +626,7 @@ foreach ($rawNavItems as $k => $item) {
             class="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-[#0f1e36] text-white hover:bg-[#162846] font-semibold text-xs sm:text-sm shadow-sm hover:shadow transition-all active:scale-[0.98]"
           >
             <span class="material-symbols-outlined text-[18px]">add</span>
-            <span class="hidden md:inline">Nuevo Ticket</span>
+            <span class="hidden md:inline">Nuevo Caso</span>
           </button>
 
           <!-- Menú Desplegable Configuración Operativa -->
@@ -746,7 +757,7 @@ foreach ($rawNavItems as $k => $item) {
                 role="menuitem"
               >
                 <span class="material-symbols-outlined text-[16px] text-slate-500">assignment_ind</span>
-                Mis Tickets Asignados
+                Mis Casos Asignados
               </a>
               <form method="post" action="<?php echo htmlspecialchars($baseUrl . '/logout.php', ENT_QUOTES, 'UTF-8'); ?>" class="m-0 p-0 border-t border-slate-100">
                 <?php
