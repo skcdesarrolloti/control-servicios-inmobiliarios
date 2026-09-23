@@ -679,7 +679,7 @@ trait RendersDashboard
               <div class="scm-mesa-subtitle">CONTROL DE MANTENIMIENTOS &amp; TICKETS</div>
             </div>
           </div>
-          <div class="scm-guide-bar scm-mesa-quick-actions">
+          <div class="scm-guide-bar scm-mesa-quick-actions" style="display:none !important;">
             <?php if ($canManageDashboardPermissions): ?>
               <button class="scm-guide-btn scm-permissions-btn" type="button" id="scm-open-permissions"><span class="material-symbols-outlined text-[16px]">lock</span> Permisos</button>
               <button class="scm-guide-btn scm-due-settings-shortcut" type="button" data-scm-open-due-settings><span class="material-symbols-outlined text-[16px]">calendar_month</span> Vencimientos</button>
@@ -1193,12 +1193,76 @@ trait RendersDashboard
 
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-actividades-administrativas' ? ' active' : ''; ?>" id="scm-panel-actividades-administrativas" data-permission-tab="actividades_administrativas">
         <div class="scm-admin-activities">
-          <div class="scm-status-subtabs scm-admin-activity-subtabs" role="tablist" aria-label="Actividades administrativas">
-            <?php foreach ($administrativeActivityTabs as $activityTabKey => $activityDef): ?>
-              <?php if (!in_array($activityTabKey, $allowedAdministrativeActivityTabs, true)) continue; ?>
-              <?php $activityPanelId = (string)($activityDef['panel'] ?? ''); ?>
-              <button class="scm-status-topic-tab scm-admin-activity-tab<?php echo $initialAdministrativeActivityKey === $activityTabKey ? ' active' : ''; ?>" type="button" data-admin-activity-key="<?php echo esc_attr($activityTabKey); ?>" data-admin-activity-target="<?php echo esc_attr($activityPanelId); ?>"><?php echo esc_html((string)($activityDef['label'] ?? $activityTabKey)); ?></button>
-            <?php endforeach; ?>
+          <!-- Toolbar Plegable de Actividades Administrativas (Reemplaza las pestañas por menú desplegable limpio) -->
+          <div class="scm-admin-activity-toolbar">
+            <div class="scm-admin-activity-header-info">
+              <div class="scm-admin-activity-icon-badge">
+                <span class="material-symbols-outlined text-[22px]">folder_shared</span>
+              </div>
+              <div>
+                <span class="scm-admin-activity-subtitle">Actividad Administrativa</span>
+                <h3 class="scm-admin-activity-title" id="scm-current-activity-label">
+                  <?php echo esc_html((string)($administrativeActivityTabs[$initialAdministrativeActivityKey]['label'] ?? 'Actividades Administrativas')); ?>
+                </h3>
+              </div>
+            </div>
+
+            <!-- Plegable Selector de Actividades -->
+            <div class="scm-admin-plegable-container relative" id="scm-admin-plegable-container">
+              <button
+                type="button"
+                id="scm-admin-plegable-trigger"
+                class="scm-admin-plegable-btn"
+                aria-haspopup="true"
+                aria-expanded="false"
+              >
+                <span class="material-symbols-outlined text-[18px] text-[#0f1e36]">filter_list</span>
+                <span class="scm-admin-plegable-btn-text" id="scm-admin-plegable-btn-text">
+                  Cambiar Actividad
+                </span>
+                <span class="material-symbols-outlined text-[18px] text-slate-400 scm-plegable-chevron">expand_more</span>
+              </button>
+
+              <div class="scm-admin-plegable-menu hidden" id="scm-admin-plegable-menu" role="menu">
+                <div class="scm-admin-plegable-header">
+                  <span>Todas las Actividades</span>
+                  <span class="text-[11px] text-slate-400 font-normal">Seleccione una opción</span>
+                </div>
+                <div class="scm-admin-plegable-list" role="tablist">
+                  <?php foreach ($administrativeActivityTabs as $activityTabKey => $activityDef): ?>
+                    <?php if (!in_array($activityTabKey, $allowedAdministrativeActivityTabs, true)) continue; ?>
+                    <?php 
+                      $activityPanelId = (string)($activityDef['panel'] ?? '');
+                      $isActiveActivity = ($initialAdministrativeActivityKey === $activityTabKey);
+                      $actIcon = 'folder';
+                      switch ($activityTabKey) {
+                        case 'notificaciones': $actIcon = 'notifications'; break;
+                        case 'gestiones_cobro': $actIcon = 'payments'; break;
+                        case 'cotizaciones_mantenimiento': $actIcon = 'request_quote'; break;
+                        case 'actas_satisfaccion': $actIcon = 'assignment_turned_in'; break;
+                        case 'preventivas_pendientes': $actIcon = 'pending_actions'; break;
+                        case 'servicios_publicos_pendientes': $actIcon = 'receipt_long'; break;
+                        case 'liquidador_servicios_publicos': $actIcon = 'calculate'; break;
+                        case 'reportes_administrativos_pendientes': $actIcon = 'summarize'; break;
+                        case 'auditoria_canon_aseguradoras': $actIcon = 'verified_user'; break;
+                        case 'cartas_aumento': $actIcon = 'mail'; break;
+                      }
+                    ?>
+                    <button
+                      class="scm-admin-activity-tab scm-admin-plegable-item<?php echo $isActiveActivity ? ' active' : ''; ?>"
+                      type="button"
+                      data-admin-activity-key="<?php echo esc_attr($activityTabKey); ?>"
+                      data-admin-activity-target="<?php echo esc_attr($activityPanelId); ?>"
+                      data-admin-activity-label="<?php echo esc_attr((string)($activityDef['label'] ?? $activityTabKey)); ?>"
+                    >
+                      <span class="material-symbols-outlined text-[18px] scm-plegable-item-icon"><?php echo $actIcon; ?></span>
+                      <span class="scm-plegable-item-text"><?php echo esc_html((string)($activityDef['label'] ?? $activityTabKey)); ?></span>
+                      <span class="material-symbols-outlined text-[16px] text-emerald-600 ml-auto scm-plegable-check<?php echo $isActiveActivity ? '' : ' hidden'; ?>">check</span>
+                    </button>
+                  <?php endforeach; ?>
+                </div>
+              </div>
+            </div>
           </div>
 
           <?php if (in_array('notificaciones', $allowedAdministrativeActivityTabs, true)): ?>

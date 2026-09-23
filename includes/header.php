@@ -109,12 +109,22 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 };
 
 // Orden solicitado:
-// 1. Gestión de Casos & Tickets (Dropdown con Abiertos, Mis Tickets, Postergados, Cerrados)
-// 2. Vencimientos
-// 3. Actividades Administrativas (Dropdown con todas las actividades administrativas)
-// 4. Métricas y Dashboard
-// 5. Inicio (Mi Calendario, Historial, etc.)
+// 1. Inicio (Mi Calendario, Historial, etc.)
+// 2. Gestión de Casos & Tickets (Dropdown con Abiertos, Mis Tickets, Postergados, Cerrados)
+// 3. Vencimientos
+// 4. Actividades Administrativas (Dropdown con todas las actividades administrativas)
+// 5. Métricas y Dashboard
 $rawNavItems = [
+  'inicio' => [
+    'type' => 'link',
+    'key' => 'inicio',
+    'label' => 'Inicio',
+    'panel_id' => 'scm-panel-inicio',
+    'subtab' => 'mine',
+    'url' => $baseUrl . '/index.php?tab=inicio',
+    'icon' => 'home',
+    'perms' => [],
+  ],
   'tickets' => [
     'type' => 'dropdown',
     'key' => 'tickets',
@@ -269,16 +279,6 @@ $rawNavItems = [
     'url' => $baseUrl . '/index.php?tab=metricas',
     'icon' => 'query_stats',
     'perms' => ['metricas'],
-  ],
-  'inicio' => [
-    'type' => 'link',
-    'key' => 'inicio',
-    'label' => 'Inicio',
-    'panel_id' => 'scm-panel-inicio',
-    'subtab' => 'mine',
-    'url' => $baseUrl . '/index.php?tab=inicio',
-    'icon' => 'home',
-    'perms' => [],
   ],
 ];
 
@@ -553,17 +553,77 @@ foreach ($rawNavItems as $k => $item) {
             <span class="hidden md:inline">Nuevo Ticket</span>
           </button>
 
-          <!-- Botón Configuración / Permisos -->
-          <button
-            type="button"
-            id="btn-global-configuracion"
-            onclick="window.dispatchEvent(new CustomEvent('scm:open-configuracion'))"
-            title="Configuración operativa"
-            class="p-2 sm:px-3 sm:py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-colors flex items-center gap-1 text-xs sm:text-sm font-medium"
-          >
-            <span class="material-symbols-outlined text-[20px]">settings</span>
-            <span class="hidden xl:inline">Configuración</span>
-          </button>
+          <!-- Menú Desplegable Configuración Operativa -->
+          <div class="relative" id="global-config-menu-container">
+            <button
+              type="button"
+              id="btn-global-configuracion"
+              title="Configuración operativa"
+              class="p-2 sm:px-3 sm:py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-colors flex items-center gap-1 text-xs sm:text-sm font-medium focus:outline-none"
+              aria-haspopup="true"
+              aria-expanded="false"
+            >
+              <span class="material-symbols-outlined text-[20px]">settings</span>
+              <span class="hidden xl:inline">Configuración</span>
+              <span class="material-symbols-outlined text-[16px] text-slate-400">expand_more</span>
+            </button>
+            <div
+              id="global-config-dropdown-menu"
+              class="hidden absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200/90 py-1.5 z-50 drop-shadow-xl"
+              role="menu"
+            >
+              <div class="px-3.5 py-1.5 border-b border-slate-100">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Configuración Operativa</p>
+              </div>
+              <div class="p-1 flex flex-col gap-0.5">
+                <button
+                  type="button"
+                  data-scm-config-action="permissions"
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">lock</span>
+                  <span>Permisos del Panel</span>
+                </button>
+                <button
+                  type="button"
+                  data-scm-config-action="due-settings"
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">calendar_month</span>
+                  <span>Configurar Vencimientos</span>
+                </button>
+                <button
+                  type="button"
+                  data-scm-config-action="notifications"
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">notifications</span>
+                  <span>Notificaciones Internas</span>
+                </button>
+                <button
+                  type="button"
+                  data-scm-config-action="actas-guide"
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">description</span>
+                  <span>Tipos de Actas</span>
+                </button>
+                <button
+                  type="button"
+                  data-scm-config-action="guide"
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">menu_book</span>
+                  <span>Guías del Sistema</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
           <!-- Notificaciones con Indicador Activo -->
           <div class="relative">
