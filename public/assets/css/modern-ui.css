@@ -1,0 +1,424 @@
+/* ==========================================================================
+   SKC SuCasa Inmobiliaria — Modern UI Overrides & Compatibility Layer
+   Tokens: Brand Navy #0f1e36, Surface #f8f9ff, Border #e2e8f0
+   ========================================================================== */
+
+/* Ocultar visualmente la barra de pestañas obsoleta del panel interno,
+   manteniéndola en el DOM para que el puente JS entre píldoras y pestañas nativas funcione */
+#scm-app .scm-main-tabs {
+  display: none !important;
+}
+
+/* Ocultar barra superior antigua si se llegara a renderizar */
+.top-bar {
+  display: none !important;
+}
+
+/* Contenedor principal del panel */
+.scm-modern-panel-wrapper {
+  width: 100%;
+}
+
+#scm-app.scm-wrap {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  color: #0b1c30 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+/* Barra de herramientas / accesos rápidos de guías */
+.scm-guide-bar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.5rem !important;
+  margin-bottom: 1.25rem !important;
+  background: #ffffff !important;
+  padding: 0.75rem 1rem !important;
+  border-radius: 0.75rem !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.03) !important;
+}
+
+.scm-guide-btn {
+  background: #eff4ff !important;
+  color: #0f1e36 !important;
+  border: 1px solid #dce9ff !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+  border-radius: 9999px !important;
+  padding: 0.35rem 0.85rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.scm-guide-btn:hover {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+}
+
+/* Tarjetas y Contenedores */
+.scm-filter-card,
+.scm-pending-wrap,
+.scm-home-hero,
+.scm-kpi,
+.scm-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 30, 54, 0.04), 0 1px 2px -1px rgba(15, 30, 54, 0.02) !important;
+}
+
+/* Tablas Modernas */
+.scm-table,
+.scm-table-wrap table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  font-size: 0.8125rem !important;
+}
+
+.scm-table thead th,
+.scm-table-wrap table thead th {
+  background: #f8f9ff !important;
+  color: #44474d !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.03em !important;
+  font-size: 0.6875rem !important;
+  padding: 0.75rem 1rem !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-top: none !important;
+}
+
+.scm-table tbody tr,
+.scm-table-wrap table tbody tr {
+  transition: background-color 0.15s ease !important;
+}
+
+.scm-table tbody tr:hover,
+.scm-table-wrap table tbody tr:hover {
+  background-color: #f8f9ff !important;
+}
+
+.scm-table tbody td,
+.scm-table-wrap table tbody td {
+  padding: 0.85rem 1rem !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  color: #0b1c30 !important;
+  vertical-align: middle !important;
+}
+
+/* Botones principales y secundarios */
+.scm-btn-primary,
+.scm-btn-primary-cyan {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 0.5rem !important;
+  font-weight: 600 !important;
+  padding: 0.45rem 1rem !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.08) !important;
+}
+
+.scm-btn-primary:hover,
+.scm-btn-primary-cyan:hover {
+  background: #162846 !important;
+  color: #ffffff !important;
+}
+
+.scm-btn-secondary {
+  background: #eff4ff !important;
+  color: #44474d !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.5rem !important;
+  font-weight: 500 !important;
+  padding: 0.45rem 0.85rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.scm-btn-secondary:hover {
+  background: #e5eeff !important;
+  color: #0b1c30 !important;
+}
+
+/* Badges redondeados */
+.scm-chip,
+.scm-badge,
+.scm-tag {
+  display: inline-flex !important;
+  align-items: center !important;
+  border-radius: 9999px !important;
+  padding: 0.2rem 0.65rem !important;
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+}
+
+/* ==========================================================================
+   MODAL DE DETALLE DE CASO & TICKET (VISTA CRM 2 COLUMNAS STITCH UI)
+   ========================================================================== */
+
+#scm-app .scm-case-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 100 !important;
+  background: rgba(15, 30, 54, 0.45) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  overflow-y: auto !important;
+  padding: 1.5rem 1rem !important;
+  display: none;
+  align-items: flex-start !important;
+  justify-content: center !important;
+}
+
+#scm-app .scm-case-modal.open {
+  display: flex !important;
+}
+
+#scm-app .scm-case-dialog {
+  max-width: 1400px !important;
+  width: 100% !important;
+  background: #f8f9ff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 30, 54, 0.25) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  margin: 1rem auto 3rem auto !important;
+  animation: scmModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes scmModalFadeIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+#scm-app .scm-case-close {
+  position: absolute !important;
+  top: 1.25rem !important;
+  right: 1.25rem !important;
+  z-index: 10 !important;
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 9999px !important;
+  font-size: 1.25rem !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-case-close:hover {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+}
+
+/* Cabecera del caso */
+#scm-app .scm-case-head {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  padding: 1.75rem 2rem 1.5rem 2rem !important;
+}
+
+#scm-app #scm-case-title {
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.025em !important;
+  margin-bottom: 0.25rem !important;
+}
+
+#scm-app #scm-case-subtitle {
+  font-size: 0.875rem !important;
+  color: #64748b !important;
+}
+
+#scm-app .scm-case-head-meta {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.5rem !important;
+  margin-top: 0.75rem !important;
+}
+
+/* Estructura asimétrica 2 Columnas (8 cols izq, 4 cols der) */
+#scm-app .scm-case-layout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 380px !important;
+  gap: 1.5rem !important;
+  align-items: start !important;
+  padding: 1.5rem 2rem 2rem 2rem !important;
+}
+
+@media (max-width: 1024px) {
+  #scm-app .scm-case-layout {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Columna Principal */
+#scm-app .scm-case-main {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1.25rem !important;
+}
+
+/* Matriz de Acciones Operativas */
+#scm-app .scm-case-work-actions {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  padding: 1.25rem !important;
+  box-shadow: 0 1px 3px rgba(15, 30, 54, 0.04) !important;
+}
+
+#scm-app .scm-case-work-actions h4 {
+  font-size: 0.875rem !important;
+  font-weight: 700 !important;
+  color: #0f1e36 !important;
+  margin-bottom: 0.85rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.03em !important;
+}
+
+#scm-app .scm-case-work-group {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;
+  gap: 0.65rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+#scm-app .scm-case-work-btn {
+  background: #f8f9ff !important;
+  border: 1px solid #dce9ff !important;
+  border-radius: 0.75rem !important;
+  padding: 0.75rem 0.85rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  color: #0f1e36 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-case-work-btn:hover {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px -1px rgba(15, 30, 54, 0.1) !important;
+}
+
+/* Barra Lateral Contextual */
+#scm-app .scm-case-sidebar {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1rem !important;
+}
+
+#scm-app .scm-case-sidebar h4 {
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #64748b !important;
+  margin-bottom: 0.25rem !important;
+}
+
+#scm-app .scm-case-sidebar-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.6rem !important;
+}
+
+#scm-app .scm-case-side-item {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.75rem !important;
+  padding: 0.75rem 1rem !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.02) !important;
+}
+
+#scm-app .scm-case-side-label {
+  display: block !important;
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  color: #64748b !important;
+  margin-bottom: 0.2rem !important;
+}
+
+#scm-app .scm-case-side-value {
+  display: block !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+}
+
+/* ==========================================================================
+   LIQUIDADOR DE SERVICIOS PÚBLICOS (STITCH UI COMPATIBILITY)
+   ========================================================================== */
+
+#scm-app .scm-psl {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+
+#scm-app .scm-psl-selected {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.25rem !important;
+  padding: 0.85rem 1rem !important;
+  background: #eff4ff !important;
+  border: 1px solid #dce9ff !important;
+  border-radius: 0.75rem !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-psl-selected strong {
+  font-size: 0.875rem !important;
+  font-weight: 700 !important;
+  color: #0f1e36 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+}
+
+#scm-app .scm-psl-selected span {
+  font-size: 0.75rem !important;
+  color: #475569 !important;
+  line-height: 1.4 !important;
+}
+
+#scm-app .scm-psl-service {
+  transition: all 0.2s ease !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.75rem !important;
+  overflow: hidden !important;
+  background: #ffffff !important;
+}
+
+#scm-app .scm-psl-service:not(.is-enabled) {
+  opacity: 0.6 !important;
+  background: #f8fafc !important;
+}
+
+#scm-app .scm-psl-service.is-enabled {
+  opacity: 1 !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 30, 54, 0.05) !important;
+}
+
+#scm-app .scm-psl-summary {
+  transition: all 0.25s ease !important;
+}
+
