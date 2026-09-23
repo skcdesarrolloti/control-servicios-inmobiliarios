@@ -38,7 +38,7 @@
     ),
     var(--scm-bg);
   color: var(--scm-text);
-  font-family: "Manrope", "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  font-family: "Poppins", "Segoe UI", sans-serif;
 }
 
 #scm-app .scm-tabs {

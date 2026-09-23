@@ -102,6 +102,54 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
         });
       }
 
+      // 1b. Menús desplegables del navbar (Inicio, Gestión de Casos, Actividades Administrativas)
+      const navDropdownContainers = document.querySelectorAll('[data-scm-nav-dropdown]');
+      navDropdownContainers.forEach(function (container) {
+        const trigger = container.querySelector('.nav-tab-dropdown-btn');
+        const menu = container.querySelector('[data-scm-dropdown-menu]');
+        if (!trigger || !menu) return;
+
+        function openNavDropdown() {
+          if (container.getAttribute('data-closed-by-click') === 'true') return;
+          navDropdownContainers.forEach(function (other) {
+            if (other !== container) {
+              const otherMenu = other.querySelector('[data-scm-dropdown-menu]');
+              if (otherMenu) otherMenu.classList.add('hidden');
+              other.classList.remove('open');
+              const otherBtn = other.querySelector('.nav-tab-dropdown-btn');
+              if (otherBtn) otherBtn.setAttribute('aria-expanded', 'false');
+            }
+          });
+          if (dropdownMenu) dropdownMenu.classList.add('hidden');
+          if (configDropdown) configDropdown.classList.add('hidden');
+          menu.classList.remove('hidden');
+          container.classList.add('open');
+          trigger.setAttribute('aria-expanded', 'true');
+        }
+
+        function closeNavDropdown() {
+          menu.classList.add('hidden');
+          container.classList.remove('open');
+          trigger.setAttribute('aria-expanded', 'false');
+          container.removeAttribute('data-closed-by-click');
+        }
+
+        container.addEventListener('mouseenter', openNavDropdown);
+        container.addEventListener('mouseleave', closeNavDropdown);
+
+        trigger.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          container.removeAttribute('data-closed-by-click');
+          const isCurrentlyOpen = container.classList.contains('open') && !menu.classList.contains('hidden');
+          if (isCurrentlyOpen) {
+            closeNavDropdown();
+          } else {
+            openNavDropdown();
+          }
+        });
+      });
+
       document.addEventListener('click', function (e) {
         if (dropdownMenu && !dropdownMenu.contains(e.target) && profileBtn && !profileBtn.contains(e.target)) {
           dropdownMenu.classList.add('hidden');
@@ -111,11 +159,39 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           configDropdown.classList.add('hidden');
           if (configBtn) configBtn.setAttribute('aria-expanded', 'false');
         }
+        navDropdownContainers.forEach(function (container) {
+          if (!container.contains(e.target)) {
+            const menu = container.querySelector('[data-scm-dropdown-menu]');
+            if (menu) menu.classList.add('hidden');
+            container.classList.remove('open');
+            container.removeAttribute('data-closed-by-click');
+            const trigger = container.querySelector('.nav-tab-dropdown-btn');
+            if (trigger) trigger.setAttribute('aria-expanded', 'false');
+          }
+        });
       });
 
-      // 2. Atajo global de búsqueda: Cmd+K o Ctrl+K
+      // 2. Atajo global de búsqueda: Cmd+K o Ctrl+K, y cierre con Escape
       const searchInput = document.getElementById('global-search-input');
       document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          if (dropdownMenu) {
+            dropdownMenu.classList.add('hidden');
+            if (profileBtn) profileBtn.setAttribute('aria-expanded', 'false');
+          }
+          if (configDropdown) {
+            configDropdown.classList.add('hidden');
+            if (configBtn) configBtn.setAttribute('aria-expanded', 'false');
+          }
+          navDropdownContainers.forEach(function (container) {
+            const menu = container.querySelector('[data-scm-dropdown-menu]');
+            if (menu) menu.classList.add('hidden');
+            container.classList.remove('open');
+            container.removeAttribute('data-closed-by-click');
+            const trigger = container.querySelector('.nav-tab-dropdown-btn');
+            if (trigger) trigger.setAttribute('aria-expanded', 'false');
+          });
+        }
         if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
           e.preventDefault();
           if (searchInput) {
@@ -132,6 +208,24 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           const panelTarget = this.getAttribute('data-panel-target');
           const subtabTarget = this.getAttribute('data-subtab-target');
           let adminSubTarget = this.getAttribute('data-admin-sub-target') || null;
+
+          // Si el elemento clicado pertenece a un dropdown, cerrarlo de inmediato
+          if (this.classList.contains('nav-tab-dropdown-item')) {
+            const container = this.closest('[data-scm-nav-dropdown]');
+            if (container) {
+              const menu = container.querySelector('[data-scm-dropdown-menu]');
+              if (menu) menu.classList.add('hidden');
+              container.classList.remove('open');
+              container.setAttribute('data-closed-by-click', 'true');
+              const trigger = container.querySelector('.nav-tab-dropdown-btn');
+              if (trigger) {
+                trigger.setAttribute('aria-expanded', 'false');
+                trigger.blur();
+              }
+            }
+            this.blur();
+            if (document.activeElement) document.activeElement.blur();
+          }
 
           // Si el panel principal #scm-app existe en esta página, realizamos cambio reactivo sin recarga
           const scmApp = document.getElementById('scm-app');

@@ -80,7 +80,7 @@
   color: var(--scm-text);
   background: var(--scm-bg);
   font-family:
-    "Inter", "Plus Jakarta Sans", "Manrope", "Segoe UI", system-ui, sans-serif;
+    "Poppins", "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;

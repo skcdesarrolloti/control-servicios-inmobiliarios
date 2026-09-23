@@ -379,7 +379,7 @@ foreach ($rawNavItems as $k => $item) {
   <!-- Fuentes e Iconos -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
@@ -423,7 +423,7 @@ foreach ($rawNavItems as $k => $item) {
             "brand-sky": "#38bdf8",
           },
           fontFamily: {
-            sans: ["'Plus Jakarta Sans'", "sans-serif"],
+            sans: ["'Poppins'", "sans-serif"],
           },
           borderRadius: {
             "DEFAULT": "0.5rem",
@@ -452,7 +452,7 @@ foreach ($rawNavItems as $k => $item) {
     }
 
     body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-family: 'Poppins', sans-serif;
       background-color: #f8f9ff;
       color: #0b1c30;
     }
@@ -780,7 +780,7 @@ foreach ($rawNavItems as $k => $item) {
                 ? 'bg-[#0f1e36] text-white font-semibold shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium';
               ?>
-              <div class="relative group" data-scm-nav-dropdown>
+              <div class="relative scm-nav-dropdown" data-scm-nav-dropdown>
                 <button
                   type="button"
                   class="nav-tab-pill nav-tab-dropdown-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-all whitespace-nowrap <?php echo $parentClass; ?>"
@@ -789,9 +789,9 @@ foreach ($rawNavItems as $k => $item) {
                 >
                   <span class="material-symbols-outlined text-[16px] <?php echo $isChildActive ? 'text-white' : 'text-slate-500'; ?>"><?php echo htmlspecialchars($tab['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
                   <span><?php echo htmlspecialchars($tab['label'], ENT_QUOTES, 'UTF-8'); ?></span>
-                  <span class="material-symbols-outlined text-[15px] <?php echo $isChildActive ? 'text-white' : 'text-slate-400'; ?> transition-transform group-hover:rotate-180">expand_more</span>
+                  <span class="material-symbols-outlined text-[15px] <?php echo $isChildActive ? 'text-white' : 'text-slate-400'; ?> transition-transform scm-dropdown-chevron">expand_more</span>
                 </button>
-                <div class="absolute left-0 top-full pt-1.5 hidden group-hover:block group-focus-within:block z-50 min-w-[240px] drop-shadow-xl" data-scm-dropdown-menu>
+                <div class="scm-dropdown-menu absolute left-0 top-full pt-1.5 hidden z-50 min-w-[240px] drop-shadow-xl" data-scm-dropdown-menu>
                   <div class="bg-white rounded-xl shadow-lg border border-slate-200/90 py-1.5 px-1.5 flex flex-col gap-0.5">
                     <?php foreach ($tab['children'] as $childKey => $child): ?>
                       <?php
