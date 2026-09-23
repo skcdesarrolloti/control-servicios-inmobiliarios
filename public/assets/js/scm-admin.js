@@ -4593,6 +4593,12 @@
     var composer = modal.querySelector("[data-scm-composer]");
     if (!composer || !caseBtn) return;
 
+    var root = findRootFromNode(modal) || modal.closest("#scm-app") || document.querySelector("#scm-app");
+    var runtime = parseRuntime(root) || {};
+    var ajaxUrl = runtime.ajaxUrl || "";
+    var nonce = runtime.nonce || "";
+    var actions = runtime.actions || {};
+
     var tabs = composer.querySelectorAll("[data-composer-tab]");
     var visBadge = composer.querySelector("[data-scm-composer-visibility]");
     var input = composer.querySelector("[data-scm-composer-input]");
@@ -4603,43 +4609,239 @@
     var submitLabel = composer.querySelector("[data-scm-composer-submit-label]");
     var cannedBtn = composer.querySelector("[data-scm-composer-canned]");
     var templateBtn = composer.querySelector("[data-scm-composer-template]");
+    var pasteBtn = composer.querySelector("[data-scm-composer-paste]");
+    var notifyOptions = composer.querySelector("[data-scm-composer-notify-options]");
+    var privateNotice = composer.querySelector("[data-scm-composer-private-notice]");
 
     var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
-    var recipient = (isPublicPqr ? caseBtn.dataset.solicitante : caseBtn.dataset.arrendatario) || "Inquilino / Solicitante";
+    var ticketPk = String(caseBtn.dataset.ticketPk || modal.dataset.ticketPk || caseBtn.dataset.ticket || "").trim();
+    var recipient = (isPublicPqr ? caseBtn.dataset.solicitante : caseBtn.dataset.arrendatario) || (isPublicPqr ? "Solicitante" : "Inquilino");
     var mode = "reply";
+    var composerFiles = [];
+
+    function renderFilePreviews() {
+      if (!preview) return;
+      preview.innerHTML = "";
+      if (!composerFiles.length) {
+        preview.style.display = "none";
+        return;
+      }
+      preview.style.display = "flex";
+      composerFiles.forEach(function (file, idx) {
+        var chip = document.createElement("div");
+        chip.className = "scm-composer-file-chip";
+        var isImg = file.type && file.type.indexOf("image/") === 0;
+        var sizeKb = Math.max(1, Math.round(file.size / 1024));
+        var thumbHtml = "";
+        if (isImg) {
+          try {
+            var url = URL.createObjectURL(file);
+            thumbHtml = '<img src="' + url + '" class="scm-composer-chip-thumb" alt="Preview">';
+          } catch (e) {
+            thumbHtml = '<span class="material-symbols-outlined text-[16px] text-blue-600">image</span>';
+          }
+        } else {
+          thumbHtml = '<span class="material-symbols-outlined text-[16px] text-blue-600">description</span>';
+        }
+        chip.innerHTML = thumbHtml +
+          '<div class="scm-composer-chip-info">' +
+            '<span class="scm-composer-chip-name">' + escHtml(file.name) + '</span>' +
+            '<span class="scm-composer-chip-size">' + sizeKb + ' KB</span>' +
+          '</div>' +
+          '<button type="button" class="scm-composer-chip-remove" data-remove-file-idx="' + idx + '" title="Quitar archivo">&times;</button>';
+        preview.appendChild(chip);
+      });
+    }
+
+    if (preview) {
+      preview.addEventListener("click", function (e) {
+        var removeBtn = e.target.closest("[data-remove-file-idx]");
+        if (removeBtn) {
+          e.preventDefault();
+          var idx = parseInt(removeBtn.getAttribute("data-remove-file-idx"), 10);
+          if (!isNaN(idx) && idx >= 0 && idx < composerFiles.length) {
+            composerFiles.splice(idx, 1);
+            renderFilePreviews();
+          }
+        }
+      });
+    }
+
+    function addFiles(files) {
+      if (!files || !files.length) return;
+      Array.prototype.forEach.call(files, function (f) {
+        composerFiles.push(f);
+      });
+      renderFilePreviews();
+    }
+
+    if (fileInput) {
+      fileInput.addEventListener("change", function () {
+        if (fileInput.files && fileInput.files.length) {
+          addFiles(fileInput.files);
+          fileInput.value = "";
+        }
+      });
+    }
+
+    // Clipboard screenshot paste (Ctrl+V) handler on composer
+    composer.addEventListener("paste", function (e) {
+      var clipboard = e.clipboardData || window.clipboardData;
+      if (!clipboard || !clipboard.items) return;
+      var pastedFiles = [];
+      for (var i = 0; i < clipboard.items.length; i++) {
+        var item = clipboard.items[i];
+        if (item && item.type && item.type.indexOf("image/") === 0) {
+          var blob = item.getAsFile();
+          if (blob) {
+            var ext = (blob.type || "image/png").split("/").pop().replace(/[^a-z0-9]/gi, "") || "png";
+            var fileName = "captura-" + Date.now() + "-" + (composerFiles.length + pastedFiles.length + 1) + "." + ext;
+            pastedFiles.push(new File([blob], fileName, { type: blob.type || "image/png" }));
+          }
+        }
+      }
+      if (pastedFiles.length > 0) {
+        e.preventDefault();
+        addFiles(pastedFiles);
+        if (typeof scmNotify === "function") {
+          scmNotify("info", pastedFiles.length === 1 ? "Captura pegada adjuntada." : pastedFiles.length + " capturas pegadas.");
+        }
+      }
+    });
+
+    if (pasteBtn) {
+      pasteBtn.addEventListener("click", function () {
+        if (navigator.clipboard && navigator.clipboard.read) {
+          navigator.clipboard.read().then(function (items) {
+            var found = false;
+            for (var i = 0; i < items.length; i++) {
+              for (var j = 0; j < items[i].types.length; j++) {
+                var type = items[i].types[j];
+                if (type.indexOf("image/") === 0) {
+                  found = true;
+                  items[i].getType(type).then(function (blob) {
+                    var ext = (blob.type || "image/png").split("/").pop().replace(/[^a-z0-9]/gi, "") || "png";
+                    var fileName = "captura-" + Date.now() + "." + ext;
+                    addFiles([new File([blob], fileName, { type: blob.type || "image/png" })]);
+                    if (typeof scmNotify === "function") {
+                      scmNotify("info", "Captura pegada adjuntada.");
+                    }
+                  });
+                }
+              }
+            }
+            if (!found) {
+              if (input) input.focus();
+              if (typeof scmNotify === "function") {
+                scmNotify("info", "Copia una captura al portapapeles y presiona Ctrl+V aquí.");
+              }
+            }
+          }).catch(function () {
+            if (input) input.focus();
+            if (typeof scmNotify === "function") {
+              scmNotify("info", "Presiona Ctrl+V para pegar la captura aquí.");
+            }
+          });
+        } else {
+          if (input) input.focus();
+          if (typeof scmNotify === "function") {
+            scmNotify("info", "Presiona Ctrl+V para pegar la captura aquí.");
+          }
+        }
+      });
+    }
+
+    // Mutual exclusion on recipient checkboxes
+    if (notifyOptions) {
+      notifyOptions.addEventListener("change", function (e) {
+        var target = e.target;
+        if (!target || target.name !== "composer_notify[]") return;
+        var allCbs = notifyOptions.querySelectorAll('input[name="composer_notify[]"]');
+        if (target.value === "none" && target.checked) {
+          allCbs.forEach(function (cb) {
+            if (cb !== target) cb.checked = false;
+          });
+        } else if (target.value !== "none" && target.checked) {
+          var noneCb = notifyOptions.querySelector('input[name="composer_notify[]"][value="none"]');
+          if (noneCb) noneCb.checked = false;
+        }
+      });
+    }
+
+    function setTabMode(newMode) {
+      mode = newMode;
+      tabs.forEach(function (t) {
+        if (t.getAttribute("data-composer-tab") === mode) {
+          t.classList.add("active");
+        } else {
+          t.classList.remove("active");
+        }
+      });
+
+      var clientCbs = notifyOptions ? notifyOptions.querySelectorAll('input[name="composer_notify[]"]:not([value="admin"]):not([value="none"])') : [];
+      var adminCb = notifyOptions ? notifyOptions.querySelector('input[name="composer_notify[]"][value="admin"]') : null;
+      var noneCb = notifyOptions ? notifyOptions.querySelector('input[name="composer_notify[]"][value="none"]') : null;
+
+      if (mode === "reply") {
+        if (visBadge) {
+          visBadge.className = "scm-composer-visibility scm-composer-visibility-public";
+          visBadge.innerHTML = '<span class="material-symbols-outlined text-[15px]">visibility</span><span>Visible para: <strong>' + escHtml(recipient) + '</strong></span>';
+        }
+        if (input) input.placeholder = "Escriba una actualización o respuesta para el cliente / inquilino...";
+        if (submitLabel) submitLabel.textContent = isPublicPqr ? "Publicar Respuesta" : "Publicar Respuesta";
+        if (privateNotice) privateNotice.style.display = "none";
+        if (notifyOptions) notifyOptions.style.display = "";
+        clientCbs.forEach(function (cb) {
+          cb.disabled = false;
+          if (cb.value === "solicitante" || cb.value === "arrendatario") cb.checked = true;
+          else cb.checked = false;
+        });
+        if (adminCb) { adminCb.disabled = false; adminCb.checked = false; }
+        if (noneCb) { noneCb.disabled = false; noneCb.checked = false; }
+      } else if (mode === "followup") {
+        if (visBadge) {
+          visBadge.className = "scm-composer-visibility scm-composer-visibility-followup";
+          visBadge.innerHTML = '<span class="material-symbols-outlined text-[15px]">engineering</span><span>Seguimiento operativo &amp; técnico</span>';
+        }
+        if (input) input.placeholder = "Escriba el avance o seguimiento técnico del caso...";
+        if (submitLabel) submitLabel.textContent = "Registrar Seguimiento";
+        if (privateNotice) privateNotice.style.display = "none";
+        if (notifyOptions) notifyOptions.style.display = "";
+        clientCbs.forEach(function (cb) {
+          cb.disabled = false;
+          cb.checked = true;
+        });
+        if (adminCb) { adminCb.disabled = false; adminCb.checked = true; }
+        if (noneCb) { noneCb.disabled = false; noneCb.checked = false; }
+      } else {
+        // mode === "note"
+        if (visBadge) {
+          visBadge.className = "scm-composer-visibility scm-composer-visibility-internal";
+          visBadge.innerHTML = '<span class="material-symbols-outlined text-[15px]">lock</span><span>Solo visible internamente</span>';
+        }
+        if (input) input.placeholder = "Escriba una nota interna o diagnóstico para el equipo técnico...";
+        if (submitLabel) submitLabel.textContent = "Guardar Nota Interna";
+        if (privateNotice) privateNotice.style.display = "inline-flex";
+        clientCbs.forEach(function (cb) {
+          cb.checked = false;
+          cb.disabled = true;
+        });
+        if (adminCb) { adminCb.disabled = false; adminCb.checked = true; }
+        if (noneCb) { noneCb.disabled = false; noneCb.checked = false; }
+      }
+    }
 
     tabs.forEach(function (tab) {
       tab.addEventListener("click", function () {
-        tabs.forEach(function (t) { t.classList.remove("active"); });
-        tab.classList.add("active");
-        mode = tab.getAttribute("data-composer-tab") || "reply";
-
-        if (mode === "reply") {
-          if (visBadge) {
-            visBadge.className = "scm-composer-visibility scm-composer-visibility-public";
-            visBadge.innerHTML = '<span class="material-symbols-outlined text-[15px]">visibility</span><span>Visible para: <strong>' + escHtml(recipient) + '</strong></span>';
-          }
-          if (input) input.placeholder = "Escriba una actualización para el inquilino o detalle la respuesta...";
-          if (submitLabel) submitLabel.textContent = "Publicar Actualización";
-        } else {
-          if (visBadge) {
-            visBadge.className = "scm-composer-visibility scm-composer-visibility-internal";
-            visBadge.innerHTML = '<span class="material-symbols-outlined text-[15px]">lock</span><span>Solo visible internamente</span>';
-          }
-          if (input) input.placeholder = "Escriba una nota interna o diagnóstico para el equipo técnico...";
-          if (submitLabel) submitLabel.textContent = "Guardar Nota Interna";
-        }
+        setTabMode(tab.getAttribute("data-composer-tab") || "reply");
       });
     });
 
     if (discardBtn) {
       discardBtn.addEventListener("click", function () {
         if (input) input.value = "";
-        if (fileInput) fileInput.value = "";
-        if (preview) {
-          preview.innerHTML = "";
-          preview.style.display = "none";
-        }
+        composerFiles = [];
+        renderFilePreviews();
       });
     }
 
@@ -4671,77 +4873,199 @@
       });
     }
 
-    if (fileInput && preview) {
-      fileInput.addEventListener("change", function () {
-        if (!fileInput.files || !fileInput.files.length) return;
-        preview.innerHTML = "";
-        preview.style.display = "flex";
-        Array.prototype.forEach.call(fileInput.files, function (file) {
-          var chip = document.createElement("span");
-          chip.className = "scm-composer-file-chip";
-          chip.innerHTML = '<span class="material-symbols-outlined text-[14px]">attach_file</span><span class="scm-chip-text">' + escHtml(file.name) + '</span>';
-          preview.appendChild(chip);
-        });
-      });
-    }
-
     if (submitBtn) {
       submitBtn.addEventListener("click", function () {
         var text = (input ? input.value : "").trim();
         if (!text) {
           if (input) input.focus();
           if (typeof scmNotify === "function") {
-            scmNotify("warning", "Por favor escriba una actualización antes de publicar.");
+            scmNotify("warning", "Por favor escriba una observación o respuesta antes de guardar.");
           }
           return;
         }
 
+        var selectedRecipients = [];
+        if (notifyOptions) {
+          var checkedCbs = notifyOptions.querySelectorAll('input[name="composer_notify[]"]:checked');
+          checkedCbs.forEach(function (cb) {
+            selectedRecipients.push(cb.value);
+          });
+        }
+        if (!selectedRecipients.length) {
+          selectedRecipients = ["none"];
+        }
+
+        var origBtnHtml = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span> Guardando...';
+
+        var fd = new FormData();
+        fd.append("nonce", nonce);
+        fd.append("ticket_pk", ticketPk);
+        fd.append("notify_recipients_present", "1");
+        selectedRecipients.forEach(function (rec) {
+          fd.append("notify_recipients[]", rec);
+        });
+
+        composerFiles.forEach(function (file) {
+          if (mode === "reply") {
+            fd.append("imagen[]", file);
+          } else {
+            fd.append("evidencia[]", file);
+          }
+        });
+
         if (mode === "reply") {
-          openTicketResponseEditor(modal, caseBtn);
-          var sub = modal.querySelector(".scm-case-submodal.open");
-          if (sub) {
-            var subInput = sub.querySelector('textarea[name="respuesta"]');
-            if (subInput) {
-              subInput.value = text;
-              subInput.focus();
+          fd.append("action", actions.ticket_response || "scm_ajax_ticket_response");
+          fd.append("respuesta", text);
+          fd.append("estado_administrativo", "__keep__");
+        } else if (mode === "followup") {
+          fd.append("action", actions.seg || "scm_ajax_ticket_seguimiento");
+          fd.append("observacion", text);
+          fd.append("estado_ticket", "__keep__");
+          fd.append("estado_administrativo", "__keep__");
+          fd.append("estado_cotizacion", "__keep__");
+        } else {
+          fd.append("action", actions.nota || "scm_ajax_case_note");
+          fd.append("observacion", text);
+        }
+
+        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (r) { return r.json(); })
+          .then(function (json) {
+            if (!json || !json.success) {
+              var errText = (json && json.data ? (json.data.message || json.data) : null) || "Error al guardar.";
+              throw new Error(errText);
+            }
+            var successMsg = (json.data && json.data.message) ? json.data.message : (
+              mode === "reply" ? "Respuesta publicada con éxito." :
+              mode === "followup" ? "Seguimiento registrado con éxito." : "Nota interna guardada con éxito."
+            );
+            if (typeof scmNotify === "function") {
+              scmNotify("success", successMsg);
+            } else if (typeof showToast === "function") {
+              showToast("success", successMsg);
+            }
+
+            if (input) input.value = "";
+            composerFiles = [];
+            renderFilePreviews();
+
+            // Refresh modal and timeline in place!
+            if (root) {
+              root.dispatchEvent(new CustomEvent("scm:case-action-saved", {
+                detail: { ticketPk: ticketPk, fromNode: modal }
+              }));
+            }
+          })
+          .catch(function (err) {
+            var msg = err && err.message ? err.message : "Error al guardar.";
+            if (typeof scmNotify === "function") {
+              scmNotify("error", msg);
+            } else if (typeof showToast === "function") {
+              showToast("error", msg);
+            }
+          })
+          .finally(function () {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = origBtnHtml;
+          });
+      });
+    }
+
+    // Timeline filtering
+    function applyTimelineFilter(filterVal) {
+      var historySections = modal.querySelectorAll(".scm-case-history:not(.scm-case-documents-section)");
+      var totalMatched = 0;
+
+      historySections.forEach(function (sec) {
+        var h4 = sec.querySelector("h4");
+        var secTitle = (h4 ? h4.textContent : "").toLowerCase();
+        var isNotesSection = secTitle.indexOf("nota") !== -1;
+        var isSeguimientoSection = secTitle.indexOf("seguimiento") !== -1;
+        var isPropertyHistory = secTitle.indexOf("inmueble") !== -1;
+
+        var items = sec.querySelectorAll(".scm-case-history-item");
+        var secVisibleCount = 0;
+
+        items.forEach(function (item) {
+          var itemType = item.getAttribute("data-history-type") || "";
+          var itemText = (item.textContent || "").toLowerCase();
+
+          var isInternal = itemType === "note" || isNotesSection || itemText.indexOf("nota interna") !== -1 || itemText.indexOf("privada") !== -1;
+          var isFollowup = itemType === "followup" || isSeguimientoSection || itemText.indexOf("seguimiento") !== -1;
+          var isPublic = itemType === "public" || (!isInternal && (itemText.indexOf("respuesta") !== -1 || itemText.indexOf("comunicaci") !== -1 || itemText.indexOf("cliente") !== -1 || itemText.indexOf("inquilino") !== -1 || itemText.indexOf("solicitante") !== -1));
+          var isActivity = itemType === "activity" || isFollowup || isPropertyHistory || itemText.indexOf("agend") !== -1 || itemText.indexOf("cita") !== -1 || itemText.indexOf("acta") !== -1 || itemText.indexOf("estado") !== -1 || itemText.indexOf("asignad") !== -1 || itemText.indexOf("cread") !== -1 || itemText.indexOf("traslad") !== -1;
+
+          var match = false;
+          if (filterVal === "all") {
+            match = true;
+          } else if (filterVal === "public") {
+            match = isPublic && !isInternal;
+          } else if (filterVal === "internal") {
+            match = isInternal;
+          } else if (filterVal === "activity") {
+            match = isActivity && !isInternal;
+          }
+
+          if (filterVal === "all") {
+            var list = item.closest(".scm-case-history-list");
+            var currentPage = list ? (list.getAttribute("data-current-page") || "1") : "1";
+            var itemPage = item.getAttribute("data-page") || "1";
+            item.style.display = (itemPage === currentPage) ? "" : "none";
+            secVisibleCount++;
+            totalMatched++;
+          } else {
+            if (match) {
+              item.style.display = "";
+              secVisibleCount++;
+              totalMatched++;
+            } else {
+              item.style.display = "none";
             }
           }
+        });
+
+        var pagination = sec.querySelector(".scm-history-pagination");
+        var emptyNotice = sec.querySelector(".scm-case-history-empty");
+
+        if (filterVal === "all") {
+          sec.style.display = "";
+          if (pagination) pagination.style.display = "";
+          if (emptyNotice) emptyNotice.style.display = items.length === 0 ? "" : "none";
         } else {
-          openCaseNoteEditor(modal, caseBtn);
-          var subNote = modal.querySelector(".scm-case-submodal.open");
-          if (subNote) {
-            var subNoteInput = subNote.querySelector('textarea[name="observacion"]');
-            if (subNoteInput) {
-              subNoteInput.value = text;
-              subNoteInput.focus();
-            }
+          if (pagination) pagination.style.display = "none";
+          if (secVisibleCount > 0) {
+            sec.style.display = "";
+            if (emptyNotice) emptyNotice.style.display = "none";
+          } else {
+            sec.style.display = "none";
           }
         }
       });
+
+      var existingEmpty = modal.querySelector(".scm-timeline-filtered-empty");
+      if (filterVal !== "all" && totalMatched === 0) {
+        if (!existingEmpty) {
+          var filterHead = modal.querySelector(".scm-case-timeline-head");
+          if (filterHead) {
+            var emptyDiv = document.createElement("div");
+            emptyDiv.className = "scm-timeline-filtered-empty";
+            emptyDiv.innerHTML = '<span class="material-symbols-outlined text-[32px] text-slate-400">filter_list_off</span><p>No se encontraron registros para el filtro seleccionado.</p>';
+            filterHead.insertAdjacentElement("afterend", emptyDiv);
+          }
+        } else {
+          existingEmpty.style.display = "flex";
+        }
+      } else if (existingEmpty) {
+        existingEmpty.style.display = "none";
+      }
     }
 
     var filterSelect = modal.querySelector("[data-scm-timeline-filter]");
     if (filterSelect) {
       filterSelect.addEventListener("change", function () {
-        var filterVal = filterSelect.value;
-        var historyItems = modal.querySelectorAll(".scm-case-history-item, .scm-case-record-card");
-        historyItems.forEach(function (item) {
-          if (filterVal === "all") {
-            item.style.display = "";
-          } else if (filterVal === "internal") {
-            var itemText = (item.textContent || "").toLowerCase();
-            var isInternal = itemText.indexOf("nota") !== -1 || itemText.indexOf("interno") !== -1 || itemText.indexOf("seguimiento") !== -1;
-            item.style.display = isInternal ? "" : "none";
-          } else if (filterVal === "public") {
-            var itemText = (item.textContent || "").toLowerCase();
-            var isPublic = itemText.indexOf("respuesta") !== -1 || itemText.indexOf("solicitud") !== -1 || itemText.indexOf("cliente") !== -1;
-            item.style.display = isPublic ? "" : "none";
-          } else if (filterVal === "activity") {
-            var itemText = (item.textContent || "").toLowerCase();
-            var isAct = itemText.indexOf("acta") !== -1 || itemText.indexOf("cita") !== -1 || itemText.indexOf("estado") !== -1 || itemText.indexOf("agend") !== -1;
-            item.style.display = isAct ? "" : "none";
-          }
-        });
+        applyTimelineFilter(filterSelect.value);
       });
     }
   }
@@ -4988,26 +5312,15 @@
         }
 
         if (isPublicPqr) {
-          mainActionButtons.push(
-            '<button type="button" class="scm-case-work-btn" data-scm-open-note><span class="material-symbols-outlined scm-btn-icon">note_add</span><div class="scm-btn-text"><span class="scm-btn-label">Agregar nota</span><span class="scm-btn-sub">Uso interno administrativo</span></div></button>',
-          );
           if (statusBucket !== "cerrados") {
             mainActionButtons.push(
               '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket><span class="material-symbols-outlined scm-btn-icon">schedule_send</span><div class="scm-btn-text"><span class="scm-btn-label">Postergar solicitud</span><span class="scm-btn-sub">En espera de repuesto</span></div></button>',
-              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response><span class="material-symbols-outlined scm-btn-icon">reply</span><div class="scm-btn-text"><span class="scm-btn-label">Responder solicitud</span><span class="scm-btn-sub">Notificar al cliente</span></div></button>',
               '<button type="button" class="scm-case-work-btn" data-scm-close-ticket><span class="material-symbols-outlined scm-btn-icon">check_circle</span><div class="scm-btn-text"><span class="scm-btn-label">Cerrar solicitud</span><span class="scm-btn-sub">Finalizar gestión</span></div></button>',
             );
           }
           if (statusBucket === "postergados" || statusBucket === "cerrados") {
             mainActionButtons.push(
               '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket><span class="material-symbols-outlined scm-btn-icon">play_arrow</span><div class="scm-btn-text"><span class="scm-btn-label">Activar solicitud</span><span class="scm-btn-sub">Reanudar caso</span></div></button>',
-            );
-          }
-        }
-        if (!isPublicPqr && seguimientoWrap) {
-          if (canUseDashboardAction("case_followup")) {
-            mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-section="scm-sec-seguimiento"><span class="material-symbols-outlined scm-btn-icon">add_comment</span><div class="scm-btn-text"><span class="scm-btn-label">Agregar seguimiento</span><span class="scm-btn-sub">Registrar avance técnico</span></div></button>',
             );
           }
         }
@@ -5040,11 +5353,6 @@
               );
             }
           }
-          if (canUseDashboardAction("case_note")) {
-            mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-note><span class="material-symbols-outlined scm-btn-icon">note_add</span><div class="scm-btn-text"><span class="scm-btn-label">Agregar nota</span><span class="scm-btn-sub">Uso administrativo</span></div></button>',
-            );
-          }
           if (canUseDashboardAction("case_postpone")) {
             mainActionButtons.push(
               '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket><span class="material-symbols-outlined scm-btn-icon">schedule_send</span><div class="scm-btn-text"><span class="scm-btn-label">Postergar caso</span><span class="scm-btn-sub">En espera de repuesto</span></div></button>',
@@ -5064,13 +5372,6 @@
           if (canUseDashboardAction("case_activate")) {
             mainActionButtons.push(
               '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket><span class="material-symbols-outlined scm-btn-icon">play_arrow</span><div class="scm-btn-text"><span class="scm-btn-label">Activar caso</span><span class="scm-btn-sub">Reanudar gestión</span></div></button>',
-            );
-          }
-        }
-        if (!isPublicPqr) {
-          if (canUseDashboardAction("case_respond")) {
-            mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response><span class="material-symbols-outlined scm-btn-icon">reply</span><div class="scm-btn-text"><span class="scm-btn-label">Responder caso</span><span class="scm-btn-sub">Notificar al cliente</span></div></button>',
             );
           }
         }
@@ -5154,7 +5455,11 @@
               '<div class="scm-case-composer-tabs" role="tablist">' +
                 '<button type="button" class="scm-composer-tab active" data-composer-tab="reply">' +
                   '<span class="material-symbols-outlined text-[16px]">reply</span>' +
-                  '<span>Respuesta a Cliente</span>' +
+                  '<span>' + (isPublicPqr ? "Respuesta a Solicitud" : "Respuesta a Cliente") + '</span>' +
+                '</button>' +
+                '<button type="button" class="scm-composer-tab" data-composer-tab="followup">' +
+                  '<span class="material-symbols-outlined text-[16px]">add_comment</span>' +
+                  '<span>Seguimiento</span>' +
                 '</button>' +
                 '<button type="button" class="scm-composer-tab" data-composer-tab="note">' +
                   '<span class="material-symbols-outlined text-[16px]">lock</span>' +
@@ -5167,8 +5472,23 @@
               '</div>' +
             '</div>' +
             '<div class="scm-case-composer-body">' +
-              '<textarea class="scm-composer-textarea" rows="3" placeholder="Escriba una actualización para el inquilino o detalle la respuesta..." data-scm-composer-input></textarea>' +
+              '<textarea class="scm-composer-textarea" rows="3" placeholder="Escriba una respuesta o actualización para el cliente..." data-scm-composer-input></textarea>' +
               '<div class="scm-composer-file-preview" data-scm-composer-preview style="display:none;"></div>' +
+            '</div>' +
+            '<div class="scm-composer-notify-row" data-scm-composer-notify-row>' +
+              '<span class="scm-composer-notify-label"><span class="material-symbols-outlined text-[15px]">mail</span><span>Notificar:</span></span>' +
+              '<div class="scm-composer-notify-options" data-scm-composer-notify-options>' +
+                (isPublicPqr
+                  ? '<label class="scm-composer-check"><input type="checkbox" name="composer_notify[]" value="solicitante" checked> Solicitante</label>'
+                  : '<label class="scm-composer-check"><input type="checkbox" name="composer_notify[]" value="arrendatario" checked> Arrendatario</label>' +
+                    '<label class="scm-composer-check"><input type="checkbox" name="composer_notify[]" value="propietario"> Propietario</label>') +
+                '<label class="scm-composer-check"><input type="checkbox" name="composer_notify[]" value="admin"> Administrativos</label>' +
+                '<label class="scm-composer-check scm-composer-check-none"><input type="checkbox" name="composer_notify[]" value="none"> Ninguno</label>' +
+              '</div>' +
+              '<div class="scm-composer-private-notice" data-scm-composer-private-notice style="display:none;">' +
+                '<span class="material-symbols-outlined text-[14px]">lock</span>' +
+                '<span>Uso interno: Los clientes no serán notificados.</span>' +
+              '</div>' +
             '</div>' +
             '<div class="scm-case-composer-footer">' +
               '<div class="scm-composer-tools">' +
@@ -5176,6 +5496,10 @@
                   '<input type="file" multiple accept="image/*,application/pdf" class="scm-composer-file-input" style="display:none;" data-scm-composer-files>' +
                   '<span class="material-symbols-outlined text-[18px]">attach_file</span>' +
                 '</label>' +
+                '<button type="button" class="scm-composer-tool-btn" data-scm-composer-paste title="Pegar captura de pantalla desde el portapapeles (Ctrl+V)">' +
+                  '<span class="material-symbols-outlined text-[18px]">content_paste</span>' +
+                  '<span class="scm-composer-paste-label">Pegar captura</span>' +
+                '</button>' +
                 '<button type="button" class="scm-composer-tool-btn" title="Plantillas y respuestas rápidas" data-scm-composer-canned>' +
                   '<span class="material-symbols-outlined text-[18px]">chat</span>' +
                 '</button>' +
@@ -5187,7 +5511,7 @@
                 '<button type="button" class="scm-composer-btn-discard" data-scm-composer-discard>Descartar</button>' +
                 '<button type="button" class="scm-composer-btn-submit" data-scm-composer-submit>' +
                   '<span class="material-symbols-outlined text-[16px]">send</span>' +
-                  '<span data-scm-composer-submit-label>Publicar Actualización</span>' +
+                  '<span data-scm-composer-submit-label>Publicar Respuesta</span>' +
                 '</button>' +
               '</div>' +
             '</div>' +
