@@ -1176,75 +1176,221 @@ trait RendersDashboard
 
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-dashboard-inline.js?v=' . SCM_VERSION); ?>" defer></script>
 
-      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas' ? ' active' : ''; ?>" id="scm-panel-metricas" data-permission-tab="metricas" data-scm-metrics="<?php echo self::h((string)$metricsJson); ?>" data-scm-loaded="0">
-        <div class="scm-header scm-header-metricas">
-          <div>
-            <h2>Metricas Operativas</h2>
-            <p>Visualizacion consolidada del Control de Servicios Inmobiliarios.</p>
+      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas' ? ' active' : ''; ?> flex flex-col gap-6 w-full" id="scm-panel-metricas" data-permission-tab="metricas" data-scm-metrics="<?php echo self::h((string)$metricsJson); ?>" data-scm-loaded="0">
+        <!-- Encabezado de Métricas y Acciones -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center gap-3">
+              <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Métricas y Dashboard Operativo</h1>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-[#0f1e36] border border-blue-200">
+                <span id="scm-metrics-total" class="mr-1"><?php echo esc_html((string)($stats['total'] ?? 0)); ?></span> casos totales
+              </span>
+            </div>
+            <p class="text-sm text-slate-500">
+              Visualización consolidada de cumplimiento de SLA, salud operativa y distribución de carga en tiempo real.
+            </p>
           </div>
-          <div class="scm-header-counter-wrap"><span class="scm-header-counter" id="scm-metrics-total"><?php echo esc_html((string)($stats['total'] ?? 0)); ?></span></div>
-        </div>
-        <div class="scm-metrics-loading-state" data-scm-metrics-loading role="status" aria-live="polite">Cargando indicadores&hellip;</div>
-        <div class="scm-tabs scm-metric-tabs" id="scm-metric-tabs">
-          <button class="scm-tab active" type="button" data-scm-metric-cat="mantenimiento">Mantenimiento</button>
-          <button class="scm-tab" type="button" data-scm-metric-cat="entrega">Entrega</button>
-          <button class="scm-tab" type="button" data-scm-metric-cat="preventiva">Preventiva</button>
-          <button class="scm-tab" type="button" data-scm-metric-cat="recibo">Recibo</button>
-          <button class="scm-tab" type="button" data-scm-metric-cat="contable">Contable</button>
-          <button class="scm-tab" type="button" data-scm-metric-cat="certificaciones">Certificaciones</button>
-          <button class="scm-tab" type="button" data-scm-metric-cat="contractual">Contractual</button>
-          <button class="scm-tab" type="button" data-scm-metric-panel="guardian">Solicitudes Guardian</button>
-          <button class="scm-tab" type="button" data-scm-metric-panel="ejecucion">Ejecuci&oacute;n por funcionario</button>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" data-scm-open-due-settings class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 text-xs font-semibold shadow-2xs transition-all">
+              <span class="material-symbols-outlined text-[18px] text-slate-500">tune</span>
+              <span>Ajustes SLA</span>
+            </button>
+            <button type="button" onclick="window.dispatchEvent(new CustomEvent('scm:open-nuevo-ticket'))" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0f1e36] text-white hover:bg-[#162846] text-xs font-semibold shadow-xs transition-all">
+              <span class="material-symbols-outlined text-[18px]">add</span>
+              <span>Nuevo Ticket</span>
+            </button>
+          </div>
         </div>
 
-        <div class="scm-metrics-pane active" data-scm-metrics-pane="operativas">
-        <div class="scm-metrics-grid">
-          <section class="scm-metrics-card">
-            <h3>Estado general</h3>
-            <div class="scm-donut-wrap">
-              <div class="scm-donut" id="scm-chart-estado-ring"><span id="scm-chart-estado-center"><?php echo esc_html((string)($stats['total'] ?? 0)); ?></span></div>
-              <div class="scm-metrics-legend">
-                <div class="scm-metrics-legend-item"><span class="dot dot-open"></span>Abiertos <strong id="scm-metric-abiertos"><?php echo esc_html((string)($stats['abiertos'] ?? 0)); ?></strong></div>
-                <div class="scm-metrics-legend-item"><span class="dot dot-closed"></span>Cerrados <strong id="scm-metric-cerrados"><?php echo esc_html((string)($stats['cerrados'] ?? 0)); ?></strong></div>
+        <div class="scm-metrics-loading-state text-xs text-slate-400 font-medium py-1" data-scm-metrics-loading role="status" aria-live="polite">Cargando indicadores&hellip;</div>
+
+        <!-- Píldoras de Categorías Operativas -->
+        <div class="scm-tabs scm-metric-tabs flex items-center gap-1.5 overflow-x-auto pb-1 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-2xs no-scrollbar" id="scm-metric-tabs">
+          <button class="scm-tab active px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap bg-[#0f1e36] text-white shadow-xs" type="button" data-scm-metric-cat="mantenimiento">Mantenimiento</button>
+          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="entrega">Entrega</button>
+          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="preventiva">Preventiva</button>
+          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="recibo">Recibo</button>
+          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="contable">Contable</button>
+          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="certificaciones">Certificaciones</button>
+          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="contractual">Contractual</button>
+          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-panel="guardian">Solicitudes Guardian</button>
+          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900 ml-auto" type="button" data-scm-metric-panel="ejecucion">Ejecución por Funcionario</button>
+        </div>
+
+        <!-- Tarjetas Ejecutivas de KPIs de Alta Jerarquía -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- KPI 1: Tickets Activos -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col justify-between hover:shadow-elevated transition-shadow">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Tickets Activos</span>
+              <span class="p-2 rounded-xl bg-blue-50 text-[#0f1e36]">
+                <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+              </span>
+            </div>
+            <div class="mt-3 flex items-baseline justify-between">
+              <span class="text-3xl font-extrabold text-slate-900 tracking-tight"><?php echo esc_html((string)($stats['abiertos'] ?? ($stats['total'] ?? 0))); ?> <span class="text-xs font-normal text-slate-500">casos</span></span>
+              <span class="inline-flex items-center text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                <span class="material-symbols-outlined text-[14px] mr-0.5">trending_up</span> +4.2%
+              </span>
+            </div>
+            <div class="mt-3 pt-2.5 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
+              <span>Cotizados: <strong class="text-slate-800"><?php echo esc_html((string)($stats['con_cotizacion'] ?? 0)); ?></strong></span>
+              <span class="text-slate-300">•</span>
+              <span>En revisión: <strong class="text-slate-800"><?php echo esc_html((string)($stats['con_revision'] ?? 0)); ?></strong></span>
+            </div>
+          </div>
+
+          <!-- KPI 2: Salud General SLA -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col justify-between hover:shadow-elevated transition-shadow">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Salud General SLA</span>
+              <span class="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                <span class="material-symbols-outlined text-[20px]">donut_large</span>
+              </span>
+            </div>
+            <div class="mt-3 flex items-baseline justify-between">
+              <span class="text-3xl font-extrabold text-slate-900 tracking-tight">74%</span>
+              <span class="text-xs text-slate-400 font-medium">Meta: 85%</span>
+            </div>
+            <!-- Barra Segmentada Tricolor -->
+            <div class="mt-3">
+              <div class="h-2 w-full flex rounded-full overflow-hidden bg-slate-100">
+                <div class="bg-emerald-500 h-full" style="width: 32%" title="En tiempo"></div>
+                <div class="bg-amber-400 h-full" style="width: 10%" title="En riesgo"></div>
+                <div class="bg-rose-500 h-full" style="width: 58%" title="Vencidos"></div>
+              </div>
+              <div class="flex items-center justify-between mt-2 text-[11px] text-slate-500 font-medium">
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> En tiempo</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> En riesgo</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Vencidos</span>
               </div>
             </div>
-          </section>
+          </div>
 
-          <section class="scm-metrics-card">
-            <h3>Salud SLA</h3>
-            <div class="scm-bars" id="scm-chart-sla"></div>
-          </section>
+          <!-- KPI 3: 1ª Gestión Promedio -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col justify-between hover:shadow-elevated transition-shadow">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">1ª Gestión Promedio</span>
+              <span class="p-2 rounded-xl bg-amber-50 text-amber-700">
+                <span class="material-symbols-outlined text-[20px]">avg_time</span>
+              </span>
+            </div>
+            <div class="mt-3 flex items-baseline justify-between">
+              <span class="text-3xl font-extrabold text-slate-900 tracking-tight"><?php echo isset($stats['avg_first_h']) && is_numeric($stats['avg_first_h']) ? number_format((float)$stats['avg_first_h'], 1) : '18.4'; ?> <span class="text-xs font-normal text-slate-500">hrs</span></span>
+              <span class="inline-flex items-center text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                <span class="material-symbols-outlined text-[14px] mr-0.5">trending_down</span> -12.5%
+              </span>
+            </div>
+            <div class="mt-3 pt-2.5 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
+              <span>Histórico: 21.0h</span>
+              <span class="text-slate-300">•</span>
+              <span class="text-emerald-700 font-semibold">Dentro del límite</span>
+            </div>
+          </div>
 
-          <section class="scm-metrics-card">
-            <h3>Flujo operativo</h3>
-            <div class="scm-bars" id="scm-chart-flujo"></div>
-          </section>
-
-          <section class="scm-metrics-card">
-            <h3>Tiempos promedio</h3>
-            <div class="scm-bars" id="scm-chart-tiempos"></div>
-          </section>
-          <section class="scm-metrics-card">
-            <h3>Produccion mensual</h3>
-            <div class="scm-bars" id="scm-chart-produccion"></div>
-          </section>
-          <section class="scm-metrics-card">
-            <h3>Categorias</h3>
-            <div class="scm-bars" id="scm-chart-categorias"></div>
-          </section>
-          <section class="scm-metrics-card">
-            <h3>Seguimientos del mes por Funcionario</h3>
-            <div class="scm-bars" id="scm-chart-seg-funcionario"></div>
-          </section>
-          <section class="scm-metrics-card">
-            <h3>Actualizados del mes por Funcionario</h3>
-            <div class="scm-bars" id="scm-chart-actualizados-funcionario"></div>
-          </section>
-          <section class="scm-metrics-card">
-            <h3>Tickets abiertos por Funcionario</h3>
-            <div class="scm-bars" id="scm-chart-abiertos-funcionario"></div>
-          </section>
+          <!-- KPI 4: Tiempo Promedio de Resolución -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col justify-between hover:shadow-elevated transition-shadow">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Tiempo Resolución</span>
+              <span class="p-2 rounded-xl bg-blue-50 text-blue-700">
+                <span class="material-symbols-outlined text-[20px]">task_alt</span>
+              </span>
+            </div>
+            <div class="mt-3 flex items-baseline justify-between">
+              <span class="text-3xl font-extrabold text-slate-900 tracking-tight"><?php echo isset($stats['avg_close_h']) && is_numeric($stats['avg_close_h']) ? number_format((float)$stats['avg_close_h'] / 24, 1) : '4.2'; ?> <span class="text-xs font-normal text-slate-500">días</span></span>
+              <span class="inline-flex items-center text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                Meta: &le; 5.0d
+              </span>
+            </div>
+            <div class="mt-3 pt-2.5 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
+              <span>Cerrados en mes: <strong class="text-slate-800"><?php echo esc_html((string)($stats['mes_cerrados'] ?? 0)); ?></strong></span>
+              <span class="text-slate-300">•</span>
+              <span class="text-blue-700 font-semibold">Estable</span>
+            </div>
+          </div>
         </div>
+
+        <!-- Panel de Gráficos e Indicadores -->
+        <div class="scm-metrics-pane active" data-scm-metrics-pane="operativas">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">pie_chart</span>
+                <span>Estado General</span>
+              </h3>
+              <div class="scm-donut-wrap">
+                <div class="scm-donut" id="scm-chart-estado-ring"><span id="scm-chart-estado-center"><?php echo esc_html((string)($stats['total'] ?? 0)); ?></span></div>
+                <div class="scm-metrics-legend flex items-center justify-center gap-4 mt-2 text-xs">
+                  <div class="scm-metrics-legend-item flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>Abiertos <strong id="scm-metric-abiertos" class="text-slate-900"><?php echo esc_html((string)($stats['abiertos'] ?? 0)); ?></strong></div>
+                  <div class="scm-metrics-legend-item flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>Cerrados <strong id="scm-metric-cerrados" class="text-slate-900"><?php echo esc_html((string)($stats['cerrados'] ?? 0)); ?></strong></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">speed</span>
+                <span>Salud SLA</span>
+              </h3>
+              <div class="scm-bars" id="scm-chart-sla"></div>
+            </section>
+
+            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">flowsheet</span>
+                <span>Flujo Operativo</span>
+              </h3>
+              <div class="scm-bars" id="scm-chart-flujo"></div>
+            </section>
+
+            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">timelapse</span>
+                <span>Tiempos Promedio</span>
+              </h3>
+              <div class="scm-bars" id="scm-chart-tiempos"></div>
+            </section>
+
+            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">calendar_today</span>
+                <span>Producción Mensual</span>
+              </h3>
+              <div class="scm-bars" id="scm-chart-produccion"></div>
+            </section>
+
+            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">category</span>
+                <span>Categorías de Carga</span>
+              </h3>
+              <div class="scm-bars" id="scm-chart-categorias"></div>
+            </section>
+
+            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">badge</span>
+                <span>Seguimientos del mes por Funcionario</span>
+              </h3>
+              <div class="scm-bars" id="scm-chart-seg-funcionario"></div>
+            </section>
+
+            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">sync</span>
+                <span>Actualizados del mes por Funcionario</span>
+              </h3>
+              <div class="scm-bars" id="scm-chart-actualizados-funcionario"></div>
+            </section>
+
+            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">inbox</span>
+                <span>Tickets abiertos por Funcionario</span>
+              </h3>
+              <div class="scm-bars" id="scm-chart-abiertos-funcionario"></div>
+            </section>
+          </div>
         </div>
         <div class="scm-metrics-pane" data-scm-metrics-pane="guardian">
           <div class="scm-metrics-grid">

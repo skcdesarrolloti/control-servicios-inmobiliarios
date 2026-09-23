@@ -249,63 +249,110 @@ final class PendingView
     $firstKey = (string) (array_key_first($bucketDefs) ?? 'por_entregar');
     ob_start();
 ?>
-    <div class="scm-pending-wrap scm-contracts-wrap" data-scm-contracts>
-      <div class="scm-pending-header scm-pending-header--brand">
-        <div>
-          <h2>Contratos de Arrendamiento</h2>
-          <p>Consulta contratos por estado y crea tickets administrativos sin salir del panel.</p>
+    <div class="scm-pending-wrap scm-contracts-wrap flex flex-col gap-5 w-full" data-scm-contracts>
+      <!-- Encabezado con título, contador registrado y acciones operativas -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center gap-3">
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Contratos de Arrendamiento</h1>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-[#0f1e36] border border-blue-200">
+              <span id="sca-kpi-count" class="mr-1">0</span> registrados
+            </span>
+          </div>
+          <p class="text-sm text-slate-500">
+            Gestiona, filtra y supervisa los contratos de arrendamiento activos y genera requerimientos administrativos.
+          </p>
         </div>
-        <div>
-          <div class="scm-pending-count" id="sca-kpi-count">0</div>
-          <div class="scm-pending-count-label">contratos filtrados</div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button type="button" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 text-xs font-semibold shadow-2xs transition-all">
+            <span class="material-symbols-outlined text-[18px] text-slate-500">upload_file</span>
+            <span>Importar CSV</span>
+          </button>
+          <button type="button" data-scm-open-due-settings class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 text-xs font-semibold shadow-2xs transition-all">
+            <span class="material-symbols-outlined text-[18px] text-slate-500">tune</span>
+            <span>Configurar Vencimientos</span>
+          </button>
+          <button type="button" onclick="window.dispatchEvent(new CustomEvent('scm:open-nuevo-ticket'))" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0f1e36] text-white hover:bg-[#162846] text-xs font-semibold shadow-xs transition-all">
+            <span class="material-symbols-outlined text-[18px]">add</span>
+            <span>Nuevo Contrato</span>
+          </button>
         </div>
       </div>
 
-      <div class="scm-status-subtabs scm-contract-subtabs" role="tablist" aria-label="Contratos de arrendamiento">
+      <!-- Filtros rápidos por estado con contadores en burbuja -->
+      <div class="scm-status-subtabs scm-contract-subtabs flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar" role="tablist" aria-label="Contratos de arrendamiento">
         <?php foreach ($bucketDefs as $key => $def): ?>
-          <button class="scm-status-topic-tab scm-contract-tab<?php echo $key === $firstKey ? ' active' : ''; ?>" type="button" data-contract-bucket="<?php echo esc_attr((string) $key); ?>">
-            <?php echo esc_html((string) ($def['label'] ?? $key)); ?>
+          <?php $isActive = ($key === $firstKey); ?>
+          <button
+            class="scm-status-topic-tab scm-contract-tab inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap <?php echo $isActive ? 'active bg-[#0f1e36] text-white shadow-xs' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'; ?>"
+            type="button"
+            data-contract-bucket="<?php echo esc_attr((string) $key); ?>"
+          >
+            <span><?php echo esc_html((string) ($def['label'] ?? $key)); ?></span>
           </button>
         <?php endforeach; ?>
       </div>
 
+      <!-- Paneles por estado -->
       <?php foreach ($bucketDefs as $key => $def): $active = $key === $firstKey; ?>
-        <div class="scm-contract-panel<?php echo $active ? ' active' : ''; ?>" data-contract-panel="<?php echo esc_attr((string) $key); ?>" data-scm-loaded="0">
-          <div class="scm-filter-card">
-            <h3>Filtros - <?php echo esc_html((string) ($def['label'] ?? $key)); ?></h3>
-            <form method="post" autocomplete="off" class="sca_form">
-              <input type="hidden" name="sca_page" value="1">
-              <div class="scm-grid" style="grid-template-columns:repeat(6,minmax(0,1fr));">
-                <div class="scm-field"><label>Contrato</label><input name="sca_contrato" type="text" placeholder="Codigo"></div>
-                <div class="scm-field"><label>Inmueble</label><input name="sca_inmueble" type="text" placeholder="# inmueble"></div>
-                <div class="scm-field"><label>Direccion</label><input name="sca_direccion" type="text" placeholder="Direccion"></div>
-                <div class="scm-field"><label>Propietario</label><input name="sca_propietario" type="text" placeholder="Nombre"></div>
-                <div class="scm-field"><label>Arrendatario</label><input name="sca_arrendatario" type="text" placeholder="Nombre"></div>
-                <div class="scm-field"><label>Por pagina</label><select name="sca_per_page"><option value="30">30</option><option value="60">60</option><option value="100">100</option></select></div>
-              </div>
-              <div class="scm-actions">
-                <button class="scm-btn-primary-cyan" type="submit">Filtrar</button>
-                <button class="scm-btn-secondary" type="button" data-contract-clear>Limpiar</button>
-                <span class="scm-spinner"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
-              </div>
-            </form>
+        <div class="scm-contract-panel bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-4 <?php echo $active ? ' active' : ''; ?>" data-contract-panel="<?php echo esc_attr((string) $key); ?>" data-scm-loaded="0" <?php echo !$active ? 'style="display:none;"' : ''; ?>>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+            <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px] text-slate-400">tune</span>
+              <span>Filtros — <?php echo esc_html((string) ($def['label'] ?? $key)); ?></span>
+            </h3>
+            <span class="text-xs text-slate-500 font-medium">Contratos filtrados: <strong class="text-slate-800" data-contract-count>0</strong></span>
           </div>
 
-          <div class="scm-kpis">
-            <div class="scm-kpi">
-              <div class="scm-kpi-label">Vista</div>
-              <div class="scm-kpi-value" style="font-size:18px;"><?php echo esc_html((string) ($def['label'] ?? $key)); ?></div>
+          <form method="post" autocomplete="off" class="sca_form flex flex-col gap-3">
+            <input type="hidden" name="sca_page" value="1">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div class="relative flex items-center">
+                <span class="material-symbols-outlined absolute left-3 text-slate-400 text-[18px] pointer-events-none">search</span>
+                <input name="sca_contrato" type="text" placeholder="Código contrato" class="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f1e36]/10 focus:border-slate-400 transition-all">
+              </div>
+              <div class="relative flex items-center">
+                <span class="material-symbols-outlined absolute left-3 text-slate-400 text-[18px] pointer-events-none">apartment</span>
+                <input name="sca_inmueble" type="text" placeholder="# Inmueble" class="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f1e36]/10 focus:border-slate-400 transition-all">
+              </div>
+              <div class="relative flex items-center">
+                <span class="material-symbols-outlined absolute left-3 text-slate-400 text-[18px] pointer-events-none">location_on</span>
+                <input name="sca_direccion" type="text" placeholder="Dirección" class="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f1e36]/10 focus:border-slate-400 transition-all">
+              </div>
+              <div class="relative flex items-center">
+                <span class="material-symbols-outlined absolute left-3 text-slate-400 text-[18px] pointer-events-none">person</span>
+                <input name="sca_propietario" type="text" placeholder="Propietario" class="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f1e36]/10 focus:border-slate-400 transition-all">
+              </div>
+              <div class="relative flex items-center">
+                <span class="material-symbols-outlined absolute left-3 text-slate-400 text-[18px] pointer-events-none">badge</span>
+                <input name="sca_arrendatario" type="text" placeholder="Arrendatario" class="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f1e36]/10 focus:border-slate-400 transition-all">
+              </div>
+              <div>
+                <select name="sca_per_page" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f1e36]/10 focus:border-slate-400 transition-all">
+                  <option value="30">Mostrar: 30 filas</option>
+                  <option value="60">Mostrar: 60 filas</option>
+                  <option value="100">Mostrar: 100 filas</option>
+                </select>
+              </div>
             </div>
-            <div class="scm-kpi">
-              <div class="scm-kpi-label">Contratos filtrados</div>
-              <div class="scm-kpi-value" data-contract-count>0</div>
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button class="scm-btn-secondary px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 transition-all" type="button" data-contract-clear>
+                Limpiar
+              </button>
+              <button class="scm-btn-primary px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#0f1e36] hover:bg-[#162846] shadow-xs transition-all flex items-center gap-1.5" type="submit">
+                <span class="material-symbols-outlined text-[16px]">filter_alt</span>
+                <span>Filtrar</span>
+              </button>
+              <span class="scm-spinner"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
             </div>
-          </div>
+          </form>
 
-          <div data-contract-table>
-            <div class="scm-table-wrap"><p style="padding:32px;text-align:center;color:var(--scm-text-muted);">Selecciona esta vista para cargar contratos.</p></div>
+          <div data-contract-table class="w-full overflow-x-auto rounded-xl border border-slate-200">
+            <div class="scm-table-wrap p-8 text-center text-slate-400 text-sm">
+              Selecciona esta vista para cargar contratos.
+            </div>
           </div>
-          <div class="scm-pagination" data-contract-pagination></div>
+          <div class="scm-pagination flex items-center justify-between pt-2" data-contract-pagination></div>
         </div>
       <?php endforeach; ?>
     </div>
@@ -501,14 +548,22 @@ final class PendingView
   public function renderContratosArrendamientoTable(array $items): string
   {
     if (empty($items)) {
-      return '<div class="scm-table-wrap"><p style="padding:32px;text-align:center;color:var(--scm-text-muted);">No hay contratos con los filtros actuales.</p></div>';
+      return '<div class="p-8 text-center text-slate-400 text-sm font-medium">No hay contratos con los filtros actuales.</div>';
     }
 
-    $html = '<div class="scm-table-wrap">'
-      . '<table class="scm-table scm-table-prev scm-contracts-table">'
-      . '<thead><tr>'
-      . '<th>Contrato</th><th>Estado</th><th>Inmueble</th><th>Direccion</th><th>Propietario</th><th>Arrendatario</th><th>Inicio</th><th>Fin</th><th>Acciones</th>'
-      . '</tr></thead><tbody>';
+    $html = '<div class="overflow-x-auto w-full">'
+      . '<table class="w-full text-left border-collapse text-xs">'
+      . '<thead><tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">'
+      . '<th class="py-3 px-4">Contrato</th>'
+      . '<th class="py-3 px-4">Estado</th>'
+      . '<th class="py-3 px-4">Inmueble</th>'
+      . '<th class="py-3 px-4">Dirección</th>'
+      . '<th class="py-3 px-4">Propietario</th>'
+      . '<th class="py-3 px-4">Arrendatario</th>'
+      . '<th class="py-3 px-4">Inicio</th>'
+      . '<th class="py-3 px-4">Fin</th>'
+      . '<th class="py-3 px-4 text-right">Acciones</th>'
+      . '</tr></thead><tbody class="divide-y divide-slate-100 bg-white">';
 
     foreach ($items as $row) {
       $row = (array) $row;
@@ -516,27 +571,43 @@ final class PendingView
       $estadoNorm = strtolower(trim($estado));
       $contractPk = trim((string) ($row['_ID'] ?? ''));
       $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
-      $html .= '<tr>';
-      $html .= '<td><span class="scm-ticket-badge">' . esc_html((string) ($row['contrato'] ?? $row['_ID'] ?? '-')) . '</span></td>';
-      $html .= '<td>' . esc_html($estado !== '' ? $estado : '-') . '</td>';
-      $html .= '<td><span class="scm-inmueble-badge">' . esc_html((string) ($row['inmueble'] ?? '-')) . '</span></td>';
-      $html .= '<td style="max-width:220px;">' . esc_html((string) ($row['direccion'] ?? '-')) . '</td>';
-      $html .= '<td>' . esc_html((string) ($row['propietario'] ?? '-')) . '</td>';
-      $html .= '<td>' . esc_html((string) ($row['arrendatario'] ?? '-')) . '</td>';
-      $html .= '<td class="scm-date-cell">' . esc_html($this->fmt($this->ts($row['inicio_contrato'] ?? null))) . '</td>';
-      $html .= '<td class="scm-date-cell">' . esc_html($this->fmt($this->ts($row['fin_contrato'] ?? null))) . '</td>';
-      $html .= '<td class="scm-pending-action-cell">';
+
+      // Badge semántico de estado
+      $badgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+      if ($estadoNorm === 'entregado' || $estadoNorm === 'al dia' || $estadoNorm === 'vigente') {
+        $badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      } elseif (str_contains($estadoNorm, 'entregar') || str_contains($estadoNorm, 'recibir') || str_contains($estadoNorm, 'proceso')) {
+        $badgeClass = 'bg-amber-50 text-amber-800 border-amber-200';
+      } elseif (str_contains($estadoNorm, 'desistido') || str_contains($estadoNorm, 'vencido') || str_contains($estadoNorm, 'cancelado')) {
+        $badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
+      }
+
+      $html .= '<tr class="hover:bg-slate-50/80 transition-colors">';
+      $html .= '<td class="py-3 px-4 font-semibold text-slate-900"><span class="px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 font-mono text-[11px]">' . esc_html((string) ($row['contrato'] ?? $row['_ID'] ?? '-')) . '</span></td>';
+      $html .= '<td class="py-3 px-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ' . $badgeClass . '">' . esc_html($estado !== '' ? $estado : '-') . '</span></td>';
+      $html .= '<td class="py-3 px-4 font-medium text-slate-700">' . esc_html((string) ($row['inmueble'] ?? '-')) . '</td>';
+      $html .= '<td class="py-3 px-4 text-slate-600 max-w-[200px] truncate" title="' . esc_attr((string) ($row['direccion'] ?? '')) . '">' . esc_html((string) ($row['direccion'] ?? '-')) . '</td>';
+      $html .= '<td class="py-3 px-4 text-slate-700">' . esc_html((string) ($row['propietario'] ?? '-')) . '</td>';
+      $html .= '<td class="py-3 px-4 text-slate-700 font-medium">' . esc_html((string) ($row['arrendatario'] ?? '-')) . '</td>';
+      $html .= '<td class="py-3 px-4 text-slate-500 whitespace-nowrap">' . esc_html($this->fmt($this->ts($row['inicio_contrato'] ?? null))) . '</td>';
+      $html .= '<td class="py-3 px-4 text-slate-500 whitespace-nowrap">' . esc_html($this->fmt($this->ts($row['fin_contrato'] ?? null))) . '</td>';
+      $html .= '<td class="py-3 px-4 text-right whitespace-nowrap">';
+      $html .= '<div class="inline-flex items-center gap-1.5 justify-end">';
+
       if ($contractPk !== '' && $estadoNorm !== 'recibido') {
-        $html .= '<button type="button" class="scm-pending-action-btn scm-contract-received-btn"'
+        $html .= '<button type="button" class="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-xs transition-colors flex items-center gap-1"'
           . ' data-scm-mark-contract-received data-contract-context="contratos"'
           . ' data-contract-id="' . esc_attr($contractPk) . '"'
           . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
-          . 'Contrato recibido</button>';
+          . '<span class="material-symbols-outlined text-[14px]">done_all</span><span>Recibido</span></button>';
       }
-      $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;"'
+
+      $html .= '<button type="button" class="px-3 py-1 rounded-lg bg-[#0f1e36] text-white hover:bg-[#162846] font-medium text-xs shadow-2xs transition-all flex items-center gap-1"'
         . ' data-scm-open-admin-ticket data-ticket-mode="administrativo" data-ticket-title="Crear ticket administrativo"'
         . $this->contractTicketAttrs($row)
-        . '>Crear ticket</button>';
+        . '><span class="material-symbols-outlined text-[14px]">add</span><span>Crear ticket</span></button>';
+
+      $html .= '</div>';
       $html .= '</td>';
       $html .= '</tr>';
     }
@@ -551,14 +622,15 @@ final class PendingView
     $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
     $total = max(0, (int) ($pagination['total'] ?? 0));
     if ($totalPages <= 1) {
-      return $total > 0 ? '<span class="scm-page-info">Mostrando ' . esc_html((string) $total) . ' contratos</span>' : '';
+      return $total > 0 ? '<span class="text-xs text-slate-500 font-medium">Mostrando ' . esc_html((string) $total) . ' contratos</span>' : '';
     }
 
-    $html = '<div class="scm-page-controls">';
-    $html .= '<button type="button" class="scm-page-btn-contracts" data-page="' . esc_attr((string) max(1, $page - 1)) . '"' . ($page <= 1 ? ' disabled' : '') . '>Anterior</button>';
-    $html .= '<span class="scm-page-info">Pagina ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' | ' . esc_html((string) $total) . ' contratos</span>';
-    $html .= '<button type="button" class="scm-page-btn-contracts" data-page="' . esc_attr((string) min($totalPages, $page + 1)) . '"' . ($page >= $totalPages ? ' disabled' : '') . '>Siguiente</button>';
-    return $html . '</div>';
+    $html = '<div class="flex items-center justify-between w-full pt-3">';
+    $html .= '<button type="button" class="scm-page-btn-contracts px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs transition-all" data-page="' . esc_attr((string) max(1, $page - 1)) . '"' . ($page <= 1 ? ' disabled' : '') . '>← Anterior</button>';
+    $html .= '<span class="text-xs text-slate-500 font-medium">Página <strong class="text-slate-800">' . esc_html((string) $page) . '</strong> de <strong class="text-slate-800">' . esc_html((string) $totalPages) . '</strong> <span class="text-slate-300 mx-1">|</span> ' . esc_html((string) $total) . ' contratos</span>';
+    $html .= '<button type="button" class="scm-page-btn-contracts px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs transition-all" data-page="' . esc_attr((string) min($totalPages, $page + 1)) . '"' . ($page >= $totalPages ? ' disabled' : '') . '>Siguiente →</button>';
+    $html .= '</div>';
+    return $html;
   }
 
   public function renderServiciosPublicosTable(array $items, array $configurationItems = []): string

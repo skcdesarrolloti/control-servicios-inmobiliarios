@@ -370,7 +370,12 @@ final class GenericTicketsCardView
 
     $caseSource  = '';
     if ($descripcionRaw !== '') {
-      $caseSource .= '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">' . $descripcionRaw . '</div></div>';
+      $caseSource .= '<div class="scm-case-description bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs mb-4">'
+        . '<div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">'
+        . '<strong class="text-sm font-semibold text-slate-900 flex items-center gap-1.5"><span class="material-symbols-outlined text-slate-400 text-[18px]">subject</span><span>Descripción del Requerimiento</span></strong>'
+        . '</div>'
+        . '<div class="scm-case-description-content p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-800 text-sm leading-relaxed font-normal">' . $descripcionRaw . '</div>'
+        . '</div>';
     }
     $caseSource .= $ticketDocumentsHtml;
     if ($isPreventivaTicket) {
@@ -726,14 +731,21 @@ final class GenericTicketsCardView
       return '';
     }
 
-    $html = '<section class="scm-case-history scm-case-documents-section" id="' . esc_attr($sectionId) . '">';
-    $html .= '<h4>Adjuntos del caso</h4>';
+    $html = '<section class="scm-case-history scm-case-documents-section bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs mb-4" id="' . esc_attr($sectionId) . '">';
+    $html .= '<h4 class="text-sm font-semibold text-slate-900 mb-3 flex items-center justify-between">'
+      . '<span class="flex items-center gap-2"><span class="material-symbols-outlined text-slate-400 text-[18px]">photo_library</span><span>Evidencias Fotográficas Adjuntas (' . count($images) . ' fotos)</span></span>'
+      . '<span class="text-xs text-slate-400 font-normal">Clic para ampliar</span>'
+      . '</h4>';
     if (!empty($images)) {
-      $html .= '<div class="scm-case-history-img">';
-      foreach ($images as $url) {
-        $html .= '<button type="button" class="scm-case-attachment-image-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="Imagen del caso" style="background:none;border:0;padding:0;margin:0;cursor:zoom-in;">'
-          . '<img src="' . esc_url($url) . '" alt="Imagen del caso" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:4px;margin-top:6px;">'
-          . '</button>';
+      $html .= '<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">';
+      foreach ($images as $idx => $url) {
+        $html .= '<div class="group relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200 aspect-video cursor-pointer shadow-2xs">'
+          . '<img src="' . esc_url($url) . '" alt="Evidencia ' . ($idx + 1) . '" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy">'
+          . '<button type="button" class="scm-case-attachment-image-btn absolute inset-0 bg-[#0f1e36]/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="Evidencia #' . ($idx + 1) . '">'
+          . '<span class="material-symbols-outlined text-[24px]">zoom_in</span>'
+          . '</button>'
+          . '<span class="absolute bottom-1.5 left-2 bg-[#0f1e36]/80 backdrop-blur-xs text-white px-2 py-0.5 rounded text-[10px] font-semibold">Evidencia #' . ($idx + 1) . '</span>'
+          . '</div>';
       }
       $html .= '</div>';
     }
