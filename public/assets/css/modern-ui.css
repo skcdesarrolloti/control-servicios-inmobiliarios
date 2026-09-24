@@ -3472,10 +3472,13 @@ body,
 }
 
 #scm-app .scm-case-submodal--transfer .scm-case-submodal-dialog {
-  width: min(760px, calc(100% - 1rem)) !important;
+  width: min(42rem, calc(100% - 1.5rem)) !important;
+  max-height: min(92vh, 820px) !important;
   border-radius: 1rem !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 28px 80px rgba(15, 30, 54, 0.22) !important;
+  border: 1px solid rgba(226, 232, 240, 0.95) !important;
+  background: #ffffff !important;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28) !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-case-submodal-dialog::before {
@@ -3484,23 +3487,27 @@ body,
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  height: 4px !important;
-  background: #f59e0b !important;
-  z-index: 1 !important;
+  height: 6px !important;
+  background: linear-gradient(90deg, #2563eb 0%, #f59e0b 58%, #ea580c 100%) !important;
+  z-index: 2 !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-case-submodal-head {
-  padding: 1.25rem 3.25rem 1rem 1.35rem !important;
+  padding: 1.25rem 3.25rem 1rem 1.5rem !important;
   background: #ffffff !important;
-  border-bottom: 1px solid #edf2f7 !important;
+  border-bottom: 1px solid #f1f5f9 !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-case-submodal-title {
   display: flex !important;
   align-items: center !important;
-  gap: 0.65rem !important;
-  font-size: 0.98rem !important;
+  gap: 0.75rem !important;
+  margin: 0 !important;
+  color: #0f172a !important;
+  font-size: 1rem !important;
+  line-height: 1.25 !important;
   font-weight: 800 !important;
+  letter-spacing: 0 !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-case-submodal-title::before {
@@ -3508,34 +3515,42 @@ body,
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 2rem !important;
-  height: 2rem !important;
-  border-radius: 0.75rem !important;
+  flex: 0 0 auto !important;
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  border-radius: 0.8rem !important;
+  border: 1px solid #dbeafe !important;
   background: #eff6ff !important;
-  color: #1d4ed8 !important;
+  color: #2563eb !important;
   font-family: 'Material Symbols Outlined' !important;
-  font-size: 1.15rem !important;
+  font-size: 1.1rem !important;
   font-weight: normal !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-case-submodal-meta {
-  margin-left: 2.65rem !important;
+  margin: 0.35rem 0 0 3rem !important;
   color: #64748b !important;
-  font-size: 0.72rem !important;
+  font-size: 0.78rem !important;
+  line-height: 1.25 !important;
+  font-weight: 500 !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-case-submodal-close {
-  top: 1.05rem !important;
-  right: 1.05rem !important;
+  top: 1rem !important;
+  right: 1rem !important;
+  width: 2rem !important;
+  height: 2rem !important;
   border: 0 !important;
+  border-radius: 0.75rem !important;
   background: transparent !important;
   color: #94a3b8 !important;
   font-size: 1.25rem !important;
+  line-height: 1 !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-case-submodal-close:hover {
-  color: #0f1e36 !important;
   background: #f1f5f9 !important;
+  color: #0f172a !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-case-submodal-body {
@@ -3551,48 +3566,57 @@ body,
 #scm-app .scm-transfer-meta-row {
   display: flex !important;
   flex-wrap: wrap !important;
-  gap: 0.45rem !important;
+  gap: 0.5rem !important;
+  padding-bottom: 0.1rem !important;
 }
 
 #scm-app .scm-transfer-meta-row span {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 0.35rem !important;
-  min-height: 1.45rem !important;
-  padding: 0.22rem 0.55rem !important;
+  gap: 0.4rem !important;
+  min-height: 2rem !important;
+  padding: 0.35rem 0.75rem !important;
   border: 1px solid #dbeafe !important;
-  border-radius: 999px !important;
+  border-radius: 9999px !important;
   background: #eff6ff !important;
   color: #1d4ed8 !important;
-  font-size: 0.68rem !important;
-  font-weight: 700 !important;
+  font-size: 0.76rem !important;
+  font-weight: 800 !important;
+  line-height: 1.1 !important;
 }
 
 #scm-app .scm-transfer-meta-row .material-symbols-outlined {
-  font-size: 0.85rem !important;
+  font-size: 0.95rem !important;
+}
+
+#scm-app .scm-transfer-meta-row b,
+#scm-app .scm-transfer-meta-row strong {
+  color: #1e3a8a !important;
+  font-weight: 800 !important;
 }
 
 #scm-app .scm-transfer-warning {
   display: flex !important;
   align-items: flex-start !important;
-  gap: 0.65rem !important;
-  padding: 0.85rem 0.95rem !important;
+  gap: 0.7rem !important;
+  padding: 0.9rem 1rem !important;
   border: 1px solid #fde68a !important;
-  border-radius: 0.85rem !important;
+  border-radius: 0.8rem !important;
   background: #fffbeb !important;
-  color: #92400e !important;
+  color: #b45309 !important;
 }
 
 #scm-app .scm-transfer-warning .material-symbols-outlined {
   font-size: 1rem !important;
-  margin-top: 0.05rem !important;
+  margin-top: 0.08rem !important;
+  color: #d97706 !important;
 }
 
 #scm-app .scm-transfer-warning p {
   margin: 0 !important;
-  color: #92400e !important;
+  color: #9a3412 !important;
   font-size: 0.78rem !important;
-  line-height: 1.45 !important;
+  line-height: 1.55 !important;
 }
 
 #scm-app .scm-transfer-current {
@@ -3600,21 +3624,36 @@ body,
   align-items: center !important;
   justify-content: space-between !important;
   gap: 0.75rem !important;
-  padding: 0.55rem 0.75rem !important;
+  min-height: 2.25rem !important;
+  padding: 0.55rem 0.85rem !important;
   border: 1px solid #edf2f7 !important;
-  border-radius: 0.65rem !important;
+  border-radius: 0.6rem !important;
   background: #f8fafc !important;
   color: #64748b !important;
-  font-size: 0.72rem !important;
+  font-size: 0.74rem !important;
+  line-height: 1.25 !important;
 }
 
 #scm-app .scm-transfer-current strong {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0.4rem !important;
   color: #0f1e36 !important;
   font-size: 0.76rem !important;
+  line-height: 1.25 !important;
   text-align: right !important;
 }
 
+#scm-app .scm-transfer-current strong i {
+  width: 0.4rem !important;
+  height: 0.4rem !important;
+  border-radius: 9999px !important;
+  background: #94a3b8 !important;
+}
+
 #scm-app .scm-transfer-field {
+  display: grid !important;
   gap: 0.45rem !important;
 }
 
@@ -3623,12 +3662,28 @@ body,
   font-size: 0.72rem !important;
   font-weight: 800 !important;
   text-transform: uppercase !important;
+  letter-spacing: 0 !important;
 }
 
 #scm-app .scm-transfer-field em {
   color: #f59e0b !important;
   font-style: normal !important;
   text-transform: none !important;
+}
+
+#scm-app .scm-transfer-select-wrap {
+  position: relative !important;
+}
+
+#scm-app .scm-transfer-select-wrap > .material-symbols-outlined {
+  position: absolute !important;
+  top: 50% !important;
+  left: 0.85rem !important;
+  transform: translateY(-50%) !important;
+  color: #94a3b8 !important;
+  font-size: 1.05rem !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
 }
 
 #scm-app .scm-transfer-field select,
@@ -3639,90 +3694,213 @@ body,
   background: #ffffff !important;
   color: #0f1e36 !important;
   font-size: 0.84rem !important;
-  padding: 0.65rem 0.8rem !important;
+  font-weight: 500 !important;
+  padding: 0.7rem 0.85rem !important;
   box-shadow: 0 1px 2px rgba(15, 30, 54, 0.04) !important;
+}
+
+#scm-app .scm-transfer-select-wrap select {
+  min-height: 2.8rem !important;
+  padding-left: 2.55rem !important;
+}
+
+#scm-app .scm-transfer-field textarea {
+  min-height: 5.2rem !important;
+  resize: vertical !important;
 }
 
 #scm-app .scm-transfer-field select:focus,
 #scm-app .scm-transfer-field textarea:focus {
   outline: none !important;
   border-color: #2563eb !important;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16) !important;
 }
 
 #scm-app .scm-transfer-field small {
   color: #64748b !important;
   font-size: 0.68rem !important;
+  line-height: 1.35 !important;
+}
+
+#scm-app .scm-transfer-field small::before {
+  content: '' !important;
+  display: inline-block !important;
+  width: 0.35rem !important;
+  height: 0.35rem !important;
+  margin-right: 0.25rem !important;
+  border-radius: 9999px !important;
+  background: #10b981 !important;
+  vertical-align: middle !important;
 }
 
 #scm-app .scm-transfer-responsible-alert {
+  margin: 0.15rem 0 0 !important;
+  padding: 0.95rem 1rem !important;
+  border: 1px solid #86efac !important;
+  border-radius: 0.8rem !important;
   background: #ecfdf5 !important;
-  border-color: #bbf7d0 !important;
-  border-radius: 0.85rem !important;
 }
 
 #scm-app .scm-transfer-responsible-alert legend {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 0 0.4rem !important;
   color: #047857 !important;
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
 }
 
 #scm-app .scm-transfer-responsible-alert .scm-seg-check {
   align-items: flex-start !important;
+  display: flex !important;
+  gap: 0.55rem !important;
+  margin: 0 !important;
   color: #047857 !important;
-  font-weight: 700 !important;
+  font-size: 0.82rem !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+  cursor: pointer !important;
+}
+
+#scm-app .scm-case-submodal--transfer input[type='checkbox'] {
+  width: 0.95rem !important;
+  height: 0.95rem !important;
+  margin: 0 !important;
+  accent-color: #f59e0b !important;
+  flex: 0 0 auto !important;
+}
+
+#scm-app .scm-transfer-responsible-alert input[type='checkbox'] {
+  margin-top: 0.15rem !important;
+  accent-color: #10b981 !important;
 }
 
 #scm-app .scm-transfer-responsible-alert small {
   display: block !important;
-  margin-top: 0.1rem !important;
+  margin-top: 0.2rem !important;
   color: #059669 !important;
   font-size: 0.68rem !important;
-  font-weight: 500 !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
 }
 
-#scm-app .scm-case-submodal--transfer .scm-notify-targets:not(.scm-transfer-responsible-alert) {
-  border-color: #e2e8f0 !important;
-  border-radius: 0.85rem !important;
+#scm-app .scm-case-submodal--transfer .scm-transfer-email-targets {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto !important;
+  gap: 0.65rem !important;
+  margin: 0 !important;
+  padding: 2.35rem 0.75rem 0.75rem !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.8rem !important;
   background: #f8fafc !important;
 }
 
-#scm-app .scm-case-submodal--transfer .scm-notify-targets:not(.scm-transfer-responsible-alert) legend {
+#scm-app .scm-case-submodal--transfer .scm-transfer-email-targets legend {
+  position: absolute !important;
+  top: 0.78rem !important;
+  left: 0.9rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  padding: 0 !important;
   color: #64748b !important;
   font-size: 0.72rem !important;
+  font-weight: 800 !important;
   text-transform: uppercase !important;
+  letter-spacing: 0 !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-transfer-email-targets legend::before {
+  content: 'mail' !important;
+  font-family: 'Material Symbols Outlined' !important;
+  color: #64748b !important;
+  font-size: 0.9rem !important;
+  font-weight: normal !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-transfer-email-targets .scm-seg-check {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  min-height: 2.25rem !important;
+  margin: 0 !important;
+  padding: 0.45rem 0.6rem !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.5rem !important;
+  background: #ffffff !important;
+  color: #64748b !important;
+  font-size: 0.76rem !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  cursor: pointer !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-transfer-email-targets .scm-seg-check:hover {
+  border-color: #fbbf24 !important;
+  color: #0f172a !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-transfer-email-targets .scm-seg-check--none {
+  justify-content: center !important;
+  border-left: 1px solid #e2e8f0 !important;
+  background: transparent !important;
+  border-color: transparent !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-seg-actions {
   display: flex !important;
-  justify-content: flex-end !important;
   align-items: center !important;
+  justify-content: flex-end !important;
   gap: 0.7rem !important;
-  padding-top: 1rem !important;
+  position: sticky !important;
+  bottom: -1.25rem !important;
   margin: 0 -1.25rem -1.25rem !important;
-  padding-right: 1.25rem !important;
-  padding-left: 1.25rem !important;
-  padding-bottom: 1rem !important;
+  padding: 1rem 1.25rem !important;
   background: #f8fafc !important;
-  border-top: 1px solid #edf2f7 !important;
+  border-top: 1px solid #f1f5f9 !important;
+  z-index: 1 !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-primary,
 #scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-secondary {
-  min-height: 2.45rem !important;
+  min-height: 2.5rem !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 0.4rem !important;
+  gap: 0.45rem !important;
+  padding: 0.58rem 1rem !important;
   border-radius: 0.65rem !important;
-  font-size: 0.8rem !important;
+  font-size: 0.82rem !important;
+  line-height: 1.1 !important;
+  cursor: pointer !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-primary {
   background: #f59e0b !important;
   color: #ffffff !important;
+  border: 1px solid #f59e0b !important;
+  font-weight: 800 !important;
+  box-shadow: 0 6px 14px rgba(245, 158, 11, 0.2) !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-primary:hover {
   background: #d97706 !important;
+  border-color: #d97706 !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-secondary {
+  background: #ffffff !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+  font-weight: 700 !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-secondary:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
 }
 
 #scm-app .scm-case-submodal--transfer .scm-seg-actions .material-symbols-outlined {
@@ -3744,11 +3922,22 @@ body,
 
   #scm-app .scm-transfer-current strong {
     text-align: left !important;
+    justify-content: flex-start !important;
   }
 
   #scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-primary,
   #scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-secondary {
     width: 100% !important;
+  }
+
+  #scm-app .scm-case-submodal--transfer .scm-transfer-email-targets {
+    grid-template-columns: 1fr !important;
+  }
+
+  #scm-app .scm-case-submodal--transfer .scm-transfer-email-targets .scm-seg-check--none {
+    justify-content: flex-start !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
   }
 }
 

@@ -1608,25 +1608,29 @@
 
     if (body) {
       sub.classList.add("scm-case-submodal--transfer");
+      var transferNotifyTargets = renderNotifyTargets(["empleado"]).replace(
+        'class="scm-notify-targets"',
+        'class="scm-notify-targets scm-transfer-email-targets"'
+      );
       body.innerHTML =
         '<form class="scm-trasladar-form scm-transfer-form-modern" method="post" autocomplete="off">' +
         '<input type="hidden" name="ticket_pk" value="' +
         escHtml(ticketPk) +
         '">' +
         '<div class="scm-transfer-meta-row">' +
-          '<span><span class="material-symbols-outlined">domain</span> Código inmueble web: <strong>' + escHtml(propertyCode) + '</strong></span>' +
-          (logicalTicket ? '<span><span class="material-symbols-outlined">confirmation_number</span> Caso activo #' + escHtml(logicalTicket) + '</span>' : '') +
-          (statusLabel ? '<span><span class="material-symbols-outlined">radio_button_checked</span> ' + escHtml(statusLabel) + '</span>' : '') +
+          '<span><span class="material-symbols-outlined">domain</span><b>Código inmueble web:</b> <strong>' + escHtml(propertyCode) + '</strong></span>' +
+          (logicalTicket ? '<span><span class="material-symbols-outlined">confirmation_number</span><b>Caso activo</b> #' + escHtml(logicalTicket) + '</span>' : '') +
+          (statusLabel ? '<span><span class="material-symbols-outlined">radio_button_checked</span>' + escHtml(statusLabel) + '</span>' : '') +
         '</div>' +
         '<div class="scm-transfer-warning"><span class="material-symbols-outlined">info</span><p>Al confirmar el traslado, el seguimiento operativo y los compromisos de SLA pasarán al funcionario receptor. Esta acción quedará registrada en la bitácora de auditoría del inmueble.</p></div>' +
-        '<div class="scm-transfer-current"><span>Funcionario actual a cargo:</span><strong>' + escHtml(currentEmpLabel) + '</strong></div>' +
-        '<label class="scm-seg-field scm-transfer-field"><span>Nuevo funcionario responsable <em>*</em></span><select name="new_empleado_id" required>' +
+        '<div class="scm-transfer-current"><span>Funcionario actual a cargo:</span><strong><i></i>' + escHtml(currentEmpLabel) + '</strong></div>' +
+        '<label class="scm-seg-field scm-transfer-field"><span>Nuevo funcionario responsable <em>*</em></span><div class="scm-transfer-select-wrap"><span class="material-symbols-outlined">person</span><select name="new_empleado_id" required>' +
           empOptions +
-        "</select><small>El nuevo funcionario recibirá las alertas de trazabilidad de forma instantánea.</small></label>" +
+        "</select></div><small>El nuevo funcionario recibirá las alertas de trazabilidad de forma instantánea.</small></label>" +
         '<fieldset class="scm-notify-targets scm-notify-traslado scm-transfer-responsible-alert"><legend>Funcionario responsable</legend>' +
         '<label class="scm-seg-check"><input type="checkbox" name="notify_funcionario" value="1" checked> Notificar al funcionario responsable <small>Envío de alerta en la plataforma web, app móvil y recordatorio de agenda.</small></label>' +
         "</fieldset>" +
-        renderNotifyTargets(["empleado"]) +
+        transferNotifyTargets +
         '<label class="scm-seg-field scm-transfer-field"><span>Motivo o notas del traslado <em>Opcional</em></span><textarea name="observacion" rows="3" placeholder="Ej: Reasignación por turno laboral, especialidad en garantías o redistribución de carga..."></textarea></label>' +
         '<div class="scm-seg-actions">' +
         '<button type="button" class="scm-btn-secondary" data-scm-case-submodal-cancel>Cancelar</button>' +
@@ -1638,6 +1642,31 @@
       if (cancelBtn) {
         cancelBtn.addEventListener("click", function () {
           closeCaseSubmodal(modal);
+        });
+      }
+      var notifyFieldset = body.querySelector(".scm-transfer-email-targets");
+      if (notifyFieldset) {
+        var noneCheckbox = notifyFieldset.querySelector('.scm-seg-check--none input[type="checkbox"]');
+        var recipientCheckboxes = Array.prototype.slice.call(
+          notifyFieldset.querySelectorAll('input[name="notify_recipients[]"]:not([value="none"])')
+        );
+        if (noneCheckbox) {
+          noneCheckbox.addEventListener("change", function () {
+            if (noneCheckbox.checked) {
+              recipientCheckboxes.forEach(function (cb) {
+                cb.checked = false;
+              });
+            }
+          });
+        }
+        recipientCheckboxes.forEach(function (cb) {
+          cb.addEventListener("change", function () {
+            if (cb.checked && noneCheckbox) {
+              noneCheckbox.checked = false;
+            } else if (noneCheckbox && recipientCheckboxes.every(function (item) { return !item.checked; })) {
+              noneCheckbox.checked = true;
+            }
+          });
         });
       }
     }
