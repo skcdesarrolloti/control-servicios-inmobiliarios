@@ -4373,7 +4373,7 @@ trait RendersDashboard
           . ' data-asunto="' . esc_attr($asuntoCaso !== '' ? $asuntoCaso : 'Cotizacion de mantenimiento') . '"'
           . ' data-estado="' . esc_attr($estadoTicket !== '' ? $estadoTicket : '-') . '"'
           . ' data-admin="' . esc_attr($estadoAdminTicket !== '' ? $estadoAdminTicket : '-') . '"'
-          . ' data-contrato="' . esc_attr($contrato !== '' ? '#' . $contrato : '-') . '"'
+          . ' data-contrato="' . esc_attr($contrato !== '' ? '#' . ltrim($contrato, '#') : '-') . '"'
           . ' data-inmueble="' . esc_attr($inmueble !== '' ? $inmueble : '-') . '"'
           . ' data-id-inmueble-web="' . esc_attr($idInmueble !== '' ? $idInmueble : '-') . '"'
           . ' data-barrio="' . esc_attr($barrio !== '' ? $barrio : '-') . '"'

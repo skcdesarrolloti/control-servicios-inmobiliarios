@@ -5281,7 +5281,8 @@
         var creadoDate = btn.dataset.creado || "";
         var dirText = btn.dataset.direccion || "";
         var barrioText = btn.dataset.barrio || "";
-        var contratoText = btn.dataset.contrato || "";
+        var contratoText = (btn.dataset.contrato || "").trim().replace(/^#+/, "");
+        var inmuebleVal = (btn.dataset.inmueble || "").trim().replace(/^#+/, "");
         var ejecucionText = (btn.dataset.ejecucion || "").trim();
         var sinActualizarText = (btn.dataset.sinActualizar || "").trim();
         var subParts = [];
@@ -5289,10 +5290,13 @@
           subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">calendar_today</span> ' + escHtml(creadoDate) + '</span>');
         }
         if (dirText || barrioText) {
-          subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">domain</span> Inmueble: ' + escHtml((barrioText ? barrioText + " • " : "") + (dirText || "")) + '</span>');
+          subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">domain</span> ' + escHtml((barrioText ? barrioText + " • " : "") + (dirText || "")) + '</span>');
         }
-        if (contratoText) {
+        if (contratoText && contratoText !== "-") {
           subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">description</span> Contrato #' + escHtml(contratoText) + '</span>');
+        }
+        if (inmuebleVal && inmuebleVal !== "-") {
+          subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">tag</span> Inmueble simi: #' + escHtml(inmuebleVal) + '</span>');
         }
         if (ejecucionText && ejecucionText !== "-") {
           subParts.push('<span class="scm-meta-bit scm-meta-bit-ejecucion"><span class="material-symbols-outlined text-[15px]">hourglass_top</span> En ejecución: ' + escHtml(ejecucionText) + '</span>');
@@ -5561,11 +5565,11 @@
         var celularVal = (btn.dataset.celularSolicitante || "").trim();
         var correoVal = (btn.dataset.correoSolicitante || "").trim();
         var propietarioVal = (btn.dataset.propietario || "").trim();
-        var inmuebleIdVal = btn.dataset.inmueble || "-";
+        var inmuebleIdVal = (btn.dataset.inmueble || "-").trim().replace(/^#+/, "");
         var webIdVal = btn.dataset.idInmuebleWeb || "-";
         var barrioVal = btn.dataset.barrio || "-";
         var direccionVal = btn.dataset.direccion || "-";
-        var contratoIdVal = btn.dataset.contrato || "-";
+        var contratoIdVal = (btn.dataset.contrato || "-").trim().replace(/^#+/, "");
 
         var caseActionsContent =
           renderActionGroup(isPublicPqr ? "Gestión de la solicitud" : "Gestión del caso", mainActionButtons, "is-main") +
@@ -5863,11 +5867,11 @@
         sidebarHtml += '<div class="scm-sidebar-card">';
         sidebarHtml += '<div class="scm-sidebar-card-head"><span class="scm-sidebar-card-title">Ficha Técnica de Inmueble</span><span class="material-symbols-outlined text-[20px]">home_work</span></div>';
         sidebarHtml += '<div class="scm-property-specs">';
-        sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Inmueble ID:</span><strong class="scm-spec-value">#' + escHtml(inmuebleIdVal) + '</strong></div>';
+        sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Inmueble simi:</span><strong class="scm-spec-value">' + (inmuebleIdVal && inmuebleIdVal !== "-" ? ('#' + escHtml(inmuebleIdVal)) : "-") + '</strong></div>';
         sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Código Web:</span><strong class="scm-spec-value">' + escHtml(webIdVal) + '</strong></div>';
         sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Barrio / Sector:</span><strong class="scm-spec-value">' + escHtml(barrioVal) + '</strong></div>';
         sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Dirección:</span><strong class="scm-spec-value text-right">' + escHtml(direccionVal) + '</strong></div>';
-        sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Contrato Asociado:</span><strong class="scm-spec-value scm-highlight">#' + escHtml(contratoIdVal) + '</strong></div>';
+        sidebarHtml += '<div class="scm-spec-row"><span class="scm-spec-label">Contrato Asociado:</span><strong class="scm-spec-value scm-highlight">' + (contratoIdVal && contratoIdVal !== "-" ? ('#' + escHtml(contratoIdVal)) : "-") + '</strong></div>';
         sidebarHtml += '</div>';
         sidebarHtml += '<div class="scm-property-map-widget"><button type="button" class="scm-case-map-preview-btn" data-scm-view-property-map><span class="material-symbols-outlined text-[16px]">pin_drop</span><span>Ver en mapa satelital</span></button></div>';
         sidebarHtml += '</div>';

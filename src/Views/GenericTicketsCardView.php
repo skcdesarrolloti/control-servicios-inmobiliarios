@@ -411,8 +411,9 @@ final class GenericTicketsCardView
     $dataAttrs .= ' data-justificacion-perturbacion="' . esc_attr($justificacionPerturbacionRaw) . '"';
     $dataAttrs .= ' data-valor-bonificacion="' . esc_attr($valorBonificacionRaw) . '"';
     $dataAttrs .= ' data-area-afectada="' . esc_attr($areaAfectadaRaw) . '"';
-    $dataAttrs .= ' data-resumen-calculo-perturbacion="' . esc_attr($resumenCalculoPerturbacionRaw) . '"';
-    $dataAttrs .= ' data-contrato="' . esc_attr($contratoRaw !== '' ? ('#' . $contratoRaw) : '-') . '"';
+    $contratoClean = ltrim($contratoRaw, '#');
+    $contratoLabel = $contratoClean !== '' ? ('#' . $contratoClean) : '-';
+    $dataAttrs .= ' data-contrato="' . esc_attr($contratoLabel) . '"';
     $dataAttrs .= ' data-inmueble="' . esc_attr($inmuebleRaw !== '' ? $inmuebleRaw : '-') . '"';
     $dataAttrs .= ' data-id-inmueble-web="' . esc_attr($idInmuebleWebRaw !== '' ? $idInmuebleWebRaw : '-') . '"';
     $dataAttrs .= ' data-id-inmueble-data="' . esc_attr($propertyDataId) . '"';
@@ -529,8 +530,8 @@ final class GenericTicketsCardView
     $c .= '<h3 class="scm-ticket-title">' . esc_html($asuntoRaw !== '' ? $asuntoRaw : '-') . '</h3>';
 
     $c .= '<div class="scm-ticket-meta-list">';
-    $c .= '<div class="scm-ticket-meta-row"><span class="scm-ticket-meta-label"><span class="material-symbols-outlined text-[15px]">description</span> Contrato:</span><strong class="scm-ticket-meta-value">' . esc_html($contratoRaw !== '' ? ('#' . $contratoRaw) : '-') . '</strong></div>';
-    $c .= '<div class="scm-ticket-meta-row"><span class="scm-ticket-meta-label"><span class="material-symbols-outlined text-[15px]">domain</span> Inmueble:</span><strong class="scm-ticket-meta-value">' . esc_html($inmuebleRaw !== '' ? $inmuebleRaw : '-') . '</strong></div>';
+    $c .= '<div class="scm-ticket-meta-row"><span class="scm-ticket-meta-label"><span class="material-symbols-outlined text-[15px]">description</span> Contrato:</span><strong class="scm-ticket-meta-value">' . esc_html($contratoLabel) . '</strong></div>';
+    $c .= '<div class="scm-ticket-meta-row"><span class="scm-ticket-meta-label"><span class="material-symbols-outlined text-[15px]">domain</span> Inmueble simi:</span><strong class="scm-ticket-meta-value">' . esc_html($inmuebleRaw !== '' ? $inmuebleRaw : '-') . '</strong></div>';
     if ($thirdPartyValue !== '') {
       $c .= '<div class="scm-ticket-meta-row"><span class="scm-ticket-meta-label"><span class="material-symbols-outlined text-[15px]">person</span> ' . esc_html($thirdPartyLabel) . ':</span><strong class="scm-ticket-meta-value">' . esc_html($thirdPartyValue) . '</strong></div>';
     }

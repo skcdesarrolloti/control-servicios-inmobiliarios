@@ -154,7 +154,8 @@ trait TableRowsConcern
       ];
       $asuntoLabel = $asunto !== '' ? $asunto : '-';
       $temaLabel = $tema !== '' ? $tema : '-';
-      $contractLabel = $contrato !== '' ? ('#' . $contrato) : '-';
+      $contratoClean = ltrim($contrato, '#');
+      $contractLabel = $contratoClean !== '' ? ('#' . $contratoClean) : '-';
       $inmuebleLabel = $inmueble !== '' ? $inmueble : '-';
       $barrioLabel = $barrio !== '' ? $barrio : '-';
       $creado = $createdTs > 0 ? $this->dateFormatter->formatDateTime($createdTs) : '-';
@@ -280,7 +281,7 @@ trait TableRowsConcern
 
       $html .= '<div class="scm-ticket-meta-list">';
       $html .= '<div class="scm-ticket-meta-row"><span class="scm-ticket-meta-label"><span class="material-symbols-outlined text-[15px]">description</span> Contrato:</span><strong class="scm-ticket-meta-value">' . esc_html($contractLabel) . '</strong></div>';
-      $html .= '<div class="scm-ticket-meta-row"><span class="scm-ticket-meta-label"><span class="material-symbols-outlined text-[15px]">domain</span> Inmueble:</span><strong class="scm-ticket-meta-value">' . esc_html($inmuebleLabel) . '</strong></div>';
+      $html .= '<div class="scm-ticket-meta-row"><span class="scm-ticket-meta-label"><span class="material-symbols-outlined text-[15px]">domain</span> Inmueble simi:</span><strong class="scm-ticket-meta-value">' . esc_html($inmuebleLabel) . '</strong></div>';
       if ($thirdPartyValue !== '') {
         $html .= '<div class="scm-ticket-meta-row"><span class="scm-ticket-meta-label"><span class="material-symbols-outlined text-[15px]">person</span> ' . esc_html($thirdPartyLabel) . ':</span><strong class="scm-ticket-meta-value">' . esc_html($thirdPartyValue) . '</strong></div>';
       }
