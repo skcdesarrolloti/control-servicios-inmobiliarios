@@ -377,7 +377,6 @@ final class GenericTicketsCardView
         . '<div class="scm-case-description-content p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-800 text-sm leading-relaxed font-normal">' . $descripcionRaw . '</div>'
         . '</div>';
     }
-    $caseSource .= $ticketDocumentsHtml;
     if ($isPreventivaTicket) {
       $caseSource .= $this->renderPreventivaNoAccessSummary($preventivaNoAccessCount);
     }
@@ -386,9 +385,16 @@ final class GenericTicketsCardView
     $caseSource .= (string) call_user_func($this->renderHistorialBlock, $historialItems);
     $caseSource .= (string) call_user_func($this->renderRecordSection, 'Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);
     $caseSource .= (string) call_user_func($this->renderRecordSection, 'Notas del ticket', $notasItems);
-    $caseSource .= '<div class="scm-case-action-buttons"><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-contrato">Ver contrato</button><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-inmueble">Ver inmueble</button><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-hist-inmueble">Ver historial del inmueble</button>';
+    $caseSource .= '<div class="scm-case-action-buttons">';
+    if ($ticketDocumentsHtml !== '') {
+      $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Adjuntos del caso</button>';
+    }
+    $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-contrato">Ver contrato</button><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-inmueble">Ver inmueble</button><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-hist-inmueble">Ver historial del inmueble</button>';
     $caseSource .= '</div>';
     $caseSource .= '<div class="scm-case-hidden-sections" style="display:none;">';
+    if ($ticketDocumentsHtml !== '') {
+      $caseSource .= $ticketDocumentsHtml;
+    }
     $caseSource .= (string) call_user_func($this->renderSingleRecordSection, 'Contrato', $contratoData, 'scm-sec-contrato');
     $caseSource .= (string) call_user_func($this->renderSingleRecordSection, 'Inmueble', $inmuebleData, 'scm-sec-inmueble');
     $caseSource .= (string) call_user_func($this->renderRecordSection, 'Historial del inmueble', $historialInmuebleItems, 'scm-sec-hist-inmueble');
@@ -489,12 +495,16 @@ final class GenericTicketsCardView
       $initials = strtoupper(substr($nameParts[0] ?? '', 0, 1) . substr($nameParts[1] ?? '', 0, 1));
     }
 
-    $slaPill = '';
-    if ($tiempoSinActualizar !== '' && $tiempoSinActualizar !== '-') {
-      $slaPill = '<span class="scm-card-sla scm-sla-badge"><span class="material-symbols-outlined text-[13px]">schedule</span> ' . esc_html($tiempoSinActualizar) . ' SLA</span>';
-    } else {
-      $slaPill = '<span class="scm-card-sla scm-sla-ok"><span class="material-symbols-outlined text-[13px]">verified</span> Al día</span>';
+    $timingPills = '<div class="scm-card-timings">';
+    if ($tiempoEjecucion !== '' && $tiempoEjecucion !== '-') {
+      $timingPills .= '<span class="scm-timing-badge scm-timing-ejecucion" title="Tiempo en ejecución"><span class="material-symbols-outlined text-[13px]">hourglass_top</span> En ejec: ' . esc_html($tiempoEjecucion) . '</span>';
     }
+    if ($tiempoSinActualizar !== '' && $tiempoSinActualizar !== '-') {
+      $timingPills .= '<span class="scm-timing-badge scm-timing-inactivo" title="Tiempo sin actualizar"><span class="material-symbols-outlined text-[13px]">history</span> Sin act: ' . esc_html($tiempoSinActualizar) . '</span>';
+    } else {
+      $timingPills .= '<span class="scm-timing-badge scm-timing-ok"><span class="material-symbols-outlined text-[13px]">verified</span> Al día</span>';
+    }
+    $timingPills .= '</div>';
 
     $cotChip = ($idCotz !== '')
       ? '<span class="scm-card-chip scm-chip-success">Con Cotización</span>'
@@ -534,7 +544,7 @@ final class GenericTicketsCardView
     $c .= '<span class="scm-ticket-assignee-role">Asignado</span>';
     $c .= '</div>';
     $c .= '</div>';
-    $c .= '<div class="scm-ticket-sla-wrap">' . $slaPill . '</div>';
+    $c .= '<div class="scm-ticket-sla-wrap">' . $timingPills . '</div>';
     $c .= '</div>';
 
     $c .= '<div class="scm-ticket-chips-row">';

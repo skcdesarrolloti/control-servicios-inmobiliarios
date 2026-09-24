@@ -889,7 +889,6 @@ final class PendingView
     if ($html === '') {
       $html = '<div class="scm-case-description"><strong>Detalle del caso:</strong><div class="scm-case-description-content">Ticket preventivo creado desde contratos pendientes.</div></div>';
     }
-    $html .= $documentsHtml;
     $seguimientoHtml = '<div class="scm-seg-readonly">No se pudo cargar el formulario de seguimiento en este momento.</div>';
     try {
       $seguimientoHtml = (new \SCM\Views\SeguimientoFormView())->render($ticketPk, \SCM\Core\Auth::isLoggedIn(), $hasCotizacionPendiente);
@@ -901,11 +900,17 @@ final class PendingView
     $html .= $this->renderPendingRecordSection('Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);
     $html .= $this->renderPendingRecordSection('Notas del ticket', $notasItems);
     $html .= '<div class="scm-case-action-buttons">';
+    if ($documentsHtml !== '') {
+      $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Adjuntos del caso</button>';
+    }
     $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-contrato">Ver contrato</button>';
     $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-inmueble">Ver inmueble</button>';
     $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-hist-inmueble">Ver historial del inmueble</button>';
     $html .= '</div>';
     $html .= '<div class="scm-case-hidden-sections" style="display:none;">';
+    if ($documentsHtml !== '') {
+      $html .= $documentsHtml;
+    }
     $html .= $this->renderPendingSingleRecordSection('Contrato', $contratoData, 'scm-sec-contrato');
     $html .= $this->renderPendingSingleRecordSection('Inmueble', $inmuebleData, 'scm-sec-inmueble');
     $html .= $this->renderPendingRecordSection('Historial del inmueble', $historialInmuebleItems, 'scm-sec-hist-inmueble');

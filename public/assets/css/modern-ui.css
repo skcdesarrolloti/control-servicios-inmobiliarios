@@ -2414,6 +2414,7 @@ body,
   color: #ef4444 !important;
 }
 
+#scm-app .scm-composer-tool-btn.scm-composer-attach-btn,
 #scm-app .scm-composer-tool-btn[data-scm-composer-paste] {
   width: auto !important;
   padding: 0 0.65rem !important;
@@ -2827,5 +2828,70 @@ body,
   transform: translateY(0) !important;
   box-shadow: 0 1px 2px rgba(15, 30, 54, 0.08) !important;
 }
+
+/* Tiempos en Card de Caso (Listing) */
+#scm-app .scm-card-timings {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  gap: 0.25rem !important;
+}
+
+#scm-app .scm-timing-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.25rem !important;
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  padding: 0.18rem 0.5rem !important;
+  border-radius: 0.375rem !important;
+  white-space: nowrap !important;
+}
+
+#scm-app .scm-timing-ejecucion {
+  color: #1e40af !important;
+  background: #eff6ff !important;
+  border: 1px solid #dbeafe !important;
+}
+
+#scm-app .scm-timing-inactivo {
+  color: #b45309 !important;
+  background: #fffbeb !important;
+  border: 1px solid #fef3c7 !important;
+}
+
+#scm-app .scm-timing-ok {
+  color: #047857 !important;
+  background: #ecfdf5 !important;
+  border: 1px solid #d1fae5 !important;
+}
+
+/* Subtítulo del Modal (En ejecución & Sin actualizar) */
+#scm-app .scm-meta-bit-ejecucion {
+  color: #1d4ed8 !important;
+  font-weight: 600 !important;
+  background: #eff6ff !important;
+  padding: 0.2rem 0.55rem !important;
+  border-radius: 0.375rem !important;
+  border: 1px solid #dbeafe !important;
+}
+
+#scm-app .scm-meta-bit-sin-act {
+  color: #b45309 !important;
+  font-weight: 600 !important;
+  background: #fffbeb !important;
+  padding: 0.2rem 0.55rem !important;
+  border-radius: 0.375rem !important;
+  border: 1px solid #fef3c7 !important;
+}
+
+/* Drag and drop highlight en composer */
+#scm-app .scm-case-composer-card.is-dragover {
+  border-color: #2563eb !important;
+  background: #f0f7ff !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+}
+
 
 

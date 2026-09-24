@@ -179,7 +179,6 @@ trait TableRowsConcern
       if ($descripcionRaw !== '') {
         $caseSource .= '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">' . $descripcionRaw . '</div></div>';
       }
-      $caseSource .= $ticketDocumentsHtml;
       if ($isPreventivaTicket) {
         $caseSource .= $this->renderPreventivaNoAccessSummary($preventivaNoAccessCount);
       }
@@ -193,11 +192,17 @@ trait TableRowsConcern
       $caseSource .= $this->renderRecordSection('Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);
       $caseSource .= $this->renderRecordSection('Notas del ticket', $notasItems);
       $caseSource .= '<div class="scm-case-action-buttons">';
+      if ($ticketDocumentsHtml !== '') {
+        $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Adjuntos del caso</button>';
+      }
       $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-contrato">Ver contrato</button>';
       $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-inmueble">Ver inmueble</button>';
       $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-hist-inmueble">Ver historial del inmueble</button>';
       $caseSource .= '</div>';
       $caseSource .= '<div class="scm-case-hidden-sections" style="display:none;">';
+      if ($ticketDocumentsHtml !== '') {
+        $caseSource .= $ticketDocumentsHtml;
+      }
       $caseSource .= $this->renderSingleRecordSection('Contrato', $contratoData, 'scm-sec-contrato');
       $caseSource .= $this->renderSingleRecordSection('Inmueble', $inmuebleData, 'scm-sec-inmueble');
       $caseSource .= $this->renderRecordSection('Historial del inmueble', $historialInmuebleItems, 'scm-sec-hist-inmueble');
@@ -240,12 +245,16 @@ trait TableRowsConcern
         $initials = strtoupper(substr($nameParts[0] ?? '', 0, 1) . substr($nameParts[1] ?? '', 0, 1));
       }
 
-      $slaPill = '';
-      if ($tiempoSinActualizar !== '' && $tiempoSinActualizar !== '-') {
-        $slaPill = '<span class="scm-card-sla scm-sla-badge"><span class="material-symbols-outlined text-[13px]">schedule</span> ' . esc_html($tiempoSinActualizar) . ' SLA</span>';
-      } else {
-        $slaPill = '<span class="scm-card-sla scm-sla-ok"><span class="material-symbols-outlined text-[13px]">verified</span> Al día</span>';
+      $timingPills = '<div class="scm-card-timings">';
+      if ($tiempoEjecucion !== '' && $tiempoEjecucion !== '-') {
+        $timingPills .= '<span class="scm-timing-badge scm-timing-ejecucion" title="Tiempo en ejecución"><span class="material-symbols-outlined text-[13px]">hourglass_top</span> En ejec: ' . esc_html($tiempoEjecucion) . '</span>';
       }
+      if ($tiempoSinActualizar !== '' && $tiempoSinActualizar !== '-') {
+        $timingPills .= '<span class="scm-timing-badge scm-timing-inactivo" title="Tiempo sin actualizar"><span class="material-symbols-outlined text-[13px]">history</span> Sin act: ' . esc_html($tiempoSinActualizar) . '</span>';
+      } else {
+        $timingPills .= '<span class="scm-timing-badge scm-timing-ok"><span class="material-symbols-outlined text-[13px]">verified</span> Al día</span>';
+      }
+      $timingPills .= '</div>';
 
       $cotChip = ($idCotz !== '')
         ? '<span class="scm-card-chip scm-chip-success">Con Cotización</span>'
@@ -285,7 +294,7 @@ trait TableRowsConcern
       $html .= '<span class="scm-ticket-assignee-role">Asignado</span>';
       $html .= '</div>';
       $html .= '</div>';
-      $html .= '<div class="scm-ticket-sla-wrap">' . $slaPill . '</div>';
+      $html .= '<div class="scm-ticket-sla-wrap">' . $timingPills . '</div>';
       $html .= '</div>';
 
       $html .= '<div class="scm-ticket-chips-row">';

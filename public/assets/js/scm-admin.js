@@ -4684,8 +4684,8 @@
       });
     }
 
-    // Clipboard screenshot paste (Ctrl+V) handler on composer
-    composer.addEventListener("paste", function (e) {
+    // Clipboard image paste (Ctrl+V) handler on modal & composer
+    function handleClipboardImagePaste(e) {
       var clipboard = e.clipboardData || window.clipboardData;
       if (!clipboard || !clipboard.items) return;
       var pastedFiles = [];
@@ -4695,7 +4695,7 @@
           var blob = item.getAsFile();
           if (blob) {
             var ext = (blob.type || "image/png").split("/").pop().replace(/[^a-z0-9]/gi, "") || "png";
-            var fileName = "captura-" + Date.now() + "-" + (composerFiles.length + pastedFiles.length + 1) + "." + ext;
+            var fileName = "imagen-" + Date.now() + "-" + (composerFiles.length + pastedFiles.length + 1) + "." + ext;
             pastedFiles.push(new File([blob], fileName, { type: blob.type || "image/png" }));
           }
         }
@@ -4704,8 +4704,27 @@
         e.preventDefault();
         addFiles(pastedFiles);
         if (typeof scmNotify === "function") {
-          scmNotify("info", pastedFiles.length === 1 ? "Captura pegada adjuntada." : pastedFiles.length + " capturas pegadas.");
+          scmNotify("info", pastedFiles.length === 1 ? "Imagen pegada adjuntada." : pastedFiles.length + " imágenes pegadas.");
         }
+      }
+    }
+
+    composer.addEventListener("paste", handleClipboardImagePaste);
+    modal.addEventListener("paste", handleClipboardImagePaste);
+
+    // Drag and drop images onto composer
+    composer.addEventListener("dragover", function (e) {
+      e.preventDefault();
+      composer.classList.add("is-dragover");
+    });
+    composer.addEventListener("dragleave", function () {
+      composer.classList.remove("is-dragover");
+    });
+    composer.addEventListener("drop", function (e) {
+      e.preventDefault();
+      composer.classList.remove("is-dragover");
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+        addFiles(e.dataTransfer.files);
       }
     });
 
@@ -4721,10 +4740,10 @@
                   found = true;
                   items[i].getType(type).then(function (blob) {
                     var ext = (blob.type || "image/png").split("/").pop().replace(/[^a-z0-9]/gi, "") || "png";
-                    var fileName = "captura-" + Date.now() + "." + ext;
+                    var fileName = "imagen-" + Date.now() + "." + ext;
                     addFiles([new File([blob], fileName, { type: blob.type || "image/png" })]);
                     if (typeof scmNotify === "function") {
-                      scmNotify("info", "Captura pegada adjuntada.");
+                      scmNotify("info", "Imagen pegada desde el portapapeles.");
                     }
                   });
                 }
@@ -4733,19 +4752,19 @@
             if (!found) {
               if (input) input.focus();
               if (typeof scmNotify === "function") {
-                scmNotify("info", "Copia una captura al portapapeles y presiona Ctrl+V aquí.");
+                scmNotify("info", "Copia una imagen o captura al portapapeles y presiona Ctrl+V.");
               }
             }
           }).catch(function () {
             if (input) input.focus();
             if (typeof scmNotify === "function") {
-              scmNotify("info", "Presiona Ctrl+V para pegar la captura aquí.");
+              scmNotify("info", "Presiona Ctrl+V para pegar la imagen aquí.");
             }
           });
         } else {
           if (input) input.focus();
           if (typeof scmNotify === "function") {
-            scmNotify("info", "Presiona Ctrl+V para pegar la captura aquí.");
+            scmNotify("info", "Presiona Ctrl+V para pegar la imagen aquí.");
           }
         }
       });
@@ -5124,6 +5143,8 @@
         var dirText = btn.dataset.direccion || "";
         var barrioText = btn.dataset.barrio || "";
         var contratoText = btn.dataset.contrato || "";
+        var ejecucionText = (btn.dataset.ejecucion || "").trim();
+        var sinActualizarText = (btn.dataset.sinActualizar || "").trim();
         var subParts = [];
         if (creadoDate) {
           subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">calendar_today</span> ' + escHtml(creadoDate) + '</span>');
@@ -5133,6 +5154,12 @@
         }
         if (contratoText) {
           subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">description</span> Contrato #' + escHtml(contratoText) + '</span>');
+        }
+        if (ejecucionText && ejecucionText !== "-") {
+          subParts.push('<span class="scm-meta-bit scm-meta-bit-ejecucion"><span class="material-symbols-outlined text-[15px]">hourglass_top</span> En ejecución: ' + escHtml(ejecucionText) + '</span>');
+        }
+        if (sinActualizarText && sinActualizarText !== "-") {
+          subParts.push('<span class="scm-meta-bit scm-meta-bit-sin-act"><span class="material-symbols-outlined text-[15px]">history</span> Sin actualizar: ' + escHtml(sinActualizarText) + '</span>');
         }
         subtitle.innerHTML = subParts.join("");
       }
@@ -5208,6 +5235,23 @@
         var runtimeConfig = runtime.config || {};
         var srcWrap = document.createElement("div");
         srcWrap.innerHTML = sourceHtml;
+
+        // Move docs section to hidden sections so it doesn't take space in the main flow
+        var docSection = srcWrap.querySelector("#scm-sec-documentos, .scm-case-documents-section");
+        if (docSection) {
+          docSection.style.display = "none";
+          var hiddenWrap = srcWrap.querySelector(".scm-case-hidden-sections");
+          if (!hiddenWrap) {
+            hiddenWrap = document.createElement("div");
+            hiddenWrap.className = "scm-case-hidden-sections";
+            hiddenWrap.style.display = "none";
+            srcWrap.appendChild(hiddenWrap);
+          }
+          if (!hiddenWrap.contains(docSection)) {
+            hiddenWrap.appendChild(docSection);
+          }
+        }
+
         var floatingActionWrap = srcWrap.querySelector(
           ".scm-case-action-buttons",
         );
@@ -5218,6 +5262,17 @@
             floatingActionWrap.querySelectorAll("[data-scm-open-section]"),
           );
           floatingActionWrap.remove();
+        }
+        if (docSection) {
+          var hasDocBtn = topActionButtons.some(function (b) {
+            return b.getAttribute("data-scm-open-section") === "scm-sec-documentos";
+          });
+          if (!hasDocBtn) {
+            var fakeDocBtn = document.createElement("button");
+            fakeDocBtn.setAttribute("data-scm-open-section", "scm-sec-documentos");
+            fakeDocBtn.textContent = "Adjuntos del caso";
+            topActionButtons.unshift(fakeDocBtn);
+          }
         }
         var timelineWrap = srcWrap.querySelector(".scm-modal-timeline-only");
         var timelineHtml = "";
@@ -5426,13 +5481,14 @@
             '</div>' +
             '<div class="scm-case-composer-footer">' +
               '<div class="scm-composer-tools">' +
-                '<label class="scm-composer-tool-btn" title="Adjuntar archivo o imagen">' +
+                '<label class="scm-composer-tool-btn scm-composer-attach-btn" title="Adjuntar imagen o archivo">' +
                   '<input type="file" multiple accept="image/*,application/pdf" class="scm-composer-file-input" style="display:none;" data-scm-composer-files>' +
-                  '<span class="material-symbols-outlined text-[18px]">attach_file</span>' +
+                  '<span class="material-symbols-outlined text-[17px]">add_photo_alternate</span>' +
+                  '<span>Adjuntar imagen</span>' +
                 '</label>' +
-                '<button type="button" class="scm-composer-tool-btn" data-scm-composer-paste title="Pegar captura de pantalla desde el portapapeles (Ctrl+V)">' +
-                  '<span class="material-symbols-outlined text-[18px]">content_paste</span>' +
-                  '<span class="scm-composer-paste-label">Pegar captura</span>' +
+                '<button type="button" class="scm-composer-tool-btn" data-scm-composer-paste title="Pegar imagen o captura del portapapeles (Ctrl+V)">' +
+                  '<span class="material-symbols-outlined text-[17px]">content_paste</span>' +
+                  '<span>Pegar (Ctrl+V)</span>' +
                 '</button>' +
                 '<button type="button" class="scm-composer-tool-btn" title="Plantillas y respuestas rápidas" data-scm-composer-canned>' +
                   '<span class="material-symbols-outlined text-[18px]">chat</span>' +
@@ -5693,12 +5749,6 @@
           sidebarHtml += '<button type="button" class="btn btn-outline btn-sm w-full" data-scm-open-llaves>Ver llaves registradas</button></div>';
         }
 
-        sidebarHtml += '<details class="scm-sidebar-more-details"><summary class="scm-sidebar-more-summary">Ver todos los campos del caso (' + summaryItems.length + ')</summary><div class="scm-case-sidebar-list">';
-        summaryItems.forEach(function (item) {
-          sidebarHtml += '<div class="scm-case-side-item"><span class="scm-case-side-label">' + escHtml(item.label) + '</span><span class="scm-case-side-value">' + escHtml(item.value) + '</span></div>';
-        });
-        sidebarHtml += '</div></details>';
-
         sidebarHtml += '</aside>';
 
         if (headActions) {
@@ -5725,6 +5775,7 @@
             if (sectionId === "scm-sec-inmueble") iconName = "apartment";
             else if (sectionId === "scm-sec-hist-inmueble") iconName = "history";
             else if (sectionId === "scm-sec-contrato") iconName = "description";
+            else if (sectionId === "scm-sec-documentos") iconName = "attach_file";
             headActions.innerHTML +=
               '<button type="button" class="scm-case-side-link" data-scm-open-section="' +
               escHtml(sectionId) +
