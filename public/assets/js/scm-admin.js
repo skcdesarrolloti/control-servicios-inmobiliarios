@@ -1056,6 +1056,49 @@
     );
   }
 
+  function formatPropertyMoney(value) {
+    value = cleanCaseValue(value);
+    if (!value) return "-";
+    var digits = value.replace(/\D/g, "");
+    var numeric = parseInt(digits || "0", 10);
+    if (!isFinite(numeric)) return value;
+    return "$" + numeric.toLocaleString("es-CO");
+  }
+
+  function formatPropertyArea(value) {
+    value = cleanCaseValue(value);
+    if (!value) return "-";
+    return /\bm(?:2|²)\b/i.test(value) ? value : value + " m²";
+  }
+
+  function formatPropertyLevel(value) {
+    value = cleanCaseValue(value);
+    if (!value) return "-";
+    return /^nivel\b/i.test(value) ? value : "Nivel " + value;
+  }
+
+  function renderPropertyMapPreview(info, label, webCode) {
+    var codeLabel = cleanCaseValue(webCode) ? "#" + cleanCaseValue(webCode) : "";
+    if (info && info.embedUrl) {
+      return (
+        '<div class="scm-property-mini-map"><iframe loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="' +
+        escHtml(info.embedUrl) +
+        '" title="Mapa del inmueble"></iframe></div>'
+      );
+    }
+    return (
+      '<div class="scm-property-mini-map scm-property-mini-map-fallback" role="img" aria-label="Mapa de referencia del inmueble">' +
+      '<div class="scm-property-map-roads"><span></span><span></span><span></span></div>' +
+      '<div class="scm-property-map-pin"><strong>' +
+      escHtml(codeLabel ? "Inmueble " + codeLabel : "Inmueble") +
+      '</strong><span class="material-symbols-outlined">store</span></div>' +
+      '<div class="scm-property-map-address"><span class="material-symbols-outlined">location_on</span>' +
+      escHtml(cleanCaseValue(label) || "Ubicacion pendiente por confirmar") +
+      "</div>" +
+      "</div>"
+    );
+  }
+
   function renderPropertyMetric(label, value, helper, icon, accent) {
     return (
       '<div class="scm-property-metric' +
@@ -1124,12 +1167,12 @@
     var tipo = firstCaseSectionValue(fields, ["Tipo"], "");
     var negocio = firstCaseSectionValue(fields, ["Negocio"], "");
     var destino = firstCaseSectionValue(fields, ["Destinacion"], "");
-    var canon = firstCaseSectionValue(fields, ["Canon", "Precio arriendo"], "");
-    var admin = firstCaseSectionValue(fields, ["Administracion"], "");
-    var areaConst = firstCaseSectionValue(fields, ["Area construida"], "");
-    var areaPrivada = firstCaseSectionValue(fields, ["Area privada"], "");
+    var canon = formatPropertyMoney(firstCaseSectionValue(fields, ["Canon", "Precio arriendo"], ""));
+    var admin = formatPropertyMoney(firstCaseSectionValue(fields, ["Administracion"], ""));
+    var areaConst = formatPropertyArea(firstCaseSectionValue(fields, ["Area construida"], ""));
+    var areaPrivada = formatPropertyArea(firstCaseSectionValue(fields, ["Area privada"], ""));
     var banos = firstCaseSectionValue(fields, ["Banos"], "");
-    var estrato = firstCaseSectionValue(fields, ["Estrato"], "");
+    var estrato = formatPropertyLevel(firstCaseSectionValue(fields, ["Estrato"], ""));
     var webUrl = buildPropertyWebUrl(webCode);
     var locationLabel =
       cleanCaseValue(payload.manualLocation) ||
@@ -1193,17 +1236,10 @@
     html +=
       '<button type="button" class="scm-property-map-link" data-scm-view-property-map><span class="material-symbols-outlined">edit_location_alt</span> Actualizar ubicación</button>';
     html += "</div>";
-    if (info.embedUrl) {
-      html +=
-        '<div class="scm-property-mini-map"><iframe loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="' +
-        escHtml(info.embedUrl) +
-        '" title="Mapa del inmueble"></iframe></div>';
-    }
+    html += renderPropertyMapPreview(info, locationLabel, webCode);
     html += "</div>";
 
     html += '<div class="scm-property-footer-actions">';
-    html +=
-      '<button type="button" class="scm-property-secondary-btn" data-scm-open-section="scm-sec-inmueble"><span class="material-symbols-outlined">visibility</span> Ver datos completos</button>';
     if (webUrl) {
       html +=
         '<a class="scm-property-web-btn" href="' +
@@ -1247,68 +1283,40 @@
   function renderCaseLocationPanel(caseBtn, fallbackNode, compact) {
     var info = buildCaseLocationInfo(caseBtn, fallbackNode);
     var payload = info.payload;
-    var editLabel = info.hasLocation
-      ? "Actualizar ubicacion"
-      : "Agregar ubicacion";
+    var locationLabel =
+      cleanCaseValue(payload.googleMapsUrl) ||
+      cleanCaseValue(payload.direccion) ||
+      "Sin ubicacion registrada";
     var html =
-      '<section class="scm-case-location-panel' +
+      '<section class="scm-case-location-panel scm-property-geo-block' +
       (compact ? " is-compact" : "") +
       '">' +
-      '<div class="scm-case-location-head"><div><h4>Ubicacion del inmueble</h4>' +
-      (payload.propertyCode
-        ? "<p>Codigo web: <strong>" +
-          escHtml(payload.propertyCode) +
-          "</strong></p>"
-        : "<p>Sin codigo de inmueble.</p>") +
-      "</div>" +
-      '<button type="button" class="btn btn-outline btn-sm" data-scm-open-location-editor>' +
-      editLabel +
-      "</button></div>";
+      '<div class="scm-property-geo-head"><span><span class="material-symbols-outlined">map</span> Geolocalización y ubicación cartográfica</span><strong>' +
+      (info.hasLocation ? "Georreferenciado" : "Sin georreferencia") +
+      "</strong></div>" +
+      '<div class="scm-property-geo-summary"><span class="material-symbols-outlined">location_on</span><span>' +
+      escHtml(locationLabel) +
+      "</span></div>";
 
-    if (payload.googleMapsUrl) {
-      html +=
-        '<p class="scm-case-location-source"><strong>Ubicacion guardada:</strong> ' +
-        escHtml(payload.googleMapsUrl) +
-        "</p>";
-    }
-    if (info.coordsLabel) {
-      html +=
-        '<p class="scm-case-location-source"><strong>Coordenadas:</strong> ' +
-        escHtml(info.coordsLabel) +
-        "</p>";
-    }
-    if (!payload.manualLocation && !info.coordsLabel && payload.direccion) {
-      html +=
-        '<p class="scm-case-location-source"><strong>Direccion base:</strong> ' +
-        escHtml(payload.direccion) +
-        "</p>";
-    }
-
-    html += '<div class="scm-case-location-links">';
+    html += '<div class="scm-property-map-actions">';
     if (info.osmUrl) {
       html +=
-        '<a class="scm-case-location-link" href="' +
+        '<a class="scm-property-map-link" href="' +
         escHtml(info.osmUrl) +
-        '" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>';
+        '" target="_blank" rel="noopener noreferrer"><span class="material-symbols-outlined">public</span> OpenStreetMap</a>';
     }
     if (info.googleUrl) {
       html +=
-        '<a class="scm-case-location-link" href="' +
+        '<a class="scm-property-map-link" href="' +
         escHtml(info.googleUrl) +
-        '" target="_blank" rel="noopener noreferrer">Google Maps</a>';
+        '" target="_blank" rel="noopener noreferrer"><span class="material-symbols-outlined">travel_explore</span> Google Maps</a>';
     }
     if (!info.osmUrl && !info.googleUrl) {
       html +=
         '<span class="scm-case-location-empty">No hay ubicacion registrada todavia.</span>';
     }
     html += "</div>";
-
-    if (info.embedUrl) {
-      html +=
-        '<div class="scm-case-location-map"><iframe loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="' +
-        escHtml(info.embedUrl) +
-        '" title="Mapa del inmueble"></iframe></div>';
-    }
+    html += renderPropertyMapPreview(info, locationLabel, payload.propertyCode);
 
     html += "</section>";
     return html;
@@ -1323,7 +1331,7 @@
     var payload = locationInfo.payload;
     return (
       renderCaseLocationPanel(caseBtn, fallbackNode, false) +
-      '<form class="scm-property-location-form" method="post" autocomplete="off">' +
+      '<form class="scm-property-location-form scm-property-location-editor" method="post" autocomplete="off">' +
       '<input type="hidden" name="ticket_pk" value="' +
       escHtml(
         readCaseValue(caseBtn, fallbackNode, "ticketPk") ||
@@ -1336,15 +1344,15 @@
       '<input type="hidden" name="property_code" value="' +
       escHtml(payload.propertyCode || "") +
       '">' +
-      '<label class="scm-seg-field"><span>Ubicacion del inmueble</span><textarea name="manual_location" rows="4" placeholder="Pega un link de Google Maps, OpenStreetMap, coordenadas lat,lng o una direccion">' +
+      '<label class="scm-seg-field scm-property-location-field"><span>Actualizar enlace o coordenadas</span><textarea name="manual_location" rows="3" placeholder="Pega un enlace de Google Maps, OpenStreetMap, coordenadas lat,lng o una dirección normalizada...">' +
       escHtml(payload.googleMapsUrl || "") +
       "</textarea></label>" +
-      '<p class="scm-muted">Tambien tomamos como apoyo la direccion y las coordenadas actuales del inmueble cuando existen.</p>' +
-      '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">' +
+      '<div class="scm-property-location-foot"><p class="scm-muted"><span class="material-symbols-outlined">info</span> También tomamos como apoyo la dirección y las coordenadas actuales del inmueble cuando existen.</p>' +
+      '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary"><span class="material-symbols-outlined">save</span> ' +
       (locationInfo.hasLocation
         ? "Guardar ubicacion manual"
         : "Agregar ubicacion manual") +
-      '</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+      '</button><span class="scm-seg-msg" aria-live="polite"></span></div></div>' +
       "</form>"
     );
   }
