@@ -96,6 +96,8 @@ trait TableRowsConcern
       $ticketUrl = ($ticketBaseUrl !== '' && $ticketIdUrl !== '') ? esc_url($ticketBaseUrl . rawurlencode($ticketIdUrl)) : '';
       $idCotzUrl = $this->firstIdValue($idCotz);
       $cotzUrl = ($tieneCotz && $idCotzUrl !== '') ? esc_url(\SCM\App\SuCasaControlServiciosInmobiliarios::signedMaintenanceQuotePublicUrl((int) $idCotzUrl)) : '';
+      $idPrevUrl = $this->firstIdValue($idPrev);
+      $idCorrUrl = $this->firstIdValue($idCorr);
 
       $employee = trim((string) ($row['nombre_empleado'] ?? $row['empleado'] ?? ''));
       $employeeId = trim((string) ($row['id_empleado'] ?? ''));
