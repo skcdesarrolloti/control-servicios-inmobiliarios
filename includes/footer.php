@@ -77,6 +77,34 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           configDropdown.classList.toggle('hidden', !isHidden);
           configBtn.setAttribute('aria-expanded', String(isHidden));
         });
+
+        configDropdown.addEventListener('click', function (e) {
+          const actionBtn = e.target.closest('[data-scm-config-action]');
+          if (!actionBtn) return;
+          const action = actionBtn.getAttribute('data-scm-config-action');
+          configDropdown.classList.add('hidden');
+          configBtn.setAttribute('aria-expanded', 'false');
+
+          if (action === 'permissions') {
+            const el = document.getElementById('scm-open-permissions');
+            if (el) el.click();
+            else window.dispatchEvent(new CustomEvent('scm:open-configuracion'));
+          } else if (action === 'due-settings') {
+            const el = document.querySelector('[data-scm-open-due-settings]');
+            if (el) el.click();
+          } else if (action === 'notifications') {
+            const el = document.getElementById('scm-open-internal-notifications') || document.getElementById('scm-open-pqr-settings');
+            if (el) el.click();
+            else window.dispatchEvent(new CustomEvent('scm:open-notificaciones'));
+          } else if (action === 'actas-guide') {
+            const el = document.getElementById('scm-open-actas-guide');
+            if (el) el.click();
+          } else if (action === 'guide') {
+            const el = document.getElementById('scm-open-guide');
+            if (el) el.click();
+            else window.dispatchEvent(new CustomEvent('scm:open-guia'));
+          }
+        });
       }
 
       if (notifBtn && notifDropdown) {
@@ -122,35 +150,6 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
         });
       }
 
-        configDropdown.addEventListener('click', function (e) {
-          const actionBtn = e.target.closest('[data-scm-config-action]');
-          if (!actionBtn) return;
-          const action = actionBtn.getAttribute('data-scm-config-action');
-          configDropdown.classList.add('hidden');
-          configBtn.setAttribute('aria-expanded', 'false');
-
-          if (action === 'permissions') {
-            const el = document.getElementById('scm-open-permissions');
-            if (el) el.click();
-            else window.dispatchEvent(new CustomEvent('scm:open-configuracion'));
-          } else if (action === 'due-settings') {
-            const el = document.querySelector('[data-scm-open-due-settings]');
-            if (el) el.click();
-          } else if (action === 'notifications') {
-            const el = document.getElementById('scm-open-internal-notifications') || document.getElementById('scm-open-pqr-settings');
-            if (el) el.click();
-            else window.dispatchEvent(new CustomEvent('scm:open-notificaciones'));
-          } else if (action === 'actas-guide') {
-            const el = document.getElementById('scm-open-actas-guide');
-            if (el) el.click();
-          } else if (action === 'guide') {
-            const el = document.getElementById('scm-open-guide');
-            if (el) el.click();
-            else window.dispatchEvent(new CustomEvent('scm:open-guia'));
-          }
-        });
-      }
-
       // 1b. Menús desplegables del navbar (Inicio, Gestión de Casos, Actividades Administrativas)
       const navDropdownContainers = document.querySelectorAll('[data-scm-nav-dropdown]');
       navDropdownContainers.forEach(function (container) {
@@ -171,6 +170,7 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           });
           if (dropdownMenu) dropdownMenu.classList.add('hidden');
           if (configDropdown) configDropdown.classList.add('hidden');
+          if (notifDropdown) notifDropdown.classList.add('hidden');
           menu.classList.remove('hidden');
           container.classList.add('open');
           trigger.setAttribute('aria-expanded', 'true');
