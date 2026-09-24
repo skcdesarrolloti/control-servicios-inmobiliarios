@@ -306,7 +306,6 @@ final class GenericTicketsCardView
     $updatedTs = (int) call_user_func($this->parseTs, $row['fecha_actualizacion'] ?? '');
     $tiempoEjecucion = (string) call_user_func($this->humanDurationSince, $creadoTs);
     $tiempoSinActualizar = (string) call_user_func($this->humanDurationSince, $updatedTs > 0 ? $updatedTs : $creadoTs);
-    $timelineHtml = $this->renderGenericTimeline($row, $hitos);
     $temaLabel = $temaRaw !== '' ? $temaRaw : '-';
     $magnitudCasoBadge = $this->renderMagnitudeBadge($magnitudCasoRaw);
     $perturbacionKey = strtolower($perturbacionRaw);
@@ -380,7 +379,6 @@ final class GenericTicketsCardView
     if ($isPreventivaTicket) {
       $caseSource .= $this->renderPreventivaNoAccessSummary($preventivaNoAccessCount);
     }
-    $caseSource .= '<div class="scm-modal-timeline-only">' . $timelineHtml . '</div>';
     $caseSource .= '<div class="scm-seg-wrap">' . (string) call_user_func($this->renderSeguimientoForm, $ticketPk, Auth::isLoggedIn(), $cotizacionPendienteRespuesta) . '</div>';
     $caseSource .= (string) call_user_func($this->renderHistorialBlock, $historialItems);
     $caseSource .= (string) call_user_func($this->renderRecordSection, 'Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);

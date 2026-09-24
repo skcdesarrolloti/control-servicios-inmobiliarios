@@ -92,32 +92,10 @@ trait TableRowsConcern
       $idCorr = trim((string) ($row['id_revision_correctiva'] ?? ''));
       $tieneCorr = $idCorr !== '';
 
-      $steps = $this->timelineEngine->build($row, $definitions);
-
       $ticketIdUrl = $this->firstIdValue($idTicket);
       $ticketUrl = ($ticketBaseUrl !== '' && $ticketIdUrl !== '') ? esc_url($ticketBaseUrl . rawurlencode($ticketIdUrl)) : '';
-
-      $idPrevUrl = $this->firstIdValue($idPrev);
-      $idCorrUrl = $this->firstIdValue($idCorr);
       $idCotzUrl = $this->firstIdValue($idCotz);
-      $idActaUrl = $this->firstIdValue(trim((string) ($row['_scm_cot_id_acta'] ?? '')));
-      $calendarEventId = $this->firstIdValue(trim((string) ($row['_scm_cita_cal_id'] ?? '')));
-
-      $prevUrl = ($tienePrev && $preventivaBaseUrl !== '' && $idPrevUrl !== '') ? esc_url($preventivaBaseUrl . rawurlencode($idPrevUrl)) : '';
-      $corrUrl = ($tieneCorr && $correctivaBaseUrl !== '' && $idCorrUrl !== '') ? esc_url($correctivaBaseUrl . rawurlencode($idCorrUrl)) : '';
-      $actaUrl = ($actaBaseUrl !== '' && $idActaUrl !== '') ? esc_url($actaBaseUrl . rawurlencode($idActaUrl)) : '';
       $cotzUrl = ($tieneCotz && $idCotzUrl !== '') ? esc_url(\SCM\App\SuCasaControlServiciosInmobiliarios::signedMaintenanceQuotePublicUrl((int) $idCotzUrl)) : '';
-      $calendarUrl = $calendarEventId !== '' ? esc_url('https://calendar-skc.netlify.app/evento/' . rawurlencode($calendarEventId)) : '';
-      $stepLinks = [
-        'queja_registrada' => $ticketUrl,
-        'cita_agendada' => $calendarUrl !== '' ? $calendarUrl : $ticketUrl,
-        'revision_correctiva_registrada' => $corrUrl !== '' ? $corrUrl : ($prevUrl !== '' ? $prevUrl : $ticketUrl),
-        'cotizacion_registrada' => $cotzUrl !== '' ? $cotzUrl : $ticketUrl,
-        'cotizacion_enviada' => $cotzUrl !== '' ? $cotzUrl : $ticketUrl,
-        'respuesta_cotizacion' => $cotzUrl !== '' ? $cotzUrl : $ticketUrl,
-        'trabajo_finalizado' => $actaUrl !== '' ? $actaUrl : ($cotzUrl !== '' ? $cotzUrl : $ticketUrl),
-      ];
-      $timeline = $this->renderTimeline($steps, $stepLinks);
 
       $employee = trim((string) ($row['nombre_empleado'] ?? $row['empleado'] ?? ''));
       $employeeId = trim((string) ($row['id_empleado'] ?? ''));
@@ -183,9 +161,6 @@ trait TableRowsConcern
       if ($isPreventivaTicket) {
         $caseSource .= $this->renderPreventivaNoAccessSummary($preventivaNoAccessCount);
       }
-      $caseSource .= '<div class="scm-modal-timeline-only">';
-      $caseSource .= $timeline;
-      $caseSource .= '</div>';
       $caseSource .= '<div class="scm-seg-wrap">';
       $caseSource .= (string) call_user_func($this->seguimientoFormRenderer, $ticketPk, $canSeguimiento, $cotizacionPendienteRespuesta);
       $caseSource .= '</div>';
