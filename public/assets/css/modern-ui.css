@@ -955,10 +955,58 @@ body,
   gap: 0.4rem !important;
 }
 
+#scm-app .scm-case-submodal--contacts .scm-case-submodal-dialog {
+  width: min(900px, calc(100% - 1rem)) !important;
+  border-radius: 1rem !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 28px 80px rgba(15, 30, 54, 0.22) !important;
+}
+
+#scm-app .scm-case-submodal--contacts .scm-case-submodal-head {
+  padding: 1.15rem 3rem 0.85rem 1.25rem !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+#scm-app .scm-case-submodal--contacts .scm-case-submodal-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.6rem !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
+}
+
+#scm-app .scm-case-submodal--contacts .scm-case-submodal-title::before {
+  content: 'groups' !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  border-radius: 0.7rem !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  font-family: 'Material Symbols Outlined' !important;
+  font-size: 1.05rem !important;
+  font-weight: normal !important;
+}
+
+#scm-app .scm-case-submodal--contacts .scm-case-submodal-meta {
+  margin-left: 2.6rem !important;
+  color: #2563eb !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+}
+
+#scm-app .scm-case-submodal--contacts .scm-case-submodal-body {
+  padding: 1.25rem !important;
+  background: #ffffff !important;
+}
+
 #scm-app .scm-contact-view-actions {
   display: flex !important;
   justify-content: flex-end !important;
-  margin-bottom: 0.9rem !important;
+  margin-bottom: 0 !important;
 }
 
 #scm-app .scm-contact-view-edit-btn {
@@ -990,7 +1038,7 @@ body,
 #scm-app .scm-contact-edit-grid {
   display: grid !important;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 1rem !important;
+  gap: 1.15rem !important;
 }
 
 #scm-app .scm-contact-view-card,
@@ -1002,7 +1050,7 @@ body,
 }
 
 #scm-app .scm-contact-view-card {
-  padding: 1rem !important;
+  padding: 1.05rem !important;
 }
 
 #scm-app .scm-contact-view-card-head {
@@ -1044,7 +1092,7 @@ body,
 
 #scm-app .scm-contact-view-card .scm-detail-list {
   display: grid !important;
-  gap: 0.6rem !important;
+  gap: 0.7rem !important;
   margin: 0 !important;
 }
 
@@ -1056,9 +1104,14 @@ body,
 }
 
 #scm-app .scm-contact-view-card .scm-detail-list dd {
-  margin: -0.35rem 0 0 !important;
+  margin: -0.4rem 0 0 !important;
   color: #0f1e36 !important;
   font-size: 0.84rem !important;
+}
+
+#scm-app .scm-contact-shell {
+  display: grid !important;
+  gap: 1rem !important;
 }
 
 #scm-app .scm-contact-editor-modern {
@@ -1091,7 +1144,7 @@ body,
 
 #scm-app .scm-contact-edit-group {
   margin: 0 !important;
-  padding: 1rem !important;
+  padding: 1rem 1rem 1.05rem !important;
 }
 
 #scm-app .scm-contact-edit-group legend {
@@ -1108,10 +1161,162 @@ body,
   font-size: 1rem !important;
 }
 
+#scm-app .scm-contact-edit-group .scm-seg-field {
+  gap: 0.35rem !important;
+}
+
+#scm-app .scm-contact-edit-group .scm-seg-field > span {
+  color: #64748b !important;
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+}
+
+#scm-app .scm-contact-edit-group input,
+#scm-app .scm-contact-edit-group select {
+  border: 1px solid #dbe6f1 !important;
+  border-radius: 0.55rem !important;
+  min-height: 2.35rem !important;
+  color: #0f1e36 !important;
+}
+
+#scm-app .scm-contact-history-panel {
+  border: 1px solid #dbe6f1 !important;
+  border-radius: 1rem !important;
+  background: #ffffff !important;
+  padding: 1rem !important;
+  box-shadow: 0 1px 3px rgba(15, 30, 54, 0.04) !important;
+}
+
+#scm-app .scm-contact-history-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 1rem !important;
+  padding-bottom: 0.75rem !important;
+  margin-bottom: 0.85rem !important;
+  border-bottom: 1px solid #edf2f7 !important;
+}
+
+#scm-app .scm-contact-history-head h5 {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.45rem !important;
+  margin: 0 !important;
+  color: #0f1e36 !important;
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+}
+
+#scm-app .scm-contact-history-head .material-symbols-outlined {
+  color: #2563eb !important;
+  font-size: 1rem !important;
+}
+
+#scm-app .scm-contact-history-head > span {
+  color: #64748b !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+}
+
+#scm-app .scm-contact-history-panel .scm-case-history {
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+#scm-app .scm-contact-history-panel .scm-case-history > h4 {
+  display: none !important;
+}
+
+#scm-app .scm-contact-history-panel .scm-case-history-list {
+  padding-left: 1.45rem !important;
+  margin-left: 0.15rem !important;
+}
+
+#scm-app .scm-contact-history-panel .scm-case-history-list::before {
+  left: 0.34rem !important;
+  background: #dbeafe !important;
+}
+
+#scm-app .scm-contact-history-panel .scm-case-record-card,
+#scm-app .scm-contact-history-panel .scm-case-history-item {
+  border-radius: 0.65rem !important;
+  padding: 0.75rem 0.9rem !important;
+  margin-bottom: 0.65rem !important;
+  border-color: #dbe6f1 !important;
+  box-shadow: 0 2px 8px rgba(15, 30, 54, 0.04) !important;
+}
+
+#scm-app .scm-contact-history-panel .scm-case-record-card::before,
+#scm-app .scm-contact-history-panel .scm-case-history-item::before {
+  left: -1.38rem !important;
+  top: 0.9rem !important;
+  width: 10px !important;
+  height: 10px !important;
+}
+
+#scm-app .scm-contact-history-panel .scm-case-record-detail {
+  font-size: 0.8rem !important;
+  line-height: 1.45 !important;
+}
+
+#scm-app .scm-contact-history-empty {
+  margin: 0 !important;
+  padding: 0.75rem !important;
+  border: 1px dashed #cbd5e1 !important;
+  border-radius: 0.75rem !important;
+  color: #64748b !important;
+  font-size: 0.8rem !important;
+  text-align: center !important;
+}
+
+#scm-app .scm-contact-view-footer,
+#scm-app .scm-contact-audit-note {
+  color: #94a3b8 !important;
+  font-size: 0.68rem !important;
+}
+
+#scm-app .scm-contact-view-footer span,
+#scm-app .scm-contact-audit-note {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+}
+
+#scm-app .scm-contact-view-footer .material-symbols-outlined,
+#scm-app .scm-contact-audit-note .material-symbols-outlined {
+  font-size: 0.82rem !important;
+}
+
+#scm-app .scm-contact-footer-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0.65rem !important;
+  padding-top: 1rem !important;
+  margin-top: 0.25rem !important;
+  border-top: 1px solid #edf2f7 !important;
+}
+
+#scm-app .scm-contact-footer-actions .scm-contact-audit-note,
+#scm-app .scm-contact-footer-actions .scm-seg-msg {
+  margin-right: auto !important;
+}
+
 @media (max-width: 760px) {
   #scm-app .scm-contact-view-grid,
   #scm-app .scm-contact-edit-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  #scm-app .scm-contact-history-head,
+  #scm-app .scm-contact-footer-actions {
+    align-items: stretch !important;
+    flex-direction: column !important;
   }
 }
 

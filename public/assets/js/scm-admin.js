@@ -685,7 +685,7 @@
     }
     var existing = modal.querySelector(".scm-case-submodal");
     if (existing) {
-      existing.classList.remove("scm-case-submodal--property-history", "scm-case-submodal--transfer");
+      existing.classList.remove("scm-case-submodal--property-history", "scm-case-submodal--transfer", "scm-case-submodal--contacts");
       return existing;
     }
 
@@ -1066,7 +1066,7 @@
     if (!sub) {
       return;
     }
-    sub.classList.remove("scm-case-submodal--transfer");
+    sub.classList.remove("scm-case-submodal--transfer", "scm-case-submodal--contacts");
     sub.classList.toggle("scm-case-submodal--property-history", targetId === "scm-sec-hist-inmueble");
 
     var clone = source.cloneNode(true);
@@ -4070,6 +4070,34 @@
     return html + "</select></label>";
   }
 
+  function getContactPropertyHistoryData(caseBtn) {
+    var card = caseBtn ? caseBtn.closest(".scm-ticket-card, .scm-card, article") : null;
+    var source = card ? card.querySelector(".scm-case-source") : null;
+    var history = source ? source.querySelector("#scm-sec-hist-inmueble") : null;
+    if (!history) {
+      return {
+        count: 0,
+        html: '<p class="scm-contact-history-empty">Sin novedades registradas para este inmueble.</p>',
+      };
+    }
+    var clone = history.cloneNode(true);
+    clone.removeAttribute("id");
+    var count = clone.querySelectorAll(".scm-case-history-item, .scm-case-record-card").length;
+    var list = clone.querySelector(".scm-case-history-list");
+    if (list) {
+      Array.prototype.slice.call(list.children).forEach(function (item, index) {
+        item.style.display = index < 2 ? "" : "none";
+      });
+    }
+    clone.querySelectorAll(".scm-history-pagination").forEach(function (pager) {
+      pager.remove();
+    });
+    return {
+      count: count,
+      html: clone.innerHTML,
+    };
+  }
+
   function openContactEditor(modal, caseBtn) {
     var sub = ensureCaseSubmodal(modal);
     if (!sub || !caseBtn) return;
@@ -4079,11 +4107,12 @@
     var title = sub.querySelector(".scm-case-submodal-title");
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = caseBtn.dataset.ticketPk || "";
+    sub.classList.add("scm-case-submodal--contacts");
     if (title) title.textContent = "Editar datos de titulares";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
       body.innerHTML =
-        '<form class="scm-contact-update-form scm-contact-editor-modern" method="post" autocomplete="off">' +
+        '<form class="scm-contact-update-form scm-contact-editor-modern scm-contact-shell" method="post" autocomplete="off">' +
         '<input type="hidden" name="ticket_pk" value="' +
         escHtml(ticketPk) +
         '">' +
@@ -4122,9 +4151,15 @@
         '"></label>' +
         "</fieldset>" +
         "</div>" +
-        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Guardar cambios</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        '<div class="scm-contact-audit-note"><span class="material-symbols-outlined">lock</span> Edición auditada bajo protocolo RGPD / Habeas Data</div>' +
+        '<div class="scm-seg-actions scm-contact-footer-actions"><button type="button" class="scm-btn-secondary" data-scm-case-submodal-cancel>Cancelar</button><button type="submit" class="scm-btn-primary"><span class="material-symbols-outlined">check</span> Guardar cambios</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
-      prependCaseLocationPanel(body, caseBtn, modal);
+      var cancelBtn = body.querySelector("[data-scm-case-submodal-cancel]");
+      if (cancelBtn) {
+        cancelBtn.addEventListener("click", function () {
+          closeCaseSubmodal(modal);
+        });
+      }
     }
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
@@ -4162,8 +4197,12 @@
           .join(" ")
           .trim(),
       );
+    var historyData = getContactPropertyHistoryData(caseBtn);
+    var historyCountText = historyData.count + " evento" + (historyData.count === 1 ? "" : "s") + " registrado" + (historyData.count === 1 ? "" : "s");
 
     return (
+      '<div class="scm-contact-shell">' +
+      '<div class="scm-contact-editor-note"><span class="material-symbols-outlined">info</span><p>Los cambios realizados actualizarán de forma inmediata las fichas vinculadas al inmueble y las notificaciones automatizadas del sistema.</p></div>' +
       '<div class="scm-contact-view-actions"><button type="button" class="scm-contact-view-edit-btn" data-scm-edit-contacts-from-view><span class="material-symbols-outlined">edit</span> Editar datos</button></div>' +
       '<div class="scm-contact-view-grid scm-contact-view-modern">' +
       '<section class="scm-contact-view-card scm-contact-view-card-owner"><div class="scm-contact-view-card-head"><h5>Propietario</h5><span>Titular registrado</span></div>' +
@@ -4176,6 +4215,11 @@
         ? '<dl class="scm-detail-list">' + arrendatario + "</dl>"
         : '<p class="scm-muted">Sin datos de arrendatario.</p>') +
       "</section>" +
+      "</div>" +
+      '<section class="scm-contact-history-panel"><div class="scm-contact-history-head"><h5><span class="material-symbols-outlined">history</span> Historial de novedades del inmueble</h5><span>' + escHtml(historyCountText) + '</span></div>' +
+      historyData.html +
+      "</section>" +
+      '<div class="scm-contact-view-footer"><span><span class="material-symbols-outlined">lock</span> Edición auditada bajo protocolo RGPD / Habeas Data</span></div>' +
       "</div>"
     );
   }
@@ -4185,6 +4229,7 @@
     if (!sub || !caseBtn) return;
     var title = sub.querySelector(".scm-case-submodal-title");
     var body = sub.querySelector(".scm-case-submodal-body");
+    sub.classList.add("scm-case-submodal--contacts");
     if (title) title.textContent = "Contactos del caso y titulares";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
@@ -4195,7 +4240,6 @@
           openContactEditor(modal, caseBtn);
         });
       }
-      prependCaseLocationPanel(body, caseBtn, modal);
     }
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
