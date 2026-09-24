@@ -4587,6 +4587,15 @@ body,
   font-size: 0.95rem !important;
 }
 
+#scm-app .scm-transfer-chip-dot {
+  display: inline-block !important;
+  width: 0.45rem !important;
+  height: 0.45rem !important;
+  border-radius: 9999px !important;
+  background: #2563eb !important;
+  box-shadow: 0 0 0 0.22rem #dbeafe !important;
+}
+
 #scm-app .scm-transfer-meta-row b,
 #scm-app .scm-transfer-meta-row strong {
   color: #1e3a8a !important;
@@ -4608,6 +4617,20 @@ body,
   font-size: 1rem !important;
   margin-top: 0.08rem !important;
   color: #d97706 !important;
+}
+
+#scm-app .scm-transfer-warning > span {
+  align-items: center !important;
+  border: 1px solid #fbbf24 !important;
+  border-radius: 9999px !important;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  font-size: 0.72rem !important;
+  font-weight: 900 !important;
+  height: 1.1rem !important;
+  justify-content: center !important;
+  margin-top: 0.05rem !important;
+  width: 1.1rem !important;
 }
 
 #scm-app .scm-transfer-warning p {
@@ -4700,7 +4723,7 @@ body,
 
 #scm-app .scm-transfer-select-wrap select {
   min-height: 2.8rem !important;
-  padding-left: 2.55rem !important;
+  padding-left: 0.85rem !important;
 }
 
 #scm-app .scm-transfer-field textarea {
@@ -4939,6 +4962,255 @@ body,
   margin-right: auto !important;
   color: #64748b !important;
   font-size: 0.75rem !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-case-submodal-dialog {
+  width: min(61rem, calc(100% - 1.5rem)) !important;
+  max-height: min(92vh, 860px) !important;
+  border-radius: 1rem !important;
+  border: 1px solid rgba(226, 232, 240, 0.95) !important;
+  background: #ffffff !important;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28) !important;
+  font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  overflow: hidden !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-case-submodal-head {
+  padding: 1.35rem 1.55rem 1.15rem !important;
+  border-bottom: 1px solid #eef2f7 !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-case-submodal-title {
+  color: #0f1e36 !important;
+  font-size: 1.35rem !important;
+  font-weight: 900 !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-case-submodal-body {
+  background: #ffffff !important;
+  padding: 1.45rem 1.55rem 0 !important;
+}
+
+#scm-app .scm-calendar-case-form-modern {
+  display: grid !important;
+  gap: 1rem !important;
+}
+
+#scm-app .scm-calendar-case-kicker {
+  align-items: center !important;
+  color: #64748b !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  gap: 0.55rem !important;
+}
+
+#scm-app .scm-calendar-case-kicker span {
+  background: #eff6ff !important;
+  border-radius: 9999px !important;
+  color: #2563eb !important;
+  font-weight: 900 !important;
+  padding: 0.25rem 0.55rem !important;
+}
+
+#scm-app .scm-calendar-case-alert {
+  align-items: flex-start !important;
+  background: #fffbeb !important;
+  border: 1px solid #fde68a !important;
+  border-radius: 0.8rem !important;
+  color: #92400e !important;
+  display: flex !important;
+  gap: 0.75rem !important;
+  padding: 1rem 1.1rem !important;
+}
+
+#scm-app .scm-calendar-case-alert > span {
+  align-items: center !important;
+  border: 1px solid #fbbf24 !important;
+  border-radius: 0.55rem !important;
+  color: #b45309 !important;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  font-size: 0.8rem !important;
+  font-weight: 900 !important;
+  height: 1.45rem !important;
+  justify-content: center !important;
+  width: 1.45rem !important;
+}
+
+#scm-app .scm-calendar-case-alert p {
+  color: #9a3412 !important;
+  font-size: 0.82rem !important;
+  font-weight: 650 !important;
+  line-height: 1.55 !important;
+  margin: 0 !important;
+}
+
+#scm-app .scm-calendar-case-grid {
+  display: grid !important;
+  gap: 0.9rem !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-seg-field {
+  display: grid !important;
+  gap: 0.45rem !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-seg-field > span {
+  align-items: center !important;
+  color: #64748b !important;
+  display: flex !important;
+  font-size: 0.72rem !important;
+  font-weight: 900 !important;
+  gap: 0.45rem !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-seg-field > span a {
+  color: #2563eb !important;
+  font-size: 0.7rem !important;
+  font-weight: 850 !important;
+  margin-left: auto !important;
+  text-decoration: none !important;
+  text-transform: none !important;
+}
+
+#scm-app .scm-case-submodal--schedule input,
+#scm-app .scm-case-submodal--schedule select,
+#scm-app .scm-case-submodal--schedule textarea {
+  background: #ffffff !important;
+  border: 1px solid #cfe0f4 !important;
+  border-radius: 0.65rem !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.04) !important;
+  color: #0f1e36 !important;
+  font: inherit !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  min-height: 2.75rem !important;
+  padding: 0.65rem 0.8rem !important;
+  width: 100% !important;
+}
+
+#scm-app .scm-case-submodal--schedule textarea {
+  line-height: 1.5 !important;
+  min-height: 6.7rem !important;
+  resize: vertical !important;
+}
+
+#scm-app .scm-case-submodal--schedule input:focus,
+#scm-app .scm-case-submodal--schedule select:focus,
+#scm-app .scm-case-submodal--schedule textarea:focus {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15) !important;
+  outline: none !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-calendar-field-full {
+  grid-column: 1 / -1 !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-seg-field small {
+  color: #64748b !important;
+  font-size: 0.7rem !important;
+  font-weight: 650 !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-calendar-case-tools {
+  align-items: center !important;
+  background: #eff6ff !important;
+  border: 1px solid #dbeafe !important;
+  border-radius: 0.9rem !important;
+  display: flex !important;
+  gap: 1rem !important;
+  justify-content: space-between !important;
+  margin-top: 0 !important;
+  padding: 0.9rem 1rem !important;
+}
+
+#scm-app .scm-calendar-case-assignee {
+  align-items: center !important;
+  display: flex !important;
+  gap: 0.8rem !important;
+  min-width: 0 !important;
+}
+
+#scm-app .scm-calendar-case-avatar {
+  align-items: center !important;
+  background: #0f1e36 !important;
+  border-radius: 9999px !important;
+  color: #ffffff !important;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  font-size: 0.78rem !important;
+  font-weight: 900 !important;
+  height: 2.6rem !important;
+  justify-content: center !important;
+  width: 2.6rem !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-calendar-case-tools strong {
+  color: #0f1e36 !important;
+  font-size: 0.82rem !important;
+  font-weight: 900 !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-calendar-case-tools span {
+  color: #64748b !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-calendar-case-open-btn {
+  background: #ffffff !important;
+  border: 1px solid #bfdbfe !important;
+  border-radius: 0.65rem !important;
+  color: #2563eb !important;
+  min-height: 2.45rem !important;
+  min-width: 11rem !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-seg-actions {
+  align-items: center !important;
+  background: #f8fafc !important;
+  border-top: 1px solid #f1f5f9 !important;
+  display: flex !important;
+  gap: 0.8rem !important;
+  justify-content: flex-end !important;
+  margin: 0 -1.55rem !important;
+  padding: 1rem 1.55rem !important;
+}
+
+#scm-app .scm-calendar-case-footnote {
+  color: #94a3b8 !important;
+  font-size: 0.72rem !important;
+  font-weight: 750 !important;
+  margin-right: auto !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-btn-primary,
+#scm-app .scm-case-submodal--schedule .scm-btn-secondary {
+  border-radius: 0.65rem !important;
+  min-height: 2.55rem !important;
+  padding: 0.6rem 1rem !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-btn-primary {
+  background: #f59e0b !important;
+  border: 1px solid #f59e0b !important;
+  box-shadow: 0 8px 18px rgba(245, 158, 11, 0.22) !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+}
+
+#scm-app .scm-case-submodal--schedule .scm-btn-secondary {
+  background: #ffffff !important;
+  border: 1px solid #dbe6f2 !important;
+  color: #475569 !important;
+  font-weight: 800 !important;
 }
 
 #scm-app .scm-case-submodal--workflow .scm-case-submodal-dialog {

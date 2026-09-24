@@ -754,6 +754,7 @@
         "scm-case-submodal--property-history",
         "scm-case-submodal--property-tech",
         "scm-case-submodal--transfer",
+        "scm-case-submodal--schedule",
         "scm-case-submodal--contacts",
         "scm-case-submodal--workflow",
         "scm-case-submodal--reply",
@@ -2071,25 +2072,25 @@
         escHtml(ticketPk) +
         '">' +
         '<div class="scm-transfer-meta-row">' +
-        '<span><span class="material-symbols-outlined">domain</span><b>Código inmueble web:</b> <strong>' +
+        '<span><i class="scm-transfer-chip-dot" aria-hidden="true"></i><b>Código inmueble web:</b> <strong>' +
         escHtml(propertyCode) +
         "</strong></span>" +
         (logicalTicket
-          ? '<span><span class="material-symbols-outlined">confirmation_number</span><b>Caso activo</b> #' +
+          ? '<span><i class="scm-transfer-chip-dot" aria-hidden="true"></i><b>Caso activo</b> #' +
             escHtml(logicalTicket) +
             "</span>"
           : "") +
         (statusLabel
-          ? '<span><span class="material-symbols-outlined">radio_button_checked</span>' +
+          ? '<span><i class="scm-transfer-chip-dot" aria-hidden="true"></i>' +
             escHtml(statusLabel) +
             "</span>"
           : "") +
         "</div>" +
-        '<div class="scm-transfer-warning"><span class="material-symbols-outlined">info</span><p>Al confirmar el traslado, el seguimiento operativo y los compromisos de SLA pasarán al funcionario receptor. Esta acción quedará registrada en la bitácora de auditoría del inmueble.</p></div>' +
+        '<div class="scm-transfer-warning"><span aria-hidden="true">i</span><p>Al confirmar el traslado, el seguimiento operativo y los compromisos de SLA pasarán al funcionario receptor. Esta acción quedará registrada en la bitácora de auditoría del inmueble.</p></div>' +
         '<div class="scm-transfer-current"><span>Funcionario actual a cargo:</span><strong><i></i>' +
         escHtml(currentEmpLabel) +
         "</strong></div>" +
-        '<label class="scm-seg-field scm-transfer-field"><span>Nuevo funcionario responsable <em>*</em></span><div class="scm-transfer-select-wrap"><span class="material-symbols-outlined">person</span><select name="new_empleado_id" required>' +
+        '<label class="scm-seg-field scm-transfer-field"><span>Nuevo funcionario responsable <em>*</em></span><div class="scm-transfer-select-wrap"><select name="new_empleado_id" required>' +
         empOptions +
         "</select></div><small>El nuevo funcionario recibirá las alertas de trazabilidad de forma instantánea.</small></label>" +
         '<fieldset class="scm-notify-targets scm-notify-traslado scm-transfer-responsible-alert"><legend>Funcionario responsable</legend>' +
@@ -2099,7 +2100,7 @@
         '<label class="scm-seg-field scm-transfer-field"><span>Motivo o notas del traslado <em>Opcional</em></span><textarea name="observacion" rows="3" placeholder="Ej: Reasignación por turno laboral, especialidad en garantías o redistribución de carga..."></textarea></label>' +
         '<div class="scm-seg-actions">' +
         '<button type="button" class="scm-btn-secondary" data-scm-case-submodal-cancel>Cancelar</button>' +
-        '<button type="submit" class="scm-btn-primary"><span class="material-symbols-outlined">sync_alt</span> Trasladar caso</button>' +
+        '<button type="submit" class="scm-btn-primary">Trasladar caso</button>' +
         '<span class="scm-seg-msg" aria-live="polite"></span>' +
         "</div>" +
         "</form>";
@@ -4588,7 +4589,7 @@
       '<div class="scm-case-calendar-event-mini" data-scm-case-calendar-event-mini>' +
       '<div class="scm-case-calendar-event-mini-card" role="dialog" aria-modal="true" aria-label="Detalle del evento">' +
       '<button type="button" class="scm-case-calendar-event-mini-close" data-scm-case-calendar-event-mini-close aria-label="Cerrar detalle">&times;</button>' +
-      '<div class="scm-case-calendar-event-mini-head"><span>Detalle del evento</span><strong>' +
+      '<div class="scm-case-calendar-event-mini-head"><span>Ver caso del calendario</span><strong>' +
       escHtml(title) +
       "</strong></div>" +
       '<div class="scm-case-calendar-event-mini-grid">' +
@@ -4633,7 +4634,7 @@
       (isDone ? "Realizado" : "Pendiente") +
       "</span>" +
       (eventId
-        ? '<button type="button" class="scm-case-calendar-transfer-btn" data-scm-case-calendar-transfer-open>Trasladar evento</button>'
+        ? '<button type="button" class="scm-case-calendar-transfer-btn" data-scm-case-calendar-transfer-open>Trasladar / Reprogramar</button>'
         : "") +
       (eventId && !isDone
         ? '<button type="button" class="scm-case-calendar-complete-btn" data-scm-case-calendar-complete-open>Marcar realizado</button>'
@@ -4641,6 +4642,7 @@
       "</div>" +
       (eventId
         ? '<form class="scm-case-calendar-complete-panel scm-case-calendar-transfer-panel" data-scm-case-calendar-transfer-panel hidden autocomplete="off">' +
+          '<div class="scm-case-calendar-transfer-title"><strong>Trasladar / Reprogramar</strong><span>Define una nueva franja para emitir el alcance formal.</span></div>' +
           '<div class="scm-case-calendar-transfer-grid">' +
           '<label><span>Nueva fecha</span><input type="date" name="fecha" required value="' +
           escHtml(
@@ -5004,12 +5006,28 @@
           );
         }
         var rowsByDay = {};
-        extractCalendarRows(json.data || []).forEach(function (row) {
+        var allRows = extractCalendarRows(json.data || []);
+        var doneCount = 0;
+        var pendingCount = 0;
+        allRows.forEach(function (row) {
+          if (isCaseCalendarEventDone(row)) {
+            doneCount += 1;
+          } else {
+            pendingCount += 1;
+          }
           var key = caseCalendarEventDateKey(row);
           if (!key) return;
           if (!rowsByDay[key]) rowsByDay[key] = [];
           rowsByDay[key].push(row);
         });
+        var doneCountNode = shell
+          ? shell.querySelector("[data-scm-case-calendar-done-count]")
+          : null;
+        var pendingCountNode = shell
+          ? shell.querySelector("[data-scm-case-calendar-pending-count]")
+          : null;
+        if (doneCountNode) doneCountNode.textContent = String(doneCount);
+        if (pendingCountNode) pendingCountNode.textContent = String(pendingCount);
         Object.keys(rowsByDay).forEach(function (key) {
           rowsByDay[key].sort(function (a, b) {
             return String(a.fecha_inicio || "").localeCompare(
@@ -5034,6 +5052,9 @@
             classes.push("is-muted");
           if (key === todayKey) classes.push("is-today");
           if (holiday) classes.push("is-holiday");
+          if (rows.length) classes.push("has-events");
+          if (!rows.length && current.getMonth() === monthDate.getMonth())
+            classes.push("is-free");
           cells.push(
             '<div class="' +
               classes.join(" ") +
@@ -5043,7 +5064,13 @@
               "</span>" +
               (holiday
                 ? '<span class="scm-case-calendar-day-holiday">' +
-                  escHtml(holiday) +
+                   escHtml(holiday) +
+                   "</span>"
+                 : "") +
+              (rows.length
+                ? '<span class="scm-case-calendar-day-events-count">' +
+                  rows.length +
+                  (rows.length === 1 ? " evento" : " citas") +
                   "</span>"
                 : "") +
               "</div>" +
@@ -5053,7 +5080,9 @@
                   var detailIndex = eventDetails.push(row) - 1;
                   var done = isCaseCalendarEventDone(row);
                   return (
-                    '<div class="scm-case-calendar-day-pill"><div><strong>' +
+                    '<div class="scm-case-calendar-day-pill' +
+                    (done ? " is-done" : "") +
+                    '"><div><strong>' +
                     escHtml(formatCalendarDateTime(row.fecha_inicio)) +
                     "</strong><span>" +
                     escHtml(row.titulo || "Evento") +
@@ -5073,6 +5102,13 @@
                 ? '<div class="scm-case-calendar-day-more">+' +
                   (rows.length - 3) +
                   " más</div>"
+                : "") +
+              (!rows.length
+                ? '<div class="scm-case-calendar-day-free">' +
+                  (current.getMonth() === monthDate.getMonth()
+                    ? "Disponible"
+                    : "Sin citas") +
+                  "</div>"
                 : "") +
               "</div>",
           );
@@ -5233,9 +5269,12 @@
     options = options || {};
     var currentMonth = caseCalendarMonthDate(selectedDate);
     window.Swal.fire({
-      title: "Calendario del funcionario",
+      title: "",
       html:
         '<div class="scm-case-calendar-month-shell" data-scm-case-calendar-popup>' +
+        '<div class="scm-case-calendar-modal-head"><span class="scm-case-calendar-modal-icon" aria-hidden="true"></span><div><h3>Calendario del funcionario</h3><p>Funcionario asignado: <strong>' +
+        escHtml(employeeName || "Funcionario asignado") +
+        '</strong></p></div><span class="scm-case-calendar-modal-badge">Vista Operativa Mensual</span></div>' +
         '<div class="scm-case-calendar-toolbar">' +
         '<button type="button" class="scm-case-calendar-nav" data-scm-case-calendar-prev aria-label="Mes anterior">&lsaquo;</button>' +
         '<div class="scm-case-calendar-heading"><span>' +
@@ -5244,14 +5283,16 @@
         escHtml(caseCalendarMonthTitle(currentMonth)) +
         "</strong><small>Eventos y festivos de Colombia</small></div>" +
         '<button type="button" class="scm-case-calendar-nav" data-scm-case-calendar-next aria-label="Mes siguiente">&rsaquo;</button>' +
+        '<div class="scm-case-calendar-top-actions"><span class="scm-case-calendar-stat is-done"><b data-scm-case-calendar-done-count>0</b> Realizados</span><span class="scm-case-calendar-stat is-pending"><b data-scm-case-calendar-pending-count>0</b> Pendientes</span><button type="button" class="scm-case-calendar-pending-btn" data-scm-case-calendar-pending>Eventos pendientes</button></div>' +
         "</div>" +
-        '<div class="scm-case-calendar-top-actions"><button type="button" class="scm-case-calendar-pending-btn" data-scm-case-calendar-pending>Eventos pendientes</button></div>' +
         '<div class="scm-case-calendar-weekdays"><span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sa</span><span>Do</span></div>' +
         '<div class="scm-case-calendar-grid" data-scm-case-calendar-grid><div class="scm-case-calendar-empty">Cargando calendario...</div></div>' +
+        '<div class="scm-case-calendar-foot"><span>Revisi&oacute;n preventiva: 45 min por visita</span></div>' +
         "</div>",
-      width: 1120,
-      showConfirmButton: false,
+      width: 1180,
+      showConfirmButton: true,
       showCancelButton: true,
+      confirmButtonText: "OK",
       cancelButtonText: "Cerrar calendario",
       confirmButtonColor: "#f59e0b",
       cancelButtonColor: "#e2e8f0",
@@ -5383,9 +5424,31 @@
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = String(caseBtn.dataset.ticketPk || "").trim();
     var employeeId = String(caseBtn.dataset.empleadoId || "").trim();
+    var employeeName = String(
+      caseBtn.dataset.empleado || caseBtn.dataset.asignado || "",
+    ).trim();
     var contractLabel = String(caseBtn.dataset.contrato || "").trim();
     var asuntoLabel = String(caseBtn.dataset.asunto || "").trim();
     var addressLabel = String(caseBtn.dataset.direccion || "").trim();
+    var propertyCode = getCasePropertyCode(caseBtn, modal) || "-";
+    var logicalTicket = String(
+      caseBtn.dataset.ticket || caseBtn.dataset.idTicket || ticketPk || "",
+    )
+      .replace(/^#+/, "")
+      .trim();
+    var tenantLabel = String(
+      caseBtn.dataset.arrendatario || caseBtn.dataset.solicitante || "",
+    ).trim();
+    var mapsUrl = String(caseBtn.dataset.ubicacionGoogleMaps || "").trim();
+    var employeeParts = employeeName.split(/\s+/).filter(Boolean);
+    var employeeInitials = employeeParts.length
+      ? (
+          employeeParts[0].charAt(0) +
+          (employeeParts.length > 1
+            ? employeeParts[employeeParts.length - 1].charAt(0)
+            : "")
+        ).toUpperCase()
+      : "FI";
     var today = new Date();
     var yyyy = today.getFullYear();
     var mm = String(today.getMonth() + 1).padStart(2, "0");
@@ -5393,9 +5456,10 @@
     var dateValue = yyyy + "-" + mm + "-" + dd;
     if (title) title.textContent = "Agendar cita del caso";
     setCaseSubmodalMeta(sub, caseBtn);
+    sub.classList.add("scm-case-submodal--schedule");
     if (body) {
       body.innerHTML =
-        '<form class="scm-calendar-case-form" method="post" autocomplete="off">' +
+        '<form class="scm-calendar-case-form scm-calendar-case-form-modern" method="post" autocomplete="off">' +
         '<input type="hidden" name="id_ticket" value="' +
         escHtml(ticketPk) +
         '">' +
@@ -5403,11 +5467,14 @@
         escHtml(employeeId) +
         '">' +
         '<input type="hidden" name="es_cita" value="si">' +
-        '<div class="scm-calendar-case-note">Se crear&aacute; el evento en el calendario y quedar&aacute; enlazado al ticket #' +
-        escHtml(ticketPk || "-") +
-        ".</div>" +
-        '<div class="scm-grid">' +
-        '<label class="scm-seg-field"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required value="' +
+        '<div class="scm-calendar-case-kicker"><span>Ticket #' +
+        escHtml(logicalTicket || ticketPk || "-") +
+        "</span><b>M&oacute;dulo de Asignaciones T&eacute;cnicas</b></div>" +
+        '<div class="scm-calendar-case-alert"><span aria-hidden="true">!</span><p>Se crear&aacute; el evento en el calendario t&eacute;cnico y quedar&aacute; sincronizado con el ticket #' +
+        escHtml(logicalTicket || ticketPk || "-") +
+        " y la agenda del funcionario asignado.</p></div>" +
+        '<div class="scm-calendar-case-grid">' +
+        '<label class="scm-seg-field"><span>T&iacute;tulo del evento</span><input class="input input-bordered input-sm scm-input" name="titulo" required value="' +
         escHtml(buildCaseCalendarTitle("", contractLabel, ticketPk)) +
         '" data-auto-calendar-title="1"></label>' +
         '<label class="scm-seg-field"><span>Categor&iacute;a</span><select class="select select-bordered select-sm scm-select" name="id_categoria" required data-scm-calendar-case-categories><option value="">Cargando...</option></select></label>' +
@@ -5416,15 +5483,34 @@
         '"></label>' +
         '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required></label>' +
         '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required></label>' +
-        '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" value="' +
+        '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n del inmueble' +
+        (mapsUrl
+          ? ' <a href="' +
+            escHtml(mapsUrl) +
+            '" target="_blank" rel="noopener">Ver en Google Maps</a>'
+          : "") +
+        '</span><input class="input input-bordered input-sm scm-input" name="ubicacion" value="' +
         escHtml(addressLabel && addressLabel !== "-" ? addressLabel : "") +
         '" data-auto-calendar-location="1"></label>' +
-        '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required data-auto-calendar-text="1">' +
+        '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n e instrucciones</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required data-auto-calendar-text="1">' +
         escHtml(asuntoLabel && asuntoLabel !== "-" ? asuntoLabel : "") +
         "</textarea><small>Se autocompleta con el texto de cita y puedes editarlo si necesitas ajustar el mensaje.</small></label>" +
         "</div>" +
-        '<div class="scm-calendar-case-tools"><div><strong>Disponibilidad del funcionario</strong><span>Revisa el calendario sin cerrar este formulario.</span></div><button type="button" class="scm-case-work-btn scm-calendar-case-open-btn" data-scm-calendar-case-open-month>Ver calendario</button></div>' +
-        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear evento</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        '<div class="scm-calendar-case-tools"><div class="scm-calendar-case-assignee"><span class="scm-calendar-case-avatar">' +
+        escHtml(employeeInitials) +
+        "</span><div><strong>" +
+        escHtml(employeeName || "Funcionario asignado") +
+        '</strong><span>' +
+        escHtml(
+          [
+            propertyCode && propertyCode !== "-" ? "Inmueble " + propertyCode : "",
+            tenantLabel ? "Arrendatario: " + tenantLabel : "",
+          ]
+            .filter(Boolean)
+            .join(" · ") || "Revisa la agenda sin cerrar este formulario.",
+        ) +
+        '</span></div></div><button type="button" class="scm-case-work-btn scm-calendar-case-open-btn" data-scm-calendar-case-open-month>Ver agenda en paralelo</button></div>' +
+        '<div class="scm-seg-actions"><span class="scm-calendar-case-footnote">Notificaci&oacute;n por WhatsApp y correo activa</span><button type="button" class="scm-btn-secondary" data-scm-case-submodal-cancel>Cancelar</button><button type="submit" class="scm-btn-primary">Crear y Notificar Evento</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
     }
     sub.classList.add("open");
@@ -5444,6 +5530,9 @@
     var endInput = form ? form.querySelector('[name="hora_fin"]') : null;
     var calendarMonthBtn = form
       ? form.querySelector("[data-scm-calendar-case-open-month]")
+      : null;
+    var cancelBtn = form
+      ? form.querySelector("[data-scm-case-submodal-cancel]")
       : null;
     function maybeAutofillCaseCalendarFields(force) {
       var categoryName = selectedCalendarCategoryName(categorySelect);
@@ -5554,15 +5643,15 @@
           openCalendarCaseMonthPopup(
             root,
             employeeId,
-            caseBtn.dataset.empleado || caseBtn.dataset.asignado || "",
+            employeeName,
             dateInput ? dateInput.value : "",
-            {
-              closeOnEventTransferred: true,
-              onEventTransferred: function () {
-                closeCaseSubmodal(modal);
-              },
-            },
+            { closeOnEventTransferred: false },
           );
+        });
+      }
+      if (cancelBtn) {
+        cancelBtn.addEventListener("click", function () {
+          closeCaseSubmodal(modal);
         });
       }
       form.addEventListener("submit", function (event) {
