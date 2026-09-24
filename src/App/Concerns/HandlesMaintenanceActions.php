@@ -5295,6 +5295,7 @@ trait HandlesMaintenanceActions
 
     $ticketPk    = (int) ($_POST['ticket_pk'] ?? 0);
     $newEmpId    = trim(sanitize_text_field(wp_unslash((string) ($_POST['new_empleado_id'] ?? ''))));
+    $observacion = trim(wp_kses_post(wp_unslash((string) ($_POST['observacion'] ?? ''))));
     $notifyTargets = $this->parse_notify_recipients($_POST['notify_recipients'] ?? []);
     $notifyOldEmp  = false;
     $notifyNewEmp  = !empty($_POST['notify_funcionario']) || !empty($_POST['notify_nuevo']);
@@ -5370,6 +5371,9 @@ trait HandlesMaintenanceActions
 
     // Registrar en el historial del ticket
     $histObservacion = 'Caso trasladado de "' . ($oldEmpNombre ?: 'sin asignar') . '" a "' . ($newNombre ?: $newEmpId) . '" por ' . $userName . '.';
+    if ($observacion !== '') {
+      $histObservacion .= ' Motivo/nota: ' . wp_strip_all_tags($observacion);
+    }
     $service->addSeguimientoEntry($ticket, $ticketPk, $histObservacion);
 
     $emailsSent = $service->notifyTrasladoCaso(

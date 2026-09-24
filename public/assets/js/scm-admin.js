@@ -685,7 +685,7 @@
     }
     var existing = modal.querySelector(".scm-case-submodal");
     if (existing) {
-      existing.classList.remove("scm-case-submodal--property-history");
+      existing.classList.remove("scm-case-submodal--property-history", "scm-case-submodal--transfer");
       return existing;
     }
 
@@ -1066,6 +1066,7 @@
     if (!sub) {
       return;
     }
+    sub.classList.remove("scm-case-submodal--transfer");
     sub.classList.toggle("scm-case-submodal--property-history", targetId === "scm-sec-hist-inmueble");
 
     var clone = source.cloneNode(true);
@@ -1530,9 +1531,7 @@
     var title = sub.querySelector(".scm-case-submodal-title");
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = caseBtn.dataset.ticketPk || "";
-    var currentEmpId = String(
-      caseBtn.dataset.empleadoId || caseBtn.dataset.empleado || "",
-    ).trim();
+    var currentEmpId = String(caseBtn.dataset.empleadoId || "").trim();
     var funcionarios =
       runtime && Array.isArray(runtime.funcionarios)
         ? runtime.funcionarios
@@ -1542,6 +1541,16 @@
       findRootFromNode(modal) ||
       findRootFromNode(caseBtn) ||
       document.querySelector("#scm-app.scm-wrap[data-scm-runtime]");
+    var currentEmpName = String(
+      caseBtn.dataset.empleado || caseBtn.dataset.asignado || caseBtn.dataset.nombreEmpleado || "",
+    ).trim();
+    var currentDept = String(caseBtn.dataset.departamento || "").trim();
+    var currentEmpLabel = currentEmpId || currentEmpName
+      ? (currentEmpId ? currentEmpId + " - " : "") + (currentEmpName || "Sin nombre") + (currentDept ? " (" + currentDept + ")" : "")
+      : "Sin funcionario asignado";
+    var propertyCode = getCasePropertyCode(caseBtn, modal) || "-";
+    var logicalTicket = String(caseBtn.dataset.ticket || caseBtn.dataset.idTicket || ticketPk || "").replace(/^#+/, "").trim();
+    var statusLabel = String(caseBtn.dataset.estado || "").trim();
 
     if (title) title.textContent = "Trasladar caso a otro funcionario";
     setCaseSubmodalMeta(sub, caseBtn);
@@ -1598,24 +1607,39 @@
     });
 
     if (body) {
+      sub.classList.add("scm-case-submodal--transfer");
       body.innerHTML =
-        '<form class="scm-trasladar-form" method="post" autocomplete="off">' +
+        '<form class="scm-trasladar-form scm-transfer-form-modern" method="post" autocomplete="off">' +
         '<input type="hidden" name="ticket_pk" value="' +
         escHtml(ticketPk) +
         '">' +
-        '<label class="scm-seg-field"><span>Nuevo funcionario</span><select name="new_empleado_id" required>' +
-        empOptions +
-        "</select></label>" +
-        '<fieldset class="scm-notify-targets scm-notify-traslado"><legend>Notificaci&oacute;n del traslado</legend>' +
-        '<label class="scm-seg-check"><input type="checkbox" name="notify_funcionario" value="1" checked> Notificar al funcionario responsable</label>' +
+        '<div class="scm-transfer-meta-row">' +
+          '<span><span class="material-symbols-outlined">domain</span> Código inmueble web: <strong>' + escHtml(propertyCode) + '</strong></span>' +
+          (logicalTicket ? '<span><span class="material-symbols-outlined">confirmation_number</span> Caso activo #' + escHtml(logicalTicket) + '</span>' : '') +
+          (statusLabel ? '<span><span class="material-symbols-outlined">radio_button_checked</span> ' + escHtml(statusLabel) + '</span>' : '') +
+        '</div>' +
+        '<div class="scm-transfer-warning"><span class="material-symbols-outlined">info</span><p>Al confirmar el traslado, el seguimiento operativo y los compromisos de SLA pasarán al funcionario receptor. Esta acción quedará registrada en la bitácora de auditoría del inmueble.</p></div>' +
+        '<div class="scm-transfer-current"><span>Funcionario actual a cargo:</span><strong>' + escHtml(currentEmpLabel) + '</strong></div>' +
+        '<label class="scm-seg-field scm-transfer-field"><span>Nuevo funcionario responsable <em>*</em></span><select name="new_empleado_id" required>' +
+          empOptions +
+        "</select><small>El nuevo funcionario recibirá las alertas de trazabilidad de forma instantánea.</small></label>" +
+        '<fieldset class="scm-notify-targets scm-notify-traslado scm-transfer-responsible-alert"><legend>Funcionario responsable</legend>' +
+        '<label class="scm-seg-check"><input type="checkbox" name="notify_funcionario" value="1" checked> Notificar al funcionario responsable <small>Envío de alerta en la plataforma web, app móvil y recordatorio de agenda.</small></label>' +
         "</fieldset>" +
         renderNotifyTargets(["empleado"]) +
+        '<label class="scm-seg-field scm-transfer-field"><span>Motivo o notas del traslado <em>Opcional</em></span><textarea name="observacion" rows="3" placeholder="Ej: Reasignación por turno laboral, especialidad en garantías o redistribución de carga..."></textarea></label>' +
         '<div class="scm-seg-actions">' +
-        '<button type="submit" class="scm-btn-primary">Trasladar caso</button>' +
+        '<button type="button" class="scm-btn-secondary" data-scm-case-submodal-cancel>Cancelar</button>' +
+        '<button type="submit" class="scm-btn-primary"><span class="material-symbols-outlined">sync_alt</span> Trasladar caso</button>' +
         '<span class="scm-seg-msg" aria-live="polite"></span>' +
         "</div>" +
         "</form>";
-      prependCaseLocationPanel(body, caseBtn, modal);
+      var cancelBtn = body.querySelector("[data-scm-case-submodal-cancel]");
+      if (cancelBtn) {
+        cancelBtn.addEventListener("click", function () {
+          closeCaseSubmodal(modal);
+        });
+      }
     }
 
     sub.classList.add("open");

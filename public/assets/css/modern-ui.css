@@ -3361,6 +3361,287 @@ body,
   justify-content: flex-end !important;
 }
 
+#scm-app .scm-case-submodal--transfer .scm-case-submodal-dialog {
+  width: min(760px, calc(100% - 1rem)) !important;
+  border-radius: 1rem !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 28px 80px rgba(15, 30, 54, 0.22) !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-case-submodal-dialog::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 4px !important;
+  background: #f59e0b !important;
+  z-index: 1 !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-case-submodal-head {
+  padding: 1.25rem 3.25rem 1rem 1.35rem !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #edf2f7 !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-case-submodal-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+  font-size: 0.98rem !important;
+  font-weight: 800 !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-case-submodal-title::before {
+  content: 'swap_horiz' !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  border-radius: 0.75rem !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  font-family: 'Material Symbols Outlined' !important;
+  font-size: 1.15rem !important;
+  font-weight: normal !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-case-submodal-meta {
+  margin-left: 2.65rem !important;
+  color: #64748b !important;
+  font-size: 0.72rem !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-case-submodal-close {
+  top: 1.05rem !important;
+  right: 1.05rem !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #94a3b8 !important;
+  font-size: 1.25rem !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-case-submodal-close:hover {
+  color: #0f1e36 !important;
+  background: #f1f5f9 !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-case-submodal-body {
+  padding: 1.25rem !important;
+  background: #ffffff !important;
+}
+
+#scm-app .scm-transfer-form-modern {
+  display: grid !important;
+  gap: 1rem !important;
+}
+
+#scm-app .scm-transfer-meta-row {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.45rem !important;
+}
+
+#scm-app .scm-transfer-meta-row span {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  min-height: 1.45rem !important;
+  padding: 0.22rem 0.55rem !important;
+  border: 1px solid #dbeafe !important;
+  border-radius: 999px !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+}
+
+#scm-app .scm-transfer-meta-row .material-symbols-outlined {
+  font-size: 0.85rem !important;
+}
+
+#scm-app .scm-transfer-warning {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 0.65rem !important;
+  padding: 0.85rem 0.95rem !important;
+  border: 1px solid #fde68a !important;
+  border-radius: 0.85rem !important;
+  background: #fffbeb !important;
+  color: #92400e !important;
+}
+
+#scm-app .scm-transfer-warning .material-symbols-outlined {
+  font-size: 1rem !important;
+  margin-top: 0.05rem !important;
+}
+
+#scm-app .scm-transfer-warning p {
+  margin: 0 !important;
+  color: #92400e !important;
+  font-size: 0.78rem !important;
+  line-height: 1.45 !important;
+}
+
+#scm-app .scm-transfer-current {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.75rem !important;
+  padding: 0.55rem 0.75rem !important;
+  border: 1px solid #edf2f7 !important;
+  border-radius: 0.65rem !important;
+  background: #f8fafc !important;
+  color: #64748b !important;
+  font-size: 0.72rem !important;
+}
+
+#scm-app .scm-transfer-current strong {
+  color: #0f1e36 !important;
+  font-size: 0.76rem !important;
+  text-align: right !important;
+}
+
+#scm-app .scm-transfer-field {
+  gap: 0.45rem !important;
+}
+
+#scm-app .scm-transfer-field > span {
+  color: #64748b !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+}
+
+#scm-app .scm-transfer-field em {
+  color: #f59e0b !important;
+  font-style: normal !important;
+  text-transform: none !important;
+}
+
+#scm-app .scm-transfer-field select,
+#scm-app .scm-transfer-field textarea {
+  width: 100% !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0.75rem !important;
+  background: #ffffff !important;
+  color: #0f1e36 !important;
+  font-size: 0.84rem !important;
+  padding: 0.65rem 0.8rem !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.04) !important;
+}
+
+#scm-app .scm-transfer-field select:focus,
+#scm-app .scm-transfer-field textarea:focus {
+  outline: none !important;
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+}
+
+#scm-app .scm-transfer-field small {
+  color: #64748b !important;
+  font-size: 0.68rem !important;
+}
+
+#scm-app .scm-transfer-responsible-alert {
+  background: #ecfdf5 !important;
+  border-color: #bbf7d0 !important;
+  border-radius: 0.85rem !important;
+}
+
+#scm-app .scm-transfer-responsible-alert legend {
+  color: #047857 !important;
+}
+
+#scm-app .scm-transfer-responsible-alert .scm-seg-check {
+  align-items: flex-start !important;
+  color: #047857 !important;
+  font-weight: 700 !important;
+}
+
+#scm-app .scm-transfer-responsible-alert small {
+  display: block !important;
+  margin-top: 0.1rem !important;
+  color: #059669 !important;
+  font-size: 0.68rem !important;
+  font-weight: 500 !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-notify-targets:not(.scm-transfer-responsible-alert) {
+  border-color: #e2e8f0 !important;
+  border-radius: 0.85rem !important;
+  background: #f8fafc !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-notify-targets:not(.scm-transfer-responsible-alert) legend {
+  color: #64748b !important;
+  font-size: 0.72rem !important;
+  text-transform: uppercase !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-seg-actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 0.7rem !important;
+  padding-top: 1rem !important;
+  margin: 0 -1.25rem -1.25rem !important;
+  padding-right: 1.25rem !important;
+  padding-left: 1.25rem !important;
+  padding-bottom: 1rem !important;
+  background: #f8fafc !important;
+  border-top: 1px solid #edf2f7 !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-primary,
+#scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-secondary {
+  min-height: 2.45rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.4rem !important;
+  border-radius: 0.65rem !important;
+  font-size: 0.8rem !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-primary {
+  background: #f59e0b !important;
+  color: #ffffff !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-primary:hover {
+  background: #d97706 !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-seg-actions .material-symbols-outlined {
+  font-size: 1rem !important;
+}
+
+#scm-app .scm-case-submodal--transfer .scm-seg-msg {
+  margin-right: auto !important;
+  color: #64748b !important;
+  font-size: 0.75rem !important;
+}
+
+@media (max-width: 640px) {
+  #scm-app .scm-transfer-current,
+  #scm-app .scm-case-submodal--transfer .scm-seg-actions {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+
+  #scm-app .scm-transfer-current strong {
+    text-align: left !important;
+  }
+
+  #scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-primary,
+  #scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-secondary {
+    width: 100% !important;
+  }
+}
+
 /* Tiempos en Card de Caso (Listing) */
 #scm-app .scm-card-timings {
   display: flex !important;
