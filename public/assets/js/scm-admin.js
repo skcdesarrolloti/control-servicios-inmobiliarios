@@ -5680,26 +5680,6 @@
           );
         }
 
-        if (statusBucket !== "cerrados" && canUseDashboardAction("case_respond")) {
-          mainActionButtons.push(
-            '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-ticket-response><span class="material-symbols-outlined scm-btn-icon">reply</span><div class="scm-btn-text"><span class="scm-btn-label">' +
-              (isPublicPqr ? "Responder solicitud" : "Responder caso") +
-              '</span><span class="scm-btn-sub">Seguimiento y respuestas</span></div></button>',
-          );
-        }
-
-        if (isPublicPqr) {
-          if (statusBucket !== "cerrados") {
-            mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-close-ticket><span class="material-symbols-outlined scm-btn-icon">check_circle</span><div class="scm-btn-text"><span class="scm-btn-label">Cerrar solicitud</span><span class="scm-btn-sub">Finalizar gestión</span></div></button>',
-            );
-          }
-        }
-        if (!isPublicPqr && statusBucket !== "cerrados" && canUseDashboardAction("case_close")) {
-          mainActionButtons.push(
-            '<button type="button" class="scm-case-work-btn" data-scm-close-ticket><span class="material-symbols-outlined scm-btn-icon">check_circle</span><div class="scm-btn-text"><span class="scm-btn-label">Cerrar caso</span><span class="scm-btn-sub">Finalizar gestión</span></div></button>',
-          );
-        }
         if (!isPublicPqr) {
           complementaryActionButtons.push(
             '<button type="button" class="scm-case-work-btn" data-scm-view-contacts><span class="material-symbols-outlined scm-btn-icon">contacts</span><div class="scm-btn-text"><span class="scm-btn-label">Ver contactos</span><span class="scm-btn-sub">Directorio de partes</span></div></button>',
@@ -5714,13 +5694,6 @@
             complementaryActionButtons.push(
               '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-acta>Acta de solución y firma</button>',
             );
-          }
-          if (calendarTicketPk) {
-            if (canUseDashboardAction("case_schedule")) {
-              mainActionButtons.push(
-                '<button type="button" class="scm-case-work-btn" data-scm-calendar-create-case><span class="material-symbols-outlined scm-btn-icon">event_available</span><div class="scm-btn-text"><span class="scm-btn-label">Agendar cita</span><span class="scm-btn-sub">Visita técnica</span></div></button>',
-              );
-            }
           }
           if (statusBucket !== "cerrados" && isMaintenanceForActions) {
             if (canUseDashboardAction("corrective_review_manage")) {
@@ -6116,9 +6089,12 @@
         sidebarHtml += '<div class="scm-stakeholder-item">';
         sidebarHtml += '<div class="scm-stakeholder-head"><span class="scm-stakeholder-role">Responsable Asignado</span><span class="material-symbols-outlined text-[#0e996b] text-[16px]">verified_user</span></div>';
         sidebarHtml += '<div class="scm-stakeholder-body"><div class="scm-avatar-circle"><span class="material-symbols-outlined text-[18px]">person</span></div><div class="scm-stakeholder-details"><strong class="scm-stakeholder-name">' + escHtml(empleadoVal) + '</strong><span class="scm-stakeholder-sub">' + escHtml(btn.dataset.departamento || "Funcionario Asignado") + '</span></div></div>';
-        sidebarHtml += '<div class="scm-stakeholder-actions">';
+        sidebarHtml += '<div class="scm-stakeholder-actions scm-stakeholder-actions-assigned">';
         if (empleadoIdVal) {
           sidebarHtml += '<button type="button" class="scm-stakeholder-btn" data-scm-calendar-view-employee><span class="material-symbols-outlined text-[14px]">calendar_month</span> Ver agenda</button>';
+        }
+        if (!isPublicPqr && calendarTicketPk && canUseDashboardAction("case_schedule")) {
+          sidebarHtml += '<button type="button" class="scm-stakeholder-btn scm-stakeholder-btn-schedule" data-scm-calendar-create-case><span class="material-symbols-outlined text-[14px]">event_available</span> Agendar cita</button>';
         }
         if (isPublicPqr) {
           if (card && card.querySelector("[data-scm-open-pqr-transfer]")) {

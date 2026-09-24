@@ -904,6 +904,10 @@ body,
   margin-top: 0.25rem !important;
 }
 
+#scm-app .scm-stakeholder-actions-assigned {
+  flex-direction: column !important;
+}
+
 #scm-app .scm-stakeholder-btn {
   flex: 1 !important;
   display: inline-flex !important;
@@ -920,6 +924,13 @@ body,
   text-decoration: none !important;
   cursor: pointer !important;
   transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-stakeholder-actions-assigned .scm-stakeholder-btn {
+  width: 100% !important;
+  min-height: 2.55rem !important;
+  justify-content: flex-start !important;
+  padding: 0.55rem 0.7rem !important;
 }
 
 #scm-app .scm-stakeholder-btn:hover {
@@ -2849,6 +2860,19 @@ body,
   border-color: #1d4ed8 !important;
 }
 
+#scm-app .scm-stakeholder-btn-schedule {
+  background: #fff7ed !important;
+  color: #b45309 !important;
+  border: 1px solid #fed7aa !important;
+  font-weight: 700 !important;
+}
+
+#scm-app .scm-stakeholder-btn-schedule:hover {
+  background: #f59e0b !important;
+  color: #ffffff !important;
+  border-color: #f59e0b !important;
+}
+
 #scm-app .scm-timeline-filtered-empty {
   display: none !important;
   flex-direction: column !important;
@@ -3107,5 +3131,4 @@ body,
   background: #f0f7ff !important;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
 }
-
 
