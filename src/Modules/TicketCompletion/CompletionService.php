@@ -749,7 +749,7 @@ final class CompletionService
     if ($source['flow'] === 'approved_quote' && !$this->repo->isApprovedMaintenanceQuoteForTicket($ticket, $source['quote_id'])) {
       throw new \DomainException('Solo se puede crear esta acta desde una cotización aprobada asociada al caso.');
     }
-    $hasAdministrativeReport = $source['flow'] !== 'approved_quote';
+    $hasAdministrativeReport = false;
     $transportMax = $context['transport_max'];
     $transport = $hasAdministrativeReport ? ($transportMax ?? 0) : 0;
     $fee = $hasAdministrativeReport ? $context['fee'] : 0;
@@ -763,7 +763,7 @@ final class CompletionService
       throw new \DomainException('El total administrativo supera el máximo permitido.');
     }
     if (($input['confirm'] ?? '') !== '1') {
-      throw new \DomainException($hasAdministrativeReport ? 'Confirma que revisaste el acta y el valor del reporte administrativo.' : 'Confirma que revisaste el acta, la cotización asociada y el firmante.');
+      throw new \DomainException('Confirma que revisaste el acta, la solución y el firmante.');
     }
     $propertyMeta = $this->propertyMeta($ticket);
     $branchContact = is_array($context['branch_contact'] ?? null) ? $context['branch_contact'] : [];
@@ -1078,20 +1078,6 @@ final class CompletionService
       $now = $signature['signed_at'];
       $isApprovedQuoteFlow = ($payload['source']['flow'] ?? '') === 'approved_quote';
       $reportId = null;
-      if (!$isApprovedQuoteFlow) {
-        $reportId = $this->repo->insertLegacy('jet_cct_reportes_administrativos', [
-          'cct_status' => 'publish', 'cct_author_id' => $payload['actor']['employee_id'],
-          'cct_created' => date('Y-m-d H:i:s'), 'cct_modified' => date('Y-m-d H:i:s'),
-          'fecha' => $now, 'fecha_revision' => $payload['created_at'], 'fecha_ticket' => $report['fecha_ticket'],
-          'id_ticket' => (int) $act['ticket_pk'], 'id_empleado' => $payload['actor']['employee_id'], 'creador' => $payload['actor']['name'],
-          'categoria' => 'Acta de satisfaccion',
-          'descripcion' => 'Acta de satisfacción #' . $id . ' firmada del caso #' . htmlspecialchars($payload['ticket_number'], ENT_QUOTES, 'UTF-8') . '. Solución por ' . CompletionPolicy::EXECUTORS[$payload['executor']] . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta y detalle de daños/soluciones</a>.',
-          'fue_pagado' => 'No', 'exportado' => 'No', 'valor' => $report['total'], 'transporte' => $report['transport'],
-          'valor_revision' => $report['service_fee'], 'valor_mantenimiento' => $report['service_fee'],
-          'id_inmueble' => $report['id_inmueble'], 'inmueble' => $payload['property'], 'arrendatario' => $report['arrendatario'],
-          'id_contrato' => $report['id_contrato'], 'contrato' => $payload['contract'], 'sucursal' => $report['sucursal'],
-        ]);
-      }
       $legacyPhotoUrls = self::legacyPhotoUrls($payload);
       $legacyId = $this->repo->insertLegacy('jet_cct_actas_de_satisfaccion', [
         'cct_status' => 'publish', 'id_ticket' => (int) $act['ticket_pk'], 'fecha' => $payload['created_at'],
@@ -1143,7 +1129,7 @@ final class CompletionService
           : ' Cotizacion(es) de mantenimiento #' . implode(', #', $quoteIds) . ' marcadas como Desaprobada por ejecucion sin aprobacion.');
       $reportAudit = $reportId
         ? ' Reporte administrativo #' . $reportId . ' registrado (no pagado, no exportado).'
-        : ' Sin reporte administrativo nuevo; el cobro corresponde a la cotización aprobada.';
+        : ' Sin reporte administrativo nuevo; el cobro se gestiona desde la cotización de mantenimiento cuando aplique.';
       $this->repo->audit((int) $act['ticket_pk'], 'Acta #' . $id . ' firmada por ' . htmlspecialchars($signature['name'], ENT_QUOTES, 'UTF-8') . '. Caso cerrado.' . $quoteAudit . $reportAudit . ' <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta firmada</a>.', $payload['actor']['name'], $payload['actor']['employee_id']);
       return $this->repo->act($id);
       });

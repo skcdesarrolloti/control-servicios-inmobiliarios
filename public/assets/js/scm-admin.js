@@ -7857,6 +7857,7 @@
         var mainActionButtons = [];
         var complementaryActionButtons = [];
         var quoteActionButtons = [];
+        var hiddenCaseActionButtons = [];
         var actionPermissions = runtime.actionPermissions || {};
         var actionPermissionMap = actionPermissions.actions || null;
         function canUseDashboardAction(action) {
@@ -7878,8 +7879,24 @@
           );
         }
 
+        function normalizeCaseActionState(value) {
+          value = String(value || "").trim();
+          return value.normalize
+            ? value
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase()
+            : value.toLowerCase();
+        }
+
+        var cotEstadoKey = normalizeCaseActionState(btn.dataset.cotEstado || "");
+        var hasApprovedCaseQuote = !!cotizacionId && cotEstadoKey === "aprobada";
+
         if (!isPublicPqr) {
-          if (canUseDashboardAction("case_completion_act")) {
+          if (
+            canUseDashboardAction("case_completion_act") &&
+            !hasApprovedCaseQuote
+          ) {
             complementaryActionButtons.push(
               '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-acta>Acta de solución y firma</button>',
             );
@@ -7917,32 +7934,16 @@
                 escHtml(btn.dataset.ticket || "") +
                 '" data-cotizacion-id="' +
                 escHtml(cotizacionId) +
-                '"><span class="material-symbols-outlined scm-btn-icon">receipt_long</span><div class="scm-btn-text"><span class="scm-btn-label">Gestionar cotizaciones</span><span class="scm-btn-sub">Costos y proveedores</span></div></button>',
+                '"><span class="material-symbols-outlined scm-btn-icon">receipt_long</span><div class="scm-btn-text"><span class="scm-btn-label">Gestionar cotizaciones</span><span class="scm-btn-sub">Responder o crear acta por cotización</span></div></button>',
             );
           }
-          if (cotizacionId && canUseDashboardAction("quote_respond")) {
-            quoteActionButtons.push(
-              '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-cotizacion-response data-ticket-pk="' +
-                escHtml(calendarTicketPk || "") +
-                '" data-cotizacion-id="' +
-                escHtml(cotizacionId) +
-                '"><span class="material-symbols-outlined scm-btn-icon">rate_review</span><div class="scm-btn-text"><span class="scm-btn-label">Responder cotizaci&oacute;n</span><span class="scm-btn-sub">Aprobaci&oacute;n o rechazo</span></div></button>',
-            );
-          }
-          var cotEstadoKey = String(btn.dataset.cotEstado || "");
-          cotEstadoKey = cotEstadoKey.normalize
-            ? cotEstadoKey
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .toLowerCase()
-            : cotEstadoKey.toLowerCase();
           if (
             canUseDashboardAction("quote_acta_create") &&
             cotizacionId &&
             cotEstadoKey === "aprobada"
           ) {
-            quoteActionButtons.push(
-              '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-ticket-acta data-scm-cotizacion-acta-button>Crear acta de cotizaci&oacute;n</button>',
+            hiddenCaseActionButtons.push(
+              '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-ticket-acta data-scm-cotizacion-acta-button hidden" hidden aria-hidden="true" tabindex="-1">Crear acta de cotizaci&oacute;n</button>',
             );
           }
           if (
@@ -8020,13 +8021,19 @@
           ) +
           renderActionGroup("Cotización", quoteActionButtons, "is-quote");
 
+        var hiddenCaseActionsHtml = hiddenCaseActionButtons.length
+          ? '<div class="scm-case-hidden-actions" hidden>' +
+            hiddenCaseActionButtons.join("") +
+            "</div>"
+          : "";
         var caseActionsHtml = caseActionsContent
           ? '<section class="scm-case-work-actions"><h4><span class="material-symbols-outlined text-[20px]">tune</span> ' +
             (isPublicPqr ? "Acciones de la solicitud" : "Acciones del caso") +
             "</h4>" +
             caseActionsContent +
+            hiddenCaseActionsHtml +
             "</section>"
-          : "";
+          : hiddenCaseActionsHtml;
 
         var recipientName =
           solicitanteVal ||

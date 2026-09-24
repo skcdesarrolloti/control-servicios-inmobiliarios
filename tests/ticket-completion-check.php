@@ -148,10 +148,10 @@ $db->insert($db->table('jet_cct_cotizacion_mantenimiento'), $repo->schema->filte
 $db->update($db->table('jet_cct_tickets'), ['id_cotizacion_mantenimiento' => '7001'], ['_ID' => 1]);
 $createPanel = (new View())->panel($service->context(1), $service);
 $assert(str_contains($createPanel, 'data-acta-photo-paste') && str_contains($createPanel, 'Máximo 4 fotos de solución por daño y 12 fotos en toda el acta'), 'act form explains solution evidence limits and exposes the clipboard paste target');
-$assert(str_contains($createPanel, 'type="hidden" name="transport" value="8000" data-acta-transport') && str_contains($createPanel, 'class="scm-acta-readonly-value"'), 'act form shows fixed configured transport without an editable number control');
+$assert(!str_contains($createPanel, 'Reporte administrativo de cobro') && str_contains($createPanel, 'no se creará reporte administrativo nuevo desde esta acta'), 'act form does not expose administrative charge inputs');
 $createdWithTamperedTransport = $service->create(1, array_replace($input, ['transport' => '1']), $actor);
 $tamperedPayload = $service->payload($repo->act($createdWithTamperedTransport['act_id']));
-$assert((int) $tamperedPayload['report']['transport'] === 8000, 'backend ignores tampered transport and uses configured fixed value');
+$assert((int) $tamperedPayload['report']['transport'] === 0 && (int) $tamperedPayload['report']['total'] === 0 && $tamperedPayload['report']['applies'] === false, 'backend ignores administrative charge values submitted from the act form');
 $service->cancel($createdWithTamperedTransport['act_id'], 'QA vuelve a generar el acta principal', $actor);
 $seedTicket(8);
 $archived = $service->create(8, $input, $actor);
@@ -232,24 +232,15 @@ $db->update($db->table('jet_cct_tickets'), ['estado_administrativo' => 'En ejecu
 $rejects(static fn() => $service->sign((int) $act['id'], $token, $signInput($act), '', ''), 'signature is blocked if execution responsibility changed after creating the act');
 $db->update($db->table('jet_cct_tickets'), ['estado_administrativo' => 'En ejecucion por inmobiliaria'], ['_ID' => 1]);
 $historyBefore = (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_ticket') . '`');
-// Force an SQL failure only in the test connection's temporary report table.
-$db->pdo()->exec('ALTER TABLE `' . $db->table('jet_cct_reportes_administrativos') . '` CHANGE COLUMN descripcion unavailable_description TEXT');
-try {
-  $service->sign((int) $act['id'], $token, $signInput($act), '127.0.0.1', 'QA');
-  $assert(false, 'report failure must throw');
-} catch (PDOException) { $assert(true, 'SQL failure reported'); }
-$assert($repo->act((int) $act['id'])['status'] === 'pending' && $repo->ticket(1)['estado'] === 'En proceso', 'report failure rolls back signature and closure');
-$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_ticket') . '`') === $historyBefore, 'report failure does not append a false closure history');
-$db->pdo()->exec('ALTER TABLE `' . $db->table('jet_cct_reportes_administrativos') . '` CHANGE COLUMN unavailable_description descripcion TEXT');
 $db->pdo()->exec('ALTER TABLE `' . $db->table('jet_cct_historial_del_ticket') . '` CHANGE COLUMN respuesta unavailable_response TEXT');
 try {
   $service->sign((int) $act['id'], $token, $signInput($act), '127.0.0.1', 'QA');
   $assert(false, 'late history failure must throw');
-} catch (PDOException) { $assert(true, 'failure after signature and charge writes is reported'); }
+} catch (PDOException) { $assert(true, 'failure after signature writes is reported'); }
 $assert($repo->act((int) $act['id'])['status'] === 'pending' && $repo->ticket(1)['estado'] === 'En proceso', 'late failure rolls back ticket and signature');
 $assert($db->getVar('SELECT estado FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7001') === 'Pendiente', 'late failure also rolls back quote disapproval');
 $assert($repo->act((int) $act['id'])['signed_pdf'] === null, 'late failure also rolls back the signed PDF');
-$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 0, 'late failure rolls back administrative charge');
+$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 0, 'late failure does not leave administrative charges');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_actas_de_satisfaccion') . '`') === 0, 'late failure rolls back legacy completion milestone');
 $db->pdo()->exec('ALTER TABLE `' . $db->table('jet_cct_historial_del_ticket') . '` CHANGE COLUMN unavailable_response respuesta TEXT');
 $signed = $service->sign((int) $act['id'], $token, $signInput($act), '127.0.0.1', 'QA');
@@ -270,12 +261,10 @@ $missingPdf = $signed; $missingPdf['signed_pdf'] = null;
 $rejects(static fn() => $service->pdf($missingPdf), 'missing signed original is not silently regenerated');
 $assert(!str_contains($signed['signed_pdf'], 'Reporte administrativo') && !str_contains($service->pdf($signed, true), 'Reporte administrativo'), 'PDF acta never exposes internal administrative charge');
 $receiptCount = count($notifications);
-$report = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_reportes_administrativos') . '` WHERE _ID = ?', [$signed['report_id']]);
-$assert((int) $report['valor'] === 12333 && (int) $report['transporte'] === 8000 && $report['exportado'] === 'No' && $report['fue_pagado'] === 'No', 'administrative report contains configured fee plus capped transport, unpaid and unexported');
-$assert((int) $report['id_ticket'] === 1, 'report links to exact internal ticket ID, not a coinciding display number');
+$assert(empty($signed['report_id']), 'signed act does not create an administrative report');
 $service->sign((int) $act['id'], $token, $signInput($act), '127.0.0.1', 'QA');
 $assert(count($notifications) === $receiptCount, 'duplicate signature does not duplicate receipt');
-$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 1, 'repeated signature cannot duplicate charge');
+$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 0, 'repeated signature cannot create an administrative charge');
 $rejects(static fn() => $service->cancel((int) $act['id'], 'corrección', $actor), 'signed document cannot be cancelled');
 $rejects(static fn() => $service->deleteRetired((int) $act['id'], $actor), 'signed act cannot be deleted');
 $signedDeleteTableRegular = (new View())->dashboardTable([$signed + ['_payload' => $service->payload($signed)]], $service);
@@ -310,7 +299,7 @@ $approvedQuoteActRow = $repo->act((int) $approvedQuoteAct['act_id']);
 $assert(($service->payload($approvedQuoteActRow)['source']['flow'] ?? '') === 'approved_quote', 'approved quote act stores its source flow');
 $requestCode($approvedQuoteActRow);
 $approvedQuoteSigned = $service->sign((int) $approvedQuoteActRow['id'], $service->token($approvedQuoteActRow), $signInput($approvedQuoteActRow), '127.0.0.1', 'QA');
-$assert(empty($approvedQuoteSigned['report_id']) && (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 1, 'approved quote act does not create a new administrative report');
+$assert(empty($approvedQuoteSigned['report_id']) && (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 0, 'approved quote act does not create a new administrative report');
 $approvedQuoteRow = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7013');
 $assert($approvedQuoteRow['estado'] === 'Aprobada' && (int) $approvedQuoteRow['id_acta_satisfaccion'] === (int) $approvedQuoteSigned['legacy_act_id'], 'approved quote act keeps quote state and links the signed satisfaction act');
 $approvedTicket = $repo->ticket(13);
@@ -324,10 +313,9 @@ $signedDeletableToken = $service->token($signedDeletableAct);
 $requestCode($signedDeletableAct);
 $signedDeletableAct = $service->sign((int) $signedDeletableAct['id'], $signedDeletableToken, $signInput($signedDeletableAct), '127.0.0.1', 'QA');
 $signedLegacyId = (int) $signedDeletableAct['legacy_act_id'];
-$signedReportId = (int) $signedDeletableAct['report_id'];
 $service->deleteRetired((int) $signedDeletableAct['id'], $actor, true);
 $rejects(static fn() => $repo->act((int) $signedDeletableAct['id']), 'administrative deletion removes signed act from act table');
-$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_actas_de_satisfaccion') . '` WHERE _ID = ?', [$signedLegacyId]) === 0 && (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '` WHERE _ID = ?', [$signedReportId]) === 0, 'deleting signed act removes linked legacy act and administrative report');
+$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_actas_de_satisfaccion') . '` WHERE _ID = ?', [$signedLegacyId]) === 0, 'deleting signed act removes linked legacy act');
 $ticketAfterSignedDelete = $repo->ticket(11);
 $assert($ticketAfterSignedDelete['estado'] === 'En proceso' && $ticketAfterSignedDelete['estado_administrativo'] === 'En ejecucion por propietario' && trim((string) $ticketAfterSignedDelete['id_acta_satisfaccion']) === '' && $ticketAfterSignedDelete['estado_acta_satisfaccion'] === 'No', 'deleting signed act restores ticket completion fields');
 $seedTicket(2);
@@ -391,7 +379,7 @@ $db->update($repo->table(), ['invitation_queued_at' => null], ['id' => $bothAct[
 $assert($service->resend((int) $bothAct['id'])['queued'], 'staff can resend signed receipt without another charge');
 $receiptOptions = end($notifications)['options'];
 $assert($receiptOptions['meta']['event'] === 'signed_receipt' && $receiptOptions['ticket_number'] === '9004' && $receiptOptions['act_url'] === $service->viewUrl((int) $bothAct['id']) . '&token=' . $service->token($repo->act((int) $bothAct['id'])) . '&format=pdf', 'signed receipt supplies its current personal PDF link');
-$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '` WHERE id_ticket = 4') === 1, 'receipt retry creates no duplicate report');
+$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '` WHERE id_ticket = 4') === 0, 'receipt retry does not create an administrative report');
 
 $seedTicket(5);
 $db->update($db->table('jet_cct_tickets'), ['celular_propietario' => '3001234567'], ['_ID' => 5]);
