@@ -1107,7 +1107,7 @@
       return "";
     }
     return (
-      "https://sucasainmobiliaria.com.co/inmuebles/inmueble/" +
+      "https://sucasainmobiliaria.com.co/inmuebles/inmueble-" +
       encodeURIComponent(code)
     );
   }

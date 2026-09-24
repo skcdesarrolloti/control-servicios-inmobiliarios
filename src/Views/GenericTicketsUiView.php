@@ -544,7 +544,7 @@ final class GenericTicketsUiView
       $webId = $this->firstNonEmptyRecordValue($record, ['codigo_inmueble_web', 'codigo', 'id_inmueble']);
       if ($webId !== '') {
         $buttons[] = [
-          'url' => 'https://sucasainmobiliaria.com.co/inmuebles/inmueble/' . rawurlencode($webId),
+          'url' => 'https://sucasainmobiliaria.com.co/inmuebles/inmueble-' . rawurlencode($webId),
           'label' => 'Ver inmueble en web',
         ];
       }
@@ -581,7 +581,8 @@ final class GenericTicketsUiView
         return false;
       }
       return strpos($url, 'sucasainmobiliaria.com.co/inmueble/') === false
-        && strpos($url, 'sucasainmobiliaria.com.co/inmuebles/inmueble/') === false;
+        && strpos($url, 'sucasainmobiliaria.com.co/inmuebles/inmueble/') === false
+        && strpos($url, 'sucasainmobiliaria.com.co/inmuebles/inmueble-') === false;
     }));
   }
 

@@ -1316,7 +1316,7 @@ final class PendingView
       $webId = trim((string) ($item['codigo_inmueble_web'] ?? $item['codigo'] ?? $item['id_inmueble'] ?? ''));
       if ($webId !== '' && $webId !== '-' && $webId !== '0') {
         $buttons[] = [
-          'url' => 'https://sucasainmobiliaria.com.co/inmuebles/inmueble/' . rawurlencode($webId),
+          'url' => 'https://sucasainmobiliaria.com.co/inmuebles/inmueble-' . rawurlencode($webId),
           'label' => 'Ver inmueble en web',
         ];
       }
