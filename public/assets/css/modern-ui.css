@@ -4251,7 +4251,8 @@ body,
 }
 
 #scm-app .scm-transfer-field select,
-#scm-app .scm-transfer-field textarea {
+#scm-app .scm-transfer-field textarea,
+#scm-app .scm-transfer-field input {
   width: 100% !important;
   border: 1px solid #cbd5e1 !important;
   border-radius: 0.75rem !important;
@@ -4274,7 +4275,8 @@ body,
 }
 
 #scm-app .scm-transfer-field select:focus,
-#scm-app .scm-transfer-field textarea:focus {
+#scm-app .scm-transfer-field textarea:focus,
+#scm-app .scm-transfer-field input:focus {
   outline: none !important;
   border-color: #2563eb !important;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16) !important;
@@ -4505,9 +4507,371 @@ body,
   font-size: 0.75rem !important;
 }
 
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-dialog {
+  width: min(42rem, calc(100% - 1.5rem)) !important;
+  max-height: min(92vh, 820px) !important;
+  border-radius: 1rem !important;
+  border: 1px solid rgba(226, 232, 240, 0.95) !important;
+  background: #ffffff !important;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28) !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+  text-rendering: geometricPrecision !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-dialog *,
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-dialog input,
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-dialog select,
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-dialog textarea,
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-dialog button {
+  box-sizing: border-box !important;
+  font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-dialog .material-symbols-outlined,
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-dialog [class*="material-symbols-"] {
+  font-family: "Material Symbols Outlined" !important;
+  font-weight: normal !important;
+  font-style: normal !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  white-space: nowrap !important;
+  word-wrap: normal !important;
+  direction: ltr !important;
+  -webkit-font-feature-settings: "liga" 1 !important;
+  font-feature-settings: "liga" 1 !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-dialog::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 6px !important;
+  background: linear-gradient(90deg, #2563eb 0%, #f59e0b 58%, #ea580c 100%) !important;
+  z-index: 2 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-head {
+  padding: 1.25rem 3.25rem 1rem 1.5rem !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  margin: 0 !important;
+  color: #0f172a !important;
+  font-size: 1rem !important;
+  line-height: 1.25 !important;
+  font-weight: 800 !important;
+  letter-spacing: 0 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-title::before {
+  content: 'edit_note' !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  border-radius: 0.8rem !important;
+  border: 1px solid #dbeafe !important;
+  background: #eff6ff !important;
+  color: #2563eb !important;
+  font-family: 'Material Symbols Outlined' !important;
+  font-size: 1.1rem !important;
+  font-weight: normal !important;
+}
+
+#scm-app .scm-case-submodal--reply .scm-case-submodal-title::before {
+  content: 'reply' !important;
+}
+
+#scm-app .scm-case-submodal--postpone .scm-case-submodal-title::before {
+  content: 'event_repeat' !important;
+}
+
+#scm-app .scm-case-submodal--quote .scm-case-submodal-title::before {
+  content: 'receipt_long' !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-meta {
+  margin: 0.35rem 0 0 3rem !important;
+  color: #64748b !important;
+  font-size: 0.78rem !important;
+  line-height: 1.25 !important;
+  font-weight: 500 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-close {
+  top: 1rem !important;
+  right: 1rem !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  border: 0 !important;
+  border-radius: 0.75rem !important;
+  background: transparent !important;
+  color: #94a3b8 !important;
+  font-size: 1.25rem !important;
+  line-height: 1 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-close:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-case-submodal-body {
+  padding: 1.25rem !important;
+  background: #ffffff !important;
+}
+
+#scm-app .scm-workflow-form-modern {
+  display: grid !important;
+  gap: 1rem !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-case-location-panel {
+  margin-bottom: 1rem !important;
+  border-radius: 0.8rem !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-cotizacion-response-inline,
+#scm-app .scm-case-submodal--workflow .scm-ticket-documents-zone {
+  display: grid !important;
+  gap: 0.8rem !important;
+  margin: 0 !important;
+  padding: 0.95rem 1rem !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.8rem !important;
+  background: #f8fafc !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-cotizacion-response-head {
+  display: grid !important;
+  gap: 0.2rem !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-cotizacion-response-head strong,
+#scm-app .scm-case-submodal--workflow .scm-ticket-documents-label {
+  color: #0f172a !important;
+  font-size: 0.82rem !important;
+  font-weight: 800 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-cotizacion-response-head span {
+  color: #64748b !important;
+  font-size: 0.72rem !important;
+  line-height: 1.35 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-paste-evidence {
+  margin: 0 !important;
+  padding: 0.85rem 1rem !important;
+  border: 1px dashed #bfdbfe !important;
+  border-radius: 0.8rem !important;
+  background: #f8fbff !important;
+  color: #1e3a8a !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-paste-evidence strong {
+  color: #1e3a8a !important;
+  font-size: 0.82rem !important;
+  font-weight: 800 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-paste-evidence span {
+  color: #64748b !important;
+  font-size: 0.72rem !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-workflow-email-targets {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto !important;
+  gap: 0.65rem !important;
+  margin: 0 !important;
+  padding: 2.35rem 0.75rem 0.75rem !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.8rem !important;
+  background: #f8fafc !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-workflow-email-targets legend {
+  position: absolute !important;
+  top: 0.78rem !important;
+  left: 0.9rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  padding: 0 !important;
+  color: #64748b !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-workflow-email-targets legend::before {
+  content: 'mail' !important;
+  font-family: 'Material Symbols Outlined' !important;
+  color: #64748b !important;
+  font-size: 0.9rem !important;
+  font-weight: normal !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-workflow-email-targets .scm-seg-check {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  min-height: 2.25rem !important;
+  margin: 0 !important;
+  padding: 0.45rem 0.6rem !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.5rem !important;
+  background: #ffffff !important;
+  color: #64748b !important;
+  font-size: 0.76rem !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  cursor: pointer !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-workflow-email-targets .scm-seg-check:hover {
+  border-color: #fbbf24 !important;
+  color: #0f172a !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-workflow-email-targets .scm-seg-check--none {
+  justify-content: center !important;
+  border-left: 1px solid #e2e8f0 !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+#scm-app .scm-case-submodal--workflow input[type='checkbox'] {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  display: inline-grid !important;
+  place-content: center !important;
+  width: 0.95rem !important;
+  min-width: 0.95rem !important;
+  height: 0.95rem !important;
+  margin: 0 !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0.28rem !important;
+  background: #ffffff !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: 0.72rem 0.72rem !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.04) !important;
+  flex: 0 0 auto !important;
+  cursor: pointer !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+#scm-app .scm-case-submodal--workflow input[type='checkbox']:checked {
+  border-color: #f59e0b !important;
+  background-color: #f59e0b !important;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3.5 8.1 6.5 11 12.5 5' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+
+#scm-app .scm-case-submodal--workflow input[type='checkbox']:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.24) !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-workflow-close-check {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.45rem !important;
+  min-height: 2.5rem !important;
+  margin: 0 !important;
+  padding: 0.55rem 0.8rem !important;
+  border: 1px solid #fecaca !important;
+  border-radius: 0.65rem !important;
+  background: #fff7f7 !important;
+  color: #991b1b !important;
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-seg-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0.7rem !important;
+  position: sticky !important;
+  bottom: -1.25rem !important;
+  margin: 0 -1.25rem -1.25rem !important;
+  padding: 1rem 1.25rem !important;
+  background: #f8fafc !important;
+  border-top: 1px solid #f1f5f9 !important;
+  z-index: 1 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-seg-actions .scm-btn-primary,
+#scm-app .scm-case-submodal--workflow .scm-seg-actions .scm-btn-secondary {
+  min-height: 2.5rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.45rem !important;
+  padding: 0.58rem 1rem !important;
+  border-radius: 0.65rem !important;
+  font-size: 0.82rem !important;
+  line-height: 1.1 !important;
+  cursor: pointer !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-seg-actions .scm-btn-primary {
+  background: #f59e0b !important;
+  color: #ffffff !important;
+  border: 1px solid #f59e0b !important;
+  font-weight: 800 !important;
+  box-shadow: 0 6px 14px rgba(245, 158, 11, 0.2) !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-seg-actions .scm-btn-primary:hover {
+  background: #d97706 !important;
+  border-color: #d97706 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-seg-actions .scm-btn-secondary {
+  background: #ffffff !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+  font-weight: 700 !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-seg-actions .scm-btn-secondary:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-seg-actions .material-symbols-outlined {
+  font-size: 1rem !important;
+}
+
+#scm-app .scm-case-submodal--workflow .scm-seg-msg {
+  margin-right: auto !important;
+  color: #64748b !important;
+  font-size: 0.75rem !important;
+}
+
 @media (max-width: 640px) {
   #scm-app .scm-transfer-current,
-  #scm-app .scm-case-submodal--transfer .scm-seg-actions {
+  #scm-app .scm-case-submodal--transfer .scm-seg-actions,
+  #scm-app .scm-case-submodal--workflow .scm-seg-actions {
     align-items: stretch !important;
     flex-direction: column !important;
   }
@@ -4518,15 +4882,19 @@ body,
   }
 
   #scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-primary,
-  #scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-secondary {
+  #scm-app .scm-case-submodal--transfer .scm-seg-actions .scm-btn-secondary,
+  #scm-app .scm-case-submodal--workflow .scm-seg-actions .scm-btn-primary,
+  #scm-app .scm-case-submodal--workflow .scm-seg-actions .scm-btn-secondary {
     width: 100% !important;
   }
 
-  #scm-app .scm-case-submodal--transfer .scm-transfer-email-targets {
+  #scm-app .scm-case-submodal--transfer .scm-transfer-email-targets,
+  #scm-app .scm-case-submodal--workflow .scm-workflow-email-targets {
     grid-template-columns: 1fr !important;
   }
 
-  #scm-app .scm-case-submodal--transfer .scm-transfer-email-targets .scm-seg-check--none {
+  #scm-app .scm-case-submodal--transfer .scm-transfer-email-targets .scm-seg-check--none,
+  #scm-app .scm-case-submodal--workflow .scm-workflow-email-targets .scm-seg-check--none {
     justify-content: flex-start !important;
     border: 1px solid #e2e8f0 !important;
     background: #ffffff !important;

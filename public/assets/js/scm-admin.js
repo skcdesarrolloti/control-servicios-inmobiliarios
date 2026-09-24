@@ -755,6 +755,10 @@
         "scm-case-submodal--property-tech",
         "scm-case-submodal--transfer",
         "scm-case-submodal--contacts",
+        "scm-case-submodal--workflow",
+        "scm-case-submodal--reply",
+        "scm-case-submodal--postpone",
+        "scm-case-submodal--quote",
       );
       return existing;
     }
@@ -845,6 +849,47 @@
       meta.style.display = "none";
       return;
     }
+    meta.textContent = "Código inmueble web: " + propertyCode;
+    meta.style.display = "";
+  }
+
+  function renderCaseWorkflowMeta(caseBtn, modal, extraItems) {
+    var propertyCode = getCasePropertyCode(caseBtn, modal) || "-";
+    var logicalTicket = String(
+      (caseBtn && caseBtn.dataset
+        ? caseBtn.dataset.ticket || caseBtn.dataset.idTicket || ""
+        : "") || "",
+    )
+      .replace(/^#+/, "")
+      .trim();
+    var statusLabel = String(
+      caseBtn && caseBtn.dataset ? caseBtn.dataset.estado || "" : "",
+    ).trim();
+    var items = [
+      '<span><span class="material-symbols-outlined">domain</span><b>Código inmueble web:</b> <strong>' +
+        escHtml(propertyCode) +
+        "</strong></span>",
+    ];
+    if (logicalTicket) {
+      items.push(
+        '<span><span class="material-symbols-outlined">confirmation_number</span><b>Caso activo</b> #' +
+          escHtml(logicalTicket) +
+          "</span>",
+      );
+    }
+    if (statusLabel) {
+      items.push(
+        '<span><span class="material-symbols-outlined">radio_button_checked</span>' +
+          escHtml(statusLabel) +
+          "</span>",
+      );
+    }
+    if (Array.isArray(extraItems)) {
+      extraItems.forEach(function (item) {
+        if (item) items.push(item);
+      });
+    }
+    return '<div class="scm-transfer-meta-row scm-workflow-meta-row">' + items.join("") + "</div>";
   }
 
   function cleanCaseValue(value) {
@@ -2133,28 +2178,43 @@
     }
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
+      sub.classList.add(
+        "scm-case-submodal--workflow",
+        "scm-case-submodal--postpone",
+      );
+      var postponeNotifyTargets = renderNotifyTargets(
+        isPublicPqr ? ["arrendatario", "propietario"] : [],
+      ).replace(
+        'class="scm-notify-targets"',
+        'class="scm-notify-targets scm-workflow-email-targets"',
+      );
       body.innerHTML =
-        '<form class="scm-postpone-ticket-form" method="post" enctype="multipart/form-data" autocomplete="off">' +
+        '<form class="scm-postpone-ticket-form scm-transfer-form-modern scm-workflow-form-modern" method="post" enctype="multipart/form-data" autocomplete="off">' +
         '<input type="hidden" name="ticket_pk" value="' +
         escHtml(ticketPk) +
         '">' +
-        '<p class="scm-muted">Esta acci&oacute;n mantendr&aacute; ' +
+        renderCaseWorkflowMeta(caseBtn, modal) +
+        '<div class="scm-transfer-warning"><span class="material-symbols-outlined">info</span><p>Esta acci&oacute;n mantendr&aacute; ' +
         (isPublicPqr ? "la solicitud" : "el caso") +
-        " abierta y marcar&aacute; el estado administrativo como Postergado.</p>" +
-        '<label class="scm-seg-field"><span>Motivo de postergaci&oacute;n</span><textarea name="observacion" rows="6" required placeholder="' +
+        " abierta y marcar&aacute; el estado administrativo como Postergado.</p></div>" +
+        '<label class="scm-seg-field scm-transfer-field"><span>Motivo de postergaci&oacute;n <em>*</em></span><textarea name="observacion" rows="6" required placeholder="' +
         (isPublicPqr
           ? "Describe por qu&eacute; se posterga la solicitud..."
           : "Describe por qu&eacute; se posterga el caso...") +
         '"></textarea></label>' +
-        '<label class="scm-seg-field"><span>Imagenes / Evidencias (opcional)</span><input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
+        '<label class="scm-seg-field scm-transfer-field"><span>Imagenes / Evidencias <em>Opcional</em></span><input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
         renderPasteEvidenceBox("evidencia[]") +
         renderTicketDocumentFields() +
-        renderNotifyTargets(
-          isPublicPqr ? ["arrendatario", "propietario"] : [],
-        ) +
-        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Guardar postergaci&oacute;n</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        postponeNotifyTargets +
+        '<div class="scm-seg-actions"><button type="button" class="scm-btn-secondary" data-scm-case-submodal-cancel>Cancelar</button><button type="submit" class="scm-btn-primary"><span class="material-symbols-outlined">event_repeat</span> Guardar postergaci&oacute;n</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
+      var cancelBtn = body.querySelector("[data-scm-case-submodal-cancel]");
+      if (cancelBtn) {
+        cancelBtn.addEventListener("click", function () {
+          closeCaseSubmodal(modal);
+        });
+      }
     }
 
     sub.classList.add("open");
@@ -3854,15 +3914,26 @@
         : "Responder caso";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
+      sub.classList.add(
+        "scm-case-submodal--workflow",
+        "scm-case-submodal--reply",
+      );
+      var replyNotifyTargets = renderNotifyTargets(
+        isPublicPqr ? ["arrendatario", "propietario"] : [],
+      ).replace(
+        'class="scm-notify-targets"',
+        'class="scm-notify-targets scm-workflow-email-targets"',
+      );
       body.innerHTML =
-        '<form class="scm-ticket-response-form" method="post" enctype="multipart/form-data" autocomplete="off">' +
+        '<form class="scm-ticket-response-form scm-transfer-form-modern scm-workflow-form-modern" method="post" enctype="multipart/form-data" autocomplete="off">' +
         '<input type="hidden" name="ticket_pk" value="' +
         escHtml(ticketPk) +
         '">' +
-        '<label class="scm-seg-field"><span>Estado administrativo</span><select name="estado_administrativo">' +
+        renderCaseWorkflowMeta(caseBtn, modal) +
+        '<label class="scm-seg-field scm-transfer-field"><span>Estado administrativo</span><select name="estado_administrativo">' +
         '<option value="__keep__">Sin cambio</option><option value="Nuevo">Nuevo</option><option value="En espera de respuesta">En espera de respuesta</option><option value="Por inspeccionar">Por inspeccionar</option><option value="Inspeccionado">Inspeccionado</option><option value="Cotizado">Cotizado</option><option value="En ejecucion por inmobiliaria">En ejecucion por inmobiliaria</option><option value="En ejecucion por propietario">En ejecucion por propietario</option><option value="En ejecucion por arrendatario">En ejecucion por arrendatario</option><option value="En ejecucion por copropiedad">En ejecucion por copropiedad</option><option value="Finalizado">Finalizado</option><option value="Trasladado">Trasladado</option><option value="Entregado">Entregado</option><option value="Recibido">Recibido</option><option value="Desistido">Desistido</option>' +
         "</select></label>" +
-        '<label class="scm-seg-field"><span>Respuesta</span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
+        '<label class="scm-seg-field scm-transfer-field"><span>Respuesta <em>*</em></span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
         (isPreventiva
           ? '<section class="scm-preventiva-no-access-box" data-scm-preventiva-no-access-box><div><strong>Comunicaci&oacute;n / Acta preventiva por no autorizaci&oacute;n</strong><span>Este ticket lleva <b>' +
             escHtml(String(noAccessCount)) +
@@ -3880,17 +3951,23 @@
           !isPublicPqr && caseHasCotizacion(caseBtn),
           caseBtn.dataset.cotizacionId || "",
         ) +
-        '<label class="scm-seg-field"><span>Imagenes (opcional)</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
+        '<label class="scm-seg-field scm-transfer-field"><span>Imagenes <em>Opcional</em></span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
         renderPasteEvidenceBox("imagen[]") +
         renderTicketDocumentFields() +
-        renderNotifyTargets(
-          isPublicPqr ? ["arrendatario", "propietario"] : [],
-        ) +
-        '<div class="scm-seg-actions"><label class="scm-seg-check"><input type="checkbox" name="cerrar_ticket" value="1"> Cerrar al responder</label><button type="submit" class="scm-btn-primary">Publicar y enviar correo</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        replyNotifyTargets +
+        '<div class="scm-seg-actions"><span class="scm-seg-msg" aria-live="polite"></span><label class="scm-seg-check scm-workflow-close-check"><input type="checkbox" name="cerrar_ticket" value="1"> Cerrar al responder</label><button type="button" class="scm-btn-secondary" data-scm-case-submodal-cancel>Cancelar</button><button type="submit" class="scm-btn-primary"><span class="material-symbols-outlined">send</span> Publicar y enviar correo</button></div>' +
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
       initCotizacionResponseFields(body);
       initPreventivaNoAccessBox(body);
+      var responseCancelBtn = body.querySelector(
+        "[data-scm-case-submodal-cancel]",
+      );
+      if (responseCancelBtn) {
+        responseCancelBtn.addEventListener("click", function () {
+          closeCaseSubmodal(modal);
+        });
+      }
     }
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
@@ -3905,25 +3982,50 @@
     if (title) title.textContent = "Responder cotizacion";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
+      sub.classList.add(
+        "scm-case-submodal--workflow",
+        "scm-case-submodal--quote",
+      );
+      var quoteNotifyTargets = renderNotifyTargets()
+        .replace(
+          'class="scm-notify-targets"',
+          'class="scm-notify-targets scm-workflow-email-targets"',
+        );
+      var cotizacionMeta = caseBtn.dataset.cotizacionId
+        ? [
+            '<span><span class="material-symbols-outlined">receipt_long</span><b>Cotizaci&oacute;n</b> #' +
+              escHtml(caseBtn.dataset.cotizacionId || "") +
+              "</span>",
+          ]
+        : [];
       body.innerHTML =
-        '<form class="scm-cotizacion-response-form" method="post" autocomplete="off">' +
+        '<form class="scm-cotizacion-response-form scm-transfer-form-modern scm-workflow-form-modern" method="post" autocomplete="off">' +
         '<input type="hidden" name="ticket_pk" value="' +
         escHtml(ticketPk) +
         '">' +
         '<input type="hidden" name="id_cotizacion" value="' +
         escHtml(caseBtn.dataset.cotizacionId || "") +
         '">' +
+        renderCaseWorkflowMeta(caseBtn, modal, cotizacionMeta) +
         '<section class="scm-cotizacion-response-inline" data-scm-cotizacion-response-fields>' +
-        '<label class="scm-seg-field"><span>Respuesta</span><select name="estado" required><option value="">Elige una respuesta</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
-        '<label class="scm-seg-field scm-cotizacion-motivo" style="display:none;"><span>Motivo</span><select name="motivo"><option value="">Elige un motivo</option><option value="Por costo">Por costo</option><option value="Ejecucción por cuenta propia">Ejecucción por cuenta propia</option></select></label>' +
-        '<label class="scm-seg-field scm-cotizacion-financiacion" style="display:none;"><span>Financiacion</span><select name="financiacion"><option value="">No aplica / sin respuesta</option><option value="Si">Si</option><option value="No">No</option></select></label>' +
-        '<label class="scm-seg-field"><span>Observaciones</span><textarea name="observacion" rows="6" placeholder="Ninguna">Ninguna</textarea></label>' +
+        '<label class="scm-seg-field scm-transfer-field"><span>Respuesta <em>*</em></span><select name="estado" required><option value="">Elige una respuesta</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
+        '<label class="scm-seg-field scm-transfer-field scm-cotizacion-motivo" style="display:none;"><span>Motivo</span><select name="motivo"><option value="">Elige un motivo</option><option value="Por costo">Por costo</option><option value="Ejecucción por cuenta propia">Ejecucción por cuenta propia</option></select></label>' +
+        '<label class="scm-seg-field scm-transfer-field scm-cotizacion-financiacion" style="display:none;"><span>Financiacion</span><select name="financiacion"><option value="">No aplica / sin respuesta</option><option value="Si">Si</option><option value="No">No</option></select></label>' +
+        '<label class="scm-seg-field scm-transfer-field"><span>Observaciones</span><textarea name="observacion" rows="6" placeholder="Ninguna">Ninguna</textarea></label>' +
         "</section>" +
-        renderNotifyTargets() +
-        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Guardar respuesta</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        quoteNotifyTargets +
+        '<div class="scm-seg-actions"><button type="button" class="scm-btn-secondary" data-scm-case-submodal-cancel>Cancelar</button><button type="submit" class="scm-btn-primary"><span class="material-symbols-outlined">receipt_long</span> Guardar respuesta</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
       prependCaseLocationPanel(body, caseBtn, modal);
       initCotizacionResponseFields(body);
+      var quoteCancelBtn = body.querySelector(
+        "[data-scm-case-submodal-cancel]",
+      );
+      if (quoteCancelBtn) {
+        quoteCancelBtn.addEventListener("click", function () {
+          closeCaseSubmodal(modal);
+        });
+      }
     }
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
