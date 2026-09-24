@@ -685,6 +685,7 @@
     }
     var existing = modal.querySelector(".scm-case-submodal");
     if (existing) {
+      existing.classList.remove("scm-case-submodal--property-history");
       return existing;
     }
 
@@ -1065,6 +1066,7 @@
     if (!sub) {
       return;
     }
+    sub.classList.toggle("scm-case-submodal--property-history", targetId === "scm-sec-hist-inmueble");
 
     var clone = source.cloneNode(true);
     clone.removeAttribute("id");
@@ -4053,16 +4055,17 @@
     var title = sub.querySelector(".scm-case-submodal-title");
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = caseBtn.dataset.ticketPk || "";
-    if (title) title.textContent = "Editar propietario y arrendatario";
+    if (title) title.textContent = "Editar datos de titulares";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
       body.innerHTML =
-        '<form class="scm-contact-update-form" method="post" autocomplete="off">' +
+        '<form class="scm-contact-update-form scm-contact-editor-modern" method="post" autocomplete="off">' +
         '<input type="hidden" name="ticket_pk" value="' +
         escHtml(ticketPk) +
         '">' +
+        '<div class="scm-contact-editor-note"><span class="material-symbols-outlined">info</span><p>Los cambios actualizan las fichas vinculadas al caso y conservan el contexto del inmueble.</p></div>' +
         '<div class="scm-contact-edit-grid">' +
-        '<fieldset class="scm-contact-edit-group"><legend>Propietario</legend>' +
+        '<fieldset class="scm-contact-edit-group scm-contact-edit-group-owner"><legend><span class="material-symbols-outlined">person_pin</span> Propietario</legend>' +
         '<label class="scm-seg-field"><span>Nombre</span><input class="input input-bordered input-sm scm-input" name="propietario" type="text" value="' +
         escHtml(caseBtn.dataset.propietario || "") +
         '"></label>' +
@@ -4078,7 +4081,7 @@
         escHtml(caseBtn.dataset.celularPropietario || "") +
         '"></label>' +
         "</fieldset>" +
-        '<fieldset class="scm-contact-edit-group"><legend>Arrendatario</legend>' +
+        '<fieldset class="scm-contact-edit-group scm-contact-edit-group-tenant"><legend><span class="material-symbols-outlined">group</span> Arrendatario</legend>' +
         '<label class="scm-seg-field"><span>Nombre</span><input class="input input-bordered input-sm scm-input" name="arrendatario" type="text" value="' +
         escHtml(caseBtn.dataset.arrendatario || "") +
         '"></label>' +
@@ -4137,14 +4140,14 @@
       );
 
     return (
-      '<div class="scm-contact-view-actions"><button type="button" class="btn btn-outline btn-sm" data-scm-edit-contacts-from-view>Editar contactos</button></div>' +
-      '<div class="scm-contact-view-grid">' +
-      '<section class="scm-contact-view-card"><h5>Propietario</h5>' +
+      '<div class="scm-contact-view-actions"><button type="button" class="scm-contact-view-edit-btn" data-scm-edit-contacts-from-view><span class="material-symbols-outlined">edit</span> Editar datos</button></div>' +
+      '<div class="scm-contact-view-grid scm-contact-view-modern">' +
+      '<section class="scm-contact-view-card scm-contact-view-card-owner"><div class="scm-contact-view-card-head"><h5>Propietario</h5><span>Titular registrado</span></div>' +
       (propietario
         ? '<dl class="scm-detail-list">' + propietario + "</dl>"
         : '<p class="scm-muted">Sin datos de propietario.</p>') +
       "</section>" +
-      '<section class="scm-contact-view-card"><h5>Arrendatario</h5>' +
+      '<section class="scm-contact-view-card scm-contact-view-card-tenant"><div class="scm-contact-view-card-head"><h5>Arrendatario</h5><span>Inquilino activo</span></div>' +
       (arrendatario
         ? '<dl class="scm-detail-list">' + arrendatario + "</dl>"
         : '<p class="scm-muted">Sin datos de arrendatario.</p>') +
@@ -4158,7 +4161,7 @@
     if (!sub || !caseBtn) return;
     var title = sub.querySelector(".scm-case-submodal-title");
     var body = sub.querySelector(".scm-case-submodal-body");
-    if (title) title.textContent = "Contactos del caso";
+    if (title) title.textContent = "Contactos del caso y titulares";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
       body.innerHTML = renderContactViewerHtml(caseBtn);
@@ -5682,7 +5685,6 @@
 
         if (!isPublicPqr) {
           complementaryActionButtons.push(
-            '<button type="button" class="scm-case-work-btn" data-scm-view-contacts><span class="material-symbols-outlined scm-btn-icon">contacts</span><div class="scm-btn-text"><span class="scm-btn-label">Ver contactos</span><span class="scm-btn-sub">Directorio de partes</span></div></button>',
             '<button type="button" class="scm-case-work-btn" data-scm-view-property-map><span class="material-symbols-outlined scm-btn-icon">map</span><div class="scm-btn-text"><span class="scm-btn-label">Ubicación GPS</span><span class="scm-btn-sub">Mapa del inmueble</span></div></button>',
           );
           if (String(btn.dataset.empleadoId || "").trim()) {
@@ -6113,10 +6115,16 @@
           sidebarHtml += '<div class="scm-stakeholder-item">';
           sidebarHtml += '<div class="scm-stakeholder-head"><span class="scm-stakeholder-role">' + (isPublicPqr ? 'Solicitante' : 'Arrendatario (Inquilino)') + '</span><span class="scm-chip scm-chip-secondary text-[10px]">Inquilino</span></div>';
           sidebarHtml += '<div class="scm-stakeholder-body"><div class="scm-stakeholder-details"><strong class="scm-stakeholder-name">' + escHtml(solicitanteVal) + '</strong>' + (celularVal ? '<span class="scm-stakeholder-sub">' + escHtml(celularVal) + '</span>' : '') + (correoVal ? '<span class="scm-stakeholder-sub">' + escHtml(correoVal) + '</span>' : '') + '</div></div>';
+          sidebarHtml += '<div class="scm-stakeholder-actions scm-stakeholder-actions-data">';
+          sidebarHtml += '<button type="button" class="scm-stakeholder-btn" data-scm-view-contacts><span class="material-symbols-outlined text-[14px]">visibility</span> Ver datos</button>';
+          if (!isPublicPqr) {
+            sidebarHtml += '<button type="button" class="scm-stakeholder-btn scm-stakeholder-btn-edit" data-scm-open-contacts><span class="material-symbols-outlined text-[14px]">edit</span> Editar datos</button>';
+          }
           if (celularVal) {
             var rawDigits = celularVal.replace(/\D/g, "");
-            sidebarHtml += '<div class="scm-stakeholder-actions"><a class="scm-stakeholder-btn" href="tel:' + escHtml(rawDigits) + '"><span class="material-symbols-outlined text-[14px]">call</span> Llamar</a><a class="scm-stakeholder-btn" href="https://wa.me/57' + escHtml(rawDigits) + '" target="_blank" rel="noopener"><span class="material-symbols-outlined text-[14px]">chat</span> WhatsApp</a></div>';
+            sidebarHtml += '<a class="scm-stakeholder-btn" href="tel:' + escHtml(rawDigits) + '"><span class="material-symbols-outlined text-[14px]">call</span> Llamar</a><a class="scm-stakeholder-btn scm-stakeholder-btn-whatsapp" href="https://wa.me/57' + escHtml(rawDigits) + '" target="_blank" rel="noopener"><span class="material-symbols-outlined text-[14px]">chat</span> WhatsApp</a>';
           }
+          sidebarHtml += '</div>';
           sidebarHtml += '</div>';
         }
 
@@ -6125,7 +6133,7 @@
           sidebarHtml += '<div class="scm-stakeholder-item">';
           sidebarHtml += '<div class="scm-stakeholder-head"><span class="scm-stakeholder-role">Propietario del Inmueble</span><span class="scm-chip scm-chip-warning text-[10px]">Propietario</span></div>';
           sidebarHtml += '<div class="scm-stakeholder-body"><div class="scm-stakeholder-details"><strong class="scm-stakeholder-name">' + escHtml(propietarioVal) + '</strong></div></div>';
-          sidebarHtml += '<div class="scm-stakeholder-actions"><button type="button" class="scm-stakeholder-btn" data-scm-view-contacts><span class="material-symbols-outlined text-[14px]">notifications_active</span> Contactar</button></div>';
+          sidebarHtml += '<div class="scm-stakeholder-actions scm-stakeholder-actions-data"><button type="button" class="scm-stakeholder-btn" data-scm-view-contacts><span class="material-symbols-outlined text-[14px]">visibility</span> Ver datos</button>' + (!isPublicPqr ? '<button type="button" class="scm-stakeholder-btn scm-stakeholder-btn-edit" data-scm-open-contacts><span class="material-symbols-outlined text-[14px]">edit</span> Editar datos</button>' : '') + '</div>';
           sidebarHtml += '</div>';
         }
         sidebarHtml += '</div>';
