@@ -726,6 +726,7 @@
     var sub = modal.querySelector(".scm-case-submodal");
     if (sub) {
       sub.classList.remove("open");
+      sub._scmReturnView = null;
     }
 
     modal.classList.remove("open");
@@ -748,6 +749,7 @@
     }
     var existing = modal.querySelector(".scm-case-submodal");
     if (existing) {
+      existing._scmReturnView = null;
       existing.classList.remove(
         "scm-case-submodal--property-history",
         "scm-case-submodal--property-tech",
@@ -770,8 +772,7 @@
     modal.querySelector(".scm-case-dialog").appendChild(wrap);
 
     function closeSub() {
-      wrap.classList.remove("open");
-      wrap.setAttribute("aria-hidden", "true");
+      closeCaseSubmodalElement(wrap);
     }
 
     var closeBtn = wrap.querySelector(".scm-case-submodal-close");
@@ -782,11 +783,21 @@
     return wrap;
   }
 
-  function closeCaseSubmodal(modal) {
-    var sub = modal ? modal.querySelector(".scm-case-submodal") : null;
+  function closeCaseSubmodalElement(sub) {
     if (!sub) return;
+    if (typeof sub._scmReturnView === "function") {
+      var returnView = sub._scmReturnView;
+      sub._scmReturnView = null;
+      returnView();
+      return;
+    }
     sub.classList.remove("open");
     sub.setAttribute("aria-hidden", "true");
+  }
+
+  function closeCaseSubmodal(modal) {
+    var sub = modal ? modal.querySelector(".scm-case-submodal") : null;
+    closeCaseSubmodalElement(sub);
   }
 
   function dispatchCaseActionSaved(root, ticketPk, fromNode) {
@@ -1264,7 +1275,10 @@
       body.innerHTML = renderPropertyTechnicalCard(caseBtn, modal, options || {});
       body.querySelectorAll("[data-scm-view-property-map]").forEach(function (mapBtn) {
         mapBtn.addEventListener("click", function () {
-          openPropertyLocationEditor(modal, caseBtn);
+          openPropertyLocationEditor(modal, caseBtn, {
+            returnToPropertyTechnical: true,
+            propertyOptions: options || {},
+          });
         });
       });
       body.querySelectorAll("[data-scm-open-section]").forEach(function (detailBtn) {
@@ -1357,9 +1371,19 @@
     );
   }
 
-  function openPropertyLocationEditor(modal, caseBtn) {
+  function openPropertyLocationEditor(modal, caseBtn, options) {
+    options = options || {};
     var sub = ensureCaseSubmodal(modal);
     if (!sub || !caseBtn) return;
+    if (options.returnToPropertyTechnical) {
+      sub._scmReturnView = function () {
+        openPropertyTechnicalSubmodal(
+          modal,
+          caseBtn,
+          options.propertyOptions || {},
+        );
+      };
+    }
     var title = sub.querySelector(".scm-case-submodal-title");
     var body = sub.querySelector(".scm-case-submodal-body");
 
