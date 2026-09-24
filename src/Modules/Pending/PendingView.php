@@ -1103,10 +1103,13 @@ final class PendingView
     $propertyWeb = $this->pendingFirstRecordValue($record, ['codigo_inmueble_web', 'id_inmueble', 'inmueble', 'codigo']);
     $propertySimi = $this->pendingFirstRecordValue($record, ['inmueble', 'codigo']);
     $status = $this->pendingFirstRecordValue($record, ['estado', 'estado_contrato']);
-    $buttons = $this->pendingHistoryItemButtons($record, 'Contrato');
+    $buttons = $this->pendingWithoutContractRecordLeaseMandateButtons(
+      $this->pendingHistoryItemButtons($record, 'Contrato'),
+      $record,
+    );
     $photoUrl = $this->pendingContractUrl($this->pendingFirstRecordValue($record, ['registro_fotografico', 'registro_fotos', 'carpeta_drive', 'google_drive']));
     if ($photoUrl !== '') {
-      $buttons[] = ['url' => $photoUrl, 'label' => 'Abrir carpeta Google Drive'];
+      $buttons[] = ['url' => $photoUrl, 'label' => 'Ver registro fotografico'];
     }
 
     $html .= '<div class="scm-contract-card">';
@@ -1236,13 +1239,13 @@ final class PendingView
       if ($url === '' || $label === '') {
         continue;
       }
-      $key = strtolower($label . '|' . $url);
+      $key = $this->pendingActionButtonUrlKey($url);
       if (isset($seen[$key])) {
         continue;
       }
       $seen[$key] = true;
       $isPrimary = strtolower($label) === 'ver inmueble en web';
-      $openNewTab = in_array(strtolower($label), ['ver inmueble en web', 'abrir carpeta google drive'], true);
+      $openNewTab = in_array(strtolower($label), ['ver inmueble en web', 'abrir carpeta google drive', 'ver registro fotografico'], true);
       if ($openNewTab) {
         $html .= '<a class="scm-contract-action' . ($isPrimary ? ' is-primary' : '') . '" href="' . esc_url($url) . '" target="_blank" rel="noopener"><span>' . esc_html($label) . '</span><span class="material-symbols-outlined">open_in_new</span></a>';
         continue;
@@ -1250,6 +1253,64 @@ final class PendingView
       $html .= '<button type="button" class="scm-contract-action" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '"><span>' . esc_html($label) . '</span><span class="material-symbols-outlined">arrow_forward</span></button>';
     }
     return $html . '</div>';
+  }
+
+  private function pendingActionButtonUrlKey(string $url): string
+  {
+    $decoded = html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $parts = parse_url($decoded);
+    if (!is_array($parts)) {
+      return strtolower($decoded);
+    }
+
+    $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+    $host = strtolower((string) ($parts['host'] ?? ''));
+    $path = rtrim((string) ($parts['path'] ?? ''), '/');
+    $query = (string) ($parts['query'] ?? '');
+    if ($query !== '') {
+      parse_str($query, $params);
+      ksort($params);
+      $query = http_build_query($params);
+    }
+
+    return strtolower($scheme . '://' . $host . $path . ($query !== '' ? '?' . $query : ''));
+  }
+
+  /**
+   * @param array<int,array<string,mixed>> $buttons
+   * @param array<string,mixed> $record
+   * @return array<int,array<string,mixed>>
+   */
+  private function pendingWithoutContractRecordLeaseMandateButtons(array $buttons, array $record): array
+  {
+    $mandateId = $this->pendingFirstRecordValue($record, ['id_contrato_mandato']);
+    $leaseIds = array_filter([
+      $this->pendingFirstRecordValue($record, ['contrato']),
+      $this->pendingFirstRecordValue($record, ['id_contrato']),
+    ], static function (string $value): bool {
+      return $value !== '';
+    });
+
+    return array_values(array_filter($buttons, static function ($button) use ($leaseIds, $mandateId): bool {
+      $label = strtolower(trim((string) ($button['label'] ?? '')));
+      if ($label !== 'ver contrato de mandato') {
+        return true;
+      }
+
+      $query = (string) (parse_url((string) ($button['url'] ?? ''), PHP_URL_QUERY) ?: '');
+      $params = [];
+      if ($query !== '') {
+        parse_str($query, $params);
+      }
+      $number = trim((string) ($params['numero'] ?? ''));
+      if ($number === '') {
+        return true;
+      }
+      if ($mandateId !== '' && $number === $mandateId) {
+        return true;
+      }
+      return !in_array($number, $leaseIds, true);
+    }));
   }
 
   /** @param array<string,mixed> $record @return array<string,string> */

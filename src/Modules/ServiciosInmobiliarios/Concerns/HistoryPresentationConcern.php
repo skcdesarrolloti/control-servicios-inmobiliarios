@@ -446,10 +446,13 @@ trait HistoryPresentationConcern
     $status = $this->firstNonEmptyRecordValue($record, ['estado', 'estado_contrato']);
     $photoUrl = $this->contractRecordUrl($this->firstNonEmptyRecordValue($record, ['registro_fotografico', 'registro_fotos', 'carpeta_drive', 'google_drive']));
 
-    $baseButtons = $this->withoutInmuebleWebButtons($this->buildHistoryItemButtons($record));
+    $baseButtons = $this->withoutContractRecordLeaseMandateButtons(
+      $this->withoutInmuebleWebButtons($this->buildHistoryItemButtons($record)),
+      $record,
+    );
     $itemButtons = $this->mergeCaseActionButtons($baseButtons, $this->singleRecordExtraButtons('Contrato', $record));
     if ($photoUrl !== '') {
-      $itemButtons = $this->mergeCaseActionButtons($itemButtons, [['url' => $photoUrl, 'label' => 'Abrir carpeta Google Drive']]);
+      $itemButtons = $this->mergeCaseActionButtons($itemButtons, [['url' => $photoUrl, 'label' => 'Ver registro fotografico']]);
     }
 
     $html .= '<div class="scm-contract-card">';
@@ -576,7 +579,7 @@ trait HistoryPresentationConcern
         continue;
       }
       $isPrimary = strtolower(trim($label)) === 'ver inmueble en web';
-      $openNewTab = in_array(strtolower(trim($label)), ['ver inmueble en web', 'abrir carpeta google drive'], true);
+      $openNewTab = in_array(strtolower(trim($label)), ['ver inmueble en web', 'abrir carpeta google drive', 'ver registro fotografico'], true);
       if ($openNewTab) {
         $html .= '<a class="scm-contract-action' . ($isPrimary ? ' is-primary' : '') . '" href="' . esc_url($url) . '" target="_blank" rel="noopener"><span>' . esc_html($label) . '</span><span class="material-symbols-outlined">open_in_new</span></a>';
         continue;
@@ -861,6 +864,43 @@ trait HistoryPresentationConcern
   }
 
   /**
+   * @param array<int,array<string,mixed>> $buttons
+   * @param array<string,mixed> $record
+   * @return array<int,array<string,mixed>>
+   */
+  private function withoutContractRecordLeaseMandateButtons(array $buttons, array $record): array
+  {
+    $mandateId = $this->firstNonEmptyRecordValue($record, ['id_contrato_mandato']);
+    $leaseIds = array_filter([
+      $this->firstNonEmptyRecordValue($record, ['contrato']),
+      $this->firstNonEmptyRecordValue($record, ['id_contrato']),
+    ], static function (string $value): bool {
+      return $value !== '';
+    });
+
+    return array_values(array_filter($buttons, static function ($button) use ($leaseIds, $mandateId): bool {
+      $label = strtolower(trim((string) ($button['label'] ?? '')));
+      if ($label !== 'ver contrato de mandato') {
+        return true;
+      }
+
+      $query = (string) (parse_url((string) ($button['url'] ?? ''), PHP_URL_QUERY) ?: '');
+      $params = [];
+      if ($query !== '') {
+        parse_str($query, $params);
+      }
+      $number = trim((string) ($params['numero'] ?? ''));
+      if ($number === '') {
+        return true;
+      }
+      if ($mandateId !== '' && $number === $mandateId) {
+        return true;
+      }
+      return !in_array($number, $leaseIds, true);
+    }));
+  }
+
+  /**
    * @param array<int,array<string,mixed>> $primary
    * @param array<int,array<string,mixed>> $extra
    * @return array<int,array{url:string,label:string}>
@@ -876,8 +916,8 @@ trait HistoryPresentationConcern
       if ($url === '' || $label === '') {
         continue;
       }
-      $urlKey = strtolower($url);
-      $pairKey = strtolower($label . '|' . $url);
+      $urlKey = $this->caseActionButtonUrlKey($url);
+      $pairKey = strtolower($label . '|' . $urlKey);
       if (isset($seenUrls[$urlKey]) || isset($seenPairs[$pairKey])) {
         continue;
       }
@@ -886,6 +926,27 @@ trait HistoryPresentationConcern
       $out[] = ['url' => esc_url_raw($url), 'label' => $label];
     }
     return $out;
+  }
+
+  private function caseActionButtonUrlKey(string $url): string
+  {
+    $decoded = html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $parts = parse_url($decoded);
+    if (!is_array($parts)) {
+      return strtolower($decoded);
+    }
+
+    $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+    $host = strtolower((string) ($parts['host'] ?? ''));
+    $path = rtrim((string) ($parts['path'] ?? ''), '/');
+    $query = (string) ($parts['query'] ?? '');
+    if ($query !== '') {
+      parse_str($query, $params);
+      ksort($params);
+      $query = http_build_query($params);
+    }
+
+    return strtolower($scheme . '://' . $host . $path . ($query !== '' ? '?' . $query : ''));
   }
 
   /**
