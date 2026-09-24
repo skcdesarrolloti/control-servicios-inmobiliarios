@@ -98,7 +98,26 @@ final class Auth
     $_SESSION['scm_user_login'] = $login;
     $_SESSION['scm_user_rol']   = (string) ($row['rol'] ?? '');
     $_SESSION['scm_user_cargo'] = trim((string) ($row['id_cargo'] ?? ''));
+    $_SESSION['scm_user_cargo_nombre'] = $this->resolveCargoName($_SESSION['scm_user_cargo']);
     $_SESSION['scm_last_activity'] = time();
+  }
+
+  private function resolveCargoName(string $cargoId): string
+  {
+    $cargoId = trim($cargoId);
+    if ($cargoId === '') {
+      return '';
+    }
+    if (!ctype_digit($cargoId)) {
+      return $cargoId;
+    }
+    try {
+      $table = $this->db->table('jet_cct_cargos');
+      $cargoName = trim((string) ($this->db->getVar("SELECT TRIM(COALESCE(`nombre_cargo`, '')) FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cargoId]) ?? ''));
+      return $cargoName !== '' ? $cargoName : $cargoId;
+    } catch (\Throwable $e) {
+      return $cargoId;
+    }
   }
 
   public function logout(): void
@@ -197,6 +216,38 @@ final class Auth
   public static function userCargo(): string
   {
     return (string) ($_SESSION['scm_user_cargo'] ?? '');
+  }
+
+  /** Devuelve el nombre descriptivo del cargo del funcionario autenticado. */
+  public static function userCargoName(): string
+  {
+    $cached = trim((string) ($_SESSION['scm_user_cargo_nombre'] ?? ''));
+    if ($cached !== '') {
+      return $cached;
+    }
+
+    $cargoId = trim((string) ($_SESSION['scm_user_cargo'] ?? ''));
+    if ($cargoId === '') {
+      return '';
+    }
+    if (!ctype_digit($cargoId)) {
+      $_SESSION['scm_user_cargo_nombre'] = $cargoId;
+      return $cargoId;
+    }
+
+    try {
+      $db = App::db();
+      $table = $db->table('jet_cct_cargos');
+      $cargoName = trim((string) ($db->getVar("SELECT TRIM(COALESCE(`nombre_cargo`, '')) FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cargoId]) ?? ''));
+      if ($cargoName !== '') {
+        $_SESSION['scm_user_cargo_nombre'] = $cargoName;
+        return $cargoName;
+      }
+    } catch (\Throwable $exception) {
+      return $cargoId;
+    }
+
+    return $cargoId;
   }
 
   /** Redirige a login si no está autenticado. */

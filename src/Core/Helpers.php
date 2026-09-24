@@ -39,7 +39,7 @@ if (!defined('SCM_DEFAULT_PORTAL_LOGO_URL')) {
 }
 
 if (!defined('SCM_DEFAULT_PORTAL_FAVICON_URL')) {
-  define('SCM_DEFAULT_PORTAL_FAVICON_URL', 'https://sucasainmobiliaria.com.co/wp-content/uploads/2023/07/SUCASA_PNG_CALIDAD-NORMAL_5-150x150.png');
+  define('SCM_DEFAULT_PORTAL_FAVICON_URL', 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/cropped-ISOLOGO-WEB.png');
 }
 
 if (!function_exists('system_image')) {
@@ -55,7 +55,7 @@ if (!function_exists('system_image')) {
     if ($fallback === '') {
       if ($function === 'portal_logo_url') {
         $fallback = SCM_DEFAULT_PORTAL_LOGO_URL;
-      } elseif ($function === 'portal_favicon_url') {
+      } elseif ($function === 'portal_favicon_url' || $function === 'portal_isologo_url') {
         $fallback = SCM_DEFAULT_PORTAL_FAVICON_URL;
       }
     }
@@ -75,6 +75,15 @@ if (!function_exists('system_image')) {
         [$function]
       );
       $url = trim((string) ($row['image_url'] ?? ''));
+      if ($url === '' && $function === 'portal_isologo_url') {
+        $rowFav = $db->getRow(
+          "SELECT COALESCE(NULLIF(`valor`, ''), NULLIF(`imagen`, '')) AS image_url
+           FROM `{$table}`
+           WHERE `funcion` = 'portal_favicon_url'
+           LIMIT 1"
+        );
+        $url = trim((string) ($rowFav['image_url'] ?? ''));
+      }
 
       return $cache[$function] = $url !== '' ? $url : $fallback;
     } catch (\Throwable $e) {

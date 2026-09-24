@@ -48,16 +48,20 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
     (function () {
       'use strict';
 
-      // 1. Menú desplegable de perfil de usuario y configuración
+      // 1. Menú desplegable de perfil de usuario, configuración y notificaciones operativas
       const profileBtn = document.getElementById('user-profile-button');
       const dropdownMenu = document.getElementById('user-dropdown-menu');
       const configBtn = document.getElementById('btn-global-configuracion');
       const configDropdown = document.getElementById('global-config-dropdown-menu');
+      const notifBtn = document.getElementById('btn-global-notificaciones');
+      const notifDropdown = document.getElementById('global-notifications-dropdown-menu');
+      const appBaseUrl = '<?php echo htmlspecialchars($baseUrl, ENT_QUOTES, "UTF-8"); ?>';
 
       if (profileBtn && dropdownMenu) {
         profileBtn.addEventListener('click', function (e) {
           e.stopPropagation();
           if (configDropdown) configDropdown.classList.add('hidden');
+          if (notifDropdown) notifDropdown.classList.add('hidden');
           const isHidden = dropdownMenu.classList.contains('hidden');
           dropdownMenu.classList.toggle('hidden', !isHidden);
           profileBtn.setAttribute('aria-expanded', String(isHidden));
@@ -68,10 +72,55 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
         configBtn.addEventListener('click', function (e) {
           e.stopPropagation();
           if (dropdownMenu) dropdownMenu.classList.add('hidden');
+          if (notifDropdown) notifDropdown.classList.add('hidden');
           const isHidden = configDropdown.classList.contains('hidden');
           configDropdown.classList.toggle('hidden', !isHidden);
           configBtn.setAttribute('aria-expanded', String(isHidden));
         });
+      }
+
+      if (notifBtn && notifDropdown) {
+        notifBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (dropdownMenu) dropdownMenu.classList.add('hidden');
+          if (configDropdown) configDropdown.classList.add('hidden');
+          const isHidden = notifDropdown.classList.contains('hidden');
+          notifDropdown.classList.toggle('hidden', !isHidden);
+          notifBtn.setAttribute('aria-expanded', String(isHidden));
+        });
+
+        notifDropdown.addEventListener('click', function (e) {
+          const item = e.target.closest('[data-scm-notif-ticket]');
+          if (!item) return;
+          const ticketPk = item.getAttribute('data-scm-notif-ticket');
+          const logicalId = item.getAttribute('data-scm-notif-logical');
+          notifDropdown.classList.add('hidden');
+          notifBtn.setAttribute('aria-expanded', 'false');
+
+          // Buscar botón de caso en la vista activa
+          const selectors = [
+            '.scm-btn-case[data-ticket-pk="' + ticketPk + '"]',
+            '.scm-btn-case[data-ticket="' + logicalId + '"]',
+            '.scm-btn-case[data-ticket="' + ticketPk + '"]',
+            '[data-scm-open-linked-ticket-case][data-ticket-pk="' + ticketPk + '"]',
+            '[data-ticket-id="' + ticketPk + '"]'
+          ];
+          let foundBtn = null;
+          for (let i = 0; i < selectors.length; i++) {
+            foundBtn = document.querySelector(selectors[i]);
+            if (foundBtn) break;
+          }
+          if (foundBtn && typeof window.scmOpenCase === 'function') {
+            window.scmOpenCase(foundBtn);
+            return;
+          }
+
+          // Si no está en el DOM actual, navegar a la pestaña adecuada
+          const isMine = item.getAttribute('data-scm-notif-is-mine') === '1';
+          const targetTab = isMine ? 'mis_tickets' : 'abiertos';
+          window.location.href = appBaseUrl + '/index.php?tab=' + targetTab + '&ticket=' + encodeURIComponent(logicalId);
+        });
+      }
 
         configDropdown.addEventListener('click', function (e) {
           const actionBtn = e.target.closest('[data-scm-config-action]');
@@ -159,6 +208,10 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           configDropdown.classList.add('hidden');
           if (configBtn) configBtn.setAttribute('aria-expanded', 'false');
         }
+        if (notifDropdown && !notifDropdown.contains(e.target) && notifBtn && !notifBtn.contains(e.target)) {
+          notifDropdown.classList.add('hidden');
+          if (notifBtn) notifBtn.setAttribute('aria-expanded', 'false');
+        }
         navDropdownContainers.forEach(function (container) {
           if (!container.contains(e.target)) {
             const menu = container.querySelector('[data-scm-dropdown-menu]');
@@ -182,6 +235,10 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           if (configDropdown) {
             configDropdown.classList.add('hidden');
             if (configBtn) configBtn.setAttribute('aria-expanded', 'false');
+          }
+          if (notifDropdown) {
+            notifDropdown.classList.add('hidden');
+            if (notifBtn) notifBtn.setAttribute('aria-expanded', 'false');
           }
           navDropdownContainers.forEach(function (container) {
             const menu = container.querySelector('[data-scm-dropdown-menu]');
@@ -454,6 +511,29 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           }
         });
       }
+
+      // 7. Auto-abrir caso si viene indicado en los parámetros de la URL (?ticket=...)
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const ticketParam = urlParams.get('ticket');
+        if (ticketParam) {
+          setTimeout(function () {
+            const selectors = [
+              '.scm-btn-case[data-ticket-pk="' + ticketParam + '"]',
+              '.scm-btn-case[data-ticket="' + ticketParam + '"]',
+              '[data-scm-open-linked-ticket-case][data-ticket-pk="' + ticketParam + '"]',
+              '[data-ticket-id="' + ticketParam + '"]'
+            ];
+            for (let i = 0; i < selectors.length; i++) {
+              const btn = document.querySelector(selectors[i]);
+              if (btn && typeof window.scmOpenCase === 'function') {
+                window.scmOpenCase(btn);
+                break;
+              }
+            }
+          }, 350);
+        }
+      } catch (err) {}
 
     })();
   </script>

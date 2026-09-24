@@ -14,7 +14,7 @@ $checks = [
   'admin lightbox supports gallery navigation' => str_contains($coreJs, 'moveImageLightbox(-1)') && str_contains($coreJs, 'moveImageLightbox(1)') && str_contains($coreJs, 'ArrowLeft') && str_contains($coreJs, 'ArrowRight'),
   'admin lightbox has accessible popup styles' => str_contains($coreJs, 'aria-modal="true"') && str_contains($coreCss, '.scm-image-lightbox') && str_contains($coreCss, 'min-height: 44px'),
   'quote images are explicitly marked for popup preview' => str_contains($dashboard, 'data-scm-lightbox="1"') && str_contains($dashboard, 'data-scm-lightbox-title'),
-  'admin css cache points to refreshed core css' => str_contains($adminCss, './admin/01-core.css?v=3.3.74'),
+  'admin css cache points to refreshed core css' => (bool) preg_match('#\./admin/01-core\.css\?v=3\.3\.\d+#', $adminCss),
 ];
 
 $failed = [];

@@ -27,23 +27,109 @@ $baseUrl = isset($base_url) && $base_url !== '' ? rtrim((string)$base_url, '/') 
 // Resolver información de usuario y cargo
 $authUserName = class_exists('\SCM\Core\Auth') ? \SCM\Core\Auth::user() : '';
 $authUserCargo = class_exists('\SCM\Core\Auth') ? \SCM\Core\Auth::userCargo() : '';
+$authUserCargoName = class_exists('\SCM\Core\Auth') ? \SCM\Core\Auth::userCargoName() : '';
 
 $userName = !empty($user_name) ? (string)$user_name : (!empty($authUserName) ? $authUserName : 'Royner Guardo');
-$userRole = !empty($user_role) ? (string)$user_role : (!empty($authUserCargo) ? $authUserCargo : 'Administrador Operativo');
+$userRole = !empty($user_role) ? (string)$user_role : (!empty($authUserCargoName) ? $authUserCargoName : (!empty($authUserCargo) ? $authUserCargo : 'Administrador Operativo'));
 $pageTitle = !empty($page_title) ? (string)$page_title : 'SKC SuCasa Inmobiliaria — Control Operativo';
 
-// Avatar local o fallback corporativo
-$defaultAvatar = $baseUrl . '/assets/img/avatar-manager.png';
-$userAvatar = !empty($user_avatar) ? (string)$user_avatar : $defaultAvatar;
-
-// Logo corporativo respetando la regla "el logo no lo cambies deja el que esta como es"
+// Logo corporativo y favicon/isologo desde wp_jet_cct_confi_sistema
 $logoUrl = function_exists('system_image')
   ? \system_image('portal_logo_url', defined('SCM_DEFAULT_PORTAL_LOGO_URL') ? SCM_DEFAULT_PORTAL_LOGO_URL : '')
   : (defined('SCM_DEFAULT_PORTAL_LOGO_URL') ? SCM_DEFAULT_PORTAL_LOGO_URL : 'https://sucasainmobiliaria.com.co/wp-content/uploads/2023/07/SUCASA_PNG_CALIDAD-NORMAL_5.png');
 
 $faviconUrl = function_exists('system_image')
   ? \system_image('portal_favicon_url', defined('SCM_DEFAULT_PORTAL_FAVICON_URL') ? SCM_DEFAULT_PORTAL_FAVICON_URL : '')
-  : (defined('SCM_DEFAULT_PORTAL_FAVICON_URL') ? SCM_DEFAULT_PORTAL_FAVICON_URL : 'https://sucasainmobiliaria.com.co/wp-content/uploads/2023/07/SUCASA_PNG_CALIDAD-NORMAL_5-150x150.png');
+  : (defined('SCM_DEFAULT_PORTAL_FAVICON_URL') ? SCM_DEFAULT_PORTAL_FAVICON_URL : 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/cropped-ISOLOGO-WEB.png');
+
+$isologoUrl = function_exists('system_image')
+  ? \system_image('portal_isologo_url', $faviconUrl)
+  : $faviconUrl;
+
+// Avatar oficial: usar isologo corporativo (eliminando la foto stock genérica)
+$defaultAvatar = $isologoUrl !== '' ? $isologoUrl : ($baseUrl . '/assets/img/cropped-ISOLOGO-WEB.png');
+$userAvatar = !empty($user_avatar) ? (string)$user_avatar : $defaultAvatar;
+
+// Resolver notificaciones operativas recientes (casos nuevos, pendientes, etc.)
+$operationalNotifications = [];
+$unreadNotifCount = 0;
+if (class_exists('\SCM\Core\App')) {
+  try {
+    $notifDb = \SCM\Core\App::db();
+    $ticketsTable = $notifDb->table('jet_cct_tickets');
+    $currentEmployeeId = class_exists('\SCM\Core\Auth') ? \SCM\Core\Auth::employeeId() : '';
+
+    $recentTickets = $notifDb->getResults(
+      "SELECT `_ID`, `id_ticket`, `asunto`, `estado`, `estado_administrativo`, 
+              `nombre_empleado`, `id_empleado`, `cct_created`, `cct_modified`
+         FROM `{$ticketsTable}`
+        WHERE `estado` NOT IN ('Cerrado', 'Resuelto')
+        ORDER BY `_ID` DESC
+        LIMIT 8"
+    );
+
+    if (is_array($recentTickets)) {
+      foreach ($recentTickets as $tRow) {
+        $pk = (int) ($tRow['_ID'] ?? 0);
+        $logical = trim((string) ($tRow['id_ticket'] ?? '')) ?: (string) $pk;
+        $subject = trim((string) ($tRow['asunto'] ?? '')) ?: ('Caso #' . $logical);
+        $st = trim((string) ($tRow['estado'] ?? 'Abierto'));
+        $stAdmin = trim((string) ($tRow['estado_administrativo'] ?? ''));
+        $emp = trim((string) ($tRow['nombre_empleado'] ?? ''));
+        $empId = trim((string) ($tRow['id_empleado'] ?? ''));
+        $created = trim((string) ($tRow['cct_created'] ?? ''));
+
+        $isMine = ($currentEmployeeId !== '' && $empId === $currentEmployeeId);
+        $isUnassigned = ($empId === '' || $empId === '0');
+
+        $timeAgo = 'Reciente';
+        if ($created !== '') {
+          $ts = strtotime($created);
+          if ($ts > 0) {
+            $diff = time() - $ts;
+            if ($diff < 3600) {
+              $m = max(1, (int) round($diff / 60));
+              $timeAgo = "Hace {$m} min";
+            } elseif ($diff < 86400) {
+              $h = (int) floor($diff / 3600);
+              $timeAgo = "Hace {$h}h";
+            } else {
+              $d = (int) floor($diff / 86400);
+              $timeAgo = "Hace {$d}d";
+            }
+          }
+        }
+
+        $typeLabel = 'Nuevo caso';
+        $badgeClass = 'bg-blue-50 text-blue-700 border-blue-200';
+        if ($isUnassigned) {
+          $typeLabel = 'Sin asignar';
+          $badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
+        } elseif ($isMine) {
+          $typeLabel = 'Tu caso';
+          $badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        }
+
+        $operationalNotifications[] = [
+          'pk' => $pk,
+          'id' => $logical,
+          'asunto' => $subject,
+          'estado' => $st,
+          'estado_admin' => $stAdmin,
+          'empleado' => $emp,
+          'is_mine' => $isMine,
+          'is_unassigned' => $isUnassigned,
+          'time_ago' => $timeAgo,
+          'type_label' => $typeLabel,
+          'badge_class' => $badgeClass,
+        ];
+      }
+    }
+  } catch (\Throwable $e) {
+    $operationalNotifications = [];
+  }
+}
+$unreadNotifCount = count($operationalNotifications);
 
 $isStandalone = !empty($standalone_function);
 
@@ -586,9 +672,15 @@ foreach ($rawNavItems as $k => $item) {
 
         <!-- Logotipo Oficial SuCasa & Branding Corporativo (Alto Contraste Stitch UI) -->
         <div class="flex items-center gap-3 shrink-0">
-          <a href="<?php echo htmlspecialchars($baseUrl . '/index.php', ENT_QUOTES, 'UTF-8'); ?>" class="flex items-center gap-3 group focus:outline-none focus:ring-2 focus:ring-[#0f1e36] rounded-xl p-1 transition-all" title="SKC SuCasa Inmobiliaria — Control Operativo">
-            <div class="w-9 h-9 rounded-xl bg-[#1e3a8a] flex items-center justify-center shrink-0 shadow-sm group-hover:bg-[#162846] transition-colors">
-              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <a href="<?php echo htmlspecialchars($baseUrl . '/index.php', ENT_QUOTES, 'UTF-8'); ?>" class="flex items-center gap-2.5 group focus:outline-none focus:ring-2 focus:ring-[#0f1e36] rounded-xl p-1 transition-all" title="SKC SuCasa Inmobiliaria — Control Operativo">
+            <div class="w-9 h-9 rounded-xl bg-[#0f1e36] flex items-center justify-center shrink-0 shadow-sm overflow-hidden p-1 group-hover:bg-[#162846] transition-colors">
+              <img
+                src="<?php echo htmlspecialchars($faviconUrl, ENT_QUOTES, 'UTF-8'); ?>"
+                alt="SKC SuCasa Inmobiliaria"
+                class="w-7 h-7 object-contain"
+                onerror="this.onerror=null; this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='block';"
+              >
+              <svg class="w-5 h-5 hidden" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 3L2 12H6V20H10V14H14V20H18V12H22L12 3Z" fill="#38bdf8"/>
                 <path d="M12 7L7 11.5V18H9V13H15V18H17V11.5L12 7Z" fill="#ffffff"/>
               </svg>
@@ -701,18 +793,95 @@ foreach ($rawNavItems as $k => $item) {
             </div>
           </div>
 
-          <!-- Notificaciones con Indicador Activo -->
-          <div class="relative">
+          <!-- Notificaciones con Indicador Activo & Menú Desplegable -->
+          <div class="relative" id="global-notifications-menu-container">
             <button
               type="button"
               id="btn-global-notificaciones"
-              onclick="window.dispatchEvent(new CustomEvent('scm:open-notificaciones'))"
-              title="Notificaciones"
-              class="relative p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-colors"
+              title="Notificaciones operativas"
+              class="relative p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-colors focus:outline-none"
+              aria-haspopup="true"
+              aria-expanded="false"
             >
               <span class="material-symbols-outlined text-[22px]">notifications</span>
-              <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white animate-pulse"></span>
+              <?php if ($unreadNotifCount > 0): ?>
+                <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white animate-pulse"></span>
+              <?php endif; ?>
             </button>
+
+            <!-- Menú Flotante de Notificaciones Operativas -->
+            <div
+              id="global-notifications-dropdown-menu"
+              class="hidden absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-0 z-50 drop-shadow-xl overflow-hidden"
+              role="menu"
+            >
+              <div class="px-4 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[18px] text-slate-600">notifications_active</span>
+                  <p class="text-xs font-bold text-slate-800 tracking-tight">Notificaciones Operativas</p>
+                </div>
+                <?php if ($unreadNotifCount > 0): ?>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                    <?php echo $unreadNotifCount; ?> casos activos
+                  </span>
+                <?php endif; ?>
+              </div>
+
+              <div class="max-h-[380px] overflow-y-auto divide-y divide-slate-100/80">
+                <?php if (!empty($operationalNotifications)): ?>
+                  <?php foreach ($operationalNotifications as $notif): ?>
+                    <button
+                      type="button"
+                      data-scm-notif-ticket="<?php echo htmlspecialchars((string)$notif['pk'], ENT_QUOTES, 'UTF-8'); ?>"
+                      data-scm-notif-logical="<?php echo htmlspecialchars((string)$notif['id'], ENT_QUOTES, 'UTF-8'); ?>"
+                      data-scm-notif-is-mine="<?php echo $notif['is_mine'] ? '1' : '0'; ?>"
+                      class="w-full text-left p-3 hover:bg-slate-50 transition-colors flex items-start gap-3 group focus:outline-none focus:bg-slate-50"
+                      role="menuitem"
+                    >
+                      <div class="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5 group-hover:border-blue-300 group-hover:bg-blue-50 transition-colors">
+                        <span class="material-symbols-outlined text-[18px] text-slate-500 group-hover:text-blue-600">inbox</span>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-1.5 mb-1">
+                          <span class="text-[11px] font-bold text-slate-900 truncate">
+                            Caso #<?php echo htmlspecialchars($notif['id'], ENT_QUOTES, 'UTF-8'); ?>
+                          </span>
+                          <span class="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded border <?php echo $notif['badge_class']; ?>">
+                            <?php echo htmlspecialchars($notif['type_label'], ENT_QUOTES, 'UTF-8'); ?>
+                          </span>
+                        </div>
+                        <p class="text-xs text-slate-600 line-clamp-2 leading-relaxed mb-1.5 font-medium">
+                          <?php echo htmlspecialchars($notif['asunto'], ENT_QUOTES, 'UTF-8'); ?>
+                        </p>
+                        <div class="flex items-center justify-between text-[10px] text-slate-400">
+                          <span class="truncate max-w-[150px]">
+                            <?php echo htmlspecialchars($notif['empleado'] !== '' ? $notif['empleado'] : 'Sin asignar', ENT_QUOTES, 'UTF-8'); ?>
+                          </span>
+                          <span class="font-medium shrink-0"><?php echo htmlspecialchars($notif['time_ago'], ENT_QUOTES, 'UTF-8'); ?></span>
+                        </div>
+                      </div>
+                    </button>
+                  <?php endforeach; ?>
+                <?php else: ?>
+                  <div class="p-6 text-center">
+                    <span class="material-symbols-outlined text-[36px] text-slate-300 mb-2">done_all</span>
+                    <p class="text-xs font-semibold text-slate-700">Sin notificaciones operativas</p>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Todos los casos están al día o gestionados.</p>
+                  </div>
+                <?php endif; ?>
+              </div>
+
+              <div class="p-2 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between">
+                <a
+                  href="<?php echo htmlspecialchars($baseUrl . '/index.php?tab=abiertos', ENT_QUOTES, 'UTF-8'); ?>"
+                  data-panel-target="scm-panel-abiertos"
+                  data-tab-key="abiertos"
+                  class="nav-tab-pill w-full text-center py-1.5 px-3 rounded-xl text-xs font-bold text-[#0f1e36] hover:bg-white hover:shadow-xs border border-transparent hover:border-slate-200 transition-all"
+                >
+                  Ver todos los casos abiertos →
+                </a>
+              </div>
+            </div>
           </div>
 
           <div class="h-6 w-px bg-slate-200 hidden sm:block"></div>
@@ -726,12 +895,14 @@ foreach ($rawNavItems as $k => $item) {
               aria-haspopup="true"
               aria-expanded="false"
             >
-              <img
-                src="<?php echo htmlspecialchars($userAvatar, ENT_QUOTES, 'UTF-8'); ?>"
-                alt="<?php echo htmlspecialchars($userName, ENT_QUOTES, 'UTF-8'); ?>"
-                class="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200 shadow-2xs"
-                onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=<?php echo urlencode($userName); ?>&background=0f1e36&color=ffffff';"
-              >
+              <div class="w-8 h-8 rounded-full bg-slate-100 ring-1 ring-slate-200 flex items-center justify-center p-1 shrink-0 shadow-2xs overflow-hidden">
+                <img
+                  src="<?php echo htmlspecialchars($userAvatar, ENT_QUOTES, 'UTF-8'); ?>"
+                  alt="<?php echo htmlspecialchars($userName, ENT_QUOTES, 'UTF-8'); ?>"
+                  class="w-6 h-6 object-contain"
+                  onerror="this.onerror=null; this.src='https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/cropped-ISOLOGO-WEB.png';"
+                >
+              </div>
               <div class="hidden lg:flex flex-col text-left">
                 <span class="text-xs font-semibold text-slate-900 leading-tight"><?php echo htmlspecialchars($userName, ENT_QUOTES, 'UTF-8'); ?></span>
                 <span class="text-[10px] font-medium text-slate-500 leading-tight"><?php echo htmlspecialchars($userRole, ENT_QUOTES, 'UTF-8'); ?></span>
