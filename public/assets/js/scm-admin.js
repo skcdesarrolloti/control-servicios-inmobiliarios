@@ -1887,6 +1887,53 @@
     syncPreventivaNoAccessBox(scope);
   }
 
+  function renderComposerAdminStateOptions() {
+    return [
+      "Nuevo",
+      "En espera de respuesta",
+      "Por inspeccionar",
+      "Inspeccionado",
+      "Cotizado",
+      "En ejecucion por inmobiliaria",
+      "En ejecucion por propietario",
+      "En ejecucion por arrendatario",
+      "En ejecucion por copropiedad",
+      "Finalizado",
+      "Trasladado",
+      "Entregado",
+      "Recibido",
+      "Desistido",
+    ].map(function (state) {
+      return '<option value="' + escHtml(state) + '">' + escHtml(state) + "</option>";
+    }).join("");
+  }
+
+  function renderComposerResponseOptions(caseBtn, isPublicPqr, statusBucket) {
+    var currentAdmin = caseBtn && caseBtn.dataset
+      ? String(caseBtn.dataset.admin || "").trim()
+      : "";
+    if (!currentAdmin || currentAdmin === "-") currentAdmin = "Sin asignar";
+    var canClose = statusBucket !== "cerrados";
+    var adminSelect = isPublicPqr ? "" : (
+      '<label class="scm-composer-response-field scm-composer-response-field-admin">' +
+        '<span>Estado administrativo <em>Actual: ' + escHtml(currentAdmin) + '</em></span>' +
+        '<select class="scm-select scm-composer-response-select" name="composer_estado_administrativo" data-scm-composer-admin-state>' +
+          '<option value="__keep__">Sin cambio</option>' +
+          renderComposerAdminStateOptions() +
+        '</select>' +
+      '</label>'
+    );
+    var closeLabel = isPublicPqr ? "Cerrar solicitud al responder" : "Cerrar caso al responder";
+    return (
+      '<div class="scm-composer-response-options" data-scm-composer-response-options>' +
+        adminSelect +
+        (canClose
+          ? '<label class="scm-composer-close-check"><input type="checkbox" name="composer_cerrar_ticket" value="1" data-scm-composer-close-ticket><span class="material-symbols-outlined text-[16px]">check_circle</span><span>' + closeLabel + '</span></label>'
+          : "") +
+      '</div>'
+    );
+  }
+
   function openTicketCompletionEditor(modal, caseBtn) {
     var sub = ensureCaseSubmodal(modal);
     var root = findRootFromNode(caseBtn);
@@ -4699,6 +4746,9 @@
     var privateNotice = composer.querySelector("[data-scm-composer-private-notice]");
     var docsContainer = composer.querySelector("[data-scm-composer-docs]");
     var addDocBtn = composer.querySelector("[data-scm-composer-add-doc]");
+    var responseOptions = composer.querySelector("[data-scm-composer-response-options]");
+    var adminStateSelect = composer.querySelector("[data-scm-composer-admin-state]");
+    var closeTicketCheck = composer.querySelector("[data-scm-composer-close-ticket]");
 
     var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
     var ticketPk = String(caseBtn.dataset.ticketPk || modal.dataset.ticketPk || caseBtn.dataset.ticket || "").trim();
@@ -5042,8 +5092,23 @@
       }
       var prevBox = composer.querySelector("[data-scm-composer-preventiva-box]");
       var cotBox = composer.querySelector("[data-scm-composer-cotizacion-box]");
+      if (responseOptions) responseOptions.style.display = mode === "reply" ? "" : "none";
       if (prevBox) prevBox.style.display = mode === "reply" ? "" : "none";
       if (cotBox) cotBox.style.display = mode === "reply" ? "" : "none";
+    }
+
+    var noAccessCheck = composer.querySelector("[data-scm-composer-no-access]");
+    if (noAccessCheck && adminStateSelect) {
+      noAccessCheck.addEventListener("change", function () {
+        if (noAccessCheck.checked) {
+          adminStateSelect.value = "En espera de respuesta";
+        }
+      });
+      adminStateSelect.addEventListener("change", function () {
+        if (noAccessCheck.checked && adminStateSelect.value !== "En espera de respuesta") {
+          noAccessCheck.checked = false;
+        }
+      });
     }
 
     var cotStateSelect = composer.querySelector("[data-scm-composer-cot-estado]");
@@ -5082,6 +5147,8 @@
           var noAcc = prevBox.querySelector("[data-scm-composer-no-access]");
           if (noAcc) noAcc.checked = false;
         }
+        if (adminStateSelect) adminStateSelect.value = "__keep__";
+        if (closeTicketCheck) closeTicketCheck.checked = false;
         var cotBox = composer.querySelector("[data-scm-composer-cotizacion-box]");
         if (cotBox) {
           var cotSel = cotBox.querySelector("[data-scm-composer-cot-estado]");
@@ -5193,13 +5260,14 @@
         if (mode === "reply") {
           fd.append("action", actions.ticket_response || "scm_ajax_ticket_response");
           fd.append("respuesta", text);
-          var adminState = "__keep__";
+          var adminState = adminStateSelect ? (adminStateSelect.value || "__keep__") : "__keep__";
           var noAccessCb = composer.querySelector("[data-scm-composer-no-access]");
           if (noAccessCb && noAccessCb.checked) {
             fd.append("generar_acta_no_acceso_preventiva", "1");
             adminState = "En espera de respuesta";
           }
           fd.append("estado_administrativo", adminState);
+          fd.append("cerrar_ticket", closeTicketCheck && closeTicketCheck.checked ? "1" : "0");
 
           var cotSelect = composer.querySelector("[data-scm-composer-cot-estado]");
           var cotState = cotSelect ? (cotSelect.value || "__keep__") : "__keep__";
@@ -5782,6 +5850,7 @@
               '</div>' +
             '</div>' +
             '<div class="scm-case-composer-body">' +
+              renderComposerResponseOptions(btn, isPublicPqr, statusBucket) +
               '<textarea class="scm-composer-textarea" rows="3" placeholder="Escriba una respuesta o actualización sobre el caso..." data-scm-composer-input></textarea>' +
               '<div class="scm-composer-file-preview" data-scm-composer-preview style="display:none;"></div>' +
               '<div class="scm-composer-docs-list" data-scm-composer-docs style="display:none;"></div>' +
@@ -6031,14 +6100,6 @@
             '<button type="button" class="scm-case-work-btn w-full" data-scm-activate-ticket>' +
               '<span class="material-symbols-outlined scm-btn-icon">play_arrow</span>' +
               '<div class="scm-btn-text"><span class="scm-btn-label">' + (isPublicPqr ? "Activar solicitud" : "Activar caso") + '</span><span class="scm-btn-sub">Reanudar gestión activa</span></div>' +
-            '</button>'
-          );
-        }
-        if (!isPublicPqr && statusBucket !== "cerrados") {
-          sidebarStateButtons.push(
-            '<button type="button" class="scm-case-work-btn w-full" data-scm-change-admin-state>' +
-              '<span class="material-symbols-outlined scm-btn-icon">swap_vert</span>' +
-              '<div class="scm-btn-text"><span class="scm-btn-label">Cambiar estado administrativo</span><span class="scm-btn-sub">' + escHtml((btn.dataset.admin && btn.dataset.admin !== "-") ? btn.dataset.admin : "Sin asignar") + '</span></div>' +
             '</button>'
           );
         }

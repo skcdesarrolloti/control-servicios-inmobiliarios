@@ -2274,6 +2274,71 @@ body,
   position: relative !important;
 }
 
+#scm-app .scm-composer-response-options {
+  display: flex !important;
+  align-items: stretch !important;
+  gap: 0.75rem !important;
+  flex-wrap: wrap !important;
+  margin-bottom: 0.75rem !important;
+}
+
+#scm-app .scm-composer-response-field {
+  min-width: min(100%, 260px) !important;
+  flex: 1 1 260px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.35rem !important;
+}
+
+#scm-app .scm-composer-response-field > span {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.5rem !important;
+  color: #64748b !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0 !important;
+}
+
+#scm-app .scm-composer-response-field > span em {
+  color: #1e3a8a !important;
+  font-style: normal !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+}
+
+#scm-app .scm-composer-response-select {
+  min-height: 40px !important;
+  border-radius: 0.7rem !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #0f1e36 !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  padding: 0.48rem 0.75rem !important;
+}
+
+#scm-app .scm-composer-close-check {
+  min-height: 40px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.45rem !important;
+  padding: 0.48rem 0.75rem !important;
+  border-radius: 0.7rem !important;
+  border: 1px solid #fecaca !important;
+  background: #fff7f7 !important;
+  color: #991b1b !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+}
+
+#scm-app .scm-composer-close-check input {
+  accent-color: #dc2626 !important;
+}
+
 #scm-app .scm-composer-textarea {
   width: 100% !important;
   min-height: 84px !important;
@@ -3042,6 +3107,5 @@ body,
   background: #f0f7ff !important;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
 }
-
 
 
