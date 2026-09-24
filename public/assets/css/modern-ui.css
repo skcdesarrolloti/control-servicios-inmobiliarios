@@ -3097,6 +3097,19 @@ body,
   margin-bottom: 0.75rem !important;
 }
 
+#scm-app .scm-case-composer-card.is-note-mode .scm-composer-response-options,
+#scm-app .scm-case-composer-card.is-note-mode .scm-composer-extra-box,
+#scm-app .scm-case-composer-card.is-note-mode .scm-composer-notify-row,
+#scm-app .scm-case-composer-card.is-note-mode .scm-composer-file-preview,
+#scm-app .scm-case-composer-card.is-note-mode .scm-composer-docs-list,
+#scm-app .scm-case-composer-card.is-note-mode .scm-composer-tools {
+  display: none !important;
+}
+
+#scm-app .scm-case-composer-card.is-note-mode .scm-case-composer-footer {
+  justify-content: flex-end !important;
+}
+
 #scm-app .scm-composer-response-field {
   min-width: min(100%, 260px) !important;
   flex: 1 1 260px !important;

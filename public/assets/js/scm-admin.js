@@ -6802,6 +6802,8 @@
 
     function setTabMode(newMode) {
       mode = newMode;
+      var isNoteMode = mode === "note";
+      composer.classList.toggle("is-note-mode", isNoteMode);
       tabs.forEach(function (t) {
         if (t.getAttribute("data-composer-tab") === mode) {
           t.classList.add("active");
@@ -6896,13 +6898,15 @@
           cb.disabled = true;
         });
         if (adminCb) {
-          adminCb.disabled = false;
-          adminCb.checked = true;
+          adminCb.disabled = true;
+          adminCb.checked = false;
         }
         if (noneCb) {
-          noneCb.disabled = false;
-          noneCb.checked = false;
+          noneCb.disabled = true;
+          noneCb.checked = true;
         }
+        if (adminStateSelect) adminStateSelect.value = "__keep__";
+        if (closeTicketCheck) closeTicketCheck.checked = false;
       }
       var prevBox = composer.querySelector(
         "[data-scm-composer-preventiva-box]",
@@ -7095,10 +7099,12 @@
         var fd = new FormData();
         fd.append("nonce", nonce);
         fd.append("ticket_pk", ticketPk);
-        fd.append("notify_recipients_present", "1");
-        selectedRecipients.forEach(function (rec) {
-          fd.append("notify_recipients[]", rec);
-        });
+        if (mode !== "note") {
+          fd.append("notify_recipients_present", "1");
+          selectedRecipients.forEach(function (rec) {
+            fd.append("notify_recipients[]", rec);
+          });
+        }
 
         if (mode !== "note") {
           composerFiles.forEach(function (file) {
