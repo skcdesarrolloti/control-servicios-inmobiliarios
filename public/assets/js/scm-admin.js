@@ -5896,7 +5896,7 @@
           "</section>"
         : "") +
       (role !== "owner"
-        ? '<section class="scm-contact-view-card scm-contact-view-card-tenant"><div class="scm-contact-view-card-head"><h5>Arrendatario</h5><span>Inquilino activo</span></div>' +
+        ? '<section class="scm-contact-view-card scm-contact-view-card-tenant"><div class="scm-contact-view-card-head"><h5>Arrendatario</h5><span>Arrendatario activo</span></div>' +
           (arrendatario
             ? '<dl class="scm-detail-list">' + arrendatario + "</dl>"
             : '<p class="scm-muted">Sin datos de arrendatario.</p>') +
@@ -6560,7 +6560,7 @@
       (isPublicPqr
         ? caseBtn.dataset.solicitante
         : caseBtn.dataset.arrendatario) ||
-      (isPublicPqr ? "Solicitante" : "Inquilino");
+      (isPublicPqr ? "Solicitante" : "Arrendatario");
     var mode = "reply";
     var composerFiles = [];
 
@@ -7916,7 +7916,7 @@
 
         var recipientName =
           solicitanteVal ||
-          (isPublicPqr ? "Solicitante" : "Inquilino / Solicitante");
+          (isPublicPqr ? "Solicitante" : "Arrendatario / Solicitante");
         var composerHtml =
           '<section class="scm-case-composer-card" data-scm-composer>' +
           '<div class="scm-case-composer-header">' +
@@ -8334,13 +8334,13 @@
         sidebarHtml += "</div>";
         sidebarHtml += "</div>";
 
-        // Inquilino / Solicitante
+        // Arrendatario / Solicitante
         if (solicitanteVal) {
           sidebarHtml += '<div class="scm-stakeholder-item">';
           sidebarHtml +=
             '<div class="scm-stakeholder-head"><span class="scm-stakeholder-role">' +
-            (isPublicPqr ? "Solicitante" : "Arrendatario (Inquilino)") +
-            '</span><span class="scm-chip scm-chip-secondary text-[10px]">Inquilino</span></div>';
+            (isPublicPqr ? "Solicitante" : "Arrendatario") +
+            '</span><span class="scm-chip scm-chip-secondary text-[10px]">Arrendatario</span></div>';
           sidebarHtml +=
             '<div class="scm-stakeholder-body"><div class="scm-stakeholder-details"><strong class="scm-stakeholder-name">' +
             escHtml(solicitanteVal) +

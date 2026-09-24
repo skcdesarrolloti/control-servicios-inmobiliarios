@@ -246,7 +246,7 @@ trait TableRowsConcern
         ? '<span class="scm-card-chip scm-chip-success">Con Cotización</span>'
         : '<span class="scm-card-chip scm-chip-muted">Sin Cotización</span>';
 
-      $thirdPartyLabel = 'Inquilino';
+      $thirdPartyLabel = 'Arrendatario';
       $thirdPartyValue = $arrendatario !== '' ? $arrendatario : ($propietario !== '' ? $propietario : '');
       if ($arrendatario === '' && $propietario !== '') {
         $thirdPartyLabel = 'Propietario';
