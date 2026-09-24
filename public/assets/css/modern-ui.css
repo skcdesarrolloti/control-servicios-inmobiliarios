@@ -2414,7 +2414,144 @@ body,
   color: #ef4444 !important;
 }
 
+#scm-app .scm-composer-docs-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.5rem !important;
+  margin-top: 0.65rem !important;
+  padding-top: 0.65rem !important;
+  border-top: 1px dashed #e2e8f0 !important;
+}
+
+#scm-app .scm-composer-doc-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.6rem !important;
+  padding: 0.45rem 0.65rem !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.625rem !important;
+  transition: all 0.2s ease !important;
+}
+
+#scm-app .scm-composer-doc-row:hover {
+  border-color: #cbd5e1 !important;
+  background: #f1f5f9 !important;
+}
+
+#scm-app .scm-composer-doc-row.is-error {
+  border-color: #fca5a5 !important;
+  background: #fef2f2 !important;
+}
+
+#scm-app .scm-composer-doc-row.has-file {
+  border-color: #93c5fd !important;
+  background: #eff6ff !important;
+}
+
+#scm-app .scm-composer-doc-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  flex-shrink: 0 !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.45rem !important;
+  color: #1e3a8a !important;
+}
+
+#scm-app .scm-composer-doc-fields {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  flex-wrap: wrap !important;
+}
+
+#scm-app .scm-composer-doc-name-input {
+  flex: 1 1 200px !important;
+  min-width: 140px !important;
+  height: 32px !important;
+  padding: 0 0.65rem !important;
+  font-size: 0.8125rem !important;
+  font-family: inherit !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0.45rem !important;
+  background: #ffffff !important;
+  color: #1e293b !important;
+  outline: none !important;
+  transition: border-color 0.15s ease !important;
+}
+
+#scm-app .scm-composer-doc-name-input:focus {
+  border-color: #1e3a8a !important;
+  box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1) !important;
+}
+
+#scm-app .scm-composer-doc-file-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  height: 32px !important;
+  padding: 0 0.65rem !important;
+  font-size: 0.78125rem !important;
+  font-weight: 500 !important;
+  color: #334155 !important;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0.45rem !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  max-width: 220px !important;
+  transition: all 0.15s ease !important;
+}
+
+#scm-app .scm-composer-doc-file-btn:hover {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1e3a8a !important;
+}
+
+#scm-app .scm-composer-doc-row.has-file .scm-composer-doc-file-btn {
+  background: #dbeafe !important;
+  border-color: #93c5fd !important;
+  color: #1e3a8a !important;
+}
+
+#scm-app .scm-composer-doc-file-text {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 160px !important;
+}
+
+#scm-app .scm-composer-doc-remove {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  flex-shrink: 0 !important;
+  background: none !important;
+  border: none !important;
+  color: #94a3b8 !important;
+  font-size: 1.15rem !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  border-radius: 0.35rem !important;
+  transition: all 0.15s ease !important;
+}
+
+#scm-app .scm-composer-doc-remove:hover {
+  background: #fee2e2 !important;
+  color: #ef4444 !important;
+}
+
 #scm-app .scm-composer-tool-btn.scm-composer-attach-btn,
+#scm-app .scm-composer-tool-btn.scm-composer-attach-doc-btn,
 #scm-app .scm-composer-tool-btn[data-scm-composer-paste] {
   width: auto !important;
   padding: 0 0.65rem !important;

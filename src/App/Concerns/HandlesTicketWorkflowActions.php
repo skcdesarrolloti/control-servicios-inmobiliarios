@@ -528,6 +528,33 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail('Servicio de notas no disponible.');
     }
 
+    $imagenes = $this->handleImageUploads('evidencia', 10);
+    if (empty($imagenes)) {
+      $imagenes = $this->handleImageUploads('imagen', 10);
+    }
+    $documentTitles = isset($_POST['documento_nombre']) && is_array($_POST['documento_nombre']) ? $_POST['documento_nombre'] : [];
+    $documentos = $this->handleDocumentUploads('documento', $documentTitles, 10);
+
+    if (!empty($imagenes)) {
+      $observacion .= "\n\nEvidencias adjuntas:\n";
+      foreach ($imagenes as $img) {
+        $imgUrl = is_array($img) ? ($img['url'] ?? '') : (string) $img;
+        if ($imgUrl !== '') {
+          $observacion .= "- {$imgUrl}\n";
+        }
+      }
+    }
+    if (!empty($documentos)) {
+      $observacion .= "\n\nDocumentos adjuntos:\n";
+      foreach ($documentos as $doc) {
+        $title = !empty($doc['nombre_archivo']) ? $doc['nombre_archivo'] : 'Documento';
+        $docUrl = $doc['archivo'] ?? $doc['media_archivo'] ?? '';
+        if ($docUrl !== '') {
+          $observacion .= "- {$title}: {$docUrl}\n";
+        }
+      }
+    }
+
     $result = $service->saveNote($ticketPk, $observacion);
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la nota.'));

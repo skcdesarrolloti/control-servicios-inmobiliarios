@@ -4612,12 +4612,102 @@
     var pasteBtn = composer.querySelector("[data-scm-composer-paste]");
     var notifyOptions = composer.querySelector("[data-scm-composer-notify-options]");
     var privateNotice = composer.querySelector("[data-scm-composer-private-notice]");
+    var docsContainer = composer.querySelector("[data-scm-composer-docs]");
+    var addDocBtn = composer.querySelector("[data-scm-composer-add-doc]");
 
     var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
     var ticketPk = String(caseBtn.dataset.ticketPk || modal.dataset.ticketPk || caseBtn.dataset.ticket || "").trim();
     var recipient = (isPublicPqr ? caseBtn.dataset.solicitante : caseBtn.dataset.arrendatario) || (isPublicPqr ? "Solicitante" : "Inquilino");
     var mode = "reply";
     var composerFiles = [];
+
+    function clearDocs() {
+      if (docsContainer) {
+        docsContainer.innerHTML = "";
+        docsContainer.style.display = "none";
+      }
+    }
+
+    function addDocumentRow(presetFile, presetTitle) {
+      if (!docsContainer) return null;
+      docsContainer.style.display = "flex";
+
+      var row = document.createElement("div");
+      row.className = "scm-composer-doc-row";
+      row.setAttribute("data-scm-doc-row", "1");
+
+      row.innerHTML =
+        '<div class="scm-composer-doc-icon">' +
+          '<span class="material-symbols-outlined text-[18px]">description</span>' +
+        '</div>' +
+        '<div class="scm-composer-doc-fields">' +
+          '<input type="text" class="scm-composer-doc-name-input" name="documento_nombre[]" placeholder="Nombre o título del documento (ej. Cotización, Cuenta de cobro, Acta...)" />' +
+          '<label class="scm-composer-doc-file-btn">' +
+            '<input type="file" class="scm-composer-doc-file-input" style="display:none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt,.csv,image/*">' +
+            '<span class="material-symbols-outlined text-[16px]">upload_file</span>' +
+            '<span class="scm-composer-doc-file-text" data-doc-file-text>Seleccionar archivo...</span>' +
+          '</label>' +
+        '</div>' +
+        '<button type="button" class="scm-composer-doc-remove" title="Quitar este documento">&times;</button>';
+
+      docsContainer.appendChild(row);
+
+      var fileInput = row.querySelector(".scm-composer-doc-file-input");
+      var fileText = row.querySelector("[data-doc-file-text]");
+      var titleInput = row.querySelector(".scm-composer-doc-name-input");
+      var removeBtn = row.querySelector(".scm-composer-doc-remove");
+
+      function setFile(file) {
+        if (!file) return;
+        row._attachedFile = file;
+        row.classList.add("has-file");
+        row.classList.remove("is-error");
+        var sizeKb = Math.max(1, Math.round(file.size / 1024));
+        if (fileText) {
+          fileText.textContent = file.name + " (" + sizeKb + " KB)";
+          fileText.title = file.name;
+        }
+        if (titleInput && !titleInput.value.trim()) {
+          var cleanTitle = file.name.replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " ");
+          titleInput.value = cleanTitle;
+        }
+      }
+
+      if (presetFile) {
+        setFile(presetFile);
+      }
+      if (presetTitle && titleInput) {
+        titleInput.value = presetTitle;
+      }
+
+      if (fileInput) {
+        fileInput.addEventListener("change", function () {
+          if (fileInput.files && fileInput.files[0]) {
+            setFile(fileInput.files[0]);
+          }
+        });
+      }
+
+      if (removeBtn) {
+        removeBtn.addEventListener("click", function () {
+          row.remove();
+          if (!docsContainer.querySelector("[data-scm-doc-row]")) {
+            docsContainer.style.display = "none";
+          }
+        });
+      }
+
+      return { row: row, fileInput: fileInput, titleInput: titleInput };
+    }
+
+    if (addDocBtn) {
+      addDocBtn.addEventListener("click", function () {
+        var created = addDocumentRow();
+        if (created && created.fileInput) {
+          created.fileInput.click();
+        }
+      });
+    }
 
     function renderFilePreviews() {
       if (!preview) return;
@@ -4712,7 +4802,7 @@
     composer.addEventListener("paste", handleClipboardImagePaste);
     modal.addEventListener("paste", handleClipboardImagePaste);
 
-    // Drag and drop images onto composer
+    // Drag and drop images and documents onto composer
     composer.addEventListener("dragover", function (e) {
       e.preventDefault();
       composer.classList.add("is-dragover");
@@ -4724,7 +4814,24 @@
       e.preventDefault();
       composer.classList.remove("is-dragover");
       if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
-        addFiles(e.dataTransfer.files);
+        var dropped = Array.prototype.slice.call(e.dataTransfer.files);
+        var images = [];
+        var docs = [];
+        dropped.forEach(function (f) {
+          if (f.type && f.type.indexOf("image/") === 0) {
+            images.push(f);
+          } else {
+            docs.push(f);
+          }
+        });
+        if (images.length) {
+          addFiles(images);
+        }
+        if (docs.length) {
+          docs.forEach(function (df) {
+            addDocumentRow(df);
+          });
+        }
       }
     });
 
@@ -4861,6 +4968,7 @@
         if (input) input.value = "";
         composerFiles = [];
         renderFilePreviews();
+        clearDocs();
       });
     }
 
@@ -4914,6 +5022,31 @@
           selectedRecipients = ["none"];
         }
 
+        var docRows = docsContainer ? docsContainer.querySelectorAll("[data-scm-doc-row]") : [];
+        var hasMissingDocFile = false;
+        var validDocs = [];
+
+        docRows.forEach(function (row) {
+          var rowFileInput = row.querySelector(".scm-composer-doc-file-input");
+          var rowTitleInput = row.querySelector(".scm-composer-doc-name-input");
+          var rowFile = (rowFileInput && rowFileInput.files && rowFileInput.files[0]) || row._attachedFile || null;
+          var rowTitle = rowTitleInput ? rowTitleInput.value.trim() : "";
+
+          if (rowFile) {
+            validDocs.push({ file: rowFile, title: rowTitle || rowFile.name });
+          } else if (rowTitle) {
+            hasMissingDocFile = true;
+            row.classList.add("is-error");
+          }
+        });
+
+        if (hasMissingDocFile) {
+          if (typeof scmNotify === "function") {
+            scmNotify("warning", "Por favor selecciona el archivo correspondiente a cada documento con título o elimina la fila.");
+          }
+          return;
+        }
+
         var origBtnHtml = submitBtn.innerHTML;
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span> Guardando...';
@@ -4932,6 +5065,11 @@
           } else {
             fd.append("evidencia[]", file);
           }
+        });
+
+        validDocs.forEach(function (doc) {
+          fd.append("documento[]", doc.file);
+          fd.append("documento_nombre[]", doc.title);
         });
 
         if (mode === "reply") {
@@ -4969,6 +5107,7 @@
             if (input) input.value = "";
             composerFiles = [];
             renderFilePreviews();
+            clearDocs();
 
             // Refresh modal and timeline in place!
             if (root) {
@@ -5463,6 +5602,7 @@
             '<div class="scm-case-composer-body">' +
               '<textarea class="scm-composer-textarea" rows="3" placeholder="Escriba una respuesta o actualización sobre el caso..." data-scm-composer-input></textarea>' +
               '<div class="scm-composer-file-preview" data-scm-composer-preview style="display:none;"></div>' +
+              '<div class="scm-composer-docs-list" data-scm-composer-docs style="display:none;"></div>' +
             '</div>' +
             '<div class="scm-composer-notify-row" data-scm-composer-notify-row>' +
               '<span class="scm-composer-notify-label"><span class="material-symbols-outlined text-[15px]">mail</span><span>Notificar:</span></span>' +
@@ -5481,14 +5621,18 @@
             '</div>' +
             '<div class="scm-case-composer-footer">' +
               '<div class="scm-composer-tools">' +
-                '<label class="scm-composer-tool-btn scm-composer-attach-btn" title="Adjuntar imagen o archivo">' +
-                  '<input type="file" multiple accept="image/*,application/pdf" class="scm-composer-file-input" style="display:none;" data-scm-composer-files>' +
+                '<label class="scm-composer-tool-btn scm-composer-attach-btn" title="Adjuntar imagen">' +
+                  '<input type="file" multiple accept="image/*" class="scm-composer-file-input" style="display:none;" data-scm-composer-files>' +
                   '<span class="material-symbols-outlined text-[17px]">add_photo_alternate</span>' +
                   '<span>Adjuntar imagen</span>' +
                 '</label>' +
                 '<button type="button" class="scm-composer-tool-btn" data-scm-composer-paste title="Pegar imagen o captura del portapapeles (Ctrl+V)">' +
                   '<span class="material-symbols-outlined text-[17px]">content_paste</span>' +
                   '<span>Pegar (Ctrl+V)</span>' +
+                '</button>' +
+                '<button type="button" class="scm-composer-tool-btn scm-composer-attach-doc-btn" data-scm-composer-add-doc title="Adjuntar documento con título (PDF, Word, Excel...)">' +
+                  '<span class="material-symbols-outlined text-[17px]">attach_file</span>' +
+                  '<span>Adjuntar documento</span>' +
                 '</button>' +
                 '<button type="button" class="scm-composer-tool-btn" title="Plantillas y respuestas rápidas" data-scm-composer-canned>' +
                   '<span class="material-symbols-outlined text-[18px]">chat</span>' +
