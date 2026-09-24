@@ -4070,34 +4070,6 @@
     return html + "</select></label>";
   }
 
-  function getContactPropertyHistoryData(caseBtn) {
-    var card = caseBtn ? caseBtn.closest(".scm-ticket-card, .scm-card, article") : null;
-    var source = card ? card.querySelector(".scm-case-source") : null;
-    var history = source ? source.querySelector("#scm-sec-hist-inmueble") : null;
-    if (!history) {
-      return {
-        count: 0,
-        html: '<p class="scm-contact-history-empty">Sin novedades registradas para este inmueble.</p>',
-      };
-    }
-    var clone = history.cloneNode(true);
-    clone.removeAttribute("id");
-    var count = clone.querySelectorAll(".scm-case-history-item, .scm-case-record-card").length;
-    var list = clone.querySelector(".scm-case-history-list");
-    if (list) {
-      Array.prototype.slice.call(list.children).forEach(function (item, index) {
-        item.style.display = index < 2 ? "" : "none";
-      });
-    }
-    clone.querySelectorAll(".scm-history-pagination").forEach(function (pager) {
-      pager.remove();
-    });
-    return {
-      count: count,
-      html: clone.innerHTML,
-    };
-  }
-
   function openContactEditor(modal, caseBtn) {
     var sub = ensureCaseSubmodal(modal);
     if (!sub || !caseBtn) return;
@@ -4197,9 +4169,6 @@
           .join(" ")
           .trim(),
       );
-    var historyData = getContactPropertyHistoryData(caseBtn);
-    var historyCountText = historyData.count + " evento" + (historyData.count === 1 ? "" : "s") + " registrado" + (historyData.count === 1 ? "" : "s");
-
     return (
       '<div class="scm-contact-shell">' +
       '<div class="scm-contact-editor-note"><span class="material-symbols-outlined">info</span><p>Los cambios realizados actualizarán de forma inmediata las fichas vinculadas al inmueble y las notificaciones automatizadas del sistema.</p></div>' +
@@ -4216,9 +4185,6 @@
         : '<p class="scm-muted">Sin datos de arrendatario.</p>') +
       "</section>" +
       "</div>" +
-      '<section class="scm-contact-history-panel"><div class="scm-contact-history-head"><h5><span class="material-symbols-outlined">history</span> Historial de novedades del inmueble</h5><span>' + escHtml(historyCountText) + '</span></div>' +
-      historyData.html +
-      "</section>" +
       '<div class="scm-contact-view-footer"><span><span class="material-symbols-outlined">lock</span> Edición auditada bajo protocolo RGPD / Habeas Data</span></div>' +
       "</div>"
     );

@@ -1180,100 +1180,6 @@ body,
   color: #0f1e36 !important;
 }
 
-#scm-app .scm-contact-history-panel {
-  border: 1px solid #dbe6f1 !important;
-  border-radius: 1rem !important;
-  background: #ffffff !important;
-  padding: 1rem !important;
-  box-shadow: 0 1px 3px rgba(15, 30, 54, 0.04) !important;
-}
-
-#scm-app .scm-contact-history-head {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 1rem !important;
-  padding-bottom: 0.75rem !important;
-  margin-bottom: 0.85rem !important;
-  border-bottom: 1px solid #edf2f7 !important;
-}
-
-#scm-app .scm-contact-history-head h5 {
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.45rem !important;
-  margin: 0 !important;
-  color: #0f1e36 !important;
-  font-size: 0.78rem !important;
-  font-weight: 800 !important;
-  text-transform: uppercase !important;
-}
-
-#scm-app .scm-contact-history-head .material-symbols-outlined {
-  color: #2563eb !important;
-  font-size: 1rem !important;
-}
-
-#scm-app .scm-contact-history-head > span {
-  color: #64748b !important;
-  font-size: 0.72rem !important;
-  font-weight: 600 !important;
-}
-
-#scm-app .scm-contact-history-panel .scm-case-history {
-  border: 0 !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  background: transparent !important;
-}
-
-#scm-app .scm-contact-history-panel .scm-case-history > h4 {
-  display: none !important;
-}
-
-#scm-app .scm-contact-history-panel .scm-case-history-list {
-  padding-left: 1.45rem !important;
-  margin-left: 0.15rem !important;
-}
-
-#scm-app .scm-contact-history-panel .scm-case-history-list::before {
-  left: 0.34rem !important;
-  background: #dbeafe !important;
-}
-
-#scm-app .scm-contact-history-panel .scm-case-record-card,
-#scm-app .scm-contact-history-panel .scm-case-history-item {
-  border-radius: 0.65rem !important;
-  padding: 0.75rem 0.9rem !important;
-  margin-bottom: 0.65rem !important;
-  border-color: #dbe6f1 !important;
-  box-shadow: 0 2px 8px rgba(15, 30, 54, 0.04) !important;
-}
-
-#scm-app .scm-contact-history-panel .scm-case-record-card::before,
-#scm-app .scm-contact-history-panel .scm-case-history-item::before {
-  left: -1.38rem !important;
-  top: 0.9rem !important;
-  width: 10px !important;
-  height: 10px !important;
-}
-
-#scm-app .scm-contact-history-panel .scm-case-record-detail {
-  font-size: 0.8rem !important;
-  line-height: 1.45 !important;
-}
-
-#scm-app .scm-contact-history-empty {
-  margin: 0 !important;
-  padding: 0.75rem !important;
-  border: 1px dashed #cbd5e1 !important;
-  border-radius: 0.75rem !important;
-  color: #64748b !important;
-  font-size: 0.8rem !important;
-  text-align: center !important;
-}
-
 #scm-app .scm-contact-view-footer,
 #scm-app .scm-contact-audit-note {
   color: #94a3b8 !important;
@@ -1313,7 +1219,6 @@ body,
     grid-template-columns: 1fr !important;
   }
 
-  #scm-app .scm-contact-history-head,
   #scm-app .scm-contact-footer-actions {
     align-items: stretch !important;
     flex-direction: column !important;
