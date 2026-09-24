@@ -1134,16 +1134,6 @@ final class PendingView
     $html .= $this->renderPendingContractMetric('Aseguradora', $this->pendingContractDisplay($this->pendingFirstRecordValue($record, ['aseguradora'])), $this->pendingFirstRecordValue($record, ['numero_solicitud']) !== '' ? ('Sol. ' . $this->pendingFirstRecordValue($record, ['numero_solicitud'])) : '');
     $html .= '</div></div>';
 
-    $chips = '';
-    $chips .= $this->renderPendingContractTrace('Contrato de Mandato', $this->pendingFirstRecordValue($record, ['id_contrato_mandato', 'id_contrato']));
-    $chips .= $this->renderPendingContractTrace('Revision Preventiva', $this->pendingFirstRecordValue($record, ['id_revision_preventiva']));
-    $chips .= $this->renderPendingContractTrace('Revision de Entrega', $this->pendingFirstRecordValue($record, ['id_revision_entrega']));
-    $chips .= $this->renderPendingContractTrace('Revision Servicios Publicos', $this->pendingFirstRecordValue($record, ['id_revision_sp', 'id_revision_servicios_publicos']));
-    $chips .= $this->renderPendingContractTrace('Hoja de Cierre', $this->pendingFirstRecordValue($record, ['id_hoja_cierre', 'id_cierre']));
-    if ($chips !== '') {
-      $html .= '<div class="scm-contract-block"><h5><span class="material-symbols-outlined">assignment_turned_in</span> Auditoria y trazabilidad operativa</h5><div class="scm-contract-trace">' . $chips . '</div></div>';
-    }
-
     $actions = $this->renderPendingContractActions($buttons);
     if ($actions !== '') {
       $html .= '<div class="scm-contract-block"><h5>Acceso directo a documentos & expedientes</h5>' . $actions . '</div>';
@@ -1252,7 +1242,12 @@ final class PendingView
       }
       $seen[$key] = true;
       $isPrimary = strtolower($label) === 'ver inmueble en web';
-      $html .= '<button type="button" class="scm-contract-action' . ($isPrimary ? ' is-primary' : '') . '" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '"><span>' . esc_html($label) . '</span><span class="material-symbols-outlined">' . ($isPrimary ? 'open_in_new' : 'arrow_forward') . '</span></button>';
+      $openNewTab = in_array(strtolower($label), ['ver inmueble en web', 'abrir carpeta google drive'], true);
+      if ($openNewTab) {
+        $html .= '<a class="scm-contract-action' . ($isPrimary ? ' is-primary' : '') . '" href="' . esc_url($url) . '" target="_blank" rel="noopener"><span>' . esc_html($label) . '</span><span class="material-symbols-outlined">open_in_new</span></a>';
+        continue;
+      }
+      $html .= '<button type="button" class="scm-contract-action" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '"><span>' . esc_html($label) . '</span><span class="material-symbols-outlined">arrow_forward</span></button>';
     }
     return $html . '</div>';
   }
