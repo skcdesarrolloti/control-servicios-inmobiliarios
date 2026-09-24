@@ -1161,11 +1161,9 @@
     var info = buildCaseLocationInfo(caseBtn, fallbackNode);
     var payload = info.payload || {};
     var simiCode = firstCaseSectionValue(fields, ["ID inmueble"], options.inmuebleId);
-    var webCode = firstCaseSectionValue(
-      fields,
-      ["Codigo inmueble web", "Codigo"],
-      options.webId || payload.propertyCode,
-    );
+    var webCode =
+      cleanCaseValue(options.webId || payload.propertyCode) ||
+      firstCaseSectionValue(fields, ["Codigo inmueble web", "Codigo"], "");
     var barrio = firstCaseSectionValue(fields, ["Barrio"], options.barrio);
     var direccion = firstCaseSectionValue(
       fields,
@@ -1182,6 +1180,7 @@
     var admin = formatPropertyMoney(firstCaseSectionValue(fields, ["Administracion"], ""));
     var areaConst = formatPropertyArea(firstCaseSectionValue(fields, ["Area construida"], ""));
     var areaPrivada = formatPropertyArea(firstCaseSectionValue(fields, ["Area privada"], ""));
+    var habitaciones = firstCaseSectionValue(fields, ["Habitaciones"], "");
     var banos = firstCaseSectionValue(fields, ["Banos"], "");
     var estrato = formatPropertyLevel(firstCaseSectionValue(fields, ["Estrato"], ""));
     var webUrl = buildPropertyWebUrl(webCode);
@@ -1208,6 +1207,7 @@
     html += renderPropertyMetric("Administración", admin, "Cuota admin", "receipt_long", false);
     html += renderPropertyMetric("Área const.", areaConst, "Superficie", "square_foot", false);
     html += renderPropertyMetric("Área privada", areaPrivada, "Área útil", "straighten", false);
+    html += renderPropertyMetric("Habitaciones", habitaciones, "Ambientes", "bed", false);
     html += renderPropertyMetric("Baños", banos, "Servicios", "bathroom", false);
     html += renderPropertyMetric("Estrato", estrato, "Nivel", "domain", false);
     html += "</div>";
