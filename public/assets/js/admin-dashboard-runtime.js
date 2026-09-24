@@ -17476,7 +17476,7 @@
       return Promise.resolve();
     }
 
-    function loadActiveLazyPanel() {
+    function loadActiveLazyPanel(skipFilterOptions) {
       var activePanel = root.querySelector(".scm-tab-panel.active");
       if (!activePanel) {
         return Promise.resolve();
@@ -17486,9 +17486,12 @@
       }
       if (
         activePanel.id !== "scm-panel-metricas" &&
-        !dashboardFilterOptionsLoaded
+        !dashboardFilterOptionsLoaded &&
+        !skipFilterOptions
       ) {
-        return loadDashboardFilterOptions().then(loadActiveLazyPanel);
+        return loadDashboardFilterOptions().then(function () {
+          return loadActiveLazyPanel(true);
+        });
       }
       if (activePanel.id === "scm-panel-abiertos") {
         return loadOpenTopicPanelIfNeeded(
