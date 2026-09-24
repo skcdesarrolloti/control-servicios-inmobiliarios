@@ -478,15 +478,28 @@ final class GenericTicketsCardView
       }
     }
 
-    $urgencyNorm = strtolower(trim($prioridadRaw !== '' ? $prioridadRaw : $magnitudCasoRaw));
-    if (str_contains($urgencyNorm, 'crit') || str_contains($urgencyNorm, 'urgente')) {
+    $magnitudKey = strtolower(trim($magnitudCasoRaw));
+    if ($magnitudKey === 'crítico') {
+      $magnitudKey = 'critico';
+    }
+
+    $urgencyPill = '';
+    $cardUrgencyClass = '';
+    if ($magnitudKey === 'critico') {
       $urgencyPill = '<span class="scm-card-urgency scm-urgency-critico"><span class="material-symbols-outlined text-[13px]">local_fire_department</span> Crítico</span>';
-    } elseif (str_contains($urgencyNorm, 'alt')) {
+      $cardUrgencyClass = 'scm-card-urgency--critico';
+    } elseif ($magnitudKey === 'alto') {
       $urgencyPill = '<span class="scm-card-urgency scm-urgency-alto"><span class="material-symbols-outlined text-[13px]">warning</span> Alto</span>';
-    } elseif (str_contains($urgencyNorm, 'med')) {
+      $cardUrgencyClass = 'scm-card-urgency--alto';
+    } elseif ($magnitudKey === 'medio') {
       $urgencyPill = '<span class="scm-card-urgency scm-urgency-medio"><span class="material-symbols-outlined text-[13px]">schedule</span> Medio</span>';
-    } else {
+      $cardUrgencyClass = 'scm-card-urgency--medio';
+    } elseif ($magnitudKey === 'bajo') {
       $urgencyPill = '<span class="scm-card-urgency scm-urgency-bajo"><span class="material-symbols-outlined text-[13px]">check</span> Bajo</span>';
+      $cardUrgencyClass = 'scm-card-urgency--bajo';
+    } else {
+      $urgencyPill = '<span class="scm-card-urgency scm-urgency-empty"><span class="material-symbols-outlined text-[13px]">tune</span> Sin clasificar</span>';
+      $cardUrgencyClass = '';
     }
 
     $assigneeName = $empleadoRaw !== '' ? $empleadoRaw : 'Sin asignar';
@@ -517,7 +530,7 @@ final class GenericTicketsCardView
       $thirdPartyLabel = 'Propietario';
     }
 
-    $c  = '<article class="scm-ticket-card card" data-pk="' . esc_attr((string) $ticketPk) . '">';
+    $c  = '<article class="scm-ticket-card card ' . esc_attr($cardUrgencyClass) . '" data-pk="' . esc_attr((string) $ticketPk) . '">';
     $c .= '<div class="scm-ticket-card-top">';
     $c .= '<div class="scm-ticket-top-badges">';
     $c .= '<span class="scm-ticket-badge badge badge-primary">#' . esc_html($ticketLabel) . '</span>';
@@ -562,7 +575,6 @@ final class GenericTicketsCardView
       $c .= '<button class="btn btn-outline btn-sm scm-activate-ticket-btn" type="button" data-scm-activate-ticket>Activar ticket</button>';
     }
     $c .= '<button class="scm-btn-case btn btn-primary btn-sm scm-btn-ver-detalle" type="button" onclick="scmOpenCase(this)" ' . $dataAttrs . '><span>Ver Detalle</span><span class="material-symbols-outlined text-[16px]">arrow_forward</span></button>';
-    $c .= '<button class="btn btn-outline btn-sm scm-btn-card-calendar" type="button" title="Agendar o ver detalle" onclick="scmOpenCase(this)" ' . $dataAttrs . '><span class="material-symbols-outlined text-[18px]">event_available</span></button>';
     $c .= '</div>';
     $c .= '<div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div></article>';
     return $c;

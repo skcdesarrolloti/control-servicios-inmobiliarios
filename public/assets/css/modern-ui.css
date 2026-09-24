@@ -1595,6 +1595,13 @@ body,
   border: 1px solid #a7f3d0 !important;
 }
 
+#scm-app .scm-urgency--empty,
+#scm-app .scm-urgency-empty {
+  background: #f8fafc !important;
+  color: #64748b !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
 #scm-app .scm-ticket-rel-time,
 #scm-app .scm-ticket-time-ago {
   font-size: 0.6875rem !important;
@@ -2163,6 +2170,12 @@ body,
   background: #f0fdf4 !important;
   color: #16a34a !important;
   border: 1px solid #bbf7d0 !important;
+}
+
+#scm-app .scm-urgency-empty {
+  background: #f8fafc !important;
+  color: #64748b !important;
+  border: 1px solid #e2e8f0 !important;
 }
 
 /* 7. Rotación suave de chevron en dropdowns del navbar */

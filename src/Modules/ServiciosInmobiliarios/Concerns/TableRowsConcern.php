@@ -223,20 +223,28 @@ trait TableRowsConcern
         }
       }
 
-      $urgencyNorm = strtolower(trim($prioridad !== '' ? $prioridad : $magnitudCaso));
-      $cardUrgencyClass = 'scm-card-urgency--bajo';
-      if (str_contains($urgencyNorm, 'crit') || str_contains($urgencyNorm, 'urgente')) {
+      $magnitudKey = strtolower(trim($magnitudCaso));
+      if ($magnitudKey === 'crítico') {
+        $magnitudKey = 'critico';
+      }
+
+      $urgencyPill = '';
+      $cardUrgencyClass = '';
+      if ($magnitudKey === 'critico') {
         $urgencyPill = '<span class="scm-card-urgency scm-urgency-critico"><span class="material-symbols-outlined text-[13px]">local_fire_department</span> Crítico</span>';
         $cardUrgencyClass = 'scm-card-urgency--critico';
-      } elseif (str_contains($urgencyNorm, 'alt')) {
+      } elseif ($magnitudKey === 'alto') {
         $urgencyPill = '<span class="scm-card-urgency scm-urgency-alto"><span class="material-symbols-outlined text-[13px]">warning</span> Alto</span>';
         $cardUrgencyClass = 'scm-card-urgency--alto';
-      } elseif (str_contains($urgencyNorm, 'med')) {
+      } elseif ($magnitudKey === 'medio') {
         $urgencyPill = '<span class="scm-card-urgency scm-urgency-medio"><span class="material-symbols-outlined text-[13px]">info</span> Medio</span>';
         $cardUrgencyClass = 'scm-card-urgency--medio';
-      } else {
+      } elseif ($magnitudKey === 'bajo') {
         $urgencyPill = '<span class="scm-card-urgency scm-urgency-bajo"><span class="material-symbols-outlined text-[13px]">check</span> Bajo</span>';
         $cardUrgencyClass = 'scm-card-urgency--bajo';
+      } else {
+        $urgencyPill = '<span class="scm-card-urgency scm-urgency-empty"><span class="material-symbols-outlined text-[13px]">tune</span> Sin clasificar</span>';
+        $cardUrgencyClass = '';
       }
 
       $assigneeName = $employee !== '' ? $employee : 'Sin asignar';
@@ -355,7 +363,6 @@ trait TableRowsConcern
         . ' data-tab-key="mantenimiento"'
         . ($statusBucket !== '' ? ' data-status-bucket="' . esc_attr($statusBucket) . '"' : '')
         . ' onclick="scmOpenCase(this)" type="button"><span>Ver Detalle</span><span class="material-symbols-outlined text-[16px]">arrow_forward</span></button>';
-      $html .= '<button class="btn btn-outline btn-sm scm-btn-card-calendar" type="button" title="Agendar o ver detalle" onclick="scmOpenCase(this)" data-ticket="' . esc_attr($idTicket) . '" data-ticket-pk="' . esc_attr((string) $ticketPk) . '"><span class="material-symbols-outlined text-[18px]">event_available</span></button>';
       $html .= '</div>';
       $html .= '<div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div>';
       $html .= '</article>';
