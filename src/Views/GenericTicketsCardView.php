@@ -714,7 +714,8 @@ final class GenericTicketsCardView
       . '<div class="scm-preventiva-no-access-icon" aria-hidden="true">!</div>'
       . '<div class="scm-preventiva-no-access-copy"><span>Constancias preventivas por no autorizaci&oacute;n</span>'
       . '<strong data-scm-preventiva-no-access-count-label>' . esc_html($label) . '</strong>'
-      . '<p>Este contador ayuda a dejar trazabilidad cuando el arrendatario no responde o no permite coordinar la revisi&oacute;n preventiva.</p></div>'
+      . '<p>Este contador ayuda a dejar trazabilidad cuando el arrendatario no responde o no permite coordinar la revisi&oacute;n preventiva.</p>'
+      . '<button type="button" class="btn btn-outline btn-xs scm-preventiva-create-notice-btn" data-scm-open-ticket-response style="align-self:flex-start;margin-top:6px;font-size:11px;font-weight:600;">Generar constancia #' . esc_html((string) $next) . '</button></div>'
       . '<div class="scm-preventiva-no-access-next"><small>Pr&oacute;xima</small><b>#' . esc_html((string) $next) . '</b></div>'
       . '</section>';
   }

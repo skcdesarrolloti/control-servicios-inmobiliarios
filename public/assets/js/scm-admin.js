@@ -1761,11 +1761,7 @@
   }
 
   function caseCotizacionCanRespond(caseBtn) {
-    if (!caseHasCotizacion(caseBtn)) {
-      return false;
-    }
-    var cotEstado = (caseBtn.dataset.cotEstado || "").trim().toLowerCase();
-    return cotEstado === "" || cotEstado === "esperando respuesta";
+    return caseHasCotizacion(caseBtn);
   }
 
   function caseCanGenerateRepairFollowup(caseBtn) {
@@ -1882,24 +1878,32 @@
 
   function syncPreventivaNoAccessBox(scope) {
     if (!scope) return;
-    var box = scope.querySelector("[data-scm-preventiva-no-access-box]");
     var select = scope.querySelector('select[name="estado_administrativo"]');
     var input = scope.querySelector('input[name="generar_acta_no_acceso_preventiva"]');
-    if (!box || !select || !input) return;
-    var show = select.value === "En espera de respuesta";
-    box.hidden = !show;
-    if (!show) {
-      input.checked = false;
+    if (!input) return;
+    if (input.checked && select && select.value !== "En espera de respuesta") {
+      select.value = "En espera de respuesta";
     }
   }
 
   function initPreventivaNoAccessBox(scope) {
     if (!scope) return;
     var select = scope.querySelector('select[name="estado_administrativo"]');
+    var input = scope.querySelector('input[name="generar_acta_no_acceso_preventiva"]');
+    if (input && !input.dataset.scmNoAccessBind) {
+      input.dataset.scmNoAccessBind = "1";
+      input.addEventListener("change", function () {
+        if (input.checked && select) {
+          select.value = "En espera de respuesta";
+        }
+      });
+    }
     if (select && !select.dataset.scmNoAccessBind) {
       select.dataset.scmNoAccessBind = "1";
       select.addEventListener("change", function () {
-        syncPreventivaNoAccessBox(scope);
+        if (input && input.checked && select.value !== "En espera de respuesta") {
+          input.checked = false;
+        }
       });
     }
     syncPreventivaNoAccessBox(scope);
@@ -2806,17 +2810,19 @@
         "</select></label>" +
         '<label class="scm-seg-field"><span>Respuesta</span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
         (isPreventiva
-          ? '<section class="scm-preventiva-no-access-box" data-scm-preventiva-no-access-box hidden><div><strong>Comunicaci&oacute;n al arrendatario</strong><span>Este ticket lleva <b>' +
+          ? '<section class="scm-preventiva-no-access-box" data-scm-preventiva-no-access-box><div><strong>Comunicaci&oacute;n / Acta preventiva por no autorizaci&oacute;n</strong><span>Este ticket lleva <b>' +
             escHtml(String(noAccessCount)) +
             '</b> comunicaci&oacute;n' +
             (noAccessCount === 1 ? "" : "es") +
             ' registrada' +
             (noAccessCount === 1 ? "" : "s") +
-            '. Si marcas esta opci&oacute;n se generar&aacute; la comunicaci&oacute;n preventiva <b>#' +
+            '. Si marcas esta opci&oacute;n se generar&aacute; la constancia oficial con membrete <b>#' +
             escHtml(String(nextNoAccessCount)) +
-            '</b>, se anexar&aacute; al caso y se enviar&aacute; por correo al arrendatario.</span></div><label class="scm-seg-check scm-preventiva-no-access-check"><input type="checkbox" name="generar_acta_no_acceso_preventiva" value="1"> Crear y enviar comunicaci&oacute;n de no autorizaci&oacute;n de revisi&oacute;n preventiva</label></section>'
+            '</b>, se anexar&aacute; al caso y se enviar&aacute; por correo al arrendatario.</span></div><label class="scm-seg-check scm-preventiva-no-access-check"><input type="checkbox" name="generar_acta_no_acceso_preventiva" value="1"> Crear y enviar comunicaci&oacute;n / acta de no autorizaci&oacute;n de revisi&oacute;n preventiva (#' +
+            escHtml(String(nextNoAccessCount)) +
+            ')</label></section>'
           : "") +
-        renderCotizacionInlineFields(!isPublicPqr && caseCotizacionCanRespond(caseBtn), caseBtn.dataset.cotizacionId || "") +
+        renderCotizacionInlineFields(!isPublicPqr && caseHasCotizacion(caseBtn), caseBtn.dataset.cotizacionId || "") +
         '<label class="scm-seg-field"><span>Imagenes (opcional)</span><input type="file" name="imagen[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
         renderPasteEvidenceBox("imagen[]") +
         renderTicketDocumentFields() +
@@ -4955,6 +4961,29 @@
         if (adminCb) { adminCb.disabled = false; adminCb.checked = true; }
         if (noneCb) { noneCb.disabled = false; noneCb.checked = false; }
       }
+      var prevBox = composer.querySelector("[data-scm-composer-preventiva-box]");
+      var cotBox = composer.querySelector("[data-scm-composer-cotizacion-box]");
+      if (prevBox) prevBox.style.display = mode === "reply" ? "" : "none";
+      if (cotBox) cotBox.style.display = mode === "reply" ? "" : "none";
+    }
+
+    var cotStateSelect = composer.querySelector("[data-scm-composer-cot-estado]");
+    var cotDetails = composer.querySelector("[data-scm-composer-cot-details]");
+    var cotMotivo = composer.querySelector("[data-scm-composer-cot-motivo]");
+    var cotFin = composer.querySelector("[data-scm-composer-cot-financiacion]");
+    if (cotStateSelect) {
+      cotStateSelect.addEventListener("change", function () {
+        var val = cotStateSelect.value;
+        if (cotDetails) {
+          cotDetails.style.display = (val === "Aprobada" || val === "Desaprobada") ? "flex" : "none";
+        }
+        if (cotMotivo) {
+          cotMotivo.style.display = val === "Desaprobada" ? "block" : "none";
+        }
+        if (cotFin) {
+          cotFin.style.display = val === "Aprobada" ? "block" : "none";
+        }
+      });
     }
 
     tabs.forEach(function (tab) {
@@ -4969,6 +4998,16 @@
         composerFiles = [];
         renderFilePreviews();
         clearDocs();
+        var prevBox = composer.querySelector("[data-scm-composer-preventiva-box]");
+        if (prevBox) {
+          var noAcc = prevBox.querySelector("[data-scm-composer-no-access]");
+          if (noAcc) noAcc.checked = false;
+        }
+        var cotBox = composer.querySelector("[data-scm-composer-cotizacion-box]");
+        if (cotBox) {
+          var cotSel = cotBox.querySelector("[data-scm-composer-cot-estado]");
+          if (cotSel) { cotSel.value = "__keep__"; cotSel.dispatchEvent(new Event("change")); }
+        }
       });
     }
 
@@ -5075,7 +5114,32 @@
         if (mode === "reply") {
           fd.append("action", actions.ticket_response || "scm_ajax_ticket_response");
           fd.append("respuesta", text);
-          fd.append("estado_administrativo", "__keep__");
+          var adminState = "__keep__";
+          var noAccessCb = composer.querySelector("[data-scm-composer-no-access]");
+          if (noAccessCb && noAccessCb.checked) {
+            fd.append("generar_acta_no_acceso_preventiva", "1");
+            adminState = "En espera de respuesta";
+          }
+          fd.append("estado_administrativo", adminState);
+
+          var cotSelect = composer.querySelector("[data-scm-composer-cot-estado]");
+          var cotState = cotSelect ? (cotSelect.value || "__keep__") : "__keep__";
+          if (cotState && cotState !== "__keep__") {
+            fd.append("estado_cotizacion", cotState);
+            fd.append("id_cotizacion", caseBtn.dataset.cotizacionId || "");
+            var motivoInput = composer.querySelector("[data-scm-composer-cot-motivo-input]");
+            var finInput = composer.querySelector("[data-scm-composer-cot-fin-input]");
+            var obsInput = composer.querySelector("[data-scm-composer-cot-obs]");
+            if (motivoInput && motivoInput.value) {
+              fd.append("motivo_cotizacion", motivoInput.value);
+            }
+            if (finInput && finInput.value) {
+              fd.append("financiacion_cotizacion", finInput.value);
+            }
+            if (obsInput && obsInput.value) {
+              fd.append("observacion_cotizacion", obsInput.value);
+            }
+          }
         } else if (mode === "followup") {
           fd.append("action", actions.seg || "scm_ajax_ticket_seguimiento");
           fd.append("observacion", text);
@@ -5296,7 +5360,8 @@
           subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">description</span> Contrato #' + escHtml(contratoText) + '</span>');
         }
         if (inmuebleVal && inmuebleVal !== "-") {
-          subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">tag</span> Inmueble simi: #' + escHtml(inmuebleVal) + '</span>');
+          var cleanInmueble = inmuebleVal.replace(/^#+/, "");
+          subParts.push('<span class="scm-meta-bit"><span class="material-symbols-outlined">domain</span> Inmueble simi: #' + escHtml(cleanInmueble) + '</span>');
         }
         if (ejecucionText && ejecucionText !== "-") {
           subParts.push('<span class="scm-meta-bit scm-meta-bit-ejecucion"><span class="material-symbols-outlined text-[15px]">hourglass_top</span> En ejecución: ' + escHtml(ejecucionText) + '</span>');
@@ -5326,7 +5391,8 @@
           metaChips.push('<span class="scm-chip scm-chip-info"><span class="scm-chip-dot"></span>' + escHtml(estadoVal) + '</span>');
         }
         if (prioridadVal && prioridadVal !== "-") {
-          metaChips.push('<span class="scm-chip scm-chip-warning"><span class="material-symbols-outlined text-[14px]">bolt</span> Prioridad ' + escHtml(prioridadVal) + '</span>');
+          var cleanPrioridad = prioridadVal.replace(/^prioridad\s+/i, "");
+          metaChips.push('<span class="scm-chip scm-chip-warning"><span class="material-symbols-outlined text-[14px]">bolt</span> ' + (cleanPrioridad ? ('Prioridad ' + escHtml(cleanPrioridad)) : escHtml(prioridadVal)) + '</span>');
         }
         if (adminVal && adminVal !== "-") {
           metaChips.push('<span class="scm-chip scm-chip-secondary">' + escHtml(adminVal) + '</span>');
@@ -5438,6 +5504,8 @@
         var cotizacionId = (btn.dataset.cotizacionId || "").trim();
         var statusBucket = (btn.dataset.statusBucket || "").trim();
         var calendarTicketPk = String(btn.dataset.ticketPk || "").trim();
+        var noAccessCount = Math.max(0, parseInt(btn.dataset.preventivaNoAccessCount || "0", 10) || 0);
+        var nextNoAccessCount = noAccessCount + 1;
         if (seguimientoWrap) {
           seguimientoWrap.setAttribute("id", "scm-sec-seguimiento");
           seguimientoWrap.style.display = "none";
@@ -5465,6 +5533,14 @@
             '</h5><div class="scm-case-work-action-list">' +
             buttons.join("") +
             "</div></div>"
+          );
+        }
+
+        if (statusBucket !== "cerrados" && canUseDashboardAction("case_respond")) {
+          mainActionButtons.push(
+            '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-ticket-response><span class="material-symbols-outlined scm-btn-icon">reply</span><div class="scm-btn-text"><span class="scm-btn-label">' +
+              (isPublicPqr ? "Responder solicitud" : "Responder caso") +
+              '</span><span class="scm-btn-sub">Seguimiento y respuestas</span></div></button>',
           );
         }
 
@@ -5506,6 +5582,18 @@
               );
             }
           }
+          if (isPreventivaCase(btn)) {
+            var prevIdVal = (btn.dataset.idRevisionPreventiva || "").trim();
+            if (prevIdVal) {
+              complementaryActionButtons.push(
+                '<a href="https://sucasainmobiliaria.com.co/revision-preventiva/?numero=' +
+                  encodeURIComponent(prevIdVal) +
+                  '" class="scm-case-work-btn" target="_blank" rel="noopener"><span class="material-symbols-outlined scm-btn-icon">verified_user</span><div class="scm-btn-text"><span class="scm-btn-label">Revisión preventiva</span><span class="scm-btn-sub">Acta #' +
+                  escHtml(prevIdVal) +
+                  '</span></div></a>',
+              );
+            }
+          }
         }
         if (!isPublicPqr && (cotizacionUrl || cotizacionId)) {
           if (canUseDashboardAction("quote_manage")) {
@@ -5517,6 +5605,15 @@
               '" data-cotizacion-id="' +
               escHtml(cotizacionId) +
               '"><span class="material-symbols-outlined scm-btn-icon">receipt_long</span><div class="scm-btn-text"><span class="scm-btn-label">Gestionar cotizaciones</span><span class="scm-btn-sub">Costos y proveedores</span></div></button>',
+            );
+          }
+          if (cotizacionId && canUseDashboardAction("quote_respond")) {
+            quoteActionButtons.push(
+              '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-cotizacion-response data-ticket-pk="' +
+              escHtml(calendarTicketPk || "") +
+              '" data-cotizacion-id="' +
+              escHtml(cotizacionId) +
+              '"><span class="material-symbols-outlined scm-btn-icon">rate_review</span><div class="scm-btn-text"><span class="scm-btn-label">Responder cotizaci&oacute;n</span><span class="scm-btn-sub">Aprobaci&oacute;n o rechazo</span></div></button>',
             );
           }
           var cotEstadoKey = String(btn.dataset.cotEstado || "");
@@ -5607,6 +5704,50 @@
               '<textarea class="scm-composer-textarea" rows="3" placeholder="Escriba una respuesta o actualización sobre el caso..." data-scm-composer-input></textarea>' +
               '<div class="scm-composer-file-preview" data-scm-composer-preview style="display:none;"></div>' +
               '<div class="scm-composer-docs-list" data-scm-composer-docs style="display:none;"></div>' +
+              (isPreventivaCase(btn)
+                ? '<div class="scm-composer-extra-box scm-composer-preventiva-box" data-scm-composer-preventiva-box style="padding:10px 14px;margin-top:8px;background:#fffbeb;border:1px solid #fef08a;border-radius:8px;font-size:13px;">' +
+                  '<label class="scm-composer-check" style="font-weight:600;display:flex;align-items:flex-start;gap:8px;cursor:pointer;">' +
+                    '<input type="checkbox" name="composer_generar_acta_no_acceso_preventiva" value="1" style="margin-top:2px;" data-scm-composer-no-access>' +
+                    '<div><span>Crear y enviar comunicación / acta preventiva por no autorización de acceso (Constancia #' + escHtml(String(nextNoAccessCount)) + ')</span>' +
+                    '<small style="display:block;color:#78350f;font-weight:normal;margin-top:2px;">Genera la constancia oficial en PDF #' + escHtml(String(nextNoAccessCount)) + ', la anexa a los documentos del caso y notifica al arrendatario.</small></div>' +
+                  '</label>' +
+                '</div>'
+                : '') +
+              (!isPublicPqr && caseHasCotizacion(btn)
+                ? '<div class="scm-composer-extra-box scm-composer-cotizacion-box" data-scm-composer-cotizacion-box style="padding:10px 14px;margin-top:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">' +
+                  '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">' +
+                    '<strong style="display:flex;align-items:center;gap:6px;"><span class="material-symbols-outlined text-[16px] text-amber-600">receipt_long</span> Responder cotización #' + escHtml(cotizacionId || "-") + '</strong>' +
+                    '<select name="composer_estado_cotizacion" data-scm-composer-cot-estado class="scm-select scm-select-sm" style="font-size:12px;padding:3px 8px;border-radius:6px;border:1px solid #cbd5e1;">' +
+                      '<option value="__keep__">Sin cambio en cotización</option>' +
+                      '<option value="Aprobada">Aprobada</option>' +
+                      '<option value="Desaprobada">Desaprobada</option>' +
+                    '</select>' +
+                  '</div>' +
+                  '<div class="scm-composer-cot-details" data-scm-composer-cot-details style="display:none;margin-top:8px;flex-direction:column;gap:8px;">' +
+                    '<div class="scm-composer-cot-motivo" data-scm-composer-cot-motivo style="display:none;">' +
+                      '<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;"><span>Motivo de desaprobación</span>' +
+                        '<select name="composer_motivo_cotizacion" data-scm-composer-cot-motivo-input class="scm-select scm-select-sm" style="font-size:12px;padding:3px 8px;border-radius:6px;border:1px solid #cbd5e1;">' +
+                          '<option value="">Elige un motivo</option>' +
+                          '<option value="Por costo">Por costo</option>' +
+                          '<option value="Ejecucción por cuenta propia">Ejecución por cuenta propia</option>' +
+                        '</select>' +
+                      '</label>' +
+                    '</div>' +
+                    '<div class="scm-composer-cot-financiacion" data-scm-composer-cot-financiacion style="display:none;">' +
+                      '<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;"><span>Financiación</span>' +
+                        '<select name="composer_financiacion_cotizacion" data-scm-composer-cot-fin-input class="scm-select scm-select-sm" style="font-size:12px;padding:3px 8px;border-radius:6px;border:1px solid #cbd5e1;">' +
+                          '<option value="">No aplica / sin respuesta</option>' +
+                          '<option value="Si">Si</option>' +
+                          '<option value="No">No</option>' +
+                        '</select>' +
+                      '</label>' +
+                    '</div>' +
+                    '<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;"><span>Observación cotización</span>' +
+                      '<textarea name="composer_observacion_cotizacion" data-scm-composer-cot-obs rows="2" class="scm-textarea" style="font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid #cbd5e1;width:100%;" placeholder="Observación sobre la cotización..."></textarea>' +
+                    '</label>' +
+                  '</div>' +
+                '</div>'
+                : '') +
             '</div>' +
             '<div class="scm-composer-notify-row" data-scm-composer-notify-row>' +
               '<span class="scm-composer-notify-label"><span class="material-symbols-outlined text-[15px]">mail</span><span>Notificar:</span></span>' +
@@ -5910,6 +6051,10 @@
               '<button type="button" class="scm-case-side-link" data-scm-open-damage="correctiva"><span class="material-symbols-outlined text-[16px]">home_repair_service</span> Magnitud correctiva</button>';
           }
           if ((btn.dataset.idRevisionPreventiva || "").trim()) {
+            headActions.innerHTML +=
+              '<a href="https://sucasainmobiliaria.com.co/revision-preventiva/?numero=' +
+              encodeURIComponent((btn.dataset.idRevisionPreventiva || "").trim()) +
+              '" class="scm-case-side-link" target="_blank" rel="noopener"><span class="material-symbols-outlined text-[16px]">verified_user</span> Ver revisión preventiva</a>';
             headActions.innerHTML +=
               '<button type="button" class="scm-case-side-link" data-scm-open-damage="preventiva"><span class="material-symbols-outlined text-[16px]">shield</span> Magnitud preventiva</button>';
           }
