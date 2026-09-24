@@ -481,6 +481,10 @@ final class GenericTicketsUiView
   /** @param array<string,mixed> $record */
   public function renderSingleRecordSection(string $title, array $record, string $sectionId = ''): string
   {
+    if (strtolower(trim($title)) === 'contrato') {
+      return $this->renderContractRecordSection($record, $sectionId);
+    }
+
     $sectionAttr = $sectionId !== '' ? ' id="' . esc_attr($sectionId) . '"' : '';
     $html = '<section class="scm-case-history"' . $sectionAttr . '><h4>' . esc_html($title) . '</h4>';
     if (empty($record)) {
@@ -529,6 +533,158 @@ final class GenericTicketsUiView
       $html .= $this->renderCaseActionButtons($itemButtons);
     }
     return $html . '</article></section>';
+  }
+
+  /** @param array<string,mixed> $record */
+  private function renderContractRecordSection(array $record, string $sectionId = ''): string
+  {
+    $sectionAttr = $sectionId !== '' ? ' id="' . esc_attr($sectionId) . '"' : '';
+    $html = '<section class="scm-case-history scm-contract-detail"' . $sectionAttr . '><h4>Contrato</h4>';
+    if (empty($record)) {
+      return $html . '<p class="scm-case-history-empty">Sin datos.</p></section>';
+    }
+
+    $contractId = $this->firstNonEmptyRecordValue($record, ['contrato', 'id_contrato', '_ID']);
+    $propertyWeb = $this->firstNonEmptyRecordValue($record, ['codigo_inmueble_web', 'id_inmueble', 'inmueble', 'codigo']);
+    $propertySimi = $this->firstNonEmptyRecordValue($record, ['inmueble', 'codigo']);
+    $status = $this->firstNonEmptyRecordValue($record, ['estado', 'estado_contrato']);
+    $photoUrl = $this->contractRecordUrl($this->firstNonEmptyRecordValue($record, ['registro_fotografico', 'registro_fotos', 'carpeta_drive', 'google_drive']));
+
+    $baseButtons = $this->withoutInmuebleWebButtons((array) call_user_func($this->buildHistoryItemButtons, $record));
+    $itemButtons = $this->mergeCaseActionButtons($baseButtons, $this->singleRecordExtraButtons('Contrato', $record));
+    if ($photoUrl !== '') {
+      $itemButtons = $this->mergeCaseActionButtons($itemButtons, [['url' => $photoUrl, 'label' => 'Abrir carpeta Google Drive']]);
+    }
+
+    $html .= '<div class="scm-contract-card">';
+    $html .= '<header class="scm-contract-head">';
+    $html .= '<div class="scm-contract-title"><span class="material-symbols-outlined">description</span><div><strong>Contrato de Arrendamiento</strong><small>' . esc_html($this->contractMetaLine($propertyWeb, $propertySimi)) . '</small></div></div>';
+    $html .= '<div class="scm-contract-badges">';
+    if ($contractId !== '') {
+      $html .= '<span class="scm-contract-code">#' . esc_html(ltrim($contractId, '#')) . '</span>';
+    }
+    if ($status !== '') {
+      $html .= '<span class="scm-contract-status">' . esc_html($status) . '</span>';
+    }
+    $html .= '</div></header>';
+
+    $html .= '<div class="scm-contract-parties">';
+    $html .= $this->renderContractPartyCard('Propietario', 'Titular', $record, ['propietario', 'nombre_propietario'], ['correo_propietario', 'email_propietario'], ['celular_propietario', 'telefono_propietario']);
+    $html .= $this->renderContractPartyCard('Arrendatario', 'Activo', $record, ['arrendatario', 'nombre_arrendatario'], ['correo_arrendatario', 'email_arrendatario'], ['celular_arrendatario', 'telefono_arrendatario']);
+    $html .= '</div>';
+
+    $html .= '<div class="scm-contract-block"><h5><span class="material-symbols-outlined">paid</span> Condiciones economicas & aseguramiento</h5><div class="scm-contract-metrics">';
+    $html .= $this->renderContractMetric('Canon mensual', $this->formatContractMoney($this->firstNonEmptyRecordValue($record, ['valor_canon', 'canon', 'canon_arrendamiento'])), '');
+    $html .= $this->renderContractMetric('Administracion', $this->formatContractMoney($this->firstNonEmptyRecordValue($record, ['valor_administracion', 'administracion', 'precio_admin'])), '');
+    $html .= $this->renderContractMetric('Tasa admin', $this->formatContractPercent($this->firstNonEmptyRecordValue($record, ['tasa_administracion', 'porcentaje_incremento_admin'])), '');
+    $html .= $this->renderContractMetric('Derechos inmob.', $this->formatContractPercent($this->firstNonEmptyRecordValue($record, ['derechos_inmobiliarios'])), '');
+    $html .= $this->renderContractMetric('Aseguradora', $this->contractDisplayValue($this->firstNonEmptyRecordValue($record, ['aseguradora'])), $this->firstNonEmptyRecordValue($record, ['numero_solicitud']) !== '' ? ('Sol. ' . $this->firstNonEmptyRecordValue($record, ['numero_solicitud'])) : '');
+    $html .= '</div></div>';
+
+    $chips = '';
+    $chips .= $this->renderContractTraceChip('Contrato de Mandato', $this->firstNonEmptyRecordValue($record, ['id_contrato_mandato', 'id_contrato']));
+    $chips .= $this->renderContractTraceChip('Revision Preventiva', $this->firstNonEmptyRecordValue($record, ['id_revision_preventiva']));
+    $chips .= $this->renderContractTraceChip('Revision de Entrega', $this->firstNonEmptyRecordValue($record, ['id_revision_entrega']));
+    $chips .= $this->renderContractTraceChip('Revision Servicios Publicos', $this->firstNonEmptyRecordValue($record, ['id_revision_sp', 'id_revision_servicios_publicos']));
+    $chips .= $this->renderContractTraceChip('Hoja de Cierre', $this->firstNonEmptyRecordValue($record, ['id_hoja_cierre', 'id_cierre']));
+    if ($chips !== '') {
+      $html .= '<div class="scm-contract-block"><h5><span class="material-symbols-outlined">assignment_turned_in</span> Auditoria y trazabilidad operativa</h5><div class="scm-contract-trace">' . $chips . '</div></div>';
+    }
+
+    $actions = $this->renderContractActionButtons($itemButtons);
+    if ($actions !== '') {
+      $html .= '<div class="scm-contract-block"><h5>Acceso directo a documentos & expedientes</h5>' . $actions . '</div>';
+    }
+
+    $html .= '<footer class="scm-contract-foot"><span>Contrato auditado y firmado digitalmente</span></footer>';
+    return $html . '</div></section>';
+  }
+
+  private function contractMetaLine(string $propertyWeb, string $propertySimi): string
+  {
+    $parts = [];
+    if ($propertyWeb !== '') {
+      $parts[] = 'Codigo inmueble Web: ' . $propertyWeb;
+    }
+    if ($propertySimi !== '') {
+      $parts[] = 'ID Inmueble: ' . $propertySimi;
+    }
+    return $parts !== [] ? implode(' · ', $parts) : 'Control inmobiliario';
+  }
+
+  private function contractDisplayValue(string $value): string
+  {
+    return $value !== '' ? $value : '-';
+  }
+
+  private function contractRecordUrl(string $value): string
+  {
+    $value = trim($value);
+    return filter_var($value, FILTER_VALIDATE_URL) ? $value : '';
+  }
+
+  /** @param array<string,mixed> $record @param array<int,string> $nameKeys @param array<int,string> $emailKeys @param array<int,string> $phoneKeys */
+  private function renderContractPartyCard(string $role, string $badge, array $record, array $nameKeys, array $emailKeys, array $phoneKeys): string
+  {
+    $name = $this->contractDisplayValue($this->firstNonEmptyRecordValue($record, $nameKeys));
+    $email = $this->contractDisplayValue($this->firstNonEmptyRecordValue($record, $emailKeys));
+    $phone = $this->contractDisplayValue($this->firstNonEmptyRecordValue($record, $phoneKeys));
+    return '<article class="scm-contract-party"><div class="scm-contract-party-head"><span>' . esc_html($role) . '</span><b>' . esc_html($badge) . '</b></div><strong>' . esc_html($name) . '</strong><small>Correo: ' . esc_html($email) . '</small><small>Tel: ' . esc_html($phone) . '</small></article>';
+  }
+
+  private function renderContractMetric(string $label, string $value, string $help): string
+  {
+    return '<div class="scm-contract-metric"><span>' . esc_html($label) . '</span><strong>' . esc_html($this->contractDisplayValue($value)) . '</strong>' . ($help !== '' ? '<small>' . esc_html($help) . '</small>' : '') . '</div>';
+  }
+
+  private function renderContractTraceChip(string $label, string $value): string
+  {
+    if ($value === '') {
+      return '';
+    }
+    return '<span class="scm-contract-trace-chip">' . esc_html($label) . ': <strong>#' . esc_html(ltrim($value, '#')) . '</strong></span>';
+  }
+
+  private function formatContractMoney(string $value): string
+  {
+    $value = trim($value);
+    if ($value === '') {
+      return '';
+    }
+    $digits = preg_replace('/\D+/', '', $value) ?? '';
+    if ($digits === '') {
+      return $value;
+    }
+    return '$' . number_format((int) $digits, 0, ',', '.');
+  }
+
+  private function formatContractPercent(string $value): string
+  {
+    $value = trim($value);
+    if ($value === '') {
+      return '';
+    }
+    return strpos($value, '%') !== false ? $value : rtrim($value, ' ') . '%';
+  }
+
+  /** @param array<int,array{url:string,label:string}> $buttons */
+  private function renderContractActionButtons(array $buttons): string
+  {
+    if (empty($buttons)) {
+      return '';
+    }
+
+    $html = '<div class="scm-contract-actions-grid">';
+    foreach ($buttons as $btn) {
+      $url = (string) ($btn['url'] ?? '');
+      $label = (string) ($btn['label'] ?? '');
+      if ($url === '' || $label === '') {
+        continue;
+      }
+      $isPrimary = strtolower(trim($label)) === 'ver inmueble en web';
+      $html .= '<button type="button" class="scm-contract-action' . ($isPrimary ? ' is-primary' : '') . '" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '"><span>' . esc_html($label) . '</span><span class="material-symbols-outlined">' . ($isPrimary ? 'open_in_new' : 'arrow_forward') . '</span></button>';
+    }
+    return $html . '</div>';
   }
 
   /**

@@ -759,6 +759,7 @@
         "scm-case-submodal--reply",
         "scm-case-submodal--postpone",
         "scm-case-submodal--quote",
+        "scm-case-submodal--contract",
       );
       return existing;
     }
@@ -783,6 +784,23 @@
     if (closeBtn) {
       closeBtn.addEventListener("click", closeSub);
     }
+    wrap.addEventListener("click", function (event) {
+      var target = event.target;
+      var iframeBtn =
+        target && typeof target.closest === "function"
+          ? target.closest("[data-scm-open-iframe]")
+          : null;
+      if (!iframeBtn || !wrap.contains(iframeBtn)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      openIframeModal(
+        iframeBtn.dataset.iframeUrl || "",
+        iframeBtn.dataset.iframeTitle || "",
+        iframeBtn.hasAttribute("data-scm-compact-iframe"),
+      );
+    });
 
     return wrap;
   }
@@ -1472,10 +1490,15 @@
       "scm-case-submodal--transfer",
       "scm-case-submodal--contacts",
       "scm-case-submodal--property-tech",
+      "scm-case-submodal--contract",
     );
     sub.classList.toggle(
       "scm-case-submodal--property-history",
       targetId === "scm-sec-hist-inmueble",
+    );
+    sub.classList.toggle(
+      "scm-case-submodal--contract",
+      targetId === "scm-sec-contrato",
     );
 
     var clone = source.cloneNode(true);
@@ -1523,7 +1546,9 @@
     if (subBody) {
       subBody.innerHTML = "";
       subBody.appendChild(clone);
-      prependCaseLocationPanel(subBody, caseBtn, modal);
+      if (targetId !== "scm-sec-contrato") {
+        prependCaseLocationPanel(subBody, caseBtn, modal);
+      }
       initCotizacionResponseFields(subBody);
     }
 
