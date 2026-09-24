@@ -4573,6 +4573,107 @@
     sub.setAttribute("aria-hidden", "false");
   }
 
+  function openChangeAdminStateEditor(modal, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = caseBtn.dataset.ticketPk || "";
+    var currentAdmin = (caseBtn.dataset.admin || "").trim();
+    if (title) title.textContent = "Cambiar estado administrativo";
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML =
+        '<form class="scm-change-admin-state-form" method="post" autocomplete="off">' +
+        '<input type="hidden" name="ticket_pk" value="' + escHtml(ticketPk) + '">' +
+        '<input type="hidden" name="estado_ticket" value="__keep__">' +
+        '<input type="hidden" name="estado_cotizacion" value="__keep__">' +
+        '<input type="hidden" name="notify_recipients_present" value="1">' +
+        '<p class="scm-muted">Selecciona el nuevo estado administrativo del ticket #' + escHtml(ticketPk) + ' (estado actual: <strong>' + escHtml(currentAdmin || "Sin asignar") + '</strong>).</p>' +
+        '<label class="scm-seg-field"><span>Nuevo estado administrativo</span>' +
+        '<select name="estado_administrativo" class="scm-select" required>' +
+        '<option value="">Selecciona un estado</option>' +
+        '<option value="Nuevo">Nuevo</option>' +
+        '<option value="En espera de respuesta">En espera de respuesta</option>' +
+        '<option value="Por inspeccionar">Por inspeccionar</option>' +
+        '<option value="Inspeccionado">Inspeccionado</option>' +
+        '<option value="Cotizado">Cotizado</option>' +
+        '<option value="En ejecucion por inmobiliaria">En ejecucion por inmobiliaria</option>' +
+        '<option value="En ejecucion por propietario">En ejecucion por propietario</option>' +
+        '<option value="En ejecucion por arrendatario">En ejecucion por arrendatario</option>' +
+        '<option value="En ejecucion por copropiedad">En ejecucion por copropiedad</option>' +
+        '<option value="Finalizado">Finalizado</option>' +
+        '<option value="Trasladado">Trasladado</option>' +
+        '<option value="Entregado">Entregado</option>' +
+        '<option value="Recibido">Recibido</option>' +
+        '<option value="Desistido">Desistido</option>' +
+        '</select></label>' +
+        '<label class="scm-seg-field"><span>Motivo / Observación del cambio</span>' +
+        '<textarea name="observacion" rows="4" required placeholder="Escribe el motivo del cambio de estado...">Cambio de estado administrativo a </textarea></label>' +
+        renderNotifyTargets([]) +
+        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Guardar cambio de estado</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        '</form>';
+      prependCaseLocationPanel(body, caseBtn, modal);
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+
+    var form = body ? body.querySelector(".scm-change-admin-state-form") : null;
+    if (form) {
+      var stateSelect = form.querySelector('select[name="estado_administrativo"]');
+      var obsTextarea = form.querySelector('textarea[name="observacion"]');
+      if (stateSelect && obsTextarea) {
+        stateSelect.addEventListener("change", function () {
+          if (stateSelect.value) {
+            obsTextarea.value = "Cambio de estado administrativo a: " + stateSelect.value;
+          }
+        });
+      }
+      form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var root = findRootFromNode(modal) || modal.closest("#scm-app") || document.querySelector("#scm-app");
+        var runtime = parseRuntime(root) || {};
+        var action = (runtime.actions && runtime.actions.seg) || "scm_guardar_seguimiento";
+        var submitBtn = form.querySelector('button[type="submit"]');
+        var msg = form.querySelector(".scm-seg-msg");
+        var fd = new FormData(form);
+        fd.set("action", action);
+        fd.set("nonce", runtime.nonce || "");
+        if (submitBtn) submitBtn.disabled = true;
+        if (msg) {
+          msg.textContent = "Guardando cambio de estado...";
+          msg.classList.remove("error");
+        }
+        fetch(runtime.ajaxUrl || "api.php", {
+          method: "POST",
+          body: fd,
+          credentials: "same-origin",
+          headers: { Accept: "application/json" }
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error((json && json.data && json.data.message) || "No se pudo actualizar el estado.");
+            }
+            if (msg) msg.textContent = "Estado actualizado correctamente.";
+            scmNotify("success", "Estado administrativo actualizado correctamente.", "Estado del caso");
+            closeCaseSubmodal(modal);
+            dispatchCaseActionSaved(root, ticketPk, form);
+          })
+          .catch(function (err) {
+            if (msg) {
+              msg.textContent = err.message || "Error al actualizar.";
+              msg.classList.add("error");
+            }
+            scmNotify("error", err.message || "Error al actualizar estado administrativo.");
+          })
+          .finally(function () {
+            if (submitBtn) submitBtn.disabled = false;
+          });
+      });
+    }
+  }
+
   function initCaseComposer(modal, caseBtn) {
     var composer = modal.querySelector("[data-scm-composer]");
     if (!composer || !caseBtn) return;
@@ -5526,6 +5627,11 @@
             );
           }
         }
+        if (!isPublicPqr && statusBucket !== "cerrados" && canUseDashboardAction("case_close")) {
+          mainActionButtons.push(
+            '<button type="button" class="scm-case-work-btn" data-scm-close-ticket><span class="material-symbols-outlined scm-btn-icon">check_circle</span><div class="scm-btn-text"><span class="scm-btn-label">Cerrar caso</span><span class="scm-btn-sub">Finalizar gestión</span></div></button>',
+          );
+        }
         if (!isPublicPqr) {
           complementaryActionButtons.push(
             '<button type="button" class="scm-case-work-btn" data-scm-view-contacts><span class="material-symbols-outlined scm-btn-icon">contacts</span><div class="scm-btn-text"><span class="scm-btn-label">Ver contactos</span><span class="scm-btn-sub">Directorio de partes</span></div></button>',
@@ -5928,6 +6034,14 @@
             '</button>'
           );
         }
+        if (!isPublicPqr && statusBucket !== "cerrados") {
+          sidebarStateButtons.push(
+            '<button type="button" class="scm-case-work-btn w-full" data-scm-change-admin-state>' +
+              '<span class="material-symbols-outlined scm-btn-icon">swap_vert</span>' +
+              '<div class="scm-btn-text"><span class="scm-btn-label">Cambiar estado administrativo</span><span class="scm-btn-sub">' + escHtml((btn.dataset.admin && btn.dataset.admin !== "-") ? btn.dataset.admin : "Sin asignar") + '</span></div>' +
+            '</button>'
+          );
+        }
         if (sidebarStateButtons.length > 0) {
           sidebarHtml += '<div class="scm-sidebar-state-actions">' + sidebarStateButtons.join("") + '</div>';
         }
@@ -6291,6 +6405,14 @@
         .forEach(function (closeBtn) {
           closeBtn.addEventListener("click", function () {
             openCloseTicketEditor(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-change-admin-state]")
+        .forEach(function (adminStateBtn) {
+          adminStateBtn.addEventListener("click", function () {
+            openChangeAdminStateEditor(modal, btn);
           });
         });
 
