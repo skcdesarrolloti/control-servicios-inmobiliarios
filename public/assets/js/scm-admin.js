@@ -7593,14 +7593,6 @@
         }
 
         if (!isPublicPqr) {
-          complementaryActionButtons.push(
-            '<button type="button" class="scm-case-work-btn" data-scm-view-property-map><span class="material-symbols-outlined scm-btn-icon">map</span><div class="scm-btn-text"><span class="scm-btn-label">Ubicación GPS</span><span class="scm-btn-sub">Mapa del inmueble</span></div></button>',
-          );
-          if (String(btn.dataset.empleadoId || "").trim()) {
-            complementaryActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-employee><span class="material-symbols-outlined scm-btn-icon">calendar_month</span><div class="scm-btn-text"><span class="scm-btn-label">Calendario funcionario</span><span class="scm-btn-sub">Disponibilidad técnica</span></div></button>',
-            );
-          }
           if (canUseDashboardAction("case_completion_act")) {
             complementaryActionButtons.push(
               '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-acta>Acta de solución y firma</button>',
