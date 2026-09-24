@@ -750,6 +750,7 @@
     if (existing) {
       existing.classList.remove(
         "scm-case-submodal--property-history",
+        "scm-case-submodal--property-tech",
         "scm-case-submodal--transfer",
         "scm-case-submodal--contacts",
       );
@@ -1213,6 +1214,36 @@
     return html;
   }
 
+  function openPropertyTechnicalSubmodal(modal, caseBtn, options) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    sub.classList.add("scm-case-submodal--property-tech");
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    if (title) {
+      title.textContent = "Ficha Técnica de Inmueble";
+    }
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML = renderPropertyTechnicalCard(caseBtn, modal, options || {});
+      body.querySelectorAll("[data-scm-view-property-map]").forEach(function (mapBtn) {
+        mapBtn.addEventListener("click", function () {
+          openPropertyLocationEditor(modal, caseBtn);
+        });
+      });
+      body.querySelectorAll("[data-scm-open-section]").forEach(function (detailBtn) {
+        detailBtn.addEventListener("click", function () {
+          var targetId = detailBtn.getAttribute("data-scm-open-section") || "";
+          if (targetId) {
+            openCaseSubmodal(modal, detailBtn, targetId);
+          }
+        });
+      });
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+  }
+
   function renderCaseLocationPanel(caseBtn, fallbackNode, compact) {
     var info = buildCaseLocationInfo(caseBtn, fallbackNode);
     var payload = info.payload;
@@ -1363,6 +1394,7 @@
     sub.classList.remove(
       "scm-case-submodal--transfer",
       "scm-case-submodal--contacts",
+      "scm-case-submodal--property-tech",
     );
     sub.classList.toggle(
       "scm-case-submodal--property-history",
@@ -8224,14 +8256,6 @@
         }
         sidebarHtml += "</div>";
 
-        sidebarHtml += renderPropertyTechnicalCard(btn, srcWrap, {
-          inmuebleId: inmuebleIdVal,
-          webId: webIdVal,
-          barrio: barrioVal,
-          direccion: direccionVal,
-          contratoId: contratoIdVal,
-        });
-
         // Entrega specifics
         var tabKeySide = (btn.dataset.tabKey || "").trim();
         var consultorEntrega = (btn.dataset.consultorEntrega || "").trim();
@@ -8305,12 +8329,12 @@
               return;
             }
             if (sectionId === "scm-sec-inmueble") {
+              headActions.innerHTML +=
+                '<button type="button" class="scm-case-side-link" data-scm-open-property-technical><span class="material-symbols-outlined text-[16px]">home_work</span> Ficha técnica del inmueble</button>';
               return;
             }
             var iconName = "description";
-            if (sectionId === "scm-sec-inmueble") iconName = "apartment";
-            else if (sectionId === "scm-sec-hist-inmueble")
-              iconName = "history";
+            if (sectionId === "scm-sec-hist-inmueble") iconName = "history";
             else if (sectionId === "scm-sec-contrato") iconName = "description";
             else if (sectionId === "scm-sec-documentos")
               iconName = "attach_file";
@@ -8380,6 +8404,20 @@
               return;
             }
             openCaseSubmodal(modal, scrollBtn, targetId);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-property-technical]")
+        .forEach(function (propertyBtn) {
+          propertyBtn.addEventListener("click", function () {
+            openPropertyTechnicalSubmodal(modal, btn, {
+              inmuebleId: inmuebleIdVal,
+              webId: webIdVal,
+              barrio: barrioVal,
+              direccion: direccionVal,
+              contratoId: contratoIdVal,
+            });
           });
         });
 

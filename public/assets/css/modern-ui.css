@@ -1283,6 +1283,37 @@ body,
   border-color: #162846 !important;
 }
 
+#scm-app .scm-case-submodal--property-tech .scm-case-submodal-dialog {
+  width: min(920px, calc(100% - 1rem)) !important;
+  border-radius: 1rem !important;
+  border-color: #dbe6f1 !important;
+  box-shadow: 0 28px 80px rgba(15, 30, 54, 0.22) !important;
+}
+
+#scm-app .scm-case-submodal--property-tech .scm-case-submodal-body {
+  background: #f8f9ff !important;
+  padding: 1.15rem !important;
+}
+
+#scm-app .scm-case-submodal--property-tech .scm-property-tech-card {
+  box-shadow: none !important;
+}
+
+#scm-app .scm-case-submodal--property-tech .scm-property-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+#scm-app .scm-case-submodal--property-tech .scm-property-detail-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 760px) {
+  #scm-app .scm-case-submodal--property-tech .scm-property-metrics,
+  #scm-app .scm-case-submodal--property-tech .scm-property-detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 #scm-app .scm-case-submodal--contacts .scm-case-submodal-dialog {
   width: min(900px, calc(100% - 1rem)) !important;
   border-radius: 1rem !important;
