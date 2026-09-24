@@ -955,6 +955,334 @@ body,
   gap: 0.4rem !important;
 }
 
+#scm-app .scm-property-tech-card {
+  gap: 0.9rem !important;
+}
+
+#scm-app .scm-property-tech-head {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 0.75rem !important;
+}
+
+#scm-app .scm-property-tech-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+  min-width: 0 !important;
+}
+
+#scm-app .scm-property-tech-title > .material-symbols-outlined {
+  width: 2.1rem !important;
+  height: 2.1rem !important;
+  border-radius: 0.7rem !important;
+  background: #eff6ff !important;
+  color: #2563eb !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1.05rem !important;
+  flex-shrink: 0 !important;
+}
+
+#scm-app .scm-property-tech-title strong {
+  display: block !important;
+  color: #0f1e36 !important;
+  font-size: 0.95rem !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+}
+
+#scm-app .scm-property-tech-title small {
+  display: block !important;
+  color: #64748b !important;
+  font-size: 0.68rem !important;
+  font-weight: 600 !important;
+  margin-top: 0.1rem !important;
+}
+
+#scm-app .scm-property-tech-badges {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  gap: 0.35rem !important;
+}
+
+#scm-app .scm-property-code-chip,
+#scm-app .scm-property-status-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 1.45rem !important;
+  padding: 0.2rem 0.55rem !important;
+  border-radius: 999px !important;
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+#scm-app .scm-property-code-chip {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+#scm-app .scm-property-status-chip {
+  background: #fff7ed !important;
+  color: #c2410c !important;
+  border: 1px solid #fed7aa !important;
+  text-transform: uppercase !important;
+}
+
+#scm-app .scm-property-metrics {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 0.55rem !important;
+}
+
+#scm-app .scm-property-metric {
+  min-height: 4.35rem !important;
+  padding: 0.65rem !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.75rem !important;
+  background: #f8fafc !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  gap: 0.25rem !important;
+}
+
+#scm-app .scm-property-metric.is-accent {
+  background: #eff6ff !important;
+  border-color: #dbeafe !important;
+}
+
+#scm-app .scm-property-metric-label {
+  color: #64748b !important;
+  font-size: 0.62rem !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  text-transform: uppercase !important;
+}
+
+#scm-app .scm-property-metric-value {
+  color: #0f1e36 !important;
+  font-size: 0.9rem !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  overflow-wrap: anywhere !important;
+}
+
+#scm-app .scm-property-metric-help {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.2rem !important;
+  color: #64748b !important;
+  font-size: 0.62rem !important;
+  font-weight: 600 !important;
+}
+
+#scm-app .scm-property-metric-help .material-symbols-outlined {
+  font-size: 0.78rem !important;
+}
+
+#scm-app .scm-property-detail-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 0.5rem !important;
+  padding: 0.75rem !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.85rem !important;
+  background: #f8fafc !important;
+}
+
+#scm-app .scm-property-detail-item {
+  display: grid !important;
+  gap: 0.15rem !important;
+  min-width: 0 !important;
+}
+
+#scm-app .scm-property-detail-label {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.28rem !important;
+  color: #64748b !important;
+  font-size: 0.62rem !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+}
+
+#scm-app .scm-property-detail-label .material-symbols-outlined {
+  color: #2563eb !important;
+  font-size: 0.82rem !important;
+}
+
+#scm-app .scm-property-detail-value {
+  color: #0f1e36 !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  overflow-wrap: anywhere !important;
+}
+
+#scm-app .scm-property-geo-block {
+  border: 1px solid #dbe6f1 !important;
+  border-radius: 0.85rem !important;
+  background: #ffffff !important;
+  overflow: hidden !important;
+}
+
+#scm-app .scm-property-geo-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.65rem !important;
+  padding: 0.65rem 0.75rem !important;
+  background: #f8fafc !important;
+  border-bottom: 1px solid #edf2f7 !important;
+}
+
+#scm-app .scm-property-geo-head span,
+#scm-app .scm-property-geo-head strong {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.32rem !important;
+}
+
+#scm-app .scm-property-geo-head span {
+  color: #475569 !important;
+  font-size: 0.62rem !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+}
+
+#scm-app .scm-property-geo-head .material-symbols-outlined {
+  color: #2563eb !important;
+  font-size: 0.9rem !important;
+}
+
+#scm-app .scm-property-geo-head strong {
+  color: #059669 !important;
+  font-size: 0.64rem !important;
+  font-weight: 800 !important;
+}
+
+#scm-app .scm-property-geo-summary {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 0.35rem !important;
+  padding: 0.7rem 0.75rem 0.45rem !important;
+  color: #0f1e36 !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  line-height: 1.3 !important;
+}
+
+#scm-app .scm-property-geo-summary .material-symbols-outlined {
+  color: #e11d48 !important;
+  font-size: 0.95rem !important;
+  flex-shrink: 0 !important;
+}
+
+#scm-app .scm-property-map-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.45rem !important;
+  padding: 0 0.75rem 0.75rem !important;
+}
+
+#scm-app .scm-property-map-link {
+  min-height: 2rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.35rem !important;
+  padding: 0.42rem 0.65rem !important;
+  border: 1px solid #dbe6f1 !important;
+  border-radius: 0.55rem !important;
+  background: #ffffff !important;
+  color: #334155 !important;
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.04) !important;
+}
+
+#scm-app .scm-property-map-link .material-symbols-outlined {
+  font-size: 0.92rem !important;
+  color: #64748b !important;
+}
+
+#scm-app .scm-property-map-link:hover {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border-color: #bfdbfe !important;
+}
+
+#scm-app .scm-property-mini-map {
+  height: 9.25rem !important;
+  border-top: 1px solid #edf2f7 !important;
+  background: #f1f5f9 !important;
+}
+
+#scm-app .scm-property-mini-map iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  display: block !important;
+}
+
+#scm-app .scm-property-footer-actions {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 0.5rem !important;
+}
+
+#scm-app .scm-property-secondary-btn,
+#scm-app .scm-property-web-btn {
+  min-height: 2.45rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.4rem !important;
+  padding: 0.55rem 0.75rem !important;
+  border-radius: 0.65rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 800 !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+}
+
+#scm-app .scm-property-secondary-btn {
+  background: #ffffff !important;
+  color: #0f1e36 !important;
+  border: 1px solid #dbe6f1 !important;
+}
+
+#scm-app .scm-property-web-btn {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border: 1px solid #0f1e36 !important;
+}
+
+#scm-app .scm-property-secondary-btn .material-symbols-outlined,
+#scm-app .scm-property-web-btn .material-symbols-outlined {
+  font-size: 1rem !important;
+}
+
+#scm-app .scm-property-secondary-btn:hover {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border-color: #bfdbfe !important;
+}
+
+#scm-app .scm-property-web-btn:hover {
+  background: #162846 !important;
+  border-color: #162846 !important;
+}
+
 #scm-app .scm-case-submodal--contacts .scm-case-submodal-dialog {
   width: min(900px, calc(100% - 1rem)) !important;
   border-radius: 1rem !important;
