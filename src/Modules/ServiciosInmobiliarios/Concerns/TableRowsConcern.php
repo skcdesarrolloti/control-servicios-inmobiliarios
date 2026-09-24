@@ -494,7 +494,7 @@ trait TableRowsConcern
     $docs = $this->extractTicketRootDocuments($documentRaw);
     $fileDocs = [];
     foreach ($docs as $doc) {
-      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+      $url = $this->normalizeHistoryAttachmentUrl($this->historyAttachmentUrlCandidate($doc));
       if ($url === '') {
         continue;
       }
@@ -510,12 +510,12 @@ trait TableRowsConcern
     }
 
     $html = '<section class="scm-case-history scm-case-documents-section" id="' . esc_attr($sectionId) . '">';
-    $html .= '<h4>Adjuntos del caso</h4>';
+    $html .= '<h4 class="scm-case-attachments-title"><span><span class="scm-case-attachments-icon" aria-hidden="true"></span>Adjuntos del caso</span><small>' . count($images) . ' foto' . (count($images) === 1 ? '' : 's') . ' · ' . count($fileDocs) . ' documento' . (count($fileDocs) === 1 ? '' : 's') . '</small></h4>';
     if (!empty($images)) {
       $html .= '<div class="scm-case-history-img">';
       foreach ($images as $url) {
-        $html .= '<button type="button" class="scm-case-attachment-image-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="Imagen del caso" style="background:none;border:0;padding:0;margin:0;cursor:zoom-in;">'
-          . '<img src="' . esc_url($url) . '" alt="Imagen del caso" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:4px;margin-top:6px;">'
+        $html .= '<button type="button" class="scm-case-attachment-image-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="Imagen del caso">'
+          . '<img src="' . esc_url($url) . '" alt="Imagen del caso" class="scm-record-img" loading="lazy">'
           . '</button>';
       }
       $html .= '</div>';
@@ -531,7 +531,7 @@ trait TableRowsConcern
         if ($label === '') {
           $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
         }
-        $html .= '<button type="button" class="scm-case-action-btn scm-case-document-link" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '">' . esc_html($label) . '</button>';
+        $html .= '<button type="button" class="scm-case-action-btn scm-case-document-link" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '"><span class="scm-case-document-icon" aria-hidden="true"></span><span>' . esc_html($label) . '</span></button>';
       }
       $html .= '</div>';
     }
@@ -562,7 +562,7 @@ trait TableRowsConcern
       $url = '';
       if (is_array($doc)) {
         $label = trim((string) ($doc['nombre_archivo'] ?? $doc['title'] ?? $doc['label'] ?? ''));
-        $url = $this->normalizeHistoryAttachmentUrl(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? $doc['url'] ?? '')));
+        $url = $this->normalizeHistoryAttachmentUrl($this->historyAttachmentUrlCandidate($doc));
       } else {
         $url = $this->normalizeHistoryAttachmentUrl(trim((string) $doc));
       }

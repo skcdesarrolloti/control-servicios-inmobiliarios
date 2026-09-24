@@ -226,13 +226,40 @@ trait HistoryPresentationConcern
 
     $out = [];
     foreach ($items as $item) {
-      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['imagenes'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
+      $url = $this->historyAttachmentUrlCandidate($item);
       $url = $this->normalizeHistoryAttachmentUrl($url);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
         $out[] = $url;
       }
     }
     return array_values(array_unique($out));
+  }
+
+  private function historyAttachmentUrlCandidate($item): string
+  {
+    if (!is_array($item)) {
+      return trim((string) $item);
+    }
+
+    foreach (['url', 'source_url', 'guid', 'link', 'href', 'file_url', 'attachment_url', 'imagenes', 'imagen', 'evidencia', 'archivo', 'media_archivo', 'file', 'value'] as $key) {
+      if (!array_key_exists($key, $item)) {
+        continue;
+      }
+      $value = $item[$key];
+      if (is_array($value)) {
+        $nested = $this->historyAttachmentUrlCandidate($value);
+        if ($nested !== '') {
+          return $nested;
+        }
+        continue;
+      }
+      $candidate = trim((string) $value);
+      if ($candidate !== '') {
+        return $candidate;
+      }
+    }
+
+    return '';
   }
 
   private function normalizeHistoryAttachmentUrl(string $url): string

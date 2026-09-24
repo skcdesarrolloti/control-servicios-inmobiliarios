@@ -794,7 +794,7 @@ final class GenericTicketsCardView
     $docs = $this->extractTicketDocuments($documentRaw);
     $fileDocs = [];
     foreach ($docs as $doc) {
-      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+      $url = $this->normalizeTicketAttachmentUrl($this->ticketAttachmentUrlCandidate($doc));
       if ($url === '') {
         continue;
       }
@@ -809,21 +809,15 @@ final class GenericTicketsCardView
       return '';
     }
 
-    $html = '<section class="scm-case-history scm-case-documents-section bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs mb-4" id="' . esc_attr($sectionId) . '">';
-    $html .= '<h4 class="text-sm font-semibold text-slate-900 mb-3 flex items-center justify-between">'
-      . '<span class="flex items-center gap-2"><span class="material-symbols-outlined text-slate-400 text-[18px]">photo_library</span><span>Evidencias Fotográficas Adjuntas (' . count($images) . ' fotos)</span></span>'
-      . '<span class="text-xs text-slate-400 font-normal">Clic para ampliar</span>'
-      . '</h4>';
+    $html = '<section class="scm-case-history scm-case-documents-section" id="' . esc_attr($sectionId) . '">';
+    $html .= '<h4 class="scm-case-attachments-title"><span><span class="scm-case-attachments-icon" aria-hidden="true"></span>Adjuntos del caso</span><small>' . count($images) . ' foto' . (count($images) === 1 ? '' : 's') . ' · ' . count($fileDocs) . ' documento' . (count($fileDocs) === 1 ? '' : 's') . '</small></h4>';
     if (!empty($images)) {
-      $html .= '<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">';
+      $html .= '<div class="scm-case-history-img">';
       foreach ($images as $idx => $url) {
-        $html .= '<div class="group relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200 aspect-video cursor-pointer shadow-2xs">'
-          . '<img src="' . esc_url($url) . '" alt="Evidencia ' . ($idx + 1) . '" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy">'
-          . '<button type="button" class="scm-case-attachment-image-btn absolute inset-0 bg-[#0f1e36]/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="Evidencia #' . ($idx + 1) . '">'
-          . '<span class="material-symbols-outlined text-[24px]">zoom_in</span>'
-          . '</button>'
-          . '<span class="absolute bottom-1.5 left-2 bg-[#0f1e36]/80 backdrop-blur-xs text-white px-2 py-0.5 rounded text-[10px] font-semibold">Evidencia #' . ($idx + 1) . '</span>'
-          . '</div>';
+        $html .= '<button type="button" class="scm-case-attachment-image-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="Evidencia #' . ($idx + 1) . '">'
+          . '<img src="' . esc_url($url) . '" alt="Evidencia ' . ($idx + 1) . '" class="scm-record-img" loading="lazy">'
+          . '<span>Evidencia #' . ($idx + 1) . '</span>'
+          . '</button>';
       }
       $html .= '</div>';
     }
@@ -838,7 +832,7 @@ final class GenericTicketsCardView
         if ($label === '') {
           $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
         }
-        $html .= '<button type="button" class="scm-case-action-btn scm-case-document-link" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '">' . esc_html($label) . '</button>';
+        $html .= '<button type="button" class="scm-case-action-btn scm-case-document-link" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '"><span class="scm-case-document-icon" aria-hidden="true"></span><span>' . esc_html($label) . '</span></button>';
       }
       $html .= '</div>';
     }
@@ -896,15 +890,40 @@ final class GenericTicketsCardView
 
     $out = [];
     foreach ($items as $item) {
-      $url = is_array($item)
-        ? trim((string) ($item['url'] ?? $item['imagenes'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? ''))
-        : trim((string) $item);
+      $url = $this->ticketAttachmentUrlCandidate($item);
       $url = $this->normalizeTicketAttachmentUrl($url);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
         $out[] = $url;
       }
     }
     return array_values(array_unique($out));
+  }
+
+  private function ticketAttachmentUrlCandidate($item): string
+  {
+    if (!is_array($item)) {
+      return trim((string) $item);
+    }
+
+    foreach (['url', 'source_url', 'guid', 'link', 'href', 'file_url', 'attachment_url', 'imagenes', 'imagen', 'evidencia', 'archivo', 'media_archivo', 'file', 'value'] as $key) {
+      if (!array_key_exists($key, $item)) {
+        continue;
+      }
+      $value = $item[$key];
+      if (is_array($value)) {
+        $nested = $this->ticketAttachmentUrlCandidate($value);
+        if ($nested !== '') {
+          return $nested;
+        }
+        continue;
+      }
+      $candidate = trim((string) $value);
+      if ($candidate !== '') {
+        return $candidate;
+      }
+    }
+
+    return '';
   }
 
   private function isImageAttachmentUrl(string $url): bool
@@ -1017,7 +1036,7 @@ final class GenericTicketsCardView
       $url = '';
       if (is_array($doc)) {
         $label = trim((string) ($doc['nombre_archivo'] ?? $doc['title'] ?? $doc['label'] ?? ''));
-        $url = $this->normalizeTicketAttachmentUrl(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? $doc['url'] ?? '')));
+        $url = $this->normalizeTicketAttachmentUrl($this->ticketAttachmentUrlCandidate($doc));
       } else {
         $url = $this->normalizeTicketAttachmentUrl(trim((string) $doc));
       }

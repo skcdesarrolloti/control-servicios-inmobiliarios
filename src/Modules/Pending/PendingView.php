@@ -1573,7 +1573,7 @@ final class PendingView
 
     $out = [];
     foreach ($items as $item) {
-      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['imagenes'] ?? $item['imagen'] ?? $item['evidencia'] ?? $item['archivo'] ?? $item['media_archivo'] ?? '')) : trim((string) $item);
+      $url = $this->pendingAttachmentUrlCandidate($item);
       $url = $this->normalizePendingAttachmentUrl($url);
       if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
         $out[] = $url;
@@ -1582,13 +1582,40 @@ final class PendingView
     return $out;
   }
 
+  private function pendingAttachmentUrlCandidate($item): string
+  {
+    if (!is_array($item)) {
+      return trim((string) $item);
+    }
+
+    foreach (['url', 'source_url', 'guid', 'link', 'href', 'file_url', 'attachment_url', 'imagenes', 'imagen', 'evidencia', 'archivo', 'media_archivo', 'file', 'value'] as $key) {
+      if (!array_key_exists($key, $item)) {
+        continue;
+      }
+      $value = $item[$key];
+      if (is_array($value)) {
+        $nested = $this->pendingAttachmentUrlCandidate($value);
+        if ($nested !== '') {
+          return $nested;
+        }
+        continue;
+      }
+      $candidate = trim((string) $value);
+      if ($candidate !== '') {
+        return $candidate;
+      }
+    }
+
+    return '';
+  }
+
   private function renderPendingTicketAttachmentsSection($imageRaw, $documentRaw, string $sectionId): string
   {
     $images = $this->extractPendingAttachmentUrls($imageRaw);
     $docs = $this->extractPendingTicketDocuments($documentRaw);
     $fileDocs = [];
     foreach ($docs as $doc) {
-      $url = trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? ''));
+      $url = $this->normalizePendingAttachmentUrl($this->pendingAttachmentUrlCandidate($doc));
       if ($url === '') {
         continue;
       }
@@ -1604,12 +1631,12 @@ final class PendingView
     }
 
     $html = '<section class="scm-case-history scm-case-documents-section" id="' . esc_attr($sectionId) . '">';
-    $html .= '<h4>Adjuntos del caso</h4>';
+    $html .= '<h4 class="scm-case-attachments-title"><span><span class="scm-case-attachments-icon" aria-hidden="true"></span>Adjuntos del caso</span><small>' . count($images) . ' foto' . (count($images) === 1 ? '' : 's') . ' · ' . count($fileDocs) . ' documento' . (count($fileDocs) === 1 ? '' : 's') . '</small></h4>';
     if (!empty($images)) {
       $html .= '<div class="scm-case-history-img">';
       foreach ($images as $url) {
-        $html .= '<button type="button" class="scm-case-attachment-image-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="Imagen del caso" style="background:none;border:0;padding:0;margin:0;cursor:zoom-in;">'
-          . '<img src="' . esc_url($url) . '" alt="Imagen del caso" class="scm-record-img" loading="lazy" style="max-width:100%;max-height:220px;border-radius:8px;margin-top:6px;">'
+        $html .= '<button type="button" class="scm-case-attachment-image-btn" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="Imagen del caso">'
+          . '<img src="' . esc_url($url) . '" alt="Imagen del caso" class="scm-record-img" loading="lazy">'
           . '</button>';
       }
       $html .= '</div>';
@@ -1625,7 +1652,7 @@ final class PendingView
         if ($label === '') {
           $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
         }
-        $html .= '<button type="button" class="scm-case-action-btn scm-case-document-link" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '">' . esc_html($label) . '</button>';
+        $html .= '<button type="button" class="scm-case-action-btn scm-case-document-link" data-scm-open-iframe data-iframe-url="' . esc_url($url) . '" data-iframe-title="' . esc_attr($label) . '"><span class="scm-case-document-icon" aria-hidden="true"></span><span>' . esc_html($label) . '</span></button>';
       }
       $html .= '</div>';
     }
@@ -1656,7 +1683,7 @@ final class PendingView
       $url = '';
       if (is_array($doc)) {
         $label = trim((string) ($doc['nombre_archivo'] ?? $doc['title'] ?? $doc['label'] ?? ''));
-        $url = $this->normalizePendingAttachmentUrl(trim((string) ($doc['archivo'] ?? $doc['media_archivo'] ?? $doc['url'] ?? '')));
+        $url = $this->normalizePendingAttachmentUrl($this->pendingAttachmentUrlCandidate($doc));
       } else {
         $url = $this->normalizePendingAttachmentUrl(trim((string) $doc));
       }
