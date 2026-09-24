@@ -105,11 +105,11 @@ final class GenericTicketsUiView
         $detail = 'Sin detalle';
       }
       $detailHtml = (string) call_user_func($this->formatDetailHtml, $detail);
-      $itemType = 'activity';
+      $itemType = 'reply';
       if (stripos($detail, 'nota interna') !== false || stripos($detail, 'nota privada') !== false) {
         $itemType = 'note';
-      } elseif (stripos($detail, 'respuesta') !== false || stripos($detail, 'solicitud') !== false || stripos($detail, 'cliente') !== false) {
-        $itemType = 'public';
+      } elseif (stripos($detail, 'seguimiento') !== false) {
+        $itemType = 'followup';
       }
 
       $html .= '<article class="scm-case-history-item scm-case-record-card" data-history-type="' . esc_attr($itemType) . '" data-timestamp="' . esc_attr((string) $ts) . '" data-page="' . esc_attr((string) $page) . '"' . $itemStyle . '>';
@@ -171,7 +171,7 @@ final class GenericTicketsUiView
       if ($detail === '') {
         $detail = 'Sin detalle';
       }
-      $secType = 'activity';
+      $secType = 'reply';
       if (stripos($title, 'nota') !== false) {
         $secType = 'note';
       } elseif (stripos($title, 'seguimiento') !== false) {

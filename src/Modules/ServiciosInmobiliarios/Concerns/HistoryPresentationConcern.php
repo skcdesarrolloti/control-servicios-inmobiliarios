@@ -49,11 +49,11 @@ trait HistoryPresentationConcern
       }
       $detailHtml = $this->formatHistoryDetailHtml($detail);
       $itemButtons = $this->buildHistoryItemButtons($item);
-      $itemType = 'activity';
+      $itemType = 'reply';
       if (stripos($detail, 'nota interna') !== false || stripos($detail, 'nota privada') !== false) {
         $itemType = 'note';
-      } elseif (stripos($detail, 'respuesta') !== false || stripos($detail, 'solicitud') !== false || stripos($detail, 'cliente') !== false) {
-        $itemType = 'public';
+      } elseif (stripos($detail, 'seguimiento') !== false) {
+        $itemType = 'followup';
       }
       $html .= '<article class="scm-case-history-item" data-history-type="' . esc_attr($itemType) . '" data-timestamp="' . esc_attr((string) $ts) . '" data-page="' . esc_attr((string) $page) . '"' . $itemStyle . '>';
       $html .= '<div class="scm-case-history-meta"><strong>' . esc_html($author) . '</strong><span>' . esc_html($date) . '</span></div>';
@@ -108,7 +108,7 @@ trait HistoryPresentationConcern
         $detail = 'Sin detalle';
       }
       $itemButtons = $showButtons ? $this->buildHistoryItemButtons($item) : [];
-      $secType = 'activity';
+      $secType = 'reply';
       if (stripos($title, 'nota') !== false) {
         $secType = 'note';
       } elseif (stripos($title, 'seguimiento') !== false) {

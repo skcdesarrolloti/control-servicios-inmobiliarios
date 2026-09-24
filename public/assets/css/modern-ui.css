@@ -2336,7 +2336,7 @@ body,
 }
 
 #scm-app .scm-composer-private-notice {
-  display: inline-flex !important;
+  display: none !important;
   align-items: center !important;
   gap: 0.35rem !important;
   font-size: 0.75rem !important;
@@ -2346,6 +2346,10 @@ body,
   padding: 0.2rem 0.5rem !important;
   border-radius: 0.35rem !important;
   border: 1px solid #fef3c7 !important;
+}
+
+#scm-app .scm-composer-private-notice.is-active {
+  display: inline-flex !important;
 }
 
 #scm-app .scm-composer-file-preview {
@@ -2630,7 +2634,7 @@ body,
 }
 
 #scm-app .scm-timeline-filtered-empty {
-  display: flex !important;
+  display: none !important;
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
@@ -2643,6 +2647,10 @@ body,
   font-size: 0.875rem !important;
   text-align: center !important;
   margin-bottom: 1rem !important;
+}
+
+#scm-app .scm-timeline-filtered-empty.is-visible {
+  display: flex !important;
 }
 
 #scm-app .scm-timeline-filtered-empty p {
@@ -2747,4 +2755,77 @@ body,
   gap: 0 !important;
   margin-top: 0.25rem !important;
 }
+
+/* Acciones en items de historial / fichas (Modern sleek chips) */
+#scm-app .scm-case-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.5rem !important;
+  margin-top: 0.75rem !important;
+  padding-top: 0.75rem !important;
+  border-top: 1px dashed #e2e8f0 !important;
+}
+
+#scm-app .scm-case-action-btn,
+#scm-app .scm-case-history-item .scm-case-action-btn,
+#scm-app .scm-case-record-card .scm-case-action-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.35rem !important;
+  padding: 0.35rem 0.75rem !important;
+  min-height: 32px !important;
+  height: auto !important;
+  background: #f0f7ff !important;
+  color: #0369a1 !important;
+  border: 1px solid #bae0fd !important;
+  border-radius: 0.5rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.04) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  white-space: nowrap !important;
+}
+
+#scm-app .scm-case-action-btn::before,
+#scm-app .scm-case-history-item .scm-case-action-btn::before,
+#scm-app .scm-case-record-card .scm-case-action-btn::before {
+  content: 'open_in_new';
+  font-family: 'Material Symbols Outlined' !important;
+  font-size: 14px !important;
+  font-style: normal !important;
+  font-weight: normal !important;
+  line-height: 1 !important;
+  color: #0284c7 !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  transition: color 0.2s ease !important;
+}
+
+#scm-app .scm-case-action-btn:hover,
+#scm-app .scm-case-history-item .scm-case-action-btn:hover,
+#scm-app .scm-case-record-card .scm-case-action-btn:hover {
+  background: #0f1e36 !important;
+  color: #ffffff !important;
+  border-color: #0f1e36 !important;
+  box-shadow: 0 2px 6px rgba(15, 30, 54, 0.15) !important;
+  transform: translateY(-1px) !important;
+}
+
+#scm-app .scm-case-action-btn:hover::before,
+#scm-app .scm-case-history-item .scm-case-action-btn:hover::before,
+#scm-app .scm-case-record-card .scm-case-action-btn:hover::before {
+  color: #93c5fd !important;
+}
+
+#scm-app .scm-case-action-btn:active,
+#scm-app .scm-case-history-item .scm-case-action-btn:active,
+#scm-app .scm-case-record-card .scm-case-action-btn:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 1px 2px rgba(15, 30, 54, 0.08) !important;
+}
+
 

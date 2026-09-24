@@ -334,8 +334,7 @@
 
 #scm-app .scm-btn-primary,
 #scm-app .scm-btn-case,
-#scm-app .btn.btn-primary,
-#scm-app .scm-case-action-btn {
+#scm-app .btn.btn-primary {
   background: #f19001 !important;
   border: none !important;
   color: #fff !important;
@@ -343,8 +342,7 @@
 
 #scm-app .scm-btn-primary:hover,
 #scm-app .scm-btn-case:hover,
-#scm-app .btn.btn-primary:hover,
-#scm-app .scm-case-action-btn:hover {
+#scm-app .btn.btn-primary:hover {
   background: #d97f00 !important;
 }
 
@@ -853,27 +851,6 @@
   margin-top: 10px !important;
 }
 
-#scm-app .scm-case-history-item .scm-case-action-btn {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 14px !important;
-  min-height: 44px !important;
-  border-radius: 6px !important;
-  border: none !important;
-  background: #1f4c8f !important;
-  color: #ffffff !important;
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  line-height: 1 !important;
-  text-decoration: none !important;
-  box-shadow: none !important;
-}
-
-#scm-app .scm-case-history-item .scm-case-action-btn:hover {
-  background: #173d75 !important;
-  color: #ffffff !important;
-}
 
 /* ============================================================
    Caso Modal - Visual upgrade (safe)

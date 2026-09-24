@@ -4783,13 +4783,13 @@
       var noneCb = notifyOptions ? notifyOptions.querySelector('input[name="composer_notify[]"][value="none"]') : null;
 
       if (mode === "reply") {
-        if (visBadge) {
-          visBadge.className = "scm-composer-visibility scm-composer-visibility-public";
-          visBadge.innerHTML = '<span class="material-symbols-outlined text-[15px]">visibility</span><span>Visible para: <strong>' + escHtml(recipient) + '</strong></span>';
+        if (visBadge) visBadge.style.display = "none";
+        if (input) input.placeholder = "Escriba una respuesta o actualización sobre el caso...";
+        if (submitLabel) submitLabel.textContent = isPublicPqr ? "Responder solicitud" : "Responder caso";
+        if (privateNotice) {
+          privateNotice.classList.remove("is-active");
+          privateNotice.style.display = "none";
         }
-        if (input) input.placeholder = "Escriba una actualización o respuesta para el cliente / inquilino...";
-        if (submitLabel) submitLabel.textContent = isPublicPqr ? "Publicar Respuesta" : "Publicar Respuesta";
-        if (privateNotice) privateNotice.style.display = "none";
         if (notifyOptions) notifyOptions.style.display = "";
         clientCbs.forEach(function (cb) {
           cb.disabled = false;
@@ -4799,13 +4799,13 @@
         if (adminCb) { adminCb.disabled = false; adminCb.checked = false; }
         if (noneCb) { noneCb.disabled = false; noneCb.checked = false; }
       } else if (mode === "followup") {
-        if (visBadge) {
-          visBadge.className = "scm-composer-visibility scm-composer-visibility-followup";
-          visBadge.innerHTML = '<span class="material-symbols-outlined text-[15px]">engineering</span><span>Seguimiento operativo &amp; técnico</span>';
-        }
+        if (visBadge) visBadge.style.display = "none";
         if (input) input.placeholder = "Escriba el avance o seguimiento técnico del caso...";
         if (submitLabel) submitLabel.textContent = "Registrar Seguimiento";
-        if (privateNotice) privateNotice.style.display = "none";
+        if (privateNotice) {
+          privateNotice.classList.remove("is-active");
+          privateNotice.style.display = "none";
+        }
         if (notifyOptions) notifyOptions.style.display = "";
         clientCbs.forEach(function (cb) {
           cb.disabled = false;
@@ -4815,13 +4815,13 @@
         if (noneCb) { noneCb.disabled = false; noneCb.checked = false; }
       } else {
         // mode === "note"
-        if (visBadge) {
-          visBadge.className = "scm-composer-visibility scm-composer-visibility-internal";
-          visBadge.innerHTML = '<span class="material-symbols-outlined text-[15px]">lock</span><span>Solo visible internamente</span>';
-        }
+        if (visBadge) visBadge.style.display = "none";
         if (input) input.placeholder = "Escriba una nota interna o diagnóstico para el equipo técnico...";
         if (submitLabel) submitLabel.textContent = "Guardar Nota Interna";
-        if (privateNotice) privateNotice.style.display = "inline-flex";
+        if (privateNotice) {
+          privateNotice.classList.add("is-active");
+          privateNotice.style.display = "inline-flex";
+        }
         clientCbs.forEach(function (cb) {
           cb.checked = false;
           cb.disabled = true;
@@ -4981,20 +4981,18 @@
       var matchedCount = 0;
 
       items.forEach(function (item) {
-        var itemType = item.getAttribute("data-history-type") || "activity";
+        var itemType = item.getAttribute("data-history-type") || "reply";
         var itemText = (item.textContent || "").toLowerCase();
         var match = false;
 
         if (filterVal === "all") {
           match = true;
-        } else if (filterVal === "public") {
-          match = (itemType === "public" || (itemType !== "internal" && itemType !== "note" && (itemText.indexOf("respuesta") !== -1 || itemText.indexOf("solicitud") !== -1 || itemText.indexOf("cliente") !== -1)));
+        } else if (filterVal === "reply" || filterVal === "public") {
+          match = (itemType === "reply" || itemType === "public" || (itemType !== "followup" && itemType !== "note" && itemType !== "internal"));
         } else if (filterVal === "followup") {
           match = (itemType === "followup" || itemText.indexOf("seguimiento") !== -1);
-        } else if (filterVal === "internal") {
-          match = (itemType === "internal" || itemType === "note" || itemText.indexOf("nota interna") !== -1 || itemText.indexOf("privada") !== -1);
-        } else if (filterVal === "activity") {
-          match = (itemType === "activity" || itemText.indexOf("agend") !== -1 || itemText.indexOf("cita") !== -1 || itemText.indexOf("acta") !== -1 || itemText.indexOf("estado") !== -1 || itemText.indexOf("asignad") !== -1 || itemText.indexOf("cread") !== -1 || itemText.indexOf("traslad") !== -1);
+        } else if (filterVal === "note" || filterVal === "internal") {
+          match = (itemType === "note" || itemType === "internal" || itemText.indexOf("nota interna") !== -1 || itemText.indexOf("privada") !== -1);
         }
 
         if (match) {
@@ -5007,14 +5005,16 @@
 
       if (emptyNotice) {
         if (matchedCount === 0) {
+          emptyNotice.classList.add("is-visible");
           emptyNotice.style.display = "flex";
           var emptyText = emptyNotice.querySelector("p");
           if (emptyText) {
             emptyText.textContent = (items.length === 0)
-              ? "No hay historial ni actividades registradas en este caso."
+              ? "No hay historial registrado en este caso."
               : "No se encontraron registros para el filtro seleccionado.";
           }
         } else {
+          emptyNotice.classList.remove("is-visible");
           emptyNotice.style.display = "none";
         }
       }
@@ -5393,7 +5393,7 @@
               '<div class="scm-case-composer-tabs" role="tablist">' +
                 '<button type="button" class="scm-composer-tab active" data-composer-tab="reply">' +
                   '<span class="material-symbols-outlined text-[16px]">reply</span>' +
-                  '<span>' + (isPublicPqr ? "Respuesta a Solicitud" : "Respuesta a Cliente") + '</span>' +
+                  '<span>' + (isPublicPqr ? "Responder solicitud" : "Responder caso") + '</span>' +
                 '</button>' +
                 '<button type="button" class="scm-composer-tab" data-composer-tab="followup">' +
                   '<span class="material-symbols-outlined text-[16px]">add_comment</span>' +
@@ -5404,13 +5404,9 @@
                   '<span>Nota Interna (Privada)</span>' +
                 '</button>' +
               '</div>' +
-              '<div class="scm-composer-visibility scm-composer-visibility-public" data-scm-composer-visibility>' +
-                '<span class="material-symbols-outlined text-[15px]">visibility</span>' +
-                '<span>Visible para: <strong data-scm-composer-recipient>' + escHtml(recipientName) + '</strong></span>' +
-              '</div>' +
             '</div>' +
             '<div class="scm-case-composer-body">' +
-              '<textarea class="scm-composer-textarea" rows="3" placeholder="Escriba una respuesta o actualización para el cliente..." data-scm-composer-input></textarea>' +
+              '<textarea class="scm-composer-textarea" rows="3" placeholder="Escriba una respuesta o actualización sobre el caso..." data-scm-composer-input></textarea>' +
               '<div class="scm-composer-file-preview" data-scm-composer-preview style="display:none;"></div>' +
             '</div>' +
             '<div class="scm-composer-notify-row" data-scm-composer-notify-row>' +
@@ -5425,7 +5421,7 @@
               '</div>' +
               '<div class="scm-composer-private-notice" data-scm-composer-private-notice style="display:none;">' +
                 '<span class="material-symbols-outlined text-[14px]">lock</span>' +
-                '<span>Uso interno: Los clientes no serán notificados.</span>' +
+                '<span>Uso interno: Solo visible para funcionarios y administradores.</span>' +
               '</div>' +
             '</div>' +
             '<div class="scm-case-composer-footer">' +
@@ -5449,7 +5445,7 @@
                 '<button type="button" class="scm-composer-btn-discard" data-scm-composer-discard>Descartar</button>' +
                 '<button type="button" class="scm-composer-btn-submit" data-scm-composer-submit>' +
                   '<span class="material-symbols-outlined text-[16px]">send</span>' +
-                  '<span data-scm-composer-submit-label>Publicar Respuesta</span>' +
+                  '<span data-scm-composer-submit-label>' + (isPublicPqr ? "Responder solicitud" : "Responder caso") + '</span>' +
                 '</button>' +
               '</div>' +
             '</div>' +
@@ -5466,18 +5462,17 @@
                 '<span>Filtrar por:</span>' +
                 '<select class="scm-timeline-filter-select" data-scm-timeline-filter>' +
                   '<option value="all">Todo el historial</option>' +
-                  '<option value="public">Solo respuestas a cliente</option>' +
+                  '<option value="reply">Solo respuestas</option>' +
                   '<option value="followup">Solo seguimientos</option>' +
-                  '<option value="internal">Solo notas internas</option>' +
-                  '<option value="activity">Solo actividades</option>' +
+                  '<option value="note">Solo notas internas</option>' +
                 '</select>' +
               '</label>' +
             '</div>' +
           '</div>';
 
-        // Unify all history sections into one single timeline feed
+        // Unify all history sections into one single timeline feed (exclude hidden modal sections like contract/inmueble)
         var historySections = Array.prototype.slice.call(
-          srcWrap.querySelectorAll(".scm-case-history:not(.scm-case-documents-section)")
+          srcWrap.querySelectorAll(".scm-case-history:not(.scm-case-documents-section):not(.scm-case-hidden-sections .scm-case-history)")
         );
         var allHistoryArticles = [];
 
@@ -5491,16 +5486,14 @@
           items.forEach(function (item) {
             var rawType = item.getAttribute("data-history-type") || "";
             var itemText = (item.textContent || "").toLowerCase();
-            var classifiedType = "activity";
+            var classifiedType = "reply";
 
             if (rawType === "note" || isNotesSection || itemText.indexOf("nota interna") !== -1 || itemText.indexOf("nota privada") !== -1) {
-              classifiedType = "internal";
+              classifiedType = "note";
             } else if (rawType === "followup" || isSeguimientoSection || itemText.indexOf("seguimiento") !== -1) {
               classifiedType = "followup";
-            } else if (rawType === "public" || itemText.indexOf("respuesta") !== -1 || itemText.indexOf("comunicaci") !== -1 || itemText.indexOf("cliente") !== -1 || itemText.indexOf("inquilino") !== -1 || itemText.indexOf("solicitante") !== -1) {
-              classifiedType = "public";
             } else {
-              classifiedType = "activity";
+              classifiedType = "reply";
             }
 
             item.setAttribute("data-history-type", classifiedType);
@@ -5508,15 +5501,12 @@
             item.style.display = "";
 
             if (!item.querySelector(".scm-timeline-type-pill")) {
-              var pillIcon = "history";
-              var pillLabel = "Actividad";
-              if (classifiedType === "public") {
-                pillIcon = "reply";
-                pillLabel = "Respuesta";
-              } else if (classifiedType === "followup") {
+              var pillIcon = "reply";
+              var pillLabel = "Respuesta";
+              if (classifiedType === "followup") {
                 pillIcon = "engineering";
                 pillLabel = "Seguimiento";
-              } else if (classifiedType === "internal") {
+              } else if (classifiedType === "note") {
                 pillIcon = "lock";
                 pillLabel = "Nota Interna";
               }
@@ -5559,9 +5549,9 @@
 
         unifiedTimelineHtml +=
             '</div>' +
-            '<div class="scm-timeline-filtered-empty" data-scm-unified-empty style="' + (allHistoryArticles.length === 0 ? 'display:flex;' : 'display:none;') + '">' +
+            '<div class="scm-timeline-filtered-empty' + (allHistoryArticles.length === 0 ? ' is-visible' : '') + '" data-scm-unified-empty style="' + (allHistoryArticles.length === 0 ? 'display:flex;' : 'display:none;') + '">' +
               '<span class="material-symbols-outlined text-[32px] text-slate-400">' + (allHistoryArticles.length === 0 ? 'history_toggle_off' : 'filter_list_off') + '</span>' +
-              '<p>' + (allHistoryArticles.length === 0 ? 'No hay historial ni actividades registradas en este caso.' : 'No se encontraron registros para el filtro seleccionado.') + '</p>' +
+              '<p>' + (allHistoryArticles.length === 0 ? 'No hay historial registrado en este caso.' : 'No se encontraron registros para el filtro seleccionado.') + '</p>' +
             '</div>' +
           '</section>';
 
