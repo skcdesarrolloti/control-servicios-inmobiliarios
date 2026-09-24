@@ -112,7 +112,7 @@ final class GenericTicketsUiView
         $itemType = 'public';
       }
 
-      $html .= '<article class="scm-case-history-item scm-case-record-card" data-history-type="' . esc_attr($itemType) . '" data-page="' . esc_attr((string) $page) . '"' . $itemStyle . '>';
+      $html .= '<article class="scm-case-history-item scm-case-record-card" data-history-type="' . esc_attr($itemType) . '" data-timestamp="' . esc_attr((string) $ts) . '" data-page="' . esc_attr((string) $page) . '"' . $itemStyle . '>';
       $html .= '<div class="scm-case-record-head"><div class="scm-case-record-title"><span class="scm-case-record-user-icon" aria-hidden="true"></span><strong>' . esc_html($author) . '</strong></div>';
       if (!empty($itemButtons)) {
         $html .= $this->renderCaseActionButtons($itemButtons);
@@ -177,7 +177,7 @@ final class GenericTicketsUiView
       } elseif (stripos($title, 'seguimiento') !== false) {
         $secType = 'followup';
       }
-      $html .= '<article class="scm-case-history-item scm-case-record-card" data-history-type="' . esc_attr($secType) . '" data-page="' . esc_attr((string) $page) . '"' . $itemStyle . '>';
+      $html .= '<article class="scm-case-history-item scm-case-record-card" data-history-type="' . esc_attr($secType) . '" data-timestamp="' . esc_attr((string) $ts) . '" data-page="' . esc_attr((string) $page) . '"' . $itemStyle . '>';
       $html .= '<div class="scm-case-record-head"><div class="scm-case-record-title"><span class="scm-case-record-user-icon" aria-hidden="true"></span><strong>' . esc_html($author) . '</strong></div>';
       if (!empty($itemButtons)) {
         $html .= $this->renderCaseActionButtons($itemButtons);

@@ -2650,3 +2650,101 @@ body,
   font-weight: 500 !important;
 }
 
+/* Acciones de estado en el lateral (Stitch Sidebar Card 1 Actions) */
+#scm-app .scm-sidebar-state-actions {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.6rem !important;
+  margin-top: 0.85rem !important;
+  padding-top: 0.85rem !important;
+  border-top: 1px solid #f1f5f9 !important;
+}
+
+#scm-app .scm-sidebar-state-actions .scm-case-work-btn {
+  width: 100% !important;
+  padding: 0.65rem 0.85rem !important;
+}
+
+/* Insignias de tipo en la línea de tiempo unificada */
+#scm-app .scm-timeline-type-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.3rem !important;
+  padding: 0.2rem 0.6rem !important;
+  border-radius: 9999px !important;
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  flex-shrink: 0 !important;
+}
+
+#scm-app .scm-timeline-type-pill.scm-type-public {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #bfdbfe !important;
+}
+
+#scm-app .scm-timeline-type-pill.scm-type-followup {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+#scm-app .scm-timeline-type-pill.scm-type-internal,
+#scm-app .scm-timeline-type-pill.scm-type-note {
+  background: #fffbeb !important;
+  color: #b45309 !important;
+  border: 1px solid #fde68a !important;
+}
+
+#scm-app .scm-timeline-type-pill.scm-type-activity {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+#scm-app .scm-case-history-meta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+  flex-wrap: wrap !important;
+  margin-bottom: 0.5rem !important;
+}
+
+#scm-app .scm-case-record-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.5rem !important;
+  flex-wrap: wrap !important;
+  margin-bottom: 0.5rem !important;
+}
+
+#scm-app .scm-case-history-item[data-history-type="public"]::before {
+  background: #2563eb !important;
+  box-shadow: 0 0 0 2px #dbeafe !important;
+}
+
+#scm-app .scm-case-history-item[data-history-type="followup"]::before {
+  background: #059669 !important;
+  box-shadow: 0 0 0 2px #d1fae5 !important;
+}
+
+#scm-app .scm-case-history-item[data-history-type="internal"]::before,
+#scm-app .scm-case-history-item[data-history-type="note"]::before {
+  background: #d97706 !important;
+  box-shadow: 0 0 0 2px #fef3c7 !important;
+}
+
+#scm-app .scm-case-history-item[data-history-type="activity"]::before {
+  background: #64748b !important;
+  box-shadow: 0 0 0 2px #e2e8f0 !important;
+}
+
+#scm-app .scm-case-unified-section {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  margin-top: 0.25rem !important;
+}
+

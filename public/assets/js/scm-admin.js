@@ -4975,90 +4975,48 @@
 
     // Timeline filtering
     function applyTimelineFilter(filterVal) {
-      var historySections = modal.querySelectorAll(".scm-case-history:not(.scm-case-documents-section)");
-      var totalMatched = 0;
+      var feed = modal.querySelector("[data-scm-timeline-feed]");
+      var emptyNotice = modal.querySelector("[data-scm-unified-empty]");
+      var items = modal.querySelectorAll("[data-scm-timeline-feed] .scm-case-history-item");
+      var matchedCount = 0;
 
-      historySections.forEach(function (sec) {
-        var h4 = sec.querySelector("h4");
-        var secTitle = (h4 ? h4.textContent : "").toLowerCase();
-        var isNotesSection = secTitle.indexOf("nota") !== -1;
-        var isSeguimientoSection = secTitle.indexOf("seguimiento") !== -1;
-        var isPropertyHistory = secTitle.indexOf("inmueble") !== -1;
-
-        var items = sec.querySelectorAll(".scm-case-history-item");
-        var secVisibleCount = 0;
-
-        items.forEach(function (item) {
-          var itemType = item.getAttribute("data-history-type") || "";
-          var itemText = (item.textContent || "").toLowerCase();
-
-          var isInternal = itemType === "note" || isNotesSection || itemText.indexOf("nota interna") !== -1 || itemText.indexOf("privada") !== -1;
-          var isFollowup = itemType === "followup" || isSeguimientoSection || itemText.indexOf("seguimiento") !== -1;
-          var isPublic = itemType === "public" || (!isInternal && (itemText.indexOf("respuesta") !== -1 || itemText.indexOf("comunicaci") !== -1 || itemText.indexOf("cliente") !== -1 || itemText.indexOf("inquilino") !== -1 || itemText.indexOf("solicitante") !== -1));
-          var isActivity = itemType === "activity" || isFollowup || isPropertyHistory || itemText.indexOf("agend") !== -1 || itemText.indexOf("cita") !== -1 || itemText.indexOf("acta") !== -1 || itemText.indexOf("estado") !== -1 || itemText.indexOf("asignad") !== -1 || itemText.indexOf("cread") !== -1 || itemText.indexOf("traslad") !== -1;
-
-          var match = false;
-          if (filterVal === "all") {
-            match = true;
-          } else if (filterVal === "public") {
-            match = isPublic && !isInternal;
-          } else if (filterVal === "internal") {
-            match = isInternal;
-          } else if (filterVal === "activity") {
-            match = isActivity && !isInternal;
-          }
-
-          if (filterVal === "all") {
-            var list = item.closest(".scm-case-history-list");
-            var currentPage = list ? (list.getAttribute("data-current-page") || "1") : "1";
-            var itemPage = item.getAttribute("data-page") || "1";
-            item.style.display = (itemPage === currentPage) ? "" : "none";
-            secVisibleCount++;
-            totalMatched++;
-          } else {
-            if (match) {
-              item.style.display = "";
-              secVisibleCount++;
-              totalMatched++;
-            } else {
-              item.style.display = "none";
-            }
-          }
-        });
-
-        var pagination = sec.querySelector(".scm-history-pagination");
-        var emptyNotice = sec.querySelector(".scm-case-history-empty");
+      items.forEach(function (item) {
+        var itemType = item.getAttribute("data-history-type") || "activity";
+        var itemText = (item.textContent || "").toLowerCase();
+        var match = false;
 
         if (filterVal === "all") {
-          sec.style.display = "";
-          if (pagination) pagination.style.display = "";
-          if (emptyNotice) emptyNotice.style.display = items.length === 0 ? "" : "none";
+          match = true;
+        } else if (filterVal === "public") {
+          match = (itemType === "public" || (itemType !== "internal" && itemType !== "note" && (itemText.indexOf("respuesta") !== -1 || itemText.indexOf("solicitud") !== -1 || itemText.indexOf("cliente") !== -1)));
+        } else if (filterVal === "followup") {
+          match = (itemType === "followup" || itemText.indexOf("seguimiento") !== -1);
+        } else if (filterVal === "internal") {
+          match = (itemType === "internal" || itemType === "note" || itemText.indexOf("nota interna") !== -1 || itemText.indexOf("privada") !== -1);
+        } else if (filterVal === "activity") {
+          match = (itemType === "activity" || itemText.indexOf("agend") !== -1 || itemText.indexOf("cita") !== -1 || itemText.indexOf("acta") !== -1 || itemText.indexOf("estado") !== -1 || itemText.indexOf("asignad") !== -1 || itemText.indexOf("cread") !== -1 || itemText.indexOf("traslad") !== -1);
+        }
+
+        if (match) {
+          item.style.display = "";
+          matchedCount++;
         } else {
-          if (pagination) pagination.style.display = "none";
-          if (secVisibleCount > 0) {
-            sec.style.display = "";
-            if (emptyNotice) emptyNotice.style.display = "none";
-          } else {
-            sec.style.display = "none";
-          }
+          item.style.display = "none";
         }
       });
 
-      var existingEmpty = modal.querySelector(".scm-timeline-filtered-empty");
-      if (filterVal !== "all" && totalMatched === 0) {
-        if (!existingEmpty) {
-          var filterHead = modal.querySelector(".scm-case-timeline-head");
-          if (filterHead) {
-            var emptyDiv = document.createElement("div");
-            emptyDiv.className = "scm-timeline-filtered-empty";
-            emptyDiv.innerHTML = '<span class="material-symbols-outlined text-[32px] text-slate-400">filter_list_off</span><p>No se encontraron registros para el filtro seleccionado.</p>';
-            filterHead.insertAdjacentElement("afterend", emptyDiv);
+      if (emptyNotice) {
+        if (matchedCount === 0) {
+          emptyNotice.style.display = "flex";
+          var emptyText = emptyNotice.querySelector("p");
+          if (emptyText) {
+            emptyText.textContent = (items.length === 0)
+              ? "No hay historial ni actividades registradas en este caso."
+              : "No se encontraron registros para el filtro seleccionado.";
           }
         } else {
-          existingEmpty.style.display = "flex";
+          emptyNotice.style.display = "none";
         }
-      } else if (existingEmpty) {
-        existingEmpty.style.display = "none";
       }
     }
 
@@ -5067,6 +5025,7 @@
       filterSelect.addEventListener("change", function () {
         applyTimelineFilter(filterSelect.value);
       });
+      applyTimelineFilter(filterSelect.value || "all");
     }
   }
 
@@ -5314,13 +5273,7 @@
         if (isPublicPqr) {
           if (statusBucket !== "cerrados") {
             mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket><span class="material-symbols-outlined scm-btn-icon">schedule_send</span><div class="scm-btn-text"><span class="scm-btn-label">Postergar solicitud</span><span class="scm-btn-sub">En espera de repuesto</span></div></button>',
               '<button type="button" class="scm-case-work-btn" data-scm-close-ticket><span class="material-symbols-outlined scm-btn-icon">check_circle</span><div class="scm-btn-text"><span class="scm-btn-label">Cerrar solicitud</span><span class="scm-btn-sub">Finalizar gestión</span></div></button>',
-            );
-          }
-          if (statusBucket === "postergados" || statusBucket === "cerrados") {
-            mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket><span class="material-symbols-outlined scm-btn-icon">play_arrow</span><div class="scm-btn-text"><span class="scm-btn-label">Activar solicitud</span><span class="scm-btn-sub">Reanudar caso</span></div></button>',
             );
           }
         }
@@ -5332,13 +5285,6 @@
           if (String(btn.dataset.empleadoId || "").trim()) {
             complementaryActionButtons.push(
               '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-employee><span class="material-symbols-outlined scm-btn-icon">calendar_month</span><div class="scm-btn-text"><span class="scm-btn-label">Calendario funcionario</span><span class="scm-btn-sub">Disponibilidad técnica</span></div></button>',
-            );
-          }
-          if (canUseDashboardAction("case_edit_magnitude")) {
-            complementaryActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-edit-case-magnitude data-ticket-pk="' +
-              escHtml(btn.dataset.ticketPk || "") +
-              '"><span class="material-symbols-outlined scm-btn-icon">tune</span><div class="scm-btn-text"><span class="scm-btn-label">Editar magnitud</span><span class="scm-btn-sub">Modificar severidad</span></div></button>',
             );
           }
           if (canUseDashboardAction("case_completion_act")) {
@@ -5353,11 +5299,6 @@
               );
             }
           }
-          if (canUseDashboardAction("case_postpone")) {
-            mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket><span class="material-symbols-outlined scm-btn-icon">schedule_send</span><div class="scm-btn-text"><span class="scm-btn-label">Postergar caso</span><span class="scm-btn-sub">En espera de repuesto</span></div></button>',
-            );
-          }
           if (statusBucket !== "cerrados" && isMaintenanceForActions) {
             if (canUseDashboardAction("corrective_review_manage")) {
               complementaryActionButtons.push(
@@ -5366,13 +5307,6 @@
                   '</span><span class="scm-btn-sub">Diagnóstico detallado</span></div></button>',
               );
             }
-          }
-        }
-        if (!isPublicPqr && (statusBucket === "postergados" || statusBucket === "cerrados")) {
-          if (canUseDashboardAction("case_activate")) {
-            mainActionButtons.push(
-              '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket><span class="material-symbols-outlined scm-btn-icon">play_arrow</span><div class="scm-btn-text"><span class="scm-btn-label">Activar caso</span><span class="scm-btn-sub">Reanudar gestión</span></div></button>',
-            );
           }
         }
         if (!isPublicPqr && (cotizacionUrl || cotizacionId)) {
@@ -5439,14 +5373,18 @@
         var direccionVal = btn.dataset.direccion || "-";
         var contratoIdVal = btn.dataset.contrato || "-";
 
-        var caseActionsHtml =
+        var caseActionsContent =
+          renderActionGroup(isPublicPqr ? "Gestión de la solicitud" : "Gestión del caso", mainActionButtons, "is-main") +
+          renderActionGroup("Complementarias", complementaryActionButtons, "is-secondary") +
+          renderActionGroup("Cotización", quoteActionButtons, "is-quote");
+
+        var caseActionsHtml = caseActionsContent ? (
           '<section class="scm-case-work-actions"><h4><span class="material-symbols-outlined text-[20px]">tune</span> ' +
           (isPublicPqr ? "Acciones de la solicitud" : "Acciones del caso") +
           "</h4>" +
-          renderActionGroup(isPublicPqr ? "Gestión de la solicitud" : "Gestión del caso", mainActionButtons, "is-main") +
-          renderActionGroup("Complementarias", complementaryActionButtons, "is-secondary") +
-          renderActionGroup("Cotización", quoteActionButtons, "is-quote") +
-          "</section>";
+          caseActionsContent +
+          "</section>"
+        ) : "";
 
         var recipientName = solicitanteVal || (isPublicPqr ? "Solicitante" : "Inquilino / Solicitante");
         var composerHtml =
@@ -5529,6 +5467,7 @@
                 '<select class="scm-timeline-filter-select" data-scm-timeline-filter>' +
                   '<option value="all">Todo el historial</option>' +
                   '<option value="public">Solo respuestas a cliente</option>' +
+                  '<option value="followup">Solo seguimientos</option>' +
                   '<option value="internal">Solo notas internas</option>' +
                   '<option value="activity">Solo actividades</option>' +
                 '</select>' +
@@ -5536,12 +5475,97 @@
             '</div>' +
           '</div>';
 
-        var firstHistoryAfterAttachments = srcWrap.querySelector(".scm-case-history:not(.scm-case-documents-section)");
-        if (firstHistoryAfterAttachments) {
-          firstHistoryAfterAttachments.insertAdjacentHTML("beforebegin", caseActionsHtml + composerHtml + timelineHeaderHtml);
-        } else {
-          srcWrap.insertAdjacentHTML("beforeend", caseActionsHtml + composerHtml + timelineHeaderHtml);
-        }
+        // Unify all history sections into one single timeline feed
+        var historySections = Array.prototype.slice.call(
+          srcWrap.querySelectorAll(".scm-case-history:not(.scm-case-documents-section)")
+        );
+        var allHistoryArticles = [];
+
+        historySections.forEach(function (sec) {
+          var h4 = sec.querySelector("h4");
+          var secTitle = (h4 ? h4.textContent : "").toLowerCase();
+          var isNotesSection = secTitle.indexOf("nota") !== -1 || sec.id === "scm-sec-notas";
+          var isSeguimientoSection = secTitle.indexOf("seguimiento") !== -1 || sec.id === "scm-sec-seguimiento";
+
+          var items = sec.querySelectorAll(".scm-case-history-item");
+          items.forEach(function (item) {
+            var rawType = item.getAttribute("data-history-type") || "";
+            var itemText = (item.textContent || "").toLowerCase();
+            var classifiedType = "activity";
+
+            if (rawType === "note" || isNotesSection || itemText.indexOf("nota interna") !== -1 || itemText.indexOf("nota privada") !== -1) {
+              classifiedType = "internal";
+            } else if (rawType === "followup" || isSeguimientoSection || itemText.indexOf("seguimiento") !== -1) {
+              classifiedType = "followup";
+            } else if (rawType === "public" || itemText.indexOf("respuesta") !== -1 || itemText.indexOf("comunicaci") !== -1 || itemText.indexOf("cliente") !== -1 || itemText.indexOf("inquilino") !== -1 || itemText.indexOf("solicitante") !== -1) {
+              classifiedType = "public";
+            } else {
+              classifiedType = "activity";
+            }
+
+            item.setAttribute("data-history-type", classifiedType);
+            item.removeAttribute("data-page");
+            item.style.display = "";
+
+            if (!item.querySelector(".scm-timeline-type-pill")) {
+              var pillIcon = "history";
+              var pillLabel = "Actividad";
+              if (classifiedType === "public") {
+                pillIcon = "reply";
+                pillLabel = "Respuesta";
+              } else if (classifiedType === "followup") {
+                pillIcon = "engineering";
+                pillLabel = "Seguimiento";
+              } else if (classifiedType === "internal") {
+                pillIcon = "lock";
+                pillLabel = "Nota Interna";
+              }
+              var pillHtml = '<span class="scm-timeline-type-pill scm-type-' + classifiedType + '"><span class="material-symbols-outlined text-[13px]">' + pillIcon + '</span> ' + pillLabel + '</span>';
+
+              var metaEl = item.querySelector(".scm-case-history-meta");
+              var recordHead = item.querySelector(".scm-case-record-head");
+              if (metaEl) {
+                metaEl.insertAdjacentHTML("afterbegin", pillHtml);
+              } else if (recordHead) {
+                recordHead.insertAdjacentHTML("beforeend", pillHtml);
+              } else {
+                item.insertAdjacentHTML("afterbegin", '<div class="scm-case-history-meta">' + pillHtml + '</div>');
+              }
+            }
+
+            allHistoryArticles.push(item);
+          });
+
+          sec.remove();
+        });
+
+        allHistoryArticles.sort(function (a, b) {
+          var tsA = parseInt(a.getAttribute("data-timestamp") || "0", 10) || 0;
+          var tsB = parseInt(b.getAttribute("data-timestamp") || "0", 10) || 0;
+          if (tsA && tsB && tsA !== tsB) {
+            return tsB - tsA;
+          }
+          return 0;
+        });
+
+        var unifiedTimelineHtml =
+          '<section class="scm-case-unified-section" data-scm-unified-section>' +
+            timelineHeaderHtml +
+            '<div class="scm-case-history-list scm-case-timeline-feed" data-scm-timeline-feed>';
+
+        allHistoryArticles.forEach(function (art) {
+          unifiedTimelineHtml += art.outerHTML;
+        });
+
+        unifiedTimelineHtml +=
+            '</div>' +
+            '<div class="scm-timeline-filtered-empty" data-scm-unified-empty style="' + (allHistoryArticles.length === 0 ? 'display:flex;' : 'display:none;') + '">' +
+              '<span class="material-symbols-outlined text-[32px] text-slate-400">' + (allHistoryArticles.length === 0 ? 'history_toggle_off' : 'filter_list_off') + '</span>' +
+              '<p>' + (allHistoryArticles.length === 0 ? 'No hay historial ni actividades registradas en este caso.' : 'No se encontraron registros para el filtro seleccionado.') + '</p>' +
+            '</div>' +
+          '</section>';
+
+        srcWrap.insertAdjacentHTML("beforeend", (caseActionsHtml || "") + composerHtml + unifiedTimelineHtml);
         sourceHtml = srcWrap.innerHTML;
 
         var sidebarHtml = '<aside class="scm-case-sidebar">';
@@ -5560,13 +5584,42 @@
         if (!isPublicPqr) {
           var sideMagnitude = normalizeMagnitudeKey(btn.dataset.magnitudCaso || "");
           sidebarHtml += '<div class="flex items-center justify-between pt-1 border-t border-slate-100"><span class="scm-spec-label text-xs">Magnitud:</span><span data-scm-case-magnitude-badge>' + renderMagnitudeBadge(sideMagnitude) + '</span></div>';
-          if (canUseDashboardAction("case_edit_magnitude")) {
-            sidebarHtml += '<button type="button" class="btn btn-outline btn-sm w-full text-xs" data-scm-edit-case-magnitude data-ticket-pk="' + escHtml(btn.dataset.ticketPk || "") + '">Editar magnitud caso</button>';
-          }
           if (isPreventivaCase(btn)) {
             var noAccessSideCount = Math.max(0, parseInt(btn.dataset.preventivaNoAccessCount || "0", 10) || 0);
             sidebarHtml += '<div class="scm-case-side-item scm-case-side-no-access"><span class="scm-case-side-label">Constancias preventivas</span><span class="scm-case-side-value">' + escHtml(String(noAccessSideCount)) + (noAccessSideCount === 1 ? " comunicación" : " comunicaciones") + '</span><small>Próxima #' + escHtml(String(noAccessSideCount + 1)) + '</small></div>';
           }
+        }
+
+        // Acciones de estado en el lateral con estilo de Acciones del caso
+        var sidebarStateButtons = [];
+        if (!isPublicPqr && canUseDashboardAction("case_edit_magnitude")) {
+          sidebarStateButtons.push(
+            '<button type="button" class="scm-case-work-btn w-full" data-scm-edit-case-magnitude data-ticket-pk="' + escHtml(btn.dataset.ticketPk || "") + '">' +
+              '<span class="material-symbols-outlined scm-btn-icon">tune</span>' +
+              '<div class="scm-btn-text"><span class="scm-btn-label">Editar magnitud</span><span class="scm-btn-sub">Modificar severidad</span></div>' +
+            '</button>'
+          );
+        }
+        var canPostpone = isPublicPqr ? (statusBucket !== "cerrados" && statusBucket !== "postergados") : (statusBucket !== "cerrados" && statusBucket !== "postergados" && canUseDashboardAction("case_postpone"));
+        if (canPostpone) {
+          sidebarStateButtons.push(
+            '<button type="button" class="scm-case-work-btn w-full" data-scm-open-postpone-ticket>' +
+              '<span class="material-symbols-outlined scm-btn-icon">schedule_send</span>' +
+              '<div class="scm-btn-text"><span class="scm-btn-label">' + (isPublicPqr ? "Postergar solicitud" : "Postergar caso") + '</span><span class="scm-btn-sub">En espera de repuesto</span></div>' +
+            '</button>'
+          );
+        }
+        var canActivate = (statusBucket === "postergados" || statusBucket === "cerrados") && (isPublicPqr || canUseDashboardAction("case_activate"));
+        if (canActivate) {
+          sidebarStateButtons.push(
+            '<button type="button" class="scm-case-work-btn w-full" data-scm-activate-ticket>' +
+              '<span class="material-symbols-outlined scm-btn-icon">play_arrow</span>' +
+              '<div class="scm-btn-text"><span class="scm-btn-label">' + (isPublicPqr ? "Activar solicitud" : "Activar caso") + '</span><span class="scm-btn-sub">Reanudar gestión activa</span></div>' +
+            '</button>'
+          );
+        }
+        if (sidebarStateButtons.length > 0) {
+          sidebarHtml += '<div class="scm-sidebar-state-actions">' + sidebarStateButtons.join("") + '</div>';
         }
         sidebarHtml += '</div>';
 

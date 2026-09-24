@@ -47,13 +47,15 @@ trait HistoryPresentationConcern
       if ($detail === '') {
         $detail = 'Sin detalle';
       }
+      $detailHtml = $this->formatHistoryDetailHtml($detail);
+      $itemButtons = $this->buildHistoryItemButtons($item);
       $itemType = 'activity';
       if (stripos($detail, 'nota interna') !== false || stripos($detail, 'nota privada') !== false) {
         $itemType = 'note';
       } elseif (stripos($detail, 'respuesta') !== false || stripos($detail, 'solicitud') !== false || stripos($detail, 'cliente') !== false) {
         $itemType = 'public';
       }
-      $html .= '<article class="scm-case-history-item" data-history-type="' . esc_attr($itemType) . '" data-page="' . esc_attr((string) $page) . '"' . $itemStyle . '>';
+      $html .= '<article class="scm-case-history-item" data-history-type="' . esc_attr($itemType) . '" data-timestamp="' . esc_attr((string) $ts) . '" data-page="' . esc_attr((string) $page) . '"' . $itemStyle . '>';
       $html .= '<div class="scm-case-history-meta"><strong>' . esc_html($author) . '</strong><span>' . esc_html($date) . '</span></div>';
       $html .= '<div class="scm-case-history-detail">' . $detailHtml . '</div>';
       $html .= $this->renderHistoryImages([$item['imagenes'] ?? '', $item['imagen'] ?? '', $item['evidencia'] ?? '']);
@@ -105,13 +107,14 @@ trait HistoryPresentationConcern
       if ($detail === '') {
         $detail = 'Sin detalle';
       }
+      $itemButtons = $showButtons ? $this->buildHistoryItemButtons($item) : [];
       $secType = 'activity';
       if (stripos($title, 'nota') !== false) {
         $secType = 'note';
       } elseif (stripos($title, 'seguimiento') !== false) {
         $secType = 'followup';
       }
-      $html .= '<article class="scm-case-history-item scm-case-record-card" data-history-type="' . esc_attr($secType) . '">';
+      $html .= '<article class="scm-case-history-item scm-case-record-card" data-history-type="' . esc_attr($secType) . '" data-timestamp="' . esc_attr((string) $ts) . '">';
       $html .= '<div class="scm-case-record-head"><div class="scm-case-record-title"><span class="scm-case-record-user-icon" aria-hidden="true"></span><strong>' . esc_html($author) . '</strong></div>';
       if (!empty($itemButtons)) {
         $html .= $this->renderCaseActionButtons($itemButtons);
