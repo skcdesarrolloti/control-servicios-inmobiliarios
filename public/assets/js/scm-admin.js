@@ -4779,8 +4779,10 @@
     var cannedBtn = composer.querySelector("[data-scm-composer-canned]");
     var templateBtn = composer.querySelector("[data-scm-composer-template]");
     var pasteBtn = composer.querySelector("[data-scm-composer-paste]");
+    var notifyRow = composer.querySelector("[data-scm-composer-notify-row]");
     var notifyOptions = composer.querySelector("[data-scm-composer-notify-options]");
     var privateNotice = composer.querySelector("[data-scm-composer-private-notice]");
+    var toolsWrap = composer.querySelector(".scm-composer-tools");
     var docsContainer = composer.querySelector("[data-scm-composer-docs]");
     var addDocBtn = composer.querySelector("[data-scm-composer-add-doc]");
     var responseOptions = composer.querySelector("[data-scm-composer-response-options]");
@@ -4801,6 +4803,7 @@
     }
 
     function addDocumentRow(presetFile, presetTitle) {
+      if (mode === "note") return null;
       if (!docsContainer) return null;
       docsContainer.style.display = "flex";
 
@@ -4930,6 +4933,7 @@
     }
 
     function addFiles(files) {
+      if (mode === "note") return;
       if (!files || !files.length) return;
       Array.prototype.forEach.call(files, function (f) {
         composerFiles.push(f);
@@ -4948,6 +4952,7 @@
 
     // Clipboard image paste (Ctrl+V) handler on modal & composer
     function handleClipboardImagePaste(e) {
+      if (mode === "note") return;
       var clipboard = e.clipboardData || window.clipboardData;
       if (!clipboard || !clipboard.items) return;
       var pastedFiles = [];
@@ -4976,6 +4981,7 @@
 
     // Drag and drop images and documents onto composer
     composer.addEventListener("dragover", function (e) {
+      if (mode === "note") return;
       e.preventDefault();
       composer.classList.add("is-dragover");
     });
@@ -4983,6 +4989,7 @@
       composer.classList.remove("is-dragover");
     });
     composer.addEventListener("drop", function (e) {
+      if (mode === "note") return;
       e.preventDefault();
       composer.classList.remove("is-dragover");
       if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
@@ -5009,6 +5016,7 @@
 
     if (pasteBtn) {
       pasteBtn.addEventListener("click", function () {
+        if (mode === "note") return;
         if (navigator.clipboard && navigator.clipboard.read) {
           navigator.clipboard.read().then(function (items) {
             var found = false;
@@ -5117,9 +5125,12 @@
         if (input) input.placeholder = "Escriba una nota interna o diagnóstico para el equipo técnico...";
         if (submitLabel) submitLabel.textContent = "Guardar Nota Interna";
         if (privateNotice) {
-          privateNotice.classList.add("is-active");
-          privateNotice.style.display = "inline-flex";
+          privateNotice.classList.remove("is-active");
+          privateNotice.style.display = "none";
         }
+        composerFiles = [];
+        renderFilePreviews();
+        clearDocs();
         clientCbs.forEach(function (cb) {
           cb.checked = false;
           cb.disabled = true;
@@ -5129,6 +5140,8 @@
       }
       var prevBox = composer.querySelector("[data-scm-composer-preventiva-box]");
       var cotBox = composer.querySelector("[data-scm-composer-cotizacion-box]");
+      if (notifyRow) notifyRow.style.display = mode === "note" ? "none" : "";
+      if (toolsWrap) toolsWrap.style.display = mode === "note" ? "none" : "";
       if (responseOptions) responseOptions.style.display = mode === "reply" ? "" : "none";
       if (prevBox) prevBox.style.display = mode === "reply" ? "" : "none";
       if (cotBox) cotBox.style.display = mode === "reply" ? "" : "none";
@@ -5243,8 +5256,11 @@
         if (!selectedRecipients.length) {
           selectedRecipients = ["none"];
         }
+        if (mode === "note") {
+          selectedRecipients = ["none"];
+        }
 
-        var docRows = docsContainer ? docsContainer.querySelectorAll("[data-scm-doc-row]") : [];
+        var docRows = mode === "note" ? [] : (docsContainer ? docsContainer.querySelectorAll("[data-scm-doc-row]") : []);
         var hasMissingDocFile = false;
         var validDocs = [];
 
@@ -5281,18 +5297,22 @@
           fd.append("notify_recipients[]", rec);
         });
 
-        composerFiles.forEach(function (file) {
-          if (mode === "reply") {
-            fd.append("imagen[]", file);
-          } else {
-            fd.append("evidencia[]", file);
-          }
-        });
+        if (mode !== "note") {
+          composerFiles.forEach(function (file) {
+            if (mode === "reply") {
+              fd.append("imagen[]", file);
+            } else {
+              fd.append("evidencia[]", file);
+            }
+          });
+        }
 
-        validDocs.forEach(function (doc) {
-          fd.append("documento[]", doc.file);
-          fd.append("documento_nombre[]", doc.title);
-        });
+        if (mode !== "note") {
+          validDocs.forEach(function (doc) {
+            fd.append("documento[]", doc.file);
+            fd.append("documento_nombre[]", doc.title);
+          });
+        }
 
         if (mode === "reply") {
           fd.append("action", actions.ticket_response || "scm_ajax_ticket_response");
