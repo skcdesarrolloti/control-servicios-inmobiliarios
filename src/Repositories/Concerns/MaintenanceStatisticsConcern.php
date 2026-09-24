@@ -218,22 +218,10 @@ trait MaintenanceStatisticsConcern
 
     $revision = (string) ($filters['fRevision'] ?? '');
     if ($revision !== '') {
-      $revFilter = trim($revision);
-      if ($revFilter === 'has') {
-        $where[] = "(TRIM(COALESCE(t.id_revision_preventiva, '')) <> '' OR TRIM(COALESCE(t.id_revision_correctiva, '')) <> '')";
-      } elseif ($revFilter === 'none') {
-        $where[] = "(TRIM(COALESCE(t.id_revision_preventiva, '')) = '' AND TRIM(COALESCE(t.id_revision_correctiva, '')) = '')";
-      } elseif ($revFilter === 'prev') {
-        $where[] = "TRIM(COALESCE(t.id_revision_preventiva, '')) <> ''";
-      } elseif ($revFilter === 'corr') {
-        $where[] = "TRIM(COALESCE(t.id_revision_correctiva, '')) <> ''";
-      } elseif (strpos($revFilter, 'state:') === 0) {
-        $state = strtolower(trim(substr($revFilter, 6)));
-        if ($state !== '') {
-          $where[] = "(LOWER(TRIM(COALESCE(t.estado_rev_preventiva, ''))) = %s OR LOWER(TRIM(COALESCE(t.estado_rev_correctiva, ''))) = %s)";
-          $args[] = $state;
-          $args[] = $state;
-        }
+      [$revisionWhere, $revisionArgs] = $this->maintenanceRevisionFilterWhere(trim($revision), 't');
+      if ($revisionWhere !== '') {
+        $where[] = $revisionWhere;
+        $args = array_merge($args, $revisionArgs);
       }
     }
 

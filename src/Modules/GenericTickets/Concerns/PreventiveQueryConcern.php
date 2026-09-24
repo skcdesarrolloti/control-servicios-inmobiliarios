@@ -180,19 +180,28 @@ trait PreventiveQueryConcern
 
     $total = (int) $this->db->getVar("SELECT COUNT(*) FROM `{$tabla}` WHERE {$whereStr}", $args);
 
-    $damageVals = ['si', '1', 'true', 'con danos'];
-    $damagePhs  = implode(',', array_fill(0, count($damageVals), '?'));
-    $conDanosSql = "SELECT COUNT(*) FROM `{$tabla}` WHERE {$whereStr}"
-      . " AND (LOWER(TRIM(COALESCE(`encontro_danos`,''))) IN ({$damagePhs})"
-      . " OR LOWER(TRIM(COALESCE(`tiene_cotizacion`,''))) IN ({$damagePhs}))";
-    $conDanosArgs = array_merge($args, $damageVals, $damageVals);
-    $conDanos = (int) $this->db->getVar($conDanosSql, $conDanosArgs);
+    $cotExists = $this->preventiveCotizacionExistsExpression($tabla, $cotTabla);
+    $damageExpr = $this->preventiveTruthyExpression($tabla, ['encontro_danos', 'se_encontraron_danos', 'tiene_cotizacion'], ['si', 'sí', '1', 'true', 'yes', 'con danos']);
+    $noDamageExpr = $this->preventiveTruthyExpression($tabla, ['encontro_danos', 'se_encontraron_danos'], ['no', '0', 'false', 'sin danos']);
+    $damageDisplayExpr = $this->preventiveFirstValueExpression($tabla, ['encontro_danos', 'se_encontraron_danos', 'tiene_cotizacion']);
+    $magnitudExpr = $this->column_exists($tabla, 'magnitud_caso')
+      ? "LOWER(TRIM(COALESCE(`magnitud_caso`, '')))"
+      : "''";
 
-    $enviadaVals = ['si', '1', 'true', 'enviada'];
-    $enviadaPhs  = implode(',', array_fill(0, count($enviadaVals), '?'));
-    $conEnviadaSql = "SELECT COUNT(*) FROM `{$tabla}` WHERE {$whereStr}"
-      . " AND LOWER(TRIM(COALESCE(`se_envio`,''))) IN ({$enviadaPhs})";
-    $conEnviada = (int) $this->db->getVar($conEnviadaSql, array_merge($args, $enviadaVals));
+    $statsSql = "SELECT
+        COUNT(1) AS total,
+        SUM(CASE WHEN {$cotExists} THEN 1 ELSE 0 END) AS con_cotizacion,
+        SUM(CASE WHEN {$damageExpr} THEN 1 ELSE 0 END) AS danos_si,
+        SUM(CASE WHEN {$noDamageExpr} THEN 1 ELSE 0 END) AS danos_no,
+        SUM(CASE WHEN {$magnitudExpr} IN ('critico', 'crítico') THEN 1 ELSE 0 END) AS magnitud_critico,
+        SUM(CASE WHEN {$magnitudExpr} = 'alto' THEN 1 ELSE 0 END) AS magnitud_alto,
+        SUM(CASE WHEN {$magnitudExpr} = 'medio' THEN 1 ELSE 0 END) AS magnitud_medio,
+        SUM(CASE WHEN {$magnitudExpr} = 'bajo' THEN 1 ELSE 0 END) AS magnitud_bajo
+      FROM `{$tabla}` WHERE {$whereStr}";
+    $statRow = $this->db->getRow($statsSql, $args) ?: [];
+    $conCotizacion = (int) ($statRow['con_cotizacion'] ?? 0);
+    $conDanos = (int) ($statRow['danos_si'] ?? 0);
+    $sinDanos = (int) ($statRow['danos_no'] ?? 0);
 
     $perPage    = max(24, min(100, (int) ($p['fPerPage'] ?? 24)));
     $page       = max(1, (int) ($p['fPage'] ?? 1));
@@ -210,9 +219,8 @@ trait PreventiveQueryConcern
         `cct_status`   AS asunto,
         'Revision Preventiva' AS tema_ayuda,
         CASE
-          WHEN LOWER(TRIM(COALESCE(`tiene_cotizacion`,''))) IN ('si','1','true','con danos')
-            OR LOWER(TRIM(COALESCE(`encontro_danos`,''))) IN ('si','1','true','con danos')
-          THEN 'Si' ELSE COALESCE(`encontro_danos`,'')
+          WHEN {$damageExpr}
+          THEN 'Si' ELSE {$damageDisplayExpr}
         END AS se_encontraron_danos
       FROM `{$tabla}` WHERE {$whereStr}
       ORDER BY `cct_created` DESC LIMIT ? OFFSET ?";
@@ -254,10 +262,16 @@ trait PreventiveQueryConcern
         'total'          => $total,
         'abiertos'       => $total,
         'cerrados'       => 0,
-        'con_cotizacion' => $conDanos,
-        'sin_cotizacion' => max(0, $total - $conDanos),
-        'con_revision'   => $conEnviada,
-        'sin_revision'   => max(0, $total - $conEnviada),
+        'con_cotizacion' => $conCotizacion,
+        'sin_cotizacion' => max(0, $total - $conCotizacion),
+        'con_revision'   => $total,
+        'sin_revision'   => 0,
+        'danos_si' => $conDanos,
+        'danos_no' => $sinDanos,
+        'magnitud_critico' => (int) ($statRow['magnitud_critico'] ?? 0),
+        'magnitud_alto' => (int) ($statRow['magnitud_alto'] ?? 0),
+        'magnitud_medio' => (int) ($statRow['magnitud_medio'] ?? 0),
+        'magnitud_bajo' => (int) ($statRow['magnitud_bajo'] ?? 0),
       ],
       'pagination' => [
         'page'        => $page,
@@ -266,6 +280,69 @@ trait PreventiveQueryConcern
         'total_pages' => $totalPages,
       ],
     ];
+  }
+
+  private function preventiveCotizacionExistsExpression(string $tabla, string $cotTabla): string
+  {
+    if (!$this->table_exists($cotTabla) || !$this->column_exists($cotTabla, 'id_ticket')) {
+      return '0';
+    }
+
+    $joinParts = [];
+    if ($this->column_exists($tabla, 'id_ticket')) {
+      $joinParts[] = "TRIM(COALESCE(cot_stats.`id_ticket`, '')) = TRIM(COALESCE(`{$tabla}`.`id_ticket`, ''))";
+    }
+    if ($this->column_exists($tabla, '_ID')) {
+      $joinParts[] = "TRIM(COALESCE(cot_stats.`id_ticket`, '')) = CAST(`{$tabla}`.`_ID` AS CHAR)";
+    }
+
+    if ($joinParts === []) {
+      return '0';
+    }
+
+    return "EXISTS (
+      SELECT 1
+      FROM `{$cotTabla}` cot_stats
+      WHERE TRIM(COALESCE(cot_stats.`id_ticket`, '')) <> ''
+        AND (" . implode(' OR ', $joinParts) . ')
+    )';
+  }
+
+  /**
+   * @param array<int,string> $columns
+   * @param array<int,string> $values
+   */
+  private function preventiveTruthyExpression(string $tabla, array $columns, array $values): string
+  {
+    $parts = [];
+    $quotedValues = array_map(static function (string $value): string {
+      return "'" . str_replace("'", "''", $value) . "'";
+    }, $values);
+    $valueSql = implode(', ', $quotedValues);
+
+    foreach ($columns as $column) {
+      if ($this->column_exists($tabla, $column)) {
+        $parts[] = "LOWER(TRIM(COALESCE(`{$column}`, ''))) IN ({$valueSql})";
+      }
+    }
+
+    return $parts === [] ? '0' : '(' . implode(' OR ', $parts) . ')';
+  }
+
+  /**
+   * @param array<int,string> $columns
+   */
+  private function preventiveFirstValueExpression(string $tabla, array $columns): string
+  {
+    $parts = [];
+    foreach ($columns as $column) {
+      if ($this->column_exists($tabla, $column)) {
+        $parts[] = "NULLIF(TRIM(COALESCE(`{$column}`, '')), '')";
+      }
+    }
+    $parts[] = "''";
+
+    return 'COALESCE(' . implode(', ', $parts) . ')';
   }
 
   /**

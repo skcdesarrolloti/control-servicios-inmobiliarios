@@ -263,22 +263,10 @@ trait MaintenanceQueriesConcern
     }
 
     if ($filters['fRevision'] !== '') {
-      $revFilter = trim((string) $filters['fRevision']);
-      if ($revFilter === 'has') {
-        $where[] = "(TRIM(COALESCE(t.id_revision_preventiva, '')) <> '' OR TRIM(COALESCE(t.id_revision_correctiva, '')) <> '')";
-      } elseif ($revFilter === 'none') {
-        $where[] = "(TRIM(COALESCE(t.id_revision_preventiva, '')) = '' AND TRIM(COALESCE(t.id_revision_correctiva, '')) = '')";
-      } elseif ($revFilter === 'prev') {
-        $where[] = "TRIM(COALESCE(t.id_revision_preventiva, '')) <> ''";
-      } elseif ($revFilter === 'corr') {
-        $where[] = "TRIM(COALESCE(t.id_revision_correctiva, '')) <> ''";
-      } elseif (strpos($revFilter, 'state:') === 0) {
-        $state = strtolower(trim(substr($revFilter, 6)));
-        if ($state !== '') {
-          $where[] = "(LOWER(TRIM(COALESCE(t.estado_rev_preventiva, ''))) = %s OR LOWER(TRIM(COALESCE(t.estado_rev_correctiva, ''))) = %s)";
-          $args[] = $state;
-          $args[] = $state;
-        }
+      [$revisionWhere, $revisionArgs] = $this->maintenanceRevisionFilterWhere(trim((string) $filters['fRevision']), 't');
+      if ($revisionWhere !== '') {
+        $where[] = $revisionWhere;
+        $args = array_merge($args, $revisionArgs);
       }
     }
 
@@ -642,6 +630,129 @@ trait MaintenanceQueriesConcern
     return "EXISTS (SELECT 1 FROM `{$cotTable}` cot_exists WHERE " . implode(' OR ', $joinParts) . ')';
   }
 
+  private function maintenanceRevisionExistsExpression(string $alias = 't', string $type = 'any'): string
+  {
+    $table = $this->ticketsTable();
+    $parts = [];
+
+    if (($type === 'any' || $type === 'prev') && $this->schema->columnExists($table, 'id_revision_preventiva')) {
+      $parts[] = "TRIM(COALESCE({$alias}.`id_revision_preventiva`, '')) <> ''";
+    }
+    if (($type === 'any' || $type === 'corr') && $this->schema->columnExists($table, 'id_revision_correctiva')) {
+      $parts[] = "TRIM(COALESCE({$alias}.`id_revision_correctiva`, '')) <> ''";
+    }
+
+    if ($type === 'any' || $type === 'prev') {
+      $relatedPrev = $this->maintenanceRelatedRevisionExistsExpression('jet_cct_revision_preventiva', 'rev_prev_exists', $alias);
+      if ($relatedPrev !== '') {
+        $parts[] = $relatedPrev;
+      }
+    }
+    if ($type === 'any' || $type === 'corr') {
+      $relatedCorr = $this->maintenanceRelatedRevisionExistsExpression('jet_cct_revision_correctiva', 'rev_corr_exists', $alias);
+      if ($relatedCorr !== '') {
+        $parts[] = $relatedCorr;
+      }
+    }
+
+    return $parts === [] ? '0 = 1' : '(' . implode(' OR ', $parts) . ')';
+  }
+
+  private function maintenanceRelatedRevisionExistsExpression(string $tableName, string $revisionAlias, string $ticketAlias): string
+  {
+    $ticketTable = $this->ticketsTable();
+    $revisionTable = $this->db->table($tableName);
+    if (!$this->schema->tableExists($revisionTable) || !$this->schema->columnExists($revisionTable, 'id_ticket')) {
+      return '';
+    }
+
+    $joinParts = [
+      "TRIM(COALESCE({$revisionAlias}.`id_ticket`, '')) = CAST({$ticketAlias}.`_ID` AS CHAR)",
+    ];
+    if ($this->schema->columnExists($ticketTable, 'id_ticket')) {
+      $joinParts[] = "(TRIM(COALESCE({$ticketAlias}.`id_ticket`, '')) <> '' AND TRIM(COALESCE({$revisionAlias}.`id_ticket`, '')) = TRIM(COALESCE({$ticketAlias}.`id_ticket`, '')))";
+    }
+
+    return "EXISTS (
+      SELECT 1
+      FROM `{$revisionTable}` {$revisionAlias}
+      WHERE TRIM(COALESCE({$revisionAlias}.`id_ticket`, '')) <> ''
+        AND (" . implode(' OR ', $joinParts) . ')
+    )';
+  }
+
+  /**
+   * @return array{0:string,1:array<int,string>}
+   */
+  private function maintenanceRevisionFilterWhere(string $filter, string $alias = 't'): array
+  {
+    if ($filter === 'has') {
+      return [$this->maintenanceRevisionExistsExpression($alias, 'any'), []];
+    }
+    if ($filter === 'none') {
+      return ['NOT (' . $this->maintenanceRevisionExistsExpression($alias, 'any') . ')', []];
+    }
+    if ($filter === 'prev') {
+      return [$this->maintenanceRevisionExistsExpression($alias, 'prev'), []];
+    }
+    if ($filter === 'corr') {
+      return [$this->maintenanceRevisionExistsExpression($alias, 'corr'), []];
+    }
+    if (strpos($filter, 'state:') !== 0) {
+      return ['', []];
+    }
+
+    $state = strtolower(trim(substr($filter, 6)));
+    if ($state === '') {
+      return ['', []];
+    }
+
+    $table = $this->ticketsTable();
+    $parts = [];
+    $args = [];
+    foreach (['estado_rev_preventiva', 'estado_revision_preventiva', 'estado_rev_correctiva', 'estado_revision_correctiva'] as $column) {
+      if ($this->schema->columnExists($table, $column)) {
+        $parts[] = "LOWER(TRIM(COALESCE({$alias}.`{$column}`, ''))) = %s";
+        $args[] = $state;
+      }
+    }
+
+    foreach ([
+      ['jet_cct_revision_preventiva', 'rev_prev_state', ['estado_rev_preventiva', 'estado_revision_preventiva', 'estado']],
+      ['jet_cct_revision_correctiva', 'rev_corr_state', ['estado_rev_correctiva', 'estado_revision_correctiva', 'estado']],
+    ] as [$tableName, $revisionAlias, $stateColumns]) {
+      $revisionTable = $this->db->table($tableName);
+      if (!$this->schema->tableExists($revisionTable) || !$this->schema->columnExists($revisionTable, 'id_ticket')) {
+        continue;
+      }
+      $stateParts = [];
+      foreach ($stateColumns as $column) {
+        if ($this->schema->columnExists($revisionTable, $column)) {
+          $stateParts[] = "LOWER(TRIM(COALESCE({$revisionAlias}.`{$column}`, ''))) = %s";
+          $args[] = $state;
+        }
+      }
+      if ($stateParts === []) {
+        continue;
+      }
+      $joinParts = [
+        "TRIM(COALESCE({$revisionAlias}.`id_ticket`, '')) = CAST({$alias}.`_ID` AS CHAR)",
+      ];
+      if ($this->schema->columnExists($table, 'id_ticket')) {
+        $joinParts[] = "(TRIM(COALESCE({$alias}.`id_ticket`, '')) <> '' AND TRIM(COALESCE({$revisionAlias}.`id_ticket`, '')) = TRIM(COALESCE({$alias}.`id_ticket`, '')))";
+      }
+      $parts[] = 'EXISTS (
+        SELECT 1
+        FROM `' . $revisionTable . '` ' . $revisionAlias . "
+        WHERE TRIM(COALESCE({$revisionAlias}.`id_ticket`, '')) <> ''
+          AND (" . implode(' OR ', $joinParts) . ')
+          AND (' . implode(' OR ', $stateParts) . ')
+      )';
+    }
+
+    return $parts === [] ? ['1 = 0', []] : ['(' . implode(' OR ', $parts) . ')', $args];
+  }
+
   private function maintenanceWebOriginExpression(string $alias = 't'): string
   {
     $table = $this->ticketsTable();
@@ -685,13 +796,9 @@ trait MaintenanceQueriesConcern
       : "COALESCE({$updatedExpr}, {$fechaExpr})";
     $closedExpr = $this->maintenanceClosedExpr('t');
     $cotExpr = $this->maintenanceCotizacionExistsExpression('t');
-    $prevExpr = $this->schema->columnExists($table, 'id_revision_preventiva')
-      ? "TRIM(COALESCE(t.`id_revision_preventiva`, '')) <> ''"
-      : '0';
-    $corrExpr = $this->schema->columnExists($table, 'id_revision_correctiva')
-      ? "TRIM(COALESCE(t.`id_revision_correctiva`, '')) <> ''"
-      : '0';
-    $revisionExpr = "({$prevExpr} OR {$corrExpr})";
+    $prevExpr = $this->maintenanceRevisionExistsExpression('t', 'prev');
+    $corrExpr = $this->maintenanceRevisionExistsExpression('t', 'corr');
+    $revisionExpr = $this->maintenanceRevisionExistsExpression('t', 'any');
     $magnitudExpr = $this->schema->columnExists($table, 'magnitud_caso')
       ? "LOWER(TRIM(COALESCE(t.`magnitud_caso`, '')))"
       : "''";

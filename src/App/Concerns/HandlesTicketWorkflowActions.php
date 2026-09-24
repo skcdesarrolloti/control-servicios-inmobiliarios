@@ -406,23 +406,7 @@ trait HandlesTicketWorkflowActions
     $module = $this->get_servicios_inmobiliarios_module();
     if ($module instanceof \SCM\Modules\ServiciosInmobiliarios\ServiciosInmobiliariosModule) {
       $params = $module->parseParams($_POST);
-      $statsOverride = null;
-      $statFilterKeys = array_diff(array_keys($params), ['fPage', 'fPerPage']);
-      $hasStatFilters = false;
-      foreach ($statFilterKeys as $filterKey) {
-        if (trim((string) ($params[$filterKey] ?? '')) !== '') {
-          $hasStatFilters = true;
-          break;
-        }
-      }
-      if (!$hasStatFilters) {
-        $cachedMetrics = $this->readDashboardPerformanceCache('dashboard-metrics-v2', 900);
-        $cachedMaintenance = is_array($cachedMetrics['detalle_por_categoria']['mantenimiento'] ?? null)
-          ? $cachedMetrics['detalle_por_categoria']['mantenimiento']
-          : [];
-        $statsOverride = $cachedMaintenance;
-      }
-      $result = $module->run($params, $config, '', $statsOverride);
+      $result = $module->run($params, $config);
       $stats  = is_array($result['stats'] ?? null) ? $result['stats'] : [];
 
       $payload = [
