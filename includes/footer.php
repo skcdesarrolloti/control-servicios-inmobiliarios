@@ -145,8 +145,14 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
 
           // Si no está en el DOM actual, navegar a la pestaña adecuada
           const isMine = item.getAttribute('data-scm-notif-is-mine') === '1';
-          const targetTab = isMine ? 'mis_tickets' : 'abiertos';
-          window.location.href = appBaseUrl + '/index.php?tab=' + targetTab + '&ticket=' + encodeURIComponent(logicalId);
+          const subtab = item.getAttribute('data-scm-notif-subtab') || '';
+          let targetUrl = appBaseUrl + '/index.php?';
+          if (isMine) {
+            targetUrl += 'tab=mis_tickets&ticket=' + encodeURIComponent(logicalId);
+          } else {
+            targetUrl += 'tab=abiertos' + (subtab ? '&scm_tab=' + encodeURIComponent(subtab) : '') + '&ticket=' + encodeURIComponent(logicalId);
+          }
+          window.location.href = targetUrl;
         });
       }
 

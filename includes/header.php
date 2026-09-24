@@ -50,7 +50,7 @@ $isologoUrl = function_exists('system_image')
 $defaultAvatar = $isologoUrl !== '' ? $isologoUrl : ($baseUrl . '/assets/img/cropped-ISOLOGO-WEB.png');
 $userAvatar = !empty($user_avatar) ? (string)$user_avatar : $defaultAvatar;
 
-// Resolver notificaciones operativas recientes (casos nuevos, pendientes, etc.)
+// Resolver notificaciones operativas recientes (casos nuevos, pendientes del área de servicios inmobiliarios)
 $operationalNotifications = [];
 $unreadNotifCount = 0;
 if (class_exists('\SCM\Core\App')) {
@@ -59,11 +59,46 @@ if (class_exists('\SCM\Core\App')) {
     $ticketsTable = $notifDb->table('jet_cct_tickets');
     $currentEmployeeId = class_exists('\SCM\Core\Auth') ? \SCM\Core\Auth::employeeId() : '';
 
+    $whereOperational = "LOWER(TRIM(COALESCE(`estado`, ''))) IN ('nuevo', 'en proceso')
+      AND LOWER(TRIM(COALESCE(`estado_administrativo`, ''))) NOT IN ('cerrado', 'resuelto', 'finalizado', 'desistido')
+      AND LOWER(TRIM(COALESCE(`departamento`, ''))) != 'servicio al cliente'
+      AND (
+        `departamento` IN ('Servicio al arrendatario', 'Servicio al propietario')
+        OR LOWER(TRIM(COALESCE(`departamento`, ''))) = 'mantenimiento'
+        OR LOWER(COALESCE(`tema_ayuda`, '')) LIKE '%reparacion%'
+        OR LOWER(COALESCE(`tema_ayuda`, '')) LIKE '%mantenimiento%'
+        OR LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) IN (
+          'entrega de inmuebles',
+          'recibo de inmuebles',
+          'revision preventiva',
+          'revisiones preventiva',
+          'revisiones preventivas',
+          'contable y tributaria',
+          'certificaciones tributarias',
+          'solicitud contractual',
+          'solicitud de servicios publicos',
+          'solicitud de servicios públicos',
+          'procesos juridicos',
+          'procesos jurídicos',
+          'retencion de contrato',
+          'retención de contrato',
+          'otros servicios'
+        )
+      )
+      AND LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) NOT IN (
+        'arriendo', 'captacion', 'venta', 'recaptacion', 'ruta', 'actualizacion', 'arriendo o venta', 'retoque'
+      )";
+
+    $countRes = $notifDb->getResults("SELECT COUNT(*) AS total FROM `{$ticketsTable}` WHERE {$whereOperational}");
+    if (!empty($countRes[0]['total'])) {
+      $unreadNotifCount = (int) $countRes[0]['total'];
+    }
+
     $recentTickets = $notifDb->getResults(
-      "SELECT `_ID`, `id_ticket`, `asunto`, `estado`, `estado_administrativo`, 
+      "SELECT `_ID`, `id_ticket`, `asunto`, `departamento`, `tema_ayuda`, `estado`, `estado_administrativo`, 
               `nombre_empleado`, `id_empleado`, `cct_created`, `cct_modified`
          FROM `{$ticketsTable}`
-        WHERE `estado` NOT IN ('Cerrado', 'Resuelto')
+        WHERE {$whereOperational}
         ORDER BY `_ID` DESC
         LIMIT 8"
     );
@@ -78,6 +113,8 @@ if (class_exists('\SCM\Core\App')) {
         $emp = trim((string) ($tRow['nombre_empleado'] ?? ''));
         $empId = trim((string) ($tRow['id_empleado'] ?? ''));
         $created = trim((string) ($tRow['cct_created'] ?? ''));
+        $tema = trim((string) ($tRow['tema_ayuda'] ?? ''));
+        $depto = trim((string) ($tRow['departamento'] ?? ''));
 
         $isMine = ($currentEmployeeId !== '' && $empId === $currentEmployeeId);
         $isUnassigned = ($empId === '' || $empId === '0');
@@ -100,7 +137,43 @@ if (class_exists('\SCM\Core\App')) {
           }
         }
 
-        $typeLabel = 'Nuevo caso';
+        $topicKey = mb_strtolower($tema, 'UTF-8');
+        $deptoKey = mb_strtolower($depto, 'UTF-8');
+        $subtab = 'mant';
+        $icon = 'build';
+        $areaLabel = 'Mantenimiento';
+
+        if (str_contains($topicKey, 'reparacion') || str_contains($topicKey, 'mejora') || str_contains($topicKey, 'mantenimiento') || $deptoKey === 'mantenimiento') {
+          $subtab = 'mant';
+          $icon = 'build';
+          $areaLabel = 'Mantenimiento';
+        } elseif (str_contains($topicKey, 'preventiva')) {
+          $subtab = 'preventiva';
+          $icon = 'verified';
+          $areaLabel = 'Preventiva';
+        } elseif (str_contains($topicKey, 'entrega')) {
+          $subtab = 'entrega';
+          $icon = 'key';
+          $areaLabel = 'Entrega';
+        } elseif (str_contains($topicKey, 'recibo')) {
+          $subtab = 'recibo';
+          $icon = 'home_pin';
+          $areaLabel = 'Recibo';
+        } elseif (str_contains($topicKey, 'certificacion')) {
+          $subtab = 'certificaciones';
+          $icon = 'verified_user';
+          $areaLabel = 'Certificaciones';
+        } elseif (str_contains($topicKey, 'contable')) {
+          $subtab = 'contable';
+          $icon = 'receipt_long';
+          $areaLabel = 'Contable';
+        } elseif (str_contains($topicKey, 'juridic') || str_contains($topicKey, 'contractual') || str_contains($topicKey, 'servicios public') || str_contains($topicKey, 'retencion')) {
+          $subtab = 'contractual';
+          $icon = 'gavel';
+          $areaLabel = 'Contractual';
+        }
+
+        $typeLabel = 'Nuevo';
         $badgeClass = 'bg-blue-50 text-blue-700 border-blue-200';
         if ($isUnassigned) {
           $typeLabel = 'Sin asignar';
@@ -108,12 +181,19 @@ if (class_exists('\SCM\Core\App')) {
         } elseif ($isMine) {
           $typeLabel = 'Tu caso';
           $badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        } elseif ($stAdmin !== '') {
+          $typeLabel = $stAdmin;
         }
 
         $operationalNotifications[] = [
           'pk' => $pk,
           'id' => $logical,
           'asunto' => $subject,
+          'tema' => $tema,
+          'departamento' => $depto,
+          'subtab' => $subtab,
+          'icon' => $icon,
+          'area_label' => $areaLabel,
           'estado' => $st,
           'estado_admin' => $stAdmin,
           'empleado' => $emp,
@@ -129,7 +209,9 @@ if (class_exists('\SCM\Core\App')) {
     $operationalNotifications = [];
   }
 }
-$unreadNotifCount = count($operationalNotifications);
+if ($unreadNotifCount === 0 && !empty($operationalNotifications)) {
+  $unreadNotifCount = count($operationalNotifications);
+}
 
 $isStandalone = !empty($standalone_function);
 
@@ -835,17 +917,23 @@ foreach ($rawNavItems as $k => $item) {
                       data-scm-notif-ticket="<?php echo htmlspecialchars((string)$notif['pk'], ENT_QUOTES, 'UTF-8'); ?>"
                       data-scm-notif-logical="<?php echo htmlspecialchars((string)$notif['id'], ENT_QUOTES, 'UTF-8'); ?>"
                       data-scm-notif-is-mine="<?php echo $notif['is_mine'] ? '1' : '0'; ?>"
+                      data-scm-notif-subtab="<?php echo htmlspecialchars((string)$notif['subtab'], ENT_QUOTES, 'UTF-8'); ?>"
                       class="w-full text-left p-3 hover:bg-slate-50 transition-colors flex items-start gap-3 group focus:outline-none focus:bg-slate-50"
                       role="menuitem"
                     >
                       <div class="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5 group-hover:border-blue-300 group-hover:bg-blue-50 transition-colors">
-                        <span class="material-symbols-outlined text-[18px] text-slate-500 group-hover:text-blue-600">inbox</span>
+                        <span class="material-symbols-outlined text-[18px] text-slate-500 group-hover:text-blue-600"><?php echo htmlspecialchars($notif['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
                       </div>
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between gap-1.5 mb-1">
-                          <span class="text-[11px] font-bold text-slate-900 truncate">
-                            Caso #<?php echo htmlspecialchars($notif['id'], ENT_QUOTES, 'UTF-8'); ?>
-                          </span>
+                          <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="text-[11px] font-bold text-slate-900 shrink-0">
+                              Caso #<?php echo htmlspecialchars($notif['id'], ENT_QUOTES, 'UTF-8'); ?>
+                            </span>
+                            <span class="text-[10px] font-medium text-slate-400 truncate">
+                              • <?php echo htmlspecialchars($notif['area_label'], ENT_QUOTES, 'UTF-8'); ?>
+                            </span>
+                          </div>
                           <span class="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded border <?php echo $notif['badge_class']; ?>">
                             <?php echo htmlspecialchars($notif['type_label'], ENT_QUOTES, 'UTF-8'); ?>
                           </span>
