@@ -3231,6 +3231,14 @@
   font-weight: 700;
 }
 
+#scm-app .scm-home-calendar .scm-calendar-day-pill--tarea {
+  border-left-color: #2563eb !important;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-day-pill--recordatorio {
+  border-left-color: #7c3aed !important;
+}
+
 #scm-app .scm-home-calendar .scm-calendar-day-card {
   top: 14px;
 }
@@ -3408,6 +3416,106 @@
   margin-top: 0;
 }
 
+#scm-app .scm-calendar-layer-filters {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+#scm-app .scm-calendar-layer-group {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+#scm-app .scm-calendar-layer-group--scope {
+  border-right: 1px solid #e2e8f0;
+  padding-right: 10px;
+}
+
+#scm-app .scm-calendar-layer-chip {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dbe6f2;
+  border-radius: 999px;
+  color: #334155;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 850;
+  gap: 7px;
+  line-height: 1;
+  min-height: 34px;
+  padding: 7px 11px !important;
+  position: relative;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+#scm-app .scm-calendar-layer-chip input {
+  appearance: none;
+  border: 0;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+#scm-app .scm-calendar-layer-chip .material-symbols-outlined {
+  color: #64748b;
+  font-size: 17px;
+  transition: color 160ms ease;
+}
+
+#scm-app .scm-calendar-layer-chip strong {
+  font: inherit;
+}
+
+#scm-app .scm-calendar-layer-chip:hover,
+#scm-app .scm-calendar-layer-chip:focus-within {
+  background: #f8fafc;
+  border-color: #b6c6da;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+}
+
+#scm-app .scm-calendar-layer-chip:has(input:checked) {
+  background: #0f1e36;
+  border-color: #0f1e36;
+  box-shadow: 0 8px 18px rgba(15, 30, 54, 0.16);
+  color: #ffffff;
+}
+
+#scm-app .scm-calendar-layer-chip:has(input:checked) .material-symbols-outlined {
+  color: #ffffff;
+}
+
+#scm-app .scm-calendar-layer-chip--event:has(input:checked) {
+  background: #ea580c;
+  border-color: #ea580c;
+}
+
+#scm-app .scm-calendar-layer-chip--task:has(input:checked) {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+#scm-app .scm-calendar-layer-chip--reminder:has(input:checked) {
+  background: #7c3aed;
+  border-color: #7c3aed;
+}
+
+#scm-app .scm-calendar-layer-chip--done:has(input:checked) {
+  background: #047857;
+  border-color: #047857;
+}
+
 #scm-app .scm-home-calendar .scm-calendar-filter-btn {
   align-items: center;
   border-radius: 11px;
@@ -3575,6 +3683,17 @@
 }
 
 @media (max-width: 1100px) {
+  #scm-app .scm-calendar-layer-filters {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-calendar-layer-group--scope {
+    border-right: 0;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 10px;
+    padding-right: 0;
+  }
+
   #scm-app .scm-calendar-due-settings-form {
     grid-template-columns: repeat(2, minmax(180px, 1fr));
   }

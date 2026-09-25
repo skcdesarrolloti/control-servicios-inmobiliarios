@@ -2411,6 +2411,44 @@ trait RendersDashboard
             <div class="scm-field"><label>Categor&iacute;a del evento</label><select class="select select-bordered select-sm scm-select" name="id_categoria" data-scm-calendar-filter-categories><option value="">Todas las categor&iacute;as</option></select></div>
             <div class="scm-field"><label>Estado de gesti&oacute;n</label><select class="select select-bordered select-sm scm-select" name="estado"><option value="" selected>Realizados y Agendados</option><option value="No">Pendientes</option><option value="Si">Realizados</option></select></div>
           </div>
+          <div class="scm-calendar-layer-filters" data-scm-calendar-layer-filters aria-label="Filtros de calendario">
+            <div class="scm-calendar-layer-group scm-calendar-layer-group--scope" role="radiogroup" aria-label="Alcance">
+              <label class="scm-calendar-layer-chip">
+                <input type="radio" name="calendar_scope" value="mine" <?php echo $mode === 'personal' ? 'checked' : ''; ?>>
+                <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+                <strong>Mi calendario</strong>
+              </label>
+              <?php if ($mode !== 'personal'): ?>
+              <label class="scm-calendar-layer-chip">
+                <input type="radio" name="calendar_scope" value="team" checked>
+                <span class="material-symbols-outlined" aria-hidden="true">groups</span>
+                <strong>Equipo</strong>
+              </label>
+              <?php endif; ?>
+            </div>
+            <div class="scm-calendar-layer-group" aria-label="Capas visibles">
+              <label class="scm-calendar-layer-chip scm-calendar-layer-chip--event">
+                <input type="checkbox" name="item_type" value="evento" checked>
+                <span class="material-symbols-outlined" aria-hidden="true">event</span>
+                <strong>Eventos</strong>
+              </label>
+              <label class="scm-calendar-layer-chip scm-calendar-layer-chip--task">
+                <input type="checkbox" name="item_type" value="tarea" checked>
+                <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
+                <strong>Tareas</strong>
+              </label>
+              <label class="scm-calendar-layer-chip scm-calendar-layer-chip--reminder">
+                <input type="checkbox" name="item_type" value="recordatorio" checked>
+                <span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>
+                <strong>Recordatorios</strong>
+              </label>
+              <label class="scm-calendar-layer-chip scm-calendar-layer-chip--done">
+                <input type="checkbox" name="show_completed" value="1" checked>
+                <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                <strong>Completadas</strong>
+              </label>
+            </div>
+          </div>
           <div class="scm-actions">
             <button class="scm-calendar-filter-btn scm-calendar-filter-btn--primary" type="submit"><span class="material-symbols-outlined" aria-hidden="true">filter_alt</span><span>Filtrar</span></button>
             <button class="scm-calendar-filter-btn scm-calendar-filter-btn--ghost" type="button" data-scm-calendar-clear>Limpiar</button>

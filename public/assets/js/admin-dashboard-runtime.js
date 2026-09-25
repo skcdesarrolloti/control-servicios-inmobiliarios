@@ -1403,6 +1403,7 @@
       var lockCurrentEmployee = panel.getAttribute("data-calendar-lock-current") === "1" || calendarMode === "personal";
 
       var filterForm = panel.querySelector("[data-scm-calendar-filters]");
+      var layerFilterForm = panel.querySelector("[data-scm-calendar-layer-filters]");
       var dueSettingsForm = panel.querySelector("[data-scm-calendar-due-settings]");
       var dueTypeFilterForm = panel.querySelector("[data-scm-calendar-due-type-filter]");
       var dueBreakdownWrap = panel.querySelector("[data-scm-calendar-due-breakdown]");
@@ -1436,6 +1437,7 @@
       var categoriesById = {};
       var currentMonth = startOfMonth(new Date());
       var selectedDay = toDateKey(new Date());
+      var calendarEventsRaw = [];
       var calendarEvents = [];
       var calendarDueAllEvents = [];
       var calendarDueSummaryGroups = [];
@@ -1946,6 +1948,75 @@
         });
       }
 
+      function activeCalendarScope() {
+        if (lockCurrentEmployee) return "mine";
+        var checked = layerFilterForm ? layerFilterForm.querySelector('input[name="calendar_scope"]:checked') : null;
+        return checked ? String(checked.value || "team") : (calendarMode === "personal" ? "mine" : "team");
+      }
+
+      function activeCalendarTypes() {
+        if (!layerFilterForm) return ["evento", "tarea", "recordatorio"];
+        return Array.prototype.slice.call(layerFilterForm.querySelectorAll('input[name="item_type"]:checked'))
+          .map(function (input) { return String(input.value || "").trim(); })
+          .filter(Boolean);
+      }
+
+      function calendarShowsCompleted() {
+        var input = layerFilterForm ? layerFilterForm.querySelector('input[name="show_completed"]') : null;
+        return !input || input.checked;
+      }
+
+      function setEmployeeFilterValue(value) {
+        var employeeField = filterForm ? filterForm.querySelector('[name="id_empleado"]') : null;
+        if (!employeeField) return;
+        employeeField.value = String(value || "");
+      }
+
+      function syncCalendarLayerScope() {
+        if (!layerFilterForm || !currentCalendarEmployeeId) return;
+        var scope = activeCalendarScope();
+        if (scope === "mine") {
+          setEmployeeFilterValue(currentCalendarEmployeeId);
+        } else if (!lockCurrentEmployee && calendarMode !== "personal") {
+          var employeeField = filterForm ? filterForm.querySelector('[name="id_empleado"]') : null;
+          if (employeeField && String(employeeField.value || "") === currentCalendarEmployeeId) {
+            employeeField.value = "";
+          }
+        }
+      }
+
+      function rowMatchesCalendarLayers(row) {
+        var types = activeCalendarTypes();
+        var kind = calendarItemKind(row);
+        if (types.indexOf(kind) === -1) return false;
+        if (!calendarShowsCompleted() && calendarItemIsDone(row)) return false;
+        if (activeCalendarScope() === "mine" && currentCalendarEmployeeId) {
+          return getEventEmployeeId(row) === currentCalendarEmployeeId;
+        }
+        return true;
+      }
+
+      function visibleCalendarItemWord(count) {
+        var types = activeCalendarTypes();
+        if (types.length === 1) {
+          if (types[0] === "tarea") return count === 1 ? " tarea" : " tareas";
+          if (types[0] === "recordatorio") return count === 1 ? " recordatorio" : " recordatorios";
+          return count === 1 ? " evento" : " eventos";
+        }
+        return count === 1 ? " item" : " items";
+      }
+
+      function applyCalendarLayerFilters() {
+        if (isDueCalendar) return;
+        calendarEvents = calendarEventsRaw.filter(rowMatchesCalendarLayers);
+        calendarDueStats = null;
+        renderKpis(calendarEvents);
+        updateFilterCategories(calendarEventsRaw);
+        renderCalendarGrid();
+        renderSelectedDay();
+        renderUpcoming();
+      }
+
       function updateFilterCategories(rows) {
         var select = filterForm ? filterForm.querySelector("[data-scm-calendar-filter-categories]") : null;
         if (!select) return;
@@ -2204,9 +2275,9 @@
         var dayRows = calendarEvents.filter(function (row) { return eventDateKey(row) === selectedDay; });
         var holiday = holidayForDateKey(selectedDay);
         if (dayTitleEl) dayTitleEl.textContent = calendarDayTitle(selectedDay);
-        if (daySubtitleEl) daySubtitleEl.textContent = (holiday ? "Festivo Colombia: " + holiday + ". " : "") + (dayRows.length ? dayRows.length + (isDueCalendar ? " vencimiento(s) para este dia." : " evento(s) para este dia.") : (isDueCalendar ? "Sin vencimientos para este dia." : "Sin eventos para este dia."));
+        if (daySubtitleEl) daySubtitleEl.textContent = (holiday ? "Festivo Colombia: " + holiday + ". " : "") + (dayRows.length ? dayRows.length + (isDueCalendar ? " vencimiento(s) para este dia." : visibleCalendarItemWord(dayRows.length) + " para este dia.") : (isDueCalendar ? "Sin vencimientos para este dia." : "Sin items para este dia."));
         if (!eventsWrap) return;
-        eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<div class="scm-calendar-empty-day"><span class="material-symbols-outlined">event_busy</span><strong>' + (isDueCalendar ? "Sin vencimientos para este día" : "Sin eventos para este día") + '</strong><p>' + (isDueCalendar ? "No hay controles vencidos o pendientes en la fecha seleccionada." : "Tu agenda está libre para este día. Puedes coordinar revisiones o citas.") + "</p></div>";
+        eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<div class="scm-calendar-empty-day"><span class="material-symbols-outlined">event_busy</span><strong>' + (isDueCalendar ? "Sin vencimientos para este día" : "Sin items para este día") + '</strong><p>' + (isDueCalendar ? "No hay controles vencidos o pendientes en la fecha seleccionada." : "No hay elementos visibles con los filtros activos.") + "</p></div>";
       }
 
       function openCreateEventWithDefaults(defaults) {
@@ -2667,9 +2738,9 @@
           html += '<button type="button" class="' + classes + '" data-scm-calendar-day="' + escHtml(key) + '">';
           html += '<span class="scm-calendar-day-number">' + String(cellDate.getDate()) + "</span>";
           if (holiday) html += '<span class="scm-calendar-day-holiday">Festivo · ' + escHtml(holiday) + "</span>";
-          html += '<span class="scm-calendar-day-events-count">' + (dayEvents.length ? dayEvents.length + (isDueCalendar ? " venc." : " evento(s)") : "") + "</span>";
+          html += '<span class="scm-calendar-day-events-count">' + (dayEvents.length ? dayEvents.length + (isDueCalendar ? " venc." : visibleCalendarItemWord(dayEvents.length)) : "") + "</span>";
           dayEvents.slice(0, 3).forEach(function (row) {
-            html += '<span class="scm-calendar-day-pill" style="border-color:' + escHtml(row.color || "#f59e0b") + '">' + escHtml(row.titulo || "Evento") + "</span>";
+            html += '<span class="scm-calendar-day-pill scm-calendar-day-pill--' + escHtml(calendarItemKind(row)) + '" style="border-color:' + escHtml(row.color || "#f59e0b") + '">' + escHtml(row.titulo || calendarItemKindLabel(row)) + "</span>";
           });
           if (dayEvents.length > 3) html += '<span class="scm-calendar-day-more">+' + (dayEvents.length - 3) + " mas</span>";
           html += "</button>";
@@ -2696,13 +2767,8 @@
       }
 
       function renderEvents(payload) {
-        calendarEvents = filterRowsByAllowedEmployees(extractRows(payload));
-        calendarDueStats = null;
-        renderKpis(calendarEvents);
-        updateFilterCategories(calendarEvents);
-        renderCalendarGrid();
-        renderSelectedDay();
-        renderUpcoming();
+        calendarEventsRaw = filterRowsByAllowedEmployees(extractRows(payload));
+        applyCalendarLayerFilters();
       }
 
       function applyDueSettings(settings) {
@@ -2922,20 +2988,27 @@
         }
         if (spinner) spinner.classList.add("active");
         enforceLockedEmployeeFilter();
+        syncCalendarLayerScope();
         var range = activeCalendarRange();
         var filters = { pagina: 1, limite: 500, fecha_inicio: range.from, fecha_fin: range.to };
         var selectedEmployeeId = "";
+        var scope = activeCalendarScope();
         if (filterForm) {
           var employeeField = filterForm.querySelector('[name="id_empleado"]');
           var categoryField = filterForm.querySelector('[name="id_categoria"]');
           var estadoField = filterForm.querySelector('[name="estado"]');
           selectedEmployeeId = employeeField ? String(employeeField.value || "").trim() : "";
+          if (scope === "mine" && currentCalendarEmployeeId) {
+            selectedEmployeeId = currentCalendarEmployeeId;
+            if (employeeField) employeeField.value = selectedEmployeeId;
+          }
           if (selectedEmployeeId) filters.id_empleado = selectedEmployeeId;
           if (categoryField && categoryField.value) filters.id_categoria = categoryField.value;
           if (estadoField && estadoField.value) filters.estado = estadoField.value;
         }
-        if (!selectedEmployeeId) {
+        if (!selectedEmployeeId && scope !== "team") {
           calendarEvents = [];
+          calendarEventsRaw = [];
           renderKpis(calendarEvents);
           if (monthGrid) monthGrid.innerHTML = '<div class="scm-calendar-loading">Selecciona un funcionario para ver su calendario.</div>';
           if (eventsWrap) eventsWrap.innerHTML = '<div class="scm-empty scm-empty-cards">Este apartado funciona por calendario de funcionario, no como calendario general.</div>';
@@ -4993,10 +5066,25 @@
       if (filterForm) {
         filterForm.addEventListener("submit", function (e) {
           e.preventDefault();
+          syncCalendarLayerScope();
           loadEvents();
         });
         filterForm.querySelectorAll("select, input").forEach(function (field) {
+          if (layerFilterForm && layerFilterForm.contains(field)) return;
           field.addEventListener("change", loadEvents);
+        });
+      }
+
+      if (layerFilterForm) {
+        layerFilterForm.addEventListener("change", function (event) {
+          var field = event.target;
+          var name = field && field.name ? String(field.name) : "";
+          if (name === "calendar_scope") {
+            syncCalendarLayerScope();
+            loadEvents();
+            return;
+          }
+          applyCalendarLayerFilters();
         });
       }
 
@@ -5005,6 +5093,7 @@
         clearBtn.addEventListener("click", function () {
           filterForm.reset();
           enforceLockedEmployeeFilter();
+          syncCalendarLayerScope();
           loadEvents();
         });
       }
