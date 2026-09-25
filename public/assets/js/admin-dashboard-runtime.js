@@ -3532,8 +3532,8 @@
         var locationFieldsHtml = '<section class="scm-calendar-location-section scm-calendar-field-full">' +
           '<div class="scm-calendar-section-heading"><span>Ubicaci&oacute;n del evento</span></div>' +
           '<div class="scm-calendar-location-fields">' +
-          '<input type="hidden" name="ubicacion_tipo" value="contrato">' +
-          '<div class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Buscar contrato o inmueble</span><div class="scm-calendar-contract-controls"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select aria-label="Buscar inmueble o direcci&oacute;n"><option value="">Cargando inmuebles...</option></select></div><small data-calendar-contract-status>Busca y selecciona el inmueble dentro del listado.</small></div>' +
+          '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="contrato">Inmueble / direcci&oacute;n</option><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option><option value="otra">Otra direcci&oacute;n</option></select></label>' +
+          '<div class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Buscar inmueble o direcci&oacute;n</span><div class="scm-calendar-contract-controls"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select aria-label="Buscar inmueble o direcci&oacute;n"><option value="">Cargando inmuebles...</option></select></div><small data-calendar-contract-status>Busca y selecciona el inmueble dentro del listado.</small></div>' +
           '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Se carga desde el inmueble seleccionado"></label>' +
           "</div></section>";
         var html = '<div class="scm-calendar-create-shell">' +
@@ -3600,6 +3600,7 @@
             var dateInput = popup.querySelector('[name="fecha"]');
             var startInput = popup.querySelector('[name="hora_inicio"]');
             var endInput = popup.querySelector('[name="hora_fin"]');
+            var locationTypeSelect = popup.querySelector("[data-calendar-location-type]");
             var contractWrap = popup.querySelector("[data-calendar-contract-wrap]");
             var contractSelect = popup.querySelector("[data-calendar-contract-select]");
             var contractStatus = popup.querySelector("[data-calendar-contract-status]");
@@ -3685,7 +3686,7 @@
               $contract.select2({
                 width: "100%",
                 dropdownParent: window.jQuery(popup),
-                placeholder: "Buscar contrato, inmueble o dirección",
+                placeholder: "Buscar inmueble o direccion",
                 allowClear: true,
                 ajax: {
                   delay: 250,
@@ -3756,6 +3757,29 @@
             }
             function applyLocationType(force) {
               if (!locationInput) return;
+              var type = locationTypeSelect ? String(locationTypeSelect.value || "contrato") : "contrato";
+              var quickLocations = {
+                oficina_corredor: "Oficina Corredor",
+                oficina_manga: "Oficina Manga"
+              };
+              if (quickLocations[type]) {
+                if (contractWrap) contractWrap.hidden = true;
+                locationInput.readOnly = true;
+                locationInput.placeholder = "";
+                locationInput.value = quickLocations[type];
+                locationInput.setAttribute("data-auto-calendar-location", "1");
+                return;
+              }
+              if (type === "otra") {
+                if (contractWrap) contractWrap.hidden = true;
+                locationInput.readOnly = false;
+                locationInput.placeholder = "Escribe la direccion o punto de encuentro";
+                if (force || locationInput.getAttribute("data-auto-calendar-location") === "1") {
+                  locationInput.value = "";
+                }
+                locationInput.setAttribute("data-auto-calendar-location", "0");
+                return;
+              }
               if (contractWrap) contractWrap.hidden = false;
               locationInput.readOnly = true;
               locationInput.placeholder = "Se carga desde el inmueble seleccionado";
@@ -4097,6 +4121,11 @@
             if (locationInput) {
               locationInput.addEventListener("input", function () {
                 locationInput.setAttribute("data-auto-calendar-location", "0");
+              });
+            }
+            if (locationTypeSelect) {
+              locationTypeSelect.addEventListener("change", function () {
+                applyLocationType(true);
               });
             }
             if (contractSelect) {
@@ -11327,6 +11356,17 @@
       return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(number);
     }
 
+    function formatDashboardDateTime(value) {
+      value = String(value || "").trim();
+      if (!value) return "";
+      var date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return new Intl.DateTimeFormat("es-CO", {
+        dateStyle: "medium",
+        timeStyle: "short"
+      }).format(date);
+    }
+
     function dashboardHomePanel() {
       return root.querySelector("#scm-panel-inicio");
     }
@@ -11396,7 +11436,7 @@
       summary = summary || {};
       var host = dashboardHomeSummaryHost(panel);
       var status = panel.querySelector("[data-scm-home-status]");
-      var generatedLabel = generatedAt ? formatDateTime(generatedAt) : "";
+      var generatedLabel = generatedAt ? formatDashboardDateTime(generatedAt) : "";
       if (host) {
         host.innerHTML =
           '<section class="scm-home-hero">' +
