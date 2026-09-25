@@ -2556,6 +2556,7 @@
             start: Number(slot.getAttribute("data-start") || 0),
             end: Number(slot.getAttribute("data-end") || 0),
             dragged: false,
+            dragging: true,
           };
           updateWeekSelection(grid, weekSlotSelection.date, weekSlotSelection.start, weekSlotSelection.end);
           if (slot.setPointerCapture && event.pointerId) {
@@ -2563,7 +2564,7 @@
           }
         });
         grid.addEventListener("pointermove", function (event) {
-          if (!weekSlotSelection) return;
+          if (!weekSlotSelection || !weekSlotSelection.dragging || event.buttons === 0) return;
           var slot = slotFromPoint(grid, event) || slotFromEvent(event);
           if (!slot || slot.getAttribute("data-date") !== weekSlotSelection.date) return;
           var next = weekSelectionFromSlot(slot, Object.assign({}, weekSlotSelection, { dragged: true }));
@@ -2587,8 +2588,8 @@
             renderCalendarGrid();
             return;
           }
-          weekSlotSelection = Object.assign({}, finalSelection, { dragged: false });
           updateWeekSelection(grid, finalSelection.date, finalSelection.start, finalSelection.end);
+          weekSlotSelection = null;
           openWeekQuickPopover(finalSelection, event);
         });
         grid.addEventListener("pointercancel", function () {
