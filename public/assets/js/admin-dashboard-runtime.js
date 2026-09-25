@@ -231,6 +231,7 @@
     var duePopupConfig = runtime.duePopup || {};
     var dashboardDuePopupShown = {};
     var dashboardDuePopupPromise = null;
+    var dashboardDuePopupRestoreAfterCase = false;
     var funcionarioBridgeMode = false;
     try {
       var initialBridgeParams = new URL(window.location.href).searchParams;
@@ -256,9 +257,9 @@
         var tab = String(params.get("tab") || params.get("scm_tab") || "").trim().toLowerCase();
         var subtab = String(params.get("subtab") || params.get("scm_subtab") || "").trim();
         if (tab === "inicio" && subtab === "") return true;
-        return source === "home-tab" && isDashboardHomePanelActive() && subtab === "";
+        return (source === "home-tab" || source === "case-return") && isDashboardHomePanelActive() && subtab === "";
       } catch (_duePopupUrlError) {
-        return source === "home-tab" && isDashboardHomePanelActive();
+        return (source === "home-tab" || source === "case-return") && isDashboardHomePanelActive();
       }
     }
 
@@ -655,6 +656,13 @@
       observer.observe(modal, { attributes: true, attributeFilter: ["class"] });
     }
 
+    function closeDashboardDuePopupForCaseReturn() {
+      dashboardDuePopupRestoreAfterCase = true;
+      if (window.Swal && window.Swal.isVisible && window.Swal.isVisible()) {
+        window.Swal.close();
+      }
+    }
+
     function openDashboardDueCaseFromButton(button, sourceHtml) {
       if (!button || typeof window.scmOpenCase !== "function") return;
       sourceHtml = String(sourceHtml || dashboardDueCaseSourceHtml(button)).trim();
@@ -690,9 +698,7 @@
       if (!button || typeof window.scmOpenCase !== "function") return;
       if (button.getAttribute("data-scm-due-case-loaded") === "1" || !actionAdminDueCase) {
         var loadedSourceHtml = dashboardDueCaseSourceHtml(button);
-        if (window.Swal && window.Swal.isVisible && window.Swal.isVisible()) {
-          window.Swal.close();
-        }
+        closeDashboardDuePopupForCaseReturn();
         window.setTimeout(function () {
           openDashboardDueCaseFromButton(button, loadedSourceHtml);
         }, 120);
@@ -711,9 +717,7 @@
         dashboardApplyDueCaseData(button, data.case || {});
         button.setAttribute("data-scm-due-case-loaded", "1");
         var loadedSourceHtml = dashboardDueCaseSourceHtml(button);
-        if (window.Swal && window.Swal.isVisible && window.Swal.isVisible()) {
-          window.Swal.close();
-        }
+        closeDashboardDuePopupForCaseReturn();
         window.setTimeout(function () {
           openDashboardDueCaseFromButton(button, loadedSourceHtml);
         }, 120);
@@ -979,6 +983,16 @@
           console.warn("No se pudo cargar el popup de vencimientos administrativos.", error);
         });
     }
+
+    root.addEventListener("scm:case-modal-closed", function () {
+      if (!dashboardDuePopupRestoreAfterCase) return;
+      dashboardDuePopupRestoreAfterCase = false;
+      window.setTimeout(function () {
+        if (root.querySelector("#scm-case-modal.open")) return;
+        delete dashboardDuePopupShown["case-return"];
+        maybeShowDashboardDuePopup("case-return");
+      }, 160);
+    });
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
     ).replace(/\/+$/, "");

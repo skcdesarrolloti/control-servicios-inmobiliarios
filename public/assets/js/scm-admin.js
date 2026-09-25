@@ -741,6 +741,11 @@
     if (headActions) {
       headActions.innerHTML = "";
     }
+
+    modal.dispatchEvent(new CustomEvent("scm:case-modal-closed", {
+      bubbles: true,
+      detail: { reason: "close" },
+    }));
   }
 
   function ensureCaseSubmodal(modal) {
