@@ -2693,7 +2693,7 @@
       function renderCalendarContractSelector(select, rows, selectedValue) {
         if (!select) return;
         selectedValue = String(selectedValue || select.value || "").trim();
-        select.innerHTML = '<option value="">Selecciona contrato</option>' + (rows || []).map(function (row) {
+        select.innerHTML = '<option value="">Selecciona inmueble o direcci&oacute;n</option>' + (rows || []).map(function (row) {
           var id = calendarContractValue(row, ["id", "_ID", "contrato"]);
           return id ? '<option value="' + escHtml(id) + '">' + escHtml(calendarContractLabel(row)) + "</option>" : "";
         }).join("");
@@ -3530,11 +3530,11 @@
         var ticketFieldsHtml = "";
         var defaultDate = escHtml(selectedDay || toDateKey(new Date()));
         var locationFieldsHtml = '<section class="scm-calendar-location-section scm-calendar-field-full">' +
-          '<div class="scm-calendar-section-heading"><span>Ubicaci&oacute;n del evento</span><small>Georreferenciaci&oacute;n SuCasa</small></div>' +
+          '<div class="scm-calendar-section-heading"><span>Ubicaci&oacute;n del evento</span></div>' +
           '<div class="scm-calendar-location-fields">' +
-          '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="contrato">Contrato de arrendamiento</option><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option><option value="otra">Otra direcci&oacute;n</option></select></label>' +
-          '<div class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Buscar contrato o inmueble</span><div class="scm-calendar-contract-controls"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select aria-label="Contrato de arrendamiento"><option value="">Cargando contratos...</option></select></div><small data-calendar-contract-status>Busca y selecciona el contrato dentro del listado.</small></div>' +
-          '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Direcci&oacute;n del contrato"></label>' +
+          '<input type="hidden" name="ubicacion_tipo" value="contrato">' +
+          '<div class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Buscar contrato o inmueble</span><div class="scm-calendar-contract-controls"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select aria-label="Buscar inmueble o direcci&oacute;n"><option value="">Cargando inmuebles...</option></select></div><small data-calendar-contract-status>Busca y selecciona el inmueble dentro del listado.</small></div>' +
+          '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Se carga desde el inmueble seleccionado"></label>' +
           "</div></section>";
         var html = '<div class="scm-calendar-create-shell">' +
           '<div class="scm-calendar-create-head">' +
@@ -3565,7 +3565,6 @@
           '<small>Se programar&aacute;n las fechas generadas respetando la configuraci&oacute;n del rango.</small>' +
           '</div></div>' +
           ticketFieldsHtml +
-          '<label class="scm-seg-field scm-calendar-description-field scm-calendar-field-full"><span>Descripci&oacute;n y observaciones operativas <em>Opcional</em></span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="3" placeholder="Observaciones internas para esta agenda."></textarea></label>' +
           '</div>' +
           '<aside class="scm-calendar-availability-panel">' +
           '<div class="scm-calendar-availability-head"><div><span>Disponibilidad en vivo</span><strong data-calendar-availability-name>' + escHtml(preselectedEmployee ? employeeDisplayName(preselectedEmployee) : "Selecciona funcionario") + '</strong></div><em data-calendar-availability-count>0 asignados</em></div>' +
@@ -3601,7 +3600,6 @@
             var dateInput = popup.querySelector('[name="fecha"]');
             var startInput = popup.querySelector('[name="hora_inicio"]');
             var endInput = popup.querySelector('[name="hora_fin"]');
-            var locationTypeSelect = popup.querySelector("[data-calendar-location-type]");
             var contractWrap = popup.querySelector("[data-calendar-contract-wrap]");
             var contractSelect = popup.querySelector("[data-calendar-contract-select]");
             var contractStatus = popup.querySelector("[data-calendar-contract-status]");
@@ -3718,7 +3716,7 @@
                   locationInput.value = "";
                   locationInput.setAttribute("data-auto-calendar-location", "1");
                 }
-                setContractStatus("Selecciona un contrato para cargar la ubicación.", false);
+                setContractStatus("Selecciona un inmueble para cargar la ubicación.", false);
                 return;
               }
               var location = calendarContractLocation(row);
@@ -3742,7 +3740,7 @@
                 if (!currentContractRows.length) {
                   setContractStatus("No se encontraron contratos con ese filtro.", true);
                 } else {
-                  setContractStatus("Busca y selecciona el contrato dentro del listado.", false);
+                  setContractStatus("Busca y selecciona el inmueble dentro del listado.", false);
                 }
                 applySelectedContract(false);
               }).catch(function (err) {
@@ -3757,32 +3755,10 @@
               return relatedTicketSelect && relatedTicketSelect.value === "si";
             }
             function applyLocationType(force) {
-              if (!locationTypeSelect || !locationInput) return;
-              var type = String(locationTypeSelect.value || "contrato");
-              var quickLocations = {
-                oficina_corredor: "Oficina Corredor",
-                oficina_manga: "Oficina Manga",
-              };
-              if (quickLocations[type]) {
-                if (contractWrap) contractWrap.hidden = true;
-                locationInput.value = quickLocations[type];
-                locationInput.readOnly = true;
-                locationInput.setAttribute("data-auto-calendar-location", "1");
-                return;
-              }
-              if (type === "otra") {
-                if (contractWrap) contractWrap.hidden = true;
-                if (force || locationInput.getAttribute("data-auto-calendar-location") === "1") {
-                  locationInput.value = "";
-                }
-                locationInput.readOnly = false;
-                locationInput.placeholder = "Escribe la dirección o punto de encuentro";
-                locationInput.setAttribute("data-auto-calendar-location", "0");
-                return;
-              }
+              if (!locationInput) return;
               if (contractWrap) contractWrap.hidden = false;
               locationInput.readOnly = true;
-              locationInput.placeholder = "Se carga desde el contrato seleccionado";
+              locationInput.placeholder = "Se carga desde el inmueble seleccionado";
               if (force && locationInput.getAttribute("data-auto-calendar-location") === "1") {
                 locationInput.value = "";
               }
@@ -4123,11 +4099,6 @@
                 locationInput.setAttribute("data-auto-calendar-location", "0");
               });
             }
-            if (locationTypeSelect) {
-              locationTypeSelect.addEventListener("change", function () {
-                applyLocationType(true);
-              });
-            }
             if (contractSelect) {
               contractSelect.addEventListener("change", function () {
                 applySelectedContract(true);
@@ -4208,7 +4179,7 @@
             var isCita = relatedTicket ? String(fd.get("es_cita") || "") : "";
             var locationType = String(fd.get("ubicacion_tipo") || "contrato");
             if (locationType === "contrato" && !String(fd.get("contrato_arrendamiento") || "").trim()) {
-              window.Swal.showValidationMessage("Selecciona un contrato de arrendamiento.");
+              window.Swal.showValidationMessage("Selecciona un inmueble para cargar la ubicacion.");
               return false;
             }
             if (!String(fd.get("titulo") || "").trim() || !String(fd.get("ubicacion") || "").trim() || !String(fd.get("id_categoria") || "").trim()) {
