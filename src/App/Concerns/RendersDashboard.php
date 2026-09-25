@@ -2462,8 +2462,8 @@ trait RendersDashboard
             <div class="scm-field"><label>Estado de gesti&oacute;n</label><select class="select select-bordered select-sm scm-select" name="estado"><option value="" selected>Realizados y Agendados</option><option value="No">Pendientes</option><option value="Si">Realizados</option></select></div>
           </div>
           <div class="scm-actions">
-            <button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button>
-            <button class="scm-btn-secondary btn btn-outline" type="button" data-scm-calendar-clear>Limpiar</button>
+            <button class="scm-calendar-filter-btn scm-calendar-filter-btn--primary" type="submit"><span class="material-symbols-outlined" aria-hidden="true">filter_alt</span><span>Filtrar</span></button>
+            <button class="scm-calendar-filter-btn scm-calendar-filter-btn--ghost" type="button" data-scm-calendar-clear>Limpiar</button>
             <span class="scm-spinner" data-scm-calendar-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
           </div>
         </form>

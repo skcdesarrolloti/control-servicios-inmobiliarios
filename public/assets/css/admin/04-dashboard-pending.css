@@ -2900,6 +2900,14 @@
   width: min(100%, calc(100vw - 32px));
 }
 
+#scm-app .scm-home-calendar .scm-calendar-section-panel,
+#scm-app .scm-home-calendar .scm-calendar-panel {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 1180px;
+  width: 100%;
+}
+
 #scm-app .scm-home-calendar .scm-calendar-section-tabs {
   margin: 0 0 22px;
 }
@@ -2982,12 +2990,43 @@
 }
 
 #scm-app .scm-home-calendar .scm-calendar-filter-card .scm-actions {
+  align-self: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(170px, 1fr) auto;
+  justify-content: stretch;
   margin-top: 0;
 }
 
-#scm-app .scm-home-calendar .scm-calendar-filter-card .scm-btn-primary {
-  min-width: 0;
-  width: 100%;
+#scm-app .scm-home-calendar .scm-calendar-filter-btn {
+  align-items: center;
+  border-radius: 11px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 850;
+  gap: 7px;
+  justify-content: center;
+  min-height: 40px;
+  padding: 9px 14px !important;
+  white-space: nowrap;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-filter-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-filter-btn--primary {
+  background: #ea580c;
+  border: 1px solid #ea580c;
+  box-shadow: 0 8px 18px rgba(234, 88, 12, 0.18);
+  color: #ffffff;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-filter-btn--ghost {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  min-width: 86px;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-layout {
