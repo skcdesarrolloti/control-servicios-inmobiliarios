@@ -1449,6 +1449,7 @@
       var calendarBootstrapPromise = null;
       var calendarDisplayMode = "month";
       var weekSlotSelection = null;
+      var weekQuickPopover = null;
 
       panel.querySelectorAll("[data-scm-calendar-open-path]").forEach(function (btn) {
         btn.addEventListener("click", function () {
@@ -1722,9 +1723,12 @@
         var start = startOfWeek(date || new Date());
         var end = addDays(start, 6);
         var sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
-        var startLabel = start.toLocaleDateString("es-CO", { day: "2-digit", month: "short" }).replace(/\./g, "");
-        var endLabel = end.toLocaleDateString("es-CO", sameMonth ? { day: "2-digit", month: "short", year: "numeric" } : { day: "2-digit", month: "short", year: "numeric" }).replace(/\./g, "");
-        return capitalizeFirst(startLabel + " - " + endLabel);
+        if (sameMonth) {
+          return String(start.getDate()).padStart(2, "0") + " - " + String(end.getDate()).padStart(2, "0") + " de " +
+            end.toLocaleDateString("es-CO", { month: "long", year: "numeric" });
+        }
+        return start.toLocaleDateString("es-CO", { day: "2-digit", month: "long" }).replace(/\./g, "") +
+          " - " + end.toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" }).replace(/\./g, "");
       }
 
       function timeFromMinutes(minutes) {
@@ -2210,6 +2214,8 @@
           btn.setAttribute("aria-pressed", active ? "true" : "false");
         });
         panel.classList.toggle("scm-calendar-panel--week", calendarDisplayMode === "week");
+        var kicker = panel.querySelector(".scm-calendar-board-card .scm-calendar-action-kicker");
+        if (kicker) kicker.textContent = calendarDisplayMode === "week" ? "Vista semanal" : "Vista mensual";
       }
 
       function eventMinutes(row, key) {
@@ -2279,6 +2285,140 @@
         if (endMinutes <= startMinutes) endMinutes = Math.min(startMinutes + 60, 21 * 60);
         if (endMinutes <= startMinutes) endMinutes = startMinutes + 30;
         return { date: dateKey, start: startMinutes, end: endMinutes };
+      }
+
+      function closeWeekQuickPopover() {
+        if (weekQuickPopover && weekQuickPopover.parentNode) {
+          weekQuickPopover.parentNode.removeChild(weekQuickPopover);
+        }
+        weekQuickPopover = null;
+        document.removeEventListener("keydown", handleWeekQuickPopoverKeydown);
+        document.removeEventListener("mousedown", handleWeekQuickPopoverOutside, true);
+      }
+
+      function handleWeekQuickPopoverKeydown(event) {
+        if (event.key === "Escape") {
+          closeWeekQuickPopover();
+        }
+      }
+
+      function handleWeekQuickPopoverOutside(event) {
+        if (!weekQuickPopover || weekQuickPopover.contains(event.target)) return;
+        closeWeekQuickPopover();
+      }
+
+      function quickCreateEmployeeId() {
+        var filterEmployee = filterForm ? filterForm.querySelector('[name="id_empleado"]') : null;
+        var preferred = currentCalendarEmployeeId || (filterEmployee && filterEmployee.value) || "";
+        if (preferred) return preferred;
+        return allowedEmployees.length ? getEmployeeId(allowedEmployees[0]) : "";
+      }
+
+      function quickCategoryOptions() {
+        return calendarAdminCategories().map(function (row) {
+          var id = String(row.id || row._ID || row.id_categoria || "").trim();
+          if (!id) return "";
+          return '<option value="' + escHtml(id) + '">' + escHtml(calendarCategoryLabel(row) || "Categoria") + "</option>";
+        }).join("");
+      }
+
+      function createQuickEvent(selection, form) {
+        var fd = new FormData(form);
+        var title = String(fd.get("titulo") || "").trim();
+        var categoryId = String(fd.get("id_categoria") || "").trim();
+        var employeeId = quickCreateEmployeeId();
+        if (!title) {
+          showToast("error", "Escribe un titulo para crear el evento.");
+          return Promise.resolve(false);
+        }
+        if (!categoryId) {
+          showToast("error", "Selecciona una categoria.");
+          return Promise.resolve(false);
+        }
+        if (!employeeId) {
+          showToast("error", "No se encontro el funcionario del calendario.");
+          return Promise.resolve(false);
+        }
+        var payload = {
+          titulo: title,
+          descripcion: "",
+          ubicacion: "Agenda interna",
+          id_categoria: categoryId,
+          fecha_inicio: selection.date + " " + timeFromMinutes(selection.start) + ":00",
+          fecha_fin: selection.date + " " + timeFromMinutes(selection.end) + ":00",
+          id_empleado: employeeId,
+        };
+        var submit = form.querySelector('[data-week-quick-save]');
+        if (submit) {
+          submit.disabled = true;
+          submit.textContent = "Guardando...";
+        }
+        return calendarApi("crear_evento", payload).then(function (json) {
+          if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el evento.");
+          showToast("success", json.message || "Evento creado.");
+          closeWeekQuickPopover();
+          return loadEvents();
+        }).catch(function (err) {
+          showToast("error", err.message || "No se pudo crear el evento.");
+          if (submit) {
+            submit.disabled = false;
+            submit.textContent = "Guardar";
+          }
+          return false;
+        });
+      }
+
+      function openWeekQuickPopover(selection, sourceEvent) {
+        if (!selection || isDueCalendar) return;
+        closeWeekQuickPopover();
+        var categoryOptions = quickCategoryOptions();
+        if (!categoryOptions) {
+          openFromWeekSelection(selection);
+          return;
+        }
+        var dateLabel = calendarDayTitle(selection.date);
+        var timeLabel = timeFromMinutes(selection.start) + " - " + timeFromMinutes(selection.end);
+        var popover = document.createElement("div");
+        popover.className = "scm-calendar-week-quick-popover";
+        popover.innerHTML = '' +
+          '<form class="scm-calendar-week-quick-form" autocomplete="off">' +
+          '<div class="scm-calendar-week-quick-top">' +
+          '<span class="material-symbols-outlined" aria-hidden="true">drag_handle</span>' +
+          '<button type="button" aria-label="Cerrar" data-week-quick-close><span class="material-symbols-outlined">close</span></button>' +
+          '</div>' +
+          '<label class="scm-calendar-week-quick-title"><span class="sr-only">Titulo</span><input name="titulo" placeholder="Añade un título" required></label>' +
+          '<div class="scm-calendar-week-quick-tabs" aria-label="Tipo"><span class="active">Evento</span><span>Tarea</span><span>Recordatorio</span></div>' +
+          '<div class="scm-calendar-week-quick-row"><span class="material-symbols-outlined">schedule</span><div><strong>' + escHtml(dateLabel) + '</strong><em>' + escHtml(timeLabel) + '</em></div></div>' +
+          '<label class="scm-calendar-week-quick-category"><span class="material-symbols-outlined">sell</span><select name="id_categoria" required><option value="">Selecciona categoría</option>' + categoryOptions + '</select></label>' +
+          '<div class="scm-calendar-week-quick-actions">' +
+          '<button type="button" data-week-quick-more>Más opciones</button>' +
+          '<button type="submit" data-week-quick-save>Guardar</button>' +
+          '</div>' +
+          '</form>';
+        document.body.appendChild(popover);
+        weekQuickPopover = popover;
+        var x = sourceEvent && typeof sourceEvent.clientX === "number" ? sourceEvent.clientX : window.innerWidth / 2;
+        var y = sourceEvent && typeof sourceEvent.clientY === "number" ? sourceEvent.clientY : window.innerHeight / 2;
+        var rect = popover.getBoundingClientRect();
+        var left = Math.min(Math.max(16, x + 12), window.innerWidth - rect.width - 16);
+        var top = Math.min(Math.max(16, y - 18), window.innerHeight - rect.height - 16);
+        popover.style.left = left + "px";
+        popover.style.top = top + "px";
+        var input = popover.querySelector('[name="titulo"]');
+        if (input) input.focus();
+        popover.querySelector("[data-week-quick-close]").addEventListener("click", closeWeekQuickPopover);
+        popover.querySelector("[data-week-quick-more]").addEventListener("click", function () {
+          closeWeekQuickPopover();
+          openFromWeekSelection(selection);
+        });
+        popover.querySelector("form").addEventListener("submit", function (event) {
+          event.preventDefault();
+          createQuickEvent(selection, event.currentTarget);
+        });
+        setTimeout(function () {
+          document.addEventListener("keydown", handleWeekQuickPopoverKeydown);
+          document.addEventListener("mousedown", handleWeekQuickPopoverOutside, true);
+        }, 0);
       }
 
       function openFromWeekSelection(selection) {
@@ -2385,7 +2525,7 @@
             renderCalendarGrid();
             return;
           }
-          openFromWeekSelection(finalSelection);
+          openWeekQuickPopover(finalSelection, event);
         });
         grid.addEventListener("pointercancel", function () {
           clearWeekSelection(grid);
