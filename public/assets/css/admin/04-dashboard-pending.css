@@ -2786,21 +2786,30 @@
 
 .swal2-popup.scm-due-entry-swal .swal2-html-container {
   margin: 0 !important;
-  max-height: min(700px, calc(100vh - 160px));
+  max-height: min(696px, calc(100vh - 150px));
   overflow: auto;
-  padding: 0 32px 16px !important;
+  padding: 0 32px 22px !important;
 }
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-close {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
   color: #94a3b8 !important;
-  font-size: 26px !important;
-  right: 22px !important;
+  font-size: 24px !important;
+  height: 40px !important;
+  line-height: 40px !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  outline: none !important;
+  right: 20px !important;
   top: 18px !important;
+  width: 40px !important;
 }
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-popup {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   text-align: left;
 }
 
@@ -2809,10 +2818,10 @@
   background: #ffffff;
   border-bottom: 1px solid #e5edf6;
   display: grid;
-  gap: 14px;
+  gap: 16px;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  margin: 0 -32px 8px;
-  padding: 26px 54px 20px 32px;
+  margin: 0 -32px 10px;
+  padding: 28px 60px 22px 32px;
 }
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-head-icon {
@@ -2845,11 +2854,11 @@
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-head h3 {
   color: #0f172a;
-  font-size: 25px;
-  font-weight: 900;
+  font-size: 24px;
+  font-weight: 800;
   letter-spacing: 0;
-  line-height: 1.08;
-  margin: 0 0 4px;
+  line-height: 1.12;
+  margin: 0 0 3px;
 }
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-head p {
@@ -2870,7 +2879,7 @@
   border-radius: 999px;
   color: #e11d48;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
   padding: 6px 12px;
 }
@@ -2878,7 +2887,7 @@
 .swal2-popup.scm-due-entry-swal .scm-due-entry-kpis,
 .swal2-popup.scm-due-entry-swal .scm-due-entry-groups {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -2886,8 +2895,8 @@
 .swal2-popup.scm-due-entry-swal .scm-due-entry-group-card {
   background: #ffffff;
   border: 1px solid #dbe5f0;
-  border-radius: 12px;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
   min-width: 0;
 }
 
@@ -2896,8 +2905,19 @@
   display: grid;
   gap: 14px;
   grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 118px;
-  padding: 18px 20px;
+  min-height: 116px;
+  padding: 20px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-kpi-card > div,
+.swal2-popup.scm-due-entry-swal .scm-due-entry-group-card > div {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  display: block !important;
+  gap: 0 !important;
+  padding: 0 !important;
 }
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-kpi-card--late {
@@ -2914,8 +2934,9 @@
 .swal2-popup.scm-due-entry-swal .scm-due-entry-group-card span {
   color: #64748b;
   display: block;
-  font-size: 12px;
-  font-weight: 850;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.015em;
   line-height: 1.25;
   text-transform: uppercase;
 }
@@ -2924,8 +2945,8 @@
 .swal2-popup.scm-due-entry-swal .scm-due-entry-group-card strong {
   color: #0f172a;
   display: block;
-  font-size: 32px;
-  font-weight: 950;
+  font-size: 30px;
+  font-weight: 800;
   letter-spacing: 0;
   line-height: 1.1;
   margin-top: 8px;
@@ -2935,7 +2956,7 @@
   color: #94a3b8;
   display: block;
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 650;
   margin-top: 8px;
 }
 
@@ -2945,7 +2966,7 @@
   border-radius: 14px;
   color: #64748b;
   display: inline-flex;
-  font-size: 25px;
+  font-size: 24px;
   height: 48px;
   justify-content: center;
   width: 48px;
@@ -2963,24 +2984,24 @@
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-section-title {
   color: #94a3b8;
-  font-size: 13px;
-  font-weight: 900;
+  font-size: 12px;
+  font-weight: 800;
   letter-spacing: 0.02em;
-  margin: 6px 4px -4px;
+  margin: 4px 4px -2px;
   text-transform: uppercase;
 }
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-group-card {
   align-items: center;
   display: grid;
-  gap: 10px;
+  gap: 12px;
   grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 98px;
+  min-height: 96px;
   padding: 16px;
 }
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-group-card strong {
-  font-size: 26px;
+  font-size: 25px;
 }
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-group-link {
@@ -2993,12 +3014,12 @@
   cursor: pointer;
   display: inline-flex;
   font: inherit;
-  font-size: 12px;
-  font-weight: 850;
+  font-size: 11px;
+  font-weight: 700;
   gap: 6px;
   justify-content: center;
-  min-height: 38px;
-  padding: 8px 12px;
+  min-height: 34px;
+  padding: 7px 10px;
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
   white-space: nowrap;
 }
@@ -3019,19 +3040,19 @@
   display: flex;
   gap: 12px;
   justify-content: space-between;
-  margin: 8px 4px -4px;
+  margin: 6px 4px -4px;
 }
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-list-head h4 {
   color: #0f172a;
-  font-size: 16px;
-  font-weight: 850;
+  font-size: 15px;
+  font-weight: 750;
   margin: 0;
 }
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-list-head p {
   color: #64748b;
-  font-size: 13px;
+  font-size: 12px;
   margin: 2px 0 0;
 }
 
@@ -3042,7 +3063,7 @@
   color: #64748b;
   flex: 0 0 auto;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   padding: 6px 12px;
 }
 
@@ -3052,7 +3073,7 @@
   border-radius: 12px;
   display: grid;
   gap: 0;
-  max-height: min(34vh, 300px);
+  max-height: min(33vh, 292px);
   overflow: auto;
 }
 
@@ -3067,7 +3088,7 @@
   gap: 14px;
   grid-template-columns: 96px minmax(0, 1fr) auto auto;
   margin: 0;
-  min-height: 68px;
+  min-height: 66px;
   padding: 12px 16px;
 }
 
@@ -3083,7 +3104,7 @@
   display: inline-flex;
   font-size: 12px;
   font-style: normal;
-  font-weight: 850;
+  font-weight: 700;
   justify-content: center;
   padding: 8px 10px;
   white-space: nowrap;
@@ -3092,7 +3113,7 @@
 .swal2-popup.scm-due-entry-swal .scm-due-entry-row span {
   color: #0f172a;
   font-size: 14px;
-  font-weight: 850;
+  font-weight: 750;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3106,7 +3127,7 @@
   color: #e11d48;
   font-size: 12px;
   font-style: normal;
-  font-weight: 850;
+  font-weight: 700;
   padding: 7px 11px;
   white-space: nowrap;
 }
@@ -3119,7 +3140,7 @@
   cursor: pointer;
   font: inherit;
   font-size: 13px;
-  font-weight: 850;
+  font-weight: 700;
   min-height: 38px;
   padding: 8px 16px;
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
@@ -3153,7 +3174,7 @@
 .swal2-popup.scm-due-entry-swal .scm-due-entry-footer-btn {
   border-radius: 12px;
   font-size: 14px;
-  font-weight: 850;
+  font-weight: 750;
   min-height: 42px;
   min-width: 94px;
 }
