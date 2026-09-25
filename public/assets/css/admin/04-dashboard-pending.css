@@ -2891,20 +2891,16 @@
   min-width: 0;
 }
 
-/* Calendario inicio - ajuste fiel al mockup compacto */
+/* Calendario inicio - página completa con UI compacta */
 #scm-app .scm-home-calendar {
   box-sizing: border-box;
-  margin: 0 auto 18px;
-  max-width: 1180px;
+  margin: 0 0 18px;
   padding: 0 0 28px;
-  width: min(100%, calc(100vw - 32px));
+  width: 100%;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-section-panel,
 #scm-app .scm-home-calendar .scm-calendar-panel {
-  margin-left: auto;
-  margin-right: auto;
-  max-width: 1180px;
   width: 100%;
 }
 
