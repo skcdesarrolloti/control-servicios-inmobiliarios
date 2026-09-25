@@ -490,7 +490,7 @@
       if (type === "ticket_preventiva_sin_cita") return "Tickets sin cita preventiva";
       if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
       if (type === "servicios_publicos_pendientes") return "Servicios públicos pendientes";
-      if (type === "terminacion_contrato_pendiente") return "Solicitudes de terminación de contrato";
+      if (type === "terminacion_contrato_pendiente") return "Terminación de contrato";
       if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
       if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
       return type || "Vencimientos";
@@ -783,19 +783,27 @@
         var summaryGroup = summaryByType[type] || {};
         var targetTab = String(summaryGroup.target_tab || "");
         var buttonHtml = targetTab
-          ? '<button type="button" class="scm-due-entry-group-link" data-scm-dashboard-due-open-admin-tab="' + escHtml(targetTab) + '">Ver pestaña</button>'
+          ? '<button type="button" class="scm-due-entry-group-link" data-scm-dashboard-due-open-admin-tab="' + escHtml(targetTab) + '">Ver pestaña <span class="material-symbols-outlined">chevron_right</span></button>'
           : "";
-        return '<div><span>' + escHtml(dashboardDueTypeLabel(type)) + '</span><strong>' + escHtml(String(groups[type] || 0)) + '</strong>' + buttonHtml + '</div>';
+        return '<div class="scm-due-entry-group-card scm-due-entry-group-card--' + escHtml(type) + '"><div><span>' + escHtml(dashboardDueTypeLabel(type)) + '</span><strong>' + escHtml(String(groups[type] || 0)) + '</strong></div>' + buttonHtml + '</div>';
       }).join("");
+      function formatDuePopupDate(value) {
+        var raw = String(value || "").slice(0, 10);
+        var match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) return raw || "-";
+        var months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+        var monthIndex = Math.max(0, Math.min(11, Number(match[2]) - 1));
+        return match[3] + " " + months[monthIndex] + " " + match[1];
+      }
       var detailRows = rows.slice(0, 18).map(function (row) {
         var caseData = row && row.case ? row.case : {};
         var sourceHtml = String(caseData.case_source_html || "").trim();
         var isCreateTicket = String(caseData.admin_ticket_create || "") === "1";
         var isPublicServices = String(caseData.public_services_review || "") === "1";
         return '<div class="scm-due-entry-row scm-ticket-card">' +
-          '<strong>' + escHtml(row.fecha_vencimiento || "-") + "</strong>" +
+          '<strong>' + escHtml(formatDuePopupDate(row.fecha_vencimiento || "-")) + "</strong>" +
           '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
-          '<em>' + escHtml(row.estado || "Pendiente") + (Number(row.dias_vencido || 0) > 0 ? " · " + escHtml(String(row.dias_vencido)) + " día(s)" : "") + "</em>" +
+          '<em>' + escHtml(row.estado || "Pendiente") + (Number(row.dias_vencido || 0) > 0 ? " • " + escHtml(String(row.dias_vencido)) + " día(s)" : "") + "</em>" +
           (isCreateTicket ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-create-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Crear ticket</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-services data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" disabled>Sin caso</button>'))) +
           '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div>" +
           "</div>";
@@ -805,12 +813,15 @@
       }
       var more = rows.length > 18 ? '<p class="scm-due-entry-more">+' + escHtml(String(rows.length - 18)) + " vencimiento(s) adicionales en el calendario.</p>" : "";
       return '<div class="scm-due-entry-popup">' +
+        '<div class="scm-due-entry-head"><div class="scm-due-entry-head-icon"><span class="material-symbols-outlined">schedule</span><i></i></div><div><h3>Vencimientos administrativos</h3><p>Control preventivo de tareas operativas. <span>•</span> SuCasa Operaciones</p></div><strong>Urgente</strong></div>' +
         '<div class="scm-due-entry-kpis">' +
-        '<div><span>Total en control</span><strong>' + escHtml(String(stats.total || 0)) + "</strong></div>" +
-        '<div><span>Vencidos</span><strong>' + escHtml(String(stats.vencidos || 0)) + "</strong></div>" +
-        '<div><span>Vencen hoy</span><strong>' + escHtml(String(stats.hoy || 0)) + "</strong></div>" +
+        '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--total"><div><span>Total en control</span><strong>' + escHtml(String(stats.total || 0)) + "</strong><small>Obligaciones asignadas</small></div><i class=\"material-symbols-outlined\">assignment</i></div>" +
+        '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--late"><div><span>Vencidos</span><strong>' + escHtml(String(stats.vencidos || 0)) + "</strong><small>Superaron el tiempo máximo</small></div><i class=\"material-symbols-outlined\">warning</i></div>" +
+        '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--today"><div><span>Vencen hoy</span><strong>' + escHtml(String(stats.hoy || 0)) + "</strong><small>Atención inmediata prioritaria</small></div><i class=\"material-symbols-outlined\">schedule</i></div>" +
         "</div>" +
+        '<h4 class="scm-due-entry-section-title">Desglose por tipo de tarea pendiente</h4>' +
         '<div class="scm-due-entry-groups">' + groupHtml + "</div>" +
+        '<div class="scm-due-entry-list-head"><div><h4>Casos con mayor tiempo de atraso</h4><p>Ordenados cronológicamente por antigüedad de vencimiento</p></div><span>Mostrando ' + escHtml(String(Math.min(rows.length, 18))) + " de " + escHtml(String(stats.vencidos || 0)) + " casos vencidos</span></div>" +
         '<div class="scm-due-entry-list">' + detailRows + "</div>" +
         more +
         "</div>";
@@ -868,15 +879,17 @@
           }, 0);
           if (!rows.length && !summaryTotal) return;
           return window.Swal.fire({
-            title: "Vencimientos administrativos",
+            title: "",
             html: dashboardDueEntryPopupHtml(rows, summaryGroups),
-            width: "min(980px, 94vw)",
+            width: "min(1024px, 96vw)",
+            showCloseButton: true,
             showConfirmButton: false,
             showCancelButton: false,
             buttonsStyling: false,
-            footer: '<button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--primary" data-scm-dashboard-due-open-calendar>Ver calendario</button><button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary" data-scm-dashboard-due-close>Cerrar</button>',
+            footer: '<button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary" data-scm-dashboard-due-close>Cerrar</button><button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--primary" data-scm-dashboard-due-open-calendar><span class="material-symbols-outlined">event</span> Ver calendario</button>',
             customClass: {
               popup: "scm-calendar-swal-popup scm-due-entry-swal",
+              closeButton: "scm-swal-close-round scm-due-entry-close",
             },
             didOpen: function () {
               var popup = window.Swal.getPopup();

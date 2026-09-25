@@ -2086,7 +2086,7 @@
             "</span>"
           : "") +
         "</div>" +
-        '<div class="scm-transfer-warning"><span aria-hidden="true">i</span><p>Al confirmar el traslado, el seguimiento operativo y los compromisos de SLA pasarán al funcionario receptor. Esta acción quedará registrada en la bitácora de auditoría del inmueble.</p></div>' +
+        '<div class="scm-transfer-warning"><span aria-hidden="true">i</span><p>Al confirmar el traslado, el seguimiento operativo y los compromisos del caso pasarán al funcionario receptor. Esta acción quedará registrada en la bitácora de auditoría del inmueble.</p></div>' +
         '<div class="scm-transfer-current"><span>Funcionario actual a cargo:</span><strong><i></i>' +
         escHtml(currentEmpLabel) +
         "</strong></div>" +
@@ -7729,7 +7729,7 @@
         }
         if (totalVal && totalVal !== "-") {
           metaChips.push(
-            '<span class="scm-chip scm-chip-muted"><span class="material-symbols-outlined text-[14px]">schedule</span> SLA: ' +
+            '<span class="scm-chip scm-chip-muted"><span class="material-symbols-outlined text-[14px]">schedule</span> Tiempo: ' +
               escHtml(totalVal) +
               "</span>",
           );

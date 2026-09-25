@@ -2924,7 +2924,7 @@ body,
   max-width: 60% !important;
 }
 
-/* Fila de Funcionario Asignado y SLA */
+/* Fila de Funcionario Asignado y tiempos */
 #scm-app .scm-ticket-stakeholder-row {
   display: flex !important;
   align-items: center !important;
@@ -2977,7 +2977,7 @@ body,
   color: #94a3b8 !important;
 }
 
-/* Badges SLA */
+/* Badges de tiempos */
 #scm-app .scm-card-sla {
   display: inline-flex !important;
   align-items: center !important;

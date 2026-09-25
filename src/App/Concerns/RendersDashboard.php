@@ -967,7 +967,6 @@ trait RendersDashboard
             </div>
             <div class="scm-kpi-value-row flex items-baseline gap-1.5">
               <span class="scm-kpi-value text-rose-600" id="scm-kpi-magnitud-critico"><?php echo esc_html((string)($stats['magnitud_critico'] ?? 0)); ?></span>
-              <span class="text-[10px] font-bold text-rose-500 uppercase tracking-wider">SLA</span>
             </div>
             <div class="scm-kpi-indicator scm-kpi-indicator-critico"></div>
           </div>
@@ -1378,13 +1377,13 @@ trait RendersDashboard
               </span>
             </div>
             <p class="text-sm text-slate-500">
-              Visualización consolidada de cumplimiento de SLA, salud operativa y distribución de carga en tiempo real.
+              Visualización consolidada de cumplimiento, salud operativa y distribución de carga en tiempo real.
             </p>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
             <button type="button" data-scm-open-due-settings class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 text-xs font-semibold shadow-2xs transition-all">
               <span class="material-symbols-outlined text-[18px] text-slate-500">tune</span>
-              <span>Ajustes SLA</span>
+              <span>Ajustes de vencimiento</span>
             </button>
             <button type="button" onclick="window.dispatchEvent(new CustomEvent('scm:open-nuevo-ticket'))" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0f1e36] text-white hover:bg-[#162846] text-xs font-semibold shadow-xs transition-all">
               <span class="material-symbols-outlined text-[18px]">add</span>
@@ -1431,10 +1430,10 @@ trait RendersDashboard
             </div>
           </div>
 
-          <!-- KPI 2: Salud General SLA -->
+          <!-- KPI 2: Salud General -->
           <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col justify-between hover:shadow-elevated transition-shadow">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Salud General SLA</span>
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Salud General</span>
               <span class="p-2 rounded-xl bg-emerald-50 text-emerald-700">
                 <span class="material-symbols-outlined text-[20px]">donut_large</span>
               </span>
@@ -1521,7 +1520,7 @@ trait RendersDashboard
             <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
               <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <span class="material-symbols-outlined text-[18px] text-slate-400">speed</span>
-                <span>Salud SLA</span>
+                <span>Salud operativa</span>
               </h3>
               <div class="scm-bars" id="scm-chart-sla"></div>
             </section>

@@ -2772,6 +2772,425 @@
   border-color: #94a3b8;
 }
 
+.swal2-container .swal2-popup.scm-due-entry-swal {
+  background: #f8fafc !important;
+  border: 1px solid rgba(203, 213, 225, 0.95) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.32) !important;
+  color: #12213a;
+}
+
+.swal2-popup.scm-due-entry-swal .swal2-title {
+  display: none !important;
+}
+
+.swal2-popup.scm-due-entry-swal .swal2-html-container {
+  margin: 0 !important;
+  max-height: min(700px, calc(100vh - 160px));
+  overflow: auto;
+  padding: 0 32px 16px !important;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-close {
+  color: #94a3b8 !important;
+  font-size: 26px !important;
+  right: 22px !important;
+  top: 18px !important;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-popup {
+  display: grid;
+  gap: 18px;
+  text-align: left;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-head {
+  align-items: center;
+  background: #ffffff;
+  border-bottom: 1px solid #e5edf6;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin: 0 -32px 8px;
+  padding: 26px 54px 20px 32px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-head-icon {
+  align-items: center;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 16px;
+  color: #f59e0b;
+  display: inline-flex;
+  height: 48px;
+  justify-content: center;
+  position: relative;
+  width: 48px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-head-icon span {
+  font-size: 24px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-head-icon i {
+  background: #f43f5e;
+  border: 3px solid #ffffff;
+  border-radius: 999px;
+  height: 14px;
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  width: 14px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-head h3 {
+  color: #0f172a;
+  font-size: 25px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.08;
+  margin: 0 0 4px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-head p {
+  color: #475569;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-head p span {
+  color: #cbd5e1;
+  padding: 0 6px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-head > strong {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 999px;
+  color: #e11d48;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 6px 12px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-kpis,
+.swal2-popup.scm-due-entry-swal .scm-due-entry-groups {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-kpi-card,
+.swal2-popup.scm-due-entry-swal .scm-due-entry-group-card {
+  background: #ffffff;
+  border: 1px solid #dbe5f0;
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  min-width: 0;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-kpi-card {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 118px;
+  padding: 18px 20px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-kpi-card--late {
+  background: linear-gradient(90deg, #ffffff 0%, #fff1f2 100%);
+  border-color: #fecdd3;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-kpi-card--today {
+  background: linear-gradient(90deg, #ffffff 0%, #fffbeb 100%);
+  border-color: #fde68a;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-kpi-card span,
+.swal2-popup.scm-due-entry-swal .scm-due-entry-group-card span {
+  color: #64748b;
+  display: block;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-kpi-card strong,
+.swal2-popup.scm-due-entry-swal .scm-due-entry-group-card strong {
+  color: #0f172a;
+  display: block;
+  font-size: 32px;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1.1;
+  margin-top: 8px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-kpi-card small {
+  color: #94a3b8;
+  display: block;
+  font-size: 12px;
+  font-weight: 750;
+  margin-top: 8px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-kpi-card > i {
+  align-items: center;
+  background: #edf3f9;
+  border-radius: 14px;
+  color: #64748b;
+  display: inline-flex;
+  font-size: 25px;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-kpi-card--late > i {
+  background: #ffe4e6;
+  color: #f43f5e;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-kpi-card--today > i {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-section-title {
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  margin: 6px 4px -4px;
+  text-transform: uppercase;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-group-card {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 98px;
+  padding: 16px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-group-card strong {
+  font-size: 26px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-group-link {
+  align-items: center;
+  align-self: start;
+  background: #f8fafc;
+  border: 1px solid #d9e3ef;
+  border-radius: 8px;
+  color: #475569;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  gap: 6px;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  white-space: nowrap;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-group-link .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-group-link:hover,
+.swal2-popup.scm-due-entry-swal .scm-due-entry-group-link:focus-visible {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #c2410c;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-list-head {
+  align-items: end;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 8px 4px -4px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-list-head h4 {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 850;
+  margin: 0;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-list-head p {
+  color: #64748b;
+  font-size: 13px;
+  margin: 2px 0 0;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-list-head > span {
+  background: #ffffff;
+  border: 1px solid #dbe5f0;
+  border-radius: 999px;
+  color: #64748b;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 12px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-list {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  display: grid;
+  gap: 0;
+  max-height: min(34vh, 300px);
+  overflow: auto;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-row {
+  align-items: center;
+  background: #ffffff;
+  border: 0;
+  border-bottom: 1px solid #eef2f7;
+  border-radius: 0;
+  box-shadow: none;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 96px minmax(0, 1fr) auto auto;
+  margin: 0;
+  min-height: 68px;
+  padding: 12px 16px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-row:last-child {
+  border-bottom: 0;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-row strong {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #475569;
+  display: inline-flex;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+  justify-content: center;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-row span {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 850;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-row em {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 999px;
+  color: #e11d48;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+  padding: 7px 11px;
+  white-space: nowrap;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-case-btn {
+  background: #ffffff;
+  border: 1px solid #d6e1ee;
+  border-radius: 10px;
+  color: #20324d;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  min-height: 38px;
+  padding: 8px 16px;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  white-space: nowrap;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-case-btn:hover,
+.swal2-popup.scm-due-entry-swal .scm-due-entry-case-btn:focus-visible {
+  background: #f8fafc;
+  border-color: #b6c6da;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-more {
+  color: #f59e0b;
+  font-size: 12px;
+  font-weight: 850;
+  margin: -4px 4px 0;
+}
+
+.swal2-popup.scm-due-entry-swal .swal2-footer {
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  gap: 12px;
+  justify-content: flex-end;
+  margin: 0 !important;
+  padding: 16px 32px !important;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-footer-btn {
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 850;
+  min-height: 42px;
+  min-width: 94px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-footer-btn--primary {
+  gap: 8px;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-footer-btn--primary .material-symbols-outlined {
+  font-size: 18px;
+}
+
+@media (max-width: 820px) {
+  .swal2-popup.scm-due-entry-swal .scm-due-entry-kpis,
+  .swal2-popup.scm-due-entry-swal .scm-due-entry-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .swal2-popup.scm-due-entry-swal .scm-due-entry-row {
+    grid-template-columns: 1fr;
+  }
+
+  .swal2-popup.scm-due-entry-swal .scm-due-entry-list-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .swal2-popup.scm-due-entry-swal .scm-due-entry-head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .swal2-popup.scm-due-entry-swal .scm-due-entry-head > strong {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
 .swal2-popup.scm-calendar-swal-popup .swal2-confirm,
 .swal2-popup.scm-calendar-swal-popup .swal2-cancel {
   border-radius: 10px !important;
