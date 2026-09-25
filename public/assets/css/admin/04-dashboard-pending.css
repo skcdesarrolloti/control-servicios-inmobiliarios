@@ -2130,6 +2130,148 @@
   font-weight: 950;
 }
 
+#scm-app .scm-calendar-panel--week .scm-calendar-weekdays {
+  display: none;
+}
+
+#scm-app .scm-calendar-panel--week .scm-calendar-month-grid {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  display: block;
+  overflow: auto;
+}
+
+#scm-app .scm-calendar-time-grid {
+  background: #dbe6f2;
+  border: 1px solid #dbe6f2;
+  border-radius: 14px;
+  display: grid;
+  grid-template-columns: 68px repeat(7, minmax(104px, 1fr));
+  min-width: 920px;
+  overflow: hidden;
+}
+
+#scm-app .scm-calendar-time-gutter,
+#scm-app .scm-calendar-week-head,
+#scm-app .scm-calendar-time-slot {
+  background: #ffffff;
+  border: 0;
+  border-bottom: 1px solid #dbe6f2;
+  border-right: 1px solid #dbe6f2;
+}
+
+#scm-app .scm-calendar-time-gutter {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  min-height: 36px;
+  padding: 8px 8px !important;
+  text-align: right;
+}
+
+#scm-app .scm-calendar-time-gutter--head {
+  align-items: center;
+  display: flex;
+  justify-content: flex-end;
+}
+
+#scm-app .scm-calendar-week-head {
+  align-items: center;
+  color: #334155;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-height: 62px;
+  padding: 8px !important;
+  text-transform: capitalize;
+}
+
+#scm-app .scm-calendar-week-head span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+#scm-app .scm-calendar-week-head strong {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 18px;
+  font-weight: 850;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+#scm-app .scm-calendar-week-head.is-today strong {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+#scm-app .scm-calendar-week-head.is-selected {
+  background: #fff7ed;
+}
+
+#scm-app .scm-calendar-week-head.is-selected strong {
+  box-shadow: inset 0 0 0 2px #f97316;
+  color: #ea580c;
+}
+
+#scm-app .scm-calendar-time-slot {
+  cursor: pointer;
+  min-height: 42px;
+  overflow: hidden;
+  padding: 3px 5px !important;
+  position: relative;
+  text-align: left;
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+#scm-app .scm-calendar-time-slot:hover,
+#scm-app .scm-calendar-time-slot.is-selecting {
+  background: #fff7ed;
+  box-shadow: inset 0 0 0 1px #fb923c;
+}
+
+#scm-app .scm-calendar-time-slot.is-selected-day {
+  background-image: linear-gradient(90deg, rgba(249, 115, 22, 0.08), rgba(249, 115, 22, 0));
+}
+
+#scm-app .scm-calendar-time-slot.is-today {
+  background-color: #f8fbff;
+}
+
+#scm-app .scm-calendar-week-event {
+  background: #fff7ed;
+  border-left: 3px solid var(--event-color, #f97316);
+  border-radius: 8px;
+  color: #0f172a;
+  display: grid;
+  gap: 1px;
+  line-height: 1.1;
+  margin-bottom: 3px;
+  min-width: 0;
+  padding: 4px 6px !important;
+}
+
+#scm-app .scm-calendar-week-event strong {
+  font-size: 10px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#scm-app .scm-calendar-week-event em,
+#scm-app .scm-calendar-week-more {
+  color: #64748b;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 750;
+}
+
 #scm-app .scm-calendar-loading {
   align-items: center;
   background: #fff;

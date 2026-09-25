@@ -1447,6 +1447,8 @@
       var calendarContractCache = {};
       var holidayCache = {};
       var calendarBootstrapPromise = null;
+      var calendarDisplayMode = "month";
+      var weekSlotSelection = null;
 
       panel.querySelectorAll("[data-scm-calendar-open-path]").forEach(function (btn) {
         btn.addEventListener("click", function () {
@@ -1687,6 +1689,56 @@
 
       function monthRange(date) {
         return { from: toDateKey(startOfMonth(date)), to: toDateKey(endOfMonth(date)) };
+      }
+
+      function dateFromKey(value) {
+        var parts = String(value || "").slice(0, 10).split("-");
+        if (parts.length !== 3) return null;
+        var date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        return Number.isNaN(date.getTime()) ? null : date;
+      }
+
+      function startOfWeek(date) {
+        var d = new Date(date || new Date());
+        var weekday = d.getDay();
+        d.setDate(d.getDate() + (weekday === 0 ? -6 : 1 - weekday));
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }
+
+      function weekRange(date) {
+        var start = startOfWeek(date || new Date());
+        return { from: toDateKey(start), to: toDateKey(addDays(start, 6)) };
+      }
+
+      function activeCalendarRange() {
+        if (calendarDisplayMode === "week") {
+          return weekRange(dateFromKey(selectedDay) || currentMonth || new Date());
+        }
+        return monthRange(currentMonth);
+      }
+
+      function weekLabel(date) {
+        var start = startOfWeek(date || new Date());
+        var end = addDays(start, 6);
+        var sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+        var startLabel = start.toLocaleDateString("es-CO", { day: "2-digit", month: "short" }).replace(/\./g, "");
+        var endLabel = end.toLocaleDateString("es-CO", sameMonth ? { day: "2-digit", month: "short", year: "numeric" } : { day: "2-digit", month: "short", year: "numeric" }).replace(/\./g, "");
+        return capitalizeFirst(startLabel + " - " + endLabel);
+      }
+
+      function timeFromMinutes(minutes) {
+        minutes = Math.max(0, Math.min(23 * 60 + 59, Number(minutes) || 0));
+        var hour = Math.floor(minutes / 60);
+        var minute = minutes % 60;
+        return String(hour).padStart(2, "0") + ":" + String(minute).padStart(2, "0");
+      }
+
+      function displayHourFromMinutes(minutes) {
+        var hour = Math.floor((Number(minutes) || 0) / 60);
+        var suffix = hour >= 12 ? "PM" : "AM";
+        var displayHour = hour % 12 || 12;
+        return displayHour + " " + suffix;
       }
 
       function calendarDayTitle(value) {
@@ -2121,8 +2173,208 @@
         eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<div class="scm-calendar-empty-day"><span class="material-symbols-outlined">event_busy</span><strong>' + (isDueCalendar ? "Sin vencimientos para este día" : "Sin eventos para este día") + '</strong><p>' + (isDueCalendar ? "No hay controles vencidos o pendientes en la fecha seleccionada." : "Tu agenda está libre para este día. Puedes coordinar revisiones o citas.") + "</p></div>";
       }
 
-      function renderCalendarGrid() {
+      function openCreateEventWithDefaults(defaults) {
+        defaults = defaults || {};
+        if (isDueCalendar) return;
+        if (defaults.date) {
+          selectedDay = String(defaults.date || selectedDay).slice(0, 10);
+          var parsed = dateFromKey(selectedDay);
+          if (parsed) currentMonth = startOfMonth(parsed);
+        }
+        renderCalendarGrid();
+        renderSelectedDay();
+        if (allowedEmployees.length) {
+          openCreateEventPopup("single", defaults);
+          return;
+        }
+        withPanelLoader(
+          function () {
+            return calendarBootstrapPromise || loadFuncionariosFallback();
+          },
+          "Cargando funcionarios",
+          "Estamos consultando los funcionarios disponibles.",
+        ).then(function () {
+          if (!allowedEmployees.length) {
+            showToast("error", "No fue posible cargar funcionarios para crear el evento.");
+            return;
+          }
+          openCreateEventPopup("single", defaults);
+        });
+      }
+
+      function updateCalendarViewButtons() {
+        panel.querySelectorAll("[data-scm-calendar-view-mode]").forEach(function (btn) {
+          var mode = btn.getAttribute("data-scm-calendar-view-mode") || "month";
+          var active = mode === calendarDisplayMode;
+          btn.classList.toggle("active", active);
+          btn.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+        panel.classList.toggle("scm-calendar-panel--week", calendarDisplayMode === "week");
+      }
+
+      function eventMinutes(row, key) {
+        var value = String((row && row[key]) || "").replace("T", " ");
+        var match = value.match(/\s(\d{2}):(\d{2})/);
+        if (!match) return null;
+        return (Number(match[1]) * 60) + Number(match[2]);
+      }
+
+      function weekSlotEvents(dateKey, startMinutes, endMinutes) {
+        return calendarEvents.filter(function (row) {
+          if (eventDateKey(row) !== dateKey) return false;
+          var start = eventMinutes(row, "fecha_inicio");
+          return start !== null && start >= startMinutes && start < endMinutes;
+        }).sort(function (a, b) {
+          return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+        });
+      }
+
+      function updateWeekSelection(grid, dateKey, startMinutes, endMinutes) {
+        if (!grid) return;
+        var min = Math.min(startMinutes, endMinutes);
+        var max = Math.max(startMinutes, endMinutes);
+        grid.querySelectorAll("[data-scm-calendar-week-slot]").forEach(function (slot) {
+          var slotDate = slot.getAttribute("data-date") || "";
+          var slotStart = Number(slot.getAttribute("data-start") || 0);
+          var slotEnd = Number(slot.getAttribute("data-end") || 0);
+          slot.classList.toggle("is-selecting", slotDate === dateKey && slotStart < max && slotEnd > min);
+        });
+      }
+
+      function clearWeekSelection(grid) {
+        weekSlotSelection = null;
+        if (!grid) return;
+        grid.querySelectorAll(".is-selecting").forEach(function (slot) {
+          slot.classList.remove("is-selecting");
+        });
+      }
+
+      function slotFromEvent(event) {
+        return event && event.target && event.target.closest ? event.target.closest("[data-scm-calendar-week-slot]") : null;
+      }
+
+      function openFromWeekSlot(slot, selection) {
+        if (!slot) return;
+        var dateKey = slot.getAttribute("data-date") || selectedDay;
+        var startMinutes = Number(slot.getAttribute("data-start") || 0);
+        var endMinutes = Number(slot.getAttribute("data-end") || 0);
+        if (selection && selection.date === dateKey) {
+          var slotStart = Number(slot.getAttribute("data-start") || 0);
+          var slotEnd = Number(slot.getAttribute("data-end") || 0);
+          startMinutes = Math.min(selection.start, slotStart);
+          endMinutes = selection.start === slotStart
+            ? Math.min(selection.start + 60, 21 * 60)
+            : Math.max(selection.start + 30, slotEnd);
+        } else {
+          endMinutes = Math.min(startMinutes + 60, 21 * 60);
+        }
+        if (endMinutes <= startMinutes) endMinutes = Math.min(startMinutes + 60, 21 * 60);
+        if (endMinutes <= startMinutes) endMinutes = startMinutes + 30;
+        openCreateEventWithDefaults({
+          date: dateKey,
+          start: timeFromMinutes(startMinutes),
+          end: timeFromMinutes(endMinutes),
+        });
+      }
+
+      function renderWeekGrid() {
         if (!monthGrid) return;
+        updateCalendarViewButtons();
+        var base = dateFromKey(selectedDay) || currentMonth || new Date();
+        var start = startOfWeek(base);
+        var todayKey = toDateKey(new Date());
+        if (titleEl) titleEl.textContent = weekLabel(base);
+        var days = [];
+        for (var dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+          days.push(addDays(start, dayIndex));
+        }
+        var html = '<div class="scm-calendar-time-grid" data-scm-calendar-week-grid>';
+        html += '<div class="scm-calendar-time-gutter scm-calendar-time-gutter--head">GMT-05</div>';
+        days.forEach(function (date) {
+          var key = toDateKey(date);
+          var classes = "scm-calendar-week-head";
+          if (key === todayKey) classes += " is-today";
+          if (key === selectedDay) classes += " is-selected";
+          html += '<button type="button" class="' + classes + '" data-scm-calendar-week-day="' + escHtml(key) + '">' +
+            '<span>' + escHtml(date.toLocaleDateString("es-CO", { weekday: "short" }).replace(/\./g, "")) + '</span>' +
+            '<strong>' + String(date.getDate()) + '</strong>' +
+            '</button>';
+        });
+        for (var minutes = 8 * 60; minutes < 21 * 60; minutes += 30) {
+          var label = minutes % 60 === 0 ? displayHourFromMinutes(minutes) : "";
+          html += '<div class="scm-calendar-time-gutter">' + escHtml(label) + '</div>';
+          days.forEach(function (date) {
+            var key = toDateKey(date);
+            var slotEnd = minutes + 30;
+            var slotRows = weekSlotEvents(key, minutes, slotEnd);
+            var slotClasses = "scm-calendar-time-slot";
+            if (key === todayKey) slotClasses += " is-today";
+            if (key === selectedDay) slotClasses += " is-selected-day";
+            html += '<button type="button" class="' + slotClasses + '" data-scm-calendar-week-slot data-date="' + escHtml(key) + '" data-start="' + String(minutes) + '" data-end="' + String(slotEnd) + '" aria-label="' + escHtml(calendarDayTitle(key) + " " + timeFromMinutes(minutes)) + '">';
+            slotRows.slice(0, 2).forEach(function (row) {
+              html += '<span class="scm-calendar-week-event" style="--event-color:' + escHtml(row.color || "#f97316") + '">' +
+                '<strong>' + escHtml(row.titulo || (isDueCalendar ? "Vencimiento" : "Evento")) + '</strong>' +
+                '<em>' + escHtml(timePartFromDateTime(row.fecha_inicio) || timeFromMinutes(minutes)) + '</em>' +
+                '</span>';
+            });
+            if (slotRows.length > 2) html += '<span class="scm-calendar-week-more">+' + String(slotRows.length - 2) + '</span>';
+            html += '</button>';
+          });
+        }
+        html += '</div>';
+        monthGrid.innerHTML = html;
+        var grid = monthGrid.querySelector("[data-scm-calendar-week-grid]");
+        monthGrid.querySelectorAll("[data-scm-calendar-week-day]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            selectedDay = btn.getAttribute("data-scm-calendar-week-day") || selectedDay;
+            var parsed = dateFromKey(selectedDay);
+            if (parsed) currentMonth = startOfMonth(parsed);
+            renderCalendarGrid();
+            renderSelectedDay();
+          });
+        });
+        if (!grid) return;
+        grid.addEventListener("pointerdown", function (event) {
+          var slot = slotFromEvent(event);
+          if (!slot || !grid.contains(slot)) return;
+          event.preventDefault();
+          selectedDay = slot.getAttribute("data-date") || selectedDay;
+          weekSlotSelection = {
+            date: selectedDay,
+            start: Number(slot.getAttribute("data-start") || 0),
+          };
+          updateWeekSelection(grid, weekSlotSelection.date, weekSlotSelection.start, Number(slot.getAttribute("data-end") || 0));
+          if (slot.setPointerCapture && event.pointerId) {
+            try { slot.setPointerCapture(event.pointerId); } catch (err) {}
+          }
+        });
+        grid.addEventListener("pointerover", function (event) {
+          if (!weekSlotSelection) return;
+          var slot = slotFromEvent(event);
+          if (!slot || slot.getAttribute("data-date") !== weekSlotSelection.date) return;
+          updateWeekSelection(grid, weekSlotSelection.date, weekSlotSelection.start, Number(slot.getAttribute("data-end") || 0));
+        });
+        grid.addEventListener("pointerup", function (event) {
+          var slot = slotFromEvent(event);
+          var selection = weekSlotSelection;
+          clearWeekSelection(grid);
+          if (!slot) return;
+          selectedDay = slot.getAttribute("data-date") || selectedDay;
+          renderSelectedDay();
+          if (isDueCalendar) {
+            renderCalendarGrid();
+            return;
+          }
+          openFromWeekSlot(slot, selection);
+        });
+        grid.addEventListener("pointercancel", function () {
+          clearWeekSelection(grid);
+        });
+      }
+
+      function renderMonthGrid() {
+        if (!monthGrid) return;
+        updateCalendarViewButtons();
         if (titleEl) titleEl.textContent = monthLabel(currentMonth);
         var prevMonthBtn = panel.querySelector("[data-scm-calendar-prev]");
         var nextMonthBtn = panel.querySelector("[data-scm-calendar-next]");
@@ -2162,25 +2414,18 @@
             renderCalendarGrid();
             renderSelectedDay();
             if (isDueCalendar) return;
-            if (allowedEmployees.length) {
-              openCreateEventPopup("single");
-              return;
-            }
-            withPanelLoader(
-              function () {
-                return calendarBootstrapPromise || loadFuncionariosFallback();
-              },
-              "Cargando funcionarios",
-              "Estamos consultando los funcionarios disponibles.",
-            ).then(function () {
-              if (!allowedEmployees.length) {
-                showToast("error", "No fue posible cargar funcionarios para crear el evento.");
-                return;
-              }
-              openCreateEventPopup("single");
-            });
+            openCreateEventWithDefaults({ date: selectedDay });
           });
         });
+      }
+
+      function renderCalendarGrid() {
+        if (!monthGrid) return;
+        if (calendarDisplayMode === "week") {
+          renderWeekGrid();
+          return;
+        }
+        renderMonthGrid();
       }
 
       function renderEvents(payload) {
@@ -2382,7 +2627,7 @@
           return Promise.resolve();
         }
         if (spinner) spinner.classList.add("active");
-        var range = monthRange(currentMonth);
+        var range = activeCalendarRange();
         return dashboardAjax(actionAdminDueCalendar, { fecha_inicio: range.from, fecha_fin: range.to, include_summary: "1" })
           .then(function (data) {
             renderDueCalendar(data || {});
@@ -2410,7 +2655,7 @@
         }
         if (spinner) spinner.classList.add("active");
         enforceLockedEmployeeFilter();
-        var range = monthRange(currentMonth);
+        var range = activeCalendarRange();
         var filters = { pagina: 1, limite: 500, fecha_inicio: range.from, fecha_fin: range.to };
         var selectedEmployeeId = "";
         if (filterForm) {
@@ -3523,8 +3768,9 @@
           });
       }
 
-      function openCreateEventPopup(mode) {
+      function openCreateEventPopup(mode, defaults) {
         mode = mode === "multiple" ? "multiple" : "single";
+        defaults = defaults || {};
         var preselectedEmployee = selectedEmployeeFromFilter();
         var employeeOptions = allowedEmployees.map(function (row) { return employeeOptionHtml(row, preselectedEmployee); }).join("");
         var categoryOptions = calendarAdminCategories().map(function (row) {
@@ -3536,7 +3782,12 @@
           ? employeeMultiPickerHtml(preselectedEmployee)
           : '<select class="select select-bordered select-sm scm-select" name="empleados" required><option value="">Selecciona funcionario</option>' + employeeOptions + "</select>";
         var ticketFieldsHtml = "";
-        var defaultDate = escHtml(selectedDay || toDateKey(new Date()));
+        var defaultDateValue = String(defaults.date || selectedDay || toDateKey(new Date())).slice(0, 10);
+        var defaultStartValue = String(defaults.start || "").slice(0, 5);
+        var defaultEndValue = String(defaults.end || "").slice(0, 5);
+        var defaultDate = escHtml(defaultDateValue);
+        var defaultStart = escHtml(defaultStartValue);
+        var defaultEnd = escHtml(defaultEndValue);
         var locationFieldsHtml = '<section class="scm-calendar-location-section scm-calendar-field-full">' +
           '<div class="scm-calendar-section-heading"><span>Ubicaci&oacute;n del evento</span></div>' +
           '<div class="scm-calendar-location-fields">' +
@@ -3559,8 +3810,8 @@
           '<label class="scm-seg-field scm-calendar-field-full"><span>Funcionario responsable <b>*</b></span>' + employeesControl + '</label>' +
           '<div class="scm-calendar-create-row scm-calendar-date-row">' +
           '<label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + defaultDate + '"></label>' +
-          '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required></label>' +
-          '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required></label>' +
+          '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required value="' + defaultStart + '"></label>' +
+          '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required value="' + defaultEnd + '"></label>' +
           '</div>' +
           '<div class="scm-calendar-recurrence scm-calendar-field-full" data-calendar-recurrence>' +
           '<label class="scm-calendar-recurrence-toggle"><input type="checkbox" name="es_recurrente" value="1" data-calendar-recurrence-toggle><span>Evento recurrente / m&uacute;ltiples fechas</span><em data-calendar-recurrence-badge>Inactivo</em></label>' +
@@ -4516,6 +4767,7 @@
       var prevBtn = panel.querySelector("[data-scm-calendar-prev]");
       var nextBtn = panel.querySelector("[data-scm-calendar-next]");
       var todayBtn = panel.querySelector("[data-scm-calendar-today-btn]");
+      var viewModeBtns = panel.querySelectorAll("[data-scm-calendar-view-mode]");
       if (upcomingAllBtn) {
         upcomingAllBtn.addEventListener("click", function () {
           showAllUpcoming = !showAllUpcoming;
@@ -4524,15 +4776,29 @@
       }
       if (prevBtn) {
         prevBtn.addEventListener("click", function () {
-          currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
-          selectedDay = toDateKey(currentMonth);
+          if (calendarDisplayMode === "week") {
+            var prevBase = dateFromKey(selectedDay) || currentMonth || new Date();
+            var prevDay = addDays(prevBase, -7);
+            selectedDay = toDateKey(prevDay);
+            currentMonth = startOfMonth(prevDay);
+          } else {
+            currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+            selectedDay = toDateKey(currentMonth);
+          }
           loadEvents();
         });
       }
       if (nextBtn) {
         nextBtn.addEventListener("click", function () {
-          currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
-          selectedDay = toDateKey(currentMonth);
+          if (calendarDisplayMode === "week") {
+            var nextBase = dateFromKey(selectedDay) || currentMonth || new Date();
+            var nextDay = addDays(nextBase, 7);
+            selectedDay = toDateKey(nextDay);
+            currentMonth = startOfMonth(nextDay);
+          } else {
+            currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+            selectedDay = toDateKey(currentMonth);
+          }
           loadEvents();
         });
       }
@@ -4543,11 +4809,22 @@
           loadEvents();
         });
       }
+      viewModeBtns.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var nextMode = btn.getAttribute("data-scm-calendar-view-mode") === "week" ? "week" : "month";
+          if (nextMode === calendarDisplayMode) return;
+          calendarDisplayMode = nextMode;
+          var parsed = dateFromKey(selectedDay) || currentMonth || new Date();
+          currentMonth = startOfMonth(parsed);
+          updateCalendarViewButtons();
+          loadEvents();
+        });
+      });
       panel.querySelectorAll("[data-scm-calendar-open-create]").forEach(function (btn) {
         btn.addEventListener("click", function () {
           var mode = btn.getAttribute("data-calendar-mode") || "single";
           if (allowedEmployees.length) {
-            openCreateEventPopup(mode);
+            openCreateEventPopup(mode, { date: selectedDay });
             return;
           }
           withPanelLoader(
@@ -4561,7 +4838,7 @@
               showToast("error", "No fue posible cargar funcionarios para crear el evento.");
               return;
             }
-            openCreateEventPopup(mode);
+            openCreateEventPopup(mode, { date: selectedDay });
           });
         });
       });
