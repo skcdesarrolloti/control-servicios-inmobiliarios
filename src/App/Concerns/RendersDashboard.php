@@ -140,8 +140,6 @@ trait RendersDashboard
       'historial_inmueble' => 'scm-panel-inicio',
       'property_history' => 'scm-panel-inicio',
       'property-history' => 'scm-panel-inicio',
-      'actividades_realizadas' => 'scm-panel-inicio',
-      'completed' => 'scm-panel-inicio',
       'mi_calendario' => 'scm-panel-inicio',
       'mine' => 'scm-panel-inicio',
       'calendario_equipo' => 'scm-panel-inicio',
@@ -490,7 +488,6 @@ trait RendersDashboard
         'internal_notifications_read' => self::AJAX_INTERNAL_NOTIFICATIONS_READ,
         'metrics_execution' => self::AJAX_METRICS_EXECUTION,
         'dashboard_home' => self::AJAX_DASHBOARD_HOME,
-        'dashboard_completed_activities' => self::AJAX_DASHBOARD_COMPLETED_ACTIVITIES,
         'property_history_report' => self::AJAX_PROPERTY_HISTORY_REPORT,
         'property_history_pdf' => self::AJAX_PROPERTY_HISTORY_PDF,
         'contract_termination_requests' => self::AJAX_CONTRACT_TERMINATION_REQUESTS,
@@ -761,8 +758,6 @@ trait RendersDashboard
           $activeHomeSection = 'scm-home-calendar-section-due';
         } elseif ($subtabReq === 'property-history' || $subtabReq === 'property_history' || $tabKey === 'historial' || $tabKey === 'historial_inmueble') {
           $activeHomeSection = 'scm-home-calendar-section-property-history';
-        } elseif ($subtabReq === 'completed' || $subtabReq === 'done' || $tabKey === 'actividades_realizadas') {
-          $activeHomeSection = 'scm-home-calendar-section-completed';
         } elseif ($subtabReq === 'team' || $tabKey === 'calendario_equipo') {
           $activeHomeSection = 'scm-home-calendar-section-team';
         } elseif ($subtabReq === 'contract-termination' || $subtabReq === 'contract_termination' || in_array($tabKey, ['contract_termination', 'contrato_terminacion', 'solicitudes_terminacion'], true)) {
@@ -777,7 +772,6 @@ trait RendersDashboard
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-mine' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-mine"><span class="material-symbols-outlined" aria-hidden="true">calendar_month</span><span>Mi calendario</span></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-team' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-team"><span class="material-symbols-outlined" aria-hidden="true">groups</span><span>Calendario equipo</span></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-due' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-due"><span class="material-symbols-outlined" aria-hidden="true">schedule</span><span>Vencimientos</span><em data-scm-calendar-due-nav-count hidden>0</em></button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-completed' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-completed"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span><span>Actividades realizadas</span></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-property-history' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-property-history"><span class="material-symbols-outlined" aria-hidden="true">home</span><span>Historial inmueble</span></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-termination' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contract-termination"><span class="material-symbols-outlined" aria-hidden="true">description</span><span>Solicitudes de terminaci&oacute;n de contrato</span></button>
             </div>
@@ -813,48 +807,6 @@ trait RendersDashboard
                 'show_report_action' => false,
                 'show_pending_action' => false,
               ]); ?>
-            </div>
-            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-completed' ? ' active' : ''; ?>" id="scm-home-calendar-section-completed" data-calendar-section-panel>
-              <section class="scm-completed-activities-panel" data-scm-completed-activities-panel aria-live="polite">
-                <div class="scm-completed-activities-head">
-                  <div>
-                    <span class="scm-calendar-action-kicker">Realizado</span>
-                    <h3>Actividades realizadas</h3>
-                    <p>Eventos cumplidos y resumen de acciones registradas durante el mes actual.</p>
-                  </div>
-                  <button type="button" class="scm-case-work-btn" data-scm-completed-activities-refresh>Actualizar</button>
-                </div>
-                <form class="scm-completed-activities-filters" data-scm-completed-activities-filter autocomplete="off">
-                  <div class="scm-field">
-                    <label for="scm_completed_funcionario">Funcionario</label>
-                    <select id="scm_completed_funcionario" name="funcionario" class="select select-bordered select-sm scm-select scm-select2" data-placeholder="Selecciona funcionario" data-current-employee="<?php echo esc_attr($currentEmployeeId); ?>">
-                      <option value="">Todos</option>
-                      <?php foreach (($filterOptions['funcionarios'] ?? []) as $func): $fId = trim((string)($func['id'] ?? '')); if ($fId === '') continue; ?>
-                        <option value="<?php echo esc_attr($fId); ?>"<?php echo $fId === $currentEmployeeId ? ' selected' : ''; ?>><?php echo esc_html((string)($func['label'] ?? $fId)); ?></option>
-                      <?php endforeach; ?>
-                    </select>
-                  </div>
-                  <button type="submit" class="scm-case-work-btn scm-primary-action">Filtrar</button>
-                </form>
-                <div class="scm-completed-activities-status" data-scm-completed-activities-status>Cargando actividades realizadas...</div>
-                <div class="scm-completed-activities-grid">
-                  <section class="scm-completed-activities-block">
-                    <div class="scm-completed-activities-block-head">
-                      <span class="scm-calendar-action-kicker">Agenda</span>
-                      <h4>Eventos realizados</h4>
-                    </div>
-                    <div class="scm-completed-activities-list" data-scm-completed-events></div>
-                  </section>
-                  <section class="scm-completed-activities-block">
-                    <div class="scm-completed-activities-block-head">
-                      <span class="scm-calendar-action-kicker">Resumen</span>
-                      <h4>Resumen de lo realizado</h4>
-                    </div>
-                    <div class="scm-completed-activities-kpis" data-scm-completed-activities-kpis></div>
-                    <div class="scm-completed-activities-list" data-scm-completed-actions></div>
-                  </section>
-                </div>
-              </section>
             </div>
             <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-property-history' ? ' active' : ''; ?>" id="scm-home-calendar-section-property-history" data-calendar-section-panel>
               <section class="scm-property-history-panel" data-scm-property-history-panel aria-live="polite">

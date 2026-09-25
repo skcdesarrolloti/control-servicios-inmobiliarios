@@ -105,7 +105,6 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_INTERNAL_NOTIFICATIONS_READ = 'scm_internal_notifications_read';
   const AJAX_METRICS_EXECUTION = 'scm_metricas_ejecucion_funcionario';
   const AJAX_DASHBOARD_HOME = 'scm_dashboard_inicio';
-  const AJAX_DASHBOARD_COMPLETED_ACTIVITIES = 'scm_dashboard_actividades_realizadas';
   const AJAX_PROPERTY_HISTORY_REPORT = 'scm_historial_inmueble_consultar';
   const AJAX_PROPERTY_HISTORY_PDF = 'scm_historial_inmueble_pdf';
   const AJAX_CONTRACT_TERMINATION_REQUESTS = 'scm_solicitudes_terminacion_contrato';

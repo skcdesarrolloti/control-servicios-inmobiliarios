@@ -100,7 +100,6 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_INTERNAL_NOTIFICATIONS_READ => 'ajax_handler_internal_notifications_read',
       SuCasaControlServiciosInmobiliarios::AJAX_METRICS_EXECUTION => 'ajax_handler_metrics_execution',
       SuCasaControlServiciosInmobiliarios::AJAX_DASHBOARD_HOME => 'ajax_handler_dashboard_home',
-      SuCasaControlServiciosInmobiliarios::AJAX_DASHBOARD_COMPLETED_ACTIVITIES => 'ajax_handler_dashboard_completed_activities',
       SuCasaControlServiciosInmobiliarios::AJAX_PROPERTY_HISTORY_REPORT => 'ajax_handler_property_history_report',
       SuCasaControlServiciosInmobiliarios::AJAX_PROPERTY_HISTORY_PDF => 'ajax_handler_property_history_pdf',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACT_TERMINATION_REQUESTS => 'ajax_handler_contract_termination_requests',

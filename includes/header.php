@@ -234,8 +234,6 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'due';
   } elseif ($tabParam === 'inicio' && $subtabParam === 'team') {
     $current_page = 'team';
-  } elseif (in_array($tabParam, ['actividades_realizadas'], true) || ($tabParam === 'inicio' && in_array($subtabParam, ['done', 'completed'], true))) {
-    $current_page = 'done';
   } elseif (in_array($tabParam, ['historial', 'historial_inmueble'], true) || ($tabParam === 'inicio' && in_array($subtabParam, ['property_history', 'property-history'], true))) {
     $current_page = 'property_history';
   } elseif (in_array($tabParam, ['terminacion_contrato', 'terminacion'], true) || ($tabParam === 'inicio' && in_array($subtabParam, ['contract_terminations', 'contract-termination'], true))) {
@@ -291,7 +289,7 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 };
 
 // Orden solicitado:
-// 1. Inicio (Dropdown: Mi Calendario, Calendario Equipo, Vencimientos, Actividades Realizadas, Historial Inmueble, Solicitudes Terminación)
+// 1. Inicio (Dropdown: Mi Calendario, Calendario Equipo, Vencimientos, Historial Inmueble, Solicitudes Terminación)
 // 2. Gestión de Casos & Tickets (Dropdown: Tickets Abiertos, Mis Tickets, Tickets Postergados, Tickets Cerrados)
 // 3. Actividades Administrativas (Dropdown: Notificaciones, Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
 // 4. Métricas y Dashboard
@@ -337,15 +335,6 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=vencimientos',
         'icon' => 'calendar_month',
         'perms' => ['calendario_actividades', 'reportes_administrativos_pendientes', 'abiertos'],
-      ],
-      'done' => [
-        'key' => 'done',
-        'label' => 'Actividades realizadas',
-        'panel_id' => 'scm-panel-inicio',
-        'subtab' => 'completed',
-        'url' => $baseUrl . '/index.php?tab=actividades_realizadas',
-        'icon' => 'task_alt',
-        'perms' => ['calendario_actividades', 'abiertos'],
       ],
       'property_history' => [
         'key' => 'property_history',

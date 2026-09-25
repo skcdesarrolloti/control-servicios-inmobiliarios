@@ -214,8 +214,6 @@
       actions.internal_notifications_read || "";
     var actionMetricsExecution = actions.metrics_execution || "";
     var actionDashboardHome = actions.dashboard_home || "";
-    var actionDashboardCompletedActivities =
-      actions.dashboard_completed_activities || "";
     var actionPropertyHistoryReport = actions.property_history_report || "";
     var actionPropertyHistoryPdf = actions.property_history_pdf || "";
     var actionContractTerminationRequests =
@@ -11147,7 +11145,7 @@
       }
       runtime.funcionarios = funcionarioOptions;
       var mappings = [
-        ["select[name$='id_empleado'], select[name$='_empleado'], select[name='empleado'], [data-scm-execution-form] select[name='funcionario'], [data-scm-completed-activities-filter] select[name='funcionario']", funcionarioOptions, "id", "label"],
+        ["select[name$='id_empleado'], select[name$='_empleado'], select[name='empleado'], [data-scm-execution-form] select[name='funcionario']", funcionarioOptions, "id", "label"],
         ["select[name$='barrio']", options.barrios || [], "value", "label"],
         ["select[name$='estado_admin']", options.estado_admin || [], "value", "label"],
         ["select[name$='prioridad']", options.prioridad || [], "value", "label"],
@@ -11227,239 +11225,10 @@
     }
 
     var dashboardHomePromise = null;
-    var dashboardCompletedActivitiesPromise = null;
     var dashboardMetricsPromise = null;
-    var dashboardCompletedActivitiesById = {};
     var propertyHistoryCurrentFilters = { contract_number: "", property_code: "" };
     var propertyHistorySectionsByKey = {};
     var contractTerminationRowsByPk = {};
-
-    function formatDashboardCount(value) {
-      var numericValue = Number(value);
-      if (!Number.isFinite(numericValue)) return "0";
-      return Math.max(0, Math.round(numericValue)).toLocaleString("es-CO");
-    }
-
-    function renderDashboardHome(summary, generatedAt) {
-      var panel = root.querySelector("#scm-panel-inicio");
-      if (!panel) return;
-
-      panel.querySelectorAll("[data-scm-home-metric]").forEach(function (node) {
-        var key = node.getAttribute("data-scm-home-metric") || "";
-        node.textContent = formatDashboardCount(summary && summary[key]);
-      });
-      var categories =
-        summary && summary.por_categoria && typeof summary.por_categoria === "object"
-          ? summary.por_categoria
-          : {};
-      panel.querySelectorAll("[data-scm-home-category]").forEach(function (node) {
-        var category = node.getAttribute("data-scm-home-category") || "";
-        node.textContent = formatDashboardCount(categories[category]);
-      });
-
-      var status = panel.querySelector("[data-scm-home-status]");
-      if (status) status.hidden = true;
-      var updated = panel.querySelector("[data-scm-home-updated]");
-      if (updated && generatedAt) {
-        var timestamp = new Date(generatedAt);
-        if (!Number.isNaN(timestamp.getTime())) {
-          updated.textContent =
-            "Actualizado a las " +
-            timestamp.toLocaleTimeString("es-CO", {
-              hour: "2-digit",
-              minute: "2-digit",
-            });
-        }
-      }
-      panel.setAttribute("data-scm-loaded", "1");
-    }
-
-    function showDashboardHomeMessage(message, isError) {
-      var panel = root.querySelector("#scm-panel-inicio");
-      if (!panel) return;
-      var status = panel.querySelector("[data-scm-home-status]");
-      var textNode = panel.querySelector("[data-scm-home-status-text]");
-      var retryButton = panel.querySelector("[data-scm-home-retry]");
-      if (status) {
-        status.hidden = false;
-        status.classList.toggle("is-error", Boolean(isError));
-      }
-      if (textNode) textNode.textContent = message;
-      if (retryButton) retryButton.hidden = !isError;
-    }
-
-    function completedActivityRowHtml(row) {
-      row = row || {};
-      var ticket = String(row.ticket || row.ticket_pk || "").trim();
-      var ticketPk = String(row.ticket_pk || "").trim();
-      var eventId = String(row.id || "").trim();
-      var rowId = String(row._completed_key || row.id || "").trim();
-      var detail = String(row.detalle || "").trim();
-      var person = String(row.funcionario || row.funcionario_label || "").trim();
-      var hasTicket = ticket && ticket !== "-";
-      var actionLabel = hasTicket ? "Ver caso" : (String(row.type || "") === "evento" ? "Ver evento" : "Ver detalle");
-      return '<article class="scm-completed-activity-row" data-scm-completed-row="' + escHtml(rowId) + '">' +
-        '<div class="scm-completed-activity-date">' + escHtml(row.fecha || "-") + "</div>" +
-        '<div class="scm-completed-activity-main">' +
-          '<strong>' + escHtml(row.titulo || row.asunto || row.label || "Actividad realizada") + "</strong>" +
-          (detail ? '<span>' + escHtml(detail) + "</span>" : "") +
-          '<small>' +
-            escHtml(row.label || "Actividad") +
-            (ticket && ticket !== "-" ? " · Caso #" + escHtml(ticket) : "") +
-            (person ? " · " + escHtml(person) : "") +
-          "</small>" +
-        "</div>" +
-        '<div class="scm-completed-activity-actions">' +
-          '<button type="button" class="scm-case-work-btn" data-scm-completed-open-detail data-completed-row="' + escHtml(rowId) + '"' +
-            (hasTicket ? ' data-ticket-id="' + escHtml(ticketPk || ticket) + '"' : "") +
-            (eventId ? ' data-event-id="' + escHtml(eventId) + '"' : "") +
-          '>' + actionLabel + '</button>' +
-        "</div>" +
-      "</article>";
-    }
-
-    function completedActivityDetailHtml(row) {
-      row = row || {};
-      var ticket = String(row.ticket || row.ticket_pk || "").trim();
-      var fields = [
-        ["Tipo", row.label || row.type || "Actividad"],
-        ["Fecha", row.fecha || "-"],
-        ["Funcionario", row.funcionario_label || row.funcionario || "-"],
-        ["Caso", ticket && ticket !== "-" ? "#" + ticket : ""],
-        ["Contrato", row.contrato || ""],
-        ["Inmueble", row.inmueble || ""],
-        ["Dirección", row.direccion || ""],
-        ["Estado", row.estado || ""],
-        ["Estado administrativo", row.estado_admin || ""],
-      ].filter(function (item) { return String(item[1] || "").trim() !== ""; });
-      return '<div class="scm-calendar-native-detail scm-completed-activity-detail">' +
-        '<div class="scm-case-calendar-event-mini-head"><span>Detalle</span><strong>' + escHtml(row.titulo || row.asunto || row.label || "Actividad realizada") + "</strong></div>" +
-        '<div class="scm-case-calendar-event-mini-grid">' +
-          fields.map(function (item) {
-            return '<div><small>' + escHtml(item[0]) + '</small><strong>' + escHtml(item[1]) + '</strong></div>';
-          }).join("") +
-        "</div>" +
-        (row.detalle ? '<div class="scm-case-calendar-event-mini-description"><small>Observaci&oacute;n</small><p>' + escHtml(row.detalle) + "</p></div>" : "") +
-      "</div>";
-    }
-
-    function openCompletedActivityDetail(rowId, ticketId) {
-      var row = dashboardCompletedActivitiesById[String(rowId || "")] || {};
-      ticketId = String(ticketId || row.ticket_pk || row.ticket || "").trim();
-      if (ticketId && ticketId !== "-" && typeof window.scmOpenCase === "function") {
-        var selectors = [
-          '.scm-btn-case[data-ticket-pk="' + cssAttrValue(ticketId) + '"]',
-          '.scm-btn-case[data-ticket="' + cssAttrValue(ticketId) + '"]',
-        ];
-        for (var i = 0; i < selectors.length; i += 1) {
-          var button = root.querySelector(selectors[i]) || document.querySelector(selectors[i]);
-          if (button) {
-            window.scmOpenCase(button);
-            return;
-          }
-        }
-      }
-      if (window.Swal && typeof window.Swal.fire === "function") {
-        window.Swal.fire({
-          title: "",
-          html: completedActivityDetailHtml(row),
-          width: 720,
-          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal" },
-          confirmButtonText: "Cerrar",
-          showCancelButton: false,
-        });
-      }
-    }
-
-    function renderCompletedActivities(data) {
-      var panel = root.querySelector("[data-scm-completed-activities-panel]");
-      if (!panel) return;
-      var totals = (data && data.totals) || {};
-      var kpis = [
-        ["total", "Total realizado"],
-        ["eventos", "Eventos"],
-        ["respuestas", "Respuestas"],
-        ["seguimientos", "Seguimientos"],
-        ["actas", "Actas"],
-        ["cerrados", "Cerrados"],
-        ["revisiones_servicios", "Rev. servicios públicos"],
-      ];
-      var kpiWrap = panel.querySelector("[data-scm-completed-activities-kpis]");
-      if (kpiWrap) {
-        kpiWrap.innerHTML = kpis.map(function (item) {
-          return '<div class="scm-completed-activity-kpi"><span>' + escHtml(item[1]) + '</span><strong>' + formatDashboardCount(totals[item[0]]) + "</strong></div>";
-        }).join("");
-      }
-
-      var eventsWrap = panel.querySelector("[data-scm-completed-events]");
-      var events = Array.isArray(data && data.events) ? data.events : [];
-      dashboardCompletedActivitiesById = {};
-      events.forEach(function (row, index) {
-        row._completed_key = "event-" + index + "-" + String(row.id || "");
-        dashboardCompletedActivitiesById[row._completed_key] = row;
-      });
-      var actions = Array.isArray(data && data.actions) ? data.actions : [];
-      actions.forEach(function (row, index) {
-        row._completed_key = "action-" + index + "-" + String(row.id || "");
-        dashboardCompletedActivitiesById[row._completed_key] = row;
-      });
-      if (eventsWrap) {
-        eventsWrap.innerHTML = events.length
-          ? events.map(completedActivityRowHtml).join("")
-          : '<div class="scm-empty scm-empty-cards">No hay eventos realizados en el rango visible.</div>';
-      }
-
-      var actionsWrap = panel.querySelector("[data-scm-completed-actions]");
-      if (actionsWrap) {
-        actionsWrap.innerHTML = actions.length
-          ? actions.map(completedActivityRowHtml).join("")
-          : '<div class="scm-empty scm-empty-cards">No hay acciones realizadas para resumir.</div>';
-      }
-
-      var status = panel.querySelector("[data-scm-completed-activities-status]");
-      if (status) {
-        status.classList.remove("is-error");
-        status.textContent = "Mostrando " + String(data.from || "") + " a " + String(data.to || "") + ".";
-      }
-      panel.setAttribute("data-scm-loaded", "1");
-    }
-
-    function loadCompletedActivities(force) {
-      var panel = root.querySelector("[data-scm-completed-activities-panel]");
-      if (!panel || !ajaxUrl || !actionDashboardCompletedActivities) {
-        return Promise.resolve();
-      }
-      if (!force && panel.getAttribute("data-scm-loaded") === "1") {
-        return Promise.resolve();
-      }
-      if (!force && dashboardCompletedActivitiesPromise) {
-        return dashboardCompletedActivitiesPromise;
-      }
-      var status = panel.querySelector("[data-scm-completed-activities-status]");
-      if (status) {
-        status.classList.remove("is-error");
-        status.textContent = "Cargando actividades realizadas...";
-      }
-      var from = dashboardDateKey(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-      var to = dashboardDateKey(new Date());
-      var filterForm = panel.querySelector("[data-scm-completed-activities-filter]");
-      var funcionarioSelect = filterForm ? filterForm.querySelector("select[name='funcionario']") : null;
-      dashboardCompletedActivitiesPromise = dashboardAction(actionDashboardCompletedActivities, {
-        fecha_desde: from,
-        fecha_hasta: to,
-        funcionario: funcionarioSelect ? funcionarioSelect.value : "",
-      }).then(function (data) {
-        renderCompletedActivities(data || {});
-      }).catch(function (error) {
-        if (status) {
-          status.classList.add("is-error");
-          status.textContent = error && error.message ? error.message : "No se pudieron cargar las actividades realizadas.";
-        }
-      }).finally(function () {
-        dashboardCompletedActivitiesPromise = null;
-      });
-      return dashboardCompletedActivitiesPromise;
-    }
 
     function propertyHistoryEmpty(message) {
       return '<div class="scm-empty scm-empty-cards">' + escHtml(message || "Sin información para mostrar.") + "</div>";
@@ -17956,9 +17725,6 @@
         });
         var activeSection = parentPanel.querySelector(".scm-calendar-section-panel.active");
         initCalendarPanel(activeSection || parentPanel);
-        if (target === "scm-home-calendar-section-completed") {
-          loadCompletedActivities(false);
-        }
         if (target === "scm-home-calendar-section-property-history") {
           var input = parentPanel.querySelector("#scm_property_history_contract");
           if (input) {
@@ -18012,13 +17778,6 @@
         return;
       }
 
-      var completedRefresh = event.target.closest("[data-scm-completed-activities-refresh]");
-      if (completedRefresh) {
-        event.preventDefault();
-        loadCompletedActivities(true);
-        return;
-      }
-
       var contractTerminationRefresh = event.target.closest("[data-scm-contract-termination-refresh]");
       if (contractTerminationRefresh) {
         event.preventDefault();
@@ -18039,16 +17798,6 @@
       if (contractTerminationCase) {
         event.preventDefault();
         dashboardOpenDueCase(contractTerminationCase);
-        return;
-      }
-
-      var completedDetail = event.target.closest("[data-scm-completed-open-detail]");
-      if (completedDetail) {
-        event.preventDefault();
-        openCompletedActivityDetail(
-          completedDetail.getAttribute("data-completed-row") || "",
-          completedDetail.getAttribute("data-ticket-id") || "",
-        );
         return;
       }
 
@@ -18087,28 +17836,7 @@
       maybeShowDashboardDuePopup("login");
     }, 0);
 
-    root.addEventListener("change", function (e) {
-      var completedEmployeeSelect = e.target && e.target.closest
-        ? e.target.closest("[data-scm-completed-activities-filter] select[name='funcionario']")
-        : null;
-      if (!completedEmployeeSelect) return;
-      var completedPanel = completedEmployeeSelect.closest("[data-scm-completed-activities-panel]");
-      if (completedPanel) completedPanel.setAttribute("data-scm-loaded", "0");
-      loadCompletedActivities(true);
-    });
-
     root.addEventListener("submit", function (e) {
-      var completedFilterForm = e.target && e.target.closest
-        ? e.target.closest("[data-scm-completed-activities-filter]")
-        : null;
-      if (completedFilterForm) {
-        e.preventDefault();
-        var completedPanel = completedFilterForm.closest("[data-scm-completed-activities-panel]");
-        if (completedPanel) completedPanel.setAttribute("data-scm-loaded", "0");
-        loadCompletedActivities(true);
-        return;
-      }
-
       var propertyHistoryForm = e.target && e.target.closest
         ? e.target.closest("[data-scm-property-history-form]")
         : null;
