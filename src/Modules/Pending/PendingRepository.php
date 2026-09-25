@@ -621,11 +621,12 @@ final class PendingRepository
           $ticketKeys[$key] = true;
         }
       }
-      foreach ([$row['id_contrato'] ?? '', $row['contrato'] ?? ''] as $id) {
-        $id = trim((string) $id);
-        if ($id !== '') {
-          $contractIds[$id] = true;
-        }
+      $contractId = trim((string) ($row['id_contrato'] ?? ''));
+      if ($contractId === '') {
+        $contractId = trim((string) ($row['contrato'] ?? ''));
+      }
+      if ($contractId !== '') {
+        $contractIds[$contractId] = true;
       }
       foreach ([
         $row['id_inmueble'] ?? '',
@@ -726,12 +727,12 @@ final class PendingRepository
         }
       }
 
-      foreach ([$row['id_contrato'] ?? '', $row['contrato'] ?? ''] as $contractId) {
-        $contractId = trim((string) $contractId);
-        if ($contractId !== '' && isset($contractById[$contractId])) {
-          $row['_scm_contrato_data'] = $contractById[$contractId];
-          break;
-        }
+      $contractId = trim((string) ($row['id_contrato'] ?? ''));
+      if ($contractId === '') {
+        $contractId = trim((string) ($row['contrato'] ?? ''));
+      }
+      if ($contractId !== '' && isset($contractById[$contractId])) {
+        $row['_scm_contrato_data'] = $contractById[$contractId];
       }
 
       $propertyId = '';

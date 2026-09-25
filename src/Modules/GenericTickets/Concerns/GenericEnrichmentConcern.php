@@ -30,7 +30,7 @@ trait GenericEnrichmentConcern
       foreach ($this->resolve_ticket_lookup_keys($row) as $key) {
         $ticketKeys[$key] = true;
       }
-      foreach ($this->split_id_values($this->first_existing_value($row, ['contrato', 'id_contrato'])) as $id) {
+      foreach ($this->split_id_values($this->first_existing_value($row, ['id_contrato', 'contrato'])) as $id) {
         $contractIds[$id] = true;
       }
       foreach ($this->split_id_values($this->first_existing_value($row, ['id_inmueble'])) as $id) {
@@ -107,7 +107,7 @@ trait GenericEnrichmentConcern
         }
       }
 
-      $contractId = $this->first_id_value($this->first_existing_value($row, ['contrato', 'id_contrato']));
+      $contractId = $this->first_id_value($this->first_existing_value($row, ['id_contrato', 'contrato']));
       if ($contractId !== '' && isset($contractById[$contractId])) {
         $row['_scm_contrato_data'] = $contractById[$contractId];
       }

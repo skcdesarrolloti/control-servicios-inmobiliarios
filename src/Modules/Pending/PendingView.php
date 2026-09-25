@@ -867,7 +867,7 @@ final class PendingView
     $documentsHtml = $this->renderPendingTicketAttachmentsSection([$ticket['imagenes'] ?? '', $ticket['imagen'] ?? '', $ticket['evidencia'] ?? ''], $ticket['archivos'] ?? '', 'scm-sec-documentos');
     $contratoData = is_array($ticket['_scm_contrato_data'] ?? null) ? $ticket['_scm_contrato_data'] : [];
     $inmuebleData = is_array($ticket['_scm_inmueble_data'] ?? null) ? $ticket['_scm_inmueble_data'] : [];
-    if (empty($contratoData)) {
+    if (empty($contratoData) || !$this->preventivaContractDataMatchesRow($contratoData, $contractRow)) {
       $contratoData = $this->preventivaContractFallbackData($ticket, $contractRow);
     }
     if (empty($inmuebleData)) {
@@ -925,10 +925,10 @@ final class PendingView
     $estado = trim((string) ($ticket['estado'] ?? ''));
     $estadoAdmin = trim((string) ($ticket['estado_administrativo'] ?? ''));
     $asunto = trim((string) ($ticket['asunto'] ?? 'REVISION PREVENTIVA'));
-    $contrato = trim((string) ($ticket['contrato'] ?? $contractRow['contrato'] ?? $contractRow['_ID'] ?? ''));
-    $inmueble = trim((string) ($ticket['inmueble'] ?? $contractRow['inmueble'] ?? ''));
-    $direccion = trim((string) ($ticket['direccion'] ?? $contractRow['direccion'] ?? ''));
-    $barrio = trim((string) ($ticket['barrio'] ?? $contractRow['barrio'] ?? ''));
+    $contrato = trim((string) ($contractRow['contrato'] ?? $ticket['contrato'] ?? $contractRow['_ID'] ?? ''));
+    $inmueble = trim((string) ($contractRow['inmueble'] ?? $ticket['inmueble'] ?? ''));
+    $direccion = trim((string) ($contractRow['direccion'] ?? $ticket['direccion'] ?? ''));
+    $barrio = trim((string) ($contractRow['barrio'] ?? $ticket['barrio'] ?? ''));
     $empleado = trim((string) ($ticket['nombre_empleado'] ?? $ticket['empleado'] ?? $ticket['id_empleado'] ?? ''));
     $inmuebleData = is_array($ticket['_scm_inmueble_data'] ?? null) ? $ticket['_scm_inmueble_data'] : [];
     $propertyDataId = trim((string) ($inmuebleData['_ID'] ?? $inmuebleData['id_inmueble_data'] ?? ''));
@@ -961,7 +961,7 @@ final class PendingView
       . ' data-resumen-calculo-perturbacion="' . esc_attr((string) ($ticket['resumen_calculo_perturbacion'] ?? '')) . '"'
       . ' data-contrato="' . esc_attr($contrato !== '' ? ('#' . ltrim($contrato, '#')) : '-') . '"'
       . ' data-inmueble="' . esc_attr($inmueble !== '' ? $inmueble : '-') . '"'
-      . ' data-id-inmueble-web="' . esc_attr(trim((string) ($ticket['id_inmueble'] ?? $contractRow['id_inmueble'] ?? '')) ?: '-') . '"'
+      . ' data-id-inmueble-web="' . esc_attr(trim((string) ($contractRow['id_inmueble'] ?? $ticket['id_inmueble'] ?? '')) ?: '-') . '"'
       . ' data-id-inmueble-data="' . esc_attr($propertyDataId) . '"'
       . ' data-ubicacion-google-maps="' . esc_attr($propertyGoogleMaps) . '"'
       . ' data-barrio="' . esc_attr($barrio !== '' ? $barrio : '-') . '"'
@@ -969,11 +969,11 @@ final class PendingView
       . ' data-creado="' . esc_attr($createdTs > 0 ? $this->fmt($createdTs) : '-') . '"'
       . ' data-empleado="' . esc_attr($empleado !== '' ? $empleado : '-') . '"'
       . ' data-empleado-id="' . esc_attr((string) ($ticket['id_empleado'] ?? '')) . '"'
-      . ' data-propietario="' . esc_attr((string) ($ticket['propietario'] ?? $contractRow['propietario'] ?? '')) . '"'
+      . ' data-propietario="' . esc_attr((string) ($contractRow['propietario'] ?? $ticket['propietario'] ?? '')) . '"'
       . ' data-correo-propietario="' . esc_attr((string) ($ticket['correo_propietario'] ?? '')) . '"'
       . ' data-celular-propietario="' . esc_attr((string) ($ticket['celular_propietario'] ?? '')) . '"'
       . ' data-indicativo-propietario="' . esc_attr((string) ($ticket['indicativo_propietario'] ?? '')) . '"'
-      . ' data-arrendatario="' . esc_attr((string) ($ticket['arrendatario'] ?? $contractRow['arrendatario'] ?? '')) . '"'
+      . ' data-arrendatario="' . esc_attr((string) ($contractRow['arrendatario'] ?? $ticket['arrendatario'] ?? '')) . '"'
       . ' data-correo-arrendatario="' . esc_attr((string) ($ticket['correo_arrendatario'] ?? '')) . '"'
       . ' data-celular-arrendatario="' . esc_attr((string) ($ticket['celular_arrendatario'] ?? '')) . '"'
       . ' data-indicativo-arrendatario="' . esc_attr((string) ($ticket['indicativo_arrendatario'] ?? '')) . '"'
@@ -1596,18 +1596,38 @@ final class PendingView
   }
 
   /** @param array<string,mixed> $ticket @param array<string,mixed> $contractRow */
+  private function preventivaContractDataMatchesRow(array $contractData, array $contractRow): bool
+  {
+    if (empty($contractRow)) {
+      return true;
+    }
+    $expectedPk = trim((string) ($contractRow['_ID'] ?? ''));
+    $expectedCode = trim((string) ($contractRow['contrato'] ?? ''));
+    $actualPk = trim((string) ($contractData['_ID'] ?? $contractData['id_contrato'] ?? ''));
+    $actualCode = trim((string) ($contractData['contrato'] ?? ''));
+    if ($expectedPk !== '' && $actualPk !== '') {
+      return $expectedPk === $actualPk;
+    }
+    if ($expectedCode !== '' && $actualCode !== '') {
+      return $expectedCode === $actualCode;
+    }
+    return true;
+  }
+
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $contractRow */
   private function preventivaContractFallbackData(array $ticket, array $contractRow): array
   {
     return array_filter([
-      'contrato' => $ticket['contrato'] ?? $contractRow['contrato'] ?? $contractRow['_ID'] ?? '',
-      'id_contrato' => $ticket['id_contrato'] ?? $contractRow['_ID'] ?? '',
+      '_ID' => $contractRow['_ID'] ?? $ticket['id_contrato'] ?? '',
+      'contrato' => $contractRow['contrato'] ?? $ticket['contrato'] ?? $contractRow['_ID'] ?? '',
+      'id_contrato' => $contractRow['_ID'] ?? $ticket['id_contrato'] ?? '',
       'estado' => $contractRow['estado'] ?? '',
-      'inmueble' => $ticket['inmueble'] ?? $contractRow['inmueble'] ?? '',
-      'id_inmueble' => $ticket['id_inmueble'] ?? $contractRow['id_inmueble'] ?? '',
-      'direccion' => $ticket['direccion'] ?? $contractRow['direccion'] ?? '',
-      'barrio' => $ticket['barrio'] ?? $contractRow['barrio'] ?? '',
-      'propietario' => $ticket['propietario'] ?? $contractRow['propietario'] ?? '',
-      'arrendatario' => $ticket['arrendatario'] ?? $contractRow['arrendatario'] ?? '',
+      'inmueble' => $contractRow['inmueble'] ?? $ticket['inmueble'] ?? '',
+      'id_inmueble' => $contractRow['id_inmueble'] ?? $ticket['id_inmueble'] ?? '',
+      'direccion' => $contractRow['direccion'] ?? $ticket['direccion'] ?? '',
+      'barrio' => $contractRow['barrio'] ?? $ticket['barrio'] ?? '',
+      'propietario' => $contractRow['propietario'] ?? $ticket['propietario'] ?? '',
+      'arrendatario' => $contractRow['arrendatario'] ?? $ticket['arrendatario'] ?? '',
       'valor_canon' => $contractRow['valor_canon'] ?? '',
       'valor_administracion' => $contractRow['valor_administracion'] ?? '',
       'id_estudio_aseguradora' => $contractRow['id_estudio_aseguradora'] ?? '',

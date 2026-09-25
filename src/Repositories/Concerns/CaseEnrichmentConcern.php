@@ -21,7 +21,7 @@ trait CaseEnrichmentConcern
       foreach ($this->resolveTicketLookupKeys($row) as $key) {
         $ticketKeys[$key] = true;
       }
-      foreach ($this->splitIds($this->firstExistingValue($row, ['contrato', 'id_contrato'])) as $id) {
+      foreach ($this->splitIds($this->firstExistingValue($row, ['id_contrato', 'contrato'])) as $id) {
         $contractIds[$id] = true;
       }
       foreach ($this->splitIds($this->firstExistingValue($row, ['id_inmueble'])) as $id) {
@@ -98,7 +98,7 @@ trait CaseEnrichmentConcern
         }
       }
 
-      $contractRaw = $this->firstExistingValue($row, ['contrato', 'id_contrato']);
+      $contractRaw = $this->firstExistingValue($row, ['id_contrato', 'contrato']);
       $contractId = $this->first_id_value($contractRaw);
       if ($contractId !== '' && isset($contractById[$contractId])) {
         $row['_scm_contrato_data'] = $contractById[$contractId];
