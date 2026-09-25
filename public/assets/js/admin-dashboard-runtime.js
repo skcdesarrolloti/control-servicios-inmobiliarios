@@ -1531,6 +1531,30 @@
         return String((row && (row.id_categoria || row.categoria_id)) || "").trim();
       }
 
+      function calendarItemKind(row) {
+        var raw = String((row && (row.tipo_item || row.tipo || row.kind || "")) || "").toLowerCase().trim();
+        if (!raw && row && row.source_table) {
+          var source = String(row.source_table || "").toLowerCase();
+          if (source.indexOf("tareas") !== -1) raw = "tarea";
+          if (source.indexOf("recordatorios") !== -1) raw = "recordatorio";
+        }
+        if (raw === "task") return "tarea";
+        if (raw === "reminder") return "recordatorio";
+        return raw === "tarea" || raw === "recordatorio" ? raw : "evento";
+      }
+
+      function calendarItemKindLabel(row) {
+        var kind = calendarItemKind(row);
+        if (kind === "tarea") return "Tarea";
+        if (kind === "recordatorio") return "Recordatorio";
+        return "Evento";
+      }
+
+      function calendarItemIsDone(row) {
+        var estado = String((row && row.estado) || "").toLowerCase().trim();
+        return estado === "si" || estado === "realizada" || estado === "enviado";
+      }
+
       function fillEmployeeOptions(selects, rows, firstLabel) {
         selects.forEach(function (select) {
           var current = lockCurrentEmployee
@@ -1956,8 +1980,8 @@
           return;
         }
         var todayKey = toDateKey(new Date());
-        var pending = rows.filter(function (row) { return String(row.estado || "").toLowerCase() !== "si"; }).length;
-        var done = rows.filter(function (row) { return String(row.estado || "").toLowerCase() === "si"; }).length;
+        var pending = rows.filter(function (row) { return !calendarItemIsDone(row); }).length;
+        var done = rows.filter(function (row) { return calendarItemIsDone(row); }).length;
         var todayCount = rows.filter(function (row) { return eventDateKey(row) === todayKey; }).length;
         if (totalEl) totalEl.textContent = String(rows.length || 0);
         if (pendingEl) pendingEl.textContent = String(pending || 0);
@@ -2111,25 +2135,29 @@
         }
         var id = String(row.id || "").trim();
         var ticket = String(row.id_ticket || "").trim();
-        var isDone = String(row.estado || "").toLowerCase() === "si";
+        var kind = calendarItemKind(row);
+        var isEventKind = kind === "evento";
+        var isDone = calendarItemIsDone(row);
         var estado = isDone ? "Realizado" : "Pendiente";
         var color = String(row.color || "#f59e0b").trim() || "#f59e0b";
+        var kindLabel = calendarItemKindLabel(row);
         return '<article class="scm-calendar-event-card">' +
           '<div class="scm-calendar-event-color" style="background:' + escHtml(color) + '"></div>' +
           '<div class="scm-calendar-event-main">' +
-          '<div class="scm-calendar-event-title-row"><h5>' + escHtml(row.titulo || "Evento") + '</h5><span class="scm-calendar-event-state">' + escHtml(estado) + "</span></div>" +
+          '<div class="scm-calendar-event-title-row"><h5>' + escHtml(row.titulo || kindLabel) + '</h5><span class="scm-calendar-event-state">' + escHtml(estado) + "</span></div>" +
           '<div class="scm-calendar-event-description">' + calendarRichTextHtml(row.descripcion || "Sin descripcion") + "</div>" +
           '<div class="scm-calendar-event-meta">' +
           '<span>' + escHtml(formatDateTime(row.fecha_inicio)) + " - " + escHtml(formatDateTime(row.fecha_fin)) + "</span>" +
           '<span>' + escHtml(row.funcionario || row.nombre || "Funcionario") + "</span>" +
+          '<span>' + escHtml(kindLabel) + "</span>" +
           '<span>' + escHtml(row.categoria || (categoriesById[getCategoryId(row)] && categoriesById[getCategoryId(row)].nombre) || "Sin categoria") + "</span>" +
           (ticket ? '<span>Ticket #' + escHtml(ticket) + "</span>" : "") +
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
-          (id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Ver evento</button>' : "") +
-          (ticket ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver ticket</button>' : "") +
-          (id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Marcar realizado</button>' : "") +
-          (id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar evento</button>' : "") +
+          (isEventKind && id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Ver evento</button>' : "") +
+          (isEventKind && ticket ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver ticket</button>' : "") +
+          (isEventKind && id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Marcar realizado</button>' : "") +
+          (isEventKind && id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar evento</button>' : "") +
           "</div></div></article>";
       }
 
@@ -2137,12 +2165,13 @@
         var dateKey = eventDateKey(row);
         var color = String(row.color || (isDueCalendar ? "#f59e0b" : "#f43f5e")).trim() || "#f59e0b";
         var category = isDueCalendar ? (row.grupo || "Vencimiento") : (row.categoria || (categoriesById[getCategoryId(row)] && categoriesById[getCategoryId(row)].nombre) || "Sin categoria");
+        var kindLabel = isDueCalendar ? category : calendarItemKindLabel(row);
         var time = isDueCalendar
           ? ("Vence: " + (row.fecha_vencimiento || dateKey || "-"))
           : (formatDateTime(row.fecha_inicio) + " - " + formatDateTime(row.fecha_fin));
         return '<button type="button" class="scm-calendar-upcoming-item" data-scm-calendar-upcoming-day="' + escHtml(dateKey) + '">' +
           '<span class="scm-calendar-upcoming-date"><strong>' + escHtml(shortMonthLabel(dateKey) || "MES") + '</strong><em>' + escHtml(String(Number(String(dateKey).slice(8, 10)) || "")) + "</em></span>" +
-          '<span class="scm-calendar-upcoming-body"><strong>' + escHtml(row.titulo || (isDueCalendar ? "Vencimiento" : "Evento")) + '</strong><em>' + escHtml(time) + '</em><small style="--event-color:' + escHtml(color) + '">' + escHtml(category) + "</small></span>" +
+          '<span class="scm-calendar-upcoming-body"><strong>' + escHtml(row.titulo || (isDueCalendar ? "Vencimiento" : kindLabel)) + '</strong><em>' + escHtml(time) + '</em><small style="--event-color:' + escHtml(color) + '">' + escHtml(kindLabel + (isDueCalendar ? "" : " · " + category)) + "</small></span>" +
           "</button>";
       }
 
@@ -2351,9 +2380,11 @@
         var categoryId = String(fd.get("id_categoria") || "").trim();
         var kind = String(fd.get("kind") || "event").trim();
         var location = String(fd.get("ubicacion") || "").trim();
+        var tipoItem = kind === "task" ? "tarea" : (kind === "reminder" ? "recordatorio" : "evento");
+        var itemLabel = tipoItem === "tarea" ? "tarea" : (tipoItem === "recordatorio" ? "recordatorio" : "evento");
         var employeeId = quickCreateEmployeeId();
         if (!title) {
-          showToast("error", "Escribe un titulo para crear el evento.");
+          showToast("error", "Escribe un titulo para crear el " + itemLabel + ".");
           return Promise.resolve(false);
         }
         if (!categoryId) {
@@ -2364,10 +2395,9 @@
           showToast("error", "No se encontro el funcionario del calendario.");
           return Promise.resolve(false);
         }
-        var titlePrefix = kind === "reminder" ? "Recordatorio: " : (kind === "task" ? "Tarea: " : "");
-        var payloadTitle = titlePrefix && title.indexOf(titlePrefix) !== 0 ? titlePrefix + title : title;
         var payload = {
-          titulo: payloadTitle,
+          tipo_item: tipoItem,
+          titulo: title,
           descripcion: "",
           ubicacion: location || (kind === "reminder" ? "Recordatorio interno" : (kind === "task" ? "Tarea interna" : "Agenda interna")),
           id_categoria: categoryId,
@@ -2375,18 +2405,30 @@
           fecha_fin: selection.date + " " + timeFromMinutes(selection.end) + ":00",
           id_empleado: employeeId,
         };
+        if (tipoItem === "tarea") {
+          payload.fecha_limite = payload.fecha_fin;
+        }
+        if (tipoItem === "recordatorio") {
+          payload.recordatorio_at = payload.fecha_inicio;
+          payload.recordatorio_canal = "whatsapp";
+        }
         var submit = form.querySelector('[data-week-quick-save]');
         if (submit) {
           submit.disabled = true;
           submit.textContent = "Guardando...";
         }
-        return calendarApi("crear_evento", payload).then(function (json) {
-          if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el evento.");
-          showToast("success", json.message || "Evento creado.");
+        return calendarApi("crear_item_calendario", payload).then(function (json) {
+          if ((!json || !json.success) && tipoItem === "evento") {
+            return calendarApi("crear_evento", payload);
+          }
+          return json;
+        }).then(function (json) {
+          if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el " + itemLabel + ".");
+          showToast("success", json.message || (itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1) + " creado."));
           closeWeekQuickPopover();
           return loadEvents();
         }).catch(function (err) {
-          showToast("error", err.message || "No se pudo crear el evento.");
+          showToast("error", err.message || "No se pudo crear el " + itemLabel + ".");
           if (submit) {
             submit.disabled = false;
             submit.textContent = "Guardar";
@@ -2900,10 +2942,22 @@
           if (spinner) spinner.classList.remove("active");
           return Promise.resolve();
         }
-        return calendarApi("filtrar_eventos_admin", filters)
-          .then(function (json) {
+        function loadLegacyEvents() {
+          return calendarApi("filtrar_eventos_admin", filters).then(function (json) {
             if (!json || !json.success) throw new Error((json && json.message) || "No se pudieron cargar eventos.");
-            renderEvents(json.data || []);
+            return json.data || [];
+          });
+        }
+        return calendarApi("listar_items_calendario", Object.assign({}, filters, { tipos_item: ["evento", "tarea", "recordatorio"] }))
+          .then(function (json) {
+            if (!json || !json.success) throw new Error((json && json.message) || "No se pudieron cargar items.");
+            return extractRows(json.data || json);
+          })
+          .catch(function () {
+            return loadLegacyEvents();
+          })
+          .then(function (rows) {
+            renderEvents(rows || []);
           })
           .catch(function (err) {
             if (monthGrid) monthGrid.innerHTML = '<div class="scm-calendar-loading">No se pudo cargar el calendario.</div>';
@@ -4745,14 +4799,17 @@
               window.Swal.showValidationMessage(defaultKind === "event" ? "Titulo, ubicacion y categoria son obligatorios." : "Titulo y categoria son obligatorios.");
               return false;
             }
-            var titlePrefix = defaultKind === "reminder" ? "Recordatorio: " : (defaultKind === "task" ? "Tarea: " : "");
-            var payloadTitle = titlePrefix && rawTitle.indexOf(titlePrefix) !== 0 ? titlePrefix + rawTitle : rawTitle;
+            var tipoItem = defaultKind === "reminder" ? "recordatorio" : (defaultKind === "task" ? "tarea" : "evento");
             var basePayload = {
-              titulo: payloadTitle,
+              tipo_item: tipoItem,
+              titulo: rawTitle,
               descripcion: fd.get("descripcion") || "",
               ubicacion: rawLocation || (defaultKind === "reminder" ? "Recordatorio interno" : (defaultKind === "task" ? "Tarea interna" : "")),
               id_categoria: fd.get("id_categoria") || "",
             };
+            if (tipoItem === "recordatorio") {
+              basePayload.recordatorio_canal = "whatsapp";
+            }
             if (mode === "single") {
               basePayload.id_ticket = relatedTicket ? fd.get("id_ticket") || "" : "";
               basePayload.es_cita = isCita;
@@ -4762,10 +4819,17 @@
             var recurrenceTypeValue = String(fd.get("tipo_recurrencia") || "diario");
             var eventsToCreate = [];
             function makePayload(dateValue, startValue, endValue) {
-              return Object.assign({}, basePayload, {
+              var payload = Object.assign({}, basePayload, {
                 fecha_inicio: dateValue + " " + startValue + ":00",
                 fecha_fin: dateValue + " " + endValue + ":00",
               });
+              if (tipoItem === "tarea") {
+                payload.fecha_limite = payload.fecha_fin;
+              }
+              if (tipoItem === "recordatorio") {
+                payload.recordatorio_at = payload.fecha_inicio;
+              }
+              return payload;
             }
             function addValidatedPayload(dateValue, startValue, endValue) {
               var err = validateCalendarEventTimes(dateValue, startValue, endValue);
@@ -4833,7 +4897,7 @@
             }
             window.Swal.showLoading();
             var citaNotificationAppointments = [];
-            if (mode === "single" && relatedTicket && isCita === "si") {
+            if (tipoItem === "evento" && mode === "single" && relatedTicket && isCita === "si") {
               var notificationCategoryName = categoryNameFromSelect(categorySelect) || fd.get("id_categoria") || "cita";
               eventsToCreate.forEach(function (eventPayload) {
                 selected.forEach(function (employeeId) {
@@ -4848,15 +4912,36 @@
                 });
               });
             }
-            var request = selected.length > 1 || eventsToCreate.length > 1
-              ? calendarApi("crear_eventos", { eventos: eventsToCreate, empleados: selected })
-              : calendarApi("crear_evento", Object.assign({}, eventsToCreate[0], { id_empleado: selected[0] }));
+            var request;
+            if (tipoItem === "evento") {
+              request = selected.length > 1 || eventsToCreate.length > 1
+                ? calendarApi("crear_eventos", { eventos: eventsToCreate, empleados: selected })
+                : calendarApi("crear_evento", Object.assign({}, eventsToCreate[0], { id_empleado: selected[0] }));
+            } else {
+              var itemPayloads = [];
+              eventsToCreate.forEach(function (eventPayload) {
+                selected.forEach(function (employeeId) {
+                  itemPayloads.push(Object.assign({}, eventPayload, { id_empleado: employeeId }));
+                });
+              });
+              request = Promise.all(itemPayloads.map(function (payload) {
+                return calendarApi("crear_item_calendario", payload);
+              })).then(function (responses) {
+                var failed = responses.find(function (json) { return !json || !json.success; });
+                if (failed) return failed;
+                return {
+                  success: true,
+                  message: tipoItem === "tarea" ? "Tarea creada." : "Recordatorio creado.",
+                  data: responses.map(function (json) { return json && json.data ? json.data : json; }),
+                };
+              });
+            }
             return request.then(function (json) {
-              if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el evento.");
+              if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el item.");
               json._scmCitaNotificationAppointments = citaNotificationAppointments;
               return json;
             }).catch(function (err) {
-              window.Swal.showValidationMessage(err.message || "No se pudo crear el evento.");
+              window.Swal.showValidationMessage(err.message || "No se pudo crear el item.");
               return false;
             });
           },
