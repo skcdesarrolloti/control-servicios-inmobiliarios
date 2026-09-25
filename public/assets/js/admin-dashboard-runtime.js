@@ -529,6 +529,22 @@
       return stats;
     }
 
+    function dashboardDueTotal(rows, summaryGroups) {
+      rows = Array.isArray(rows) ? rows : [];
+      summaryGroups = Array.isArray(summaryGroups) ? summaryGroups : [];
+      return rows.length + summaryGroups.reduce(function (total, group) {
+        return total + Math.max(0, Number(group && group.count ? group.count : 0));
+      }, 0);
+    }
+
+    function updateDashboardDueNavBadge(total) {
+      var dueNavCountEl = root.querySelector("[data-scm-calendar-due-nav-count]");
+      if (!dueNavCountEl) return;
+      total = Math.max(0, Number(total || 0));
+      dueNavCountEl.textContent = String(total);
+      dueNavCountEl.hidden = total <= 0;
+    }
+
     function dashboardDueCaseAttrMap() {
       return {
         ticket: "ticket",
@@ -881,11 +897,22 @@
           rows: rows,
           summaryGroups: Array.isArray(data.summary_groups) ? data.summary_groups : [],
         };
+      }).then(function (payload) {
+        payload = payload || {};
+        updateDashboardDueNavBadge(dashboardDueTotal(payload.rows, payload.summaryGroups));
+        return payload;
       }).catch(function (error) {
         dashboardDuePopupPromise = null;
         throw error;
       });
       return dashboardDuePopupPromise;
+    }
+
+    function refreshDashboardDueNavBadge() {
+      if (!ajaxUrl || !actionAdminDueCalendar) return Promise.resolve();
+      return loadDashboardDuePopupRows().catch(function (error) {
+        console.warn("No se pudo cargar el contador de vencimientos administrativos.", error);
+      });
     }
 
     function maybeShowDashboardDuePopup(source) {
@@ -1405,6 +1432,7 @@
       var selectedDay = toDateKey(new Date());
       var calendarEvents = [];
       var calendarDueAllEvents = [];
+      var calendarDueSummaryGroups = [];
       var calendarPendingRows = [];
       var calendarDueStats = null;
       var calendarDueSettings = {};
@@ -1842,13 +1870,14 @@
         if (isDueCalendar) {
           var dueStats = computeDueStats(rows || calendarEvents);
           var dueTotal = Number(dueStats.total || 0);
+          var dueNavTotal = dashboardDueTotal(calendarDueAllEvents, calendarDueSummaryGroups);
           if (totalEl) totalEl.textContent = String(dueTotal);
           if (pendingEl) pendingEl.textContent = String(dueTotal);
           if (doneEl) doneEl.textContent = String(Number(dueStats.vencidos || 0));
           if (todayEl) todayEl.textContent = String(Number(dueStats.hoy || 0));
           if (dueNavCountEl) {
-            dueNavCountEl.textContent = String(dueTotal);
-            dueNavCountEl.hidden = dueTotal <= 0;
+            dueNavCountEl.textContent = String(dueNavTotal);
+            dueNavCountEl.hidden = dueNavTotal <= 0;
           }
           return;
         }
@@ -2325,6 +2354,7 @@
       function renderDueCalendar(payload) {
         payload = payload || {};
         calendarDueAllEvents = extractRows(payload.eventos || payload.items || payload);
+        calendarDueSummaryGroups = Array.isArray(payload.summary_groups) ? payload.summary_groups : [];
         calendarEvents = filterDueRows(calendarDueAllEvents);
         calendarDueStats = computeDueStats(calendarEvents);
         applyDueSettings(payload.settings || {});
@@ -2338,13 +2368,14 @@
         }
         if (spinner) spinner.classList.add("active");
         var range = monthRange(currentMonth);
-        return dashboardAjax(actionAdminDueCalendar, { fecha_inicio: range.from, fecha_fin: range.to })
+        return dashboardAjax(actionAdminDueCalendar, { fecha_inicio: range.from, fecha_fin: range.to, include_summary: "1" })
           .then(function (data) {
             renderDueCalendar(data || {});
           })
           .catch(function (err) {
             calendarEvents = [];
             calendarDueAllEvents = [];
+            calendarDueSummaryGroups = [];
             calendarDueStats = null;
             renderKpis(calendarEvents);
             renderUpcoming();
@@ -17830,6 +17861,7 @@
         window.setTimeout(function () {
           loadActiveLazyPanelWithFeedback();
           if ((tab.getAttribute("data-tab") || "") === "scm-panel-inicio") {
+            refreshDashboardDueNavBadge();
             maybeShowDashboardDuePopup("home-tab");
           }
         }, 0);
@@ -17929,6 +17961,7 @@
     });
 
     loadActiveLazyPanel();
+    refreshDashboardDueNavBadge();
     window.setTimeout(function () {
       maybeShowDashboardDuePopup("login");
     }, 0);
