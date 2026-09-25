@@ -840,7 +840,7 @@
       }
       var more = rows.length > 18 ? '<p class="scm-due-entry-more">+' + escHtml(String(rows.length - 18)) + " vencimiento(s) adicionales en el calendario.</p>" : "";
       return '<div class="scm-due-entry-popup">' +
-        '<div class="scm-due-entry-head"><div class="scm-due-entry-head-icon"><span class="material-symbols-outlined">schedule</span><i></i></div><div><h3>Vencimientos administrativos</h3><p>Control preventivo de tareas operativas. <span>•</span> SuCasa Operaciones</p></div><strong>Urgente</strong></div>' +
+        '<div class="scm-due-entry-head"><div class="scm-due-entry-head-icon"><span class="material-symbols-outlined">schedule</span><i></i></div><div><h3>Vencimientos administrativos</h3><p>Control preventivo de tareas operativas.</p></div><strong>Urgente</strong></div>' +
         '<div class="scm-due-entry-kpis">' +
         '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--total"><div><span>Total en control</span><strong>' + escHtml(String(stats.total || 0)) + "</strong><small>Obligaciones asignadas</small></div><i class=\"material-symbols-outlined\">assignment</i></div>" +
         '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--late"><div><span>Vencidos</span><strong>' + escHtml(String(stats.vencidos || 0)) + "</strong><small>Superaron el tiempo máximo</small></div><i class=\"material-symbols-outlined\">warning</i></div>" +
