@@ -789,6 +789,8 @@ trait RendersDashboard
                 'title_id' => 'scm-home-calendar-title',
                 'description' => 'Tu agenda del mes se carga por defecto con el funcionario asociado a tu sesión.',
                 'show_report_action' => false,
+                'show_kpis' => false,
+                'show_employee_filter' => false,
               ]); ?>
             </div>
             <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-team' ? ' active' : ''; ?>" id="scm-home-calendar-section-team" data-calendar-section-panel>
@@ -797,6 +799,7 @@ trait RendersDashboard
                 'variant' => 'home',
                 'title' => 'Calendario del equipo',
                 'description' => 'Cambia el funcionario para revisar la disponibilidad y agenda de otras personas.',
+                'show_kpis' => false,
               ]); ?>
             </div>
             <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-due' ? ' active' : ''; ?>" id="scm-home-calendar-section-due" data-calendar-section-panel>
@@ -2397,6 +2400,8 @@ trait RendersDashboard
     $showCreateActions = !array_key_exists('show_create_actions', $options) || (bool) $options['show_create_actions'];
     $showPendingAction = !array_key_exists('show_pending_action', $options) || (bool) $options['show_pending_action'];
     $showReportAction = !array_key_exists('show_report_action', $options) || (bool) $options['show_report_action'];
+    $showKpis = !array_key_exists('show_kpis', $options) || (bool) $options['show_kpis'];
+    $showEmployeeFilter = !array_key_exists('show_employee_filter', $options) || (bool) $options['show_employee_filter'];
     $canConfigureDueCalendar = $this->canManageDashboardPermissions();
     $employeeLabel = $mode === 'personal' ? 'Funcionario' : 'Funcionario';
     $employeePlaceholder = $mode === 'personal' ? 'Mi calendario' : 'Selecciona funcionario';
@@ -2434,17 +2439,23 @@ trait RendersDashboard
         </div>
       </div>
 
+      <?php if ($showKpis): ?>
       <div class="scm-calendar-kpis">
         <div class="scm-kpi"><div class="scm-kpi-label"><?php echo $view === 'pending' ? 'Total vencimientos' : 'Pendientes'; ?></div><div class="scm-kpi-value" data-scm-calendar-pending>0</div></div>
         <div class="scm-kpi"><div class="scm-kpi-label"><?php echo $view === 'pending' ? 'Vencidos' : 'Realizados'; ?></div><div class="scm-kpi-value" data-scm-calendar-done>0</div></div>
         <div class="scm-kpi"><div class="scm-kpi-label"><?php echo $view === 'pending' ? 'Vencen hoy' : 'Hoy'; ?></div><div class="scm-kpi-value" data-scm-calendar-today>0</div></div>
       </div>
+      <?php endif; ?>
 
       <?php if ($view !== 'pending'): ?>
       <section class="scm-calendar-card scm-calendar-filter-card">
         <form class="scm-calendar-filter-form" data-scm-calendar-filters autocomplete="off">
           <div class="scm-grid">
+            <?php if ($showEmployeeFilter): ?>
             <div class="scm-field"><label><?php echo esc_html($employeeLabel); ?></label><select class="select select-bordered select-sm scm-select" name="id_empleado" data-scm-calendar-filter-employees><option value=""><?php echo esc_html($employeePlaceholder); ?></option></select></div>
+            <?php else: ?>
+            <input type="hidden" name="id_empleado" value="<?php echo esc_attr($currentCalendarEmployeeId); ?>">
+            <?php endif; ?>
             <div class="scm-field"><label>Categor&iacute;a</label><select class="select select-bordered select-sm scm-select" name="id_categoria" data-scm-calendar-filter-categories><option value="">Todas</option></select></div>
             <div class="scm-field"><label>Estado</label><select class="select select-bordered select-sm scm-select" name="estado"><option value="">Todos</option><option value="No" selected>Pendientes</option><option value="Si">Realizados</option></select></div>
           </div>
