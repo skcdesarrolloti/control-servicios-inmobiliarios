@@ -2269,6 +2269,11 @@
         });
       }
 
+      function clearActiveWeekSelection() {
+        var grid = monthGrid ? monthGrid.querySelector("[data-scm-calendar-week-grid]") : null;
+        clearWeekSelection(grid);
+      }
+
       function slotFromEvent(event) {
         return event && event.target && event.target.closest ? event.target.closest("[data-scm-calendar-week-slot]") : null;
       }
@@ -2301,13 +2306,17 @@
         return { date: dateKey, start: startMinutes, end: endMinutes };
       }
 
-      function closeWeekQuickPopover() {
+      function closeWeekQuickPopover(options) {
+        options = options || {};
         if (weekQuickPopover && weekQuickPopover.parentNode) {
           weekQuickPopover.parentNode.removeChild(weekQuickPopover);
         }
         weekQuickPopover = null;
         document.removeEventListener("keydown", handleWeekQuickPopoverKeydown);
         document.removeEventListener("mousedown", handleWeekQuickPopoverOutside, true);
+        if (!options.preserveSelection) {
+          clearActiveWeekSelection();
+        }
       }
 
       function handleWeekQuickPopoverKeydown(event) {
@@ -2388,7 +2397,7 @@
 
       function openWeekQuickPopover(selection, sourceEvent) {
         if (!selection || isDueCalendar) return;
-        closeWeekQuickPopover();
+        closeWeekQuickPopover({ preserveSelection: true });
         var categoryOptions = quickCategoryOptions();
         if (!categoryOptions) {
           openFromWeekSelection(selection);
@@ -2532,6 +2541,7 @@
           var slot = slotFromEvent(event);
           if (!slot || !grid.contains(slot)) return;
           event.preventDefault();
+          closeWeekQuickPopover();
           selectedDay = slot.getAttribute("data-date") || selectedDay;
           weekSlotSelection = {
             date: selectedDay,
@@ -2558,14 +2568,19 @@
           var slot = slotFromPoint(grid, event) || slotFromEvent(event);
           var selection = weekSlotSelection;
           var finalSelection = weekSelectionFromSlot(slot, selection);
-          clearWeekSelection(grid);
-          if (!finalSelection) return;
+          if (!finalSelection) {
+            clearWeekSelection(grid);
+            return;
+          }
           selectedDay = finalSelection.date || selectedDay;
           renderSelectedDay();
           if (isDueCalendar) {
+            clearWeekSelection(grid);
             renderCalendarGrid();
             return;
           }
+          weekSlotSelection = Object.assign({}, finalSelection, { dragged: false });
+          updateWeekSelection(grid, finalSelection.date, finalSelection.start, finalSelection.end);
           openWeekQuickPopover(finalSelection, event);
         });
         grid.addEventListener("pointercancel", function () {
