@@ -2378,6 +2378,10 @@ trait RendersDashboard
             <button type="button" class="scm-case-work-btn scm-calendar-pending-action" data-scm-calendar-open-pending><span class="material-symbols-outlined" aria-hidden="true">warning</span><span>Eventos pendientes</span><em data-scm-calendar-pending-action-count>0</em></button>
           <?php endif; ?>
           <?php if ($showCreateActions): ?>
+            <?php if ($mode === 'personal'): ?>
+              <button type="button" class="scm-case-work-btn scm-calendar-reminder-action" data-scm-calendar-open-create data-calendar-mode="single" data-calendar-kind="reminder"><span class="material-symbols-outlined" aria-hidden="true">notifications_active</span><span>Recordatorio</span></button>
+              <button type="button" class="scm-case-work-btn scm-calendar-task-action" data-scm-calendar-open-create data-calendar-mode="single" data-calendar-kind="task"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><span>Tarea</span></button>
+            <?php endif; ?>
             <button type="button" class="scm-case-work-btn scm-calendar-multiple-action" data-scm-calendar-open-create data-calendar-mode="multiple"><span class="material-symbols-outlined" aria-hidden="true">inventory_2</span><span>Evento m&uacute;ltiple</span></button>
             <button type="button" class="scm-btn-primary btn btn-primary scm-calendar-create-action" data-scm-calendar-open-create data-calendar-mode="single"><span class="material-symbols-outlined" aria-hidden="true">add</span><span>Crear evento</span></button>
           <?php endif; ?>

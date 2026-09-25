@@ -2253,27 +2253,40 @@
         return event && event.target && event.target.closest ? event.target.closest("[data-scm-calendar-week-slot]") : null;
       }
 
-      function openFromWeekSlot(slot, selection) {
-        if (!slot) return;
+      function slotFromPoint(grid, event) {
+        if (!grid || !event || !document.elementFromPoint) return null;
+        var node = document.elementFromPoint(event.clientX, event.clientY);
+        var slot = node && node.closest ? node.closest("[data-scm-calendar-week-slot]") : null;
+        return slot && grid.contains(slot) ? slot : null;
+      }
+
+      function weekSelectionFromSlot(slot, selection) {
+        if (!slot) return null;
         var dateKey = slot.getAttribute("data-date") || selectedDay;
-        var startMinutes = Number(slot.getAttribute("data-start") || 0);
-        var endMinutes = Number(slot.getAttribute("data-end") || 0);
+        var slotStart = Number(slot.getAttribute("data-start") || 0);
+        var slotEnd = Number(slot.getAttribute("data-end") || 0);
+        var startMinutes = slotStart;
+        var endMinutes = slotEnd;
         if (selection && selection.date === dateKey) {
-          var slotStart = Number(slot.getAttribute("data-start") || 0);
-          var slotEnd = Number(slot.getAttribute("data-end") || 0);
           startMinutes = Math.min(selection.start, slotStart);
-          endMinutes = selection.start === slotStart
-            ? Math.min(selection.start + 60, 21 * 60)
-            : Math.max(selection.start + 30, slotEnd);
+          endMinutes = Math.max(selection.start + 30, slotEnd);
+          if (selection.start === slotStart && !selection.dragged) {
+            endMinutes = Math.min(selection.start + 60, 21 * 60);
+          }
         } else {
           endMinutes = Math.min(startMinutes + 60, 21 * 60);
         }
         if (endMinutes <= startMinutes) endMinutes = Math.min(startMinutes + 60, 21 * 60);
         if (endMinutes <= startMinutes) endMinutes = startMinutes + 30;
+        return { date: dateKey, start: startMinutes, end: endMinutes };
+      }
+
+      function openFromWeekSelection(selection) {
+        if (!selection) return;
         openCreateEventWithDefaults({
-          date: dateKey,
-          start: timeFromMinutes(startMinutes),
-          end: timeFromMinutes(endMinutes),
+          date: selection.date,
+          start: timeFromMinutes(selection.start),
+          end: timeFromMinutes(selection.end),
         });
       }
 
@@ -2342,30 +2355,37 @@
           weekSlotSelection = {
             date: selectedDay,
             start: Number(slot.getAttribute("data-start") || 0),
+            end: Number(slot.getAttribute("data-end") || 0),
+            dragged: false,
           };
-          updateWeekSelection(grid, weekSlotSelection.date, weekSlotSelection.start, Number(slot.getAttribute("data-end") || 0));
+          updateWeekSelection(grid, weekSlotSelection.date, weekSlotSelection.start, weekSlotSelection.end);
           if (slot.setPointerCapture && event.pointerId) {
             try { slot.setPointerCapture(event.pointerId); } catch (err) {}
           }
         });
-        grid.addEventListener("pointerover", function (event) {
+        grid.addEventListener("pointermove", function (event) {
           if (!weekSlotSelection) return;
-          var slot = slotFromEvent(event);
+          var slot = slotFromPoint(grid, event) || slotFromEvent(event);
           if (!slot || slot.getAttribute("data-date") !== weekSlotSelection.date) return;
-          updateWeekSelection(grid, weekSlotSelection.date, weekSlotSelection.start, Number(slot.getAttribute("data-end") || 0));
+          var next = weekSelectionFromSlot(slot, Object.assign({}, weekSlotSelection, { dragged: true }));
+          if (!next) return;
+          weekSlotSelection.dragged = true;
+          weekSlotSelection.end = next.end;
+          updateWeekSelection(grid, next.date, next.start, next.end);
         });
         grid.addEventListener("pointerup", function (event) {
-          var slot = slotFromEvent(event);
+          var slot = slotFromPoint(grid, event) || slotFromEvent(event);
           var selection = weekSlotSelection;
+          var finalSelection = weekSelectionFromSlot(slot, selection);
           clearWeekSelection(grid);
-          if (!slot) return;
-          selectedDay = slot.getAttribute("data-date") || selectedDay;
+          if (!finalSelection) return;
+          selectedDay = finalSelection.date || selectedDay;
           renderSelectedDay();
           if (isDueCalendar) {
             renderCalendarGrid();
             return;
           }
-          openFromWeekSlot(slot, selection);
+          openFromWeekSelection(finalSelection);
         });
         grid.addEventListener("pointercancel", function () {
           clearWeekSelection(grid);
@@ -3785,25 +3805,31 @@
         var defaultDateValue = String(defaults.date || selectedDay || toDateKey(new Date())).slice(0, 10);
         var defaultStartValue = String(defaults.start || "").slice(0, 5);
         var defaultEndValue = String(defaults.end || "").slice(0, 5);
+        var defaultKind = String(defaults.kind || "event").trim();
+        var defaultTitleValue = String(defaults.title || "").trim();
+        var defaultTitlePlaceholder = defaultKind === "reminder"
+          ? "Ej: Recordar llamar al propietario"
+          : (defaultKind === "task" ? "Ej: Revisar documentos del caso" : "Ej: Cita revisión preventiva");
+        var defaultKindLabel = defaultKind === "reminder" ? "Recordatorio" : (defaultKind === "task" ? "Tarea" : "Operativo");
         var defaultDate = escHtml(defaultDateValue);
         var defaultStart = escHtml(defaultStartValue);
         var defaultEnd = escHtml(defaultEndValue);
         var locationFieldsHtml = '<section class="scm-calendar-location-section scm-calendar-field-full">' +
           '<div class="scm-calendar-section-heading"><span>Ubicaci&oacute;n del evento</span></div>' +
           '<div class="scm-calendar-location-fields">' +
-          '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option><option value="otra">Otra direcci&oacute;n</option></select></label>' +
-          '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Se carga desde la ubicaci&oacute;n seleccionada"></label>' +
+          '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="">Selecciona ubicaci&oacute;n</option><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option><option value="otra">Otra direcci&oacute;n</option></select></label>' +
+          '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Selecciona una ubicaci&oacute;n para completar este campo"></label>' +
           "</div></section>";
         var html = '<div class="scm-calendar-create-shell">' +
           '<div class="scm-calendar-create-head">' +
           '<div class="scm-calendar-create-icon" aria-hidden="true"><span class="material-symbols-outlined">calendar_month</span></div>' +
           '<div class="scm-calendar-create-title"><strong>' + (mode === "multiple" ? "Crear evento m&uacute;ltiple" : "Crear evento en calendario") + '</strong><span>Programaci&oacute;n de visitas t&eacute;cnicas, inspecciones locativas y reuniones</span></div>' +
-          '<span class="scm-calendar-create-badge">Operativo</span>' +
+          '<span class="scm-calendar-create-badge">' + escHtml(defaultKindLabel) + '</span>' +
           '</div>' +
           '<form class="scm-calendar-popup-form scm-calendar-create-form" autocomplete="off">' +
           '<div class="scm-calendar-create-main">' +
           '<div class="scm-calendar-create-row scm-calendar-create-row--top">' +
-          '<label class="scm-seg-field"><span>T&iacute;tulo del evento <b>*</b></span><input class="input input-bordered input-sm scm-input" name="titulo" required placeholder="Ej: Cita revisi&oacute;n preventiva"></label>' +
+          '<label class="scm-seg-field"><span>T&iacute;tulo del evento <b>*</b></span><input class="input input-bordered input-sm scm-input" name="titulo" required value="' + escHtml(defaultTitleValue) + '" placeholder="' + escHtml(defaultTitlePlaceholder) + '"></label>' +
           '<label class="scm-seg-field"><span>Categor&iacute;a <b>*</b></span><select class="select select-bordered select-sm scm-select" name="id_categoria" required><option value="">Selecciona categor&iacute;a</option>' + categoryOptions + '</select></label>' +
           '</div>' +
           locationFieldsHtml +
@@ -4028,11 +4054,20 @@
             }
             function applyLocationType(force) {
               if (!locationInput) return;
-              var type = locationTypeSelect ? String(locationTypeSelect.value || "oficina_corredor") : "oficina_corredor";
+              var type = locationTypeSelect ? String(locationTypeSelect.value || "") : "";
               var quickLocations = {
                 oficina_corredor: "Oficina Corredor",
                 oficina_manga: "Oficina Manga"
               };
+              if (!type) {
+                locationInput.readOnly = true;
+                locationInput.placeholder = "Selecciona una ubicación para completar este campo";
+                if (force || locationInput.getAttribute("data-auto-calendar-location") === "1") {
+                  locationInput.value = "";
+                }
+                locationInput.setAttribute("data-auto-calendar-location", "1");
+                return;
+              }
               if (quickLocations[type]) {
                 locationInput.readOnly = true;
                 locationInput.placeholder = "";
@@ -4490,19 +4525,27 @@
             var fd = new FormData(form);
             var relatedTicket = mode === "single" && fd.get("relacionado_ticket") === "si";
             var isCita = relatedTicket ? String(fd.get("es_cita") || "") : "";
-            var locationType = String(fd.get("ubicacion_tipo") || "oficina_corredor");
+            var locationType = String(fd.get("ubicacion_tipo") || "");
+            if (!locationType && defaultKind === "event") {
+              window.Swal.showValidationMessage("Selecciona una ubicacion.");
+              return false;
+            }
             if (locationType === "contrato" && !String(fd.get("contrato_arrendamiento") || "").trim()) {
               window.Swal.showValidationMessage("Selecciona un inmueble para cargar la ubicacion.");
               return false;
             }
-            if (!String(fd.get("titulo") || "").trim() || !String(fd.get("ubicacion") || "").trim() || !String(fd.get("id_categoria") || "").trim()) {
-              window.Swal.showValidationMessage("Titulo, ubicacion y categoria son obligatorios.");
+            var rawTitle = String(fd.get("titulo") || "").trim();
+            var rawLocation = String(fd.get("ubicacion") || "").trim();
+            if (!rawTitle || !String(fd.get("id_categoria") || "").trim() || (defaultKind === "event" && !rawLocation)) {
+              window.Swal.showValidationMessage(defaultKind === "event" ? "Titulo, ubicacion y categoria son obligatorios." : "Titulo y categoria son obligatorios.");
               return false;
             }
+            var titlePrefix = defaultKind === "reminder" ? "Recordatorio: " : (defaultKind === "task" ? "Tarea: " : "");
+            var payloadTitle = titlePrefix && rawTitle.indexOf(titlePrefix) !== 0 ? titlePrefix + rawTitle : rawTitle;
             var basePayload = {
-              titulo: fd.get("titulo") || "",
+              titulo: payloadTitle,
               descripcion: fd.get("descripcion") || "",
-              ubicacion: fd.get("ubicacion") || "",
+              ubicacion: rawLocation || (defaultKind === "reminder" ? "Recordatorio interno" : (defaultKind === "task" ? "Tarea interna" : "")),
               id_categoria: fd.get("id_categoria") || "",
             };
             if (mode === "single") {
@@ -4823,8 +4866,9 @@
       panel.querySelectorAll("[data-scm-calendar-open-create]").forEach(function (btn) {
         btn.addEventListener("click", function () {
           var mode = btn.getAttribute("data-calendar-mode") || "single";
+          var kind = btn.getAttribute("data-calendar-kind") || "event";
           if (allowedEmployees.length) {
-            openCreateEventPopup(mode, { date: selectedDay });
+            openCreateEventPopup(mode, { date: selectedDay, kind: kind });
             return;
           }
           withPanelLoader(
@@ -4838,7 +4882,7 @@
               showToast("error", "No fue posible cargar funcionarios para crear el evento.");
               return;
             }
-            openCreateEventPopup(mode, { date: selectedDay });
+            openCreateEventPopup(mode, { date: selectedDay, kind: kind });
           });
         });
       });

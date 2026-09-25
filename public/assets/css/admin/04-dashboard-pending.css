@@ -2150,6 +2150,8 @@
   grid-template-columns: 68px repeat(7, minmax(104px, 1fr));
   min-width: 920px;
   overflow: hidden;
+  touch-action: none;
+  user-select: none;
 }
 
 #scm-app .scm-calendar-time-gutter,
@@ -2226,6 +2228,7 @@
   padding: 3px 5px !important;
   position: relative;
   text-align: left;
+  touch-action: none;
   transition: background-color 140ms ease, box-shadow 140ms ease;
 }
 
@@ -3101,6 +3104,18 @@
   background: #ffffff !important;
   border-color: #cbd5e1 !important;
   color: #334155 !important;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-reminder-action {
+  background: #fff7ed !important;
+  border-color: #fed7aa !important;
+  color: #9a3412 !important;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-task-action {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #3730a3 !important;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-create-action {
