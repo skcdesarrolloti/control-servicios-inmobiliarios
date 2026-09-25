@@ -2421,7 +2421,7 @@
           '<button type="button" data-week-quick-kind="reminder">Recordatorio</button>' +
           '</div>' +
           '<div class="scm-calendar-week-quick-row"><span class="material-symbols-outlined">schedule</span><div><strong>' + escHtml(dateLabel) + '</strong><em>' + escHtml(timeLabel) + '</em></div></div>' +
-          '<div class="scm-calendar-week-quick-location"><span class="material-symbols-outlined">location_on</span><div><input name="ubicacion" placeholder="Añadir ubicación o dirección"><div class="scm-calendar-week-quick-location-presets" aria-label="Ubicaciones rápidas"><button type="button" data-week-quick-location="Oficina Manga">Oficina Manga</button><button type="button" data-week-quick-location="Oficina Corredor">Oficina Corredor</button></div></div></div>' +
+          '<div class="scm-calendar-week-quick-location"><span class="material-symbols-outlined">location_on</span><div><input name="ubicacion" placeholder="Añadir ubicación o dirección"><div class="scm-calendar-week-quick-location-presets" aria-label="Ubicaciones rápidas"><button type="button" data-week-quick-location="Oficina Manga">Oficina Manga</button> <button type="button" data-week-quick-location="Oficina Corredor">Oficina Corredor</button></div></div></div>' +
           '<label class="scm-calendar-week-quick-category"><span class="material-symbols-outlined">sell</span><select name="id_categoria" required><option value="">Selecciona categoría</option>' + categoryOptions + '</select></label>' +
           '<div class="scm-calendar-week-quick-actions">' +
           '<button type="button" data-week-quick-more>Más opciones</button>' +
