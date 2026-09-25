@@ -61,6 +61,14 @@ trait GenericEnrichmentConcern
       ['_ID', 'contrato'],
       array_keys($contractIds)
     );
+    foreach ($contractById as $contract) {
+      foreach ($this->split_id_values($this->first_existing_value($contract, ['id_propietario'])) as $id) {
+        $ownerIds[$id] = true;
+      }
+      foreach ($this->split_id_values($this->first_existing_value($contract, ['id_arrendatario'])) as $id) {
+        $tenantIds[$id] = true;
+      }
+    }
     $propertyById = $this->fetch_single_rows_by_id_candidates(
       $this->db->table('jet_cct_inmuebles'),
       ['codigo'],
@@ -68,12 +76,12 @@ trait GenericEnrichmentConcern
     );
     $ownerById = $this->fetch_single_rows_by_id_candidates(
       $this->db->table('jet_cct_propietarios'),
-      ['id_propietario'],
+      ['id_propietario', '_ID'],
       array_keys($ownerIds)
     );
     $tenantById = $this->fetch_single_rows_by_id_candidates(
       $this->db->table('jet_cct_arrendatarios'),
-      ['id_arrendatario'],
+      ['id_arrendatario', '_ID'],
       array_keys($tenantIds)
     );
     $histByProperty = $this->fetch_rows_grouped_by_column_candidates(
@@ -120,15 +128,29 @@ trait GenericEnrichmentConcern
         $row['_scm_inmueble_data'] = $propertyById[$propertyId];
       }
       $ownerId = $this->first_id_value($this->first_existing_value($row, ['id_propietario']));
+      if ($ownerId === '' && !empty($row['_scm_contrato_data']) && is_array($row['_scm_contrato_data'])) {
+        $ownerId = $this->first_id_value($this->first_existing_value($row['_scm_contrato_data'], ['id_propietario']));
+      }
       if ($ownerId !== '' && isset($ownerById[$ownerId])) {
         $row['_scm_propietario_data'] = $ownerById[$ownerId];
+        $this->merge_actor_contact_fields($row, $ownerById[$ownerId], 'propietario');
+        if (!empty($row['_scm_contrato_data']) && is_array($row['_scm_contrato_data'])) {
+          $this->merge_actor_contact_fields($row['_scm_contrato_data'], $ownerById[$ownerId], 'propietario');
+        }
         if (trim((string) ($row['indicativo_propietario'] ?? '')) === '') {
           $row['indicativo_propietario'] = trim((string) ($ownerById[$ownerId]['indicativo'] ?? ''));
         }
       }
       $tenantId = $this->first_id_value($this->first_existing_value($row, ['id_arrendatario']));
+      if ($tenantId === '' && !empty($row['_scm_contrato_data']) && is_array($row['_scm_contrato_data'])) {
+        $tenantId = $this->first_id_value($this->first_existing_value($row['_scm_contrato_data'], ['id_arrendatario']));
+      }
       if ($tenantId !== '' && isset($tenantById[$tenantId])) {
         $row['_scm_arrendatario_data'] = $tenantById[$tenantId];
+        $this->merge_actor_contact_fields($row, $tenantById[$tenantId], 'arrendatario');
+        if (!empty($row['_scm_contrato_data']) && is_array($row['_scm_contrato_data'])) {
+          $this->merge_actor_contact_fields($row['_scm_contrato_data'], $tenantById[$tenantId], 'arrendatario');
+        }
         if (trim((string) ($row['indicativo_arrendatario'] ?? '')) === '') {
           $row['indicativo_arrendatario'] = trim((string) ($tenantById[$tenantId]['indicativo'] ?? ''));
         }
@@ -661,11 +683,17 @@ trait GenericEnrichmentConcern
       'id_contrato',
       'id_contrato_mandato',
       'id_contrato_arrendamiento',
+      'id_propietario',
+      'id_arrendatario',
       'id_inmueble',
       'id_inmueble_data',
       'inmueble',
       'arrendatario',
       'propietario',
+      'correo_propietario',
+      'celular_propietario',
+      'correo_arrendatario',
+      'celular_arrendatario',
       'nombre',
       'correo',
       'celular',
@@ -859,5 +887,31 @@ trait GenericEnrichmentConcern
     return '';
   }
 
-  /** @return array<string,mixed> */
+  /** @param array<string,mixed> $target @param array<string,mixed> $actor */
+  private function merge_actor_contact_fields(array &$target, array $actor, string $role): void
+  {
+    $maps = $role === 'propietario'
+      ? [
+        'propietario' => ['propietario', 'nombre', 'nombre_juridico', 'destinatario'],
+        'correo_propietario' => ['correo_propietario', 'email_propietario', 'correo', 'email'],
+        'celular_propietario' => ['celular_propietario', 'telefono_propietario', 'celular', 'telefono'],
+        'indicativo_propietario' => ['indicativo_propietario', 'indicativo'],
+      ]
+      : [
+        'arrendatario' => ['arrendatario', 'nombre', 'nombre_juridico', 'destinatario'],
+        'correo_arrendatario' => ['correo_arrendatario', 'email_arrendatario', 'correo', 'email'],
+        'celular_arrendatario' => ['celular_arrendatario', 'telefono_arrendatario', 'celular', 'telefono'],
+        'indicativo_arrendatario' => ['indicativo_arrendatario', 'indicativo'],
+      ];
+    foreach ($maps as $targetKey => $sourceKeys) {
+      if (trim((string) ($target[$targetKey] ?? '')) !== '') {
+        continue;
+      }
+      $value = $this->first_existing_value($actor, $sourceKeys);
+      if ($value !== '') {
+        $target[$targetKey] = $value;
+      }
+    }
+  }
+
 }

@@ -970,13 +970,13 @@ final class PendingView
       . ' data-empleado="' . esc_attr($empleado !== '' ? $empleado : '-') . '"'
       . ' data-empleado-id="' . esc_attr((string) ($ticket['id_empleado'] ?? '')) . '"'
       . ' data-propietario="' . esc_attr((string) ($contractRow['propietario'] ?? $ticket['propietario'] ?? '')) . '"'
-      . ' data-correo-propietario="' . esc_attr((string) ($ticket['correo_propietario'] ?? '')) . '"'
-      . ' data-celular-propietario="' . esc_attr((string) ($ticket['celular_propietario'] ?? '')) . '"'
-      . ' data-indicativo-propietario="' . esc_attr((string) ($ticket['indicativo_propietario'] ?? '')) . '"'
+      . ' data-correo-propietario="' . esc_attr((string) ($contractRow['correo_propietario'] ?? $ticket['correo_propietario'] ?? '')) . '"'
+      . ' data-celular-propietario="' . esc_attr((string) ($contractRow['celular_propietario'] ?? $ticket['celular_propietario'] ?? '')) . '"'
+      . ' data-indicativo-propietario="' . esc_attr((string) ($contractRow['indicativo_propietario'] ?? $ticket['indicativo_propietario'] ?? '')) . '"'
       . ' data-arrendatario="' . esc_attr((string) ($contractRow['arrendatario'] ?? $ticket['arrendatario'] ?? '')) . '"'
-      . ' data-correo-arrendatario="' . esc_attr((string) ($ticket['correo_arrendatario'] ?? '')) . '"'
-      . ' data-celular-arrendatario="' . esc_attr((string) ($ticket['celular_arrendatario'] ?? '')) . '"'
-      . ' data-indicativo-arrendatario="' . esc_attr((string) ($ticket['indicativo_arrendatario'] ?? '')) . '"'
+      . ' data-correo-arrendatario="' . esc_attr((string) ($contractRow['correo_arrendatario'] ?? $ticket['correo_arrendatario'] ?? '')) . '"'
+      . ' data-celular-arrendatario="' . esc_attr((string) ($contractRow['celular_arrendatario'] ?? $ticket['celular_arrendatario'] ?? '')) . '"'
+      . ' data-indicativo-arrendatario="' . esc_attr((string) ($contractRow['indicativo_arrendatario'] ?? $ticket['indicativo_arrendatario'] ?? '')) . '"'
       . ' data-id-revision-preventiva="' . esc_attr((string) ($ticket['id_revision_preventiva'] ?? '')) . '"'
       . ' data-id-revision-correctiva="' . esc_attr((string) ($ticket['id_revision_correctiva'] ?? '')) . '"'
       . ' data-prev-encontro-danos="' . esc_attr((string) ($ticket['_scm_prev_encontro_danos'] ?? $ticket['se_encontraron_danos'] ?? $ticket['encontro_danos'] ?? '')) . '"'
@@ -1627,7 +1627,13 @@ final class PendingView
       'direccion' => $contractRow['direccion'] ?? $ticket['direccion'] ?? '',
       'barrio' => $contractRow['barrio'] ?? $ticket['barrio'] ?? '',
       'propietario' => $contractRow['propietario'] ?? $ticket['propietario'] ?? '',
+      'correo_propietario' => $contractRow['correo_propietario'] ?? $ticket['correo_propietario'] ?? '',
+      'celular_propietario' => $contractRow['celular_propietario'] ?? $ticket['celular_propietario'] ?? '',
+      'indicativo_propietario' => $contractRow['indicativo_propietario'] ?? $ticket['indicativo_propietario'] ?? '',
       'arrendatario' => $contractRow['arrendatario'] ?? $ticket['arrendatario'] ?? '',
+      'correo_arrendatario' => $contractRow['correo_arrendatario'] ?? $ticket['correo_arrendatario'] ?? '',
+      'celular_arrendatario' => $contractRow['celular_arrendatario'] ?? $ticket['celular_arrendatario'] ?? '',
+      'indicativo_arrendatario' => $contractRow['indicativo_arrendatario'] ?? $ticket['indicativo_arrendatario'] ?? '',
       'valor_canon' => $contractRow['valor_canon'] ?? '',
       'valor_administracion' => $contractRow['valor_administracion'] ?? '',
       'id_estudio_aseguradora' => $contractRow['id_estudio_aseguradora'] ?? '',

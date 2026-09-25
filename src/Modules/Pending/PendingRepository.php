@@ -614,6 +614,8 @@ final class PendingRepository
     $ticketKeys = [];
     $contractIds = [];
     $propertyIds = [];
+    $ownerIds = [];
+    $tenantIds = [];
     foreach ($rows as $row) {
       foreach ([$row['ticket_id'] ?? '', $row['id_ticket'] ?? ''] as $key) {
         $key = trim((string) $key);
@@ -627,6 +629,18 @@ final class PendingRepository
       }
       if ($contractId !== '') {
         $contractIds[$contractId] = true;
+      }
+      foreach ([$row['id_propietario'] ?? ''] as $id) {
+        $id = trim((string) $id);
+        if ($id !== '') {
+          $ownerIds[$id] = true;
+        }
+      }
+      foreach ([$row['id_arrendatario'] ?? ''] as $id) {
+        $id = trim((string) $id);
+        if ($id !== '') {
+          $tenantIds[$id] = true;
+        }
       }
       foreach ([
         $row['id_inmueble'] ?? '',
@@ -661,6 +675,18 @@ final class PendingRepository
     );
 
     foreach ($contractById as $contract) {
+      foreach ([$contract['id_propietario'] ?? ''] as $id) {
+        $id = trim((string) $id);
+        if ($id !== '') {
+          $ownerIds[$id] = true;
+        }
+      }
+      foreach ([$contract['id_arrendatario'] ?? ''] as $id) {
+        $id = trim((string) $id);
+        if ($id !== '') {
+          $tenantIds[$id] = true;
+        }
+      }
       foreach ([
         $contract['inmueble'] ?? '',
         $contract['id_inmueble'] ?? '',
@@ -679,6 +705,16 @@ final class PendingRepository
       $this->db->table('jet_cct_inmuebles'),
       ['codigo', '_ID', 'id_inmueble', 'codigo_inmueble_web', 'id_inmueble_data', 'inmueble'],
       array_keys($propertyIds)
+    );
+    $ownerById = $this->fetchPendingSingleRows(
+      $this->db->table('jet_cct_propietarios'),
+      ['id_propietario', '_ID'],
+      array_keys($ownerIds)
+    );
+    $tenantById = $this->fetchPendingSingleRows(
+      $this->db->table('jet_cct_arrendatarios'),
+      ['id_arrendatario', '_ID'],
+      array_keys($tenantIds)
     );
     $historyColumns = $this->pendingHistoryColumns();
     $histByProperty = $this->fetchPendingRowsGroupedByColumns(
@@ -735,6 +771,28 @@ final class PendingRepository
         $row['_scm_contrato_data'] = $contractById[$contractId];
       }
 
+      $ownerId = trim((string) ($row['id_propietario'] ?? ''));
+      if ($ownerId === '' && !empty($row['_scm_contrato_data']) && is_array($row['_scm_contrato_data'])) {
+        $ownerId = trim((string) ($row['_scm_contrato_data']['id_propietario'] ?? ''));
+      }
+      if ($ownerId !== '' && isset($ownerById[$ownerId])) {
+        $this->mergePendingActorContactFields($row, $ownerById[$ownerId], 'propietario');
+        if (!empty($row['_scm_contrato_data']) && is_array($row['_scm_contrato_data'])) {
+          $this->mergePendingActorContactFields($row['_scm_contrato_data'], $ownerById[$ownerId], 'propietario');
+        }
+      }
+
+      $tenantId = trim((string) ($row['id_arrendatario'] ?? ''));
+      if ($tenantId === '' && !empty($row['_scm_contrato_data']) && is_array($row['_scm_contrato_data'])) {
+        $tenantId = trim((string) ($row['_scm_contrato_data']['id_arrendatario'] ?? ''));
+      }
+      if ($tenantId !== '' && isset($tenantById[$tenantId])) {
+        $this->mergePendingActorContactFields($row, $tenantById[$tenantId], 'arrendatario');
+        if (!empty($row['_scm_contrato_data']) && is_array($row['_scm_contrato_data'])) {
+          $this->mergePendingActorContactFields($row['_scm_contrato_data'], $tenantById[$tenantId], 'arrendatario');
+        }
+      }
+
       $propertyId = '';
       foreach ([
         $row['inmueble'] ?? '',
@@ -784,6 +842,36 @@ final class PendingRepository
     unset($row);
 
     return $rows;
+  }
+
+  /** @param array<string,mixed> $target @param array<string,mixed> $actor */
+  private function mergePendingActorContactFields(array &$target, array $actor, string $role): void
+  {
+    $maps = $role === 'propietario'
+      ? [
+        'propietario' => ['propietario', 'nombre', 'nombre_juridico', 'destinatario'],
+        'correo_propietario' => ['correo_propietario', 'email_propietario', 'correo', 'email'],
+        'celular_propietario' => ['celular_propietario', 'telefono_propietario', 'celular', 'telefono'],
+        'indicativo_propietario' => ['indicativo_propietario', 'indicativo'],
+      ]
+      : [
+        'arrendatario' => ['arrendatario', 'nombre', 'nombre_juridico', 'destinatario'],
+        'correo_arrendatario' => ['correo_arrendatario', 'email_arrendatario', 'correo', 'email'],
+        'celular_arrendatario' => ['celular_arrendatario', 'telefono_arrendatario', 'celular', 'telefono'],
+        'indicativo_arrendatario' => ['indicativo_arrendatario', 'indicativo'],
+      ];
+    foreach ($maps as $targetKey => $sourceKeys) {
+      if (trim((string) ($target[$targetKey] ?? '')) !== '') {
+        continue;
+      }
+      foreach ($sourceKeys as $sourceKey) {
+        $value = trim((string) ($actor[$sourceKey] ?? ''));
+        if ($value !== '') {
+          $target[$targetKey] = $value;
+          break;
+        }
+      }
+    }
   }
 
   /** @param array<int,string> $keys @param array<int,string> $wantedColumns @return array<string,array<int,array<string,mixed>>> */
