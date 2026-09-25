@@ -245,6 +245,17 @@
       root.classList.add("scm-funcionario-bridge-mode");
     }
 
+    function shouldAutoShowDashboardDuePopup() {
+      try {
+        var params = new URL(window.location.href).searchParams;
+        var tab = String(params.get("tab") || params.get("scm_tab") || "").trim().toLowerCase();
+        var subtab = String(params.get("subtab") || params.get("scm_subtab") || "").trim();
+        return tab === "inicio" && subtab === "";
+      } catch (_duePopupUrlError) {
+        return false;
+      }
+    }
+
     function markStandaloneFunctionReady() {
       if (!funcionarioBridgeMode) return;
       document.body.classList.remove("scm-standalone-function-error");
@@ -864,6 +875,7 @@
     function maybeShowDashboardDuePopup(source) {
       source = source || "login";
       if (funcionarioBridgeMode) return Promise.resolve();
+      if (!shouldAutoShowDashboardDuePopup()) return Promise.resolve();
       if (!duePopupConfig.enabled || dashboardDuePopupShown[source]) return Promise.resolve();
       if (!window.Swal || !ajaxUrl || !actionAdminDueCalendar) {
         return Promise.resolve();
