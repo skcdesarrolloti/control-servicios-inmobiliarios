@@ -1479,12 +1479,61 @@
     });
   }
 
+  function fallbackCaseSectionSource(modal, targetId) {
+    var caseBtn = (modal && modal._scmCurrentCaseButton) || (modal ? modal.querySelector(".scm-btn-case") : null);
+    if (!caseBtn) {
+      return null;
+    }
+    var titles = {
+      "scm-sec-documentos": "Adjuntos del caso",
+      "scm-sec-contrato": "Contrato",
+      "scm-sec-inmueble": "Inmueble",
+      "scm-sec-hist-inmueble": "Historial del inmueble",
+    };
+    if (!Object.prototype.hasOwnProperty.call(titles, targetId)) {
+      return null;
+    }
+    var rows = [];
+    function pushRow(label, value) {
+      value = String(value || "").trim();
+      if (!value || value === "-") {
+        return;
+      }
+      rows.push("<p><strong>" + escHtml(label) + ":</strong> " + escHtml(value) + "</p>");
+    }
+    if (targetId === "scm-sec-contrato") {
+      pushRow("Contrato", caseBtn.dataset.contrato || "");
+      pushRow("Propietario", caseBtn.dataset.propietario || "");
+      pushRow("Arrendatario", caseBtn.dataset.arrendatario || "");
+      pushRow("Inmueble", caseBtn.dataset.inmueble || caseBtn.dataset.idInmuebleWeb || "");
+      pushRow("Direccion", caseBtn.dataset.direccion || "");
+    } else if (targetId === "scm-sec-inmueble") {
+      pushRow("Inmueble", caseBtn.dataset.inmueble || "");
+      pushRow("Codigo inmueble web", caseBtn.dataset.idInmuebleWeb || "");
+      pushRow("Direccion", caseBtn.dataset.direccion || "");
+      pushRow("Barrio", caseBtn.dataset.barrio || "");
+      pushRow("Departamento", caseBtn.dataset.departamento || "");
+    }
+    var section = document.createElement("section");
+    section.className = "scm-case-history";
+    section.innerHTML =
+      "<h4>" + escHtml(titles[targetId]) + "</h4>" +
+      (rows.length
+        ? '<article class="scm-case-history-item"><div class="scm-case-history-detail">' + rows.join("") + "</div></article>"
+        : '<p class="scm-case-history-empty">Sin datos disponibles para esta vista.</p>');
+    return section;
+  }
+
   function openCaseSubmodal(modal, triggerBtn, targetId) {
     if (!modal || !targetId) {
       return;
     }
     var source = modal.querySelector("#" + targetId);
     if (!source) {
+      source = fallbackCaseSectionSource(modal, targetId);
+    }
+    if (!source) {
+      scmNotify("error", "No se pudo abrir este detalle del caso.", "Detalle no disponible");
       return;
     }
 
@@ -7550,6 +7599,7 @@
     if (!modal) {
       return;
     }
+    modal._scmCurrentCaseButton = btn;
 
     try {
       var sourceHtml = "";

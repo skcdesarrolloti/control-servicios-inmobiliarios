@@ -11951,57 +11951,10 @@
         initCalendarPanel(activeHomeCalendarSection || panel);
       };
       var calendarReady = loadDashboardFilterOptions().then(initHomeCalendar);
-      if (!ajaxUrl || !actionDashboardHome) {
-        return calendarReady;
-      }
-      if (panel.getAttribute("data-scm-loaded") === "1") {
-        return calendarReady;
-      }
-      if (dashboardHomePromise) {
-        return Promise.all([calendarReady, dashboardHomePromise]).then(function () {});
-      }
-
-      panel.setAttribute("aria-busy", "true");
-      showDashboardHomeMessage("Cargando el resumen…", false);
-      var fd = new FormData();
-      fd.append("action", actionDashboardHome);
-      fd.append("nonce", nonce);
-      dashboardHomePromise = fetchWithTimeout(ajaxUrl, {
-        method: "POST",
-        body: fd,
-        credentials: "same-origin",
-      })
-        .then(function (response) { return response.json(); })
-        .then(function (json) {
-          if (!json || !json.success || !json.data) {
-            throw new Error(
-              (json && json.data && json.data.message) ||
-                "No se pudo cargar el resumen.",
-            );
-          }
-          if (!json.data.summary) {
-            panel.setAttribute("data-scm-loaded", "1");
-            showDashboardHomeMessage(
-              json.data.message || "No hay indicadores disponibles para tu perfil.",
-              false,
-            );
-            return;
-          }
-          renderDashboardHome(json.data.summary, json.data.generated_at || "");
-        })
-        .catch(function (error) {
-          dashboardHomePromise = null;
-          showDashboardHomeMessage(
-            error && error.message
-              ? error.message
-              : "No fue posible cargar el resumen. Puedes reintentarlo.",
-            true,
-          );
-        })
-        .finally(function () {
-          panel.removeAttribute("aria-busy");
-        });
-      return Promise.all([calendarReady, dashboardHomePromise]).then(function () {});
+      return calendarReady.then(function () {
+        panel.setAttribute("data-scm-loaded", "1");
+        panel.removeAttribute("aria-busy");
+      });
     }
 
     function loadDashboardMetrics() {

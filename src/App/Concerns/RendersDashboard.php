@@ -744,13 +744,7 @@ trait RendersDashboard
         <?php endforeach; ?>
       </div>
 
-      <section class="scm-tab-panel scm-home-panel<?php echo $initialTab === 'scm-panel-inicio' ? ' active' : ''; ?>" id="scm-panel-inicio" data-scm-loaded="0" aria-busy="true" aria-label="Inicio">
-        <div class="scm-home-status" data-scm-home-status role="status" aria-live="polite">
-          <span class="scm-home-status-spinner" aria-hidden="true"></span>
-          <span data-scm-home-status-text>Cargando el resumen&hellip;</span>
-          <button type="button" data-scm-home-retry hidden>Reintentar</button>
-        </div>
-
+      <section class="scm-tab-panel scm-home-panel<?php echo $initialTab === 'scm-panel-inicio' ? ' active' : ''; ?>" id="scm-panel-inicio" data-scm-loaded="0" aria-label="Inicio">
         <?php
         $subtabReq = mb_strtolower(trim((string)($_GET['subtab'] ?? '')), 'UTF-8');
         $activeHomeSection = 'scm-home-calendar-section-mine';
