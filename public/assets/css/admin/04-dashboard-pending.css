@@ -2223,6 +2223,16 @@
   color: #ea580c;
 }
 
+#scm-app .scm-calendar-week-head.is-today.is-selected {
+  background: #eff6ff;
+}
+
+#scm-app .scm-calendar-week-head.is-today.is-selected strong {
+  background: #0b57d0;
+  box-shadow: 0 0 0 3px #ffffff, 0 0 0 5px #f97316;
+  color: #ffffff;
+}
+
 #scm-app .scm-calendar-time-slot {
   cursor: pointer;
   min-height: 43px;
