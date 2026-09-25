@@ -1385,6 +1385,10 @@
       var doneEl = panel.querySelector("[data-scm-calendar-done]");
       var todayEl = panel.querySelector("[data-scm-calendar-today]");
       var dueNavCountEl = root.querySelector("[data-scm-calendar-due-nav-count]");
+      var pendingActionCountEl = panel.querySelector("[data-scm-calendar-pending-action-count]");
+      var upcomingWrap = panel.querySelector("[data-scm-calendar-upcoming]");
+      var upcomingAllBtn = panel.querySelector("[data-scm-calendar-upcoming-all]");
+      var showAllUpcoming = false;
       var allowedCargos = String(panel.getAttribute("data-calendar-allowed-cargos") || "").split(",").map(function (v) { return v.trim(); }).filter(Boolean);
       var allowedEmployees = parseCalendarEmployees(panel.getAttribute("data-calendar-employees-json") || "[]");
       var currentCalendarEmployeeId = String(panel.getAttribute("data-calendar-current-employee-id") || "").trim();
@@ -1654,6 +1658,14 @@
         }).replace(/\./g, ""));
       }
 
+      function shortMonthLabel(value) {
+        var parts = String(value || "").slice(0, 10).split("-");
+        if (parts.length !== 3) return "";
+        var date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        if (Number.isNaN(date.getTime())) return "";
+        return date.toLocaleDateString("es-CO", { month: "short" }).replace(/\./g, "").slice(0, 3).toUpperCase();
+      }
+
       function capitalizeFirst(value) {
         value = String(value || "");
         return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
@@ -1848,6 +1860,7 @@
         if (pendingEl) pendingEl.textContent = String(pending || 0);
         if (doneEl) doneEl.textContent = String(done || 0);
         if (todayEl) todayEl.textContent = String(todayCount || 0);
+        if (pendingActionCountEl) pendingActionCountEl.textContent = String(pending || 0);
       }
 
       function dueCaseAttrsHtml(caseData) {
@@ -2017,6 +2030,44 @@
           "</div></div></article>";
       }
 
+      function upcomingItemHtml(row) {
+        var dateKey = eventDateKey(row);
+        var color = String(row.color || (isDueCalendar ? "#f59e0b" : "#f43f5e")).trim() || "#f59e0b";
+        var category = isDueCalendar ? (row.grupo || "Vencimiento") : (row.categoria || (categoriesById[getCategoryId(row)] && categoriesById[getCategoryId(row)].nombre) || "Sin categoria");
+        var time = isDueCalendar
+          ? ("Vence: " + (row.fecha_vencimiento || dateKey || "-"))
+          : (formatDateTime(row.fecha_inicio) + " - " + formatDateTime(row.fecha_fin));
+        return '<button type="button" class="scm-calendar-upcoming-item" data-scm-calendar-upcoming-day="' + escHtml(dateKey) + '">' +
+          '<span class="scm-calendar-upcoming-date"><strong>' + escHtml(shortMonthLabel(dateKey) || "MES") + '</strong><em>' + escHtml(String(Number(String(dateKey).slice(8, 10)) || "")) + "</em></span>" +
+          '<span class="scm-calendar-upcoming-body"><strong>' + escHtml(row.titulo || (isDueCalendar ? "Vencimiento" : "Evento")) + '</strong><em>' + escHtml(time) + '</em><small style="--event-color:' + escHtml(color) + '">' + escHtml(category) + "</small></span>" +
+          "</button>";
+      }
+
+      function renderUpcoming() {
+        if (!upcomingWrap) return;
+        var todayKey = toDateKey(new Date());
+        var range = monthRange(currentMonth);
+        var rows = calendarEvents.filter(function (row) {
+          var key = eventDateKey(row);
+          return key >= todayKey && key >= range.from && key <= range.to;
+        }).sort(function (a, b) {
+          return String(eventDateKey(a)).localeCompare(String(eventDateKey(b))) || String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+        });
+        var visibleRows = showAllUpcoming ? rows : rows.slice(0, 2);
+        upcomingWrap.innerHTML = visibleRows.length ? visibleRows.map(upcomingItemHtml).join("") : '<div class="scm-calendar-empty-day scm-calendar-empty-day--compact"><span class="material-symbols-outlined">event_available</span><strong>Sin próximos eventos</strong><p>No hay eventos próximos en este mes.</p></div>';
+        if (upcomingAllBtn) {
+          upcomingAllBtn.hidden = rows.length <= 2;
+          upcomingAllBtn.textContent = showAllUpcoming ? "Ver menos" : "Ver todos";
+        }
+        upcomingWrap.querySelectorAll("[data-scm-calendar-upcoming-day]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            selectedDay = btn.getAttribute("data-scm-calendar-upcoming-day") || selectedDay;
+            renderCalendarGrid();
+            renderSelectedDay();
+          });
+        });
+      }
+
       function renderSelectedDay() {
         var dayRows = calendarEvents.filter(function (row) { return eventDateKey(row) === selectedDay; });
         var holiday = holidayForDateKey(selectedDay);
@@ -2095,6 +2146,7 @@
         updateFilterCategories(calendarEvents);
         renderCalendarGrid();
         renderSelectedDay();
+        renderUpcoming();
       }
 
       function applyDueSettings(settings) {
@@ -2197,6 +2249,7 @@
         renderKpis(calendarEvents);
         renderCalendarGrid();
         renderSelectedDay();
+        renderUpcoming();
         renderDueBreakdown(calendarEvents);
       }
 
@@ -2294,6 +2347,7 @@
             calendarDueAllEvents = [];
             calendarDueStats = null;
             renderKpis(calendarEvents);
+            renderUpcoming();
             renderDueBreakdown(calendarEvents);
             if (monthGrid) monthGrid.innerHTML = '<div class="scm-calendar-loading">No se pudieron cargar los vencimientos.</div>';
             if (eventsWrap) eventsWrap.innerHTML = '<div class="scm-empty scm-empty-cards">No se pudieron cargar vencimientos administrativos.</div>';
@@ -4043,7 +4097,7 @@
             if (id) categoriesById[id] = row;
           });
           applyCalendarEmployeeOptions(funcionarios, currentCalendarEmployeeId);
-          fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), calendarAdminCategories(), "Todas");
+          fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), calendarAdminCategories(), "Todas las categorías");
         }).catch(function (err) {
           showToast("error", (err && err.message) || "No se pudieron cargar los funcionarios del calendario.");
         }).finally(loadEvents);
@@ -4159,6 +4213,12 @@
       var prevBtn = panel.querySelector("[data-scm-calendar-prev]");
       var nextBtn = panel.querySelector("[data-scm-calendar-next]");
       var todayBtn = panel.querySelector("[data-scm-calendar-today-btn]");
+      if (upcomingAllBtn) {
+        upcomingAllBtn.addEventListener("click", function () {
+          showAllUpcoming = !showAllUpcoming;
+          renderUpcoming();
+        });
+      }
       if (prevBtn) {
         prevBtn.addEventListener("click", function () {
           currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
