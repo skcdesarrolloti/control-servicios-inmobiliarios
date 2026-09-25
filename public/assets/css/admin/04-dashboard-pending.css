@@ -2421,6 +2421,11 @@
   gap: 2px;
 }
 
+.scm-calendar-week-quick-location > div {
+  display: grid;
+  gap: 8px;
+}
+
 .scm-calendar-week-quick-row strong {
   color: #3c4043;
   font-size: 14px;
@@ -2453,6 +2458,31 @@
 
 .scm-calendar-week-quick-location input:focus {
   border-bottom-color: #1a73e8;
+}
+
+.scm-calendar-week-quick-location-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scm-calendar-week-quick-location-presets button {
+  background: #ffffff;
+  border: 1px solid #dadce0;
+  border-radius: 999px;
+  color: #3c4043;
+  font-size: 12px;
+  font-weight: 500;
+  min-height: 32px;
+  padding: 0 12px !important;
+}
+
+.scm-calendar-week-quick-location-presets button:hover,
+.scm-calendar-week-quick-location-presets button:focus-visible {
+  background: #e8f0fe;
+  border-color: #1a73e8;
+  color: #0b57d0;
+  outline: 0;
 }
 
 .scm-calendar-week-quick-category select {
