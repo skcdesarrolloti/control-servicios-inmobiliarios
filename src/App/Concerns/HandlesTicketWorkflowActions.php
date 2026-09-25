@@ -1500,6 +1500,8 @@ trait HandlesTicketWorkflowActions
     $controller = $this->get_pending_controller();
     $payload = $controller->buildServiciosPublicosPayload([]);
     $items = [];
+    $yearStartTs = strtotime(date('Y-01-01 00:00:00', $fromTs)) ?: $fromTs;
+    $todayTs = strtotime(date('Y-m-d 00:00:00')) ?: time();
     foreach ((array) ($payload['items'] ?? []) as $item) {
       $item = (array) $item;
       $row = (array) ($item['row'] ?? []);
@@ -1507,10 +1509,10 @@ trait HandlesTicketWorkflowActions
       if ($dueTs <= 0) {
         continue;
       }
-      if ($dueTs < $fromTs || $dueTs > $toTs) {
+      if ($dueTs < $yearStartTs || $dueTs > $toTs) {
         continue;
       }
-      $calendarTs = $dueTs;
+      $calendarTs = $dueTs < $fromTs ? ($todayTs >= $fromTs && $todayTs <= $toTs ? $todayTs : $fromTs) : $dueTs;
       $contractPk = trim((string) ($row['_ID'] ?? ''));
       $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
       $fallbackId = md5((string) json_encode($row));
