@@ -3165,10 +3165,17 @@
 .swal2-popup.scm-due-entry-swal .swal2-footer {
   background: #ffffff;
   border-top: 1px solid #e2e8f0;
-  gap: 12px;
   justify-content: flex-end;
   margin: 0 !important;
-  padding: 16px 32px !important;
+  padding: 18px 32px 16px !important;
+}
+
+.swal2-popup.scm-due-entry-swal .scm-due-entry-footer-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin: 2px 0;
+  width: 100%;
 }
 
 .swal2-popup.scm-due-entry-swal .scm-due-entry-footer-btn {
@@ -3199,6 +3206,10 @@
 
   .swal2-popup.scm-due-entry-swal .scm-due-entry-list-head {
     align-items: stretch;
+    flex-direction: column;
+  }
+
+  .swal2-popup.scm-due-entry-swal .scm-due-entry-footer-actions {
     flex-direction: column;
   }
 

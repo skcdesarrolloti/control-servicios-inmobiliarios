@@ -245,14 +245,20 @@
       root.classList.add("scm-funcionario-bridge-mode");
     }
 
-    function shouldAutoShowDashboardDuePopup() {
+    function isDashboardHomePanelActive() {
+      var homePanel = root.querySelector("#scm-panel-inicio");
+      return !!(homePanel && homePanel.classList.contains("active"));
+    }
+
+    function shouldAutoShowDashboardDuePopup(source) {
       try {
         var params = new URL(window.location.href).searchParams;
         var tab = String(params.get("tab") || params.get("scm_tab") || "").trim().toLowerCase();
         var subtab = String(params.get("subtab") || params.get("scm_subtab") || "").trim();
-        return tab === "inicio" && subtab === "";
+        if (tab === "inicio" && subtab === "") return true;
+        return source === "home-tab" && isDashboardHomePanelActive() && subtab === "";
       } catch (_duePopupUrlError) {
-        return false;
+        return source === "home-tab" && isDashboardHomePanelActive();
       }
     }
 
@@ -684,6 +690,9 @@
       if (!button || typeof window.scmOpenCase !== "function") return;
       if (button.getAttribute("data-scm-due-case-loaded") === "1" || !actionAdminDueCase) {
         var loadedSourceHtml = dashboardDueCaseSourceHtml(button);
+        if (window.Swal && window.Swal.isVisible && window.Swal.isVisible()) {
+          window.Swal.close();
+        }
         window.setTimeout(function () {
           openDashboardDueCaseFromButton(button, loadedSourceHtml);
         }, 120);
@@ -702,6 +711,9 @@
         dashboardApplyDueCaseData(button, data.case || {});
         button.setAttribute("data-scm-due-case-loaded", "1");
         var loadedSourceHtml = dashboardDueCaseSourceHtml(button);
+        if (window.Swal && window.Swal.isVisible && window.Swal.isVisible()) {
+          window.Swal.close();
+        }
         window.setTimeout(function () {
           openDashboardDueCaseFromButton(button, loadedSourceHtml);
         }, 120);
@@ -875,7 +887,7 @@
     function maybeShowDashboardDuePopup(source) {
       source = source || "login";
       if (funcionarioBridgeMode) return Promise.resolve();
-      if (!shouldAutoShowDashboardDuePopup()) return Promise.resolve();
+      if (!shouldAutoShowDashboardDuePopup(source)) return Promise.resolve();
       if (!duePopupConfig.enabled || dashboardDuePopupShown[source]) return Promise.resolve();
       if (!window.Swal || !ajaxUrl || !actionAdminDueCalendar) {
         return Promise.resolve();
@@ -898,7 +910,7 @@
             showConfirmButton: false,
             showCancelButton: false,
             buttonsStyling: false,
-            footer: '<button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary" data-scm-dashboard-due-close>Cerrar</button><button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--primary" data-scm-dashboard-due-open-calendar><span class="material-symbols-outlined">event</span> Ver calendario</button>',
+            footer: '<div class="scm-due-entry-footer-actions"><button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--primary" data-scm-dashboard-due-open-calendar><span class="material-symbols-outlined">event</span> Ver calendario</button><button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary" data-scm-dashboard-due-close>Cerrar</button></div>',
             customClass: {
               popup: "scm-calendar-swal-popup scm-due-entry-swal",
               closeButton: "scm-swal-close-round scm-due-entry-close",
@@ -17725,7 +17737,12 @@
 
     root.querySelectorAll(".scm-tab[data-tab]").forEach(function (tab) {
       tab.addEventListener("click", function () {
-        window.setTimeout(loadActiveLazyPanelWithFeedback, 0);
+        window.setTimeout(function () {
+          loadActiveLazyPanelWithFeedback();
+          if ((tab.getAttribute("data-tab") || "") === "scm-panel-inicio") {
+            maybeShowDashboardDuePopup("home-tab");
+          }
+        }, 0);
       });
     });
 
