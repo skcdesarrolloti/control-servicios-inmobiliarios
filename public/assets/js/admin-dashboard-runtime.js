@@ -2518,8 +2518,8 @@
         });
       }
 
-      function agendaRowsHtml(rows) {
-        if (!rows.length) return '<div class="scm-calendar-popup-agenda-empty">Sin eventos visibles este mes.</div>';
+      function agendaRowsHtml(rows, emptyText) {
+        if (!rows.length) return '<div class="scm-calendar-popup-agenda-empty">' + escHtml(emptyText || "Sin eventos visibles este mes.") + '</div>';
         return rows.slice(0, 12).map(function (row) {
           return '<div class="scm-calendar-popup-agenda-item"><strong>' + escHtml(formatDateTime(row.fecha_inicio)) + '</strong><span>' + escHtml(row.titulo || "Evento") + '</span></div>';
         }).join("");
@@ -2550,6 +2550,39 @@
             agenda.innerHTML = agendaRowsHtml(allRows[0] || []);
           }
         });
+      }
+
+      function popupDateLabel(dateKey) {
+        var parts = String(dateKey || "").slice(0, 10).split("-");
+        if (parts.length !== 3) return "Selecciona una fecha";
+        var date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        if (Number.isNaN(date.getTime())) return "Selecciona una fecha";
+        return date.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
+      }
+
+      function popupTimeMinutes(value) {
+        var parts = String(value || "").split(":");
+        if (parts.length < 2) return null;
+        var hour = Number(parts[0]);
+        var minute = Number(parts[1]);
+        if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+        return (hour * 60) + minute;
+      }
+
+      function popupRowsForDate(rows, dateKey) {
+        dateKey = String(dateKey || "").slice(0, 10);
+        return (rows || []).filter(function (row) { return eventDateKey(row) === dateKey; }).sort(function (a, b) {
+          return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+        });
+      }
+
+      function popupRowOverlaps(row, startValue, endValue) {
+        var start = popupTimeMinutes(startValue);
+        var end = popupTimeMinutes(endValue);
+        var rowStart = popupTimeMinutes(timePartFromDateTime(row && row.fecha_inicio));
+        var rowEnd = popupTimeMinutes(timePartFromDateTime(row && row.fecha_fin));
+        if (start === null || end === null || rowStart === null || rowEnd === null) return false;
+        return start < rowEnd && end > rowStart;
       }
 
       function ticketLabel(ticket) {
@@ -3497,47 +3530,67 @@
           ? employeeMultiPickerHtml(preselectedEmployee)
           : '<select class="select select-bordered select-sm scm-select" name="empleados" required><option value="">Selecciona funcionario</option>' + employeeOptions + "</select>";
         var ticketFieldsHtml = "";
+        var defaultDate = escHtml(selectedDay || toDateKey(new Date()));
         var locationFieldsHtml = '<section class="scm-calendar-location-section scm-calendar-field-full">' +
-          '<div class="scm-calendar-section-heading"><span>Ubicaci&oacute;n del evento</span></div>' +
+          '<div class="scm-calendar-section-heading"><span>Ubicaci&oacute;n del evento</span><small>Georreferenciaci&oacute;n SuCasa</small></div>' +
           '<div class="scm-calendar-location-fields">' +
           '<label class="scm-seg-field"><span>Tipo de ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="contrato">Contrato de arrendamiento</option><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option></select></label>' +
-          '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Direcci&oacute;n del contrato"></label>' +
-          '<div class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Contrato de arrendamiento</span><div class="scm-calendar-contract-controls"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select aria-label="Contrato de arrendamiento"><option value="">Cargando contratos...</option></select></div><small data-calendar-contract-status>Busca y selecciona el contrato dentro del listado.</small></div>' +
+          '<div class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Buscar contrato o inmueble</span><div class="scm-calendar-contract-controls"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select aria-label="Contrato de arrendamiento"><option value="">Cargando contratos...</option></select></div><small data-calendar-contract-status>Busca y selecciona el contrato dentro del listado.</small></div>' +
+          '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Direcci&oacute;n del contrato"></label>' +
           "</div></section>";
-        var html = '<form class="scm-calendar-popup-form" autocomplete="off">' +
-          '<div class="scm-calendar-popup-grid">' +
-          '<label class="scm-seg-field"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required placeholder="Ej: Cita revisi&oacute;n preventiva"></label>' +
-          '<label class="scm-seg-field"><span>Categor&iacute;a</span><select class="select select-bordered select-sm scm-select" name="id_categoria" required><option value="">Selecciona categor&iacute;a</option>' + categoryOptions + '</select></label>' +
+        var html = '<div class="scm-calendar-create-shell">' +
+          '<div class="scm-calendar-create-head">' +
+          '<div class="scm-calendar-create-icon" aria-hidden="true"><span class="material-symbols-outlined">calendar_month</span></div>' +
+          '<div class="scm-calendar-create-title"><strong>' + (mode === "multiple" ? "Crear evento m&uacute;ltiple" : "Crear evento en calendario") + '</strong><span>Programaci&oacute;n de visitas t&eacute;cnicas, inspecciones locativas y reuniones</span></div>' +
+          '<span class="scm-calendar-create-badge">Operativo</span>' +
+          '</div>' +
+          '<form class="scm-calendar-popup-form scm-calendar-create-form" autocomplete="off">' +
+          '<div class="scm-calendar-create-main">' +
+          '<div class="scm-calendar-create-row scm-calendar-create-row--top">' +
+          '<label class="scm-seg-field"><span>T&iacute;tulo del evento <b>*</b></span><input class="input input-bordered input-sm scm-input" name="titulo" required placeholder="Ej: Cita revisi&oacute;n preventiva"></label>' +
+          '<label class="scm-seg-field"><span>Categor&iacute;a <b>*</b></span><select class="select select-bordered select-sm scm-select" name="id_categoria" required><option value="">Selecciona categor&iacute;a</option>' + categoryOptions + '</select></label>' +
+          '</div>' +
           locationFieldsHtml +
-          '<label class="scm-seg-field scm-calendar-field-full"><span>Funcionario(s)</span>' + employeesControl + '</label>' +
-          '<label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + escHtml(selectedDay || toDateKey(new Date())) + '"></label>' +
+          '<label class="scm-seg-field scm-calendar-field-full"><span>Funcionario responsable <b>*</b></span>' + employeesControl + '</label>' +
+          '<div class="scm-calendar-create-row scm-calendar-date-row">' +
+          '<label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + defaultDate + '"></label>' +
           '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required></label>' +
           '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required></label>' +
+          '</div>' +
           '<div class="scm-calendar-recurrence scm-calendar-field-full" data-calendar-recurrence>' +
-          '<label class="scm-calendar-recurrence-toggle"><input type="checkbox" name="es_recurrente" value="1" data-calendar-recurrence-toggle><span>Evento recurrente / m&uacute;ltiples fechas</span></label>' +
+          '<label class="scm-calendar-recurrence-toggle"><input type="checkbox" name="es_recurrente" value="1" data-calendar-recurrence-toggle><span>Evento recurrente / m&uacute;ltiples fechas</span><em data-calendar-recurrence-badge>Inactivo</em></label>' +
           '<div class="scm-calendar-recurrence-body" data-calendar-recurrence-body hidden>' +
-          '<label class="scm-seg-field"><span>Tipo recurrencia</span><select class="select select-bordered select-sm scm-select" name="tipo_recurrencia" data-calendar-recurrence-type><option value="diario">Diario</option><option value="semanal">Semanal</option><option value="personalizado">Personalizado</option></select></label>' +
-          '<label class="scm-seg-field" data-calendar-recurrence-end><span>Fecha fin</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha_fin_recurrencia"></label>' +
+          '<label class="scm-seg-field"><span>Frecuencia</span><select class="select select-bordered select-sm scm-select" name="tipo_recurrencia" data-calendar-recurrence-type><option value="diario">Diario</option><option value="semanal">Semanal</option><option value="personalizado">Personalizado</option></select></label>' +
+          '<label class="scm-seg-field" data-calendar-recurrence-end><span>Fecha l&iacute;mite de recurrencia</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha_fin_recurrencia"></label>' +
           '<div class="scm-calendar-week-picker" data-calendar-week-picker hidden><span>D&iacute;as de la semana</span><label><input type="checkbox" value="1" name="dias_semana"> Lun</label><label><input type="checkbox" value="2" name="dias_semana"> Mar</label><label><input type="checkbox" value="3" name="dias_semana"> Mi&eacute;</label><label><input type="checkbox" value="4" name="dias_semana"> Jue</label><label><input type="checkbox" value="5" name="dias_semana"> Vie</label><label><input type="checkbox" value="6" name="dias_semana"> S&aacute;b</label><label><input type="checkbox" value="0" name="dias_semana"> Dom</label></div>' +
           '<div class="scm-calendar-custom-dates" data-calendar-custom-dates hidden><div data-calendar-custom-rows></div><button type="button" class="scm-case-work-btn" data-calendar-add-custom-date>Agregar fecha personalizada</button></div>' +
+          '<small>Se programar&aacute;n las fechas generadas respetando la configuraci&oacute;n del rango.</small>' +
           '</div></div>' +
           ticketFieldsHtml +
-          '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="4" required></textarea></label>' +
-          '</div><div class="scm-calendar-popup-agenda"><h4>' + (mode === "multiple" ? "Agenda por funcionario" : "Agenda del funcionario") + '</h4><div data-scm-calendar-popup-agenda>' + popupEmployeeAgendaHtml(preselectedEmployee) + '</div></div></form>';
+          '<label class="scm-seg-field scm-calendar-description-field scm-calendar-field-full"><span>Descripci&oacute;n y observaciones operativas <em>Opcional</em></span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="3" placeholder="Observaciones internas para esta agenda."></textarea></label>' +
+          '</div>' +
+          '<aside class="scm-calendar-availability-panel">' +
+          '<div class="scm-calendar-availability-head"><div><span>Disponibilidad en vivo</span><strong data-calendar-availability-name>' + escHtml(preselectedEmployee ? employeeDisplayName(preselectedEmployee) : "Selecciona funcionario") + '</strong></div><em data-calendar-availability-count>0 asignados</em></div>' +
+          '<div class="scm-calendar-availability-date">Agenda programada para el <strong data-calendar-availability-date>' + escHtml(popupDateLabel(defaultDate)) + '</strong></div>' +
+          '<div class="scm-calendar-popup-agenda"><div data-scm-calendar-popup-agenda>' + popupEmployeeAgendaHtml(preselectedEmployee) + '</div></div>' +
+          '<div class="scm-calendar-availability-status is-free" data-calendar-availability-status><strong>Franja horaria disponible</strong><span>Selecciona funcionario, fecha y hora para validar cruces.</span></div>' +
+          '<button type="button" class="scm-calendar-full-agenda-btn" data-calendar-open-full-agenda><span class="material-symbols-outlined">calendar_month</span> Ver calendario completo del funcionario</button>' +
+          '</aside></form></div>';
         if (!window.Swal || typeof window.Swal.fire !== "function") {
           showToast("error", "No esta disponible el popup para crear eventos.");
           return;
         }
         window.Swal.fire({
-          title: mode === "multiple" ? "Crear evento múltiple" : "Crear evento",
+          title: "",
           html: html,
-          width: 1060,
+          width: 1120,
           customClass: {
-            popup: "scm-calendar-swal-popup",
+            popup: "scm-calendar-swal-popup scm-calendar-create-swal",
           },
+          showCloseButton: true,
           showCancelButton: true,
-          confirmButtonText: "Crear evento",
-          cancelButtonText: "Cerrar",
+          confirmButtonText: "+ Crear evento",
+          cancelButtonText: "Cancelar",
           focusConfirm: false,
           didOpen: function () {
             var popup = window.Swal.getPopup();
@@ -3557,11 +3610,17 @@
             var recurrenceToggle = popup.querySelector("[data-calendar-recurrence-toggle]");
             var recurrenceBody = popup.querySelector("[data-calendar-recurrence-body]");
             var recurrenceType = popup.querySelector("[data-calendar-recurrence-type]");
+            var recurrenceBadge = popup.querySelector("[data-calendar-recurrence-badge]");
             var recurrenceEndWrap = popup.querySelector("[data-calendar-recurrence-end]");
             var weekPicker = popup.querySelector("[data-calendar-week-picker]");
             var customDatesWrap = popup.querySelector("[data-calendar-custom-dates]");
             var customRows = popup.querySelector("[data-calendar-custom-rows]");
             var addCustomDateBtn = popup.querySelector("[data-calendar-add-custom-date]");
+            var availabilityName = popup.querySelector("[data-calendar-availability-name]");
+            var availabilityCount = popup.querySelector("[data-calendar-availability-count]");
+            var availabilityDate = popup.querySelector("[data-calendar-availability-date]");
+            var availabilityStatus = popup.querySelector("[data-calendar-availability-status]");
+            var openFullAgendaBtn = popup.querySelector("[data-calendar-open-full-agenda]");
             var locationInput = popup.querySelector('[name="ubicacion"]');
             var descriptionInput = popup.querySelector('[name="descripcion"]');
             var relatedTicketSelect = popup.querySelector("[data-calendar-related-ticket]");
@@ -3794,7 +3853,58 @@
               });
             }
             function refreshAgenda() {
-              updatePopupAgenda(agenda, selectedEmployees(), mode === "multiple");
+              if (!agenda) return;
+              var selected = selectedEmployees();
+              var dateValue = dateInput ? String(dateInput.value || "") : "";
+              var startValue = startInput ? String(startInput.value || "") : "";
+              var endValue = endInput ? String(endInput.value || "") : "";
+              if (availabilityDate) availabilityDate.textContent = popupDateLabel(dateValue);
+              if (availabilityName) {
+                availabilityName.textContent = selected.length === 1
+                  ? employeeDisplayName(selected[0])
+                  : (selected.length ? selected.length + " funcionarios seleccionados" : "Selecciona funcionario");
+              }
+              if (!selected.length) {
+                if (availabilityCount) availabilityCount.textContent = "0 asignados";
+                agenda.innerHTML = '<div class="scm-calendar-popup-agenda-empty">Selecciona funcionario para ver su agenda del d&iacute;a.</div>';
+                if (availabilityStatus) {
+                  availabilityStatus.className = "scm-calendar-availability-status is-free";
+                  availabilityStatus.innerHTML = '<strong>Franja horaria disponible</strong><span>Selecciona funcionario, fecha y hora para validar cruces.</span>';
+                }
+                return;
+              }
+              var requestId = ++popupAgendaRequestId;
+              agenda.innerHTML = '<div class="scm-calendar-popup-agenda-empty">Cargando disponibilidad...</div>';
+              Promise.all(selected.map(fetchEmployeeMonthEvents)).then(function (allRows) {
+                if (requestId !== popupAgendaRequestId) return;
+                var totalDayRows = 0;
+                var hasOverlap = false;
+                var htmlRows = "";
+                selected.forEach(function (employeeId, index) {
+                  var dayRows = popupRowsForDate(allRows[index] || [], dateValue);
+                  totalDayRows += dayRows.length;
+                  hasOverlap = hasOverlap || dayRows.some(function (row) { return popupRowOverlaps(row, startValue, endValue); });
+                  if (mode === "multiple") {
+                    htmlRows += '<details class="scm-calendar-agenda-accordion"' + (index === 0 ? " open" : "") + '><summary>' + escHtml(employeeDisplayName(employeeId)) + '<span>' + dayRows.length + ' evento(s)</span></summary><div>' + agendaRowsHtml(dayRows, "Sin eventos visibles para esta fecha.") + '</div></details>';
+                  } else {
+                    htmlRows += agendaRowsHtml(dayRows, "Sin eventos visibles para esta fecha.");
+                  }
+                });
+                if (availabilityCount) availabilityCount.textContent = totalDayRows + " asignado" + (totalDayRows === 1 ? "" : "s");
+                agenda.innerHTML = htmlRows || '<div class="scm-calendar-popup-agenda-empty">Sin eventos visibles para esta fecha.</div>';
+                if (availabilityStatus) {
+                  if (hasOverlap) {
+                    availabilityStatus.className = "scm-calendar-availability-status is-busy";
+                    availabilityStatus.innerHTML = '<strong>Cruce de horario detectado</strong><span>Revisa la agenda antes de crear el evento.</span>';
+                  } else if (startValue && endValue && dateValue) {
+                    availabilityStatus.className = "scm-calendar-availability-status is-free";
+                    availabilityStatus.innerHTML = '<strong>Franja horaria disponible</strong><span>No existen cruces de horario para el bloque de ' + escHtml(startValue) + ' a ' + escHtml(endValue) + '.</span>';
+                  } else {
+                    availabilityStatus.className = "scm-calendar-availability-status is-free";
+                    availabilityStatus.innerHTML = '<strong>Franja horaria disponible</strong><span>Completa fecha y hora para validar la franja.</span>';
+                  }
+                }
+              });
             }
             function maybeAutofillPreventiveDescription() {
               if (!categorySelect || !dateInput || !startInput || !endInput || !descriptionInput) return;
@@ -3833,6 +3943,7 @@
             function refreshRecurrenceUi() {
               var active = !!(recurrenceToggle && recurrenceToggle.checked);
               if (recurrenceBody) recurrenceBody.hidden = !active;
+              if (recurrenceBadge) recurrenceBadge.textContent = active ? "Activo" : "Inactivo";
               var type = recurrenceType ? recurrenceType.value : "diario";
               if (recurrenceEndWrap) recurrenceEndWrap.hidden = !active || type === "personalizado";
               if (weekPicker) weekPicker.hidden = !active || type !== "semanal";
@@ -3915,8 +4026,14 @@
               if (field) field.addEventListener("change", function () {
                 maybeAutofillTitleAndLocation(false);
                 maybeAutofillPreventiveDescription();
+                refreshAgenda();
               });
             });
+            if (openFullAgendaBtn) {
+              openFullAgendaBtn.addEventListener("click", function () {
+                openCalendarPath("/", "Calendario del funcionario");
+              });
+            }
             if (recurrenceToggle) recurrenceToggle.addEventListener("change", refreshRecurrenceUi);
             if (recurrenceType) recurrenceType.addEventListener("change", refreshRecurrenceUi);
             if (addCustomDateBtn && customRows) {
@@ -3978,10 +4095,6 @@
             }
             if (!String(fd.get("titulo") || "").trim() || !String(fd.get("ubicacion") || "").trim() || !String(fd.get("id_categoria") || "").trim()) {
               window.Swal.showValidationMessage("Titulo, ubicacion y categoria son obligatorios.");
-              return false;
-            }
-            if (relatedTicket && isCita === "no" && !String(fd.get("descripcion") || "").trim()) {
-              window.Swal.showValidationMessage("La descripcion es obligatoria si el evento no es una cita.");
               return false;
             }
             var basePayload = {
