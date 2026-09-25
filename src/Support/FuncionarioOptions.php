@@ -160,10 +160,8 @@ final class FuncionarioOptions
       $cargoName = trim((string) ($row['nombre_cargo'] ?? ''));
       $cargoId = trim((string) ($row['id_cargo'] ?? ''));
       $cargo = $cargoName !== '' ? $cargoName : ($cargoId !== '' ? 'Cargo ' . $cargoId : 'Funcionario');
-      $displayName = $name !== '' ? $name : ('Funcionario #' . $id);
-      $label = $employeeId !== '' && $idMode !== 'primary'
-        ? $employeeId . ' - ' . $displayName
-        : $displayName;
+      $displayName = $name !== '' ? $name : 'Funcionario';
+      $label = $displayName;
 
       $out[] = [
         'id' => $id,

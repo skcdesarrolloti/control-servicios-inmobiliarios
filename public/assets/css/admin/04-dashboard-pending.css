@@ -4267,7 +4267,7 @@
   display: inline-flex;
   gap: 7px;
   min-height: 32px;
-  padding: 5px 10px !important;
+  padding: 5px 8px 5px 12px !important;
   transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
@@ -4283,13 +4283,6 @@
   font-weight: 750 !important;
   letter-spacing: 0 !important;
   text-transform: none !important;
-}
-
-.swal2-popup .scm-calendar-selected-chip small {
-  color: #bfdbfe !important;
-  font-size: 10px !important;
-  font-weight: 700 !important;
-  margin: 0 !important;
 }
 
 .swal2-popup .scm-calendar-selected-chip b {
@@ -4628,7 +4621,7 @@
 
 .swal2-popup.scm-calendar-create-swal .scm-calendar-location-fields {
   gap: 12px;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(210px, 0.78fr) minmax(0, 1.22fr);
 }
 
 .swal2-popup.scm-calendar-create-swal .scm-calendar-contract-picker {
@@ -4636,7 +4629,7 @@
 }
 
 .swal2-popup.scm-calendar-create-swal .scm-calendar-location-address {
-  grid-column: 1 / -1;
+  grid-column: auto;
 }
 
 .swal2-popup.scm-calendar-create-swal .scm-calendar-recurrence {

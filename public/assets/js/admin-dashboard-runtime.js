@@ -1512,6 +1512,15 @@
         return String((row && (row.id_empleado || row.funcionario_id || row.empleado_id)) || "").trim();
       }
 
+      function employeeDisplayLabel(row, fallbackId) {
+        fallbackId = String(fallbackId || "").trim();
+        var raw = String((row && (row.nombre || row.name || row.empleado || row.funcionario || row.label || row.nombre_empleado)) || fallbackId || "Funcionario").trim();
+        raw = raw.replace(/^\s*\d+\s*[-–]\s*/u, "");
+        raw = raw.replace(/\s*\(\s*\d+\s*\)\s*$/u, "");
+        raw = raw.replace(/\s+ID\s+\d+\s*$/iu, "");
+        return raw || "Funcionario";
+      }
+
       function getCategoryId(row) {
         return String((row && (row.id_categoria || row.categoria_id)) || "").trim();
       }
@@ -1527,11 +1536,11 @@
           select.innerHTML = '<option value="">' + (lockCurrentEmployee ? "Mi calendario" : firstLabel) + "</option>";
           rows.forEach(function (row) {
             var id = getEmployeeId(row);
-            var name = String(row.nombre || row.empleado || row.funcionario || id).trim();
+            var name = employeeDisplayLabel(row, id);
             if (!id) return;
             var option = document.createElement("option");
             option.value = id;
-            option.textContent = name ? name + " (" + id + ")" : id;
+            option.textContent = name || "Funcionario";
             select.appendChild(option);
           });
           var hasCurrentOption = Array.prototype.slice.call(select.options || []).some(function (option) {
@@ -1540,7 +1549,7 @@
           if (lockCurrentEmployee && current && !hasCurrentOption) {
             var currentOption = document.createElement("option");
             currentOption.value = current;
-            currentOption.textContent = "Funcionario actual (" + current + ")";
+            currentOption.textContent = "Funcionario actual";
             select.appendChild(currentOption);
           }
           if (current) select.value = current;
@@ -2444,34 +2453,32 @@
       function employeeDisplayName(employeeId) {
         employeeId = String(employeeId || "").trim();
         var employee = allowedEmployees.find(function (row) { return getEmployeeId(row) === employeeId; });
-        if (!employee) return employeeId || "Funcionario";
-        return String(employee.nombre || employee.empleado || employee.funcionario || employeeId).trim();
+        if (!employee) return "Funcionario";
+        return employeeDisplayLabel(employee, employeeId);
       }
 
       function employeeOptionHtml(row, selected) {
         var id = getEmployeeId(row);
         if (!id) return "";
-        var name = String(row.nombre || row.empleado || row.funcionario || id).trim();
-        var label = name ? name + " (" + id + ")" : id;
-        return '<option value="' + escHtml(id) + '"' + (selected && id === selected ? " selected" : "") + '>' + escHtml(label) + "</option>";
+        var name = employeeDisplayLabel(row, id);
+        return '<option value="' + escHtml(id) + '"' + (selected && id === selected ? " selected" : "") + '>' + escHtml(name || "Funcionario") + "</option>";
       }
 
       function employeeMultiPickerHtml(preselectedEmployee) {
-        var rows = allowedEmployees.map(function (row) {
+        var hiddenChecks = allowedEmployees.map(function (row) {
           var id = getEmployeeId(row);
           if (!id) return "";
-          var name = String(row.nombre || row.empleado || row.funcionario || id).trim();
           var checked = preselectedEmployee && id === preselectedEmployee ? " checked" : "";
-          return '<label class="scm-calendar-employee-option" data-employee-option data-search-text="' + escHtml((name + " " + id).toLowerCase()) + '">' +
-            '<input type="checkbox" name="empleados_multi" value="' + escHtml(id) + '"' + checked + ' data-calendar-employee-check>' +
-            '<span><strong>' + escHtml(name || id) + '</strong><small>ID ' + escHtml(id) + '</small></span>' +
-            '</label>';
+          return '<input type="checkbox" name="empleados_multi" value="' + escHtml(id) + '"' + checked + ' hidden data-calendar-employee-check>';
+        }).join("");
+        var options = allowedEmployees.map(function (row) {
+          return employeeOptionHtml(row, "");
         }).join("");
         return '<div class="scm-calendar-employee-picker" data-calendar-employee-picker>' +
-          '<input class="input input-bordered input-sm scm-input scm-calendar-employee-search" type="search" placeholder="Buscar funcionario..." data-calendar-employee-search>' +
+          '<select class="select select-bordered select-sm scm-select scm-calendar-employee-search" data-calendar-employee-add-select><option value="">Buscar funcionario...</option>' + options + '</select>' +
           '<div class="scm-calendar-selected-employees" data-calendar-selected-employees></div>' +
-          '<div class="scm-calendar-employee-options">' + rows + '</div>' +
-          '<small>Marca uno o varios funcionarios. La agenda se agrupa abajo por cada seleccionado.</small>' +
+          '<div class="scm-calendar-employee-options" hidden>' + hiddenChecks + '</div>' +
+          '<small>Busca un funcionario y se agregar&aacute; abajo como seleccionado.</small>' +
           '</div>';
       }
 
@@ -3532,10 +3539,9 @@
         var defaultDate = escHtml(selectedDay || toDateKey(new Date()));
         var locationFieldsHtml = '<section class="scm-calendar-location-section scm-calendar-field-full">' +
           '<div class="scm-calendar-section-heading"><span>Ubicaci&oacute;n del evento</span></div>' +
-          '<input type="hidden" name="ubicacion_tipo" value="contrato">' +
           '<div class="scm-calendar-location-fields">' +
-          '<div class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Buscar inmueble o direcci&oacute;n</span><div class="scm-calendar-contract-controls"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select aria-label="Buscar inmueble o direcci&oacute;n"><option value="">Cargando inmuebles...</option></select></div><small data-calendar-contract-status>Busca y selecciona el inmueble dentro del listado.</small></div>' +
-          '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Se carga desde el inmueble seleccionado"></label>' +
+          '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option><option value="otra">Otra direcci&oacute;n</option></select></label>' +
+          '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Se carga desde la ubicaci&oacute;n seleccionada"></label>' +
           "</div></section>";
         var html = '<div class="scm-calendar-create-shell">' +
           '<div class="scm-calendar-create-head">' +
@@ -3595,14 +3601,14 @@
             if (!popup) return;
             var employeesSelect = popup.querySelector('[name="empleados"]');
             var employeePicker = popup.querySelector("[data-calendar-employee-picker]");
-            var employeeSearch = popup.querySelector("[data-calendar-employee-search]");
+            var employeeAddSelect = popup.querySelector("[data-calendar-employee-add-select]");
             var selectedEmployeesWrap = popup.querySelector("[data-calendar-selected-employees]");
             var agenda = popup.querySelector("[data-scm-calendar-popup-agenda]");
             var categorySelect = popup.querySelector('[name="id_categoria"]');
             var dateInput = popup.querySelector('[name="fecha"]');
             var startInput = popup.querySelector('[name="hora_inicio"]');
             var endInput = popup.querySelector('[name="hora_fin"]');
-            var contractWrap = popup.querySelector("[data-calendar-contract-wrap]");
+            var locationTypeSelect = popup.querySelector("[data-calendar-location-type]");
             var contractSelect = popup.querySelector("[data-calendar-contract-select]");
             var contractStatus = popup.querySelector("[data-calendar-contract-status]");
             var recurrenceToggle = popup.querySelector("[data-calendar-recurrence-toggle]");
@@ -3657,17 +3663,13 @@
             function updateSelectedEmployeeChips() {
               if (!employeePicker || !selectedEmployeesWrap) return;
               var selected = selectedEmployees();
-              employeePicker.querySelectorAll("[data-employee-option]").forEach(function (option) {
-                var input = option.querySelector("[data-calendar-employee-check]");
-                option.classList.toggle("is-checked", !!(input && input.checked));
-              });
               if (!selected.length) {
                 selectedEmployeesWrap.innerHTML = '<span class="scm-calendar-selected-empty">Sin funcionarios seleccionados</span>';
                 return;
               }
               selectedEmployeesWrap.innerHTML = selected.map(function (employeeId) {
                 return '<button type="button" class="scm-calendar-selected-chip" data-calendar-remove-employee="' + escHtml(employeeId) + '">' +
-                  '<span>' + escHtml(employeeDisplayName(employeeId)) + '</span><small>ID ' + escHtml(employeeId) + '</small><b aria-hidden="true">&times;</b>' +
+                  '<span>' + escHtml(employeeDisplayName(employeeId)) + '</span><b aria-hidden="true">&times;</b>' +
                   '</button>';
               }).join("");
             }
@@ -3704,7 +3706,7 @@
               $contract.select2({
                 width: "100%",
                 dropdownParent: window.jQuery(popup),
-                placeholder: "Buscar inmueble o direccion",
+                placeholder: "Seleccionar contrato",
                 allowClear: true,
                 ajax: {
                   delay: 250,
@@ -3775,18 +3777,24 @@
             }
             function applyLocationType(force) {
               if (!locationInput) return;
-              if (contractWrap) contractWrap.hidden = false;
-              locationInput.readOnly = true;
-              locationInput.placeholder = "Se carga desde el inmueble seleccionado";
-              if (force && locationInput.getAttribute("data-auto-calendar-location") === "1") {
+              var type = locationTypeSelect ? String(locationTypeSelect.value || "oficina_corredor") : "oficina_corredor";
+              var quickLocations = {
+                oficina_corredor: "Oficina Corredor",
+                oficina_manga: "Oficina Manga"
+              };
+              if (quickLocations[type]) {
+                locationInput.readOnly = true;
+                locationInput.placeholder = "";
+                locationInput.value = quickLocations[type];
+                locationInput.setAttribute("data-auto-calendar-location", "1");
+                return;
+              }
+              locationInput.readOnly = false;
+              locationInput.placeholder = "Escribe la dirección o punto de encuentro";
+              if (force || locationInput.getAttribute("data-auto-calendar-location") === "1") {
                 locationInput.value = "";
               }
-              if (!currentContractRows.length) {
-                refreshContractOptions("");
-              } else {
-                initContractSelect2();
-                applySelectedContract(false);
-              }
+              locationInput.setAttribute("data-auto-calendar-location", "0");
             }
             function maybeAutofillTitleAndLocation(force) {
               var ticket = isTicketRelated() ? selectedTicket() : null;
@@ -4073,12 +4081,31 @@
             }
             if (employeePicker) {
               employeePicker.querySelectorAll("[data-calendar-employee-check]").forEach(function (input) {
-                input.addEventListener("change", function () {
+                input.addEventListener("change", updateSelectedEmployeeChips);
+              });
+              if (employeeAddSelect) {
+                if (canUseSelect2()) {
+                  window.jQuery(employeeAddSelect).select2({
+                    width: "100%",
+                    dropdownParent: window.jQuery(popup),
+                    placeholder: "Buscar funcionario...",
+                    allowClear: true,
+                  });
+                }
+                employeeAddSelect.addEventListener("change", function () {
+                  var id = String(employeeAddSelect.value || "");
+                  if (!id) return;
+                  var input = Array.prototype.slice.call(employeePicker.querySelectorAll("[data-calendar-employee-check]")).find(function (candidate) {
+                    return String(candidate.value || "") === id;
+                  });
+                  if (input) input.checked = true;
+                  employeeAddSelect.value = "";
+                  if (canUseSelect2()) window.jQuery(employeeAddSelect).val("").trigger("change.select2");
                   updateSelectedEmployeeChips();
                   refreshAgenda();
                   refreshTickets();
                 });
-              });
+              }
               if (selectedEmployeesWrap) {
                 selectedEmployeesWrap.addEventListener("click", function (event) {
                   var btn = event.target && event.target.closest ? event.target.closest("[data-calendar-remove-employee]") : null;
@@ -4096,14 +4123,6 @@
                   }
                 });
               }
-            }
-            if (employeeSearch) {
-              employeeSearch.addEventListener("input", function () {
-                var term = normalizeText(employeeSearch.value);
-                employeePicker.querySelectorAll("[data-employee-option]").forEach(function (option) {
-                  option.style.display = !term || normalizeText(option.getAttribute("data-search-text") || "").indexOf(term) !== -1 ? "" : "none";
-                });
-              });
             }
             if (ticketSelect) {
               ticketSelect.addEventListener("change", function () {
@@ -4134,6 +4153,11 @@
             if (locationInput) {
               locationInput.addEventListener("input", function () {
                 locationInput.setAttribute("data-auto-calendar-location", "0");
+              });
+            }
+            if (locationTypeSelect) {
+              locationTypeSelect.addEventListener("change", function () {
+                applyLocationType(true);
               });
             }
             if (contractSelect) {
@@ -4191,7 +4215,7 @@
           willClose: function () {
             if (!(window.jQuery && window.jQuery.fn && window.jQuery.fn.select2)) return;
             var popup = window.Swal.getPopup();
-            ["[data-calendar-ticket-select]", "[data-calendar-contract-select]"].forEach(function (selector) {
+            ["[data-calendar-ticket-select]", "[data-calendar-contract-select]", "[data-calendar-employee-add-select]"].forEach(function (selector) {
               var select = popup ? popup.querySelector(selector) : null;
               if (!select) return;
               var $select = window.jQuery(select);
@@ -4215,7 +4239,7 @@
             var fd = new FormData(form);
             var relatedTicket = mode === "single" && fd.get("relacionado_ticket") === "si";
             var isCita = relatedTicket ? String(fd.get("es_cita") || "") : "";
-            var locationType = String(fd.get("ubicacion_tipo") || "contrato");
+            var locationType = String(fd.get("ubicacion_tipo") || "oficina_corredor");
             if (locationType === "contrato" && !String(fd.get("contrato_arrendamiento") || "").trim()) {
               window.Swal.showValidationMessage("Selecciona un inmueble para cargar la ubicacion.");
               return false;
@@ -11186,6 +11210,14 @@
     var dashboardFilterOptionsLoaded = false;
     var dashboardFilterOptionsPromise = null;
 
+    function cleanFuncionarioOptionLabel(label) {
+      label = String(label || "").trim();
+      label = label.replace(/^\s*\d+\s*[-–]\s*/u, "");
+      label = label.replace(/\s*\(\s*\d+\s*\)\s*$/u, "");
+      label = label.replace(/\s+ID\s+\d+\s*$/iu, "");
+      return label;
+    }
+
     function replaceSelectOptions(select, rows, valueKey, labelKey) {
       if (!select) return;
       var current = String(
@@ -11271,6 +11303,20 @@
             return !!allowedEmployeeMap[id];
           });
         }
+      }
+      funcionarioOptions = funcionarioOptions.map(function (row) {
+        if (!row || typeof row !== "object") return row;
+        return Object.assign({}, row, {
+          label: cleanFuncionarioOptionLabel(row.label || row.nombre || row.name || row.empleado || row.funcionario || row.id || ""),
+        });
+      });
+      if (Array.isArray(cotizacionOptions.funcionarios)) {
+        cotizacionOptions.funcionarios = cotizacionOptions.funcionarios.map(function (row) {
+          if (!row || typeof row !== "object") return row;
+          return Object.assign({}, row, {
+            label: cleanFuncionarioOptionLabel(row.label || row.nombre || row.name || row.empleado || row.funcionario || row.id || ""),
+          });
+        });
       }
       runtime.funcionarios = funcionarioOptions;
       var mappings = [
