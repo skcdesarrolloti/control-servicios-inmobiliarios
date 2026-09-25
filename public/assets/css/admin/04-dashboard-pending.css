@@ -4229,12 +4229,79 @@
   background: #f8fafc;
   border: 1px solid #dbe6f2;
   border-radius: 12px;
-  padding: 10px !important;
+  padding: 14px !important;
 }
 
 .swal2-popup .scm-calendar-employee-search {
   background: #fff !important;
-  margin-bottom: 9px !important;
+  margin-bottom: 10px !important;
+}
+
+.swal2-popup .scm-calendar-selected-employees {
+  align-items: center;
+  background: #fff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  min-height: 44px;
+  padding: 8px !important;
+}
+
+.swal2-popup .scm-calendar-selected-empty {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 650;
+  padding-left: 3px;
+}
+
+.swal2-popup .scm-calendar-selected-chip {
+  align-items: center;
+  background: #0f1d33;
+  border: 1px solid #1e3354;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 7px;
+  min-height: 32px;
+  padding: 5px 10px !important;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.swal2-popup .scm-calendar-selected-chip:hover {
+  background: #1d3150;
+  border-color: #f59e0b;
+  transform: translateY(-1px);
+}
+
+.swal2-popup .scm-calendar-selected-chip span {
+  color: inherit !important;
+  font-size: 11px !important;
+  font-weight: 750 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.swal2-popup .scm-calendar-selected-chip small {
+  color: #bfdbfe !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  margin: 0 !important;
+}
+
+.swal2-popup .scm-calendar-selected-chip b {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 14px;
+  height: 18px;
+  justify-content: center;
+  line-height: 1;
+  width: 18px;
 }
 
 .swal2-popup .scm-calendar-employee-options {
@@ -4257,6 +4324,12 @@
   min-height: 46px;
   padding: 8px 10px !important;
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.swal2-popup .scm-calendar-employee-option.is-checked {
+  background: #fff7ed;
+  border-color: #f59e0b;
+  box-shadow: inset 3px 0 0 #f97316;
 }
 
 .swal2-popup .scm-calendar-employee-option:hover {
@@ -4543,8 +4616,8 @@
   border-color: #dbe6f2;
   border-radius: 12px;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.03);
-  gap: 10px;
-  padding: 12px !important;
+  gap: 14px;
+  padding: 18px !important;
 }
 
 .swal2-popup.scm-calendar-create-swal .scm-calendar-section-heading small {
@@ -4554,12 +4627,12 @@
 }
 
 .swal2-popup.scm-calendar-create-swal .scm-calendar-location-fields {
-  gap: 10px;
-  grid-template-columns: minmax(210px, 0.88fr) minmax(0, 1.12fr);
+  gap: 12px;
+  grid-template-columns: 1fr;
 }
 
 .swal2-popup.scm-calendar-create-swal .scm-calendar-contract-picker {
-  grid-column: auto;
+  grid-column: 1 / -1;
 }
 
 .swal2-popup.scm-calendar-create-swal .scm-calendar-location-address {

@@ -2469,6 +2469,7 @@
         }).join("");
         return '<div class="scm-calendar-employee-picker" data-calendar-employee-picker>' +
           '<input class="input input-bordered input-sm scm-input scm-calendar-employee-search" type="search" placeholder="Buscar funcionario..." data-calendar-employee-search>' +
+          '<div class="scm-calendar-selected-employees" data-calendar-selected-employees></div>' +
           '<div class="scm-calendar-employee-options">' + rows + '</div>' +
           '<small>Marca uno o varios funcionarios. La agenda se agrupa abajo por cada seleccionado.</small>' +
           '</div>';
@@ -3531,8 +3532,8 @@
         var defaultDate = escHtml(selectedDay || toDateKey(new Date()));
         var locationFieldsHtml = '<section class="scm-calendar-location-section scm-calendar-field-full">' +
           '<div class="scm-calendar-section-heading"><span>Ubicaci&oacute;n del evento</span></div>' +
+          '<input type="hidden" name="ubicacion_tipo" value="contrato">' +
           '<div class="scm-calendar-location-fields">' +
-          '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="contrato">Inmueble / direcci&oacute;n</option><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option><option value="otra">Otra direcci&oacute;n</option></select></label>' +
           '<div class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Buscar inmueble o direcci&oacute;n</span><div class="scm-calendar-contract-controls"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select aria-label="Buscar inmueble o direcci&oacute;n"><option value="">Cargando inmuebles...</option></select></div><small data-calendar-contract-status>Busca y selecciona el inmueble dentro del listado.</small></div>' +
           '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Se carga desde el inmueble seleccionado"></label>' +
           "</div></section>";
@@ -3595,12 +3596,12 @@
             var employeesSelect = popup.querySelector('[name="empleados"]');
             var employeePicker = popup.querySelector("[data-calendar-employee-picker]");
             var employeeSearch = popup.querySelector("[data-calendar-employee-search]");
+            var selectedEmployeesWrap = popup.querySelector("[data-calendar-selected-employees]");
             var agenda = popup.querySelector("[data-scm-calendar-popup-agenda]");
             var categorySelect = popup.querySelector('[name="id_categoria"]');
             var dateInput = popup.querySelector('[name="fecha"]');
             var startInput = popup.querySelector('[name="hora_inicio"]');
             var endInput = popup.querySelector('[name="hora_fin"]');
-            var locationTypeSelect = popup.querySelector("[data-calendar-location-type]");
             var contractWrap = popup.querySelector("[data-calendar-contract-wrap]");
             var contractSelect = popup.querySelector("[data-calendar-contract-select]");
             var contractStatus = popup.querySelector("[data-calendar-contract-status]");
@@ -3652,6 +3653,23 @@
             }
             function selectedEmployees() {
               return selectedEmployeesFromPopup(popup.querySelector(".scm-calendar-popup-form"));
+            }
+            function updateSelectedEmployeeChips() {
+              if (!employeePicker || !selectedEmployeesWrap) return;
+              var selected = selectedEmployees();
+              employeePicker.querySelectorAll("[data-employee-option]").forEach(function (option) {
+                var input = option.querySelector("[data-calendar-employee-check]");
+                option.classList.toggle("is-checked", !!(input && input.checked));
+              });
+              if (!selected.length) {
+                selectedEmployeesWrap.innerHTML = '<span class="scm-calendar-selected-empty">Sin funcionarios seleccionados</span>';
+                return;
+              }
+              selectedEmployeesWrap.innerHTML = selected.map(function (employeeId) {
+                return '<button type="button" class="scm-calendar-selected-chip" data-calendar-remove-employee="' + escHtml(employeeId) + '">' +
+                  '<span>' + escHtml(employeeDisplayName(employeeId)) + '</span><small>ID ' + escHtml(employeeId) + '</small><b aria-hidden="true">&times;</b>' +
+                  '</button>';
+              }).join("");
             }
             function selectedTicket() {
               var value = ticketSelect ? String(ticketSelect.value || "").trim() : "";
@@ -3757,29 +3775,6 @@
             }
             function applyLocationType(force) {
               if (!locationInput) return;
-              var type = locationTypeSelect ? String(locationTypeSelect.value || "contrato") : "contrato";
-              var quickLocations = {
-                oficina_corredor: "Oficina Corredor",
-                oficina_manga: "Oficina Manga"
-              };
-              if (quickLocations[type]) {
-                if (contractWrap) contractWrap.hidden = true;
-                locationInput.readOnly = true;
-                locationInput.placeholder = "";
-                locationInput.value = quickLocations[type];
-                locationInput.setAttribute("data-auto-calendar-location", "1");
-                return;
-              }
-              if (type === "otra") {
-                if (contractWrap) contractWrap.hidden = true;
-                locationInput.readOnly = false;
-                locationInput.placeholder = "Escribe la direccion o punto de encuentro";
-                if (force || locationInput.getAttribute("data-auto-calendar-location") === "1") {
-                  locationInput.value = "";
-                }
-                locationInput.setAttribute("data-auto-calendar-location", "0");
-                return;
-              }
               if (contractWrap) contractWrap.hidden = false;
               locationInput.readOnly = true;
               locationInput.placeholder = "Se carga desde el inmueble seleccionado";
@@ -4079,10 +4074,28 @@
             if (employeePicker) {
               employeePicker.querySelectorAll("[data-calendar-employee-check]").forEach(function (input) {
                 input.addEventListener("change", function () {
+                  updateSelectedEmployeeChips();
                   refreshAgenda();
                   refreshTickets();
                 });
               });
+              if (selectedEmployeesWrap) {
+                selectedEmployeesWrap.addEventListener("click", function (event) {
+                  var btn = event.target && event.target.closest ? event.target.closest("[data-calendar-remove-employee]") : null;
+                  if (!btn) return;
+                  event.preventDefault();
+                  var id = String(btn.getAttribute("data-calendar-remove-employee") || "");
+                  var input = Array.prototype.slice.call(employeePicker.querySelectorAll("[data-calendar-employee-check]")).find(function (candidate) {
+                    return String(candidate.value || "") === id;
+                  });
+                  if (input) {
+                    input.checked = false;
+                    updateSelectedEmployeeChips();
+                    refreshAgenda();
+                    refreshTickets();
+                  }
+                });
+              }
             }
             if (employeeSearch) {
               employeeSearch.addEventListener("input", function () {
@@ -4121,11 +4134,6 @@
             if (locationInput) {
               locationInput.addEventListener("input", function () {
                 locationInput.setAttribute("data-auto-calendar-location", "0");
-              });
-            }
-            if (locationTypeSelect) {
-              locationTypeSelect.addEventListener("change", function () {
-                applyLocationType(true);
               });
             }
             if (contractSelect) {
@@ -4175,6 +4183,7 @@
             refreshTickets();
             applyRelatedTicketVisibility();
             applyLocationType(false);
+            updateSelectedEmployeeChips();
             refreshRecurrenceUi();
             maybeAutofillTitleAndLocation(false);
             maybeAutofillPreventiveDescription();
