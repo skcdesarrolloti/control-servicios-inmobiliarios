@@ -297,6 +297,7 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           // Si el panel principal #scm-app existe en esta página, realizamos cambio reactivo sin recarga
           const scmApp = document.getElementById('scm-app');
           if (scmApp && panelTarget) {
+            const selectedTabKey = this.getAttribute('data-tab-key') || '';
             let nativeTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab[data-tab="' + panelTarget + '"]');
             if (!adminSubTarget && !nativeTabBtn) {
               const subBtn = scmApp.querySelector('[data-admin-activity-target="' + panelTarget + '"]');
@@ -313,6 +314,11 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
               e.preventDefault();
               nativeTabBtn.click();
               window.scrollTo({ top: 0, behavior: 'instant' });
+              if (panelTarget === 'scm-panel-inicio' && selectedTabKey === 'inicio') {
+                setTimeout(function () {
+                  scmApp.dispatchEvent(new CustomEvent('scm:home-summary-selected', { bubbles: true }));
+                }, 180);
+              }
 
               if (adminSubTarget) {
                 setTimeout(function () {

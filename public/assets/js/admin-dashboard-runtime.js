@@ -256,9 +256,11 @@
         var params = new URL(window.location.href).searchParams;
         var tab = String(params.get("tab") || params.get("scm_tab") || "").trim().toLowerCase();
         var subtab = String(params.get("subtab") || params.get("scm_subtab") || "").trim();
+        if (source === "home-manual") return isDashboardHomePanelActive();
         if (tab === "inicio" && subtab === "") return true;
         return (source === "home-tab" || source === "case-return") && isDashboardHomePanelActive() && subtab === "";
       } catch (_duePopupUrlError) {
+        if (source === "home-manual") return isDashboardHomePanelActive();
         return (source === "home-tab" || source === "case-return") && isDashboardHomePanelActive();
       }
     }
@@ -1019,6 +1021,12 @@
         delete dashboardDuePopupShown["case-return"];
         maybeShowDashboardDuePopup("case-return");
       }, 160);
+    });
+
+    root.addEventListener("scm:home-summary-selected", function () {
+      delete dashboardDuePopupShown["home-manual"];
+      refreshDashboardDueNavBadge();
+      maybeShowDashboardDuePopup("home-manual");
     });
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
