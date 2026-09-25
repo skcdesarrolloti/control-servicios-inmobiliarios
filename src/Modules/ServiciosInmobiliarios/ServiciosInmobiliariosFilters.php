@@ -57,6 +57,7 @@ final class ServiciosInmobiliariosFilters
       'fAtraso' => $this->value($input, $prefix . 'atraso'),
       'fSinActualizar' => $this->value($input, $prefix . 'sin_actualizar'),
       'fTuvoSeguimiento' => $this->value($input, $prefix . 'tuvo_seguimiento'),
+      'fSort' => $this->sortValue($input, $prefix . 'sort'),
       'fFecha' => $singleDate,
       'fFechaDesde' => $dateFrom,
       'fFechaHasta' => $dateTo,
@@ -73,6 +74,15 @@ final class ServiciosInmobiliariosFilters
     }
 
     return trim((string) sanitize_text_field(wp_unslash((string) $input[$key])));
+  }
+
+  /** @param array<string,mixed> $input */
+  private function sortValue(array $input, string $key): string
+  {
+    $value = strtolower($this->value($input, $key));
+    return in_array($value, ['created_desc', 'created_asc', 'stale_desc', 'stale_asc', 'magnitude_desc', 'magnitude_asc'], true)
+      ? $value
+      : 'created_desc';
   }
 
   /** @param array<string,mixed> $input */

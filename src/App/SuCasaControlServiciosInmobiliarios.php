@@ -1451,6 +1451,14 @@ final class SuCasaControlServiciosInmobiliarios
         <input type="hidden" id="<?php echo esc_attr($prefix); ?>page" name="<?php echo esc_attr($prefix); ?>page" value="<?php echo esc_attr((string)($p['fPage'] ?? 1)); ?>">
         <div class="scm-grid">
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>estado_bloqueado">Vista</label><input id="<?php echo esc_attr($prefix); ?>estado_bloqueado" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr($lockedStatusLabel); ?>" readonly></div>
+          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>sort">Ordenar por</label><select id="<?php echo esc_attr($prefix); ?>sort" name="<?php echo esc_attr($prefix); ?>sort" class="select select-bordered select-sm scm-select scm-sort-select">
+              <option value="created_desc" <?php selected((string) ($p['fSort'] ?? 'created_desc'), 'created_desc'); ?>>Fecha de creaci&oacute;n reciente</option>
+              <option value="created_asc" <?php selected((string) ($p['fSort'] ?? ''), 'created_asc'); ?>>Fecha de creaci&oacute;n antigua</option>
+              <option value="stale_desc" <?php selected((string) ($p['fSort'] ?? ''), 'stale_desc'); ?>>M&aacute;s tiempo sin actualizar</option>
+              <option value="stale_asc" <?php selected((string) ($p['fSort'] ?? ''), 'stale_asc'); ?>>Actualizados recientemente</option>
+              <option value="magnitude_desc" <?php selected((string) ($p['fSort'] ?? ''), 'magnitude_desc'); ?>>Mayor magnitud</option>
+              <option value="magnitude_asc" <?php selected((string) ($p['fSort'] ?? ''), 'magnitude_asc'); ?>>Menor magnitud</option>
+            </select></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>origen">Origen</label><select id="<?php echo esc_attr($prefix); ?>origen" name="<?php echo esc_attr($prefix); ?>origen" class="select select-bordered select-sm scm-select">
               <option value="">Todos</option>
               <option value="web" <?php selected(($p['fOrigen'] ?? ''), 'web'); ?>>Guardian</option>

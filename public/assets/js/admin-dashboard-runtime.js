@@ -11999,8 +11999,15 @@
       });
       var perPageSelect = form.querySelector("#scm_per_page");
       var cotizacionSelect = form.querySelector("#scm_cotizacion");
+      var sortSelect = root.querySelector("#scm_sort");
       if (perPageSelect) {
         perPageSelect.addEventListener("change", function () {
+          setMantPage(1);
+          doFetch(new FormData(form));
+        });
+      }
+      if (sortSelect) {
+        sortSelect.addEventListener("change", function () {
           setMantPage(1);
           doFetch(new FormData(form));
         });
@@ -12033,6 +12040,7 @@
         if (
           select === cotizacionSelect ||
           select === perPageSelect ||
+          select === sortSelect ||
           (select.closest && select.closest(".scm-cotizacion-dependent"))
         ) {
           return;
@@ -12054,6 +12062,9 @@
           .forEach(function (i) {
             i.value = "";
           });
+          if (sortSelect) {
+            sortSelect.selectedIndex = 0;
+          }
           setMantPage(1);
           applyBinaryFilterKpiVisibility("scm-", "", "con-cotz", "sin-cotz");
           if (cotizacionSelect) {

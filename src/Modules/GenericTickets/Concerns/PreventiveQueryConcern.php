@@ -211,6 +211,7 @@ trait PreventiveQueryConcern
     }
     $offset = ($page - 1) * $perPage;
 
+    $orderBy = $this->preventiveOrderBySql($tabla, (string) ($p['fSort'] ?? 'created_desc'));
     $sql = "SELECT *,
         `_ID`          AS id_revision_preventiva,
         UNIX_TIMESTAMP(`cct_created`) AS fecha,
@@ -223,7 +224,7 @@ trait PreventiveQueryConcern
           THEN 'Si' ELSE {$damageDisplayExpr}
         END AS se_encontraron_danos
       FROM `{$tabla}` WHERE {$whereStr}
-      ORDER BY `cct_created` DESC LIMIT ? OFFSET ?";
+      ORDER BY {$orderBy} LIMIT ? OFFSET ?";
     $rows = $this->db->getResults($sql, array_merge($args, [$perPage, $offset]));
 
     if (!empty($rows) && $this->table_exists($cotTabla)) {
@@ -280,6 +281,40 @@ trait PreventiveQueryConcern
         'total_pages' => $totalPages,
       ],
     ];
+  }
+
+  private function preventiveOrderBySql(string $tabla, string $sort): string
+  {
+    $sort = strtolower(trim($sort));
+    if (!in_array($sort, ['created_desc', 'created_asc', 'stale_desc', 'stale_asc', 'magnitude_desc', 'magnitude_asc'], true)) {
+      $sort = 'created_desc';
+    }
+
+    if ($this->column_exists($tabla, 'fecha') && $this->column_exists($tabla, 'cct_created')) {
+      $createdExpr = "COALESCE(NULLIF(`fecha`, 0), UNIX_TIMESTAMP(`cct_created`), 0)";
+    } elseif ($this->column_exists($tabla, 'fecha')) {
+      $createdExpr = "COALESCE(NULLIF(`fecha`, 0), 0)";
+    } elseif ($this->column_exists($tabla, 'cct_created')) {
+      $createdExpr = "COALESCE(UNIX_TIMESTAMP(`cct_created`), 0)";
+    } else {
+      $createdExpr = '0';
+    }
+    $updatedExpr = $this->column_exists($tabla, 'cct_modified')
+      ? "COALESCE(UNIX_TIMESTAMP(`cct_modified`), {$createdExpr})"
+      : $createdExpr;
+    $magnitudeExpr = $this->column_exists($tabla, 'magnitud_caso')
+      ? "CASE LOWER(TRIM(COALESCE(`magnitud_caso`, ''))) WHEN 'critico' THEN 4 WHEN 'crítico' THEN 4 WHEN 'alto' THEN 3 WHEN 'medio' THEN 2 WHEN 'bajo' THEN 1 ELSE 0 END"
+      : '0';
+    $fallback = $this->column_exists($tabla, '_ID') ? '`_ID` DESC' : "{$createdExpr} DESC";
+
+    return match ($sort) {
+      'created_asc' => "{$createdExpr} ASC, {$fallback}",
+      'stale_desc' => "{$updatedExpr} ASC, {$createdExpr} DESC, {$fallback}",
+      'stale_asc' => "{$updatedExpr} DESC, {$createdExpr} DESC, {$fallback}",
+      'magnitude_desc' => "{$magnitudeExpr} DESC, {$updatedExpr} ASC, {$createdExpr} DESC, {$fallback}",
+      'magnitude_asc' => "{$magnitudeExpr} ASC, {$updatedExpr} ASC, {$createdExpr} DESC, {$fallback}",
+      default => "{$createdExpr} DESC, {$fallback}",
+    };
   }
 
   private function preventiveCotizacionExistsExpression(string $tabla, string $cotTabla): string

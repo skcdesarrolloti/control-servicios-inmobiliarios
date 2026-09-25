@@ -395,7 +395,8 @@ trait MaintenanceQueriesConcern
     $selectableColumns = $this->maintenanceSelectableColumns($table);
 
     $select = implode(', ', array_map(static fn(string $col): string => "t.`{$col}`", $selectableColumns));
-    $sql  = "SELECT {$select} FROM `{$table}` t WHERE " . implode(' AND ', $where) . ' ORDER BY t.fecha DESC LIMIT ? OFFSET ?';
+    $orderBy = $this->maintenanceOrderBySql($filters, 't');
+    $sql  = "SELECT {$select} FROM `{$table}` t WHERE " . implode(' AND ', $where) . " ORDER BY {$orderBy} LIMIT ? OFFSET ?";
     $rows = $this->db->getResults($this->convertSql($sql), array_merge($args, [$perPage, $offset]));
     if (empty($rows)) {
       return [];
@@ -453,9 +454,9 @@ trait MaintenanceQueriesConcern
     [$where, $args] = $this->buildMaintenanceWhereParts($filters);
     $selectableColumns = $this->maintenanceSelectableColumns($table);
     $select = implode(', ', array_map(static fn(string $col): string => "t.`{$col}`", $selectableColumns));
-    $orderColumn = $this->schema->columnExists($table, 'fecha') ? 't.`fecha`' : 't.`_ID`';
+    $orderBy = $this->maintenanceOrderBySql($filters, 't');
     $rows = $this->db->getResults(
-      $this->convertSql("SELECT {$select} FROM `{$table}` t WHERE " . implode(' AND ', $where) . " ORDER BY {$orderColumn} DESC"),
+      $this->convertSql("SELECT {$select} FROM `{$table}` t WHERE " . implode(' AND ', $where) . " ORDER BY {$orderBy}"),
       $args
     );
 
@@ -539,6 +540,35 @@ trait MaintenanceQueriesConcern
     }
 
     return !empty($selectableColumns) ? $selectableColumns : ['_ID'];
+  }
+
+  private function maintenanceOrderBySql(array $filters, string $alias = 't'): string
+  {
+    $table = $this->ticketsTable();
+    $sort = strtolower(trim((string) ($filters['fSort'] ?? 'created_desc')));
+    if (!in_array($sort, ['created_desc', 'created_asc', 'stale_desc', 'stale_asc', 'magnitude_desc', 'magnitude_asc'], true)) {
+      $sort = 'created_desc';
+    }
+
+    $createdExpr = $this->schema->columnExists($table, 'fecha')
+      ? "COALESCE(NULLIF({$alias}.`fecha`, 0), 0)"
+      : '0';
+    $updatedExpr = $this->schema->columnExists($table, 'fecha_actualizacion')
+      ? "COALESCE(NULLIF({$alias}.`fecha_actualizacion`, 0), {$createdExpr})"
+      : $createdExpr;
+    $magnitudeExpr = $this->schema->columnExists($table, 'magnitud_caso')
+      ? "CASE LOWER(TRIM(COALESCE({$alias}.`magnitud_caso`, ''))) WHEN 'critico' THEN 4 WHEN 'crítico' THEN 4 WHEN 'alto' THEN 3 WHEN 'medio' THEN 2 WHEN 'bajo' THEN 1 ELSE 0 END"
+      : '0';
+    $fallback = $this->schema->columnExists($table, '_ID') ? "{$alias}.`_ID` DESC" : "{$createdExpr} DESC";
+
+    return match ($sort) {
+      'created_asc' => "{$createdExpr} ASC, {$fallback}",
+      'stale_desc' => "{$updatedExpr} ASC, {$createdExpr} DESC, {$fallback}",
+      'stale_asc' => "{$updatedExpr} DESC, {$createdExpr} DESC, {$fallback}",
+      'magnitude_desc' => "{$magnitudeExpr} DESC, {$updatedExpr} ASC, {$createdExpr} DESC, {$fallback}",
+      'magnitude_asc' => "{$magnitudeExpr} ASC, {$updatedExpr} ASC, {$createdExpr} DESC, {$fallback}",
+      default => "{$createdExpr} DESC, {$fallback}",
+    };
   }
 
   /** @return array<int,string> */

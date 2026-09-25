@@ -905,10 +905,6 @@ trait RendersDashboard
                 <button class="scm-status-topic-tab scm-open-topic-tab<?php echo $activeOpenTopic === $openTopicKey ? ' active' : ''; ?>" type="button" data-open-target="<?php echo esc_attr($openTopicKey); ?>"><?php echo esc_html((string)($openTopicDef['label'] ?? $openTopicKey)); ?></button>
               <?php endforeach; ?>
             </div>
-            <div class="scm-sync-status hidden md:flex items-center gap-2 text-xs text-slate-500 font-medium px-2 py-1 bg-slate-50 border border-slate-200/60 rounded-full">
-              <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-              <span>Sincronizado vía SIMI Inmobiliaria</span>
-            </div>
           </div>
 
       <div class="scm-open-topic-panel<?php echo $activeOpenTopic === 'mant' ? ' active' : ''; ?>" id="scm-panel-mant" data-open-topic="mant" data-scm-loaded="<?php echo $hydrateMaintenanceRows ? '1' : '0'; ?>">
@@ -1136,10 +1132,15 @@ trait RendersDashboard
             <span class="scm-cases-count-badge text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200" id="scm-cases-count-badge"><?php echo esc_html($countBadgeText); ?></span>
           </div>
           <div class="scm-cases-sort-wrap flex items-center gap-1.5 text-xs text-slate-500">
-            <span class="scm-cases-sort-label font-medium">Ordenar por:</span>
-            <span class="scm-cases-sort-badge flex items-center gap-1 font-semibold text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded-lg shadow-2xs">
-              <span class="material-symbols-outlined text-[15px] text-slate-500">swap_vert</span> Mayor Urgencia (SLA)
-            </span>
+            <label class="scm-cases-sort-label font-medium" for="scm_sort">Ordenar por:</label>
+            <select id="scm_sort" name="scm_sort" form="scm-form" class="select select-bordered select-sm scm-select scm-cases-sort-select">
+              <option value="created_desc" <?php selected((string) ($params['fSort'] ?? 'created_desc'), 'created_desc'); ?>>Fecha de creaci&oacute;n reciente</option>
+              <option value="created_asc" <?php selected((string) ($params['fSort'] ?? ''), 'created_asc'); ?>>Fecha de creaci&oacute;n antigua</option>
+              <option value="stale_desc" <?php selected((string) ($params['fSort'] ?? ''), 'stale_desc'); ?>>M&aacute;s tiempo sin actualizar</option>
+              <option value="stale_asc" <?php selected((string) ($params['fSort'] ?? ''), 'stale_asc'); ?>>Actualizados recientemente</option>
+              <option value="magnitude_desc" <?php selected((string) ($params['fSort'] ?? ''), 'magnitude_desc'); ?>>Mayor magnitud</option>
+              <option value="magnitude_asc" <?php selected((string) ($params['fSort'] ?? ''), 'magnitude_asc'); ?>>Menor magnitud</option>
+            </select>
           </div>
         </div>
 
@@ -2347,8 +2348,16 @@ trait RendersDashboard
       $temaOptions = is_array($filterOptions['tema'] ?? null) ? $filterOptions['tema'] : [];
     }
     $form = $this->render_generic_filter_form('mis_tickets', 'scm_my_', $params, true, $temaOptions, $filterOptions, 'mis_tickets', 'Mis tickets');
+    $kpis = '<div class="scm-kpis scm-kpis-daisy">'
+      . '<div class="scm-kpi"><div class="scm-kpi-label">TOTAL</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-total">' . esc_html((string) ($stats['total'] ?? 0)) . '</div></div>'
+      . '<div class="scm-kpi scm-kpi-magnitud scm-kpi-critico"><div class="scm-kpi-label">CR&Iacute;TICOS</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-magnitud-critico">' . esc_html((string) ($stats['magnitud_critico'] ?? 0)) . '</div></div>'
+      . '<div class="scm-kpi scm-kpi-magnitud scm-kpi-alto"><div class="scm-kpi-label">ALTOS</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-magnitud-alto">' . esc_html((string) ($stats['magnitud_alto'] ?? 0)) . '</div></div>'
+      . '<div class="scm-kpi scm-kpi-magnitud scm-kpi-medio"><div class="scm-kpi-label">MEDIOS</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-magnitud-medio">' . esc_html((string) ($stats['magnitud_medio'] ?? 0)) . '</div></div>'
+      . '<div class="scm-kpi scm-kpi-magnitud scm-kpi-bajo"><div class="scm-kpi-label">BAJOS</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-magnitud-bajo">' . esc_html((string) ($stats['magnitud_bajo'] ?? 0)) . '</div></div>'
+      . '</div>';
     return '<span id="scm-mis_tickets-count" style="display:none;">' . esc_html((string) ($stats['total'] ?? 0)) . '</span>'
       . '<div class="scm-status-topic-head"><div><h3>Mis tickets</h3><p>Tickets asignados a tu funcionario, excepto los de Servicio al cliente.</p></div><span class="scm-status-count"><strong>' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> tickets</span></div>'
+      . $kpis
       . $form
       . '<div class="scm-cards-wrap"><div class="scm-ticket-cards" id="scm-cards-mis_tickets">' . $cards . '</div></div>'
       . '<div class="scm-pagination" id="scm-pagination-mis_tickets">' . $pagination . '</div>';

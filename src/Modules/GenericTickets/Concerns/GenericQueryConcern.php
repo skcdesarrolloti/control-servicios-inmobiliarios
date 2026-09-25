@@ -60,6 +60,7 @@ trait GenericQueryConcern
       'fAtraso' => $clean($input[$prefix . 'atraso'] ?? ''),
       'fSinActualizar' => $clean($input[$prefix . 'sin_actualizar'] ?? ''),
       'fTuvoSeguimiento' => $clean($input[$prefix . 'tuvo_seguimiento'] ?? ''),
+      'fSort' => $this->normalize_generic_sort($clean($input[$prefix . 'sort'] ?? '')),
       'fTema' => $clean($input[$prefix . 'tema'] ?? ''),
       'fPage' => max(1, (int) $clean($input[$prefix . 'page'] ?? '1')),
       'fPerPage' => max(10, min(100, (int) $clean($input[$prefix . 'per_page'] ?? '10'))),
@@ -592,7 +593,8 @@ trait GenericQueryConcern
 
     $rows = [];
     if ($includeRows) {
-      $sql = "SELECT * FROM `{$tabla}` WHERE {$whereStr} ORDER BY fecha DESC LIMIT ? OFFSET ?";
+      $orderBy = $this->generic_order_by_sql($tabla, (string) ($p['fSort'] ?? 'created_desc'));
+      $sql = "SELECT * FROM `{$tabla}` WHERE {$whereStr} ORDER BY {$orderBy} LIMIT ? OFFSET ?";
       $queryArgs = array_merge($args, [$perPage, $offset]);
 
       $rows = $this->db->getResults($sql, $queryArgs);
@@ -645,6 +647,38 @@ trait GenericQueryConcern
       ],
       'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
     ];
+  }
+
+  private function normalize_generic_sort(string $sort): string
+  {
+    $sort = strtolower(trim($sort));
+    return in_array($sort, ['created_desc', 'created_asc', 'stale_desc', 'stale_asc', 'magnitude_desc', 'magnitude_asc'], true)
+      ? $sort
+      : 'created_desc';
+  }
+
+  private function generic_order_by_sql(string $tabla, string $sort): string
+  {
+    $sort = $this->normalize_generic_sort($sort);
+    $createdExpr = $this->column_exists($tabla, 'fecha')
+      ? 'COALESCE(NULLIF(`fecha`, 0), 0)'
+      : '0';
+    $updatedExpr = $this->column_exists($tabla, 'fecha_actualizacion')
+      ? "COALESCE(NULLIF(`fecha_actualizacion`, 0), {$createdExpr})"
+      : $createdExpr;
+    $magnitudeExpr = $this->column_exists($tabla, 'magnitud_caso')
+      ? "CASE LOWER(TRIM(COALESCE(`magnitud_caso`, ''))) WHEN 'critico' THEN 4 WHEN 'crítico' THEN 4 WHEN 'alto' THEN 3 WHEN 'medio' THEN 2 WHEN 'bajo' THEN 1 ELSE 0 END"
+      : '0';
+    $fallback = $this->column_exists($tabla, '_ID') ? '`_ID` DESC' : $createdExpr . ' DESC';
+
+    return match ($sort) {
+      'created_asc' => "{$createdExpr} ASC, {$fallback}",
+      'stale_desc' => "{$updatedExpr} ASC, {$createdExpr} DESC, {$fallback}",
+      'stale_asc' => "{$updatedExpr} DESC, {$createdExpr} DESC, {$fallback}",
+      'magnitude_desc' => "{$magnitudeExpr} DESC, {$updatedExpr} ASC, {$createdExpr} DESC, {$fallback}",
+      'magnitude_asc' => "{$magnitudeExpr} ASC, {$updatedExpr} ASC, {$createdExpr} DESC, {$fallback}",
+      default => "{$createdExpr} DESC, {$fallback}",
+    };
   }
 
   private function generic_web_origin_expression(string $tabla): string
