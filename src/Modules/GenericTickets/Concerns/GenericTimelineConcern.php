@@ -197,6 +197,8 @@ trait GenericTimelineConcern
       'Procesos juridicos' => 'contractual_procesos_juridicos',
       'Solicitud contractual' => 'contractual_solicitud_contractual',
       'Solicitud de servicios publicos' => 'contractual_solicitud_sp',
+      'No prorroga de contrato' => 'contractual_solicitud_contractual',
+      'Terminacion de contrato' => 'contractual_solicitud_contractual',
       'Retencion de contrato' => 'contractual_retencion_contrato',
       'Otros servicios' => 'contractual_otros_servicios',
     ];

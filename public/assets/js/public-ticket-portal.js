@@ -522,6 +522,18 @@
                 asunto: 'Solicitud sobre servicios publicos',
                 placeholder: 'Indica el servicio, numero de cuenta o factura, inmueble y situacion presentada.'
               },
+              'No prorroga de contrato': {
+                title: 'No prorroga de contrato',
+                help: 'Solicita registrar o gestionar la no prorroga del contrato vigente.',
+                asunto: 'No prorroga de contrato',
+                placeholder: 'Indica el contrato, inmueble, fecha de finalizacion y detalle de la no prorroga.'
+              },
+              'Terminacion de contrato': {
+                title: 'Terminacion de contrato',
+                help: 'Solicita registrar o gestionar una terminacion de contrato.',
+                asunto: 'Terminacion de contrato',
+                placeholder: 'Indica el contrato, inmueble, causal, fecha estimada y documentos de soporte.'
+              },
               'Reparaciones antes de la entrega': {
                 title: 'Reparaciones antes de la entrega',
                 help: 'Reparaciones que deben realizarse antes de entregar el inmueble.',

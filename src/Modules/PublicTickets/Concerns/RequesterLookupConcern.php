@@ -325,6 +325,8 @@ trait RequesterLookupConcern
       'Procesos juridicos',
       'Solicitud contractual',
       'Solicitud de servicios publicos',
+      'No prorroga de contrato',
+      'Terminacion de contrato',
       'Reparaciones necesarias',
       'Reparaciones locativas',
       'Mejoras utiles',

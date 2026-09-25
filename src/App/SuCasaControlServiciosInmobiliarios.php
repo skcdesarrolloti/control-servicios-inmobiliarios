@@ -1254,7 +1254,7 @@ final class SuCasaControlServiciosInmobiliarios
       'recibo' => ['label' => 'Recibo de Inmuebles', 'temas' => ['Recibo de inmuebles'], 'prefix' => 'scmrc_'],
       'contable' => ['label' => 'Contable y Tributaria', 'temas' => ['Contable y tributaria'], 'prefix' => 'scmco_'],
       'certificaciones' => ['label' => 'Certificaciones Tributarias', 'temas' => ['Certificaciones tributarias'], 'prefix' => 'scmcr_'],
-      'contractual' => ['label' => 'Contractual', 'temas' => ['Procesos juridicos', 'Solicitud contractual', 'Solicitud de servicios publicos', 'Retencion de contrato', 'Otros servicios'], 'prefix' => 'scmct_'],
+      'contractual' => ['label' => 'Contractual', 'temas' => ['Procesos juridicos', 'Solicitud contractual', 'Solicitud de servicios publicos', 'No prorroga de contrato', 'Terminacion de contrato', 'Retencion de contrato', 'Otros servicios'], 'prefix' => 'scmct_'],
     ];
     return $defaults;
   }

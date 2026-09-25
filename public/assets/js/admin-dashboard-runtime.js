@@ -8530,6 +8530,8 @@
         "Procesos juridicos",
         "Solicitud contractual",
         "Solicitud de servicios publicos",
+        "No prorroga de contrato",
+        "Terminacion de contrato",
         "Retencion de contrato",
         "Otros servicios",
         "Contable y tributaria",

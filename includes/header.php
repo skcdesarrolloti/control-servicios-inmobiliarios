@@ -855,6 +855,15 @@ foreach ($rawNavItems as $k => $item) {
                 </button>
                 <button
                   type="button"
+                  data-scm-config-action="guardian-settings"
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">shield_person</span>
+                  <span>Configuración de Guardian</span>
+                </button>
+                <button
+                  type="button"
                   data-scm-config-action="actas-guide"
                   class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
                   role="menuitem"

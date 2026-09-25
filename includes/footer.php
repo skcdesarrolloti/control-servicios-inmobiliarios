@@ -96,6 +96,10 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
             const el = document.getElementById('scm-open-internal-notifications') || document.getElementById('scm-open-pqr-settings');
             if (el) el.click();
             else window.dispatchEvent(new CustomEvent('scm:open-notificaciones'));
+          } else if (action === 'guardian-settings') {
+            const el = document.getElementById('scm-open-pqr-settings');
+            if (el) el.click();
+            else window.dispatchEvent(new CustomEvent('scm:open-configuracion-guardian'));
           } else if (action === 'actas-guide') {
             const el = document.getElementById('scm-open-actas-guide');
             if (el) el.click();
@@ -483,6 +487,16 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
         } else {
           const adminPill = document.querySelector('.nav-tab-pill[data-tab-key="administrativas"]');
           if (adminPill) adminPill.click();
+        }
+      });
+
+      window.addEventListener('scm:open-configuracion-guardian', function () {
+        const guardianBtn = document.getElementById('scm-open-pqr-settings');
+        if (guardianBtn) {
+          guardianBtn.click();
+        } else {
+          const ticketsPill = document.querySelector('.nav-tab-pill[data-tab-key="tickets"]');
+          if (ticketsPill) ticketsPill.click();
         }
       });
 

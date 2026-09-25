@@ -1159,7 +1159,7 @@ trait RendersDashboard
         $gCardsHtml = $gLoaded ? $this->render_generic_cards($gRows, $config, $gTabKey) : $this->render_lazy_tickets_placeholder();
         $showTema = false;
         $gFilterOptions = $filterOptions;
-        $gFormHtml = $this->render_generic_filter_form($gTabKey, $gTabData['def']['prefix'], $gParams, $showTema, ['Procesos juridicos', 'Solicitud contractual', 'Solicitud de servicios publicos', 'Retencion de contrato', 'Otros servicios'], $gFilterOptions);
+        $gFormHtml = $this->render_generic_filter_form($gTabKey, $gTabData['def']['prefix'], $gParams, $showTema, ['Procesos juridicos', 'Solicitud contractual', 'Solicitud de servicios publicos', 'No prorroga de contrato', 'Terminacion de contrato', 'Retencion de contrato', 'Otros servicios'], $gFilterOptions);
         $gPaginationHtml = $gLoaded ? $this->get_generic_tickets_module()->render_generic_pagination($gTabKey, $gPagination) : ''; ?>
         <div class="scm-open-topic-panel<?php echo $activeOpenTopic === $gTabKey ? ' active' : ''; ?>" id="scm-panel-<?php echo esc_attr($gTabKey); ?>" data-open-topic="<?php echo esc_attr($gTabKey); ?>" data-scm-loaded="<?php echo $gLoaded ? '1' : '0'; ?>">
           <span id="scm-<?php echo esc_attr($gTabKey); ?>-count" style="display:none;"><?php echo esc_html((string)($gStats['total'] ?? 0)); ?></span>
@@ -1641,6 +1641,7 @@ trait RendersDashboard
         <?php echo $this->renderDashboardPermissionsModal($dashboardPermissionTabs, $dashboardCargoOptions, $dashboardPermissionConfig, $dashboardFuncionarioCargoIds, $adminDuePopupCargoIds, $dashboardActionPermissionCatalog, $dashboardActionPermissionConfig); ?>
       <?php endif; ?>
       <?php if ($canManagePublicPqrSettings): ?>
+        <button type="button" id="scm-open-pqr-settings" style="display:none !important;" aria-hidden="true" tabindex="-1">Configuraci&oacute;n de Guardian</button>
         <div id="scm-pqr-settings-modal" data-scm-lazy-settings="public-pqr" aria-hidden="true"></div>
       <?php endif; ?>
       <?php if ($canManageInternalNotificationSettings): ?>
