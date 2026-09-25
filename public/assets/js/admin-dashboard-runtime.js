@@ -1384,6 +1384,7 @@
       var pendingEl = panel.querySelector("[data-scm-calendar-pending]");
       var doneEl = panel.querySelector("[data-scm-calendar-done]");
       var todayEl = panel.querySelector("[data-scm-calendar-today]");
+      var dueNavCountEl = root.querySelector("[data-scm-calendar-due-nav-count]");
       var allowedCargos = String(panel.getAttribute("data-calendar-allowed-cargos") || "").split(",").map(function (v) { return v.trim(); }).filter(Boolean);
       var allowedEmployees = parseCalendarEmployees(panel.getAttribute("data-calendar-employees-json") || "[]");
       var currentCalendarEmployeeId = String(panel.getAttribute("data-calendar-current-employee-id") || "").trim();
@@ -1641,6 +1642,18 @@
         return { from: toDateKey(startOfMonth(date)), to: toDateKey(endOfMonth(date)) };
       }
 
+      function calendarDayTitle(value) {
+        var parts = String(value || "").slice(0, 10).split("-");
+        if (parts.length !== 3) return value || "Selecciona un dia";
+        var date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        if (Number.isNaN(date.getTime())) return value || "Selecciona un dia";
+        return capitalizeFirst(date.toLocaleDateString("es-CO", {
+          weekday: "long",
+          day: "2-digit",
+          month: "short",
+        }).replace(/\./g, ""));
+      }
+
       function capitalizeFirst(value) {
         value = String(value || "");
         return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
@@ -1821,6 +1834,10 @@
           if (pendingEl) pendingEl.textContent = String(dueTotal);
           if (doneEl) doneEl.textContent = String(Number(dueStats.vencidos || 0));
           if (todayEl) todayEl.textContent = String(Number(dueStats.hoy || 0));
+          if (dueNavCountEl) {
+            dueNavCountEl.textContent = String(dueTotal);
+            dueNavCountEl.hidden = dueTotal <= 0;
+          }
           return;
         }
         var todayKey = toDateKey(new Date());
@@ -1956,8 +1973,7 @@
         var canOpen = sourceHtml !== "";
         var overdue = String(row.estado || "").toLowerCase() === "vencido";
         var color = String(row.color || (overdue ? "#dc2626" : "#f59e0b")).trim();
-        return '<article class="scm-calendar-event-card scm-calendar-due-event-card scm-ticket-card">' +
-          '<div class="scm-calendar-event-color" style="background:' + escHtml(color) + '"></div>' +
+        return '<article class="scm-calendar-event-card scm-calendar-event-card--stripe scm-calendar-due-event-card scm-ticket-card" style="border-left-color:' + escHtml(color) + '">' +
           '<div class="scm-calendar-event-main">' +
           '<div class="scm-calendar-event-title-row"><h5>' + escHtml(row.titulo || "Vencimiento") + '</h5><span class="scm-calendar-event-state ' + (overdue ? "is-overdue" : "is-pending") + '">' + escHtml(row.estado || "Pendiente") + "</span></div>" +
           '<div class="scm-calendar-event-description">' + escHtml(row.descripcion || "Control de vencimiento administrativo.") + "</div>" +
@@ -2004,10 +2020,10 @@
       function renderSelectedDay() {
         var dayRows = calendarEvents.filter(function (row) { return eventDateKey(row) === selectedDay; });
         var holiday = holidayForDateKey(selectedDay);
-        if (dayTitleEl) dayTitleEl.textContent = selectedDay || "Selecciona un dia";
+        if (dayTitleEl) dayTitleEl.textContent = calendarDayTitle(selectedDay);
         if (daySubtitleEl) daySubtitleEl.textContent = (holiday ? "Festivo Colombia: " + holiday + ". " : "") + (dayRows.length ? dayRows.length + (isDueCalendar ? " vencimiento(s) para este dia." : " evento(s) para este dia.") : (isDueCalendar ? "Sin vencimientos para este dia." : "Sin eventos para este dia."));
         if (!eventsWrap) return;
-        eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<div class="scm-empty scm-empty-cards">' + (isDueCalendar ? "No hay vencimientos para este dia." : "No hay eventos para este dia.") + "</div>";
+        eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<div class="scm-calendar-empty-day"><span class="material-symbols-outlined">event_busy</span><strong>' + (isDueCalendar ? "Sin vencimientos para este día" : "Sin eventos para este día") + '</strong><p>' + (isDueCalendar ? "No hay controles vencidos o pendientes en la fecha seleccionada." : "Tu agenda está libre para este día. Puedes coordinar revisiones o citas.") + "</p></div>";
       }
 
       function renderCalendarGrid() {
@@ -2015,8 +2031,8 @@
         if (titleEl) titleEl.textContent = monthLabel(currentMonth);
         var prevMonthBtn = panel.querySelector("[data-scm-calendar-prev]");
         var nextMonthBtn = panel.querySelector("[data-scm-calendar-next]");
-        if (prevMonthBtn) prevMonthBtn.textContent = "‹ " + capitalizeFirst(monthLabel(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1)).replace(/\s+\d{4}$/, ""));
-        if (nextMonthBtn) nextMonthBtn.textContent = capitalizeFirst(monthLabel(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)).replace(/\s+\d{4}$/, "")) + " ›";
+        if (prevMonthBtn) prevMonthBtn.textContent = "‹";
+        if (nextMonthBtn) nextMonthBtn.textContent = "›";
         var first = startOfMonth(currentMonth);
         var start = new Date(first);
         var weekday = first.getDay();
