@@ -11321,6 +11321,111 @@
     var propertyHistorySectionsByKey = {};
     var contractTerminationRowsByPk = {};
 
+    function formatDashboardCount(value) {
+      var number = Number(value || 0);
+      if (!Number.isFinite(number)) number = 0;
+      return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(number);
+    }
+
+    function dashboardHomePanel() {
+      return root.querySelector("#scm-panel-inicio");
+    }
+
+    function dashboardHomeSummaryHost(panel) {
+      panel = panel || dashboardHomePanel();
+      if (!panel) return null;
+      var host = panel.querySelector("[data-scm-home-summary]");
+      if (host) return host;
+      host = document.createElement("div");
+      host.className = "scm-home-summary";
+      host.setAttribute("data-scm-home-summary", "1");
+      var status = panel.querySelector("[data-scm-home-status]");
+      if (status && status.parentNode) {
+        status.parentNode.insertBefore(host, status.nextSibling);
+      } else {
+        panel.insertBefore(host, panel.firstChild);
+      }
+      return host;
+    }
+
+    function showDashboardHomeMessage(message, isError) {
+      var panel = dashboardHomePanel();
+      if (!panel) return;
+      var status = panel.querySelector("[data-scm-home-status]");
+      if (!status) return;
+      var text = status.querySelector("[data-scm-home-status-text]");
+      var retry = status.querySelector("[data-scm-home-retry]");
+      status.hidden = false;
+      status.classList.toggle("is-error", !!isError);
+      if (text) text.textContent = message || "";
+      if (retry) retry.hidden = !isError;
+    }
+
+    function dashboardHomeMetric(label, value, tone) {
+      return '<article class="scm-kpi' + (tone ? " " + tone : "") + '">' +
+        '<div class="scm-kpi-label">' + escHtml(label) + "</div>" +
+        '<div class="scm-kpi-value">' + formatDashboardCount(value) + "</div>" +
+      "</article>";
+    }
+
+    function dashboardHomeCategoryRows(categories) {
+      categories = categories && typeof categories === "object" ? categories : {};
+      var rows = Object.keys(categories).map(function (key) {
+        var item = categories[key] || {};
+        return {
+          key: key,
+          label: item.label || key,
+          total: Number(item.total || item.abiertos || 0),
+          abiertos: Number(item.abiertos || 0),
+          vencidos: Number(item.sla_vencido || item.vencidos || 0),
+        };
+      }).sort(function (a, b) {
+        return b.abiertos - a.abiertos || b.total - a.total || a.label.localeCompare(b.label);
+      });
+      if (!rows.length) {
+        return '<div class="scm-empty scm-empty-cards">Sin indicadores por categor&iacute;a.</div>';
+      }
+      return '<div class="scm-home-process-list">' + rows.slice(0, 6).map(function (row) {
+        return '<div class="scm-home-process"><span>' + escHtml(row.label) + '</span><strong>' + formatDashboardCount(row.abiertos || row.total) + '</strong></div>';
+      }).join("") + "</div>";
+    }
+
+    function renderDashboardHome(summary, generatedAt) {
+      var panel = dashboardHomePanel();
+      if (!panel) return;
+      summary = summary || {};
+      var host = dashboardHomeSummaryHost(panel);
+      var status = panel.querySelector("[data-scm-home-status]");
+      var generatedLabel = generatedAt ? formatDateTime(generatedAt) : "";
+      if (host) {
+        host.innerHTML =
+          '<section class="scm-home-hero">' +
+            '<div><span class="scm-home-eyebrow">Resumen general</span><h1>Inicio operativo</h1><p>Indicadores principales del panel y accesos r&aacute;pidos a las vistas de trabajo.</p></div>' +
+            '<button type="button" class="scm-home-primary-action" data-scm-home-target="scm-home-calendar-section-due"><span class="material-symbols-outlined" aria-hidden="true">schedule</span><span>Ver vencimientos</span></button>' +
+          '</section>' +
+          '<div class="scm-kpis scm-kpis-daisy">' +
+            dashboardHomeMetric("Total", summary.total, "") +
+            dashboardHomeMetric("Abiertos", summary.abiertos, "") +
+            dashboardHomeMetric("Cerrados", summary.cerrados, "success") +
+            dashboardHomeMetric("Vencidos", summary.sla_vencido, "danger") +
+            dashboardHomeMetric("En riesgo", summary.sla_riesgo, "warning") +
+            dashboardHomeMetric("Sin cotiz.", summary.sin_cotizacion, "") +
+            dashboardHomeMetric("Sin revisi&oacute;n", summary.sin_revision, "") +
+          '</div>' +
+          '<div class="scm-home-content-grid">' +
+            '<section class="scm-home-card"><div class="scm-home-card-heading"><div><span class="scm-home-card-kicker">Categor&iacute;as</span><h2>Casos abiertos por frente</h2></div><span class="scm-home-updated">' + escHtml(generatedLabel ? "Actualizado " + generatedLabel : "Actualizado") + '</span></div>' + dashboardHomeCategoryRows(summary.por_categoria) + '</section>' +
+            '<section class="scm-home-shortcuts"><div class="scm-home-card-heading"><div><span class="scm-home-card-kicker">Accesos</span><h2>Ir directo</h2></div></div><div class="scm-home-shortcut-grid">' +
+              '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-mine"><span class="material-symbols-outlined">calendar_month</span><strong>Mi calendario</strong><i>Agenda</i></button>' +
+              '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-team"><span class="material-symbols-outlined">groups</span><strong>Calendario equipo</strong><i>Equipo</i></button>' +
+              '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-property-history"><span class="material-symbols-outlined">home</span><strong>Historial inmueble</strong><i>Consulta</i></button>' +
+              '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-contract-termination"><span class="material-symbols-outlined">description</span><strong>Terminaciones</strong><i>Contratos</i></button>' +
+            '</div></section>' +
+          '</div>';
+      }
+      if (status) status.hidden = true;
+      panel.setAttribute("data-scm-loaded", "1");
+    }
+
     function propertyHistoryEmpty(message) {
       return '<div class="scm-empty scm-empty-cards">' + escHtml(message || "Sin información para mostrar.") + "</div>";
     }
