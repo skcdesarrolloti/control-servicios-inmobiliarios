@@ -1450,6 +1450,9 @@
       var calendarDisplayMode = "month";
       var weekSlotSelection = null;
       var weekQuickPopover = null;
+      var WEEK_SLOT_MINUTES = 15;
+      var WEEK_DEFAULT_EVENT_MINUTES = 30;
+      var WEEK_DAY_END_MINUTES = 21 * 60;
 
       panel.querySelectorAll("[data-scm-calendar-open-path]").forEach(function (btn) {
         btn.addEventListener("click", function () {
@@ -2243,7 +2246,15 @@
           var slotDate = slot.getAttribute("data-date") || "";
           var slotStart = Number(slot.getAttribute("data-start") || 0);
           var slotEnd = Number(slot.getAttribute("data-end") || 0);
-          slot.classList.toggle("is-selecting", slotDate === dateKey && slotStart < max && slotEnd > min);
+          var active = slotDate === dateKey && slotStart < max && slotEnd > min;
+          slot.classList.toggle("is-selecting", active);
+          slot.classList.toggle("is-selection-start", active && slotStart === min);
+          slot.classList.toggle("is-selection-end", active && slotEnd === max);
+          if (active && slotStart === min) {
+            slot.setAttribute("data-selection-label", timeFromMinutes(min) + " - " + timeFromMinutes(max));
+          } else {
+            slot.removeAttribute("data-selection-label");
+          }
         });
       }
 
@@ -2252,6 +2263,9 @@
         if (!grid) return;
         grid.querySelectorAll(".is-selecting").forEach(function (slot) {
           slot.classList.remove("is-selecting");
+          slot.classList.remove("is-selection-start");
+          slot.classList.remove("is-selection-end");
+          slot.removeAttribute("data-selection-label");
         });
       }
 
@@ -2275,15 +2289,15 @@
         var endMinutes = slotEnd;
         if (selection && selection.date === dateKey) {
           startMinutes = Math.min(selection.start, slotStart);
-          endMinutes = Math.max(selection.start + 30, slotEnd);
+          endMinutes = Math.max(selection.start + WEEK_SLOT_MINUTES, slotEnd);
           if (selection.start === slotStart && !selection.dragged) {
-            endMinutes = Math.min(selection.start + 60, 21 * 60);
+            endMinutes = Math.min(selection.start + WEEK_DEFAULT_EVENT_MINUTES, WEEK_DAY_END_MINUTES);
           }
         } else {
-          endMinutes = Math.min(startMinutes + 60, 21 * 60);
+          endMinutes = Math.min(startMinutes + WEEK_DEFAULT_EVENT_MINUTES, WEEK_DAY_END_MINUTES);
         }
-        if (endMinutes <= startMinutes) endMinutes = Math.min(startMinutes + 60, 21 * 60);
-        if (endMinutes <= startMinutes) endMinutes = startMinutes + 30;
+        if (endMinutes <= startMinutes) endMinutes = Math.min(startMinutes + WEEK_DEFAULT_EVENT_MINUTES, WEEK_DAY_END_MINUTES);
+        if (endMinutes <= startMinutes) endMinutes = startMinutes + WEEK_SLOT_MINUTES;
         return { date: dateKey, start: startMinutes, end: endMinutes };
       }
 
@@ -2326,6 +2340,8 @@
         var fd = new FormData(form);
         var title = String(fd.get("titulo") || "").trim();
         var categoryId = String(fd.get("id_categoria") || "").trim();
+        var kind = String(fd.get("kind") || "event").trim();
+        var location = String(fd.get("ubicacion") || "").trim();
         var employeeId = quickCreateEmployeeId();
         if (!title) {
           showToast("error", "Escribe un titulo para crear el evento.");
@@ -2339,10 +2355,12 @@
           showToast("error", "No se encontro el funcionario del calendario.");
           return Promise.resolve(false);
         }
+        var titlePrefix = kind === "reminder" ? "Recordatorio: " : (kind === "task" ? "Tarea: " : "");
+        var payloadTitle = titlePrefix && title.indexOf(titlePrefix) !== 0 ? titlePrefix + title : title;
         var payload = {
-          titulo: title,
+          titulo: payloadTitle,
           descripcion: "",
-          ubicacion: "Agenda interna",
+          ubicacion: location || (kind === "reminder" ? "Recordatorio interno" : (kind === "task" ? "Tarea interna" : "Agenda interna")),
           id_categoria: categoryId,
           fecha_inicio: selection.date + " " + timeFromMinutes(selection.start) + ":00",
           fecha_fin: selection.date + " " + timeFromMinutes(selection.end) + ":00",
@@ -2386,9 +2404,15 @@
           '<span class="material-symbols-outlined" aria-hidden="true">drag_handle</span>' +
           '<button type="button" aria-label="Cerrar" data-week-quick-close><span class="material-symbols-outlined">close</span></button>' +
           '</div>' +
+          '<input type="hidden" name="kind" value="event" data-week-quick-kind-value>' +
           '<label class="scm-calendar-week-quick-title"><span class="sr-only">Titulo</span><input name="titulo" placeholder="Añade un título" required></label>' +
-          '<div class="scm-calendar-week-quick-tabs" aria-label="Tipo"><span class="active">Evento</span><span>Tarea</span><span>Recordatorio</span></div>' +
+          '<div class="scm-calendar-week-quick-tabs" aria-label="Tipo">' +
+          '<button type="button" class="active" data-week-quick-kind="event">Evento</button>' +
+          '<button type="button" data-week-quick-kind="task">Tarea</button>' +
+          '<button type="button" data-week-quick-kind="reminder">Recordatorio</button>' +
+          '</div>' +
           '<div class="scm-calendar-week-quick-row"><span class="material-symbols-outlined">schedule</span><div><strong>' + escHtml(dateLabel) + '</strong><em>' + escHtml(timeLabel) + '</em></div></div>' +
+          '<label class="scm-calendar-week-quick-location"><span class="material-symbols-outlined">location_on</span><input name="ubicacion" placeholder="Añadir ubicación o dirección"></label>' +
           '<label class="scm-calendar-week-quick-category"><span class="material-symbols-outlined">sell</span><select name="id_categoria" required><option value="">Selecciona categoría</option>' + categoryOptions + '</select></label>' +
           '<div class="scm-calendar-week-quick-actions">' +
           '<button type="button" data-week-quick-more>Más opciones</button>' +
@@ -2406,10 +2430,27 @@
         popover.style.top = top + "px";
         var input = popover.querySelector('[name="titulo"]');
         if (input) input.focus();
+        popover.querySelectorAll("[data-week-quick-kind]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var kind = btn.getAttribute("data-week-quick-kind") || "event";
+            var hidden = popover.querySelector("[data-week-quick-kind-value]");
+            if (hidden) hidden.value = kind;
+            popover.querySelectorAll("[data-week-quick-kind]").forEach(function (candidate) {
+              candidate.classList.toggle("active", candidate === btn);
+            });
+          });
+        });
         popover.querySelector("[data-week-quick-close]").addEventListener("click", closeWeekQuickPopover);
         popover.querySelector("[data-week-quick-more]").addEventListener("click", function () {
+          var selectedKind = popover.querySelector("[data-week-quick-kind-value]");
+          var kind = selectedKind ? String(selectedKind.value || "event") : "event";
           closeWeekQuickPopover();
-          openFromWeekSelection(selection);
+          openCreateEventWithDefaults({
+            date: selection.date,
+            start: timeFromMinutes(selection.start),
+            end: timeFromMinutes(selection.end),
+            kind: kind,
+          });
         });
         popover.querySelector("form").addEventListener("submit", function (event) {
           event.preventDefault();
@@ -2453,12 +2494,12 @@
             '<strong>' + String(date.getDate()) + '</strong>' +
             '</button>';
         });
-        for (var minutes = 8 * 60; minutes < 21 * 60; minutes += 30) {
+        for (var minutes = 8 * 60; minutes < WEEK_DAY_END_MINUTES; minutes += WEEK_SLOT_MINUTES) {
           var label = minutes % 60 === 0 ? displayHourFromMinutes(minutes) : "";
           html += '<div class="scm-calendar-time-gutter">' + escHtml(label) + '</div>';
           days.forEach(function (date) {
             var key = toDateKey(date);
-            var slotEnd = minutes + 30;
+            var slotEnd = minutes + WEEK_SLOT_MINUTES;
             var slotRows = weekSlotEvents(key, minutes, slotEnd);
             var slotClasses = "scm-calendar-time-slot";
             if (key === todayKey) slotClasses += " is-today";
