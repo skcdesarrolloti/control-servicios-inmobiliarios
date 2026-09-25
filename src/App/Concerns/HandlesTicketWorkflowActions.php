@@ -1507,10 +1507,10 @@ trait HandlesTicketWorkflowActions
       if ($dueTs <= 0) {
         continue;
       }
-      $calendarTs = $this->adminDueCalendarPlacementTimestamp($dueTs, $fromTs, $toTs);
-      if ($calendarTs <= 0) {
+      if ($dueTs < $fromTs || $dueTs > $toTs) {
         continue;
       }
+      $calendarTs = $dueTs;
       $contractPk = trim((string) ($row['_ID'] ?? ''));
       $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
       $fallbackId = md5((string) json_encode($row));
