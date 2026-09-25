@@ -3532,7 +3532,7 @@
         var locationFieldsHtml = '<section class="scm-calendar-location-section scm-calendar-field-full">' +
           '<div class="scm-calendar-section-heading"><span>Ubicaci&oacute;n del evento</span><small>Georreferenciaci&oacute;n SuCasa</small></div>' +
           '<div class="scm-calendar-location-fields">' +
-          '<label class="scm-seg-field"><span>Tipo de ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="contrato">Contrato de arrendamiento</option><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option></select></label>' +
+          '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="contrato">Contrato de arrendamiento</option><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option><option value="otra">Otra direcci&oacute;n</option></select></label>' +
           '<div class="scm-seg-field scm-calendar-contract-picker" data-calendar-contract-wrap><span>Buscar contrato o inmueble</span><div class="scm-calendar-contract-controls"><select class="select select-bordered select-sm scm-select" name="contrato_arrendamiento" data-calendar-contract-select aria-label="Contrato de arrendamiento"><option value="">Cargando contratos...</option></select></div><small data-calendar-contract-status>Busca y selecciona el contrato dentro del listado.</small></div>' +
           '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Direcci&oacute;n del contrato"></label>' +
           "</div></section>";
@@ -3770,6 +3770,16 @@
                 locationInput.setAttribute("data-auto-calendar-location", "1");
                 return;
               }
+              if (type === "otra") {
+                if (contractWrap) contractWrap.hidden = true;
+                if (force || locationInput.getAttribute("data-auto-calendar-location") === "1") {
+                  locationInput.value = "";
+                }
+                locationInput.readOnly = false;
+                locationInput.placeholder = "Escribe la dirección o punto de encuentro";
+                locationInput.setAttribute("data-auto-calendar-location", "0");
+                return;
+              }
               if (contractWrap) contractWrap.hidden = false;
               locationInput.readOnly = true;
               locationInput.placeholder = "Se carga desde el contrato seleccionado";
@@ -3950,6 +3960,116 @@
                 customRows.insertAdjacentHTML("beforeend", customDateRowHtml());
               }
             }
+            function employeeMonthRows(employeeId, monthDate) {
+              var range = monthRange(monthDate);
+              return calendarApi("filtrar_eventos_admin", {
+                pagina: 1,
+                limite: 180,
+                fecha_inicio: range.from,
+                fecha_fin: range.to,
+                id_empleado: employeeId,
+              }).then(function (json) {
+                if (!json || !json.success) return [];
+                return filterRowsByAllowedEmployees(extractRows(json.data || [])).filter(function (row) {
+                  return getEventEmployeeId(row) === String(employeeId);
+                }).sort(function (a, b) {
+                  return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+                });
+              }).catch(function () {
+                return [];
+              });
+            }
+            function renderEmployeeMonthOverlay(shell, employeeId, employeeName, monthDate) {
+              if (!shell) return;
+              var titleNode = shell.querySelector("[data-calendar-employee-month-title]");
+              var grid = shell.querySelector("[data-calendar-employee-month-grid]");
+              var doneCount = shell.querySelector("[data-calendar-employee-month-done]");
+              var pendingCount = shell.querySelector("[data-calendar-employee-month-pending]");
+              if (titleNode) titleNode.textContent = capitalizeFirst(monthLabel(monthDate));
+              if (grid) grid.innerHTML = '<div class="scm-case-calendar-empty">Cargando calendario...</div>';
+              employeeMonthRows(employeeId, monthDate).then(function (rows) {
+                var done = rows.filter(function (row) { return String(row.estado || "").toLowerCase() === "si"; }).length;
+                var pending = rows.length - done;
+                if (doneCount) doneCount.textContent = String(done);
+                if (pendingCount) pendingCount.textContent = String(pending);
+                if (!grid) return;
+                var first = startOfMonth(monthDate);
+                var start = new Date(first);
+                var weekday = first.getDay();
+                start.setDate(first.getDate() + (weekday === 0 ? -6 : 1 - weekday));
+                var todayKey = toDateKey(new Date());
+                var htmlRows = "";
+                for (var i = 0; i < 42; i += 1) {
+                  var cellDate = new Date(start);
+                  cellDate.setDate(start.getDate() + i);
+                  var key = toDateKey(cellDate);
+                  var holiday = holidayForDateKey(key);
+                  var dayRows = rows.filter(function (row) { return eventDateKey(row) === key; });
+                  var classes = "scm-case-calendar-day" + (cellDate.getMonth() !== monthDate.getMonth() ? " is-muted" : "") + (key === todayKey ? " is-today" : "") + (holiday ? " is-holiday" : "");
+                  htmlRows += '<div class="' + classes + '">' +
+                    '<div class="scm-case-calendar-day-head"><span class="scm-case-calendar-day-number">' + String(cellDate.getDate()) + '</span>' +
+                    (dayRows.length ? '<span class="scm-case-calendar-day-events-count">' + dayRows.length + ' evento(s)</span>' : "") + '</div>' +
+                    (holiday ? '<span class="scm-case-calendar-day-holiday">' + escHtml(holiday) + '</span>' : "");
+                  if (dayRows.length) {
+                    dayRows.slice(0, 2).forEach(function (row) {
+                      var isDone = String(row.estado || "").toLowerCase() === "si";
+                      htmlRows += '<div class="scm-case-calendar-day-pill' + (isDone ? " is-done" : "") + '"><strong>' + escHtml(timePartFromDateTime(row.fecha_inicio) || "--:--") + '</strong><span>' + escHtml(row.titulo || "Evento") + '</span></div>';
+                    });
+                    if (dayRows.length > 2) htmlRows += '<span class="scm-case-calendar-day-more">+' + (dayRows.length - 2) + ' m&aacute;s</span>';
+                  } else {
+                    htmlRows += '<span class="scm-case-calendar-day-free">Disponible</span>';
+                  }
+                  htmlRows += "</div>";
+                }
+                grid.innerHTML = htmlRows;
+              });
+            }
+            function openEmployeeMonthOverlay() {
+              var selected = selectedEmployees();
+              if (!selected.length) {
+                showToast("warning", "Selecciona un funcionario para ver su calendario.");
+                return;
+              }
+              var employeeId = selected[0];
+              var employeeName = employeeDisplayName(employeeId);
+              var selectedDateValue = dateInput && dateInput.value ? dateInput.value : toDateKey(new Date());
+              var parts = selectedDateValue.split("-");
+              var overlayMonth = parts.length === 3 ? new Date(Number(parts[0]), Number(parts[1]) - 1, 1) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+              var existing = popup.querySelector("[data-calendar-employee-month-overlay]");
+              if (existing) existing.remove();
+              var overlay = document.createElement("div");
+              overlay.className = "scm-calendar-employee-month-overlay";
+              overlay.setAttribute("data-calendar-employee-month-overlay", "1");
+              overlay.innerHTML = '<div class="scm-calendar-employee-month-backdrop" data-calendar-employee-month-close></div>' +
+                '<div class="scm-calendar-employee-month-modal">' +
+                '<button type="button" class="scm-case-calendar-event-mini-close" data-calendar-employee-month-close aria-label="Cerrar calendario">&times;</button>' +
+                '<div class="scm-case-calendar-month-shell" data-calendar-employee-month-shell>' +
+                '<div class="scm-case-calendar-modal-head"><span class="scm-case-calendar-modal-icon" aria-hidden="true"></span><div><h3>Calendario del funcionario</h3><p>Funcionario asignado: <strong>' + escHtml(employeeName) + '</strong></p></div><span class="scm-case-calendar-modal-badge">Vista Operativa Mensual</span></div>' +
+                '<div class="scm-case-calendar-toolbar"><button type="button" class="scm-case-calendar-nav" data-calendar-employee-month-prev aria-label="Mes anterior">&lsaquo;</button><div class="scm-case-calendar-heading"><span>' + escHtml(employeeName) + '</span><strong data-calendar-employee-month-title>' + escHtml(capitalizeFirst(monthLabel(overlayMonth))) + '</strong><small>Eventos y festivos de Colombia</small></div><button type="button" class="scm-case-calendar-nav" data-calendar-employee-month-next aria-label="Mes siguiente">&rsaquo;</button><div class="scm-case-calendar-top-actions"><span class="scm-case-calendar-stat is-done"><b data-calendar-employee-month-done>0</b> Realizados</span><span class="scm-case-calendar-stat is-pending"><b data-calendar-employee-month-pending>0</b> Pendientes</span></div></div>' +
+                '<div class="scm-case-calendar-weekdays"><span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sa</span><span>Do</span></div>' +
+                '<div class="scm-case-calendar-grid" data-calendar-employee-month-grid><div class="scm-case-calendar-empty">Cargando calendario...</div></div>' +
+                '<div class="scm-case-calendar-foot"><span>Revisi&oacute;n preventiva: 45 min por visita</span></div>' +
+                '</div></div>';
+              popup.appendChild(overlay);
+              var shell = overlay.querySelector("[data-calendar-employee-month-shell]");
+              renderEmployeeMonthOverlay(shell, employeeId, employeeName, overlayMonth);
+              overlay.addEventListener("click", function (event) {
+                if (event.target && event.target.closest("[data-calendar-employee-month-close]")) {
+                  event.preventDefault();
+                  overlay.remove();
+                }
+              });
+              var prev = overlay.querySelector("[data-calendar-employee-month-prev]");
+              var next = overlay.querySelector("[data-calendar-employee-month-next]");
+              if (prev) prev.addEventListener("click", function () {
+                overlayMonth = new Date(overlayMonth.getFullYear(), overlayMonth.getMonth() - 1, 1);
+                renderEmployeeMonthOverlay(shell, employeeId, employeeName, overlayMonth);
+              });
+              if (next) next.addEventListener("click", function () {
+                overlayMonth = new Date(overlayMonth.getFullYear(), overlayMonth.getMonth() + 1, 1);
+                renderEmployeeMonthOverlay(shell, employeeId, employeeName, overlayMonth);
+              });
+            }
             if (employeesSelect) {
               employeesSelect.addEventListener("change", function () {
                 refreshAgenda();
@@ -4029,7 +4149,7 @@
             });
             if (openFullAgendaBtn) {
               openFullAgendaBtn.addEventListener("click", function () {
-                openCalendarPath("/", "Calendario del funcionario");
+                openEmployeeMonthOverlay();
               });
             }
             if (recurrenceToggle) recurrenceToggle.addEventListener("change", refreshRecurrenceUi);
