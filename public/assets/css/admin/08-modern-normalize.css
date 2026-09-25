@@ -1,0 +1,128 @@
+/* Final admin layer: keeps legacy modules from overpowering redesigned views. */
+#scm-app,
+.swal2-popup[class*="scm-"] {
+  font-family: Poppins, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+
+#scm-app :is(button, input, select, textarea),
+.swal2-popup[class*="scm-"] :is(button, input, select, textarea) {
+  font-family: inherit;
+  letter-spacing: 0;
+}
+
+#scm-app :is(.material-symbols-outlined, .material-icons),
+.swal2-popup[class*="scm-"] :is(.material-symbols-outlined, .material-icons) {
+  font-family: "Material Symbols Outlined" !important;
+  font-weight: normal !important;
+  letter-spacing: normal !important;
+  line-height: 1 !important;
+  text-transform: none !important;
+}
+
+#scm-app :is(.scm-btn-primary, .scm-btn-secondary, .scm-primary-action, .scm-case-work-btn, .scm-btn-case, .scm-page-btn, .scm-status-topic-tab, .scm-calendar-filter-btn, .scm-calendar-day-create, .scm-filter-collapse-btn),
+.swal2-popup[class*="scm-"] :is(.swal2-confirm, .swal2-cancel, .scm-btn-primary, .scm-btn-secondary, .scm-case-work-btn, .scm-calendar-full-agenda-btn, .scm-due-entry-footer-btn) {
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+#scm-app :is(.scm-btn-primary, .scm-primary-action, .scm-case-work-btn.scm-primary-action, .scm-calendar-filter-btn--primary, .scm-calendar-create-action, .scm-calendar-day-create),
+.swal2-popup[class*="scm-"] :is(.swal2-confirm, .scm-btn-primary, .scm-due-entry-footer-btn--primary) {
+  background: #f97316 !important;
+  border-color: #f97316 !important;
+  box-shadow: 0 10px 20px rgba(249, 115, 22, 0.2) !important;
+  color: #ffffff !important;
+}
+
+#scm-app :is(.scm-btn-secondary, .scm-case-work-btn, .scm-calendar-filter-btn--ghost),
+.swal2-popup[class*="scm-"] :is(.swal2-cancel, .scm-case-work-btn, .scm-calendar-full-agenda-btn, .scm-due-entry-footer-btn--secondary) {
+  background: #ffffff !important;
+  border-color: #dbe6f2 !important;
+  color: #1f334f !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+}
+
+#scm-app :is(.scm-primary-action, .scm-case-work-btn.scm-primary-action, .scm-calendar-create-action, .scm-calendar-day-create) {
+  background: #f97316 !important;
+  border-color: #f97316 !important;
+  color: #ffffff !important;
+}
+
+#scm-app :is(.scm-btn-primary, .scm-btn-secondary, .scm-case-work-btn, .scm-calendar-filter-btn):hover,
+.swal2-popup[class*="scm-"] :is(.swal2-confirm, .swal2-cancel, .scm-case-work-btn, .scm-calendar-full-agenda-btn):hover {
+  transform: translateY(-1px);
+}
+
+#scm-app :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, .select, .input, .textarea),
+.swal2-popup[class*="scm-"] :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, .select2-selection--single) {
+  border-color: #cbd5e1 !important;
+  border-radius: 10px !important;
+  color: #0f172a !important;
+  font-weight: 500 !important;
+}
+
+#scm-app :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus,
+.swal2-popup[class*="scm-"] :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus {
+  border-color: #fb923c !important;
+  box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.16) !important;
+  outline: 0 !important;
+}
+
+#scm-app :is(.scm-field label, .scm-field span, .scm-seg-field > span, .scm-calendar-action-kicker, .scm-kpi-label, .scm-status-topic-head p),
+.swal2-popup[class*="scm-"] :is(.scm-seg-field > span, .scm-calendar-action-kicker, .scm-calendar-section-heading span, label) {
+  font-weight: 600 !important;
+  letter-spacing: 0.025em !important;
+}
+
+#scm-app :is(h1, h2, h3, h4, h5, h6, .scm-kpi-value, .scm-status-count strong),
+.swal2-popup[class*="scm-"] :is(h1, h2, h3, h4, h5, h6, .swal2-title, .scm-calendar-create-title strong) {
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+}
+
+#scm-app :is(.card, .scm-kpi, .scm-filter-card, .scm-calendar-card, .scm-ticket-card),
+.swal2-popup[class*="scm-"] :is(.scm-calendar-location-section, .scm-calendar-availability-panel, .scm-calendar-popup-agenda-item, .scm-calendar-employee-month-modal) {
+  border-color: #dbe6f2;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 26px rgba(15, 23, 42, 0.06);
+}
+
+#scm-app .scm-home-calendar {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-head-actions .scm-case-work-btn,
+#scm-app .scm-home-calendar .scm-calendar-head-actions .scm-btn-primary,
+#scm-app .scm-home-calendar .scm-calendar-filter-btn,
+#scm-app .scm-home-calendar .scm-calendar-day-create {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-filter-card .scm-actions {
+  align-items: end;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-filter-btn--primary {
+  min-width: 170px;
+}
+
+.swal2-popup.scm-calendar-create-swal .scm-calendar-popup-form .scm-seg-field > span,
+.swal2-popup.scm-calendar-create-swal .scm-calendar-section-heading span,
+.swal2-popup.scm-calendar-create-swal .scm-calendar-recurrence-toggle span,
+.swal2-popup.scm-calendar-create-swal .scm-calendar-full-agenda-btn {
+  font-weight: 600 !important;
+}
+
+.swal2-popup.scm-calendar-create-swal .scm-calendar-create-title strong {
+  font-size: 18px;
+}
+
+.swal2-popup.scm-calendar-create-swal .swal2-actions {
+  gap: 10px !important;
+}
