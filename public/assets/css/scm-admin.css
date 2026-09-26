@@ -1,12 +1,12 @@
-@import url("./admin/01-core.css?v=3.3.273");
-@import url("./admin/02-case-timeline.css?v=3.3.273");
-@import url("./admin/03-public-pqr.css?v=3.3.273");
-@import url("./admin/04-dashboard-pending.css?v=3.3.273");
-@import url("./admin/05-guide-contracts.css?v=3.3.273");
-@import url("./admin/06-canon-insurance-audit.css?v=3.3.273");
-@import url("./admin/07-collection-management.css?v=3.3.273");
-@import url('./ticket-completion.css?v=3.3.273');
-@import url("./admin/08-modern-normalize.css?v=3.3.273");
+@import url("./admin/01-core.css?v=3.3.283");
+@import url("./admin/02-case-timeline.css?v=3.3.283");
+@import url("./admin/03-public-pqr.css?v=3.3.283");
+@import url("./admin/04-dashboard-pending.css?v=3.3.283");
+@import url("./admin/05-guide-contracts.css?v=3.3.283");
+@import url("./admin/06-canon-insurance-audit.css?v=3.3.283");
+@import url("./admin/07-collection-management.css?v=3.3.283");
+@import url('./ticket-completion.css?v=3.3.283');
+@import url("./admin/08-modern-normalize.css?v=3.3.283");
 
 #scm-app .scm-origin-badge {
   display: inline-flex;
