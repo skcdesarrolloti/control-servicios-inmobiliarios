@@ -2295,7 +2295,7 @@
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
           (isEventKind && id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Ver evento</button>' : "") +
-          (isEventKind && ticket ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver ticket</button>' : "") +
+          (isEventKind && ticket ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver caso</button>' : "") +
           (isEventKind && id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Marcar realizado</button>' : "") +
           (isEventKind && id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar evento</button>' : "") +
           (kind === "tarea" && id && !isDone ? '<button type="button" class="scm-case-work-btn scm-calendar-action-btn--success" data-scm-calendar-complete-task data-task-id="' + escHtml(id) + '">Marcar realizada</button>' : "") +
@@ -4054,7 +4054,7 @@
           calendarDetailCardHtml("category", "Categoria", category, false, '<em style="--detail-dot:' + escHtml(row.color || "#f59e0b") + '"></em>') +
           calendarDetailCardHtml("", "Funcionario", "", false, '<span class="scm-calendar-detail-avatar">' + escHtml(calendarInitialsFromName(employee)) + '</span><strong>' + escHtml(employee || "Funcionario") + '</strong>') +
           calendarDetailCardHtml("location_on", "Ubicacion", location, true) +
-          (ticket ? calendarDetailCardHtml("confirmation_number", "Ticket asociado", "#" + ticket, true, '<button type="button" class="scm-calendar-detail-ticket" data-scm-calendar-view-ticket data-event-id="' + escHtml(eventId) + '" data-ticket-id="' + escHtml(ticket) + '">Ver ticket</button>') : "") +
+          (ticket ? calendarDetailCardHtml("confirmation_number", "Caso asociado", "#" + ticket, true, '<button type="button" class="scm-calendar-detail-ticket" data-scm-calendar-view-ticket data-event-id="' + escHtml(eventId) + '" data-ticket-id="' + escHtml(ticket) + '">Ver caso</button>') : "") +
           '</div>' +
           (description ? '<div class="scm-calendar-detail-description"><div><span>Descripci&oacute;n del evento</span>' + (priority ? '<strong>' + escHtml(priority) + '</strong>' : "") + '</div><p>' + calendarRichTextHtml(description) + '</p></div>' : "") +
           '<div class="scm-calendar-detail-progress"><div><span>Progreso de ejecuci&oacute;n</span><strong>' + escHtml(String(progress)) + '% completado</strong></div><i><b style="width:' + escHtml(String(progress)) + '%"></b></i></div>' +
@@ -4088,10 +4088,55 @@
           var btn = root.querySelector(selectors[i]) || document.querySelector(selectors[i]);
           if (btn) {
             window.scmOpenCase(btn);
+            window.setTimeout(elevateDashboardDueCaseModal, 30);
             return true;
           }
         }
         return false;
+      }
+
+      function openNativeCaseFromCalendarTicket(ticket, ticketId) {
+        if (!ticket || typeof window.scmOpenCase !== "function") return false;
+        var sourceHtml = String(ticket.case_source_html || ticket.caseSourceHtml || "").trim();
+        if (!sourceHtml) return false;
+        ticketId = String(ticketId || ticketIdFromRow(ticket) || "").trim();
+        var proxyCard = document.createElement("article");
+        proxyCard.className = "scm-ticket-card";
+        proxyCard.hidden = true;
+        var proxyButton = document.createElement("button");
+        proxyButton.type = "button";
+        proxyButton.className = "scm-btn-case";
+        var attrs = {
+          "ticket-pk": ticketId,
+          ticket: ticket.id_ticket || ticket.id || ticketId,
+          asunto: ticket.asunto || ticket.titulo || ticket.title || "Caso de servicios inmobiliarios",
+          estado: ticket.estado || ticket.estado_ticket || "",
+          admin: ticket.estado_administrativo || "",
+          creado: ticket.creado || ticket.fecha_creacion || ticket.created_at || "",
+          empleado: ticket.funcionario || ticket.empleado || ticket.nombre_empleado || "",
+          "empleado-id": ticket.id_empleado || ticket.id_funcionario || "",
+          categoria: ticket.categoria || ticket.tipo_pqrs || ticket.tema_ayuda || ticket.tipo || "",
+          departamento: ticket.departamento || ticket.area || "",
+          solicitante: ticket.solicitante || ticket.nombre_solicitante || ticket.cliente || "",
+          descripcion: ticket.descripcion || ticket.observacion || ticket.detalle || ticket.solicitud || "",
+          contrato: ticket.contrato || ticket.id_contrato || "",
+          inmueble: ticket.inmueble || ticket.id_inmueble || ticket.id_inmueble_web || "",
+          direccion: ticket.direccion || ticket.direccion_inmueble || "",
+          barrio: ticket.barrio || "",
+        };
+        Object.keys(attrs).forEach(function (key) {
+          proxyButton.setAttribute("data-" + key, String(attrs[key] || ""));
+        });
+        var proxySource = document.createElement("div");
+        proxySource.className = "scm-case-source";
+        proxySource.innerHTML = sourceHtml;
+        proxyCard.appendChild(proxyButton);
+        proxyCard.appendChild(proxySource);
+        root.appendChild(proxyCard);
+        window.scmOpenCase(proxyButton);
+        window.setTimeout(elevateDashboardDueCaseModal, 30);
+        window.setTimeout(function () { proxyCard.remove(); }, 800);
+        return true;
       }
 
       function ticketIdFromRow(ticket) {
@@ -4111,9 +4156,9 @@
         var description = calendarDetailValue(ticket, ["descripcion", "observacion", "detalle", "solicitud"]);
         var eventTitle = eventRow ? String(eventRow.titulo || eventRow.title || "").trim() : "";
         var eventId = eventRow ? String(eventRow.id || eventRow._ID || eventRow.event_id || "").trim() : "";
-        var ticketTitle = ticketId ? "Ticket #" + ticketId : (ticketIdFromRow(ticket) ? ticketLabel(ticket) : "Ticket");
+        var ticketTitle = ticketId ? "Caso #" + ticketId : (ticketIdFromRow(ticket) ? ticketLabel(ticket) : "Caso");
         return '<div class="scm-calendar-native-detail scm-calendar-ticket-native-detail">' +
-          '<div class="scm-case-calendar-event-mini-head"><span>Detalle del ticket</span><strong>' + escHtml(ticketTitle) + '</strong></div>' +
+          '<div class="scm-case-calendar-event-mini-head"><span>Detalle del caso</span><strong>' + escHtml(ticketTitle) + '</strong></div>' +
           '<div class="scm-case-calendar-event-mini-grid">' +
           calendarDetailFieldHtml("Ticket", ticketId ? "#" + ticketId : "", false) +
           calendarDetailFieldHtml("Solicitante", calendarDetailValue(ticket, ["solicitante", "nombre_solicitante", "cliente"]), false) +
@@ -4133,7 +4178,9 @@
           "</div>";
       }
 
-      function bindCalendarNativePopupActions(eventRow) {
+      function bindCalendarNativePopupActions(eventRow, options, state) {
+        options = options || {};
+        state = state || { navigating: false };
         var popup = window.Swal && window.Swal.getPopup ? window.Swal.getPopup() : null;
         if (!popup) return;
         popup.addEventListener("click", function (event) {
@@ -4141,8 +4188,9 @@
           if (eventBtn) {
             event.preventDefault();
             var viewEventId = eventBtn.getAttribute("data-event-id") || "";
+            state.navigating = true;
             window.Swal.close();
-            window.setTimeout(function () { openCalendarEventDetailPopup(viewEventId); }, 50);
+            window.setTimeout(function () { openCalendarEventDetailPopup(viewEventId, { returnTo: options.returnTo }); }, 50);
             return;
           }
           var ticketBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-view-ticket]") : null;
@@ -4150,24 +4198,37 @@
             event.preventDefault();
             var ticketId = ticketBtn.getAttribute("data-ticket-id") || "";
             var ticketEventId = ticketBtn.getAttribute("data-event-id") || (eventRow ? String(eventRow.id || eventRow._ID || eventRow.event_id || "") : "");
-            window.Swal.close();
-            window.setTimeout(function () { openCalendarTicketDetailPopup(ticketId, ticketEventId); }, 50);
+            state.navigating = true;
+            var openedNative = openCalendarTicketDetailPopup(ticketId, ticketEventId, {
+              returnTo: function () { openCalendarEventDetailPopup(ticketEventId, { returnTo: options.returnTo }); },
+            });
+            if (openedNative) state.navigating = false;
             return;
           }
           var completeBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-complete-event]") : null;
           if (completeBtn) {
             event.preventDefault();
             var completeId = completeBtn.getAttribute("data-event-id") || "";
+            state.navigating = true;
             window.Swal.close();
-            window.setTimeout(function () { openCompleteEventPopup(completeId); }, 50);
+            window.setTimeout(function () {
+              openCompleteEventPopup(completeId, {
+                returnTo: function () { openCalendarEventDetailPopup(completeId, { returnTo: options.returnTo }); },
+              });
+            }, 50);
             return;
           }
           var rescheduleBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-reschedule-event]") : null;
           if (rescheduleBtn) {
             event.preventDefault();
             var rescheduleId = rescheduleBtn.getAttribute("data-event-id") || "";
+            state.navigating = true;
             window.Swal.close();
-            window.setTimeout(function () { openRescheduleEventPopup(rescheduleId); }, 50);
+            window.setTimeout(function () {
+              openRescheduleEventPopup(rescheduleId, {
+                returnTo: function () { openCalendarEventDetailPopup(rescheduleId, { returnTo: options.returnTo }); },
+              });
+            }, 50);
             return;
           }
           var closeBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-close]") : null;
@@ -4178,7 +4239,8 @@
         });
       }
 
-      function openCalendarEventDetailPopup(eventId) {
+      function openCalendarEventDetailPopup(eventId, options) {
+        options = options || {};
         if (!window.Swal || typeof window.Swal.fire !== "function") {
           showToast("error", "No esta disponible el detalle del evento.");
           return;
@@ -4188,6 +4250,7 @@
           showToast("error", "No encontre el evento seleccionado.");
           return;
         }
+        var state = { navigating: false };
         window.Swal.fire({
           title: "",
           html: calendarEventDetailHtml(row),
@@ -4195,26 +4258,32 @@
           customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal scm-calendar-event-detail-swal" },
           showConfirmButton: false,
           showCancelButton: false,
-          didOpen: function () { bindCalendarNativePopupActions(row); },
+          didOpen: function () { bindCalendarNativePopupActions(row, options, state); },
+        }).then(function () {
+          if (!state.navigating && typeof options.returnTo === "function") {
+            window.setTimeout(options.returnTo, 80);
+          }
         });
       }
 
-      function openCalendarTicketDetailPopup(ticketId, eventId) {
+      function openCalendarTicketDetailPopup(ticketId, eventId, options) {
+        options = options || {};
         ticketId = String(ticketId || "").trim();
         if (!ticketId) {
           showToast("warning", "Este evento no tiene ticket relacionado.");
-          return;
+          return true;
         }
-        if (openLoadedNativeTicket(ticketId)) return;
+        if (openLoadedNativeTicket(ticketId)) return true;
         if (!window.Swal || typeof window.Swal.fire !== "function") {
           showToast("error", "No esta disponible el detalle del ticket.");
-          return;
+          return true;
         }
         var eventRow = calendarEventById(eventId) || calendarEventByTicket(ticketId) || {};
         var employeeId = getEventEmployeeId(eventRow) || selectedEmployeeFromFilter();
+        var state = { navigating: false };
         window.Swal.fire({
           title: "",
-          html: '<div class="scm-calendar-report-loading">Cargando detalle del ticket...</div>',
+          html: '<div class="scm-calendar-report-loading">Cargando detalle del caso...</div>',
           width: 760,
           customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal" },
           confirmButtonText: "Cerrar",
@@ -4223,8 +4292,13 @@
             var popup = window.Swal.getPopup();
             var container = popup ? popup.querySelector(".swal2-html-container") : null;
             var finish = function (ticket) {
+              if (openNativeCaseFromCalendarTicket(ticket, ticketId)) {
+                state.navigating = true;
+                window.Swal.close();
+                return;
+              }
               if (container) container.innerHTML = calendarTicketDetailHtml(ticket, eventRow, ticketId);
-              bindCalendarNativePopupActions(eventRow);
+              bindCalendarNativePopupActions(eventRow, options, state);
             };
             if (!employeeId) {
               finish(null);
@@ -4236,10 +4310,16 @@
               finish(null);
             });
           },
+        }).then(function () {
+          if (!state.navigating && typeof options.returnTo === "function") {
+            window.setTimeout(options.returnTo, 80);
+          }
         });
+        return false;
       }
 
-      function openRescheduleEventPopup(eventId) {
+      function openRescheduleEventPopup(eventId, options) {
+        options = options || {};
         if (!window.Swal || typeof window.Swal.fire !== "function") {
           showToast("error", "No esta disponible el popup para trasladar eventos.");
           return;
@@ -4398,7 +4478,10 @@
             });
           },
         }).then(function (result) {
-          if (!result.isConfirmed || !result.value) return;
+          if (!result.isConfirmed || !result.value) {
+            if (typeof options.returnTo === "function") window.setTimeout(options.returnTo, 80);
+            return;
+          }
           showToast("success", result.value.message || "Evento trasladado.");
           if (Array.isArray(result.value._scmCitaNotificationAppointments) && result.value._scmCitaNotificationAppointments.length) {
             notifyCalendarAppointment(root, result.value._scmCitaNotificationAppointments)
@@ -4408,7 +4491,8 @@
         });
       }
 
-      function openCompleteEventPopup(eventId) {
+      function openCompleteEventPopup(eventId, options) {
+        options = options || {};
         if (!window.Swal || typeof window.Swal.fire !== "function") {
           showToast("error", "No esta disponible el popup para marcar eventos.");
           return;
@@ -4416,22 +4500,45 @@
         var row = calendarEventById(eventId) || {};
         var title = String(row.titulo || row.title || "Evento #" + eventId).trim();
         var ticket = String(row.id_ticket || "").trim();
-        var html = '<form class="scm-calendar-popup-form scm-calendar-complete-form" autocomplete="off">' +
-          '<div class="scm-calendar-reschedule-summary">' +
-          '<strong>' + escHtml(title) + '</strong>' +
-          '<span>' + escHtml(formatDateTime(row.fecha_inicio || "")) + (ticket ? " · Ticket #" + escHtml(ticket) : "") + '</span>' +
-          '</div>' +
-          '<label class="scm-seg-field scm-calendar-field-full"><span>Observaci&oacute;n de cierre</span><textarea class="textarea textarea-bordered scm-input" name="observacion" rows="4" required>Realizado</textarea><small>Este texto se guardar&aacute; por defecto. Si tienes informaci&oacute;n adicional, puedes ampliarlo antes de guardar.</small></label>' +
+        var categoryName = categoryNameForRow(row);
+        var html = '<form class="scm-calendar-complete-modern scm-calendar-complete-form" autocomplete="off">' +
+          '<header class="scm-calendar-complete-head">' +
+          '<div class="scm-calendar-complete-title"><span class="material-symbols-outlined" aria-hidden="true">done</span><div><h3>Marcar evento realizado <em>Confirmaci&oacute;n</em></h3><p>Control de tareas y registro en bit&aacute;cora</p></div></div>' +
+          '<button type="button" class="scm-calendar-modern-close" data-scm-calendar-complete-cancel aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>' +
+          '</header>' +
+          '<section class="scm-calendar-complete-body">' +
+          '<article class="scm-calendar-complete-summary">' +
+          '<div><span class="scm-calendar-complete-status"><i></i>En progreso</span>' + (ticket ? '<small>Ticket #' + escHtml(ticket) + '</small>' : "") + '</div>' +
+          '<h4>' + escHtml(title) + '</h4>' +
+          '<p><span class="material-symbols-outlined" aria-hidden="true">calendar_today</span>' + escHtml(formatDateTime(row.fecha_inicio || "")) + '<span class="material-symbols-outlined" aria-hidden="true">person</span>' + escHtml(employeeNameForRow(row)) + '<b>' + escHtml(categoryName) + '</b></p>' +
+          '</article>' +
+          '<label class="scm-calendar-complete-field"><span><i class="material-symbols-outlined" aria-hidden="true">chat</i>Observaci&oacute;n de cierre<small>Requerido para auditor&iacute;a</small></span><textarea name="observacion" rows="4" required placeholder="Ingresa notas o comentarios finales del evento...">Realizado</textarea><em>Texto predeterminado</em></label>' +
+          '<p class="scm-calendar-complete-note"><span class="material-symbols-outlined" aria-hidden="true">info</span>Este texto se guardar&aacute; por defecto. Si tienes informaci&oacute;n adicional, puedes ampliarlo antes de guardar.</p>' +
+          '<label class="scm-calendar-complete-sync"><input type="checkbox" checked disabled><span>Notificar actualizaci&oacute;n y registrar en bit&aacute;cora de actividad</span><b>Auto-sync</b></label>' +
+          '</section>' +
+          '<footer class="scm-calendar-complete-foot"><button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-complete-cancel>Cerrar</button><button type="submit" class="scm-calendar-modern-btn scm-calendar-modern-btn--yellow"><span class="material-symbols-outlined" aria-hidden="true">done</span>Marcar realizado</button></footer>' +
           '</form>';
         window.Swal.fire({
-          title: "Marcar evento realizado",
+          title: "",
           html: html,
           width: 680,
-          customClass: { popup: "scm-calendar-swal-popup scm-calendar-complete-swal" },
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-complete-swal scm-calendar-complete-modern-swal" },
           showCancelButton: true,
           confirmButtonText: "Marcar realizado",
           cancelButtonText: "Cerrar",
           focusConfirm: false,
+          didOpen: function () {
+            var popup = window.Swal.getPopup();
+            var form = popup ? popup.querySelector(".scm-calendar-complete-form") : null;
+            if (!form) return;
+            form.addEventListener("submit", function (event) {
+              event.preventDefault();
+              window.Swal.clickConfirm();
+            });
+            form.querySelectorAll("[data-scm-calendar-complete-cancel]").forEach(function (btn) {
+              btn.addEventListener("click", function () { window.Swal.clickCancel(); });
+            });
+          },
           preConfirm: function () {
             var popup = window.Swal.getPopup();
             var form = popup ? popup.querySelector(".scm-calendar-complete-form") : null;
@@ -4453,7 +4560,10 @@
             });
           },
         }).then(function (result) {
-          if (!result.isConfirmed || !result.value) return;
+          if (!result.isConfirmed || !result.value) {
+            if (typeof options.returnTo === "function") window.setTimeout(options.returnTo, 80);
+            return;
+          }
           showToast("success", result.value.message || "Evento marcado como realizado.");
           loadEvents();
         });
@@ -4474,7 +4584,7 @@
               '<p class="scm-calendar-pending-event-meta"><b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (legacyTicket ? ' <b>Ticket:</b> #' + escHtml(legacyTicket) : "") + '</p>' +
               '<div class="scm-calendar-event-actions scm-calendar-pending-event-actions">' +
               (legacyId ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-event data-event-id="' + escHtml(legacyId) + '">Ver evento</button>' : "") +
-              (legacyTicket ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-ticket data-event-id="' + escHtml(legacyId) + '" data-ticket-id="' + escHtml(legacyTicket) + '">Ver ticket</button>' : "") +
+              (legacyTicket ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-ticket data-event-id="' + escHtml(legacyId) + '" data-ticket-id="' + escHtml(legacyTicket) + '">Ver caso</button>' : "") +
               (legacyId ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--primary" data-scm-calendar-complete-event data-event-id="' + escHtml(legacyId) + '">Marcar realizado</button>' : "") +
               '</div>' +
               '</article>';
@@ -4490,7 +4600,7 @@
             '<div class="scm-calendar-pending-modern-actions">' +
             (id ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Reprogramar</button>' : "") +
             (id ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--orange" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Gestionar evento<span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></button>' : "") +
-            (ticket ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver ticket</button>' : "") +
+            (ticket ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver caso</button>' : "") +
             '</div>' +
             '</article>';
         }).join("") + '</div>';
@@ -4519,6 +4629,7 @@
           return;
         }
         var employeeName = employeeDisplayName(employeeId);
+        var reopenPendingPopup = function () { openPendingEventsPopup(); };
         window.Swal.fire({
           title: "",
           html: pendingEventsShellHtml(employeeName),
@@ -4552,17 +4663,18 @@
                 var eventViewBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-view-event]") : null;
                 if (eventViewBtn) {
                   event.preventDefault();
+                  var viewId = eventViewBtn.getAttribute("data-event-id") || "";
                   window.Swal.close();
-                  openCalendarEventDetailPopup(eventViewBtn.getAttribute("data-event-id") || "");
+                  openCalendarEventDetailPopup(viewId, { returnTo: reopenPendingPopup });
                   return;
                 }
                 var ticketViewBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-view-ticket]") : null;
                 if (ticketViewBtn) {
                   event.preventDefault();
-                  window.Swal.close();
                   openCalendarTicketDetailPopup(
                     ticketViewBtn.getAttribute("data-ticket-id") || "",
                     ticketViewBtn.getAttribute("data-event-id") || "",
+                    { returnTo: reopenPendingPopup },
                   );
                   return;
                 }
@@ -4571,7 +4683,7 @@
                   event.preventDefault();
                   var rescheduleId = rescheduleBtn.getAttribute("data-event-id") || "";
                   window.Swal.close();
-                  openRescheduleEventPopup(rescheduleId);
+                  openRescheduleEventPopup(rescheduleId, { returnTo: reopenPendingPopup });
                   return;
                 }
                 var completeBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-complete-event]") : null;
@@ -4579,7 +4691,7 @@
                   event.preventDefault();
                   var id = completeBtn.getAttribute("data-event-id") || "";
                   window.Swal.close();
-                  openCompleteEventPopup(id);
+                  openCompleteEventPopup(id, { returnTo: reopenPendingPopup });
                 }
               });
             }

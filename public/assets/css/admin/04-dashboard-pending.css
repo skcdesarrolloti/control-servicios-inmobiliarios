@@ -7498,6 +7498,13 @@
   color: #ffffff;
 }
 
+.swal2-popup .scm-calendar-modern-btn--yellow {
+  background: #f8cf4a;
+  border-color: #f3aa32;
+  box-shadow: 0 10px 24px rgba(248, 207, 74, 0.28);
+  color: #061d49;
+}
+
 .swal2-popup .scm-calendar-modern-btn--dark {
   background: #0f1e36;
   color: #ffffff;
@@ -7713,6 +7720,319 @@
   color: #b45309;
   font-size: 16px;
   margin-top: 1px;
+}
+
+.swal2-popup.scm-calendar-complete-modern-swal {
+  background: #ffffff !important;
+  border: 1px solid #ededed !important;
+  border-radius: 18px !important;
+  color: #061d49 !important;
+  font-family: "Poppins", inherit !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+.swal2-popup.scm-calendar-complete-modern-swal .swal2-title {
+  display: none !important;
+}
+
+.swal2-popup.scm-calendar-complete-modern-swal .swal2-html-container {
+  margin: 0 !important;
+  max-height: min(760px, calc(100vh - 72px)) !important;
+  overflow: auto !important;
+  padding: 0 !important;
+}
+
+.swal2-popup.scm-calendar-complete-modern-swal .swal2-actions {
+  display: none !important;
+}
+
+.swal2-popup .scm-calendar-complete-modern {
+  background: #ffffff;
+  color: #061d49;
+  display: block;
+  font-family: "Poppins", inherit;
+  text-align: left;
+}
+
+.swal2-popup .scm-calendar-complete-head {
+  align-items: center;
+  background: #061d49;
+  color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  padding: 22px 28px !important;
+  position: relative;
+}
+
+.swal2-popup .scm-calendar-complete-title {
+  align-items: center;
+  display: grid;
+  gap: 13px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  padding-right: 42px;
+}
+
+.swal2-popup .scm-calendar-complete-title > span {
+  align-items: center;
+  background: #f8cf4a;
+  border-radius: 12px;
+  color: #061d49;
+  display: inline-flex;
+  font-size: 22px;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.swal2-popup .scm-calendar-complete-title h3 {
+  align-items: center;
+  color: #ffffff;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 20px;
+  font-weight: 900;
+  gap: 8px;
+  letter-spacing: 0;
+  line-height: 1.15;
+  margin: 0 !important;
+}
+
+.swal2-popup .scm-calendar-complete-title h3 em {
+  background: rgba(248, 207, 74, 0.16);
+  border: 1px solid rgba(248, 207, 74, 0.34);
+  border-radius: 999px;
+  color: #f8cf4a;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  padding: 3px 8px !important;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-calendar-complete-title p {
+  color: #9dacc7;
+  font-size: 12px;
+  font-weight: 650;
+  margin: 4px 0 0 !important;
+}
+
+.swal2-popup .scm-calendar-complete-body {
+  background: #ffffff;
+  display: grid;
+  gap: 16px;
+  padding: 22px 28px !important;
+}
+
+.swal2-popup .scm-calendar-complete-summary {
+  background: #f6f6f6;
+  border: 1px solid #ededed;
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  padding: 15px !important;
+}
+
+.swal2-popup .scm-calendar-complete-summary > div {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.swal2-popup .scm-calendar-complete-status {
+  align-items: center;
+  background: #fff7e5;
+  border: 1px solid #fed7aa;
+  border-radius: 7px;
+  color: #a45b00;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 850;
+  gap: 6px;
+  padding: 4px 8px !important;
+}
+
+.swal2-popup .scm-calendar-complete-status i {
+  background: #f59e0b;
+  border-radius: 999px;
+  display: inline-flex;
+  height: 7px;
+  width: 7px;
+}
+
+.swal2-popup .scm-calendar-complete-summary small {
+  color: #817a7a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.swal2-popup .scm-calendar-complete-summary h4 {
+  color: #1e3c76;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.25;
+  margin: 0 !important;
+}
+
+.swal2-popup .scm-calendar-complete-summary p {
+  align-items: center;
+  border-top: 1px solid #ededed;
+  color: #63605b;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  font-weight: 650;
+  gap: 8px;
+  margin: 0 !important;
+  padding-top: 10px !important;
+}
+
+.swal2-popup .scm-calendar-complete-summary p .material-symbols-outlined {
+  color: rgba(30, 60, 118, 0.65);
+  font-size: 16px;
+}
+
+.swal2-popup .scm-calendar-complete-summary p b {
+  background: #ffffff;
+  border: 1px solid #ededed;
+  border-radius: 6px;
+  color: rgba(30, 60, 118, 0.72);
+  font-size: 11px;
+  font-weight: 800;
+  margin-left: auto;
+  padding: 3px 8px !important;
+}
+
+.swal2-popup .scm-calendar-complete-field {
+  display: grid;
+  gap: 8px;
+  margin: 0 !important;
+  position: relative;
+}
+
+.swal2-popup .scm-calendar-complete-field > span {
+  align-items: center;
+  color: #1e3c76;
+  display: flex;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 6px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-calendar-complete-field > span i {
+  color: #f3aa32;
+  font-size: 16px;
+}
+
+.swal2-popup .scm-calendar-complete-field > span small {
+  color: #817a7a;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0;
+  margin-left: auto;
+  text-transform: none;
+}
+
+.swal2-popup .scm-calendar-complete-field textarea {
+  background: #f6f6f6 !important;
+  border: 1px solid #ededed !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  color: #061d49 !important;
+  font: inherit !important;
+  font-size: 14px !important;
+  font-weight: 650 !important;
+  line-height: 1.5 !important;
+  min-height: 118px !important;
+  padding: 14px !important;
+  resize: vertical;
+  width: 100% !important;
+}
+
+.swal2-popup .scm-calendar-complete-field textarea:focus {
+  background: #ffffff !important;
+  border-color: #f8cf4a !important;
+  box-shadow: 0 0 0 3px rgba(248, 207, 74, 0.28) !important;
+  outline: none !important;
+}
+
+.swal2-popup .scm-calendar-complete-field em {
+  bottom: 8px;
+  color: rgba(129, 122, 122, 0.8);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 650;
+  pointer-events: none;
+  position: absolute;
+  right: 12px;
+}
+
+.swal2-popup .scm-calendar-complete-note {
+  align-items: flex-start;
+  color: #63605b;
+  display: flex;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 8px;
+  line-height: 1.45;
+  margin: -4px 0 0 !important;
+}
+
+.swal2-popup .scm-calendar-complete-note .material-symbols-outlined {
+  color: rgba(30, 60, 118, 0.72);
+  font-size: 17px;
+  margin-top: 1px;
+}
+
+.swal2-popup .scm-calendar-complete-sync {
+  align-items: center;
+  background: rgba(246, 246, 246, 0.72);
+  border: 1px solid #ededed;
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin: 0 !important;
+  padding: 12px !important;
+}
+
+.swal2-popup .scm-calendar-complete-sync input {
+  accent-color: #1e3c76;
+  height: 16px;
+  width: 16px;
+}
+
+.swal2-popup .scm-calendar-complete-sync span {
+  color: #061d49;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.swal2-popup .scm-calendar-complete-sync b {
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  border-radius: 7px;
+  color: #059669;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  padding: 4px 8px !important;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-calendar-complete-foot {
+  align-items: center;
+  background: rgba(246, 246, 246, 0.64);
+  border-top: 1px solid #ededed;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 16px 28px !important;
 }
 
 @media (max-width: 720px) {
