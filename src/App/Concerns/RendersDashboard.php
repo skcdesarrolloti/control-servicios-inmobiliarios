@@ -2501,29 +2501,31 @@ trait RendersDashboard
           </div>
         </section>
 
-        <section class="scm-calendar-card scm-calendar-day-card">
-          <div class="scm-calendar-card-head">
-            <div>
-              <span class="scm-calendar-action-kicker">Agenda del d&iacute;a</span>
-              <h4 data-scm-calendar-day-title>Selecciona un d&iacute;a</h4>
-              <p data-scm-calendar-day-subtitle><?php echo $view === 'pending' ? 'Los vencimientos se agrupan por tipo de control.' : 'Los eventos se muestran seg&uacute;n funcionario, estado y categor&iacute;a.'; ?></p>
+        <aside class="scm-calendar-side-rail">
+          <section class="scm-calendar-card scm-calendar-day-card">
+            <div class="scm-calendar-card-head">
+              <div>
+                <span class="scm-calendar-action-kicker">Agenda del d&iacute;a</span>
+                <h4 data-scm-calendar-day-title>Selecciona un d&iacute;a</h4>
+                <p data-scm-calendar-day-subtitle><?php echo $view === 'pending' ? 'Los vencimientos se agrupan por tipo de control.' : 'Los eventos se muestran seg&uacute;n funcionario, estado y categor&iacute;a.'; ?></p>
+              </div>
+              <button type="button" class="scm-case-work-btn" data-scm-calendar-refresh>Actualizar</button>
             </div>
-            <button type="button" class="scm-case-work-btn" data-scm-calendar-refresh>Actualizar</button>
-          </div>
-          <div class="scm-calendar-events" data-scm-calendar-events><div class="scm-empty scm-empty-cards">Selecciona un d&iacute;a del calendario.</div></div>
-          <?php if ($view !== 'pending'): ?>
-            <button type="button" class="scm-btn-primary btn btn-primary scm-calendar-day-create" data-scm-calendar-open-create data-calendar-mode="single">Crear evento para este d&iacute;a</button>
-          <?php endif; ?>
-        </section>
-        <section class="scm-calendar-card scm-calendar-upcoming-card">
-          <div class="scm-calendar-upcoming-head">
-            <span>Pr&oacute;ximos en el mes</span>
-            <button type="button" data-scm-calendar-upcoming-all>Ver todos</button>
-          </div>
-          <div class="scm-calendar-upcoming-list" data-scm-calendar-upcoming>
-            <div class="scm-empty scm-empty-cards">Sin pr&oacute;ximos eventos.</div>
-          </div>
-        </section>
+            <div class="scm-calendar-events" data-scm-calendar-events><div class="scm-empty scm-empty-cards">Selecciona un d&iacute;a del calendario.</div></div>
+            <?php if ($view !== 'pending'): ?>
+              <button type="button" class="scm-btn-primary btn btn-primary scm-calendar-day-create" data-scm-calendar-open-create data-calendar-mode="single">Crear evento para este d&iacute;a</button>
+            <?php endif; ?>
+          </section>
+          <section class="scm-calendar-card scm-calendar-upcoming-card">
+            <div class="scm-calendar-upcoming-head">
+              <span>Pr&oacute;ximos en el mes</span>
+              <button type="button" data-scm-calendar-upcoming-all>Ver todos</button>
+            </div>
+            <div class="scm-calendar-upcoming-list" data-scm-calendar-upcoming>
+              <div class="scm-empty scm-empty-cards">Sin pr&oacute;ximos eventos.</div>
+            </div>
+          </section>
+        </aside>
       </div>
     </div>
 <?php

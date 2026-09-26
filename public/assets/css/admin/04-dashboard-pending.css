@@ -1988,6 +1988,13 @@
   min-height: 640px;
 }
 
+#scm-app .scm-calendar-side-rail {
+  align-self: start;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
 #scm-app .scm-calendar-month-actions {
   align-items: center;
   display: flex;
@@ -3363,6 +3370,24 @@
   top: 14px;
 }
 
+#scm-app .scm-home-calendar .scm-calendar-side-rail {
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: calc(100vh - 118px);
+  min-height: 0;
+  position: sticky;
+  top: 14px;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-side-rail .scm-calendar-day-card {
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+  position: static;
+}
+
 #scm-app .scm-home-calendar .scm-calendar-day-card .scm-calendar-card-head h4 {
   font-size: 18px;
 }
@@ -3692,7 +3717,7 @@
 }
 
 #scm-app .scm-home-calendar .scm-calendar-board-card {
-  grid-row: 1 / span 2;
+  grid-row: auto;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day {
@@ -3726,6 +3751,8 @@
 
 #scm-app .scm-home-calendar .scm-calendar-upcoming-card {
   align-self: start;
+  flex: 0 0 auto;
+  min-height: 0;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-upcoming-head {
@@ -3755,6 +3782,9 @@
 #scm-app .scm-home-calendar .scm-calendar-upcoming-list {
   display: grid;
   gap: 10px;
+  max-height: 240px;
+  overflow: auto;
+  padding-right: 4px !important;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-upcoming-item {
@@ -7020,6 +7050,15 @@
   #scm-app .scm-calendar-create-card,
   #scm-app .scm-calendar-day-card {
     position: static;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-side-rail {
+    max-height: none;
+    position: static;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-upcoming-list {
+    max-height: none;
   }
 }
 
