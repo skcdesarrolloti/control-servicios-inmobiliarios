@@ -2204,9 +2204,11 @@
   border: 1px solid #d8e1ec;
   border-radius: 12px;
   display: grid;
+  grid-auto-rows: 24px;
   grid-template-columns: 68px repeat(7, minmax(124px, 1fr));
   min-width: 920px;
   overflow: hidden;
+  position: relative;
   touch-action: none;
   user-select: none;
 }
@@ -2229,7 +2231,7 @@
   color: #475569;
   font-size: 11px;
   font-weight: 500;
-  min-height: 46px;
+  min-height: 24px;
   padding: 7px 10px !important;
   text-align: right;
 }
@@ -2297,7 +2299,7 @@
 
 #scm-app .scm-calendar-time-slot {
   cursor: pointer;
-  min-height: 23px;
+  min-height: 24px;
   overflow: hidden;
   padding: 2px 6px !important;
   position: relative;
@@ -2354,6 +2356,54 @@
 #scm-app .scm-calendar-time-slot.is-selected-day.is-selecting {
   background: #1a73e8;
   background-image: none;
+}
+
+#scm-app .scm-calendar-time-event {
+  align-self: stretch;
+  background: var(--event-color, #1a73e8);
+  border: 0;
+  border-radius: 6px;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.16);
+  color: #ffffff;
+  display: grid;
+  gap: 2px;
+  margin: 3px 6px !important;
+  min-height: 34px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 7px 8px !important;
+  position: relative;
+  text-align: left;
+  z-index: 5;
+}
+
+#scm-app button.scm-calendar-time-event {
+  cursor: pointer;
+  font: inherit;
+}
+
+#scm-app button.scm-calendar-time-event:hover,
+#scm-app button.scm-calendar-time-event:focus-visible {
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.22), inset 0 0 0 2px rgba(255, 255, 255, 0.72);
+  outline: none;
+}
+
+#scm-app .scm-calendar-time-event strong {
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.15;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#scm-app .scm-calendar-time-event em {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 750;
+  line-height: 1.15;
 }
 
 #scm-app .scm-calendar-week-event {

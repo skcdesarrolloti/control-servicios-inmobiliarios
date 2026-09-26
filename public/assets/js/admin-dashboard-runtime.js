@@ -1454,6 +1454,7 @@
       var weekQuickPopover = null;
       var WEEK_SLOT_MINUTES = 15;
       var WEEK_DEFAULT_EVENT_MINUTES = 30;
+      var WEEK_DAY_START_MINUTES = 8 * 60;
       var WEEK_DAY_END_MINUTES = 21 * 60;
 
       panel.querySelectorAll("[data-scm-calendar-open-path]").forEach(function (btn) {
@@ -1928,7 +1929,7 @@
       }
 
       function calendarRichTextHtml(value) {
-        var html = escHtml(value || "Sin descripcion");
+        var html = escHtml(value || "");
         html = html
           .replace(/\r?\n/g, "<br>")
           .replace(/&lt;\/?br\s*\/?&gt;/gi, "<br>")
@@ -2279,11 +2280,12 @@
         var estadoKey = String((row.estado || estado) || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
         var color = String(row.color || "#f59e0b").trim() || "#f59e0b";
         var kindLabel = calendarItemKindLabel(row);
+        var descriptionHtml = calendarRichTextHtml(row.descripcion || "");
         return '<article class="scm-calendar-event-card">' +
           '<div class="scm-calendar-event-color" style="background:' + escHtml(color) + '"></div>' +
           '<div class="scm-calendar-event-main">' +
           '<div class="scm-calendar-event-title-row"><h5>' + escHtml(row.titulo || kindLabel) + '</h5><span class="scm-calendar-event-state scm-calendar-event-state--' + escHtml(estadoKey || "pendiente") + '">' + escHtml(estado) + "</span></div>" +
-          '<div class="scm-calendar-event-description">' + calendarRichTextHtml(row.descripcion || "Sin descripcion") + "</div>" +
+          (descriptionHtml ? '<div class="scm-calendar-event-description">' + descriptionHtml + "</div>" : "") +
           '<div class="scm-calendar-event-meta">' +
           '<span>' + escHtml(formatDateTime(row.fecha_inicio)) + " - " + escHtml(formatDateTime(row.fecha_fin)) + "</span>" +
           '<span>' + escHtml(row.funcionario || row.nombre || "Funcionario") + "</span>" +
@@ -2408,6 +2410,43 @@
         }).sort(function (a, b) {
           return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
         });
+      }
+
+      function timeGridEvents(dateKey) {
+        return calendarEvents.filter(function (row) {
+          if (eventDateKey(row) !== dateKey) return false;
+          var start = eventMinutes(row, "fecha_inicio");
+          if (start === null) return false;
+          var end = eventMinutes(row, "fecha_fin");
+          if (end === null || end <= start) end = start + WEEK_DEFAULT_EVENT_MINUTES;
+          return start < WEEK_DAY_END_MINUTES && end > WEEK_DAY_START_MINUTES;
+        }).sort(function (a, b) {
+          return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+        });
+      }
+
+      function timeGridEventHtml(row, columnIndex) {
+        var start = eventMinutes(row, "fecha_inicio");
+        if (start === null) return "";
+        var end = eventMinutes(row, "fecha_fin");
+        if (end === null || end <= start) end = start + WEEK_DEFAULT_EVENT_MINUTES;
+        var visibleStart = Math.max(WEEK_DAY_START_MINUTES, start);
+        var visibleEnd = Math.min(WEEK_DAY_END_MINUTES, end);
+        if (visibleEnd <= visibleStart) return "";
+        var rowStart = Math.floor((visibleStart - WEEK_DAY_START_MINUTES) / WEEK_SLOT_MINUTES) + 2;
+        var span = Math.max(1, Math.ceil((visibleEnd - visibleStart) / WEEK_SLOT_MINUTES));
+        var color = String(row.color || "#f97316").trim() || "#f97316";
+        var id = String(row.id || row._ID || row.event_id || "").trim();
+        var kind = calendarItemKind(row);
+        var tag = kind === "evento" && id ? "button" : "div";
+        var attrs = tag === "button"
+          ? ' type="button" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '"'
+          : ' role="group"';
+        var timeLabel = (timePartFromDateTime(row.fecha_inicio) || timeFromMinutes(start)) + " - " + (timePartFromDateTime(row.fecha_fin) || timeFromMinutes(end));
+        return '<' + tag + attrs + ' class="scm-calendar-time-event scm-calendar-time-event--' + escHtml(kind) + '" style="grid-column:' + String(columnIndex) + ';grid-row:' + String(rowStart) + ' / span ' + String(span) + ';--event-color:' + escHtml(color) + '">' +
+          '<strong>' + escHtml(row.titulo || calendarItemKindLabel(row)) + '</strong>' +
+          '<em>' + escHtml(timeLabel) + '</em>' +
+          '</' + tag + '>';
       }
 
       function updateWeekSelection(grid, dateKey, startMinutes, endMinutes) {
@@ -2750,27 +2789,25 @@
             '<strong>' + String(date.getDate()) + '</strong>' +
             '</button>';
         });
-        for (var minutes = 8 * 60; minutes < WEEK_DAY_END_MINUTES; minutes += WEEK_SLOT_MINUTES) {
+        for (var minutes = WEEK_DAY_START_MINUTES; minutes < WEEK_DAY_END_MINUTES; minutes += WEEK_SLOT_MINUTES) {
           var label = minutes % 60 === 0 ? displayHourFromMinutes(minutes) : "";
           html += '<div class="scm-calendar-time-gutter">' + escHtml(label) + '</div>';
           days.forEach(function (date) {
             var key = toDateKey(date);
             var slotEnd = minutes + WEEK_SLOT_MINUTES;
-            var slotRows = weekSlotEvents(key, minutes, slotEnd);
             var slotClasses = "scm-calendar-time-slot";
             if (key === todayKey) slotClasses += " is-today";
             if (key === selectedDay) slotClasses += " is-selected-day";
             html += '<button type="button" class="' + slotClasses + '" data-scm-calendar-week-slot data-date="' + escHtml(key) + '" data-start="' + String(minutes) + '" data-end="' + String(slotEnd) + '" aria-label="' + escHtml(calendarDayTitle(key) + " " + timeFromMinutes(minutes)) + '">';
-            slotRows.slice(0, 2).forEach(function (row) {
-              html += '<span class="scm-calendar-week-event" style="--event-color:' + escHtml(row.color || "#f97316") + '">' +
-                '<strong>' + escHtml(row.titulo || (isDueCalendar ? "Vencimiento" : "Evento")) + '</strong>' +
-                '<em>' + escHtml(timePartFromDateTime(row.fecha_inicio) || timeFromMinutes(minutes)) + '</em>' +
-                '</span>';
-            });
-            if (slotRows.length > 2) html += '<span class="scm-calendar-week-more">+' + String(slotRows.length - 2) + '</span>';
             html += '</button>';
           });
         }
+        days.forEach(function (date, dayIndex) {
+          var key = toDateKey(date);
+          timeGridEvents(key).forEach(function (row) {
+            html += timeGridEventHtml(row, dayIndex + 2);
+          });
+        });
         html += '</div>';
         monthGrid.innerHTML = html;
         var grid = monthGrid.querySelector("[data-scm-calendar-week-grid]");
@@ -2802,23 +2839,18 @@
           '<span>' + escHtml(date.toLocaleDateString("es-CO", { weekday: "short" }).replace(/\./g, "")) + '</span>' +
           '<strong>' + String(date.getDate()) + '</strong>' +
           '</button>';
-        for (var minutes = 8 * 60; minutes < WEEK_DAY_END_MINUTES; minutes += WEEK_SLOT_MINUTES) {
+        for (var minutes = WEEK_DAY_START_MINUTES; minutes < WEEK_DAY_END_MINUTES; minutes += WEEK_SLOT_MINUTES) {
           var label = minutes % 60 === 0 ? displayHourFromMinutes(minutes) : "";
           var slotEnd = minutes + WEEK_SLOT_MINUTES;
-          var slotRows = weekSlotEvents(key, minutes, slotEnd);
           var slotClasses = "scm-calendar-time-slot is-selected-day";
           if (key === todayKey) slotClasses += " is-today";
           html += '<div class="scm-calendar-time-gutter">' + escHtml(label) + '</div>';
           html += '<button type="button" class="' + slotClasses + '" data-scm-calendar-week-slot data-date="' + escHtml(key) + '" data-start="' + String(minutes) + '" data-end="' + String(slotEnd) + '" aria-label="' + escHtml(calendarDayTitle(key) + " " + timeFromMinutes(minutes)) + '">';
-          slotRows.slice(0, 4).forEach(function (row) {
-            html += '<span class="scm-calendar-week-event" style="--event-color:' + escHtml(row.color || "#f97316") + '">' +
-              '<strong>' + escHtml(row.titulo || calendarItemKindLabel(row)) + '</strong>' +
-              '<em>' + escHtml(timePartFromDateTime(row.fecha_inicio) || timeFromMinutes(minutes)) + '</em>' +
-              '</span>';
-          });
-          if (slotRows.length > 4) html += '<span class="scm-calendar-week-more">+' + String(slotRows.length - 4) + '</span>';
           html += '</button>';
         }
+        timeGridEvents(key).forEach(function (row) {
+          html += timeGridEventHtml(row, 2);
+        });
         html += '</div>';
         monthGrid.innerHTML = html;
         bindTimeGridInteractions(monthGrid.querySelector("[data-scm-calendar-week-grid]"));
