@@ -4200,6 +4200,7 @@
       function calendarNativeCaseDueType(row) {
         var raw = String((row && (row.tipo_vencimiento || row.due_type || row.dueType || row.vencimiento_tipo)) || "").trim();
         if (raw) return raw;
+        if (row && (row.id_ticket || row.ticket)) return "calendar_ticket";
         var category = normalizeText(categoryNameForRow(row || {}));
         var title = normalizeText((row && (row.titulo || row.title)) || "");
         if (category.indexOf("preventiva") !== -1 || title.indexOf("preventiva") !== -1) {

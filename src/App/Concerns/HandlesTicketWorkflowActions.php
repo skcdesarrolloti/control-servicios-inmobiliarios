@@ -1032,6 +1032,27 @@ trait HandlesTicketWorkflowActions
 
     $type = sanitize_key((string) ($_POST['tipo_vencimiento'] ?? $_POST['due_type'] ?? ''));
     $case = [];
+    $ticketRefs = [
+      trim((string) ($_POST['ticket_pk'] ?? '')),
+      trim((string) ($_POST['id_ticket'] ?? '')),
+      trim((string) ($_POST['ticket'] ?? '')),
+    ];
+    $ticketRefs = array_values(array_unique(array_filter($ticketRefs, static function ($ref): bool {
+      return $ref !== '';
+    })));
+    if ($case === [] && $type === 'calendar_ticket' && $ticketRefs !== []) {
+      $ticket = [];
+      foreach ($ticketRefs as $ticketRef) {
+        $ticket = $this->adminDueTicketByReference($ticketRef);
+        if (!empty($ticket)) {
+          break;
+        }
+      }
+      $ticketPk = (int) ($ticket['_ID'] ?? 0);
+      if ($ticketPk > 0) {
+        $case = $this->adminDueNativeTicketCasePayload($ticketPk, $this->adminDueStatusBucket($ticket));
+      }
+    }
     if (strpos($type, 'cotizacion') === 0 && $this->canAccessDashboardTab('cotizaciones_mantenimiento')) {
       $quoteId = (int) ($_POST['cotizacion_id'] ?? $_POST['id_cotizacion'] ?? 0);
       $quote = $this->adminDueQuoteById($quoteId);
@@ -1049,14 +1070,6 @@ trait HandlesTicketWorkflowActions
     }
     if ($case === [] && in_array($type, ['ticket_preventiva_sin_cita', 'preventiva_cita_sin_realizar', 'preventiva_pendiente'], true) && $this->canAccessDashboardTab('preventivas_pendientes')) {
       $ticket = [];
-      $ticketRefs = [
-        trim((string) ($_POST['ticket_pk'] ?? '')),
-        trim((string) ($_POST['id_ticket'] ?? '')),
-        trim((string) ($_POST['ticket'] ?? '')),
-      ];
-      $ticketRefs = array_values(array_unique(array_filter($ticketRefs, static function ($ref): bool {
-        return $ref !== '';
-      })));
       foreach ($ticketRefs as $ticketRef) {
         $ticket = $this->adminDueTicketByReference($ticketRef);
         if (!empty($ticket)) {
