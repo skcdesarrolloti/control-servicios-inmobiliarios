@@ -3004,8 +3004,6 @@
             selectedDay = btn.getAttribute("data-scm-calendar-day") || selectedDay;
             renderCalendarGrid();
             renderSelectedDay();
-            if (isDueCalendar) return;
-            openCreateEventWithDefaults({ date: selectedDay });
           });
         });
       }

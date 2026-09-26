@@ -3856,6 +3856,7 @@
   align-self: start;
   flex: 0 0 auto;
   min-height: 0;
+  width: 100%;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-upcoming-head {
@@ -7159,6 +7160,11 @@
     max-height: none;
     min-width: 0;
     position: static;
+    width: 100%;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-upcoming-card {
+    width: 100%;
   }
 
   #scm-app .scm-home-calendar .scm-calendar-upcoming-list {
