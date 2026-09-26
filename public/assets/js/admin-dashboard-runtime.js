@@ -1961,9 +1961,11 @@
           .filter(Boolean);
       }
 
-      function calendarShowsCompleted() {
-        var input = layerFilterForm ? layerFilterForm.querySelector('input[name="show_completed"]') : null;
-        return !input || input.checked;
+      function activeCalendarStatuses() {
+        if (!layerFilterForm) return ["pending", "completed"];
+        return Array.prototype.slice.call(layerFilterForm.querySelectorAll('input[name="item_status"]:checked'))
+          .map(function (input) { return String(input.value || "").trim(); })
+          .filter(Boolean);
       }
 
       function setEmployeeFilterValue(value) {
@@ -1987,9 +1989,11 @@
 
       function rowMatchesCalendarLayers(row) {
         var types = activeCalendarTypes();
+        var statuses = activeCalendarStatuses();
         var kind = calendarItemKind(row);
+        var status = calendarItemIsDone(row) ? "completed" : "pending";
         if (types.indexOf(kind) === -1) return false;
-        if (!calendarShowsCompleted() && calendarItemIsDone(row)) return false;
+        if (statuses.indexOf(status) === -1) return false;
         if (activeCalendarScope() === "mine" && currentCalendarEmployeeId) {
           return getEventEmployeeId(row) === currentCalendarEmployeeId;
         }
@@ -2996,7 +3000,6 @@
         if (filterForm) {
           var employeeField = filterForm.querySelector('[name="id_empleado"]');
           var categoryField = filterForm.querySelector('[name="id_categoria"]');
-          var estadoField = filterForm.querySelector('[name="estado"]');
           selectedEmployeeId = employeeField ? String(employeeField.value || "").trim() : "";
           if (scope === "mine" && currentCalendarEmployeeId) {
             selectedEmployeeId = currentCalendarEmployeeId;
@@ -3004,7 +3007,6 @@
           }
           if (selectedEmployeeId) filters.id_empleado = selectedEmployeeId;
           if (categoryField && categoryField.value) filters.id_categoria = categoryField.value;
-          if (estadoField && estadoField.value) filters.estado = estadoField.value;
         }
         if (!selectedEmployeeId && scope !== "team") {
           calendarEvents = [];

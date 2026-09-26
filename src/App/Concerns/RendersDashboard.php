@@ -2409,7 +2409,6 @@ trait RendersDashboard
             <input type="hidden" name="id_empleado" value="<?php echo esc_attr($currentCalendarEmployeeId); ?>">
             <?php endif; ?>
             <div class="scm-field"><label>Categor&iacute;a del evento</label><select class="select select-bordered select-sm scm-select" name="id_categoria" data-scm-calendar-filter-categories><option value="">Todas las categor&iacute;as</option></select></div>
-            <div class="scm-field"><label>Estado de gesti&oacute;n</label><select class="select select-bordered select-sm scm-select" name="estado"><option value="" selected>Realizados y Agendados</option><option value="No">Pendientes</option><option value="Si">Realizados</option></select></div>
           </div>
           <div class="scm-calendar-layer-filters" data-scm-calendar-layer-filters aria-label="Filtros de calendario">
             <div class="scm-calendar-layer-group scm-calendar-layer-group--scope" role="radiogroup" aria-label="Alcance">
@@ -2442,10 +2441,15 @@ trait RendersDashboard
                 <span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>
                 <strong>Recordatorios</strong>
               </label>
+              <label class="scm-calendar-layer-chip scm-calendar-layer-chip--pending">
+                <input type="checkbox" name="item_status" value="pending" checked>
+                <span class="material-symbols-outlined" aria-hidden="true">pending_actions</span>
+                <strong>Pendientes</strong>
+              </label>
               <label class="scm-calendar-layer-chip scm-calendar-layer-chip--done">
-                <input type="checkbox" name="show_completed" value="1" checked>
+                <input type="checkbox" name="item_status" value="completed" checked>
                 <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
-                <strong>Completadas</strong>
+                <strong>Realizados</strong>
               </label>
             </div>
           </div>
@@ -2468,11 +2472,11 @@ trait RendersDashboard
             </div>
           </div>
           <form class="scm-calendar-due-type-filter" data-scm-calendar-due-type-filter autocomplete="off">
-            <label><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked> <span>Preventivas sin enviar</span></label>
-            <label><input type="checkbox" name="due_type" value="ticket_preventiva_sin_cita" checked> <span>Tickets sin cita preventiva</span></label>
-            <label><input type="checkbox" name="due_type" value="preventiva_cita_sin_realizar" checked> <span>Preventivas con cita sin realizar</span></label>
-            <label><input type="checkbox" name="due_type" value="cotizacion_sin_enviar" checked> <span>Cotizaciones sin enviar</span></label>
-            <label><input type="checkbox" name="due_type" value="cotizacion_enviada_sin_respuesta" checked> <span>Cotizaciones sin respuesta</span></label>
+            <label class="scm-calendar-due-chip"><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><strong>Preventivas sin enviar</strong></label>
+            <label class="scm-calendar-due-chip"><input type="checkbox" name="due_type" value="ticket_preventiva_sin_cita" checked><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><strong>Tickets sin cita preventiva</strong></label>
+            <label class="scm-calendar-due-chip"><input type="checkbox" name="due_type" value="preventiva_cita_sin_realizar" checked><span class="material-symbols-outlined" aria-hidden="true">pending_actions</span><strong>Preventivas con cita sin realizar</strong></label>
+            <label class="scm-calendar-due-chip"><input type="checkbox" name="due_type" value="cotizacion_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">receipt_long</span><strong>Cotizaciones sin enviar</strong></label>
+            <label class="scm-calendar-due-chip"><input type="checkbox" name="due_type" value="cotizacion_enviada_sin_respuesta" checked><span class="material-symbols-outlined" aria-hidden="true">mark_email_unread</span><strong>Cotizaciones sin respuesta</strong></label>
           </form>
         </section>
       <?php endif; ?>
