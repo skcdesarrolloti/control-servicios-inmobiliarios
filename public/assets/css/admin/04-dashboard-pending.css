@@ -7129,6 +7129,616 @@
   font-size: 18px;
 }
 
+.swal2-popup.scm-calendar-event-detail-swal,
+.swal2-popup.scm-calendar-reschedule-modern-swal {
+  background: #ffffff !important;
+  border: 0 !important;
+  border-radius: 20px !important;
+  color: #0f1e36 !important;
+  font-family: "Poppins", inherit !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+.swal2-popup.scm-calendar-event-detail-swal .swal2-title,
+.swal2-popup.scm-calendar-reschedule-modern-swal .swal2-title {
+  display: none !important;
+}
+
+.swal2-popup.scm-calendar-event-detail-swal .swal2-html-container,
+.swal2-popup.scm-calendar-reschedule-modern-swal .swal2-html-container {
+  margin: 0 !important;
+  max-height: min(780px, calc(100vh - 72px)) !important;
+  overflow: auto !important;
+  padding: 0 !important;
+}
+
+.swal2-popup.scm-calendar-reschedule-modern-swal .swal2-actions {
+  display: none !important;
+}
+
+.swal2-popup .scm-calendar-event-detail-modern,
+.swal2-popup .scm-calendar-reschedule-modern {
+  background: #ffffff;
+  color: #0f1e36;
+  display: block;
+  font-family: "Poppins", inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.swal2-popup .scm-calendar-event-detail-head,
+.swal2-popup .scm-calendar-reschedule-head {
+  background: #0f1e36;
+  color: #ffffff;
+  padding: 22px 28px 20px !important;
+  position: relative;
+}
+
+.swal2-popup .scm-calendar-event-detail-head > div:first-child {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-right: 44px;
+}
+
+.swal2-popup .scm-calendar-event-detail-head span:first-child {
+  color: #c9d8ef;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-calendar-event-detail-head h3,
+.swal2-popup .scm-calendar-reschedule-title h3 {
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.16;
+  margin: 6px 42px 0 0 !important;
+}
+
+.swal2-popup .scm-calendar-event-detail-status {
+  align-items: center;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  border-radius: 999px;
+  color: #86efac !important;
+  display: inline-flex;
+  font-size: 11px !important;
+  font-weight: 850 !important;
+  gap: 6px;
+  letter-spacing: 0 !important;
+  padding: 3px 8px !important;
+  text-transform: none !important;
+}
+
+.swal2-popup .scm-calendar-event-detail-status i {
+  background: currentColor;
+  border-radius: 999px;
+  height: 6px;
+  width: 6px;
+}
+
+.swal2-popup .scm-calendar-event-detail-status:not(.is-done) {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(251, 191, 36, 0.45);
+  color: #fde68a !important;
+}
+
+.swal2-popup .scm-calendar-modern-close {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  border: 0;
+  border-radius: 10px;
+  color: #d7e3ff;
+  cursor: pointer;
+  display: inline-flex;
+  height: 36px;
+  justify-content: center;
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  transition: background-color 160ms ease, color 160ms ease;
+  width: 36px;
+}
+
+.swal2-popup .scm-calendar-modern-close:hover,
+.swal2-popup .scm-calendar-modern-close:focus-visible {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  outline: none;
+}
+
+.swal2-popup .scm-calendar-modern-close .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.swal2-popup .scm-calendar-event-detail-body,
+.swal2-popup .scm-calendar-reschedule-body {
+  background: #ffffff;
+  display: grid;
+  gap: 16px;
+  padding: 22px 28px !important;
+}
+
+.swal2-popup .scm-calendar-detail-info-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.swal2-popup .scm-calendar-detail-info-card {
+  align-items: center;
+  background: #eef4ff;
+  border: 1px solid #dbe6f2;
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  min-height: 74px;
+  padding: 12px !important;
+}
+
+.swal2-popup .scm-calendar-detail-info-card.is-wide {
+  grid-column: 1 / -1;
+}
+
+.swal2-popup .scm-calendar-detail-info-card.is-avatar-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.swal2-popup .scm-calendar-detail-icon,
+.swal2-popup .scm-calendar-detail-avatar {
+  align-items: center;
+  background: rgba(15, 30, 54, 0.08);
+  border-radius: 10px;
+  color: #263a55;
+  display: inline-flex;
+  font-size: 20px;
+  font-weight: 900;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.swal2-popup .scm-calendar-detail-icon:empty {
+  display: none;
+}
+
+.swal2-popup .scm-calendar-detail-avatar {
+  background: #0f1e36;
+  color: #ffffff;
+  font-size: 13px;
+  grid-row: 1 / span 2;
+}
+
+.swal2-popup .scm-calendar-detail-info-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.swal2-popup .is-avatar-card .scm-calendar-detail-info-body {
+  align-items: center;
+  column-gap: 10px;
+  grid-template-columns: 38px minmax(0, 1fr);
+}
+
+.swal2-popup .is-avatar-card .scm-calendar-detail-info-body small {
+  grid-column: 1 / -1;
+}
+
+.swal2-popup .is-avatar-card .scm-calendar-detail-avatar {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.swal2-popup .is-avatar-card .scm-calendar-detail-info-body strong {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.swal2-popup .scm-calendar-detail-info-body small,
+.swal2-popup .scm-calendar-detail-description span,
+.swal2-popup .scm-calendar-detail-progress span {
+  color: #6b7f9c;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-calendar-detail-info-body strong {
+  color: #0f1e36;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.25;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.swal2-popup .scm-calendar-detail-info-body em {
+  background: var(--detail-dot, #f59e0b);
+  border-radius: 999px;
+  display: inline-block;
+  height: 8px;
+  margin-right: 6px;
+  width: 8px;
+}
+
+.swal2-popup .scm-calendar-detail-ticket {
+  background: #ffffff;
+  border: 1px solid #dbe6f2;
+  border-radius: 8px;
+  color: #263a55;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  justify-self: start;
+  min-height: 32px;
+  padding: 6px 10px !important;
+}
+
+.swal2-popup .scm-calendar-detail-description,
+.swal2-popup .scm-calendar-detail-progress {
+  background: #eef4ff;
+  border: 1px solid #dbe6f2;
+  border-radius: 12px;
+  display: grid;
+  gap: 9px;
+  padding: 14px !important;
+}
+
+.swal2-popup .scm-calendar-detail-description > div,
+.swal2-popup .scm-calendar-detail-progress > div {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.swal2-popup .scm-calendar-detail-description > div strong,
+.swal2-popup .scm-calendar-detail-progress strong {
+  color: #059669;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.swal2-popup .scm-calendar-detail-description p {
+  color: #24364b;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.55;
+  margin: 0 !important;
+}
+
+.swal2-popup .scm-calendar-detail-progress i {
+  background: #d7e3ff;
+  border-radius: 999px;
+  display: block;
+  height: 8px;
+  overflow: hidden;
+}
+
+.swal2-popup .scm-calendar-detail-progress b {
+  background: #10b981;
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.swal2-popup .scm-calendar-event-detail-foot,
+.swal2-popup .scm-calendar-reschedule-foot {
+  align-items: center;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 16px 28px !important;
+}
+
+.swal2-popup .scm-calendar-event-detail-foot > div,
+.swal2-popup .scm-calendar-reschedule-foot > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.swal2-popup .scm-calendar-modern-btn,
+.swal2-popup .scm-calendar-modern-done-pill {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  gap: 7px;
+  justify-content: center;
+  min-height: 40px;
+  padding: 9px 14px !important;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+
+.swal2-popup .scm-calendar-modern-btn .material-symbols-outlined,
+.swal2-popup .scm-calendar-modern-done-pill .material-symbols-outlined {
+  font-size: 17px;
+}
+
+.swal2-popup .scm-calendar-modern-btn--success,
+.swal2-popup .scm-calendar-modern-done-pill {
+  background: #047857;
+  color: #ffffff;
+}
+
+.swal2-popup .scm-calendar-modern-btn--soft {
+  background: #eef4ff;
+  border-color: #dbe6f2;
+  color: #263a55;
+}
+
+.swal2-popup .scm-calendar-modern-btn--ghost {
+  background: #ffffff;
+  border-color: #dbe6f2;
+  color: #475569;
+}
+
+.swal2-popup .scm-calendar-modern-btn--orange {
+  background: #f59e0b;
+  border-color: #d97706;
+  box-shadow: 0 10px 24px rgba(245, 158, 11, 0.24);
+  color: #ffffff;
+}
+
+.swal2-popup .scm-calendar-modern-btn--dark {
+  background: #0f1e36;
+  color: #ffffff;
+}
+
+.swal2-popup .scm-calendar-modern-btn:hover,
+.swal2-popup .scm-calendar-modern-btn:focus-visible {
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
+  outline: none;
+}
+
+.swal2-popup .scm-calendar-reschedule-title {
+  align-items: center;
+  display: grid;
+  gap: 13px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  padding-right: 44px;
+}
+
+.swal2-popup .scm-calendar-reschedule-icon {
+  align-items: center;
+  background: rgba(245, 158, 11, 0.15);
+  border-radius: 10px;
+  color: #f59e0b;
+  display: inline-flex;
+  font-size: 22px;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.swal2-popup .scm-calendar-reschedule-title h3 {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 !important;
+}
+
+.swal2-popup .scm-calendar-reschedule-title h3 em {
+  background: #f59e0b;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  padding: 3px 7px !important;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-calendar-reschedule-title p {
+  color: #b8c7e6;
+  font-size: 12px;
+  font-weight: 650;
+  margin: 4px 0 0 !important;
+}
+
+.swal2-popup .scm-calendar-reschedule-modern .scm-calendar-reschedule-summary {
+  align-items: center;
+  background: #eff4ff;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: none;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 14px !important;
+}
+
+.swal2-popup .scm-calendar-reschedule-modern .scm-calendar-reschedule-summary strong {
+  color: #0f1e36;
+  display: block;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.swal2-popup .scm-calendar-reschedule-modern .scm-calendar-reschedule-summary span {
+  color: #64748b;
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 3px;
+}
+
+.swal2-popup .scm-calendar-reschedule-modern .scm-calendar-reschedule-summary p {
+  background: #ffffff;
+  border-radius: 10px;
+  color: #0f1e36;
+  margin: 0 !important;
+  padding: 9px 11px !important;
+  text-align: right;
+}
+
+.swal2-popup .scm-calendar-reschedule-modern .scm-calendar-reschedule-summary small {
+  color: #64748b;
+  display: block;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.swal2-popup .scm-calendar-reschedule-modern .scm-calendar-reschedule-summary b {
+  color: #0f1e36;
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  margin-top: 2px;
+}
+
+.swal2-popup .scm-calendar-reschedule-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.swal2-popup .scm-calendar-reschedule-grid label,
+.swal2-popup .scm-calendar-reschedule-field {
+  display: grid;
+  gap: 6px;
+  margin: 0 !important;
+}
+
+.swal2-popup .scm-calendar-reschedule-grid span,
+.swal2-popup .scm-calendar-reschedule-field > span {
+  align-items: center;
+  color: #334155;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 11px;
+  font-weight: 850;
+  gap: 5px;
+  justify-content: space-between;
+  line-height: 1.25;
+}
+
+.swal2-popup .scm-calendar-reschedule-grid span i,
+.swal2-popup .scm-calendar-reschedule-field > span i {
+  color: #b45309;
+  font-size: 16px;
+}
+
+.swal2-popup .scm-calendar-reschedule-field small {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.swal2-popup .scm-calendar-reschedule-field b {
+  color: #dc2626;
+  font-size: 10px;
+  font-weight: 750;
+  margin-left: auto;
+}
+
+.swal2-popup .scm-calendar-reschedule-field button {
+  background: transparent;
+  border: 0;
+  color: #b45309;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  margin-left: auto;
+  padding: 0 !important;
+}
+
+.swal2-popup .scm-calendar-reschedule-modern input,
+.swal2-popup .scm-calendar-reschedule-modern select,
+.swal2-popup .scm-calendar-reschedule-modern textarea {
+  background: #eff4ff !important;
+  border: 1px solid #dbe6f2 !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  color: #0f1e36 !important;
+  font: inherit !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  line-height: 1.4 !important;
+  min-height: 42px !important;
+  padding: 10px 12px !important;
+  width: 100% !important;
+}
+
+.swal2-popup .scm-calendar-reschedule-modern textarea {
+  min-height: 94px !important;
+  resize: vertical;
+}
+
+.swal2-popup .scm-calendar-reschedule-modern input:focus,
+.swal2-popup .scm-calendar-reschedule-modern select:focus,
+.swal2-popup .scm-calendar-reschedule-modern textarea:focus {
+  background: #ffffff !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.16) !important;
+  outline: none !important;
+}
+
+.swal2-popup .scm-calendar-reschedule-note {
+  align-items: flex-start;
+  color: #64748b;
+  display: flex;
+  font-size: 11px;
+  font-weight: 650;
+  gap: 7px;
+  line-height: 1.45;
+  margin: -4px 0 0 !important;
+}
+
+.swal2-popup .scm-calendar-reschedule-note .material-symbols-outlined {
+  color: #b45309;
+  font-size: 16px;
+  margin-top: 1px;
+}
+
+@media (max-width: 720px) {
+  .swal2-popup .scm-calendar-detail-info-grid,
+  .swal2-popup .scm-calendar-reschedule-grid,
+  .swal2-popup .scm-calendar-reschedule-modern .scm-calendar-reschedule-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .swal2-popup .scm-calendar-event-detail-foot,
+  .swal2-popup .scm-calendar-reschedule-foot {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .swal2-popup .scm-calendar-event-detail-foot > div,
+  .swal2-popup .scm-calendar-reschedule-foot > div,
+  .swal2-popup .scm-calendar-modern-btn {
+    width: 100%;
+  }
+
+  .swal2-popup .scm-calendar-reschedule-modern .scm-calendar-reschedule-summary p {
+    text-align: left;
+  }
+}
+
 .swal2-popup .scm-calendar-native-note {
   background: #f8fafc;
   border: 1px dashed #cfe0f4;

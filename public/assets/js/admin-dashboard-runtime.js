@@ -3968,6 +3968,25 @@
         return '<div' + (wide ? ' class="is-wide"' : "") + '><small>' + escHtml(label) + '</small><strong>' + escHtml(value) + '</strong></div>';
       }
 
+      function calendarInitialsFromName(name) {
+        var parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+        if (!parts.length) return "SK";
+        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+      }
+
+      function calendarDetailCardHtml(icon, label, value, wide, extraHtml) {
+        value = String(value || "").trim();
+        icon = String(icon || "").trim();
+        if (!value && !extraHtml) return "";
+        return '<div class="scm-calendar-detail-info-card' + (wide ? " is-wide" : "") + (!icon ? " is-avatar-card" : "") + '">' +
+          '<span class="scm-calendar-detail-icon material-symbols-outlined" aria-hidden="true">' + escHtml(icon) + '</span>' +
+          '<div class="scm-calendar-detail-info-body"><small>' + escHtml(label) + '</small>' +
+          (value ? '<strong>' + escHtml(value) + '</strong>' : "") +
+          (extraHtml || "") +
+          '</div></div>';
+      }
+
       function calendarEventDetailHtml(row) {
         var eventId = String(row.id || row._ID || row.event_id || "").trim();
         var ticket = String(row.id_ticket || row.ticket || "").trim();
@@ -3975,24 +3994,37 @@
         var title = String(row.titulo || row.title || "Evento").trim();
         var location = calendarDetailValue(row, ["ubicacion", "lugar", "direccion"]);
         var description = calendarDetailValue(row, ["descripcion", "observacion", "detalle"]);
-        return '<div class="scm-calendar-native-detail scm-case-calendar-event-mini-card">' +
-          '<div class="scm-case-calendar-event-mini-head"><span>Detalle del evento</span><strong>' + escHtml(title) + '</strong></div>' +
-          '<div class="scm-case-calendar-event-mini-grid">' +
-          calendarDetailFieldHtml("Inicio", formatDateTime(row.fecha_inicio || row.fecha || row.start), false) +
-          calendarDetailFieldHtml("Fin", formatDateTime(row.fecha_fin || row.end), false) +
-          calendarDetailFieldHtml("Categoria", categoryNameForRow(row), false) +
-          calendarDetailFieldHtml("Funcionario", employeeNameForRow(row), false) +
-          (ticket ? calendarDetailFieldHtml("Ticket", "#" + ticket, false) : "") +
-          calendarDetailFieldHtml("Ubicacion", location, true) +
-          "</div>" +
-          (description ? '<div class="scm-case-calendar-event-mini-description"><small>Descripci&oacute;n</small><p>' + calendarRichTextHtml(description) + "</p></div>" : "") +
-          '<div class="scm-case-calendar-event-mini-actions">' +
-          '<span class="scm-case-calendar-event-state-badge' + (isDone ? " is-done" : "") + '">' + (isDone ? "Realizado" : "Pendiente") + "</span>" +
-          (ticket ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-ticket data-event-id="' + escHtml(eventId) + '" data-ticket-id="' + escHtml(ticket) + '">Ver ticket</button>' : "") +
-          (eventId ? '<button type="button" class="scm-case-calendar-transfer-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(eventId) + '">Trasladar evento</button>' : "") +
-          (eventId && !isDone ? '<button type="button" class="scm-case-calendar-complete-btn" data-scm-calendar-complete-event data-event-id="' + escHtml(eventId) + '">Marcar realizado</button>' : "") +
-          "</div>" +
-          "</div>";
+        var employee = employeeNameForRow(row);
+        var category = categoryNameForRow(row);
+        var priority = calendarDetailValue(row, ["prioridad", "nivel_prioridad"]);
+        var statusLabel = isDone ? "Realizado" : "En curso";
+        var progress = isDone ? 100 : 65;
+        return '<div class="scm-calendar-event-detail-modern">' +
+          '<header class="scm-calendar-event-detail-head">' +
+          '<div><span>Detalle del evento</span><span class="scm-calendar-event-detail-status' + (isDone ? " is-done" : "") + '"><i></i>' + escHtml(statusLabel) + '</span></div>' +
+          '<h3>' + escHtml(title) + '</h3>' +
+          '<button type="button" class="scm-calendar-modern-close" data-scm-calendar-close aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>' +
+          '</header>' +
+          '<section class="scm-calendar-event-detail-body">' +
+          '<div class="scm-calendar-detail-info-grid">' +
+          calendarDetailCardHtml("calendar_today", "Inicio", formatDateTime(row.fecha_inicio || row.fecha || row.start), false) +
+          calendarDetailCardHtml("schedule", "Fin", formatDateTime(row.fecha_fin || row.end), false) +
+          calendarDetailCardHtml("category", "Categoria", category, false, '<em style="--detail-dot:' + escHtml(row.color || "#f59e0b") + '"></em>') +
+          calendarDetailCardHtml("", "Funcionario", "", false, '<span class="scm-calendar-detail-avatar">' + escHtml(calendarInitialsFromName(employee)) + '</span><strong>' + escHtml(employee || "Funcionario") + '</strong>') +
+          calendarDetailCardHtml("location_on", "Ubicacion", location, true) +
+          (ticket ? calendarDetailCardHtml("confirmation_number", "Ticket asociado", "#" + ticket, true, '<button type="button" class="scm-calendar-detail-ticket" data-scm-calendar-view-ticket data-event-id="' + escHtml(eventId) + '" data-ticket-id="' + escHtml(ticket) + '">Ver ticket</button>') : "") +
+          '</div>' +
+          (description ? '<div class="scm-calendar-detail-description"><div><span>Descripci&oacute;n del evento</span>' + (priority ? '<strong>' + escHtml(priority) + '</strong>' : "") + '</div><p>' + calendarRichTextHtml(description) + '</p></div>' : "") +
+          '<div class="scm-calendar-detail-progress"><div><span>Progreso de ejecuci&oacute;n</span><strong>' + escHtml(String(progress)) + '% completado</strong></div><i><b style="width:' + escHtml(String(progress)) + '%"></b></i></div>' +
+          '</section>' +
+          '<footer class="scm-calendar-event-detail-foot">' +
+          '<div>' +
+          (eventId && !isDone ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--success" data-scm-calendar-complete-event data-event-id="' + escHtml(eventId) + '"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span>Marcar como realizado</button>' : '<span class="scm-calendar-modern-done-pill"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span>Realizado</span>') +
+          (eventId ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-reschedule-event data-event-id="' + escHtml(eventId) + '"><span class="material-symbols-outlined" aria-hidden="true">event_repeat</span>Trasladar evento</button>' : "") +
+          '</div>' +
+          '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--dark" data-scm-calendar-close>Cerrar</button>' +
+          '</footer>' +
+          '</div>';
       }
 
       function cssCalendarAttrValue(value) {
@@ -4094,6 +4126,12 @@
             var rescheduleId = rescheduleBtn.getAttribute("data-event-id") || "";
             window.Swal.close();
             window.setTimeout(function () { openRescheduleEventPopup(rescheduleId); }, 50);
+            return;
+          }
+          var closeBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-close]") : null;
+          if (closeBtn) {
+            event.preventDefault();
+            window.Swal.close();
           }
         });
       }
@@ -4112,8 +4150,8 @@
           title: "",
           html: calendarEventDetailHtml(row),
           width: 720,
-          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal" },
-          confirmButtonText: "Cerrar",
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal scm-calendar-event-detail-swal" },
+          showConfirmButton: false,
           showCancelButton: false,
           didOpen: function () { bindCalendarNativePopupActions(row); },
         });
@@ -4175,24 +4213,37 @@
         var startValue = timePartFromDateTime(row.fecha_inicio);
         var endValue = timePartFromDateTime(row.fecha_fin);
         var ticket = String(row.id_ticket || "").trim();
-        var html = '<form class="scm-calendar-popup-form scm-calendar-reschedule-form" autocomplete="off">' +
+        var location = String(row.ubicacion || row.lugar || row.direccion || "").trim();
+        var html = '<form class="scm-calendar-reschedule-modern scm-calendar-reschedule-form" autocomplete="off">' +
+          '<header class="scm-calendar-reschedule-head">' +
+          '<div class="scm-calendar-reschedule-title"><span class="scm-calendar-reschedule-icon material-symbols-outlined" aria-hidden="true">update</span><div><h3>Trasladar evento <em>Reprogramaci&oacute;n</em></h3><p>Ajuste de fecha, ventana horaria y sincronizaci&oacute;n con ticket operativo</p></div></div>' +
+          '<button type="button" class="scm-calendar-modern-close" data-scm-calendar-reschedule-cancel aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>' +
+          '</header>' +
+          '<section class="scm-calendar-reschedule-body">' +
           '<div class="scm-calendar-reschedule-summary">' +
-          '<strong>' + escHtml(title) + '</strong>' +
-          '<span>' + escHtml(categoryName) + (ticket ? " · Ticket #" + escHtml(ticket) : "") + '</span>' +
+          '<div><strong>' + escHtml(title) + '</strong><span>' + escHtml(categoryName) + (ticket ? " / Cita tecnica" : "") + (location ? ' <i>&bull;</i> ' + escHtml(location) : "") + '</span></div>' +
+          '<p><small>Ventana original</small><b>' + escHtml(formatDateTime(row.fecha_inicio || "")) + (row.fecha_fin ? " - " + escHtml(timePartFromDateTime(row.fecha_fin)) : "") + '</b></p>' +
           '</div>' +
-          '<div class="scm-calendar-popup-grid">' +
-          '<label class="scm-seg-field"><span>Nueva fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + escHtml(dateValue) + '"></label>' +
-          '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required value="' + escHtml(startValue) + '"></label>' +
-          '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required value="' + escHtml(endValue) + '"></label>' +
-          '<label class="scm-seg-field"><span>Es cita</span><select class="select select-bordered select-sm scm-select" name="es_cita"><option value="si"' + (ticket ? " selected" : "") + '>Si</option><option value="no"' + (!ticket ? " selected" : "") + '>No</option></select></label>' +
-          '<label class="scm-seg-field scm-calendar-field-full"><span>Motivo del traslado</span><textarea class="textarea textarea-bordered scm-input" name="observacion" rows="3" required placeholder="Explica por qu&eacute; se traslada este evento..."></textarea></label>' +
-          '<label class="scm-seg-field scm-calendar-field-full"><span>Mensaje para el ticket</span><textarea class="textarea textarea-bordered scm-input" name="descripcion" rows="5" placeholder="Este texto se enviar&aacute; al proceso del ticket si el evento est&aacute; relacionado."></textarea><small>Si es una cita preventiva o correctiva, el texto se genera autom&aacute;ticamente y puedes editarlo.</small></label>' +
-          '</div></form>';
+          '<div class="scm-calendar-reschedule-grid">' +
+          '<label><span><i class="material-symbols-outlined" aria-hidden="true">event_repeat</i>Nueva fecha</span><input type="date" name="fecha" required value="' + escHtml(dateValue) + '"></label>' +
+          '<label><span><i class="material-symbols-outlined" aria-hidden="true">schedule</i>Hora inicio</span><input type="time" name="hora_inicio" required value="' + escHtml(startValue) + '"></label>' +
+          '<label><span><i class="material-symbols-outlined" aria-hidden="true">hourglass_bottom</i>Hora fin</span><input type="time" name="hora_fin" required value="' + escHtml(endValue) + '"></label>' +
+          '</div>' +
+          '<label class="scm-calendar-reschedule-field"><span><i class="material-symbols-outlined" aria-hidden="true">location_away</i>¿Es cita presencial?<small>Impacta agenda del equipo de campo</small></span><select name="es_cita"><option value="si"' + (ticket ? " selected" : "") + '>Si, requiere presencia en el inmueble</option><option value="no"' + (!ticket ? " selected" : "") + '>No, coordinaci&oacute;n remota / tarea interna</option></select></label>' +
+          '<label class="scm-calendar-reschedule-field"><span><i class="material-symbols-outlined" aria-hidden="true">edit_note</i>Motivo del traslado<b>Requerido para auditor&iacute;a</b></span><textarea name="observacion" rows="3" required placeholder="Explica claramente por qu&eacute; se traslada este evento..."></textarea></label>' +
+          '<label class="scm-calendar-reschedule-field"><span><i class="material-symbols-outlined" aria-hidden="true">mark_chat_unread</i>Mensaje para el ticket / cliente<button type="button" data-scm-calendar-template-default>Plantilla por defecto</button></span><textarea name="descripcion" rows="4" placeholder="Este texto se enviar&aacute; al proceso del ticket si el evento est&aacute; relacionado."></textarea></label>' +
+          '<p class="scm-calendar-reschedule-note"><span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>Si es una cita vinculada a ticket, este texto se enviar&aacute; autom&aacute;ticamente como actualizaci&oacute;n por correo y WhatsApp institucional.</p>' +
+          '</section>' +
+          '<footer class="scm-calendar-reschedule-foot">' +
+          '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-reschedule-cancel><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>Cancelar</button>' +
+          '<div><button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--ghost" data-scm-calendar-reschedule-preview><span class="material-symbols-outlined" aria-hidden="true">visibility</span>Previsualizar</button><button type="submit" class="scm-calendar-modern-btn scm-calendar-modern-btn--orange"><span class="material-symbols-outlined" aria-hidden="true">schedule_send</span>Guardar traslado</button></div>' +
+          '</footer>' +
+          '</form>';
         window.Swal.fire({
-          title: "Trasladar evento",
+          title: "",
           html: html,
           width: 760,
-          customClass: { popup: "scm-calendar-swal-popup scm-calendar-reschedule-swal" },
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-reschedule-swal scm-calendar-reschedule-modern-swal" },
           showCancelButton: true,
           confirmButtonText: "Guardar traslado",
           cancelButtonText: "Cerrar",
@@ -4221,6 +4272,29 @@
             if (descriptionInput) {
               descriptionInput.addEventListener("input", function () {
                 descriptionInput.setAttribute("data-auto-calendar-text", "0");
+              });
+            }
+            form.addEventListener("submit", function (event) {
+              event.preventDefault();
+              window.Swal.clickConfirm();
+            });
+            form.querySelectorAll("[data-scm-calendar-reschedule-cancel]").forEach(function (btn) {
+              btn.addEventListener("click", function () { window.Swal.clickCancel(); });
+            });
+            var restoreTemplateBtn = form.querySelector("[data-scm-calendar-template-default]");
+            if (restoreTemplateBtn && descriptionInput) {
+              restoreTemplateBtn.addEventListener("click", function () {
+                descriptionInput.value = buildRescheduleDescription(title, dateInput ? dateInput.value : dateValue, startInput ? startInput.value : startValue, endInput ? endInput.value : endValue, observationInput ? observationInput.value.trim() : "");
+                descriptionInput.setAttribute("data-auto-calendar-text", "1");
+                descriptionInput.focus();
+              });
+            }
+            var previewBtn = form.querySelector("[data-scm-calendar-reschedule-preview]");
+            if (previewBtn) {
+              previewBtn.addEventListener("click", function () {
+                maybeAutofillRescheduleDescription();
+                if (descriptionInput) descriptionInput.focus();
+                showToast("info", "Revisa el mensaje en el campo antes de guardar el traslado.");
               });
             }
             maybeAutofillRescheduleDescription();
