@@ -2130,11 +2130,13 @@
   font-weight: 950;
 }
 
-#scm-app .scm-calendar-panel--week .scm-calendar-weekdays {
+#scm-app .scm-calendar-panel--week .scm-calendar-weekdays,
+#scm-app .scm-calendar-panel--day .scm-calendar-weekdays {
   display: none;
 }
 
-#scm-app .scm-calendar-panel--week .scm-calendar-month-grid {
+#scm-app .scm-calendar-panel--week .scm-calendar-month-grid,
+#scm-app .scm-calendar-panel--day .scm-calendar-month-grid {
   background: #fff;
   border: 0;
   border-radius: 12px;
@@ -2152,6 +2154,11 @@
   overflow: hidden;
   touch-action: none;
   user-select: none;
+}
+
+#scm-app .scm-calendar-time-grid--day {
+  grid-template-columns: 68px minmax(420px, 1fr);
+  min-width: 0;
 }
 
 #scm-app .scm-calendar-time-gutter,
@@ -3196,57 +3203,77 @@
 }
 
 #scm-app .scm-home-calendar .scm-calendar-weekdays {
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  gap: 6px;
-  margin-bottom: 6px;
+  background: #ffffff;
+  border: 1px solid #dbe6f2;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  gap: 0;
+  margin-bottom: 0;
+  overflow: hidden;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-weekdays span {
-  background: #f8fafc;
-  border-radius: 7px;
-  color: #64748b;
-  letter-spacing: 0.04em;
-  padding: 9px 8px !important;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  border-radius: 0;
+  color: #5f6368;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 8px 8px !important;
+  text-align: center;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-weekdays span:last-child {
+  border-right: 0;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-month-grid {
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  gap: 7px;
+  background: #dbe6f2;
+  border: 1px solid #dbe6f2;
+  border-radius: 0 0 12px 12px;
+  gap: 1px;
+  overflow: hidden;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  min-height: 86px;
-  padding: 10px !important;
+  background: #ffffff;
+  border: 0;
+  border-radius: 0;
+  min-height: 104px;
+  padding: 7px 8px !important;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day.is-muted {
   background: #f8fafc;
-  border-style: dashed;
+  color: #94a3b8;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day.is-selected {
   background: #fff7ed;
-  border-color: #fb923c;
-  box-shadow: inset 0 0 0 1px #f97316;
+  box-shadow: inset 0 0 0 2px #f97316;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day-number {
-  font-size: 13px;
-  font-weight: 750;
+  align-items: center;
+  border-radius: 999px;
+  color: #202124;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  height: 24px;
+  justify-content: center;
+  min-width: 24px;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day-events-count {
   align-self: flex-end;
-  background: #eff6ff;
+  background: #f1f5f9;
   border-radius: 999px;
-  color: #2563eb;
+  color: #475569;
   font-size: 9px;
+  font-weight: 850;
   min-height: 0;
   padding: 2px 6px;
 }
@@ -3256,22 +3283,35 @@
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day-pill {
-  background: #f8fafc;
+  background: #fff7ed;
   border: 0;
-  border-left: 3px solid #f97316;
+  border-left: 0;
+  border-radius: 6px;
+  color: #9a3412;
+  display: block;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 850;
+  line-height: 1.15;
+  overflow: hidden;
+  padding: 4px 6px !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day-pill--tarea {
-  border-left-color: #2563eb !important;
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day-pill--recordatorio {
-  border-left-color: #7c3aed !important;
+  background: #f5f3ff;
+  color: #6d28d9;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day-card {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 118px);
   top: 14px;
 }
 
@@ -3280,7 +3320,11 @@
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day-card .scm-calendar-events {
-  max-height: 520px;
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 8px !important;
 }
 
 #scm-app .scm-calendar-empty-day {
@@ -3594,19 +3638,26 @@
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day {
-  min-height: 84px;
+  min-height: 104px;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day-card .scm-calendar-events {
-  max-height: 420px;
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 8px !important;
 }
 
 #scm-app .scm-home-calendar .scm-calendar-day-create {
   background: #ea580c !important;
   border-color: #ea580c !important;
   box-shadow: 0 12px 22px rgba(234, 88, 12, 0.22);
+  flex: 0 0 auto;
   margin-top: 14px;
   min-height: 42px;
+  position: relative;
+  z-index: 2;
   width: 100%;
 }
 

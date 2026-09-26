@@ -1741,7 +1741,15 @@
         return { from: toDateKey(start), to: toDateKey(addDays(start, 6)) };
       }
 
+      function dayRange(date) {
+        var key = toDateKey(date || new Date());
+        return { from: key, to: key };
+      }
+
       function activeCalendarRange() {
+        if (calendarDisplayMode === "day") {
+          return dayRange(dateFromKey(selectedDay) || currentMonth || new Date());
+        }
         if (calendarDisplayMode === "week") {
           return weekRange(dateFromKey(selectedDay) || currentMonth || new Date());
         }
@@ -1758,6 +1766,11 @@
         }
         return start.toLocaleDateString("es-CO", { day: "2-digit", month: "long" }).replace(/\./g, "") +
           " - " + end.toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" }).replace(/\./g, "");
+      }
+
+      function dayViewLabel(date) {
+        var d = date || new Date();
+        return d.toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" }).replace(/\./g, "");
       }
 
       function timeFromMinutes(minutes) {
@@ -2321,8 +2334,9 @@
           btn.setAttribute("aria-pressed", active ? "true" : "false");
         });
         panel.classList.toggle("scm-calendar-panel--week", calendarDisplayMode === "week");
+        panel.classList.toggle("scm-calendar-panel--day", calendarDisplayMode === "day");
         var kicker = panel.querySelector(".scm-calendar-board-card .scm-calendar-action-kicker");
-        if (kicker) kicker.textContent = calendarDisplayMode === "week" ? "Vista semanal" : "Vista mensual";
+        if (kicker) kicker.textContent = calendarDisplayMode === "day" ? "Vista diaria" : (calendarDisplayMode === "week" ? "Vista semanal" : "Vista mensual");
       }
 
       function eventMinutes(row, key) {
@@ -2605,6 +2619,60 @@
         });
       }
 
+      function bindTimeGridInteractions(grid) {
+        if (!grid) return;
+        grid.addEventListener("pointerdown", function (event) {
+          var slot = slotFromEvent(event);
+          if (!slot || !grid.contains(slot)) return;
+          event.preventDefault();
+          closeWeekQuickPopover();
+          selectedDay = slot.getAttribute("data-date") || selectedDay;
+          weekSlotSelection = {
+            date: selectedDay,
+            start: Number(slot.getAttribute("data-start") || 0),
+            end: Number(slot.getAttribute("data-end") || 0),
+            dragged: false,
+            dragging: true,
+          };
+          updateWeekSelection(grid, weekSlotSelection.date, weekSlotSelection.start, weekSlotSelection.end);
+          if (slot.setPointerCapture && event.pointerId) {
+            try { slot.setPointerCapture(event.pointerId); } catch (err) {}
+          }
+        });
+        grid.addEventListener("pointermove", function (event) {
+          if (!weekSlotSelection || !weekSlotSelection.dragging || event.buttons === 0) return;
+          var slot = slotFromPoint(grid, event) || slotFromEvent(event);
+          if (!slot || slot.getAttribute("data-date") !== weekSlotSelection.date) return;
+          var next = weekSelectionFromSlot(slot, Object.assign({}, weekSlotSelection, { dragged: true }));
+          if (!next) return;
+          weekSlotSelection.dragged = true;
+          weekSlotSelection.end = next.end;
+          updateWeekSelection(grid, next.date, next.start, next.end);
+        });
+        grid.addEventListener("pointerup", function (event) {
+          var slot = slotFromPoint(grid, event) || slotFromEvent(event);
+          var selection = weekSlotSelection;
+          var finalSelection = weekSelectionFromSlot(slot, selection);
+          if (!finalSelection) {
+            clearWeekSelection(grid);
+            return;
+          }
+          selectedDay = finalSelection.date || selectedDay;
+          renderSelectedDay();
+          if (isDueCalendar) {
+            clearWeekSelection(grid);
+            renderCalendarGrid();
+            return;
+          }
+          updateWeekSelection(grid, finalSelection.date, finalSelection.start, finalSelection.end);
+          weekSlotSelection = null;
+          openWeekQuickPopover(finalSelection, event);
+        });
+        grid.addEventListener("pointercancel", function () {
+          clearWeekSelection(grid);
+        });
+      }
+
       function renderWeekGrid() {
         if (!monthGrid) return;
         updateCalendarViewButtons();
@@ -2661,57 +2729,45 @@
             renderSelectedDay();
           });
         });
-        if (!grid) return;
-        grid.addEventListener("pointerdown", function (event) {
-          var slot = slotFromEvent(event);
-          if (!slot || !grid.contains(slot)) return;
-          event.preventDefault();
-          closeWeekQuickPopover();
-          selectedDay = slot.getAttribute("data-date") || selectedDay;
-          weekSlotSelection = {
-            date: selectedDay,
-            start: Number(slot.getAttribute("data-start") || 0),
-            end: Number(slot.getAttribute("data-end") || 0),
-            dragged: false,
-            dragging: true,
-          };
-          updateWeekSelection(grid, weekSlotSelection.date, weekSlotSelection.start, weekSlotSelection.end);
-          if (slot.setPointerCapture && event.pointerId) {
-            try { slot.setPointerCapture(event.pointerId); } catch (err) {}
-          }
-        });
-        grid.addEventListener("pointermove", function (event) {
-          if (!weekSlotSelection || !weekSlotSelection.dragging || event.buttons === 0) return;
-          var slot = slotFromPoint(grid, event) || slotFromEvent(event);
-          if (!slot || slot.getAttribute("data-date") !== weekSlotSelection.date) return;
-          var next = weekSelectionFromSlot(slot, Object.assign({}, weekSlotSelection, { dragged: true }));
-          if (!next) return;
-          weekSlotSelection.dragged = true;
-          weekSlotSelection.end = next.end;
-          updateWeekSelection(grid, next.date, next.start, next.end);
-        });
-        grid.addEventListener("pointerup", function (event) {
-          var slot = slotFromPoint(grid, event) || slotFromEvent(event);
-          var selection = weekSlotSelection;
-          var finalSelection = weekSelectionFromSlot(slot, selection);
-          if (!finalSelection) {
-            clearWeekSelection(grid);
-            return;
-          }
-          selectedDay = finalSelection.date || selectedDay;
-          renderSelectedDay();
-          if (isDueCalendar) {
-            clearWeekSelection(grid);
-            renderCalendarGrid();
-            return;
-          }
-          updateWeekSelection(grid, finalSelection.date, finalSelection.start, finalSelection.end);
-          weekSlotSelection = null;
-          openWeekQuickPopover(finalSelection, event);
-        });
-        grid.addEventListener("pointercancel", function () {
-          clearWeekSelection(grid);
-        });
+        bindTimeGridInteractions(grid);
+      }
+
+      function renderDayGrid() {
+        if (!monthGrid) return;
+        updateCalendarViewButtons();
+        var date = dateFromKey(selectedDay) || currentMonth || new Date();
+        var key = toDateKey(date);
+        var todayKey = toDateKey(new Date());
+        if (titleEl) titleEl.textContent = dayViewLabel(date);
+        var html = '<div class="scm-calendar-time-grid scm-calendar-time-grid--day" data-scm-calendar-week-grid>';
+        html += '<div class="scm-calendar-time-gutter scm-calendar-time-gutter--head">GMT-05</div>';
+        var headClasses = "scm-calendar-week-head";
+        if (key === todayKey) headClasses += " is-today";
+        headClasses += " is-selected";
+        html += '<button type="button" class="' + headClasses + '" data-scm-calendar-week-day="' + escHtml(key) + '">' +
+          '<span>' + escHtml(date.toLocaleDateString("es-CO", { weekday: "short" }).replace(/\./g, "")) + '</span>' +
+          '<strong>' + String(date.getDate()) + '</strong>' +
+          '</button>';
+        for (var minutes = 8 * 60; minutes < WEEK_DAY_END_MINUTES; minutes += WEEK_SLOT_MINUTES) {
+          var label = minutes % 60 === 0 ? displayHourFromMinutes(minutes) : "";
+          var slotEnd = minutes + WEEK_SLOT_MINUTES;
+          var slotRows = weekSlotEvents(key, minutes, slotEnd);
+          var slotClasses = "scm-calendar-time-slot is-selected-day";
+          if (key === todayKey) slotClasses += " is-today";
+          html += '<div class="scm-calendar-time-gutter">' + escHtml(label) + '</div>';
+          html += '<button type="button" class="' + slotClasses + '" data-scm-calendar-week-slot data-date="' + escHtml(key) + '" data-start="' + String(minutes) + '" data-end="' + String(slotEnd) + '" aria-label="' + escHtml(calendarDayTitle(key) + " " + timeFromMinutes(minutes)) + '">';
+          slotRows.slice(0, 4).forEach(function (row) {
+            html += '<span class="scm-calendar-week-event" style="--event-color:' + escHtml(row.color || "#f97316") + '">' +
+              '<strong>' + escHtml(row.titulo || calendarItemKindLabel(row)) + '</strong>' +
+              '<em>' + escHtml(timePartFromDateTime(row.fecha_inicio) || timeFromMinutes(minutes)) + '</em>' +
+              '</span>';
+          });
+          if (slotRows.length > 4) html += '<span class="scm-calendar-week-more">+' + String(slotRows.length - 4) + '</span>';
+          html += '</button>';
+        }
+        html += '</div>';
+        monthGrid.innerHTML = html;
+        bindTimeGridInteractions(monthGrid.querySelector("[data-scm-calendar-week-grid]"));
       }
 
       function renderMonthGrid() {
@@ -2763,6 +2819,10 @@
 
       function renderCalendarGrid() {
         if (!monthGrid) return;
+        if (calendarDisplayMode === "day") {
+          renderDayGrid();
+          return;
+        }
         if (calendarDisplayMode === "week") {
           renderWeekGrid();
           return;
@@ -5200,7 +5260,12 @@
       }
       if (prevBtn) {
         prevBtn.addEventListener("click", function () {
-          if (calendarDisplayMode === "week") {
+          if (calendarDisplayMode === "day") {
+            var prevSingleBase = dateFromKey(selectedDay) || currentMonth || new Date();
+            var prevSingleDay = addDays(prevSingleBase, -1);
+            selectedDay = toDateKey(prevSingleDay);
+            currentMonth = startOfMonth(prevSingleDay);
+          } else if (calendarDisplayMode === "week") {
             var prevBase = dateFromKey(selectedDay) || currentMonth || new Date();
             var prevDay = addDays(prevBase, -7);
             selectedDay = toDateKey(prevDay);
@@ -5214,7 +5279,12 @@
       }
       if (nextBtn) {
         nextBtn.addEventListener("click", function () {
-          if (calendarDisplayMode === "week") {
+          if (calendarDisplayMode === "day") {
+            var nextSingleBase = dateFromKey(selectedDay) || currentMonth || new Date();
+            var nextSingleDay = addDays(nextSingleBase, 1);
+            selectedDay = toDateKey(nextSingleDay);
+            currentMonth = startOfMonth(nextSingleDay);
+          } else if (calendarDisplayMode === "week") {
             var nextBase = dateFromKey(selectedDay) || currentMonth || new Date();
             var nextDay = addDays(nextBase, 7);
             selectedDay = toDateKey(nextDay);
@@ -5235,7 +5305,8 @@
       }
       viewModeBtns.forEach(function (btn) {
         btn.addEventListener("click", function () {
-          var nextMode = btn.getAttribute("data-scm-calendar-view-mode") === "week" ? "week" : "month";
+          var requestedMode = btn.getAttribute("data-scm-calendar-view-mode") || "month";
+          var nextMode = requestedMode === "day" ? "day" : (requestedMode === "week" ? "week" : "month");
           if (nextMode === calendarDisplayMode) return;
           calendarDisplayMode = nextMode;
           var parsed = dateFromKey(selectedDay) || currentMonth || new Date();

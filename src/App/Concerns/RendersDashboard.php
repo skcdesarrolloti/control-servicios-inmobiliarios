@@ -2492,7 +2492,7 @@ trait RendersDashboard
               <button type="button" class="scm-case-work-btn" data-scm-calendar-prev aria-label="Mes anterior">&lsaquo;</button>
               <button type="button" class="scm-case-work-btn" data-scm-calendar-today-btn>Hoy</button>
               <button type="button" class="scm-case-work-btn" data-scm-calendar-next aria-label="Mes siguiente">&rsaquo;</button>
-              <span class="scm-calendar-view-switch" aria-label="Vista de calendario"><button type="button" class="active" data-scm-calendar-view-mode="month" aria-pressed="true">Mes</button><button type="button" data-scm-calendar-view-mode="week" aria-pressed="false">Semana</button></span>
+              <span class="scm-calendar-view-switch" aria-label="Vista de calendario"><button type="button" class="active" data-scm-calendar-view-mode="month" aria-pressed="true">Mes</button><button type="button" data-scm-calendar-view-mode="week" aria-pressed="false">Semana</button><button type="button" data-scm-calendar-view-mode="day" aria-pressed="false">D&iacute;a</button></span>
             </div>
           </div>
           <div class="scm-calendar-weekdays" aria-hidden="true"><span>Lun</span><span>Mar</span><span>Mi&eacute;</span><span>Jue</span><span>Vie</span><span>S&aacute;b</span><span>Dom</span></div>
