@@ -2316,13 +2316,14 @@
 #scm-app .scm-calendar-time-slot.is-selecting {
   background: #1a73e8;
   border-bottom-color: #1a73e8;
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
   color: #ffffff;
 }
 
 #scm-app .scm-calendar-time-slot.is-selection-start {
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7);
 }
 
 #scm-app .scm-calendar-time-slot.is-selection-end {

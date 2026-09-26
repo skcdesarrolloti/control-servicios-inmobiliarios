@@ -2503,26 +2503,63 @@
         var dateKey = slot.getAttribute("data-date") || selectedDay;
         var slotStart = Number(slot.getAttribute("data-start") || 0);
         var slotEnd = Number(slot.getAttribute("data-end") || 0);
-        var startMinutes = slotStart;
-        var endMinutes = slotEnd;
+        return weekSelectionFromBoundary(dateKey, slotStart, slotEnd, selection);
+      }
+
+      function weekBoundaryFromPoint(grid, event, fallbackDate) {
+        if (!grid || !event) return null;
+        var slot = slotFromPoint(grid, event) || slotFromEvent(event);
+        if (slot && grid.contains(slot)) {
+          var rect = slot.getBoundingClientRect();
+          var slotStart = Number(slot.getAttribute("data-start") || 0);
+          var slotEnd = Number(slot.getAttribute("data-end") || 0);
+          var boundary = event.clientY >= rect.bottom ? slotEnd : slotStart;
+          return {
+            date: slot.getAttribute("data-date") || fallbackDate || selectedDay,
+            minutes: boundary,
+            slotEnd: slotEnd,
+          };
+        }
+
+        var firstSlot = grid.querySelector("[data-scm-calendar-week-slot]");
+        if (!firstSlot) return null;
+        var firstRect = firstSlot.getBoundingClientRect();
+        var slotHeight = Math.max(1, firstRect.height);
+        var slotIndex = Math.floor((event.clientY - firstRect.top) / slotHeight);
+        var maxSlots = Math.floor((WEEK_DAY_END_MINUTES - WEEK_DAY_START_MINUTES) / WEEK_SLOT_MINUTES);
+        slotIndex = Math.max(0, Math.min(maxSlots, slotIndex));
+        var minutes = WEEK_DAY_START_MINUTES + (slotIndex * WEEK_SLOT_MINUTES);
+        return {
+          date: fallbackDate || selectedDay,
+          minutes: minutes,
+          slotEnd: Math.min(minutes + WEEK_SLOT_MINUTES, WEEK_DAY_END_MINUTES),
+        };
+      }
+
+      function weekSelectionFromBoundary(dateKey, boundaryMinutes, boundarySlotEnd, selection) {
+        dateKey = dateKey || selectedDay;
+        boundaryMinutes = Number(boundaryMinutes || WEEK_DAY_START_MINUTES);
+        boundarySlotEnd = Number(boundarySlotEnd || Math.min(boundaryMinutes + WEEK_SLOT_MINUTES, WEEK_DAY_END_MINUTES));
+        var startMinutes = boundaryMinutes;
+        var endMinutes = boundarySlotEnd;
         if (selection && selection.date === dateKey) {
-          var anchor = Number(selection.start || slotStart);
+          var anchor = Number(selection.start || boundaryMinutes);
           if (selection.dragged) {
-            if (slotStart > anchor) {
+            if (boundaryMinutes > anchor) {
               startMinutes = anchor;
-              endMinutes = slotStart;
-            } else if (slotStart < anchor) {
-              startMinutes = slotStart;
+              endMinutes = boundaryMinutes;
+            } else if (boundaryMinutes < anchor) {
+              startMinutes = boundaryMinutes;
               endMinutes = anchor;
             } else {
               startMinutes = anchor;
               endMinutes = Math.min(anchor + WEEK_SLOT_MINUTES, WEEK_DAY_END_MINUTES);
             }
           } else {
-            startMinutes = Math.min(anchor, slotStart);
-            endMinutes = Math.max(anchor + WEEK_SLOT_MINUTES, slotEnd);
+            startMinutes = Math.min(anchor, boundaryMinutes);
+            endMinutes = Math.max(anchor + WEEK_SLOT_MINUTES, boundarySlotEnd);
           }
-          if (selection.start === slotStart && !selection.dragged) {
+          if (selection.start === boundaryMinutes && !selection.dragged) {
             endMinutes = Math.min(selection.start + WEEK_DEFAULT_EVENT_MINUTES, WEEK_DAY_END_MINUTES);
           }
         } else {
@@ -2797,18 +2834,20 @@
         });
         grid.addEventListener("pointermove", function (event) {
           if (!weekSlotSelection || !weekSlotSelection.dragging || event.buttons === 0) return;
-          var slot = slotFromPoint(grid, event) || slotFromEvent(event);
-          if (!slot || slot.getAttribute("data-date") !== weekSlotSelection.date) return;
-          var next = weekSelectionFromSlot(slot, Object.assign({}, weekSlotSelection, { dragged: true }));
+          var boundary = weekBoundaryFromPoint(grid, event, weekSlotSelection.date);
+          if (!boundary || boundary.date !== weekSlotSelection.date) return;
+          var next = weekSelectionFromBoundary(boundary.date, boundary.minutes, boundary.slotEnd, Object.assign({}, weekSlotSelection, { dragged: true }));
           if (!next) return;
           weekSlotSelection.dragged = true;
           weekSlotSelection.end = next.end;
           updateWeekSelection(grid, next.date, next.start, next.end);
         });
         grid.addEventListener("pointerup", function (event) {
-          var slot = slotFromPoint(grid, event) || slotFromEvent(event);
           var selection = weekSlotSelection;
-          var finalSelection = weekSelectionFromSlot(slot, selection);
+          var boundary = selection && selection.dragged ? weekBoundaryFromPoint(grid, event, selection.date) : null;
+          var finalSelection = boundary
+            ? weekSelectionFromBoundary(boundary.date, boundary.minutes, boundary.slotEnd, selection)
+            : weekSelectionFromSlot(slotFromPoint(grid, event) || slotFromEvent(event), selection);
           if (!finalSelection) {
             clearWeekSelection(grid);
             return;
