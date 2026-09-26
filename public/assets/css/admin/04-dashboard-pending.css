@@ -1841,6 +1841,28 @@
   padding: 4px 9px;
 }
 
+#scm-app .scm-calendar-event-state--realizada,
+#scm-app .scm-calendar-event-state--realizado,
+#scm-app .scm-calendar-event-state--enviado {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+#scm-app .scm-calendar-event-state--cancelada,
+#scm-app .scm-calendar-event-state--cancelado {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+#scm-app .scm-calendar-event-state--en-proceso,
+#scm-app .scm-calendar-event-state--programado {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+
 #scm-app .scm-calendar-event-meta {
   display: flex;
   flex-wrap: wrap;
@@ -1863,6 +1885,32 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 11px;
+}
+
+#scm-app .scm-calendar-event-actions .scm-calendar-action-btn--success {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+#scm-app .scm-calendar-event-actions .scm-calendar-action-btn--success:hover,
+#scm-app .scm-calendar-event-actions .scm-calendar-action-btn--success:focus-visible {
+  background: #d1fae5;
+  border-color: #34d399;
+  color: #064e3b;
+}
+
+#scm-app .scm-calendar-event-actions .scm-calendar-action-btn--danger {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #be123c;
+}
+
+#scm-app .scm-calendar-event-actions .scm-calendar-action-btn--danger:hover,
+#scm-app .scm-calendar-event-actions .scm-calendar-action-btn--danger:focus-visible {
+  background: #ffe4e6;
+  border-color: #fb7185;
+  color: #9f1239;
 }
 
 #scm-app .scm-calendar-quick-grid,

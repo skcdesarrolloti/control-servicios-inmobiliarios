@@ -1584,7 +1584,25 @@
 
       function calendarItemIsDone(row) {
         var estado = String((row && row.estado) || "").toLowerCase().trim();
-        return estado === "si" || estado === "realizada" || estado === "enviado";
+        return estado === "si" || estado === "realizada" || estado === "enviado" || estado === "cancelada" || estado === "cancelado";
+      }
+
+      function calendarItemStatusLabel(row) {
+        var estado = String((row && row.estado) || "").toLowerCase().trim();
+        var kind = calendarItemKind(row);
+        if (kind === "tarea") {
+          if (estado === "realizada") return "Realizada";
+          if (estado === "cancelada") return "Cancelada";
+          if (estado === "en_proceso") return "En proceso";
+          return "Pendiente";
+        }
+        if (kind === "recordatorio") {
+          if (estado === "enviado") return "Enviado";
+          if (estado === "cancelado") return "Cancelado";
+          if (estado === "programado") return "Programado";
+          return "Pendiente";
+        }
+        return calendarItemIsDone(row) ? "Realizado" : "Pendiente";
       }
 
       function fillEmployeeOptions(selects, rows, firstLabel) {
@@ -2257,13 +2275,14 @@
         var kind = calendarItemKind(row);
         var isEventKind = kind === "evento";
         var isDone = calendarItemIsDone(row);
-        var estado = isDone ? "Realizado" : "Pendiente";
+        var estado = calendarItemStatusLabel(row);
+        var estadoKey = String((row.estado || estado) || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
         var color = String(row.color || "#f59e0b").trim() || "#f59e0b";
         var kindLabel = calendarItemKindLabel(row);
         return '<article class="scm-calendar-event-card">' +
           '<div class="scm-calendar-event-color" style="background:' + escHtml(color) + '"></div>' +
           '<div class="scm-calendar-event-main">' +
-          '<div class="scm-calendar-event-title-row"><h5>' + escHtml(row.titulo || kindLabel) + '</h5><span class="scm-calendar-event-state">' + escHtml(estado) + "</span></div>" +
+          '<div class="scm-calendar-event-title-row"><h5>' + escHtml(row.titulo || kindLabel) + '</h5><span class="scm-calendar-event-state scm-calendar-event-state--' + escHtml(estadoKey || "pendiente") + '">' + escHtml(estado) + "</span></div>" +
           '<div class="scm-calendar-event-description">' + calendarRichTextHtml(row.descripcion || "Sin descripcion") + "</div>" +
           '<div class="scm-calendar-event-meta">' +
           '<span>' + escHtml(formatDateTime(row.fecha_inicio)) + " - " + escHtml(formatDateTime(row.fecha_fin)) + "</span>" +
@@ -2277,6 +2296,9 @@
           (isEventKind && ticket ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver ticket</button>' : "") +
           (isEventKind && id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Marcar realizado</button>' : "") +
           (isEventKind && id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar evento</button>' : "") +
+          (kind === "tarea" && id && !isDone ? '<button type="button" class="scm-case-work-btn scm-calendar-action-btn--success" data-scm-calendar-complete-task data-task-id="' + escHtml(id) + '">Marcar realizada</button>' : "") +
+          (kind === "recordatorio" && id && !isDone ? '<button type="button" class="scm-case-work-btn scm-calendar-action-btn--success" data-scm-calendar-send-reminder data-reminder-id="' + escHtml(id) + '">Marcar enviado</button>' : "") +
+          (kind === "recordatorio" && id && !isDone ? '<button type="button" class="scm-case-work-btn scm-calendar-action-btn--danger" data-scm-calendar-cancel-reminder data-reminder-id="' + escHtml(id) + '">Cancelar</button>' : "") +
           "</div></div></article>";
       }
 
@@ -3691,6 +3713,16 @@
         }) || null;
       }
 
+      function calendarItemById(id, kind) {
+        id = String(id || "").trim();
+        kind = String(kind || "").trim();
+        if (!id) return null;
+        return calendarEvents.concat(calendarPendingRows).find(function (row) {
+          var rowId = String(row.id || row._ID || row.event_id || "").trim();
+          return rowId === id && (!kind || calendarItemKind(row) === kind);
+        }) || null;
+      }
+
       function calendarEventByTicket(ticketId) {
         ticketId = String(ticketId || "").trim();
         if (!ticketId) return null;
@@ -3705,6 +3737,87 @@
           return "El calendario no permite cerrar este evento hasta completar el reporte comercial asociado.";
         }
         return message;
+      }
+
+      function confirmCalendarStateChange(options) {
+        options = options || {};
+        var action = String(options.action || "").trim();
+        var payload = options.payload || {};
+        var title = String(options.title || "Actualizar item").trim();
+        var text = String(options.text || "Confirma la actualización.").trim();
+        var confirmButtonText = String(options.confirmButtonText || "Confirmar").trim();
+        var successMessage = String(options.successMessage || "Item actualizado.").trim();
+        if (!action) {
+          showToast("error", "No se encontró la acción del calendario.");
+          return;
+        }
+        function runRequest() {
+          return calendarApi(action, payload).then(function (json) {
+            if (!json || !json.success) throw new Error((json && json.message) || "No se pudo actualizar el item.");
+            return json;
+          });
+        }
+        if (!window.Swal || typeof window.Swal.fire !== "function") {
+          if (!window.confirm(text)) return;
+          runRequest()
+            .then(function (json) {
+              showToast("success", json.message || successMessage);
+              loadEvents();
+            })
+            .catch(function (err) {
+              showToast("error", compactCalendarActionMessage(err && err.message) || "No se pudo actualizar el item.");
+            });
+          return;
+        }
+        window.Swal.fire({
+          title: title,
+          text: text,
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: confirmButtonText,
+          cancelButtonText: "Cerrar",
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-state-swal" },
+          preConfirm: function () {
+            window.Swal.showLoading();
+            return runRequest().catch(function (err) {
+              window.Swal.showValidationMessage(compactCalendarActionMessage(err && err.message) || "No se pudo actualizar el item.");
+              return false;
+            });
+          },
+        }).then(function (result) {
+          if (!result.isConfirmed || !result.value) return;
+          showToast("success", result.value.message || successMessage);
+          loadEvents();
+        });
+      }
+
+      function completeCalendarTask(taskId) {
+        var row = calendarItemById(taskId, "tarea") || {};
+        var title = String(row.titulo || "esta tarea").trim();
+        confirmCalendarStateChange({
+          action: "actualizar_tarea_estado",
+          payload: { id_tarea: taskId, estado: "realizada" },
+          title: "Marcar tarea realizada",
+          text: "¿Quieres marcar \"" + title + "\" como realizada?",
+          confirmButtonText: "Marcar realizada",
+          successMessage: "Tarea marcada como realizada.",
+        });
+      }
+
+      function updateCalendarReminderState(reminderId, estado) {
+        estado = estado === "cancelado" ? "cancelado" : "enviado";
+        var row = calendarItemById(reminderId, "recordatorio") || {};
+        var title = String(row.titulo || "este recordatorio").trim();
+        confirmCalendarStateChange({
+          action: "actualizar_recordatorio_estado",
+          payload: { id_recordatorio: reminderId, estado: estado },
+          title: estado === "cancelado" ? "Cancelar recordatorio" : "Marcar recordatorio enviado",
+          text: estado === "cancelado"
+            ? "¿Quieres cancelar \"" + title + "\"?"
+            : "¿Quieres marcar \"" + title + "\" como enviado?",
+          confirmButtonText: estado === "cancelado" ? "Cancelar recordatorio" : "Marcar enviado",
+          successMessage: estado === "cancelado" ? "Recordatorio cancelado." : "Recordatorio marcado como enviado.",
+        });
       }
 
       function calendarDetailValue(row, keys) {
@@ -5277,6 +5390,24 @@
         if (completeBtn && panel.contains(completeBtn)) {
           e.preventDefault();
           openCompleteEventPopup(completeBtn.getAttribute("data-event-id") || "");
+          return;
+        }
+        var completeTaskBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-complete-task]") : null;
+        if (completeTaskBtn && panel.contains(completeTaskBtn)) {
+          e.preventDefault();
+          completeCalendarTask(completeTaskBtn.getAttribute("data-task-id") || "");
+          return;
+        }
+        var sendReminderBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-send-reminder]") : null;
+        if (sendReminderBtn && panel.contains(sendReminderBtn)) {
+          e.preventDefault();
+          updateCalendarReminderState(sendReminderBtn.getAttribute("data-reminder-id") || "", "enviado");
+          return;
+        }
+        var cancelReminderBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-cancel-reminder]") : null;
+        if (cancelReminderBtn && panel.contains(cancelReminderBtn)) {
+          e.preventDefault();
+          updateCalendarReminderState(cancelReminderBtn.getAttribute("data-reminder-id") || "", "cancelado");
           return;
         }
         var rescheduleBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-reschedule-event]") : null;
