@@ -3376,6 +3376,7 @@
   flex-direction: column;
   gap: 16px;
   max-height: calc(100vh - 118px);
+  min-width: 420px;
   min-height: 0;
   position: sticky;
   top: 14px;
@@ -3713,7 +3714,7 @@
 
 #scm-app .scm-home-calendar .scm-calendar-layout {
   gap: 22px;
-  grid-template-columns: minmax(0, 2fr) minmax(300px, 0.95fr);
+  grid-template-columns: minmax(0, 1.72fr) minmax(420px, 1fr);
 }
 
 #scm-app .scm-home-calendar .scm-calendar-board-card {
@@ -7054,6 +7055,7 @@
 
   #scm-app .scm-home-calendar .scm-calendar-side-rail {
     max-height: none;
+    min-width: 0;
     position: static;
   }
 
