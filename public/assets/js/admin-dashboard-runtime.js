@@ -2744,14 +2744,14 @@
           '<button type="button" aria-label="Cerrar" data-week-quick-close><span class="material-symbols-outlined">close</span></button>' +
           '</div>' +
           '<input type="hidden" name="kind" value="event" data-week-quick-kind-value>' +
-          '<label class="scm-calendar-week-quick-title"><span class="sr-only">Titulo</span><input name="titulo" placeholder="Añade un título" required></label>' +
+          '<label class="scm-calendar-week-quick-title"><span class="sr-only">Titulo</span><input name="titulo" placeholder="A&ntilde;ade un t&iacute;tulo" required data-week-quick-title-input></label>' +
           '<div class="scm-calendar-week-quick-tabs" aria-label="Tipo">' +
           '<button type="button" class="active" data-week-quick-kind="event">Evento</button>' +
           '<button type="button" data-week-quick-kind="task">Tarea</button>' +
           '<button type="button" data-week-quick-kind="reminder">Recordatorio</button>' +
           '</div>' +
           '<div class="scm-calendar-week-quick-row"><span class="material-symbols-outlined">schedule</span><div><strong>' + escHtml(dateLabel) + '</strong><em>' + escHtml(timeLabel) + '</em></div></div>' +
-          '<div class="scm-calendar-week-quick-location"><span class="material-symbols-outlined">location_on</span><div><input name="ubicacion" placeholder="Añadir ubicación o dirección"><div class="scm-calendar-week-quick-location-presets" aria-label="Ubicaciones rápidas"><button type="button" data-week-quick-location="Oficina Manga">Oficina Manga</button> <button type="button" data-week-quick-location="Oficina Corredor">Oficina Corredor</button></div></div></div>' +
+          '<div class="scm-calendar-week-quick-location" data-week-quick-location-row><span class="material-symbols-outlined">location_on</span><div><input name="ubicacion" placeholder="A&ntilde;adir ubicaci&oacute;n o direcci&oacute;n"><div class="scm-calendar-week-quick-location-presets" aria-label="Ubicaciones r&aacute;pidas"><button type="button" data-week-quick-location="Oficina Manga">Oficina Manga</button> <button type="button" data-week-quick-location="Oficina Corredor">Oficina Corredor</button></div></div></div>' +
           '<label class="scm-calendar-week-quick-category"><span class="material-symbols-outlined">sell</span><select name="id_categoria" required><option value="">Selecciona categoría</option>' + categoryOptions + '</select></label>' +
           '<div class="scm-calendar-week-quick-actions">' +
           '<button type="button" data-week-quick-more>Más opciones</button>' +
@@ -2763,14 +2763,51 @@
         placeWeekQuickPopover(popover, sourceEvent);
         var input = popover.querySelector('[name="titulo"]');
         if (input) input.focus();
+        function weekQuickKindConfig(kind) {
+          if (kind === "task") {
+            return {
+              className: "is-kind-task",
+              placeholder: "Añade el nombre de la tarea",
+              saveText: "Guardar tarea",
+              hideLocation: true,
+            };
+          }
+          if (kind === "reminder") {
+            return {
+              className: "is-kind-reminder",
+              placeholder: "Añade el recordatorio",
+              saveText: "Guardar recordatorio",
+              hideLocation: true,
+            };
+          }
+          return {
+            className: "is-kind-event",
+            placeholder: "Añade un título",
+            saveText: "Guardar",
+            hideLocation: false,
+          };
+        }
+        function applyWeekQuickKind(kind) {
+          var config = weekQuickKindConfig(kind);
+          var hidden = popover.querySelector("[data-week-quick-kind-value]");
+          var titleInput = popover.querySelector("[data-week-quick-title-input]");
+          var locationRow = popover.querySelector("[data-week-quick-location-row]");
+          var saveBtn = popover.querySelector("[data-week-quick-save]");
+          if (hidden) hidden.value = kind;
+          popover.classList.remove("is-kind-event", "is-kind-task", "is-kind-reminder");
+          popover.classList.add(config.className);
+          if (titleInput) titleInput.placeholder = config.placeholder;
+          if (locationRow) locationRow.hidden = !!config.hideLocation;
+          if (saveBtn) saveBtn.textContent = config.saveText;
+          popover.querySelectorAll("[data-week-quick-kind]").forEach(function (candidate) {
+            candidate.classList.toggle("active", (candidate.getAttribute("data-week-quick-kind") || "event") === kind);
+          });
+        }
+        applyWeekQuickKind("event");
         popover.querySelectorAll("[data-week-quick-kind]").forEach(function (btn) {
           btn.addEventListener("click", function () {
             var kind = btn.getAttribute("data-week-quick-kind") || "event";
-            var hidden = popover.querySelector("[data-week-quick-kind-value]");
-            if (hidden) hidden.value = kind;
-            popover.querySelectorAll("[data-week-quick-kind]").forEach(function (candidate) {
-              candidate.classList.toggle("active", candidate === btn);
-            });
+            applyWeekQuickKind(kind);
           });
         });
         popover.querySelectorAll("[data-week-quick-location]").forEach(function (btn) {
@@ -3726,7 +3763,7 @@
 
       function calendarReportShellHtml(defaultDate, defaultEmployee, defaultCategory) {
         return '<div class="scm-calendar-report-shell scm-calendar-report-modern-shell">' +
-          '<header class="scm-calendar-report-modern-head"><div class="scm-calendar-report-modern-title"><span class="material-symbols-outlined" aria-hidden="true">analytics</span><div><h3>Informe del d&iacute;a <em>En vivo</em></h3><p>Resumen integral de actividades inmobiliarias y asignaci&oacute;n operativa</p></div></div><div class="scm-calendar-report-modern-head-actions"><span><i class="material-symbols-outlined" aria-hidden="true">calendar_today</i>' + escHtml(defaultDate) + '</span><button type="button" data-calendar-report-close aria-label="Cerrar"><i class="material-symbols-outlined" aria-hidden="true">close</i></button></div></header>' +
+          '<header class="scm-calendar-report-modern-head"><div class="scm-calendar-report-modern-title"><span class="material-symbols-outlined" aria-hidden="true">analytics</span><div><h3>Informe del d&iacute;a <em>En vivo</em></h3><p>Resumen integral de actividades inmobiliarias y asignaci&oacute;n operativa</p></div></div><div class="scm-calendar-report-modern-head-actions"><span><i class="material-symbols-outlined" aria-hidden="true">calendar_today</i><b data-calendar-report-date-badge>' + escHtml(defaultDate) + '</b></span><button type="button" data-calendar-report-close aria-label="Cerrar"><i class="material-symbols-outlined" aria-hidden="true">close</i></button></div></header>' +
           '<div class="scm-calendar-report-modern-body">' +
           '<form class="scm-calendar-report-filters" data-calendar-report-filters autocomplete="off">' +
           '<label><span>Creado el d&iacute;a</span><input class="input input-bordered input-sm scm-input" type="date" name="creado_en" value="' + escHtml(defaultDate) + '"></label>' +
@@ -3839,6 +3876,7 @@
             var popup = window.Swal.getPopup();
             var form = popup ? popup.querySelector("[data-calendar-report-filters]") : null;
             var content = popup ? popup.querySelector("[data-calendar-report-content]") : null;
+            var dateBadge = popup ? popup.querySelector("[data-calendar-report-date-badge]") : null;
             function currentReportFilters() {
               if (!form) return { creado_en: defaultDate, id_empleado: defaultEmployee, id_categoria: defaultCategory };
               var fd = new FormData(form);
@@ -3850,6 +3888,7 @@
             }
             function renderReport() {
               var filters = currentReportFilters();
+              if (dateBadge) dateBadge.textContent = String(filters.creado_en || defaultDate);
               if (content) content.innerHTML = '<div class="scm-calendar-report-loading">Cargando informe por fecha de creaci&oacute;n...</div>';
               loadCalendarReportRows(filters).then(function (rows) {
                 if (content) content.innerHTML = calendarReportHtml(rows, filters);
@@ -4759,31 +4798,64 @@
         var defaultStartValue = String(defaults.start || "").slice(0, 5);
         var defaultEndValue = String(defaults.end || "").slice(0, 5);
         var defaultKind = String(defaults.kind || "event").trim();
+        if (["event", "task", "reminder"].indexOf(defaultKind) === -1) defaultKind = "event";
         var defaultTitleValue = String(defaults.title || "").trim();
-        var defaultTitlePlaceholder = defaultKind === "reminder"
-          ? "Ej: Recordar llamar al propietario"
-          : (defaultKind === "task" ? "Ej: Revisar documentos del caso" : "Ej: Cita revisión preventiva");
-        var defaultKindLabel = defaultKind === "reminder" ? "Recordatorio" : (defaultKind === "task" ? "Tarea" : "Operativo");
+        var defaultKindConfig = defaultKind === "reminder"
+          ? {
+            label: "Recordatorio",
+            title: "Crear recordatorio",
+            subtitle: "Avisos internos, seguimientos y alertas programadas",
+            icon: "notifications_active",
+            titleLabel: "Nombre del recordatorio",
+            titlePlaceholder: "Ej: Recordar llamar al propietario",
+            categoryLabel: "Tipo de recordatorio",
+            descriptionLabel: "Detalle del recordatorio",
+            descriptionPlaceholder: "Agrega el contexto que debe recordarse.",
+            recurrenceLabel: "Recordatorio recurrente / m&uacute;ltiples fechas",
+          }
+          : (defaultKind === "task" ? {
+            label: "Tarea",
+            title: "Crear tarea",
+            subtitle: "Pendientes operativos con responsable y fecha l&iacute;mite",
+            icon: "task_alt",
+            titleLabel: "Nombre de la tarea",
+            titlePlaceholder: "Ej: Revisar documentos del caso",
+            categoryLabel: "Tipo de tarea",
+            descriptionLabel: "Notas de la tarea",
+            descriptionPlaceholder: "Agrega instrucciones o contexto para completar la tarea.",
+            recurrenceLabel: "Tarea recurrente / m&uacute;ltiples fechas",
+          } : {
+            label: "Operativo",
+            title: mode === "multiple" ? "Crear evento m&uacute;ltiple" : "Crear evento en calendario",
+            subtitle: "Programaci&oacute;n de visitas t&eacute;cnicas, inspecciones locativas y reuniones",
+            icon: "calendar_month",
+            titleLabel: "T&iacute;tulo del evento",
+            titlePlaceholder: "Ej: Cita revisi&oacute;n preventiva",
+            categoryLabel: "Categor&iacute;a",
+            descriptionLabel: "Descripci&oacute;n del evento",
+            descriptionPlaceholder: "Agrega notas visibles para el equipo.",
+            recurrenceLabel: "Evento recurrente / m&uacute;ltiples fechas",
+          });
         var defaultDate = escHtml(defaultDateValue);
         var defaultStart = escHtml(defaultStartValue);
         var defaultEnd = escHtml(defaultEndValue);
-        var locationFieldsHtml = '<section class="scm-calendar-location-section scm-calendar-field-full">' +
+        var locationFieldsHtml = defaultKind === "event" ? '<section class="scm-calendar-location-section scm-calendar-field-full">' +
           '<div class="scm-calendar-section-heading"><span>Ubicaci&oacute;n del evento</span></div>' +
           '<div class="scm-calendar-location-fields">' +
           '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="">Selecciona ubicaci&oacute;n</option><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option><option value="otra">Otra direcci&oacute;n</option></select></label>' +
           '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Selecciona una ubicaci&oacute;n para completar este campo"></label>' +
-          "</div></section>";
-        var html = '<div class="scm-calendar-create-shell">' +
+          "</div></section>" : "";
+        var html = '<div class="scm-calendar-create-shell scm-calendar-create-shell--' + escHtml(defaultKind) + '">' +
           '<div class="scm-calendar-create-head">' +
-          '<div class="scm-calendar-create-icon" aria-hidden="true"><span class="material-symbols-outlined">calendar_month</span></div>' +
-          '<div class="scm-calendar-create-title"><strong>' + (mode === "multiple" ? "Crear evento m&uacute;ltiple" : "Crear evento en calendario") + '</strong><span>Programaci&oacute;n de visitas t&eacute;cnicas, inspecciones locativas y reuniones</span></div>' +
-          '<span class="scm-calendar-create-badge">' + escHtml(defaultKindLabel) + '</span>' +
+          '<div class="scm-calendar-create-icon" aria-hidden="true"><span class="material-symbols-outlined">' + escHtml(defaultKindConfig.icon) + '</span></div>' +
+          '<div class="scm-calendar-create-title"><strong>' + escHtml(defaultKindConfig.title) + '</strong><span>' + escHtml(defaultKindConfig.subtitle) + '</span></div>' +
+          '<span class="scm-calendar-create-badge">' + escHtml(defaultKindConfig.label) + '</span>' +
           '</div>' +
           '<form class="scm-calendar-popup-form scm-calendar-create-form" autocomplete="off">' +
           '<div class="scm-calendar-create-main">' +
           '<div class="scm-calendar-create-row scm-calendar-create-row--top">' +
-          '<label class="scm-seg-field"><span>T&iacute;tulo del evento <b>*</b></span><input class="input input-bordered input-sm scm-input" name="titulo" required value="' + escHtml(defaultTitleValue) + '" placeholder="' + escHtml(defaultTitlePlaceholder) + '"></label>' +
-          '<label class="scm-seg-field"><span>Categor&iacute;a <b>*</b></span><select class="select select-bordered select-sm scm-select" name="id_categoria" required><option value="">Selecciona categor&iacute;a</option>' + categoryOptions + '</select></label>' +
+          '<label class="scm-seg-field"><span>' + escHtml(defaultKindConfig.titleLabel) + ' <b>*</b></span><input class="input input-bordered input-sm scm-input" name="titulo" required value="' + escHtml(defaultTitleValue) + '" placeholder="' + escHtml(defaultKindConfig.titlePlaceholder) + '"></label>' +
+          '<label class="scm-seg-field"><span>' + escHtml(defaultKindConfig.categoryLabel) + ' <b>*</b></span><select class="select select-bordered select-sm scm-select" name="id_categoria" required><option value="">Selecciona categor&iacute;a</option>' + categoryOptions + '</select></label>' +
           '</div>' +
           locationFieldsHtml +
           '<label class="scm-seg-field scm-calendar-field-full"><span>Funcionario responsable <b>*</b></span>' + employeesControl + '</label>' +
@@ -4792,8 +4864,9 @@
           '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required value="' + defaultStart + '"></label>' +
           '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required value="' + defaultEnd + '"></label>' +
           '</div>' +
+          '<label class="scm-seg-field scm-calendar-field-full"><span>' + escHtml(defaultKindConfig.descriptionLabel) + '</span><textarea class="textarea textarea-bordered textarea-sm scm-textarea" name="descripcion" rows="3" placeholder="' + escHtml(defaultKindConfig.descriptionPlaceholder) + '"></textarea></label>' +
           '<div class="scm-calendar-recurrence scm-calendar-field-full" data-calendar-recurrence>' +
-          '<label class="scm-calendar-recurrence-toggle"><input type="checkbox" name="es_recurrente" value="1" data-calendar-recurrence-toggle><span>Evento recurrente / m&uacute;ltiples fechas</span><em data-calendar-recurrence-badge>Inactivo</em></label>' +
+          '<label class="scm-calendar-recurrence-toggle"><input type="checkbox" name="es_recurrente" value="1" data-calendar-recurrence-toggle><span>' + defaultKindConfig.recurrenceLabel + '</span><em data-calendar-recurrence-badge>Inactivo</em></label>' +
           '<div class="scm-calendar-recurrence-body" data-calendar-recurrence-body hidden>' +
           '<label class="scm-seg-field"><span>Frecuencia</span><select class="select select-bordered select-sm scm-select" name="tipo_recurrencia" data-calendar-recurrence-type><option value="diario">Diario</option><option value="semanal">Semanal</option><option value="personalizado">Personalizado</option></select></label>' +
           '<label class="scm-seg-field" data-calendar-recurrence-end><span>Fecha l&iacute;mite de recurrencia</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha_fin_recurrencia"></label>' +
@@ -4823,7 +4896,7 @@
           },
           showCloseButton: true,
           showCancelButton: true,
-          confirmButtonText: "+ Crear evento",
+          confirmButtonText: "+ Crear " + (defaultKind === "task" ? "tarea" : (defaultKind === "reminder" ? "recordatorio" : "evento")),
           cancelButtonText: "Cancelar",
           focusConfirm: false,
           didOpen: function () {

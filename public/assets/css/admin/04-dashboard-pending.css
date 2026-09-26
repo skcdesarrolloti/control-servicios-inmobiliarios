@@ -2516,6 +2516,24 @@
   background: #c2e7ff;
 }
 
+.scm-calendar-week-quick-popover.is-kind-task .scm-calendar-week-quick-tabs button.active {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.scm-calendar-week-quick-popover.is-kind-reminder .scm-calendar-week-quick-tabs button.active {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.scm-calendar-week-quick-popover.is-kind-task .scm-calendar-week-quick-title input {
+  border-bottom-color: #10b981;
+}
+
+.scm-calendar-week-quick-popover.is-kind-reminder .scm-calendar-week-quick-title input {
+  border-bottom-color: #8b5cf6;
+}
+
 .scm-calendar-week-quick-row,
 .scm-calendar-week-quick-location,
 .scm-calendar-week-quick-category {
@@ -5335,6 +5353,28 @@
 
 .swal2-popup .scm-calendar-create-icon .material-symbols-outlined {
   font-size: 19px;
+}
+
+.swal2-popup .scm-calendar-create-shell--task .scm-calendar-create-icon {
+  background: #0d3b2e;
+  color: #34d399;
+}
+
+.swal2-popup .scm-calendar-create-shell--reminder .scm-calendar-create-icon {
+  background: #39265f;
+  color: #c4b5fd;
+}
+
+.swal2-popup .scm-calendar-create-shell--task .scm-calendar-create-badge {
+  background: #d1fae5;
+  border-color: #86efac;
+  color: #047857;
+}
+
+.swal2-popup .scm-calendar-create-shell--reminder .scm-calendar-create-badge {
+  background: #ede9fe;
+  border-color: #c4b5fd;
+  color: #5b21b6;
 }
 
 .swal2-popup .scm-calendar-create-title {
@@ -8183,6 +8223,11 @@
   padding: 7px 10px !important;
 }
 
+.swal2-popup .scm-calendar-report-modern-head-actions > span b {
+  color: inherit;
+  font: inherit;
+}
+
 .swal2-popup .scm-calendar-report-modern-head-actions button,
 .swal2-popup .scm-calendar-pending-modern-head button {
   align-items: center;
@@ -8204,8 +8249,8 @@
 
 .swal2-popup .scm-calendar-report-modern-body {
   display: grid;
-  gap: 14px;
-  padding: 22px 24px 18px !important;
+  gap: 18px;
+  padding: 26px 28px 22px !important;
 }
 
 .swal2-popup .scm-calendar-report-modern-shell .scm-calendar-report-filters {
@@ -8215,10 +8260,10 @@
   border-radius: 14px;
   box-shadow: none;
   display: grid;
-  gap: 12px;
+  gap: 16px;
   grid-template-columns: minmax(150px, 0.8fr) minmax(220px, 1fr) minmax(220px, 1fr) auto;
   margin: 0 !important;
-  padding: 14px !important;
+  padding: 18px !important;
 }
 
 .swal2-popup .scm-calendar-report-modern-shell .scm-calendar-report-filters span {
@@ -8281,7 +8326,7 @@
 
 .swal2-popup .scm-calendar-report-modern-kpis {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
@@ -8291,9 +8336,9 @@
   border-radius: 12px;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
   display: grid;
-  gap: 5px;
-  min-height: 86px;
-  padding: 12px !important;
+  gap: 7px;
+  min-height: 92px;
+  padding: 16px !important;
 }
 
 .swal2-popup .scm-calendar-report-modern-kpis span {
@@ -8335,7 +8380,7 @@
 
 .swal2-popup .scm-calendar-report-modern-columns {
   display: grid;
-  gap: 14px;
+  gap: 18px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -8345,7 +8390,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
-  padding: 14px !important;
+  padding: 18px !important;
 }
 
 .swal2-popup .scm-calendar-report-modern-panel-head {
@@ -8379,15 +8424,15 @@
 
 .swal2-popup .scm-calendar-report-modern-bars {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .swal2-popup .scm-calendar-report-modern-bar {
   background: #eff4ff;
   border-radius: 10px;
   display: grid;
-  gap: 7px;
-  padding: 9px !important;
+  gap: 9px;
+  padding: 11px !important;
 }
 
 .swal2-popup .scm-calendar-report-modern-bar div {
@@ -8438,8 +8483,8 @@
   display: grid;
   gap: 12px;
   grid-template-columns: 78px minmax(0, 1.6fr) minmax(140px, 0.8fr) minmax(110px, 0.7fr) minmax(120px, 0.7fr);
-  min-height: 64px;
-  padding: 10px 0 !important;
+  min-height: 72px;
+  padding: 14px 0 !important;
 }
 
 .swal2-popup .scm-calendar-report-modern-row:first-child {
@@ -8525,7 +8570,7 @@
   display: flex;
   gap: 12px;
   justify-content: flex-end;
-  padding: 16px 24px !important;
+  padding: 18px 28px !important;
 }
 
 .swal2-popup .scm-calendar-pending-modern-head {
