@@ -3649,6 +3649,17 @@
         }).join("") + '</section>';
       }
 
+      function reportModernGroupListHtml(title, subtitle, icon, groups, emptyText) {
+        if (!groups.length) {
+          return '<section class="scm-calendar-report-modern-panel"><div class="scm-calendar-report-modern-panel-head"><h4><span class="material-symbols-outlined" aria-hidden="true">' + escHtml(icon) + '</span>' + escHtml(title) + '</h4><small>' + escHtml(subtitle) + '</small></div><div class="scm-calendar-report-modern-empty">' + escHtml(emptyText) + '</div></section>';
+        }
+        var max = groups.reduce(function (acc, item) { return Math.max(acc, item.count); }, 1);
+        return '<section class="scm-calendar-report-modern-panel"><div class="scm-calendar-report-modern-panel-head"><h4><span class="material-symbols-outlined" aria-hidden="true">' + escHtml(icon) + '</span>' + escHtml(title) + '</h4><small>' + escHtml(subtitle) + '</small></div><div class="scm-calendar-report-modern-bars">' + groups.map(function (item, index) {
+          var width = Math.max(10, Math.round((item.count / max) * 100));
+          return '<div class="scm-calendar-report-modern-bar" style="--bar-width:' + width + '%;--bar-dot:' + escHtml(index % 3 === 0 ? "#0f1e36" : (index % 3 === 1 ? "#f59e0b" : "#515f7a")) + '"><div><span>' + escHtml(item.label) + '</span><strong>' + item.count + ' evento' + (item.count === 1 ? "" : "s") + '</strong></div><i><b></b></i></div>';
+        }).join("") + '</div></section>';
+      }
+
       function reportEventsListHtml(rows) {
         if (!rows.length) {
           return '<section class="scm-calendar-report-section scm-calendar-report-events-section"><h4>Eventos creados</h4><div class="scm-calendar-report-empty">No hay eventos creados con esos filtros.</div></section>';
@@ -3659,6 +3670,26 @@
           return '<article class="scm-calendar-report-event">' +
             '<div><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>Creado: ' + escHtml(created ? formatDateTime(created) : "Sin fecha") + '</span></div>' +
             '<p><b>Programado:</b> ' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + ' <b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (ticket ? ' <b>Ticket:</b> #' + escHtml(ticket) : "") + '</p>' +
+            '</article>';
+        }).join("") + '</div></section>';
+      }
+
+      function reportModernEventsListHtml(rows) {
+        if (!rows.length) {
+          return '<section class="scm-calendar-report-modern-events"><div class="scm-calendar-report-modern-panel-head"><h4><span class="material-symbols-outlined" aria-hidden="true">event_note</span>Eventos creados hoy</h4><small>Sin registros para los filtros</small></div><div class="scm-calendar-report-modern-empty">No hay eventos creados con esos filtros.</div></section>';
+        }
+        return '<section class="scm-calendar-report-modern-events"><div class="scm-calendar-report-modern-panel-head"><h4><span class="material-symbols-outlined" aria-hidden="true">event_note</span>Eventos creados hoy</h4><small>Mostrando ' + rows.length + ' registro' + (rows.length === 1 ? "" : "s") + ' correspondiente' + (rows.length === 1 ? "" : "s") + ' a los filtros</small></div><div class="scm-calendar-report-modern-table">' + rows.map(function (row) {
+          var ticket = String(row.id_ticket || "").trim();
+          var created = eventCreatedValue(row);
+          var done = String(row.estado || "").toLowerCase() === "si";
+          var employee = employeeNameForRow(row);
+          var category = categoryNameForRow(row);
+          return '<article class="scm-calendar-report-modern-row">' +
+            '<div><strong>' + escHtml(timePartFromDateTime(row.fecha_inicio) || "--:--") + '</strong><span>' + (ticket ? "#" + escHtml(ticket) : escHtml(String(row.id || row._ID || "EV"))) + '</span></div>' +
+            '<div><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + '</span></div>' +
+            '<div><span class="scm-calendar-report-avatar">' + escHtml(calendarInitialsFromName(employee)) + '</span><small>' + escHtml(employee) + '</small></div>' +
+            '<div><em>' + escHtml(category) + '</em></div>' +
+            '<div><b class="' + (done ? "is-done" : "is-pending") + '">' + (done ? "Realizada" : "Pendiente") + '</b><small>Creado: ' + escHtml(created ? formatDateTime(created) : "Sin fecha") + '</small></div>' +
             '</article>';
         }).join("") + '</div></section>';
       }
@@ -3694,14 +3725,17 @@
       }
 
       function calendarReportShellHtml(defaultDate, defaultEmployee, defaultCategory) {
-        return '<div class="scm-calendar-report-shell">' +
+        return '<div class="scm-calendar-report-shell scm-calendar-report-modern-shell">' +
+          '<header class="scm-calendar-report-modern-head"><div class="scm-calendar-report-modern-title"><span class="material-symbols-outlined" aria-hidden="true">analytics</span><div><h3>Informe del d&iacute;a <em>En vivo</em></h3><p>Resumen integral de actividades inmobiliarias y asignaci&oacute;n operativa</p></div></div><div class="scm-calendar-report-modern-head-actions"><span><i class="material-symbols-outlined" aria-hidden="true">calendar_today</i>' + escHtml(defaultDate) + '</span><button type="button" data-calendar-report-close aria-label="Cerrar"><i class="material-symbols-outlined" aria-hidden="true">close</i></button></div></header>' +
+          '<div class="scm-calendar-report-modern-body">' +
           '<form class="scm-calendar-report-filters" data-calendar-report-filters autocomplete="off">' +
           '<label><span>Creado el d&iacute;a</span><input class="input input-bordered input-sm scm-input" type="date" name="creado_en" value="' + escHtml(defaultDate) + '"></label>' +
           '<label><span>Funcionario</span><select class="select select-bordered select-sm scm-select" name="id_empleado">' + reportEmployeeOptionsHtml(defaultEmployee) + '</select></label>' +
           '<label><span>Categor&iacute;a</span><select class="select select-bordered select-sm scm-select" name="id_categoria">' + reportCategoryOptionsHtml(defaultCategory) + '</select></label>' +
-          '<button type="submit" class="scm-btn-primary btn btn-primary">Aplicar</button>' +
+          '<button type="submit" class="scm-btn-primary btn btn-primary"><span class="material-symbols-outlined" aria-hidden="true">filter_alt</span>Aplicar</button>' +
           '</form>' +
           '<div data-calendar-report-content><div class="scm-calendar-report-loading">Cargando informe...</div></div>' +
+          '</div><footer class="scm-calendar-report-modern-foot"><button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-calendar-report-close>Cerrar</button><button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--orange" data-calendar-report-refresh><span class="material-symbols-outlined" aria-hidden="true">sync</span>Actualizar datos</button></footer>' +
           '</div>';
       }
 
@@ -3768,21 +3802,21 @@
         var categoryGroups = countReportGroups(rowsToday, categoryNameForRow);
         var employeeGroups = countReportGroups(rowsToday, employeeNameForRow);
         var scopeLabel = employee ? (employee.nombre || employee.funcionario || selectedEmployee) : "Todos los funcionarios visibles";
-        return '<div class="scm-calendar-report-modal">' +
-          '<p class="scm-calendar-report-employee"><span>Eventos creados el ' + escHtml(filters.creado_en || toDateKey(new Date())) + '</span><strong>' + escHtml(scopeLabel) + '</strong><em>' + escHtml(categoryLabel) + '</em></p>' +
-          '<div class="scm-calendar-report-grid">' +
-          '<div><span>Creados</span><strong>' + rowsToday.length + '</strong></div>' +
-          '<div><span>Categor&iacute;as</span><strong>' + categoryGroups.length + '</strong></div>' +
-          '<div><span>Funcionarios</span><strong>' + employeeGroups.length + '</strong></div>' +
-          '<div><span>Para ese mismo d&iacute;a</span><strong>' + scheduledTodayRows.length + '</strong></div>' +
-          '<div><span>Pendientes</span><strong>' + pendingRows.length + '</strong></div>' +
-          '<div><span>Realizadas</span><strong>' + doneRows.length + '</strong></div>' +
+        return '<div class="scm-calendar-report-modal scm-calendar-report-modern-modal">' +
+          '<div class="scm-calendar-report-modern-summary"><span>Filtros activos:</span><b>Fecha: ' + escHtml(filters.creado_en || toDateKey(new Date())) + '</b><b>Funcionario: ' + escHtml(scopeLabel) + '</b><b>Categor&iacute;a: ' + escHtml(categoryLabel) + '</b></div>' +
+          '<div class="scm-calendar-report-modern-kpis">' +
+          '<div><span>Creados</span><strong>' + rowsToday.length + '</strong><small>Total</small></div>' +
+          '<div><span>Categor&iacute;as</span><strong>' + categoryGroups.length + '</strong><small>Activas</small></div>' +
+          '<div><span>Equipo</span><strong>' + employeeGroups.length + '</strong><small>Asignados</small></div>' +
+          '<div><span>Mismo d&iacute;a</span><strong>' + scheduledTodayRows.length + '</strong><small>Urgente</small></div>' +
+          '<div class="is-warning"><span>Pendientes</span><strong>' + pendingRows.length + '</strong><small>Atenci&oacute;n</small></div>' +
+          '<div class="is-ok"><span>Realizadas</span><strong>' + doneRows.length + '</strong><small>' + (rowsToday.length ? Math.round((doneRows.length / rowsToday.length) * 100) : 0) + '% OK</small></div>' +
           '</div>' +
-          '<div class="scm-calendar-report-columns">' +
-          reportGroupListHtml("Eventos por categoría", categoryGroups, "Sin categorías para hoy.") +
-          reportGroupListHtml("Por funcionario", employeeGroups, "Sin funcionarios para hoy.") +
+          '<div class="scm-calendar-report-modern-columns">' +
+          reportModernGroupListHtml("Eventos por categoria", categoryGroups.length + " tipologia" + (categoryGroups.length === 1 ? "" : "s"), "pie_chart", categoryGroups, "Sin categorias para hoy.") +
+          reportModernGroupListHtml("Carga por funcionario", "Operaciones del dia", "badge", employeeGroups, "Sin funcionarios para hoy.") +
           '</div>' +
-          reportEventsListHtml(rowsToday) +
+          reportModernEventsListHtml(rowsToday) +
           '</div>';
       }
 
@@ -3795,11 +3829,11 @@
         var defaultEmployee = selectedEmployeeFromFilter();
         var defaultCategory = filterForm && filterForm.querySelector('[name="id_categoria"]') ? filterForm.querySelector('[name="id_categoria"]').value : "";
         window.Swal.fire({
-          title: "Informe del día",
+          title: "",
           html: calendarReportShellHtml(defaultDate, defaultEmployee, defaultCategory),
           width: 980,
-          customClass: { popup: "scm-calendar-swal-popup scm-calendar-report-swal" },
-          confirmButtonText: "Cerrar",
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-report-swal scm-calendar-report-modern-swal" },
+          showConfirmButton: false,
           showCancelButton: false,
           didOpen: function () {
             var popup = window.Swal.getPopup();
@@ -3830,6 +3864,14 @@
               });
               form.querySelectorAll("input, select").forEach(function (field) {
                 field.addEventListener("change", renderReport);
+              });
+            }
+            if (popup) {
+              popup.querySelectorAll("[data-calendar-report-close]").forEach(function (btn) {
+                btn.addEventListener("click", function () { window.Swal.close(); });
+              });
+              popup.querySelectorAll("[data-calendar-report-refresh]").forEach(function (btn) {
+                btn.addEventListener("click", renderReport);
               });
             }
             renderReport();
@@ -4231,12 +4273,12 @@
           '</div>' +
           '<label class="scm-calendar-reschedule-field"><span><i class="material-symbols-outlined" aria-hidden="true">location_away</i>¿Es cita presencial?<small>Impacta agenda del equipo de campo</small></span><select name="es_cita"><option value="si"' + (ticket ? " selected" : "") + '>Si, requiere presencia en el inmueble</option><option value="no"' + (!ticket ? " selected" : "") + '>No, coordinaci&oacute;n remota / tarea interna</option></select></label>' +
           '<label class="scm-calendar-reschedule-field"><span><i class="material-symbols-outlined" aria-hidden="true">edit_note</i>Motivo del traslado<b>Requerido para auditor&iacute;a</b></span><textarea name="observacion" rows="3" required placeholder="Explica claramente por qu&eacute; se traslada este evento..."></textarea></label>' +
-          '<label class="scm-calendar-reschedule-field"><span><i class="material-symbols-outlined" aria-hidden="true">mark_chat_unread</i>Mensaje para el ticket / cliente<button type="button" data-scm-calendar-template-default>Plantilla por defecto</button></span><textarea name="descripcion" rows="4" placeholder="Este texto se enviar&aacute; al proceso del ticket si el evento est&aacute; relacionado."></textarea></label>' +
+          '<label class="scm-calendar-reschedule-field scm-calendar-reschedule-message-field" data-scm-calendar-message-field><span><i class="material-symbols-outlined" aria-hidden="true">mark_chat_unread</i>Mensaje para el ticket / cliente<button type="button" data-scm-calendar-template-default>Plantilla por defecto</button></span><textarea name="descripcion" rows="4" placeholder="Este texto se enviar&aacute; al proceso del ticket si el evento est&aacute; relacionado."></textarea></label>' +
           '<p class="scm-calendar-reschedule-note"><span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>Si es una cita vinculada a ticket, este texto se enviar&aacute; autom&aacute;ticamente como actualizaci&oacute;n por correo y WhatsApp institucional.</p>' +
           '</section>' +
           '<footer class="scm-calendar-reschedule-foot">' +
           '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-reschedule-cancel><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>Cancelar</button>' +
-          '<div><button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--ghost" data-scm-calendar-reschedule-preview><span class="material-symbols-outlined" aria-hidden="true">visibility</span>Previsualizar</button><button type="submit" class="scm-calendar-modern-btn scm-calendar-modern-btn--orange"><span class="material-symbols-outlined" aria-hidden="true">schedule_send</span>Guardar traslado</button></div>' +
+          '<div><button type="submit" class="scm-calendar-modern-btn scm-calendar-modern-btn--orange"><span class="material-symbols-outlined" aria-hidden="true">schedule_send</span>Guardar traslado</button></div>' +
           '</footer>' +
           '</form>';
         window.Swal.fire({
@@ -4258,6 +4300,15 @@
             var citaSelect = form.querySelector('[name="es_cita"]');
             var observationInput = form.querySelector('[name="observacion"]');
             var descriptionInput = form.querySelector('[name="descripcion"]');
+            var messageField = form.querySelector("[data-scm-calendar-message-field]");
+            function syncMessageVisibility() {
+              var showMessage = !!(citaSelect && citaSelect.value === "si");
+              if (messageField) messageField.hidden = !showMessage;
+              if (!showMessage && descriptionInput) {
+                descriptionInput.value = "";
+                descriptionInput.setAttribute("data-auto-calendar-text", "0");
+              }
+            }
             function maybeAutofillRescheduleDescription() {
               if (!descriptionInput || !dateInput || !startInput || !endInput) return;
               if (!ticket || !isCalendarAppointmentCategoryName(categoryName) || (citaSelect && citaSelect.value !== "si")) return;
@@ -4274,6 +4325,7 @@
                 descriptionInput.setAttribute("data-auto-calendar-text", "0");
               });
             }
+            if (citaSelect) citaSelect.addEventListener("change", syncMessageVisibility);
             form.addEventListener("submit", function (event) {
               event.preventDefault();
               window.Swal.clickConfirm();
@@ -4289,14 +4341,7 @@
                 descriptionInput.focus();
               });
             }
-            var previewBtn = form.querySelector("[data-scm-calendar-reschedule-preview]");
-            if (previewBtn) {
-              previewBtn.addEventListener("click", function () {
-                maybeAutofillRescheduleDescription();
-                if (descriptionInput) descriptionInput.focus();
-                showToast("info", "Revisa el mensaje en el campo antes de guardar el traslado.");
-              });
-            }
+            syncMessageVisibility();
             maybeAutofillRescheduleDescription();
           },
           preConfirm: function () {
@@ -4414,23 +4459,53 @@
         });
       }
 
-      function pendingEventRowsHtml(rows) {
+      function pendingEventRowsHtml(rows, modern) {
         if (!rows.length) {
-          return '<div class="scm-calendar-report-empty">Este funcionario no tiene eventos pendientes vencidos.</div>';
+          return modern
+            ? '<div class="scm-calendar-pending-modern-empty"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><strong>Sin compromisos vencidos</strong><p>Este funcionario no tiene eventos pendientes vencidos.</p></div>'
+            : '<div class="scm-calendar-report-empty">Este funcionario no tiene eventos pendientes vencidos.</div>';
         }
-        return '<div class="scm-calendar-report-events scm-calendar-pending-events">' + rows.map(function (row) {
+        if (!modern) {
+          return '<div class="scm-calendar-report-events scm-calendar-pending-events">' + rows.map(function (row) {
+            var legacyId = String(row.id || row._ID || row.event_id || "").trim();
+            var legacyTicket = String(row.id_ticket || "").trim();
+            return '<article class="scm-calendar-report-event scm-calendar-pending-event-card">' +
+              '<div class="scm-calendar-pending-event-head"><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + '</span></div>' +
+              '<p class="scm-calendar-pending-event-meta"><b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (legacyTicket ? ' <b>Ticket:</b> #' + escHtml(legacyTicket) : "") + '</p>' +
+              '<div class="scm-calendar-event-actions scm-calendar-pending-event-actions">' +
+              (legacyId ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-event data-event-id="' + escHtml(legacyId) + '">Ver evento</button>' : "") +
+              (legacyTicket ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-ticket data-event-id="' + escHtml(legacyId) + '" data-ticket-id="' + escHtml(legacyTicket) + '">Ver ticket</button>' : "") +
+              (legacyId ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--primary" data-scm-calendar-complete-event data-event-id="' + escHtml(legacyId) + '">Marcar realizado</button>' : "") +
+              '</div>' +
+              '</article>';
+          }).join("") + '</div>';
+        }
+        return '<div class="scm-calendar-pending-modern-list">' + rows.map(function (row) {
           var id = String(row.id || row._ID || row.event_id || "").trim();
           var ticket = String(row.id_ticket || "").trim();
-          return '<article class="scm-calendar-report-event scm-calendar-pending-event-card">' +
-            '<div class="scm-calendar-pending-event-head"><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + '</span></div>' +
-            '<p class="scm-calendar-pending-event-meta"><b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (ticket ? ' <b>Ticket:</b> #' + escHtml(ticket) : "") + '</p>' +
-            '<div class="scm-calendar-event-actions scm-calendar-pending-event-actions">' +
-            (id ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Ver evento</button>' : "") +
+          return '<article class="scm-calendar-pending-modern-event">' +
+            '<div class="scm-calendar-pending-modern-event-head"><div><span>' + escHtml(row.fecha_fin ? "Vence: " + formatDateTime(row.fecha_fin) : "Pendiente") + '</span>' + (ticket ? '<em>#TSK-' + escHtml(ticket) + '</em>' : "") + '</div><strong>' + escHtml(row.fecha_fin ? "Limite: " + formatDateTime(row.fecha_fin) : formatDateTime(row.fecha_inicio)) + '</strong></div>' +
+            '<h4>' + escHtml(row.titulo || "Evento") + '</h4>' +
+            '<p><span class="material-symbols-outlined" aria-hidden="true">location_on</span>' + escHtml(calendarDetailValue(row, ["ubicacion", "lugar", "direccion"]) || categoryNameForRow(row)) + ' <i>&bull;</i> Funcionario: ' + escHtml(employeeNameForRow(row)) + '</p>' +
+            '<div class="scm-calendar-pending-modern-actions">' +
+            (id ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Reprogramar</button>' : "") +
+            (id ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--orange" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Gestionar evento<span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></button>' : "") +
             (ticket ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver ticket</button>' : "") +
-            (id ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--primary" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Marcar realizado</button>' : "") +
             '</div>' +
             '</article>';
         }).join("") + '</div>';
+      }
+
+      function pendingEventsShellHtml(employeeName) {
+        return '<div class="scm-calendar-pending-modern-shell">' +
+          '<header class="scm-calendar-pending-modern-head"><div><span class="material-symbols-outlined" aria-hidden="true">warning</span><div><h3>Eventos pendientes <em>Urgente</em></h3><p>Control de compromisos vencidos o pendientes de resoluci&oacute;n inmediata</p></div></div><button type="button" data-calendar-pending-close aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>' +
+          '<section class="scm-calendar-pending-modern-body">' +
+          '<div class="scm-calendar-pending-modern-officer"><span>' + escHtml(calendarInitialsFromName(employeeName)) + '</span><div><small>Funcionario asignado</small><strong>' + escHtml(employeeName) + '</strong><em>Eventos vencidos sin realizar</em></div><b data-calendar-pending-count>Validando pendientes...</b></div>' +
+          '<div class="scm-calendar-pending-modern-alert"><span class="material-symbols-outlined" aria-hidden="true">error</span><div><strong>Atenci&oacute;n requerida</strong><p>Se encontraron compromisos no concretados que superaron el plazo establecido de entrega o informe de firma.</p></div></div>' +
+          '<div><h4 class="scm-calendar-pending-modern-title">Detalle de compromisos</h4><div data-calendar-pending-content><div class="scm-calendar-report-loading">Cargando pendientes...</div></div></div>' +
+          '<p class="scm-calendar-pending-modern-note">Una vez gestionados los eventos vencidos, el sistema actualizar&aacute; autom&aacute;ticamente el balance general del funcionario en el informe diario.</p>' +
+          '</section><footer class="scm-calendar-pending-modern-foot"><span><i class="material-symbols-outlined" aria-hidden="true">dashboard</i> SKC SuCasa Inmobiliaria &bull; Calendario operativo</span><button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--orange" data-calendar-pending-close>Cerrar</button></footer>' +
+          '</div>';
       }
 
       function openPendingEventsPopup() {
@@ -4445,27 +4520,35 @@
         }
         var employeeName = employeeDisplayName(employeeId);
         window.Swal.fire({
-          title: "Eventos pendientes",
-          html: '<div class="scm-calendar-report-shell"><p class="scm-calendar-report-employee"><span>Funcionario</span><strong>' + escHtml(employeeName) + '</strong><em>Eventos vencidos sin realizar</em></p><div data-calendar-pending-content><div class="scm-calendar-report-loading">Cargando pendientes...</div></div></div>',
+          title: "",
+          html: pendingEventsShellHtml(employeeName),
           width: 920,
-          customClass: { popup: "scm-calendar-swal-popup scm-calendar-pending-swal" },
-          confirmButtonText: "Cerrar",
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-pending-swal scm-calendar-pending-modern-swal" },
+          showConfirmButton: false,
           showCancelButton: false,
           didOpen: function () {
             var popup = window.Swal.getPopup();
             var content = popup ? popup.querySelector("[data-calendar-pending-content]") : null;
+            var countBadge = popup ? popup.querySelector("[data-calendar-pending-count]") : null;
             calendarApi("listar_pendientes_vencidos", { id_empleado: employeeId })
               .then(function (json) {
                 if (!json || !json.success) throw new Error((json && json.message) || "No se pudieron cargar pendientes.");
                 var rows = filterRowsByAllowedEmployees(extractRows(json.data || []));
                 calendarPendingRows = rows;
-                if (content) content.innerHTML = pendingEventRowsHtml(rows);
+                if (countBadge) countBadge.textContent = rows.length ? rows.length + " evento" + (rows.length === 1 ? "" : "s") + " requieren gestion" : "Sin eventos pendientes";
+                if (content) content.innerHTML = pendingEventRowsHtml(rows, true);
               })
               .catch(function (err) {
                 if (content) content.innerHTML = '<div class="scm-calendar-report-empty">No se pudieron cargar los pendientes: ' + escHtml(err.message || "Error") + '</div>';
             });
             if (popup) {
               popup.addEventListener("click", function (event) {
+                var closeBtn = event.target && event.target.closest ? event.target.closest("[data-calendar-pending-close]") : null;
+                if (closeBtn) {
+                  event.preventDefault();
+                  window.Swal.close();
+                  return;
+                }
                 var eventViewBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-view-event]") : null;
                 if (eventViewBtn) {
                   event.preventDefault();
@@ -4481,6 +4564,14 @@
                     ticketViewBtn.getAttribute("data-ticket-id") || "",
                     ticketViewBtn.getAttribute("data-event-id") || "",
                   );
+                  return;
+                }
+                var rescheduleBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-reschedule-event]") : null;
+                if (rescheduleBtn) {
+                  event.preventDefault();
+                  var rescheduleId = rescheduleBtn.getAttribute("data-event-id") || "";
+                  window.Swal.close();
+                  openRescheduleEventPopup(rescheduleId);
                   return;
                 }
                 var completeBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-complete-event]") : null;
