@@ -754,14 +754,6 @@ trait RendersDashboard
           $activeHomeSection = 'scm-home-calendar-section-property-history';
         } elseif ($subtabReq === 'team' || $tabKey === 'calendario_equipo') {
           $activeHomeSection = 'scm-home-calendar-section-team';
-        } elseif (in_array($subtabReq, ['my-tasks', 'my_tasks', 'mis-tareas', 'mis_tareas'], true) || $tabKey === 'mis_tareas') {
-          $activeHomeSection = 'scm-home-calendar-section-my-tasks';
-        } elseif (in_array($subtabReq, ['team-tasks', 'team_tasks', 'tareas-equipo', 'tareas_equipo'], true) || $tabKey === 'tareas_equipo') {
-          $activeHomeSection = 'scm-home-calendar-section-team-tasks';
-        } elseif (in_array($subtabReq, ['my-reminders', 'my_reminders', 'mis-recordatorios', 'mis_recordatorios'], true) || $tabKey === 'mis_recordatorios') {
-          $activeHomeSection = 'scm-home-calendar-section-my-reminders';
-        } elseif (in_array($subtabReq, ['team-reminders', 'team_reminders', 'recordatorios-equipo', 'recordatorios_equipo'], true) || $tabKey === 'recordatorios_equipo') {
-          $activeHomeSection = 'scm-home-calendar-section-team-reminders';
         } elseif ($subtabReq === 'contract-termination' || $subtabReq === 'contract_termination' || in_array($tabKey, ['contract_termination', 'contrato_terminacion', 'solicitudes_terminacion'], true)) {
           $activeHomeSection = 'scm-home-calendar-section-contract-termination';
         } elseif ($subtabReq === 'mine' || $tabKey === 'mi_calendario') {
@@ -773,10 +765,6 @@ trait RendersDashboard
             <div class="scm-calendar-section-tabs" role="tablist" aria-label="Calendarios administrativos">
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-mine' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-mine"><span class="material-symbols-outlined" aria-hidden="true">calendar_month</span><span>Mi calendario</span></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-team' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-team"><span class="material-symbols-outlined" aria-hidden="true">groups</span><span>Calendario equipo</span></button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-my-tasks' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-my-tasks"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><span>Mis tareas</span></button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-team-tasks' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-team-tasks"><span class="material-symbols-outlined" aria-hidden="true">assignment_turned_in</span><span>Tareas equipo</span></button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-my-reminders' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-my-reminders"><span class="material-symbols-outlined" aria-hidden="true">notifications_active</span><span>Mis recordatorios</span></button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-team-reminders' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-team-reminders"><span class="material-symbols-outlined" aria-hidden="true">notification_important</span><span>Recordatorios equipo</span></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-due' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-due"><span class="material-symbols-outlined" aria-hidden="true">schedule</span><span>Vencimientos</span><em data-scm-calendar-due-nav-count hidden>0</em></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-property-history' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-property-history"><span class="material-symbols-outlined" aria-hidden="true">home</span><span>Historial inmueble</span></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-termination' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contract-termination"><span class="material-symbols-outlined" aria-hidden="true">description</span><span>Solicitudes de terminaci&oacute;n de contrato</span></button>
@@ -799,58 +787,6 @@ trait RendersDashboard
                 'variant' => 'home',
                 'title' => 'Calendario operativo del equipo',
                 'description' => 'Revisa la disponibilidad mensual y la agenda de los funcionarios operativos.',
-                'show_kpis' => false,
-              ]); ?>
-            </div>
-            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-my-tasks' ? ' active' : ''; ?>" id="scm-home-calendar-section-my-tasks" data-calendar-section-panel>
-              <?php echo $this->render_calendario_actividades_panel($config, [
-                'mode' => 'personal',
-                'variant' => 'home',
-                'title' => 'Mis tareas',
-                'description' => 'Tareas propias del calendario operativo, con pendientes y realizadas en la misma vista.',
-                'preset_types' => ['tarea'],
-                'total_label' => 'tareas',
-                'show_create_actions' => false,
-                'show_report_action' => false,
-                'show_kpis' => false,
-                'show_employee_filter' => false,
-              ]); ?>
-            </div>
-            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-team-tasks' ? ' active' : ''; ?>" id="scm-home-calendar-section-team-tasks" data-calendar-section-panel>
-              <?php echo $this->render_calendario_actividades_panel($config, [
-                'mode' => 'team',
-                'variant' => 'home',
-                'title' => 'Tareas del equipo',
-                'description' => 'Tareas operativas por funcionario, filtrables por responsable, estado y categoría.',
-                'preset_types' => ['tarea'],
-                'total_label' => 'tareas',
-                'show_create_actions' => false,
-                'show_kpis' => false,
-              ]); ?>
-            </div>
-            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-my-reminders' ? ' active' : ''; ?>" id="scm-home-calendar-section-my-reminders" data-calendar-section-panel>
-              <?php echo $this->render_calendario_actividades_panel($config, [
-                'mode' => 'personal',
-                'variant' => 'home',
-                'title' => 'Mis recordatorios',
-                'description' => 'Recordatorios propios programados, enviados o cancelados manualmente.',
-                'preset_types' => ['recordatorio'],
-                'total_label' => 'recordatorios',
-                'show_create_actions' => false,
-                'show_report_action' => false,
-                'show_kpis' => false,
-                'show_employee_filter' => false,
-              ]); ?>
-            </div>
-            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-team-reminders' ? ' active' : ''; ?>" id="scm-home-calendar-section-team-reminders" data-calendar-section-panel>
-              <?php echo $this->render_calendario_actividades_panel($config, [
-                'mode' => 'team',
-                'variant' => 'home',
-                'title' => 'Recordatorios del equipo',
-                'description' => 'Recordatorios por funcionario para revisar envíos, cancelaciones y pendientes.',
-                'preset_types' => ['recordatorio'],
-                'total_label' => 'recordatorios',
-                'show_create_actions' => false,
                 'show_kpis' => false,
               ]); ?>
             </div>
