@@ -1446,6 +1446,8 @@
       var calendarDueSettings = {};
       var popupAgendaRequestId = 0;
       var ticketCacheByEmployee = {};
+      var calendarNativeCaseCache = {};
+      var calendarNativeCasePromiseByTicket = {};
       var calendarContractCache = {};
       var holidayCache = {};
       var calendarBootstrapPromise = null;
@@ -4134,26 +4136,56 @@
         return false;
       }
 
-      function openNativeCaseFromCalendarTicket(ticket, ticketId) {
-        if (!ticket || typeof window.scmOpenCase !== "function") return false;
-        var sourceHtml = String(ticket.case_source_html || ticket.caseSourceHtml || "").trim();
+      function openNativeCaseFromCalendarCaseData(caseData, ticketId) {
+        caseData = caseData || {};
+        if (typeof window.scmOpenCase !== "function") return false;
+        var sourceHtml = String(caseData.case_source_html || caseData.caseSourceHtml || "").trim();
         if (!sourceHtml) return false;
-        ticketId = String(ticketId || ticketIdFromRow(ticket) || "").trim();
+        ticketId = String(ticketId || caseData.ticket_pk || caseData.ticket || caseData.id_ticket || "").trim();
         var proxyCard = document.createElement("article");
         proxyCard.className = "scm-ticket-card";
         proxyCard.hidden = true;
         var proxyButton = document.createElement("button");
         proxyButton.type = "button";
         proxyButton.className = "scm-btn-case";
-        var attrs = {
-          "ticket-pk": ticketId,
-          ticket: ticket.id_ticket || ticket.id || ticketId,
+        var proxySource = document.createElement("div");
+        proxySource.className = "scm-case-source";
+        proxySource.innerHTML = sourceHtml;
+        proxyCard.appendChild(proxyButton);
+        proxyCard.appendChild(proxySource);
+        root.appendChild(proxyCard);
+        if (typeof dashboardApplyDueCaseData === "function") {
+          dashboardApplyDueCaseData(proxyButton, Object.assign({}, caseData, {
+            ticket_pk: caseData.ticket_pk || ticketId,
+            ticket: caseData.ticket || caseData.id_ticket || ticketId,
+          }));
+        } else {
+          proxyButton.setAttribute("data-ticket-pk", ticketId);
+          proxyButton.setAttribute("data-ticket", String(caseData.ticket || caseData.id_ticket || ticketId));
+          proxyButton.setAttribute("data-asunto", String(caseData.asunto || caseData.titulo || caseData.title || "Caso de servicios inmobiliarios"));
+          proxyButton.setAttribute("data-estado", String(caseData.estado || caseData.estado_ticket || ""));
+          proxyButton.setAttribute("data-admin", String(caseData.admin || caseData.estado_administrativo || ""));
+          proxyButton.setAttribute("data-departamento", String(caseData.departamento || caseData.area || ""));
+          proxyButton.setAttribute("data-direccion", String(caseData.direccion || caseData.direccion_inmueble || ""));
+        }
+        window.scmOpenCase(proxyButton);
+        window.setTimeout(elevateDashboardDueCaseModal, 30);
+        window.setTimeout(function () { proxyCard.remove(); }, 800);
+        return true;
+      }
+
+      function openNativeCaseFromCalendarTicket(ticket, ticketId) {
+        if (!ticket) return false;
+        return openNativeCaseFromCalendarCaseData({
+          case_source_html: ticket.case_source_html || ticket.caseSourceHtml || "",
+          ticket_pk: ticket.ticket_pk || ticket._ID || ticket.id_ticket || ticket.id || ticketId,
+          ticket: ticket.id_ticket || ticket.ticket || ticket.id || ticketId,
           asunto: ticket.asunto || ticket.titulo || ticket.title || "Caso de servicios inmobiliarios",
           estado: ticket.estado || ticket.estado_ticket || "",
-          admin: ticket.estado_administrativo || "",
+          admin: ticket.admin || ticket.estado_administrativo || "",
           creado: ticket.creado || ticket.fecha_creacion || ticket.created_at || "",
           empleado: ticket.funcionario || ticket.empleado || ticket.nombre_empleado || "",
-          "empleado-id": ticket.id_empleado || ticket.id_funcionario || "",
+          empleado_id: ticket.id_empleado || ticket.id_funcionario || "",
           categoria: ticket.categoria || ticket.tipo_pqrs || ticket.tema_ayuda || ticket.tipo || "",
           departamento: ticket.departamento || ticket.area || "",
           solicitante: ticket.solicitante || ticket.nombre_solicitante || ticket.cliente || "",
@@ -4162,20 +4194,47 @@
           inmueble: ticket.inmueble || ticket.id_inmueble || ticket.id_inmueble_web || "",
           direccion: ticket.direccion || ticket.direccion_inmueble || "",
           barrio: ticket.barrio || "",
+        }, ticketId);
+      }
+
+      function calendarNativeCaseDueType(row) {
+        var raw = String((row && (row.tipo_vencimiento || row.due_type || row.dueType || row.vencimiento_tipo)) || "").trim();
+        if (raw) return raw;
+        var category = normalizeText(categoryNameForRow(row || {}));
+        var title = normalizeText((row && (row.titulo || row.title)) || "");
+        if (category.indexOf("preventiva") !== -1 || title.indexOf("preventiva") !== -1) {
+          return "preventiva_cita_sin_realizar";
+        }
+        return "ticket_preventiva_sin_cita";
+      }
+
+      function loadNativeCalendarCase(ticketId, eventRow) {
+        ticketId = String(ticketId || "").trim();
+        if (!ticketId || !actionAdminDueCase) return Promise.reject(new Error("No esta configurada la carga del caso completo."));
+        if (calendarNativeCaseCache[ticketId]) return Promise.resolve(calendarNativeCaseCache[ticketId]);
+        if (calendarNativeCasePromiseByTicket[ticketId]) return calendarNativeCasePromiseByTicket[ticketId];
+        var payload = {
+          tipo_vencimiento: calendarNativeCaseDueType(eventRow || {}),
+          ticket_pk: ticketId,
+          id_ticket: ticketId,
+          ticket: ticketId,
         };
-        Object.keys(attrs).forEach(function (key) {
-          proxyButton.setAttribute("data-" + key, String(attrs[key] || ""));
+        ["cotizacion_id", "id_cotizacion", "id_revision_preventiva", "revision_id"].forEach(function (key) {
+          if (eventRow && eventRow[key]) payload[key] = eventRow[key];
         });
-        var proxySource = document.createElement("div");
-        proxySource.className = "scm-case-source";
-        proxySource.innerHTML = sourceHtml;
-        proxyCard.appendChild(proxyButton);
-        proxyCard.appendChild(proxySource);
-        root.appendChild(proxyCard);
-        window.scmOpenCase(proxyButton);
-        window.setTimeout(elevateDashboardDueCaseModal, 30);
-        window.setTimeout(function () { proxyCard.remove(); }, 800);
-        return true;
+        calendarNativeCasePromiseByTicket[ticketId] = dashboardAction(actionAdminDueCase, payload)
+          .then(function (data) {
+            var caseData = data && data.case ? data.case : data;
+            if (!caseData || !String(caseData.case_source_html || "").trim()) {
+              throw new Error("No se pudo cargar el popup completo del caso.");
+            }
+            calendarNativeCaseCache[ticketId] = caseData;
+            return caseData;
+          })
+          .finally(function () {
+            delete calendarNativeCasePromiseByTicket[ticketId];
+          });
+        return calendarNativeCasePromiseByTicket[ticketId];
       }
 
       function ticketIdFromRow(ticket) {
@@ -4313,48 +4372,32 @@
           return true;
         }
         if (openLoadedNativeTicket(ticketId)) return true;
-        if (!window.Swal || typeof window.Swal.fire !== "function") {
-          showToast("error", "No esta disponible el detalle del ticket.");
-          return true;
-        }
         var eventRow = calendarEventById(eventId) || calendarEventByTicket(ticketId) || {};
         var employeeId = getEventEmployeeId(eventRow) || selectedEmployeeFromFilter();
-        var state = { navigating: false };
-        window.Swal.fire({
-          title: "",
-          html: '<div class="scm-calendar-report-loading">Cargando detalle del caso...</div>',
-          width: 760,
-          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal" },
-          confirmButtonText: "Cerrar",
-          showCancelButton: false,
-          didOpen: function () {
-            var popup = window.Swal.getPopup();
-            var container = popup ? popup.querySelector(".swal2-html-container") : null;
-            var finish = function (ticket) {
-              if (openNativeCaseFromCalendarTicket(ticket, ticketId)) {
-                state.navigating = true;
-                window.Swal.close();
-                return;
-              }
-              if (container) container.innerHTML = calendarTicketDetailHtml(ticket, eventRow, ticketId);
-              bindCalendarNativePopupActions(eventRow, options, state);
-            };
-            if (!employeeId) {
-              finish(null);
-              return;
+        var cachedGroups = Object.keys(ticketCacheByEmployee).map(function (key) {
+          return ticketCacheByEmployee[key] || [];
+        });
+        var cachedTickets = Array.prototype.concat.apply([], cachedGroups);
+        var cachedTicket = findTicketInRows(ticketId, cachedTickets);
+        if (openNativeCaseFromCalendarTicket(cachedTicket, ticketId)) return true;
+        showToast("info", "Cargando caso completo...");
+        var loadTickets = employeeId ? loadTicketsForEmployee(employeeId) : Promise.resolve([]);
+        loadTickets.then(function (rows) {
+          var ticket = findTicketInRows(ticketId, rows) || findTicketInRows(ticketId, cachedTickets);
+          if (openNativeCaseFromCalendarTicket(ticket, ticketId)) return null;
+          return loadNativeCalendarCase(ticketId, eventRow).then(function (caseData) {
+            if (!openNativeCaseFromCalendarCaseData(caseData, ticketId)) {
+              throw new Error("No se pudo abrir el popup completo del caso.");
             }
-            loadTicketsForEmployee(employeeId).then(function (rows) {
-              finish(findTicketInRows(ticketId, rows));
-            }).catch(function () {
-              finish(null);
-            });
-          },
-        }).then(function () {
-          if (!state.navigating && typeof options.returnTo === "function") {
+            return null;
+          });
+        }).catch(function (err) {
+          showToast("error", (err && err.message) || "No se pudo abrir el caso completo.");
+          if (typeof options.returnTo === "function") {
             window.setTimeout(options.returnTo, 80);
           }
         });
-        return false;
+        return true;
       }
 
       function openRescheduleEventPopup(eventId, options) {
