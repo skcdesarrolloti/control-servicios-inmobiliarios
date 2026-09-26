@@ -2359,7 +2359,6 @@
 }
 
 #scm-app .scm-calendar-time-event {
-  align-self: stretch;
   background: var(--event-color, #1a73e8);
   border: 0;
   border-radius: 6px;
@@ -2367,13 +2366,17 @@
   color: #ffffff;
   display: grid;
   gap: 2px;
-  margin: 3px 6px !important;
+  height: calc((var(--event-slot-span, 1) * 24px) - 6px);
+  left: calc(68px + (((100% - 68px) / var(--event-days, 7)) * var(--event-day, 0)) + 6px);
+  margin: 0 !important;
   min-height: 34px;
   min-width: 0;
   overflow: hidden;
   padding: 7px 8px !important;
-  position: relative;
+  position: absolute;
   text-align: left;
+  top: calc(68px + (var(--event-start-slot, 0) * 24px) + 3px);
+  width: calc(((100% - 68px) / var(--event-days, 7)) - 12px);
   z-index: 5;
 }
 

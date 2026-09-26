@@ -2425,7 +2425,7 @@
         });
       }
 
-      function timeGridEventHtml(row, columnIndex) {
+      function timeGridEventHtml(row, columnIndex, totalDays) {
         var start = eventMinutes(row, "fecha_inicio");
         if (start === null) return "";
         var end = eventMinutes(row, "fecha_fin");
@@ -2433,7 +2433,7 @@
         var visibleStart = Math.max(WEEK_DAY_START_MINUTES, start);
         var visibleEnd = Math.min(WEEK_DAY_END_MINUTES, end);
         if (visibleEnd <= visibleStart) return "";
-        var rowStart = Math.floor((visibleStart - WEEK_DAY_START_MINUTES) / WEEK_SLOT_MINUTES) + 2;
+        var startSlot = Math.floor((visibleStart - WEEK_DAY_START_MINUTES) / WEEK_SLOT_MINUTES);
         var span = Math.max(1, Math.ceil((visibleEnd - visibleStart) / WEEK_SLOT_MINUTES));
         var color = String(row.color || "#f97316").trim() || "#f97316";
         var id = String(row.id || row._ID || row.event_id || "").trim();
@@ -2443,7 +2443,9 @@
           ? ' type="button" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '"'
           : ' role="group"';
         var timeLabel = (timePartFromDateTime(row.fecha_inicio) || timeFromMinutes(start)) + " - " + (timePartFromDateTime(row.fecha_fin) || timeFromMinutes(end));
-        return '<' + tag + attrs + ' class="scm-calendar-time-event scm-calendar-time-event--' + escHtml(kind) + '" style="grid-column:' + String(columnIndex) + ';grid-row:' + String(rowStart) + ' / span ' + String(span) + ';--event-color:' + escHtml(color) + '">' +
+        var dayIndex = Math.max(0, columnIndex - 2);
+        var daysCount = Math.max(1, totalDays || 7);
+        return '<' + tag + attrs + ' class="scm-calendar-time-event scm-calendar-time-event--' + escHtml(kind) + '" style="--event-day:' + String(dayIndex) + ';--event-days:' + String(daysCount) + ';--event-start-slot:' + String(startSlot) + ';--event-slot-span:' + String(span) + ';--event-color:' + escHtml(color) + '">' +
           '<strong>' + escHtml(row.titulo || calendarItemKindLabel(row)) + '</strong>' +
           '<em>' + escHtml(timeLabel) + '</em>' +
           '</' + tag + '>';
@@ -2805,7 +2807,7 @@
         days.forEach(function (date, dayIndex) {
           var key = toDateKey(date);
           timeGridEvents(key).forEach(function (row) {
-            html += timeGridEventHtml(row, dayIndex + 2);
+            html += timeGridEventHtml(row, dayIndex + 2, 7);
           });
         });
         html += '</div>';
@@ -2849,7 +2851,7 @@
           html += '</button>';
         }
         timeGridEvents(key).forEach(function (row) {
-          html += timeGridEventHtml(row, 2);
+          html += timeGridEventHtml(row, 2, 1);
         });
         html += '</div>';
         monthGrid.innerHTML = html;
