@@ -2472,11 +2472,11 @@ trait RendersDashboard
             </div>
           </div>
           <form class="scm-calendar-due-type-filter" data-scm-calendar-due-type-filter autocomplete="off">
-            <label class="scm-calendar-due-chip"><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><strong>Preventivas sin enviar</strong></label>
-            <label class="scm-calendar-due-chip"><input type="checkbox" name="due_type" value="ticket_preventiva_sin_cita" checked><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><strong>Tickets sin cita preventiva</strong></label>
-            <label class="scm-calendar-due-chip"><input type="checkbox" name="due_type" value="preventiva_cita_sin_realizar" checked><span class="material-symbols-outlined" aria-hidden="true">pending_actions</span><strong>Preventivas con cita sin realizar</strong></label>
-            <label class="scm-calendar-due-chip"><input type="checkbox" name="due_type" value="cotizacion_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">receipt_long</span><strong>Cotizaciones sin enviar</strong></label>
-            <label class="scm-calendar-due-chip"><input type="checkbox" name="due_type" value="cotizacion_enviada_sin_respuesta" checked><span class="material-symbols-outlined" aria-hidden="true">mark_email_unread</span><strong>Cotizaciones sin respuesta</strong></label>
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-sin-enviar"><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><strong>Preventivas sin enviar</strong></label>
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--ticket-preventiva-sin-cita"><input type="checkbox" name="due_type" value="ticket_preventiva_sin_cita" checked><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><strong>Tickets sin cita preventiva</strong></label>
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-cita-sin-realizar"><input type="checkbox" name="due_type" value="preventiva_cita_sin_realizar" checked><span class="material-symbols-outlined" aria-hidden="true">pending_actions</span><strong>Preventivas con cita sin realizar</strong></label>
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--cotizacion-sin-enviar"><input type="checkbox" name="due_type" value="cotizacion_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">receipt_long</span><strong>Cotizaciones sin enviar</strong></label>
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--cotizacion-enviada-sin-respuesta"><input type="checkbox" name="due_type" value="cotizacion_enviada_sin_respuesta" checked><span class="material-symbols-outlined" aria-hidden="true">mark_email_unread</span><strong>Cotizaciones sin respuesta</strong></label>
           </form>
         </section>
       <?php endif; ?>

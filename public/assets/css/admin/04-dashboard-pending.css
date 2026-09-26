@@ -2666,10 +2666,15 @@
 
 #scm-app .scm-calendar-due-chip {
   align-items: center;
-  background: #f8fafc;
-  border: 1px solid #dbe6f2;
+  --due-bg: #f8fafc;
+  --due-border: #dbe6f2;
+  --due-color: #0f1e36;
+  --due-text: #334155;
+  --due-active-text: #ffffff;
+  background: var(--due-bg);
+  border: 1px solid var(--due-border);
   border-radius: 999px;
-  color: #334155;
+  color: var(--due-text);
   cursor: pointer;
   display: inline-flex;
   font-size: 12px;
@@ -2691,7 +2696,7 @@
 }
 
 #scm-app .scm-calendar-due-chip .material-symbols-outlined {
-  color: #64748b;
+  color: var(--due-color);
   font-size: 17px;
 }
 
@@ -2703,19 +2708,55 @@
 #scm-app .scm-calendar-due-chip:hover,
 #scm-app .scm-calendar-due-chip:focus-within {
   background: #ffffff;
-  border-color: #b6c6da;
+  border-color: var(--due-color);
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
 }
 
 #scm-app .scm-calendar-due-chip:has(input:checked) {
-  background: #0f1e36;
-  border-color: #0f1e36;
+  background: var(--due-color);
+  border-color: var(--due-color);
   box-shadow: 0 8px 18px rgba(15, 30, 54, 0.16);
-  color: #ffffff;
+  color: var(--due-active-text);
 }
 
 #scm-app .scm-calendar-due-chip:has(input:checked) .material-symbols-outlined {
-  color: #ffffff;
+  color: var(--due-active-text);
+}
+
+#scm-app .scm-calendar-due-chip--preventiva-sin-enviar {
+  --due-bg: #eff6ff;
+  --due-border: #bfdbfe;
+  --due-color: #2563eb;
+  --due-text: #1d4ed8;
+}
+
+#scm-app .scm-calendar-due-chip--ticket-preventiva-sin-cita {
+  --due-bg: #ecfdf5;
+  --due-border: #99f6e4;
+  --due-color: #0f766e;
+  --due-text: #0f766e;
+}
+
+#scm-app .scm-calendar-due-chip--preventiva-cita-sin-realizar {
+  --due-bg: #f5f3ff;
+  --due-border: #ddd6fe;
+  --due-color: #7c3aed;
+  --due-text: #6d28d9;
+}
+
+#scm-app .scm-calendar-due-chip--cotizacion-sin-enviar {
+  --due-bg: #fffbeb;
+  --due-border: #fde68a;
+  --due-color: #f59e0b;
+  --due-text: #92400e;
+  --due-active-text: #111827;
+}
+
+#scm-app .scm-calendar-due-chip--cotizacion-enviada-sin-respuesta {
+  --due-bg: #fef2f2;
+  --due-border: #fecaca;
+  --due-color: #dc2626;
+  --due-text: #b91c1c;
 }
 
 #scm-app .scm-calendar-due-settings-form {
@@ -3308,6 +3349,13 @@
   color: #6d28d9;
 }
 
+#scm-app .scm-home-calendar .scm-calendar-day-pill--due {
+  background: var(--due-bg, #f8fafc);
+  border: 1px solid var(--due-border, #dbe6f2);
+  color: var(--due-text, #334155);
+  box-shadow: inset 3px 0 0 var(--due-color, #f59e0b);
+}
+
 #scm-app .scm-home-calendar .scm-calendar-day-card {
   display: flex;
   flex-direction: column;
@@ -3371,6 +3419,16 @@
   border-left: 4px solid #f97316;
   display: block;
   grid-template-columns: minmax(0, 1fr);
+}
+
+#scm-app .scm-calendar-due-event-card {
+  background: linear-gradient(90deg, var(--due-bg, #fff7ed) 0, #ffffff 42%);
+  border-color: var(--due-border, #fed7aa);
+}
+
+#scm-app .scm-calendar-due-event-card .scm-calendar-event-description {
+  background: #ffffff;
+  border-color: var(--due-border, #fed7aa);
 }
 
 #scm-app .scm-calendar-event-card--stripe .scm-calendar-event-main {
@@ -3710,6 +3768,20 @@
   padding: 10px 12px !important;
   text-align: left;
   width: 100%;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-upcoming-item[class*="scm-calendar-due-type--"] {
+  background: var(--due-bg, #f8fafc);
+  border-color: var(--due-border, #dbe6f2);
+}
+
+#scm-app .scm-home-calendar .scm-calendar-upcoming-item[class*="scm-calendar-due-type--"] .scm-calendar-upcoming-date {
+  background: #ffffff;
+  color: var(--due-color, #f97316);
+}
+
+#scm-app .scm-home-calendar .scm-calendar-upcoming-item[class*="scm-calendar-due-type--"] .scm-calendar-upcoming-body small {
+  color: var(--due-text, #334155);
 }
 
 #scm-app .scm-home-calendar .scm-calendar-upcoming-date {

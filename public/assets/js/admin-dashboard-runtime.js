@@ -1552,6 +1552,36 @@
         return "Evento";
       }
 
+      function dueTypeKey(rowOrType) {
+        var raw = typeof rowOrType === "string"
+          ? rowOrType
+          : String((rowOrType && rowOrType.tipo_vencimiento) || "");
+        return String(raw || "otros").toLowerCase().replace(/[^a-z0-9_-]+/g, "_") || "otros";
+      }
+
+      function dueTypeTheme(rowOrType) {
+        var key = dueTypeKey(rowOrType);
+        var themes = {
+          preventiva_sin_enviar: { color: "#2563eb", bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
+          ticket_preventiva_sin_cita: { color: "#0f766e", bg: "#ecfdf5", text: "#0f766e", border: "#99f6e4" },
+          preventiva_cita_sin_realizar: { color: "#7c3aed", bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" },
+          cotizacion_sin_enviar: { color: "#f59e0b", bg: "#fffbeb", text: "#92400e", border: "#fde68a" },
+          cotizacion_enviada_sin_respuesta: { color: "#dc2626", bg: "#fef2f2", text: "#b91c1c", border: "#fecaca" },
+          preventiva_pendiente: { color: "#0891b2", bg: "#ecfeff", text: "#0e7490", border: "#a5f3fc" },
+          servicios_publicos_pendientes: { color: "#0284c7", bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
+        };
+        var theme = themes[key] || { color: "#475569", bg: "#f8fafc", text: "#334155", border: "#cbd5e1" };
+        if (typeof rowOrType !== "string" && rowOrType && rowOrType.color) {
+          theme = Object.assign({}, theme, { color: String(rowOrType.color || theme.color) });
+        }
+        return Object.assign({ key: key }, theme);
+      }
+
+      function dueTypeStyleAttr(theme) {
+        theme = theme || dueTypeTheme("");
+        return '--due-color:' + escHtml(theme.color) + ';--due-bg:' + escHtml(theme.bg) + ';--due-text:' + escHtml(theme.text) + ';--due-border:' + escHtml(theme.border) + ';';
+      }
+
       function calendarItemIsDone(row) {
         var estado = String((row && row.estado) || "").toLowerCase().trim();
         return estado === "si" || estado === "realizada" || estado === "enviado";
@@ -2200,8 +2230,9 @@
         var isPublicServices = String(caseData.public_services_review || "") === "1";
         var canOpen = sourceHtml !== "";
         var overdue = String(row.estado || "").toLowerCase() === "vencido";
-        var color = String(row.color || (overdue ? "#dc2626" : "#f59e0b")).trim();
-        return '<article class="scm-calendar-event-card scm-calendar-event-card--stripe scm-calendar-due-event-card scm-ticket-card" style="border-left-color:' + escHtml(color) + '">' +
+        var theme = dueTypeTheme(row);
+        var color = String(theme.color || row.color || (overdue ? "#dc2626" : "#f59e0b")).trim();
+        return '<article class="scm-calendar-event-card scm-calendar-event-card--stripe scm-calendar-due-event-card scm-calendar-due-type--' + escHtml(theme.key) + ' scm-ticket-card" style="' + dueTypeStyleAttr(theme) + 'border-left-color:' + escHtml(color) + '">' +
           '<div class="scm-calendar-event-main">' +
           '<div class="scm-calendar-event-title-row"><h5>' + escHtml(row.titulo || "Vencimiento") + '</h5><span class="scm-calendar-event-state ' + (overdue ? "is-overdue" : "is-pending") + '">' + escHtml(row.estado || "Pendiente") + "</span></div>" +
           '<div class="scm-calendar-event-description">' + escHtml(row.descripcion || "Control de vencimiento administrativo.") + "</div>" +
@@ -2251,13 +2282,14 @@
 
       function upcomingItemHtml(row) {
         var dateKey = eventDateKey(row);
-        var color = String(row.color || (isDueCalendar ? "#f59e0b" : "#f43f5e")).trim() || "#f59e0b";
+        var dueTheme = isDueCalendar ? dueTypeTheme(row) : null;
+        var color = String((dueTheme && dueTheme.color) || row.color || (isDueCalendar ? "#f59e0b" : "#f43f5e")).trim() || "#f59e0b";
         var category = isDueCalendar ? (row.grupo || "Vencimiento") : (row.categoria || (categoriesById[getCategoryId(row)] && categoriesById[getCategoryId(row)].nombre) || "Sin categoria");
         var kindLabel = isDueCalendar ? category : calendarItemKindLabel(row);
         var time = isDueCalendar
           ? ("Vence: " + (row.fecha_vencimiento || dateKey || "-"))
           : (formatDateTime(row.fecha_inicio) + " - " + formatDateTime(row.fecha_fin));
-        return '<button type="button" class="scm-calendar-upcoming-item" data-scm-calendar-upcoming-day="' + escHtml(dateKey) + '">' +
+        return '<button type="button" class="scm-calendar-upcoming-item' + (dueTheme ? ' scm-calendar-due-type--' + escHtml(dueTheme.key) : '') + '" data-scm-calendar-upcoming-day="' + escHtml(dateKey) + '"' + (dueTheme ? ' style="' + dueTypeStyleAttr(dueTheme) + '"' : "") + '>' +
           '<span class="scm-calendar-upcoming-date"><strong>' + escHtml(shortMonthLabel(dateKey) || "MES") + '</strong><em>' + escHtml(String(Number(String(dateKey).slice(8, 10)) || "")) + "</em></span>" +
           '<span class="scm-calendar-upcoming-body"><strong>' + escHtml(row.titulo || (isDueCalendar ? "Vencimiento" : kindLabel)) + '</strong><em>' + escHtml(time) + '</em><small style="--event-color:' + escHtml(color) + '">' + escHtml(kindLabel + (isDueCalendar ? "" : " · " + category)) + "</small></span>" +
           "</button>";
@@ -2800,7 +2832,12 @@
           if (holiday) html += '<span class="scm-calendar-day-holiday">Festivo · ' + escHtml(holiday) + "</span>";
           html += '<span class="scm-calendar-day-events-count">' + (dayEvents.length ? dayEvents.length + (isDueCalendar ? " venc." : visibleCalendarItemWord(dayEvents.length)) : "") + "</span>";
           dayEvents.slice(0, 3).forEach(function (row) {
-            html += '<span class="scm-calendar-day-pill scm-calendar-day-pill--' + escHtml(calendarItemKind(row)) + '" style="border-color:' + escHtml(row.color || "#f59e0b") + '">' + escHtml(row.titulo || calendarItemKindLabel(row)) + "</span>";
+            if (isDueCalendar) {
+              var dueTheme = dueTypeTheme(row);
+              html += '<span class="scm-calendar-day-pill scm-calendar-day-pill--due scm-calendar-due-type--' + escHtml(dueTheme.key) + '" style="' + dueTypeStyleAttr(dueTheme) + '">' + escHtml(row.titulo || dueTypeLabel(row.tipo_vencimiento || "")) + "</span>";
+            } else {
+              html += '<span class="scm-calendar-day-pill scm-calendar-day-pill--' + escHtml(calendarItemKind(row)) + '" style="border-color:' + escHtml(row.color || "#f59e0b") + '">' + escHtml(row.titulo || calendarItemKindLabel(row)) + "</span>";
+            }
           });
           if (dayEvents.length > 3) html += '<span class="scm-calendar-day-more">+' + (dayEvents.length - 3) + " mas</span>";
           html += "</button>";
