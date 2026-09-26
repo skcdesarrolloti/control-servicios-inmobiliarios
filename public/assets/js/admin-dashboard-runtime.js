@@ -2506,8 +2506,22 @@
         var startMinutes = slotStart;
         var endMinutes = slotEnd;
         if (selection && selection.date === dateKey) {
-          startMinutes = Math.min(selection.start, slotStart);
-          endMinutes = Math.max(selection.start + WEEK_SLOT_MINUTES, slotEnd);
+          var anchor = Number(selection.start || slotStart);
+          if (selection.dragged) {
+            if (slotStart > anchor) {
+              startMinutes = anchor;
+              endMinutes = slotStart;
+            } else if (slotStart < anchor) {
+              startMinutes = slotStart;
+              endMinutes = anchor;
+            } else {
+              startMinutes = anchor;
+              endMinutes = Math.min(anchor + WEEK_SLOT_MINUTES, WEEK_DAY_END_MINUTES);
+            }
+          } else {
+            startMinutes = Math.min(anchor, slotStart);
+            endMinutes = Math.max(anchor + WEEK_SLOT_MINUTES, slotEnd);
+          }
           if (selection.start === slotStart && !selection.dragged) {
             endMinutes = Math.min(selection.start + WEEK_DEFAULT_EVENT_MINUTES, WEEK_DAY_END_MINUTES);
           }
@@ -2517,6 +2531,59 @@
         if (endMinutes <= startMinutes) endMinutes = Math.min(startMinutes + WEEK_DEFAULT_EVENT_MINUTES, WEEK_DAY_END_MINUTES);
         if (endMinutes <= startMinutes) endMinutes = startMinutes + WEEK_SLOT_MINUTES;
         return { date: dateKey, start: startMinutes, end: endMinutes };
+      }
+
+      function weekSelectionRect() {
+        var grid = monthGrid ? monthGrid.querySelector("[data-scm-calendar-week-grid]") : null;
+        if (!grid) return null;
+        var slots = Array.prototype.slice.call(grid.querySelectorAll("[data-scm-calendar-week-slot].is-selecting"));
+        if (!slots.length) return null;
+        return slots.reduce(function (bounds, slot) {
+          var rect = slot.getBoundingClientRect();
+          if (!bounds) {
+            return {
+              left: rect.left,
+              top: rect.top,
+              right: rect.right,
+              bottom: rect.bottom,
+            };
+          }
+          bounds.left = Math.min(bounds.left, rect.left);
+          bounds.top = Math.min(bounds.top, rect.top);
+          bounds.right = Math.max(bounds.right, rect.right);
+          bounds.bottom = Math.max(bounds.bottom, rect.bottom);
+          return bounds;
+        }, null);
+      }
+
+      function placeWeekQuickPopover(popover, sourceEvent) {
+        var rect = popover.getBoundingClientRect();
+        var selectionRect = weekSelectionRect();
+        var fallbackX = sourceEvent && typeof sourceEvent.clientX === "number" ? sourceEvent.clientX : window.innerWidth / 2;
+        var fallbackY = sourceEvent && typeof sourceEvent.clientY === "number" ? sourceEvent.clientY : window.innerHeight / 2;
+        var left = fallbackX + 12;
+        var top = fallbackY - 18;
+        if (selectionRect) {
+          var rightSide = selectionRect.right + 16;
+          var leftSide = selectionRect.left - rect.width - 16;
+          if (rightSide + rect.width <= window.innerWidth - 16) {
+            left = rightSide;
+            top = selectionRect.top;
+          } else if (leftSide >= 16) {
+            left = leftSide;
+            top = selectionRect.top;
+          } else {
+            left = selectionRect.left;
+            top = selectionRect.bottom + 12;
+            if (top + rect.height > window.innerHeight - 16) {
+              top = selectionRect.top - rect.height - 12;
+            }
+          }
+        }
+        left = Math.min(Math.max(16, left), window.innerWidth - rect.width - 16);
+        top = Math.min(Math.max(16, top), window.innerHeight - rect.height - 16);
+        popover.style.left = left + "px";
+        popover.style.top = top + "px";
       }
 
       function closeWeekQuickPopover(options) {
@@ -2656,13 +2723,7 @@
           '</form>';
         document.body.appendChild(popover);
         weekQuickPopover = popover;
-        var x = sourceEvent && typeof sourceEvent.clientX === "number" ? sourceEvent.clientX : window.innerWidth / 2;
-        var y = sourceEvent && typeof sourceEvent.clientY === "number" ? sourceEvent.clientY : window.innerHeight / 2;
-        var rect = popover.getBoundingClientRect();
-        var left = Math.min(Math.max(16, x + 12), window.innerWidth - rect.width - 16);
-        var top = Math.min(Math.max(16, y - 18), window.innerHeight - rect.height - 16);
-        popover.style.left = left + "px";
-        popover.style.top = top + "px";
+        placeWeekQuickPopover(popover, sourceEvent);
         var input = popover.querySelector('[name="titulo"]');
         if (input) input.focus();
         popover.querySelectorAll("[data-week-quick-kind]").forEach(function (btn) {
