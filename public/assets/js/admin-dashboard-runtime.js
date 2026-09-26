@@ -1481,6 +1481,87 @@
         });
       }
 
+      function googleCalendarAuthWindow(url) {
+        var width = 560;
+        var height = 720;
+        var left = Math.max(0, Math.round((window.screen.width - width) / 2));
+        var top = Math.max(0, Math.round((window.screen.height - height) / 2));
+        return window.open(
+          url,
+          "scm_google_calendar_auth",
+          "popup=yes,width=" + width + ",height=" + height + ",left=" + left + ",top=" + top
+        );
+      }
+
+      function waitForGoogleCalendarConnection(employeeId, attempts) {
+        attempts = attempts || 0;
+        return calendarApi("estado_google_oauth", { id_empleado: employeeId }).then(function (json) {
+          var data = json && json.data ? json.data : {};
+          if (json && json.success && data.connected) {
+            return true;
+          }
+          if (attempts >= 60) {
+            throw new Error("No se confirmó la conexión con Google Calendar. Autoriza la cuenta y vuelve a guardar.");
+          }
+          return new Promise(function (resolve) {
+            window.setTimeout(resolve, 2000);
+          }).then(function () {
+            return waitForGoogleCalendarConnection(employeeId, attempts + 1);
+          });
+        });
+      }
+
+      function ensureGoogleCalendarReady(employeeIds, requested) {
+        if (!requested) return Promise.resolve(true);
+        var ids = Array.prototype.slice.call(employeeIds || []).map(function (id) {
+          return String(id || "").trim();
+        }).filter(Boolean).filter(function (id, index, arr) {
+          return arr.indexOf(id) === index;
+        });
+        if (!ids.length) {
+          return Promise.reject(new Error("Selecciona un funcionario para agregar a Google Calendar."));
+        }
+
+        function ensureIndex(index) {
+          if (index >= ids.length) return Promise.resolve(true);
+          var employeeId = ids[index];
+          return calendarApi("estado_google_oauth", { id_empleado: employeeId }).then(function (json) {
+            var data = json && json.data ? json.data : {};
+            if (!json || !json.success) {
+              throw new Error((json && json.message) || "No se pudo validar Google Calendar.");
+            }
+            if (!data.configured) {
+              throw new Error("Google Calendar aún no está configurado en el servidor.");
+            }
+            if (data.connected) {
+              return ensureIndex(index + 1);
+            }
+            return calendarApi("iniciar_google_oauth", {
+              id_empleado: employeeId,
+              redirect_after: window.location.href,
+            }).then(function (authJson) {
+              var authUrl = authJson && authJson.data ? authJson.data.auth_url : "";
+              if (!authJson || !authJson.success || !authUrl) {
+                throw new Error((authJson && authJson.message) || "No se pudo iniciar la autorización de Google.");
+              }
+              var authWindow = googleCalendarAuthWindow(authUrl);
+              if (!authWindow) {
+                throw new Error("El navegador bloqueó la ventana de Google. Permite popups y vuelve a guardar.");
+              }
+              if (window.Swal && typeof window.Swal.showValidationMessage === "function") {
+                window.Swal.showValidationMessage("Autoriza Google Calendar en la ventana abierta. Guardaremos al confirmar la conexión.");
+              }
+              return waitForGoogleCalendarConnection(employeeId).then(function () {
+                try { authWindow.close(); } catch (err) {}
+                return ensureIndex(index + 1);
+              });
+            });
+          });
+        }
+
+        return ensureIndex(0);
+      }
+
       function dashboardAjax(action, payload) {
         var fd = new FormData();
         fd.set("action", action || "");
@@ -2672,6 +2753,7 @@
         var location = String(fd.get("ubicacion") || "").trim();
         var tipoItem = kind === "task" ? "tarea" : (kind === "reminder" ? "recordatorio" : "evento");
         var itemLabel = tipoItem === "tarea" ? "tarea" : (tipoItem === "recordatorio" ? "recordatorio" : "evento");
+        var googleRequested = tipoItem !== "tarea" && fd.get("sincronizar_google") === "1";
         var employeeId = quickCreateEmployeeId();
         if (!title) {
           showToast("error", "Escribe un titulo para crear el " + itemLabel + ".");
@@ -2702,12 +2784,19 @@
           payload.recordatorio_at = payload.fecha_inicio;
           payload.recordatorio_canal = "whatsapp";
         }
+        if (googleRequested) {
+          payload.sincronizar_google = "1";
+          payload.google_calendar = "1";
+          payload.meta = { google_calendar_requested: true };
+        }
         var submit = form.querySelector('[data-week-quick-save]');
         if (submit) {
           submit.disabled = true;
           submit.textContent = "Guardando...";
         }
-        return calendarApi("crear_item_calendario", payload).then(function (json) {
+        return ensureGoogleCalendarReady([employeeId], googleRequested).then(function () {
+          return calendarApi("crear_item_calendario", payload);
+        }).then(function (json) {
           if ((!json || !json.success) && tipoItem === "evento") {
             return calendarApi("crear_evento", payload);
           }
@@ -2755,6 +2844,7 @@
           '<div class="scm-calendar-week-quick-row"><span class="material-symbols-outlined">schedule</span><div><strong>' + escHtml(dateLabel) + '</strong><em>' + escHtml(timeLabel) + '</em></div></div>' +
           '<div class="scm-calendar-week-quick-location" data-week-quick-location-row><span class="material-symbols-outlined">location_on</span><div><input name="ubicacion" placeholder="A&ntilde;adir ubicaci&oacute;n o direcci&oacute;n"><div class="scm-calendar-week-quick-location-presets" aria-label="Ubicaciones r&aacute;pidas"><button type="button" data-week-quick-location="Oficina Manga">Oficina Manga</button> <button type="button" data-week-quick-location="Oficina Corredor">Oficina Corredor</button></div></div></div>' +
           '<label class="scm-calendar-week-quick-category"><span class="material-symbols-outlined">sell</span><select name="id_categoria" required><option value="">Selecciona categoría</option>' + categoryOptions + '</select></label>' +
+          '<label class="scm-calendar-week-quick-google" data-week-quick-google-row><input type="checkbox" name="sincronizar_google" value="1"><span><strong>Google Calendar</strong><em>Agregar y usar sus recordatorios</em></span></label>' +
           '<div class="scm-calendar-week-quick-actions">' +
           '<button type="button" data-week-quick-more>Más opciones</button>' +
           '<button type="submit" data-week-quick-save>Guardar</button>' +
@@ -2794,12 +2884,14 @@
           var hidden = popover.querySelector("[data-week-quick-kind-value]");
           var titleInput = popover.querySelector("[data-week-quick-title-input]");
           var locationRow = popover.querySelector("[data-week-quick-location-row]");
+          var googleRow = popover.querySelector("[data-week-quick-google-row]");
           var saveBtn = popover.querySelector("[data-week-quick-save]");
           if (hidden) hidden.value = kind;
           popover.classList.remove("is-kind-event", "is-kind-task", "is-kind-reminder");
           popover.classList.add(config.className);
           if (titleInput) titleInput.placeholder = config.placeholder;
           if (locationRow) locationRow.hidden = !!config.hideLocation;
+          if (googleRow) googleRow.hidden = kind === "task";
           if (saveBtn) saveBtn.textContent = config.saveText;
           popover.querySelectorAll("[data-week-quick-kind]").forEach(function (candidate) {
             candidate.classList.toggle("active", (candidate.getAttribute("data-week-quick-kind") || "event") === kind);
@@ -4889,6 +4981,9 @@
           '<label class="scm-seg-field"><span>Ubicaci&oacute;n</span><select class="select select-bordered select-sm scm-select" name="ubicacion_tipo" data-calendar-location-type><option value="">Selecciona ubicaci&oacute;n</option><option value="oficina_corredor">Oficina Corredor</option><option value="oficina_manga">Oficina Manga</option><option value="otra">Otra direcci&oacute;n</option></select></label>' +
           '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Selecciona una ubicaci&oacute;n para completar este campo"></label>' +
           "</div></section>" : "";
+        var googleCalendarHtml = defaultKind !== "task"
+          ? '<label class="scm-calendar-google-toggle scm-calendar-field-full"><input type="checkbox" name="sincronizar_google" value="1"><span><strong>Agregar a Google Calendar</strong><em>Si el funcionario no ha autorizado su cuenta, se pedir&aacute; permiso antes de guardar.</em></span></label>'
+          : "";
         var html = '<div class="scm-calendar-create-shell scm-calendar-create-shell--' + escHtml(defaultKind) + '">' +
           '<div class="scm-calendar-create-head">' +
           '<div class="scm-calendar-create-icon" aria-hidden="true"><span class="material-symbols-outlined">' + escHtml(defaultKindConfig.icon) + '</span></div>' +
@@ -4908,6 +5003,7 @@
           '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required value="' + defaultStart + '"></label>' +
           '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required value="' + defaultEnd + '"></label>' +
           '</div>' +
+          googleCalendarHtml +
           '<label class="scm-seg-field scm-calendar-field-full"><span>' + escHtml(defaultKindConfig.descriptionLabel) + '</span><textarea class="textarea textarea-bordered textarea-sm scm-textarea" name="descripcion" rows="3" placeholder="' + escHtml(defaultKindConfig.descriptionPlaceholder) + '"></textarea></label>' +
           '<div class="scm-calendar-recurrence scm-calendar-field-full" data-calendar-recurrence>' +
           '<label class="scm-calendar-recurrence-toggle"><input type="checkbox" name="es_recurrente" value="1" data-calendar-recurrence-toggle><span>' + defaultKindConfig.recurrenceLabel + '</span><em data-calendar-recurrence-badge>Inactivo</em></label>' +
@@ -5611,6 +5707,7 @@
               return false;
             }
             var tipoItem = defaultKind === "reminder" ? "recordatorio" : (defaultKind === "task" ? "tarea" : "evento");
+            var googleRequested = tipoItem !== "tarea" && fd.get("sincronizar_google") === "1";
             var basePayload = {
               tipo_item: tipoItem,
               titulo: rawTitle,
@@ -5620,6 +5717,11 @@
             };
             if (tipoItem === "recordatorio") {
               basePayload.recordatorio_canal = "whatsapp";
+            }
+            if (googleRequested) {
+              basePayload.sincronizar_google = "1";
+              basePayload.google_calendar = "1";
+              basePayload.meta = { google_calendar_requested: true };
             }
             if (mode === "single") {
               basePayload.id_ticket = relatedTicket ? fd.get("id_ticket") || "" : "";
@@ -5706,51 +5808,53 @@
                 }
               }
             }
-            window.Swal.showLoading();
-            var citaNotificationAppointments = [];
-            if (tipoItem === "evento" && mode === "single" && relatedTicket && isCita === "si") {
-              var notificationCategoryName = categoryNameFromSelect(categorySelect) || fd.get("id_categoria") || "cita";
-              eventsToCreate.forEach(function (eventPayload) {
-                selected.forEach(function (employeeId) {
-                  citaNotificationAppointments.push(Object.assign({}, eventPayload, {
-                    id_ticket: basePayload.id_ticket,
-                    id_empleado: employeeId,
-                    categoria: notificationCategoryName,
-                    titulo: basePayload.titulo,
-                    ubicacion: basePayload.ubicacion,
-                    es_cita: "si",
-                  }));
+            return ensureGoogleCalendarReady(selected, googleRequested).then(function () {
+              window.Swal.showLoading();
+              var citaNotificationAppointments = [];
+              if (tipoItem === "evento" && mode === "single" && relatedTicket && isCita === "si") {
+                var notificationCategoryName = categoryNameFromSelect(categorySelect) || fd.get("id_categoria") || "cita";
+                eventsToCreate.forEach(function (eventPayload) {
+                  selected.forEach(function (employeeId) {
+                    citaNotificationAppointments.push(Object.assign({}, eventPayload, {
+                      id_ticket: basePayload.id_ticket,
+                      id_empleado: employeeId,
+                      categoria: notificationCategoryName,
+                      titulo: basePayload.titulo,
+                      ubicacion: basePayload.ubicacion,
+                      es_cita: "si",
+                    }));
+                  });
                 });
-              });
-            }
-            var request;
-            if (tipoItem === "evento") {
-              request = selected.length > 1 || eventsToCreate.length > 1
-                ? calendarApi("crear_eventos", { eventos: eventsToCreate, empleados: selected })
-                : calendarApi("crear_evento", Object.assign({}, eventsToCreate[0], { id_empleado: selected[0] }));
-            } else {
-              var itemPayloads = [];
-              eventsToCreate.forEach(function (eventPayload) {
-                selected.forEach(function (employeeId) {
-                  itemPayloads.push(Object.assign({}, eventPayload, { id_empleado: employeeId }));
+              }
+              var request;
+              if (tipoItem === "evento") {
+                request = selected.length > 1 || eventsToCreate.length > 1
+                  ? calendarApi("crear_eventos", { eventos: eventsToCreate, empleados: selected, sincronizar_google: googleRequested ? "1" : "" })
+                  : calendarApi("crear_evento", Object.assign({}, eventsToCreate[0], { id_empleado: selected[0] }));
+              } else {
+                var itemPayloads = [];
+                eventsToCreate.forEach(function (eventPayload) {
+                  selected.forEach(function (employeeId) {
+                    itemPayloads.push(Object.assign({}, eventPayload, { id_empleado: employeeId }));
+                  });
                 });
+                request = Promise.all(itemPayloads.map(function (payload) {
+                  return calendarApi("crear_item_calendario", payload);
+                })).then(function (responses) {
+                  var failed = responses.find(function (json) { return !json || !json.success; });
+                  if (failed) return failed;
+                  return {
+                    success: true,
+                    message: tipoItem === "tarea" ? "Tarea creada." : "Recordatorio creado.",
+                    data: responses.map(function (json) { return json && json.data ? json.data : json; }),
+                  };
+                });
+              }
+              return request.then(function (json) {
+                if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el item.");
+                json._scmCitaNotificationAppointments = citaNotificationAppointments;
+                return json;
               });
-              request = Promise.all(itemPayloads.map(function (payload) {
-                return calendarApi("crear_item_calendario", payload);
-              })).then(function (responses) {
-                var failed = responses.find(function (json) { return !json || !json.success; });
-                if (failed) return failed;
-                return {
-                  success: true,
-                  message: tipoItem === "tarea" ? "Tarea creada." : "Recordatorio creado.",
-                  data: responses.map(function (json) { return json && json.data ? json.data : json; }),
-                };
-              });
-            }
-            return request.then(function (json) {
-              if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el item.");
-              json._scmCitaNotificationAppointments = citaNotificationAppointments;
-              return json;
             }).catch(function (err) {
               window.Swal.showValidationMessage(err.message || "No se pudo crear el item.");
               return false;
