@@ -1248,12 +1248,12 @@ final class SuCasaControlServiciosInmobiliarios
   private function get_generic_tab_definitions(): array
   {
     $defaults = [
-      'entrega' => ['label' => 'Entrega de Inmuebles', 'temas' => ['Entrega de inmuebles'], 'prefix' => 'scmeg_'],
-      'preventiva' => ['label' => 'Revisiones Preventiva', 'temas' => ['Revisiones Preventiva', 'Revisiones preventiva', 'Revision preventiva', 'Revision preventiva'], 'prefix' => 'scmpv_'],
-      'recibo' => ['label' => 'Recibo de Inmuebles', 'temas' => ['Recibo de inmuebles'], 'prefix' => 'scmrc_'],
-      'contable' => ['label' => 'Contable y Tributaria', 'temas' => ['Contable y tributaria'], 'prefix' => 'scmco_'],
-      'certificaciones' => ['label' => 'Certificaciones Tributarias', 'temas' => ['Certificaciones tributarias'], 'prefix' => 'scmcr_'],
-      'contractual' => ['label' => 'Contractual', 'temas' => ['Procesos juridicos', 'Solicitud contractual', 'Solicitud de servicios publicos', 'No prorroga de contrato', 'Terminacion de contrato', 'Retencion de contrato', 'Otros servicios'], 'prefix' => 'scmct_'],
+      'entrega' => ['label' => 'Entrega de Inmuebles', 'temas' => ['Entrega de inmuebles', 'Entrega de inmueble', 'Entregas de inmuebles'], 'prefix' => 'scmeg_'],
+      'preventiva' => ['label' => 'Revisiones Preventiva', 'temas' => ['Revision preventiva', 'Revision preventivas', 'Revisiones preventiva', 'Revisiones preventivas'], 'prefix' => 'scmpv_'],
+      'recibo' => ['label' => 'Recibo de Inmuebles', 'temas' => ['Recibo de inmuebles', 'Recibo de inmueble', 'Recibos de inmuebles'], 'prefix' => 'scmrc_'],
+      'contable' => ['label' => 'Contable y Tributaria', 'temas' => ['Contable y tributaria', 'Contable y tributario', 'Contabilidad tributaria'], 'prefix' => 'scmco_'],
+      'certificaciones' => ['label' => 'Certificaciones Tributarias', 'temas' => ['Certificaciones tributarias', 'Certificacion tributaria', 'Certificado tributario', 'Certificados tributarios'], 'prefix' => 'scmcr_'],
+      'contractual' => ['label' => 'Contractual', 'temas' => ['Procesos juridicos', 'Proceso juridico', 'Solicitud contractual', 'Solicitudes contractuales', 'Solicitud de servicios publicos', 'Solicitudes de servicios publicos', 'No prorroga de contrato', 'Terminacion de contrato', 'Retencion de contrato', 'Otros servicios'], 'prefix' => 'scmct_'],
     ];
     return $defaults;
   }

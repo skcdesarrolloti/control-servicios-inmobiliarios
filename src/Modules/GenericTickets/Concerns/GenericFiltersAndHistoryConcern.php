@@ -29,18 +29,23 @@ trait GenericFiltersAndHistoryConcern
 
     $where = [];
     $args = [];
-    $temaPhs = implode(',', array_fill(0, count($temas), '?'));
-    $where[] = "CONVERT(`tema_ayuda` USING utf8mb4) COLLATE utf8mb4_unicode_ci IN ({$temaPhs})";
-    foreach ($temas as $t) {
-      $args[] = $t;
-    }
+    $where[] = $this->generic_topic_where_sql($temas, $args);
     $where[] = 'LOWER(TRIM(COALESCE(`estado`, \'\'))) IN (?, ?)';
     $args[] = 'nuevo';
     $args[] = 'en proceso';
+    $adminStatusCol = $this->detect_first_existing_column($tabla, ['estado_admin_ticket', 'estado_administrativo', 'estado_admin']);
+    if ($adminStatusCol !== '') {
+      $where[] = "LOWER(TRIM(COALESCE(`{$adminStatusCol}`, ''))) NOT IN (?, ?, ?, ?, ?)";
+      $args[] = 'postergado';
+      $args[] = 'cerrado';
+      $args[] = 'resuelto';
+      $args[] = 'finalizado';
+      $args[] = 'desistido';
+    }
     $whereStr = implode(' AND ', $where);
 
     $estadoAdmin = [];
-    $adminCol = $this->detect_first_existing_column($tabla, ['estado_admin_ticket', 'estado_administrativo', 'estado_admin']);
+    $adminCol = $adminStatusCol;
     if ($adminCol !== '') {
       $sql = "SELECT DISTINCT `{$adminCol}` AS val FROM `{$tabla}` WHERE {$whereStr} AND TRIM(COALESCE(`{$adminCol}`, '')) <> '' ORDER BY val ASC";
       $rows = $this->db->getResults($sql, $args);

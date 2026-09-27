@@ -79,11 +79,7 @@ trait GenericQueryConcern
     $args = [];
 
     if (!empty($temas)) {
-      $temaPhs = implode(',', array_fill(0, count($temas), '?'));
-      $where[] = "CONVERT(`tema_ayuda` USING utf8mb4) COLLATE utf8mb4_unicode_ci IN ({$temaPhs})";
-      foreach ($temas as $t) {
-        $args[] = $t;
-      }
+      $where[] = $this->generic_topic_where_sql($temas, $args);
     }
 
     if (!empty($p['fTema'])) {
@@ -132,6 +128,16 @@ trait GenericQueryConcern
       $where[] = 'LOWER(TRIM(COALESCE(`estado`, \'\'))) IN (?, ?)';
       $args[] = 'nuevo';
       $args[] = 'en proceso';
+
+      $adminCol = $this->detect_first_existing_column($tabla, ['estado_admin_ticket', 'estado_administrativo', 'estado_admin']);
+      if ($adminCol !== '') {
+        $where[] = "LOWER(TRIM(COALESCE(`{$adminCol}`, ''))) NOT IN (?, ?, ?, ?, ?)";
+        $args[] = 'postergado';
+        $args[] = 'cerrado';
+        $args[] = 'resuelto';
+        $args[] = 'finalizado';
+        $args[] = 'desistido';
+      }
 
       if (!empty($p['fEstado'])) {
         $estadoFilter = strtolower(trim((string) $p['fEstado']));
@@ -688,6 +694,80 @@ trait GenericQueryConcern
     }
     $creadorExpr = "LOWER(TRIM(COALESCE(`creador_por`, '')))";
     return "({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario')";
+  }
+
+  /**
+   * @param array<int,string> $temas
+   * @param array<int,mixed> $args
+   */
+  private function generic_topic_where_sql(array $temas, array &$args): string
+  {
+    $variants = $this->generic_topic_variants($temas);
+    if (empty($variants)) {
+      return '1 = 0';
+    }
+
+    $temaPhs = implode(',', array_fill(0, count($variants), '?'));
+    foreach ($variants as $tema) {
+      $args[] = $tema;
+    }
+
+    return "LOWER(TRIM(CONVERT(`tema_ayuda` USING utf8mb4) COLLATE utf8mb4_unicode_ci)) IN ({$temaPhs})";
+  }
+
+  /**
+   * @param array<int,string> $temas
+   * @return array<int,string>
+   */
+  private function generic_topic_variants(array $temas): array
+  {
+    $aliases = [
+      'entrega de inmuebles' => ['Entrega de inmueble', 'Entregas de inmuebles'],
+      'entrega de inmueble' => ['Entrega de inmuebles', 'Entregas de inmuebles'],
+      'revision preventiva' => ['Revision preventivas', 'Revisiones preventiva', 'Revisiones preventivas'],
+      'revisiones preventiva' => ['Revision preventiva', 'Revision preventivas', 'Revisiones preventivas'],
+      'recibo de inmuebles' => ['Recibo de inmueble', 'Recibos de inmuebles'],
+      'recibo de inmueble' => ['Recibo de inmuebles', 'Recibos de inmuebles'],
+      'contable y tributaria' => ['Contable y tributario', 'Contabilidad tributaria'],
+      'certificaciones tributarias' => ['Certificacion tributaria', 'Certificado tributario', 'Certificados tributarios'],
+      'procesos juridicos' => ['Proceso juridico'],
+      'solicitud contractual' => ['Solicitudes contractuales'],
+      'solicitud de servicios publicos' => ['Solicitudes de servicios publicos'],
+      'no prorroga de contrato' => ['No prorroga contrato', 'No prorrogacion de contrato'],
+      'terminacion de contrato' => ['Terminacion contrato'],
+      'retencion de contrato' => ['Retencion contrato'],
+    ];
+
+    $out = [];
+    foreach ($temas as $tema) {
+      $value = trim((string) $tema);
+      if ($value === '') {
+        continue;
+      }
+      $out[mb_strtolower($value, 'UTF-8')] = true;
+      $key = $this->generic_topic_key($value);
+      foreach (($aliases[$key] ?? []) as $alias) {
+        $out[mb_strtolower($alias, 'UTF-8')] = true;
+      }
+    }
+
+    return array_keys($out);
+  }
+
+  private function generic_topic_key(string $value): string
+  {
+    $value = mb_strtolower(trim($value), 'UTF-8');
+    $value = strtr($value, [
+      'á' => 'a',
+      'é' => 'e',
+      'í' => 'i',
+      'ó' => 'o',
+      'ú' => 'u',
+      'ü' => 'u',
+      'ñ' => 'n',
+    ]);
+    $value = preg_replace('/\s+/u', ' ', $value) ?: $value;
+    return trim($value);
   }
 
   private function generic_cotizacion_exists_expression(string $tabla): string

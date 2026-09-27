@@ -114,6 +114,15 @@ trait MaintenanceQueriesConcern
       $args[] = 'nuevo';
       $args[] = 'en proceso';
 
+      if ($this->schema->columnExists($table, 'estado_administrativo')) {
+        $where[] = "LOWER(TRIM(COALESCE(t.estado_administrativo, ''))) NOT IN (%s, %s, %s, %s, %s)";
+        $args[] = 'postergado';
+        $args[] = 'cerrado';
+        $args[] = 'resuelto';
+        $args[] = 'finalizado';
+        $args[] = 'desistido';
+      }
+
       if (($filters['fEstado'] ?? '') !== '') {
         $estadoFilter = strtolower(trim((string) $filters['fEstado']));
         if (in_array($estadoFilter, ['nuevo', 'en proceso'], true)) {
