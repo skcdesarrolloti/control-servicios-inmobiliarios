@@ -35,8 +35,11 @@ trait GenericFiltersAndHistoryConcern
     $args[] = 'en proceso';
     $adminStatusCol = $this->detect_first_existing_column($tabla, ['estado_admin_ticket', 'estado_administrativo', 'estado_admin']);
     if ($adminStatusCol !== '') {
-      $where[] = "LOWER(TRIM(COALESCE(`{$adminStatusCol}`, ''))) NOT IN (?, ?, ?, ?, ?)";
+      $where[] = "LOWER(TRIM(COALESCE(`{$adminStatusCol}`, ''))) NOT IN (?, ?, ?, ?, ?, ?, ?, ?)";
       $args[] = 'postergado';
+      $args[] = 'postergada';
+      $args[] = 'postergados';
+      $args[] = 'en espera de respuesta';
       $args[] = 'cerrado';
       $args[] = 'resuelto';
       $args[] = 'finalizado';

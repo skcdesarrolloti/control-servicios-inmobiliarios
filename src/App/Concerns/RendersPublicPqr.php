@@ -272,7 +272,7 @@ trait RendersPublicPqr
     }
     $closedExpr = '(' . implode(' OR ', $closedExprParts) . ')';
     $postponedExpr = $this->column_exists($ticketsTable, 'estado_administrativo')
-      ? "(LOWER(TRIM(COALESCE(`estado_administrativo`, ''))) = 'postergado' AND NOT {$closedExpr})"
+      ? "(LOWER(TRIM(COALESCE(`estado_administrativo`, ''))) IN ('postergado', 'postergada', 'postergados', 'en espera de respuesta') AND NOT {$closedExpr})"
       : '0 = 1';
     $openExpr = "(NOT {$closedExpr} AND NOT {$postponedExpr})";
 

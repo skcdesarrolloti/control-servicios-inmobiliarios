@@ -20986,7 +20986,27 @@
 
     root.querySelectorAll(".scm-open-topic-tab").forEach(function (tab) {
       tab.addEventListener("click", function () {
-        window.setTimeout(loadActiveLazyPanelWithFeedback, 0);
+        var target = tab.getAttribute("data-open-target") || "";
+        window.setTimeout(function () {
+          var openPanel = target
+            ? root.querySelector(
+                '#scm-panel-abiertos .scm-open-topic-panel[data-open-topic="' +
+                  cssAttrValue(target) +
+                  '"]',
+              )
+            : null;
+          if (openPanel) {
+            withPanelLoader(
+              function () {
+                return loadOpenTopicPanelIfNeeded(openPanel);
+              },
+              "Cargando " + (tab.textContent || "casos").trim(),
+              "Estamos consultando los tickets de esta pestaña.",
+            );
+            return;
+          }
+          loadActiveLazyPanelWithFeedback();
+        }, 0);
       });
     });
 

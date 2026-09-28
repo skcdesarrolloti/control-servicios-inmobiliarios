@@ -2910,7 +2910,7 @@ trait HandlesTicketWorkflowActions
     if (in_array($estado, ['cerrado', 'resuelto', 'finalizado'], true) || in_array($admin, ['cerrado', 'resuelto', 'finalizado'], true)) {
       return 'cerrados';
     }
-    if ($admin === 'postergado') {
+    if (in_array($admin, ['postergado', 'postergada', 'postergados', 'en espera de respuesta'], true)) {
       return 'postergados';
     }
     return 'abiertos';

@@ -268,6 +268,8 @@ final class GenericTicketsCardView
     $contratoRaw = trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? ''));
     $barrioRaw = trim((string) ($row['barrio'] ?? ''));
     $direccionRaw = trim((string) ($row['direccion'] ?? ''));
+    $inmuebleData = is_array($row['_scm_inmueble_data'] ?? null) ? $row['_scm_inmueble_data'] : [];
+    $idInmuebleWebRaw = trim((string) ($row['id_inmueble'] ?? ($inmuebleData['codigo'] ?? '')));
     $empleadoRaw   = trim((string) ($row['nombre_empleado'] ?? $row['empleado'] ?? $row['id_empleado'] ?? ''));
     $empleadoIdRaw = trim((string) ($row['id_empleado'] ?? ''));
     $propietarioRaw = trim((string) ($row['propietario'] ?? ''));
@@ -359,8 +361,6 @@ final class GenericTicketsCardView
     $notasFields = ['_ID' => 'ID', 'cct_status' => 'Estado', 'id_ticket' => 'Ticket', 'id_empleado' => 'Empleado', 'cct_author_id' => 'Autor ID', 'fecha' => 'Fecha', 'cct_created' => 'Creado', 'cct_modified' => 'Modificado'];
     $historialInmuebleItems = is_array($row['_scm_historial_inmueble'] ?? null) ? $row['_scm_historial_inmueble'] : [];
     $contratoData = is_array($row['_scm_contrato_data'] ?? null) ? $row['_scm_contrato_data'] : [];
-    $inmuebleData = is_array($row['_scm_inmueble_data'] ?? null) ? $row['_scm_inmueble_data'] : [];
-    $idInmuebleWebRaw = trim((string) ($row['id_inmueble'] ?? ($inmuebleData['codigo'] ?? '')));
     $propertyDataId = trim((string) ($inmuebleData['_ID'] ?? $inmuebleData['id_inmueble_data'] ?? ''));
     $propertyGoogleMaps = trim((string) ($inmuebleData['ubicacion_google_maps'] ?? ''));
     $preventivaNoAccessCount = $isPreventivaTicket ? $this->countPreventivaNoAccessNotices($row, $historialItems) : 0;
@@ -781,7 +781,7 @@ final class GenericTicketsCardView
     if (in_array($estado, ['cerrado', 'resuelto', 'finalizado'], true) || in_array($estadoAdmin, ['cerrado', 'resuelto', 'finalizado'], true)) {
       return 'cerrados';
     }
-    if ($estadoAdmin === 'postergado') {
+    if (in_array($estadoAdmin, ['postergado', 'postergada', 'postergados', 'en espera de respuesta'], true)) {
       return 'postergados';
     }
 

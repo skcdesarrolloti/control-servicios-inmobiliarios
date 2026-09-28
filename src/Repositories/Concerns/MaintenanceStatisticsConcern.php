@@ -38,8 +38,11 @@ trait MaintenanceStatisticsConcern
     }
     if ($statusBucket === 'postergados') {
       if ($this->schema->columnExists($table, 'estado_administrativo')) {
-        $where[] = "LOWER(TRIM(COALESCE(t.estado_administrativo, ''))) = %s";
+        $where[] = "LOWER(TRIM(COALESCE(t.estado_administrativo, ''))) IN (%s, %s, %s, %s)";
         $args[] = 'postergado';
+        $args[] = 'postergada';
+        $args[] = 'postergados';
+        $args[] = 'en espera de respuesta';
         $where[] = "LOWER(TRIM(COALESCE(t.estado, ''))) NOT IN (%s, %s, %s)";
         $args[] = 'cerrado';
         $args[] = 'resuelto';
@@ -66,8 +69,11 @@ trait MaintenanceStatisticsConcern
       $args[] = 'en proceso';
 
       if ($this->schema->columnExists($table, 'estado_administrativo')) {
-        $where[] = "LOWER(TRIM(COALESCE(t.estado_administrativo, ''))) NOT IN (%s, %s, %s, %s, %s)";
+        $where[] = "LOWER(TRIM(COALESCE(t.estado_administrativo, ''))) NOT IN (%s, %s, %s, %s, %s, %s, %s, %s)";
         $args[] = 'postergado';
+        $args[] = 'postergada';
+        $args[] = 'postergados';
+        $args[] = 'en espera de respuesta';
         $args[] = 'cerrado';
         $args[] = 'resuelto';
         $args[] = 'finalizado';

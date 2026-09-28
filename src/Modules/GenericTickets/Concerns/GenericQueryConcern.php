@@ -101,8 +101,11 @@ trait GenericQueryConcern
     if ($statusBucket === 'postergados') {
       $col = $this->detect_first_existing_column($tabla, ['estado_administrativo', 'estado_admin_ticket', 'estado_admin']);
       if ($col !== '') {
-        $where[] = "LOWER(TRIM(COALESCE(`{$col}`, ''))) = ?";
+        $where[] = "LOWER(TRIM(COALESCE(`{$col}`, ''))) IN (?, ?, ?, ?)";
         $args[] = 'postergado';
+        $args[] = 'postergada';
+        $args[] = 'postergados';
+        $args[] = 'en espera de respuesta';
         $where[] = "LOWER(TRIM(COALESCE(`estado`, ''))) NOT IN (?, ?, ?)";
         $args[] = 'cerrado';
         $args[] = 'resuelto';
@@ -131,8 +134,11 @@ trait GenericQueryConcern
 
       $adminCol = $this->detect_first_existing_column($tabla, ['estado_admin_ticket', 'estado_administrativo', 'estado_admin']);
       if ($adminCol !== '') {
-        $where[] = "LOWER(TRIM(COALESCE(`{$adminCol}`, ''))) NOT IN (?, ?, ?, ?, ?)";
+        $where[] = "LOWER(TRIM(COALESCE(`{$adminCol}`, ''))) NOT IN (?, ?, ?, ?, ?, ?, ?, ?)";
         $args[] = 'postergado';
+        $args[] = 'postergada';
+        $args[] = 'postergados';
+        $args[] = 'en espera de respuesta';
         $args[] = 'cerrado';
         $args[] = 'resuelto';
         $args[] = 'finalizado';
