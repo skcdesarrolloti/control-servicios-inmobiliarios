@@ -291,7 +291,7 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 };
 
 // Orden solicitado:
-// 1. Inicio (Dropdown: Mi Calendario, Calendario Equipo, Vencimientos, Historial Inmueble, Solicitudes Terminación)
+// 1. Inicio (Dropdown: Mi Calendario, Calendario Equipo, Vencimientos, Historial Inmueble, Contratos por terminar, Solicitudes Terminación)
 // 2. Gestión de Casos & Tickets (Dropdown: Tickets Abiertos, Mis Tickets, Tickets Postergados, Tickets Cerrados)
 // 3. Actividades Administrativas (Dropdown: Notificaciones, Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
 // 4. Métricas y Dashboard
@@ -345,6 +345,15 @@ $rawNavItems = [
         'subtab' => 'property-history',
         'url' => $baseUrl . '/index.php?tab=historial_inmueble',
         'icon' => 'history',
+        'perms' => ['calendario_actividades', 'abiertos'],
+      ],
+      'contracts_ending' => [
+        'key' => 'contracts_ending',
+        'label' => 'Contratos por terminar',
+        'panel_id' => 'scm-panel-inicio',
+        'subtab' => 'contracts-ending',
+        'url' => $baseUrl . '/index.php?tab=contratos_por_terminar',
+        'icon' => 'event_upcoming',
         'perms' => ['calendario_actividades', 'abiertos'],
       ],
       'contract_termination' => [
