@@ -1696,6 +1696,8 @@ trait RendersDashboard
       <?php if ($canManagePublicPqrSettings): ?>
         <button type="button" id="scm-open-pqr-settings" style="display:none !important;" aria-hidden="true" tabindex="-1">Configuraci&oacute;n de Guardian</button>
         <div id="scm-pqr-settings-modal" data-scm-lazy-settings="public-pqr" aria-hidden="true"></div>
+        <button type="button" id="scm-open-ticket-topic-settings" style="display:none !important;" aria-hidden="true" tabindex="-1">Temas de Casos</button>
+        <?php echo $this->renderDashboardTicketTopicSettingsModal(); ?>
       <?php endif; ?>
       <?php if ($canManageInternalNotificationSettings): ?>
         <div id="scm-internal-notifications-modal" data-scm-lazy-settings="internal-notifications" aria-hidden="true"></div>
@@ -1734,6 +1736,42 @@ trait RendersDashboard
     return (string)ob_get_clean();
   }
 
+  private function renderDashboardTicketTopicSettingsModal(): string
+  {
+    $topicTabsHtml = '';
+    foreach (self::configuredGenericTicketTabDefinitions() as $tabKey => $definition) {
+      $label = trim((string) ($definition['label'] ?? $tabKey));
+      $topics = self::sanitizeTicketTopicList($definition['temas'] ?? []);
+      $topicTabsHtml .= '<label class="scm-ticket-topic-config-field">';
+      $topicTabsHtml .= '<span>' . esc_html($label) . '</span>';
+      $topicTabsHtml .= '<textarea name="topics[' . esc_attr((string) $tabKey) . ']" class="textarea textarea-bordered scm-input" rows="4">' . esc_textarea(implode("\n", $topics)) . '</textarea>';
+      $topicTabsHtml .= '</label>';
+    }
+
+    ob_start();
+?>
+    <div id="scm-ticket-topic-settings-modal" class="scm-pqr-settings-modal scm-ticket-topic-settings-modal" aria-hidden="true">
+      <div class="scm-pqr-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-ticket-topic-settings-title">
+        <button type="button" class="scm-pqr-settings-close" id="scm-close-ticket-topic-settings" aria-label="Cerrar">&times;</button>
+        <div class="scm-pqr-settings-head">
+          <h3 id="scm-ticket-topic-settings-title">Temas de Casos</h3>
+          <p>Define qu&eacute; valores de <code>tema_ayuda</code> alimentan Entrega, Preventiva, Recibo, Contractual y las dem&aacute;s pesta&ntilde;as operativas.</p>
+        </div>
+        <section class="scm-pqr-settings-section">
+          <form id="scm-ticket-topic-tabs-form" class="scm-ticket-topic-tabs-form scm-pqr-config-form" method="post" autocomplete="off">
+            <div class="scm-ticket-topic-config-grid"><?php echo $topicTabsHtml; ?></div>
+            <div class="scm-pqr-config-actions">
+              <button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Guardar temas</button>
+              <small class="scm-ticket-topic-tabs-msg" aria-live="polite"></small>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
   private function renderDashboardPublicPqrSettingsModal(): string
   {
     $currentNotifIds = \SCM\Modules\PublicTickets\PublicTicketsService::getNotifResponsables();
@@ -1748,7 +1786,6 @@ trait RendersDashboard
     $themes = $this->get_public_pqr_themes();
     $corresponsables = $this->get_public_pqr_corresponsables();
     $corresponsableCandidates = $this->get_public_pqr_corresponsable_candidates();
-    $topicTabDefinitions = self::configuredGenericTicketTabDefinitions();
 
     $notifOptions = '';
     foreach ($corresponsableCandidates as $func) {
@@ -1836,16 +1873,6 @@ trait RendersDashboard
       $correspGridHtml = '<p class="scm-pqr-config-empty">No hay funcionarios disponibles para configurar.</p>';
     }
 
-    $topicTabsHtml = '';
-    foreach ($topicTabDefinitions as $tabKey => $definition) {
-      $label = trim((string) ($definition['label'] ?? $tabKey));
-      $topics = self::sanitizeTicketTopicList($definition['temas'] ?? []);
-      $topicTabsHtml .= '<label class="scm-ticket-topic-config-field">';
-      $topicTabsHtml .= '<span>' . esc_html($label) . '</span>';
-      $topicTabsHtml .= '<textarea name="topics[' . esc_attr((string) $tabKey) . ']" class="textarea textarea-bordered scm-input" rows="4">' . esc_textarea(implode("\n", $topics)) . '</textarea>';
-      $topicTabsHtml .= '</label>';
-    }
-
     ob_start();
 ?>
     <div id="scm-pqr-settings-modal" class="scm-pqr-settings-modal" data-scm-dashboard-pqr-settings="1" aria-hidden="true">
@@ -1860,17 +1887,6 @@ trait RendersDashboard
           <span><strong><?php echo count($themes); ?></strong> tipos de solicitud</span>
           <span><strong><?php echo count($corresponsableCandidates); ?></strong> funcionarios disponibles</span>
         </div>
-        <section class="scm-pqr-settings-section">
-          <h4>Temas por pesta&ntilde;a de casos</h4>
-          <p>Estos son los valores de <code>tema_ayuda</code> que alimentan Entrega, Preventiva, Recibo, Contractual y las dem&aacute;s pesta&ntilde;as. Escribe un tema por l&iacute;nea para agregar o quitar.</p>
-          <form class="scm-ticket-topic-tabs-form scm-pqr-config-form scm-dashboard-pqr-config-form" method="post" autocomplete="off">
-            <div class="scm-ticket-topic-config-grid"><?php echo $topicTabsHtml; ?></div>
-            <div class="scm-pqr-config-actions">
-              <button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Guardar temas</button>
-              <small class="scm-ticket-topic-tabs-msg" aria-live="polite"></small>
-            </div>
-          </form>
-        </section>
         <section class="scm-pqr-settings-section">
           <h4>Funcionarios que reciben notificaciones</h4>
           <p>Recibir&aacute;n WhatsApp y correo cada vez que se cree una solicitud desde Guardian. Puedes seleccionar varios funcionarios.</p>

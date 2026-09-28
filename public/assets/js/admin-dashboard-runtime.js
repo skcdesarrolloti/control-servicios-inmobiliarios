@@ -914,6 +914,73 @@
       }, 120);
     }
 
+    function standaloneDueSettingValue(settings, key, fallback) {
+      var value = Number(settings && settings[key] ? settings[key] : fallback);
+      return Number.isFinite(value) && value > 0 ? value : fallback;
+    }
+
+    function standaloneDueSettingsModalHtml(settings) {
+      settings = settings || {};
+      return '<form class="scm-calendar-due-settings-form scm-calendar-due-settings-form--modal" data-scm-calendar-due-settings-modal autocomplete="off">' +
+        '<label class="scm-field"><span>Cotizaciones sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "cotizaciones_sin_enviar_dias", 3)) + '"><small>Días desde la creación.</small></label>' +
+        '<label class="scm-field"><span>Tickets sin cita preventiva</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="tickets_preventivos_sin_cita_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "tickets_preventivos_sin_cita_dias", 3)) + '"><small>Días desde que se crea el ticket preventivo.</small></label>' +
+        '<label class="scm-field"><span>Preventivas sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "preventivas_dias", 3)) + '"><small>Días desde que se crea la revisión preventiva.</small></label>' +
+        '<label class="scm-field"><span>Cotizaciones enviadas sin respuesta</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "cotizaciones_enviadas_sin_respuesta_dias", 10)) + '"><small>Días desde el envío.</small></label>' +
+        "</form>";
+    }
+
+    function collectStandaloneDueSettings(popup) {
+      var payload = {};
+      Array.prototype.slice.call((popup || document).querySelectorAll("[data-scm-due-setting]")).forEach(function (input) {
+        var value = Number(input.value || 0);
+        if (!Number.isFinite(value) || value <= 0) {
+          value = Number(input.getAttribute("value") || 1);
+        }
+        payload[input.name] = String(Math.max(1, Math.round(value)));
+      });
+      return payload;
+    }
+
+    function openStandaloneDueSettingsModal() {
+      if (!window.Swal || !ajaxUrl || !actionAdminDueCalendar || !actionAdminDueSettingsSave) {
+        showToast("error", "La configuración de vencimientos no está disponible.");
+        return;
+      }
+      dashboardAction(actionAdminDueCalendar, dashboardMonthRange(new Date()))
+        .then(function (data) {
+          var settings = data.settings || {};
+          return window.Swal.fire({
+            title: "Días de vencimiento",
+            html: standaloneDueSettingsModalHtml(settings),
+            width: 980,
+            showCancelButton: true,
+            confirmButtonText: "Guardar configuración",
+            cancelButtonText: "Cerrar",
+            buttonsStyling: false,
+            customClass: {
+              popup: "scm-calendar-swal-popup scm-calendar-due-settings-swal",
+              confirmButton: "scm-btn-primary",
+              cancelButton: "scm-btn-secondary",
+            },
+            preConfirm: function () {
+              var popup = window.Swal.getPopup();
+              return dashboardAction(actionAdminDueSettingsSave, collectStandaloneDueSettings(popup)).catch(function (err) {
+                window.Swal.showValidationMessage(err.message || "No se pudo guardar la configuración.");
+                return false;
+              });
+            },
+          });
+        })
+        .then(function (result) {
+          if (result && result.isConfirmed && result.value) {
+            showToast("success", result.value.message || "Configuración guardada.");
+          }
+        })
+        .catch(function (error) {
+          showToast("error", error.message || "No se pudo cargar la configuración.");
+        });
+    }
+
     function loadDashboardDuePopupRows() {
       if (dashboardDuePopupPromise) return dashboardDuePopupPromise;
       if (!ajaxUrl || !actionAdminDueCalendar) return Promise.resolve([]);
@@ -9814,7 +9881,7 @@
 
       function setMessage(form, text, isError) {
         var msg = form.querySelector(
-          ".scm-public-pqr-corresponsable-msg, .scm-notif-responsable-msg, .scm-ticket-topic-tabs-msg"
+          ".scm-public-pqr-corresponsable-msg, .scm-notif-responsable-msg"
         );
         if (!msg) {
           return;
@@ -9845,12 +9912,9 @@
         }
         event.preventDefault();
         var isCorresponsable = form.classList.contains("scm-public-pqr-corresponsable-form");
-        var isTopicTabs = form.classList.contains("scm-ticket-topic-tabs-form");
-        var action = isTopicTabs
-          ? actions.ticket_topic_settings_save || "scm_ticket_topic_settings_save"
-          : (isCorresponsable
+        var action = isCorresponsable
             ? actions.guardar_corresponsable_pqr_publico || "scm_guardar_corresponsable_pqr_publico"
-            : actions.notif_responsable_pqr || "scm_guardar_notif_responsable_pqr");
+            : actions.notif_responsable_pqr || "scm_guardar_notif_responsable_pqr";
         var btn = form.querySelector('button[type="submit"]');
         if (btn) btn.disabled = true;
         setMessage(form, "Guardando...", false);
@@ -9867,9 +9931,7 @@
             if (!json || !json.success) {
               throw new Error(
                 (json && json.data && json.data.message) ||
-                  (isTopicTabs
-                    ? "No se pudieron guardar los temas."
-                    : isCorresponsable
+                  (isCorresponsable
                     ? "No se pudo guardar el corresponsable."
                     : "No se pudo guardar la notificacion.")
               );
@@ -9889,6 +9951,82 @@
     }
 
     bindPublicPqrSettingsShortcut();
+
+    function bindTicketTopicSettings() {
+      var openBtn = root.querySelector("#scm-open-ticket-topic-settings");
+      var modal = root.querySelector("#scm-ticket-topic-settings-modal");
+      var form = root.querySelector("#scm-ticket-topic-tabs-form");
+      if (!openBtn || !modal || !form || modal.dataset.scmSettingsBound === "1") {
+        return;
+      }
+      modal.dataset.scmSettingsBound = "1";
+      var closeBtn = modal.querySelector("#scm-close-ticket-topic-settings");
+      var msg = modal.querySelector(".scm-ticket-topic-tabs-msg");
+
+      function openModal() {
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+      }
+
+      function closeModal() {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+      }
+
+      function setMessage(text, isError) {
+        if (!msg) return;
+        msg.textContent = text || "";
+        msg.classList.toggle("error", !!isError);
+      }
+
+      openBtn.addEventListener("click", openModal);
+      if (closeBtn) {
+        closeBtn.addEventListener("click", closeModal);
+      }
+      modal.addEventListener("click", function (event) {
+        if (event.target === modal) {
+          closeModal();
+        }
+      });
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var action = actions.ticket_topic_settings_save || "scm_ticket_topic_settings_save";
+        if (!ajaxUrl || !action) {
+          setMessage("No está disponible la configuración de temas.", true);
+          return;
+        }
+        var btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+        setMessage("Guardando temas...", false);
+
+        var fd = new FormData(form);
+        fd.append("action", action);
+        fd.append("nonce", nonce);
+        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (response) { return response.json(); })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error((json && json.data && json.data.message) || "No se pudieron guardar los temas.");
+            }
+            setMessage((json.data && json.data.message) || "Temas guardados.", false);
+            showToast("success", "Temas de casos guardados.");
+          })
+          .catch(function (error) {
+            setMessage(error.message || "No se pudieron guardar los temas.", true);
+            showToast("error", error.message || "No se pudieron guardar los temas.");
+          })
+          .finally(function () {
+            if (btn) btn.disabled = false;
+          });
+      });
+    }
+
+    bindTicketTopicSettings();
+
+    window.addEventListener("scm:open-ticket-topic-settings", function () {
+      var openBtn = root.querySelector("#scm-open-ticket-topic-settings");
+      if (openBtn) openBtn.click();
+    });
 
     function bindInternalNotificationsSettings() {
       var openBtn = root.querySelector("#scm-open-internal-notifications");
@@ -20868,18 +21006,7 @@
       var dueSettingsShortcut = event.target.closest("[data-scm-open-due-settings]");
       if (dueSettingsShortcut) {
         event.preventDefault();
-        var duePanel = root.querySelector('#scm-home-calendar-section-due [data-scm-calendar-panel]');
-        if (duePanel) {
-          duePanel.dispatchEvent(new CustomEvent("scm:open-due-settings", { bubbles: false }));
-        } else {
-          openDashboardDueCalendar();
-          window.setTimeout(function () {
-            var loadedDuePanel = root.querySelector('#scm-home-calendar-section-due [data-scm-calendar-panel]');
-            if (loadedDuePanel) {
-              loadedDuePanel.dispatchEvent(new CustomEvent("scm:open-due-settings", { bubbles: false }));
-            }
-          }, 180);
-        }
+        openStandaloneDueSettingsModal();
         return;
       }
 
@@ -20992,6 +21119,10 @@
         targetTab.click();
         targetTab.focus({ preventScroll: true });
       }
+    });
+
+    window.addEventListener("scm:open-due-settings-global", function () {
+      openStandaloneDueSettingsModal();
     });
 
     loadActiveLazyPanel();

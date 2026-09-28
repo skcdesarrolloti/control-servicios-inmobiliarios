@@ -90,8 +90,11 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
             if (el) el.click();
             else window.dispatchEvent(new CustomEvent('scm:open-configuracion'));
           } else if (action === 'due-settings') {
-            const el = document.querySelector('[data-scm-open-due-settings]');
+            window.dispatchEvent(new CustomEvent('scm:open-due-settings-global'));
+          } else if (action === 'ticket-topic-settings') {
+            const el = document.getElementById('scm-open-ticket-topic-settings');
             if (el) el.click();
+            else window.dispatchEvent(new CustomEvent('scm:open-ticket-topic-settings'));
           } else if (action === 'notifications') {
             const el = document.getElementById('scm-open-internal-notifications') || document.getElementById('scm-open-pqr-settings');
             if (el) el.click();
