@@ -3660,8 +3660,17 @@ trait HandlesTicketWorkflowActions
   /** @param array<string,mixed> $ticket @return array<string,mixed> */
   private function contractRetentionTicketUiData(array $ticket): array
   {
-    $schema = new \SCM\Support\SchemaInspector($this->db);
-    $funcionarios = FuncionarioOptions::activeFuncionarios($this->db, $schema);
+    try {
+      $schema = new \SCM\Support\SchemaInspector($this->db);
+      $funcionarios = FuncionarioOptions::activeFuncionarios($this->db, $schema);
+    } catch (\Throwable $exception) {
+      error_log('[contract_retention_ticket_ui] funcionarios: ' . $exception->getMessage());
+      return [
+        'enabled' => false,
+        'default_employee_id' => '',
+        'funcionarios' => [],
+      ];
+    }
     $validIds = [];
     $options = [];
     foreach ($funcionarios as $funcionario) {
@@ -3680,9 +3689,16 @@ trait HandlesTicketWorkflowActions
       ];
     }
 
+    $defaultEmployeeId = '';
+    try {
+      $defaultEmployeeId = $this->contractRetentionDefaultEmployeeId($ticket, array_keys($validIds));
+    } catch (\Throwable $exception) {
+      error_log('[contract_retention_ticket_ui] default_employee: ' . $exception->getMessage());
+    }
+
     return [
       'enabled' => $options !== [],
-      'default_employee_id' => $this->contractRetentionDefaultEmployeeId($ticket, array_keys($validIds)),
+      'default_employee_id' => $defaultEmployeeId,
       'funcionarios' => $options,
     ];
   }
@@ -3692,13 +3708,12 @@ trait HandlesTicketWorkflowActions
   {
     $valid = array_fill_keys(array_map('strval', $validEmployeeIds), true);
     $contract = $this->contractTerminationContractByContext($ticket);
-    $property = $this->contractRetentionPropertyByContext($ticket, $contract);
     $columns = [
       'id_empleado', 'id_funcionario', 'id_asesor', 'asesor_id', 'id_comercial', 'comercial_id',
       'id_captador', 'captador_id', 'funcionario_creador', 'id_funcionario_creador', 'cct_author_id',
     ];
 
-    foreach ([$contract, $property, $ticket] as $row) {
+    foreach ([$contract, $ticket] as $row) {
       foreach ($columns as $column) {
         $employeeId = $this->contractRetentionNormalizeEmployeeId((string) ($row[$column] ?? ''), $valid);
         if ($employeeId !== '') {
@@ -3728,43 +3743,6 @@ trait HandlesTicketWorkflowActions
       }
     }
     return '';
-  }
-
-  /** @param array<string,mixed> $ticket @param array<string,mixed> $contract @return array<string,mixed> */
-  private function contractRetentionPropertyByContext(array $ticket, array $contract = []): array
-  {
-    $table = $this->db->table('jet_cct_inmuebles');
-    if (!$this->table_exists($table)) {
-      return [];
-    }
-    $refs = array_values(array_unique(array_filter(array_map('trim', array_map('strval', [
-      $ticket['id_inmueble_data'] ?? '',
-      $ticket['id_inmueble'] ?? '',
-      $ticket['inmueble'] ?? '',
-      $contract['id_inmueble_data'] ?? '',
-      $contract['id_inmueble'] ?? '',
-      $contract['inmueble'] ?? '',
-      $contract['codigo_inmueble_web'] ?? '',
-    ])))));
-    if ($refs === []) {
-      return [];
-    }
-    $columns = array_values(array_filter(
-      ['_ID', 'id_inmueble', 'codigo', 'codigo_inmueble', 'codigo_inmueble_web', 'inmueble'],
-      fn(string $column): bool => $this->column_exists($table, $column)
-    ));
-    if ($columns === []) {
-      return [];
-    }
-    $where = [];
-    $args = [];
-    foreach ($columns as $column) {
-      foreach ($refs as $ref) {
-        $where[] = "TRIM(COALESCE(`{$column}`, '')) = ?";
-        $args[] = $ref;
-      }
-    }
-    return $this->db->getRow("SELECT * FROM `{$table}` WHERE " . implode(' OR ', $where) . ' ORDER BY `_ID` DESC LIMIT 1', $args) ?: [];
   }
 
   /** @param array<string,mixed> $ticket @return array<string,mixed> */
