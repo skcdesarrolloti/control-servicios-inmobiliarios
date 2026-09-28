@@ -3358,6 +3358,51 @@ body.scm-modal-open {
   padding: 8px 10px;
 }
 
+#scm-app .scm-contracts-ending-import {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #d9e4f2;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+#scm-app .scm-contracts-ending-import label {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+#scm-app .scm-contracts-ending-import label > span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-contracts-ending-import input[type="file"] {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #0b1f3a;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px 10px;
+}
+
+#scm-app .scm-contracts-ending-import small {
+  grid-column: 1 / -1;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 #scm-app .scm-contracts-ending-list {
   display: grid;
   gap: 12px;
@@ -3479,6 +3524,10 @@ body.scm-modal-open {
   #scm-app .scm-contracts-ending-actions {
     justify-content: flex-start;
   }
+
+  #scm-app .scm-contracts-ending-import {
+    grid-template-columns: 1fr;
+  }
 }
 
 .swal2-popup.scm-contract-termination-swal .swal2-html-container {
@@ -3489,6 +3538,147 @@ body.scm-modal-open {
 .swal2-html-container .scm-contract-termination-form {
   display: grid;
   gap: 14px;
+}
+
+.swal2-popup.scm-contracts-ending-import-swal .swal2-html-container {
+  max-height: min(68vh, 680px);
+  overflow: auto;
+}
+
+.swal2-html-container .scm-contracts-ending-import-preview {
+  display: grid;
+  gap: 12px;
+  color: #0b1f3a;
+  font-family: "Poppins", sans-serif;
+}
+
+.swal2-html-container .scm-contracts-ending-import-head,
+.swal2-html-container .scm-contracts-ending-import-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.swal2-html-container .scm-contracts-ending-import-head {
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #d9e4f2;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.swal2-html-container .scm-contracts-ending-import-head span,
+.swal2-html-container .scm-contracts-ending-import-kpis span {
+  display: block;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.swal2-html-container .scm-contracts-ending-import-head strong,
+.swal2-html-container .scm-contracts-ending-import-kpis strong {
+  display: block;
+  color: #0b1f3a;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.swal2-html-container .scm-contracts-ending-import-head small,
+.swal2-html-container .scm-contracts-ending-import-head em {
+  color: #64748b;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.swal2-html-container .scm-contracts-ending-import-head em {
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  padding: 7px 10px;
+}
+
+.swal2-html-container .scm-contracts-ending-import-kpis > div {
+  flex: 1 1 150px;
+  padding: 12px;
+  border: 1px solid #d9e4f2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.swal2-html-container .scm-contracts-ending-import-kpis .is-change {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.swal2-html-container .scm-contracts-ending-import-kpis .is-warning {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.swal2-html-container .scm-contracts-ending-import-table-wrap {
+  overflow: auto;
+  border: 1px solid #d9e4f2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.swal2-html-container .scm-contracts-ending-import-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.swal2-html-container .scm-contracts-ending-import-table-wrap th,
+.swal2-html-container .scm-contracts-ending-import-table-wrap td {
+  padding: 10px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.swal2-html-container .scm-contracts-ending-import-table-wrap th {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.swal2-html-container .scm-contracts-ending-import-table-wrap td strong,
+.swal2-html-container .scm-contracts-ending-import-table-wrap td span {
+  display: block;
+  color: #0b1f3a;
+  font-weight: 900;
+}
+
+.swal2-html-container .scm-contracts-ending-import-table-wrap td small {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.swal2-html-container .scm-contracts-ending-import-table-wrap tr.is-change td:last-child span {
+  color: #047857;
+}
+
+.swal2-html-container .scm-contracts-ending-import-table-wrap tr.is-unmatched td:last-child span,
+.swal2-html-container .scm-contracts-ending-import-table-wrap tr.is-ambiguous td:last-child span,
+.swal2-html-container .scm-contracts-ending-import-table-wrap tr.is-invalid td:last-child span {
+  color: #c2410c;
+}
+
+.swal2-html-container .scm-contracts-ending-import-note,
+.swal2-html-container .scm-contracts-ending-import-more {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .swal2-html-container .scm-contract-termination-case {

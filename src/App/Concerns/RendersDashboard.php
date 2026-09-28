@@ -501,6 +501,8 @@ trait RendersDashboard
         'contract_non_renewal_respond' => self::AJAX_CONTRACT_NON_RENEWAL_RESPOND,
         'contracts_ending_months' => self::AJAX_CONTRACTS_ENDING_MONTHS,
         'contracts_ending_create_retention' => self::AJAX_CONTRACTS_ENDING_CREATE_RETENTION,
+        'contracts_ending_import_preview' => self::AJAX_CONTRACTS_ENDING_IMPORT_PREVIEW,
+        'contracts_ending_import_apply' => self::AJAX_CONTRACTS_ENDING_IMPORT_APPLY,
         'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
@@ -856,6 +858,14 @@ trait RendersDashboard
                     <button type="button" class="scm-case-work-btn" data-scm-contracts-ending-refresh>Actualizar</button>
                   </div>
                 </div>
+                <form class="scm-contracts-ending-import" data-scm-contracts-ending-import enctype="multipart/form-data" autocomplete="off">
+                  <label>
+                    <span>Actualizar fecha fin desde Excel</span>
+                    <input type="file" name="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+                  </label>
+                  <button type="submit" class="scm-case-work-btn scm-primary-action">Previsualizar actualizaci&oacute;n</button>
+                  <small>Se cruzan No. Contrato + No. Inmueble y solo se aplica despu&eacute;s de confirmar los cambios.</small>
+                </form>
                 <div class="scm-contract-termination-status" data-scm-contracts-ending-status>Cargando contratos por terminar...</div>
                 <div class="scm-contract-termination-summary" data-scm-contracts-ending-summary></div>
                 <div class="scm-contracts-ending-list" data-scm-contracts-ending-list></div>

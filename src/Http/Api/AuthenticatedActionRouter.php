@@ -108,6 +108,8 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACT_NON_RENEWAL_RESPOND => 'ajax_handler_contract_non_renewal_respond',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACTS_ENDING_MONTHS => 'ajax_handler_contracts_ending_months',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACTS_ENDING_CREATE_RETENTION => 'ajax_handler_contracts_ending_create_retention',
+      SuCasaControlServiciosInmobiliarios::AJAX_CONTRACTS_ENDING_IMPORT_PREVIEW => 'ajax_handler_contracts_ending_import_preview',
+      SuCasaControlServiciosInmobiliarios::AJAX_CONTRACTS_ENDING_IMPORT_APPLY => 'ajax_handler_contracts_ending_import_apply',
       SuCasaControlServiciosInmobiliarios::AJAX_DASHBOARD_METRICS => 'ajax_handler_dashboard_metrics',
       SuCasaControlServiciosInmobiliarios::AJAX_DASHBOARD_FILTER_OPTIONS => 'ajax_handler_dashboard_filter_options',
       SuCasaControlServiciosInmobiliarios::AJAX_CANON_INSURANCE_AUDIT_LIST => 'ajax_handler_canon_insurance_audit_list',

@@ -7,6 +7,8 @@ namespace SCM\App\Concerns;
 use SCM\Core\Auth;
 use SCM\Core\Settings;
 use SCM\Support\FuncionarioOptions;
+use SCM\Support\LegacyXlsReader;
+use Shuchkin\SimpleXLSX;
 
 trait HandlesTicketWorkflowActions
 {
@@ -1140,6 +1142,393 @@ trait HandlesTicketWorkflowActions
       'ticket_url' => (string) ($result['ticket_url'] ?? ''),
       'whatsapp_queued' => (string) ($result['whatsapp_queued'] ?? 0),
     ]);
+  }
+
+  public function ajax_handler_contracts_ending_import_preview(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessContractsEndingPanel() || (!$this->canAccessDashboardTab('contratos_arrendamiento') && !$this->canUseDashboardAction('case_respond'))) {
+      $this->jsonFail('No tienes permiso para actualizar fechas de contratos.');
+    }
+
+    $file = $_FILES['file'] ?? null;
+    if (!is_array($file)) {
+      $this->jsonFail('Selecciona un archivo .xls o .xlsx.');
+    }
+
+    try {
+      $preview = $this->contractsEndingImportPreview($file);
+      $this->jsonOk($preview + [
+        'message' => 'Revisa los cambios antes de aplicar.',
+      ]);
+    } catch (\Throwable $exception) {
+      error_log('[contracts_ending_import_preview] ' . $exception->getMessage());
+      $this->jsonFail($exception->getMessage());
+    }
+  }
+
+  public function ajax_handler_contracts_ending_import_apply(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessContractsEndingPanel() || (!$this->canAccessDashboardTab('contratos_arrendamiento') && !$this->canUseDashboardAction('case_respond'))) {
+      $this->jsonFail('No tienes permiso para actualizar fechas de contratos.');
+    }
+
+    $changesJson = trim(wp_unslash((string) ($_POST['changes'] ?? '')));
+    $token = trim(sanitize_text_field(wp_unslash((string) ($_POST['token'] ?? ''))));
+    $changes = json_decode($changesJson, true);
+    if (!is_array($changes) || $changes === []) {
+      $this->jsonFail('No hay cambios para aplicar.');
+    }
+    if (!hash_equals($this->contractsEndingImportToken($changes), $token)) {
+      $this->jsonFail('La previsualización ya no es válida. Vuelve a subir el archivo y revisa los cambios.');
+    }
+
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    if (!$this->table_exists($table) || !$this->column_exists($table, 'fin_contrato')) {
+      $this->jsonFail('La tabla de contratos no está disponible.');
+    }
+
+    $updated = 0;
+    $skipped = 0;
+    $applied = [];
+    $now = date('Y-m-d H:i:s');
+    $employeeId = Auth::employeeId();
+    foreach ($changes as $change) {
+      if (!is_array($change)) {
+        $skipped++;
+        continue;
+      }
+      $contractId = (int) ($change['contract_id'] ?? 0);
+      $newTs = (int) ($change['new_fin_contrato'] ?? 0);
+      if ($contractId <= 0 || $newTs <= 0) {
+        $skipped++;
+        continue;
+      }
+      $current = $this->db->getRow("SELECT `_ID`, `fin_contrato`, `contrato`, `inmueble`, `id_inmueble` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$contractId]);
+      if (!is_array($current) || $current === []) {
+        $skipped++;
+        continue;
+      }
+      $currentTs = $this->contractTerminationTimestamp($current['fin_contrato'] ?? '');
+      if ($currentTs === $newTs) {
+        $skipped++;
+        continue;
+      }
+      $payload = ['fin_contrato' => (string) $newTs];
+      if ($this->column_exists($table, 'cct_modified')) {
+        $payload['cct_modified'] = $now;
+      }
+      if ($employeeId !== '' && $this->column_exists($table, 'cct_author_id')) {
+        $payload['cct_author_id'] = $employeeId;
+      }
+      $rows = $this->db->update($table, $payload, ['_ID' => $contractId]);
+      if ($rows >= 0) {
+        $updated++;
+        $applied[] = [
+          'contract_id' => (string) $contractId,
+          'contrato' => trim((string) ($current['contrato'] ?? '')),
+          'inmueble' => trim((string) ($current['inmueble'] ?? $current['id_inmueble'] ?? '')),
+          'old_fin_label' => $currentTs > 0 ? date('d/m/Y', $currentTs) : '',
+          'new_fin_label' => date('d/m/Y', $newTs),
+        ];
+      } else {
+        $skipped++;
+      }
+    }
+
+    $this->jsonOk([
+      'message' => 'Fechas de fin actualizadas: ' . $updated . '.',
+      'updated' => $updated,
+      'skipped' => $skipped,
+      'applied' => $applied,
+    ]);
+  }
+
+  /** @param array<string,mixed> $file @return array<string,mixed> */
+  private function contractsEndingImportPreview(array $file): array
+  {
+    $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($error !== UPLOAD_ERR_OK) {
+      throw new \RuntimeException('No se pudo subir el archivo.');
+    }
+    $tmp = (string) ($file['tmp_name'] ?? '');
+    $name = basename((string) ($file['name'] ?? 'contratos.xls'));
+    $size = (int) ($file['size'] ?? 0);
+    $maxBytes = defined('SCM_UPLOAD_MAX_BYTES') ? (int) SCM_UPLOAD_MAX_BYTES : 10485760;
+    if ($tmp === '' || !is_readable($tmp) || $size <= 0 || $size > $maxBytes) {
+      throw new \RuntimeException('El archivo está vacío o supera el límite permitido.');
+    }
+    $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    if (!in_array($extension, ['xls', 'xlsx'], true)) {
+      throw new \RuntimeException('Formato no soportado. Sube un archivo .xls o .xlsx.');
+    }
+
+    $rows = $this->contractsEndingImportSpreadsheetRows($tmp, $name);
+    if (count($rows) < 2) {
+      throw new \RuntimeException('El archivo no tiene filas para procesar.');
+    }
+    $headers = array_map(fn($value): string => $this->contractsEndingImportNormalizeHeader((string) $value), $rows[0]);
+    $contractIndex = $this->contractsEndingImportFindHeader($headers, ['no contrato', 'contrato', 'numero contrato', 'n contrato']);
+    $propertyIndex = $this->contractsEndingImportFindHeader($headers, ['no inm', 'no inmueble', 'inmueble', 'numero inmueble', 'cod inmueble']);
+    $endIndex = $this->contractsEndingImportFindHeader($headers, ['fin contrato', 'fecha fin contrato', 'fecha final contrato', 'fecha fin']);
+    $tenantIndex = $this->contractsEndingImportFindHeader($headers, ['arrendatario', 'nombre arrendatario']);
+    if ($contractIndex < 0 || $propertyIndex < 0 || $endIndex < 0) {
+      throw new \RuntimeException('El archivo debe tener columnas No. Contrato, No. Inm y Fin Contrato.');
+    }
+
+    $importRows = [];
+    for ($i = 1, $max = min(count($rows), 5001); $i < $max; $i++) {
+      $row = $rows[$i];
+      $contract = $this->contractsEndingImportCleanText($row[$contractIndex] ?? '');
+      $property = $this->contractsEndingImportCleanText($row[$propertyIndex] ?? '');
+      $endRaw = $row[$endIndex] ?? '';
+      $tenant = $tenantIndex >= 0 ? $this->contractsEndingImportCleanText($row[$tenantIndex] ?? '') : '';
+      if ($contract === '' && $property === '' && $this->contractsEndingImportCleanText($endRaw) === '') {
+        continue;
+      }
+      $newTs = $this->contractsEndingImportDateTimestamp($endRaw);
+      $importRows[] = [
+        'line' => $i + 1,
+        'contract' => $this->contractsEndingImportIdentifier($contract),
+        'property' => $this->contractsEndingImportIdentifier($property),
+        'tenant' => $tenant,
+        'end_raw' => $this->contractsEndingImportCleanText($endRaw),
+        'new_ts' => $newTs,
+      ];
+    }
+
+    if ($importRows === []) {
+      throw new \RuntimeException('No se encontraron filas con contratos en el archivo.');
+    }
+
+    $matches = $this->contractsEndingImportContractMatches($importRows);
+    $changes = [];
+    $previewRows = [];
+    $stats = ['total' => count($importRows), 'changes' => 0, 'unchanged' => 0, 'unmatched' => 0, 'ambiguous' => 0, 'invalid' => 0];
+    foreach ($importRows as $row) {
+      $key = $row['line'];
+      $candidates = $matches[$key] ?? [];
+      $status = 'change';
+      $note = '';
+      $contractDb = [];
+      $currentTs = 0;
+      if ((int) $row['new_ts'] <= 0) {
+        $status = 'invalid';
+        $note = 'Fecha fin inválida.';
+        $stats['invalid']++;
+      } elseif (count($candidates) === 0) {
+        $status = 'unmatched';
+        $note = 'No se encontró contrato con ese No. Contrato + No. Inm.';
+        $stats['unmatched']++;
+      } elseif (count($candidates) > 1) {
+        $status = 'ambiguous';
+        $note = 'Coincide con más de un contrato. No se actualizará automáticamente.';
+        $stats['ambiguous']++;
+      } else {
+        $contractDb = $candidates[0];
+        $currentTs = $this->contractTerminationTimestamp($contractDb['fin_contrato'] ?? '');
+        if ($currentTs === (int) $row['new_ts']) {
+          $status = 'unchanged';
+          $note = 'Ya tiene la misma fecha fin.';
+          $stats['unchanged']++;
+        } else {
+          $stats['changes']++;
+          $changes[] = [
+            'contract_id' => (string) ($contractDb['_ID'] ?? ''),
+            'new_fin_contrato' => (string) $row['new_ts'],
+          ];
+        }
+      }
+
+      $previewRows[] = [
+        'line' => (string) $row['line'],
+        'status' => $status,
+        'note' => $note,
+        'contract_id' => (string) ($contractDb['_ID'] ?? ''),
+        'contrato_excel' => (string) $row['contract'],
+        'inmueble_excel' => (string) $row['property'],
+        'arrendatario_excel' => (string) $row['tenant'],
+        'contrato_db' => trim((string) ($contractDb['contrato'] ?? '')),
+        'inmueble_db' => trim((string) ($contractDb['inmueble'] ?? $contractDb['id_inmueble'] ?? $contractDb['codigo_inmueble_web'] ?? '')),
+        'old_fin_label' => $currentTs > 0 ? date('d/m/Y', $currentTs) : '',
+        'new_fin_label' => (int) $row['new_ts'] > 0 ? date('d/m/Y', (int) $row['new_ts']) : (string) $row['end_raw'],
+      ];
+    }
+
+    return [
+      'stats' => $stats,
+      'rows' => $previewRows,
+      'changes' => $changes,
+      'token' => $this->contractsEndingImportToken($changes),
+      'filename' => $name,
+      'generated_at' => date('d/m/Y H:i'),
+    ];
+  }
+
+  /** @return array<int,array<int,mixed>> */
+  private function contractsEndingImportSpreadsheetRows(string $path, string $name): array
+  {
+    $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    if ($extension === 'xls') {
+      $book = new LegacyXlsReader($path);
+      if (!$book->success()) {
+        throw new \RuntimeException('No se pudo leer el archivo XLS: ' . (string) $book->error());
+      }
+      $rowsEx = $book->rowsEx(0, 5001);
+      return array_map(function (array $row): array {
+        return array_map(static fn($cell) => is_array($cell) ? ($cell['raw'] ?? $cell['value'] ?? '') : $cell, array_values($row));
+      }, $rowsEx);
+    }
+    $book = SimpleXLSX::parseFile($path);
+    if (!$book instanceof SimpleXLSX) {
+      throw new \RuntimeException('No se pudo leer el archivo XLSX: ' . (string) SimpleXLSX::parseError());
+    }
+    return array_map(static fn(array $row): array => array_values($row), $book->rows(0, 5001));
+  }
+
+  /** @param array<int,array<string,mixed>> $importRows @return array<int,array<int,array<string,mixed>>> */
+  private function contractsEndingImportContractMatches(array $importRows): array
+  {
+    $contracts = array_values(array_unique(array_filter(array_map(static fn(array $row): string => (string) ($row['contract'] ?? ''), $importRows))));
+    if ($contracts === []) {
+      return [];
+    }
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+    $columns = ['_ID', 'contrato', 'id_contrato', 'id_contrato_arrendamiento', 'inmueble', 'id_inmueble', 'codigo_inmueble_web', 'arrendatario', 'direccion', 'fin_contrato'];
+    $select = [];
+    foreach ($columns as $column) {
+      if ($this->column_exists($table, $column)) {
+        $select[] = "`{$column}`";
+      }
+    }
+    if ($select === []) {
+      return [];
+    }
+
+    $contractColumns = array_values(array_filter(['contrato', 'id_contrato', 'id_contrato_arrendamiento', '_ID'], fn($column): bool => $this->column_exists($table, $column)));
+    $whereParts = [];
+    $args = [];
+    foreach (array_chunk($contracts, 150) as $chunk) {
+      $placeholders = implode(', ', array_fill(0, count($chunk), '?'));
+      foreach ($contractColumns as $column) {
+        $whereParts[] = "TRIM(COALESCE(`{$column}`, '')) IN ({$placeholders})";
+        array_push($args, ...$chunk);
+      }
+    }
+    if ($whereParts === []) {
+      return [];
+    }
+    $dbRows = $this->db->getResults("SELECT " . implode(', ', $select) . " FROM `{$table}` WHERE " . implode(' OR ', $whereParts) . " LIMIT 3000", $args);
+    $matches = [];
+    foreach ($importRows as $row) {
+      $rowContract = (string) ($row['contract'] ?? '');
+      $rowProperty = (string) ($row['property'] ?? '');
+      $line = (int) ($row['line'] ?? 0);
+      foreach ($dbRows as $dbRow) {
+        if (!$this->contractsEndingImportRowMatches($dbRow, ['contrato', 'id_contrato', 'id_contrato_arrendamiento', '_ID'], $rowContract)) {
+          continue;
+        }
+        if ($rowProperty !== '' && !$this->contractsEndingImportRowMatches($dbRow, ['inmueble', 'id_inmueble', 'codigo_inmueble_web'], $rowProperty)) {
+          continue;
+        }
+        $matches[$line][] = $dbRow;
+      }
+    }
+    return $matches;
+  }
+
+  /** @param array<string,mixed> $row @param array<int,string> $columns */
+  private function contractsEndingImportRowMatches(array $row, array $columns, string $expected): bool
+  {
+    $expected = $this->contractsEndingImportIdentifier($expected);
+    if ($expected === '') {
+      return false;
+    }
+    foreach ($columns as $column) {
+      if ($this->contractsEndingImportIdentifier($row[$column] ?? '') === $expected) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private function contractsEndingImportToken(array $changes): string
+  {
+    $canonical = [];
+    foreach ($changes as $change) {
+      if (!is_array($change)) {
+        continue;
+      }
+      $contractId = trim((string) ($change['contract_id'] ?? ''));
+      $newTs = trim((string) ($change['new_fin_contrato'] ?? ''));
+      if ($contractId !== '' && $newTs !== '') {
+        $canonical[] = ['contract_id' => $contractId, 'new_fin_contrato' => $newTs];
+      }
+    }
+    usort($canonical, static fn(array $a, array $b): int => strcmp($a['contract_id'], $b['contract_id']) ?: strcmp($a['new_fin_contrato'], $b['new_fin_contrato']));
+    $secret = defined('SCM_APP_SECRET') ? (string) SCM_APP_SECRET : 'scm-contracts-ending-import';
+    return hash_hmac('sha256', json_encode($canonical, JSON_UNESCAPED_UNICODE), $secret);
+  }
+
+  /** @param array<int,string> $headers @param array<int,string> $aliases */
+  private function contractsEndingImportFindHeader(array $headers, array $aliases): int
+  {
+    foreach ($headers as $index => $header) {
+      foreach ($aliases as $alias) {
+        if ($header === $this->contractsEndingImportNormalizeHeader($alias)) {
+          return (int) $index;
+        }
+      }
+    }
+    return -1;
+  }
+
+  private function contractsEndingImportNormalizeHeader(string $value): string
+  {
+    $value = $this->contractsEndingImportCleanText($value);
+    $value = function_exists('remove_accents') ? remove_accents($value) : strtr($value, [
+      'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ñ' => 'N',
+      'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ñ' => 'n',
+    ]);
+    $value = strtolower($value);
+    $value = preg_replace('/[^a-z0-9]+/', ' ', $value) ?? $value;
+    return trim(preg_replace('/\s+/', ' ', $value) ?? $value);
+  }
+
+  private function contractsEndingImportCleanText($value): string
+  {
+    $text = trim(str_replace("\0", '', (string) $value));
+    return trim(preg_replace('/\s+/', ' ', $text) ?? $text);
+  }
+
+  private function contractsEndingImportIdentifier($value): string
+  {
+    $text = $this->contractsEndingImportCleanText($value);
+    $text = preg_replace('/\.0$/', '', $text) ?? $text;
+    $text = preg_replace('/[^0-9A-Za-z_-]+/', '', $text) ?? $text;
+    return ltrim($text, '0') !== '' ? ltrim($text, '0') : $text;
+  }
+
+  private function contractsEndingImportDateTimestamp($value): int
+  {
+    if (is_numeric($value)) {
+      $number = (float) $value;
+      if ($number > 20000 && $number < 80000) {
+        return (int) strtotime('1899-12-30 +' . (int) $number . ' days 00:00:00');
+      }
+    }
+    $text = $this->contractsEndingImportCleanText($value);
+    if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $text, $m) === 1) {
+      return (int) strtotime(sprintf('%04d-%02d-%02d 00:00:00', (int) $m[3], (int) $m[2], (int) $m[1]));
+    }
+    if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})/', $text, $m) === 1) {
+      return (int) strtotime(sprintf('%04d-%02d-%02d 00:00:00', (int) $m[1], (int) $m[2], (int) $m[3]));
+    }
+    return 0;
   }
 
   public function ajax_handler_repair_followup_notice(): void

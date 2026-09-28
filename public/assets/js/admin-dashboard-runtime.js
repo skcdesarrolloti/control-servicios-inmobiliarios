@@ -227,6 +227,10 @@
     var actionContractsEndingMonths = actions.contracts_ending_months || "";
     var actionContractsEndingCreateRetention =
       actions.contracts_ending_create_retention || "";
+    var actionContractsEndingImportPreview =
+      actions.contracts_ending_import_preview || "";
+    var actionContractsEndingImportApply =
+      actions.contracts_ending_import_apply || "";
     var actionDashboardMetrics = actions.dashboard_metrics || "";
     var actionDashboardFilterOptions = actions.dashboard_filter_options || "";
     var actionRentIncreaseLettersList =
@@ -14614,6 +14618,109 @@
       });
     }
 
+    function contractsEndingImportStatusLabel(status) {
+      if (status === "change") return "Cambiar";
+      if (status === "unchanged") return "Igual";
+      if (status === "unmatched") return "Sin cruce";
+      if (status === "ambiguous") return "Revisar";
+      if (status === "invalid") return "Inválida";
+      return status || "-";
+    }
+
+    function contractsEndingImportPreviewHtml(data) {
+      data = data || {};
+      var stats = data.stats || {};
+      var rows = Array.isArray(data.rows) ? data.rows : [];
+      var visibleRows = rows.slice(0, 80);
+      var rowHtml = visibleRows.map(function (row) {
+        row = row || {};
+        var status = String(row.status || "");
+        return '<tr class="is-' + escHtml(status) + '">' +
+          '<td>' + escHtml(row.line || "") + "</td>" +
+          '<td><strong>' + escHtml(row.contrato_excel || "-") + '</strong><small>Inm. ' + escHtml(row.inmueble_excel || "-") + "</small></td>" +
+          '<td>' + escHtml(row.contrato_db || row.contract_id || "-") + '<small>' + escHtml(row.inmueble_db || "") + "</small></td>" +
+          '<td>' + escHtml(row.old_fin_label || "Sin fecha") + "</td>" +
+          '<td>' + escHtml(row.new_fin_label || "-") + "</td>" +
+          '<td><span>' + escHtml(contractsEndingImportStatusLabel(status)) + '</span><small>' + escHtml(row.note || "") + "</small></td>" +
+        "</tr>";
+      }).join("");
+      if (!rowHtml) {
+        rowHtml = '<tr><td colspan="6">No se encontraron filas para mostrar.</td></tr>';
+      }
+      var more = rows.length > visibleRows.length
+        ? '<p class="scm-contracts-ending-import-more">Mostrando ' + escHtml(String(visibleRows.length)) + " de " + escHtml(String(rows.length)) + " filas revisadas.</p>"
+        : "";
+      return '<div class="scm-contracts-ending-import-preview">' +
+        '<div class="scm-contracts-ending-import-head"><div><span>Archivo</span><strong>' + escHtml(data.filename || "Excel") + '</strong><small>Generado ' + escHtml(data.generated_at || "") + '</small></div><em>Revisión requerida</em></div>' +
+        '<div class="scm-contracts-ending-import-kpis">' +
+          '<div><span>Total filas</span><strong>' + escHtml(String(stats.total || 0)) + "</strong></div>" +
+          '<div class="is-change"><span>Cambiarían</span><strong>' + escHtml(String(stats.changes || 0)) + "</strong></div>" +
+          '<div><span>Iguales</span><strong>' + escHtml(String(stats.unchanged || 0)) + "</strong></div>" +
+          '<div class="is-warning"><span>Sin aplicar</span><strong>' + escHtml(String((stats.unmatched || 0) + (stats.ambiguous || 0) + (stats.invalid || 0))) + "</strong></div>" +
+        "</div>" +
+        '<div class="scm-contracts-ending-import-table-wrap"><table><thead><tr><th>Fila</th><th>Excel</th><th>Contrato encontrado</th><th>Fecha actual</th><th>Nueva fecha</th><th>Estado</th></tr></thead><tbody>' + rowHtml + "</tbody></table></div>" +
+        more +
+        '<p class="scm-contracts-ending-import-note">Al confirmar solo se actualiza <b>fin_contrato</b> de las filas marcadas como Cambiar. La fecha se guarda como Unix en la base de datos.</p>' +
+      "</div>";
+    }
+
+    function openContractsEndingImportPreview(data) {
+      if (!window.Swal || typeof window.Swal.fire !== "function") {
+        showToast("warning", "No se pudo abrir la previsualización.");
+        return;
+      }
+      var changes = Array.isArray(data && data.changes) ? data.changes : [];
+      window.Swal.fire({
+        title: "Previsualización de fechas fin",
+        html: contractsEndingImportPreviewHtml(data || {}),
+        width: "min(1040px, 96vw)",
+        showCancelButton: true,
+        showConfirmButton: changes.length > 0,
+        confirmButtonText: "Aplicar " + changes.length + " cambio" + (changes.length === 1 ? "" : "s"),
+        cancelButtonText: changes.length > 0 ? "No aplicar" : "Cerrar",
+        buttonsStyling: false,
+        customClass: {
+          popup: "scm-calendar-swal-popup scm-contract-termination-swal scm-contracts-ending-import-swal",
+          confirmButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--primary",
+          cancelButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary",
+        },
+      }).then(function (result) {
+        if (!result.isConfirmed || !changes.length) return;
+        return dashboardFormAction(actionContractsEndingImportApply, function (fd) {
+          fd.append("changes", JSON.stringify(changes));
+          fd.append("token", String(data && data.token || ""));
+        }).then(function (applied) {
+          showToast("success", (applied && applied.message) || "Fechas actualizadas.");
+          loadContractsEnding(true);
+        }).catch(function (error) {
+          showToast("error", error && error.message ? error.message : "No se pudieron aplicar los cambios.");
+        });
+      });
+    }
+
+    function previewContractsEndingImport(form) {
+      if (!form || !actionContractsEndingImportPreview) {
+        showToast("error", "La importación no está disponible.");
+        return;
+      }
+      var fileInput = form.querySelector('input[type="file"]');
+      if (!fileInput || !fileInput.files || !fileInput.files.length) {
+        showToast("warning", "Selecciona un archivo .xls o .xlsx.");
+        return;
+      }
+      var submit = form.querySelector('button[type="submit"]');
+      if (submit) submit.disabled = true;
+      dashboardFormAction(actionContractsEndingImportPreview, function (fd) {
+        fd.append("file", fileInput.files[0], fileInput.files[0].name);
+      }).then(function (data) {
+        openContractsEndingImportPreview(data || {});
+      }).catch(function (error) {
+        showToast("error", error && error.message ? error.message : "No se pudo previsualizar el archivo.");
+      }).finally(function () {
+        if (submit) submit.disabled = false;
+      });
+    }
+
     function openContractsEndingRetention(contractPk) {
       var row = contractsEndingRowsByPk[String(contractPk || "")];
       if (!row || !window.Swal || typeof window.Swal.fire !== "function") {
@@ -20884,6 +20991,15 @@
     }, 0);
 
     root.addEventListener("submit", function (e) {
+      var contractsEndingImport = e.target && e.target.closest
+        ? e.target.closest("[data-scm-contracts-ending-import]")
+        : null;
+      if (contractsEndingImport) {
+        e.preventDefault();
+        previewContractsEndingImport(contractsEndingImport);
+        return;
+      }
+
       var propertyHistoryForm = e.target && e.target.closest
         ? e.target.closest("[data-scm-property-history-form]")
         : null;
