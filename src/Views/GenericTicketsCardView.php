@@ -523,8 +523,8 @@ final class GenericTicketsCardView
       : '<span class="scm-card-chip scm-chip-muted">Sin Cotización</span>';
 
     $thirdPartyLabel = 'Inquilino';
-    $thirdPartyValue = $arrendatarioRaw !== '' ? $arrendatarioRaw : ($ownerLabel !== '' ? $ownerLabel : '');
-    if ($arrendatarioRaw === '' && $ownerLabel !== '') {
+    $thirdPartyValue = $arrendatarioRaw !== '' ? $arrendatarioRaw : $propietarioRaw;
+    if ($arrendatarioRaw === '' && $propietarioRaw !== '') {
       $thirdPartyLabel = 'Propietario';
     }
 
