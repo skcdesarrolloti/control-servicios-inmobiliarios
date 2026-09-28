@@ -951,6 +951,8 @@ trait HandlesTicketWorkflowActions
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $term = sanitize_key((string) ($_POST['termino'] ?? ''));
     $endDate = trim(sanitize_text_field(wp_unslash((string) ($_POST['fecha_terminacion'] ?? ''))));
+    $createRetentionTicket = trim((string) ($_POST['crear_ticket_retencion'] ?? '')) === '1';
+    $retentionEmployeeId = trim(sanitize_text_field(wp_unslash((string) ($_POST['retencion_id_empleado'] ?? ''))));
     $notifyRecipients = $this->parse_notify_recipients($_POST['notify_recipients'] ?? []);
     if (isset($_POST['notify_recipients_present']) && empty($notifyRecipients)) {
       $notifyRecipients = ['none'];
@@ -1034,6 +1036,103 @@ trait HandlesTicketWorkflowActions
     }
 
     $this->jsonOk($result);
+  }
+
+  public function ajax_handler_contracts_ending_months(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessContractsEndingPanel()) {
+      $this->jsonFail('No tienes permiso para ver contratos por terminar.');
+    }
+
+    $months = max(1, min(24, (int) ($_POST['months'] ?? 12)));
+    try {
+      $items = $this->contractsEndingMonthItems($months);
+    } catch (\Throwable $exception) {
+      error_log('[contracts_ending_months] ' . $exception->getMessage());
+      $this->jsonFail('No se pudieron cargar los contratos por terminar.');
+    }
+
+    $groups = [];
+    $fromTs = strtotime(date('Y-m-01 00:00:00')) ?: time();
+    for ($i = 0; $i < $months; $i++) {
+      $monthTs = strtotime('+' . $i . ' months', $fromTs) ?: $fromTs;
+      $key = date('Y-m', $monthTs);
+      $groups[$key] = [
+        'key' => $key,
+        'label' => $this->contractEndingMonthLabel($monthTs),
+        'count' => 0,
+        'items' => [],
+      ];
+    }
+    foreach ($items as $item) {
+      $key = (string) ($item['month_key'] ?? '');
+      if ($key === '') {
+        continue;
+      }
+      if (!isset($groups[$key])) {
+        $groups[$key] = [
+          'key' => $key,
+          'label' => (string) ($item['month_label'] ?? $key),
+          'count' => 0,
+          'items' => [],
+        ];
+      }
+      $groups[$key]['count']++;
+      $groups[$key]['items'][] = $item;
+    }
+
+    $this->jsonOk([
+      'items' => $items,
+      'groups' => array_values($groups),
+      'count' => count($items),
+      'months' => $months,
+      'generated_at' => date('d/m/Y H:i'),
+    ]);
+  }
+
+  public function ajax_handler_contracts_ending_create_retention(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_respond') && !$this->canAccessDashboardTab('contratos_arrendamiento')) {
+      $this->jsonFail('No tienes permiso para crear tickets de retención.');
+    }
+
+    $contractPk = trim(sanitize_text_field(wp_unslash((string) ($_POST['contract_pk'] ?? $_POST['id_contrato'] ?? ''))));
+    $employeeId = trim(sanitize_text_field(wp_unslash((string) ($_POST['retencion_id_empleado'] ?? $_POST['id_empleado'] ?? ''))));
+    if ($contractPk === '') {
+      $this->jsonFail('Contrato inválido.');
+    }
+    if ($employeeId === '') {
+      $this->jsonFail('Selecciona el funcionario responsable del ticket de retención.');
+    }
+
+    $contract = $this->contractEndingContractByPk($contractPk);
+    if ($contract === []) {
+      $this->jsonFail('No se encontró el contrato seleccionado.');
+    }
+    $existingTicket = $this->contractEndingRetentionTicketId($contract);
+    if ($existingTicket !== '') {
+      $this->jsonFail('Este contrato ya tiene ticket de retención #' . $existingTicket . '.');
+    }
+
+    $contractCode = $this->contractTerminationFirstText([$contract], ['contrato', 'id_contrato', '_ID']);
+    $endTs = $this->contractTerminationTimestamp($contract['fin_contrato'] ?? '');
+    $endLabel = $endTs > 0 ? date('d/m/Y', $endTs) : 'sin fecha fin registrada';
+    $responseText = 'Ticket creado desde la pestaña Contratos por terminar para gestionar retención comercial. '
+      . 'Contrato ' . ($contractCode !== '' ? $contractCode : $contractPk) . ', fecha fin ' . $endLabel . '.';
+
+    $result = $this->createContractRetentionTicketFromContractRequest($contract, '', $employeeId, $responseText, '', '', 'contrato por terminar');
+    if (($result['ok'] ?? '0') !== '1') {
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo crear el ticket comercial de retención.'));
+    }
+
+    $this->jsonOk([
+      'message' => 'Ticket comercial de retención #' . (string) ($result['ticket_id'] ?? '') . ' creado.',
+      'ticket_id' => (string) ($result['ticket_id'] ?? ''),
+      'ticket_url' => (string) ($result['ticket_url'] ?? ''),
+      'whatsapp_queued' => (string) ($result['whatsapp_queued'] ?? 0),
+    ]);
   }
 
   public function ajax_handler_repair_followup_notice(): void
@@ -3864,6 +3963,161 @@ trait HandlesTicketWorkflowActions
     return '';
   }
 
+  private function canAccessContractsEndingPanel(): bool
+  {
+    return $this->canAccessDashboardTab('contratos_arrendamiento')
+      || $this->canAccessDashboardTab('contractual')
+      || $this->canUseDashboardAction('case_respond');
+  }
+
+  /** @return array<int,array<string,mixed>> */
+  private function contractsEndingMonthItems(int $months): array
+  {
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    if (!$this->table_exists($table) || !$this->column_exists($table, 'fin_contrato')) {
+      return [];
+    }
+    $fromTs = strtotime(date('Y-m-01 00:00:00')) ?: time();
+    $untilBase = strtotime('+' . max(0, $months - 1) . ' months', $fromTs) ?: $fromTs;
+    $toTs = strtotime(date('Y-m-t 23:59:59', $untilBase)) ?: $untilBase;
+    $columns = [
+      '_ID', 'contrato', 'id_contrato', 'id_contrato_arrendamiento', 'inmueble', 'id_inmueble',
+      'codigo_inmueble_web', 'direccion', 'barrio', 'ciudad', 'propietario', 'arrendatario',
+      'correo_propietario', 'correo_arrendatario', 'celular_propietario', 'celular_arrendatario',
+      'id_propietario', 'id_arrendatario', 'inicio_contrato', 'fin_contrato', 'valor_canon',
+      'valor_administracion', 'id_empleado', 'id_funcionario', 'id_asesor', 'id_comercial',
+      'id_captador', 'funcionario_creador', 'id_funcionario_creador', 'cct_author_id',
+    ];
+    $select = [];
+    foreach ($columns as $column) {
+      if ($this->column_exists($table, $column)) {
+        $select[] = "`{$column}`";
+      }
+    }
+    if ($select === []) {
+      $select[] = '`_ID`';
+    }
+
+    $rows = $this->db->getResults(
+      "SELECT " . implode(', ', $select) . " FROM `{$table}` WHERE CAST(COALESCE(`fin_contrato`, 0) AS UNSIGNED) BETWEEN ? AND ? ORDER BY CAST(COALESCE(`fin_contrato`, 0) AS UNSIGNED) ASC, CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC LIMIT 500",
+      [$fromTs, $toTs]
+    );
+    if (!is_array($rows)) {
+      return [];
+    }
+
+    $items = [];
+    foreach ($rows as $row) {
+      if (!is_array($row)) {
+        continue;
+      }
+      $item = $this->contractEndingListItem($row);
+      if ($item !== []) {
+        $items[] = $item;
+      }
+    }
+    return $items;
+  }
+
+  /** @param array<string,mixed> $row @return array<string,mixed> */
+  private function contractEndingListItem(array $row): array
+  {
+    $contractPk = $this->contractTerminationFirstText([$row], ['_ID', 'id_contrato', 'id_contrato_arrendamiento', 'contrato']);
+    if ($contractPk === '') {
+      return [];
+    }
+    $endTs = $this->contractTerminationTimestamp($row['fin_contrato'] ?? '');
+    if ($endTs <= 0) {
+      return [];
+    }
+    $contractCode = $this->contractTerminationFirstText([$row], ['contrato', 'id_contrato', 'id_contrato_arrendamiento', '_ID']);
+    $property = $this->contractTerminationFirstText([$row], ['inmueble', 'id_inmueble', 'codigo_inmueble_web']);
+    $address = $this->contractTerminationFirstText([$row], ['direccion']);
+    $owner = $this->contractTerminationFirstText([$row], ['propietario']);
+    $tenant = $this->contractTerminationFirstText([$row], ['arrendatario']);
+    $existingTicket = $this->contractEndingRetentionTicketId($row);
+
+    return [
+      'contract_pk' => $contractPk,
+      'contrato' => $contractCode,
+      'inmueble' => $property,
+      'direccion' => $address,
+      'propietario' => $owner,
+      'arrendatario' => $tenant,
+      'inicio_contrato' => $this->contractEndingDateLabel($row['inicio_contrato'] ?? ''),
+      'fin_contrato' => date('Y-m-d', $endTs),
+      'fin_contrato_label' => date('d/m/Y', $endTs),
+      'days_left' => (int) floor(($endTs - strtotime(date('Y-m-d 00:00:00'))) / 86400),
+      'month_key' => date('Y-m', $endTs),
+      'month_label' => $this->contractEndingMonthLabel($endTs),
+      'existing_retention_ticket_id' => $existingTicket,
+      'existing_retention_ticket_url' => $existingTicket !== '' ? $this->contractTicketWhatsappUrl($existingTicket) : '',
+      'retention_ticket' => $this->contractRetentionTicketUiData($row),
+    ];
+  }
+
+  private function contractEndingDateLabel($value): string
+  {
+    $ts = $this->contractTerminationTimestamp($value);
+    return $ts > 0 ? date('d/m/Y', $ts) : '';
+  }
+
+  private function contractEndingMonthLabel(int $timestamp): string
+  {
+    $months = [
+      1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril',
+      5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto',
+      9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre',
+    ];
+    $month = (int) date('n', $timestamp);
+    return ($months[$month] ?? date('F', $timestamp)) . ' ' . date('Y', $timestamp);
+  }
+
+  /** @param array<string,mixed> $contract */
+  private function contractEndingRetentionTicketId(array $contract): string
+  {
+    $ticketsTable = $this->db->table('jet_cct_tickets');
+    if (!$this->table_exists($ticketsTable) || !$this->column_exists($ticketsTable, 'id_contrato')) {
+      return '';
+    }
+    $contractRefs = array_values(array_unique(array_filter([
+      trim((string) ($contract['_ID'] ?? '')),
+      trim((string) ($contract['id_contrato'] ?? '')),
+      trim((string) ($contract['id_contrato_arrendamiento'] ?? '')),
+      trim((string) ($contract['contrato'] ?? '')),
+    ], static fn(string $value): bool => $value !== '')));
+    if ($contractRefs === []) {
+      return '';
+    }
+    $topicSql = $this->column_exists($ticketsTable, 'tema_ayuda')
+      ? " AND LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) IN ('retencion de contrato', 'retención de contrato')"
+      : '';
+    $select = $this->column_exists($ticketsTable, 'id_ticket') ? '`_ID`, `id_ticket`' : '`_ID`';
+    $rows = $this->db->getResults(
+      "SELECT {$select} FROM `{$ticketsTable}` WHERE TRIM(COALESCE(`id_contrato`, '')) IN (" . implode(', ', array_fill(0, count($contractRefs), '?')) . "){$topicSql} ORDER BY CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC LIMIT 1",
+      $contractRefs
+    );
+    if (!is_array($rows) || $rows === [] || !is_array($rows[0])) {
+      return '';
+    }
+    return $this->contractTerminationFirstText([$rows[0]], ['id_ticket', '_ID']);
+  }
+
+  private function contractEndingContractByPk(string $contractPk): array
+  {
+    $contractPk = trim($contractPk);
+    if ($contractPk === '') {
+      return [];
+    }
+    $contract = $this->contractTerminationContractByContext([
+      '_ID' => $contractPk,
+      'id_contrato' => $contractPk,
+      'id_contrato_arrendamiento' => $contractPk,
+      'contrato' => $contractPk,
+    ]);
+    return is_array($contract) ? $contract : [];
+  }
+
   /** @param array<string,mixed> $ticket @return array<string,mixed> */
   private function createContractRetentionTicketFromContractRequest(array $ticket, string $term, string $employeeId, string $responseText, string $actaUrl = '', string $actaTitle = '', string $sourceLabel = 'no prórroga'): array
   {
@@ -3874,12 +4128,13 @@ trait HandlesTicketWorkflowActions
     $activeIds = [];
     foreach (FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db)) as $funcionario) {
       $id = trim((string) ($funcionario['id'] ?? ''));
-      if ($id !== '') {
+      $cargo = mb_strtolower(trim((string) ($funcionario['cargo'] ?? '')), 'UTF-8');
+      if ($id !== '' && $cargo === 'consultor de arriendo') {
         $activeIds[$id] = true;
       }
     }
     if (!isset($activeIds[$employeeId])) {
-      return ['ok' => '0', 'message' => 'El funcionario responsable no existe o no está activo.'];
+      return ['ok' => '0', 'message' => 'El funcionario responsable debe ser un consultor de arriendo activo.'];
     }
 
     $contract = $this->contractTerminationContractByContext($ticket);
@@ -3891,11 +4146,17 @@ trait HandlesTicketWorkflowActions
     $contractCode = $this->contractTerminationFirstText([$contract, $ticket], ['contrato', 'id_contrato', '_ID']);
     $property = $this->contractTerminationFirstText([$contract, $ticket], ['inmueble', 'id_inmueble', 'codigo_inmueble_web']);
     $address = $this->contractTerminationFirstText([$contract, $ticket], ['direccion']);
-    $status = $term === 'dentro' ? 'dentro de término' : 'fuera de término';
+    $status = $term === 'dentro' ? 'dentro de término' : ($term === 'fuera' ? 'fuera de término' : '');
     $sourceLabel = trim($sourceLabel) !== '' ? trim($sourceLabel) : 'solicitud contractual';
-    $description = "Se crea ticket comercial de retención de contrato a partir de la {$sourceLabel} respondida en el ticket #{$logicalTicket}.\n\n";
+    if ($logicalTicket !== '-' && $term !== '') {
+      $description = "Se crea ticket comercial de retención de contrato a partir de la {$sourceLabel} respondida en el ticket #{$logicalTicket}.\n\n";
+    } else {
+      $description = "Se crea ticket comercial de retención de contrato desde el control de {$sourceLabel}.\n\n";
+    }
     $description .= "Objetivo: gestionar retención del contrato o iniciar búsqueda comercial para el inmueble asociado.\n";
-    $description .= "Clasificación de la solicitud: {$status}.\n";
+    if ($status !== '') {
+      $description .= "Clasificación de la solicitud: {$status}.\n";
+    }
     if ($contractCode !== '') {
       $description .= "Contrato: {$contractCode}.\n";
     }

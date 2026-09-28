@@ -3324,6 +3324,163 @@ body.scm-modal-open {
   justify-content: flex-end;
 }
 
+#scm-app .scm-contracts-ending-tools {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+#scm-app .scm-contracts-ending-tools label {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+#scm-app .scm-contracts-ending-tools label > span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-contracts-ending-tools select {
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0b1f3a;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 10px;
+}
+
+#scm-app .scm-contracts-ending-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+#scm-app .scm-contracts-ending-month {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d9e4f2;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+#scm-app .scm-contracts-ending-month-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+#scm-app .scm-contracts-ending-month-head span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-contracts-ending-month-head h4 {
+  margin: 2px 0 0;
+  color: #0b1f3a;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+#scm-app .scm-contracts-ending-month-head strong {
+  min-width: 42px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 900;
+  padding: 7px 10px;
+  text-align: center;
+}
+
+#scm-app .scm-contracts-ending-rows {
+  display: grid;
+  gap: 8px;
+}
+
+#scm-app .scm-contracts-ending-empty-month {
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 14px;
+  text-align: center;
+}
+
+#scm-app .scm-contracts-ending-row {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 118px minmax(0, 1fr) auto;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+#scm-app .scm-contracts-ending-date {
+  display: grid;
+  gap: 2px;
+}
+
+#scm-app .scm-contracts-ending-date span,
+#scm-app .scm-contracts-ending-date small,
+#scm-app .scm-contracts-ending-main small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+#scm-app .scm-contracts-ending-date strong,
+#scm-app .scm-contracts-ending-main strong {
+  color: #0b1f3a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+#scm-app .scm-contracts-ending-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+#scm-app .scm-contracts-ending-main span {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#scm-app .scm-contracts-ending-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 760px) {
+  #scm-app .scm-contracts-ending-row {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-contracts-ending-actions {
+    justify-content: flex-start;
+  }
+}
+
 .swal2-popup.scm-contract-termination-swal .swal2-html-container {
   margin: 0;
   text-align: left;

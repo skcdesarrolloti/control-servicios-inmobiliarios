@@ -111,6 +111,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_TERMINATION_RESPOND = 'scm_responder_terminacion_contrato';
   const AJAX_CONTRACT_NON_RENEWAL_REQUESTS = 'scm_solicitudes_no_prorroga_contrato';
   const AJAX_CONTRACT_NON_RENEWAL_RESPOND = 'scm_responder_no_prorroga_contrato';
+  const AJAX_CONTRACTS_ENDING_MONTHS = 'scm_contratos_por_terminar';
+  const AJAX_CONTRACTS_ENDING_CREATE_RETENTION = 'scm_contratos_por_terminar_retencion';
   const AJAX_DASHBOARD_METRICS = 'scm_dashboard_metricas';
   const AJAX_DASHBOARD_FILTER_OPTIONS = 'scm_dashboard_filter_options';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';

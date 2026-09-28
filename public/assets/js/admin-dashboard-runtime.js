@@ -224,6 +224,9 @@
       actions.contract_non_renewal_requests || "";
     var actionContractNonRenewalRespond =
       actions.contract_non_renewal_respond || "";
+    var actionContractsEndingMonths = actions.contracts_ending_months || "";
+    var actionContractsEndingCreateRetention =
+      actions.contracts_ending_create_retention || "";
     var actionDashboardMetrics = actions.dashboard_metrics || "";
     var actionDashboardFilterOptions = actions.dashboard_filter_options || "";
     var actionRentIncreaseLettersList =
@@ -13002,6 +13005,7 @@
     var propertyHistorySectionsByKey = {};
     var contractTerminationRowsByPk = {};
     var contractNonRenewalRowsByPk = {};
+    var contractsEndingRowsByPk = {};
 
     function formatDashboardCount(value) {
       var number = Number(value || 0);
@@ -13111,6 +13115,7 @@
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-mine"><span class="material-symbols-outlined">calendar_month</span><strong>Mi calendario</strong><i>Agenda</i></button>' +
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-team"><span class="material-symbols-outlined">groups</span><strong>Calendario equipo</strong><i>Equipo</i></button>' +
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-property-history"><span class="material-symbols-outlined">home</span><strong>Historial inmueble</strong><i>Consulta</i></button>' +
+              '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-contracts-ending"><span class="material-symbols-outlined">event_upcoming</span><strong>Contratos por terminar</strong><i>Retención</i></button>' +
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-contract-termination"><span class="material-symbols-outlined">description</span><strong>Terminaciones</strong><i>Contratos</i></button>' +
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-contract-non-renewal"><span class="material-symbols-outlined">event_busy</span><strong>No prórroga</strong><i>Contratos</i></button>' +
             '</div></section>' +
@@ -13851,6 +13856,180 @@
       });
     }
 
+    function contractsEndingEmployeeOptions(row) {
+      var retention = (row && row.retention_ticket) || {};
+      var employees = Array.isArray(retention.funcionarios) ? retention.funcionarios : [];
+      var defaultEmployee = String(retention.default_employee_id || "");
+      var options = employees.map(function (func) {
+        func = func || {};
+        var id = String(func.id || "");
+        if (!id) return "";
+        var label = String(func.name || func.label || id);
+        return '<option value="' + escHtml(id) + '"' + (id === defaultEmployee ? " selected" : "") + '>' + escHtml(label) + "</option>";
+      }).join("");
+      return options || '<option value="">No hay consultores de arriendo activos disponibles</option>';
+    }
+
+    function contractsEndingHelpHtml(row) {
+      var retention = (row && row.retention_ticket) || {};
+      var helpItems = Array.isArray(retention.assignment_help) ? retention.assignment_help : [];
+      if (!helpItems.length) {
+        helpItems = [
+          { label: "Contrato", value: row && row.contrato ? "#" + row.contrato : "" },
+          { label: "Inmueble", value: [row && row.inmueble ? "Inmueble " + row.inmueble : "", row && row.direccion || ""].filter(Boolean).join(" · ") },
+          { label: "Fecha fin", value: row && row.fin_contrato_label || "" },
+        ];
+      }
+      return helpItems.map(function (item) {
+        item = item || {};
+        var label = String(item.label || "").trim();
+        var value = String(item.value || "").trim();
+        if (!label || !value) return "";
+        return '<div class="scm-retention-ticket-context-item"><span>' + escHtml(label) + '</span><strong>' + escHtml(value) + "</strong></div>";
+      }).join("");
+    }
+
+    function contractsEndingEmpty(message) {
+      return '<div class="scm-empty scm-empty-cards">' + escHtml(message || "No hay contratos por terminar en el rango seleccionado.") + "</div>";
+    }
+
+    function renderContractsEnding(data) {
+      var panel = root.querySelector("[data-scm-contracts-ending-panel]");
+      if (!panel) return;
+      var status = panel.querySelector("[data-scm-contracts-ending-status]");
+      var summary = panel.querySelector("[data-scm-contracts-ending-summary]");
+      var list = panel.querySelector("[data-scm-contracts-ending-list]");
+      var groups = Array.isArray(data && data.groups) ? data.groups : [];
+      contractsEndingRowsByPk = {};
+      groups.forEach(function (group) {
+        (Array.isArray(group.items) ? group.items : []).forEach(function (row) {
+          if (row && row.contract_pk) contractsEndingRowsByPk[String(row.contract_pk)] = row;
+        });
+      });
+      if (status) {
+        status.classList.remove("is-error");
+        status.textContent = "Actualizado " + String((data && data.generated_at) || "") + ".";
+      }
+      if (summary) {
+        summary.innerHTML =
+          '<div><span>Contratos en rango</span><strong>' + formatDashboardCount(data && data.count || 0) + "</strong></div>" +
+          '<div><span>Meses visibles</span><strong>' + formatDashboardCount(groups.length) + "</strong></div>" +
+          '<div><span>Acción</span><strong>Crear retención</strong></div>';
+      }
+      if (!list) return;
+      if (!groups.length) {
+        list.innerHTML = contractsEndingEmpty();
+        return;
+      }
+      list.innerHTML = groups.map(function (group) {
+        var items = Array.isArray(group.items) ? group.items : [];
+        return '<section class="scm-contracts-ending-month">' +
+          '<div class="scm-contracts-ending-month-head"><div><span>Mes de terminación</span><h4>' + escHtml(group.label || group.key || "Mes") + '</h4></div><strong>' + formatDashboardCount(group.count || items.length) + '</strong></div>' +
+          '<div class="scm-contracts-ending-rows">' + (items.length ? items.map(function (row) {
+            row = row || {};
+            var existingTicket = String(row.existing_retention_ticket_id || "");
+            var party = [row.arrendatario ? "Arrendatario: " + row.arrendatario : "", row.propietario ? "Propietario: " + row.propietario : ""].filter(Boolean).join(" · ");
+            var place = [row.inmueble ? "Inmueble " + row.inmueble : "", row.direccion || ""].filter(Boolean).join(" · ");
+            var daysLeft = Number(row.days_left || 0);
+            var daysLabel = daysLeft < 0 ? Math.abs(daysLeft) + " días vencido" : daysLeft + " días restantes";
+            return '<article class="scm-contracts-ending-row">' +
+              '<div class="scm-contracts-ending-date"><span>Fin</span><strong>' + escHtml(row.fin_contrato_label || "-") + '</strong><small>' + escHtml(daysLabel) + '</small></div>' +
+              '<div class="scm-contracts-ending-main">' +
+                '<strong>Contrato #' + escHtml(row.contrato || row.contract_pk || "-") + '</strong>' +
+                (party ? '<span>' + escHtml(party) + '</span>' : "") +
+                (place ? '<small>' + escHtml(place) + '</small>' : "") +
+              '</div>' +
+              '<div class="scm-contracts-ending-actions">' +
+                (existingTicket
+                  ? '<button type="button" class="scm-case-work-btn" disabled>Ticket #' + escHtml(existingTicket) + ' creado</button>'
+                  : '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-contracts-ending-create data-contract-pk="' + escHtml(row.contract_pk || "") + '">Crear retención</button>') +
+              '</div>' +
+            '</article>';
+          }).join("") : '<div class="scm-contracts-ending-empty-month">Sin contratos con fecha fin este mes.</div>') + '</div>' +
+        "</section>";
+      }).join("");
+      panel.setAttribute("data-scm-loaded", "1");
+    }
+
+    function loadContractsEnding(force) {
+      var panel = root.querySelector("[data-scm-contracts-ending-panel]");
+      if (!panel || !ajaxUrl || !actionContractsEndingMonths) {
+        return Promise.resolve();
+      }
+      if (!force && panel.getAttribute("data-scm-loaded") === "1") {
+        return Promise.resolve();
+      }
+      var status = panel.querySelector("[data-scm-contracts-ending-status]");
+      var monthsSelect = panel.querySelector("[data-scm-contracts-ending-months]");
+      if (status) {
+        status.classList.remove("is-error");
+        status.textContent = "Cargando contratos por terminar...";
+      }
+      return dashboardAction(actionContractsEndingMonths, {
+        months: monthsSelect ? monthsSelect.value : "12",
+      }).then(function (data) {
+        renderContractsEnding(data || {});
+      }).catch(function (error) {
+        if (status) {
+          status.classList.add("is-error");
+          status.textContent = error && error.message ? error.message : "No se pudieron cargar los contratos por terminar.";
+        }
+        showToast("error", error && error.message ? error.message : "No se pudieron cargar los contratos por terminar.");
+      });
+    }
+
+    function openContractsEndingRetention(contractPk) {
+      var row = contractsEndingRowsByPk[String(contractPk || "")];
+      if (!row || !window.Swal || typeof window.Swal.fire !== "function") {
+        showToast("warning", "No se encontró el contrato seleccionado.");
+        return;
+      }
+      var retention = row.retention_ticket || {};
+      var helpHtml = contractsEndingHelpHtml(row);
+      var html = '<form class="scm-contract-termination-form" data-scm-contracts-ending-retention-form>' +
+        '<section class="scm-retention-ticket-card' + (!retention.enabled ? " is-disabled" : "") + '">' +
+          '<div class="scm-retention-ticket-head"><div><span class="scm-retention-ticket-eyebrow">Ticket comercial</span><strong>Retención de contrato</strong></div><span class="scm-retention-ticket-pill">Contratos por terminar</span></div>' +
+          (helpHtml ? '<div class="scm-retention-ticket-context">' + helpHtml + "</div>" : "") +
+          '<label class="scm-retention-ticket-field"><span>Asignar a consultor de arriendo</span><select name="retencion_id_empleado" ' + (!retention.enabled ? "disabled" : "") + '><option value="">Selecciona responsable</option>' + contractsEndingEmployeeOptions(row) + '</select></label>' +
+        "</section>" +
+      "</form>";
+      window.Swal.fire({
+        title: "Crear ticket de retención",
+        html: html,
+        width: "min(760px, 94vw)",
+        showCancelButton: true,
+        confirmButtonText: "Crear ticket",
+        cancelButtonText: "Cancelar",
+        buttonsStyling: false,
+        customClass: {
+          popup: "scm-calendar-swal-popup scm-contract-termination-swal",
+          confirmButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--primary",
+          cancelButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary",
+        },
+        preConfirm: function () {
+          var popup = window.Swal.getPopup();
+          var form = popup ? popup.querySelector("[data-scm-contracts-ending-retention-form]") : null;
+          var employee = form ? form.querySelector("[name='retencion_id_empleado']") : null;
+          if (!employee || !employee.value) {
+            window.Swal.showValidationMessage("Selecciona el responsable del ticket comercial de retención.");
+            return false;
+          }
+          return { employee: employee.value };
+        },
+      }).then(function (result) {
+        if (!result.isConfirmed || !result.value) return;
+        return dashboardFormAction(actionContractsEndingCreateRetention, function (fd) {
+          fd.append("contract_pk", String(row.contract_pk || ""));
+          fd.append("retencion_id_empleado", result.value.employee || "");
+        }).then(function (data) {
+          showToast("success", (data && data.message) || "Ticket de retención creado.");
+          loadContractsEnding(true);
+        }).catch(function (error) {
+          showToast("error", error && error.message ? error.message : "No se pudo crear el ticket de retención.");
+        });
+      });
+    }
+
     function loadDashboardHome() {
       var panel = root.querySelector("#scm-panel-inicio");
       if (!panel) {
@@ -13864,6 +14043,9 @@
         }
         if (activeHomeCalendarSection && activeHomeCalendarSection.id === "scm-home-calendar-section-contract-non-renewal") {
           return loadContractNonRenewalRequests(false);
+        }
+        if (activeHomeCalendarSection && activeHomeCalendarSection.id === "scm-home-calendar-section-contracts-ending") {
+          return loadContractsEnding(false);
         }
         return Promise.resolve();
       };
@@ -19843,6 +20025,9 @@
         if (target === "scm-home-calendar-section-contract-non-renewal") {
           loadContractNonRenewalRequests(false);
         }
+        if (target === "scm-home-calendar-section-contracts-ending") {
+          loadContractsEnding(false);
+        }
       });
     });
 
@@ -19930,6 +20115,22 @@
       if (contractNonRenewalCase) {
         event.preventDefault();
         dashboardOpenDueCase(contractNonRenewalCase);
+        return;
+      }
+
+      var contractsEndingRefresh = event.target.closest("[data-scm-contracts-ending-refresh]");
+      if (contractsEndingRefresh) {
+        event.preventDefault();
+        var contractsEndingPanel = contractsEndingRefresh.closest("[data-scm-contracts-ending-panel]");
+        if (contractsEndingPanel) contractsEndingPanel.setAttribute("data-scm-loaded", "0");
+        loadContractsEnding(true);
+        return;
+      }
+
+      var contractsEndingCreate = event.target.closest("[data-scm-contracts-ending-create]");
+      if (contractsEndingCreate) {
+        event.preventDefault();
+        openContractsEndingRetention(contractsEndingCreate.getAttribute("data-contract-pk") || "");
         return;
       }
 
@@ -20087,6 +20288,11 @@
           target.closest("[data-scm-cotizacion-response-fields]") ||
             target.closest(".scm-seg-form"),
         );
+      }
+      if (target && target.matches && target.matches("[data-scm-contracts-ending-months]")) {
+        var panel = target.closest("[data-scm-contracts-ending-panel]");
+        if (panel) panel.setAttribute("data-scm-loaded", "0");
+        loadContractsEnding(true);
       }
     });
 

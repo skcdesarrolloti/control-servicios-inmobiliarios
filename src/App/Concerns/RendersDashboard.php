@@ -494,6 +494,8 @@ trait RendersDashboard
         'contract_termination_respond' => self::AJAX_CONTRACT_TERMINATION_RESPOND,
         'contract_non_renewal_requests' => self::AJAX_CONTRACT_NON_RENEWAL_REQUESTS,
         'contract_non_renewal_respond' => self::AJAX_CONTRACT_NON_RENEWAL_RESPOND,
+        'contracts_ending_months' => self::AJAX_CONTRACTS_ENDING_MONTHS,
+        'contracts_ending_create_retention' => self::AJAX_CONTRACTS_ENDING_CREATE_RETENTION,
         'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
@@ -760,6 +762,8 @@ trait RendersDashboard
           $activeHomeSection = 'scm-home-calendar-section-contract-termination';
         } elseif ($subtabReq === 'contract-non-renewal' || $subtabReq === 'contract_non_renewal' || in_array($tabKey, ['contract_non_renewal', 'contrato_no_prorroga', 'solicitudes_no_prorroga'], true)) {
           $activeHomeSection = 'scm-home-calendar-section-contract-non-renewal';
+        } elseif ($subtabReq === 'contracts-ending' || $subtabReq === 'contracts_ending' || in_array($tabKey, ['contracts_ending', 'contratos_por_terminar'], true)) {
+          $activeHomeSection = 'scm-home-calendar-section-contracts-ending';
         } elseif ($subtabReq === 'mine' || $tabKey === 'mi_calendario') {
           $activeHomeSection = 'scm-home-calendar-section-mine';
         }
@@ -771,6 +775,7 @@ trait RendersDashboard
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-team' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-team"><span class="material-symbols-outlined" aria-hidden="true">groups</span><span>Calendario equipo</span></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-due' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-due"><span class="material-symbols-outlined" aria-hidden="true">schedule</span><span>Vencimientos</span><em data-scm-calendar-due-nav-count hidden>0</em></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-property-history' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-property-history"><span class="material-symbols-outlined" aria-hidden="true">home</span><span>Historial inmueble</span></button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-contracts-ending' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contracts-ending"><span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span><span>Contratos por terminar</span></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-termination' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contract-termination"><span class="material-symbols-outlined" aria-hidden="true">description</span><span>Solicitudes de terminaci&oacute;n de contrato</span></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-non-renewal' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contract-non-renewal"><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><span>No pr&oacute;rroga de contrato</span></button>
             </div>
@@ -830,6 +835,24 @@ trait RendersDashboard
                 </form>
                 <div class="scm-property-history-status" data-scm-property-history-status>Ingresa un contrato o un c&oacute;digo web/inmueble para consultar.</div>
                 <div class="scm-property-history-results" data-scm-property-history-results></div>
+              </section>
+            </div>
+            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-contracts-ending' ? ' active' : ''; ?>" id="scm-home-calendar-section-contracts-ending" data-calendar-section-panel>
+              <section class="scm-contract-termination-panel scm-contracts-ending-panel" data-scm-contracts-ending-panel aria-live="polite">
+                <div class="scm-contract-termination-head">
+                  <div>
+                    <span class="scm-calendar-action-kicker">Contratos</span>
+                    <h3>Contratos por terminar</h3>
+                    <p>Consulta mes a mes qu&eacute; contratos llegan a fecha fin y crea tickets comerciales de retenci&oacute;n cuando aplique.</p>
+                  </div>
+                  <div class="scm-contracts-ending-tools">
+                    <label><span>Meses a mostrar</span><select data-scm-contracts-ending-months><option value="6">6 meses</option><option value="12" selected>12 meses</option><option value="18">18 meses</option><option value="24">24 meses</option></select></label>
+                    <button type="button" class="scm-case-work-btn" data-scm-contracts-ending-refresh>Actualizar</button>
+                  </div>
+                </div>
+                <div class="scm-contract-termination-status" data-scm-contracts-ending-status>Cargando contratos por terminar...</div>
+                <div class="scm-contract-termination-summary" data-scm-contracts-ending-summary></div>
+                <div class="scm-contracts-ending-list" data-scm-contracts-ending-list></div>
               </section>
             </div>
             <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-termination' ? ' active' : ''; ?>" id="scm-home-calendar-section-contract-termination" data-calendar-section-panel>
