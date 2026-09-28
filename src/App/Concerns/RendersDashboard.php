@@ -2485,6 +2485,7 @@ trait RendersDashboard
       $item = [
         'id' => trim((string) ($row['_ID'] ?? '')),
         'ticket' => $ticketRef,
+        'contrato' => trim((string) ($row['contrato'] ?? $row['id_contrato'] ?? '')),
         'direccion' => trim((string) ($row['direccion'] ?? '')),
         'inmueble' => trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '')),
         'destinatario' => trim((string) ($row['destinatario'] ?? '')),
@@ -2494,7 +2495,7 @@ trait RendersDashboard
         'administracion' => $admin,
         'acta_id' => $actaId,
         'trabajo_terminado' => $isFinished,
-        'case_source_html' => $ticketRef !== '' ? (string) ($linkedTicketCards[$ticketRef] ?? '') : '',
+        'case_source_html' => $this->cotizacion_linked_ticket_card_for_row($row, $linkedTicketCards),
       ];
       $items[] = $item;
       if ($isFinished) {
@@ -4692,7 +4693,7 @@ trait RendersDashboard
     $caseSource .= '</div></article></section>';
     $caseSource .= '<section class="scm-case-history"><h4>&Oacute;rdenes de mantenimiento</h4>' . $ordersHistoryHtml . '</section>';
     $ticketCaseButton = '';
-    $linkedTicketCardHtml = $ticket !== '' ? (string) ($linkedTicketCards[$ticket] ?? '') : '';
+    $linkedTicketCardHtml = $this->cotizacion_linked_ticket_card_for_row($row, $linkedTicketCards);
     $linkedTicketSource = $linkedTicketCardHtml !== ''
       ? '<template class="scm-cotizacion-linked-ticket-source">' . $linkedTicketCardHtml . '</template>'
       : '';
@@ -4833,24 +4834,31 @@ trait RendersDashboard
   private function cotizacion_linked_ticket_cards_by_rows(array $rows): array
   {
     $refs = [];
+    $quoteIds = [];
     foreach ($rows as $row) {
       $ref = trim((string) ($row['id_ticket'] ?? ''));
       if ($ref !== '') {
         $refs[$ref] = $ref;
       }
+      $quoteId = trim((string) ($row['_ID'] ?? ''));
+      if ($quoteId !== '') {
+        $quoteIds[$quoteId] = $quoteId;
+      }
     }
-    if (empty($refs)) {
+    if (empty($refs) && empty($quoteIds)) {
       return [];
     }
 
     $primaryByRef = $this->cotizacion_resolve_ticket_primary_keys(array_values($refs));
-    if (empty($primaryByRef)) {
+    $primaryByQuote = $this->cotizacion_resolve_ticket_primary_keys_by_quote_ids(array_values($quoteIds));
+    $primaryKeys = array_values(array_unique(array_merge(array_values($primaryByRef), array_values($primaryByQuote))));
+    if (empty($primaryKeys)) {
       return [];
     }
 
     try {
       $cardsByPk = $this->get_servicios_inmobiliarios_module()->renderCardsByTicketIds(
-        array_values(array_unique(array_values($primaryByRef))),
+        $primaryKeys,
         [
           'ticket_url' => self::DEFAULT_TICKET_URL,
           'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
@@ -4870,7 +4878,27 @@ trait RendersDashboard
         $out[$ref] = $card;
       }
     }
+    foreach ($primaryByQuote as $quoteId => $pk) {
+      $card = (string) ($cardsByPk[$pk] ?? '');
+      if ($card !== '') {
+        $out['cot:' . $quoteId] = $card;
+      }
+    }
     return $out;
+  }
+
+  /** @param array<string,mixed> $row @param array<string,string> $linkedTicketCards */
+  private function cotizacion_linked_ticket_card_for_row(array $row, array $linkedTicketCards): string
+  {
+    $quoteId = trim((string) ($row['_ID'] ?? ''));
+    if ($quoteId !== '') {
+      $card = (string) ($linkedTicketCards['cot:' . $quoteId] ?? '');
+      if ($card !== '') {
+        return $card;
+      }
+    }
+    $ticketRef = trim((string) ($row['id_ticket'] ?? ''));
+    return $ticketRef !== '' ? (string) ($linkedTicketCards[$ticketRef] ?? '') : '';
   }
 
   /** @param array<int,string> $ticketRefs @return array<string,string> */
@@ -4922,6 +4950,55 @@ trait RendersDashboard
       $logical = trim((string) ($row['id_ticket'] ?? ''));
       if ($logical !== '' && isset($wanted[$logical])) {
         $out[$logical] = $pk;
+      }
+    }
+    return $out;
+  }
+
+  /** @param array<int,string> $quoteIds @return array<string,string> */
+  private function cotizacion_resolve_ticket_primary_keys_by_quote_ids(array $quoteIds): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->table_exists($table) || !$this->column_exists($table, 'id_cotizacion_mantenimiento')) {
+      return [];
+    }
+
+    $ids = [];
+    foreach ($quoteIds as $id) {
+      $id = trim((string) $id);
+      if ($id !== '') {
+        $ids[$id] = $id;
+      }
+    }
+    if (empty($ids)) {
+      return [];
+    }
+
+    $where = [];
+    $args = [];
+    foreach (array_values($ids) as $id) {
+      $where[] = "FIND_IN_SET(?, REPLACE(TRIM(COALESCE(`id_cotizacion_mantenimiento`, '')), ' ', ''))";
+      $args[] = $id;
+    }
+    $rows = $this->db->getResults(
+      "SELECT `_ID`, `id_cotizacion_mantenimiento` FROM `{$table}` WHERE " . implode(' OR ', $where) . " ORDER BY `_ID` DESC",
+      $args
+    );
+    if (empty($rows)) {
+      return [];
+    }
+
+    $out = [];
+    foreach ($rows as $row) {
+      $pk = trim((string) ($row['_ID'] ?? ''));
+      if ($pk === '') {
+        continue;
+      }
+      $linked = array_filter(array_map('trim', explode(',', str_replace(' ', '', (string) ($row['id_cotizacion_mantenimiento'] ?? '')))));
+      foreach ($linked as $quoteId) {
+        if (isset($ids[$quoteId]) && !isset($out[$quoteId])) {
+          $out[$quoteId] = $pk;
+        }
       }
     }
     return $out;

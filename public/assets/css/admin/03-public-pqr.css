@@ -1481,6 +1481,11 @@
   gap: 10px;
 }
 
+#scm-app .scm-maintenance-quote-section {
+  display: grid;
+  gap: 10px;
+}
+
 #scm-app .scm-maintenance-quote-list-head,
 #scm-app .scm-maintenance-quote-row {
   display: grid;
@@ -1536,6 +1541,18 @@
   margin-top: 4px;
   color: #0f2742;
   font-size: 18px;
+  font-weight: 900;
+}
+
+#scm-app .scm-maintenance-quote-row-id em {
+  display: inline-flex;
+  margin-top: 6px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #eef6ff;
+  color: #174a84;
+  font-size: 11px;
+  font-style: normal;
   font-weight: 900;
 }
 

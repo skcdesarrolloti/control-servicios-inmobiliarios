@@ -12373,36 +12373,47 @@
         }).join("");
       }
       if (!list) return;
-      var rows = Array.isArray(data.finished_items) ? data.finished_items : [];
-      if (!rows.length) {
-        list.innerHTML = '<div class="scm-empty scm-empty-cards">No hay cotizaciones aprobadas de este mes con trabajo terminado y acta de satisfacci&oacute;n.</div>';
+      var approvedRows = Array.isArray(data.items) ? data.items : [];
+      var finishedRows = approvedRows.filter(function (row) { return row && row.trabajo_terminado; });
+      var pendingRows = approvedRows.filter(function (row) { return row && !row.trabajo_terminado; });
+      function quoteMetricRowHtml(row, stateLabel) {
+        row = row || {};
+        var sourceHtml = String(row.case_source_html || "").trim();
+        var meta = [
+          row.ticket ? "Ticket #" + row.ticket : "",
+          row.contrato ? "Contrato #" + row.contrato : "",
+          row.inmueble ? "Inmueble " + row.inmueble : "",
+          row.destinatario || "",
+        ].filter(Boolean).join(" · ");
+        var canOpenCase = sourceHtml || row.id || row.ticket;
+        return (
+          '<article class="scm-maintenance-quote-row" data-cotizacion-id="' + escHtml(row.id || "") + '" data-ticket="' + escHtml(row.ticket || "") + '" data-contract="' + escHtml(row.contrato || "") + '">' +
+            '<div class="scm-maintenance-quote-row-id"><span>Cotizaci&oacute;n</span><strong>#' + escHtml(row.id || "-") + "</strong><em>" + escHtml(stateLabel || "") + "</em></div>" +
+            '<div class="scm-maintenance-quote-row-main"><strong>' + escHtml(row.direccion || "Cotización de mantenimiento") + "</strong>" +
+              (meta ? '<small>' + escHtml(meta) + "</small>" : "") +
+              '<small>Cotización: ' + escHtml(row.fecha_cotizacion || row.fecha_aprobacion || "-") + (row.acta_id ? " · Acta #" + escHtml(row.acta_id) : "") + "</small></div>" +
+            '<div class="scm-maintenance-quote-row-money"><span>Administraci&oacute;n</span><strong>' + escHtml(formatDashboardCurrency(row.administracion || 0)) + "</strong>" +
+              (canOpenCase ? '<button type="button" class="scm-case-work-btn scm-maintenance-quote-case-btn" data-scm-maintenance-quote-open-case data-cotizacion-id="' + escHtml(row.id || "") + '" data-ticket="' + escHtml(row.ticket || "") + '" data-contract="' + escHtml(row.contrato || "") + '">' + (sourceHtml ? "Ver caso" : "Buscar caso") + "</button>" : '<button type="button" class="scm-case-work-btn scm-maintenance-quote-case-btn" disabled>Sin referencia</button>') +
+            "</div>" +
+            (sourceHtml ? '<template class="scm-maintenance-quote-case-source">' + sourceHtml + "</template>" : "") +
+          "</article>"
+        );
+      }
+      function quoteMetricSectionHtml(title, kicker, rows, stateLabel, emptyText) {
+        return '<div class="scm-maintenance-quote-section">' +
+          '<div class="scm-maintenance-quote-list-head"><div><span class="scm-calendar-action-kicker">' + escHtml(kicker) + '</span><h4>' + escHtml(title) + '</h4></div><strong>' +
+          escHtml(formatDashboardCount(rows.length)) +
+          "</strong></div>" +
+          (rows.length ? rows.map(function (row) { return quoteMetricRowHtml(row, stateLabel); }).join("") : '<div class="scm-empty scm-empty-cards">' + emptyText + "</div>") +
+          "</div>";
+      }
+      if (!approvedRows.length) {
+        list.innerHTML = '<div class="scm-empty scm-empty-cards">No hay cotizaciones aprobadas para este mes.</div>';
         return;
       }
       list.innerHTML =
-        '<div class="scm-maintenance-quote-list-head"><div><span class="scm-calendar-action-kicker">Trabajos terminados</span><h4>Cotizaciones aprobadas con acta de satisfacci&oacute;n</h4></div><strong>' +
-        escHtml(formatDashboardCount(rows.length)) +
-        "</strong></div>" +
-        rows.map(function (row) {
-          row = row || {};
-          var sourceHtml = String(row.case_source_html || "").trim();
-          var meta = [
-            row.ticket ? "Ticket #" + row.ticket : "",
-            row.inmueble ? "Inmueble " + row.inmueble : "",
-            row.destinatario || "",
-          ].filter(Boolean).join(" · ");
-          return (
-            '<article class="scm-maintenance-quote-row">' +
-              '<div class="scm-maintenance-quote-row-id"><span>Cotizaci&oacute;n</span><strong>#' + escHtml(row.id || "-") + "</strong></div>" +
-              '<div class="scm-maintenance-quote-row-main"><strong>' + escHtml(row.direccion || "Cotización de mantenimiento") + "</strong>" +
-                (meta ? '<small>' + escHtml(meta) + "</small>" : "") +
-                '<small>Cotización: ' + escHtml(row.fecha_cotizacion || row.fecha_aprobacion || "-") + (row.acta_id ? " · Acta #" + escHtml(row.acta_id) : "") + "</small></div>" +
-              '<div class="scm-maintenance-quote-row-money"><span>Administraci&oacute;n</span><strong>' + escHtml(formatDashboardCurrency(row.administracion || 0)) + "</strong>" +
-                (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-maintenance-quote-case-btn" data-scm-maintenance-quote-open-case>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-maintenance-quote-case-btn" disabled>Sin caso</button>') +
-              "</div>" +
-              (sourceHtml ? '<template class="scm-maintenance-quote-case-source">' + sourceHtml + "</template>" : "") +
-            "</article>"
-          );
-        }).join("");
+        quoteMetricSectionHtml("Terminadas con acta de satisfacción", "Trabajos terminados", finishedRows, "Terminada", "No hay cotizaciones terminadas con acta para este mes.") +
+        quoteMetricSectionHtml("Aprobadas sin acta de satisfacción", "Aprobadas", pendingRows, "Aprobada", "No hay cotizaciones aprobadas pendientes de acta para este mes.");
     }
 
     function loadMaintenanceQuoteMetrics(force) {
@@ -19906,7 +19917,34 @@
           ? metricRow.querySelector(".scm-maintenance-quote-case-source")
           : null;
         if (!metricSource) {
-          showToast("error", "No se encontró el caso completo de la cotización.");
+          var cotizacionId = maintenanceMetricCaseBtn.getAttribute("data-cotizacion-id") || (metricRow ? metricRow.getAttribute("data-cotizacion-id") : "");
+          var ticketRef = maintenanceMetricCaseBtn.getAttribute("data-ticket") || (metricRow ? metricRow.getAttribute("data-ticket") : "");
+          if (!cotizacionId || !actionAdminDueCase) {
+            showToast("error", "No se encontró el caso completo de la cotización.");
+            return;
+          }
+          var oldText = maintenanceMetricCaseBtn.textContent;
+          maintenanceMetricCaseBtn.disabled = true;
+          maintenanceMetricCaseBtn.textContent = "Cargando...";
+          dashboardAction(actionAdminDueCase, {
+            tipo_vencimiento: "cotizacion_metricas",
+            cotizacion_id: cotizacionId,
+            ticket_pk: ticketRef,
+            ticket: ticketRef,
+          }).then(function (data) {
+            var caseData = data && data.case ? data.case : {};
+            var sourceHtml = String(caseData.case_source_html || "").trim();
+            if (!sourceHtml) {
+              throw new Error("No se encontró el detalle del caso.");
+            }
+            dashboardApplyDueCaseData(maintenanceMetricCaseBtn, caseData);
+            openDashboardDueCaseFromButton(maintenanceMetricCaseBtn, sourceHtml);
+          }).catch(function (error) {
+            showToast("error", error && error.message ? error.message : "No se pudo cargar el caso completo.");
+          }).finally(function () {
+            maintenanceMetricCaseBtn.disabled = false;
+            maintenanceMetricCaseBtn.textContent = oldText || "Ver caso";
+          });
           return;
         }
         var metricHolder = metricRow.querySelector(".scm-maintenance-quote-case-dom");
