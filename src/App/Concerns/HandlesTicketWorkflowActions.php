@@ -1410,28 +1410,35 @@ trait HandlesTicketWorkflowActions
     }
 
     $contractColumns = array_values(array_filter(['contrato', 'id_contrato', 'id_contrato_arrendamiento', '_ID'], fn($column): bool => $this->column_exists($table, $column)));
-    $whereParts = [];
-    $args = [];
-    foreach (array_chunk($contracts, 150) as $chunk) {
-      $placeholders = implode(', ', array_fill(0, count($chunk), '?'));
-      foreach ($contractColumns as $column) {
-        $whereParts[] = "TRIM(COALESCE(`{$column}`, '')) IN ({$placeholders})";
-        array_push($args, ...$chunk);
-      }
-    }
-    if ($whereParts === []) {
+    if ($contractColumns === []) {
       return [];
     }
-    $dbRows = $this->db->getResults("SELECT " . implode(', ', $select) . " FROM `{$table}` WHERE " . implode(' OR ', $whereParts) . " LIMIT 3000", $args);
+    $contractSet = array_fill_keys($contracts, true);
+    $orderSql = $this->column_exists($table, '_ID') ? " ORDER BY CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC" : '';
+    $dbRows = $this->db->getResults("SELECT " . implode(', ', $select) . " FROM `{$table}`{$orderSql} LIMIT 50000");
+    $rowsByContract = [];
+    foreach ($dbRows as $dbRow) {
+      foreach ($contractColumns as $column) {
+        $contractKey = $this->contractsEndingImportIdentifier($dbRow[$column] ?? '');
+        if ($contractKey !== '' && isset($contractSet[$contractKey])) {
+          $rowsByContract[$contractKey][] = $dbRow;
+        }
+      }
+    }
+
     $matches = [];
     foreach ($importRows as $row) {
       $rowContract = (string) ($row['contract'] ?? '');
       $rowProperty = (string) ($row['property'] ?? '');
       $line = (int) ($row['line'] ?? 0);
-      foreach ($dbRows as $dbRow) {
-        if (!$this->contractsEndingImportRowMatches($dbRow, ['contrato', 'id_contrato', 'id_contrato_arrendamiento', '_ID'], $rowContract)) {
+      $seenRows = [];
+      foreach (($rowsByContract[$rowContract] ?? []) as $dbRow) {
+        $rowId = trim((string) ($dbRow['_ID'] ?? ''));
+        $seenKey = $rowId !== '' ? $rowId : md5(json_encode($dbRow, JSON_UNESCAPED_UNICODE));
+        if (isset($seenRows[$seenKey])) {
           continue;
         }
+        $seenRows[$seenKey] = true;
         if ($rowProperty !== '' && !$this->contractsEndingImportRowMatches($dbRow, ['inmueble', 'id_inmueble', 'codigo_inmueble_web'], $rowProperty)) {
           continue;
         }
