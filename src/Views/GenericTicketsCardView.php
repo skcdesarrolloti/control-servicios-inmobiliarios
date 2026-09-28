@@ -570,10 +570,6 @@ final class GenericTicketsCardView
     $c .= '</div>';
 
     $c .= '<div class="scm-ticket-card-footer">';
-    if ($effectiveTabKey === 'entrega') {
-      $c .= '<button class="btn btn-outline btn-sm" type="button" data-scm-open-card-consultor>Consultor/a de entrega</button>';
-      $c .= '<button class="btn btn-outline btn-sm" type="button" data-scm-open-card-llaves>Llaves</button>';
-    }
     if (in_array($effectiveStatusBucket, ['postergados', 'cerrados'], true)) {
       $c .= '<button class="btn btn-outline btn-sm scm-activate-ticket-btn" type="button" data-scm-activate-ticket>Activar ticket</button>';
     }
