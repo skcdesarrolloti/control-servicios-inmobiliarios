@@ -11412,6 +11412,33 @@
         });
     }
 
+    function pslOpenGuide(panel, trigger) {
+      var modal = panel ? panel.querySelector("[data-psl-guide-modal]") : null;
+      if (!modal) return;
+      panel._pslGuideTrigger = trigger || document.activeElement;
+      modal.hidden = false;
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+      var dialog = modal.querySelector(".scm-psl-guide-panel");
+      if (dialog && dialog.focus) {
+        window.setTimeout(function () {
+          dialog.focus();
+        }, 0);
+      }
+    }
+
+    function pslCloseGuide(panel) {
+      var modal = panel ? panel.querySelector("[data-psl-guide-modal]") : null;
+      if (!modal || modal.hidden) return;
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+      modal.hidden = true;
+      var trigger = panel._pslGuideTrigger;
+      if (trigger && trigger.focus) {
+        trigger.focus();
+      }
+    }
+
     function pslBindPanel(panel) {
       if (!panel || panel.getAttribute("data-psl-bound") === "1") return;
       panel.setAttribute("data-psl-bound", "1");
@@ -11436,6 +11463,18 @@
         });
       }
       panel.addEventListener("click", function (event) {
+        var openGuide = event.target.closest("[data-psl-open-guide]");
+        if (openGuide) {
+          event.preventDefault();
+          pslOpenGuide(panel, openGuide);
+          return;
+        }
+        var closeGuide = event.target.closest("[data-psl-close-guide]");
+        if (closeGuide) {
+          event.preventDefault();
+          pslCloseGuide(panel);
+          return;
+        }
         var select = event.target.closest("[data-psl-select-contract]");
         if (select) {
           event.preventDefault();
@@ -11464,6 +11503,11 @@
         var section = checkbox.closest("[data-psl-service]");
         if (section) {
           section.classList.toggle("is-enabled", checkbox.checked);
+        }
+      });
+      panel.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          pslCloseGuide(panel);
         }
       });
     }

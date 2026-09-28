@@ -261,27 +261,54 @@ final class PublicServicesLiquidatorView
           </section>
 
           <!-- Guías del Módulo -->
-          <section class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 flex flex-col gap-3 scm-filter-card scm-psl-guide">
-            <div class="flex items-center gap-2 pb-2 border-b border-slate-100">
-              <span class="material-symbols-outlined text-amber-700 text-[20px]">menu_book</span>
-              <h3 class="text-sm font-bold text-[#0b1c30]">Guías Operativas del Módulo</h3>
+          <section class="bg-white rounded-xl p-5 shadow-sm border border-slate-200 flex flex-col gap-3 scm-filter-card scm-psl-guide-card">
+            <div class="flex items-start gap-3">
+              <span class="material-symbols-outlined text-amber-700 text-[22px] mt-0.5">menu_book</span>
+              <div class="min-w-0">
+                <h3 class="text-sm font-bold text-[#0b1c30]">Guías y plantillas</h3>
+                <p class="text-xs text-slate-500 leading-relaxed mt-1">Consulta el prorrateo, la plantilla de WhatsApp y el correo sin perder el contexto de la liquidación.</p>
+              </div>
             </div>
-            <div class="flex flex-col gap-3 text-xs text-slate-600 scm-psl-guide-grid">
-              <article class="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <strong class="text-slate-800 font-bold block mb-1">Cálculo de Prorrateo Normativo</strong>
-                <p class="text-[11px] text-slate-500 leading-relaxed">El valor unitario resulta de dividir el valor consumo facturado entre el consumo total del periodo. El cobro al inquilino suma el consumo físico más la proporción de cargos fijos según los días habitados. Aplica el Art. 15 de la Ley 820 de 2003.</p>
-              </article>
-              <article class="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <strong class="text-slate-800 font-bold block mb-1">Plantilla Oficial WhatsApp</strong>
-                <p class="text-[11px] text-slate-500 leading-relaxed">Plantilla Meta <code>scm_liquidador_servicios_reembolso_v1</code> con documento PDF adjunto y firma corporativa de SKC SuCasa Inmobiliaria.</p>
-              </article>
-              <article class="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <strong class="text-slate-800 font-bold block mb-1">Notificación por Correo</strong>
-                <p class="text-[11px] text-slate-500 leading-relaxed">Envío institucional automático con detalle del inmueble, acta de liquidación y orden de reembolso PDF adjunta.</p>
-              </article>
-            </div>
+            <button type="button" class="scm-psl-guide-open inline-flex items-center justify-center gap-2 rounded-lg bg-[#0f1e36] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#162846]" data-psl-open-guide>
+              <span class="material-symbols-outlined text-[18px]">open_in_new</span>
+              <span>Abrir guía operativa</span>
+            </button>
           </section>
         </div>
+      </div>
+
+      <div class="scm-psl-guide-modal" data-psl-guide-modal hidden>
+        <div class="scm-psl-guide-backdrop" data-psl-close-guide aria-hidden="true"></div>
+        <section class="scm-psl-guide-panel" role="dialog" aria-modal="true" aria-labelledby="scm-psl-guide-title" tabindex="-1">
+          <header class="scm-psl-guide-head">
+            <div>
+              <span class="scm-psl-guide-kicker">Guía operativa</span>
+              <h3 id="scm-psl-guide-title">Liquidador de Servicios Públicos</h3>
+              <p>Usa estas referencias para revisar el cálculo, crear la plantilla oficial de WhatsApp y entender el correo institucional que queda en cola.</p>
+            </div>
+            <button type="button" class="scm-psl-guide-close" data-psl-close-guide aria-label="Cerrar guía">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </header>
+          <div class="scm-psl-guide-body">
+            <article>
+              <span class="material-symbols-outlined">calculate</span>
+              <strong>Cálculo de prorrateo normativo</strong>
+              <p>El valor unitario resulta de dividir el valor de consumo facturado entre el consumo total del periodo. El cobro al inquilino suma el consumo físico más la proporción de cargos fijos según los días habitados. Aplica el Art. 15 de la Ley 820 de 2003.</p>
+            </article>
+            <article>
+              <span class="material-symbols-outlined">chat</span>
+              <strong>Plantilla oficial WhatsApp</strong>
+              <p>Crea en Meta una plantilla de utilidad llamada <code>scm_liquidador_servicios_reembolso_v1</code>, idioma <code>es_CO</code>, con encabezado tipo documento para adjuntar el PDF generado.</p>
+              <p class="scm-psl-template-copy">Buen día, {{1}}.<br><br>Compartimos {{2}} del contrato #{{3}}, inmueble #{{4}}, correspondiente al periodo {{5}}.<br><br>Puedes consultar el PDF adjunto. Enlace de respaldo: {{6}}<br><br>Atentamente,<br>{{7}}<br>SKC SuCasa Inmobiliaria.</p>
+            </article>
+            <article>
+              <span class="material-symbols-outlined">mail</span>
+              <strong>Notificación por correo</strong>
+              <p>El módulo deja la notificación institucional en la cola compartida, con detalle del inmueble, acta de liquidación y orden de reembolso PDF adjunta para propietario e inquilino según corresponda.</p>
+            </article>
+          </div>
+        </section>
       </div>
     </div>
 <?php
@@ -296,58 +323,48 @@ final class PublicServicesLiquidatorView
     }
     ob_start();
 ?>
-    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white mt-2 shadow-sm scm-table-wrap">
-      <table class="w-full text-left border-collapse text-xs scm-table scm-psl-contract-table">
-        <thead>
-          <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
-            <th class="p-3">Contrato</th>
-            <th class="p-3">Inmueble / Dirección</th>
-            <th class="p-3">Propietario</th>
-            <th class="p-3">Inquilino</th>
-            <th class="p-3">Servicios Configurados</th>
-            <th class="p-3 text-right">Acción</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          <?php foreach ($rows as $row): ?>
-            <?php $payload = $this->contractPayload($row); ?>
-            <tr class="hover:bg-slate-50/70 transition-colors">
-              <td class="p-3 font-bold text-[#0f1e36]">
-                <span class="px-2 py-0.5 rounded bg-[#eff4ff] text-[#0f1e36] font-mono text-[11px]">
-                  <?php echo esc_html((string) ($row['contrato'] ?? $row['_ID'] ?? '')); ?>
-                </span>
-              </td>
-              <td class="p-3">
-                <div class="font-semibold text-slate-800"><?php echo esc_html((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '')); ?></div>
-                <div class="text-[11px] text-slate-500"><?php echo esc_html((string) ($row['direccion'] ?? '')); ?></div>
-              </td>
-              <td class="p-3 text-slate-700"><?php echo esc_html((string) ($row['propietario'] ?? '')); ?></td>
-              <td class="p-3 text-slate-700"><?php echo esc_html((string) ($row['arrendatario'] ?? '')); ?></td>
-              <td class="p-3">
-                <?php
-                  $services = (array) ($row['configured_services'] ?? []);
-                  if ($services === []): ?>
-                    <span class="text-slate-400 italic">Sin configurar</span>
-                  <?php else: ?>
-                    <div class="flex flex-wrap gap-1">
-                      <?php foreach ($services as $srv): ?>
-                        <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium text-[10px]">
-                          <?php echo esc_html((string) ($srv['label'] ?? '')); ?>
-                        </span>
-                      <?php endforeach; ?>
-                    </div>
-                  <?php endif; ?>
-              </td>
-              <td class="p-3 text-right">
-                <button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0f1e36] text-white text-xs font-semibold rounded-lg hover:bg-[#162846] transition-colors shadow-sm scm-btn-secondary scm-btn-sm" data-psl-select-contract data-contract="<?php echo esc_attr(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}'); ?>">
-                  <span>Usar</span>
-                  <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
-                </button>
-              </td>
-            </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
+    <div class="scm-psl-contract-list" role="list">
+      <?php foreach ($rows as $row): ?>
+        <?php
+          $payload = $this->contractPayload($row);
+          $services = (array) ($row['configured_services'] ?? []);
+        ?>
+        <article class="scm-psl-contract-row" role="listitem">
+          <div class="scm-psl-contract-code">
+            <span>Contrato</span>
+            <strong><?php echo esc_html((string) ($row['contrato'] ?? $row['_ID'] ?? '')); ?></strong>
+          </div>
+          <div class="scm-psl-contract-address">
+            <span>Inmueble / dirección</span>
+            <strong><?php echo esc_html((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '')); ?></strong>
+            <small><?php echo esc_html((string) ($row['direccion'] ?? '')); ?></small>
+          </div>
+          <div class="scm-psl-contract-party">
+            <span>Propietario</span>
+            <strong><?php echo esc_html((string) ($row['propietario'] ?? '')); ?></strong>
+          </div>
+          <div class="scm-psl-contract-party">
+            <span>Inquilino</span>
+            <strong><?php echo esc_html((string) ($row['arrendatario'] ?? '')); ?></strong>
+          </div>
+          <div class="scm-psl-contract-services">
+            <span>Servicios</span>
+            <?php if ($services === []): ?>
+              <em>Sin configurar</em>
+            <?php else: ?>
+              <div>
+                <?php foreach ($services as $srv): ?>
+                  <small><?php echo esc_html((string) ($srv['label'] ?? '')); ?></small>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+          </div>
+          <button type="button" class="scm-psl-contract-use" data-psl-select-contract data-contract="<?php echo esc_attr(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}'); ?>">
+            <span>Usar</span>
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+          </button>
+        </article>
+      <?php endforeach; ?>
     </div>
 <?php
     return (string) ob_get_clean();
