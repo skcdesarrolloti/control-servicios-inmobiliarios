@@ -12,6 +12,7 @@ $dashboardView = (string) file_get_contents($root . '/src/Views/DashboardView.ph
 $handler = (string) file_get_contents($root . '/src/App/Concerns/HandlesMaintenanceActions.php');
 $runtimeJs = (string) file_get_contents($root . '/public/assets/js/admin-dashboard-runtime.js');
 $adminJs = (string) file_get_contents($root . '/public/assets/js/scm-admin.js');
+$sessionGuardJs = (string) file_get_contents($root . '/public/assets/js/scm-session-guard.js');
 $ticketCompletionJs = (string) file_get_contents($root . '/public/assets/js/ticket-completion-create.js');
 $ticketCompletionService = (string) file_get_contents($root . '/src/Modules/TicketCompletion/CompletionService.php');
 $ticketCompletionView = (string) file_get_contents($root . '/src/Modules/TicketCompletion/CompletionView.php');
@@ -255,6 +256,7 @@ $checks = [
   'public order response selects management or development official and stores employee authorizer' => str_contains($handler, 'public_cotizacion_order_funcionarios') && str_contains($handler, 'FuncionarioOptions::activeFuncionarios') && str_contains($handler, "str_contains(\$cargo, 'gerenc')") && str_contains($handler, "str_contains(\$cargo, 'desarrollo')") && str_contains($publicOrder, 'name="id_funcionario"') && str_contains($handler, "'id_autorizador' => \$employeeId"),
   'public order response logo uses configured portal logo with visible sizing' => str_contains($publicOrder, "system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL)") && str_contains($publicOrderCss, 'max-height: 42px') && str_contains($publicOrderCss, 'width: auto'),
   'public order response page has dedicated responsive styles' => str_contains($publicOrderCss, '.scm-order-public-shell') && str_contains($publicOrderCss, '.scm-order-public-button') && str_contains($publicOrderCss, '@media (max-width: 760px)'),
+  'session expired popup is styled in loaded dashboard css and keeps icon bounded' => str_contains($adminCss, '.scm-session-expired-dialog') && str_contains($adminCss, '.scm-session-expired-icon svg') && str_contains($adminCss, 'width: min(100%, 480px)') && str_contains($sessionGuardJs, 'width="30" height="30"') && str_contains($sessionGuardJs, 'fill="none" stroke="currentColor"'),
   'frontend warns before submitting order above balance' => str_contains($runtimeJs, 'value > balance') && str_contains($runtimeJs, 'El valor supera el saldo disponible'),
   'frontend validates quote order amount live' => str_contains($runtimeJs, 'validateOrderAmount') && str_contains($runtimeJs, 'data-scm-order-value-error') && str_contains($runtimeJs, 'confirmButton.disabled = isOver') && str_contains($adminCss, '.scm-cotizacion-order-balance.is-over') && str_contains($adminCss, '.scm-cotizacion-order-value-error'),
   'frontend formats order value as COP and shows remaining balance live' => str_contains($runtimeJs, 'formatCotizacionOrderMoneyField') && str_contains($runtimeJs, 'Saldo restante') && str_contains($runtimeJs, 'has-live-value') && str_contains($adminCss, '.scm-cotizacion-order-balance.has-live-value'),

@@ -362,7 +362,7 @@
     overlay.className = "scm-session-expired";
     overlay.innerHTML =
       '<div class="scm-session-expired-dialog" role="alertdialog" aria-modal="true" aria-labelledby="scm-session-expired-title" aria-describedby="scm-session-expired-description">' +
-      '<span class="scm-session-expired-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 8v5m0 3h.01M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/></svg></span>' +
+      '<span class="scm-session-expired-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" focusable="false" style="width:30px;height:30px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.8;"><path d="M12 8v5m0 3h.01M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg></span>' +
       '<span class="scm-session-expired-kicker">Seguridad de la cuenta</span>' +
       '<h2 id="scm-session-expired-title">Tu sesión terminó</h2>' +
       '<p id="scm-session-expired-description">' +
