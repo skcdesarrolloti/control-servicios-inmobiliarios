@@ -1045,48 +1045,48 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail('No tienes permiso para ver contratos por terminar.');
     }
 
-    $months = max(1, min(24, (int) ($_POST['months'] ?? 12)));
+    $year = max(2000, min(2100, (int) ($_POST['year'] ?? date('Y'))));
+    $month = max(1, min(12, (int) ($_POST['month'] ?? date('n'))));
     try {
-      $items = $this->contractsEndingMonthItems($months);
+      $items = $this->contractsEndingMonthItems($year, $month);
     } catch (\Throwable $exception) {
       error_log('[contracts_ending_months] ' . $exception->getMessage());
       $this->jsonFail('No se pudieron cargar los contratos por terminar.');
     }
 
-    $groups = [];
-    $fromTs = strtotime(date('Y-m-01 00:00:00')) ?: time();
-    for ($i = 0; $i < $months; $i++) {
-      $monthTs = strtotime('+' . $i . ' months', $fromTs) ?: $fromTs;
-      $key = date('Y-m', $monthTs);
-      $groups[$key] = [
+    $monthTs = strtotime(sprintf('%04d-%02d-01 00:00:00', $year, $month)) ?: time();
+    $key = date('Y-m', $monthTs);
+    $groups = [
+      $key => [
         'key' => $key,
         'label' => $this->contractEndingMonthLabel($monthTs),
         'count' => 0,
         'items' => [],
-      ];
-    }
+      ],
+    ];
     foreach ($items as $item) {
-      $key = (string) ($item['month_key'] ?? '');
-      if ($key === '') {
+      $itemKey = (string) ($item['month_key'] ?? '');
+      if ($itemKey === '') {
         continue;
       }
-      if (!isset($groups[$key])) {
-        $groups[$key] = [
-          'key' => $key,
-          'label' => (string) ($item['month_label'] ?? $key),
+      if (!isset($groups[$itemKey])) {
+        $groups[$itemKey] = [
+          'key' => $itemKey,
+          'label' => (string) ($item['month_label'] ?? $itemKey),
           'count' => 0,
           'items' => [],
         ];
       }
-      $groups[$key]['count']++;
-      $groups[$key]['items'][] = $item;
+      $groups[$itemKey]['count']++;
+      $groups[$itemKey]['items'][] = $item;
     }
 
     $this->jsonOk([
       'items' => $items,
       'groups' => array_values($groups),
       'count' => count($items),
-      'months' => $months,
+      'year' => $year,
+      'month' => $month,
       'generated_at' => date('d/m/Y H:i'),
     ]);
   }
@@ -3971,15 +3971,14 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @return array<int,array<string,mixed>> */
-  private function contractsEndingMonthItems(int $months): array
+  private function contractsEndingMonthItems(int $year, int $month): array
   {
     $table = $this->db->table('jet_cct_contratos_arrendamiento');
     if (!$this->table_exists($table) || !$this->column_exists($table, 'fin_contrato')) {
       return [];
     }
-    $fromTs = strtotime(date('Y-m-01 00:00:00')) ?: time();
-    $untilBase = strtotime('+' . max(0, $months - 1) . ' months', $fromTs) ?: $fromTs;
-    $toTs = strtotime(date('Y-m-t 23:59:59', $untilBase)) ?: $untilBase;
+    $fromTs = strtotime(sprintf('%04d-%02d-01 00:00:00', $year, $month)) ?: strtotime(date('Y-m-01 00:00:00'));
+    $toTs = strtotime(date('Y-m-t 23:59:59', $fromTs)) ?: $fromTs;
     $columns = [
       '_ID', 'contrato', 'id_contrato', 'id_contrato_arrendamiento', 'inmueble', 'id_inmueble',
       'codigo_inmueble_web', 'direccion', 'barrio', 'ciudad', 'propietario', 'arrendatario',

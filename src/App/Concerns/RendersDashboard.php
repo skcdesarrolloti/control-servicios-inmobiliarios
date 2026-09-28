@@ -843,10 +843,11 @@ trait RendersDashboard
                   <div>
                     <span class="scm-calendar-action-kicker">Contratos</span>
                     <h3>Contratos por terminar</h3>
-                    <p>Consulta mes a mes qu&eacute; contratos llegan a fecha fin y crea tickets comerciales de retenci&oacute;n cuando aplique.</p>
+                    <p>Escoge un a&ntilde;o y mes para ver qu&eacute; contratos llegan a fecha fin y crear tickets comerciales de retenci&oacute;n cuando aplique.</p>
                   </div>
                   <div class="scm-contracts-ending-tools">
-                    <label><span>Meses a mostrar</span><select data-scm-contracts-ending-months><option value="6">6 meses</option><option value="12" selected>12 meses</option><option value="18">18 meses</option><option value="24">24 meses</option></select></label>
+                    <label><span>A&ntilde;o</span><select data-scm-contracts-ending-year></select></label>
+                    <label><span>Mes</span><select data-scm-contracts-ending-month></select></label>
                     <button type="button" class="scm-case-work-btn" data-scm-contracts-ending-refresh>Actualizar</button>
                   </div>
                 </div>

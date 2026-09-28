@@ -13890,7 +13890,35 @@
     }
 
     function contractsEndingEmpty(message) {
-      return '<div class="scm-empty scm-empty-cards">' + escHtml(message || "No hay contratos por terminar en el rango seleccionado.") + "</div>";
+      return '<div class="scm-empty scm-empty-cards">' + escHtml(message || "No hay contratos por terminar en el mes seleccionado.") + "</div>";
+    }
+
+    function contractsEndingMonthName(month) {
+      return ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"][Math.max(0, Math.min(11, Number(month || 1) - 1))];
+    }
+
+    function initContractsEndingFilters(panel) {
+      if (!panel || panel.getAttribute("data-scm-contracts-ending-filters-ready") === "1") return;
+      var yearSelect = panel.querySelector("[data-scm-contracts-ending-year]");
+      var monthSelect = panel.querySelector("[data-scm-contracts-ending-month]");
+      var now = new Date();
+      var currentYear = now.getFullYear();
+      var currentMonth = now.getMonth() + 1;
+      if (yearSelect && !yearSelect.options.length) {
+        var years = [];
+        for (var year = currentYear - 1; year <= currentYear + 5; year += 1) {
+          years.push('<option value="' + escHtml(year) + '"' + (year === currentYear ? " selected" : "") + '>' + escHtml(year) + "</option>");
+        }
+        yearSelect.innerHTML = years.join("");
+      }
+      if (monthSelect && !monthSelect.options.length) {
+        var months = [];
+        for (var month = 1; month <= 12; month += 1) {
+          months.push('<option value="' + escHtml(month) + '"' + (month === currentMonth ? " selected" : "") + '>' + escHtml(contractsEndingMonthName(month)) + "</option>");
+        }
+        monthSelect.innerHTML = months.join("");
+      }
+      panel.setAttribute("data-scm-contracts-ending-filters-ready", "1");
     }
 
     function renderContractsEnding(data) {
@@ -13912,8 +13940,8 @@
       }
       if (summary) {
         summary.innerHTML =
-          '<div><span>Contratos en rango</span><strong>' + formatDashboardCount(data && data.count || 0) + "</strong></div>" +
-          '<div><span>Meses visibles</span><strong>' + formatDashboardCount(groups.length) + "</strong></div>" +
+          '<div><span>Contratos del mes</span><strong>' + formatDashboardCount(data && data.count || 0) + "</strong></div>" +
+          '<div><span>Mes consultado</span><strong>' + escHtml(groups[0] && groups[0].label || "-") + "</strong></div>" +
           '<div><span>Acción</span><strong>Crear retención</strong></div>';
       }
       if (!list) return;
@@ -13960,13 +13988,16 @@
         return Promise.resolve();
       }
       var status = panel.querySelector("[data-scm-contracts-ending-status]");
-      var monthsSelect = panel.querySelector("[data-scm-contracts-ending-months]");
+      initContractsEndingFilters(panel);
+      var yearSelect = panel.querySelector("[data-scm-contracts-ending-year]");
+      var monthSelect = panel.querySelector("[data-scm-contracts-ending-month]");
       if (status) {
         status.classList.remove("is-error");
         status.textContent = "Cargando contratos por terminar...";
       }
       return dashboardAction(actionContractsEndingMonths, {
-        months: monthsSelect ? monthsSelect.value : "12",
+        year: yearSelect ? yearSelect.value : String(new Date().getFullYear()),
+        month: monthSelect ? monthSelect.value : String(new Date().getMonth() + 1),
       }).then(function (data) {
         renderContractsEnding(data || {});
       }).catch(function (error) {
@@ -20289,7 +20320,7 @@
             target.closest(".scm-seg-form"),
         );
       }
-      if (target && target.matches && target.matches("[data-scm-contracts-ending-months]")) {
+      if (target && target.matches && target.matches("[data-scm-contracts-ending-year], [data-scm-contracts-ending-month]")) {
         var panel = target.closest("[data-scm-contracts-ending-panel]");
         if (panel) panel.setAttribute("data-scm-loaded", "0");
         loadContractsEnding(true);
