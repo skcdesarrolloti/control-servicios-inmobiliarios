@@ -492,6 +492,8 @@ trait RendersDashboard
         'property_history_pdf' => self::AJAX_PROPERTY_HISTORY_PDF,
         'contract_termination_requests' => self::AJAX_CONTRACT_TERMINATION_REQUESTS,
         'contract_termination_respond' => self::AJAX_CONTRACT_TERMINATION_RESPOND,
+        'contract_non_renewal_requests' => self::AJAX_CONTRACT_NON_RENEWAL_REQUESTS,
+        'contract_non_renewal_respond' => self::AJAX_CONTRACT_NON_RENEWAL_RESPOND,
         'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
@@ -756,6 +758,8 @@ trait RendersDashboard
           $activeHomeSection = 'scm-home-calendar-section-team';
         } elseif ($subtabReq === 'contract-termination' || $subtabReq === 'contract_termination' || in_array($tabKey, ['contract_termination', 'contrato_terminacion', 'solicitudes_terminacion'], true)) {
           $activeHomeSection = 'scm-home-calendar-section-contract-termination';
+        } elseif ($subtabReq === 'contract-non-renewal' || $subtabReq === 'contract_non_renewal' || in_array($tabKey, ['contract_non_renewal', 'contrato_no_prorroga', 'solicitudes_no_prorroga'], true)) {
+          $activeHomeSection = 'scm-home-calendar-section-contract-non-renewal';
         } elseif ($subtabReq === 'mine' || $tabKey === 'mi_calendario') {
           $activeHomeSection = 'scm-home-calendar-section-mine';
         }
@@ -768,6 +772,7 @@ trait RendersDashboard
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-due' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-due"><span class="material-symbols-outlined" aria-hidden="true">schedule</span><span>Vencimientos</span><em data-scm-calendar-due-nav-count hidden>0</em></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-property-history' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-property-history"><span class="material-symbols-outlined" aria-hidden="true">home</span><span>Historial inmueble</span></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-termination' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contract-termination"><span class="material-symbols-outlined" aria-hidden="true">description</span><span>Solicitudes de terminaci&oacute;n de contrato</span></button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-non-renewal' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contract-non-renewal"><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><span>No pr&oacute;rroga de contrato</span></button>
             </div>
             <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-mine' ? ' active' : ''; ?>" id="scm-home-calendar-section-mine" data-calendar-section-panel>
               <?php echo $this->render_calendario_actividades_panel($config, [
@@ -840,6 +845,21 @@ trait RendersDashboard
                 <div class="scm-contract-termination-status" data-scm-contract-termination-status>Cargando solicitudes pendientes...</div>
                 <div class="scm-contract-termination-summary" data-scm-contract-termination-summary></div>
                 <div class="scm-contract-termination-list" data-scm-contract-termination-list></div>
+              </section>
+            </div>
+            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-non-renewal' ? ' active' : ''; ?>" id="scm-home-calendar-section-contract-non-renewal" data-calendar-section-panel>
+              <section class="scm-contract-termination-panel" data-scm-contract-non-renewal-panel aria-live="polite">
+                <div class="scm-contract-termination-head">
+                  <div>
+                    <span class="scm-calendar-action-kicker">Contratos</span>
+                    <h3>Solicitudes de no pr&oacute;rroga de contrato</h3>
+                    <p>Responde si la solicitud est&aacute; dentro o fuera de t&eacute;rmino, elige destinatarios y cierra el ticket con acta.</p>
+                  </div>
+                  <button type="button" class="scm-case-work-btn" data-scm-contract-non-renewal-refresh>Actualizar</button>
+                </div>
+                <div class="scm-contract-termination-status" data-scm-contract-non-renewal-status>Cargando solicitudes pendientes...</div>
+                <div class="scm-contract-termination-summary" data-scm-contract-non-renewal-summary></div>
+                <div class="scm-contract-termination-list" data-scm-contract-non-renewal-list></div>
               </section>
             </div>
           </section>

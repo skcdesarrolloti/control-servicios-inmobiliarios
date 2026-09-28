@@ -109,6 +109,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_PROPERTY_HISTORY_PDF = 'scm_historial_inmueble_pdf';
   const AJAX_CONTRACT_TERMINATION_REQUESTS = 'scm_solicitudes_terminacion_contrato';
   const AJAX_CONTRACT_TERMINATION_RESPOND = 'scm_responder_terminacion_contrato';
+  const AJAX_CONTRACT_NON_RENEWAL_REQUESTS = 'scm_solicitudes_no_prorroga_contrato';
+  const AJAX_CONTRACT_NON_RENEWAL_RESPOND = 'scm_responder_no_prorroga_contrato';
   const AJAX_DASHBOARD_METRICS = 'scm_dashboard_metricas';
   const AJAX_DASHBOARD_FILTER_OPTIONS = 'scm_dashboard_filter_options';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';
@@ -309,6 +311,11 @@ final class SuCasaControlServiciosInmobiliarios
           'terminacion_contrato' => [
             'label' => 'Solicitudes de terminación de contrato',
             'description' => 'Cuando se responde una solicitud de terminación, se genera acta y se cierra el caso.',
+            'channel' => 'Email interno en cola',
+          ],
+          'no_prorroga_contrato' => [
+            'label' => 'Solicitudes de no prórroga de contrato',
+            'description' => 'Cuando se responde una solicitud de no prórroga, se genera acta y se cierra el caso.',
             'channel' => 'Email interno en cola',
           ],
         ],

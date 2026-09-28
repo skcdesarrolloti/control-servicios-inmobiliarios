@@ -238,6 +238,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'property_history';
   } elseif (in_array($tabParam, ['terminacion_contrato', 'terminacion'], true) || ($tabParam === 'inicio' && in_array($subtabParam, ['contract_terminations', 'contract-termination'], true))) {
     $current_page = 'contract_termination';
+  } elseif (in_array($tabParam, ['no_prorroga_contrato', 'no_prorroga'], true) || ($tabParam === 'inicio' && in_array($subtabParam, ['contract_non_renewal', 'contract-non-renewal'], true))) {
+    $current_page = 'contract_non_renewal';
   } elseif ($tabParam === 'inicio' && $subtabParam === 'mine') {
     $current_page = 'mine';
   } elseif (in_array($tabParam, ['inicio', 'home', 'resumen', 'scm-panel-inicio'], true)) {
@@ -352,6 +354,15 @@ $rawNavItems = [
         'subtab' => 'contract-termination',
         'url' => $baseUrl . '/index.php?tab=terminacion_contrato',
         'icon' => 'assignment_late',
+        'perms' => ['calendario_actividades', 'abiertos'],
+      ],
+      'contract_non_renewal' => [
+        'key' => 'contract_non_renewal',
+        'label' => 'Solicitudes de no prórroga',
+        'panel_id' => 'scm-panel-inicio',
+        'subtab' => 'contract-non-renewal',
+        'url' => $baseUrl . '/index.php?tab=no_prorroga_contrato',
+        'icon' => 'event_busy',
         'perms' => ['calendario_actividades', 'abiertos'],
       ],
     ],

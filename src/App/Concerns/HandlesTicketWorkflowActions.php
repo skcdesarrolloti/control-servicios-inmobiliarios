@@ -900,6 +900,102 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk($result);
   }
 
+  public function ajax_handler_contract_non_renewal_requests(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessContractTerminationRequests()) {
+      $this->jsonFail('No tienes permiso para ver solicitudes de no prórroga de contrato.');
+    }
+
+    try {
+      $items = $this->contractNonRenewalRequestItems(150);
+    } catch (\Throwable $exception) {
+      error_log('[contract_non_renewal_requests] ' . $exception->getMessage());
+      $this->jsonFail('No se pudieron cargar las solicitudes de no prórroga.');
+    }
+
+    $this->jsonOk([
+      'items' => $items,
+      'count' => count($items),
+      'generated_at' => date('d/m/Y H:i'),
+    ]);
+  }
+
+  public function ajax_handler_contract_non_renewal_respond(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_respond')) {
+      $this->jsonFail('No tienes permiso para responder tickets.');
+    }
+
+    $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
+    $term = sanitize_key((string) ($_POST['termino'] ?? ''));
+    $endDate = trim(sanitize_text_field(wp_unslash((string) ($_POST['fecha_terminacion'] ?? ''))));
+    $notifyRecipients = $this->parse_notify_recipients($_POST['notify_recipients'] ?? []);
+    if (isset($_POST['notify_recipients_present']) && empty($notifyRecipients)) {
+      $notifyRecipients = ['none'];
+    }
+
+    if ($ticketPk <= 0) {
+      $this->jsonFail('Ticket inválido.');
+    }
+    if (!in_array($term, ['dentro', 'fuera'], true)) {
+      $this->jsonFail('Selecciona si la solicitud está dentro o fuera de término.');
+    }
+
+    $ticket = $this->contractTerminationTicketByPk($ticketPk);
+    if ($ticket === [] || !$this->isContractNonRenewalTicket($ticket)) {
+      $this->jsonFail('No se encontró la solicitud de no prórroga.');
+    }
+
+    $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
+    $creator = $this->calendarCitaCreatorContact();
+    $creatorName = trim((string) ($creator['name'] ?? '')) ?: (Auth::user() ?: 'Funcionario de SKC SuCasa Inmobiliaria');
+    $creatorDetails = $this->contractTerminationCreatorSignatureDetails($creator);
+    $creatorSignature = $this->contractTerminationCreatorSignatureText($creatorName, $creatorDetails);
+    $requestTs = $this->adminDueFirstTimestamp($ticket, ['fecha', 'cct_created']);
+    $requestDate = $requestTs > 0 ? date('Y-m-d', $requestTs) : '';
+    if ($endDate === '') {
+      $finContratoTs = $this->contractTerminationTimestamp($ticket['fin_contrato'] ?? '');
+      $endDate = $finContratoTs > 0 ? date('Y-m-d', $finContratoTs) : '';
+    }
+    $responseText = $this->contractNonRenewalResponseText($ticket, $term, $requestDate, $endDate, $creatorSignature);
+
+    try {
+      $acta = $this->generateContractNonRenewalActa($ticket, $term, $responseText, $creatorName, $creatorDetails);
+    } catch (\Throwable $exception) {
+      error_log('[contract_non_renewal_acta] ' . $exception->getMessage());
+      $this->jsonFail('No se pudo generar el acta de no prórroga: ' . $exception->getMessage());
+    }
+
+    $documentos = [];
+    $actaUrl = trim((string) ($acta['url'] ?? ''));
+    if ($actaUrl !== '') {
+      $documentos[] = [
+        'nombre_archivo' => (string) ($acta['title'] ?? 'Acta de respuesta no prórroga de contrato'),
+        'media_archivo' => $actaUrl,
+        'archivo' => $actaUrl,
+      ];
+    }
+
+    $service = $this->get_seguimiento_service();
+    $result = $service->saveTicketResponse($ticketPk, $responseText, 'Finalizado', true, ['none'], [], $documentos);
+    if (($result['ok'] ?? '0') !== '1') {
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta de no prórroga.'));
+    }
+
+    $this->contractNonRenewalInsertPropertyHistory($ticket, $term, $responseText, $actaUrl, $creatorName);
+    $creatorWhatsappSignature = $this->contractTerminationCreatorSignatureInline($creatorName, $creatorDetails);
+    $extraQueued = $this->notifyContractNonRenewalActa($ticket, $term, $responseText, $actaUrl, $notifyRecipients, $creatorWhatsappSignature);
+    $result['acta_url'] = $actaUrl;
+    $result['acta_title'] = (string) ($acta['title'] ?? '');
+    $result['non_renewal_email_queued'] = (string) ($extraQueued['email'] ?? 0);
+    $result['non_renewal_whatsapp_queued'] = (string) ($extraQueued['whatsapp'] ?? 0);
+    $result['message'] = 'Solicitud de no prórroga respondida, acta generada y ticket cerrado.';
+
+    $this->jsonOk($result);
+  }
+
   public function ajax_handler_repair_followup_notice(): void
   {
     $this->verifyCsrf();
@@ -3020,6 +3116,41 @@ trait HandlesTicketWorkflowActions
     return array_values(array_map(fn(array $row): array => $this->contractTerminationListItem($this->contractTerminationMergeSolicitudTicket($row)), $rows));
   }
 
+  /** @return array<int,array<string,mixed>> */
+  private function contractNonRenewalRequestItems(int $limit = 150): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+    $select = $this->contractTerminationTicketSelect($table);
+    if ($select === []) {
+      return [];
+    }
+    $textCols = array_values(array_filter(
+      ['tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion'],
+      fn(string $column): bool => $this->column_exists($table, $column)
+    ));
+    if ($textCols === []) {
+      return [];
+    }
+    $haystack = implode(", ' ', ", array_map(fn(string $column): string => "COALESCE(t.`{$column}`, '')", $textCols));
+    $where = "(LOWER(CONCAT_WS(' ', {$haystack})) LIKE '%no prorroga%' OR LOWER(CONCAT_WS(' ', {$haystack})) LIKE '%no renovacion%' OR LOWER(CONCAT_WS(' ', {$haystack})) LIKE '%no prorrogacion%')";
+    if ($this->column_exists($table, 'estado')) {
+      $where .= " AND LOWER(TRIM(COALESCE(t.`estado`, ''))) NOT IN ('cerrado', 'cerrada', 'finalizado', 'finalizada', 'anulado', 'anulada')";
+    }
+    if ($this->column_exists($table, 'estado_administrativo')) {
+      $where .= " AND LOWER(TRIM(COALESCE(t.`estado_administrativo`, ''))) NOT IN ('finalizado', 'finalizada', 'cerrado', 'cerrada')";
+    }
+    $limit = max(1, min(300, $limit));
+    $order = $this->contractTerminationOrderSql($table, 't');
+    $rows = $this->db->getResults(
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` t WHERE {$where} {$order} LIMIT {$limit}"
+    );
+
+    return array_values(array_map(fn(array $row): array => $this->contractNonRenewalListItem($row), $rows));
+  }
+
   private function contractTerminationPendingCount(): int
   {
     $table = $this->db->table('jet_cct_solicitudes_terminacion_contrato');
@@ -3073,6 +3204,7 @@ trait HandlesTicketWorkflowActions
     $columns = [
       '_ID', 'id_ticket', 'tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion', 'estado', 'estado_administrativo',
       'id_contrato', 'contrato', 'id_inmueble', 'id_inmueble_data', 'codigo_inmueble_web', 'inmueble', 'direccion', 'barrio', 'ciudad',
+      'fin_contrato', 'fecha_final_contrato', 'fecha_terminacion_contrato',
       'solicitante', 'solicitante_tipo', 'correo_solicitante', 'celular_solicitante',
       'arrendatario', 'correo_arrendatario', 'celular_arrendatario',
       'propietario', 'correo_propietario', 'celular_propietario',
@@ -3352,6 +3484,55 @@ trait HandlesTicketWorkflowActions
     );
   }
 
+  /** @param array<string,mixed> $ticket */
+  private function isContractNonRenewalTicket(array $ticket): bool
+  {
+    $haystack = strtolower($this->contractTerminationFirstText([$ticket], ['tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion']));
+    return $haystack !== '' && (
+      strpos($haystack, 'no prorroga') !== false
+      || strpos($haystack, 'no prórroga') !== false
+      || strpos($haystack, 'no renovacion') !== false
+      || strpos($haystack, 'no renovación') !== false
+    );
+  }
+
+  /** @param array<string,mixed> $row @return array<string,mixed> */
+  private function contractNonRenewalListItem(array $row): array
+  {
+    $createdTs = $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
+    $ticketPk = trim((string) ($row['_ID'] ?? ''));
+    $logicalTicket = $this->contractTerminationFirstText([$row], ['id_ticket', '_ID']);
+    $subject = $this->contractTerminationFirstText([$row], ['asunto', 'tema_ayuda', 'tipo_pqrs']) ?: 'Solicitud de no prórroga de contrato';
+    $termInfo = $this->contractTerminationTermInfo($row, $createdTs);
+    $case = ctype_digit($ticketPk) ? $this->adminDueNativeTicketCasePayload((int) $ticketPk, $this->adminDueStatusBucket($row)) : [];
+    return [
+      'solicitud_id' => $ticketPk,
+      'ticket_pk' => $ticketPk,
+      'id_ticket' => $logicalTicket,
+      'titulo' => 'Ticket #' . ($logicalTicket !== '' ? $logicalTicket : $ticketPk),
+      'asunto' => $subject,
+      'estado' => $this->contractTerminationFirstText([$row], ['estado']) ?: '-',
+      'estado_solicitud' => 'Pendiente',
+      'estado_administrativo' => $this->contractTerminationFirstText([$row], ['estado_administrativo']) ?: '-',
+      'contrato' => $this->contractTerminationFirstText([$row], ['contrato', 'id_contrato']) ?: '-',
+      'inmueble' => $this->contractTerminationFirstText([$row], ['inmueble', 'id_inmueble']) ?: '-',
+      'direccion' => $this->contractTerminationFirstText([$row], ['direccion']) ?: '-',
+      'solicitante' => $this->contractTerminationFirstText([$row], ['solicitante', 'arrendatario', 'propietario']) ?: '-',
+      'creado' => $createdTs > 0 ? date('d/m/Y H:i', $createdTs) : '-',
+      'fecha_solicitud' => $createdTs > 0 ? date('Y-m-d', $createdTs) : date('Y-m-d'),
+      'fin_contrato' => $termInfo['fin_contrato'],
+      'fin_contrato_label' => $termInfo['fin_contrato_label'],
+      'fecha_limite_terminacion' => $termInfo['fecha_limite_terminacion'],
+      'fecha_limite_label' => $termInfo['fecha_limite_label'],
+      'term_status' => $termInfo['term_status'],
+      'term_label' => $termInfo['term_label'],
+      'term_hint' => $termInfo['term_hint'],
+      'term_recommended' => $termInfo['term_recommended'],
+      'recipients' => $this->contractTerminationRecipientOptions($row, 'no_prorroga_contrato'),
+      'case' => $case,
+    ];
+  }
+
   /** @param array<string,mixed> $row @return array<string,mixed> */
   private function contractTerminationListItem(array $row): array
   {
@@ -3391,7 +3572,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $ticket @return array<int,array<string,string|bool>> */
-  private function contractTerminationRecipientOptions(array $ticket): array
+  private function contractTerminationRecipientOptions(array $ticket, string $internalAction = 'terminacion_contrato'): array
   {
     $options = [];
     $map = [
@@ -3412,7 +3593,7 @@ trait HandlesTicketWorkflowActions
         'available' => $email !== '' || $phone !== '',
       ];
     }
-    $adminEmails = \SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, 'terminacion_contrato');
+    $adminEmails = \SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, $internalAction);
     $options[] = [
       'value' => 'admin',
       'label' => 'Funcionario configurado',
@@ -3550,6 +3731,70 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $ticket */
+  private function contractNonRenewalResponseText(array $ticket, string $term, string $requestDate, string $endDate, string $creatorSignature): string
+  {
+    $recipient = $this->contractTerminationFirstText([$ticket], ['solicitante', 'arrendatario', 'propietario']) ?: 'cliente';
+    $address = $this->contractTerminationFirstText([$ticket], ['direccion']) ?: 'el inmueble relacionado';
+    $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: '-';
+    $requestLabel = $this->contractTerminationHumanDate($requestDate);
+    $endLabel = $this->contractTerminationHumanDate($endDate);
+
+    $text = "Cartagena de Indias D.T. y C., " . date('d/m/Y') . "\n\n";
+    $text .= "Señor(a): {$recipient}\nCiudad\n\n";
+    $text .= "SKC SuCasa Inmobiliaria, en calidad de administradora del inmueble ubicado en {$address}, da respuesta a la solicitud relacionada con la no prórroga del contrato de arrendamiento #{$contract}. ";
+    if ($term === 'dentro') {
+      $text .= "De acuerdo con la comunicación recibida el {$requestLabel}, la solicitud fue presentada dentro del término establecido para informar la no prórroga del contrato.\n\n";
+      $text .= "En consecuencia, se deja constancia de la no prórroga y el contrato conservará su vigencia hasta el día {$endLabel}, fecha en la cual deberán adelantarse las actuaciones de cierre, entrega o restitución que correspondan según el contrato y la normatividad aplicable.";
+    } else {
+      $text .= "La comunicación recibida el {$requestLabel} se encuentra fuera del término previsto para informar la no prórroga del contrato.\n\n";
+      $text .= "Por lo anterior, la solicitud no produce los efectos esperados en los términos planteados y el contrato podrá entenderse prorrogado o sujeto a las consecuencias contractuales y legales aplicables, sin perjuicio de las validaciones adicionales que realice el área encargada.";
+    }
+    $text .= "\n\nAtentamente,\n{$creatorSignature}";
+    return $text;
+  }
+
+  /** @param array<string,mixed> $ticket @return array{title:string,url:string,path:string} */
+  private function generateContractNonRenewalActa(array $ticket, string $term, string $responseText, string $creatorName, string $creatorDetails): array
+  {
+    if (!defined('SCM_UPLOAD_PATH')) {
+      throw new \RuntimeException('No está configurada la ruta de almacenamiento.');
+    }
+    $ticketPk = (int) ($ticket['_ID'] ?? 0);
+    $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
+    $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: '-';
+    $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
+    $title = $term === 'dentro'
+      ? 'Acta de no prórroga dentro de término'
+      : 'Acta de no prórroga fuera de término';
+    $safeName = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
+    $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . $safeName;
+
+    $pdf = new \SCM\Support\SimplePdf();
+    $pdf->layout(42, 42, 44);
+    $membrete = defined('SCM_RESOURCES_PATH') ? SCM_RESOURCES_PATH . '/assets/membrete-sucasa.jpg' : '';
+    if ($membrete !== '' && is_file($membrete)) {
+      $pdf->backgroundImage($membrete);
+    }
+    $pdf->footerLabel('SKC SuCasa Inmobiliaria - No prórroga de contrato');
+    $pdf->actaHeader($title, 'Ticket #' . $logicalTicket . ' · Contrato #' . $contract . ' · Inmueble ' . $property, $term === 'dentro' ? 'Dentro de término' : 'Fuera de término');
+    $pdf->sectionTitle('Respuesta emitida');
+    foreach (preg_split('/\n{2,}/', $responseText) ?: [] as $paragraph) {
+      $paragraph = trim($paragraph);
+      if ($paragraph !== '') {
+        $pdf->paragraph($paragraph, 8);
+      }
+    }
+    $pdf->signatureBlock('Realizado por', $creatorName, $creatorDetails !== '' ? $creatorDetails : 'SKC SuCasa Inmobiliaria');
+    $pdf->save($path);
+
+    return [
+      'title' => $title . ' - Ticket #' . $logicalTicket,
+      'url' => \SCM\Support\StoredFileService::fromRuntime()->urlFor($safeName),
+      'path' => $path,
+    ];
+  }
+
+  /** @param array<string,mixed> $ticket */
   private function contractTerminationInsertPropertyHistory(array $ticket, string $term, string $responseText, string $actaUrl, string $creatorName): void
   {
     $histTable = $this->db->table('jet_cct_historial_del_inmueble');
@@ -3606,6 +3851,74 @@ trait HandlesTicketWorkflowActions
     if ($actaUrl !== '') {
       $payload['archivos'] = serialize([[
         'nombre_archivo' => 'Acta de terminación ' . $status,
+        'media_archivo' => $actaUrl,
+        'archivo' => $actaUrl,
+      ]]);
+    }
+
+    $payload = $schema->filterTableData($histTable, $payload);
+    if (!empty($payload)) {
+      $this->db->insert($histTable, $payload);
+    }
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function contractNonRenewalInsertPropertyHistory(array $ticket, string $term, string $responseText, string $actaUrl, string $creatorName): void
+  {
+    $histTable = $this->db->table('jet_cct_historial_del_inmueble');
+    $schema = new \SCM\Support\SchemaInspector($this->db);
+    if (!$schema->tableExists($histTable)) {
+      return;
+    }
+
+    $nowTs = time();
+    $nowMysql = date('Y-m-d H:i:s', $nowTs);
+    $userId = Auth::userId();
+    $employeeId = (string) $userId;
+    $funcTable = $this->db->table('jet_cct_funcionarios');
+    if ($userId > 0 && $this->table_exists($funcTable)) {
+      $func = $this->db->getRow("SELECT * FROM `{$funcTable}` WHERE `_ID` = ? LIMIT 1", [$userId]);
+      if (is_array($func) && trim((string) ($func['id_empleado'] ?? '')) !== '') {
+        $employeeId = trim((string) $func['id_empleado']);
+      }
+    }
+
+    $status = $term === 'dentro' ? 'dentro de término' : 'fuera de término';
+    $title = $term === 'dentro' ? 'No prórroga dentro de término' : 'No prórroga fuera de término';
+    $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']);
+    $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']);
+    $property = $this->contractTerminationFirstText([$ticket], ['codigo_inmueble_web', 'codigo', 'id_inmueble', 'inmueble']);
+    $propertyData = $this->contractTerminationFirstText([$ticket], ['id_inmueble_data', 'inmueble']);
+    $detail = 'Se emitió respuesta a la solicitud de no prórroga de contrato clasificada como ' . $status . '.';
+    if ($contract !== '') {
+      $detail .= ' Contrato #' . $contract . '.';
+    }
+    if ($actaUrl !== '') {
+      $detail .= ' Acta generada y anexada al caso.';
+    }
+
+    $payload = [
+      'cct_status' => 'publish',
+      'cct_author_id' => $employeeId,
+      'cct_created' => $nowMysql,
+      'cct_modified' => $nowMysql,
+      'id_empleado' => $employeeId,
+      'id_inmueble' => $property,
+      'id_inmueble_data' => $propertyData !== '' ? $propertyData : $property,
+      'fecha' => $nowTs,
+      'tipo_de_reporte_his' => $title,
+      'tipo_reporte' => $title,
+      'observacion_his' => $detail,
+      'observacion' => $detail,
+      'respuesta' => $responseText,
+      'funcionario' => $creatorName,
+      'id_ticket' => $logicalTicket !== '' ? $logicalTicket : $this->contractTerminationFirstText([$ticket], ['_ID']),
+      'contrato' => $contract,
+      'id_contrato' => $contract,
+    ];
+    if ($actaUrl !== '') {
+      $payload['archivos'] = serialize([[
+        'nombre_archivo' => 'Acta de no prórroga ' . $status,
         'media_archivo' => $actaUrl,
         'archivo' => $actaUrl,
       ]]);
@@ -3693,8 +4006,71 @@ trait HandlesTicketWorkflowActions
     return ['email' => $emailQueued, 'whatsapp' => $whatsappQueued];
   }
 
+  /** @param array<string,mixed> $ticket @param string[] $notifyTargets @return array{email:int,whatsapp:int} */
+  private function notifyContractNonRenewalActa(array $ticket, string $term, string $responseText, string $actaUrl, array $notifyTargets, string $creatorSignature): array
+  {
+    $targets = array_values(array_unique($notifyTargets));
+    if ($actaUrl === '' || in_array('none', $targets, true) || $targets === []) {
+      return ['email' => 0, 'whatsapp' => 0];
+    }
+    $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: '-';
+    $subject = 'Respuesta solicitud de no prórroga de contrato - Ticket #' . $logicalTicket;
+    $status = $term === 'dentro' ? 'dentro de término' : 'fuera de término';
+    $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: '-';
+    $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
+    $address = $this->contractTerminationFirstText([$ticket], ['direccion']) ?: 'dirección registrada';
+    $emailRecipients = $this->contractTerminationNotificationEmails($ticket, $targets, 'no_prorroga_contrato');
+    $html = \SCM\Support\EmailTemplate::render('Respuesta solicitud de no prórroga de contrato', nl2br(\SCM\Support\EmailTemplate::e($responseText)), [
+      'buttons' => [['url' => $actaUrl, 'label' => 'Ver acta generada']],
+    ]);
+    $emailQueued = $emailRecipients !== []
+      ? (new \SCM\Support\EmailQueue($this->db))->enqueue(array_values($emailRecipients), $subject, $html, [
+        'source_module' => 'no_prorroga_contrato',
+        'destination_name' => '',
+        'dedupe_key' => 'no_prorroga_contrato:' . $logicalTicket . ':' . $term,
+        'meta' => ['id_ticket' => $logicalTicket, 'acta_url' => $actaUrl, 'termino' => $status],
+      ])
+      : 0;
+
+    $whatsappQueued = 0;
+    foreach ($this->contractTerminationNotificationPhones($ticket, $targets) as $recipient) {
+      try {
+        $phone = (string) ($recipient['phone'] ?? '');
+        $name = (string) ($recipient['name'] ?? 'cliente');
+        $summary = "No prórroga contrato #{$contract}, inmueble {$property}, dirección {$address}, ticket #{$logicalTicket}. Clasificación: {$status}. Acta: {$actaUrl}";
+        $message = "Buen dia, {$name}.\n\nSKC SuCasa Inmobiliaria emitio respuesta sobre la no prorroga del contrato.\n\n{$summary}\n\nAtentamente,\n{$creatorSignature}";
+        $smsQueue = new \SCM\Support\SmsQueue($this->db);
+        $ok = $smsQueue->enqueue($phone, $name, $message, [
+          'source_module' => 'no_prorroga_contrato',
+          'campaign_tag' => 'no_prorroga_contrato',
+          'categoria_mensaje' => 'informacion',
+          'id_ticket' => $logicalTicket,
+          'acta_url' => $actaUrl,
+          'dedupe_key' => 'no_prorroga_contrato:' . $logicalTicket . ':' . $term,
+          'template_name' => 'scm_no_prorroga_contrato_respuesta',
+          'template_language' => 'es_CO',
+          'template_components' => [[
+            'type' => 'body',
+            'parameters' => [
+              ['type' => 'text', 'text' => $name],
+              ['type' => 'text', 'text' => $summary],
+              ['type' => 'text', 'text' => $creatorSignature],
+            ],
+          ]],
+        ]);
+        if ($ok) {
+          $whatsappQueued++;
+        }
+      } catch (\Throwable $exception) {
+        error_log('[contract_non_renewal_whatsapp] ' . $exception->getMessage());
+      }
+    }
+
+    return ['email' => $emailQueued, 'whatsapp' => $whatsappQueued];
+  }
+
   /** @param array<string,mixed> $ticket @param string[] $targets @return array<string,string> */
-  private function contractTerminationNotificationEmails(array $ticket, array $targets): array
+  private function contractTerminationNotificationEmails(array $ticket, array $targets, string $internalAction = 'terminacion_contrato'): array
   {
     $emails = [];
     $map = [
@@ -3703,7 +4079,7 @@ trait HandlesTicketWorkflowActions
     ];
     foreach ($targets as $target) {
       if ($target === 'admin') {
-        foreach (\SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, 'terminacion_contrato') as $email) {
+        foreach (\SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, $internalAction) as $email) {
           $emails[strtolower($email)] = $email;
         }
         continue;

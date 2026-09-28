@@ -220,6 +220,10 @@
       actions.contract_termination_requests || "";
     var actionContractTerminationRespond =
       actions.contract_termination_respond || "";
+    var actionContractNonRenewalRequests =
+      actions.contract_non_renewal_requests || "";
+    var actionContractNonRenewalRespond =
+      actions.contract_non_renewal_respond || "";
     var actionDashboardMetrics = actions.dashboard_metrics || "";
     var actionDashboardFilterOptions = actions.dashboard_filter_options || "";
     var actionRentIncreaseLettersList =
@@ -12975,6 +12979,7 @@
     var propertyHistoryCurrentFilters = { contract_number: "", property_code: "" };
     var propertyHistorySectionsByKey = {};
     var contractTerminationRowsByPk = {};
+    var contractNonRenewalRowsByPk = {};
 
     function formatDashboardCount(value) {
       var number = Number(value || 0);
@@ -13085,6 +13090,7 @@
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-team"><span class="material-symbols-outlined">groups</span><strong>Calendario equipo</strong><i>Equipo</i></button>' +
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-property-history"><span class="material-symbols-outlined">home</span><strong>Historial inmueble</strong><i>Consulta</i></button>' +
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-contract-termination"><span class="material-symbols-outlined">description</span><strong>Terminaciones</strong><i>Contratos</i></button>' +
+              '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-contract-non-renewal"><span class="material-symbols-outlined">event_busy</span><strong>No prórroga</strong><i>Contratos</i></button>' +
             '</div></section>' +
           '</div>';
       }
@@ -13567,6 +13573,174 @@
       });
     }
 
+    function renderContractNonRenewal(data) {
+      var panel = root.querySelector("[data-scm-contract-non-renewal-panel]");
+      if (!panel) return;
+      var status = panel.querySelector("[data-scm-contract-non-renewal-status]");
+      var summary = panel.querySelector("[data-scm-contract-non-renewal-summary]");
+      var list = panel.querySelector("[data-scm-contract-non-renewal-list]");
+      var rows = Array.isArray(data && data.items) ? data.items : [];
+      contractNonRenewalRowsByPk = {};
+      rows.forEach(function (row) {
+        if (row && row.solicitud_id) contractNonRenewalRowsByPk[String(row.solicitud_id)] = row;
+      });
+      if (status) {
+        status.classList.remove("is-error");
+        status.textContent = "Actualizado " + String((data && data.generated_at) || "") + ".";
+      }
+      if (summary) {
+        summary.innerHTML =
+          '<div><span>Pendientes</span><strong>' + formatDashboardCount(data && data.count || rows.length) + "</strong></div>" +
+          '<div><span>Acción</span><strong>Responder y cerrar</strong></div>';
+      }
+      if (!list) return;
+      if (!rows.length) {
+        list.innerHTML = contractTerminationEmpty("No hay solicitudes de no prórroga pendientes.");
+        return;
+      }
+      list.innerHTML = rows.map(function (row) {
+        row = row || {};
+        var caseData = row.case || {};
+        var sourceHtml = String(caseData.case_source_html || "").trim();
+        var canOpenCase = sourceHtml !== "";
+        var meta = [
+          row.contrato && row.contrato !== "-" ? "Contrato #" + row.contrato : "",
+          row.inmueble && row.inmueble !== "-" ? "Inmueble " + row.inmueble : "",
+          row.direccion && row.direccion !== "-" ? row.direccion : "",
+        ].filter(Boolean);
+        return '<article class="scm-contract-termination-row scm-ticket-card">' +
+          '<div class="scm-contract-termination-date"><span>Creado</span><strong>' + escHtml(row.creado || "-") + "</strong></div>" +
+          '<div class="scm-contract-termination-main">' +
+            '<strong>' + escHtml(row.titulo || "Ticket") + " · " + escHtml(row.asunto || "Solicitud de no prórroga") + "</strong>" +
+            '<span>' + escHtml(meta.join(" · ") || "Sin datos de inmueble") + "</span>" +
+            '<small>' + escHtml(row.solicitante || "-") + " · Solicitud: " + escHtml(row.estado_solicitud || "-") + " · Caso: " + escHtml(row.estado || "-") + " / " + escHtml(row.estado_administrativo || "-") + "</small>" +
+            contractTerminationTermBadge(row, true) +
+          "</div>" +
+          '<div class="scm-contract-termination-actions">' +
+            (canOpenCase ? '<button type="button" class="scm-case-work-btn" data-scm-contract-non-renewal-open-case data-scm-due-case-loaded="1" data-due-type="no_prorroga_contrato_pendiente"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso</button>') +
+            '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-contract-non-renewal-respond data-solicitud-id="' + escHtml(row.solicitud_id || "") + '" data-ticket-pk="' + escHtml(row.ticket_pk || "") + '">Responder</button>' +
+          '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div>" +
+        "</article>";
+      }).join("");
+      panel.setAttribute("data-scm-loaded", "1");
+    }
+
+    function loadContractNonRenewalRequests(force) {
+      var panel = root.querySelector("[data-scm-contract-non-renewal-panel]");
+      if (!panel || !ajaxUrl || !actionContractNonRenewalRequests) {
+        return Promise.resolve();
+      }
+      if (!force && panel.getAttribute("data-scm-loaded") === "1") {
+        return Promise.resolve();
+      }
+      var status = panel.querySelector("[data-scm-contract-non-renewal-status]");
+      if (status) {
+        status.classList.remove("is-error");
+        status.textContent = "Cargando solicitudes de no prórroga...";
+      }
+      return dashboardAction(actionContractNonRenewalRequests, {})
+        .then(function (data) {
+          renderContractNonRenewal(data || {});
+        })
+        .catch(function (error) {
+          if (status) {
+            status.classList.add("is-error");
+            status.textContent = error && error.message ? error.message : "No se pudieron cargar las solicitudes.";
+          }
+          showToast("error", error && error.message ? error.message : "No se pudieron cargar las solicitudes.");
+        });
+    }
+
+    function openContractNonRenewalResponse(solicitudId) {
+      var row = contractNonRenewalRowsByPk[String(solicitudId || "")];
+      if (!row || !window.Swal || typeof window.Swal.fire !== "function") {
+        showToast("warning", "No se encontró la solicitud seleccionada.");
+        return;
+      }
+      var html = '<form class="scm-contract-termination-form" data-scm-contract-non-renewal-form>' +
+        '<div class="scm-contract-termination-case">' +
+          '<strong>' + escHtml(row.titulo || "Ticket") + '</strong><span>' + escHtml(row.asunto || "Solicitud de no prórroga") + "</span>" +
+          '<small>' + escHtml([row.contrato ? "Contrato #" + row.contrato : "", row.inmueble ? "Inmueble " + row.inmueble : "", row.direccion || ""].filter(Boolean).join(" · ")) + "</small>" +
+        "</div>" +
+        contractTerminationTermBadge(row, false) +
+        '<div class="scm-contract-termination-form-grid">' +
+          '<label><span>Clasificación</span><select name="termino" required><option value="" selected disabled>Selecciona clasificación</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label>' +
+          '<label><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || "") + '" readonly aria-readonly="true"></label>' +
+          '<label><span>Fecha fin de contrato</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || "") + '"></label>' +
+        "</div>" +
+        '<div><span class="scm-contract-termination-label">Notificar a</span>' + contractTerminationRecipientChecks(row) + "</div>" +
+      "</form>";
+      window.Swal.fire({
+        title: "Responder no prórroga",
+        html: html,
+        width: "min(860px, 94vw)",
+        showCancelButton: true,
+        confirmButtonText: "Responder y cerrar",
+        cancelButtonText: "Cancelar",
+        buttonsStyling: false,
+        customClass: {
+          popup: "scm-calendar-swal-popup scm-contract-termination-swal",
+          confirmButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--primary",
+          cancelButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary",
+        },
+        didOpen: function () {
+          var popup = window.Swal.getPopup();
+          var form = popup ? popup.querySelector("[data-scm-contract-non-renewal-form]") : null;
+          if (!form) return;
+          form.addEventListener("change", function (event) {
+            if (event.target && event.target.name === "notify_recipients[]") {
+              var none = form.querySelector('input[name="notify_recipients[]"][value="none"]');
+              if (event.target.value === "none" && event.target.checked) {
+                form.querySelectorAll('input[name="notify_recipients[]"]').forEach(function (input) {
+                  if (input !== none) input.checked = false;
+                });
+              } else if (none && event.target.checked) {
+                none.checked = false;
+              }
+            }
+          });
+        },
+        preConfirm: function () {
+          var popup = window.Swal.getPopup();
+          var form = popup ? popup.querySelector("[data-scm-contract-non-renewal-form]") : null;
+          if (!form) return false;
+          var checked = Array.prototype.slice.call(form.querySelectorAll('input[name="notify_recipients[]"]:checked'));
+          if (!checked.length) {
+            window.Swal.showValidationMessage("Selecciona a quién notificar o marca No notificar.");
+            return false;
+          }
+          var term = form.querySelector("[name='termino']");
+          if (!term || !term.value) {
+            window.Swal.showValidationMessage("Selecciona la clasificación de la solicitud.");
+            return false;
+          }
+          return {
+            termino: term.value,
+            fecha_terminacion: form.querySelector("[name='fecha_terminacion']").value,
+            notify: checked.map(function (input) { return input.value; }),
+          };
+        },
+      }).then(function (result) {
+        if (!result.isConfirmed || !result.value) return;
+        var value = result.value;
+        return dashboardFormAction(actionContractNonRenewalRespond, function (fd) {
+          fd.append("ticket_pk", String(row.ticket_pk || ""));
+          fd.append("solicitud_id", String(row.solicitud_id || ""));
+          fd.append("termino", value.termino || "");
+          fd.append("fecha_terminacion", value.fecha_terminacion || "");
+          fd.append("notify_recipients_present", "1");
+          (value.notify || []).forEach(function (target) {
+            fd.append("notify_recipients[]", target);
+          });
+        }).then(function (data) {
+          showToast("success", (data && data.message) || "Solicitud respondida.");
+          loadContractNonRenewalRequests(true);
+        }).catch(function (error) {
+          showToast("error", error && error.message ? error.message : "No se pudo responder la solicitud.");
+        });
+      });
+    }
+
     function loadDashboardHome() {
       var panel = root.querySelector("#scm-panel-inicio");
       if (!panel) {
@@ -13575,6 +13749,13 @@
       var initHomeCalendar = function () {
         var activeHomeCalendarSection = panel.querySelector("[data-calendar-sections] .scm-calendar-section-panel.active");
         initCalendarPanel(activeHomeCalendarSection || panel);
+        if (activeHomeCalendarSection && activeHomeCalendarSection.id === "scm-home-calendar-section-contract-termination") {
+          return loadContractTerminationRequests(false);
+        }
+        if (activeHomeCalendarSection && activeHomeCalendarSection.id === "scm-home-calendar-section-contract-non-renewal") {
+          return loadContractNonRenewalRequests(false);
+        }
+        return Promise.resolve();
       };
       var calendarReady = loadDashboardFilterOptions().then(initHomeCalendar);
       return calendarReady.then(function () {
@@ -19549,6 +19730,9 @@
         if (target === "scm-home-calendar-section-contract-termination") {
           loadContractTerminationRequests(false);
         }
+        if (target === "scm-home-calendar-section-contract-non-renewal") {
+          loadContractNonRenewalRequests(false);
+        }
       });
     });
 
@@ -19616,6 +19800,29 @@
         return;
       }
 
+      var contractNonRenewalRefresh = event.target.closest("[data-scm-contract-non-renewal-refresh]");
+      if (contractNonRenewalRefresh) {
+        event.preventDefault();
+        var nonRenewalPanel = contractNonRenewalRefresh.closest("[data-scm-contract-non-renewal-panel]");
+        if (nonRenewalPanel) nonRenewalPanel.setAttribute("data-scm-loaded", "0");
+        loadContractNonRenewalRequests(true);
+        return;
+      }
+
+      var contractNonRenewalRespond = event.target.closest("[data-scm-contract-non-renewal-respond]");
+      if (contractNonRenewalRespond) {
+        event.preventDefault();
+        openContractNonRenewalResponse(contractNonRenewalRespond.getAttribute("data-solicitud-id") || "");
+        return;
+      }
+
+      var contractNonRenewalCase = event.target.closest("[data-scm-contract-non-renewal-open-case]");
+      if (contractNonRenewalCase) {
+        event.preventDefault();
+        dashboardOpenDueCase(contractNonRenewalCase);
+        return;
+      }
+
       var propertyHistoryPdf = event.target.closest("[data-scm-property-history-pdf]");
       if (propertyHistoryPdf) {
         event.preventDefault();
@@ -19633,6 +19840,17 @@
       var shortcut = event.target.closest("[data-scm-home-target]");
       if (!shortcut) return;
       var targetPanel = shortcut.getAttribute("data-scm-home-target") || "";
+      var sectionTab = targetPanel
+        ? Array.prototype.find.call(root.querySelectorAll(".scm-calendar-section-tab[data-calendar-section-target]"), function (tab) {
+          return tab.getAttribute("data-calendar-section-target") === targetPanel;
+        })
+        : null;
+      if (sectionTab) {
+        event.preventDefault();
+        sectionTab.click();
+        sectionTab.focus({ preventScroll: true });
+        return;
+      }
       var targetTab = Array.prototype.find.call(
         root.querySelectorAll(".scm-main-tabs .scm-tab[data-tab]"),
         function (tab) {
