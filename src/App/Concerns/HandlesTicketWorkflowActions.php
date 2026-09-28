@@ -3127,15 +3127,21 @@ trait HandlesTicketWorkflowActions
     if ($select === []) {
       return [];
     }
-    $textCols = array_values(array_filter(
+    $topicCols = array_values(array_filter(
+      ['tipo_pqrs', 'tema_ayuda', 'asunto'],
+      fn(string $column): bool => $this->column_exists($table, $column)
+    ));
+    if ($topicCols === []) {
+      return [];
+    }
+    $allTextCols = array_values(array_filter(
       ['tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion'],
       fn(string $column): bool => $this->column_exists($table, $column)
     ));
-    if ($textCols === []) {
-      return [];
-    }
-    $haystack = implode(", ' ', ", array_map(fn(string $column): string => "COALESCE(t.`{$column}`, '')", $textCols));
-    $where = "(LOWER(CONCAT_WS(' ', {$haystack})) LIKE '%no prorroga%' OR LOWER(CONCAT_WS(' ', {$haystack})) LIKE '%no renovacion%' OR LOWER(CONCAT_WS(' ', {$haystack})) LIKE '%no prorrogacion%')";
+    $topicHaystack = "LOWER(CONCAT_WS(' ', " . implode(', ', array_map(fn(string $column): string => "COALESCE(t.`{$column}`, '')", $topicCols)) . '))';
+    $allHaystack = "LOWER(CONCAT_WS(' ', " . implode(', ', array_map(fn(string $column): string => "COALESCE(t.`{$column}`, '')", $allTextCols)) . '))';
+    $where = "({$topicHaystack} LIKE '%no prorroga%' OR {$topicHaystack} LIKE '%no prórroga%' OR {$topicHaystack} LIKE '%no renovacion%' OR {$topicHaystack} LIKE '%no renovación%' OR {$topicHaystack} LIKE '%no prorrogacion%' OR {$topicHaystack} LIKE '%no prorrogación%')";
+    $where .= " AND {$allHaystack} NOT LIKE '%terminacion%' AND {$allHaystack} NOT LIKE '%terminación%' AND {$allHaystack} NOT LIKE '%desocupacion%' AND {$allHaystack} NOT LIKE '%desocupación%'";
     if ($this->column_exists($table, 'estado')) {
       $where .= " AND LOWER(TRIM(COALESCE(t.`estado`, ''))) NOT IN ('cerrado', 'cerrada', 'finalizado', 'finalizada', 'anulado', 'anulada')";
     }
@@ -3487,12 +3493,30 @@ trait HandlesTicketWorkflowActions
   /** @param array<string,mixed> $ticket */
   private function isContractNonRenewalTicket(array $ticket): bool
   {
-    $haystack = strtolower($this->contractTerminationFirstText([$ticket], ['tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion']));
-    return $haystack !== '' && (
-      strpos($haystack, 'no prorroga') !== false
-      || strpos($haystack, 'no prórroga') !== false
-      || strpos($haystack, 'no renovacion') !== false
-      || strpos($haystack, 'no renovación') !== false
+    $topicHaystack = strtolower(trim(implode(' ', array_map(
+      fn(string $column): string => (string) ($ticket[$column] ?? ''),
+      ['tipo_pqrs', 'tema_ayuda', 'asunto']
+    ))));
+    $allHaystack = strtolower(trim(implode(' ', array_map(
+      fn(string $column): string => (string) ($ticket[$column] ?? ''),
+      ['tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion']
+    ))));
+    if (
+      $allHaystack === ''
+      || strpos($allHaystack, 'terminacion') !== false
+      || strpos($allHaystack, 'terminación') !== false
+      || strpos($allHaystack, 'desocupacion') !== false
+      || strpos($allHaystack, 'desocupación') !== false
+    ) {
+      return false;
+    }
+    return $topicHaystack !== '' && (
+      strpos($topicHaystack, 'no prorroga') !== false
+      || strpos($topicHaystack, 'no prórroga') !== false
+      || strpos($topicHaystack, 'no renovacion') !== false
+      || strpos($topicHaystack, 'no renovación') !== false
+      || strpos($topicHaystack, 'no prorrogacion') !== false
+      || strpos($topicHaystack, 'no prorrogación') !== false
     );
   }
 

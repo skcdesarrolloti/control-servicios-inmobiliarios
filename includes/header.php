@@ -358,7 +358,7 @@ $rawNavItems = [
       ],
       'contract_non_renewal' => [
         'key' => 'contract_non_renewal',
-        'label' => 'Solicitudes de no prórroga',
+        'label' => 'Solicitudes de no prórroga de contrato',
         'panel_id' => 'scm-panel-inicio',
         'subtab' => 'contract-non-renewal',
         'url' => $baseUrl . '/index.php?tab=no_prorroga_contrato',
