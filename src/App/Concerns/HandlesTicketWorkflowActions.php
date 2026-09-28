@@ -882,6 +882,16 @@ trait HandlesTicketWorkflowActions
         'archivo' => $actaUrl,
       ];
     }
+    $retentionTicket = [];
+    if ($createRetentionTicket) {
+      if ($retentionEmployeeId === '') {
+        $this->jsonFail('Selecciona el funcionario responsable del ticket de retención.');
+      }
+      $retentionTicket = $this->createContractRetentionTicketFromContractRequest($ticket, $term, $retentionEmployeeId, $responseText, $actaUrl, (string) ($acta['title'] ?? 'Acta de respuesta terminación de contrato'), 'terminación de contrato');
+      if (($retentionTicket['ok'] ?? '0') !== '1') {
+        $this->jsonFail((string) ($retentionTicket['message'] ?? 'No se pudo crear el ticket comercial de retención.'));
+      }
+    }
 
     $service = $this->get_seguimiento_service();
     $result = $service->saveTicketResponse($ticketPk, $responseText, 'Finalizado', true, ['none'], [], $documentos);
@@ -897,7 +907,15 @@ trait HandlesTicketWorkflowActions
     $result['acta_title'] = (string) ($acta['title'] ?? '');
     $result['termination_email_queued'] = (string) ($extraQueued['email'] ?? 0);
     $result['termination_whatsapp_queued'] = (string) ($extraQueued['whatsapp'] ?? 0);
+    if ($retentionTicket !== []) {
+      $result['retention_ticket_id'] = (string) ($retentionTicket['ticket_id'] ?? '');
+      $result['retention_ticket_url'] = (string) ($retentionTicket['ticket_url'] ?? '');
+      $result['retention_whatsapp_queued'] = (string) ($retentionTicket['whatsapp_queued'] ?? 0);
+    }
     $result['message'] = 'Solicitud respondida, acta generada y ticket cerrado.';
+    if ($retentionTicket !== []) {
+      $result['message'] .= ' Ticket comercial de retención #' . (string) ($retentionTicket['ticket_id'] ?? '') . ' creado.';
+    }
 
     $this->jsonOk($result);
   }
@@ -986,7 +1004,7 @@ trait HandlesTicketWorkflowActions
       ];
     }
     if ($createRetentionTicket) {
-      $retentionTicket = $this->createContractRetentionTicketFromNonRenewal($ticket, $term, $retentionEmployeeId, $responseText, $actaUrl, (string) ($acta['title'] ?? 'Acta de respuesta no prórroga de contrato'));
+      $retentionTicket = $this->createContractRetentionTicketFromContractRequest($ticket, $term, $retentionEmployeeId, $responseText, $actaUrl, (string) ($acta['title'] ?? 'Acta de respuesta no prórroga de contrato'), 'no prórroga');
       if (($retentionTicket['ok'] ?? '0') !== '1') {
         $this->jsonFail((string) ($retentionTicket['message'] ?? 'No se pudo crear el ticket comercial de retención.'));
       }
@@ -3750,7 +3768,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $ticket @return array<string,mixed> */
-  private function createContractRetentionTicketFromNonRenewal(array $ticket, string $term, string $employeeId, string $responseText, string $actaUrl = '', string $actaTitle = ''): array
+  private function createContractRetentionTicketFromContractRequest(array $ticket, string $term, string $employeeId, string $responseText, string $actaUrl = '', string $actaTitle = '', string $sourceLabel = 'no prórroga'): array
   {
     $employeeId = trim($employeeId);
     if ($employeeId === '') {
@@ -3777,9 +3795,10 @@ trait HandlesTicketWorkflowActions
     $property = $this->contractTerminationFirstText([$contract, $ticket], ['inmueble', 'id_inmueble', 'codigo_inmueble_web']);
     $address = $this->contractTerminationFirstText([$contract, $ticket], ['direccion']);
     $status = $term === 'dentro' ? 'dentro de término' : 'fuera de término';
-    $description = "Se crea ticket comercial de retención de contrato a partir de la no prórroga respondida en el ticket #{$logicalTicket}.\n\n";
+    $sourceLabel = trim($sourceLabel) !== '' ? trim($sourceLabel) : 'solicitud contractual';
+    $description = "Se crea ticket comercial de retención de contrato a partir de la {$sourceLabel} respondida en el ticket #{$logicalTicket}.\n\n";
     $description .= "Objetivo: gestionar retención del contrato o iniciar búsqueda comercial para el inmueble asociado.\n";
-    $description .= "Clasificación de la no prórroga: {$status}.\n";
+    $description .= "Clasificación de la solicitud: {$status}.\n";
     if ($contractCode !== '') {
       $description .= "Contrato: {$contractCode}.\n";
     }
@@ -3845,6 +3864,7 @@ trait HandlesTicketWorkflowActions
     $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: (string) ($input['id_contrato'] ?? '-');
     $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
     $summary = 'Contrato ' . $contract . ', inmueble ' . $property . '. Gestionar retención o búsqueda comercial.';
+    $ticketButtonSuffix = $this->contractTicketWhatsappButtonSuffix((string) $ticketId);
     $requesterType = $this->contractRetentionRequesterType($ticket);
     $requesterName = $this->contractTerminationFirstText([$ticket], [$requesterType, 'solicitante']) ?: 'cliente';
     $requesterPhone = $this->contractTerminationFirstText([$ticket], ['celular_' . $requesterType]);
@@ -3855,17 +3875,27 @@ trait HandlesTicketWorkflowActions
         'campaign_tag' => 'retencion_contrato',
         'categoria_mensaje' => 'informacion',
         'id_ticket' => (string) $ticketId,
+        'ticket_url' => $this->contractTicketWhatsappUrl((string) $ticketId),
+        'button_url_mode' => 'dynamic_suffix',
         'dedupe_key' => 'retencion_contrato_solicitante:' . $ticketId,
         'template_name' => 'scm_retencion_contrato_solicitante',
         'template_language' => 'es_CO',
-        'template_components' => [[
-          'type' => 'body',
-          'parameters' => [
-            ['type' => 'text', 'text' => $requesterName],
-            ['type' => 'text', 'text' => (string) $ticketId],
-            ['type' => 'text', 'text' => $summary],
+        'template_components' => [
+          [
+            'type' => 'body',
+            'parameters' => [
+              ['type' => 'text', 'text' => $requesterName],
+              ['type' => 'text', 'text' => (string) $ticketId],
+              ['type' => 'text', 'text' => $summary],
+            ],
           ],
-        ]],
+          [
+            'type' => 'button',
+            'sub_type' => 'url',
+            'index' => '0',
+            'parameters' => [['type' => 'text', 'text' => $ticketButtonSuffix]],
+          ],
+        ],
       ]);
       if ($ok) {
         $queued++;
@@ -3880,17 +3910,27 @@ trait HandlesTicketWorkflowActions
         'campaign_tag' => 'retencion_contrato',
         'categoria_mensaje' => 'informacion',
         'id_ticket' => (string) $ticketId,
+        'ticket_url' => $this->contractTicketWhatsappUrl((string) $ticketId),
+        'button_url_mode' => 'dynamic_suffix',
         'dedupe_key' => 'retencion_contrato_funcionario:' . $ticketId,
         'template_name' => 'scm_retencion_contrato_funcionario',
         'template_language' => 'es_CO',
-        'template_components' => [[
-          'type' => 'body',
-          'parameters' => [
-            ['type' => 'text', 'text' => $employeeName],
-            ['type' => 'text', 'text' => (string) $ticketId],
-            ['type' => 'text', 'text' => $summary],
+        'template_components' => [
+          [
+            'type' => 'body',
+            'parameters' => [
+              ['type' => 'text', 'text' => $employeeName],
+              ['type' => 'text', 'text' => (string) $ticketId],
+              ['type' => 'text', 'text' => $summary],
+            ],
           ],
-        ]],
+          [
+            'type' => 'button',
+            'sub_type' => 'url',
+            'index' => '0',
+            'parameters' => [['type' => 'text', 'text' => $ticketButtonSuffix]],
+          ],
+        ],
       ]);
       if ($ok) {
         $queued++;
@@ -3934,6 +3974,7 @@ trait HandlesTicketWorkflowActions
       'term_hint' => $termInfo['term_hint'],
       'term_recommended' => $termInfo['term_recommended'],
       'recipients' => $this->contractTerminationRecipientOptions($row),
+      'retention_ticket' => $this->contractRetentionTicketUiData($row),
       'case' => $case,
     ];
   }
@@ -4561,6 +4602,17 @@ trait HandlesTicketWorkflowActions
     $query = isset($parts['query']) ? ('?' . (string) $parts['query']) : '';
     $suffix = ltrim($path . $query, '/');
     return $suffix !== '' ? $suffix : $url;
+  }
+
+  private function contractTicketWhatsappUrl(string $ticketId): string
+  {
+    $ticketId = trim($ticketId);
+    return 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($ticketId);
+  }
+
+  private function contractTicketWhatsappButtonSuffix(string $ticketId): string
+  {
+    return $this->contractTerminationWhatsappButtonSuffix($this->contractTicketWhatsappUrl($ticketId));
   }
 
   /** @return array{name:string,phone:string,id_empleado:string,cargo:string,email:string} */
