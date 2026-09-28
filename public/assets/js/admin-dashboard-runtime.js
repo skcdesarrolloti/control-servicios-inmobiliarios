@@ -14447,7 +14447,7 @@
               : "operativas";
           var mainKpis = root.querySelector("[data-scm-metrics-main-kpis]");
           if (mainKpis) {
-            mainKpis.hidden = name === "cotizaciones_mantenimiento";
+            mainKpis.hidden = name !== "operativas";
           }
           root.querySelectorAll("[data-scm-metrics-pane]").forEach(function (pane) {
             pane.classList.toggle(

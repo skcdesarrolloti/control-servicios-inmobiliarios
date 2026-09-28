@@ -1637,7 +1637,6 @@ trait RendersDashboard
               <span>Revisión correctiva</span>
               <span>Servicios públicos</span>
             </div>
-            <iframe class="scm-contractual-report-frame" src="<?php echo esc_url($contractualReportsUrl); ?>" title="Reporte de Gestión contractual" loading="lazy"></iframe>
           </section>
         </div>
       </div>

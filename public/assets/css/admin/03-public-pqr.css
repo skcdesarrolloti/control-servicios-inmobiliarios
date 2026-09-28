@@ -1359,14 +1359,6 @@
   font-weight: 800;
 }
 
-#scm-app .scm-contractual-report-frame {
-  width: 100%;
-  min-height: 720px;
-  border: 1px solid #dbe6f1;
-  border-radius: 16px;
-  background: #ffffff;
-}
-
 #scm-app .scm-maintenance-quote-list {
   display: grid;
   gap: 10px;
@@ -1493,10 +1485,6 @@
 
   #scm-app .scm-maintenance-quote-case-btn {
     justify-self: start;
-  }
-
-  #scm-app .scm-contractual-report-frame {
-    min-height: 620px;
   }
 }
 
