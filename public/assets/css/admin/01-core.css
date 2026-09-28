@@ -3400,6 +3400,133 @@ body.scm-modal-open {
   cursor: default;
 }
 
+.swal2-html-container .scm-retention-ticket-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .06);
+}
+
+.swal2-html-container .scm-retention-ticket-card.is-disabled,
+.swal2-html-container .scm-retention-ticket-card.is-off {
+  background: #f8fafc;
+}
+
+.swal2-html-container .scm-retention-ticket-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.swal2-html-container .scm-retention-ticket-head > div {
+  display: grid;
+  gap: 3px;
+}
+
+.swal2-html-container .scm-retention-ticket-head strong {
+  color: #0b1f3a;
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.swal2-html-container .scm-retention-ticket-eyebrow,
+.swal2-html-container .scm-retention-ticket-pill {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.swal2-html-container .scm-retention-ticket-pill {
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+
+.swal2-html-container .scm-contract-termination-form .scm-retention-ticket-toggle {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #eff6ff;
+  cursor: pointer;
+}
+
+.swal2-html-container .scm-contract-termination-form .scm-retention-ticket-toggle input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  padding: 0;
+}
+
+.swal2-html-container .scm-contract-termination-form .scm-retention-ticket-toggle > span {
+  display: grid;
+  gap: 3px;
+  color: #0b1f3a;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.35;
+  text-transform: none;
+}
+
+.swal2-html-container .scm-contract-termination-form .scm-retention-ticket-toggle small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.swal2-html-container .scm-retention-ticket-context {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.swal2-html-container .scm-retention-ticket-context-item {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.swal2-html-container .scm-retention-ticket-context-item span {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.swal2-html-container .scm-retention-ticket-context-item strong {
+  color: #0f172a;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.swal2-html-container .scm-contract-termination-form .scm-retention-ticket-field {
+  display: grid;
+  gap: 7px;
+}
+
+.swal2-html-container .scm-retention-ticket-card.is-off .scm-retention-ticket-field,
+.swal2-html-container .scm-retention-ticket-card.is-disabled .scm-retention-ticket-field {
+  opacity: .58;
+}
+
 .swal2-html-container .scm-contract-termination-checks {
   display: grid;
   gap: 8px;
@@ -3427,6 +3554,12 @@ body.scm-modal-open {
   color: #64748b;
   font-size: 11px;
   font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .swal2-html-container .scm-retention-ticket-context {
+    grid-template-columns: 1fr;
+  }
 }
 
 #scm-app .scm-property-history-head {

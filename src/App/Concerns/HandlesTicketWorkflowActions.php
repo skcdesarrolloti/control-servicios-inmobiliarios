@@ -3669,6 +3669,7 @@ trait HandlesTicketWorkflowActions
         'enabled' => false,
         'default_employee_id' => '',
         'funcionarios' => [],
+        'assignment_help' => [],
       ];
     }
     $validIds = [];
@@ -3705,7 +3706,120 @@ trait HandlesTicketWorkflowActions
       'enabled' => $options !== [],
       'default_employee_id' => $defaultEmployeeId,
       'funcionarios' => $options,
+      'assignment_help' => $this->contractRetentionAssignmentHelp($ticket, $defaultEmployeeId),
     ];
+  }
+
+  /** @param array<string,mixed> $ticket @return array<int,array{label:string,value:string}> */
+  private function contractRetentionAssignmentHelp(array $ticket, string $defaultEmployeeId): array
+  {
+    try {
+      $contract = $this->contractTerminationContractByContext($ticket);
+    } catch (\Throwable $exception) {
+      error_log('[contract_retention_ticket_ui] assignment_help: ' . $exception->getMessage());
+      $contract = [];
+    }
+
+    $help = [];
+    $contractRef = $this->contractRetentionFirstCleanText([$ticket, $contract], ['contrato', 'id_contrato', 'id_contrato_arrendamiento', '_ID']);
+    if ($contractRef !== '') {
+      $help[] = ['label' => 'Contrato', 'value' => '#' . ltrim($contractRef, '#')];
+    }
+
+    $arrendatario = $this->contractRetentionFirstCleanText([$ticket, $contract], ['arrendatario', 'solicitante']);
+    $propietario = $this->contractRetentionFirstCleanText([$ticket, $contract], ['propietario']);
+    $parties = array_values(array_filter([
+      $arrendatario !== '' ? 'Arrendatario: ' . $arrendatario : '',
+      $propietario !== '' ? 'Propietario: ' . $propietario : '',
+    ]));
+    if ($parties !== []) {
+      $help[] = ['label' => 'Contrato de', 'value' => implode(' / ', $parties)];
+    }
+
+    $propertyRef = $this->contractRetentionFirstCleanText([$ticket, $contract], ['inmueble', 'id_inmueble', 'codigo_inmueble_web', 'id_inmueble_data']);
+    $address = $this->contractRetentionFirstCleanText([$ticket, $contract], ['direccion']);
+    $propertyParts = array_values(array_filter([
+      $propertyRef !== '' ? 'Inmueble ' . $propertyRef : '',
+      $address,
+    ]));
+    if ($propertyParts !== []) {
+      $help[] = ['label' => 'Inmueble', 'value' => implode(' · ', $propertyParts)];
+    }
+
+    $employee = $this->contractRetentionEmployeeFromRows([$contract, $ticket], [
+      'id_empleado', 'id_funcionario', 'id_asesor', 'asesor_id', 'id_comercial', 'comercial_id',
+      'id_captador', 'captador_id', 'funcionario_creador', 'id_funcionario_creador', 'cct_author_id',
+    ]);
+    if ($employee !== '') {
+      $help[] = ['label' => 'Funcionario relacionado', 'value' => $employee];
+    }
+
+    $suggested = $this->contractRetentionEmployeeDisplayName($defaultEmployeeId, 'id_empleado');
+    if ($suggested !== '') {
+      $help[] = ['label' => 'Sugerido para asignar', 'value' => $suggested];
+    }
+
+    return $help;
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @param string[] $columns */
+  private function contractRetentionFirstCleanText(array $rows, array $columns): string
+  {
+    foreach ($rows as $row) {
+      foreach ($columns as $column) {
+        $value = trim((string) ($row[$column] ?? ''));
+        if ($value !== '' && $value !== '-') {
+          return $value;
+        }
+      }
+    }
+    return '';
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @param string[] $columns */
+  private function contractRetentionEmployeeFromRows(array $rows, array $columns): string
+  {
+    foreach ($rows as $row) {
+      foreach ($columns as $column) {
+        $value = trim((string) ($row[$column] ?? ''));
+        if ($value === '' || $value === '-') {
+          continue;
+        }
+        $mode = $column === 'cct_author_id' ? 'internal' : 'id_empleado';
+        $name = $this->contractRetentionEmployeeDisplayName($value, $mode);
+        if ($name !== '') {
+          return $name;
+        }
+      }
+    }
+    return '';
+  }
+
+  private function contractRetentionEmployeeDisplayName(string $value, string $mode): string
+  {
+    $value = trim($value);
+    if ($value === '') {
+      return '';
+    }
+    try {
+      $employee = $this->calendarCitaFuncionarioRow($value, $mode);
+      $name = trim((string) ($employee['name'] ?? ''));
+      $cargo = trim((string) ($employee['cargo'] ?? ''));
+      if ($name !== '') {
+        return $cargo !== '' ? ($name . ' · ' . $cargo) : $name;
+      }
+      if ($mode !== 'internal' && ctype_digit($value)) {
+        $employee = $this->calendarCitaFuncionarioRow($value, 'internal');
+        $name = trim((string) ($employee['name'] ?? ''));
+        $cargo = trim((string) ($employee['cargo'] ?? ''));
+        if ($name !== '') {
+          return $cargo !== '' ? ($name . ' · ' . $cargo) : $name;
+        }
+      }
+    } catch (\Throwable $exception) {
+      error_log('[contract_retention_ticket_ui] employee_display: ' . $exception->getMessage());
+    }
+    return '';
   }
 
   /** @param array<string,mixed> $ticket @param string[] $validEmployeeIds */

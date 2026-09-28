@@ -13505,12 +13505,8 @@
         });
     }
 
-    function openContractTerminationResponse(solicitudId) {
-      var row = contractTerminationRowsByPk[String(solicitudId || "")];
-      if (!row || !window.Swal || typeof window.Swal.fire !== "function") {
-        showToast("warning", "No se encontró la solicitud seleccionada.");
-        return;
-      }
+    function contractRetentionTicketBlockHtml(row) {
+      row = row || {};
       var retention = row.retention_ticket || {};
       var retentionEmployees = Array.isArray(retention.funcionarios) ? retention.funcionarios : [];
       var defaultRetentionEmployee = String(retention.default_employee_id || "");
@@ -13518,11 +13514,60 @@
         func = func || {};
         var id = String(func.id || "");
         if (!id) return "";
-        var label = String(func.label || func.name || id);
-        return '<option value="' + escHtml(id) + '"' + (id === defaultRetentionEmployee ? " selected" : "") + '>' + escHtml(label) + "</option>";
+        var label = String(func.name || func.label || id);
+        return '<option value="' + escAttr(id) + '"' + (id === defaultRetentionEmployee ? " selected" : "") + '>' + escHtml(label) + "</option>";
       }).join("");
       if (!retentionOptions) {
-        retentionOptions = '<option value="">No hay funcionarios activos disponibles</option>';
+        retentionOptions = '<option value="">No hay consultores de arriendo activos disponibles</option>';
+      }
+      var helpItems = Array.isArray(retention.assignment_help) ? retention.assignment_help : [];
+      if (!helpItems.length) {
+        helpItems = [
+          { label: "Contrato", value: row.contrato ? "#" + row.contrato : "" },
+          { label: "Inmueble", value: [row.inmueble ? "Inmueble " + row.inmueble : "", row.direccion || ""].filter(Boolean).join(" · ") },
+        ];
+      }
+      var helpHtml = helpItems.map(function (item) {
+        item = item || {};
+        var label = String(item.label || "").trim();
+        var value = String(item.value || "").trim();
+        if (!label || !value) return "";
+        return '<div class="scm-retention-ticket-context-item"><span>' + escHtml(label) + '</span><strong>' + escHtml(value) + "</strong></div>";
+      }).join("");
+
+      return '<section class="scm-retention-ticket-card' + (!retention.enabled ? " is-disabled" : "") + '">' +
+        '<div class="scm-retention-ticket-head">' +
+          '<div><span class="scm-retention-ticket-eyebrow">Ticket comercial</span><strong>Retención de contrato</strong></div>' +
+          '<span class="scm-retention-ticket-pill">Opcional</span>' +
+        "</div>" +
+        '<label class="scm-retention-ticket-toggle">' +
+          '<input type="checkbox" name="crear_ticket_retencion" value="1" ' + (retention.enabled ? "checked" : "disabled") + '>' +
+          '<span><strong>Crear ticket y enviar segundo mensaje</strong><small>Si lo desmarcas, solo se responde y se cierra esta solicitud.</small></span>' +
+        "</label>" +
+        (helpHtml ? '<div class="scm-retention-ticket-context">' + helpHtml + "</div>" : "") +
+        '<label class="scm-retention-ticket-field"><span>Asignar a consultor de arriendo</span><select name="retencion_id_empleado" ' + (!retention.enabled ? "disabled" : "") + '><option value="">Selecciona responsable</option>' + retentionOptions + '</select></label>' +
+      "</section>";
+    }
+
+    function syncContractRetentionTicketState(form) {
+      if (!form) return;
+      var checkbox = form.querySelector('[name="crear_ticket_retencion"]');
+      var select = form.querySelector('[name="retencion_id_empleado"]');
+      var card = form.querySelector(".scm-retention-ticket-card");
+      var enabled = Boolean(checkbox && !checkbox.disabled && checkbox.checked);
+      if (select) {
+        select.disabled = !enabled;
+      }
+      if (card) {
+        card.classList.toggle("is-off", !enabled);
+      }
+    }
+
+    function openContractTerminationResponse(solicitudId) {
+      var row = contractTerminationRowsByPk[String(solicitudId || "")];
+      if (!row || !window.Swal || typeof window.Swal.fire !== "function") {
+        showToast("warning", "No se encontró la solicitud seleccionada.");
+        return;
       }
       var html = '<form class="scm-contract-termination-form" data-scm-contract-termination-form>' +
         '<div class="scm-contract-termination-case">' +
@@ -13535,11 +13580,7 @@
           '<label><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || "") + '" readonly aria-readonly="true"></label>' +
           '<label><span>Fecha terminación / entrega</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || "") + '"></label>' +
         "</div>" +
-        '<div class="scm-contract-termination-case">' +
-          '<label class="scm-calendar-checkbox-line"><input type="checkbox" name="crear_ticket_retencion" value="1" ' + (retention.enabled ? "checked" : "disabled") + '><span>Crear ticket comercial de Retención de contrato</span></label>' +
-          '<label><span>Responsable del ticket comercial</span><select name="retencion_id_empleado" ' + (!retention.enabled ? "disabled" : "") + '><option value="">Selecciona funcionario responsable</option>' + retentionOptions + '</select></label>' +
-          '<small>Déjalo marcado para crear el ticket comercial y enviar el segundo mensaje. Desmárcalo si solo vas a responder y cerrar la solicitud.</small>' +
-        "</div>" +
+        contractRetentionTicketBlockHtml(row) +
         '<div><span class="scm-contract-termination-label">Notificar a</span>' + contractTerminationRecipientChecks(row) + "</div>" +
       "</form>";
       window.Swal.fire({
@@ -13559,6 +13600,7 @@
           var popup = window.Swal.getPopup();
           var form = popup ? popup.querySelector("[data-scm-contract-termination-form]") : null;
           if (!form) return;
+          syncContractRetentionTicketState(form);
           form.addEventListener("change", function (event) {
             if (event.target && event.target.name === "notify_recipients[]") {
               var none = form.querySelector('input[name="notify_recipients[]"][value="none"]');
@@ -13569,6 +13611,9 @@
               } else if (none && event.target.checked) {
                 none.checked = false;
               }
+            }
+            if (event.target && event.target.name === "crear_ticket_retencion") {
+              syncContractRetentionTicketState(form);
             }
           });
         },
@@ -13707,19 +13752,6 @@
         showToast("warning", "No se encontró la solicitud seleccionada.");
         return;
       }
-      var retention = row.retention_ticket || {};
-      var retentionEmployees = Array.isArray(retention.funcionarios) ? retention.funcionarios : [];
-      var defaultRetentionEmployee = String(retention.default_employee_id || "");
-      var retentionOptions = retentionEmployees.map(function (func) {
-        func = func || {};
-        var id = String(func.id || "");
-        if (!id) return "";
-        var label = String(func.label || func.name || id);
-        return '<option value="' + escHtml(id) + '"' + (id === defaultRetentionEmployee ? " selected" : "") + '>' + escHtml(label) + "</option>";
-      }).join("");
-      if (!retentionOptions) {
-        retentionOptions = '<option value="">No hay funcionarios activos disponibles</option>';
-      }
       var html = '<form class="scm-contract-termination-form" data-scm-contract-non-renewal-form>' +
         '<div class="scm-contract-termination-case">' +
           '<strong>' + escHtml(row.titulo || "Ticket") + '</strong><span>' + escHtml(row.asunto || "Solicitud de no prórroga") + "</span>" +
@@ -13731,11 +13763,7 @@
           '<label><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || "") + '" readonly aria-readonly="true"></label>' +
           '<label><span>Fecha fin de contrato</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || "") + '"></label>' +
         "</div>" +
-        '<div class="scm-contract-termination-case">' +
-          '<label class="scm-calendar-checkbox-line"><input type="checkbox" name="crear_ticket_retencion" value="1" ' + (retention.enabled ? "checked" : "disabled") + '><span>Crear ticket comercial de Retención de contrato</span></label>' +
-          '<label><span>Responsable del ticket comercial</span><select name="retencion_id_empleado" ' + (!retention.enabled ? "disabled" : "") + '><option value="">Selecciona funcionario responsable</option>' + retentionOptions + '</select></label>' +
-          '<small>Déjalo marcado para crear el ticket comercial y enviar el segundo mensaje. Desmárcalo si solo vas a responder y cerrar la solicitud.</small>' +
-        "</div>" +
+        contractRetentionTicketBlockHtml(row) +
         '<div><span class="scm-contract-termination-label">Notificar a</span>' + contractTerminationRecipientChecks(row) + "</div>" +
       "</form>";
       window.Swal.fire({
@@ -13755,6 +13783,7 @@
           var popup = window.Swal.getPopup();
           var form = popup ? popup.querySelector("[data-scm-contract-non-renewal-form]") : null;
           if (!form) return;
+          syncContractRetentionTicketState(form);
           form.addEventListener("change", function (event) {
             if (event.target && event.target.name === "notify_recipients[]") {
               var none = form.querySelector('input[name="notify_recipients[]"][value="none"]');
@@ -13765,6 +13794,9 @@
               } else if (none && event.target.checked) {
                 none.checked = false;
               }
+            }
+            if (event.target && event.target.name === "crear_ticket_retencion") {
+              syncContractRetentionTicketState(form);
             }
           });
         },
