@@ -147,15 +147,47 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
             return;
           }
 
-          // Si no está en el DOM actual, navegar a la pestaña adecuada
+          // Si no está en el DOM actual, cargar la vista interna y abrir el popup sin navegar.
           const isMine = item.getAttribute('data-scm-notif-is-mine') === '1';
           const subtab = item.getAttribute('data-scm-notif-subtab') || '';
-          let targetUrl = appBaseUrl + '/index.php?';
-          if (isMine) {
-            targetUrl += 'tab=mis_tickets&ticket=' + encodeURIComponent(logicalId);
-          } else {
-            targetUrl += 'tab=abiertos' + (subtab ? '&scm_tab=' + encodeURIComponent(subtab) : '') + '&ticket=' + encodeURIComponent(logicalId);
+          const scmApp = document.getElementById('scm-app');
+          if (scmApp) {
+            const targetPanel = isMine ? 'scm-panel-mis-tickets' : 'scm-panel-abiertos';
+            const previousTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab.active[data-tab]');
+            const nativeTabBtn = scmApp.querySelector('.scm-main-tabs .scm-tab[data-tab="' + targetPanel + '"]');
+            if (nativeTabBtn) nativeTabBtn.click();
+            if (!isMine && subtab) {
+              setTimeout(function () {
+                const topicBtn = scmApp.querySelector('.scm-open-topic-tab[data-open-target="' + subtab + '"]');
+                if (topicBtn) topicBtn.click();
+              }, 40);
+            }
+
+            let attempts = 0;
+            const openWhenReady = function () {
+              attempts += 1;
+              let btn = null;
+              for (let i = 0; i < selectors.length; i++) {
+                btn = document.querySelector(selectors[i]);
+                if (btn) break;
+              }
+              if (btn && typeof window.scmOpenCase === 'function') {
+                window.scmOpenCase(btn);
+                if (previousTabBtn && previousTabBtn !== nativeTabBtn) {
+                  setTimeout(function () { previousTabBtn.click(); }, 80);
+                }
+                return;
+              }
+              if (attempts < 28) {
+                setTimeout(openWhenReady, 250);
+              }
+            };
+            setTimeout(openWhenReady, 260);
+            return;
           }
+
+          // Fallback para páginas sin app embebida.
+          const targetUrl = appBaseUrl + '/index.php?tab=' + (isMine ? 'mis_tickets' : 'abiertos') + (subtab && !isMine ? '&scm_tab=' + encodeURIComponent(subtab) : '') + '&ticket=' + encodeURIComponent(logicalId);
           window.location.href = targetUrl;
         });
       }

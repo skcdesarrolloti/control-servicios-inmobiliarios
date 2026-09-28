@@ -9814,7 +9814,7 @@
 
       function setMessage(form, text, isError) {
         var msg = form.querySelector(
-          ".scm-public-pqr-corresponsable-msg, .scm-notif-responsable-msg"
+          ".scm-public-pqr-corresponsable-msg, .scm-notif-responsable-msg, .scm-ticket-topic-tabs-msg"
         );
         if (!msg) {
           return;
@@ -9845,9 +9845,12 @@
         }
         event.preventDefault();
         var isCorresponsable = form.classList.contains("scm-public-pqr-corresponsable-form");
-        var action = isCorresponsable
-          ? actions.guardar_corresponsable_pqr_publico || "scm_guardar_corresponsable_pqr_publico"
-          : actions.notif_responsable_pqr || "scm_guardar_notif_responsable_pqr";
+        var isTopicTabs = form.classList.contains("scm-ticket-topic-tabs-form");
+        var action = isTopicTabs
+          ? actions.ticket_topic_settings_save || "scm_ticket_topic_settings_save"
+          : (isCorresponsable
+            ? actions.guardar_corresponsable_pqr_publico || "scm_guardar_corresponsable_pqr_publico"
+            : actions.notif_responsable_pqr || "scm_guardar_notif_responsable_pqr");
         var btn = form.querySelector('button[type="submit"]');
         if (btn) btn.disabled = true;
         setMessage(form, "Guardando...", false);
@@ -9864,7 +9867,9 @@
             if (!json || !json.success) {
               throw new Error(
                 (json && json.data && json.data.message) ||
-                  (isCorresponsable
+                  (isTopicTabs
+                    ? "No se pudieron guardar los temas."
+                    : isCorresponsable
                     ? "No se pudo guardar el corresponsable."
                     : "No se pudo guardar la notificacion.")
               );
@@ -20863,13 +20868,18 @@
       var dueSettingsShortcut = event.target.closest("[data-scm-open-due-settings]");
       if (dueSettingsShortcut) {
         event.preventDefault();
-        openDashboardDueCalendar();
-        window.setTimeout(function () {
-          var duePanel = root.querySelector('#scm-home-calendar-section-due [data-scm-calendar-panel]');
-          if (duePanel) {
-            duePanel.dispatchEvent(new CustomEvent("scm:open-due-settings", { bubbles: false }));
-          }
-        }, 180);
+        var duePanel = root.querySelector('#scm-home-calendar-section-due [data-scm-calendar-panel]');
+        if (duePanel) {
+          duePanel.dispatchEvent(new CustomEvent("scm:open-due-settings", { bubbles: false }));
+        } else {
+          openDashboardDueCalendar();
+          window.setTimeout(function () {
+            var loadedDuePanel = root.querySelector('#scm-home-calendar-section-due [data-scm-calendar-panel]');
+            if (loadedDuePanel) {
+              loadedDuePanel.dispatchEvent(new CustomEvent("scm:open-due-settings", { bubbles: false }));
+            }
+          }, 180);
+        }
         return;
       }
 

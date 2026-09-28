@@ -84,6 +84,38 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk(['html' => $this->renderDashboardInternalNotificationsModal()]);
   }
 
+  public function ajax_handler_ticket_topic_settings_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canManagePublicPqrSettings()) {
+      $this->jsonFail('No tienes permiso para configurar temas de casos.');
+    }
+
+    $defaults = self::defaultGenericTicketTabDefinitions();
+    $topicsRaw = $_POST['topics'] ?? [];
+    if (!is_array($topicsRaw)) {
+      $this->jsonFail('La configuracion de temas no es valida.');
+    }
+
+    $settings = [];
+    foreach ($defaults as $key => $definition) {
+      $topics = self::sanitizeTicketTopicList($topicsRaw[$key] ?? []);
+      if ($topics === []) {
+        $this->jsonFail('La pestaña "' . (string) ($definition['label'] ?? $key) . '" debe tener al menos un tema.');
+      }
+      $settings[$key] = $topics;
+    }
+
+    \SCM\Core\App::settings()->set('ticket_topic_tabs', $settings, Auth::userId());
+    \SCM\Core\App::settings()->refresh();
+    $this->clearDashboardPerformanceCache('dashboard-metrics-v2');
+
+    $this->jsonOk([
+      'message' => 'Temas de pestañas guardados.',
+      'ticket_topic_tabs' => $settings,
+    ]);
+  }
+
   public function ajax_handler_dashboard_filter_options(): void
   {
     $this->verifyCsrf();

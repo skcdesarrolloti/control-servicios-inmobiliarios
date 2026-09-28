@@ -605,6 +605,47 @@
   align-self: flex-start;
 }
 
+#scm-app .scm-ticket-topic-tabs-form {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dbe6f1;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-ticket-topic-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+#scm-app .scm-ticket-topic-config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+#scm-app .scm-ticket-topic-config-field span {
+  color: #33465d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#scm-app .scm-ticket-topic-config-field textarea {
+  min-height: 104px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+#scm-app .scm-pqr-config-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
 #scm-app .scm-pqr-settings-select-wrap small,
 #scm-app .scm-dashboard-pqr-config-form small {
   display: block;

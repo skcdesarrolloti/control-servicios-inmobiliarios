@@ -468,6 +468,7 @@ trait RendersDashboard
         'filtrar_pqr_publico' => self::AJAX_FILTER_PQR_PUBLICO,
         'guardar_corresponsable_pqr_publico' => self::AJAX_GUARDAR_CORRESPONSABLE_PQR_PUBLICO,
         'notif_responsable_pqr' => self::AJAX_GUARDAR_NOTIF_RESPONSABLE_PQR,
+        'ticket_topic_settings_save' => self::AJAX_TICKET_TOPIC_SETTINGS_SAVE,
         'session_heartbeat' => self::AJAX_SESSION_HEARTBEAT,
         'dashboard_permissions_read' => self::AJAX_DASHBOARD_PERMISSIONS_READ,
         'dashboard_permissions_save' => self::AJAX_DASHBOARD_PERMISSIONS_SAVE,
@@ -1747,6 +1748,7 @@ trait RendersDashboard
     $themes = $this->get_public_pqr_themes();
     $corresponsables = $this->get_public_pqr_corresponsables();
     $corresponsableCandidates = $this->get_public_pqr_corresponsable_candidates();
+    $topicTabDefinitions = self::configuredGenericTicketTabDefinitions();
 
     $notifOptions = '';
     foreach ($corresponsableCandidates as $func) {
@@ -1834,6 +1836,16 @@ trait RendersDashboard
       $correspGridHtml = '<p class="scm-pqr-config-empty">No hay funcionarios disponibles para configurar.</p>';
     }
 
+    $topicTabsHtml = '';
+    foreach ($topicTabDefinitions as $tabKey => $definition) {
+      $label = trim((string) ($definition['label'] ?? $tabKey));
+      $topics = self::sanitizeTicketTopicList($definition['temas'] ?? []);
+      $topicTabsHtml .= '<label class="scm-ticket-topic-config-field">';
+      $topicTabsHtml .= '<span>' . esc_html($label) . '</span>';
+      $topicTabsHtml .= '<textarea name="topics[' . esc_attr((string) $tabKey) . ']" class="textarea textarea-bordered scm-input" rows="4">' . esc_textarea(implode("\n", $topics)) . '</textarea>';
+      $topicTabsHtml .= '</label>';
+    }
+
     ob_start();
 ?>
     <div id="scm-pqr-settings-modal" class="scm-pqr-settings-modal" data-scm-dashboard-pqr-settings="1" aria-hidden="true">
@@ -1848,6 +1860,17 @@ trait RendersDashboard
           <span><strong><?php echo count($themes); ?></strong> tipos de solicitud</span>
           <span><strong><?php echo count($corresponsableCandidates); ?></strong> funcionarios disponibles</span>
         </div>
+        <section class="scm-pqr-settings-section">
+          <h4>Temas por pesta&ntilde;a de casos</h4>
+          <p>Estos son los valores de <code>tema_ayuda</code> que alimentan Entrega, Preventiva, Recibo, Contractual y las dem&aacute;s pesta&ntilde;as. Escribe un tema por l&iacute;nea para agregar o quitar.</p>
+          <form class="scm-ticket-topic-tabs-form scm-pqr-config-form scm-dashboard-pqr-config-form" method="post" autocomplete="off">
+            <div class="scm-ticket-topic-config-grid"><?php echo $topicTabsHtml; ?></div>
+            <div class="scm-pqr-config-actions">
+              <button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Guardar temas</button>
+              <small class="scm-ticket-topic-tabs-msg" aria-live="polite"></small>
+            </div>
+          </form>
+        </section>
         <section class="scm-pqr-settings-section">
           <h4>Funcionarios que reciben notificaciones</h4>
           <p>Recibir&aacute;n WhatsApp y correo cada vez que se cree una solicitud desde Guardian. Puedes seleccionar varios funcionarios.</p>

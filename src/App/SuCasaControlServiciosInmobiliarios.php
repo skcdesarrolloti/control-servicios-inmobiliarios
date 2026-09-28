@@ -79,6 +79,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_ASIGNAR_PQR_PUBLICO = 'scm_asignar_pqr_publico';
   const AJAX_GUARDAR_CORRESPONSABLE_PQR_PUBLICO = 'scm_guardar_corresponsable_pqr_publico';
   const AJAX_GUARDAR_NOTIF_RESPONSABLE_PQR = 'scm_guardar_notif_responsable_pqr';
+  const AJAX_TICKET_TOPIC_SETTINGS_SAVE = 'scm_ticket_topic_settings_save';
   const AJAX_FILTER_PQR_PUBLICO = 'scm_filtrar_pqr_publico';
   const AJAX_SESSION_HEARTBEAT = 'scm_session_heartbeat';
   const AJAX_DASHBOARD_PERMISSIONS_READ = 'scm_dashboard_permissions_read';
@@ -173,6 +174,79 @@ final class SuCasaControlServiciosInmobiliarios
   private static function h(string $s): string
   {
     return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+  }
+
+  /** @return array<string,array<string,mixed>> */
+  public static function defaultGenericTicketTabDefinitions(): array
+  {
+    return [
+      'entrega' => ['label' => 'Entrega de Inmuebles', 'temas' => ['Entrega', 'Entrega de inmuebles', 'Entrega de inmueble', 'Entregas de inmuebles'], 'prefix' => 'scmeg_'],
+      'preventiva' => ['label' => 'Revisiones Preventiva', 'temas' => ['Revision preventiva', 'Revision preventivas', 'Revisiones preventiva', 'Revisiones preventivas'], 'prefix' => 'scmpv_'],
+      'recibo' => ['label' => 'Recibo de Inmuebles', 'temas' => ['Recibo de inmuebles', 'Recibo de inmueble', 'Recibos de inmuebles'], 'prefix' => 'scmrc_'],
+      'contable' => ['label' => 'Contable y Tributaria', 'temas' => ['Contable y tributaria', 'Contable y tributario', 'Contabilidad tributaria'], 'prefix' => 'scmco_'],
+      'certificaciones' => ['label' => 'Certificaciones Tributarias', 'temas' => ['Certificaciones tributarias', 'Certificacion tributaria', 'Certificado tributario', 'Certificados tributarios'], 'prefix' => 'scmcr_'],
+      'contractual' => ['label' => 'Contractual', 'temas' => ['Procesos juridicos', 'Proceso juridico', 'Solicitud contractual', 'Solicitudes contractuales', 'Solicitud de servicios publicos', 'Solicitudes de servicios publicos', 'No prorroga de contrato', 'Terminacion de contrato', 'Retencion de contrato', 'Otros servicios'], 'prefix' => 'scmct_'],
+    ];
+  }
+
+  /** @param array<string,array<string,mixed>> $defaults @return array<string,array<string,mixed>> */
+  public static function configuredGenericTicketTabDefinitions(array $defaults = []): array
+  {
+    $defaults = $defaults !== [] ? $defaults : self::defaultGenericTicketTabDefinitions();
+    $raw = [];
+    if (class_exists('\SCM\Core\App')) {
+      try {
+        $stored = \SCM\Core\App::settings()->get('ticket_topic_tabs', []);
+        if (is_array($stored)) {
+          $raw = $stored;
+        }
+      } catch (\Throwable $e) {
+        $raw = [];
+      }
+    }
+
+    $out = $defaults;
+    foreach ($defaults as $key => $definition) {
+      $configured = self::sanitizeTicketTopicList($raw[$key] ?? null);
+      if ($configured !== []) {
+        $out[$key]['temas'] = $configured;
+      } else {
+        $out[$key]['temas'] = self::sanitizeTicketTopicList($definition['temas'] ?? []);
+      }
+    }
+
+    return $out;
+  }
+
+  /** @param mixed $raw @return array<int,string> */
+  public static function sanitizeTicketTopicList($raw): array
+  {
+    if (is_string($raw)) {
+      $raw = preg_split('/\r\n|\r|\n|,/', $raw) ?: [];
+    }
+    if (!is_array($raw)) {
+      return [];
+    }
+
+    $out = [];
+    $seen = [];
+    foreach ($raw as $item) {
+      if (is_array($item)) {
+        continue;
+      }
+      $value = trim((string) $item);
+      $value = preg_replace('/\s+/u', ' ', $value) ?: $value;
+      if ($value === '') {
+        continue;
+      }
+      $key = mb_strtolower($value, 'UTF-8');
+      if (!isset($seen[$key])) {
+        $seen[$key] = true;
+        $out[] = $value;
+      }
+    }
+
+    return $out;
   }
 
   /** @return array<int,string> */
@@ -1263,15 +1337,7 @@ final class SuCasaControlServiciosInmobiliarios
   /** @return array<string,array<string,mixed>> */
   private function get_generic_tab_definitions(): array
   {
-    $defaults = [
-      'entrega' => ['label' => 'Entrega de Inmuebles', 'temas' => ['Entrega de inmuebles', 'Entrega de inmueble', 'Entregas de inmuebles'], 'prefix' => 'scmeg_'],
-      'preventiva' => ['label' => 'Revisiones Preventiva', 'temas' => ['Revision preventiva', 'Revision preventivas', 'Revisiones preventiva', 'Revisiones preventivas'], 'prefix' => 'scmpv_'],
-      'recibo' => ['label' => 'Recibo de Inmuebles', 'temas' => ['Recibo de inmuebles', 'Recibo de inmueble', 'Recibos de inmuebles'], 'prefix' => 'scmrc_'],
-      'contable' => ['label' => 'Contable y Tributaria', 'temas' => ['Contable y tributaria', 'Contable y tributario', 'Contabilidad tributaria'], 'prefix' => 'scmco_'],
-      'certificaciones' => ['label' => 'Certificaciones Tributarias', 'temas' => ['Certificaciones tributarias', 'Certificacion tributaria', 'Certificado tributario', 'Certificados tributarios'], 'prefix' => 'scmcr_'],
-      'contractual' => ['label' => 'Contractual', 'temas' => ['Procesos juridicos', 'Proceso juridico', 'Solicitud contractual', 'Solicitudes contractuales', 'Solicitud de servicios publicos', 'Solicitudes de servicios publicos', 'No prorroga de contrato', 'Terminacion de contrato', 'Retencion de contrato', 'Otros servicios'], 'prefix' => 'scmct_'],
-    ];
-    return $defaults;
+    return self::configuredGenericTicketTabDefinitions();
   }
 
   /** @return array<string,array<string,string>> */

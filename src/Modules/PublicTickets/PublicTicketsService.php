@@ -99,7 +99,6 @@ final class PublicTicketsService
     'Ruta',
     'Retoque',
     'Otros servicios',
-    'Retencion de contrato',
   ];
 
   /** @var array<string,string> */

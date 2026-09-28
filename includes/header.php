@@ -58,6 +58,36 @@ if (class_exists('\SCM\Core\App')) {
     $notifDb = \SCM\Core\App::db();
     $ticketsTable = $notifDb->table('jet_cct_tickets');
     $currentEmployeeId = class_exists('\SCM\Core\Auth') ? \SCM\Core\Auth::employeeId() : '';
+    $operationalTopicLowers = [];
+    if (class_exists('\SCM\App\SuCasaControlServiciosInmobiliarios')) {
+      foreach (\SCM\App\SuCasaControlServiciosInmobiliarios::configuredGenericTicketTabDefinitions() as $topicDef) {
+        foreach ((array) ($topicDef['temas'] ?? []) as $topicValue) {
+          $topicValue = mb_strtolower(trim((string) $topicValue), 'UTF-8');
+          if ($topicValue !== '') {
+            $operationalTopicLowers[$topicValue] = true;
+          }
+        }
+      }
+    }
+    foreach ([
+      'solicitud de servicios publicos' => 'solicitud de servicios públicos',
+      'solicitudes de servicios publicos' => 'solicitudes de servicios públicos',
+      'procesos juridicos' => 'procesos jurídicos',
+      'proceso juridico' => 'proceso jurídico',
+      'retencion de contrato' => 'retención de contrato',
+      'revision preventiva' => 'revisión preventiva',
+    ] as $plainTopic => $accentedTopic) {
+      if (isset($operationalTopicLowers[$plainTopic])) {
+        $operationalTopicLowers[$accentedTopic] = true;
+      }
+    }
+    $operationalTopics = array_keys($operationalTopicLowers);
+    $operationalTopicSql = '';
+    $operationalTopicArgs = [];
+    if ($operationalTopics !== []) {
+      $operationalTopicSql = " OR LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) IN (" . implode(',', array_fill(0, count($operationalTopics), '?')) . ")";
+      $operationalTopicArgs = $operationalTopics;
+    }
 
     $whereOperational = "LOWER(TRIM(COALESCE(`estado`, ''))) IN ('nuevo', 'en proceso')
       AND LOWER(TRIM(COALESCE(`estado_administrativo`, ''))) NOT IN ('cerrado', 'resuelto', 'finalizado', 'desistido')
@@ -67,29 +97,13 @@ if (class_exists('\SCM\Core\App')) {
         OR LOWER(TRIM(COALESCE(`departamento`, ''))) = 'mantenimiento'
         OR LOWER(COALESCE(`tema_ayuda`, '')) LIKE '%reparacion%'
         OR LOWER(COALESCE(`tema_ayuda`, '')) LIKE '%mantenimiento%'
-        OR LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) IN (
-          'entrega de inmuebles',
-          'recibo de inmuebles',
-          'revision preventiva',
-          'revisiones preventiva',
-          'revisiones preventivas',
-          'contable y tributaria',
-          'certificaciones tributarias',
-          'solicitud contractual',
-          'solicitud de servicios publicos',
-          'solicitud de servicios públicos',
-          'procesos juridicos',
-          'procesos jurídicos',
-          'retencion de contrato',
-          'retención de contrato',
-          'otros servicios'
-        )
+        {$operationalTopicSql}
       )
       AND LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) NOT IN (
         'arriendo', 'captacion', 'venta', 'recaptacion', 'ruta', 'actualizacion', 'arriendo o venta', 'retoque'
       )";
 
-    $countRes = $notifDb->getResults("SELECT COUNT(*) AS total FROM `{$ticketsTable}` WHERE {$whereOperational}");
+    $countRes = $notifDb->getResults("SELECT COUNT(*) AS total FROM `{$ticketsTable}` WHERE {$whereOperational}", $operationalTopicArgs);
     if (!empty($countRes[0]['total'])) {
       $unreadNotifCount = (int) $countRes[0]['total'];
     }
@@ -100,7 +114,8 @@ if (class_exists('\SCM\Core\App')) {
          FROM `{$ticketsTable}`
         WHERE {$whereOperational}
         ORDER BY `_ID` DESC
-        LIMIT 8"
+        LIMIT 8",
+      $operationalTopicArgs
     );
 
     if (is_array($recentTickets)) {
