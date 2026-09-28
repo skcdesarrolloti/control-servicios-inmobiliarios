@@ -1401,7 +1401,7 @@ trait RendersDashboard
         </div>
 
         <!-- Tarjetas Ejecutivas de KPIs de Alta Jerarquía -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-scm-metrics-main-kpis>
           <!-- KPI 1: Tickets Activos -->
           <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col justify-between hover:shadow-elevated transition-shadow">
             <div class="flex items-center justify-between">
@@ -2416,6 +2416,8 @@ trait RendersDashboard
        LIMIT 500",
       $args
     );
+    $rows = is_array($rows) ? $rows : [];
+    $linkedTicketCards = $this->cotizacion_linked_ticket_cards_by_rows($rows);
 
     $approved = 0;
     $finished = 0;
@@ -2423,7 +2425,7 @@ trait RendersDashboard
     $adminFinished = 0.0;
     $items = [];
     $finishedItems = [];
-    foreach (is_array($rows) ? $rows : [] as $row) {
+    foreach ($rows as $row) {
       $approved++;
       $admin = $this->maintenance_quote_admin_amount($row);
       $adminApproved += $admin;
@@ -2440,9 +2442,10 @@ trait RendersDashboard
         $finished++;
         $adminFinished += $admin;
       }
+      $ticketRef = trim((string) ($row['id_ticket'] ?? ''));
       $item = [
         'id' => trim((string) ($row['_ID'] ?? '')),
-        'ticket' => trim((string) ($row['id_ticket'] ?? '')),
+        'ticket' => $ticketRef,
         'direccion' => trim((string) ($row['direccion'] ?? '')),
         'inmueble' => trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '')),
         'destinatario' => trim((string) ($row['destinatario'] ?? '')),
@@ -2451,6 +2454,7 @@ trait RendersDashboard
         'administracion' => $admin,
         'acta_id' => $actaId,
         'trabajo_terminado' => $isFinished,
+        'case_source_html' => $ticketRef !== '' ? (string) ($linkedTicketCards[$ticketRef] ?? '') : '',
       ];
       $items[] = $item;
       if ($isFinished) {

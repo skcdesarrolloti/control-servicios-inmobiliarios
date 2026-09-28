@@ -12384,6 +12384,7 @@
         "</strong></div>" +
         rows.map(function (row) {
           row = row || {};
+          var sourceHtml = String(row.case_source_html || "").trim();
           var meta = [
             row.ticket ? "Ticket #" + row.ticket : "",
             row.inmueble ? "Inmueble " + row.inmueble : "",
@@ -12395,7 +12396,10 @@
               '<div class="scm-maintenance-quote-row-main"><strong>' + escHtml(row.direccion || "Cotización de mantenimiento") + "</strong>" +
                 (meta ? '<small>' + escHtml(meta) + "</small>" : "") +
                 '<small>Aprobada: ' + escHtml(row.fecha_aprobacion || "-") + (row.acta_id ? " · Acta #" + escHtml(row.acta_id) : "") + "</small></div>" +
-              '<div class="scm-maintenance-quote-row-money"><span>Administraci&oacute;n</span><strong>' + escHtml(formatDashboardCurrency(row.administracion || 0)) + "</strong></div>" +
+              '<div class="scm-maintenance-quote-row-money"><span>Administraci&oacute;n</span><strong>' + escHtml(formatDashboardCurrency(row.administracion || 0)) + "</strong>" +
+                (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-maintenance-quote-case-btn" data-scm-maintenance-quote-open-case>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-maintenance-quote-case-btn" disabled>Sin caso</button>') +
+              "</div>" +
+              (sourceHtml ? '<template class="scm-maintenance-quote-case-source">' + sourceHtml + "</template>" : "") +
             "</article>"
           );
         }).join("");
@@ -14337,6 +14341,10 @@
       if (metricTabsWrap) {
         function showMetricsPane(name) {
           name = name === "cotizaciones_mantenimiento" || name === "ejecucion" ? name : "operativas";
+          var mainKpis = root.querySelector("[data-scm-metrics-main-kpis]");
+          if (mainKpis) {
+            mainKpis.hidden = name === "cotizaciones_mantenimiento";
+          }
           root.querySelectorAll("[data-scm-metrics-pane]").forEach(function (pane) {
             pane.classList.toggle(
               "active",
@@ -19457,6 +19465,38 @@
     }
 
     root.addEventListener("click", function (e) {
+      var maintenanceMetricCaseBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-maintenance-quote-open-case]")
+          : null;
+      if (maintenanceMetricCaseBtn) {
+        e.preventDefault();
+        var metricRow = maintenanceMetricCaseBtn.closest(".scm-maintenance-quote-row");
+        var metricSource = metricRow
+          ? metricRow.querySelector(".scm-maintenance-quote-case-source")
+          : null;
+        if (!metricSource) {
+          showToast("error", "No se encontró el caso completo de la cotización.");
+          return;
+        }
+        var metricHolder = metricRow.querySelector(".scm-maintenance-quote-case-dom");
+        if (!metricHolder) {
+          metricHolder = document.createElement("div");
+          metricHolder.className = "scm-maintenance-quote-case-dom";
+          metricHolder.setAttribute("aria-hidden", "true");
+          metricHolder.style.display = "none";
+          metricHolder.innerHTML = metricSource.innerHTML || "";
+          metricRow.appendChild(metricHolder);
+        }
+        var metricCaseButton = metricHolder.querySelector(".scm-btn-case");
+        if (!metricCaseButton || typeof window.scmOpenCase !== "function") {
+          showToast("error", "No se pudo abrir el popup completo del caso.");
+          return;
+        }
+        window.scmOpenCase(metricCaseButton);
+        return;
+      }
+
       var linkedTicketCaseBtn =
         e.target && e.target.closest
           ? e.target.closest("[data-scm-open-linked-ticket-case]")
