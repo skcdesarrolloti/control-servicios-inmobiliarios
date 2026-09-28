@@ -12442,6 +12442,328 @@
         });
     }
 
+    var contractualReportState = { tab: "ocupaciones", utility: "luz" };
+
+    function contractualPanel() {
+      return root.querySelector("[data-scm-contractual-reports]");
+    }
+
+    function contractualApiUrl(panel, route, params) {
+      var base = String((panel && panel.getAttribute("data-api-base")) || "").replace(/\/+$/, "");
+      var url = new URL(base + "/");
+      url.searchParams.set("route", route);
+      Object.keys(params || {}).forEach(function (key) {
+        var value = params[key];
+        if (value !== undefined && value !== null && String(value).trim() !== "") {
+          url.searchParams.set(key, value);
+        }
+      });
+      return url.toString();
+    }
+
+    function contractualNumber(value) {
+      var number = Number(value || 0);
+      return Number.isFinite(number) ? number : 0;
+    }
+
+    function contractualCurrency(value) {
+      return formatDashboardCurrency(contractualNumber(value));
+    }
+
+    function contractualPercent(value) {
+      return contractualNumber(value).toLocaleString("es-CO", {
+        maximumFractionDigits: 1,
+        minimumFractionDigits: 1,
+      }) + "%";
+    }
+
+    function contractualReadFilters(panel) {
+      var form = panel ? panel.querySelector("[data-scm-contractual-filters]") : null;
+      var now = new Date();
+      var year = contractualNumber((form && form.querySelector("[name='year']") || {}).value) || now.getFullYear();
+      var month = contractualNumber((form && form.querySelector("[name='month']") || {}).value) || now.getMonth() + 1;
+      var period = String((form && form.querySelector("[name='period']") || {}).value || "mesActual");
+      var params = { year: year };
+      if (period === "mesActual" || period === "porMes" || period === "anioAnterior") {
+        params.month_from = month;
+        params.month_to = month;
+      } else if (period === "acumulado" || period === "acumuladoAnterior") {
+        params.month_from = 1;
+        params.month_to = month;
+      }
+      return { year: year, month: month, period: period, params: params };
+    }
+
+    function contractualStatus(panel, message, warning) {
+      var status = panel ? panel.querySelector("[data-scm-contractual-status]") : null;
+      if (!status) return;
+      status.textContent = message;
+      status.classList.toggle("is-warning", Boolean(warning));
+    }
+
+    function contractualKpis(panel, rows) {
+      var target = panel ? panel.querySelector("[data-scm-contractual-kpis]") : null;
+      if (!target) return;
+      target.innerHTML = (rows || []).map(function (row) {
+        return '<article class="scm-contractual-kpi"><span>' + escHtml(row.label) + '</span><strong>' + escHtml(row.value) + "</strong></article>";
+      }).join("");
+    }
+
+    function contractualCleanRows(rows, labelKey, valueKey) {
+      return (Array.isArray(rows) ? rows : []).map(function (row) {
+        row = row || {};
+        var label = String(row[labelKey || "categoria"] || row.categoria || row.funcionario || row.estado || "Sin dato").trim() || "Sin dato";
+        var value = contractualNumber(row[valueKey || "total"]);
+        return { label: label, value: value };
+      }).filter(function (row) {
+        var label = row.label.toLowerCase();
+        return row.value > 0 && ["", "sin dato", "sin datos", "sin informacion", "sin información"].indexOf(label) === -1;
+      }).sort(function (a, b) {
+        return b.value - a.value;
+      }).slice(0, 10);
+    }
+
+    function contractualCard(title, rows, formatter) {
+      rows = contractualCleanRows(rows);
+      if (!rows.length) {
+        return '<section class="scm-contractual-card"><h4>' + escHtml(title) + '</h4><div class="scm-contractual-empty">Sin datos para este filtro.</div></section>';
+      }
+      var max = rows.reduce(function (acc, row) { return Math.max(acc, row.value); }, 1);
+      return '<section class="scm-contractual-card"><h4>' + escHtml(title) + '</h4>' + rows.map(function (row) {
+        var width = Math.max(5, (row.value / max) * 100);
+        var value = formatter ? formatter(row.value) : formatDashboardCount(row.value);
+        return '<div class="scm-contractual-row"><div class="scm-contractual-row-head"><span>' + escHtml(row.label) + '</span><strong>' + escHtml(value) + '</strong></div><div class="scm-contractual-bar"><span style="width:' + width.toFixed(2) + '%"></span></div></div>';
+      }).join("") + "</section>";
+    }
+
+    function contractualGrid(panel, html) {
+      var target = panel ? panel.querySelector("[data-scm-contractual-report-grid]") : null;
+      if (target) target.innerHTML = html || '<div class="scm-contractual-empty">Sin datos para este filtro.</div>';
+    }
+
+    function contractualContractValue(row) {
+      row = row || {};
+      var canon = String(row.valor_canon || "").replace(/\$/g, "").replace(/COP/gi, "").replace(/\s+/g, "").replace(/\./g, "").replace(/,/g, ".");
+      var admin = String(row.valor_administracion || "").replace(/\$/g, "").replace(/COP/gi, "").replace(/\s+/g, "").replace(/\./g, "").replace(/,/g, ".");
+      return contractualNumber(canon) + contractualNumber(admin);
+    }
+
+    function contractualTotalValue(data) {
+      var contracts = Array.isArray(data && data.contratos) ? data.contratos : [];
+      return contracts.reduce(function (sum, row) {
+        return sum + contractualContractValue(row);
+      }, 0);
+    }
+
+    function contractualFetch(panel, route, params) {
+      return fetchWithTimeout(contractualApiUrl(panel, route, params), {
+        method: "GET",
+        credentials: "omit",
+      }).then(function (response) {
+        return response.json();
+      }).then(function (json) {
+        if (!json || json.error) {
+          throw new Error((json && json.message) || "No se pudo cargar el reporte.");
+        }
+        return json;
+      });
+    }
+
+    function renderContractStatus(panel, data, title, totalLabel) {
+      var total = contractualNumber(data.total_year || data.total || 0);
+      var value = contractualTotalValue(data);
+      var average = total > 0 ? value / total : 0;
+      var destinationValues = Array.isArray(data.promedio_valor_destinacion) ? data.promedio_valor_destinacion : [];
+      contractualKpis(panel, [
+        { label: totalLabel, value: formatDashboardCount(total) },
+        { label: "Valor total (canon + administración)", value: contractualCurrency(value) },
+        { label: "Valor promedio", value: contractualCurrency(average) },
+      ].concat(destinationValues.slice(0, 2).map(function (row) {
+        return { label: "Promedio " + (row.categoria || "destinación"), value: contractualCurrency(row.promedio_valor || 0) };
+      })));
+      contractualGrid(panel, [
+        contractualCard(title + " por tipo de inmueble", data.tipo_inmueble_porcentaje),
+        contractualCard(title + " por destinación", data.destinacion_porcentaje),
+        contractualCard(title + " por rango de valor", buildContractValueRanges(data.contratos || [])),
+        contractualCard(title + " por barrio", data.barrio_porcentaje),
+        contractualCard(title + " por estrato", data.estrato_porcentaje),
+        contractualCard(title + " por medio", data.medio_porcentaje),
+      ].join(""));
+    }
+
+    function buildContractValueRanges(contracts) {
+      var ranges = {
+        "Menor a $1M": 0,
+        "$1M a $2M": 0,
+        "$2M a $3M": 0,
+        "$3M a $5M": 0,
+        "Mayor o igual a $5M": 0,
+      };
+      (contracts || []).forEach(function (row) {
+        var value = contractualContractValue(row);
+        if (value < 1000000) ranges["Menor a $1M"] += 1;
+        else if (value < 2000000) ranges["$1M a $2M"] += 1;
+        else if (value < 3000000) ranges["$2M a $3M"] += 1;
+        else if (value < 5000000) ranges["$3M a $5M"] += 1;
+        else ranges["Mayor o igual a $5M"] += 1;
+      });
+      return Object.keys(ranges).map(function (label) {
+        return { categoria: label, total: ranges[label] };
+      });
+    }
+
+    function renderContractBalance(panel, occupied, vacated) {
+      var occupiedTotal = contractualNumber(occupied.total_year || 0);
+      var vacatedTotal = contractualNumber(vacated.total_year || 0);
+      contractualKpis(panel, [
+        { label: "Ocupaciones", value: formatDashboardCount(occupiedTotal) },
+        { label: "Desocupaciones", value: formatDashboardCount(vacatedTotal) },
+        { label: "Balance neto", value: formatDashboardCount(occupiedTotal - vacatedTotal) },
+        { label: "Valor ocupaciones", value: contractualCurrency(contractualTotalValue(occupied)) },
+      ]);
+      contractualGrid(panel, [
+        contractualCard("Ocupaciones por mes", (occupied.serie_mensual || []).map(function (row) { return { categoria: monthName(row.month), total: row.total }; })),
+        contractualCard("Desocupaciones por mes", (vacated.serie_mensual || []).map(function (row) { return { categoria: monthName(row.month), total: row.total }; })),
+        contractualCard("Ocupaciones por destinación", occupied.destinacion_porcentaje),
+        contractualCard("Desocupaciones por destinación", vacated.destinacion_porcentaje),
+      ].join(""));
+    }
+
+    function renderMaintenanceReport(panel, data, title) {
+      var totals = data.totales || {};
+      contractualKpis(panel, [
+        { label: "Revisiones", value: formatDashboardCount(totals.revisiones || 0) },
+        { label: "Con daño", value: formatDashboardCount(totals.con_dano || 0) },
+        { label: "Cotizaciones", value: formatDashboardCount(totals.cotizaciones || 0) },
+        { label: "Valor cotizado", value: contractualCurrency(totals.valor_cotizado || 0) },
+        { label: "Tasa cotización", value: contractualPercent(totals.tasa_cotizacion || 0) },
+        { label: "Enviadas", value: formatDashboardCount(totals.cotizaciones_enviadas || 0) },
+      ]);
+      contractualGrid(panel, [
+        contractualCard(title + " por estado", data.estados),
+        contractualCard(title + " por tipo de cotización", data.tipos_cotizacion),
+        contractualCard(title + " por envío", data.envio),
+        contractualCard(title + " por categoría", data.categorias || data.tipos_mantenimiento),
+        contractualCard(title + " por funcionario", data.funcionarios || data.empleados || data.por_funcionario),
+        contractualCard(title + " mensual", (data.mensual || []).map(function (row) { return { categoria: monthName(row.month), total: row.revisiones }; })),
+      ].join(""));
+    }
+
+    function renderServicesReport(panel, data) {
+      var utility = contractualReportState.utility || "luz";
+      var totals = data.totales || {};
+      var total = contractualNumber(totals[utility]);
+      var ok = contractualNumber(totals["al_dia_" + utility]);
+      contractualKpis(panel, [
+        { label: "Total " + utility, value: formatDashboardCount(total) },
+        { label: "Al día " + utility, value: formatDashboardCount(ok) },
+        { label: "Cumplimiento " + utility, value: contractualPercent(total > 0 ? (ok / total) * 100 : 0) },
+      ]);
+      contractualGrid(panel, [
+        contractualCard("Resultado " + utility, data["por_resultado_" + utility] || (data.resultados || {})[utility]),
+        contractualCard("Revisiones por funcionario", (data.por_funcionario || []).map(function (row) { return { categoria: row.funcionario, total: row.total }; })),
+        contractualCard("Por tipo de inmueble", data.por_tipo_inmueble),
+        contractualCard("Por destinación", data.por_destinacion),
+        contractualCard("Por barrio", data.por_barrio),
+        contractualCard("Por estrato", data.por_estrato),
+      ].join(""));
+    }
+
+    function monthName(value) {
+      var months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+      return months[Math.max(1, Math.min(12, contractualNumber(value))) - 1] || String(value || "-");
+    }
+
+    function loadContractualReport() {
+      var panel = contractualPanel();
+      if (!panel) return Promise.resolve();
+      var filters = contractualReadFilters(panel);
+      var utilityTabs = panel.querySelector("[data-scm-contractual-utility-tabs]");
+      if (utilityTabs) utilityTabs.hidden = contractualReportState.tab !== "servicios";
+      panel.classList.add("is-loading");
+      contractualStatus(panel, "Cargando reporte...");
+      contractualKpis(panel, []);
+      contractualGrid(panel, "");
+
+      var tab = contractualReportState.tab;
+      var request;
+      if (tab === "ocupaciones" || tab === "desocupaciones") {
+        request = contractualFetch(panel, "reportes/contratos", Object.assign({}, filters.params, {
+          estado: tab === "ocupaciones" ? "Vigente" : "Expirado",
+          fecha_base: tab === "ocupaciones" ? "fecha_entrega" : "fecha_recibo",
+        })).then(function (data) {
+          renderContractStatus(panel, data, tab === "ocupaciones" ? "Ocupaciones" : "Desocupaciones", tab === "ocupaciones" ? "Total ocupaciones" : "Total desocupaciones");
+        });
+      } else if (tab === "balance") {
+        request = Promise.all([
+          contractualFetch(panel, "reportes/contratos", Object.assign({}, filters.params, { estado: "Vigente", fecha_base: "fecha_entrega" })),
+          contractualFetch(panel, "reportes/contratos", Object.assign({}, filters.params, { estado: "Expirado", fecha_base: "fecha_recibo" })),
+        ]).then(function (items) {
+          renderContractBalance(panel, items[0] || {}, items[1] || {});
+        });
+      } else if (tab === "revision_preventiva" || tab === "revision_correctiva") {
+        request = contractualFetch(panel, "reportes/mantenimiento", Object.assign({}, filters.params, {
+          mode: tab === "revision_preventiva" ? "preventiva" : "correctiva",
+        })).then(function (data) {
+          renderMaintenanceReport(panel, data, tab === "revision_preventiva" ? "Revisión preventiva" : "Revisión correctiva");
+        });
+      } else {
+        request = contractualFetch(panel, "reportes/servicios-publicos", filters.params).then(function (data) {
+          renderServicesReport(panel, data);
+        });
+      }
+
+      return request.then(function () {
+        contractualStatus(panel, "Datos actualizados con el backend de reportes.");
+      }).catch(function (error) {
+        contractualStatus(panel, error && error.message ? error.message : "No se pudo cargar el reporte.", true);
+        contractualGrid(panel, '<div class="scm-contractual-empty">No se pudo cargar el reporte contractual.</div>');
+        showToast("error", error && error.message ? error.message : "No se pudo cargar el reporte contractual.");
+      }).finally(function () {
+        panel.classList.remove("is-loading");
+      });
+    }
+
+    function initContractualReports() {
+      var panel = contractualPanel();
+      if (!panel || panel.getAttribute("data-scm-contractual-ready") === "1") return;
+      panel.setAttribute("data-scm-contractual-ready", "1");
+      var tabs = panel.querySelector("[data-scm-contractual-tabs]");
+      if (tabs) {
+        tabs.addEventListener("click", function (event) {
+          var btn = event.target && event.target.closest("[data-contractual-report-tab]");
+          if (!btn) return;
+          contractualReportState.tab = btn.getAttribute("data-contractual-report-tab") || "ocupaciones";
+          tabs.querySelectorAll("[data-contractual-report-tab]").forEach(function (item) {
+            item.classList.toggle("active", item === btn);
+          });
+          loadContractualReport();
+        });
+      }
+      var utilities = panel.querySelector("[data-scm-contractual-utility-tabs]");
+      if (utilities) {
+        utilities.addEventListener("click", function (event) {
+          var btn = event.target && event.target.closest("[data-contractual-utility]");
+          if (!btn) return;
+          contractualReportState.utility = btn.getAttribute("data-contractual-utility") || "luz";
+          utilities.querySelectorAll("[data-contractual-utility]").forEach(function (item) {
+            item.classList.toggle("active", item === btn);
+          });
+          loadContractualReport();
+        });
+      }
+      var form = panel.querySelector("[data-scm-contractual-filters]");
+      if (form) {
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          loadContractualReport();
+        });
+        form.addEventListener("change", function () {
+          loadContractualReport();
+        });
+      }
+    }
+
     function toggleKpiVisibility(id, visible) {
       var el = root.querySelector("#" + id);
       if (!el || !el.parentElement) {
@@ -14474,6 +14796,9 @@
                 loadDashboardFilterOptions().then(function () {
                   applyCaseMetricFilters();
                 });
+              } else if (paneName === "gestion_contractual") {
+                initContractualReports();
+                loadContractualReport();
               } else {
                 renderMaintenanceQuoteMetrics(initialMetrics.cotizaciones_mantenimiento || {});
               }

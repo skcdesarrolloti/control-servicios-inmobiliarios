@@ -390,7 +390,7 @@ trait RendersDashboard
     if ($reportesGerencialesBaseUrl === '') {
       $reportesGerencialesBaseUrl = 'https://sucasainmobiliaria.com.co/reportesgerenciales';
     }
-    $contractualReportsUrl = rtrim($reportesGerencialesBaseUrl, '/') . '/informe-gerencial?tab=contractual';
+    $reportesGerencialesBaseUrl = rtrim($reportesGerencialesBaseUrl, '/');
     $runtimeData = [
       'ajaxUrl'      => $apiUrl,
       'baseUrl'      => rtrim((string) (defined('SCM_BASE_URL') ? SCM_BASE_URL : ''), '/'),
@@ -1399,6 +1399,8 @@ trait RendersDashboard
           <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-panel="gestion_contractual">Gestión contractual</button>
         </div>
 
+        <!-- Panel de Gráficos e Indicadores -->
+        <div class="scm-metrics-pane active" data-scm-metrics-pane="operativas">
         <!-- Tarjetas Ejecutivas de KPIs de Alta Jerarquía -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-scm-metrics-main-kpis>
           <!-- KPI 1: Tickets Activos -->
@@ -1492,8 +1494,6 @@ trait RendersDashboard
           </div>
         </div>
 
-        <!-- Panel de Gráficos e Indicadores -->
-        <div class="scm-metrics-pane active" data-scm-metrics-pane="operativas">
           <form class="scm-execution-filters scm-metric-case-filters" data-scm-metric-case-filters autocomplete="off">
             <div class="scm-field">
               <label for="scm_metric_tema">Tema</label>
@@ -1620,23 +1620,60 @@ trait RendersDashboard
           </section>
         </div>
         <div class="scm-metrics-pane" data-scm-metrics-pane="gestion_contractual">
-          <section class="scm-execution-panel scm-contractual-report-panel">
+          <section class="scm-execution-panel scm-contractual-report-panel" data-scm-contractual-reports data-api-base="<?php echo esc_attr($reportesGerencialesBaseUrl); ?>">
             <div class="scm-execution-head">
               <div>
                 <span class="scm-eyebrow">Reportes gerenciales</span>
                 <h3>Gestión contractual</h3>
-                <p>Consulta desde este tablero los reportes contractuales: ocupaciones, desocupaciones, revisiones preventivas, correctivas y servicios públicos.</p>
+                <p>Consulta desde este tablero los reportes contractuales usando el backend existente de reportes gerenciales.</p>
               </div>
-              <a class="scm-contractual-report-open" href="<?php echo esc_url($contractualReportsUrl); ?>" target="_blank" rel="noopener">Abrir completo</a>
             </div>
-            <div class="scm-contractual-report-links" aria-label="Reportes incluidos">
-              <span>Ocupaciones</span>
-              <span>Desocupaciones</span>
-              <span>Ocupación vs desocupación</span>
-              <span>Revisión preventiva</span>
-              <span>Revisión correctiva</span>
-              <span>Servicios públicos</span>
+            <div class="scm-contractual-native-tabs" data-scm-contractual-tabs aria-label="Reportes incluidos">
+              <button type="button" class="active" data-contractual-report-tab="ocupaciones">Ocupaciones</button>
+              <button type="button" data-contractual-report-tab="desocupaciones">Desocupaciones</button>
+              <button type="button" data-contractual-report-tab="balance">Ocupación vs desocupación</button>
+              <button type="button" data-contractual-report-tab="revision_preventiva">Revisión preventiva</button>
+              <button type="button" data-contractual-report-tab="revision_correctiva">Revisión correctiva</button>
+              <button type="button" data-contractual-report-tab="servicios">Servicios públicos</button>
             </div>
+            <form class="scm-contractual-report-filters" data-scm-contractual-filters autocomplete="off">
+              <div class="scm-field">
+                <label for="scm_contractual_year">Año</label>
+                <select id="scm_contractual_year" name="year" class="select select-bordered select-sm scm-select">
+                  <?php $currentYear = (int) date('Y'); for ($yearOption = $currentYear; $yearOption >= $currentYear - 5; $yearOption--): ?>
+                    <option value="<?php echo esc_attr((string) $yearOption); ?>" <?php selected($yearOption, $currentYear); ?>><?php echo esc_html((string) $yearOption); ?></option>
+                  <?php endfor; ?>
+                </select>
+              </div>
+              <div class="scm-field">
+                <label for="scm_contractual_month">Mes</label>
+                <select id="scm_contractual_month" name="month" class="select select-bordered select-sm scm-select">
+                  <?php $monthLabels = [1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril', 5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto', 9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre']; $currentMonth = (int) date('n'); foreach ($monthLabels as $monthValue => $monthLabel): ?>
+                    <option value="<?php echo esc_attr((string) $monthValue); ?>" <?php selected($monthValue, $currentMonth); ?>><?php echo esc_html($monthLabel); ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div class="scm-field">
+                <label for="scm_contractual_period">Periodo</label>
+                <select id="scm_contractual_period" name="period" class="select select-bordered select-sm scm-select">
+                  <option value="mesActual">Mes actual</option>
+                  <option value="porMes">Por mes</option>
+                  <option value="anio">Año</option>
+                  <option value="acumulado">Acumulado del año</option>
+                  <option value="anioAnterior">Comparativa año anterior por mes</option>
+                  <option value="acumuladoAnterior">Comparativa acumulado año anterior</option>
+                </select>
+              </div>
+              <button type="submit" class="scm-btn-primary btn btn-primary">Actualizar</button>
+            </form>
+            <div class="scm-execution-status" data-scm-contractual-status aria-live="polite">Selecciona un reporte para cargar los datos.</div>
+            <div class="scm-contractual-utility-tabs" data-scm-contractual-utility-tabs hidden>
+              <button type="button" class="active" data-contractual-utility="luz">Luz</button>
+              <button type="button" data-contractual-utility="agua">Agua</button>
+              <button type="button" data-contractual-utility="gas">Gas</button>
+            </div>
+            <div class="scm-contractual-kpis" data-scm-contractual-kpis></div>
+            <div class="scm-contractual-report-grid" data-scm-contractual-report-grid></div>
           </section>
         </div>
       </div>

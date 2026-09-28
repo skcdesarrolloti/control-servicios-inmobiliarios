@@ -1326,37 +1326,149 @@
   gap: 14px;
 }
 
-#scm-app .scm-contractual-report-open {
-  display: inline-flex;
-  min-height: 38px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  padding: 8px 14px;
-  background: #0f1e36;
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 900;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-#scm-app .scm-contractual-report-links {
+#scm-app .scm-contractual-native-tabs,
+#scm-app .scm-contractual-utility-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-#scm-app .scm-contractual-report-links span {
+#scm-app .scm-contractual-native-tabs button,
+#scm-app .scm-contractual-utility-tabs button {
   display: inline-flex;
-  min-height: 30px;
+  min-height: 36px;
   align-items: center;
+  justify-content: center;
   border: 1px solid #cfe2ff;
   border-radius: 999px;
-  padding: 5px 10px;
+  padding: 7px 12px;
   background: #eef6ff;
   color: #1e3a5f;
   font-size: 12px;
+  font-weight: 900;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+#scm-app .scm-contractual-native-tabs button.active,
+#scm-app .scm-contractual-utility-tabs button.active {
+  border-color: #0f1e36;
+  background: #0f1e36;
+  color: #ffffff;
+}
+
+#scm-app .scm-contractual-report-filters {
+  display: grid;
+  grid-template-columns: minmax(150px, 180px) minmax(150px, 220px) minmax(240px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid #dbe6f1;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-contractual-report-filters .scm-field {
+  margin: 0;
+}
+
+#scm-app .scm-contractual-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+#scm-app .scm-contractual-kpi {
+  min-height: 92px;
+  display: grid;
+  align-content: center;
+  gap: 7px;
+  padding: 15px;
+  border: 1px solid #dbe6f1;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(15, 39, 66, 0.06);
+}
+
+#scm-app .scm-contractual-kpi span {
+  color: #6c7f96;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-contractual-kpi strong {
+  color: #092746;
+  font-size: 24px;
+  line-height: 1.08;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+#scm-app .scm-contractual-report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+#scm-app .scm-contractual-card {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid #dbe6f1;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(15, 39, 66, 0.06);
+}
+
+#scm-app .scm-contractual-card h4 {
+  margin: 0 0 12px;
+  color: #0f2742;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+#scm-app .scm-contractual-row {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+#scm-app .scm-contractual-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #52647a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#scm-app .scm-contractual-row-head strong {
+  color: #092746;
+  font-variant-numeric: tabular-nums;
+}
+
+#scm-app .scm-contractual-bar {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf3f9;
+}
+
+#scm-app .scm-contractual-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #1b447d;
+}
+
+#scm-app .scm-contractual-empty {
+  padding: 18px;
+  border: 1px dashed #cfe2ff;
+  border-radius: 14px;
+  background: #f8fbff;
+  color: #1e3a5f;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -1474,7 +1586,8 @@
   #scm-app .scm-maintenance-quote-list-head,
   #scm-app .scm-maintenance-quote-row,
   #scm-app .scm-maintenance-quote-filters,
-  #scm-app .scm-metric-case-filters {
+  #scm-app .scm-metric-case-filters,
+  #scm-app .scm-contractual-report-filters {
     grid-template-columns: 1fr;
   }
 
