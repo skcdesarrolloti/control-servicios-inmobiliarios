@@ -1742,25 +1742,28 @@ trait RendersDashboard
     foreach (self::configuredGenericTicketTabDefinitions() as $tabKey => $definition) {
       $label = trim((string) ($definition['label'] ?? $tabKey));
       $topics = self::sanitizeTicketTopicList($definition['temas'] ?? []);
-      $topicTabsHtml .= '<label class="scm-ticket-topic-config-field">';
-      $topicTabsHtml .= '<span>' . esc_html($label) . '</span>';
+      $topicCount = count($topics);
+      $topicTabsHtml .= '<label class="scm-ticket-topic-config-field scm-tw-card bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col gap-3">';
+      $topicTabsHtml .= '<span class="scm-topic-card-head flex items-center justify-between gap-2"><strong>' . esc_html($label) . '</strong><em>' . esc_html((string) $topicCount) . ' temas</em></span>';
+      $topicTabsHtml .= '<small>Temas reconocidos</small>';
       $topicTabsHtml .= '<textarea name="topics[' . esc_attr((string) $tabKey) . ']" class="textarea textarea-bordered scm-input" rows="4">' . esc_textarea(implode("\n", $topics)) . '</textarea>';
+      $topicTabsHtml .= '<span class="scm-topic-card-foot">Bandeja sincronizada</span>';
       $topicTabsHtml .= '</label>';
     }
 
     ob_start();
 ?>
-    <div id="scm-ticket-topic-settings-modal" class="scm-pqr-settings-modal scm-ticket-topic-settings-modal scm-config-modal--topics" aria-hidden="true">
-      <div class="scm-pqr-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-ticket-topic-settings-title">
-        <button type="button" class="scm-pqr-settings-close" id="scm-close-ticket-topic-settings" aria-label="Cerrar">&times;</button>
-        <div class="scm-pqr-settings-head">
-          <span class="scm-config-head-icon material-symbols-outlined" aria-hidden="true">sell</span>
-          <h3 id="scm-ticket-topic-settings-title">Temas de Casos</h3>
-          <span class="scm-config-head-badge">Taxonom&iacute;a operativa</span>
+    <div id="scm-ticket-topic-settings-modal" class="scm-pqr-settings-modal scm-ticket-topic-settings-modal scm-config-modal--topics scm-tw-modal fixed inset-0 z-50 p-3 bg-slate-900/70 backdrop-blur-md" aria-hidden="true">
+      <div class="scm-pqr-settings-dialog scm-tw-dialog bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-slate-200" role="dialog" aria-modal="true" aria-labelledby="scm-ticket-topic-settings-title">
+        <button type="button" class="scm-pqr-settings-close scm-tw-close" id="scm-close-ticket-topic-settings" aria-label="Cerrar">&times;</button>
+        <div class="scm-pqr-settings-head scm-tw-head bg-[#0f1e36] text-white px-6 py-5 flex items-start gap-4">
+          <span class="scm-config-head-icon material-symbols-outlined shrink-0" aria-hidden="true">sell</span>
+          <h3 id="scm-ticket-topic-settings-title" class="text-2xl font-bold text-white">Temas de Casos</h3>
+          <span class="scm-config-head-badge inline-flex rounded-full text-[10px] font-bold uppercase">Taxonom&iacute;a operativa</span>
           <p>Define qu&eacute; valores de <code>tema_ayuda</code> alimentan Entrega, Preventiva, Recibo, Contractual y las dem&aacute;s pesta&ntilde;as operativas.</p>
         </div>
-        <div class="scm-config-info-strip"><strong>Mapeo autom&aacute;tico:</strong> Cada l&iacute;nea ingresada alimenta la bandeja operativa correspondiente para los funcionarios.</div>
-        <section class="scm-pqr-settings-section">
+        <div class="scm-config-info-strip bg-slate-50 border-b border-slate-200 px-6 py-3"><strong>Mapeo autom&aacute;tico:</strong> Cada l&iacute;nea ingresada alimenta la bandeja operativa correspondiente para los funcionarios.</div>
+        <section class="scm-pqr-settings-section bg-slate-100 p-6">
           <form id="scm-ticket-topic-tabs-form" class="scm-ticket-topic-tabs-form scm-pqr-config-form" method="post" autocomplete="off">
             <div class="scm-ticket-topic-config-grid"><?php echo $topicTabsHtml; ?></div>
             <div class="scm-pqr-config-actions">
@@ -1878,15 +1881,15 @@ trait RendersDashboard
 
     ob_start();
 ?>
-    <div id="scm-pqr-settings-modal" class="scm-pqr-settings-modal scm-config-modal--guardian" data-scm-dashboard-pqr-settings="1" aria-hidden="true">
-      <div class="scm-pqr-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-pqr-settings-title">
-        <button type="button" class="scm-pqr-settings-close" id="scm-close-pqr-settings" aria-label="Cerrar">&times;</button>
-        <div class="scm-pqr-settings-head">
+    <div id="scm-pqr-settings-modal" class="scm-pqr-settings-modal scm-config-modal--guardian scm-tw-modal fixed inset-0 z-50 p-3 bg-slate-900/70 backdrop-blur-md" data-scm-dashboard-pqr-settings="1" aria-hidden="true">
+      <div class="scm-pqr-settings-dialog scm-tw-dialog bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-slate-200" role="dialog" aria-modal="true" aria-labelledby="scm-pqr-settings-title">
+        <button type="button" class="scm-pqr-settings-close scm-tw-close" id="scm-close-pqr-settings" aria-label="Cerrar">&times;</button>
+        <div class="scm-pqr-settings-head scm-tw-head bg-[#0f1e36] text-white px-6 py-5 flex items-start gap-4">
           <span class="scm-config-head-icon material-symbols-outlined" aria-hidden="true">shield</span>
-          <h3 id="scm-pqr-settings-title">Configuraci&oacute;n de Guardian</h3>
+          <h3 id="scm-pqr-settings-title" class="text-2xl font-bold text-white">Configuraci&oacute;n de Guardian</h3>
           <p>Define qui&eacute;n recibe notificaciones nuevas y qui&eacute;nes quedan como corresponsables por tipo de solicitud.</p>
         </div>
-        <div class="scm-pqr-settings-summary" aria-label="Resumen de configuraci&oacute;n">
+        <div class="scm-pqr-settings-summary bg-slate-50 px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-3" aria-label="Resumen de configuraci&oacute;n">
           <span><strong><?php echo count($currentNotifIds); ?></strong> notificadores</span>
           <span><strong><?php echo count($themes); ?></strong> tipos de solicitud</span>
           <span><strong><?php echo count($corresponsableCandidates); ?></strong> funcionarios disponibles</span>
@@ -1963,12 +1966,12 @@ trait RendersDashboard
 
     ob_start();
 ?>
-    <div id="scm-internal-notifications-modal" class="scm-pqr-settings-modal scm-internal-notifications-modal scm-config-modal--internal" aria-hidden="true">
-      <div class="scm-pqr-settings-dialog scm-internal-notifications-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-internal-notifications-title">
-        <button type="button" class="scm-pqr-settings-close" id="scm-close-internal-notifications" aria-label="Cerrar">&times;</button>
-        <div class="scm-pqr-settings-head">
-          <span class="scm-config-head-badge">Configuraci&oacute;n &amp; despacho</span>
-          <h3 id="scm-internal-notifications-title">Notificaciones internas administrativas</h3>
+    <div id="scm-internal-notifications-modal" class="scm-pqr-settings-modal scm-internal-notifications-modal scm-config-modal--internal scm-tw-modal fixed inset-0 z-50 p-3 bg-slate-900/70 backdrop-blur-md" aria-hidden="true">
+      <div class="scm-pqr-settings-dialog scm-internal-notifications-dialog scm-tw-dialog bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-slate-200" role="dialog" aria-modal="true" aria-labelledby="scm-internal-notifications-title">
+        <button type="button" class="scm-pqr-settings-close scm-tw-close" id="scm-close-internal-notifications" aria-label="Cerrar">&times;</button>
+        <div class="scm-pqr-settings-head scm-tw-head bg-[#0f1e36] text-white px-6 py-5">
+          <span class="scm-config-head-badge inline-flex rounded-full text-[10px] font-bold uppercase">Configuraci&oacute;n &amp; despacho</span>
+          <h3 id="scm-internal-notifications-title" class="text-2xl font-bold text-white">Notificaciones internas administrativas</h3>
           <p>Clasifica a qu&eacute; funcionarios se les avisa por cada acci&oacute;n del panel. Gesti&oacute;n de cobro y Cobro prejur&iacute;dico ya encolan Email interno real; las dem&aacute;s acciones quedan listas para conectar al flujo correspondiente.</p>
         </div>
         <form id="scm-internal-notifications-form" class="scm-internal-notifications-form" autocomplete="off">
@@ -2028,14 +2031,14 @@ trait RendersDashboard
     }
     ob_start();
 ?>
-    <div class="scm-permissions-modal scm-config-modal--permissions" id="scm-permissions-modal" aria-hidden="true">
-      <div class="scm-permissions-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-permissions-title">
-        <button type="button" class="scm-permissions-close" id="scm-close-permissions" aria-label="Cerrar">&times;</button>
-        <div class="scm-permissions-head">
+    <div class="scm-permissions-modal scm-config-modal--permissions scm-tw-modal fixed inset-0 z-50 p-3 bg-slate-900/70 backdrop-blur-md" id="scm-permissions-modal" aria-hidden="true">
+      <div class="scm-permissions-dialog scm-tw-dialog bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-slate-200" role="dialog" aria-modal="true" aria-labelledby="scm-permissions-title">
+        <button type="button" class="scm-permissions-close scm-tw-close" id="scm-close-permissions" aria-label="Cerrar">&times;</button>
+        <div class="scm-permissions-head scm-tw-head bg-[#0f1e36] text-white px-6 py-5">
           <div>
             <span class="scm-config-head-icon material-symbols-outlined" aria-hidden="true">admin_panel_settings</span>
-            <h3 id="scm-permissions-title">Permisos por cargo</h3>
-            <span class="scm-config-head-badge">Control de accesos &amp; roles</span>
+            <h3 id="scm-permissions-title" class="text-2xl font-bold text-white">Permisos por cargo</h3>
+            <span class="scm-config-head-badge inline-flex rounded-full text-[10px] font-bold uppercase">Control de accesos &amp; roles</span>
             <p>Activa o desactiva las pesta&ntilde;as que puede ver cada cargo. Si un cargo no aparece configurado, seguir&aacute; viendo todas las pesta&ntilde;as.</p>
           </div>
         </div>
