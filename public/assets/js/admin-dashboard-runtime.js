@@ -513,6 +513,7 @@
       if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
       if (type === "servicios_publicos_pendientes") return "Servicios públicos pendientes";
       if (type === "terminacion_contrato_pendiente") return "Terminación de contrato";
+      if (type === "no_prorroga_contrato_pendiente") return "No prórroga de contrato";
       if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
       if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
       return type || "Vencimientos";
@@ -756,6 +757,10 @@
         openContractTerminationTab();
         return;
       }
+      if (key === "contract_non_renewal") {
+        openContractNonRenewalTab();
+        return;
+      }
       dashboardDuePopupShown.administrative = true;
       var adminTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-actividades-administrativas"]');
       if (adminTab) {
@@ -783,6 +788,22 @@
         if (terminationTab) {
           terminationTab.click();
           terminationTab.focus({ preventScroll: true });
+        }
+      }, 160);
+    }
+
+    function openContractNonRenewalTab() {
+      dashboardDuePopupShown.administrative = true;
+      var homeTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-inicio"]');
+      if (homeTab) {
+        homeTab.click();
+        homeTab.focus({ preventScroll: true });
+      }
+      window.setTimeout(function () {
+        var nonRenewalTab = root.querySelector('[data-calendar-section-target="scm-home-calendar-section-contract-non-renewal"]');
+        if (nonRenewalTab) {
+          nonRenewalTab.click();
+          nonRenewalTab.focus({ preventScroll: true });
         }
       }, 160);
     }
@@ -820,6 +841,7 @@
         "preventiva_sin_enviar",
         "servicios_publicos_pendientes",
         "terminacion_contrato_pendiente",
+        "no_prorroga_contrato_pendiente",
         "cotizacion_sin_enviar",
         "cotizacion_enviada_sin_respuesta",
       ];

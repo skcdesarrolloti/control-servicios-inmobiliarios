@@ -1324,6 +1324,18 @@ trait HandlesTicketWorkflowActions
         'vencidos' => $count,
         'hoy' => 0,
       ];
+
+      $nonRenewalCount = $this->contractNonRenewalPendingCount();
+      if ($nonRenewalCount > 0) {
+        $groups[] = [
+          'type' => 'no_prorroga_contrato_pendiente',
+          'label' => 'No prórroga de contrato pendiente',
+          'target_tab' => 'contract_non_renewal',
+          'count' => $nonRenewalCount,
+          'vencidos' => $nonRenewalCount,
+          'hoy' => 0,
+        ];
+      }
     }
 
     return $groups;
@@ -3127,26 +3139,9 @@ trait HandlesTicketWorkflowActions
     if ($select === []) {
       return [];
     }
-    $topicCols = array_values(array_filter(
-      ['tipo_pqrs', 'tema_ayuda', 'asunto'],
-      fn(string $column): bool => $this->column_exists($table, $column)
-    ));
-    if ($topicCols === []) {
+    $where = $this->contractNonRenewalWhereSql($table, 't');
+    if ($where === '') {
       return [];
-    }
-    $allTextCols = array_values(array_filter(
-      ['tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion'],
-      fn(string $column): bool => $this->column_exists($table, $column)
-    ));
-    $topicHaystack = "LOWER(CONCAT_WS(' ', " . implode(', ', array_map(fn(string $column): string => "COALESCE(t.`{$column}`, '')", $topicCols)) . '))';
-    $allHaystack = "LOWER(CONCAT_WS(' ', " . implode(', ', array_map(fn(string $column): string => "COALESCE(t.`{$column}`, '')", $allTextCols)) . '))';
-    $where = "({$topicHaystack} LIKE '%no prorroga%' OR {$topicHaystack} LIKE '%no prórroga%' OR {$topicHaystack} LIKE '%no renovacion%' OR {$topicHaystack} LIKE '%no renovación%' OR {$topicHaystack} LIKE '%no prorrogacion%' OR {$topicHaystack} LIKE '%no prorrogación%')";
-    $where .= " AND {$allHaystack} NOT LIKE '%terminacion%' AND {$allHaystack} NOT LIKE '%terminación%' AND {$allHaystack} NOT LIKE '%desocupacion%' AND {$allHaystack} NOT LIKE '%desocupación%'";
-    if ($this->column_exists($table, 'estado')) {
-      $where .= " AND LOWER(TRIM(COALESCE(t.`estado`, ''))) NOT IN ('cerrado', 'cerrada', 'finalizado', 'finalizada', 'anulado', 'anulada')";
-    }
-    if ($this->column_exists($table, 'estado_administrativo')) {
-      $where .= " AND LOWER(TRIM(COALESCE(t.`estado_administrativo`, ''))) NOT IN ('finalizado', 'finalizada', 'cerrado', 'cerrada')";
     }
     $limit = max(1, min(300, $limit));
     $order = $this->contractTerminationOrderSql($table, 't');
@@ -3155,6 +3150,51 @@ trait HandlesTicketWorkflowActions
     );
 
     return array_values(array_map(fn(array $row): array => $this->contractNonRenewalListItem($row), $rows));
+  }
+
+  private function contractNonRenewalPendingCount(): int
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->table_exists($table)) {
+      return 0;
+    }
+    $where = $this->contractNonRenewalWhereSql($table, 't');
+    if ($where === '') {
+      return 0;
+    }
+    try {
+      return (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` t WHERE {$where}");
+    } catch (\Throwable $exception) {
+      error_log('[contract_non_renewal_pending_count] ' . $exception->getMessage());
+      return 0;
+    }
+  }
+
+  private function contractNonRenewalWhereSql(string $table, string $alias = 't'): string
+  {
+    $prefix = $alias !== '' ? $alias . '.' : '';
+    $topicCols = array_values(array_filter(
+      ['tipo_pqrs', 'tema_ayuda', 'asunto'],
+      fn(string $column): bool => $this->column_exists($table, $column)
+    ));
+    if ($topicCols === []) {
+      return '';
+    }
+    $allTextCols = array_values(array_filter(
+      ['tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion'],
+      fn(string $column): bool => $this->column_exists($table, $column)
+    ));
+    $topicHaystack = "LOWER(CONCAT_WS(' ', " . implode(', ', array_map(fn(string $column): string => "COALESCE({$prefix}`{$column}`, '')", $topicCols)) . '))';
+    $allHaystack = "LOWER(CONCAT_WS(' ', " . implode(', ', array_map(fn(string $column): string => "COALESCE({$prefix}`{$column}`, '')", $allTextCols)) . '))';
+    $where = "({$topicHaystack} LIKE '%no prorroga%' OR {$topicHaystack} LIKE '%no prórroga%' OR {$topicHaystack} LIKE '%no renovacion%' OR {$topicHaystack} LIKE '%no renovación%' OR {$topicHaystack} LIKE '%no prorrogacion%' OR {$topicHaystack} LIKE '%no prorrogación%')";
+    $where .= " AND {$allHaystack} NOT LIKE '%terminacion%' AND {$allHaystack} NOT LIKE '%terminación%' AND {$allHaystack} NOT LIKE '%desocupacion%' AND {$allHaystack} NOT LIKE '%desocupación%'";
+    if ($this->column_exists($table, 'estado')) {
+      $where .= " AND LOWER(TRIM(COALESCE({$prefix}`estado`, ''))) NOT IN ('cerrado', 'cerrada', 'finalizado', 'finalizada', 'anulado', 'anulada')";
+    }
+    if ($this->column_exists($table, 'estado_administrativo')) {
+      $where .= " AND LOWER(TRIM(COALESCE({$prefix}`estado_administrativo`, ''))) NOT IN ('finalizado', 'finalizada', 'cerrado', 'cerrada')";
+    }
+    return $where;
   }
 
   private function contractTerminationPendingCount(): int
