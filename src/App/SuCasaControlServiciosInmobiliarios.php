@@ -318,6 +318,11 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Cuando se responde una solicitud de no prórroga, se genera acta y se cierra el caso.',
             'channel' => 'Email interno en cola',
           ],
+          'retencion_contrato_ticket' => [
+            'label' => 'Ticket comercial de retención de contrato',
+            'description' => 'Cuando una no prórroga crea un ticket comercial para gestionar la retención o búsqueda del inmueble.',
+            'channel' => 'Email interno en cola',
+          ],
         ],
       ],
       'cartas_aumento' => [

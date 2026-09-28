@@ -13679,6 +13679,20 @@
         showToast("warning", "No se encontró la solicitud seleccionada.");
         return;
       }
+      var retention = row.retention_ticket || {};
+      var retentionEmployees = Array.isArray(retention.funcionarios) ? retention.funcionarios : [];
+      var defaultRetentionEmployee = String(retention.default_employee_id || "");
+      var retentionOptions = retentionEmployees.map(function (func) {
+        func = func || {};
+        var id = String(func.id || "");
+        if (!id) return "";
+        var label = String(func.label || func.name || id);
+        var meta = [func.cargo || "", func.email || ""].filter(Boolean).join(" · ");
+        return '<option value="' + escHtml(id) + '"' + (id === defaultRetentionEmployee ? " selected" : "") + '>' + escHtml(label + (meta ? " · " + meta : "")) + "</option>";
+      }).join("");
+      if (!retentionOptions) {
+        retentionOptions = '<option value="">No hay funcionarios activos disponibles</option>';
+      }
       var html = '<form class="scm-contract-termination-form" data-scm-contract-non-renewal-form>' +
         '<div class="scm-contract-termination-case">' +
           '<strong>' + escHtml(row.titulo || "Ticket") + '</strong><span>' + escHtml(row.asunto || "Solicitud de no prórroga") + "</span>" +
@@ -13689,6 +13703,11 @@
           '<label><span>Clasificación</span><select name="termino" required><option value="" selected disabled>Selecciona clasificación</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label>' +
           '<label><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || "") + '" readonly aria-readonly="true"></label>' +
           '<label><span>Fecha fin de contrato</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || "") + '"></label>' +
+        "</div>" +
+        '<div class="scm-contract-termination-case">' +
+          '<label class="scm-calendar-checkbox-line"><input type="checkbox" name="crear_ticket_retencion" value="1" ' + (retention.enabled ? "checked" : "disabled") + '><span>Crear ticket comercial de Retención de contrato</span></label>' +
+          '<label><span>Responsable del ticket comercial</span><select name="retencion_id_empleado" ' + (!retention.enabled ? "disabled" : "") + '><option value="">Selecciona funcionario responsable</option>' + retentionOptions + '</select></label>' +
+          '<small>Se notificará al solicitante y al funcionario asignado, y se usará la configuración interna de Guardian para Retención de contrato.</small>' +
         "</div>" +
         '<div><span class="scm-contract-termination-label">Notificar a</span>' + contractTerminationRecipientChecks(row) + "</div>" +
       "</form>";
@@ -13736,9 +13755,17 @@
             window.Swal.showValidationMessage("Selecciona la clasificación de la solicitud.");
             return false;
           }
+          var createRetention = form.querySelector("[name='crear_ticket_retencion']");
+          var retentionEmployee = form.querySelector("[name='retencion_id_empleado']");
+          if (createRetention && createRetention.checked && (!retentionEmployee || !retentionEmployee.value)) {
+            window.Swal.showValidationMessage("Selecciona el responsable del ticket comercial de retención.");
+            return false;
+          }
           return {
             termino: term.value,
             fecha_terminacion: form.querySelector("[name='fecha_terminacion']").value,
+            crear_ticket_retencion: createRetention && createRetention.checked ? "1" : "0",
+            retencion_id_empleado: retentionEmployee ? retentionEmployee.value : "",
             notify: checked.map(function (input) { return input.value; }),
           };
         },
@@ -13750,6 +13777,8 @@
           fd.append("solicitud_id", String(row.solicitud_id || ""));
           fd.append("termino", value.termino || "");
           fd.append("fecha_terminacion", value.fecha_terminacion || "");
+          fd.append("crear_ticket_retencion", value.crear_ticket_retencion || "0");
+          fd.append("retencion_id_empleado", value.retencion_id_empleado || "");
           fd.append("notify_recipients_present", "1");
           (value.notify || []).forEach(function (target) {
             fd.append("notify_recipients[]", target);

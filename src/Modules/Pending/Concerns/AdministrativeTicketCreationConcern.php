@@ -167,6 +167,9 @@ trait AdministrativeTicketCreationConcern
       'fecha_terminacion_contrato' => $this->firstNonEmpty([$input['fecha_final_contrato'] ?? '', $contract['fin_contrato'] ?? '']),
       'registro_fotografico' => $this->firstNonEmpty([$input['registro_fotografico'] ?? '', $contract['registro_fotografico'] ?? '']),
     ];
+    if (in_array($tema, ['Retencion de contrato', 'Retención de contrato'], true)) {
+      $ticketPayload['estado_comercial'] = 'Nuevo';
+    }
 
     if (!empty($imagenes)) {
       $ticketPayload['imagenes'] = count($imagenes) === 1 ? $imagenes[0] : serialize(array_values($imagenes));

@@ -73,7 +73,10 @@ trait PendingNotificationsAndDatesConcern
       } elseif ($target === 'propietario') {
         $addJob($jobs, (string) ($ticketPayload['correo_propietario'] ?? ''), $target, $this->pdfsForTarget($generatedPdfs, 'propietario', 'arrendatario'));
       } elseif ($target === 'admin') {
-        $adminAction = $mode === 'preventiva' ? 'crear_ticket_preventiva' : 'ticket_administrativo_creado';
+        $adminAction = trim((string) ($ticketPayload['internal_notification_action'] ?? ''));
+        if ($adminAction === '') {
+          $adminAction = $mode === 'preventiva' ? 'crear_ticket_preventiva' : 'ticket_administrativo_creado';
+        }
         foreach (InternalNotificationRecipients::emailsForAction($this->repo->getDb(), $adminAction) as $adminEmail) {
           $addJob($jobs, $adminEmail, $target, $generatedPdfs);
         }

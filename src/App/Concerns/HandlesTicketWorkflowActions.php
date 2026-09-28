@@ -827,6 +827,8 @@ trait HandlesTicketWorkflowActions
     $solicitudId = isset($_POST['solicitud_id']) ? (int) $_POST['solicitud_id'] : 0;
     $term = sanitize_key((string) ($_POST['termino'] ?? ''));
     $endDate = trim(sanitize_text_field(wp_unslash((string) ($_POST['fecha_terminacion'] ?? ''))));
+    $createRetentionTicket = trim((string) ($_POST['crear_ticket_retencion'] ?? '')) === '1';
+    $retentionEmployeeId = trim(sanitize_text_field(wp_unslash((string) ($_POST['retencion_id_empleado'] ?? ''))));
     $notifyRecipients = $this->parse_notify_recipients($_POST['notify_recipients'] ?? []);
     if (isset($_POST['notify_recipients_present']) && empty($notifyRecipients)) {
       $notifyRecipients = ['none'];
@@ -960,6 +962,12 @@ trait HandlesTicketWorkflowActions
       $endDate = $finContratoTs > 0 ? date('Y-m-d', $finContratoTs) : '';
     }
     $responseText = $this->contractNonRenewalResponseText($ticket, $term, $requestDate, $endDate, $creatorSignature);
+    $retentionTicket = [];
+    if ($createRetentionTicket) {
+      if ($retentionEmployeeId === '') {
+        $this->jsonFail('Selecciona el funcionario responsable del ticket de retención.');
+      }
+    }
 
     try {
       $acta = $this->generateContractNonRenewalActa($ticket, $term, $responseText, $creatorName, $creatorDetails);
@@ -977,6 +985,12 @@ trait HandlesTicketWorkflowActions
         'archivo' => $actaUrl,
       ];
     }
+    if ($createRetentionTicket) {
+      $retentionTicket = $this->createContractRetentionTicketFromNonRenewal($ticket, $term, $retentionEmployeeId, $responseText, $actaUrl, (string) ($acta['title'] ?? 'Acta de respuesta no prórroga de contrato'));
+      if (($retentionTicket['ok'] ?? '0') !== '1') {
+        $this->jsonFail((string) ($retentionTicket['message'] ?? 'No se pudo crear el ticket comercial de retención.'));
+      }
+    }
 
     $service = $this->get_seguimiento_service();
     $result = $service->saveTicketResponse($ticketPk, $responseText, 'Finalizado', true, ['none'], [], $documentos);
@@ -991,7 +1005,15 @@ trait HandlesTicketWorkflowActions
     $result['acta_title'] = (string) ($acta['title'] ?? '');
     $result['non_renewal_email_queued'] = (string) ($extraQueued['email'] ?? 0);
     $result['non_renewal_whatsapp_queued'] = (string) ($extraQueued['whatsapp'] ?? 0);
+    if ($retentionTicket !== []) {
+      $result['retention_ticket_id'] = (string) ($retentionTicket['ticket_id'] ?? '');
+      $result['retention_ticket_url'] = (string) ($retentionTicket['ticket_url'] ?? '');
+      $result['retention_whatsapp_queued'] = (string) ($retentionTicket['whatsapp_queued'] ?? 0);
+    }
     $result['message'] = 'Solicitud de no prórroga respondida, acta generada y ticket cerrado.';
+    if ($retentionTicket !== []) {
+      $result['message'] .= ' Ticket comercial de retención #' . (string) ($retentionTicket['ticket_id'] ?? '') . ' creado.';
+    }
 
     $this->jsonOk($result);
   }
@@ -3612,8 +3634,270 @@ trait HandlesTicketWorkflowActions
       'term_hint' => $termInfo['term_hint'],
       'term_recommended' => $termInfo['term_recommended'],
       'recipients' => $this->contractTerminationRecipientOptions($row, 'no_prorroga_contrato'),
+      'retention_ticket' => $this->contractRetentionTicketUiData($row),
       'case' => $case,
     ];
+  }
+
+  /** @param array<string,mixed> $ticket @return array<string,mixed> */
+  private function contractRetentionTicketUiData(array $ticket): array
+  {
+    $schema = new \SCM\Support\SchemaInspector($this->db);
+    $funcionarios = FuncionarioOptions::activeFuncionarios($this->db, $schema);
+    $validIds = [];
+    $options = [];
+    foreach ($funcionarios as $funcionario) {
+      $id = trim((string) ($funcionario['id'] ?? ''));
+      if ($id === '') {
+        continue;
+      }
+      $validIds[$id] = true;
+      $options[] = [
+        'id' => $id,
+        'label' => trim((string) ($funcionario['label'] ?? $funcionario['name'] ?? $id)),
+        'name' => trim((string) ($funcionario['name'] ?? $funcionario['label'] ?? $id)),
+        'email' => trim((string) ($funcionario['email'] ?? '')),
+        'phone' => trim((string) ($funcionario['phone'] ?? '')),
+        'cargo' => trim((string) ($funcionario['cargo'] ?? '')),
+      ];
+    }
+
+    return [
+      'enabled' => $options !== [],
+      'default_employee_id' => $this->contractRetentionDefaultEmployeeId($ticket, array_keys($validIds)),
+      'funcionarios' => $options,
+    ];
+  }
+
+  /** @param array<string,mixed> $ticket @param string[] $validEmployeeIds */
+  private function contractRetentionDefaultEmployeeId(array $ticket, array $validEmployeeIds): string
+  {
+    $valid = array_fill_keys(array_map('strval', $validEmployeeIds), true);
+    $contract = $this->contractTerminationContractByContext($ticket);
+    $property = $this->contractRetentionPropertyByContext($ticket, $contract);
+    $columns = [
+      'id_empleado', 'id_funcionario', 'id_asesor', 'asesor_id', 'id_comercial', 'comercial_id',
+      'id_captador', 'captador_id', 'funcionario_creador', 'id_funcionario_creador', 'cct_author_id',
+    ];
+
+    foreach ([$contract, $property, $ticket] as $row) {
+      foreach ($columns as $column) {
+        $employeeId = $this->contractRetentionNormalizeEmployeeId((string) ($row[$column] ?? ''), $valid);
+        if ($employeeId !== '') {
+          return $employeeId;
+        }
+      }
+    }
+
+    return '';
+  }
+
+  /** @param array<string,bool> $valid */
+  private function contractRetentionNormalizeEmployeeId(string $value, array $valid): string
+  {
+    $value = trim($value);
+    if ($value === '') {
+      return '';
+    }
+    if (isset($valid[$value])) {
+      return $value;
+    }
+    if (ctype_digit($value)) {
+      $func = $this->calendarCitaFuncionarioRow($value, 'internal');
+      $employeeId = trim((string) ($func['id_empleado'] ?? ''));
+      if ($employeeId !== '' && isset($valid[$employeeId])) {
+        return $employeeId;
+      }
+    }
+    return '';
+  }
+
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $contract @return array<string,mixed> */
+  private function contractRetentionPropertyByContext(array $ticket, array $contract = []): array
+  {
+    $table = $this->db->table('jet_cct_inmuebles');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+    $refs = array_values(array_unique(array_filter(array_map('trim', array_map('strval', [
+      $ticket['id_inmueble_data'] ?? '',
+      $ticket['id_inmueble'] ?? '',
+      $ticket['inmueble'] ?? '',
+      $contract['id_inmueble_data'] ?? '',
+      $contract['id_inmueble'] ?? '',
+      $contract['inmueble'] ?? '',
+      $contract['codigo_inmueble_web'] ?? '',
+    ])))));
+    if ($refs === []) {
+      return [];
+    }
+    $columns = array_values(array_filter(
+      ['_ID', 'id_inmueble', 'codigo', 'codigo_inmueble', 'codigo_inmueble_web', 'inmueble'],
+      fn(string $column): bool => $this->column_exists($table, $column)
+    ));
+    if ($columns === []) {
+      return [];
+    }
+    $where = [];
+    $args = [];
+    foreach ($columns as $column) {
+      foreach ($refs as $ref) {
+        $where[] = "TRIM(COALESCE(`{$column}`, '')) = ?";
+        $args[] = $ref;
+      }
+    }
+    return $this->db->getRow("SELECT * FROM `{$table}` WHERE " . implode(' OR ', $where) . ' ORDER BY `_ID` DESC LIMIT 1', $args) ?: [];
+  }
+
+  /** @param array<string,mixed> $ticket @return array<string,mixed> */
+  private function createContractRetentionTicketFromNonRenewal(array $ticket, string $term, string $employeeId, string $responseText, string $actaUrl = '', string $actaTitle = ''): array
+  {
+    $employeeId = trim($employeeId);
+    if ($employeeId === '') {
+      return ['ok' => '0', 'message' => 'Selecciona el funcionario responsable del ticket de retención.'];
+    }
+    $activeIds = [];
+    foreach (FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db)) as $funcionario) {
+      $id = trim((string) ($funcionario['id'] ?? ''));
+      if ($id !== '') {
+        $activeIds[$id] = true;
+      }
+    }
+    if (!isset($activeIds[$employeeId])) {
+      return ['ok' => '0', 'message' => 'El funcionario responsable no existe o no está activo.'];
+    }
+
+    $contract = $this->contractTerminationContractByContext($ticket);
+    $contractPk = $this->contractTerminationFirstText([$contract, $ticket], ['_ID', 'id_contrato', 'contrato']);
+    if ($contractPk === '') {
+      return ['ok' => '0', 'message' => 'No se encontró el contrato para crear el ticket de retención.'];
+    }
+    $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: '-';
+    $contractCode = $this->contractTerminationFirstText([$contract, $ticket], ['contrato', 'id_contrato', '_ID']);
+    $property = $this->contractTerminationFirstText([$contract, $ticket], ['inmueble', 'id_inmueble', 'codigo_inmueble_web']);
+    $address = $this->contractTerminationFirstText([$contract, $ticket], ['direccion']);
+    $status = $term === 'dentro' ? 'dentro de término' : 'fuera de término';
+    $description = "Se crea ticket comercial de retención de contrato a partir de la no prórroga respondida en el ticket #{$logicalTicket}.\n\n";
+    $description .= "Objetivo: gestionar retención del contrato o iniciar búsqueda comercial para el inmueble asociado.\n";
+    $description .= "Clasificación de la no prórroga: {$status}.\n";
+    if ($contractCode !== '') {
+      $description .= "Contrato: {$contractCode}.\n";
+    }
+    if ($property !== '') {
+      $description .= "Inmueble: {$property}.\n";
+    }
+    if ($address !== '') {
+      $description .= "Dirección: {$address}.\n";
+    }
+    $description .= "\nRespuesta emitida:\n" . trim(strip_tags($responseText));
+
+    $input = [
+      'ticket_mode' => 'administrativo',
+      'contract_pk' => $contractPk,
+      'id_contrato' => $contractPk,
+      'id_empleado' => $employeeId,
+      'solicitante_tipo' => $this->contractRetentionRequesterType($ticket),
+      'prioridad' => 'Prioridad urgente',
+      'departamento' => 'Servicio al cliente',
+      'tema_ayuda' => 'Retencion de contrato',
+      'asunto' => 'Retención de contrato #' . ($contractCode !== '' ? $contractCode : $contractPk),
+      'descripcion' => $description,
+      'internal_notification_action' => 'retencion_contrato_ticket',
+    ];
+    $documentos = [];
+    if ($actaUrl !== '') {
+      $documentos[] = [
+        'nombre_archivo' => $actaTitle !== '' ? $actaTitle : 'Acta de respuesta no prórroga de contrato',
+        'media_archivo' => $actaUrl,
+        'archivo' => $actaUrl,
+      ];
+    }
+
+    $result = $this->get_pending_controller()->createAdministrativeTicket($input, [], $documentos, ['empleado', 'solicitante', 'admin']);
+    if (($result['ok'] ?? '0') !== '1') {
+      return $result;
+    }
+    $ticketId = (int) ($result['ticket_id'] ?? 0);
+    $employee = $this->calendarCitaFuncionarioRow($employeeId, 'id_empleado');
+    $result['whatsapp_queued'] = (string) $this->queueContractRetentionTicketWhatsApp($ticket, $ticketId, $employee, $input);
+    return $result;
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function contractRetentionRequesterType(array $ticket): string
+  {
+    $solicitante = strtolower(trim($this->contractTerminationFirstText([$ticket], ['solicitante'])));
+    $arrendatario = strtolower(trim($this->contractTerminationFirstText([$ticket], ['arrendatario'])));
+    if ($solicitante !== '' && $arrendatario !== '' && $solicitante === $arrendatario) {
+      return 'arrendatario';
+    }
+    return 'propietario';
+  }
+
+  /** @param array<string,mixed> $ticket @param array<string,mixed> $employee @param array<string,string> $input */
+  private function queueContractRetentionTicketWhatsApp(array $ticket, int $ticketId, array $employee, array $input): int
+  {
+    if ($ticketId <= 0) {
+      return 0;
+    }
+    $queue = new \SCM\Support\SmsQueue($this->db);
+    $queued = 0;
+    $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: (string) ($input['id_contrato'] ?? '-');
+    $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
+    $summary = 'Contrato ' . $contract . ', inmueble ' . $property . '. Gestionar retención o búsqueda comercial.';
+    $requesterType = $this->contractRetentionRequesterType($ticket);
+    $requesterName = $this->contractTerminationFirstText([$ticket], [$requesterType, 'solicitante']) ?: 'cliente';
+    $requesterPhone = $this->contractTerminationFirstText([$ticket], ['celular_' . $requesterType]);
+
+    if ($requesterPhone !== '') {
+      $ok = $queue->enqueue($requesterPhone, $requesterName, "Se creó el ticket comercial #{$ticketId} para gestionar la retención del contrato.", [
+        'source_module' => 'retencion_contrato',
+        'campaign_tag' => 'retencion_contrato',
+        'categoria_mensaje' => 'informacion',
+        'id_ticket' => (string) $ticketId,
+        'dedupe_key' => 'retencion_contrato_solicitante:' . $ticketId,
+        'template_name' => 'scm_retencion_contrato_solicitante',
+        'template_language' => 'es_CO',
+        'template_components' => [[
+          'type' => 'body',
+          'parameters' => [
+            ['type' => 'text', 'text' => $requesterName],
+            ['type' => 'text', 'text' => (string) $ticketId],
+            ['type' => 'text', 'text' => $summary],
+          ],
+        ]],
+      ]);
+      if ($ok) {
+        $queued++;
+      }
+    }
+
+    $employeePhone = trim((string) ($employee['phone'] ?? ''));
+    if ($employeePhone !== '') {
+      $employeeName = trim((string) ($employee['name'] ?? 'Funcionario')) ?: 'Funcionario';
+      $ok = $queue->enqueue($employeePhone, $employeeName, "Se te asignó el ticket comercial #{$ticketId} de retención de contrato.", [
+        'source_module' => 'retencion_contrato',
+        'campaign_tag' => 'retencion_contrato',
+        'categoria_mensaje' => 'informacion',
+        'id_ticket' => (string) $ticketId,
+        'dedupe_key' => 'retencion_contrato_funcionario:' . $ticketId,
+        'template_name' => 'scm_retencion_contrato_funcionario',
+        'template_language' => 'es_CO',
+        'template_components' => [[
+          'type' => 'body',
+          'parameters' => [
+            ['type' => 'text', 'text' => $employeeName],
+            ['type' => 'text', 'text' => (string) $ticketId],
+            ['type' => 'text', 'text' => $summary],
+          ],
+        ]],
+      ]);
+      if ($ok) {
+        $queued++;
+      }
+    }
+
+    return $queued;
   }
 
   /** @param array<string,mixed> $row @return array<string,mixed> */
