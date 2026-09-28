@@ -3297,7 +3297,7 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid rgba(157, 172, 199, 0.5);
-  border-radius: 14px;
+  border-radius: 10px;
   background: #fff;
   color: #061d49;
   box-shadow: 0 28px 70px rgba(6, 29, 73, 0.34);
@@ -3309,10 +3309,10 @@
   align-items: center;
   gap: 10px;
   margin: 0;
-  padding: 24px 64px 10px 32px;
-  background: #061d49;
+  padding: 22px 58px 8px 32px;
+  background: #061d49 !important;
   color: #fff;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 900;
   text-align: left;
 }
@@ -3322,8 +3322,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border: 1px solid rgba(248, 207, 74, 0.38);
   border-radius: 10px;
   background: rgba(248, 207, 74, 0.14);
@@ -3338,7 +3338,7 @@
   display: inline-flex;
   align-items: center;
   margin-left: 2px;
-  padding: 4px 9px;
+  padding: 3px 9px;
   border: 1px solid rgba(248, 207, 74, 0.42);
   border-radius: 999px;
   background: rgba(248, 207, 74, 0.16);
@@ -3366,7 +3366,7 @@
 
 .swal2-popup.scm-calendar-due-settings-swal .swal2-html-container {
   margin: 0;
-  padding: 22px 32px 18px;
+  padding: 18px 28px 18px;
   background: #fff;
   text-align: left;
 }
@@ -3464,9 +3464,29 @@
   justify-content: flex-end;
   gap: 10px;
   margin: 0;
-  padding: 16px 32px 22px;
+  padding: 16px 28px 22px;
   border-top: 1px solid #e5edf7;
   background: #fff;
+}
+
+.swal2-popup.scm-calendar-due-settings-swal .swal2-confirm.scm-btn-primary {
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: #f8cf4a !important;
+  color: #061d49 !important;
+  box-shadow: none !important;
+}
+
+.swal2-popup.scm-calendar-due-settings-swal .swal2-confirm.scm-btn-primary:hover {
+  background: #ffbe3e !important;
+}
+
+.swal2-popup.scm-calendar-due-settings-swal .swal2-cancel.scm-btn-secondary {
+  border: 1px solid #e5edf7 !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  color: #061d49 !important;
+  box-shadow: none !important;
 }
 
 @media (max-width: 820px) {
