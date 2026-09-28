@@ -14442,7 +14442,6 @@
         function showMetricsPane(name) {
           name =
             name === "cotizaciones_mantenimiento" ||
-            name === "ejecucion" ||
             name === "gestion_contractual"
               ? name
               : "operativas";
@@ -14469,11 +14468,7 @@
               btn.classList.add("active");
               var paneName = btn.getAttribute("data-scm-metric-panel") || "cotizaciones_mantenimiento";
               showMetricsPane(paneName);
-              if (paneName === "ejecucion") {
-                loadDashboardFilterOptions().then(function () {
-                  loadMetricsExecution(false);
-                });
-              } else if (paneName === "cotizaciones_mantenimiento") {
+              if (paneName === "cotizaciones_mantenimiento") {
                 loadMaintenanceQuoteMetrics(false);
               } else if (paneName === "operativas") {
                 loadDashboardFilterOptions().then(function () {

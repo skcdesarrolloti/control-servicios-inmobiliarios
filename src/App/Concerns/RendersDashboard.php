@@ -1397,7 +1397,6 @@ trait RendersDashboard
           <button class="scm-tab active px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap bg-[#0f1e36] text-white shadow-xs" type="button" data-scm-metric-panel="operativas">Casos</button>
           <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-panel="cotizaciones_mantenimiento">Cotizaciones de mantenimiento</button>
           <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-panel="gestion_contractual">Gestión contractual</button>
-          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900 ml-auto" type="button" data-scm-metric-panel="ejecucion">Ejecución por Funcionario</button>
         </div>
 
         <!-- Tarjetas Ejecutivas de KPIs de Alta Jerarquía -->
@@ -1618,41 +1617,6 @@ trait RendersDashboard
             <div class="scm-execution-status" data-scm-maintenance-quote-status aria-live="polite">Resumen del mes actual.</div>
             <div class="scm-execution-kpis" data-scm-maintenance-quote-kpis></div>
             <div class="scm-maintenance-quote-list" data-scm-maintenance-quote-list></div>
-          </section>
-        </div>
-        <div class="scm-metrics-pane" data-scm-metrics-pane="ejecucion">
-          <section class="scm-execution-panel" data-scm-execution-panel>
-            <div class="scm-execution-head">
-              <div>
-                <span class="scm-eyebrow">Resumen para gerencia</span>
-                <h3>Ejecuci&oacute;n por funcionario</h3>
-                <p>Consulta respuestas, actualizaciones, seguimientos y citas realizadas en cada caso durante el rango seleccionado.</p>
-              </div>
-            </div>
-            <form class="scm-execution-filters" data-scm-execution-form autocomplete="off">
-              <div class="scm-field">
-                <label for="scm_exec_desde">Fecha desde</label>
-                <input id="scm_exec_desde" name="fecha_desde" class="input input-bordered input-sm" type="date" value="<?php echo esc_attr(date('Y-m-01')); ?>">
-              </div>
-              <div class="scm-field">
-                <label for="scm_exec_hasta">Fecha hasta</label>
-                <input id="scm_exec_hasta" name="fecha_hasta" class="input input-bordered input-sm" type="date" value="<?php echo esc_attr(date('Y-m-d')); ?>">
-              </div>
-              <div class="scm-field scm-execution-funcionario-field">
-                <label for="scm_exec_funcionario">Funcionario</label>
-                <select id="scm_exec_funcionario" name="funcionario" class="select select-bordered select-sm scm-select scm-select2" data-placeholder="Todos los funcionarios">
-                  <option value="">Todos</option>
-                  <?php foreach (($filterOptions['funcionarios'] ?? []) as $func): $fId = trim((string)($func['id'] ?? '')); if ($fId === '') continue; ?>
-                    <option value="<?php echo esc_attr($fId); ?>"><?php echo esc_html((string)($func['label'] ?? $fId)); ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-              <button type="submit" class="scm-btn-primary btn btn-primary">Ver resumen</button>
-            </form>
-            <div class="scm-execution-status" data-scm-execution-status aria-live="polite">Selecciona un rango y consulta la ejecuci&oacute;n.</div>
-            <div class="scm-execution-kpis" data-scm-execution-kpis></div>
-            <div class="scm-execution-summary" data-scm-execution-summary></div>
-            <div class="scm-execution-details" data-scm-execution-details></div>
           </section>
         </div>
         <div class="scm-metrics-pane" data-scm-metrics-pane="gestion_contractual">
