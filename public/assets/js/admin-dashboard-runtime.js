@@ -12358,7 +12358,7 @@
       var list = panel.querySelector("[data-scm-maintenance-quote-list]");
       var month = data.month || (panel.querySelector("input[name='cotizaciones_mes']") || {}).value || "";
       if (status) {
-        status.textContent = warning || ("Aprobadas en " + maintenanceQuoteMonthLabel(month) + ".");
+        status.textContent = warning || ("Cotizaciones de " + maintenanceQuoteMonthLabel(month) + " con estado aprobado.");
         status.classList.toggle("is-warning", Boolean(warning));
       }
       if (kpis) {
@@ -12395,7 +12395,7 @@
               '<div class="scm-maintenance-quote-row-id"><span>Cotizaci&oacute;n</span><strong>#' + escHtml(row.id || "-") + "</strong></div>" +
               '<div class="scm-maintenance-quote-row-main"><strong>' + escHtml(row.direccion || "Cotización de mantenimiento") + "</strong>" +
                 (meta ? '<small>' + escHtml(meta) + "</small>" : "") +
-                '<small>Aprobada: ' + escHtml(row.fecha_aprobacion || "-") + (row.acta_id ? " · Acta #" + escHtml(row.acta_id) : "") + "</small></div>" +
+                '<small>Cotización: ' + escHtml(row.fecha_cotizacion || row.fecha_aprobacion || "-") + (row.acta_id ? " · Acta #" + escHtml(row.acta_id) : "") + "</small></div>" +
               '<div class="scm-maintenance-quote-row-money"><span>Administraci&oacute;n</span><strong>' + escHtml(formatDashboardCurrency(row.administracion || 0)) + "</strong>" +
                 (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-maintenance-quote-case-btn" data-scm-maintenance-quote-open-case>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-maintenance-quote-case-btn" disabled>Sin caso</button>') +
               "</div>" +
@@ -12678,6 +12678,7 @@
       var panel = contractualPanel();
       if (!panel) return Promise.resolve();
       var filters = contractualReadFilters(panel);
+      panel.setAttribute("data-active-contractual-tab", contractualReportState.tab);
       var utilityTabs = panel.querySelector("[data-scm-contractual-utility-tabs]");
       if (utilityTabs) utilityTabs.hidden = contractualReportState.tab !== "servicios";
       panel.classList.add("is-loading");
@@ -12734,6 +12735,7 @@
           var btn = event.target && event.target.closest("[data-contractual-report-tab]");
           if (!btn) return;
           contractualReportState.tab = btn.getAttribute("data-contractual-report-tab") || "ocupaciones";
+          panel.setAttribute("data-active-contractual-tab", contractualReportState.tab);
           tabs.querySelectorAll("[data-contractual-report-tab]").forEach(function (item) {
             item.classList.toggle("active", item === btn);
           });

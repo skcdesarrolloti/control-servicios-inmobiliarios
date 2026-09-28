@@ -1333,6 +1333,10 @@
   gap: 8px;
 }
 
+#scm-app .scm-contractual-utility-tabs[hidden] {
+  display: none !important;
+}
+
 #scm-app .scm-contractual-native-tabs button,
 #scm-app .scm-contractual-utility-tabs button {
   display: inline-flex;

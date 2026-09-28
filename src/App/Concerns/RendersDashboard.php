@@ -2412,13 +2412,7 @@ trait RendersDashboard
       return $this->empty_maintenance_quote_month_metrics($month);
     }
 
-    $approvalDateColumns = array_values(array_filter(
-      ['fecha_respuesta_cotizacion_mantenimiento', 'fecha_respuesta', 'fecha_aprobacion'],
-      $hasColumn
-    ));
-    $dateColumns = $approvalDateColumns !== []
-      ? $approvalDateColumns
-      : array_values(array_filter(['fecha', 'cct_modified', 'cct_created'], $hasColumn));
+    $dateColumns = array_values(array_filter(['fecha', 'cct_created'], $hasColumn));
     if ($dateColumns === []) {
       return $this->empty_maintenance_quote_month_metrics($month);
     }
@@ -2495,6 +2489,7 @@ trait RendersDashboard
         'inmueble' => trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '')),
         'destinatario' => trim((string) ($row['destinatario'] ?? '')),
         'estado' => $this->maintenance_quote_first_value($row, $statusColumns),
+        'fecha_cotizacion' => $this->maintenance_quote_date_label($row, $dateColumns),
         'fecha_aprobacion' => $this->maintenance_quote_date_label($row, $dateColumns),
         'administracion' => $admin,
         'acta_id' => $actaId,
