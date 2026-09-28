@@ -12567,6 +12567,72 @@
       });
     }
 
+    function metricTopicLabel(key) {
+      var labels = {
+        mantenimiento: "mantenimiento",
+        entrega: "entrega",
+        preventiva: "preventiva",
+        recibo: "recibo",
+        contable: "contable",
+        certificaciones: "certificaciones",
+        contractual: "contractual",
+      };
+      return labels[key] || labels.mantenimiento;
+    }
+
+    function selectedMetricFuncionarioLabel(value) {
+      value = String(value || "").trim();
+      if (!value) return "";
+      var select = root.querySelector("[data-scm-metric-funcionario-filter]");
+      if (!select) return value;
+      var option = Array.prototype.slice
+        .call(select.options || [])
+        .find(function (row) {
+          return String(row.value || "").trim() === value;
+        });
+      return cleanFuncionarioOptionLabel(option ? option.textContent : value);
+    }
+
+    function metricFuncionarioMatches(name, selectedValue) {
+      var selectedLabel = selectedMetricFuncionarioLabel(selectedValue);
+      var needle = normalizeText(cleanFuncionarioOptionLabel(selectedLabel || selectedValue));
+      if (!needle) return true;
+      var haystack = normalizeText(cleanFuncionarioOptionLabel(name));
+      return haystack === needle || haystack.indexOf(needle) !== -1 || needle.indexOf(haystack) !== -1;
+    }
+
+    function filterMetricFuncionarioMap(map, selectedValue) {
+      if (!selectedValue || !map || typeof map !== "object") {
+        return map || {};
+      }
+      return Object.keys(map).reduce(function (filtered, name) {
+        if (metricFuncionarioMatches(name, selectedValue)) {
+          filtered[name] = map[name];
+        }
+        return filtered;
+      }, {});
+    }
+
+    function applyMetricFuncionarioFilter(metrics, selectedValue) {
+      if (!selectedValue) {
+        return metrics;
+      }
+      return Object.assign({}, metrics, {
+        seg_por_funcionario: filterMetricFuncionarioMap(
+          metrics.seg_por_funcionario,
+          selectedValue,
+        ),
+        abiertos_por_funcionario: filterMetricFuncionarioMap(
+          metrics.abiertos_por_funcionario,
+          selectedValue,
+        ),
+        actualizados_por_funcionario: filterMetricFuncionarioMap(
+          metrics.actualizados_por_funcionario,
+          selectedValue,
+        ),
+      });
+    }
+
     function readInitialMetrics() {
       var panel = root.querySelector("#scm-panel-metricas");
       if (!panel) {
@@ -12585,6 +12651,47 @@
     }
 
     var activeMetricCategory = "mantenimiento";
+    var activeMetricFuncionario = "";
+
+    function applyCaseMetricFilters() {
+      if (!initialMetrics) {
+        return null;
+      }
+      var topicSelect = root.querySelector("[data-scm-metric-topic-filter]");
+      var funcionarioSelect = root.querySelector("[data-scm-metric-funcionario-filter]");
+      activeMetricCategory = String(
+        (topicSelect && topicSelect.value) || activeMetricCategory || "mantenimiento",
+      ).trim() || "mantenimiento";
+      activeMetricFuncionario = String(
+        (funcionarioSelect && funcionarioSelect.value) || "",
+      ).trim();
+
+      var categoryMetrics = getCategoryMetricSet(
+        initialMetrics,
+        activeMetricCategory,
+      );
+      var chartMetrics = applyMetricFuncionarioFilter(
+        categoryMetrics,
+        activeMetricFuncionario,
+      );
+      renderMetricsCharts(chartMetrics, activeMetricCategory);
+      applyRevisionKpiVisibility(
+        "scm-",
+        categoryMetrics.con_revision,
+        categoryMetrics.sin_revision,
+      );
+
+      var status = root.querySelector("[data-scm-metric-case-filter-status]");
+      if (status) {
+        var funcionarioLabel = selectedMetricFuncionarioLabel(activeMetricFuncionario);
+        status.textContent =
+          "Mostrando casos de " +
+          metricTopicLabel(activeMetricCategory) +
+          (funcionarioLabel ? " para " + funcionarioLabel + "." : ".");
+      }
+      return categoryMetrics;
+    }
+
     function updateMetricsFromAjax(data) {
       if (!initialMetrics) {
         return;
@@ -12616,10 +12723,7 @@
       };
       initialMetrics.por_categoria =
         data.kpi_por_categoria || initialMetrics.por_categoria || {};
-      renderMetricsCharts(
-        getCategoryMetricSet(initialMetrics, activeMetricCategory),
-        activeMetricCategory,
-      );
+      applyCaseMetricFilters();
     }
 
     function parseExecutionDate(value) {
@@ -13076,7 +13180,7 @@
       }
       runtime.funcionarios = funcionarioOptions;
       var mappings = [
-        ["select[name$='id_empleado'], select[name$='_empleado'], select[name='empleado'], [data-scm-execution-form] select[name='funcionario']", funcionarioOptions, "id", "label"],
+        ["select[name$='id_empleado'], select[name$='_empleado'], select[name='empleado'], [data-scm-execution-form] select[name='funcionario'], [data-scm-metric-case-filters] select[name='funcionario']", funcionarioOptions, "id", "label"],
         ["select[name$='barrio']", options.barrios || [], "value", "label"],
         ["select[name$='estado_admin']", options.estado_admin || [], "value", "label"],
         ["select[name$='prioridad']", options.prioridad || [], "value", "label"],
@@ -14290,17 +14394,15 @@
           if (loadingState) {
             loadingState.hidden = true;
           }
-          var activeCategoryMetrics = getCategoryMetricSet(
-            initialMetrics,
-            activeMetricCategory,
-          );
-          renderMetricsCharts(activeCategoryMetrics, activeMetricCategory);
+          var activeCategoryMetrics = applyCaseMetricFilters();
           renderMaintenanceQuoteMetrics(initialMetrics.cotizaciones_mantenimiento || {});
-          applyRevisionKpiVisibility(
-            "scm-",
-            activeCategoryMetrics.con_revision,
-            activeCategoryMetrics.sin_revision,
-          );
+          if (activeCategoryMetrics) {
+            applyRevisionKpiVisibility(
+              "scm-",
+              activeCategoryMetrics.con_revision,
+              activeCategoryMetrics.sin_revision,
+            );
+          }
         })
         .catch(function (error) {
           dashboardMetricsPromise = null;
@@ -14326,21 +14428,24 @@
     }
 
     if (initialMetrics) {
-      var initialCategoryMetrics = getCategoryMetricSet(
-        initialMetrics,
-        activeMetricCategory,
-      );
-      renderMetricsCharts(initialCategoryMetrics, activeMetricCategory);
+      var initialCategoryMetrics = applyCaseMetricFilters();
       renderMaintenanceQuoteMetrics(initialMetrics.cotizaciones_mantenimiento || {});
-      applyRevisionKpiVisibility(
-        "scm-",
-        initialCategoryMetrics.con_revision,
-        initialCategoryMetrics.sin_revision,
-      );
+      if (initialCategoryMetrics) {
+        applyRevisionKpiVisibility(
+          "scm-",
+          initialCategoryMetrics.con_revision,
+          initialCategoryMetrics.sin_revision,
+        );
+      }
       var metricTabsWrap = root.querySelector("#scm-metric-tabs");
       if (metricTabsWrap) {
         function showMetricsPane(name) {
-          name = name === "cotizaciones_mantenimiento" || name === "ejecucion" ? name : "operativas";
+          name =
+            name === "cotizaciones_mantenimiento" ||
+            name === "ejecucion" ||
+            name === "gestion_contractual"
+              ? name
+              : "operativas";
           var mainKpis = root.querySelector("[data-scm-metrics-main-kpis]");
           if (mainKpis) {
             mainKpis.hidden = name === "cotizaciones_mantenimiento";
@@ -14353,36 +14458,11 @@
           });
         }
         metricTabsWrap
-          .querySelectorAll("[data-scm-metric-cat]")
-          .forEach(function (btn) {
-            btn.addEventListener("click", function () {
-              showMetricsPane("operativas");
-              activeMetricCategory =
-                btn.getAttribute("data-scm-metric-cat") || "mantenimiento";
-              metricTabsWrap
-                .querySelectorAll("[data-scm-metric-cat], [data-scm-metric-panel]")
-                .forEach(function (b) {
-                  b.classList.remove("active");
-                });
-              btn.classList.add("active");
-              var activeCategoryMetrics = getCategoryMetricSet(
-                initialMetrics,
-                activeMetricCategory,
-              );
-              renderMetricsCharts(activeCategoryMetrics, activeMetricCategory);
-              applyRevisionKpiVisibility(
-                "scm-",
-                activeCategoryMetrics.con_revision,
-                activeCategoryMetrics.sin_revision,
-              );
-            });
-          });
-        metricTabsWrap
           .querySelectorAll("[data-scm-metric-panel]")
           .forEach(function (btn) {
             btn.addEventListener("click", function () {
               metricTabsWrap
-                .querySelectorAll("[data-scm-metric-cat], [data-scm-metric-panel]")
+                .querySelectorAll("[data-scm-metric-panel]")
                 .forEach(function (b) {
                   b.classList.remove("active");
                 });
@@ -14395,11 +14475,39 @@
                 });
               } else if (paneName === "cotizaciones_mantenimiento") {
                 loadMaintenanceQuoteMetrics(false);
+              } else if (paneName === "operativas") {
+                loadDashboardFilterOptions().then(function () {
+                  applyCaseMetricFilters();
+                });
               } else {
                 renderMaintenanceQuoteMetrics(initialMetrics.cotizaciones_mantenimiento || {});
               }
             });
           });
+        var metricCaseFilters = root.querySelector("[data-scm-metric-case-filters]");
+        if (metricCaseFilters) {
+          metricCaseFilters.addEventListener("change", function (event) {
+            if (
+              event.target &&
+              event.target.matches(
+                "[data-scm-metric-topic-filter], [data-scm-metric-funcionario-filter]",
+              )
+            ) {
+              applyCaseMetricFilters();
+            }
+          });
+          if (window.jQuery) {
+            window
+              .jQuery(metricCaseFilters)
+              .find("[data-scm-metric-topic-filter], [data-scm-metric-funcionario-filter]")
+              .on("change", function () {
+                applyCaseMetricFilters();
+              });
+          }
+          loadDashboardFilterOptions().then(function () {
+            applyCaseMetricFilters();
+          });
+        }
       }
     }
 

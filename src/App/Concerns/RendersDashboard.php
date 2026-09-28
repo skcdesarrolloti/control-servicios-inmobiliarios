@@ -386,6 +386,11 @@ trait RendersDashboard
 
     $nonce = \SCM\Core\App::csrf()->token(self::NONCE_KEY);
     $apiUrl = defined('SCM_BASE_URL') ? (SCM_BASE_URL . '/api.php') : '/api.php';
+    $reportesGerencialesBaseUrl = trim((string) (getenv('REPORTES_GERENCIALES_URL') ?: ''));
+    if ($reportesGerencialesBaseUrl === '') {
+      $reportesGerencialesBaseUrl = 'https://sucasainmobiliaria.com.co/reportesgerenciales';
+    }
+    $contractualReportsUrl = rtrim($reportesGerencialesBaseUrl, '/') . '/informe-gerencial?tab=contractual';
     $runtimeData = [
       'ajaxUrl'      => $apiUrl,
       'baseUrl'      => rtrim((string) (defined('SCM_BASE_URL') ? SCM_BASE_URL : ''), '/'),
@@ -1387,16 +1392,11 @@ trait RendersDashboard
 
         <div class="scm-metrics-loading-state text-xs text-slate-400 font-medium py-1" data-scm-metrics-loading role="status" aria-live="polite">Cargando indicadores&hellip;</div>
 
-        <!-- Píldoras de Categorías Operativas -->
+        <!-- Píldoras de vistas operativas -->
         <div class="scm-tabs scm-metric-tabs flex items-center gap-1.5 overflow-x-auto pb-1 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-2xs no-scrollbar" id="scm-metric-tabs">
-          <button class="scm-tab active px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap bg-[#0f1e36] text-white shadow-xs" type="button" data-scm-metric-cat="mantenimiento">Mantenimiento</button>
-          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="entrega">Entrega</button>
-          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="preventiva">Preventiva</button>
-          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="recibo">Recibo</button>
-          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="contable">Contable</button>
-          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="certificaciones">Certificaciones</button>
-          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="contractual">Contractual</button>
+          <button class="scm-tab active px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap bg-[#0f1e36] text-white shadow-xs" type="button" data-scm-metric-panel="operativas">Casos</button>
           <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-panel="cotizaciones_mantenimiento">Cotizaciones de mantenimiento</button>
+          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-panel="gestion_contractual">Gestión contractual</button>
           <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900 ml-auto" type="button" data-scm-metric-panel="ejecucion">Ejecución por Funcionario</button>
         </div>
 
@@ -1495,6 +1495,30 @@ trait RendersDashboard
 
         <!-- Panel de Gráficos e Indicadores -->
         <div class="scm-metrics-pane active" data-scm-metrics-pane="operativas">
+          <form class="scm-execution-filters scm-metric-case-filters" data-scm-metric-case-filters autocomplete="off">
+            <div class="scm-field">
+              <label for="scm_metric_tema">Tema</label>
+              <select id="scm_metric_tema" name="metric_tema" class="select select-bordered select-sm scm-select" data-scm-metric-topic-filter>
+                <option value="mantenimiento">Mantenimiento</option>
+                <option value="entrega">Entrega</option>
+                <option value="preventiva">Preventiva</option>
+                <option value="recibo">Recibo</option>
+                <option value="contable">Contable</option>
+                <option value="certificaciones">Certificaciones</option>
+                <option value="contractual">Contractual</option>
+              </select>
+            </div>
+            <div class="scm-field scm-metric-case-funcionario-field">
+              <label for="scm_metric_funcionario">Funcionario</label>
+              <select id="scm_metric_funcionario" name="funcionario" class="select select-bordered select-sm scm-select scm-select2" data-placeholder="Todos los funcionarios" data-scm-metric-funcionario-filter>
+                <option value="">Todos</option>
+                <?php foreach (($filterOptions['funcionarios'] ?? []) as $func): $fId = trim((string)($func['id'] ?? '')); if ($fId === '') continue; ?>
+                  <option value="<?php echo esc_attr($fId); ?>"><?php echo esc_html((string)($func['label'] ?? $fId)); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="scm-metric-case-filter-note" data-scm-metric-case-filter-status aria-live="polite">Mostrando casos de mantenimiento.</div>
+          </form>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
               <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -1629,6 +1653,27 @@ trait RendersDashboard
             <div class="scm-execution-kpis" data-scm-execution-kpis></div>
             <div class="scm-execution-summary" data-scm-execution-summary></div>
             <div class="scm-execution-details" data-scm-execution-details></div>
+          </section>
+        </div>
+        <div class="scm-metrics-pane" data-scm-metrics-pane="gestion_contractual">
+          <section class="scm-execution-panel scm-contractual-report-panel">
+            <div class="scm-execution-head">
+              <div>
+                <span class="scm-eyebrow">Reportes gerenciales</span>
+                <h3>Gestión contractual</h3>
+                <p>Consulta desde este tablero los reportes contractuales: ocupaciones, desocupaciones, revisiones preventivas, correctivas y servicios públicos.</p>
+              </div>
+              <a class="scm-contractual-report-open" href="<?php echo esc_url($contractualReportsUrl); ?>" target="_blank" rel="noopener">Abrir completo</a>
+            </div>
+            <div class="scm-contractual-report-links" aria-label="Reportes incluidos">
+              <span>Ocupaciones</span>
+              <span>Desocupaciones</span>
+              <span>Ocupación vs desocupación</span>
+              <span>Revisión preventiva</span>
+              <span>Revisión correctiva</span>
+              <span>Servicios públicos</span>
+            </div>
+            <iframe class="scm-contractual-report-frame" src="<?php echo esc_url($contractualReportsUrl); ?>" title="Reporte de Gestión contractual" loading="lazy"></iframe>
           </section>
         </div>
       </div>
