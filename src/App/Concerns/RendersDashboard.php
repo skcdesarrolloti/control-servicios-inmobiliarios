@@ -1497,7 +1497,7 @@ trait RendersDashboard
           <form class="scm-execution-filters scm-metric-case-filters" data-scm-metric-case-filters autocomplete="off">
             <div class="scm-field">
               <label for="scm_metric_tema">Tema</label>
-              <select id="scm_metric_tema" name="metric_tema" class="select select-bordered select-sm scm-select" data-scm-metric-topic-filter>
+              <select id="scm_metric_tema" name="metric_categoria" class="select select-bordered select-sm scm-select" data-scm-metric-topic-filter>
                 <option value="mantenimiento">Mantenimiento</option>
                 <option value="entrega">Entrega</option>
                 <option value="preventiva">Preventiva</option>

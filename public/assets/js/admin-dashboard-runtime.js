@@ -13186,7 +13186,7 @@
         ["select[name$='prioridad']", options.prioridad || [], "value", "label"],
         ["select[name$='cotizacion_estado']", options.cotizacion_estado || [], "value", "label"],
         ["select[name$='revision_estado']", options.revision_estado || [], "value", "label"],
-        ["select[name$='tema']:not(#scm_my_tema)", options.tema || [], "value", "label"],
+        ["select[name$='tema']:not(#scm_my_tema):not([data-scm-metric-topic-filter])", options.tema || [], "value", "label"],
         ["#scm_my_tema", options.my_ticket_topics || options.tema || [], "value", "label"],
       ];
       mappings.forEach(function (mapping) {
