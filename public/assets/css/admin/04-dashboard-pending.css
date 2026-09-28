@@ -3293,6 +3293,199 @@
   width: 100%;
 }
 
+.swal2-popup.scm-calendar-due-settings-swal {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(157, 172, 199, 0.5);
+  border-radius: 14px;
+  background: #fff;
+  color: #061d49;
+  box-shadow: 0 28px 70px rgba(6, 29, 73, 0.34);
+}
+
+.swal2-popup.scm-calendar-due-settings-swal .swal2-title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 24px 64px 10px 32px;
+  background: #061d49;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.swal2-popup.scm-calendar-due-settings-swal .swal2-title::before {
+  content: "calendar_month";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(248, 207, 74, 0.38);
+  border-radius: 10px;
+  background: rgba(248, 207, 74, 0.14);
+  color: #f8cf4a;
+  font-family: "Material Symbols Outlined";
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.swal2-popup.scm-calendar-due-settings-swal .swal2-title::after {
+  content: "Configuración de alertas";
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+  padding: 4px 9px;
+  border: 1px solid rgba(248, 207, 74, 0.42);
+  border-radius: 999px;
+  background: rgba(248, 207, 74, 0.16);
+  color: #f8cf4a;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.swal2-popup.scm-calendar-due-settings-swal .swal2-close {
+  top: 16px;
+  right: 18px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: #e8eef8;
+  font-size: 24px;
+}
+
+.swal2-popup.scm-calendar-due-settings-swal .swal2-close:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.swal2-popup.scm-calendar-due-settings-swal .swal2-html-container {
+  margin: 0;
+  padding: 22px 32px 18px;
+  background: #fff;
+  text-align: left;
+}
+
+.swal2-popup .scm-due-settings-intro {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-left: 4px solid #1e3c76;
+  border-radius: 0 10px 10px 0;
+  background: #f6f6f6;
+  color: #63605b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.swal2-popup .scm-due-settings-intro strong {
+  color: #1e3c76;
+}
+
+.swal2-popup .scm-calendar-due-settings-form--modal {
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.swal2-popup .scm-calendar-due-settings-form--modal .scm-field {
+  position: relative;
+  min-height: 162px;
+  padding: 16px;
+  border: 1px solid #ededed;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(6, 29, 73, 0.04);
+}
+
+.swal2-popup .scm-calendar-due-settings-form--modal .scm-field span {
+  color: #1e3c76;
+  font-size: 11px;
+}
+
+.swal2-popup .scm-calendar-due-settings-form--modal .scm-field em {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f6f6f6;
+  color: #63605b;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.swal2-popup .scm-calendar-due-settings-form--modal .scm-field small {
+  min-height: 34px;
+  color: #63605b;
+  line-height: 1.35;
+}
+
+.swal2-popup .scm-calendar-due-settings-form--modal input {
+  margin-top: auto;
+  min-height: 42px;
+  border-radius: 10px;
+  background: #fbfdff;
+  color: #061d49;
+  font-size: 18px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.swal2-popup .scm-due-settings-impact {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  grid-column: span 2;
+  min-height: 120px;
+  padding: 18px;
+  border-radius: 12px;
+  background: #f6f6f6;
+  color: #63605b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.swal2-popup .scm-due-settings-impact strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #1e3c76;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.swal2-popup.scm-calendar-due-settings-swal .swal2-actions {
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0;
+  padding: 16px 32px 22px;
+  border-top: 1px solid #e5edf7;
+  background: #fff;
+}
+
+@media (max-width: 820px) {
+  .swal2-popup .scm-calendar-due-settings-form--modal {
+    grid-template-columns: 1fr;
+  }
+
+  .swal2-popup .scm-due-settings-impact {
+    grid-column: auto;
+  }
+
+  .swal2-popup.scm-calendar-due-settings-swal .swal2-title,
+  .swal2-popup.scm-calendar-due-settings-swal .swal2-html-container,
+  .swal2-popup.scm-calendar-due-settings-swal .swal2-actions {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+}
+
 #scm-app .scm-calendar-due-layout .scm-calendar-day-card {
   min-width: min(100%, 420px);
 }

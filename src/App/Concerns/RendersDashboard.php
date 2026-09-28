@@ -1750,13 +1750,16 @@ trait RendersDashboard
 
     ob_start();
 ?>
-    <div id="scm-ticket-topic-settings-modal" class="scm-pqr-settings-modal scm-ticket-topic-settings-modal" aria-hidden="true">
+    <div id="scm-ticket-topic-settings-modal" class="scm-pqr-settings-modal scm-ticket-topic-settings-modal scm-config-modal--topics" aria-hidden="true">
       <div class="scm-pqr-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-ticket-topic-settings-title">
         <button type="button" class="scm-pqr-settings-close" id="scm-close-ticket-topic-settings" aria-label="Cerrar">&times;</button>
         <div class="scm-pqr-settings-head">
+          <span class="scm-config-head-icon material-symbols-outlined" aria-hidden="true">sell</span>
           <h3 id="scm-ticket-topic-settings-title">Temas de Casos</h3>
+          <span class="scm-config-head-badge">Taxonom&iacute;a operativa</span>
           <p>Define qu&eacute; valores de <code>tema_ayuda</code> alimentan Entrega, Preventiva, Recibo, Contractual y las dem&aacute;s pesta&ntilde;as operativas.</p>
         </div>
+        <div class="scm-config-info-strip"><strong>Mapeo autom&aacute;tico:</strong> Cada l&iacute;nea ingresada alimenta la bandeja operativa correspondiente para los funcionarios.</div>
         <section class="scm-pqr-settings-section">
           <form id="scm-ticket-topic-tabs-form" class="scm-ticket-topic-tabs-form scm-pqr-config-form" method="post" autocomplete="off">
             <div class="scm-ticket-topic-config-grid"><?php echo $topicTabsHtml; ?></div>
@@ -1875,10 +1878,11 @@ trait RendersDashboard
 
     ob_start();
 ?>
-    <div id="scm-pqr-settings-modal" class="scm-pqr-settings-modal" data-scm-dashboard-pqr-settings="1" aria-hidden="true">
+    <div id="scm-pqr-settings-modal" class="scm-pqr-settings-modal scm-config-modal--guardian" data-scm-dashboard-pqr-settings="1" aria-hidden="true">
       <div class="scm-pqr-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-pqr-settings-title">
         <button type="button" class="scm-pqr-settings-close" id="scm-close-pqr-settings" aria-label="Cerrar">&times;</button>
         <div class="scm-pqr-settings-head">
+          <span class="scm-config-head-icon material-symbols-outlined" aria-hidden="true">shield</span>
           <h3 id="scm-pqr-settings-title">Configuraci&oacute;n de Guardian</h3>
           <p>Define qui&eacute;n recibe notificaciones nuevas y qui&eacute;nes quedan como corresponsables por tipo de solicitud.</p>
         </div>
@@ -1959,14 +1963,16 @@ trait RendersDashboard
 
     ob_start();
 ?>
-    <div id="scm-internal-notifications-modal" class="scm-pqr-settings-modal scm-internal-notifications-modal" aria-hidden="true">
+    <div id="scm-internal-notifications-modal" class="scm-pqr-settings-modal scm-internal-notifications-modal scm-config-modal--internal" aria-hidden="true">
       <div class="scm-pqr-settings-dialog scm-internal-notifications-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-internal-notifications-title">
         <button type="button" class="scm-pqr-settings-close" id="scm-close-internal-notifications" aria-label="Cerrar">&times;</button>
         <div class="scm-pqr-settings-head">
+          <span class="scm-config-head-badge">Configuraci&oacute;n &amp; despacho</span>
           <h3 id="scm-internal-notifications-title">Notificaciones internas administrativas</h3>
           <p>Clasifica a qu&eacute; funcionarios se les avisa por cada acci&oacute;n del panel. Gesti&oacute;n de cobro y Cobro prejur&iacute;dico ya encolan Email interno real; las dem&aacute;s acciones quedan listas para conectar al flujo correspondiente.</p>
         </div>
         <form id="scm-internal-notifications-form" class="scm-internal-notifications-form" autocomplete="off">
+          <div class="scm-config-info-strip"><strong>Acciones y destinatarios internos:</strong> Selecciona uno o varios funcionarios por acci&oacute;n. Si una acci&oacute;n queda vac&iacute;a, no se env&iacute;an avisos internos para esa actividad.</div>
           <section class="scm-pqr-settings-section">
             <h4>Acciones y destinatarios internos</h4>
             <p>Selecciona uno o varios funcionarios por acci&oacute;n. Si una acci&oacute;n queda vac&iacute;a, no se env&iacute;an avisos internos para esa actividad.</p>
@@ -2022,12 +2028,14 @@ trait RendersDashboard
     }
     ob_start();
 ?>
-    <div class="scm-permissions-modal" id="scm-permissions-modal" aria-hidden="true">
+    <div class="scm-permissions-modal scm-config-modal--permissions" id="scm-permissions-modal" aria-hidden="true">
       <div class="scm-permissions-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-permissions-title">
         <button type="button" class="scm-permissions-close" id="scm-close-permissions" aria-label="Cerrar">&times;</button>
         <div class="scm-permissions-head">
           <div>
+            <span class="scm-config-head-icon material-symbols-outlined" aria-hidden="true">admin_panel_settings</span>
             <h3 id="scm-permissions-title">Permisos por cargo</h3>
+            <span class="scm-config-head-badge">Control de accesos &amp; roles</span>
             <p>Activa o desactiva las pesta&ntilde;as que puede ver cada cargo. Si un cargo no aparece configurado, seguir&aacute; viendo todas las pesta&ntilde;as.</p>
           </div>
         </div>
