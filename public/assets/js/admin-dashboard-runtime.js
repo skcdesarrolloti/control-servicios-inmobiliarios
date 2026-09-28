@@ -13515,7 +13515,7 @@
         var id = String(func.id || "");
         if (!id) return "";
         var label = String(func.name || func.label || id);
-        return '<option value="' + escAttr(id) + '"' + (id === defaultRetentionEmployee ? " selected" : "") + '>' + escHtml(label) + "</option>";
+        return '<option value="' + escHtml(id) + '"' + (id === defaultRetentionEmployee ? " selected" : "") + '>' + escHtml(label) + "</option>";
       }).join("");
       if (!retentionOptions) {
         retentionOptions = '<option value="">No hay consultores de arriendo activos disponibles</option>';
