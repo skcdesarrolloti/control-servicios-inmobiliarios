@@ -518,9 +518,12 @@ final class GenericTicketsCardView
     }
     $timingPills .= '</div>';
 
-    $cotChip = ($idCotz !== '')
-      ? '<span class="scm-card-chip scm-chip-success">Con Cotización</span>'
-      : '<span class="scm-card-chip scm-chip-muted">Sin Cotización</span>';
+    $showCotChip = in_array($effectiveTabKey, ['mantenimiento', 'preventiva'], true);
+    $cotChip = $showCotChip
+      ? (($idCotz !== '')
+        ? '<span class="scm-card-chip scm-chip-success">Con Cotización</span>'
+        : '<span class="scm-card-chip scm-chip-muted">Sin Cotización</span>')
+      : '';
 
     $thirdPartyLabel = 'Inquilino';
     $thirdPartyValue = $arrendatarioRaw !== '' ? $arrendatarioRaw : $propietarioRaw;
@@ -561,7 +564,9 @@ final class GenericTicketsCardView
 
     $c .= '<div class="scm-ticket-chips-row">';
     $c .= '<div class="scm-ticket-status-label"><span>Estado:</span> ' . (string) call_user_func($this->estadoBadge, $estadoRaw !== '' ? $estadoRaw : '-') . '</div>';
-    $c .= '<div class="scm-ticket-extra-chips">' . $cotChip . '</div>';
+    if ($cotChip !== '') {
+      $c .= '<div class="scm-ticket-extra-chips">' . $cotChip . '</div>';
+    }
     $c .= '</div>';
 
     $c .= '<div class="scm-ticket-card-footer">';
