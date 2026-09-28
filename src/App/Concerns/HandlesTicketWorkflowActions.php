@@ -3674,18 +3674,23 @@ trait HandlesTicketWorkflowActions
     $validIds = [];
     $options = [];
     foreach ($funcionarios as $funcionario) {
+      $cargo = trim((string) ($funcionario['cargo'] ?? ''));
+      if (mb_strtolower($cargo, 'UTF-8') !== 'consultor de arriendo') {
+        continue;
+      }
       $id = trim((string) ($funcionario['id'] ?? ''));
       if ($id === '') {
         continue;
       }
       $validIds[$id] = true;
+      $name = trim((string) ($funcionario['name'] ?? $funcionario['label'] ?? $id));
       $options[] = [
         'id' => $id,
-        'label' => trim((string) ($funcionario['label'] ?? $funcionario['name'] ?? $id)),
-        'name' => trim((string) ($funcionario['name'] ?? $funcionario['label'] ?? $id)),
+        'label' => $name,
+        'name' => $name,
         'email' => trim((string) ($funcionario['email'] ?? '')),
         'phone' => trim((string) ($funcionario['phone'] ?? '')),
-        'cargo' => trim((string) ($funcionario['cargo'] ?? '')),
+        'cargo' => $cargo,
       ];
     }
 

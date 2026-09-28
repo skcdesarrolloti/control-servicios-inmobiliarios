@@ -13519,8 +13519,7 @@
         var id = String(func.id || "");
         if (!id) return "";
         var label = String(func.label || func.name || id);
-        var meta = [func.cargo || "", func.email || ""].filter(Boolean).join(" · ");
-        return '<option value="' + escHtml(id) + '"' + (id === defaultRetentionEmployee ? " selected" : "") + '>' + escHtml(label + (meta ? " · " + meta : "")) + "</option>";
+        return '<option value="' + escHtml(id) + '"' + (id === defaultRetentionEmployee ? " selected" : "") + '>' + escHtml(label) + "</option>";
       }).join("");
       if (!retentionOptions) {
         retentionOptions = '<option value="">No hay funcionarios activos disponibles</option>';
@@ -13539,7 +13538,7 @@
         '<div class="scm-contract-termination-case">' +
           '<label class="scm-calendar-checkbox-line"><input type="checkbox" name="crear_ticket_retencion" value="1" ' + (retention.enabled ? "checked" : "disabled") + '><span>Crear ticket comercial de Retención de contrato</span></label>' +
           '<label><span>Responsable del ticket comercial</span><select name="retencion_id_empleado" ' + (!retention.enabled ? "disabled" : "") + '><option value="">Selecciona funcionario responsable</option>' + retentionOptions + '</select></label>' +
-          '<small>Este es el segundo mensaje: creación del ticket comercial con botón para ver el ticket.</small>' +
+          '<small>Déjalo marcado para crear el ticket comercial y enviar el segundo mensaje. Desmárcalo si solo vas a responder y cerrar la solicitud.</small>' +
         "</div>" +
         '<div><span class="scm-contract-termination-label">Notificar a</span>' + contractTerminationRecipientChecks(row) + "</div>" +
       "</form>";
@@ -13716,8 +13715,7 @@
         var id = String(func.id || "");
         if (!id) return "";
         var label = String(func.label || func.name || id);
-        var meta = [func.cargo || "", func.email || ""].filter(Boolean).join(" · ");
-        return '<option value="' + escHtml(id) + '"' + (id === defaultRetentionEmployee ? " selected" : "") + '>' + escHtml(label + (meta ? " · " + meta : "")) + "</option>";
+        return '<option value="' + escHtml(id) + '"' + (id === defaultRetentionEmployee ? " selected" : "") + '>' + escHtml(label) + "</option>";
       }).join("");
       if (!retentionOptions) {
         retentionOptions = '<option value="">No hay funcionarios activos disponibles</option>';
@@ -13736,7 +13734,7 @@
         '<div class="scm-contract-termination-case">' +
           '<label class="scm-calendar-checkbox-line"><input type="checkbox" name="crear_ticket_retencion" value="1" ' + (retention.enabled ? "checked" : "disabled") + '><span>Crear ticket comercial de Retención de contrato</span></label>' +
           '<label><span>Responsable del ticket comercial</span><select name="retencion_id_empleado" ' + (!retention.enabled ? "disabled" : "") + '><option value="">Selecciona funcionario responsable</option>' + retentionOptions + '</select></label>' +
-          '<small>Se notificará al solicitante y al funcionario asignado, y se usará la configuración interna de Guardian para Retención de contrato.</small>' +
+          '<small>Déjalo marcado para crear el ticket comercial y enviar el segundo mensaje. Desmárcalo si solo vas a responder y cerrar la solicitud.</small>' +
         "</div>" +
         '<div><span class="scm-contract-termination-label">Notificar a</span>' + contractTerminationRecipientChecks(row) + "</div>" +
       "</form>";
