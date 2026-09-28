@@ -3173,6 +3173,16 @@ trait HandlesTicketWorkflowActions
   private function contractNonRenewalWhereSql(string $table, string $alias = 't'): string
   {
     $prefix = $alias !== '' ? $alias . '.' : '';
+    if ($this->column_exists($table, 'tema_ayuda')) {
+      $where = "LOWER(TRIM(COALESCE({$prefix}`tema_ayuda`, ''))) IN ('no prorroga de contrato', 'no prórroga de contrato')";
+      if ($this->column_exists($table, 'estado')) {
+        $where .= " AND LOWER(TRIM(COALESCE({$prefix}`estado`, ''))) NOT IN ('cerrado', 'cerrada', 'finalizado', 'finalizada', 'anulado', 'anulada')";
+      }
+      if ($this->column_exists($table, 'estado_administrativo')) {
+        $where .= " AND LOWER(TRIM(COALESCE({$prefix}`estado_administrativo`, ''))) NOT IN ('finalizado', 'finalizada', 'cerrado', 'cerrada')";
+      }
+      return $where;
+    }
     $topicCols = array_values(array_filter(
       ['tipo_pqrs', 'tema_ayuda', 'asunto'],
       fn(string $column): bool => $this->column_exists($table, $column)
@@ -3270,13 +3280,14 @@ trait HandlesTicketWorkflowActions
   private function contractTerminationWhereSql(string $table, string $alias): array
   {
     $p = trim($alias) !== '' ? trim($alias) . '.' : '';
-    if (!$this->column_exists($table, 'estado')) {
-      return ['1 = 1', []];
+    $where = [];
+    if ($this->column_exists($table, 'tema_ayuda')) {
+      $where[] = "LOWER(TRIM(COALESCE({$p}`tema_ayuda`, ''))) IN ('terminacion de contrato', 'terminación de contrato')";
     }
-    return [
-      "LOWER(TRIM(COALESCE({$p}`estado`, ''))) NOT IN ('respondida', 'respondido', 'dentro de término', 'dentro de termino', 'fuera de término', 'fuera de termino', 'cerrada', 'cerrado', 'finalizada', 'finalizado', 'anulada', 'anulado')",
-      [],
-    ];
+    if ($this->column_exists($table, 'estado')) {
+      $where[] = "LOWER(TRIM(COALESCE({$p}`estado`, ''))) NOT IN ('respondida', 'respondido', 'dentro de término', 'dentro de termino', 'fuera de término', 'fuera de termino', 'cerrada', 'cerrado', 'finalizada', 'finalizado', 'anulada', 'anulado')";
+    }
+    return [$where !== [] ? implode(' AND ', $where) : '1 = 1', []];
   }
 
   private function contractTerminationOrderSql(string $table, string $alias): string
@@ -3521,7 +3532,11 @@ trait HandlesTicketWorkflowActions
   /** @param array<string,mixed> $ticket */
   private function isContractTerminationTicket(array $ticket): bool
   {
-    $haystack = strtolower($this->contractTerminationFirstText([$ticket], ['tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion']));
+    $tema = strtolower(trim((string) ($ticket['tema_ayuda'] ?? '')));
+    if ($tema !== '') {
+      return in_array($tema, ['terminacion de contrato', 'terminación de contrato'], true);
+    }
+    $haystack = strtolower($this->contractTerminationFirstText([$ticket], ['tipo_pqrs', 'asunto', 'descripcion']));
     return $haystack !== '' && (
       strpos($haystack, 'terminacion') !== false
       || strpos($haystack, 'terminación') !== false
@@ -3533,13 +3548,17 @@ trait HandlesTicketWorkflowActions
   /** @param array<string,mixed> $ticket */
   private function isContractNonRenewalTicket(array $ticket): bool
   {
+    $tema = strtolower(trim((string) ($ticket['tema_ayuda'] ?? '')));
+    if ($tema !== '') {
+      return in_array($tema, ['no prorroga de contrato', 'no prórroga de contrato'], true);
+    }
     $topicHaystack = strtolower(trim(implode(' ', array_map(
       fn(string $column): string => (string) ($ticket[$column] ?? ''),
-      ['tipo_pqrs', 'tema_ayuda', 'asunto']
+      ['tipo_pqrs', 'asunto']
     ))));
     $allHaystack = strtolower(trim(implode(' ', array_map(
       fn(string $column): string => (string) ($ticket[$column] ?? ''),
-      ['tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion']
+      ['tipo_pqrs', 'asunto', 'descripcion']
     ))));
     if (
       $allHaystack === ''
