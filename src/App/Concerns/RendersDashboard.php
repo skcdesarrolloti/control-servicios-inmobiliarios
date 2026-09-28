@@ -1396,7 +1396,7 @@ trait RendersDashboard
           <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="contable">Contable</button>
           <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="certificaciones">Certificaciones</button>
           <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-cat="contractual">Contractual</button>
-          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-panel="guardian">Solicitudes Guardian</button>
+          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-panel="cotizaciones_mantenimiento">Cotizaciones de mantenimiento</button>
           <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900 ml-auto" type="button" data-scm-metric-panel="ejecucion">Ejecución por Funcionario</button>
         </div>
 
@@ -1575,21 +1575,26 @@ trait RendersDashboard
             </section>
           </div>
         </div>
-        <div class="scm-metrics-pane" data-scm-metrics-pane="guardian">
-          <div class="scm-metrics-grid">
-            <section class="scm-metrics-card">
-              <h3>Solicitudes Guardian</h3>
-              <div class="scm-bars" id="scm-chart-web"></div>
-            </section>
-            <section class="scm-metrics-card">
-              <h3>Guardian por estado comercial</h3>
-              <div class="scm-bars" id="scm-chart-web-comercial"></div>
-            </section>
-            <section class="scm-metrics-card">
-              <h3>Guardian por estado administrativo</h3>
-              <div class="scm-bars" id="scm-chart-web-admin"></div>
-            </section>
-          </div>
+        <div class="scm-metrics-pane" data-scm-metrics-pane="cotizaciones_mantenimiento">
+          <section class="scm-execution-panel scm-maintenance-quote-metrics" data-scm-maintenance-quote-metrics>
+            <div class="scm-execution-head">
+              <div>
+                <span class="scm-eyebrow">Resumen financiero</span>
+                <h3>Cotizaciones de mantenimiento</h3>
+                <p>Filtra por mes de aprobaci&oacute;n para ver aprobadas, administraci&oacute;n ganada y cu&aacute;les ya terminaron trabajo con acta de satisfacci&oacute;n.</p>
+              </div>
+            </div>
+            <form class="scm-execution-filters scm-maintenance-quote-filters" data-scm-maintenance-quote-form autocomplete="off">
+              <div class="scm-field">
+                <label for="scm_metric_cotizaciones_mes">Mes</label>
+                <input id="scm_metric_cotizaciones_mes" name="cotizaciones_mes" class="input input-bordered input-sm" type="month" value="<?php echo esc_attr(date('Y-m')); ?>">
+              </div>
+              <button type="submit" class="scm-btn-primary btn btn-primary">Ver cotizaciones</button>
+            </form>
+            <div class="scm-execution-status" data-scm-maintenance-quote-status aria-live="polite">Resumen del mes actual.</div>
+            <div class="scm-execution-kpis" data-scm-maintenance-quote-kpis></div>
+            <div class="scm-maintenance-quote-list" data-scm-maintenance-quote-list></div>
+          </section>
         </div>
         <div class="scm-metrics-pane" data-scm-metrics-pane="ejecucion">
           <section class="scm-execution-panel" data-scm-execution-panel>
@@ -2330,6 +2335,199 @@ trait RendersDashboard
       'ordenes_total' => $ordersTotal,
       'valor_total' => (float) ($row['valor_total'] ?? 0),
     ];
+  }
+
+  /** @return array<string,mixed> */
+  private function maintenance_quote_month_metrics(string $month): array
+  {
+    $month = trim($month);
+    if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
+      $month = date('Y-m');
+    }
+    $monthStart = strtotime($month . '-01 00:00:00');
+    if ($monthStart === false) {
+      $monthStart = strtotime(date('Y-m-01 00:00:00')) ?: time();
+      $month = date('Y-m', $monthStart);
+    }
+    $monthEnd = strtotime(date('Y-m-t 23:59:59', $monthStart)) ?: $monthStart;
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($table)) {
+      return $this->empty_maintenance_quote_month_metrics($month);
+    }
+
+    $schema = new \SCM\Support\SchemaInspector($this->db);
+    $columns = $schema->getTableColumns($table);
+    $hasColumn = static fn(string $column): bool => in_array($column, $columns, true);
+
+    $statusColumns = array_values(array_filter(
+      ['estado', 'estado_cotizacion_mantenimiento', 'estado_respuesta_cotizacion_mantenimiento', 'estado_respuesta', 'respuesta'],
+      $hasColumn
+    ));
+    if ($statusColumns === []) {
+      return $this->empty_maintenance_quote_month_metrics($month);
+    }
+
+    $approvalDateColumns = array_values(array_filter(
+      ['fecha_respuesta_cotizacion_mantenimiento', 'fecha_respuesta', 'fecha_aprobacion'],
+      $hasColumn
+    ));
+    $dateColumns = $approvalDateColumns !== []
+      ? $approvalDateColumns
+      : array_values(array_filter(['fecha', 'cct_modified', 'cct_created'], $hasColumn));
+    if ($dateColumns === []) {
+      return $this->empty_maintenance_quote_month_metrics($month);
+    }
+
+    $where = ['(' . implode(' OR ', array_map(
+      static fn(string $column): string => "LOWER(TRIM(COALESCE(c.`{$column}`, ''))) IN ('aprobada', 'aprobado', 'finalizado')",
+      $statusColumns
+    )) . ')'];
+    $args = [];
+    $dateParts = [];
+    foreach ($dateColumns as $column) {
+      $dateParts[] = "((CAST(NULLIF(TRIM(CAST(c.`{$column}` AS CHAR)), '') AS UNSIGNED) BETWEEN ? AND ?) OR (UNIX_TIMESTAMP(c.`{$column}`) BETWEEN ? AND ?))";
+      array_push($args, $monthStart, $monthEnd, $monthStart, $monthEnd);
+    }
+    $where[] = '(' . implode(' OR ', $dateParts) . ')';
+
+    $ticketsTable = $this->db->table('jet_cct_tickets');
+    $joinTicket = '';
+    $ticketSelect = "'' AS _scm_ticket_acta_satisfaccion, '' AS _scm_ticket_estado_acta";
+    if ($this->table_exists($ticketsTable) && $hasColumn('id_ticket')) {
+      $joinTicket = " LEFT JOIN `{$ticketsTable}` t ON TRIM(COALESCE(c.`id_ticket`, '')) = CAST(t.`_ID` AS CHAR)";
+      if ($schema->columnExists($ticketsTable, 'id_ticket')) {
+        $joinTicket = " LEFT JOIN `{$ticketsTable}` t ON (TRIM(COALESCE(c.`id_ticket`, '')) = CAST(t.`_ID` AS CHAR) OR TRIM(COALESCE(c.`id_ticket`, '')) = TRIM(COALESCE(t.`id_ticket`, '')))";
+      }
+      $ticketSelect = "t.`id_acta_satisfaccion` AS _scm_ticket_acta_satisfaccion, t.`estado_acta_satisfaccion` AS _scm_ticket_estado_acta";
+    }
+
+    $orderParts = [];
+    foreach ($dateColumns as $column) {
+      $orderParts[] = "COALESCE(NULLIF(CAST(c.`{$column}` AS UNSIGNED), 0), UNIX_TIMESTAMP(c.`{$column}`))";
+    }
+    $orderSql = $orderParts !== [] ? 'COALESCE(' . implode(', ', $orderParts) . ', c.`_ID`) DESC, c.`_ID` DESC' : 'c.`_ID` DESC';
+
+    $rows = $this->db->getResults(
+      "SELECT c.*, {$ticketSelect}
+       FROM `{$table}` c
+       {$joinTicket}
+       WHERE " . implode(' AND ', $where) . "
+       ORDER BY {$orderSql}
+       LIMIT 500",
+      $args
+    );
+
+    $approved = 0;
+    $finished = 0;
+    $adminApproved = 0.0;
+    $adminFinished = 0.0;
+    $items = [];
+    $finishedItems = [];
+    foreach (is_array($rows) ? $rows : [] as $row) {
+      $approved++;
+      $admin = $this->maintenance_quote_admin_amount($row);
+      $adminApproved += $admin;
+      $actaId = trim((string) ($row['id_acta_satisfaccion'] ?? ''));
+      if ($actaId === '') {
+        $ticketActState = strtolower(trim((string) ($row['_scm_ticket_estado_acta'] ?? '')));
+        $ticketActId = trim((string) ($row['_scm_ticket_acta_satisfaccion'] ?? ''));
+        if ($ticketActId !== '' && ($ticketActState === '' || in_array($ticketActState, ['si', 'sí', 'signed', 'firmada', 'firmado', 'finalizada', 'finalizado'], true))) {
+          $actaId = $ticketActId;
+        }
+      }
+      $isFinished = $actaId !== '';
+      if ($isFinished) {
+        $finished++;
+        $adminFinished += $admin;
+      }
+      $item = [
+        'id' => trim((string) ($row['_ID'] ?? '')),
+        'ticket' => trim((string) ($row['id_ticket'] ?? '')),
+        'direccion' => trim((string) ($row['direccion'] ?? '')),
+        'inmueble' => trim((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '')),
+        'destinatario' => trim((string) ($row['destinatario'] ?? '')),
+        'estado' => $this->maintenance_quote_first_value($row, $statusColumns),
+        'fecha_aprobacion' => $this->maintenance_quote_date_label($row, $dateColumns),
+        'administracion' => $admin,
+        'acta_id' => $actaId,
+        'trabajo_terminado' => $isFinished,
+      ];
+      $items[] = $item;
+      if ($isFinished) {
+        $finishedItems[] = $item;
+      }
+    }
+
+    return [
+      'month' => $month,
+      'from' => date('Y-m-d', $monthStart),
+      'to' => date('Y-m-d', $monthEnd),
+      'aprobadas' => $approved,
+      'administracion_aprobada' => $adminApproved,
+      'terminadas' => $finished,
+      'administracion_terminada' => $adminFinished,
+      'items' => array_slice($items, 0, 100),
+      'finished_items' => array_slice($finishedItems, 0, 100),
+    ];
+  }
+
+  /** @return array<string,mixed> */
+  private function empty_maintenance_quote_month_metrics(string $month): array
+  {
+    return [
+      'month' => preg_match('/^\d{4}-\d{2}$/', $month) ? $month : date('Y-m'),
+      'from' => '',
+      'to' => '',
+      'aprobadas' => 0,
+      'administracion_aprobada' => 0,
+      'terminadas' => 0,
+      'administracion_terminada' => 0,
+      'items' => [],
+      'finished_items' => [],
+    ];
+  }
+
+  /** @param array<string,mixed> $row */
+  private function maintenance_quote_admin_amount(array $row): float
+  {
+    $admin = $this->cotizacion_money_value($row, ['total_admon', 'total_administracion', 'administracion']);
+    if ($admin > 0) {
+      return $admin;
+    }
+    $subtotal = $this->cotizacion_money_value($row, ['total_materiales'])
+      + $this->cotizacion_money_value($row, ['total_mano_obra'])
+      + $this->cotizacion_money_value($row, ['total_maquinarias'])
+      + $this->cotizacion_money_value($row, ['total_otros_costos']);
+    $percentage = $this->parse_cop_number($row['porcentaje_admon'] ?? null);
+    if ($subtotal <= 0 || $percentage === null || $percentage <= 0) {
+      return 0.0;
+    }
+    return round($subtotal * ($percentage / 100));
+  }
+
+  /** @param array<string,mixed> $row @param array<int,string> $columns */
+  private function maintenance_quote_first_value(array $row, array $columns): string
+  {
+    foreach ($columns as $column) {
+      $value = trim((string) ($row[$column] ?? ''));
+      if ($value !== '') {
+        return $value;
+      }
+    }
+    return '';
+  }
+
+  /** @param array<string,mixed> $row @param array<int,string> $columns */
+  private function maintenance_quote_date_label(array $row, array $columns): string
+  {
+    foreach ($columns as $column) {
+      $value = $row[$column] ?? null;
+      $ts = is_numeric($value) ? (int) $value : (strtotime((string) $value) ?: 0);
+      if ($ts > 0) {
+        return date('d/m/Y', $ts);
+      }
+    }
+    return '';
   }
 
   private function render_my_tickets_panel(array $result, array $stats, array $params, array $filterOptions): string

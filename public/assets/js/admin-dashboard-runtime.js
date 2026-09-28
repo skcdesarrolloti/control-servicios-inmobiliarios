@@ -12338,6 +12338,106 @@
       );
     }
 
+    function maintenanceQuoteMonthLabel(value) {
+      value = String(value || "").trim();
+      if (!/^\d{4}-\d{2}$/.test(value)) return value || "-";
+      var parts = value.split("-");
+      var date = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+      return new Intl.DateTimeFormat("es-CO", {
+        month: "long",
+        year: "numeric",
+      }).format(date);
+    }
+
+    function renderMaintenanceQuoteMetrics(data, warning) {
+      var panel = root.querySelector("[data-scm-maintenance-quote-metrics]");
+      if (!panel) return;
+      data = data || {};
+      var status = panel.querySelector("[data-scm-maintenance-quote-status]");
+      var kpis = panel.querySelector("[data-scm-maintenance-quote-kpis]");
+      var list = panel.querySelector("[data-scm-maintenance-quote-list]");
+      var month = data.month || (panel.querySelector("input[name='cotizaciones_mes']") || {}).value || "";
+      if (status) {
+        status.textContent = warning || ("Aprobadas en " + maintenanceQuoteMonthLabel(month) + ".");
+        status.classList.toggle("is-warning", Boolean(warning));
+      }
+      if (kpis) {
+        var kpiRows = [
+          ["Aprobadas", formatDashboardCount(data.aprobadas || 0)],
+          ["Administración aprobada", formatDashboardCurrency(data.administracion_aprobada || 0)],
+          ["Terminadas con acta", formatDashboardCount(data.terminadas || 0)],
+          ["Administración terminada", formatDashboardCurrency(data.administracion_terminada || 0)],
+        ];
+        kpis.innerHTML = kpiRows.map(function (row) {
+          return '<article class="scm-execution-kpi"><span>' + escHtml(row[0]) + '</span><strong>' + escHtml(row[1]) + "</strong></article>";
+        }).join("");
+      }
+      if (!list) return;
+      var rows = Array.isArray(data.finished_items) ? data.finished_items : [];
+      if (!rows.length) {
+        list.innerHTML = '<div class="scm-empty scm-empty-cards">No hay cotizaciones aprobadas de este mes con trabajo terminado y acta de satisfacci&oacute;n.</div>';
+        return;
+      }
+      list.innerHTML =
+        '<div class="scm-maintenance-quote-list-head"><div><span class="scm-calendar-action-kicker">Trabajos terminados</span><h4>Cotizaciones aprobadas con acta de satisfacci&oacute;n</h4></div><strong>' +
+        escHtml(formatDashboardCount(rows.length)) +
+        "</strong></div>" +
+        rows.map(function (row) {
+          row = row || {};
+          var meta = [
+            row.ticket ? "Ticket #" + row.ticket : "",
+            row.inmueble ? "Inmueble " + row.inmueble : "",
+            row.destinatario || "",
+          ].filter(Boolean).join(" · ");
+          return (
+            '<article class="scm-maintenance-quote-row">' +
+              '<div class="scm-maintenance-quote-row-id"><span>Cotizaci&oacute;n</span><strong>#' + escHtml(row.id || "-") + "</strong></div>" +
+              '<div class="scm-maintenance-quote-row-main"><strong>' + escHtml(row.direccion || "Cotización de mantenimiento") + "</strong>" +
+                (meta ? '<small>' + escHtml(meta) + "</small>" : "") +
+                '<small>Aprobada: ' + escHtml(row.fecha_aprobacion || "-") + (row.acta_id ? " · Acta #" + escHtml(row.acta_id) : "") + "</small></div>" +
+              '<div class="scm-maintenance-quote-row-money"><span>Administraci&oacute;n</span><strong>' + escHtml(formatDashboardCurrency(row.administracion || 0)) + "</strong></div>" +
+            "</article>"
+          );
+        }).join("");
+    }
+
+    function loadMaintenanceQuoteMetrics(force) {
+      var panel = root.querySelector("[data-scm-maintenance-quote-metrics]");
+      if (!panel || !ajaxUrl || !actionDashboardMetrics) {
+        return Promise.resolve();
+      }
+      var form = panel.querySelector("[data-scm-maintenance-quote-form]");
+      var monthInput = form ? form.querySelector("input[name='cotizaciones_mes']") : null;
+      var month = String((monthInput && monthInput.value) || "").trim();
+      if (!/^\d{4}-\d{2}$/.test(month)) {
+        showToast("warning", "Selecciona un mes válido.");
+        return Promise.resolve();
+      }
+      if (!force && initialMetrics && initialMetrics.cotizaciones_mantenimiento && initialMetrics.cotizaciones_mantenimiento.month === month) {
+        renderMaintenanceQuoteMetrics(initialMetrics.cotizaciones_mantenimiento);
+        return Promise.resolve();
+      }
+      panel.classList.add("is-loading");
+      return dashboardAction(actionDashboardMetrics, { cotizaciones_mes: month })
+        .then(function (data) {
+          if (data && data.metrics) {
+            initialMetrics = data.metrics;
+            var metricsPanel = root.querySelector("#scm-panel-metricas");
+            if (metricsPanel) {
+              metricsPanel.setAttribute("data-scm-metrics", JSON.stringify(initialMetrics));
+            }
+          }
+          renderMaintenanceQuoteMetrics((initialMetrics || {}).cotizaciones_mantenimiento || {}, "");
+        })
+        .catch(function (error) {
+          renderMaintenanceQuoteMetrics({}, error && error.message ? error.message : "No se pudo cargar el resumen de cotizaciones.");
+          showToast("error", error && error.message ? error.message : "No se pudo cargar el resumen de cotizaciones.");
+        })
+        .finally(function () {
+          panel.classList.remove("is-loading");
+        });
+    }
+
     function toggleKpiVisibility(id, visible) {
       var el = root.querySelector("#" + id);
       if (!el || !el.parentElement) {
@@ -12850,6 +12950,14 @@
       });
     }
 
+    var maintenanceQuoteMetricsForm = root.querySelector("[data-scm-maintenance-quote-form]");
+    if (maintenanceQuoteMetricsForm) {
+      maintenanceQuoteMetricsForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        loadMaintenanceQuoteMetrics(true);
+      });
+    }
+
     var initialMetrics = readInitialMetrics();
     var dashboardFilterOptionsLoaded = false;
     var dashboardFilterOptionsPromise = null;
@@ -13055,6 +13163,16 @@
       var number = Number(value || 0);
       if (!Number.isFinite(number)) number = 0;
       return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(number);
+    }
+
+    function formatDashboardCurrency(value) {
+      var number = Number(value || 0);
+      if (!Number.isFinite(number)) number = 0;
+      return new Intl.NumberFormat("es-CO", {
+        style: "currency",
+        currency: "COP",
+        maximumFractionDigits: 0,
+      }).format(number);
     }
 
     function formatDashboardDateTime(value) {
@@ -14173,7 +14291,7 @@
             activeMetricCategory,
           );
           renderMetricsCharts(activeCategoryMetrics, activeMetricCategory);
-          renderGuardianMetrics(initialMetrics.web || {});
+          renderMaintenanceQuoteMetrics(initialMetrics.cotizaciones_mantenimiento || {});
           applyRevisionKpiVisibility(
             "scm-",
             activeCategoryMetrics.con_revision,
@@ -14209,7 +14327,7 @@
         activeMetricCategory,
       );
       renderMetricsCharts(initialCategoryMetrics, activeMetricCategory);
-      renderGuardianMetrics(initialMetrics.web || {});
+      renderMaintenanceQuoteMetrics(initialMetrics.cotizaciones_mantenimiento || {});
       applyRevisionKpiVisibility(
         "scm-",
         initialCategoryMetrics.con_revision,
@@ -14218,7 +14336,7 @@
       var metricTabsWrap = root.querySelector("#scm-metric-tabs");
       if (metricTabsWrap) {
         function showMetricsPane(name) {
-          name = name === "guardian" || name === "ejecucion" ? name : "operativas";
+          name = name === "cotizaciones_mantenimiento" || name === "ejecucion" ? name : "operativas";
           root.querySelectorAll("[data-scm-metrics-pane]").forEach(function (pane) {
             pane.classList.toggle(
               "active",
@@ -14261,14 +14379,16 @@
                   b.classList.remove("active");
                 });
               btn.classList.add("active");
-              var paneName = btn.getAttribute("data-scm-metric-panel") || "guardian";
+              var paneName = btn.getAttribute("data-scm-metric-panel") || "cotizaciones_mantenimiento";
               showMetricsPane(paneName);
               if (paneName === "ejecucion") {
                 loadDashboardFilterOptions().then(function () {
                   loadMetricsExecution(false);
                 });
+              } else if (paneName === "cotizaciones_mantenimiento") {
+                loadMaintenanceQuoteMetrics(false);
               } else {
-                renderGuardianMetrics(initialMetrics.web || {});
+                renderMaintenanceQuoteMetrics(initialMetrics.cotizaciones_mantenimiento || {});
               }
             });
           });

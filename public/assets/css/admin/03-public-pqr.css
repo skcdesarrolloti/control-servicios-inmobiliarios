@@ -1298,6 +1298,103 @@
   color: #9a5a00;
 }
 
+#scm-app .scm-maintenance-quote-filters {
+  grid-template-columns: minmax(180px, 240px) auto;
+  justify-content: start;
+}
+
+#scm-app .scm-maintenance-quote-list {
+  display: grid;
+  gap: 10px;
+}
+
+#scm-app .scm-maintenance-quote-list-head,
+#scm-app .scm-maintenance-quote-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 160px) minmax(0, 1fr) minmax(150px, 190px);
+  gap: 12px;
+  align-items: center;
+}
+
+#scm-app .scm-maintenance-quote-list-head {
+  padding: 12px 14px;
+  border: 1px solid #dbe6f1;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+#scm-app .scm-maintenance-quote-list-head h4 {
+  margin: 2px 0 0;
+  color: #0f2742;
+  font-size: 15px;
+}
+
+#scm-app .scm-maintenance-quote-list-head > strong {
+  justify-self: end;
+  min-width: 44px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #0f1e36;
+  color: #ffffff;
+  text-align: center;
+}
+
+#scm-app .scm-maintenance-quote-row {
+  min-height: 82px;
+  padding: 12px 14px;
+  border: 1px solid #dbe6f1;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(15, 39, 66, 0.06);
+}
+
+#scm-app .scm-maintenance-quote-row-id span,
+#scm-app .scm-maintenance-quote-row-money span {
+  display: block;
+  color: #6c7f96;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#scm-app .scm-maintenance-quote-row-id strong {
+  display: block;
+  margin-top: 4px;
+  color: #0f2742;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+#scm-app .scm-maintenance-quote-row-main strong {
+  display: block;
+  color: #0f2742;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+#scm-app .scm-maintenance-quote-row-main small {
+  display: block;
+  margin-top: 4px;
+  color: #6c7f96;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+#scm-app .scm-maintenance-quote-row-money {
+  justify-self: end;
+  text-align: right;
+}
+
+#scm-app .scm-maintenance-quote-row-money strong {
+  display: block;
+  margin-top: 4px;
+  color: #0b7a46;
+  font-size: 18px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 980px) {
   #scm-app .scm-execution-filters {
     grid-template-columns: 1fr;
@@ -1305,6 +1402,18 @@
 
   #scm-app .scm-execution-card-stats {
     grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-maintenance-quote-list-head,
+  #scm-app .scm-maintenance-quote-row,
+  #scm-app .scm-maintenance-quote-filters {
+    grid-template-columns: 1fr;
+  }
+
+  #scm-app .scm-maintenance-quote-list-head > strong,
+  #scm-app .scm-maintenance-quote-row-money {
+    justify-self: start;
+    text-align: left;
   }
 }
 

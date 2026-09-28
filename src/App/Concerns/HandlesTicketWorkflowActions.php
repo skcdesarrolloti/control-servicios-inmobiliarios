@@ -182,6 +182,7 @@ trait HandlesTicketWorkflowActions
         'mes_cerrados' => (int) ($maintenanceStats['mes_cerrados'] ?? 0),
         'mes_seguimientos' => (int) ($maintenanceStats['mes_seguimientos'] ?? 0),
         'web' => $this->get_web_ticket_statistics(),
+        'cotizaciones_mantenimiento' => $this->maintenance_quote_month_metrics(date('Y-m')),
         'por_categoria' => $categoryMetrics,
         'detalle_por_categoria' => [
           'mantenimiento' => ['label' => 'Mantenimiento'] + $maintenanceStats,
@@ -249,7 +250,13 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail('No tienes permiso para ver esta pestaña.');
     }
 
-    $this->jsonOk(['metrics' => $this->dashboardMetricsSnapshot()]);
+    $metrics = $this->dashboardMetricsSnapshot();
+    $month = trim((string) ($_POST['cotizaciones_mes'] ?? ''));
+    if ($month !== '') {
+      $metrics['cotizaciones_mantenimiento'] = $this->maintenance_quote_month_metrics($month);
+    }
+
+    $this->jsonOk(['metrics' => $metrics]);
   }
 
   public function ajax_handler_dashboard_permissions_read(): void
