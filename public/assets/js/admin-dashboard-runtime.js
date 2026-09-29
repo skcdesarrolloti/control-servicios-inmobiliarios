@@ -2497,10 +2497,12 @@
             ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Ver evento</button>'
             : '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-item data-item-id="' + escHtml(id) + '" data-item-kind="' + escHtml(kind) + '">Ver ' + escHtml(kindLabel.toLowerCase()) + '</button>') : "") +
           (isEventKind && ticket ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver caso</button>' : "") +
+          (isEventKind && id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-edit-event data-event-id="' + escHtml(id) + '">Editar</button>' : "") +
           (isEventKind && id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Marcar realizado</button>' : "") +
           (isEventKind && id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar evento</button>' : "") +
           (kind === "tarea" && id && !isDone ? '<button type="button" class="scm-case-work-btn scm-calendar-action-btn--success" data-scm-calendar-complete-task data-task-id="' + escHtml(id) + '">Marcar realizada</button>' : "") +
           (kind === "recordatorio" && id && !isDone ? '<button type="button" class="scm-case-work-btn scm-calendar-action-btn--success" data-scm-calendar-send-reminder data-reminder-id="' + escHtml(id) + '">Marcar enviado</button>' : "") +
+          (kind === "recordatorio" && id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-edit-item data-item-id="' + escHtml(id) + '" data-item-kind="recordatorio">Editar</button>' : "") +
           (kind === "recordatorio" && id && !isDone ? '<button type="button" class="scm-case-work-btn scm-calendar-action-btn--danger" data-scm-calendar-cancel-reminder data-reminder-id="' + escHtml(id) + '">Cancelar</button>' : "") +
           "</div></div></article>";
       }
@@ -2903,6 +2905,7 @@
         if (tipoItem === "recordatorio") {
           payload.recordatorio_at = payload.fecha_inicio;
           payload.recordatorio_canal = "whatsapp";
+          payload.aviso_minutos_antes = Number(fd.get("aviso_minutos_antes") || 30);
         }
         if (googleRequested) {
           payload.sincronizar_google = "1";
@@ -2965,6 +2968,7 @@
           '<div class="scm-calendar-week-quick-location" data-week-quick-location-row><span class="material-symbols-outlined">location_on</span><div><input name="ubicacion" placeholder="A&ntilde;adir ubicaci&oacute;n o direcci&oacute;n"><div class="scm-calendar-week-quick-location-presets" aria-label="Ubicaciones r&aacute;pidas"><button type="button" data-week-quick-location="Oficina Manga">Oficina Manga</button> <button type="button" data-week-quick-location="Oficina Corredor">Oficina Corredor</button></div></div></div>' +
           '<label class="scm-calendar-week-quick-category"><span class="material-symbols-outlined">sell</span><select name="id_categoria" required><option value="">Selecciona categoría</option>' + categoryOptions + '</select></label>' +
           '<label class="scm-calendar-week-quick-google" data-week-quick-google-row><input type="checkbox" name="sincronizar_google" value="1"><span><strong>Google Calendar</strong><em>Agregar y usar sus recordatorios</em></span></label>' +
+          '<input type="hidden" name="aviso_minutos_antes" value="30">' +
           '<div class="scm-calendar-week-quick-actions">' +
           '<button type="button" data-week-quick-more>Más opciones</button>' +
           '<button type="submit" data-week-quick-save>Guardar</button>' +
@@ -4222,6 +4226,9 @@
         }).then(function (result) {
           if (!result.isConfirmed || !result.value) return;
           showToast("success", result.value.message || successMessage);
+          if (result.value.data && result.value.data.google_pendiente) {
+            showToast("error", "El cambio se guardo aqui, pero no se pudo actualizar en Google Calendar.", "Google Calendar pendiente");
+          }
           loadEvents();
         });
       }
@@ -4322,6 +4329,7 @@
           '</section>' +
           '<footer class="scm-calendar-event-detail-foot">' +
           '<div>' +
+          (eventId ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-edit-event data-event-id="' + escHtml(eventId) + '">Editar evento</button>' : "") +
           (eventId && !isDone ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--success" data-scm-calendar-complete-event data-event-id="' + escHtml(eventId) + '"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span>Marcar como realizado</button>' : '<span class="scm-calendar-modern-done-pill"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span>Realizado</span>') +
           (eventId ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-reschedule-event data-event-id="' + escHtml(eventId) + '"><span class="material-symbols-outlined" aria-hidden="true">event_repeat</span>Trasladar evento</button>' : "") +
           '</div>' +
@@ -4550,11 +4558,103 @@
             }, 50);
             return;
           }
+          var editBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-edit-event]") : null;
+          if (editBtn) {
+            event.preventDefault();
+            var editId = editBtn.getAttribute("data-event-id") || "";
+            state.navigating = true;
+            window.Swal.close();
+            window.setTimeout(function () {
+              openCalendarEditPopup(editId, "evento", {
+                returnTo: function () { openCalendarEventDetailPopup(editId, { returnTo: options.returnTo }); },
+              });
+            }, 50);
+            return;
+          }
           var closeBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-close]") : null;
           if (closeBtn) {
             event.preventDefault();
             window.Swal.close();
           }
+        });
+      }
+
+      function openCalendarEditPopup(itemId, kind, options) {
+        options = options || {};
+        if (!window.Swal || typeof window.Swal.fire !== "function") return;
+        var row = calendarItemById(itemId, kind);
+        if (!row || (kind !== "evento" && kind !== "recordatorio")) {
+          showToast("error", "No encontre el elemento para editar.");
+          return;
+        }
+        var isReminder = kind === "recordatorio";
+        if (isReminder && calendarItemIsDone(row)) {
+          showToast("error", "Solo se pueden editar recordatorios pendientes.");
+          return;
+        }
+        var categoryId = getCategoryId(row);
+        var categoryOptions = calendarAdminCategories().map(function (category) {
+          var id = String(category.id || category._ID || category.id_categoria || "").trim();
+          return id ? '<option value="' + escHtml(id) + '"' + (id === categoryId ? ' selected' : '') + '>' + escHtml(calendarCategoryLabel(category) || "Categoria") + '</option>' : "";
+        }).join("");
+        if (categoryId && categoryOptions.indexOf('value="' + escHtml(categoryId) + '"') === -1) {
+          categoryOptions += '<option value="' + escHtml(categoryId) + '" selected>' + escHtml(row.categoria || "Categoria actual") + '</option>';
+        }
+        var dateValue = datePartFromDateTime(row.recordatorio_at || row.fecha_inicio);
+        var timeValue = timePartFromDateTime(row.recordatorio_at || row.fecha_inicio);
+        var noticeMinutes = Number(row.meta && row.meta.aviso_minutos_antes !== undefined ? row.meta.aviso_minutos_antes : 0);
+        var html = '<div class="scm-calendar-create-shell"><div class="scm-calendar-create-head"><div class="scm-calendar-create-title"><strong>Editar ' + (isReminder ? 'recordatorio' : 'evento') + '</strong><span>Los cambios se actualizar&aacute;n en Google Calendar si est&aacute; vinculado.</span></div></div>' +
+          '<form class="scm-calendar-popup-form scm-calendar-create-form" data-scm-calendar-edit-form autocomplete="off"><div class="scm-calendar-create-main">' +
+          '<label class="scm-seg-field scm-calendar-field-full"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required value="' + escHtml(row.titulo || "") + '"></label>' +
+          '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered textarea-sm scm-textarea" name="descripcion" rows="3">' + escHtml(isReminder ? (row.mensaje || row.descripcion || "") : (row.descripcion || "")) + '</textarea></label>' +
+          (isReminder
+            ? '<div class="scm-calendar-create-row scm-calendar-date-row"><label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + escHtml(dateValue) + '"></label><label class="scm-seg-field"><span>Hora del recordatorio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora" required value="' + escHtml(timeValue) + '"></label></div>' +
+              '<label class="scm-seg-field scm-calendar-field-full"><span>Aviso por WhatsApp y Google (minutos antes)</span><input class="input input-bordered input-sm scm-input" type="number" name="aviso_minutos_antes" min="0" max="1440" step="1" required value="' + escHtml(noticeMinutes) + '"></label>'
+            : '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" value="' + escHtml(row.ubicacion || "") + '"></label>' +
+              '<label class="scm-seg-field scm-calendar-field-full"><span>Categor&iacute;a</span><select class="select select-bordered select-sm scm-select" name="id_categoria" required>' + categoryOptions + '</select></label>') +
+          '</div></form></div>';
+        window.Swal.fire({
+          title: "",
+          html: html,
+          width: 720,
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal" },
+          showCancelButton: true,
+          confirmButtonText: "Guardar cambios",
+          cancelButtonText: "Cerrar",
+          preConfirm: function () {
+            var popup = window.Swal.getPopup();
+            var form = popup && popup.querySelector("[data-scm-calendar-edit-form]");
+            if (!form || !form.reportValidity()) return false;
+            var fd = new FormData(form);
+            var payload = { titulo: String(fd.get("titulo") || "").trim(), descripcion: String(fd.get("descripcion") || "") };
+            if (isReminder) {
+              payload.id_recordatorio = itemId;
+              payload.recordatorio_at = String(fd.get("fecha") || "") + " " + String(fd.get("hora") || "") + ":00";
+              payload.aviso_minutos_antes = Number(fd.get("aviso_minutos_antes"));
+            } else {
+              payload.id = itemId;
+              payload.ubicacion = String(fd.get("ubicacion") || "").trim();
+              payload.id_categoria = String(fd.get("id_categoria") || "");
+            }
+            window.Swal.showLoading();
+            return calendarApi(isReminder ? "actualizar_recordatorio" : "actualizar_evento", payload).then(function (json) {
+              if (!json || !json.success) throw new Error((json && json.message) || "No se pudieron guardar los cambios.");
+              return json;
+            }).catch(function (err) {
+              window.Swal.showValidationMessage(err.message || "No se pudieron guardar los cambios.");
+              return false;
+            });
+          },
+        }).then(function (result) {
+          if (!result.isConfirmed || !result.value) {
+            if (typeof options.returnTo === "function") window.setTimeout(options.returnTo, 80);
+            return;
+          }
+          showToast("success", result.value.message || "Cambios guardados.");
+          var data = result.value.data || {};
+          if (data.google_pendiente) showToast("error", "El cambio se guardo aqui, pero no se pudo actualizar en Google Calendar.", "Google Calendar pendiente");
+          if (isReminder && data.aviso_programado === false) showToast("error", "El recordatorio se guardo, pero no se pudo programar el aviso por WhatsApp.", "Aviso pendiente");
+          loadEvents();
         });
       }
 
@@ -4586,7 +4686,9 @@
           calendarDetailCardHtml("location_on", "Ubicacion", row.ubicacion || "", true) +
           (kind === "recordatorio" ? calendarDetailCardHtml("notifications", "Canal", row.recordatorio_canal || row.canal || "", false) : "") +
           '</div>' + (description ? '<div class="scm-calendar-detail-description"><div><span>Descripci&oacute;n</span></div><p>' + calendarRichTextHtml(description) + '</p></div>' : "") +
-          '</section><footer class="scm-calendar-event-detail-foot"><div></div><button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--dark" data-scm-calendar-close>Cerrar</button></footer></div>';
+          '</section><footer class="scm-calendar-event-detail-foot"><div>' +
+          (kind === "recordatorio" && !calendarItemIsDone(row) ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-edit-item data-item-id="' + escHtml(itemId) + '" data-item-kind="recordatorio">Editar recordatorio</button>' : "") +
+          '</div><button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--dark" data-scm-calendar-close>Cerrar</button></footer></div>';
         window.Swal.fire({
           title: "",
           html: html,
@@ -4598,6 +4700,12 @@
             if (!popup) return;
             popup.querySelectorAll("[data-scm-calendar-close]").forEach(function (button) {
               button.addEventListener("click", function () { window.Swal.close(); });
+            });
+            popup.querySelectorAll("[data-scm-calendar-edit-item]").forEach(function (button) {
+              button.addEventListener("click", function () {
+                window.Swal.close();
+                window.setTimeout(function () { openCalendarEditPopup(itemId, kind); }, 50);
+              });
             });
           },
         });
@@ -4831,6 +4939,9 @@
             return;
           }
           showToast("success", result.value.message || "Evento trasladado.");
+          if (result.value.data && result.value.data.google_pendiente) {
+            showToast("error", "El traslado se guardo aqui, pero no se pudo actualizar en Google Calendar.", "Google Calendar pendiente");
+          }
           if (Array.isArray(result.value._scmCitaNotificationAppointments) && result.value._scmCitaNotificationAppointments.length) {
             notifyCalendarAppointment(root, result.value._scmCitaNotificationAppointments)
               .then(showCalendarNotificationResult);
@@ -4913,6 +5024,9 @@
             return;
           }
           showToast("success", result.value.message || "Evento marcado como realizado.");
+          if (result.value.data && result.value.data.google_pendiente) {
+            showToast("error", "El evento quedo realizado aqui, pero no se pudo actualizar en Google Calendar.", "Google Calendar pendiente");
+          }
           loadEvents();
         });
       }
@@ -5177,6 +5291,7 @@
           '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required value="' + defaultEnd + '"></label>' +
           '</div>' +
           googleCalendarHtml +
+          (defaultKind === "reminder" ? '<label class="scm-seg-field scm-calendar-field-full"><span>Aviso por WhatsApp y Google Calendar</span><select class="select select-bordered select-sm scm-select" name="aviso_minutos_antes"><option value="0">A la hora del recordatorio</option><option value="5">5 minutos antes</option><option value="15">15 minutos antes</option><option value="30" selected>30 minutos antes</option><option value="60">1 hora antes</option></select></label>' : "") +
           '<label class="scm-seg-field scm-calendar-field-full"><span>' + escHtml(defaultKindConfig.descriptionLabel) + '</span><textarea class="textarea textarea-bordered textarea-sm scm-textarea" name="descripcion" rows="3" placeholder="' + escHtml(defaultKindConfig.descriptionPlaceholder) + '"></textarea></label>' +
           '<div class="scm-calendar-recurrence scm-calendar-field-full" data-calendar-recurrence>' +
           '<label class="scm-calendar-recurrence-toggle"><input type="checkbox" name="es_recurrente" value="1" data-calendar-recurrence-toggle><span>' + defaultKindConfig.recurrenceLabel + '</span><em data-calendar-recurrence-badge>Inactivo</em></label>' +
@@ -5890,6 +6005,7 @@
             };
             if (tipoItem === "recordatorio") {
               basePayload.recordatorio_canal = "whatsapp";
+              basePayload.aviso_minutos_antes = Number(fd.get("aviso_minutos_antes") || 0);
             }
             if (googleRequested) {
               basePayload.sincronizar_google = "1";
@@ -6184,6 +6300,18 @@
         if (itemViewBtn && panel.contains(itemViewBtn)) {
           e.preventDefault();
           openCalendarItemDetailPopup(itemViewBtn.getAttribute("data-item-id") || "", itemViewBtn.getAttribute("data-item-kind") || "");
+          return;
+        }
+        var eventEditBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-edit-event]") : null;
+        if (eventEditBtn && panel.contains(eventEditBtn)) {
+          e.preventDefault();
+          openCalendarEditPopup(eventEditBtn.getAttribute("data-event-id") || "", "evento");
+          return;
+        }
+        var itemEditBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-edit-item]") : null;
+        if (itemEditBtn && panel.contains(itemEditBtn)) {
+          e.preventDefault();
+          openCalendarEditPopup(itemEditBtn.getAttribute("data-item-id") || "", itemEditBtn.getAttribute("data-item-kind") || "");
           return;
         }
         var ticketViewBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-view-ticket]") : null;
