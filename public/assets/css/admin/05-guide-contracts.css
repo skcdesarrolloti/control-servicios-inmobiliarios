@@ -54,6 +54,12 @@
 .scm-go-title-icon {
   color: #facc15;
 }
+.scm-go-ms-icon {
+  flex: 0 0 auto;
+  font-size: 18px;
+  line-height: 1;
+  vertical-align: middle;
+}
 .scm-go-close {
   background: none;
   border: none;
@@ -153,7 +159,17 @@
 
 /* ── Búsqueda ───────────────────────────────────────────────────────── */
 .scm-go-search-wrap {
+  position: relative;
   margin-bottom: 4px;
+}
+.scm-go-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  z-index: 1;
+  color: #64748b;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 .scm-go-input {
   width: 100%;
@@ -167,6 +183,9 @@
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
+}
+.scm-go-input--with-icon {
+  padding-left: 40px;
 }
 .scm-go-input:focus {
   border-color: #2563eb;
@@ -220,6 +239,9 @@
   flex-shrink: 0;
   color: #fff;
 }
+.scm-go-card-icon .scm-go-ms-icon {
+  font-size: 18px;
+}
 .scm-go-card-extra {
   margin-top: 8px;
   padding: 8px 10px;
@@ -251,7 +273,7 @@
   align-items: center;
   gap: 8px;
 }
-.scm-go-empty i {
+.scm-go-empty .scm-go-ms-icon {
   font-size: 2rem;
 }
 
@@ -351,6 +373,10 @@
     opacity 0.15s;
   white-space: nowrap;
 }
+.scm-go-btn .scm-go-ms-icon,
+.scm-go-copy-btn .scm-go-ms-icon {
+  font-size: 16px;
+}
 .scm-go-btn--primary {
   background: #2563eb;
   color: #fff;
@@ -434,6 +460,9 @@
   white-space: nowrap;
 }
 .scm-go-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 3px 8px;
   font-size: 0.72rem;
   background: #f1f5f9;
@@ -490,6 +519,16 @@
   display: flex;
   align-items: center;
   gap: 7px;
+}
+
+.scm-go-spin {
+  animation: scm-go-spin 0.9s linear infinite;
+}
+
+@keyframes scm-go-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .scm-go-edit-body {
   padding: 18px;

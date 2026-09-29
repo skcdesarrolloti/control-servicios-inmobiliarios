@@ -13,6 +13,12 @@ final class GuideModalView
 {
   // ─── Punto de entrada ────────────────────────────────────────────────
 
+  private static function msIcon(string $name, string $class = ''): string
+  {
+    $classes = trim('material-symbols-outlined scm-go-ms-icon ' . $class);
+    return '<span class="' . esc_attr($classes) . '" aria-hidden="true">' . esc_html($name) . '</span>';
+  }
+
   public static function render(): string
   {
     ob_start();
@@ -23,23 +29,23 @@ final class GuideModalView
 
         <!-- Cabecera -->
         <div class="scm-go-header">
-          <h3><i class="fas fa-book-open scm-go-title-icon"></i> Guía de Referencia</h3>
+          <h3><?php echo self::msIcon('menu_book', 'scm-go-title-icon'); ?> Guía de Referencia</h3>
           <button type="button" class="scm-go-close" id="scm-close-guide" aria-label="Cerrar">&times;</button>
         </div>
 
         <!-- Barra de tabs principales -->
         <div class="scm-go-tabs-bar">
           <button type="button" class="scm-go-tab active" data-go-tab="estados">
-            <i class="fas fa-tags"></i> Estados
+            <?php echo self::msIcon('sell'); ?> Estados
           </button>
           <button type="button" class="scm-go-tab" data-go-tab="correspondencias">
-            <i class="fas fa-tools"></i> Correspondencias
+            <?php echo self::msIcon('construction'); ?> Correspondencias
           </button>
           <button type="button" class="scm-go-tab" data-go-tab="respuestas">
-            <i class="fas fa-comment-dots"></i> Respuestas
+            <?php echo self::msIcon('forum'); ?> Respuestas
           </button>
           <button type="button" class="scm-go-tab" data-go-tab="articulos">
-            <i class="fas fa-book-open"></i> Código Civil
+            <?php echo self::msIcon('gavel'); ?> Código Civil
           </button>
         </div>
 
@@ -123,12 +129,13 @@ final class GuideModalView
     ob_start();
   ?>
     <div class="scm-go-search-wrap">
-      <input type="text" id="scm-go-search" class="scm-go-input" placeholder="&#128269; Buscar estado..." autocomplete="off" oninput="scmGoSearch()">
+      <?php echo self::msIcon('search', 'scm-go-search-icon'); ?>
+      <input type="text" id="scm-go-search" class="scm-go-input scm-go-input--with-icon" placeholder="Buscar estado..." autocomplete="off" oninput="scmGoSearch()">
     </div>
 
     <div class="scm-go-subtabs">
       <button type="button" class="scm-go-subtab active" id="scm-go-subtab-adm" onclick="scmGoSubTab('adm')">
-        <i class="fas fa-tools"></i> Administrativos
+        <?php echo self::msIcon('engineering'); ?> Administrativos
       </button>
     </div>
 
@@ -137,7 +144,7 @@ final class GuideModalView
         <div class="scm-go-card" data-search="<?php echo esc_attr(mb_strtolower($item['titulo'])); ?>">
           <div class="scm-go-card-head">
             <span class="scm-go-card-icon <?php echo esc_attr($item['color']); ?>">
-              <i class="fas <?php echo esc_attr($item['icono']); ?>"></i>
+              <?php echo self::msIcon((string) $item['icono']); ?>
             </span>
             <h4><?php echo esc_html($item['titulo']); ?></h4>
           </div>
@@ -147,7 +154,7 @@ final class GuideModalView
     </div>
 
     <div id="scm-go-no-results" class="scm-go-empty" style="display:none">
-      <i class="fas fa-search"></i><span>Sin resultados para tu búsqueda.</span>
+      <?php echo self::msIcon('search_off'); ?><span>Sin resultados para tu búsqueda.</span>
     </div>
   <?php
     return (string) ob_get_clean();
@@ -174,18 +181,18 @@ final class GuideModalView
           <?php endif; ?>
         <?php endforeach; ?>
         <button type="submit" class="scm-go-btn scm-go-btn--primary">
-          <i class="fas fa-search"></i> Filtrar
+          <?php echo self::msIcon('search'); ?> Filtrar
         </button>
         <button type="button" class="scm-go-btn scm-go-btn--secondary" onclick="scmGoReset('<?php echo esc_attr($prefix); ?>')">
-          <i class="fas fa-undo"></i> Limpiar
+          <?php echo self::msIcon('backspace'); ?> Limpiar
         </button>
       </form>
       <button type="button" class="scm-go-btn scm-go-btn--success" onclick="scmGoModal('<?php echo esc_attr($prefix); ?>', null)">
-        <i class="fas fa-plus-circle"></i> Nuevo
+        <?php echo self::msIcon('add_circle'); ?> Nuevo
       </button>
     </div>
     <div id="scm-<?php echo esc_attr($prefix); ?>-result" class="scm-go-result">
-      <div class="scm-go-loading"><i class="fas fa-circle-notch fa-spin"></i></div>
+      <div class="scm-go-loading"><?php echo self::msIcon('progress_activity', 'scm-go-spin'); ?></div>
     </div>
   <?php
     return (string) ob_get_clean();
@@ -203,7 +210,7 @@ final class GuideModalView
     <div id="scm-gcd-edit" class="scm-go-edit-overlay" style="display:none" aria-hidden="true">
       <div class="scm-go-edit-dialog">
         <div class="scm-go-edit-header">
-          <h4 id="scm-gcd-edit-title"><i class="fas fa-tools"></i> Correspondencia</h4>
+          <h4 id="scm-gcd-edit-title"><?php echo self::msIcon('construction'); ?> Correspondencia</h4>
           <button type="button" class="scm-go-close" onclick="document.getElementById('scm-gcd-edit').style.display='none'">&times;</button>
         </div>
         <div class="scm-go-edit-body">
@@ -248,7 +255,7 @@ final class GuideModalView
         <div class="scm-go-edit-footer">
           <button type="button" class="scm-go-btn scm-go-btn--secondary" onclick="document.getElementById('scm-gcd-edit').style.display='none'">Cancelar</button>
           <button type="button" class="scm-go-btn scm-go-btn--primary" id="scm-gcd-save-btn" onclick="scmGoSave('gcd')">
-            <i class="fas fa-save"></i> Guardar
+            <?php echo self::msIcon('save'); ?> Guardar
           </button>
         </div>
       </div>
@@ -266,7 +273,7 @@ final class GuideModalView
     <div id="scm-grt-edit" class="scm-go-edit-overlay" style="display:none" aria-hidden="true">
       <div class="scm-go-edit-dialog">
         <div class="scm-go-edit-header">
-          <h4 id="scm-grt-edit-title"><i class="fas fa-comment-dots"></i> Respuesta</h4>
+          <h4 id="scm-grt-edit-title"><?php echo self::msIcon('forum'); ?> Respuesta</h4>
           <button type="button" class="scm-go-close" onclick="document.getElementById('scm-grt-edit').style.display='none'">&times;</button>
         </div>
         <div class="scm-go-edit-body">
@@ -297,7 +304,7 @@ final class GuideModalView
         <div class="scm-go-edit-footer">
           <button type="button" class="scm-go-btn scm-go-btn--secondary" onclick="document.getElementById('scm-grt-edit').style.display='none'">Cancelar</button>
           <button type="button" class="scm-go-btn scm-go-btn--primary" id="scm-grt-save-btn" onclick="scmGoSave('grt')">
-            <i class="fas fa-save"></i> Guardar
+            <?php echo self::msIcon('save'); ?> Guardar
           </button>
         </div>
       </div>
@@ -313,7 +320,7 @@ final class GuideModalView
     <div id="scm-gac-edit" class="scm-go-edit-overlay" style="display:none" aria-hidden="true">
       <div class="scm-go-edit-dialog">
         <div class="scm-go-edit-header">
-          <h4 id="scm-gac-edit-title"><i class="fas fa-book-open"></i> Artículo Código Civil</h4>
+          <h4 id="scm-gac-edit-title"><?php echo self::msIcon('gavel'); ?> Artículo Código Civil</h4>
           <button type="button" class="scm-go-close" onclick="document.getElementById('scm-gac-edit').style.display='none'">&times;</button>
         </div>
         <div class="scm-go-edit-body">
@@ -330,7 +337,7 @@ final class GuideModalView
         <div class="scm-go-edit-footer">
           <button type="button" class="scm-go-btn scm-go-btn--secondary" onclick="document.getElementById('scm-gac-edit').style.display='none'">Cancelar</button>
           <button type="button" class="scm-go-btn scm-go-btn--primary" id="scm-gac-save-btn" onclick="scmGoSave('gac')">
-            <i class="fas fa-save"></i> Guardar
+            <?php echo self::msIcon('save'); ?> Guardar
           </button>
         </div>
       </div>
@@ -347,99 +354,99 @@ final class GuideModalView
     return [
       [
         'titulo' => 'Nuevo',
-        'icono'  => 'fa-star',
+        'icono'  => 'star',
         'color'  => 'scm-gc-yellow',
         'desc'   => 'Estado inicial generado automáticamente cuando se crea un ticket.',
       ],
       [
         'titulo' => 'Contactado',
-        'icono'  => 'fa-headset',
+        'icono'  => 'support_agent',
         'color'  => 'scm-gc-blue',
         'desc'   => 'El A/C estableció contacto (llamada, email, WhatsApp o personalmente) con el cliente.',
       ],
       [
         'titulo' => 'Prospectado',
-        'icono'  => 'fa-magnifying-glass-dollar',
+        'icono'  => 'manage_search',
         'color'  => 'scm-gc-green',
         'desc'   => 'Se estableció relación con el cliente y se diligencia el formulario de prospectación para conocer su necesidad.',
       ],
       [
         'titulo' => 'Mostrando',
-        'icono'  => 'fa-eye',
+        'icono'  => 'visibility',
         'color'  => 'scm-gc-purple',
         'desc'   => 'Se hace la presentación de inmuebles requeridos (máx. 4). Puede ser presencial, documental o virtual.',
       ],
       [
         'titulo' => 'En cierre',
-        'icono'  => 'fa-file-signature',
+        'icono'  => 'contract_edit',
         'color'  => 'scm-gc-indigo',
         'desc'   => 'En proceso de elaboración de contrato o promesa de venta. Incluye revisión de servicios y paz y salvos.',
         'extra'  => '<p style="margin:.5rem 0 .25rem;font-weight:700;font-size:.7rem;color:#6b7280;text-transform:uppercase;">Tiempo estimado según conservación:</p><ul style="list-style:none;padding:0;margin:0;font-size:.82rem"><li><strong style="color:#16a34a">5</strong> — Entrega inmediata</li><li><strong style="color:#16a34a">4</strong> — 1 día hábil</li><li><strong style="color:#ca8a04">3</strong> — 2 días hábiles</li><li><strong style="color:#ea580c">2</strong> — 5 días hábiles</li><li><strong style="color:#dc2626">1</strong> — Sin fecha definida</li></ul>',
       ],
       [
         'titulo' => 'Entregado',
-        'icono'  => 'fa-key',
+        'icono'  => 'key',
         'color'  => 'scm-gc-teal',
         'desc'   => 'Se realiza la entrega física del inmueble al arrendatario o comprador.',
       ],
       [
         'titulo' => 'Por publicar',
-        'icono'  => 'fa-cloud-upload-alt',
+        'icono'  => 'cloud_upload',
         'color'  => 'scm-gc-cyan',
         'desc'   => 'Captación/re-captación agendada; está en proceso de ser verificada y publicada por el asistente.',
       ],
       [
         'titulo' => 'En estudio',
-        'icono'  => 'fa-file-contract',
+        'icono'  => 'contract',
         'color'  => 'scm-gc-blue-dk',
         'desc'   => 'Documentos enviados a la Afianzadora o al Banco.',
         'nota'   => 'Una vez se obtenga el asegurable se debe hacer la inspección antes de la ocupación.',
       ],
       [
         'titulo' => 'En búsqueda',
-        'icono'  => 'fa-binoculars',
+        'icono'  => 'travel_explore',
         'color'  => 'scm-gc-amber',
         'desc'   => 'No existe en la oferta el inmueble requerido y se sale a conseguirlo.',
       ],
       [
         'titulo' => 'Captado',
-        'icono'  => 'fa-check-circle',
+        'icono'  => 'check_circle',
         'color'  => 'scm-gc-green-lt',
         'desc'   => 'El inmueble fue captado y hace parte del portafolio a promocionar.',
       ],
       [
         'titulo' => 'Recaptado',
-        'icono'  => 'fa-sync-alt',
+        'icono'  => 'sync',
         'color'  => 'scm-gc-green-dk',
         'desc'   => 'El inmueble fue recaptado y vuelve al portafolio a promocionar.',
       ],
       [
         'titulo' => 'Aplazado',
-        'icono'  => 'fa-clock',
+        'icono'  => 'schedule',
         'color'  => 'scm-gc-orange',
         'desc'   => 'Las aseguradoras o entidades financieras aplazan la solicitud por falta de documentos.',
       ],
       [
         'titulo' => 'Trasladado',
-        'icono'  => 'fa-exchange-alt',
+        'icono'  => 'swap_horiz',
         'color'  => 'scm-gc-gray',
         'desc'   => 'El cliente solicita cambio en la destinación o cambio de asesor.',
       ],
       [
         'titulo' => 'Rechazado',
-        'icono'  => 'fa-ban',
+        'icono'  => 'block',
         'color'  => 'scm-gc-red',
         'desc'   => 'Las aseguradoras niegan el arriendo o el Banco niega el crédito.',
       ],
       [
         'titulo' => 'Postergado',
-        'icono'  => 'fa-calendar-minus',
+        'icono'  => 'event_busy',
         'color'  => 'scm-gc-gray-lt',
         'desc'   => 'El cliente solicita prolongación en el tiempo para definir el negocio.',
       ],
       [
         'titulo' => 'Desistido',
-        'icono'  => 'fa-times-circle',
+        'icono'  => 'cancel',
         'color'  => 'scm-gc-red-lt',
         'desc'   => 'El cliente desiste del negocio o el presupuesto no se ajusta al mercado.',
       ],
@@ -454,91 +461,91 @@ final class GuideModalView
     return [
       [
         'titulo'    => 'Nuevo',
-        'icono'     => 'fa-bolt',
+        'icono'     => 'bolt',
         'color'     => 'scm-gc-yellow',
         'contenido' => '<strong>Definición:</strong> Estado inicial para notificar asignación de tarea.<br><br><strong>Política:</strong> Atender de forma inmediata (2 h máx.) y coordinar visita.',
       ],
       [
         'titulo'    => 'En espera de respuesta',
-        'icono'     => 'fa-hourglass-half',
+        'icono'     => 'hourglass_top',
         'color'     => 'scm-gc-blue',
         'contenido' => '<strong>Definición:</strong> Se ha contactado al cliente para definir la fecha de visita.<br><br><strong>Política:</strong> Dejar constancia de la actividad realizada.',
       ],
       [
         'titulo'    => 'Por inspeccionar',
-        'icono'     => 'fa-calendar-check',
+        'icono'     => 'event_available',
         'color'     => 'scm-gc-blue',
         'contenido' => '<strong>Definición:</strong> La cita o visita ya fue agendada y el caso queda pendiente de realizar la inspección o revisión correspondiente.<br><br><strong>Política:</strong> Dejar constancia de la fecha y hora de la visita programada y actualizar el caso cuando se realice la inspección o revisión.',
       ],
       [
         'titulo'    => 'Inspeccionado',
-        'icono'     => 'fa-clipboard-list',
+        'icono'     => 'fact_check',
         'color'     => 'scm-gc-indigo',
         'contenido' => '<strong>Definición:</strong> Valoración técnica de daños, causas y consecuencias.<br><br><strong>Política:</strong> Clasificar actividades de solución. Registro fotográfico con FECHA, HORA, DIRECCIÓN y COORDENADAS.',
       ],
       [
         'titulo'    => 'Cotizado',
-        'icono'     => 'fa-file-invoice-dollar',
+        'icono'     => 'request_quote',
         'color'     => 'scm-gc-green',
         'contenido' => '<strong>Definición:</strong> Valoración económica (mano de obra, materiales, etc.).<br><br><strong>Política:</strong> Discriminar actividades detalladamente y anexar cotizaciones de proveedores.',
       ],
       [
         'titulo'    => 'En ejecución por inmobiliaria',
-        'icono'     => 'fa-tools',
+        'icono'     => 'construction',
         'color'     => 'scm-gc-orange',
         'contenido' => '<strong>Definición:</strong> La inmobiliaria gestiona directamente la reparación o actividad pendiente.<br><br><strong>Política:</strong> Registrar seguimientos con fotos, avances, proveedor asignado y fecha estimada de cierre.',
       ],
       [
         'titulo'    => 'En ejecución por propietario',
-        'icono'     => 'fa-user-tie',
+        'icono'     => 'person',
         'color'     => 'scm-gc-blue',
         'contenido' => '<strong>Definición:</strong> El propietario asumió la ejecución de la reparación o actividad pendiente.<br><br><strong>Política:</strong> Hacer seguimiento al propietario, solicitar soportes/fotos y validar terminación antes del acta de satisfacción.',
       ],
       [
         'titulo'    => 'En ejecución por arrendatario',
-        'icono'     => 'fa-user-check',
+        'icono'     => 'how_to_reg',
         'color'     => 'scm-gc-indigo',
         'contenido' => '<strong>Definición:</strong> El arrendatario asumió la ejecución de la reparación o actividad pendiente.<br><br><strong>Política:</strong> Dejar evidencia de autorización, responsable, soportes y validación final para evitar reprocesos.',
       ],
       [
         'titulo'    => 'En ejecución por copropiedad',
-        'icono'     => 'fa-building',
+        'icono'     => 'apartment',
         'color'     => 'scm-gc-teal',
         'contenido' => '<strong>Definición:</strong> La solución depende de la copropiedad, administración del edificio o zona común.<br><br><strong>Política:</strong> Registrar radicados, contactos, respuestas de administración y fechas de seguimiento hasta cierre.',
       ],
       [
         'titulo'    => 'Finalizado',
-        'icono'     => 'fa-flag-checkered',
+        'icono'     => 'flag',
         'color'     => 'scm-gc-green-dk',
         'contenido' => '<strong>Definición:</strong> Reparación terminada y acta firmada.<br><br><strong>Política:</strong> Solo cerrar ticket con Acta de Satisfacción firmada. <em>Encuesta se envía con el acta.</em>',
       ],
       [
         'titulo'    => 'En espera de firma',
-        'icono'     => 'fa-file-signature',
+        'icono'     => 'draw',
         'color'     => 'scm-gc-blue',
         'contenido' => '<strong>Definición:</strong> Acta de solución generada y pendiente de aceptación del firmante seleccionado.<br><br><strong>Política:</strong> Registrar daños, soluciones y observaciones. El ticket permanece abierto; la firma registra el cierre y un único reporte administrativo. Para corregir el documento, anular la versión pendiente y generar otra.',
       ],
       [
         'titulo'    => 'Entregado',
-        'icono'     => 'fa-key',
+        'icono'     => 'key',
         'color'     => 'scm-gc-teal',
         'contenido' => '<strong>Definición:</strong> Entrega del inmueble al Arrendatario.<br><br><strong>Política:</strong> Revisión previa, Inventario, Acta de entrega y Fotos (Fecha/Hora/Coords). <em>Encuesta con el acta.</em>',
       ],
       [
         'titulo'    => 'Recibido',
-        'icono'     => 'fa-box-open',
+        'icono'     => 'inventory_2',
         'color'     => 'scm-gc-blue-dk',
         'contenido' => '<strong>Definición:</strong> Recepción del inmueble del Arrendatario o devolución al Propietario.<br><br><strong>Política:</strong> Revisión, Acta de desocupación/recibo y Fotos. <em>Encuesta con el acta.</em>',
       ],
       [
         'titulo'    => 'Desistido',
-        'icono'     => 'fa-thumbs-down',
+        'icono'     => 'thumb_down',
         'color'     => 'scm-gc-red-lt',
         'contenido' => '<strong>Definición:</strong> Negocio no concretado o reparación no aprobada.<br><br><strong>Política:</strong> Contener pruebas en historial (chats, fotos, correos).',
       ],
       [
         'titulo'    => 'Trasladado',
-        'icono'     => 'fa-share-square',
+        'icono'     => 'ios_share',
         'color'     => 'scm-gc-gray',
         'contenido' => '<strong>Definición:</strong> Responsabilidad trasladada a otro funcionario.<br><br><strong>Política:</strong> Daños de tercero (Copropiedad) se reasignan al líder de área.',
       ],

@@ -58,6 +58,16 @@
       .replace(/"/g, "&quot;");
   }
 
+  function msIcon(name, extraClass) {
+    return (
+      '<span class="material-symbols-outlined scm-go-ms-icon ' +
+      esc(extraClass || "") +
+      '" aria-hidden="true">' +
+      esc(name) +
+      "</span>"
+    );
+  }
+
   // ── Tab switching ─────────────────────────────────────────────────
 
   window.scmGoTab = function (tabKey) {
@@ -154,7 +164,9 @@
     var container = document.getElementById("scm-" + prefix + "-result");
     if (!container) return;
     container.innerHTML =
-      '<div class="scm-go-loading"><i class="fas fa-circle-notch fa-spin"></i></div>';
+      '<div class="scm-go-loading">' +
+      msIcon("progress_activity", "scm-go-spin") +
+      "</div>";
 
     var filters = {};
     var filtersForm = document.getElementById("scm-" + prefix + "-filters");
@@ -238,10 +250,10 @@
       if (titleEl)
         titleEl.innerHTML =
           prefix === "gcd"
-            ? '<i class="fas fa-tools"></i> Nueva Correspondencia'
+            ? msIcon("construction") + " Nueva Correspondencia"
             : prefix === "grt"
-              ? '<i class="fas fa-comment-dots"></i> Nueva Respuesta'
-              : '<i class="fas fa-book-open"></i> Nuevo Artículo';
+              ? msIcon("forum") + " Nueva Respuesta"
+              : msIcon("gavel") + " Nuevo Artículo";
       if (prefix === "gcd") {
         document.getElementById("scm-gcd-id").value = "";
         document.getElementById("scm-gcd-desc").value = "";
@@ -266,12 +278,12 @@
       if (titleEl)
         titleEl.innerHTML =
           prefix === "gcd"
-            ? '<i class="fas fa-tools"></i> Editar Correspondencia #' +
+            ? msIcon("construction") + " Editar Correspondencia #" +
               esc(row._ID)
             : prefix === "grt"
-              ? '<i class="fas fa-comment-dots"></i> Editar Respuesta #' +
+              ? msIcon("forum") + " Editar Respuesta #" +
                 esc(row._ID)
-              : '<i class="fas fa-book-open"></i> Editar Artículo #' +
+              : msIcon("gavel") + " Editar Artículo #" +
                 esc(row._ID);
       if (prefix === "gcd") {
         document.getElementById("scm-gcd-id").value = row._ID || "";
@@ -466,10 +478,14 @@
         '<td><div class="scm-go-table-actions">' +
         '<button class="scm-go-btn scm-go-btn--secondary" style="padding:4px 8px" onclick=\'scmGoModal("gcd",' +
         JSON.stringify(r) +
-        ')\'><i class="fas fa-edit"></i> Editar</button>' +
+        ")'>" +
+        msIcon("edit") +
+        " Editar</button>" +
         '<button class="scm-go-btn scm-go-btn--danger" style="padding:4px 8px" onclick="scmGoDel(\'gcd\',' +
         esc(r._ID) +
-        ')"><i class="fas fa-trash"></i> Eliminar</button>' +
+        ')">' +
+        msIcon("delete") +
+        " Eliminar</button>" +
         "</div></td>" +
         "</tr>";
     });
@@ -505,13 +521,19 @@
         '<td><div class="scm-go-table-actions">' +
         '<button class="scm-go-copy-btn" onclick=\'scmGoCopy(' +
         JSON.stringify(respText) +
-        ')\'><i class="fas fa-copy"></i> Copiar</button>' +
+        ")'>" +
+        msIcon("content_copy") +
+        " Copiar</button>" +
         '<button class="scm-go-btn scm-go-btn--secondary" style="padding:4px 8px" onclick=\'scmGoModal("grt",' +
         JSON.stringify(r) +
-        ')\'><i class="fas fa-edit"></i> Editar</button>' +
+        ")'>" +
+        msIcon("edit") +
+        " Editar</button>" +
         '<button class="scm-go-btn scm-go-btn--danger" style="padding:4px 8px" onclick="scmGoDel(\'grt\',' +
         esc(r._ID) +
-        ')"><i class="fas fa-trash"></i> Eliminar</button>' +
+        ')">' +
+        msIcon("delete") +
+        " Eliminar</button>" +
         "</div></td>" +
         "</tr>";
     });
@@ -542,10 +564,14 @@
         '<td><div class="scm-go-table-actions">' +
         '<button class="scm-go-btn scm-go-btn--secondary" style="padding:4px 8px" onclick=\'scmGoModal("gac",' +
         JSON.stringify(r) +
-        ')\'><i class="fas fa-edit"></i> Editar</button>' +
+        ")'>" +
+        msIcon("edit") +
+        " Editar</button>" +
         '<button class="scm-go-btn scm-go-btn--danger" style="padding:4px 8px" onclick="scmGoDel(\'gac\',' +
         esc(r._ID) +
-        ')"><i class="fas fa-trash"></i> Eliminar</button>' +
+        ')">' +
+        msIcon("delete") +
+        " Eliminar</button>" +
         "</div></td>" +
         "</tr>";
     });
