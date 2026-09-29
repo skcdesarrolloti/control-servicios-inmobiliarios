@@ -20714,6 +20714,108 @@
       }
     });
 
+    function cssAttrValue(value) {
+      return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    }
+
+    function notificationCaseSelectors(ticketPk, logicalId) {
+      var pk = cssAttrValue(ticketPk);
+      var logical = cssAttrValue(logicalId);
+      var selectors = [];
+      if (pk) {
+        selectors.push('.scm-btn-case[data-ticket-pk="' + pk + '"]');
+        selectors.push('.scm-btn-case[data-ticket="' + pk + '"]');
+        selectors.push('[data-scm-open-linked-ticket-case][data-ticket-pk="' + pk + '"]');
+        selectors.push('[data-ticket-id="' + pk + '"]');
+      }
+      if (logical && logical !== pk) {
+        selectors.push('.scm-btn-case[data-ticket="' + logical + '"]');
+        selectors.push('[data-ticket-id="' + logical + '"]');
+      }
+      return selectors;
+    }
+
+    function findNotificationCaseButton(container, ticketPk, logicalId) {
+      var base = container || document;
+      var selectors = notificationCaseSelectors(ticketPk, logicalId);
+      for (var i = 0; i < selectors.length; i += 1) {
+        var btn = base.querySelector(selectors[i]);
+        if (btn) {
+          return btn;
+        }
+      }
+      return null;
+    }
+
+    function withCaseFilter(form, logicalId, ticketPk) {
+      var fd = new FormData(form);
+      var wanted = String(logicalId || ticketPk || "").trim();
+      if (!wanted) {
+        return fd;
+      }
+      var caseInput = form.querySelector('input[name$="caso"]:not([name$="magnitud_caso"])');
+      if (caseInput && caseInput.name) {
+        fd.set(caseInput.name, wanted);
+      } else {
+        var pageInput = form.querySelector('input[name$="page"]');
+        var pageName = pageInput && pageInput.name ? pageInput.name : "";
+        if (pageName && pageName.slice(-4) === "page") {
+          fd.set(pageName.slice(0, -4) + "caso", wanted);
+        }
+      }
+      var fdPage = form.querySelector('input[name$="page"]');
+      if (fdPage && fdPage.name) {
+        fd.set(fdPage.name, "1");
+      }
+      return fd;
+    }
+
+    function openButtonFromNotification(btn) {
+      if (!btn || typeof window.scmOpenCase !== "function") {
+        return false;
+      }
+      window.scmOpenCase(btn);
+      return true;
+    }
+
+    window.scmOpenOperationalNotificationCase = function (payload) {
+      payload = payload || {};
+      var ticketPk = String(payload.ticketPk || payload.ticket_pk || "").trim();
+      var logicalId = String(payload.logicalId || payload.logical_id || payload.ticket || "").trim();
+      var subtab = String(payload.subtab || "").trim() || "mant";
+      var isMine = payload.isMine === true || String(payload.isMine || "") === "1";
+
+      var currentBtn = findNotificationCaseButton(document, ticketPk, logicalId);
+      if (openButtonFromNotification(currentBtn)) {
+        return Promise.resolve(true);
+      }
+
+      var fetchKey = isMine ? "mis_tickets" : subtab;
+      var fetchPromise = null;
+
+      if (fetchKey === "mant") {
+        if (!form || typeof doFetch !== "function") {
+          fetchPromise = Promise.resolve();
+        } else {
+          fetchPromise = doFetch(withCaseFilter(form, logicalId, ticketPk));
+        }
+      } else if (tabFetchers[fetchKey] && tabFetchers[fetchKey].form) {
+        fetchPromise = tabFetchers[fetchKey].fetchTab(
+          withCaseFilter(tabFetchers[fetchKey].form, logicalId, ticketPk),
+        );
+      } else {
+        fetchPromise = Promise.resolve();
+      }
+
+      return fetchPromise.then(function () {
+        var loadedBtn = findNotificationCaseButton(document, ticketPk, logicalId);
+        if (openButtonFromNotification(loadedBtn)) {
+          return true;
+        }
+        throw new Error("No se encontro el caso en el panel cargado.");
+      });
+    };
+
     // Seguimiento form
     function loadPanelOnce(panel, fetcherKey) {
       if (!panel || !fetcherKey || !tabFetchers[fetcherKey]) {

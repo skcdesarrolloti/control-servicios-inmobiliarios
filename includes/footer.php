@@ -132,6 +132,21 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           notifDropdown.classList.add('hidden');
           notifBtn.setAttribute('aria-expanded', 'false');
 
+          const isMine = item.getAttribute('data-scm-notif-is-mine') === '1';
+          const subtab = item.getAttribute('data-scm-notif-subtab') || '';
+          if (typeof window.scmOpenOperationalNotificationCase === 'function') {
+            window.scmOpenOperationalNotificationCase({
+              ticketPk: ticketPk,
+              logicalId: logicalId,
+              isMine: isMine,
+              subtab: subtab
+            }).catch(function () {
+              const targetUrl = appBaseUrl + '/index.php?tab=' + (isMine ? 'mis_tickets' : 'abiertos') + (subtab && !isMine ? '&scm_tab=' + encodeURIComponent(subtab) : '') + '&ticket=' + encodeURIComponent(logicalId);
+              window.location.href = targetUrl;
+            });
+            return;
+          }
+
           // Buscar botón de caso en la vista activa
           const selectors = [
             '.scm-btn-case[data-ticket-pk="' + ticketPk + '"]',
@@ -151,8 +166,6 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           }
 
           // Si no está en el DOM actual, cargar la vista interna y abrir el popup sin navegar.
-          const isMine = item.getAttribute('data-scm-notif-is-mine') === '1';
-          const subtab = item.getAttribute('data-scm-notif-subtab') || '';
           const scmApp = document.getElementById('scm-app');
           if (scmApp) {
             const targetPanel = isMine ? 'scm-panel-mis-tickets' : 'scm-panel-abiertos';
