@@ -1585,7 +1585,13 @@
           options.body = JSON.stringify(payload);
         }
         return fetch(calendarApiUrl + encodeURIComponent(action), options).then(function (r) {
-          return r.json();
+          return r.text().then(function (body) {
+            try {
+              return JSON.parse(body);
+            } catch (err) {
+              throw new Error("La API del calendario devolvio una respuesta no valida en " + action + " (HTTP " + r.status + ").");
+            }
+          });
         });
       }
 
@@ -2487,7 +2493,9 @@
           (ticket ? '<span>Ticket #' + escHtml(ticket) + "</span>" : "") +
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
-          (isEventKind && id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Ver evento</button>' : "") +
+          (id ? (isEventKind
+            ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Ver evento</button>'
+            : '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-item data-item-id="' + escHtml(id) + '" data-item-kind="' + escHtml(kind) + '">Ver ' + escHtml(kindLabel.toLowerCase()) + '</button>') : "") +
           (isEventKind && ticket ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver caso</button>' : "") +
           (isEventKind && id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Marcar realizado</button>' : "") +
           (isEventKind && id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar evento</button>' : "") +
@@ -2631,9 +2639,11 @@
         var color = String(row.color || "#f97316").trim() || "#f97316";
         var id = String(row.id || row._ID || row.event_id || "").trim();
         var kind = calendarItemKind(row);
-        var tag = kind === "evento" && id ? "button" : "div";
+        var tag = id ? "button" : "div";
         var attrs = tag === "button"
-          ? ' type="button" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '"'
+          ? (kind === "evento"
+            ? ' type="button" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '"'
+            : ' type="button" data-scm-calendar-view-item data-item-id="' + escHtml(id) + '" data-item-kind="' + escHtml(kind) + '"')
           : ' role="group"';
         var timeLabel = (timePartFromDateTime(row.fecha_inicio) || timeFromMinutes(start)) + " - " + (timePartFromDateTime(row.fecha_fin) || timeFromMinutes(end));
         var dayIndex = Math.max(0, columnIndex - 2);
@@ -3541,7 +3551,7 @@
           .catch(function (err) {
             if (monthGrid) monthGrid.innerHTML = '<div class="scm-calendar-loading">No se pudo cargar el calendario.</div>';
             if (eventsWrap) eventsWrap.innerHTML = '<div class="scm-empty scm-empty-cards">No se pudieron cargar eventos.</div>';
-            showToast("error", err.message || "No se pudieron cargar eventos.");
+            showToast("error", err.message || "No se pudieron cargar eventos.", "No se pudo cargar el calendario");
           })
           .finally(function () {
             if (spinner) spinner.classList.remove("active");
@@ -4135,11 +4145,7 @@
       }
 
       function calendarEventById(id) {
-        id = String(id || "").trim();
-        if (!id) return null;
-        return calendarEvents.concat(calendarPendingRows).find(function (row) {
-          return String(row.id || row._ID || row.event_id || "").trim() === id;
-        }) || null;
+        return calendarItemById(id, "evento");
       }
 
       function calendarItemById(id, kind) {
@@ -4549,6 +4555,51 @@
             event.preventDefault();
             window.Swal.close();
           }
+        });
+      }
+
+      function openCalendarItemDetailPopup(itemId, kind) {
+        if (!window.Swal || typeof window.Swal.fire !== "function") {
+          showToast("error", "No esta disponible el detalle del calendario.");
+          return;
+        }
+        if (kind !== "tarea" && kind !== "recordatorio") return;
+        var row = calendarItemById(itemId, kind);
+        if (!row) {
+          showToast("error", "No encontre el elemento seleccionado.");
+          return;
+        }
+        var label = calendarItemKindLabel(row);
+        var description = calendarDetailValue(row, ["descripcion", "detalle", "mensaje"]);
+        var dateLabel = kind === "recordatorio" ? "Aviso programado" : "Inicio";
+        var dateValue = kind === "recordatorio" ? (row.recordatorio_at || row.fecha_inicio) : row.fecha_inicio;
+        var html = '<div class="scm-calendar-event-detail-modern">' +
+          '<header class="scm-calendar-event-detail-head"><div><span>Detalle de ' + escHtml(label.toLowerCase()) + '</span></div>' +
+          '<h3>' + escHtml(row.titulo || label) + '</h3>' +
+          '<button type="button" class="scm-calendar-modern-close" data-scm-calendar-close aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>' +
+          '<section class="scm-calendar-event-detail-body"><div class="scm-calendar-detail-info-grid">' +
+          calendarDetailCardHtml("schedule", dateLabel, formatDateTime(dateValue), false) +
+          (kind === "tarea" ? calendarDetailCardHtml("event", "Limite", formatDateTime(row.fecha_limite || row.fecha_fin), false) : "") +
+          calendarDetailCardHtml("task_alt", "Estado", calendarItemStatusLabel(row), false) +
+          calendarDetailCardHtml("category", "Categoria", categoryNameForRow(row), false) +
+          calendarDetailCardHtml("person", "Funcionario", employeeNameForRow(row), false) +
+          calendarDetailCardHtml("location_on", "Ubicacion", row.ubicacion || "", true) +
+          (kind === "recordatorio" ? calendarDetailCardHtml("notifications", "Canal", row.recordatorio_canal || row.canal || "", false) : "") +
+          '</div>' + (description ? '<div class="scm-calendar-detail-description"><div><span>Descripci&oacute;n</span></div><p>' + calendarRichTextHtml(description) + '</p></div>' : "") +
+          '</section><footer class="scm-calendar-event-detail-foot"><div></div><button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--dark" data-scm-calendar-close>Cerrar</button></footer></div>';
+        window.Swal.fire({
+          title: "",
+          html: html,
+          width: 720,
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal scm-calendar-event-detail-swal" },
+          showConfirmButton: false,
+          didOpen: function () {
+            var popup = window.Swal.getPopup();
+            if (!popup) return;
+            popup.querySelectorAll("[data-scm-calendar-close]").forEach(function (button) {
+              button.addEventListener("click", function () { window.Swal.close(); });
+            });
+          },
         });
       }
 
@@ -6129,6 +6180,12 @@
           openCalendarEventDetailPopup(eventViewBtn.getAttribute("data-event-id") || "");
           return;
         }
+        var itemViewBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-view-item]") : null;
+        if (itemViewBtn && panel.contains(itemViewBtn)) {
+          e.preventDefault();
+          openCalendarItemDetailPopup(itemViewBtn.getAttribute("data-item-id") || "", itemViewBtn.getAttribute("data-item-kind") || "");
+          return;
+        }
         var ticketViewBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-view-ticket]") : null;
         if (ticketViewBtn && panel.contains(ticketViewBtn)) {
           e.preventDefault();
@@ -6291,8 +6348,8 @@
       cardsEl.setAttribute("aria-busy", isLoading ? "true" : "false");
     }
 
-    function showToast(type, message) {
-      return scmNotify(type, message);
+    function showToast(type, message, title) {
+      return scmNotify(type, message, title);
     }
 
     var adminNotificationsPanelPromise = null;
