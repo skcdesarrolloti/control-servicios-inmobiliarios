@@ -6947,7 +6947,12 @@
       }
     }
 
-    composer.addEventListener("paste", handleClipboardImagePaste);
+    // The composer is inside the modal: one listener handles either paste target.
+    // Remove the previous handler when reopening this reused modal.
+    if (modal._scmComposerPasteHandler) {
+      modal.removeEventListener("paste", modal._scmComposerPasteHandler);
+    }
+    modal._scmComposerPasteHandler = handleClipboardImagePaste;
     modal.addEventListener("paste", handleClipboardImagePaste);
 
     // Drag and drop images and documents onto composer
@@ -7296,7 +7301,9 @@
     }
 
     if (submitBtn) {
+      var composerSubmitting = false;
       submitBtn.addEventListener("click", function () {
+        if (composerSubmitting) return;
         var text = (input ? input.value : "").trim();
         if (!text) {
           if (input) input.focus();
@@ -7362,6 +7369,7 @@
         }
 
         var origBtnHtml = submitBtn.innerHTML;
+        composerSubmitting = true;
         submitBtn.disabled = true;
         submitBtn.innerHTML =
           '<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span> Guardando...';
@@ -7500,6 +7508,7 @@
             }
           })
           .finally(function () {
+            composerSubmitting = false;
             submitBtn.disabled = false;
             submitBtn.innerHTML = origBtnHtml;
           });
@@ -8244,6 +8253,37 @@
           ),
         );
         var allHistoryArticles = [];
+        var historyEntries = new Set();
+        var followupEntries = new Set();
+
+        function timelineEntryKey(item) {
+          var detail = item.querySelector(".scm-case-history-detail");
+          var author = item.querySelector(".scm-case-history-meta strong, .scm-case-record-title strong");
+          if (!detail || !author) return "";
+          return [
+            item.getAttribute("data-timestamp") || "",
+            author.textContent.trim(),
+            detail.textContent.trim(),
+          ].join("\u0000");
+        }
+
+        // A follow-up is stored in both the follow-up table and case history.
+        // The unified feed should show that single action only once.
+        historySections.forEach(function (sec) {
+          var heading = sec.querySelector("h4");
+          if (!heading) return;
+          var title = heading.textContent.toLowerCase();
+          var entries = title.indexOf("historial del caso") !== -1
+            ? historyEntries
+            : title.indexOf("seguimiento") !== -1
+              ? followupEntries
+              : null;
+          if (!entries) return;
+          sec.querySelectorAll(".scm-case-history-item").forEach(function (item) {
+            var key = timelineEntryKey(item);
+            if (key) entries.add(key);
+          });
+        });
 
         historySections.forEach(function (sec) {
           var h4 = sec.querySelector("h4");
@@ -8256,6 +8296,8 @@
 
           var items = sec.querySelectorAll(".scm-case-history-item");
           items.forEach(function (item) {
+            var entryKey = timelineEntryKey(item);
+            if (isSeguimientoSection && entryKey && historyEntries.has(entryKey)) return;
             var rawType = item.getAttribute("data-history-type") || "";
             var itemText = (item.textContent || "").toLowerCase();
             var classifiedType = "reply";
@@ -8270,6 +8312,7 @@
             } else if (
               rawType === "followup" ||
               isSeguimientoSection ||
+              (entryKey && followupEntries.has(entryKey)) ||
               itemText.indexOf("seguimiento") !== -1
             ) {
               classifiedType = "followup";
