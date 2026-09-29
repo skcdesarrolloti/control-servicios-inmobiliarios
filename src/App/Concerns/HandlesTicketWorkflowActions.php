@@ -1770,6 +1770,7 @@ trait HandlesTicketWorkflowActions
     $settings = [
       'cotizaciones_sin_enviar_dias' => $this->adminDueDaysFromPost('cotizaciones_sin_enviar_dias', 3, 1, 120),
       'tickets_preventivos_sin_cita_dias' => $this->adminDueDaysFromPost('tickets_preventivos_sin_cita_dias', 3, 1, 120),
+      'preventivas_con_cita_sin_realizar_dias' => $this->adminDueDaysFromPost('preventivas_con_cita_sin_realizar_dias', 0, 0, 120),
       'preventivas_dias' => $this->adminDueDaysFromPost('preventivas_dias', 3, 1, 120),
       'cotizaciones_enviadas_sin_respuesta_dias' => $this->adminDueDaysFromPost('cotizaciones_enviadas_sin_respuesta_dias', 10, 1, 180),
     ];
@@ -1793,6 +1794,7 @@ trait HandlesTicketWorkflowActions
     $defaults = [
       'cotizaciones_sin_enviar_dias' => 3,
       'tickets_preventivos_sin_cita_dias' => 3,
+      'preventivas_con_cita_sin_realizar_dias' => 0,
       'preventivas_dias' => 3,
       'cotizaciones_enviadas_sin_respuesta_dias' => 10,
     ];
@@ -1810,6 +1812,7 @@ trait HandlesTicketWorkflowActions
     return [
       'cotizaciones_sin_enviar_dias' => $this->adminDueClampDays($stored['cotizaciones_sin_enviar_dias'] ?? $defaults['cotizaciones_sin_enviar_dias'], 1, 120, $defaults['cotizaciones_sin_enviar_dias']),
       'tickets_preventivos_sin_cita_dias' => $this->adminDueClampDays($stored['tickets_preventivos_sin_cita_dias'] ?? $defaults['tickets_preventivos_sin_cita_dias'], 1, 120, $defaults['tickets_preventivos_sin_cita_dias']),
+      'preventivas_con_cita_sin_realizar_dias' => $this->adminDueClampDays($stored['preventivas_con_cita_sin_realizar_dias'] ?? $defaults['preventivas_con_cita_sin_realizar_dias'], 0, 120, $defaults['preventivas_con_cita_sin_realizar_dias']),
       'preventivas_dias' => $this->adminDueClampDays($stored['preventivas_dias'] ?? $defaults['preventivas_dias'], 1, 120, $defaults['preventivas_dias']),
       'cotizaciones_enviadas_sin_respuesta_dias' => $this->adminDueClampDays($stored['cotizaciones_enviadas_sin_respuesta_dias'] ?? $defaults['cotizaciones_enviadas_sin_respuesta_dias'], 1, 180, $defaults['cotizaciones_enviadas_sin_respuesta_dias']),
     ];
@@ -2055,6 +2058,7 @@ trait HandlesTicketWorkflowActions
 
     $items = [];
     $days = (int) ($settings['tickets_preventivos_sin_cita_dias'] ?? 3);
+    $appointmentDays = (int) ($settings['preventivas_con_cita_sin_realizar_dias'] ?? 0);
     $preventivaWhere = $this->adminDuePreventivaTicketWhereSql('t');
     $revisionAttachedWhere = $this->adminDuePreventivaRevisionAttachedWhereSql('t');
     $closedWhere = $this->adminDueOpenTicketWhereSql('t');
@@ -2086,7 +2090,8 @@ trait HandlesTicketWorkflowActions
         if ($appointmentTs <= 0) {
           continue;
         }
-        $dueTs = strtotime(date('Y-m-d 00:00:00', $appointmentTs)) ?: $appointmentTs;
+        $appointmentDayTs = strtotime(date('Y-m-d 00:00:00', $appointmentTs)) ?: $appointmentTs;
+        $dueTs = strtotime('+' . max(0, $appointmentDays) . ' days', $appointmentDayTs) ?: $appointmentDayTs;
         $calendarTs = $this->adminDueCalendarPlacementTimestamp((int) $dueTs, $fromTs, $toTs);
         if ($calendarTs <= 0) {
           continue;
@@ -2098,12 +2103,14 @@ trait HandlesTicketWorkflowActions
           'type' => 'preventiva_cita_sin_realizar',
           'group' => 'Preventivas con cita sin realizar',
           'title' => 'Preventiva #' . ($revisionId !== '' ? $revisionId : ($ticketPk !== '' ? $ticketPk : '-')) . ' con cita sin realizar',
-          'description' => 'Vence el día de la cita preventiva agendada.',
+          'description' => $appointmentDays > 0
+            ? 'Vence ' . $appointmentDays . ' día(s) después de la cita preventiva agendada.'
+            : 'Vence el día de la cita preventiva agendada.',
           'color' => '#7c3aed',
           'base_ts' => $appointmentTs,
           'due_ts' => (int) $dueTs,
           'calendar_ts' => $calendarTs,
-          'days_limit' => 0,
+          'days_limit' => $appointmentDays,
           'case' => $this->adminDueLightCaseDataFromPreventivaTicket($row, 'preventiva_cita_sin_realizar'),
         ]);
       }
@@ -2531,13 +2538,16 @@ trait HandlesTicketWorkflowActions
   /** @return array{base_ts:int,due_ts:int,days_limit:int,elapsed_days:int,overdue_days:int} */
   private function adminDuePreventivaAppointmentTiming(array $appointment): array
   {
+    $settings = $this->adminDueCalendarSettings();
+    $days = (int) ($settings['preventivas_con_cita_sin_realizar_dias'] ?? 0);
     $baseTs = $this->adminDueFirstTimestamp($appointment, ['fecha_inicio']);
-    $dueTs = $baseTs > 0 ? (strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs) : 0;
+    $baseDayTs = $baseTs > 0 ? (strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs) : 0;
+    $dueTs = $baseDayTs > 0 ? (strtotime('+' . max(0, $days) . ' days', $baseDayTs) ?: $baseDayTs) : 0;
     $todayTs = strtotime(date('Y-m-d 00:00:00')) ?: time();
     return [
       'base_ts' => $baseTs,
       'due_ts' => $dueTs,
-      'days_limit' => 0,
+      'days_limit' => $days,
       'elapsed_days' => $baseTs > 0 ? $this->adminDueElapsedDays($baseTs) : 0,
       'overdue_days' => $dueTs > 0 && $dueTs < $todayTs ? max(0, (int) floor(($todayTs - $dueTs) / 86400)) : 0,
     ];

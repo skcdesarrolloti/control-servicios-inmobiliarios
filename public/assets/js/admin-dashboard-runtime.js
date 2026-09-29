@@ -925,6 +925,7 @@
         '<form class="scm-calendar-due-settings-form scm-calendar-due-settings-form--modal" data-scm-calendar-due-settings-modal autocomplete="off">' +
         '<label class="scm-field"><span>Cotizaciones sin enviar</span><em>Fase emisión</em><small>Días hábiles desde la creación del ticket para emitir la cotización.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "cotizaciones_sin_enviar_dias", 3)) + '"></label>' +
         '<label class="scm-field"><span>Tickets sin cita preventiva</span><em>Agendamiento</em><small>Días transcurridos desde que se crea el ticket preventivo hasta agendar cita.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="tickets_preventivos_sin_cita_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "tickets_preventivos_sin_cita_dias", 3)) + '"></label>' +
+        '<label class="scm-field"><span>Preventivas con cita sin realizar</span><em>Cita agendada</em><small>Días desde la fecha de la cita preventiva hasta marcarla como realizada.</small><input class="input input-bordered input-sm scm-input" type="number" min="0" max="120" name="preventivas_con_cita_sin_realizar_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "preventivas_con_cita_sin_realizar_dias", 0)) + '"></label>' +
         '<label class="scm-field"><span>Preventivas sin enviar</span><em>Revisión</em><small>Días de plazo desde que se realiza la revisión preventiva técnica.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "preventivas_dias", 3)) + '"></label>' +
         '<label class="scm-field"><span>Cotizaciones sin respuesta</span><em>Seguimiento</em><small>Días límite de espera de respuesta del cliente desde el envío inicial.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "cotizaciones_enviadas_sin_respuesta_dias", 10)) + '"></label>' +
         '<aside class="scm-due-settings-impact"><strong>Impacto en el semáforo de casos</strong><span>Al superar estos días, los casos cambiarán de estado a Por Vencer o Vencido y se notificará al responsable.</span></aside>' +
@@ -935,10 +936,12 @@
       var payload = {};
       Array.prototype.slice.call((popup || document).querySelectorAll("[data-scm-due-setting]")).forEach(function (input) {
         var value = Number(input.value || 0);
-        if (!Number.isFinite(value) || value <= 0) {
-          value = Number(input.getAttribute("value") || 1);
+        var min = Number(input.getAttribute("min") || 1);
+        min = Number.isFinite(min) ? min : 1;
+        if (!Number.isFinite(value) || value < min) {
+          value = Number(input.getAttribute("value") || min);
         }
-        payload[input.name] = String(Math.max(1, Math.round(value)));
+        payload[input.name] = String(Math.max(Number.isFinite(min) ? min : 1, Math.round(value)));
       });
       return payload;
     }
@@ -3375,6 +3378,7 @@
           '<form class="scm-calendar-due-settings-form scm-calendar-due-settings-form--modal" data-scm-calendar-due-settings-modal autocomplete="off">' +
           '<label class="scm-field"><span>Cotizaciones sin enviar</span><em>Fase emisión</em><small>Días hábiles desde la creación del ticket para emitir la cotización.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_sin_enviar_dias", 3)) + '"></label>' +
           '<label class="scm-field"><span>Tickets sin cita preventiva</span><em>Agendamiento</em><small>Días transcurridos desde que se crea el ticket preventivo hasta agendar cita.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="tickets_preventivos_sin_cita_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "tickets_preventivos_sin_cita_dias", 3)) + '"></label>' +
+          '<label class="scm-field"><span>Preventivas con cita sin realizar</span><em>Cita agendada</em><small>Días desde la fecha de la cita preventiva hasta marcarla como realizada.</small><input class="input input-bordered input-sm scm-input" type="number" min="0" max="120" name="preventivas_con_cita_sin_realizar_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "preventivas_con_cita_sin_realizar_dias", 0)) + '"></label>' +
           '<label class="scm-field"><span>Preventivas sin enviar</span><em>Revisión</em><small>Días de plazo desde que se realiza la revisión preventiva técnica.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "preventivas_dias", 3)) + '"></label>' +
           '<label class="scm-field"><span>Cotizaciones sin respuesta</span><em>Seguimiento</em><small>Días límite de espera de respuesta del cliente desde el envío inicial.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_enviadas_sin_respuesta_dias", 10)) + '"></label>' +
           '<aside class="scm-due-settings-impact"><strong>Impacto en el semáforo de casos</strong><span>Al superar estos días, los casos cambiarán de estado a Por Vencer o Vencido y se notificará al responsable.</span></aside>' +
@@ -3385,10 +3389,12 @@
         var payload = {};
         Array.prototype.slice.call((popup || document).querySelectorAll("[data-scm-due-setting]")).forEach(function (input) {
           var value = Number(input.value || 0);
-          if (!Number.isFinite(value) || value <= 0) {
-            value = Number(input.getAttribute("value") || 1);
+          var min = Number(input.getAttribute("min") || 1);
+          min = Number.isFinite(min) ? min : 1;
+          if (!Number.isFinite(value) || value < min) {
+            value = Number(input.getAttribute("value") || min);
           }
-          payload[input.name] = String(Math.max(1, Math.round(value)));
+          payload[input.name] = String(Math.max(Number.isFinite(min) ? min : 1, Math.round(value)));
         });
         return payload;
       }
