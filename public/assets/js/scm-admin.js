@@ -5578,9 +5578,11 @@
     if (googleStatus && employeeId) {
       calendarApiRequest(root, "estado_google_oauth", { id_empleado: employeeId }).then(function (json) {
         var google = json && json.data ? json.data : {};
-        googleStatus.textContent = google.connected
-          ? "Google Calendar conectado: la cita se agregará a la cuenta del funcionario."
-          : "Google Calendar sin conectar: la cita se guardará en el panel. El funcionario debe conectar personalmente su cuenta.";
+        googleStatus.textContent = !google.sync_enabled
+          ? "Google Calendar está desactivado en el servidor: la cita se guardará solo en el panel."
+          : google.connected
+            ? "Google Calendar conectado: la cita se agregará a la cuenta del funcionario."
+            : "Google Calendar sin conectar: la cita se guardará en el panel. El funcionario debe conectar personalmente su cuenta.";
       }).catch(function () {
         googleStatus.textContent = "No se pudo comprobar Google Calendar. La cita se guardará en el panel.";
       });

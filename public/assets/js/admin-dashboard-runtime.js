@@ -1672,6 +1672,9 @@
             if (!data.configured) {
               throw new Error("Google Calendar aún no está configurado en el servidor.");
             }
+            if (!data.sync_enabled) {
+              throw new Error("La sincronización con Google Calendar está desactivada en el servidor. Activa CALENDARIO_GOOGLE_SYNC_ENABLED=1 o desmarca Google Calendar para guardar solo en el panel.");
+            }
             if (data.connected) {
               return ensureIndex(index + 1);
             }
