@@ -1650,6 +1650,9 @@
             if (data.connected) {
               return ensureIndex(index + 1);
             }
+            if (!currentCalendarEmployeeId || employeeId !== currentCalendarEmployeeId) {
+              throw new Error(employeeDisplayName(employeeId) + " debe conectar personalmente su cuenta de Google. Desmarca Google Calendar para guardar solo en el panel.");
+            }
             return calendarApi("iniciar_google_oauth", {
               id_empleado: employeeId,
               redirect_after: window.location.href,
@@ -2898,6 +2901,8 @@
           fecha_inicio: selection.date + " " + timeFromMinutes(selection.start) + ":00",
           fecha_fin: selection.date + " " + timeFromMinutes(selection.end) + ":00",
           id_empleado: employeeId,
+          creado_por: currentCalendarEmployeeId || "",
+          sincronizar_google: googleRequested ? "1" : "0",
         };
         if (tipoItem === "tarea") {
           payload.fecha_limite = payload.fecha_fin;
@@ -2927,6 +2932,9 @@
         }).then(function (json) {
           if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el " + itemLabel + ".");
           showToast("success", json.message || (itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1) + " creado."));
+          if (googleRequested && json.data && (json.data.google_pendiente || (json.data.item && !json.data.item.google_event_id))) {
+            showToast("error", "Se guardó en el panel, pero quedó pendiente en Google Calendar.", "Google Calendar pendiente");
+          }
           closeWeekQuickPopover();
           return loadEvents();
         }).catch(function (err) {
@@ -2967,7 +2975,7 @@
           '<div class="scm-calendar-week-quick-row"><span class="material-symbols-outlined">schedule</span><div><strong>' + escHtml(dateLabel) + '</strong><em>' + escHtml(timeLabel) + '</em></div></div>' +
           '<div class="scm-calendar-week-quick-location" data-week-quick-location-row><span class="material-symbols-outlined">location_on</span><div><input name="ubicacion" placeholder="A&ntilde;adir ubicaci&oacute;n o direcci&oacute;n"><div class="scm-calendar-week-quick-location-presets" aria-label="Ubicaciones r&aacute;pidas"><button type="button" data-week-quick-location="Oficina Manga">Oficina Manga</button> <button type="button" data-week-quick-location="Oficina Corredor">Oficina Corredor</button></div></div></div>' +
           '<label class="scm-calendar-week-quick-category"><span class="material-symbols-outlined">sell</span><select name="id_categoria" required><option value="">Selecciona categoría</option>' + categoryOptions + '</select></label>' +
-          '<label class="scm-calendar-week-quick-google" data-week-quick-google-row><input type="checkbox" name="sincronizar_google" value="1"><span><strong>Google Calendar</strong><em>Agregar y usar sus recordatorios</em></span></label>' +
+          '<label class="scm-calendar-week-quick-google" data-week-quick-google-row><input type="checkbox" name="sincronizar_google" value="1" checked><span><strong>Google Calendar</strong><em>Se usa la cuenta conectada del funcionario</em></span></label>' +
           '<input type="hidden" name="aviso_minutos_antes" value="30">' +
           '<div class="scm-calendar-week-quick-actions">' +
           '<button type="button" data-week-quick-more>Más opciones</button>' +
@@ -5269,7 +5277,7 @@
           '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Selecciona una ubicaci&oacute;n para completar este campo"></label>' +
           "</div></section>" : "";
         var googleCalendarHtml = defaultKind !== "task"
-          ? '<label class="scm-calendar-google-toggle scm-calendar-field-full"><input type="checkbox" name="sincronizar_google" value="1"><span><strong>Agregar a Google Calendar</strong><em>Si el funcionario no ha autorizado su cuenta, se pedir&aacute; permiso antes de guardar.</em></span></label>'
+          ? '<label class="scm-calendar-google-toggle scm-calendar-field-full"><input type="checkbox" name="sincronizar_google" value="1" checked><span><strong>Agregar a Google Calendar</strong><em>Se usa la cuenta conectada del funcionario. Cada funcionario autoriza su propia cuenta.</em></span></label>'
           : "";
         var html = '<div class="scm-calendar-create-shell scm-calendar-create-shell--' + escHtml(defaultKind) + '">' +
           '<div class="scm-calendar-create-head">' +
@@ -6002,6 +6010,8 @@
               descripcion: fd.get("descripcion") || "",
               ubicacion: rawLocation || (defaultKind === "reminder" ? "Recordatorio interno" : (defaultKind === "task" ? "Tarea interna" : "")),
               id_categoria: fd.get("id_categoria") || "",
+              creado_por: currentCalendarEmployeeId || "",
+              sincronizar_google: googleRequested ? "1" : "0",
             };
             if (tipoItem === "recordatorio") {
               basePayload.recordatorio_canal = "whatsapp";
@@ -6142,6 +6152,7 @@
               return request.then(function (json) {
                 if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el item.");
                 json._scmCitaNotificationAppointments = citaNotificationAppointments;
+                json._scmGoogleRequested = googleRequested;
                 return json;
               });
             }).catch(function (err) {
@@ -6152,6 +6163,9 @@
         }).then(function (result) {
           if (!result.isConfirmed || !result.value) return;
           showToast("success", result.value.message || "Evento creado.");
+          if (result.value._scmGoogleRequested && result.value.data && (result.value.data.google_pendiente || result.value.data.google_pendientes > 0 || (Array.isArray(result.value.data) && result.value.data.some(function (item) { return item && !item.google_event_id; })))) {
+            showToast("error", "Se guardó en el panel, pero uno o más elementos quedaron pendientes en Google Calendar.", "Google Calendar pendiente");
+          }
           if (Array.isArray(result.value._scmCitaNotificationAppointments) && result.value._scmCitaNotificationAppointments.length) {
             notifyCalendarAppointment(root, result.value._scmCitaNotificationAppointments)
               .then(showCalendarNotificationResult);

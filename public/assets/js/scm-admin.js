@@ -5478,6 +5478,8 @@
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = String(caseBtn.dataset.ticketPk || "").trim();
     var employeeId = String(caseBtn.dataset.empleadoId || "").trim();
+    var caseRuntime = parseRuntime(root) || {};
+    var creatorId = String((caseRuntime.config && caseRuntime.config.calendar_current_employee_id) || "").trim();
     var employeeName = String(
       caseBtn.dataset.empleado || caseBtn.dataset.asignado || "",
     ).trim();
@@ -5564,6 +5566,7 @@
             .join(" · ") || "Revisa la agenda sin cerrar este formulario.",
         ) +
         '</span></div></div><button type="button" class="scm-case-work-btn scm-calendar-case-open-btn" data-scm-calendar-case-open-month>Ver agenda en paralelo</button></div>' +
+        '<p class="scm-calendar-case-footnote" data-scm-case-google-status>Comprobando Google Calendar del funcionario...</p>' +
         '<div class="scm-seg-actions"><span class="scm-calendar-case-footnote">Notificaci&oacute;n por WhatsApp y correo activa</span><button type="button" class="scm-btn-secondary" data-scm-case-submodal-cancel>Cancelar</button><button type="submit" class="scm-btn-primary">Crear y Notificar Evento</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
     }
@@ -5571,6 +5574,17 @@
     sub.setAttribute("aria-hidden", "false");
 
     var form = body ? body.querySelector(".scm-calendar-case-form") : null;
+    var googleStatus = body ? body.querySelector("[data-scm-case-google-status]") : null;
+    if (googleStatus && employeeId) {
+      calendarApiRequest(root, "estado_google_oauth", { id_empleado: employeeId }).then(function (json) {
+        var google = json && json.data ? json.data : {};
+        googleStatus.textContent = google.connected
+          ? "Google Calendar conectado: la cita se agregará a la cuenta del funcionario."
+          : "Google Calendar sin conectar: la cita se guardará en el panel. El funcionario debe conectar personalmente su cuenta.";
+      }).catch(function () {
+        googleStatus.textContent = "No se pudo comprobar Google Calendar. La cita se guardará en el panel.";
+      });
+    }
     var categorySelect = body
       ? body.querySelector("[data-scm-calendar-case-categories]")
       : null;
@@ -5750,6 +5764,8 @@
           fecha_inicio: dateValue + " " + startValue + ":00",
           fecha_fin: dateValue + " " + endValue + ":00",
           id_empleado: employeeId,
+          creado_por: creatorId,
+          sincronizar_google: "1",
           id_categoria: fd.get("id_categoria") || "",
           id_ticket: ticketPk,
           es_cita: "si",
@@ -5773,6 +5789,9 @@
               json.message || "Evento creado.",
               "Calendario",
             );
+            if (json.data && json.data.google_pendiente) {
+              scmNotify("warning", "La cita se guardó en el panel, pero no se agregó a Google Calendar. El funcionario debe conectar su cuenta.", "Google Calendar");
+            }
             return notifyCalendarAppointment(root, [
               Object.assign({}, payload, {
                 categoria: selectedCalendarCategoryName(categorySelect),
