@@ -1889,11 +1889,6 @@ trait RendersDashboard
           <h3 id="scm-pqr-settings-title" class="text-2xl font-bold text-white">Configuraci&oacute;n de Guardian</h3>
           <p>Define qui&eacute;n recibe notificaciones nuevas y qui&eacute;nes quedan como corresponsables por tipo de solicitud.</p>
         </div>
-        <div class="scm-pqr-settings-summary bg-slate-50 px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-3" aria-label="Resumen de configuraci&oacute;n">
-          <span><strong><?php echo count($currentNotifIds); ?></strong> notificadores</span>
-          <span><strong><?php echo count($themes); ?></strong> tipos de solicitud</span>
-          <span><strong><?php echo count($corresponsableCandidates); ?></strong> funcionarios disponibles</span>
-        </div>
         <section class="scm-pqr-settings-section">
           <h4>Funcionarios que reciben notificaciones</h4>
           <p>Recibir&aacute;n WhatsApp y correo cada vez que se cree una solicitud desde Guardian. Puedes seleccionar varios funcionarios.</p>
