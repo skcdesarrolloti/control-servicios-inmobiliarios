@@ -4655,7 +4655,7 @@
           title: "",
           html: html,
           width: 720,
-          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal" },
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal scm-calendar-edit-swal" },
           showCancelButton: true,
           confirmButtonText: "Guardar cambios",
           cancelButtonText: "Cerrar",

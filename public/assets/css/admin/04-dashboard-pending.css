@@ -16251,3 +16251,59 @@ body.scm-session-locked {
   }
 
 }
+
+.swal2-popup.scm-calendar-edit-swal .swal2-html-container {
+  padding: 0 !important;
+}
+
+.swal2-popup.scm-calendar-edit-swal .scm-calendar-create-head {
+  display: block;
+  min-height: 0;
+  padding: 22px 24px !important;
+}
+
+.swal2-popup.scm-calendar-edit-swal .scm-calendar-create-title {
+  gap: 6px;
+}
+
+.swal2-popup.scm-calendar-edit-swal .scm-calendar-create-title strong {
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.swal2-popup.scm-calendar-edit-swal .scm-calendar-create-title span {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.swal2-popup.scm-calendar-edit-swal .scm-calendar-popup-form.scm-calendar-create-form {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 20px 24px 24px !important;
+}
+
+.swal2-popup.scm-calendar-edit-swal .scm-calendar-create-main {
+  gap: 14px;
+}
+
+.swal2-popup.scm-calendar-edit-swal .scm-calendar-date-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.swal2-popup.scm-calendar-edit-swal .scm-calendar-popup-form textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+@media (max-width: 600px) {
+  .swal2-popup.scm-calendar-edit-swal .scm-calendar-create-head {
+    padding: 18px 20px !important;
+  }
+
+  .swal2-popup.scm-calendar-edit-swal .scm-calendar-popup-form.scm-calendar-create-form {
+    padding: 18px 20px 22px !important;
+  }
+
+  .swal2-popup.scm-calendar-edit-swal .scm-calendar-date-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
