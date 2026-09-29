@@ -685,6 +685,12 @@
   overflow-y: auto;
 }
 
+#scm-app #scm-pqr-settings-modal.scm-config-modal--guardian .select2-container .select2-selection--multiple {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
 #scm-app .select2-container--default .select2-selection--single .select2-selection__rendered {
   color: #1f344d;
   line-height: 36px;
@@ -703,6 +709,11 @@
   max-width: 100%;
   padding: 4px 8px 4px;
   overflow-x: hidden;
+}
+
+#scm-app #scm-pqr-settings-modal.scm-config-modal--guardian .select2-container--default .select2-selection--multiple .select2-selection__rendered {
+  max-height: none;
+  overflow: visible;
 }
 
 #scm-app .select2-container--default .select2-selection--multiple .select2-selection__choice {

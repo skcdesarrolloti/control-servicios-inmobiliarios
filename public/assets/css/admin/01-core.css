@@ -1497,6 +1497,40 @@
   min-height: 0;
 }
 
+#scm-app #scm-pqr-settings-modal.scm-config-modal--guardian .scm-pqr-settings-dialog {
+  overflow-y: auto !important;
+}
+
+#scm-app #scm-pqr-settings-modal.scm-config-modal--guardian .scm-pqr-settings-section {
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+}
+
+#scm-app #scm-pqr-settings-modal.scm-config-modal--guardian .scm-pqr-settings-section + .scm-pqr-settings-section {
+  padding-top: 22px !important;
+}
+
+#scm-app #scm-pqr-settings-modal.scm-config-modal--guardian .scm-pqr-settings-dialog > .scm-pqr-settings-section:last-child {
+  flex: 0 0 auto !important;
+  min-height: auto !important;
+}
+
+#scm-app #scm-pqr-settings-modal.scm-config-modal--guardian .scm-notif-responsable-form {
+  align-items: flex-start !important;
+  min-height: auto !important;
+  overflow: visible !important;
+}
+
+#scm-app #scm-pqr-settings-modal.scm-config-modal--guardian .scm-notif-responsable-form .scm-pqr-settings-select-wrap {
+  overflow: visible !important;
+}
+
+#scm-app #scm-pqr-settings-modal.scm-config-modal--guardian .scm-notif-responsable-form .scm-pqr-settings-select-wrap small {
+  clear: both;
+  display: block !important;
+  margin-top: 8px !important;
+}
+
 @media (max-width: 760px) {
   #scm-app .scm-permissions-modal,
   #scm-app .scm-pqr-settings-modal {
