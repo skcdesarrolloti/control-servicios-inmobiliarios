@@ -2151,6 +2151,7 @@
 
 #scm-app .scm-calendar-event-state--realizada,
 #scm-app .scm-calendar-event-state--realizado,
+#scm-app .scm-calendar-event-state--finalizado,
 #scm-app .scm-calendar-event-state--enviado {
   background: #ecfdf5;
   border-color: #a7f3d0;

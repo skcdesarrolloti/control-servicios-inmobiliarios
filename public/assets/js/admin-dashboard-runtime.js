@@ -1817,7 +1817,7 @@
 
       function calendarItemIsDone(row) {
         var estado = String((row && row.estado) || "").toLowerCase().trim();
-        return estado === "si" || estado === "realizada" || estado === "enviado" || estado === "cancelada" || estado === "cancelado";
+        return estado === "si" || estado === "realizada" || estado === "finalizado" || estado === "enviado" || estado === "cancelada" || estado === "cancelado";
       }
 
       function calendarItemStatusLabel(row) {
@@ -1830,6 +1830,7 @@
           return "Pendiente";
         }
         if (kind === "recordatorio") {
+          if (estado === "finalizado") return "Finalizado";
           if (estado === "enviado") return "Enviado";
           if (estado === "cancelado") return "Cancelado";
           if (estado === "programado") return "Programado";
@@ -2534,7 +2535,6 @@
           (isEventKind && id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Marcar realizado</button>' : "") +
           (isEventKind && id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar evento</button>' : "") +
           (kind === "tarea" && id && !isDone ? '<button type="button" class="scm-case-work-btn scm-calendar-action-btn--success" data-scm-calendar-complete-task data-task-id="' + escHtml(id) + '">Marcar realizada</button>' : "") +
-          (kind === "recordatorio" && id && !isDone ? '<button type="button" class="scm-case-work-btn scm-calendar-action-btn--success" data-scm-calendar-send-reminder data-reminder-id="' + escHtml(id) + '">Marcar enviado</button>' : "") +
           (kind === "recordatorio" && id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-edit-item data-item-id="' + escHtml(id) + '" data-item-kind="recordatorio">Editar</button>' : "") +
           (kind === "recordatorio" && id && !isDone ? '<button type="button" class="scm-case-work-btn scm-calendar-action-btn--danger" data-scm-calendar-cancel-reminder data-reminder-id="' + escHtml(id) + '">Cancelar</button>' : "") +
           "</div></div></article>";
@@ -4284,19 +4284,16 @@
         });
       }
 
-      function updateCalendarReminderState(reminderId, estado) {
-        estado = estado === "cancelado" ? "cancelado" : "enviado";
+      function updateCalendarReminderState(reminderId) {
         var row = calendarItemById(reminderId, "recordatorio") || {};
         var title = String(row.titulo || "este recordatorio").trim();
         confirmCalendarStateChange({
           action: "actualizar_recordatorio_estado",
-          payload: { id_recordatorio: reminderId, estado: estado },
-          title: estado === "cancelado" ? "Cancelar recordatorio" : "Marcar recordatorio enviado",
-          text: estado === "cancelado"
-            ? "¿Quieres cancelar \"" + title + "\"?"
-            : "¿Quieres marcar \"" + title + "\" como enviado?",
-          confirmButtonText: estado === "cancelado" ? "Cancelar recordatorio" : "Marcar enviado",
-          successMessage: estado === "cancelado" ? "Recordatorio cancelado." : "Recordatorio marcado como enviado.",
+          payload: { id_recordatorio: reminderId, estado: "cancelado" },
+          title: "Cancelar recordatorio",
+          text: "¿Quieres cancelar \"" + title + "\"?",
+          confirmButtonText: "Cancelar recordatorio",
+          successMessage: "Recordatorio cancelado.",
         });
       }
 
@@ -6238,6 +6235,16 @@
         }).finally(loadEvents);
       }
 
+      if (!isDueCalendar) {
+        var reminderRefreshTimer = window.setInterval(function () {
+          if (!panel.isConnected) {
+            window.clearInterval(reminderRefreshTimer);
+            return;
+          }
+          if (!document.hidden && panel.offsetParent !== null) loadEvents();
+        }, 60000);
+      }
+
       if (filterForm) {
         filterForm.addEventListener("submit", function (e) {
           e.preventDefault();
@@ -6379,16 +6386,10 @@
           completeCalendarTask(completeTaskBtn.getAttribute("data-task-id") || "");
           return;
         }
-        var sendReminderBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-send-reminder]") : null;
-        if (sendReminderBtn && panel.contains(sendReminderBtn)) {
-          e.preventDefault();
-          updateCalendarReminderState(sendReminderBtn.getAttribute("data-reminder-id") || "", "enviado");
-          return;
-        }
         var cancelReminderBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-cancel-reminder]") : null;
         if (cancelReminderBtn && panel.contains(cancelReminderBtn)) {
           e.preventDefault();
-          updateCalendarReminderState(cancelReminderBtn.getAttribute("data-reminder-id") || "", "cancelado");
+          updateCalendarReminderState(cancelReminderBtn.getAttribute("data-reminder-id") || "");
           return;
         }
         var rescheduleBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-reschedule-event]") : null;
