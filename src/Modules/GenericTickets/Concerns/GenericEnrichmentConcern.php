@@ -114,6 +114,8 @@ trait GenericEnrichmentConcern
           $row['_scm_notas_ticket'] = array_merge($row['_scm_notas_ticket'], $notesByTicket[$key]);
         }
       }
+      $row['_scm_seguimientos_ticket'] = $this->uniqueGenericActivityRows($row['_scm_seguimientos_ticket']);
+      $row['_scm_notas_ticket'] = $this->uniqueGenericActivityRows($row['_scm_notas_ticket']);
 
       $contractId = $this->first_id_value($this->first_existing_value($row, ['id_contrato', 'contrato']));
       if ($contractId !== '' && isset($contractById[$contractId])) {
@@ -185,6 +187,18 @@ trait GenericEnrichmentConcern
     unset($row);
 
     return $rows;
+  }
+
+  /** @param array<int,array<string,mixed>> $items */
+  private function uniqueGenericActivityRows(array $items): array
+  {
+    $unique = [];
+    foreach ($items as $item) {
+      $id = trim((string) ($item['_ID'] ?? ''));
+      $key = $id !== '' ? 'id:' . $id : 'row:' . md5((string) json_encode($item));
+      $unique[$key] = $item;
+    }
+    return array_values($unique);
   }
 
   /**
