@@ -2840,6 +2840,8 @@ trait RendersDashboard
             <label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-cita-sin-realizar"><input type="checkbox" name="due_type" value="preventiva_cita_sin_realizar" checked><span class="material-symbols-outlined" aria-hidden="true">pending_actions</span><strong>Preventivas con cita sin realizar</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--cotizacion-sin-enviar"><input type="checkbox" name="due_type" value="cotizacion_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">receipt_long</span><strong>Cotizaciones sin enviar</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--cotizacion-enviada-sin-respuesta"><input type="checkbox" name="due_type" value="cotizacion_enviada_sin_respuesta" checked><span class="material-symbols-outlined" aria-hidden="true">mark_email_unread</span><strong>Cotizaciones sin respuesta</strong></label>
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--terminacion-contrato"><input type="checkbox" name="due_type" value="terminacion_contrato_pendiente" checked><span class="material-symbols-outlined" aria-hidden="true">contract_edit</span><strong>Terminación de contrato</strong></label>
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--no-prorroga-contrato"><input type="checkbox" name="due_type" value="no_prorroga_contrato_pendiente" checked><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><strong>No prórroga de contrato</strong></label>
           </form>
         </section>
       <?php endif; ?>

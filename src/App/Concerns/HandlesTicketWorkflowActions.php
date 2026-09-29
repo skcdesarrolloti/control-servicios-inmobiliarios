@@ -1710,7 +1710,7 @@ trait HandlesTicketWorkflowActions
     $ticketRefs = array_values(array_unique(array_filter($ticketRefs, static function ($ref): bool {
       return $ref !== '';
     })));
-    if ($case === [] && $type === 'calendar_ticket' && $ticketRefs !== []) {
+    if ($case === [] && in_array($type, ['calendar_ticket', 'terminacion_contrato_pendiente', 'no_prorroga_contrato_pendiente'], true) && $ticketRefs !== []) {
       $ticket = [];
       foreach ($ticketRefs as $ticketRef) {
         $ticket = $this->adminDueTicketByReference($ticketRef);
@@ -1773,6 +1773,8 @@ trait HandlesTicketWorkflowActions
       'preventivas_con_cita_sin_realizar_dias' => $this->adminDueDaysFromPost('preventivas_con_cita_sin_realizar_dias', 0, 0, 120),
       'preventivas_dias' => $this->adminDueDaysFromPost('preventivas_dias', 3, 1, 120),
       'cotizaciones_enviadas_sin_respuesta_dias' => $this->adminDueDaysFromPost('cotizaciones_enviadas_sin_respuesta_dias', 10, 1, 180),
+      'terminacion_contrato_dias' => $this->adminDueDaysFromPost('terminacion_contrato_dias', 3, 1, 120),
+      'no_prorroga_contrato_dias' => $this->adminDueDaysFromPost('no_prorroga_contrato_dias', 3, 1, 120),
     ];
 
     try {
@@ -1797,6 +1799,8 @@ trait HandlesTicketWorkflowActions
       'preventivas_con_cita_sin_realizar_dias' => 0,
       'preventivas_dias' => 3,
       'cotizaciones_enviadas_sin_respuesta_dias' => 10,
+      'terminacion_contrato_dias' => 3,
+      'no_prorroga_contrato_dias' => 3,
     ];
 
     try {
@@ -1815,6 +1819,8 @@ trait HandlesTicketWorkflowActions
       'preventivas_con_cita_sin_realizar_dias' => $this->adminDueClampDays($stored['preventivas_con_cita_sin_realizar_dias'] ?? $defaults['preventivas_con_cita_sin_realizar_dias'], 0, 120, $defaults['preventivas_con_cita_sin_realizar_dias']),
       'preventivas_dias' => $this->adminDueClampDays($stored['preventivas_dias'] ?? $defaults['preventivas_dias'], 1, 120, $defaults['preventivas_dias']),
       'cotizaciones_enviadas_sin_respuesta_dias' => $this->adminDueClampDays($stored['cotizaciones_enviadas_sin_respuesta_dias'] ?? $defaults['cotizaciones_enviadas_sin_respuesta_dias'], 1, 180, $defaults['cotizaciones_enviadas_sin_respuesta_dias']),
+      'terminacion_contrato_dias' => $this->adminDueClampDays($stored['terminacion_contrato_dias'] ?? $defaults['terminacion_contrato_dias'], 1, 120, $defaults['terminacion_contrato_dias']),
+      'no_prorroga_contrato_dias' => $this->adminDueClampDays($stored['no_prorroga_contrato_dias'] ?? $defaults['no_prorroga_contrato_dias'], 1, 120, $defaults['no_prorroga_contrato_dias']),
     ];
   }
 
@@ -1857,6 +1863,9 @@ trait HandlesTicketWorkflowActions
       $items = array_merge($items, $this->adminDuePreventivaItems($settings, $fromTs, $toTs));
       $items = array_merge($items, $this->adminDuePreventivaTicketItems($settings, $fromTs, $toTs));
     }
+    if ($this->canAccessDashboardTab('contractual') || $this->canUseDashboardAction('case_respond')) {
+      $items = array_merge($items, $this->adminDueContractRequestItems($settings, $fromTs, $toTs));
+    }
 
     usort($items, static function (array $a, array $b): int {
       $date = strcmp((string) ($a['fecha_inicio'] ?? ''), (string) ($b['fecha_inicio'] ?? ''));
@@ -1866,6 +1875,86 @@ trait HandlesTicketWorkflowActions
       return strcmp((string) ($a['titulo'] ?? ''), (string) ($b['titulo'] ?? ''));
     });
     return $items;
+  }
+
+  /** @param array<string,int> $settings @return array<int,array<string,mixed>> */
+  private function adminDueContractRequestItems(array $settings, int $fromTs, int $toTs): array
+  {
+    $items = [];
+    $types = [
+      [
+        'requests' => $this->contractTerminationRequestItems(300, false),
+        'type' => 'terminacion_contrato_pendiente',
+        'group' => 'Solicitudes de terminación de contrato',
+        'label' => 'Terminación de contrato',
+        'days' => (int) $settings['terminacion_contrato_dias'],
+        'color' => '#be123c',
+      ],
+      [
+        'requests' => $this->contractNonRenewalRequestItems(300, false),
+        'type' => 'no_prorroga_contrato_pendiente',
+        'group' => 'Solicitudes de no prórroga de contrato',
+        'label' => 'No prórroga de contrato',
+        'days' => (int) $settings['no_prorroga_contrato_dias'],
+        'color' => '#7c3aed',
+      ],
+    ];
+
+    foreach ($types as $config) {
+      foreach ($config['requests'] as $request) {
+        if (($request['creado'] ?? '-') === '-') {
+          continue;
+        }
+        $baseTs = strtotime((string) ($request['fecha_solicitud'] ?? '')) ?: 0;
+        if ($baseTs <= 0) {
+          continue;
+        }
+        $dueTs = strtotime('+' . $config['days'] . ' days', strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs);
+        $calendarTs = $dueTs !== false ? $this->adminDueCalendarPlacementTimestamp((int) $dueTs, $fromTs, $toTs) : 0;
+        if ($dueTs === false || $calendarTs <= 0) {
+          continue;
+        }
+        $requestId = trim((string) ($request['solicitud_id'] ?? $request['ticket_pk'] ?? ''));
+        $ticketLabel = trim((string) ($request['id_ticket'] ?? $request['ticket_pk'] ?? ''));
+        $items[] = $this->adminDueEvent([
+          'id' => $config['type'] . '-' . $requestId,
+          'type' => $config['type'],
+          'group' => $config['group'],
+          'title' => 'Solicitud de ' . strtolower($config['label']) . ' · Ticket #' . ($ticketLabel !== '' ? $ticketLabel : '-'),
+          'description' => 'Plazo operativo de respuesta: ' . $config['days'] . ' día(s) calendario desde la solicitud.',
+          'color' => $config['color'],
+          'base_ts' => $baseTs,
+          'due_ts' => (int) $dueTs,
+          'calendar_ts' => $calendarTs,
+          'days_limit' => $config['days'],
+          'case' => $this->adminDueLightCaseDataFromContractRequest($request),
+        ]);
+      }
+    }
+    return $items;
+  }
+
+  /** @param array<string,mixed> $request @return array<string,string> */
+  private function adminDueLightCaseDataFromContractRequest(array $request): array
+  {
+    $ticketPk = trim((string) ($request['ticket_pk'] ?? ''));
+    if ($ticketPk === '' || $ticketPk === '0') {
+      return [];
+    }
+    return [
+      'ticket_pk' => $ticketPk,
+      'ticket' => trim((string) ($request['id_ticket'] ?? $ticketPk)) ?: $ticketPk,
+      'asunto' => trim((string) ($request['asunto'] ?? 'Solicitud contractual')),
+      'estado' => trim((string) ($request['estado'] ?? '-')),
+      'admin' => trim((string) ($request['estado_administrativo'] ?? '-')),
+      'contrato' => trim((string) ($request['contrato'] ?? '-')),
+      'inmueble' => trim((string) ($request['inmueble'] ?? '-')),
+      'direccion' => trim((string) ($request['direccion'] ?? '-')),
+      'creado' => trim((string) ($request['creado'] ?? '-')),
+      'tab_key' => 'contractual',
+      'status_bucket' => 'abiertos',
+      'case_source_html' => $this->adminDueLoadingCaseSourceHtml('Cargando detalle completo de la solicitud contractual.'),
+    ];
   }
 
   /** @return array<int,array<string,mixed>> */
@@ -1889,30 +1978,6 @@ trait HandlesTicketWorkflowActions
         'servicios_publicos_pendientes',
         $this->adminDueServiciosPublicosItems($fromTs, $toTs)
       );
-    }
-
-    if ($this->canAccessDashboardTab('contractual') || $this->canUseDashboardAction('case_respond')) {
-      $count = $this->contractTerminationPendingCount();
-      $groups[] = [
-        'type' => 'terminacion_contrato_pendiente',
-        'label' => 'Terminaciones de contrato pendientes',
-        'target_tab' => 'contract_termination',
-        'count' => $count,
-        'vencidos' => $count,
-        'hoy' => 0,
-      ];
-
-      $nonRenewalCount = $this->contractNonRenewalPendingCount();
-      if ($nonRenewalCount > 0) {
-        $groups[] = [
-          'type' => 'no_prorroga_contrato_pendiente',
-          'label' => 'No prórroga de contrato pendiente',
-          'target_tab' => 'contract_non_renewal',
-          'count' => $nonRenewalCount,
-          'vencidos' => $nonRenewalCount,
-          'hoy' => 0,
-        ];
-      }
     }
 
     return $groups;
@@ -3693,7 +3758,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @return array<int,array<string,mixed>> */
-  private function contractTerminationRequestItems(int $limit = 150): array
+  private function contractTerminationRequestItems(int $limit = 150, bool $includeCase = true): array
   {
     $table = $this->db->table('jet_cct_solicitudes_terminacion_contrato');
     if (!$this->table_exists($table)) {
@@ -3709,11 +3774,11 @@ trait HandlesTicketWorkflowActions
       $args
     );
 
-    return array_values(array_map(fn(array $row): array => $this->contractTerminationListItem($this->contractTerminationMergeSolicitudTicket($row)), $rows));
+    return array_values(array_map(fn(array $row): array => $this->contractTerminationListItem($this->contractTerminationMergeSolicitudTicket($row), $includeCase), $rows));
   }
 
   /** @return array<int,array<string,mixed>> */
-  private function contractNonRenewalRequestItems(int $limit = 150): array
+  private function contractNonRenewalRequestItems(int $limit = 150, bool $includeCase = true): array
   {
     $table = $this->db->table('jet_cct_tickets');
     if (!$this->table_exists($table)) {
@@ -3733,7 +3798,7 @@ trait HandlesTicketWorkflowActions
       'SELECT ' . implode(', ', $select) . " FROM `{$table}` t WHERE {$where} {$order} LIMIT {$limit}"
     );
 
-    return array_values(array_map(fn(array $row): array => $this->contractNonRenewalListItem($row), $rows));
+    return array_values(array_map(fn(array $row): array => $this->contractNonRenewalListItem($row, $includeCase), $rows));
   }
 
   private function contractNonRenewalPendingCount(): int
@@ -4164,14 +4229,14 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $row @return array<string,mixed> */
-  private function contractNonRenewalListItem(array $row): array
+  private function contractNonRenewalListItem(array $row, bool $includeCase = true): array
   {
     $createdTs = $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
     $ticketPk = trim((string) ($row['_ID'] ?? ''));
     $logicalTicket = $this->contractTerminationFirstText([$row], ['id_ticket', '_ID']);
     $subject = $this->contractTerminationFirstText([$row], ['asunto', 'tema_ayuda', 'tipo_pqrs']) ?: 'Solicitud de no prórroga de contrato';
     $termInfo = $this->contractTerminationTermInfo($row, $createdTs);
-    $case = ctype_digit($ticketPk) ? $this->adminDueNativeTicketCasePayload((int) $ticketPk, $this->adminDueStatusBucket($row)) : [];
+    $case = $includeCase && ctype_digit($ticketPk) ? $this->adminDueNativeTicketCasePayload((int) $ticketPk, $this->adminDueStatusBucket($row)) : [];
     return [
       'solicitud_id' => $ticketPk,
       'ticket_pk' => $ticketPk,
@@ -4195,8 +4260,8 @@ trait HandlesTicketWorkflowActions
       'term_label' => $termInfo['term_label'],
       'term_hint' => $termInfo['term_hint'],
       'term_recommended' => $termInfo['term_recommended'],
-      'recipients' => $this->contractTerminationRecipientOptions($row, 'no_prorroga_contrato'),
-      'retention_ticket' => $this->contractRetentionTicketUiData($row),
+      'recipients' => $includeCase ? $this->contractTerminationRecipientOptions($row, 'no_prorroga_contrato') : [],
+      'retention_ticket' => $includeCase ? $this->contractRetentionTicketUiData($row) : [],
       'case' => $case,
     ];
   }
@@ -4743,7 +4808,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $row @return array<string,mixed> */
-  private function contractTerminationListItem(array $row): array
+  private function contractTerminationListItem(array $row, bool $includeCase = true): array
   {
     $createdTs = $this->adminDueFirstTimestamp($row, ['solicitud_fecha', 'fecha', 'solicitud_created', 'cct_created']);
     $solicitudId = trim((string) ($row['solicitud_id'] ?? ''));
@@ -4751,7 +4816,7 @@ trait HandlesTicketWorkflowActions
     $logicalTicket = $this->contractTerminationFirstText([$row], ['id_ticket']);
     $subject = $this->contractTerminationFirstText([$row], ['asunto', 'tema_ayuda', 'tipo_pqrs']) ?: 'Solicitud de terminación de contrato';
     $termInfo = $this->contractTerminationTermInfo($row, $createdTs);
-    $case = ctype_digit($ticketPk) ? $this->adminDueNativeTicketCasePayload((int) $ticketPk, $this->adminDueStatusBucket($row)) : [];
+    $case = $includeCase && ctype_digit($ticketPk) ? $this->adminDueNativeTicketCasePayload((int) $ticketPk, $this->adminDueStatusBucket($row)) : [];
     return [
       'solicitud_id' => $solicitudId,
       'ticket_pk' => $ticketPk,
@@ -4775,8 +4840,8 @@ trait HandlesTicketWorkflowActions
       'term_label' => $termInfo['term_label'],
       'term_hint' => $termInfo['term_hint'],
       'term_recommended' => $termInfo['term_recommended'],
-      'recipients' => $this->contractTerminationRecipientOptions($row),
-      'retention_ticket' => $this->contractRetentionTicketUiData($row),
+      'recipients' => $includeCase ? $this->contractTerminationRecipientOptions($row) : [],
+      'retention_ticket' => $includeCase ? $this->contractRetentionTicketUiData($row) : [],
       'case' => $case,
     ];
   }

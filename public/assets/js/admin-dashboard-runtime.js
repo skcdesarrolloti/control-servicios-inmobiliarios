@@ -857,7 +857,7 @@
       });
       var groupHtml = groupOrder.map(function (type) {
         var summaryGroup = summaryByType[type] || {};
-        var targetTab = String(summaryGroup.target_tab || "");
+        var targetTab = String(summaryGroup.target_tab || (type === "terminacion_contrato_pendiente" ? "contract_termination" : type === "no_prorroga_contrato_pendiente" ? "contract_non_renewal" : ""));
         var buttonHtml = targetTab
           ? '<button type="button" class="scm-due-entry-group-link" data-scm-dashboard-due-open-admin-tab="' + escHtml(targetTab) + '">Ver pestaña <span class="material-symbols-outlined">chevron_right</span></button>'
           : "";
@@ -928,6 +928,8 @@
         '<label class="scm-field"><span>Preventivas con cita sin realizar</span><em>Cita agendada</em><small>Días desde la fecha de la cita preventiva hasta marcarla como realizada.</small><input class="input input-bordered input-sm scm-input" type="number" min="0" max="120" name="preventivas_con_cita_sin_realizar_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "preventivas_con_cita_sin_realizar_dias", 0)) + '"></label>' +
         '<label class="scm-field"><span>Preventivas sin enviar</span><em>Revisión</em><small>Días de plazo desde que se realiza la revisión preventiva técnica.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "preventivas_dias", 3)) + '"></label>' +
         '<label class="scm-field"><span>Cotizaciones sin respuesta</span><em>Seguimiento</em><small>Días límite de espera de respuesta del cliente desde el envío inicial.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "cotizaciones_enviadas_sin_respuesta_dias", 10)) + '"></label>' +
+        '<label class="scm-field"><span>Solicitud de terminación de contrato</span><em>Respuesta</em><small>Días calendario desde la solicitud para responderla.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="terminacion_contrato_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "terminacion_contrato_dias", 3)) + '"></label>' +
+        '<label class="scm-field"><span>Solicitud de no prórroga de contrato</span><em>Respuesta</em><small>Días calendario desde la solicitud para responderla.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="no_prorroga_contrato_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "no_prorroga_contrato_dias", 3)) + '"></label>' +
         '<aside class="scm-due-settings-impact"><strong>Impacto en el semáforo de casos</strong><span>Al superar estos días, los casos cambiarán de estado a Por Vencer o Vencido y se notificará al responsable.</span></aside>' +
         "</form>";
     }
@@ -1759,6 +1761,8 @@
           cotizacion_enviada_sin_respuesta: { color: "#dc2626", bg: "#fef2f2", text: "#b91c1c", border: "#fecaca" },
           preventiva_pendiente: { color: "#0891b2", bg: "#ecfeff", text: "#0e7490", border: "#a5f3fc" },
           servicios_publicos_pendientes: { color: "#0284c7", bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
+          terminacion_contrato_pendiente: { color: "#be123c", bg: "#fff1f2", text: "#9f1239", border: "#fecdd3" },
+          no_prorroga_contrato_pendiente: { color: "#7c3aed", bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" },
         };
         var theme = themes[key] || { color: "#475569", bg: "#f8fafc", text: "#334155", border: "#cbd5e1" };
         if (typeof rowOrType !== "string" && rowOrType && rowOrType.color) {
@@ -3301,6 +3305,8 @@
           ticket_preventiva_sin_cita: 0,
           preventiva_cita_sin_realizar: 0,
           servicios_publicos_pendientes: 0,
+          terminacion_contrato_pendiente: 0,
+          no_prorroga_contrato_pendiente: 0,
           cotizacion_sin_enviar: 0,
           cotizacion_enviada_sin_respuesta: 0,
         };
@@ -3319,6 +3325,8 @@
         if (type === "ticket_preventiva_sin_cita") return "Tickets sin cita preventiva";
         if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
         if (type === "servicios_publicos_pendientes") return "Servicios públicos pendientes";
+        if (type === "terminacion_contrato_pendiente") return "Terminación de contrato";
+        if (type === "no_prorroga_contrato_pendiente") return "No prórroga de contrato";
         if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
         if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
         return type || "Vencimientos";
@@ -3381,6 +3389,8 @@
           '<label class="scm-field"><span>Preventivas con cita sin realizar</span><em>Cita agendada</em><small>Días desde la fecha de la cita preventiva hasta marcarla como realizada.</small><input class="input input-bordered input-sm scm-input" type="number" min="0" max="120" name="preventivas_con_cita_sin_realizar_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "preventivas_con_cita_sin_realizar_dias", 0)) + '"></label>' +
           '<label class="scm-field"><span>Preventivas sin enviar</span><em>Revisión</em><small>Días de plazo desde que se realiza la revisión preventiva técnica.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "preventivas_dias", 3)) + '"></label>' +
           '<label class="scm-field"><span>Cotizaciones sin respuesta</span><em>Seguimiento</em><small>Días límite de espera de respuesta del cliente desde el envío inicial.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_enviadas_sin_respuesta_dias", 10)) + '"></label>' +
+          '<label class="scm-field"><span>Solicitud de terminación de contrato</span><em>Respuesta</em><small>Días calendario desde la solicitud para responderla.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="terminacion_contrato_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "terminacion_contrato_dias", 3)) + '"></label>' +
+          '<label class="scm-field"><span>Solicitud de no prórroga de contrato</span><em>Respuesta</em><small>Días calendario desde la solicitud para responderla.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="no_prorroga_contrato_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "no_prorroga_contrato_dias", 3)) + '"></label>' +
           '<aside class="scm-due-settings-impact"><strong>Impacto en el semáforo de casos</strong><span>Al superar estos días, los casos cambiarán de estado a Por Vencer o Vencido y se notificará al responsable.</span></aside>' +
           "</form>";
       }
