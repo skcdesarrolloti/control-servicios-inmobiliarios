@@ -1607,21 +1607,46 @@
         );
       }
 
-      function waitForGoogleCalendarConnection(employeeId, attempts) {
-        attempts = attempts || 0;
-        return calendarApi("estado_google_oauth", { id_empleado: employeeId }).then(function (json) {
-          var data = json && json.data ? json.data : {};
-          if (json && json.success && data.connected) {
-            return true;
+      function waitForGoogleCalendarConnection(employeeId, authWindow) {
+        return new Promise(function (resolve, reject) {
+          var settled = false;
+          var attempts = 0;
+          var timer = null;
+          function finish(error) {
+            if (settled) return;
+            settled = true;
+            if (timer) window.clearTimeout(timer);
+            window.removeEventListener("message", onMessage);
+            if (error) reject(error);
+            else resolve(true);
           }
-          if (attempts >= 60) {
-            throw new Error("No se confirmó la conexión con Google Calendar. Autoriza la cuenta y vuelve a guardar.");
+          function onMessage(event) {
+            var data = event.data || {};
+            if (event.origin !== window.location.origin || event.source !== authWindow ||
+                data.type !== "scm-google-calendar-connected" || String(data.id_empleado) !== employeeId) return;
+            finish();
           }
-          return new Promise(function (resolve) {
-            window.setTimeout(resolve, 2000);
-          }).then(function () {
-            return waitForGoogleCalendarConnection(employeeId, attempts + 1);
-          });
+          function checkConnection() {
+            if (settled) return;
+            calendarApi("estado_google_oauth", { id_empleado: employeeId }).then(function (json) {
+              if (settled) return;
+              if (json && json.success && json.data && json.data.connected) {
+                finish();
+                return;
+              }
+              if (authWindow.closed) {
+                finish(new Error("Se cerró la autorización de Google sin conectar la cuenta."));
+                return;
+              }
+              if (++attempts >= 60) {
+                finish(new Error("No se confirmó la conexión con Google Calendar. Autoriza la cuenta y vuelve a guardar."));
+                return;
+              }
+              timer = window.setTimeout(checkConnection, 2000);
+            }).catch(finish);
+          }
+          window.addEventListener("message", onMessage);
+          checkConnection();
         });
       }
 
@@ -1653,9 +1678,11 @@
             if (!currentCalendarEmployeeId || employeeId !== currentCalendarEmployeeId) {
               throw new Error(employeeDisplayName(employeeId) + " debe conectar personalmente su cuenta de Google. Desmarca Google Calendar para guardar solo en el panel.");
             }
+            var redirectUrl = new URL(window.location.href);
+            redirectUrl.searchParams.set("scm_google_popup", "1");
             return calendarApi("iniciar_google_oauth", {
               id_empleado: employeeId,
-              redirect_after: window.location.href,
+              redirect_after: redirectUrl.toString(),
             }).then(function (authJson) {
               var authUrl = authJson && authJson.data ? authJson.data.auth_url : "";
               if (!authJson || !authJson.success || !authUrl) {
@@ -1668,7 +1695,7 @@
               if (window.Swal && typeof window.Swal.showValidationMessage === "function") {
                 window.Swal.showValidationMessage("Autoriza Google Calendar en la ventana abierta. Guardaremos al confirmar la conexión.");
               }
-              return waitForGoogleCalendarConnection(employeeId).then(function () {
+              return waitForGoogleCalendarConnection(employeeId, authWindow).then(function () {
                 try { authWindow.close(); } catch (err) {}
                 return ensureIndex(index + 1);
               });
