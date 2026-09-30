@@ -26,12 +26,12 @@ Aplicación PHP para administrar tickets, mantenimientos, PQR, revisiones preven
 - MySQL/MariaDB y acceso al esquema existente de la aplicación.
 - Composer para instalar herramientas de desarrollo.
 
-Para generar y enviar el PDF de cotización de mantenimiento con el diseño de la vista HTML, hay dos opciones:
+El PDF de cotización de mantenimiento se genera localmente aunque el servidor no tenga un navegador. Para conservar exactamente el diseño de la vista HTML, hay dos opciones:
 
 - En un servidor propio o VPS, instala Chromium, Google Chrome o Microsoft Edge. Si el ejecutable no está en una ruta estándar, configura `SCM_CHROMIUM_BIN` con su ruta absoluta.
 - En Hostinger Cloud, usa un servicio Gotenberg privado con Chromium en otro servidor. Configura `SCM_GOTENBERG_URL` con su dirección HTTPS, y `SCM_GOTENBERG_USERNAME` y `SCM_GOTENBERG_PASSWORD` si usa autenticación básica. La extensión PHP cURL debe estar habilitada.
 
-El envío se detiene con un mensaje claro cuando no se puede generar el PDF; ya no se adjunta un diseño diferente. No uses un servidor Gotenberg público para cotizaciones con datos de clientes.
+Si Chromium o Gotenberg no están disponibles, la aplicación genera un PDF local con los datos, tablas y soportes JPG/PNG almacenados por el panel. No uses un servidor Gotenberg público para cotizaciones con datos de clientes.
 
 ## Instalación
 

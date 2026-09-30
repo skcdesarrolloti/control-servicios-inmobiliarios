@@ -16,7 +16,7 @@ final class SimplePdf
   private float $contentWidth = 505.0;
   private float $y = 46.0;
   private ?string $backgroundImagePath = null;
-  /** @var array<string,array{path:string,width:int,height:int}> */
+  /** @var array<string,array{path:string,width:int,height:int,data?:string,filter?:string}> */
   private array $images = [];
   private string $footerLabel = 'SKC SuCasa Inmobiliaria - Cotización de mantenimiento';
   private string $actaEyebrow = '';
@@ -105,11 +105,11 @@ final class SimplePdf
 
     $imageObjectIds = [];
     foreach ($this->images as $resource => $image) {
-      $data = @file_get_contents($image['path']);
+      $data = $image['data'] ?? @file_get_contents($image['path']);
       if (!is_string($data) || $data === '') { continue; }
       $imageObjectIds[$resource] = $next;
       $objects[$next++] = '<< /Type /XObject /Subtype /Image /Width ' . $image['width']
-        . ' /Height ' . $image['height'] . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '
+        . ' /Height ' . $image['height'] . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter ' . ($image['filter'] ?? '/DCTDecode') . ' /Length '
         . strlen($data) . ">>\nstream\n" . $data . "\nendstream";
     }
 
@@ -152,20 +152,101 @@ final class SimplePdf
     return $pdf;
   }
 
-  /** Embed a local, already validated JPEG without a remote fetch or image decoder. */
+  /** Embed a local, already validated JPEG or 8-bit RGB/RGBA PNG. */
   public function image(string $path, float $maximumWidth = 320, float $maximumHeight = 220): bool
   {
     $info = @getimagesize($path);
-    if (!is_array($info) || $info['mime'] !== 'image/jpeg' || (int) $info[0] < 1 || (int) $info[1] < 1) { return false; }
+    if (!is_array($info) || !in_array($info['mime'], ['image/jpeg', 'image/png'], true) || (int) $info[0] < 1 || (int) $info[1] < 1) { return false; }
+    $pngData = $info['mime'] === 'image/png' ? $this->pngRgbData($path) : null;
+    if ($info['mime'] === 'image/png' && $pngData === null) { return false; }
     $ratio = min($maximumWidth / (int) $info[0], $maximumHeight / (int) $info[1], 1.0);
     $width = max(1.0, (int) $info[0] * $ratio); $height = max(1.0, (int) $info[1] * $ratio);
     $this->ensureSpace($height + 14);
     $resource = 'Im' . (count($this->images) + 1);
     $this->images[$resource] = ['path' => $path, 'width' => (int) $info[0], 'height' => (int) $info[1]];
+    if ($pngData !== null) {
+      $this->images[$resource]['data'] = $pngData;
+      $this->images[$resource]['filter'] = '/FlateDecode';
+    }
     $this->content .= 'q ' . $this->n($width) . ' 0 0 ' . $this->n($height) . ' ' . $this->n($this->margin)
       . ' ' . $this->n(self::PAGE_H - $this->y - $height) . ' cm /' . $resource . " Do Q\n";
     $this->y += $height + 14;
     return true;
+  }
+
+  /** Decode PNG scanlines into RGB so image evidence also works without GD. */
+  private function pngRgbData(string $path): ?string
+  {
+    $png = @file_get_contents($path);
+    if (!is_string($png) || !str_starts_with($png, "\x89PNG\r\n\x1a\n")) return null;
+    $offset = 8;
+    $compressed = '';
+    $width = $height = $type = $depth = 0;
+    while ($offset + 12 <= strlen($png)) {
+      $length = unpack('N', substr($png, $offset, 4))[1];
+      $chunk = substr($png, $offset + 4, 4);
+      if ($length < 0 || $offset + 12 + $length > strlen($png)) return null;
+      $value = substr($png, $offset + 8, $length);
+      if ($chunk === 'IHDR') {
+        if (strlen($value) !== 13) return null;
+        [$width, $height, $depth, $type] = array_values(unpack('Nwidth/Nheight/Cdepth/Ctype', substr($value, 0, 10)));
+        if ($depth !== 8 || !in_array($type, [2, 6], true) || ord($value[10]) !== 0 || ord($value[11]) !== 0 || ord($value[12]) !== 0 || $width < 1 || $height < 1 || $width > 2500 || $height > 2500) return null;
+      } elseif ($chunk === 'IDAT') {
+        $compressed .= $value;
+      } elseif ($chunk === 'IEND') {
+        break;
+      }
+      $offset += 12 + $length;
+    }
+    if ($width === 0 || $height === 0 || $compressed === '') return null;
+    $channels = $type === 6 ? 4 : 3;
+    $stride = $width * $channels;
+    $decoded = @gzuncompress($compressed, ($stride + 1) * $height);
+    if (!is_string($decoded) || strlen($decoded) !== ($stride + 1) * $height) return null;
+    $rgb = '';
+    $previous = str_repeat("\0", $stride);
+    $position = 0;
+    for ($y = 0; $y < $height; $y++) {
+      $filter = ord($decoded[$position++]);
+      if ($filter > 4) return null;
+      $raw = substr($decoded, $position, $stride);
+      $position += $stride;
+      $row = '';
+      for ($x = 0; $x < $stride; $x++) {
+        $left = $x >= $channels ? ord($row[$x - $channels]) : 0;
+        $above = ord($previous[$x]);
+        $upperLeft = $x >= $channels ? ord($previous[$x - $channels]) : 0;
+        $predictor = match ($filter) {
+          1 => $left,
+          2 => $above,
+          3 => intdiv($left + $above, 2),
+          4 => $this->pngPaeth($left, $above, $upperLeft),
+          default => 0,
+        };
+        $row .= chr((ord($raw[$x]) + $predictor) & 255);
+      }
+      if ($channels === 3) {
+        $rgb .= $row;
+      } else {
+        for ($x = 0; $x < $stride; $x += 4) {
+          $alpha = ord($row[$x + 3]);
+          for ($channel = 0; $channel < 3; $channel++) {
+            $rgb .= chr((int) round((ord($row[$x + $channel]) * $alpha + 255 * (255 - $alpha)) / 255));
+          }
+        }
+      }
+      $previous = $row;
+    }
+    return gzcompress($rgb, 6) ?: null;
+  }
+
+  private function pngPaeth(int $left, int $above, int $upperLeft): int
+  {
+    $prediction = $left + $above - $upperLeft;
+    $leftDistance = abs($prediction - $left);
+    $aboveDistance = abs($prediction - $above);
+    $cornerDistance = abs($prediction - $upperLeft);
+    return $leftDistance <= $aboveDistance && $leftDistance <= $cornerDistance ? $left : ($aboveDistance <= $cornerDistance ? $above : $upperLeft);
   }
 
   /** Validated normalized strokes, 1000 x 350; no image decoder or remote resource. */
@@ -440,7 +521,8 @@ final class SimplePdf
     $ratioTotal = (float) array_sum($widthRatios);
     $widths = array_map(fn(float $ratio): float => $this->contentWidth * ($ratio / $ratioTotal), $widthRatios);
     $headerCells = array_map(static fn($value): string => (string) $value, $headers);
-    $this->drawTableRow($headerCells, $widths, max(7, $fontSize - 1), true, false, $rightAlignColumns);
+    $hasHeader = array_filter($headerCells, static fn(string $value): bool => trim($value) !== '') !== [];
+    if ($hasHeader) $this->drawTableRow($headerCells, $widths, max(7, $fontSize - 1), true, false, $rightAlignColumns);
 
     foreach ($rows as $index => $row) {
       $cells = array_values(array_map(static fn($value): string => (string) $value, $row));
@@ -448,7 +530,7 @@ final class SimplePdf
       $height = $this->tableRowHeight($cells, $widths, $fontSize);
       if (!$this->hasSpace($height)) {
         $this->startNewPage();
-        $this->drawTableRow($headerCells, $widths, max(7, $fontSize - 1), true, false, $rightAlignColumns);
+        if ($hasHeader) $this->drawTableRow($headerCells, $widths, max(7, $fontSize - 1), true, false, $rightAlignColumns);
       }
       $this->drawTableRow($cells, $widths, $fontSize, false, $index % 2 === 1, $rightAlignColumns);
     }

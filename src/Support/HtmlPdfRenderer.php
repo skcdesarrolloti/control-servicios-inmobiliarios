@@ -13,12 +13,12 @@ final class HtmlPdfRenderer
     $cssPath = dirname(__DIR__, 2) . '/public/assets/css/admin/04-dashboard-pending.css';
     $printCssPath = dirname(__DIR__, 2) . '/public/assets/css/quote-print.css';
     if (($browser === null && $remoteUrl === '') || !is_readable($cssPath) || !is_readable($printCssPath)) {
-      return null;
+      return HtmlPdfFallback::render($content, $title);
     }
 
     $directory = rtrim(sys_get_temp_dir(), '/\\') . '/scm-quote-' . bin2hex(random_bytes(8));
     if (!mkdir($directory, 0700)) {
-      return null;
+      return HtmlPdfFallback::render($content, $title);
     }
     $htmlPath = $directory . '/quote.html';
     $pdfPath = $directory . '/quote.pdf';
@@ -33,7 +33,7 @@ final class HtmlPdfRenderer
 
     try {
       if (file_put_contents($htmlPath, $html, LOCK_EX) === false) {
-        return null;
+        return HtmlPdfFallback::render($content, $title);
       }
       if ($remoteUrl !== '') {
         $remotePdf = self::renderWithGotenberg($htmlPath, $remoteUrl);
@@ -42,7 +42,7 @@ final class HtmlPdfRenderer
         }
       }
       if ($browser === null || !function_exists('proc_open')) {
-        return null;
+        return HtmlPdfFallback::render($content, $title);
       }
       $command = [
         $browser, '--headless', '--disable-gpu', '--no-sandbox', '--no-first-run',
@@ -52,7 +52,7 @@ final class HtmlPdfRenderer
       ];
       $process = @proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
       if (!is_resource($process)) {
-        return null;
+        return HtmlPdfFallback::render($content, $title);
       }
       fclose($pipes[0]);
       stream_set_blocking($pipes[1], false);
@@ -74,7 +74,7 @@ final class HtmlPdfRenderer
       fclose($pipes[2]);
       proc_close($process);
       $bytes = is_file($pdfPath) ? file_get_contents($pdfPath) : false;
-      return is_string($bytes) && str_starts_with($bytes, '%PDF-') ? $bytes : null;
+      return is_string($bytes) && str_starts_with($bytes, '%PDF-') ? $bytes : HtmlPdfFallback::render($content, $title);
     } finally {
       if (is_dir($directory . '/profile')) {
         $files = new \RecursiveIteratorIterator(

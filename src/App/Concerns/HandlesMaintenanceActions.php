@@ -2735,7 +2735,7 @@ trait HandlesMaintenanceActions
     $html = $this->render_native_cotizacion_mantenimiento_view($row, $orders);
     $bytes = \SCM\Support\HtmlPdfRenderer::render($html, 'Cotización de mantenimiento #' . $id);
     if ($bytes === null) {
-      throw new \DomainException('No se pudo generar el PDF con el diseño de la cotización. Configura Chromium en un VPS o el servicio privado SCM_GOTENBERG_URL e inténtalo de nuevo.');
+      throw new \DomainException('No se pudo generar el PDF de la cotización. Inténtalo de nuevo o contacta a soporte.');
     }
     return $bytes;
   }
