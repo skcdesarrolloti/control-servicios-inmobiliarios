@@ -2,7 +2,8 @@
 
 const http = require('node:http');
 const { timingSafeEqual } = require('node:crypto');
-const { chmodSync, statSync } = require('node:fs');
+const { chmodSync, existsSync, statSync } = require('node:fs');
+const { basename, dirname, join } = require('node:path');
 const Busboy = require('busboy');
 const puppeteer = require('puppeteer');
 
@@ -36,10 +37,13 @@ async function getBrowser() {
   if (browser && browser.connected) return browser;
   const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || await puppeteer.executablePath();
   if (process.platform === 'linux' && !process.env.PUPPETEER_EXECUTABLE_PATH) {
-    const mode = statSync(executablePath).mode & 0o777;
-    if ((mode & 0o111) !== 0o111) {
-      chmodSync(executablePath, mode | 0o111);
-      console.log('Permiso de ejecución de Chromium corregido:', (statSync(executablePath).mode & 0o777).toString(8));
+    for (const path of [executablePath, join(dirname(executablePath), 'chrome_crashpad_handler'), join(dirname(executablePath), 'chrome_sandbox')]) {
+      if (!existsSync(path)) continue;
+      const mode = statSync(path).mode & 0o777;
+      if ((mode & 0o111) !== 0o111) {
+        chmodSync(path, mode | 0o111);
+        console.log('Permiso de ejecución corregido:', basename(path), (statSync(path).mode & 0o777).toString(8));
+      }
     }
   }
   browser = await puppeteer.launch({
