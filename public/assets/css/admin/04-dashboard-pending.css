@@ -11473,6 +11473,184 @@
   grid-column: 1 / -1;
 }
 
+.scm-order-invoice {
+  gap: 14px;
+  color: #10233f;
+  text-align: left;
+}
+
+.scm-order-invoice-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px;
+  border-radius: 18px;
+  background: linear-gradient(125deg, #061d49, #123765 72%, #a66d1e);
+  color: #fff;
+}
+
+.scm-order-invoice-brand {
+  display: grid;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.scm-order-invoice-brand img {
+  display: block;
+  width: auto;
+  max-width: min(260px, 100%);
+  max-height: 58px;
+  object-fit: contain;
+}
+
+.scm-order-invoice-brand span {
+  color: #dbeafe;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.scm-order-invoice-number {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  text-align: right;
+}
+
+.scm-order-invoice-number span,
+.scm-order-invoice-number em {
+  color: #dbeafe;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.scm-order-invoice-number strong {
+  color: #fff;
+  font-size: 32px;
+  line-height: 1.1;
+}
+
+.scm-order-invoice-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.scm-order-invoice-totals > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid #d7e4f3;
+  border-radius: 14px;
+  background: #f2f7fd;
+}
+
+.scm-order-invoice-totals > .is-primary {
+  border-color: #061d49;
+  background: #061d49;
+  color: #fff;
+}
+
+.scm-order-invoice-totals span,
+.scm-order-invoice-totals small {
+  color: #536985;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.scm-order-invoice-totals .is-primary span,
+.scm-order-invoice-totals .is-primary small { color: #c7d9ef; }
+.scm-order-invoice-totals strong { color: #061d49; font-size: 25px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.scm-order-invoice-totals .is-primary strong { color: #fff; }
+
+.scm-order-invoice-reference {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 0 3px;
+  color: #536985;
+  font-size: 11px;
+}
+
+.scm-order-invoice-reference strong { color: #10233f; }
+
+.scm-cotizacion-order-detail.scm-order-invoice section {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #d7e4f3;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.scm-cotizacion-order-detail.scm-order-invoice section h3 {
+  margin: 0 0 12px;
+  color: #061d49;
+  font-size: 14px;
+}
+
+.scm-order-invoice-table-wrap { overflow-x: auto; }
+.scm-order-invoice table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.scm-order-invoice th,
+.scm-order-invoice td { padding: 9px 11px; border-bottom: 1px solid #e2eaf4; overflow-wrap: anywhere; }
+.scm-order-invoice thead { background: #edf4fc; color: #28476d; }
+.scm-order-invoice th { text-align: left; font-weight: 800; }
+.scm-order-invoice td { text-align: right; font-variant-numeric: tabular-nums; }
+.scm-order-invoice tbody tr:nth-child(even) { background: #f8fbff; }
+.scm-order-invoice tbody tr.is-current { background: #fff3df; color: #843f06; font-weight: 800; }
+.scm-order-invoice tfoot { background: #061d49; color: #fff; font-weight: 800; }
+.scm-order-invoice tfoot th,
+.scm-order-invoice tfoot td { border: 0; }
+
+.scm-order-invoice-concept {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 13px 15px;
+  border-left: 4px solid #f28c00;
+  border-radius: 8px;
+  background: #fff8ee;
+}
+
+.scm-order-invoice-concept span { color: #8a4b09; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.scm-order-invoice-concept strong { font-size: 13px; }
+.scm-order-invoice-concept p { margin: 0; color: #475569; font-size: 12px; }
+
+.scm-order-invoice-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.scm-order-invoice-person { display: block; margin-bottom: 8px; color: #061d49; font-size: 16px; }
+.scm-order-invoice dl { display: grid; gap: 0; margin: 0; }
+.scm-order-invoice dl > div { display: grid; grid-template-columns: minmax(95px, 38%) minmax(0, 1fr); gap: 8px; padding: 7px 0; border-bottom: 1px solid #e8eef6; }
+.scm-order-invoice dl > div:last-child { border-bottom: 0; }
+.scm-order-invoice dt { color: #64748b; font-size: 11px; font-weight: 700; }
+.scm-order-invoice dd { margin: 0; overflow-wrap: anywhere; font-size: 12px; font-weight: 700; }
+.scm-order-invoice-approval dl { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.scm-order-invoice-approval dl > div { display: block; border: 0; }
+.scm-order-invoice-approval dd { margin-top: 4px; }
+
+@media (max-width: 700px) {
+  .scm-order-invoice-head,
+  .scm-order-invoice-totals,
+  .scm-order-invoice-columns,
+  .scm-order-invoice-approval dl { grid-template-columns: 1fr; }
+  .scm-order-invoice-head { display: grid; }
+  .scm-order-invoice-number { justify-items: start; text-align: left; }
+  .scm-order-invoice-table-wrap { overflow: visible; }
+  .scm-order-invoice table,
+  .scm-order-invoice tbody,
+  .scm-order-invoice tfoot { display: block; }
+  .scm-order-invoice thead { display: none; }
+  .scm-order-invoice tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 8px 10px; border-bottom: 1px solid #e2eaf4; }
+  .scm-order-invoice tr > th { grid-column: 1 / -1; }
+  .scm-order-invoice tr > th,
+  .scm-order-invoice tr > td { padding: 4px; border: 0; text-align: left; }
+  .scm-order-invoice tr > td::before { display: block; margin-bottom: 3px; color: #64748b; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+  .scm-order-invoice tr > td:nth-child(2)::before { content: "Cotización"; }
+  .scm-order-invoice tr > td:nth-child(3)::before { content: "Esta orden"; }
+  .scm-order-invoice tfoot tr > td::before { color: #c7d9ef; }
+}
+
 .scm-maint-quote-form {
   text-align: left;
 }

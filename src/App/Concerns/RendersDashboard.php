@@ -4684,7 +4684,7 @@ trait RendersDashboard
         . '</div>'
         . '</article>';
       $ordersHistoryHtml .= '<article class="scm-case-history-item"><div class="scm-case-history-meta"><strong>Orden #' . esc_html($orderId !== '' ? $orderId : '-') . '</strong><span>' . esc_html($orderState !== '' ? $orderState : '-') . '</span></div><div class="scm-case-history-detail"><p><strong>Proveedor:</strong> ' . esc_html($orderProvider !== '' ? $orderProvider : '-') . '</p><p><strong>Actividad:</strong> ' . esc_html($orderActivity !== '' ? $orderActivity : '-') . '</p><p><strong>Valor:</strong> ' . esc_html($this->format_cop_currency($order['valor'] ?? 0)) . '</p></div></article>';
-      $orderDetailsHtml .= '<template class="scm-cotizacion-order-detail-source" data-scm-cotizacion-order-detail="' . esc_attr($orderKey) . '" data-order-number="' . esc_attr($orderId !== '' ? $orderId : '-') . '">' . $this->render_cotizacion_order_detail($order) . '</template>';
+      $orderDetailsHtml .= '<template class="scm-cotizacion-order-detail-source" data-scm-cotizacion-order-detail="' . esc_attr($orderKey) . '" data-order-number="' . esc_attr($orderId !== '' ? $orderId : '-') . '">' . $this->render_cotizacion_order_detail($order, $row) . '</template>';
     }
     if (!empty($orders)) {
       $ordersHtml .= '</div>';
@@ -4808,63 +4808,46 @@ trait RendersDashboard
       . $linkedTicketSource . '<div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div></article>';
   }
 
-  /** @param array<string,mixed> $order */
-  private function render_cotizacion_order_detail(array $order): string
+  /** @param array<string,mixed> $order @param array<string,mixed> $quote */
+  private function render_cotizacion_order_detail(array $order, array $quote): string
   {
     $value = static fn(string $key, string $fallback = '-'): string => trim((string) ($order[$key] ?? '')) !== '' ? trim((string) $order[$key]) : $fallback;
     $dateTs = (int) ($order['fecha'] ?? 0);
     if ($dateTs <= 0) {
       $dateTs = strtotime((string) ($order['cct_created'] ?? '')) ?: 0;
     }
-    $date = $dateTs > 0 ? date('d/m/Y h:i a', $dateTs) : '-';
-    $createdTs = strtotime((string) ($order['cct_created'] ?? '')) ?: 0;
-    $modifiedTs = strtotime((string) ($order['cct_modified'] ?? '')) ?: 0;
-    $state = $value('estado', '');
+    $date = $dateTs > 0 ? date('d/m/Y', $dateTs) : '-';
+    $state = $value('estado', 'Esperando respuesta');
     $isPending = in_array(strtolower(trim($state)), ['', 'esperando respuesta'], true);
     $orderId = $value('_ID', '');
-    $detailItem = static function (string $label, string $content, bool $wide = false): string {
-      return '<div class="scm-cotizacion-order-detail-item' . ($wide ? ' is-wide' : '') . '"><span>' . esc_html($label) . '</span><strong>' . esc_html($content !== '' ? $content : '-') . '</strong></div>';
-    };
+    $approvalLabel = strtolower($state) === 'desaprobada' ? 'Respondida por' : 'Aprobada por';
+    $approvedBy = $isPending ? 'Pendiente de aprobación' : $value('autorizador', 'Sin registrar');
+    $quoteTotal = \SCM\Support\MaintenanceOrderInvoice::quoteTotal($quote);
+    $money = fn(mixed $amount): string => $amount === null ? 'No disponible' : $this->format_cop_currency($amount);
+    $pair = static fn(string $label, string $content): string => '<div><dt>' . esc_html($label) . '</dt><dd>' . esc_html($content !== '' ? $content : '-') . '</dd></div>';
+    $logo = function_exists('system_image') ? system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL) : SCM_DEFAULT_PORTAL_LOGO_URL;
 
-    $html = '<div class="scm-cotizacion-order-detail">';
-    $html .= '<div class="scm-cotizacion-order-detail-hero"><div><span>Orden de mantenimiento</span><strong>#' . esc_html($value('_ID')) . '</strong></div><span class="scm-cotizacion-order-state">' . esc_html($value('estado', 'Sin estado')) . '</span></div>';
-    $html .= '<section><h3>Informaci&oacute;n de la orden</h3><div class="scm-cotizacion-order-detail-grid">';
-    $html .= $detailItem('Fecha', $date);
-    $html .= $detailItem('Categoría', $value('categoria'));
-    $html .= $detailItem('Concepto', $value('concepto'));
-    $html .= $detailItem('Valor', $this->format_cop_currency($order['valor'] ?? 0));
-    $html .= $detailItem('Actividad', $value('actividad'), true);
-    $html .= '</div></section>';
-    $html .= '<section><h3>Ubicaci&oacute;n y referencias</h3><div class="scm-cotizacion-order-detail-grid">';
-    $html .= $detailItem('Cotización', '#' . $value('id_cotizacion'));
-    $html .= $detailItem('Ticket', '#' . $value('id_ticket'));
-    $html .= $detailItem('Contrato', '#' . $value('contrato', $value('id_contrato')));
-    $html .= $detailItem('Inmueble', $value('inmueble', $value('id_inmueble')));
-    $html .= $detailItem('Sucursal', $value('sucursal'));
-    $html .= $detailItem('Dirección', $value('direccion'), true);
-    $html .= '</div></section>';
-    $html .= '<section><h3>Proveedor</h3><div class="scm-cotizacion-order-detail-grid">';
-    $html .= $detailItem('Nombre', $value('proveedor'));
-    $html .= $detailItem('Identificación', trim($value('tipo_identificacion_proveedor', '')) . ' ' . $value('identificacion_proveedor'));
-    $html .= $detailItem('Correo', $value('correo_proveedor'));
-    $html .= $detailItem('Celular', $value('celular_proveedor'));
-    $html .= $detailItem('Dirección', $value('direccion_proveedor'), true);
-    $html .= '</div></section>';
-    $html .= '<section><h3>Datos para pago</h3><div class="scm-cotizacion-order-detail-grid">';
-    $html .= $detailItem('Titular', $value('titular_proveedor'));
-    $html .= $detailItem('Identificación del titular', $value('identificacion_cuenta_proveedor'));
-    $html .= $detailItem('Banco', $value('banco_proveedor'));
-    $html .= $detailItem('Tipo de cuenta', $value('tipo_cuenta_proveedor'));
-    $html .= $detailItem('Cuenta', $value('cuenta_proveedor'));
-    $html .= $detailItem('Correo de pago', $value('correo_pago_proveedor'));
-    $html .= '</div></section>';
-    $html .= '<section><h3>Responsables y trazabilidad</h3><div class="scm-cotizacion-order-detail-grid">';
-    $html .= $detailItem('Creador', $value('creador'));
-    $html .= $detailItem('Coordinador', $value('coordinador'));
-    $html .= $detailItem('Autorizador', $value('autorizador'));
-    $html .= $detailItem('Creada', $createdTs > 0 ? date('d/m/Y h:i a', $createdTs) : '-');
-    $html .= $detailItem('Última actualización', $modifiedTs > 0 ? date('d/m/Y h:i a', $modifiedTs) : '-');
-    $html .= '</div></section></div>';
+    $html = '<div class="scm-cotizacion-order-detail scm-order-invoice">';
+    $html .= '<header class="scm-order-invoice-head"><div class="scm-order-invoice-brand"><img src="' . esc_attr($logo) . '" alt="SKC SuCasa Inmobiliaria"><span>SKC SuCasa Inmobiliaria</span></div><div class="scm-order-invoice-number"><span>Orden de mantenimiento</span><strong>#' . esc_html($orderId !== '' ? $orderId : '-') . '</strong><em>' . esc_html($state) . '</em></div></header>';
+    $html .= '<div class="scm-order-invoice-totals"><div class="is-primary"><span>Valor de esta orden</span><strong>' . esc_html($money($order['valor'] ?? 0)) . '</strong><small>' . esc_html($value('categoria')) . '</small></div><div><span>Valor total de la cotización</span><strong>' . esc_html($money($quoteTotal)) . '</strong><small>Cotización #' . esc_html($value('id_cotizacion')) . '</small></div></div>';
+    $html .= '<div class="scm-order-invoice-reference"><span>Fecha: <strong>' . esc_html($date) . '</strong></span><span>Ticket: <strong>#' . esc_html($value('id_ticket')) . '</strong></span><span>Contrato: <strong>#' . esc_html($value('contrato', $value('id_contrato'))) . '</strong></span><span>Inmueble: <strong>' . esc_html($value('inmueble', $value('id_inmueble'))) . '</strong></span></div>';
+    $html .= '<section class="scm-order-invoice-lines"><h3>Desglose por tipo de concepto</h3><div class="scm-order-invoice-table-wrap"><table><thead><tr><th scope="col">Tipo</th><th scope="col">En la cotización</th><th scope="col">En esta orden</th></tr></thead><tbody>';
+    foreach (\SCM\Support\MaintenanceOrderInvoice::rows($order, $quote) as $line) {
+      $html .= '<tr' . ($line['current'] ? ' class="is-current"' : '') . '><th scope="row">' . esc_html($line['label']) . '</th><td>' . esc_html($money($line['quote'])) . '</td><td>' . esc_html($money($line['order'])) . '</td></tr>';
+    }
+    $html .= '</tbody><tfoot><tr><th scope="row">Total</th><td>' . esc_html($money($quoteTotal)) . '</td><td>' . esc_html($money($order['valor'] ?? 0)) . '</td></tr></tfoot></table></div>';
+    $html .= '<div class="scm-order-invoice-concept"><span>Concepto autorizado</span><strong>' . esc_html($value('concepto', $value('actividad'))) . '</strong><p>' . esc_html($value('actividad', 'Sin actividad registrada.')) . '</p></div></section>';
+    $html .= '<div class="scm-order-invoice-columns"><section><h3>Beneficiario del pago</h3><strong class="scm-order-invoice-person">' . esc_html($value('proveedor')) . '</strong><dl>';
+    $html .= $pair('Identificación', trim($value('tipo_identificacion_proveedor', '') . ' ' . $value('identificacion_proveedor')));
+    $html .= $pair('Correo', $value('correo_proveedor')) . $pair('Celular', $value('celular_proveedor')) . $pair('Dirección', $value('direccion_proveedor'));
+    $html .= '</dl></section><section><h3>Datos para consignar</h3><dl>';
+    $html .= $pair('Titular', $value('titular_proveedor')) . $pair('Identificación', $value('identificacion_cuenta_proveedor'));
+    $html .= $pair('Banco', $value('banco_proveedor')) . $pair('Tipo de cuenta', $value('tipo_cuenta_proveedor'));
+    $html .= $pair('Número de cuenta', $value('cuenta_proveedor')) . $pair('Correo para pago', $value('correo_pago_proveedor'));
+    $html .= '</dl></section></div>';
+    $html .= '<section class="scm-order-invoice-approval"><h3>Creación y aprobación</h3><dl>';
+    $html .= $pair('Creada por', $value('creador')) . $pair($approvalLabel, $approvedBy) . $pair('Coordinación', $value('coordinador'));
+    $html .= '</dl></section></div>';
     $detailActions = '';
     if ($orderId !== '') {
       $detailActions .= '<button type="button" class="scm-cotizacion-order-view" data-scm-cotizacion-order-pdf data-order-id="' . esc_attr($orderId) . '">Soporte de pago</button>';

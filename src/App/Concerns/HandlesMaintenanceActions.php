@@ -2749,7 +2749,9 @@ trait HandlesMaintenanceActions
     if (!is_array($order)) {
       throw new \DomainException('Orden no encontrada.');
     }
-    return $this->build_cotizacion_order_pdf($order)->bytes();
+    $quoteId = (int) ($order['id_cotizacion'] ?? 0);
+    $quote = $quoteId > 0 ? $this->maintenance_order_find_cotizacion($quoteId) : null;
+    return $this->build_cotizacion_order_pdf($order, $quote)->bytes();
   }
 
   /** @return array<int,array<string,mixed>> */
@@ -4231,8 +4233,8 @@ trait HandlesMaintenanceActions
     ];
   }
 
-  /** @param array<string,mixed> $order */
-  private function build_cotizacion_order_pdf(array $order): \SCM\Support\SimplePdf
+  /** @param array<string,mixed> $order @param array<string,mixed>|null $quote */
+  private function build_cotizacion_order_pdf(array $order, ?array $quote): \SCM\Support\SimplePdf
   {
     $pdf = new \SCM\Support\SimplePdf();
     $letterhead = dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg';
@@ -4255,33 +4257,37 @@ trait HandlesMaintenanceActions
     $category = $clean('categoria');
     $activity = $clean('actividad', 'Sin actividad registrada.');
     $concept = $clean('concepto', $activity);
+    $quoteTotal = \SCM\Support\MaintenanceOrderInvoice::quoteTotal($quote);
+    $money = fn(mixed $amount): string => $amount === null ? 'No disponible' : $this->format_cop_currency($amount);
+    $approvalLabel = strtolower($state) === 'desaprobada' ? 'Respondida por' : 'Aprobada por';
+    $approvedBy = in_array(strtolower($state), ['esperando respuesta', 'sin estado'], true) ? 'Pendiente de aprobación' : $clean('autorizador', 'Sin registrar');
 
     $pdf->actaHeader(
-      'Orden de mantenimiento para cartera #' . ($orderId !== '-' ? $orderId : ''),
-      'Documento interno para solicitud y trazabilidad de pago',
+      'Orden de mantenimiento #' . ($orderId !== '-' ? $orderId : ''),
+      'Cotización #' . $clean('id_cotizacion') . '  |  Ticket #' . $clean('id_ticket') . '  |  Contrato #' . $clean('contrato', $clean('id_contrato')) . '  |  Inmueble ' . $clean('inmueble', $clean('id_inmueble')) . '  |  Fecha: ' . $date,
       'Estado: ' . $state
     );
     $pdf->heading('Resumen para pago');
-    $pdf->amountHighlight('Valor solicitado para pago', $value, 'Monto principal del soporte para revisión de cartera.');
-    $pdf->table(['Campo', 'Información'], [
-      ['Orden', '#' . $orderId],
-      ['Estado', $state],
-      ['Fecha de creación', $date],
-      ['Categoría', $category],
-      ['Concepto', $concept],
-    ], [0.32, 0.68], 8, [1]);
+    $pdf->amountHighlight('Valor de esta orden', $value, $category . '  |  Beneficiario: ' . $provider);
+    $pdf->table(['Concepto', 'Valor'], [
+      ['Total de la cotización', $money($quoteTotal)],
+      ['Categoría de esta orden', $category],
+    ], [0.68, 0.32], 9, [1]);
 
-    $pdf->heading('Referencias del caso');
-    $pdf->table(['Campo', 'Información'], [
-      ['Cotización', '#' . $clean('id_cotizacion')],
-      ['Ticket', '#' . $clean('id_ticket')],
-      ['Contrato', '#' . $clean('contrato', $clean('id_contrato'))],
-      ['Inmueble', $clean('inmueble', $clean('id_inmueble'))],
-      ['Sucursal', $clean('sucursal')],
-      ['Dirección', $clean('direccion')],
-    ], [0.32, 0.68], 8);
+    $pdf->heading('Desglose por tipo de concepto');
+    $breakdown = [];
+    foreach (\SCM\Support\MaintenanceOrderInvoice::rows($order, $quote) as $line) {
+      $breakdown[] = [$line['label'] . ($line['current'] ? ' - esta orden' : ''), $money($line['quote']), $money($line['order'])];
+    }
+    $breakdown[] = ['TOTAL', $money($quoteTotal), $value];
+    $pdf->table(['Tipo', 'Cotización', 'Esta orden'], $breakdown, [0.40, 0.30, 0.30], 8, [1, 2]);
+    $pdf->callout('Concepto autorizado', $concept . ($activity !== $concept ? ' - ' . $activity : ''), 8);
 
-    $pdf->heading('Proveedor');
+    if ($clean('direccion', '') !== '') {
+      $pdf->callout('Lugar de ejecución', $clean('direccion'), 8);
+    }
+
+    $pdf->heading('Beneficiario del pago');
     $pdf->table(['Campo', 'Información'], [
       ['Nombre', $provider],
       ['Identificación', trim($clean('tipo_identificacion_proveedor', '') . ' ' . $clean('identificacion_proveedor', '')) ?: '-'],
@@ -4290,7 +4296,7 @@ trait HandlesMaintenanceActions
       ['Dirección', $clean('direccion_proveedor')],
     ], [0.32, 0.68], 8);
 
-    $pdf->heading('Datos bancarios para cartera');
+    $pdf->heading('Datos para consignar');
     $pdf->table(['Campo', 'Información'], [
       ['Titular de cuenta', $clean('titular_proveedor')],
       ['Identificación titular', $clean('identificacion_cuenta_proveedor')],
@@ -4300,23 +4306,12 @@ trait HandlesMaintenanceActions
       ['Correo de pago', $clean('correo_pago_proveedor')],
     ], [0.32, 0.68], 8);
 
-    $pdf->heading('Actividad autorizada');
-    $pdf->callout('Actividad', $activity, 8);
-    $pdf->heading('Responsables y trazabilidad');
-    $pdf->table(['Campo', 'Información'], [
-      ['Creador', $clean('creador')],
-      ['Coordinador', $clean('coordinador')],
-      ['Autorizador', $clean('autorizador')],
-      ['Actualización', $clean('cct_modified')],
-    ], [0.32, 0.68], 8);
-    $pdf->spacer(8);
+    $pdf->heading('Creación y aprobación');
     $pdf->signatureGroup([
-      ['label' => 'Solicita / registra', 'name' => $clean('creador', 'Control Servicios Inmobiliarios'),
+      ['label' => 'Creada por', 'name' => $clean('creador', 'Control Servicios Inmobiliarios'),
         'details' => 'SKC SuCasa Inmobiliaria'],
-      ['label' => 'Autorización interna', 'name' => $clean('autorizador', 'Pendiente / según respuesta de orden'),
-        'details' => 'Validar estado antes de pago'],
-      ['label' => 'Cartera', 'name' => 'Recibido para gestión de pago',
-        'details' => 'Espacio de control interno'],
+      ['label' => $approvalLabel, 'name' => $approvedBy,
+        'details' => 'Estado: ' . $state],
     ]);
 
     return $pdf;
