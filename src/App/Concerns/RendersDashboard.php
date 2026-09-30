@@ -5144,14 +5144,15 @@ trait RendersDashboard
       'Fecha' => $fecha,
       'Fecha de envío' => $fechaEnvio,
       'Contrato' => (string) ($row['contrato'] ?? '-'),
+      'Inmueble simi' => (string) ($row['inmueble'] ?? '-'),
       'Validez' => $this->cotizacion_days_label($row['valides_oferta'] ?? ''),
       'Duración del trabajo' => $this->cotizacion_days_label($row['duracion'] ?? ''),
-      'Inmueble' => (string) ($row['inmueble'] ?? '-'),
       'Destinatario' => (string) ($row['destinatario'] ?? '-'),
       'Dirección' => (string) ($row['direccion'] ?? '-'),
       'Responsable de cotización' => $responsableCotizacion['nombre'] !== '' ? $responsableCotizacion['nombre'] : '-',
       'Elaboró la cotización' => $creadorNombre !== '' ? $creadorNombre : '-',
-      'Ticket / Inmueble' => ($ticket !== '' ? '#' . $ticket : '-') . ' / ' . trim((string) ($row['id_inmueble'] ?? '-')),
+      '# Caso' => $ticket !== '' ? '#' . $ticket : '-',
+      '# Código inmueble web' => trim((string) ($row['id_inmueble'] ?? '-')),
     ];
     foreach (array_chunk($summaryFields, 2, true) as $fields) {
       $html .= '<tr>';

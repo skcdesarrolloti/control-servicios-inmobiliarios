@@ -752,6 +752,7 @@ trait HandlesMaintenanceActions
       ],
       'media' => [
         'mejor_oferta' => $this->maintenance_quote_media_list($quote['mejor_oferta'] ?? ''),
+        'mejor_oferta_items' => $this->cotizacion_media_items($this->cotizacion_split_media_refs($quote['mejor_oferta'] ?? '')),
         'otras_oferta' => $this->maintenance_quote_media_list($quote['otras_oferta'] ?? ''),
       ],
     ];

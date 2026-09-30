@@ -17572,7 +17572,7 @@
       var media = q.media || {};
       return (
         '<form class="scm-maint-quote-form" data-maint-quote-form>' +
-        '<div class="scm-maint-quote-hero"><div><span>' + escHtml(context.tipo_mantenimiento || "Mantenimiento") + '</span><h3>' + escHtml(title) + '</h3><p>Ticket #' + escHtml(ticket.numero || ticket.id || "-") + ' · Inmueble ' + escHtml(ticket.inmueble || ticket.id_inmueble || "-") + ' · Contrato ' + escHtml(ticket.contrato || "-") + '</p></div><strong data-quote-grand-total>$0</strong></div>' +
+        '<div class="scm-maint-quote-hero"><div><span>' + escHtml(context.tipo_mantenimiento || "Mantenimiento") + '</span><h3>' + escHtml(title) + '</h3><p># Caso ' + escHtml(ticket.numero || ticket.id || "-") + ' · # Código inmueble web ' + escHtml(ticket.id_inmueble || "-") + ' · Contrato ' + escHtml(ticket.contrato || "-") + ' · Inmueble simi ' + escHtml(ticket.inmueble || "-") + '</p></div><strong data-quote-grand-total>$0</strong></div>' +
         '<input type="hidden" name="mode" value="' + escHtml(context.mode || "create") + '">' +
         '<input type="hidden" name="ticket_pk" value="' + escHtml(ticket.id || "") + '">' +
         '<input type="hidden" name="id_cotizacion" value="' + escHtml(q.id || "") + '">' +
@@ -17774,19 +17774,23 @@
       var wrap = form ? form.querySelector("[data-material-generated-offer-attachments]") : null;
       if (!wrap) return;
       var offers = maintenanceQuoteGeneratedMaterialOffers(form);
+      var saved = Array.isArray(form._savedBestOffers) ? form._savedBestOffers.filter(function (item) { return item && item.url; }) : [];
       if (!offers.length) {
-        wrap.innerHTML = "<p>No has generado imágenes desde la tabla de materiales.</p>";
-        return;
+        wrap.innerHTML = saved.length ? "" : "<p>No has generado imágenes desde la tabla de materiales.</p>";
+      } else {
+        wrap.innerHTML = offers.map(function (offer, index) {
+          var title = offer.provider || ("Oferta " + (index + 1));
+          return '<article class="scm-maint-quote-auto-offer-card">' +
+            '<button type="button" class="scm-maint-quote-image-thumb" data-view-generated-material-offer="' + escHtml(offer.key) + '" aria-label="Ver imagen de cotización material de ' + escHtml(title) + '">' +
+            '<img src="' + escHtml(offer.image) + '" alt="Imagen de cotización material de ' + escHtml(title) + '">' +
+            '</button>' +
+            '<div><span>Mejor oferta generada</span><strong>' + escHtml(title) + '</strong><b>' + escHtml(formatCotizacionOrderCurrency(offer.total || 0)) + '</b></div>' +
+            '<div class="scm-maint-quote-auto-offer-actions"><button type="button" class="scm-maint-quote-view-image" data-view-generated-material-offer="' + escHtml(offer.key) + '">Ver imagen</button><button type="button" class="scm-maint-quote-remove" data-remove-generated-material-offer="' + escHtml(offer.key) + '">Quitar</button></div>' +
+            '</article>';
+        }).join("");
       }
-      wrap.innerHTML = offers.map(function (offer, index) {
-        var title = offer.provider || ("Oferta " + (index + 1));
-        return '<article class="scm-maint-quote-auto-offer-card">' +
-          '<button type="button" class="scm-maint-quote-image-thumb" data-view-generated-material-offer="' + escHtml(offer.key) + '" aria-label="Ver imagen de cotización material de ' + escHtml(title) + '">' +
-          '<img src="' + escHtml(offer.image) + '" alt="Imagen de cotización material de ' + escHtml(title) + '">' +
-          '</button>' +
-          '<div><span>Mejor oferta generada</span><strong>' + escHtml(title) + '</strong><b>' + escHtml(formatCotizacionOrderCurrency(offer.total || 0)) + '</b></div>' +
-          '<div class="scm-maint-quote-auto-offer-actions"><button type="button" class="scm-maint-quote-view-image" data-view-generated-material-offer="' + escHtml(offer.key) + '">Ver imagen</button><button type="button" class="scm-maint-quote-remove" data-remove-generated-material-offer="' + escHtml(offer.key) + '">Quitar</button></div>' +
-          '</article>';
+      wrap.innerHTML += saved.map(function (item, index) {
+        return '<article class="scm-maint-quote-auto-offer-card"><button type="button" class="scm-maint-quote-image-thumb" data-view-saved-best-offer="' + index + '" aria-label="Ver oferta guardada ' + (index + 1) + '"><img src="' + escHtml(item.url) + '" alt="Oferta de materiales guardada"></button><div><span>Mejor oferta guardada</span><strong>' + escHtml(item.title || ("Oferta " + (index + 1))) + '</strong></div><div class="scm-maint-quote-auto-offer-actions"><button type="button" class="scm-maint-quote-view-image" data-view-saved-best-offer="' + index + '">Ver imagen</button></div></article>';
       }).join("");
     }
 
@@ -17795,6 +17799,7 @@
       if (!wrap) return;
       syncMaintenanceQuoteGeneratedMaterialRows(form);
       var imageByKey = maintenanceQuoteGeneratedOfferByKey(form);
+      var savedOffers = Array.isArray(form._savedBestOffers) ? form._savedBestOffers : [];
       var rows = Array.prototype.slice.call(form.querySelectorAll('[data-quote-row="materiales"]')).map(function (row, index) {
         var data = quoteRowToObject(row);
         var provider = String(data.provedor_materiales || data.proveedor_materiales || "").trim();
@@ -17810,9 +17815,11 @@
         return;
       }
       wrap.innerHTML = rows.map(function (item) {
+        var savedIndex = !item.image && savedOffers.length === 1 && rows.length === 1 ? 0 : -1;
+        var savedImage = savedIndex >= 0 && savedOffers[savedIndex] ? savedOffers[savedIndex].url : "";
         var imageHtml = item.image
           ? '<button type="button" class="scm-maint-quote-image-thumb" data-view-generated-material-offer="' + escHtml(item.key) + '" aria-label="Ver imagen de cotización material de ' + escHtml(item.provider || ("oferta " + (item.index + 1))) + '"><img src="' + escHtml(item.image) + '" alt="Imagen de cotización material de ' + escHtml(item.provider || ("oferta " + (item.index + 1))) + '"></button>'
-          : '<div class="scm-maint-quote-generated-card-placeholder">Sin imagen<br>generada</div>';
+          : (savedImage ? '<button type="button" class="scm-maint-quote-image-thumb" data-view-saved-best-offer="' + savedIndex + '" aria-label="Ver imagen guardada de materiales"><img src="' + escHtml(savedImage) + '" alt="Imagen guardada de materiales"></button>' : '<div class="scm-maint-quote-generated-card-placeholder">Sin imagen<br>generada</div>');
         var removeAttr = item.key
           ? ' data-remove-generated-material-offer="' + escHtml(item.key) + '"'
           : ' data-remove-material-row-index="' + escHtml(String(item.index)) + '"';
@@ -18323,6 +18330,7 @@
 
     function wireMaintenanceQuoteForm(form, context) {
       if (!form) return;
+      form._savedBestOffers = context && context.cotizacion && context.cotizacion.media ? (context.cotizacion.media.mejor_oferta_items || []).filter(function (item) { return item && item.url; }) : [];
       form.addEventListener("input", function (event) {
         var target = event.target || null;
         if (target && target.hasAttribute && target.hasAttribute("data-quote-format")) {
@@ -18384,6 +18392,14 @@
           if (offer && offer.image) {
             showMaintenanceQuoteMaterialImagePreview(offer.image, offer.provider || "Cotización material");
           }
+          return;
+        }
+        var viewSavedOfferBtn = event.target && event.target.closest ? event.target.closest("[data-view-saved-best-offer]") : null;
+        if (viewSavedOfferBtn) {
+          event.preventDefault();
+          var savedIndex = parseInt(viewSavedOfferBtn.getAttribute("data-view-saved-best-offer") || "-1", 10);
+          var savedOffer = (form._savedBestOffers || [])[savedIndex];
+          if (savedOffer && savedOffer.url) showMaintenanceQuoteMaterialImagePreview(savedOffer.url, savedOffer.title || "Oferta de materiales guardada");
           return;
         }
         var removeMaterialRowBtn = event.target && event.target.closest ? event.target.closest("[data-remove-material-row-index]") : null;

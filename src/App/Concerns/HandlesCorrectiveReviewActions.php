@@ -840,10 +840,11 @@ trait HandlesCorrectiveReviewActions
       <p class="scm-acta-notice">Esta revisión correctiva registra los daños encontrados y deja el caso como <strong>Inspeccionado</strong>.</p>
       <div class="scm-acta-meta">
         <strong>Caso #<?= $h($ticketLabel) ?></strong>
-        <span>Inmueble <?= $h($idInmueble !== '' ? $idInmueble : '-') ?> · Contrato <?= $h($contrato !== '' ? $contrato : '-') ?></span>
+        <span>Inmueble web <?= $h($idInmueble !== '' ? $idInmueble : '-') ?></span>
       </div>
       <div class="scm-corrective-summary">
-        <div><span>Inmueble interno</span><strong><?= $h($inmueble !== '' ? $inmueble : '-') ?></strong></div>
+        <div><span>Contrato</span><strong><?= $h($contrato !== '' ? $contrato : '-') ?></strong></div>
+        <div><span>Inmueble simi</span><strong><?= $h($inmueble !== '' ? $inmueble : '-') ?></strong></div>
         <div><span>Dirección</span><strong><?= $h($direccion !== '' ? $direccion : '-') ?></strong></div>
         <div><span>Propietario</span><strong><?= $h($this->correctiveReviewFirstText([$ticket['propietario'] ?? '', $contract['propietario'] ?? '']) ?: '-') ?></strong></div>
         <div><span>Arrendatario</span><strong><?= $h($this->correctiveReviewFirstText([$ticket['arrendatario'] ?? '', $contract['arrendatario'] ?? '']) ?: '-') ?></strong></div>

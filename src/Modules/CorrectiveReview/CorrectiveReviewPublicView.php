@@ -38,9 +38,10 @@ final class CorrectiveReviewPublicView
     $items = $this->items($review['evaluacion_de_danos'] ?? '');
     $title = 'Revisión correctiva #' . $reviewId;
     $meta = [
-      'Caso' => $this->withHash($this->first([$review['id_ticket'] ?? '', $ticket['id_ticket'] ?? '', $ticket['_ID'] ?? ''])),
-      'Inmueble' => $this->first([$review['inmueble'] ?? '', $ticket['inmueble'] ?? '', $contract['inmueble'] ?? '', $review['id_inmueble'] ?? '']),
+      '# Caso' => $this->withHash($this->first([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '', $review['id_ticket'] ?? ''])),
+      'Inmueble web' => $this->first([$review['id_inmueble'] ?? '', $ticket['id_inmueble'] ?? '', $contract['id_inmueble'] ?? '']),
       'Contrato' => $this->withHash($this->first([$review['contrato'] ?? '', $ticket['contrato'] ?? '', $contract['contrato'] ?? '', $review['id_contrato'] ?? ''])),
+      'Inmueble simi' => $this->first([$review['inmueble'] ?? '', $ticket['inmueble'] ?? '', $contract['inmueble'] ?? '']),
       'Dirección' => $this->first([$review['direccion'] ?? '', $ticket['direccion'] ?? '', $contract['direccion'] ?? '', $property['direccion'] ?? '', $property['direccion_fisica'] ?? '']),
       'Destinatario' => $this->first([$review['destinatario'] ?? '', $ticket['propietario'] ?? '', $contract['propietario'] ?? '']),
       'Fecha' => $this->dateLabel($this->displayDateRaw($review)),
