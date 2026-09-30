@@ -99,9 +99,9 @@ try {
     }
     $download = (string) $_GET['download'];
     if ($download === 'quote_pdf') {
-      $bytes = $maintenanceApp->maintenance_quote_pdf_bytes($quoteId, 'funcionario');
+      $bytes = $maintenanceApp->maintenance_quote_pdf_bytes($quoteId);
       header('Content-Type: application/pdf');
-      header('Content-Disposition: attachment; filename="cotizacion-mantenimiento-' . $quoteId . '-funcionario.pdf"');
+      header('Content-Disposition: attachment; filename="cotizacion-mantenimiento-' . $quoteId . '.pdf"');
       header('Content-Length: ' . strlen($bytes));
       session_write_close();
       echo $bytes;

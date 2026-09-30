@@ -110,7 +110,7 @@ session_write_close();
     .scm-public-quote-response-form input,.scm-public-quote-response-form select,.scm-public-quote-response-form textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:12px;padding:11px 12px;font:500 14px Poppins,Arial,sans-serif;color:#0f172a;background:#fff}
     .scm-public-quote-response-form button{grid-column:1/-1;justify-self:start;border:0;border-radius:13px;background:#ff8a00;color:#fff;font:800 14px Poppins,Arial,sans-serif;padding:12px 18px;cursor:pointer}
     @media (max-width:720px){.scm-public-quote-response-form{grid-template-columns:1fr}.scm-public-quote-head{align-items:flex-start;flex-direction:column}.scm-public-quote-logo{max-width:100%;width:170px}.scm-public-quote-confirmation{align-items:flex-start;flex-direction:column}.scm-public-quote-confirmation a{width:100%;box-sizing:border-box}}
-    @media print{body{background:#fff}#scm-app{max-width:none;padding:0}.scm-public-quote-head{box-shadow:none;border:0;margin-bottom:8px}.scm-cotizacion-native-audience{display:none!important}}
+    @media print{body{background:#fff}#scm-app{max-width:none;padding:0}.scm-public-quote-head{box-shadow:none;border:0;margin-bottom:8px}}
   </style>
 </head>
 <body>

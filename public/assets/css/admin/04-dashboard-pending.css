@@ -13126,7 +13126,7 @@
 
 .scm-cotizacion-native-toolbar {
   display: grid;
-  grid-template-columns: auto minmax(280px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
   padding: 20px 26px;
@@ -13139,44 +13139,6 @@
 .scm-cotizacion-native-toolbar-heading {
   display: grid;
   line-height: 1.1;
-}
-
-.scm-cotizacion-native-audience-switch {
-  display: inline-grid;
-  grid-template-columns: repeat(2, minmax(132px, 1fr));
-  gap: 4px;
-  justify-self: center;
-  padding: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.scm-cotizacion-native-audience-switch button {
-  min-height: 40px;
-  padding: 8px 12px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: #e2e8f0;
-  cursor: pointer;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.scm-cotizacion-native-audience-switch button:hover,
-.scm-cotizacion-native-audience-switch button:focus-visible {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  outline: 2px solid #ffb45c;
-  outline-offset: 1px;
-}
-
-.scm-cotizacion-native-audience-switch button.active {
-  background: #fff;
-  color: #061d49;
-  box-shadow: 0 8px 18px rgba(3, 15, 38, 0.24);
 }
 
 .swal2-popup.scm-cotizacion-native-swal .scm-swal-close-round {
@@ -13210,14 +13172,54 @@
   font-weight: 700;
 }
 
-.scm-cotizacion-native-toolbar-actions .scm-case-work-btn {
-  border-radius: 12px;
-  font-weight: 700;
+.scm-cotizacion-native-toolbar-actions {
+  display: flex;
+  gap: 10px;
 }
 
-.scm-cotizacion-native-toolbar-actions .scm-primary-action {
-  background: linear-gradient(135deg, #ff9f0a 0%, #f28c00 100%) !important;
-  box-shadow: 0 14px 26px rgba(242, 140, 0, 0.22);
+.scm-cotizacion-native-toolbar-actions .scm-cotizacion-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 9px 15px;
+  border: 1px solid rgba(255, 255, 255, .42);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .09);
+  color: #fff;
+  font: 700 12px Poppins, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .18s, transform .18s;
+}
+
+.scm-cotizacion-native-toolbar-actions .scm-cotizacion-tool-btn .material-symbols-outlined {
+  color: inherit;
+  font-size: 18px;
+}
+
+.scm-cotizacion-native-toolbar-actions .scm-cotizacion-tool-btn:hover,
+.scm-cotizacion-native-toolbar-actions .scm-cotizacion-tool-btn:focus-visible {
+  background: rgba(255, 255, 255, .2);
+  transform: translateY(-1px);
+  outline: 2px solid #ffb45c;
+  outline-offset: 2px;
+}
+
+.scm-cotizacion-native-toolbar-actions .scm-cotizacion-tool-btn.is-primary {
+  border-color: #ffae38;
+  background: #ff9f0a;
+  color: #09234d;
+}
+
+.scm-cotizacion-native-toolbar-actions .scm-cotizacion-tool-btn.is-primary:hover {
+  background: #ffb43b;
+}
+
+.scm-cotizacion-native-toolbar-actions .scm-cotizacion-tool-btn:disabled {
+  opacity: .65;
+  cursor: wait;
 }
 
 .scm-cotizacion-native-scroll {
@@ -13240,43 +13242,6 @@
   box-shadow: 0 20px 52px rgba(15, 23, 42, 0.09);
   font-size: 12.5px;
   line-height: 1.55;
-}
-
-.scm-cotizacion-native-audience {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 12px;
-  padding: 11px 14px;
-  border: 1px solid #cbd5e1;
-  border-radius: 13px;
-  background: #eef5ff;
-  color: #10233f;
-}
-
-.scm-cotizacion-native-audience span {
-  color: #1f4f99;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.scm-cotizacion-native-audience strong {
-  color: #10233f;
-  font-size: 12px;
-  font-weight: 800;
-  text-align: right;
-}
-
-.scm-cotizacion-native-doc.is-audience-destinatario .scm-cotizacion-native-audience {
-  border-color: #ffd09a;
-  background: #fff7ed;
-}
-
-.scm-cotizacion-native-doc.is-audience-destinatario .scm-cotizacion-native-audience span {
-  color: #9a4f00;
 }
 
 .scm-cotizacion-native-hero {
@@ -13802,13 +13767,9 @@
     padding-right: 70px;
   }
 
-  .scm-cotizacion-native-audience-switch {
-    justify-self: stretch;
-  }
-
   .scm-cotizacion-native-toolbar-actions {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .scm-cotizacion-native-summary {
@@ -13833,19 +13794,16 @@
 }
 
 @media (max-width: 680px) {
-  .scm-cotizacion-native-toolbar-actions,
-  .scm-cotizacion-native-audience-switch {
+  .scm-cotizacion-native-toolbar-actions {
     grid-template-columns: 1fr;
   }
 
-  .scm-cotizacion-native-audience,
   .scm-cotizacion-native-section-title,
   .scm-cotizacion-damage-title {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .scm-cotizacion-native-audience strong,
   .scm-cotizacion-damage-title p {
     text-align: left;
   }

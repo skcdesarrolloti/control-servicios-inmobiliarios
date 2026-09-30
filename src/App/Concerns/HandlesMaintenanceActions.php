@@ -2661,12 +2661,8 @@ trait HandlesMaintenanceActions
       $this->jsonFail('Cotizacion invalida.');
     }
 
-    $audience = strtolower(trim(sanitize_text_field((string) ($_POST['audience'] ?? 'funcionario'))));
-    if (!in_array($audience, ['funcionario', 'destinatario'], true)) {
-      $audience = 'funcionario';
-    }
     try {
-      $bytes = $this->maintenance_quote_pdf_bytes($cotizacionId, $audience);
+      $bytes = $this->maintenance_quote_pdf_bytes($cotizacionId);
     } catch (\DomainException $error) {
       $this->jsonFail($error->getMessage());
     }
@@ -2676,7 +2672,7 @@ trait HandlesMaintenanceActions
     }
     header_remove('Content-Type');
     header('Content-Type: application/pdf');
-    header('Content-Disposition: attachment; filename="cotizacion-mantenimiento-' . $cotizacionId . '-' . $audience . '.pdf"');
+    header('Content-Disposition: attachment; filename="cotizacion-mantenimiento-' . $cotizacionId . '.pdf"');
     header('Content-Length: ' . (string) strlen($bytes));
     header('Cache-Control: private, max-age=0, must-revalidate');
     echo $bytes;
@@ -2713,7 +2709,7 @@ trait HandlesMaintenanceActions
     exit;
   }
 
-  public function maintenance_quote_pdf_bytes(int $cotizacionId, string $audience = 'funcionario'): string
+  public function maintenance_quote_pdf_bytes(int $cotizacionId): string
   {
     $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
     if (!$this->table_exists($table)) {
@@ -2728,12 +2724,16 @@ trait HandlesMaintenanceActions
     $rows = $this->attach_cotizacion_orders([$row]);
     $row = is_array($rows[0] ?? null) ? $rows[0] : $row;
     $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
-    $audience = strtolower(trim($audience));
-    if (!in_array($audience, ['funcionario', 'destinatario'], true)) {
-      $audience = 'funcionario';
-    }
-    $pdf = $this->build_cotizacion_mantenimiento_pdf($row, $orders, $audience);
-    return $pdf->bytes();
+    return $this->maintenance_quote_document_bytes($row, $orders);
+  }
+
+  /** @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders */
+  private function maintenance_quote_document_bytes(array $row, array $orders): string
+  {
+    $id = (int) ($row['_ID'] ?? 0);
+    $html = $this->render_native_cotizacion_mantenimiento_view($row, $orders);
+    $bytes = \SCM\Support\HtmlPdfRenderer::render($html, 'Cotización de mantenimiento #' . $id);
+    return $bytes ?? $this->build_cotizacion_mantenimiento_pdf($row, $orders)->bytes();
   }
 
   public function maintenance_order_pdf_bytes(int $orderId): string
@@ -2820,13 +2820,18 @@ trait HandlesMaintenanceActions
         $_POST['iva'] ?? ($quote['iva'] ?? '')
       );
       $quote = array_merge($quote, $sendTotals);
-      $pdf = $this->build_cotizacion_mantenimiento_pdf(array_merge($quote, [
+      [$now, $nowSql] = $this->maintenance_quote_now_pair();
+      $documentRow = array_merge($quote, [
         'destinatario' => $destinatario,
         'email_destinatario' => $email,
         'celular_destinatario' => $celular,
         'indicativo_destinarario' => $indicativo,
-      ]), $orders, 'destinatario');
-      $document = $this->maintenance_quote_store_pdf_document($pdf, $cotizacionId, 'destinatario');
+        'se_envio' => 'Si',
+        'estado' => 'Esperando respuesta',
+        'fecha_envio' => $now,
+      ]);
+      $pdfBytes = $this->maintenance_quote_document_bytes($documentRow, $orders);
+      $document = $this->maintenance_quote_store_pdf_document($pdfBytes, $cotizacionId);
       $quoteUrl = self::signedMaintenanceQuotePublicUrl($cotizacionId);
 
       $actor = $this->ticketCompletionActor();
@@ -2935,7 +2940,6 @@ trait HandlesMaintenanceActions
         throw new \DomainException('No se pudo encolar el correo ni el WhatsApp. La cotización quedó sin marcar como enviada.');
       }
 
-      [$now, $nowSql] = $this->maintenance_quote_now_pair();
       $employeeId = trim((string) ($actor['employee_id'] ?? ''));
       if ($employeeId === '' && method_exists($this, 'current_employee_id')) {
         $employeeId = trim((string) $this->current_employee_id());
@@ -3057,7 +3061,7 @@ trait HandlesMaintenanceActions
   }
 
   /** @return array{path:string,url:string,name:string,attachment_name:string} */
-  private function maintenance_quote_store_pdf_document(\SCM\Support\SimplePdf $pdf, int $cotizacionId, string $audience): array
+  private function maintenance_quote_store_pdf_document(string $bytes, int $cotizacionId): array
   {
     $dir = (string) SCM_UPLOAD_PATH;
     if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
@@ -3065,11 +3069,11 @@ trait HandlesMaintenanceActions
     }
     $name = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
     $path = rtrim($dir, '/\\') . '/' . $name;
-    $pdf->save($path);
+    file_put_contents($path, $bytes, LOCK_EX);
     if (!is_file($path)) {
       throw new \DomainException('No se pudo generar el PDF de la cotización.');
     }
-    $attachmentName = 'cotizacion-mantenimiento-' . $cotizacionId . '-' . ($audience === 'destinatario' ? 'destinatario' : 'funcionario') . '.pdf';
+    $attachmentName = 'cotizacion-mantenimiento-' . $cotizacionId . '.pdf';
     return [
       'path' => $path,
       'url' => \SCM\Support\StoredFileService::fromRuntime()->urlFor($name),
@@ -4225,14 +4229,12 @@ trait HandlesMaintenanceActions
   }
 
   /** @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders */
-  private function build_cotizacion_mantenimiento_pdf(array $row, array $orders, string $audience = 'funcionario'): \SCM\Support\SimplePdf
+  private function build_cotizacion_mantenimiento_pdf(array $row, array $orders): \SCM\Support\SimplePdf
   {
-    $audience = strtolower(trim($audience)) === 'destinatario' ? 'destinatario' : 'funcionario';
-    $isFuncionario = $audience === 'funcionario';
     $pdf = new \SCM\Support\SimplePdf();
     $letterhead = dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg';
     $pdf->backgroundImage($letterhead);
-    $pdf->documentDesign($isFuncionario ? 'Cotización interna' : 'Copia para destinatario');
+    $pdf->documentDesign('Cotización de mantenimiento');
     $pdf->footerLabel('SKC SuCasa Inmobiliaria - Cotización de mantenimiento');
 
     $id = trim((string) ($row['_ID'] ?? ''));
@@ -4253,7 +4255,6 @@ trait HandlesMaintenanceActions
     $porcentajeIva = $this->cotizacion_clean_text($row['iva'] ?? '0');
 
     $pdf->title('Cotización de mantenimiento #' . ($id !== '' ? $id : '-'));
-    $pdf->line($isFuncionario ? 'VERSIÓN INTERNA PARA FUNCIONARIO' : 'COPIA PARA DESTINATARIO', 9, 'F2');
     $pdf->line('Estado: ' . ($estado !== '' ? $this->cotizacion_clean_text($estado) : 'Sin estado') . ' | Envío: ' . ($enviada ? 'Fue enviada' : 'Sin enviar'), 8, 'F2');
     $pdf->line('Fecha: ' . $fecha . ' | Fecha de envío: ' . $fechaEnvio, 8);
     $pdf->spacer(5);
@@ -4269,10 +4270,10 @@ trait HandlesMaintenanceActions
       ['Validez / duración', $this->cotizacion_days_label($row['valides_oferta'] ?? '') . ' / ' . $this->cotizacion_days_label($row['duracion'] ?? '')],
     ], [0.30, 0.70], 8);
 
-    $administrationLabel = $isFuncionario && $porcentajeAdmon !== ''
+    $administrationLabel = $porcentajeAdmon !== ''
       ? 'Administración (' . $porcentajeAdmon . '%)'
       : 'Administración';
-    $ivaLabel = $isFuncionario && $porcentajeIva !== ''
+    $ivaLabel = $porcentajeIva !== ''
       ? 'IVA sobre administración (' . $porcentajeIva . '%)'
       : 'IVA sobre administración';
     $economicRows = [
@@ -4315,8 +4316,7 @@ trait HandlesMaintenanceActions
       $pdf->table(['Descripción / proveedor', 'Valor'], $budgetRows, [0.74, 0.26], 8, [1]);
     }
 
-    if ($isFuncionario) {
-      $pdf->heading('Control de saldos');
+    $pdf->heading('Control de saldos');
       $pdf->table(['Categoría', 'Presupuesto', 'Saldo'], [
         ['Materiales', $this->format_cop_currency($row['total_materiales'] ?? 0), $this->format_cop_currency($row['saldo_materiales'] ?? 0)],
         ['Mano de obra', $this->format_cop_currency($row['total_mano_obra'] ?? 0), $this->format_cop_currency($row['saldo_obra'] ?? 0)],
@@ -4334,7 +4334,6 @@ trait HandlesMaintenanceActions
             + $this->cotizacion_money_value($row, ['saldo_otros_costo'])
         )],
       ], [0.46, 0.27, 0.27], 8, [1, 2]);
-    }
 
     $revision = $this->cotizacion_revision_row($row);
     $danos = $this->cotizacion_parse_list($revision['evaluacion_de_danos'] ?? '');
