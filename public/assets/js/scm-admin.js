@@ -2979,7 +2979,7 @@
       }
       function compressedFormData(form) {
         var data = new FormData(form),
-          inputs = Array.from(form.querySelectorAll("[data-acta-photos]"));
+          inputs = Array.from(form.querySelectorAll("[data-acta-photos], [data-acta-corrective-wrap]:not([hidden]) [data-corrective-photos]"));
         var total = inputs.reduce(function (sum, input) {
           return sum + (input.files ? input.files.length : 0);
         }, 0);
@@ -3036,6 +3036,29 @@
         }
         form.querySelector("[data-acta-fee]").addEventListener("input", total);
         total();
+        function syncActaCorrectiveArea(item) {
+          if (!item) return;
+          var indice = item.querySelector("[data-corrective-indice]");
+          var value = (indice ? indice.value : "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+          var key = value.includes("estructurales") ? "area_afectada_2" : value.includes("otros inconvenientes") ? "area_afectada_3" : value.includes("servicios publicos") ? "area_afectada_4" : "area_afectada_1";
+          item.querySelectorAll("[data-corrective-area-group]").forEach(function (group) {
+            var active = group.dataset.correctiveAreaFor === key;
+            group.hidden = !active;
+            group.querySelectorAll("[data-corrective-area-field]").forEach(function (field) { field.disabled = !active; field.required = active; });
+          });
+        }
+        function previewActaDamagePhotos(input) {
+          var preview = input.closest("[data-acta-item]").querySelector("[data-corrective-photo-preview]");
+          if (!preview) return;
+          preview.querySelectorAll("[data-acta-new-damage-photo]").forEach(function (image) { URL.revokeObjectURL(image.src); image.remove(); });
+          Array.from(input.files || []).forEach(function (file) {
+            var image = document.createElement("img");
+            image.src = URL.createObjectURL(file);
+            image.alt = "Nueva evidencia del daño";
+            image.dataset.actaNewDamagePhoto = "";
+            preview.appendChild(image);
+          });
+        }
         form
           .querySelector("[data-acta-add-item]")
           .addEventListener("click", function () {
@@ -3045,6 +3068,22 @@
               return;
             }
             var item = items.firstElementChild.cloneNode(true);
+            item.querySelectorAll("[name]").forEach(function (field) {
+              field.name = field.name.replace(/items\[\d+\]/, "items[" + sequence + "]");
+            });
+            var syncField = item.querySelector("[name$='[corrective_sync_id]']");
+            if (syncField) syncField.remove();
+            var correctiveWrap = item.querySelector("[data-acta-corrective-wrap]");
+            if (correctiveWrap) {
+              correctiveWrap.hidden = false;
+              correctiveWrap.querySelector("[data-acta-corrective-fields]").disabled = false;
+              correctiveWrap.querySelectorAll("input, select, textarea").forEach(function (field) {
+                if (field.type === "file") { field.name = "acta_damage_photos_" + sequence + "[]"; field.value = ""; }
+                else if (field.type !== "hidden") field.value = "";
+              });
+              correctiveWrap.querySelectorAll("[data-corrective-existing-photo]").forEach(function (photo) { photo.remove(); });
+              syncActaCorrectiveArea(item);
+            }
             item.querySelectorAll("textarea").forEach(function (field) {
               field.name = field.name.replace(
                 /items\[\d+\]/,
@@ -3061,6 +3100,7 @@
             if (photoHelp) photoHelp.id = helpId;
             photoInput.setAttribute("aria-describedby", helpId);
             item.querySelector("[data-acta-photo-preview]").innerHTML = "";
+            item.querySelectorAll("[data-acta-existing-photo]").forEach(function (photo) { photo.remove(); });
             sequence++;
             items.appendChild(item);
             item.querySelector("textarea").focus();
@@ -3105,6 +3145,16 @@
         form.addEventListener("change", function (event) {
           if (event.target.matches("[data-acta-photos]"))
             addPhotos(event.target, Array.from(event.target.files || []));
+          if (event.target.matches("[data-corrective-indice]"))
+            syncActaCorrectiveArea(event.target.closest("[data-acta-item]"));
+          if (event.target.matches("[data-corrective-photos]"))
+            previewActaDamagePhotos(event.target);
+        });
+        form.addEventListener("input", function (event) {
+          if (!event.target.matches("[name$='[descripcion_dano]']")) return;
+          var item = event.target.closest("[data-acta-item]");
+          var damage = item && item.querySelector("[name$='[damage]']");
+          if (damage) damage.value = event.target.value;
         });
         form.addEventListener("paste", function (event) {
           var pasteButton =

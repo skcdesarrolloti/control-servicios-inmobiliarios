@@ -658,6 +658,7 @@ final class CompletionService
       $now = time();
       $context = $this->context($ticketId);
       $payload = $this->payloadFromInput($ticketId, $ticket, $context, $input, $actor, null, $now);
+      $payload['items'] = $this->syncCorrectiveDamages($ticket, $payload['items'], $actor);
       $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
       $this->repo->db->insert($this->repo->table(), [
         'ticket_pk' => $ticketId, 'payload_json' => $json,
@@ -699,6 +700,7 @@ final class CompletionService
         is_array($oldPayload['previous'] ?? null) ? $oldPayload['previous'] : null,
         (int) ($oldPayload['created_at'] ?? $now)
       );
+      $payload['items'] = $this->syncCorrectiveDamages($ticket, $payload['items'], $actor, (array) ($oldPayload['items'] ?? []));
       $payload['updated_at'] = $now;
       $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
       $this->repo->db->update($this->repo->table(), [
@@ -716,6 +718,81 @@ final class CompletionService
     });
     try { return $this->notify($act, false, true); }
     catch (\Throwable) { return ['act_id' => (int) $act['id'], 'queued' => false, 'message' => 'Acta actualizada. No se pudo confirmar el envío; usa Reenviar invitación desde Actas de satisfacción.']; }
+  }
+
+  /** @param array<int,array<string,mixed>> $items @param array<int,array<string,mixed>> $previousItems */
+  private function syncCorrectiveDamages(array $ticket, array $items, array $actor, array $previousItems = []): array
+  {
+    $known = [];
+    foreach ($previousItems as $oldItem) {
+      $id = (string) ($oldItem['corrective_sync_id'] ?? '');
+      if (preg_match('/^[a-f0-9]{32}$/D', $id)) { $known[$id] = $oldItem; }
+    }
+    $pending = [];
+    foreach ($items as $index => &$item) {
+      $id = (string) ($item['corrective_sync_id'] ?? '');
+      if ($id !== '' && isset($known[$id])) {
+        $item['corrective'] = $known[$id]['corrective'] ?? [];
+        $item['damage'] = $this->correctiveDamageText($item['corrective']);
+        continue;
+      }
+      $item['corrective_sync_id'] = '';
+      if (!is_array($item['corrective'] ?? null) || $item['corrective'] === []) { continue; }
+      $raw = $item['corrective'];
+      $required = ['indice', 'descripcion_dano', 'consecuencia', 'nivel_dano', 'tiempo_atencion'];
+      $damage = [];
+      foreach (array_merge($required, ['area_afectada_1', 'area_afectada_2', 'area_afectada_3', 'area_afectada_4', 'a_quien_corresponde']) as $field) {
+        $damage[$field] = trim(strip_tags((string) ($raw[$field] ?? '')));
+        if (mb_strlen($damage[$field]) > 3000) { throw new \DomainException('El detalle del daño para la revisión es demasiado largo.'); }
+      }
+      foreach ($required as $field) {
+        if ($damage[$field] === '') { throw new \DomainException('Completa el formulario de revisión correctiva del daño agregado.'); }
+      }
+      if (!array_filter([$damage['area_afectada_1'], $damage['area_afectada_2'], $damage['area_afectada_3'], $damage['area_afectada_4']])) {
+        throw new \DomainException('Selecciona el área afectada del daño agregado.');
+      }
+      $refs = \SCM\Modules\CorrectiveReview\CorrectiveReviewPhotos::refs($raw['registro_foto_dano'] ?? '');
+      if (count($refs) > 10) { throw new \DomainException('Cada daño admite máximo 10 fotos.'); }
+      $damage['registro_foto_dano'] = implode(',', $refs);
+      $item['corrective'] = $damage;
+      $item['damage'] = $this->correctiveDamageText($damage);
+      if (mb_strlen($item['damage']) > 3000) { throw new \DomainException('El resumen del daño supera 3000 caracteres. Acorta su descripción o consecuencia.'); }
+      $pending[$index] = $damage;
+    }
+    unset($item);
+    if ($pending === []) { return $items; }
+    $rows = $this->linkedRowsByIds('jet_cct_revision_correctiva', (string) ($ticket['id_revision_correctiva'] ?? ''));
+    if ($rows === []) { throw new \DomainException('Este caso no tiene revisión correctiva. Guarda primero la revisión antes de agregar daños desde el acta.'); }
+    $review = $rows[0];
+    $stored = $this->decodeStoredItems($review['evaluacion_de_danos'] ?? '');
+    if (count($stored) + count($pending) > 30) { throw new \DomainException('La revisión correctiva admite máximo 30 daños.'); }
+    $photoCount = 0;
+    foreach (array_merge($stored, array_values($pending)) as $damage) {
+      if (is_array($damage)) { $photoCount += count(\SCM\Modules\CorrectiveReview\CorrectiveReviewPhotos::refs($damage['registro_foto_dano'] ?? '')); }
+    }
+    if ($photoCount > 30) { throw new \DomainException('La revisión correctiva admite máximo 30 fotos en total.'); }
+    foreach ($pending as $index => $damage) {
+      $stored[] = $damage;
+      $items[$index]['corrective_sync_id'] = bin2hex(random_bytes(16));
+    }
+    $areas = [];
+    foreach ($stored as $damage) {
+      foreach (['area_afectada_1', 'area_afectada_2', 'area_afectada_3', 'area_afectada_4'] as $key) {
+        $area = trim((string) ($damage[$key] ?? ''));
+        if ($area !== '') { $areas[$area] = $area; }
+      }
+    }
+    $table = $this->repo->db->table('jet_cct_revision_correctiva');
+    $update = $this->repo->schema->filterTableData($table, [
+      'evaluacion_de_danos' => serialize($stored),
+      'area_afectada' => implode(', ', $areas),
+      'cct_modified' => date('Y-m-d H:i:s'),
+      'cct_author_id' => (string) ($actor['employee_id'] ?? ''),
+      'id_empleado' => (string) ($actor['employee_id'] ?? ''),
+    ]);
+    $this->repo->db->update($table, $update, ['_ID' => (int) $review['_ID']]);
+    $this->repo->audit((int) $ticket['_ID'], 'Se agregaron ' . count($pending) . ' daños a la revisión correctiva #' . $review['_ID'] . ' desde el acta de satisfacción.', (string) ($actor['name'] ?? ''), (string) ($actor['employee_id'] ?? ''));
+    return $items;
   }
 
   private function payloadFromInput(int $ticketId, array $ticket, array $context, array $input, array $actor, ?array $previous, int $createdAt): array

@@ -85,6 +85,8 @@
 .scm-corrective-area-field { display: grid; gap: 6px; font-weight: 600; margin: 12px 0; min-width: 0; }
 .scm-corrective-area-field [data-corrective-area-group][hidden] { display: none !important; }
 .scm-corrective-item select, .scm-corrective-item input, .scm-corrective-item textarea { color: var(--acta-ink); }
+.scm-acta-item [data-acta-corrective-fields] { border: 0; padding: 0; margin: 0 0 12px; min-width: 0; }
+.scm-acta-item [data-acta-corrective-fields] > .scm-corrective-item { margin: 0; border-color: #bfdbfe; background: #f8fbff; }
 @media (max-width: 720px) { .scm-corrective-summary { grid-template-columns: 1fr; } .scm-corrective-existing article { align-items: stretch; } .scm-corrective-existing-actions { width: 100%; } .scm-corrective-existing-actions .scm-acta-button { flex: 1 1 140px; } }
 .scm-acta-page { margin: 0; background: #eef2f7; padding: 24px 16px; }
 .scm-acta-create-body { min-height: 100vh; padding-top: 0; font-family: Poppins, system-ui, sans-serif; }

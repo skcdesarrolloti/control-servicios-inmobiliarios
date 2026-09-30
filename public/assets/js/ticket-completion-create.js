@@ -196,7 +196,7 @@
 
   function compressedFormData() {
     var data = new FormData(form);
-    var inputs = Array.from(form.querySelectorAll("[data-acta-photos]"));
+    var inputs = Array.from(form.querySelectorAll("[data-acta-photos], [data-acta-corrective-wrap]:not([hidden]) [data-corrective-photos]"));
     var total = inputs.reduce(function (sum, input) { return sum + selectedPhotos(input).length; }, 0);
     if (total > MAX_PHOTOS_PER_ACT) return Promise.reject(new Error("El acta admite máximo 12 fotos en total."));
     return Promise.all(inputs.map(function (input) {
@@ -238,10 +238,52 @@
     }).format(fee + transport);
   }
 
+  function syncActaCorrectiveArea(item) {
+    if (!item) return;
+    var indice = item.querySelector("[data-corrective-indice]");
+    var value = (indice ? indice.value : "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    var key = value.includes("estructurales") ? "area_afectada_2" : value.includes("otros inconvenientes") ? "area_afectada_3" : value.includes("servicios publicos") ? "area_afectada_4" : "area_afectada_1";
+    item.querySelectorAll("[data-corrective-area-group]").forEach(function (group) {
+      var active = group.dataset.correctiveAreaFor === key;
+      group.hidden = !active;
+      group.querySelectorAll("[data-corrective-area-field]").forEach(function (field) { field.disabled = !active; field.required = active; });
+    });
+  }
+
+  function previewActaDamagePhotos(input) {
+    var preview = input.closest("[data-acta-item]").querySelector("[data-corrective-photo-preview]");
+    if (!preview) return;
+    preview.querySelectorAll("[data-acta-new-damage-photo]").forEach(function (image) { URL.revokeObjectURL(image.src); image.remove(); });
+    Array.from(input.files || []).forEach(function (file) {
+      var image = document.createElement("img");
+      image.src = URL.createObjectURL(file);
+      image.alt = "Nueva evidencia del daño";
+      image.dataset.actaNewDamagePhoto = "";
+      preview.appendChild(image);
+    });
+  }
+
   function appendBlankItem(focusNewItem) {
     var items = form.querySelector("[data-acta-items]");
     if (!items || !items.firstElementChild || items.children.length >= 30) return null;
     var item = items.firstElementChild.cloneNode(true);
+    item.querySelectorAll("[name]").forEach(function (field) {
+      field.name = field.name.replace(/items\[\d+\]/, "items[" + sequence + "]");
+    });
+    var syncField = item.querySelector("[name$='[corrective_sync_id]']");
+    if (syncField) syncField.remove();
+    var correctiveWrap = item.querySelector("[data-acta-corrective-wrap]");
+    if (correctiveWrap) {
+      correctiveWrap.hidden = false;
+      var correctiveFields = correctiveWrap.querySelector("[data-acta-corrective-fields]");
+      if (correctiveFields) correctiveFields.disabled = false;
+      correctiveWrap.querySelectorAll("input, select, textarea").forEach(function (field) {
+        if (field.type === "file") { field.name = "acta_damage_photos_" + sequence + "[]"; field.value = ""; }
+        else if (field.type !== "hidden") field.value = "";
+      });
+      correctiveWrap.querySelectorAll("[data-corrective-existing-photo]").forEach(function (photo) { photo.remove(); });
+      syncActaCorrectiveArea(item);
+    }
     item.querySelectorAll("textarea").forEach(function (field) {
       field.name = field.name.replace(/items\[\d+\]/, "items[" + sequence + "]");
       field.value = "";
@@ -305,12 +347,15 @@
       fields[field.name] = fieldValue(field);
     });
     var items = Array.from(form.querySelectorAll("[data-acta-item]")).map(function (item) {
-      return Array.from(item.querySelectorAll("textarea[name]")).map(function (field) {
-        return field.value || "";
+      var values = {};
+      item.querySelectorAll("input[name], select[name], textarea[name]").forEach(function (field) {
+        if (field.type === "file" || field.type === "hidden" || field.disabled) return;
+        values[field.name.replace(/^items\[\d+\]/, "")] = fieldValue(field);
       });
+      return { values: values, corrective: !item.querySelector("[data-acta-corrective-wrap]").hidden };
     });
     return {
-      version: 1,
+      version: 2,
       savedAt: Date.now(),
       fields: fields,
       items: items,
@@ -360,10 +405,18 @@
     });
 
     Array.from(form.querySelectorAll("[data-acta-item]")).forEach(function (item, index) {
-      var values = payload.items[index] || [];
-      item.querySelectorAll("textarea[name]").forEach(function (field, fieldIndex) {
-        field.value = values[fieldIndex] || "";
+      var saved = payload.items[index] || {};
+      if (Array.isArray(saved)) {
+        item.querySelectorAll("textarea[name]").forEach(function (field, fieldIndex) { field.value = saved[fieldIndex] || ""; });
+        return;
+      }
+      var wrap = item.querySelector("[data-acta-corrective-wrap]");
+      if (wrap && saved.corrective) { wrap.hidden = false; wrap.querySelector("[data-acta-corrective-fields]").disabled = false; }
+      item.querySelectorAll("input[name], select[name], textarea[name]").forEach(function (field) {
+        var key = field.name.replace(/^items\[\d+\]/, "");
+        if (field.type !== "file" && field.type !== "hidden" && Object.prototype.hasOwnProperty.call(saved.values || {}, key)) setFieldValue(field, saved.values[key]);
       });
+      syncActaCorrectiveArea(item);
     });
 
     syncSigner(false);
@@ -481,10 +534,17 @@
 
   form.addEventListener("change", function (event) {
     if (event.target.matches("[data-acta-photos]")) addPhotos(event.target, Array.from(event.target.files || []));
+    if (event.target.matches("[data-corrective-indice]")) syncActaCorrectiveArea(event.target.closest("[data-acta-item]"));
+    if (event.target.matches("[data-corrective-photos]")) previewActaDamagePhotos(event.target);
     scheduleActaDraftSave();
   });
 
-  form.addEventListener("input", function () {
+  form.addEventListener("input", function (event) {
+    if (event.target.matches("[name$='[descripcion_dano]']")) {
+      var item = event.target.closest("[data-acta-item]");
+      var damage = item && item.querySelector("[name$='[damage]']");
+      if (damage) damage.value = event.target.value;
+    }
     syncTotal();
     scheduleActaDraftSave();
   });

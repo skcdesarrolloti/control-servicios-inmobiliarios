@@ -6,6 +6,8 @@ namespace SCM\Modules\TicketCompletion;
 
 final class CompletionView
 {
+  public function __construct(private ?\Closure $correctiveItem = null) {}
+
   private static function e(mixed $value): string
   {
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -125,6 +127,11 @@ final class CompletionView
 
   public function item(int $index, array $values = []): string
   {
+    $hasCorrective = is_array($values['corrective'] ?? null) && $values['corrective'] !== [];
+    $syncId = trim((string) ($values['corrective_sync_id'] ?? ''));
+    $correctiveHtml = $this->correctiveItem !== null ? ($this->correctiveItem)($index, $hasCorrective ? $values['corrective'] : []) : '';
+    $correctiveBlock = $correctiveHtml === '' ? '' : '<div data-acta-corrective-wrap' . ($hasCorrective ? '' : ' hidden') . '><fieldset data-acta-corrective-fields' . ($hasCorrective && $syncId === '' ? '' : ' disabled') . '><legend>Detalle para la revisión correctiva</legend>' . $correctiveHtml . '</fieldset></div>';
+    $syncField = $syncId !== '' ? '<input type="hidden" name="items[' . $index . '][corrective_sync_id]" value="' . self::e($syncId) . '">' : '';
     $helpId = 'acta-photo-help-' . $index;
     $damagePhotosHtml = '';
     foreach ((array) ($values['damage_photos'] ?? []) as $photoIndex => $photo) {
@@ -147,7 +154,7 @@ final class CompletionView
       }
       $photosHtml .= '</figure>';
     }
-    return '<fieldset class="scm-acta-item" data-acta-item><legend>Daño y solución</legend><div class="scm-acta-grid"><label>Daño encontrado *<textarea name="items[' . $index . '][damage]" required maxlength="3000" rows="3">' . self::e($values['damage'] ?? '') . '</textarea></label><label>Solución realizada *<textarea name="items[' . $index . '][solution]" required maxlength="3000" rows="3">' . self::e($values['solution'] ?? '') . '</textarea></label></div>' . $damagePhotosBlock . '<div class="scm-acta-photo-field"><label>Fotos de la solución realizada (opcional)<input type="file" name="acta_item_photos_' . $index . '[]" accept="image/jpeg,image/png,image/webp" multiple data-acta-photos aria-describedby="' . $helpId . '"></label><button type="button" class="scm-acta-photo-paste" data-acta-photo-paste><strong>Pegar foto de solución</strong><span>Haz clic aquí y presiona Ctrl+V</span></button><small id="' . $helpId . '" data-acta-photo-help>Máximo 4 fotos de solución por daño y 12 fotos en toda el acta. JPG, PNG o WebP; hasta 25 MB por archivo. Se comprimen automáticamente.</small></div><div class="scm-acta-photo-preview" data-acta-photo-preview aria-live="polite" aria-label="Fotos de solución seleccionadas">' . $photosHtml . '</div><button type="button" class="scm-acta-remove" data-acta-remove-item>Quitar este detalle</button></fieldset>';
+    return '<fieldset class="scm-acta-item" data-acta-item><legend>Daño y solución</legend>' . $syncField . $correctiveBlock . '<div class="scm-acta-grid"><label>Daño encontrado *<textarea name="items[' . $index . '][damage]" required maxlength="3000" rows="3">' . self::e($values['damage'] ?? '') . '</textarea></label><label>Solución realizada *<textarea name="items[' . $index . '][solution]" required maxlength="3000" rows="3">' . self::e($values['solution'] ?? '') . '</textarea></label></div>' . $damagePhotosBlock . '<div class="scm-acta-photo-field"><label>Fotos de la solución realizada (opcional)<input type="file" name="acta_item_photos_' . $index . '[]" accept="image/jpeg,image/png,image/webp" multiple data-acta-photos aria-describedby="' . $helpId . '"></label><button type="button" class="scm-acta-photo-paste" data-acta-photo-paste><strong>Pegar foto de solución</strong><span>Haz clic aquí y presiona Ctrl+V</span></button><small id="' . $helpId . '" data-acta-photo-help>Máximo 4 fotos de solución por daño y 12 fotos en toda el acta. JPG, PNG o WebP; hasta 25 MB por archivo. Se comprimen automáticamente.</small></div><div class="scm-acta-photo-preview" data-acta-photo-preview aria-live="polite" aria-label="Fotos de solución seleccionadas">' . $photosHtml . '</div><button type="button" class="scm-acta-remove" data-acta-remove-item>Quitar este detalle</button></fieldset>';
   }
 
   /** @param array<string,string|int> $filters @param array<int,array<string,mixed>> $items @param array<string,int> $stats @param array<string,int> $pagination */

@@ -338,40 +338,12 @@ final class CorrectiveReviewPublicView
   /** @return array<int,string> */
   private function photoRefs(mixed $value): array
   {
-    $refs = [];
-    if (is_array($value)) {
-      foreach ($value as $entry) {
-        foreach ($this->photoRefs($entry) as $ref) {
-          $refs[$ref] = $ref;
-        }
-      }
-      return array_values($refs);
-    }
-    foreach (preg_split('/[,\r\n]+/', html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?: [] as $part) {
-      $ref = trim(strip_tags((string) $part));
-      if ($ref === '' || strlen($ref) > 2048 || preg_match('/[\x00<>"\']/', $ref)) {
-        continue;
-      }
-      if (preg_match('#^https?://#i', $ref) || str_starts_with($ref, '/') || str_starts_with($ref, 'file.php?')) {
-        $refs[$ref] = $ref;
-      }
-    }
-    return array_values($refs);
+    return CorrectiveReviewPhotos::refs($value);
   }
 
   private function photoUrl(string $url): string
   {
-    $url = trim($url);
-    if ($url === '') {
-      return '';
-    }
-    if (preg_match('#^https?://#i', $url)) {
-      return $url;
-    }
-    if (str_starts_with($url, 'file.php?') && defined('SCM_BASE_URL')) {
-      return rtrim((string) SCM_BASE_URL, '/') . '/' . $url;
-    }
-    return $url;
+    return CorrectiveReviewPhotos::url($this->db, $url);
   }
 
   /** @param array<int,mixed> $values */

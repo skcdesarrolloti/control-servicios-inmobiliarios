@@ -915,9 +915,16 @@ trait HandlesCorrectiveReviewActions
   }
 
   /** @param array<string,mixed> $item */
-  private function renderCorrectiveReviewItem(int $index, array $item = []): string
+  public function correctiveReviewActaItem(int $index, array $item = []): string
+  {
+    return $this->renderCorrectiveReviewItem($index, $item, true);
+  }
+
+  private function renderCorrectiveReviewItem(int $index, array $item = [], bool $acta = false): string
   {
     $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    $fieldBase = 'items[' . $index . ']' . ($acta ? '[corrective]' : '');
+    $photoField = ($acta ? 'acta_damage_photos_' : 'corrective_review_photos_') . $index . '[]';
     $indice = $this->correctiveReviewText($item['indice'] ?? '');
     $activeAreaKey = $this->correctiveReviewAreaKeyForIndice($indice);
     $indiceOptions = $this->correctiveReviewGlossaryOptions(585, [
@@ -964,14 +971,14 @@ trait HandlesCorrectiveReviewActions
       'Fabricante' => 'Fabricante',
       'Constructor' => 'Constructor',
     ]);
-    $photos = $this->correctiveReviewSplitPhotoRefs((string) ($item['registro_foto_dano'] ?? ''));
+    $photos = $this->correctiveReviewSafePhotoRefs($item['registro_foto_dano'] ?? '');
     ob_start();
     ?>
     <fieldset class="scm-acta-item scm-corrective-item" data-corrective-item>
       <legend>Daño #<?= $h((string) ($index + 1)) ?></legend>
       <div class="scm-acta-grid">
         <label>Índice *
-          <select name="items[<?= $h((string) $index) ?>][indice]" required data-corrective-indice>
+          <select name="<?= $h($fieldBase) ?>[indice]" required data-corrective-indice>
             <?= $this->correctiveReviewRenderOptions($indiceOptions, $indice, 'Seleccionar índice') ?>
           </select>
         </label>
@@ -979,72 +986,73 @@ trait HandlesCorrectiveReviewActions
           <span>Área afectada *</span>
           <div data-corrective-area-group data-corrective-area-for="area_afectada_1"<?= $activeAreaKey === 'area_afectada_1' ? '' : ' hidden' ?>>
           <?php if ($areaArquitectonicaOptions): ?>
-            <select name="items[<?= $h((string) $index) ?>][area_afectada_1]" data-corrective-area-field<?= $activeAreaKey === 'area_afectada_1' ? ' required' : ' disabled' ?>>
+            <select name="<?= $h($fieldBase) ?>[area_afectada_1]" data-corrective-area-field<?= $activeAreaKey === 'area_afectada_1' ? ' required' : ' disabled' ?>>
               <?= $this->correctiveReviewRenderOptions($areaArquitectonicaOptions, $item['area_afectada_1'] ?? $item['area_afectada'] ?? '', 'Elige un área') ?>
             </select>
           <?php else: ?>
-            <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada_1]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_1'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_1' ? ' required' : ' disabled' ?>>
+            <input type="text" name="<?= $h($fieldBase) ?>[area_afectada_1]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_1'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_1' ? ' required' : ' disabled' ?>>
           <?php endif; ?>
           </div>
           <div data-corrective-area-group data-corrective-area-for="area_afectada_2"<?= $activeAreaKey === 'area_afectada_2' ? '' : ' hidden' ?>>
           <?php if ($areaEstructuralOptions): ?>
-            <select name="items[<?= $h((string) $index) ?>][area_afectada_2]" data-corrective-area-field<?= $activeAreaKey === 'area_afectada_2' ? ' required' : ' disabled' ?>>
+            <select name="<?= $h($fieldBase) ?>[area_afectada_2]" data-corrective-area-field<?= $activeAreaKey === 'area_afectada_2' ? ' required' : ' disabled' ?>>
               <?= $this->correctiveReviewRenderOptions($areaEstructuralOptions, $item['area_afectada_2'] ?? $item['area_afectada'] ?? '', 'Elige un área') ?>
             </select>
           <?php else: ?>
-            <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada_2]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_2'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_2' ? ' required' : ' disabled' ?>>
+            <input type="text" name="<?= $h($fieldBase) ?>[area_afectada_2]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_2'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_2' ? ' required' : ' disabled' ?>>
           <?php endif; ?>
           </div>
           <div data-corrective-area-group data-corrective-area-for="area_afectada_3"<?= $activeAreaKey === 'area_afectada_3' ? '' : ' hidden' ?>>
-          <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada_3]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_3'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_3' ? ' required' : ' disabled' ?>>
+          <input type="text" name="<?= $h($fieldBase) ?>[area_afectada_3]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_3'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_3' ? ' required' : ' disabled' ?>>
           </div>
           <div data-corrective-area-group data-corrective-area-for="area_afectada_4"<?= $activeAreaKey === 'area_afectada_4' ? '' : ' hidden' ?>>
-          <input type="text" name="items[<?= $h((string) $index) ?>][area_afectada_4]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_4'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_4' ? ' required' : ' disabled' ?>>
+          <input type="text" name="<?= $h($fieldBase) ?>[area_afectada_4]" data-corrective-area-field placeholder="Escribe un área" value="<?= $h($item['area_afectada_4'] ?? $item['area_afectada'] ?? '') ?>"<?= $activeAreaKey === 'area_afectada_4' ? ' required' : ' disabled' ?>>
           </div>
         </div>
       </div>
       <div class="scm-acta-grid">
         <label>Descripción del daño *
-          <textarea name="items[<?= $h((string) $index) ?>][descripcion_dano]" rows="4" required><?= $h($this->correctiveReviewText($item['descripcion_dano'] ?? '')) ?></textarea>
+          <textarea name="<?= $h($fieldBase) ?>[descripcion_dano]" rows="4" required><?= $h($this->correctiveReviewText($item['descripcion_dano'] ?? '')) ?></textarea>
         </label>
         <label>Consecuencia *
-          <textarea name="items[<?= $h((string) $index) ?>][consecuencia]" rows="4" required><?= $h($this->correctiveReviewText($item['consecuencia'] ?? '')) ?></textarea>
+          <textarea name="<?= $h($fieldBase) ?>[consecuencia]" rows="4" required><?= $h($this->correctiveReviewText($item['consecuencia'] ?? '')) ?></textarea>
         </label>
       </div>
       <div class="scm-acta-grid">
         <label>Nivel del daño *
-          <select name="items[<?= $h((string) $index) ?>][nivel_dano]" required>
+          <select name="<?= $h($fieldBase) ?>[nivel_dano]" required>
             <?= $this->correctiveReviewRenderOptions($nivelOptions, $item['nivel_dano'] ?? '', 'Seleccionar nivel') ?>
           </select>
         </label>
         <label>Tiempo de atención *
-          <select name="items[<?= $h((string) $index) ?>][tiempo_atencion]" required>
+          <select name="<?= $h($fieldBase) ?>[tiempo_atencion]" required>
             <?= $this->correctiveReviewRenderOptions($tiempoOptions, $item['tiempo_atencion'] ?? '', 'Seleccionar tiempo') ?>
           </select>
         </label>
       </div>
       <label>¿A quién corresponde el daño?
-        <select name="items[<?= $h((string) $index) ?>][a_quien_corresponde]">
+        <select name="<?= $h($fieldBase) ?>[a_quien_corresponde]">
           <?= $this->correctiveReviewRenderOptions($correspondeOptions, $item['a_quien_corresponde'] ?? '', 'Por definir') ?>
         </select>
       </label>
       <div class="scm-acta-photo-field">
         <label>Registro fotográfico
-          <input type="file" name="corrective_review_photos_<?= $h((string) $index) ?>[]" accept="image/jpeg,image/png,image/webp" multiple data-corrective-photos>
+          <input type="file" name="<?= $h($photoField) ?>" accept="image/jpeg,image/png,image/webp" multiple data-corrective-photos>
         </label>
-        <small>Máximo 10 fotos por daño y 30 por revisión. Se comprimen automáticamente antes de guardarlas.</small>
+        <small><?= $acta ? 'Máximo 4 fotos del daño en el acta. Se guardarán también en la revisión correctiva.' : 'Máximo 10 fotos por daño y 30 por revisión.' ?> Se comprimen automáticamente antes de guardarlas.</small>
         <div class="scm-acta-photo-preview" data-corrective-photo-preview>
           <?php foreach ($photos as $photoIndex => $photo): ?>
             <figure data-corrective-existing-photo>
-              <img src="<?= $h($photo) ?>" alt="Foto guardada <?= $h((string) ($photoIndex + 1)) ?>">
+              <?php $photoUrl = \SCM\Modules\CorrectiveReview\CorrectiveReviewPhotos::url($this->db, $photo); ?>
+              <?php if ($photoUrl !== ''): ?><img src="<?= $h($photoUrl) ?>" alt="Foto guardada <?= $h((string) ($photoIndex + 1)) ?>"><?php else: ?><span>Foto no disponible</span><?php endif; ?>
               <figcaption>Foto guardada</figcaption>
-              <input type="hidden" name="items[<?= $h((string) $index) ?>][existing_fotos][]" value="<?= $h($photo) ?>">
+              <input type="hidden" name="<?= $h($fieldBase) ?>[existing_fotos][]" value="<?= $h($photo) ?>">
               <button type="button" class="scm-acta-photo-remove" data-corrective-remove-existing-photo aria-label="Quitar foto guardada">×</button>
             </figure>
           <?php endforeach; ?>
         </div>
       </div>
-      <button type="button" class="scm-acta-remove" data-corrective-remove-item>Quitar este daño</button>
+      <?php if (!$acta): ?><button type="button" class="scm-acta-remove" data-corrective-remove-item>Quitar este daño</button><?php endif; ?>
     </fieldset>
     <?php
     return (string) ob_get_clean();
@@ -1245,25 +1253,7 @@ trait HandlesCorrectiveReviewActions
   /** @return array<int,string> */
   private function correctiveReviewSafePhotoRefs($value): array
   {
-    $refs = [];
-    if (is_array($value)) {
-      foreach ($value as $entry) {
-        foreach ($this->correctiveReviewSafePhotoRefs($entry) as $ref) {
-          $refs[$ref] = $ref;
-        }
-      }
-      return array_values($refs);
-    }
-    foreach (preg_split('/[,\r\n]+/', html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?: [] as $part) {
-      $ref = trim(strip_tags((string) $part));
-      if ($ref === '' || strlen($ref) > 2048 || preg_match('/[\x00<>"\']/', $ref)) {
-        continue;
-      }
-      if (preg_match('#^https?://#i', $ref) || str_starts_with($ref, '/') || str_starts_with($ref, 'file.php?')) {
-        $refs[$ref] = $ref;
-      }
-    }
-    return array_values($refs);
+    return \SCM\Modules\CorrectiveReview\CorrectiveReviewPhotos::refs($value);
   }
 
   /** @return array<int,string> */

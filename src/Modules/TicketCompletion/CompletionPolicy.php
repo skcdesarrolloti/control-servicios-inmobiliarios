@@ -143,11 +143,14 @@ final class CompletionPolicy
       }
       $damagePhotos = self::photoList($row['damage_photos'] ?? [], $photoCount, $photoBytes);
       $photos = self::photoList($row['photos'] ?? [], $photoCount, $photoBytes);
+      $corrective = is_array($row['corrective'] ?? null) ? $row['corrective'] : [];
       $items[] = [
         'damage' => self::text($row['damage'] ?? '', 'daño encontrado', 3000),
         'solution' => self::text($row['solution'] ?? '', 'solución realizada', 3000),
         'damage_photos' => $damagePhotos,
         'photos' => $photos,
+        'corrective' => $corrective,
+        'corrective_sync_id' => preg_match('/^[a-f0-9]{32}$/D', (string) ($row['corrective_sync_id'] ?? '')) ? (string) $row['corrective_sync_id'] : '',
       ];
     }
     return $items;

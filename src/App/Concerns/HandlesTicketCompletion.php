@@ -162,7 +162,9 @@ trait HandlesTicketCompletion
           }
           $oldPayload = $service->payload($existingAct);
           foreach ((array) ($oldPayload['items'] ?? []) as $oldItem) {
-            $verifyOldPhotos((array) ($oldItem['damage_photos'] ?? []), $allowExistingDamagePhoto);
+          foreach ((array) ($oldItem['damage_photos'] ?? []) as $oldDamagePhoto) {
+            if (is_array($oldDamagePhoto)) { $allowExistingDamagePhoto($oldDamagePhoto); }
+          }
             $verifyOldPhotos((array) ($oldItem['photos'] ?? []), $allowExistingPhoto);
           }
         }
@@ -182,6 +184,37 @@ trait HandlesTicketCompletion
           if (!preg_match('/^\d+$/D', (string) $index)) { continue; }
           $item['damage_photos'] = $keptDamagePhotos;
           $item['photos'] = $keptPhotos;
+          if (is_array($item['corrective'] ?? null)) {
+            unset($item['corrective']['registro_foto_dano'], $item['corrective']['existing_fotos']);
+          }
+          $damageField = 'acta_damage_photos_' . $index;
+          $damageNames = $_FILES[$damageField]['name'] ?? [];
+          $damageNames = is_array($damageNames) ? array_values(array_filter($damageNames, static fn($name): bool => trim((string) $name) !== '')) : [];
+          if ($damageNames) {
+            if (!is_array($item['corrective'] ?? null) || trim((string) ($item['corrective_sync_id'] ?? '')) !== '' || count($damageNames) > 4) {
+              throw new \DomainException('El registro fotográfico del daño no es válido.');
+            }
+            $damageUploads = $this->handleImageUploadsDetailed($damageField, 4);
+            if (count($damageUploads) !== count($damageNames)) {
+              $this->storedFiles()->deleteStoredImages(array_merge($storedPhotos, $damageUploads));
+              throw new \DomainException('No se pudieron procesar las fotos del daño.');
+            }
+            $storedPhotos = array_merge($storedPhotos, $damageUploads);
+            $refs = [];
+            foreach ($damageUploads as $photo) {
+              $refs[] = $photo['url'];
+              $item['damage_photos'][] = [
+                'name' => $photo['name'], 'mime' => $photo['mime'], 'width' => $photo['width'],
+                'height' => $photo['height'], 'bytes' => $photo['bytes'], 'sha256' => $photo['sha256'],
+              ];
+              $storedBytes += (int) $photo['bytes'];
+            }
+            if (count($item['damage_photos']) > 4 || $storedBytes > 8000000) {
+              $this->storedFiles()->deleteStoredImages($storedPhotos);
+              throw new \DomainException('El acta admite máximo 4 fotos de daño por detalle y 8 MB en total.');
+            }
+            $item['corrective']['registro_foto_dano'] = implode(',', $refs);
+          }
           $field = 'acta_item_photos_' . $index;
           $names = $_FILES[$field]['name'] ?? [];
           $names = is_array($names) ? array_values(array_filter($names, static fn($name): bool => trim((string) $name) !== '')) : [];
@@ -251,7 +284,8 @@ trait HandlesTicketCompletion
       } elseif ($operation !== 'read') {
         throw new \DomainException('Operación de acta no válida.');
       }
-      $this->jsonOk($result + ['html' => (new CompletionView())->panel($service->context($ticketId, $sourceFlow), $service, 0, true, $this->canDeleteAnyTicketCompletionActs())]);
+      $view = new CompletionView(fn(int $index, array $item): string => $this->correctiveReviewActaItem($index, $item));
+      $this->jsonOk($result + ['html' => $view->panel($service->context($ticketId, $sourceFlow), $service, 0, true, $this->canDeleteAnyTicketCompletionActs())]);
     } catch (\DomainException $error) {
       $this->jsonFail($error->getMessage());
     }
