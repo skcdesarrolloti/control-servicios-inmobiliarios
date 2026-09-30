@@ -38,8 +38,9 @@ body {
 .scm-cotizacion-native-summary td { padding: 8px 10px; }
 .scm-cotizacion-native-section { padding: 13px !important; }
 
-.scm-cotizacion-native-damage-report { break-before: page; page-break-before: always; }
 .scm-cotizacion-damage-card + .scm-cotizacion-damage-card { break-before: page; page-break-before: always; }
+.scm-cotizacion-native-section > .scm-cotizacion-native-section-title,
+.scm-cotizacion-native-section > h3,
 .scm-cotizacion-damage-title,
 .scm-cotizacion-damage-head,
 .scm-cotizacion-native-section h4,
@@ -47,6 +48,8 @@ body {
   break-after: avoid-page;
   page-break-after: avoid;
 }
+
+.scm-cotizacion-native-rich p { break-inside: avoid-page; page-break-inside: avoid; }
 
 .scm-cotizacion-damage-card,
 .scm-cotizacion-budget-block,
