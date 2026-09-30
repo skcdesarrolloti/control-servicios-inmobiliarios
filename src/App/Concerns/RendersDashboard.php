@@ -5134,8 +5134,6 @@ trait RendersDashboard
     $fecha = $this->cotizacion_date_label($row['fecha'] ?? $row['cct_created'] ?? '');
     $fechaEnvio = $this->cotizacion_date_label($row['fecha_envio'] ?? '');
     $estado = trim((string) ($row['estado'] ?? ''));
-    $seEnvio = strtolower(trim((string) ($row['se_envio'] ?? '')));
-    $enviada = in_array($seEnvio, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true);
     $logo = function_exists('system_image') ? system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL) : SCM_DEFAULT_PORTAL_LOGO_URL;
     $revision = $this->cotizacion_revision_row($row);
     $danos = $this->cotizacion_parse_list($revision['evaluacion_de_danos'] ?? '');
@@ -5154,12 +5152,12 @@ trait RendersDashboard
 
     $html = '<article class="scm-cotizacion-native-doc" data-cotizacion-print-title="Cotización #' . esc_attr($id) . '">';
     $html .= '<header class="scm-cotizacion-native-hero">';
-    $html .= '<div class="scm-cotizacion-native-brand"><div class="scm-cotizacion-native-logo"><img src="' . esc_attr($logo) . '" alt="SKC SuCasa Inmobiliaria"></div><div class="scm-cotizacion-native-number"><span>Cotización de mantenimiento</span><strong>#' . esc_html($id !== '' ? $id : '-') . '</strong></div></div>';
-    $html .= '<div class="scm-cotizacion-native-hero-bottom"><div><p class="scm-cotizacion-native-eyebrow">Documento comercial</p><h2>Cotización de mantenimiento para revisión ' . esc_html($tipo !== '' ? strtolower($this->cotizacion_clean_text($tipo)) : 'de mantenimiento') . '</h2></div><div class="scm-cotizacion-native-state"><span class="' . ($enviada ? 'is-sent' : 'is-pending') . '">' . esc_html($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><strong>' . esc_html($estado !== '' ? $this->cotizacion_clean_text($estado) : 'Sin estado') . '</strong><em>Total ' . esc_html($totalCotizacion) . '</em></div></div>';
+    $html .= '<div class="scm-cotizacion-native-brand"><div class="scm-cotizacion-native-logo" style="background:#092859!important"><img src="' . esc_attr($logo) . '" alt="SKC SuCasa Inmobiliaria" style="background:transparent!important"></div><div class="scm-cotizacion-native-number"><span>Cotización de mantenimiento</span><strong>#' . esc_html($id !== '' ? $id : '-') . '</strong></div></div>';
+    $html .= '<div class="scm-cotizacion-native-hero-bottom"><div><h2>Cotización de mantenimiento para revisión ' . esc_html($tipo !== '' ? strtolower($this->cotizacion_clean_text($tipo)) : 'de mantenimiento') . '</h2></div><div class="scm-cotizacion-native-state"><strong>' . esc_html($estado !== '' ? $this->cotizacion_clean_text($estado) : 'Sin estado') . '</strong><em>Total ' . esc_html($totalCotizacion) . '</em></div></div>';
     $html .= '</header>';
 
-    $html .= '<section class="scm-cotizacion-native-grid scm-cotizacion-native-summary">';
-    foreach ([
+    $html .= '<section class="scm-cotizacion-native-summary"><h3>Datos de la cotización</h3><div class="scm-cotizacion-native-summary-scroll"><table><tbody>';
+    $summaryFields = [
       'Fecha' => $fecha,
       'Fecha de envío' => $fechaEnvio,
       'Contrato' => (string) ($row['contrato'] ?? '-'),
@@ -5171,11 +5169,16 @@ trait RendersDashboard
       'Responsable de cotización' => $responsableCotizacion['nombre'] !== '' ? $responsableCotizacion['nombre'] : '-',
       'Elaboró la cotización' => $creadorNombre !== '' ? $creadorNombre : '-',
       'Ticket / Inmueble' => ($ticket !== '' ? '#' . $ticket : '-') . ' / ' . trim((string) ($row['id_inmueble'] ?? '-')),
-    ] as $label => $value) {
-      $cleanValue = $this->cotizacion_clean_text($value);
-      $html .= '<div><span>' . esc_html($label) . '</span><strong>' . esc_html($cleanValue !== '' ? $cleanValue : '-') . '</strong></div>';
+    ];
+    foreach (array_chunk($summaryFields, 2, true) as $fields) {
+      $html .= '<tr>';
+      foreach ($fields as $label => $value) {
+        $cleanValue = $this->cotizacion_clean_text($value);
+        $html .= '<th scope="row">' . esc_html($label) . '</th><td' . (count($fields) === 1 ? ' colspan="3"' : '') . '>' . esc_html($cleanValue !== '' ? $cleanValue : '-') . '</td>';
+      }
+      $html .= '</tr>';
     }
-    $html .= '</section>';
+    $html .= '</tbody></table></div></section>';
 
     $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-damage-report"><div class="scm-cotizacion-native-section-title"><div><span>Informe t&eacute;cnico</span><h3>Da&ntilde;os encontrados</h3></div><strong>' . esc_html((string) count($danos)) . ' ' . (count($danos) === 1 ? 'hallazgo' : 'hallazgos') . '</strong></div>';
     if (empty($danos)) {

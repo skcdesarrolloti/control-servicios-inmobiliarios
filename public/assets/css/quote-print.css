@@ -27,7 +27,6 @@ body {
 
 .scm-cotizacion-native-brand,
 .scm-cotizacion-native-hero-bottom { display: flex !important; }
-.scm-cotizacion-native-summary { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 .scm-cotizacion-native-two-col { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 .scm-cotizacion-damage-head { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
 .scm-cotizacion-native-footer { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
@@ -35,7 +34,8 @@ body {
 .scm-cotizacion-native-state { text-align: right !important; }
 
 .scm-cotizacion-native-hero { padding: 22px !important; }
-.scm-cotizacion-native-summary > div { min-height: 0; padding: 6px 9px; }
+.scm-cotizacion-native-summary th,
+.scm-cotizacion-native-summary td { padding: 8px 10px; }
 .scm-cotizacion-native-section { padding: 13px !important; }
 
 .scm-cotizacion-native-damage-report { break-before: page; page-break-before: always; }
@@ -55,7 +55,8 @@ body {
 .scm-cotizacion-damage-card,
 .scm-cotizacion-budget-block,
 .scm-cotizacion-table-wrap { break-inside: auto !important; page-break-inside: auto !important; }
-.scm-cotizacion-native-summary > div,
+.scm-cotizacion-native-summary,
+.scm-cotizacion-native-summary tr,
 .scm-cotizacion-budget-table tr,
 .scm-cotizacion-media-item,
 .scm-cotizacion-native-total-box,
