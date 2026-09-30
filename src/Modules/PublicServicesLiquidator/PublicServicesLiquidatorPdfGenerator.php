@@ -31,7 +31,7 @@ final class PublicServicesLiquidatorPdfGenerator
     $pdf = new SimplePdf();
     $pdf->backgroundImage(dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg');
     $pdf->footerLabel('SKC SuCasa Inmobiliaria - Orden de reembolso servicios publicos');
-    $pdf->layout(58, 168, 118);
+    $pdf->documentDesign('Orden de reembolso');
 
     $pdf->title('Orden de reembolso - ' . $serviceLabel);
     $pdf->line($city . ', ' . $this->longDate($timestamp), 8);
@@ -106,16 +106,17 @@ final class PublicServicesLiquidatorPdfGenerator
     }
 
     $pdf->paragraph('Esta orden se genera con base en las lecturas, fechas y valores registrados por el funcionario en el liquidador de servicios publicos. La validacion documental de la factura y los soportes de pago permanece a cargo del area responsable.', 8);
-    $pdf->signatureBlock(
-      'Atentamente',
-      $this->value($context, 'realizado_por', 'Control Servicios Inmobiliarios'),
-      $this->signatureDetails([
-        $this->value($context, 'realizado_por_cargo', ''),
-        $this->value($context, 'realizado_por_telefono', ''),
-        $this->value($context, 'realizado_por_correo', ''),
-      ])
-    );
-    $pdf->signatureBlock('Empresa', 'SKC SuCasa Inmobiliaria', 'NIT 900623242-4 | Cartagena de Indias - Colombia');
+    $pdf->signatureGroup([
+      ['label' => 'Atentamente',
+        'name' => $this->value($context, 'realizado_por', 'Control Servicios Inmobiliarios'),
+        'details' => $this->signatureDetails([
+          $this->value($context, 'realizado_por_cargo', ''),
+          $this->value($context, 'realizado_por_telefono', ''),
+          $this->value($context, 'realizado_por_correo', ''),
+        ])],
+      ['label' => 'Empresa', 'name' => 'SKC SuCasa Inmobiliaria',
+        'details' => 'NIT 900623242-4 | Cartagena de Indias - Colombia'],
+    ]);
 
     $basename = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
     $path = (string) SCM_UPLOAD_PATH . '/' . $basename;

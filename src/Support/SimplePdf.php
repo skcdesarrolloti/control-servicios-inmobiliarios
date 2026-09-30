@@ -52,6 +52,11 @@ final class SimplePdf
     $this->layout(51, 136, 92);
   }
 
+  public function documentDesign(string $eyebrow): void
+  {
+    $this->actaDesign($eyebrow);
+  }
+
   public function save(string $path): void
   {
     $dir = dirname($path);
@@ -619,15 +624,25 @@ final class SimplePdf
     $people = array_values(array_filter($people, static fn(array $person): bool => trim($person['name']) !== ''));
     if ($people === []) { return; }
     $width = ($this->contentWidth - 18) / 2;
-    foreach (array_chunk($people, 2) as $row) {
+    $rows = array_chunk($people, 2);
+    $rowHeights = [];
+    foreach ($rows as $row) {
       $heights = [];
       foreach ($row as $person) {
         $heights[] = 24 + count($this->wrap($person['label'], $width, 7)) * 10
           + count($this->wrap($person['name'], $width, 10)) * 13
           + count($this->wrap($person['details'], $width, 7)) * 10;
       }
-      $height = max($heights) + 12;
-      $this->ensureSpace($height);
+      $rowHeights[] = max($heights) + 12;
+    }
+    $groupHeight = array_sum($rowHeights);
+    if (!$this->hasSpace($groupHeight) && $this->actaEyebrow !== '') {
+      $this->startNewPage();
+      $this->title('Responsables y firmas');
+    }
+    $this->ensureSpace($groupHeight);
+    foreach ($rows as $rowIndex => $row) {
+      $height = $rowHeights[$rowIndex];
       foreach ($row as $index => $person) {
         $x = $this->margin + $index * ($width + 18);
         $this->fill(245, 145, 32);

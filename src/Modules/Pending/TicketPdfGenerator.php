@@ -176,7 +176,8 @@ final class TicketPdfGenerator
   {
     $pdf = new SimplePdf();
     $pdf->backgroundImage($this->letterheadPath());
-    $pdf->layout(58, 170, 118);
+    $pdf->documentDesign('Mantenimiento y servicios');
+    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Seguimiento de reparaciones');
 
     $city = $this->value($ticket, 'ciudad', 'Cartagena de Indias');
     $recipient = $this->firstValue([
@@ -212,9 +213,12 @@ final class TicketPdfGenerator
     $pdf->paragraph('Le recordamos la importancia de mantener el inmueble en buen estado de conservacion y de atender oportunamente las reparaciones que correspondan, con el fin de evitar agravaciones, mayores costos, incomodidades para el ocupante o afectaciones en el uso normal del inmueble.');
     $pdf->paragraph('En caso de requerir financiacion para llevar a feliz termino el trabajo, puede comunicarse con nuestro equipo para recibir orientacion sobre las alternativas disponibles. La presente comunicacion queda anexada al historial del caso como seguimiento de reparaciones.');
     $pdf->spacer(8);
-    $pdf->signatureBlock('Realizado por', $creator['name'], $creator['details']);
-    $pdf->signatureBlock('Funcionario asignado', $checker['name'], $checker['details']);
-    $pdf->signatureBlock('Empresa', 'SKC SuCasa Inmobiliaria', 'NIT 900623242-4 | Cartagena de Indias - Colombia');
+    $pdf->signatureGroup([
+      ['label' => 'Realizado por', 'name' => $creator['name'], 'details' => $creator['details']],
+      ['label' => 'Funcionario asignado', 'name' => $checker['name'], 'details' => $checker['details']],
+      ['label' => 'Empresa', 'name' => 'SKC SuCasa Inmobiliaria',
+        'details' => 'NIT 900623242-4 | Cartagena de Indias - Colombia'],
+    ]);
 
     return $pdf;
   }

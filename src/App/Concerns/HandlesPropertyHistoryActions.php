@@ -580,7 +580,7 @@ trait HandlesPropertyHistoryActions
     $pdf = new \SCM\Support\SimplePdf();
     $pdf->backgroundImage(dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg');
     $pdf->footerLabel('SKC SuCasa Inmobiliaria - Reporte de inmueble');
-    $pdf->layout(58, 168, 118);
+    $pdf->documentDesign('Reporte de inmueble');
     $property = is_array($payload['property'] ?? null) ? $payload['property'] : [];
     $propertyLabel = (string) ($property['codigo'] ?? ($payload['property_code'] ?? ''));
     $pdf->actaHeader(
@@ -662,8 +662,11 @@ trait HandlesPropertyHistoryActions
 
     $actor = $this->property_history_current_employee_signature();
     $pdf->spacer(8);
-    $pdf->signatureBlock('Informe generado por', $actor['name'], $actor['details']);
-    $pdf->signatureBlock('Empresa', 'SKC SuCasa Inmobiliaria', 'NIT 900623242-4 | Cartagena de Indias - Colombia');
+    $pdf->signatureGroup([
+      ['label' => 'Informe generado por', 'name' => $actor['name'], 'details' => $actor['details']],
+      ['label' => 'Empresa', 'name' => 'SKC SuCasa Inmobiliaria',
+        'details' => 'NIT 900623242-4 | Cartagena de Indias - Colombia'],
+    ]);
 
     return $pdf;
   }

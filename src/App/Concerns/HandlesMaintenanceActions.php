@@ -4232,7 +4232,8 @@ trait HandlesMaintenanceActions
     $pdf = new \SCM\Support\SimplePdf();
     $letterhead = dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg';
     $pdf->backgroundImage($letterhead);
-    $pdf->layout(58, 166, 116);
+    $pdf->documentDesign($isFuncionario ? 'Cotización interna' : 'Copia para destinatario');
+    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Cotización de mantenimiento');
 
     $id = trim((string) ($row['_ID'] ?? ''));
     $ticket = trim((string) ($row['id_ticket'] ?? ''));
@@ -4435,9 +4436,15 @@ trait HandlesMaintenanceActions
     $pdf->heading('Nota contractual');
     $pdf->paragraph('Cuando las reparaciones sean responsabilidad de los propietarios, el administrador informará la novedad. Si no se atiende dentro del plazo contractual, la administración podrá realizar la gestión y descontar el valor correspondiente del canon de arrendamiento, de acuerdo con el contrato de mandato vigente.', 8);
     $pdf->spacer(8);
-    $pdf->signatureBlock('Responsable de cotización', $responsableCotizacion['nombre'] !== '' ? $responsableCotizacion['nombre'] : 'Control Servicios Inmobiliarios', trim(($responsableCotizacion['cargo'] !== '' ? $responsableCotizacion['cargo'] : 'Responsable de cotización') . ' | Email: ' . ($responsableCotizacion['email'] !== '' ? $responsableCotizacion['email'] : '-') . ' | Cel. ' . ($responsableCotizacion['celular'] !== '' ? $responsableCotizacion['celular'] : '-'), ' |'));
-    $pdf->signatureBlock('Elaboró la cotización', $creador !== '' ? $creador : 'Control Servicios Inmobiliarios', trim('Email: ' . ($creadorEmail !== '' ? $creadorEmail : '-') . ' | Cel. ' . ($creadorCelular !== '' ? $creadorCelular : '-'), ' |'));
-    $pdf->signatureBlock('Empresa', 'SKC SuCasa Inmobiliaria', 'NIT 900623242-4 | Cartagena de Indias - Colombia');
+    $pdf->signatureGroup([
+      ['label' => 'Responsable de cotización',
+        'name' => $responsableCotizacion['nombre'] !== '' ? $responsableCotizacion['nombre'] : 'Control Servicios Inmobiliarios',
+        'details' => trim(($responsableCotizacion['cargo'] !== '' ? $responsableCotizacion['cargo'] : 'Responsable de cotización') . ' | Email: ' . ($responsableCotizacion['email'] !== '' ? $responsableCotizacion['email'] : '-') . ' | Cel. ' . ($responsableCotizacion['celular'] !== '' ? $responsableCotizacion['celular'] : '-'), ' |')],
+      ['label' => 'Elaboró la cotización', 'name' => $creador !== '' ? $creador : 'Control Servicios Inmobiliarios',
+        'details' => trim('Email: ' . ($creadorEmail !== '' ? $creadorEmail : '-') . ' | Cel. ' . ($creadorCelular !== '' ? $creadorCelular : '-'), ' |')],
+      ['label' => 'Empresa', 'name' => 'SKC SuCasa Inmobiliaria',
+        'details' => 'NIT 900623242-4 | Cartagena de Indias - Colombia'],
+    ]);
 
     return $pdf;
   }
@@ -4448,7 +4455,7 @@ trait HandlesMaintenanceActions
     $pdf = new \SCM\Support\SimplePdf();
     $letterhead = dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg';
     $pdf->backgroundImage($letterhead);
-    $pdf->layout(58, 166, 116);
+    $pdf->documentDesign('Orden de mantenimiento');
     $pdf->footerLabel('SKC SuCasa Inmobiliaria - Orden de mantenimiento para cartera');
 
     $clean = fn(string $key, string $fallback = '-'): string => $this->maintenance_order_clean($order[$key] ?? '') !== ''
@@ -4521,9 +4528,14 @@ trait HandlesMaintenanceActions
       ['Actualización', $clean('cct_modified')],
     ], [0.32, 0.68], 8);
     $pdf->spacer(8);
-    $pdf->signatureBlock('Solicita / registra', $clean('creador', 'Control Servicios Inmobiliarios'), 'SKC SuCasa Inmobiliaria');
-    $pdf->signatureBlock('Autorización interna', $clean('autorizador', 'Pendiente / según respuesta de orden'), 'Validar estado antes de pago');
-    $pdf->signatureBlock('Cartera', 'Recibido para gestión de pago', 'Espacio de control interno');
+    $pdf->signatureGroup([
+      ['label' => 'Solicita / registra', 'name' => $clean('creador', 'Control Servicios Inmobiliarios'),
+        'details' => 'SKC SuCasa Inmobiliaria'],
+      ['label' => 'Autorización interna', 'name' => $clean('autorizador', 'Pendiente / según respuesta de orden'),
+        'details' => 'Validar estado antes de pago'],
+      ['label' => 'Cartera', 'name' => 'Recibido para gestión de pago',
+        'details' => 'Espacio de control interno'],
+    ]);
 
     return $pdf;
   }

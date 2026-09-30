@@ -15,7 +15,7 @@ final class RentIncreasePdfGenerator
     $pdf = new SimplePdf();
     $pdf->backgroundImage(dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg');
     $pdf->footerLabel('SKC SuCasa Inmobiliaria - Carta de aumento');
-    $pdf->layout(58, 168, 112);
+    $pdf->documentDesign('Carta de aumento');
 
     $isCanon = $type === 'canon';
     $title = $isCanon ? 'Carta de aumento de canon' : 'Carta de aumento de administración';
@@ -58,7 +58,10 @@ final class RentIncreasePdfGenerator
     $pdf->paragraph('Esta carta hace parte integrante para todos los efectos legales del contrato de arrendamiento suscrito entre usted y nuestra firma.', 8);
     $pdf->paragraph('Agradecemos su atención.', 8);
     $pdf->spacer(10);
-    $pdf->signatureBlock('Cordialmente', $contractual, $this->signatureDetails([$contractualPhone, $contractualEmail]));
+    $pdf->signatureGroup([[
+      'label' => 'Cordialmente', 'name' => $contractual,
+      'details' => $this->signatureDetails([$contractualPhone, $contractualEmail]),
+    ]]);
     $pdf->signatureBlock('Representante Legal', $representative, $this->signatureDetails([$representativePhone, $representativeEmail]), $representativeSignature['path']);
 
     $slug = $isCanon ? 'carta-aumento-canon' : 'carta-aumento-administracion';

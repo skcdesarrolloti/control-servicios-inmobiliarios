@@ -47,9 +47,13 @@ $document = (new RentIncreasePdfGenerator())->generate('canon', $context);
 $content = (string) file_get_contents((string) $document['path']);
 @unlink((string) $document['path']);
 
-$assert(str_contains($content, 'CATORCE MILLONES SEISCIENTOS'), 'generated PDF stores amount words before numeric pesos');
+$amountPosition = strpos($content, 'CATORCE');
+$numericPosition = strpos($content, '$' . chr(160) . '14.620.525');
+$assert($amountPosition !== false && str_contains($content, 'MILLONES') && str_contains($content, 'SEISCIENTOS') && $numericPosition !== false && $amountPosition < $numericPosition, 'generated PDF stores amount words before numeric pesos across wrapped lines');
 $assert(str_contains($content, '$' . chr(160) . '14.620.525'), 'generated PDF keeps numeric pesos together');
-$assert(preg_match('/cl.usula cuarta/i', $content) === 1, 'generated PDF uses clause-fourth canon text');
+$renderedText = (new \Smalot\PdfParser\Parser())->parseContent($content)->getText();
+$compactText = preg_replace('/\s+/u', '', mb_strtolower($renderedText, 'UTF-8')) ?: '';
+$assert(str_contains($compactText, 'cláusulacuarta'), 'generated PDF uses clause-fourth canon text');
 
 $view = new RentIncreaseView();
 $moneyMethod = new ReflectionMethod($view, 'money');

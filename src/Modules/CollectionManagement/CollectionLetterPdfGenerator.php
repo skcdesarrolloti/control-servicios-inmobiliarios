@@ -19,7 +19,7 @@ final class CollectionLetterPdfGenerator
     $pdf = new SimplePdf();
     $pdf->backgroundImage($this->letterheadPath());
     $pdf->footerLabel('SKC SuCasa Inmobiliaria - Gestión de cartera');
-    $pdf->layout(58, 166, 116);
+    $pdf->documentDesign('Gestión de cartera');
     if ($type === 'siniestro') {
       $this->buildClaimNotice($pdf, $item, $sender);
     } else {
@@ -129,12 +129,12 @@ final class CollectionLetterPdfGenerator
   private function signature(SimplePdf $pdf, array $sender): void
   {
     $pdf->spacer(8);
-    $pdf->signatureBlock(
-      'Cordialmente',
-      trim((string) ($sender['name'] ?? 'SuCasa Inmobiliaria')),
-      trim((string) ($sender['cargo'] ?? 'Control Servicios Inmobiliarios'))
-        . (trim((string) ($sender['phone'] ?? '')) !== '' ? ' | Cel. ' . trim((string) $sender['phone']) : '')
-    );
+    $pdf->signatureGroup([[
+      'label' => 'Cordialmente',
+      'name' => trim((string) ($sender['name'] ?? 'SKC SuCasa Inmobiliaria')),
+      'details' => trim((string) ($sender['cargo'] ?? 'Control Servicios Inmobiliarios'))
+        . (trim((string) ($sender['phone'] ?? '')) !== '' ? ' | Cel. ' . trim((string) $sender['phone']) : ''),
+    ]]);
   }
 
   private function money(mixed $value): string
