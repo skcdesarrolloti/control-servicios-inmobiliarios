@@ -3873,16 +3873,25 @@
             };
           });
         }
+        function correctiveDraftHasContent(entries) {
+          return Array.isArray(entries) && entries.some(function (entry) {
+            return String(entry.value || "").trim() !== "";
+          });
+        }
         function saveCorrectiveDraft() {
           try {
+            var draftItems = Array.from(
+              form.querySelectorAll("[data-corrective-item]"),
+            ).map(correctiveDraftFields);
+            while (draftItems.length > 1 && !correctiveDraftHasContent(draftItems[draftItems.length - 1]))
+              draftItems.pop();
             window.localStorage.setItem(
               correctiveDraftKey(),
               JSON.stringify({
                 version: 1,
+                reviewVersion: form.dataset.correctiveReviewVersion || "",
                 savedAt: Date.now(),
-                items: Array.from(
-                  form.querySelectorAll("[data-corrective-item]"),
-                ).map(correctiveDraftFields),
+                items: draftItems,
               }),
             );
           } catch (error) {
@@ -3927,6 +3936,13 @@
             !payload.items.length
           )
             return;
+          if (form.hasAttribute("data-corrective-review-edit") &&
+            payload.reviewVersion !== form.dataset.correctiveReviewVersion) {
+            clearCorrectiveDraft();
+            return;
+          }
+          while (payload.items.length > 1 && !correctiveDraftHasContent(payload.items[payload.items.length - 1]))
+            payload.items.pop();
           var list = form.querySelector("[data-corrective-review-items]");
           if (list) {
             while (

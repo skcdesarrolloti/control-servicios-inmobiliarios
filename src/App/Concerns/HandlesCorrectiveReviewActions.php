@@ -868,7 +868,7 @@ trait HandlesCorrectiveReviewActions
       <?php endif; ?>
       <?php if ($editReview): ?>
         <?php $editItems = $this->correctiveReviewStoredItems($editReview['evaluacion_de_danos'] ?? []); ?>
-        <form data-corrective-review-edit autocomplete="off" enctype="multipart/form-data">
+        <form data-corrective-review-edit data-corrective-review-version="<?= $h(hash('sha256', (string) ($editReview['evaluacion_de_danos'] ?? ''))) ?>" autocomplete="off" enctype="multipart/form-data">
           <input type="hidden" name="ticket_pk" value="<?= $h((string) $ticketId) ?>">
           <input type="hidden" name="review_id" value="<?= $h((string) $editReviewId) ?>">
           <section>
@@ -1228,7 +1228,7 @@ trait HandlesCorrectiveReviewActions
   {
     $items = [];
     if (is_string($raw) && trim($raw) !== '') {
-      $unserialized = @unserialize($raw);
+      $unserialized = @unserialize($raw, ['allowed_classes' => false]);
       if (is_array($unserialized)) {
         $items = $unserialized;
       } else {
@@ -1240,9 +1240,16 @@ trait HandlesCorrectiveReviewActions
     }
     $out = [];
     foreach ($items as $item) {
-      if (is_array($item)) {
-        $out[] = $item;
+      if (!is_array($item)) { continue; }
+      $hasContent = false;
+      foreach (['area_afectada', 'area_afectada_1', 'area_afectada_2', 'area_afectada_3', 'area_afectada_4', 'descripcion_dano', 'consecuencia'] as $field) {
+        if (isset($item[$field]) && is_scalar($item[$field]) && trim(strip_tags((string) $item[$field])) !== '') {
+          $hasContent = true;
+          break;
+        }
       }
+      if (!$hasContent && $this->correctiveReviewSafePhotoRefs($item['registro_foto_dano'] ?? '') === []) { continue; }
+      $out[] = $item;
       if (count($out) >= 30) {
         break;
       }
