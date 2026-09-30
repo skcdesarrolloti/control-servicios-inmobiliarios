@@ -34,7 +34,7 @@ function response(res, status, message) {
 
 async function getBrowser() {
   if (browser && browser.connected) return browser;
-  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || await puppeteer.executablePath();
   if (process.platform === 'linux' && !process.env.PUPPETEER_EXECUTABLE_PATH) {
     const mode = statSync(executablePath).mode & 0o777;
     if ((mode & 0o111) !== 0o111) {
