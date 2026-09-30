@@ -1,0 +1,16 @@
+{
+  "name": "skc-quote-pdf-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private Chromium PDF renderer for SKC SuCasa Inmobiliaria quotations",
+  "engines": {
+    "node": ">=20 <25"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "busboy": "1.6.0",
+    "puppeteer": "25.12.0"
+  }
+}
