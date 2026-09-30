@@ -11,6 +11,8 @@ final class CompletionPdf
   public function render(array $act, array $payload, bool $staff = false): string
   {
     $pdf = new SimplePdf();
+    $pdf->backgroundImage(dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg');
+    $pdf->actaDesign('Solución de daños');
     $actor = CompletionView::actor($payload);
     $status = $act['status'] === 'signed'
       ? 'Firmada - Caso cerrado'
@@ -55,19 +57,21 @@ final class CompletionPdf
     }
     $pdf->sectionTitle('Observaciones');
     foreach ($this->chunks($payload['observations'], 900) as $chunk) { $pdf->paragraph($chunk, 9); }
+    $pdf->sectionTitle('Trazabilidad del documento');
+    $pdf->paragraph('Identificador de contenido SHA-256: ' . $act['payload_hash'], 8);
     if ($act['status'] === 'signed') {
       $evidence = json_decode((string) $act['signed_json'], true, 16, JSON_THROW_ON_ERROR);
-      $pdf->reserveSpace(370);
-      $pdf->sectionTitle('Firma electrónica registrada');
+      $pdf->pageBreak();
+      $pdf->title('Firma electrónica registrada');
       if (!empty($evidence['strokes'])) { $pdf->drawnSignature($evidence['strokes']); }
       $identityLine = (string) $evidence['name'] . (!empty($evidence['document']) ? ' | Documento: ' . $evidence['document'] : '');
       $pdf->paragraph($identityLine, 10);
       $pdf->paragraph('Firmada el ' . date('d/m/Y H:i:s', (int) $act['signed_at']) . ' (Colombia).', 9);
       $pdf->paragraph($evidence['consent_text'], 9);
     }
-    $pdf->sectionTitle('Trazabilidad del documento');
-    $pdf->signatureBlock('Elaborada por', $actor['name'], CompletionView::actorDetails($actor));
-    $pdf->paragraph('Identificador de contenido SHA-256: ' . $act['payload_hash'], 8);
+    $pdf->signatureGroup([
+      ['label' => 'Elaborada por', 'name' => $actor['name'], 'details' => CompletionView::actorDetails($actor)],
+    ]);
     return $pdf->bytes();
   }
 

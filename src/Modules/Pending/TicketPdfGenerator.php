@@ -78,7 +78,8 @@ final class TicketPdfGenerator
   {
     $pdf = new SimplePdf();
     $pdf->backgroundImage($this->letterheadPath());
-    $pdf->layout(58, 170, 118);
+    $pdf->actaDesign('Revisión preventiva');
+    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Revisión preventiva');
 
     $isOwner = $destinatario === 'propietario';
     $nombreDest = $isOwner
@@ -118,8 +119,10 @@ final class TicketPdfGenerator
 
     $pdf->paragraph('Nuestro proposito es acompanar la gestion del inmueble de manera preventiva, ordenada y transparente, procurando una experiencia de servicio clara, oportuna y memorable.');
     $pdf->spacer(8);
-    $pdf->signatureBlock('Creado por', $creator['name'], $creator['details']);
-    $pdf->signatureBlock('Verificador asignado', $checker['name'], $checker['details']);
+    $pdf->signatureGroup([
+      ['label' => 'Creado por', 'name' => $creator['name'], 'details' => $creator['details']],
+      ['label' => 'Verificador asignado', 'name' => $checker['name'], 'details' => $checker['details']],
+    ]);
 
     return $pdf;
   }
@@ -129,7 +132,8 @@ final class TicketPdfGenerator
   {
     $pdf = new SimplePdf();
     $pdf->backgroundImage($this->letterheadPath());
-    $pdf->layout(58, 170, 118);
+    $pdf->actaDesign('Revisión preventiva');
+    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Revisión preventiva');
 
     $tenantName = $this->value($ticket, '_scm_arrendatario_nombre_resuelto', $this->value($ticket, 'arrendatario', $this->value($ticket, 'solicitante', 'arrendatario(a)')));
     $contract = $this->value($ticket, 'contrato', '-');
@@ -156,8 +160,10 @@ final class TicketPdfGenerator
     $pdf->paragraph('En consecuencia, al no permitirse la realizacion de la revision previamente informada, cualquier dano, deterioro, agravacion o mayor costo de reparacion que posteriormente se presente y que razonablemente hubiera podido ser identificado, prevenido o atendido oportunamente mediante dicha inspeccion sera imputable a quien impidio su realizacion.');
     $pdf->paragraph('La presente comunicacion se remite para dejar constancia de lo anterior dentro del historial del caso.');
     $pdf->spacer(8);
-    $pdf->signatureBlock('Creado por', $creator['name'], $creator['details']);
-    $pdf->signatureBlock('Verificador asignado', $checker['name'], $checker['details']);
+    $pdf->signatureGroup([
+      ['label' => 'Creado por', 'name' => $creator['name'], 'details' => $creator['details']],
+      ['label' => 'Verificador asignado', 'name' => $checker['name'], 'details' => $checker['details']],
+    ]);
 
     return $pdf;
   }
@@ -217,30 +223,29 @@ final class TicketPdfGenerator
   private function buildActaDesocupacion(array $ticket): SimplePdf
   {
     $pdf = new SimplePdf();
+    $pdf->backgroundImage($this->letterheadPath());
+    $pdf->actaDesign('Gestión contractual');
+    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Acta de desocupación');
     $pdf->title('Acta de desocupacion');
-    $pdf->logo();
-    $pdf->heading('Encabezado');
-    $pdf->heading('Encabezado');
     $pdf->line($this->value($ticket, 'ciudad', 'Cartagena de Indias') . ', ' . date('d-m-Y'));
     $pdf->line('Apreciado(a) ' . $this->value($ticket, 'arrendatario', 'arrendatario'));
     $pdf->spacer(8);
-    $pdf->heading('Encabezado');
-    $pdf->heading('Encabezado');
+    $pdf->heading('Notificación');
     $pdf->paragraph('Por medio de la presente le notificamos que su contrato #' . $this->value($ticket, 'contrato', '-') . ' de arrendamiento esta proximo a culminar, es por ello por lo que, con anticipacion, le invitamos a realizar las reparaciones que se encuentren pendientes en el inmueble; lo anterior, toda vez que tal como lo estipula el contrato de arrendamiento en su CLAUSULA DECIMA NOVENA, la cual establece:');
     $pdf->paragraph('"DECIMA NOVENA: RECIBO Y ESTADO. El arrendatario declara que ha recibido el inmueble objeto de este contrato en buen estado, conforme al inventario que hace parte de este, y que en el mismo estado lo restituira al arrendador a la terminacion del arrendamiento, o cuando este haya de cesar por alguna de las causales previstas, salvo el deterioro proveniente del tiempo y del uso legitimo."');
     $pdf->paragraph('Asi mismo, destacamos que para recibir el bien inmueble, usted debera estar a paz y salvo de canon de arrendamiento, administracion (si aplica), y servicios publicos con su respectivo deposito.');
     $pdf->paragraph('Nota: En caso de que el inmueble tenga reparaciones pendientes, o presente deudas de canon de arrendamiento, administracion y/o servicios publicos, los valores adeudados seguiran contando hasta el dia en que se reciba formalmente el inmueble y el mismo se encuentre totalmente a paz y salvo.');
-    $pdf->line('Anexos:', 8, 'F2');
+    $pdf->heading('Anexos');
     $registro = $this->value($ticket, 'registro_fotografico', '');
     if ($registro !== '') {
       $pdf->linkText('Registro fotografico', $registro);
     }
-    $pdf->heading('Encabezado');
-    $pdf->line('Coordinador Contractual, Mantenimiento y Servicios Publicos:', 8, 'F2');
-    $pdf->line($this->contactLine($ticket, 'contractual'));
-    $pdf->spacer(8);
-    $pdf->line('Verificador de inmuebles:', 8, 'F2');
-    $pdf->line($this->contactLine($ticket, 'empleado'));
+    $contractual = $this->contactParts($ticket, 'contractual');
+    $checker = $this->contactParts($ticket, 'empleado');
+    $pdf->signatureGroup([
+      ['label' => 'Coordinación contractual', 'name' => $contractual['name'], 'details' => $contractual['details']],
+      ['label' => 'Verificador de inmuebles', 'name' => $checker['name'], 'details' => $checker['details']],
+    ]);
     return $pdf;
   }
 

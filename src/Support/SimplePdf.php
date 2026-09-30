@@ -19,6 +19,7 @@ final class SimplePdf
   /** @var array<string,array{path:string,width:int,height:int}> */
   private array $images = [];
   private string $footerLabel = 'SKC SuCasa Inmobiliaria - Cotización de mantenimiento';
+  private string $actaEyebrow = '';
 
   public function __construct()
   {
@@ -43,6 +44,12 @@ final class SimplePdf
   public function footerLabel(string $label): void
   {
     $this->footerLabel = trim($label);
+  }
+
+  public function actaDesign(string $eyebrow): void
+  {
+    $this->actaEyebrow = trim($eyebrow);
+    $this->layout(51, 136, 92);
   }
 
   public function save(string $path): void
@@ -184,6 +191,21 @@ final class SimplePdf
 
   public function title(string $text): void
   {
+    if ($this->actaEyebrow !== '') {
+      $this->ensureSpace(64);
+      $this->fill(207, 109, 12);
+      $this->text($this->margin, $this->y, mb_strtoupper($this->actaEyebrow, 'UTF-8'), 7, 'F2');
+      $this->y += 15;
+      $this->fill(6, 29, 73);
+      foreach ($this->wrap($text, $this->contentWidth, 16) as $line) {
+        $this->text($this->margin, $this->y, $line, 16, 'F2');
+        $this->y += 21;
+      }
+      $this->fill(245, 145, 32);
+      $this->rect($this->margin, $this->y + 1, 54, 2.5);
+      $this->y += 17;
+      return;
+    }
     $this->ensureSpace(42);
     $this->fill(6, 29, 73);
     foreach ($this->wrap($text, $this->contentWidth, 17) as $line) {
@@ -197,6 +219,15 @@ final class SimplePdf
 
   public function actaHeader(string $title, string $recordLine, string $status): void
   {
+    if ($this->actaEyebrow !== '') {
+      $this->title($title);
+      $this->fill(61, 76, 105);
+      foreach ($this->wrap($recordLine, $this->contentWidth, 8) as $line) {
+        $this->line($line, 8);
+      }
+      $this->statusPill($status);
+      return;
+    }
     if ($this->backgroundImagePath !== null && $this->y < 148.0) {
       $this->y = 148.0;
     }
@@ -226,6 +257,10 @@ final class SimplePdf
 
   public function sectionTitle(string $text): void
   {
+    if ($this->actaEyebrow !== '') {
+      $this->heading($text);
+      return;
+    }
     $this->ensureSpace(34);
     $this->fill(245, 145, 32);
     $this->rect($this->margin, $this->y + 2, 4, 16);
@@ -237,19 +272,19 @@ final class SimplePdf
   /** @param array<int,array{0:string,1:string}> $items */
   public function detailGrid(array $items): void
   {
-    $gap = 10.0;
+    $gap = $this->actaEyebrow !== '' ? 6.0 : 10.0;
     $cardW = ($this->contentWidth - $gap) / 2;
     for ($i = 0; $i < count($items); $i += 2) {
       $left = $items[$i] ?? ['', ''];
       $right = $items[$i + 1] ?? ['', ''];
       $height = max($this->detailCardHeight($left, $cardW), $right[0] !== '' ? $this->detailCardHeight($right, $cardW) : 0);
-      $height = max(46.0, $height);
-      $this->ensureSpace($height + 10);
+      $height = max($this->actaEyebrow !== '' ? 32.0 : 46.0, $height);
+      $this->ensureSpace($height + $gap);
       $this->detailCard($this->margin, $this->y, $cardW, $height, $left[0], $left[1]);
       if ($right[0] !== '') {
         $this->detailCard($this->margin + $cardW + $gap, $this->y, $cardW, $height, $right[0], $right[1]);
       }
-      $this->y += $height + 10;
+      $this->y += $height + $gap;
     }
   }
 
@@ -318,11 +353,29 @@ final class SimplePdf
   {
     $labelLines = $this->wrap((string) $item[0], $width - 16, 7);
     $valueLines = $this->wrap((string) $item[1], $width - 16, 9);
+    if ($this->actaEyebrow !== '') {
+      return 12 + count($labelLines) * 8 + count($valueLines) * 11;
+    }
     return 22 + count($labelLines) * 9 + count($valueLines) * 13;
   }
 
   private function detailCard(float $x, float $y, float $width, float $height, string $label, string $value): void
   {
+    if ($this->actaEyebrow !== '') {
+      $this->fill(248, 250, 252);
+      $this->rect($x, $y, $width, $height);
+      $this->fill(100, 116, 139);
+      $cursor = $y + 10;
+      foreach ($this->wrap($label, $width - 12, 7) as $line) {
+        $this->text($x + 6, $cursor, $line, 7, 'F1'); $cursor += 8;
+      }
+      $cursor += 3;
+      $this->fill(6, 29, 73);
+      foreach ($this->wrap($value, $width - 12, 9) as $line) {
+        $this->text($x + 6, $cursor, $line, 9, 'F2'); $cursor += 11;
+      }
+      return;
+    }
     $this->fill(248, 250, 252);
     $this->rect($x, $y, $width, $height);
     $this->fill(72, 89, 113);
@@ -341,6 +394,17 @@ final class SimplePdf
 
   public function heading(string $text): void
   {
+    if ($this->actaEyebrow !== '') {
+      $this->ensureSpace(42);
+      $this->fill(6, 29, 73);
+      $this->rect($this->margin, $this->y, $this->contentWidth, 22);
+      $this->fill(245, 145, 32);
+      $this->rect($this->margin, $this->y, 4, 22);
+      $this->fill(255, 255, 255);
+      $this->text($this->margin + 12, $this->y + 15, $text, 9, 'F2');
+      $this->y += 36;
+      return;
+    }
     $this->ensureSpace(72);
     $this->fill(6, 29, 73);
     $this->rect($this->margin, $this->y, $this->contentWidth, 28);
@@ -434,6 +498,18 @@ final class SimplePdf
 
   public function line(string $text, int $size = 8, string $font = 'F1'): void
   {
+    if ($this->actaEyebrow !== '') {
+      $size = max(9, $size);
+      $lines = $this->wrap($text, $this->contentWidth, $size);
+      $this->ensureSpace(count($lines) * ($size + 6) + 3);
+      $this->fill(13, 33, 58);
+      foreach ($lines as $line) {
+        $this->text($this->margin, $this->y, $line, $size, $font);
+        $this->y += $size + 6;
+      }
+      $this->y += 3;
+      return;
+    }
     $this->ensureSpace(max(72, $size + 8));
     $this->fill(13, 33, 58);
     $this->text($this->margin, $this->y, $text, $size, $font);
@@ -442,6 +518,7 @@ final class SimplePdf
 
   public function paragraph(string $text, int $size = 8): void
   {
+    if ($this->actaEyebrow !== '') { $size = max(9, $size); }
     $lines = $this->wrap($text, $this->contentWidth, $size);
     $this->ensureSpace(max(18, count($lines) * ($size + 6)));
     $this->fill(25, 43, 69);
@@ -534,6 +611,43 @@ final class SimplePdf
       }
     }
     $this->y += 10;
+  }
+
+  /** @param array<int,array{label:string,name:string,details:string}> $people */
+  public function signatureGroup(array $people): void
+  {
+    $people = array_values(array_filter($people, static fn(array $person): bool => trim($person['name']) !== ''));
+    if ($people === []) { return; }
+    $width = ($this->contentWidth - 18) / 2;
+    foreach (array_chunk($people, 2) as $row) {
+      $heights = [];
+      foreach ($row as $person) {
+        $heights[] = 24 + count($this->wrap($person['label'], $width, 7)) * 10
+          + count($this->wrap($person['name'], $width, 10)) * 13
+          + count($this->wrap($person['details'], $width, 7)) * 10;
+      }
+      $height = max($heights) + 12;
+      $this->ensureSpace($height);
+      foreach ($row as $index => $person) {
+        $x = $this->margin + $index * ($width + 18);
+        $this->fill(245, 145, 32);
+        $this->rect($x, $this->y, $width, 2);
+        $cursor = $this->y + 13;
+        $this->fill(100, 116, 139);
+        foreach ($this->wrap($person['label'], $width, 7) as $line) {
+          $this->text($x, $cursor, $line, 7, 'F2'); $cursor += 10;
+        }
+        $this->fill(6, 29, 73);
+        foreach ($this->wrap($person['name'], $width, 10) as $line) {
+          $this->text($x, $cursor, $line, 10, 'F2'); $cursor += 13;
+        }
+        $this->fill(89, 101, 121);
+        foreach ($this->wrap($person['details'], $width, 7) as $line) {
+          $this->text($x, $cursor, $line, 7, 'F1'); $cursor += 10;
+        }
+      }
+      $this->y += $height;
+    }
   }
 
   private function ensureSpace(float $height): void

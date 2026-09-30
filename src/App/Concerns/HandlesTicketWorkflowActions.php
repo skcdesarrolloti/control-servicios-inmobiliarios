@@ -4981,7 +4981,7 @@ trait HandlesTicketWorkflowActions
     $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . $safeName;
 
     $pdf = new \SCM\Support\SimplePdf();
-    $pdf->layout(42, 42, 44);
+    $pdf->actaDesign('Gestión contractual');
     $membrete = defined('SCM_RESOURCES_PATH') ? SCM_RESOURCES_PATH . '/assets/membrete-sucasa.jpg' : '';
     if ($membrete !== '' && is_file($membrete)) {
       $pdf->backgroundImage($membrete);
@@ -4995,7 +4995,9 @@ trait HandlesTicketWorkflowActions
         $pdf->paragraph($paragraph, 8);
       }
     }
-    $pdf->signatureBlock('Realizado por', $creatorName, $creatorDetails !== '' ? $creatorDetails : 'SKC SuCasa Inmobiliaria');
+    $pdf->signatureGroup([
+      ['label' => 'Realizado por', 'name' => $creatorName, 'details' => $creatorDetails !== '' ? $creatorDetails : 'SKC SuCasa Inmobiliaria'],
+    ]);
     $pdf->save($path);
 
     return [
@@ -5045,7 +5047,7 @@ trait HandlesTicketWorkflowActions
     $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . $safeName;
 
     $pdf = new \SCM\Support\SimplePdf();
-    $pdf->layout(42, 42, 44);
+    $pdf->actaDesign('Gestión contractual');
     $membrete = defined('SCM_RESOURCES_PATH') ? SCM_RESOURCES_PATH . '/assets/membrete-sucasa.jpg' : '';
     if ($membrete !== '' && is_file($membrete)) {
       $pdf->backgroundImage($membrete);
@@ -5059,7 +5061,9 @@ trait HandlesTicketWorkflowActions
         $pdf->paragraph($paragraph, 8);
       }
     }
-    $pdf->signatureBlock('Realizado por', $creatorName, $creatorDetails !== '' ? $creatorDetails : 'SKC SuCasa Inmobiliaria');
+    $pdf->signatureGroup([
+      ['label' => 'Realizado por', 'name' => $creatorName, 'details' => $creatorDetails !== '' ? $creatorDetails : 'SKC SuCasa Inmobiliaria'],
+    ]);
     $pdf->save($path);
 
     return [

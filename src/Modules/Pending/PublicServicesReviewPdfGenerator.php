@@ -59,7 +59,7 @@ final class PublicServicesReviewPdfGenerator
     $pdf = new SimplePdf();
     $pdf->backgroundImage($this->letterheadPath());
     $pdf->footerLabel('SKC SuCasa Inmobiliaria - Revisión de servicios públicos');
-    $pdf->layout(58, 168, 118);
+    $pdf->actaDesign('Revisión de servicios públicos');
 
     $serviceLabel = (string) ($service['label'] ?? 'servicio publico');
     $status = (string) ($service['status'] ?? '');
@@ -111,8 +111,10 @@ final class PublicServicesReviewPdfGenerator
     }
 
     $pdf->spacer(6);
-    $pdf->signatureBlock('Revisión registrada por', $reviewer, $reviewerDetails);
-    $pdf->signatureBlock('Firma institucional', $representative, $representativeDetails);
+    $pdf->signatureGroup([
+      ['label' => 'Revisión registrada por', 'name' => $reviewer, 'details' => $reviewerDetails],
+      ['label' => 'Firma institucional', 'name' => $representative, 'details' => $representativeDetails],
+    ]);
 
     return $pdf;
   }
