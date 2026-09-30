@@ -2,6 +2,7 @@
 
 const http = require('node:http');
 const { timingSafeEqual } = require('node:crypto');
+const { chmodSync, statSync } = require('node:fs');
 const Busboy = require('busboy');
 const puppeteer = require('puppeteer');
 
@@ -33,9 +34,17 @@ function response(res, status, message) {
 
 async function getBrowser() {
   if (browser && browser.connected) return browser;
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
+  if (process.platform === 'linux' && !process.env.PUPPETEER_EXECUTABLE_PATH) {
+    const mode = statSync(executablePath).mode & 0o777;
+    if ((mode & 0o111) !== 0o111) {
+      chmodSync(executablePath, mode | 0o111);
+      console.log('Permiso de ejecución de Chromium corregido:', (statSync(executablePath).mode & 0o777).toString(8));
+    }
+  }
   browser = await puppeteer.launch({
     headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    executablePath,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   });
   return browser;

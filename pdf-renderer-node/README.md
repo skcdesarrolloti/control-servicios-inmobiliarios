@@ -21,6 +21,8 @@ Esta aplicación Node recibe el HTML que envía el panel PHP y devuelve el PDF c
 
 Hostinger permite [subir una app Node.js](https://www.hostinger.com/support/how-to-deploy-a-nodejs-website-in-hostinger/) y [configurar variables de entorno](https://www.hostinger.com/support/how-to-add-environment-variables-during-node-js-application-deployment/). La descarga de Chromium ocurre durante `npm install` de Puppeteer. Si el despliegue falla, revisa los [registros de despliegue](https://www.hostinger.com/support/how-to-troubleshoot-a-failed-node-js-deployment-using-build-logs/). Node.js por sí solo no confirma que Chromium pueda ejecutarse en ese plan: compruébalo con `/health` antes de conectar el PHP.
 
+Si `/health` devuelve 503 y el registro muestra `spawn .../chrome EACCES`, la app intenta corregir el permiso de ejecución del Chrome descargado en cada arranque. Vuelve a subir el ZIP más reciente y prueba `/health`. Si el error persiste aun después de aparecer `Permiso de ejecución de Chromium corregido` en los registros, el alojamiento probablemente impide ejecutar ese binario desde la carpeta de la app; necesitarás un VPS o un servicio privado externo para conservar el PDF HTML exacto. El panel PHP mantiene su PDF local de respaldo.
+
 ## Probar localmente
 
 ```powershell
