@@ -3053,6 +3053,29 @@
             group.querySelectorAll("[data-corrective-area-field]").forEach(function (field) { field.disabled = !active; field.required = active; });
           });
         }
+        function syncActaDamageSummary(item) {
+          if (!item) return;
+          var wrap = item.querySelector("[data-acta-corrective-wrap]");
+          var fields = wrap && wrap.querySelector("[data-acta-corrective-fields]");
+          if (!wrap || wrap.hidden || !fields || fields.disabled) return;
+          var damage = item.querySelector("[name$='[damage]']");
+          if (!damage) return;
+          var value = function (name) {
+            var field = fields.querySelector("[name$='[" + name + "]']");
+            return field ? field.value.replace(/[ \t\u00a0]+/g, " ").replace(/\r?\n\s*/g, "\n").trim() : "";
+          };
+          var area = fields.querySelector("[data-corrective-area-field]:not([disabled])");
+          var parts = [
+            ["Área afectada", area ? area.value.trim() : ""],
+            ["Descripción del daño", value("descripcion_dano")],
+            ["Consecuencia", value("consecuencia")],
+            ["Nivel del daño", value("nivel_dano")],
+            ["Tiempo de atención", value("tiempo_atencion")],
+          ];
+          damage.value = parts.filter(function (part) { return part[1]; })
+            .map(function (part) { return part[0] + ": " + part[1]; }).join("\n");
+          damage.readOnly = true;
+        }
         function previewActaDamagePhotos(input) {
           var preview = input.closest("[data-acta-item]").querySelector("[data-corrective-photo-preview]");
           if (!preview) return;
@@ -3089,6 +3112,7 @@
               });
               correctiveWrap.querySelectorAll("[data-corrective-existing-photo]").forEach(function (photo) { photo.remove(); });
               syncActaCorrectiveArea(item);
+              syncActaDamageSummary(item);
             }
             item.querySelectorAll("textarea").forEach(function (field) {
               field.name = field.name.replace(
@@ -3153,14 +3177,14 @@
             addPhotos(event.target, Array.from(event.target.files || []));
           if (event.target.matches("[data-corrective-indice]"))
             syncActaCorrectiveArea(event.target.closest("[data-acta-item]"));
+          if (event.target.closest("[data-acta-corrective-wrap]"))
+            syncActaDamageSummary(event.target.closest("[data-acta-item]"));
           if (event.target.matches("[data-corrective-photos]"))
             previewActaDamagePhotos(event.target);
         });
         form.addEventListener("input", function (event) {
-          if (!event.target.matches("[name$='[descripcion_dano]']")) return;
-          var item = event.target.closest("[data-acta-item]");
-          var damage = item && item.querySelector("[name$='[damage]']");
-          if (damage) damage.value = event.target.value;
+          if (event.target.closest("[data-acta-corrective-wrap]"))
+            syncActaDamageSummary(event.target.closest("[data-acta-item]"));
         });
         form.addEventListener("paste", function (event) {
           var pasteButton =
