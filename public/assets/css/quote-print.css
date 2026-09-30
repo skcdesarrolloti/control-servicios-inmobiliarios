@@ -1,0 +1,65 @@
+@page { size: A4; margin: 8mm; }
+
+html,
+body {
+  margin: 0;
+  background: #fff !important;
+  font-family: Poppins, Arial, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.scm-cotizacion-native-print-root {
+  width: 800px;
+  max-width: none;
+  margin: 0 auto;
+  padding: 0;
+  background: #fff;
+  zoom: .9;
+}
+
+.scm-cotizacion-native-doc {
+  margin: 0 auto;
+  padding: 16px;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.scm-cotizacion-native-brand,
+.scm-cotizacion-native-hero-bottom { display: flex !important; }
+.scm-cotizacion-native-summary { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+.scm-cotizacion-native-two-col { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.scm-cotizacion-damage-head { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+.scm-cotizacion-native-footer { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.scm-cotizacion-native-number,
+.scm-cotizacion-native-state { text-align: right !important; }
+
+.scm-cotizacion-native-hero { padding: 22px !important; }
+.scm-cotizacion-native-summary > div { min-height: 58px; padding: 9px; }
+.scm-cotizacion-native-section { padding: 13px !important; }
+
+.scm-cotizacion-native-damage-report { break-before: page; page-break-before: always; }
+.scm-cotizacion-damage-card + .scm-cotizacion-damage-card { break-before: page; page-break-before: always; }
+.scm-cotizacion-damage-title,
+.scm-cotizacion-damage-head,
+.scm-cotizacion-native-section h4,
+.scm-cotizacion-damage-card > .scm-cotizacion-native-tags {
+  break-after: avoid-page;
+  page-break-after: avoid;
+}
+
+.scm-cotizacion-damage-card,
+.scm-cotizacion-budget-block,
+.scm-cotizacion-table-wrap { overflow: visible !important; }
+.scm-cotizacion-native-section,
+.scm-cotizacion-damage-card,
+.scm-cotizacion-budget-block,
+.scm-cotizacion-table-wrap { break-inside: auto !important; page-break-inside: auto !important; }
+.scm-cotizacion-native-summary > div,
+.scm-cotizacion-budget-table tr,
+.scm-cotizacion-media-item,
+.scm-cotizacion-native-total-box,
+.scm-cotizacion-native-note,
+.scm-cotizacion-native-legal,
+.scm-cotizacion-native-footer,
+.scm-cotizacion-native-footer > div { break-inside: avoid-page; page-break-inside: avoid; }

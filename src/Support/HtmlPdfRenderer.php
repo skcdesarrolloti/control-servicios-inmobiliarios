@@ -9,8 +9,10 @@ final class HtmlPdfRenderer
   public static function render(string $content, string $title): ?string
   {
     $browser = self::browserPath();
+    $remoteUrl = trim((string) getenv('SCM_GOTENBERG_URL'));
     $cssPath = dirname(__DIR__, 2) . '/public/assets/css/admin/04-dashboard-pending.css';
-    if ($browser === null || !is_readable($cssPath) || !function_exists('proc_open')) {
+    $printCssPath = dirname(__DIR__, 2) . '/public/assets/css/quote-print.css';
+    if (($browser === null && $remoteUrl === '') || !is_readable($cssPath) || !is_readable($printCssPath)) {
       return null;
     }
 
@@ -23,26 +25,23 @@ final class HtmlPdfRenderer
     $base = htmlspecialchars(rtrim((string) SCM_BASE_URL, '/') . '/', ENT_QUOTES, 'UTF-8');
     $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
     $css = (string) file_get_contents($cssPath);
+    $printCss = (string) file_get_contents($printCssPath);
     $content = self::inlineConfiguredLogo($content);
     $html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><base href="' . $base . '"><title>' . $safeTitle . '</title>'
       . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">'
-      . '<style>' . $css . '</style><style>@page{size:A4;margin:10mm}'
-      . 'html,body{margin:0;background:#fff!important;font-family:Poppins,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
-      . '.scm-cotizacion-native-print-root{width:100%;max-width:980px;margin:0 auto;padding:0;background:#fff}'
-      . '.scm-cotizacion-native-doc{box-shadow:none!important;margin:0 auto}'
-      . '.scm-cotizacion-native-brand,.scm-cotizacion-native-hero-bottom{display:flex!important}'
-      . '.scm-cotizacion-native-summary{grid-template-columns:repeat(4,minmax(0,1fr))!important}'
-      . '.scm-cotizacion-native-two-col{grid-template-columns:repeat(2,minmax(0,1fr))!important}'
-      . '.scm-cotizacion-damage-head{grid-template-columns:repeat(4,minmax(0,1fr))!important}'
-      . '.scm-cotizacion-native-footer{grid-template-columns:repeat(3,minmax(0,1fr))!important}'
-      . '.scm-cotizacion-native-number,.scm-cotizacion-native-state{text-align:right!important}'
-      . '.scm-cotizacion-native-doc,.scm-cotizacion-damage-card,.scm-cotizacion-budget-block,.scm-cotizacion-table-wrap{overflow:visible!important}'
-      . '.scm-cotizacion-native-section,.scm-cotizacion-damage-card,.scm-cotizacion-budget-block,.scm-cotizacion-table-wrap{break-inside:auto!important}'
-      . '.scm-cotizacion-native-summary>div,.scm-cotizacion-budget-table tr,.scm-cotizacion-media-item,.scm-cotizacion-native-footer>div{break-inside:avoid-page}'
-      . '</style></head><body><main class="scm-cotizacion-native-modal"><div class="scm-cotizacion-native-print-root">' . $content . '</div></main></body></html>';
+      . '<style>' . $css . '</style><style>' . $printCss . '</style></head><body><main class="scm-cotizacion-native-modal"><div class="scm-cotizacion-native-print-root">' . $content . '</div></main></body></html>';
 
     try {
       if (file_put_contents($htmlPath, $html, LOCK_EX) === false) {
+        return null;
+      }
+      if ($remoteUrl !== '') {
+        $remotePdf = self::renderWithGotenberg($htmlPath, $remoteUrl);
+        if ($remotePdf !== null) {
+          return $remotePdf;
+        }
+      }
+      if ($browser === null || !function_exists('proc_open')) {
         return null;
       }
       $command = [
@@ -91,6 +90,42 @@ final class HtmlPdfRenderer
       @rmdir($directory . '/profile');
       @rmdir($directory);
     }
+  }
+
+  private static function renderWithGotenberg(string $htmlPath, string $baseUrl): ?string
+  {
+    if (!str_starts_with($baseUrl, 'https://') || !function_exists('curl_init')) {
+      return null;
+    }
+    $url = rtrim($baseUrl, '/') . '/forms/chromium/convert/html';
+    $curl = curl_init($url);
+    if ($curl === false) {
+      return null;
+    }
+    $username = trim((string) getenv('SCM_GOTENBERG_USERNAME'));
+    $password = (string) getenv('SCM_GOTENBERG_PASSWORD');
+    $options = [
+      CURLOPT_POST => true,
+      CURLOPT_POSTFIELDS => [
+        'files' => new \CURLFile($htmlPath, 'text/html', 'index.html'),
+        'preferCssPageSize' => 'true',
+        'printBackground' => 'true',
+      ],
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_FOLLOWLOCATION => false,
+      CURLOPT_CONNECTTIMEOUT => 10,
+      CURLOPT_TIMEOUT => 55,
+      CURLOPT_HTTPHEADER => ['Accept: application/pdf'],
+    ];
+    if ($username !== '' && $password !== '') {
+      $options[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC;
+      $options[CURLOPT_USERPWD] = $username . ':' . $password;
+    }
+    curl_setopt_array($curl, $options);
+    $bytes = curl_exec($curl);
+    $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    curl_close($curl);
+    return $status === 200 && is_string($bytes) && str_starts_with($bytes, '%PDF-') ? $bytes : null;
   }
 
   private static function inlineConfiguredLogo(string $content): string

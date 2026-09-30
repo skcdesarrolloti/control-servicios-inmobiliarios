@@ -19020,25 +19020,17 @@
       var safeTitle = escHtml(title || "Cotización de mantenimiento");
       var sheet = document.querySelector('link[href*="04-dashboard-pending.css"]');
       var stylesheetUrl = sheet ? sheet.href : new URL("assets/css/admin/04-dashboard-pending.css", window.location.href).href;
+      var printStylesheet = new URL("../quote-print.css", stylesheetUrl);
+      printStylesheet.search = new URL(stylesheetUrl).search;
+      var printStylesheetUrl = printStylesheet.href;
       return (
         '<!doctype html><html lang="es"><head><meta charset="utf-8">' +
         '<meta name="viewport" content="width=device-width,initial-scale=1">' +
         '<title>' + safeTitle + '</title>' +
         '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">' +
         '<link rel="stylesheet" href="' + escHtml(stylesheetUrl) + '">' +
-        '<style>@page{size:A4;margin:10mm}html,body{margin:0;background:#fff!important;font-family:Poppins,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
-        '.scm-cotizacion-native-print-root{width:100%;max-width:980px;margin:0 auto;padding:0;background:#fff}' +
-        '.scm-cotizacion-native-doc{box-shadow:none!important;margin:0 auto}' +
-        '.scm-cotizacion-native-brand,.scm-cotizacion-native-hero-bottom{display:flex!important}' +
-        '.scm-cotizacion-native-summary{grid-template-columns:repeat(4,minmax(0,1fr))!important}' +
-        '.scm-cotizacion-native-two-col{grid-template-columns:repeat(2,minmax(0,1fr))!important}' +
-        '.scm-cotizacion-damage-head{grid-template-columns:repeat(4,minmax(0,1fr))!important}' +
-        '.scm-cotizacion-native-footer{grid-template-columns:repeat(3,minmax(0,1fr))!important}' +
-        '.scm-cotizacion-native-number,.scm-cotizacion-native-state{text-align:right!important}' +
-        '.scm-cotizacion-native-doc,.scm-cotizacion-damage-card,.scm-cotizacion-budget-block,.scm-cotizacion-table-wrap{overflow:visible!important}' +
-        '.scm-cotizacion-native-section,.scm-cotizacion-damage-card,.scm-cotizacion-budget-block,.scm-cotizacion-table-wrap{break-inside:auto!important}' +
-        '.scm-cotizacion-native-summary>div,.scm-cotizacion-budget-table tr,.scm-cotizacion-media-item,.scm-cotizacion-native-footer>div{break-inside:avoid-page}' +
-        '</style></head><body><main class="scm-cotizacion-native-modal"><div class="scm-cotizacion-native-print-root">' +
+        '<link rel="stylesheet" href="' + escHtml(printStylesheetUrl) + '">' +
+        '</head><body><main class="scm-cotizacion-native-modal"><div class="scm-cotizacion-native-print-root">' +
         contentHtml + '</div></main>' +
         (autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){window.focus();window.print();},450);});<\/script>' : '') +
         '</body></html>'
