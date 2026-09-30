@@ -5154,7 +5154,7 @@ trait RendersDashboard
 
     $html = '<article class="scm-cotizacion-native-doc" data-cotizacion-print-title="Cotización #' . esc_attr($id) . '">';
     $html .= '<header class="scm-cotizacion-native-hero">';
-    $html .= '<div class="scm-cotizacion-native-brand"><div class="scm-cotizacion-native-logo"><img src="' . esc_attr($logo) . '" alt="SKC SuCasa Inmobiliaria"><strong>SKC SuCasa Inmobiliaria</strong><span>Control Servicios Inmobiliarios</span></div><div class="scm-cotizacion-native-number"><span>Cotización de mantenimiento</span><strong>#' . esc_html($id !== '' ? $id : '-') . '</strong></div></div>';
+    $html .= '<div class="scm-cotizacion-native-brand"><div class="scm-cotizacion-native-logo"><img src="' . esc_attr($logo) . '" alt="SKC SuCasa Inmobiliaria"></div><div class="scm-cotizacion-native-number"><span>Cotización de mantenimiento</span><strong>#' . esc_html($id !== '' ? $id : '-') . '</strong></div></div>';
     $html .= '<div class="scm-cotizacion-native-hero-bottom"><div><p class="scm-cotizacion-native-eyebrow">Documento comercial</p><h2>Cotización de mantenimiento para revisión ' . esc_html($tipo !== '' ? strtolower($this->cotizacion_clean_text($tipo)) : 'de mantenimiento') . '</h2></div><div class="scm-cotizacion-native-state"><span class="' . ($enviada ? 'is-sent' : 'is-pending') . '">' . esc_html($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><strong>' . esc_html($estado !== '' ? $this->cotizacion_clean_text($estado) : 'Sin estado') . '</strong><em>Total ' . esc_html($totalCotizacion) . '</em></div></div>';
     $html .= '</header>';
 

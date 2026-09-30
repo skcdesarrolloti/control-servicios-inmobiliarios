@@ -13611,44 +13611,29 @@
 }
 
 .scm-cotizacion-native-logo {
-  display: grid;
-  grid-template-columns: auto 1fr;
+  display: flex;
   align-items: center;
-  column-gap: 14px;
-  min-width: min(430px, 100%);
+  justify-content: center;
+  width: min(430px, 100%);
+  min-height: 86px;
   padding: 12px 16px;
   border-radius: 18px;
-  background: #fff;
-  color: #061d49;
+  background: #092859;
+  color: #fff;
   box-shadow: 0 18px 36px rgba(8, 34, 71, 0.16);
 }
 
 .scm-cotizacion-native-logo img {
-  grid-row: span 2;
-  width: 82px !important;
-  max-width: 82px !important;
-  max-height: 58px !important;
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 62px !important;
   padding: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-}
-
-.scm-cotizacion-native-logo strong {
-  margin: 0;
-  color: #061d49;
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: -0.03em;
-}
-
-.scm-cotizacion-native-logo span {
-  color: #64748b;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .scm-cotizacion-native-number {

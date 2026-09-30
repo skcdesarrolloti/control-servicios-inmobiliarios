@@ -26,7 +26,7 @@ Aplicación PHP para administrar tickets, mantenimientos, PQR, revisiones preven
 - MySQL/MariaDB y acceso al esquema existente de la aplicación.
 - Composer para instalar herramientas de desarrollo.
 
-Para que el PDF de cotización de mantenimiento conserve el diseño de la vista HTML, instala Chromium, Google Chrome o Microsoft Edge en el servidor PHP. Si el ejecutable no está en una ruta estándar, configura `SCM_CHROMIUM_BIN` con su ruta absoluta. Cuando no está disponible, el envío sigue funcionando con el PDF básico de respaldo.
+Para generar y enviar el PDF de cotización de mantenimiento con el diseño de la vista HTML, instala Chromium, Google Chrome o Microsoft Edge en el servidor PHP. Si el ejecutable no está en una ruta estándar, configura `SCM_CHROMIUM_BIN` con su ruta absoluta. El envío se detiene con un mensaje claro cuando no se puede generar ese PDF; ya no se adjunta un diseño diferente.
 
 ## Instalación
 

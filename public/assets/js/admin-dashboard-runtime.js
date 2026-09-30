@@ -151,7 +151,6 @@
     var actionCotizacionOrderContext = actions.cotizacion_order_context || "";
     var actionCotizacionOrderSave = actions.cotizacion_order_save || "";
     var actionCotizacionOrderResponse = actions.cotizacion_order_response || "";
-    var actionCotizacionPdf = actions.cotizacion_pdf || "";
     var actionCotizacionOrderPdf = actions.cotizacion_order_pdf || "";
     var actionSendCotizacion = actions.send_cotizacion || "";
     var actionActivateTicket = actions.activate_ticket || "";
@@ -19028,9 +19027,17 @@
         '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">' +
         '<link rel="stylesheet" href="' + escHtml(stylesheetUrl) + '">' +
         '<style>@page{size:A4;margin:10mm}html,body{margin:0;background:#fff!important;font-family:Poppins,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
-        '.scm-cotizacion-native-print-root{max-width:980px;margin:0 auto;padding:0;background:#fff}' +
+        '.scm-cotizacion-native-print-root{width:100%;max-width:980px;margin:0 auto;padding:0;background:#fff}' +
         '.scm-cotizacion-native-doc{box-shadow:none!important;margin:0 auto}' +
-        '.scm-cotizacion-native-section,.scm-cotizacion-damage-card,.scm-cotizacion-budget-block,.scm-cotizacion-table-wrap,.scm-cotizacion-native-footer{break-inside:avoid-page}' +
+        '.scm-cotizacion-native-brand,.scm-cotizacion-native-hero-bottom{display:flex!important}' +
+        '.scm-cotizacion-native-summary{grid-template-columns:repeat(4,minmax(0,1fr))!important}' +
+        '.scm-cotizacion-native-two-col{grid-template-columns:repeat(2,minmax(0,1fr))!important}' +
+        '.scm-cotizacion-damage-head{grid-template-columns:repeat(4,minmax(0,1fr))!important}' +
+        '.scm-cotizacion-native-footer{grid-template-columns:repeat(3,minmax(0,1fr))!important}' +
+        '.scm-cotizacion-native-number,.scm-cotizacion-native-state{text-align:right!important}' +
+        '.scm-cotizacion-native-doc,.scm-cotizacion-damage-card,.scm-cotizacion-budget-block,.scm-cotizacion-table-wrap{overflow:visible!important}' +
+        '.scm-cotizacion-native-section,.scm-cotizacion-damage-card,.scm-cotizacion-budget-block,.scm-cotizacion-table-wrap{break-inside:auto!important}' +
+        '.scm-cotizacion-native-summary>div,.scm-cotizacion-budget-table tr,.scm-cotizacion-media-item,.scm-cotizacion-native-footer>div{break-inside:avoid-page}' +
         '</style></head><body><main class="scm-cotizacion-native-modal"><div class="scm-cotizacion-native-print-root">' +
         contentHtml + '</div></main>' +
         (autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){window.focus();window.print();},450);});<\/script>' : '') +
@@ -19049,68 +19056,12 @@
       printWin.document.close();
     }
 
-    function downloadCotizacionPdf(cotizacionId, button) {
-      if (!ajaxUrl || !actionCotizacionPdf || !cotizacionId) {
-        showToast("error", "No se pudo generar el PDF de la cotización.");
+    function downloadCotizacionPdf(cotizacionId, contentHtml) {
+      if (!contentHtml) {
+        showToast("error", "No se encontró la vista de la cotización.");
         return;
       }
-      var originalText = button ? button.textContent : "";
-      if (button) {
-        button.disabled = true;
-        button.textContent = "Generando...";
-      }
-      var formData = new FormData();
-      formData.append("action", actionCotizacionPdf);
-      formData.append("nonce", nonce);
-      formData.append("id_cotizacion", cotizacionId);
-      fetch(ajaxUrl, {
-        method: "POST",
-        body: formData,
-        credentials: "same-origin",
-      })
-        .then(function (response) {
-          var contentType = response.headers.get("content-type") || "";
-          if (!response.ok || contentType.indexOf("application/pdf") === -1) {
-            return response.text().then(function (text) {
-              var message = "No se pudo generar el PDF.";
-              try {
-                var json = JSON.parse(text);
-                message =
-                  (json && json.data && json.data.message) ||
-                  json.message ||
-                  message;
-              } catch (ignore) {
-                if (text) {
-                  message = text.replace(/<[^>]+>/g, " ").trim() || message;
-                }
-              }
-              throw new Error(message);
-            });
-          }
-          return response.blob();
-        })
-        .then(function (blob) {
-          var url = URL.createObjectURL(blob);
-          var link = document.createElement("a");
-          link.href = url;
-            link.download = "cotizacion-mantenimiento-" + cotizacionId + ".pdf";
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          setTimeout(function () {
-            URL.revokeObjectURL(url);
-          }, 1500);
-          showToast("success", "PDF de la cotización generado.");
-        })
-        .catch(function (err) {
-          showToast("error", err.message || "No se pudo generar el PDF.");
-        })
-        .finally(function () {
-          if (button) {
-            button.disabled = false;
-            button.textContent = originalText || "Generar PDF";
-          }
-        });
+      openCotizacionPrintWindow("Cotización #" + cotizacionId, contentHtml, true);
     }
 
     function downloadCotizacionOrderPdf(orderId, button) {
@@ -19384,7 +19335,7 @@
           '<div class="scm-cotizacion-native-toolbar-heading"><span>Cotización de mantenimiento</span><strong>#' + escHtml(cotizacionId || "-") + "</strong></div>" +
           '<div class="scm-cotizacion-native-toolbar-actions">' +
           '<button type="button" class="scm-cotizacion-tool-btn" data-scm-cotizacion-open-large><span class="material-symbols-outlined" aria-hidden="true">open_in_new</span> Ampliar</button>' +
-          '<button type="button" class="scm-cotizacion-tool-btn is-primary" data-scm-cotizacion-print><span class="material-symbols-outlined" aria-hidden="true">download</span> Descargar PDF</button>' +
+          '<button type="button" class="scm-cotizacion-tool-btn is-primary" data-scm-cotizacion-print><span class="material-symbols-outlined" aria-hidden="true">print</span> Imprimir / guardar PDF</button>' +
           "</div></div>" +
           '<div class="scm-cotizacion-native-scroll"><div class="scm-cotizacion-native-print-root">' +
           content +
@@ -19409,7 +19360,7 @@
           }
           var printButton = popup.querySelector("[data-scm-cotizacion-print]");
           if (printButton) printButton.addEventListener("click", function () {
-            downloadCotizacionPdf(cotizacionId, printButton);
+            downloadCotizacionPdf(cotizacionId, printRoot ? printRoot.innerHTML : content);
           });
         },
       });
