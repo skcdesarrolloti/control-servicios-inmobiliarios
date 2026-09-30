@@ -3012,6 +3012,12 @@
       }
       var form = body.querySelector("[data-acta-create]");
       if (form) {
+        var sequence = Array.from(form.querySelectorAll("[data-acta-item]"))
+          .reduce(function (next, item) {
+            var field = item.querySelector("[name$='[damage]']");
+            var match = field && field.name.match(/^items\[(\d+)\]/);
+            return match ? Math.max(next, Number(match[1]) + 1) : next;
+          }, 0);
         var signer = form.querySelector("[data-acta-signer]");
         signer.addEventListener("change", function () {
           var option = signer.selectedOptions[0];

@@ -6,7 +6,11 @@
 
   var form = root.querySelector("[data-acta-create]");
   var busy = false;
-  var sequence = root.querySelectorAll("[data-acta-item]").length || 1;
+  var sequence = Array.from(root.querySelectorAll("[data-acta-item]")).reduce(function (next, item) {
+    var field = item.querySelector("[name$='[damage]']");
+    var match = field && field.name.match(/^items\[(\d+)\]/);
+    return match ? Math.max(next, Number(match[1]) + 1) : next;
+  }, 0);
   var MAX_PHOTOS_PER_DAMAGE = 4;
   var MAX_PHOTOS_PER_ACT = 12;
   var MAX_SOURCE_PHOTO_BYTES = 25 * 1024 * 1024;
