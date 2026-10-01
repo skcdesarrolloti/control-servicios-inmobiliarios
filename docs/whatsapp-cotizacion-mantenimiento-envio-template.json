@@ -14,7 +14,7 @@
     },
     {
       "type": "BODY",
-      "text": "Buen día, {{1}}.\n\nTe compartimos la cotización de mantenimiento #{{2}} del caso #{{3}} por {{4}}.\n\nContrato: #{{5}}.\nDirección: {{6}}.\n\nPuedes ver el PDF adjunto y responder la cotización desde el botón.\n\nAtentamente,\n{{7}}\nSKC SuCasa Inmobiliaria",
+      "text": "Buen día, {{1}}.\n\nTe compartimos la cotización de mantenimiento #{{2}} del caso #{{3}} por {{4}}.\n\nContrato: #{{5}}.\nDirección: {{6}}.\n\nPuedes ver el PDF adjunto y responder la cotización desde el botón.\n\nAtentamente,\n{{7}}",
       "example": {
         "body_text": [
           [
@@ -28,6 +28,10 @@
           ]
         ]
       }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
     },
     {
       "type": "BUTTONS",

@@ -7,7 +7,7 @@ En Meta Business Suite abre **Administrador de WhatsApp → Plantillas de mensaj
 - Idioma: **Español (Colombia)** (`es_CO`).
 - Variables: **numéricas**.
 - Encabezado: ninguno. Esta notificación no lleva PDF adjunto.
-- Pie de página: ninguno; la empresa ya está incluida en el cuerpo.
+- Pie de página de Meta: `SKC SuCasa Inmobiliaria`.
 
 ## Cuerpo para copiar
 
@@ -22,8 +22,6 @@ Contrato: {{6}} · Inmueble SIMI: {{7}}.
 Detalle: {{8}}.
 
 Puedes consultar la cotización desde el botón.
-
-SKC SuCasa Inmobiliaria
 ```
 
 ## Ejemplos de variables
@@ -62,8 +60,8 @@ En las plantillas que cierran con **Atentamente**, el sistema envía en la varia
 
 Se completaron las firmas del envío de cotizaciones, órdenes de mantenimiento, comunicaciones preventivas, seguimientos de reparaciones, reembolsos de servicios y cartas de aumento. Las administrativas, cobranza, terminación y no prórroga ya resuelven esos datos. La revisión correctiva pública y el PDF del liquidador también disponen de cargo y contacto en su cierre.
 
-Estas correcciones conservan los nombres y cantidades de variables de las plantillas existentes. No requieren recrear las aprobadas en Meta. Completa el cargo y teléfono del funcionario en su registro: el sistema no inventa datos ausentes. En las cartas de aumento se utiliza la identidad del coordinador contractual.
+Las firmas conservan los nombres y cantidades de variables de las plantillas existentes. El nombre de la empresa se coloca únicamente en el pie de página de Meta. Si una plantilla aprobada todavía lo tiene en el cuerpo, retíralo allí y agrégalo al pie de página al editarla en Meta; verifica su aprobación antes de usarla. Completa el cargo y teléfono del funcionario en su registro: el sistema no inventa datos ausentes. En las cartas de aumento se utiliza la identidad del coordinador contractual.
 
-La plantilla de **respuesta** anterior es un aviso automático de la decisión del destinatario, por lo que cierra con la empresa y no firma en nombre de un funcionario.
+La plantilla de **respuesta** anterior es un aviso automático de la decisión del destinatario, por lo que no firma en nombre de un funcionario. La empresa aparece en el pie de página de Meta.
 
 Referencia oficial: [Plantillas de Meta WhatsApp Business Platform](https://www.postman.com/meta/whatsapp-business-platform/folder/lczy75a/templates).

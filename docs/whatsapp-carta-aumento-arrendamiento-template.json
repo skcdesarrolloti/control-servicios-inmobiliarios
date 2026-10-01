@@ -14,7 +14,7 @@
     },
     {
       "type": "BODY",
-      "text": "Hola {{1}}.\n\nSe generó la carta de aumento de {{2}} del contrato #{{3}}, inmueble #{{4}}, ubicado en {{5}}.\n\nTe compartimos el PDF adjunto para tu consulta.\n\nAtentamente,\n{{6}}\nSKC SuCasa Inmobiliaria.",
+      "text": "Hola {{1}}.\n\nSe generó la carta de aumento de {{2}} del contrato #{{3}}, inmueble #{{4}}, ubicado en {{5}}.\n\nTe compartimos el PDF adjunto para tu consulta.\n\nAtentamente,\n{{6}}",
       "example": {
         "body_text": [
           [
@@ -27,6 +27,10 @@
           ]
         ]
       }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
     }
   ]
 }

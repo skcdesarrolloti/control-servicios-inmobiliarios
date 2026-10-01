@@ -2901,7 +2901,7 @@ trait HandlesMaintenanceActions
       $message .= "Dirección: " . ($direccionRef !== '' ? $direccionRef : '-') . ".\n\n";
       $message .= "Puedes ver el PDF adjunto y responder la cotización desde el botón.\n\n";
       $message .= "Enlace directo: {$quoteUrl}\n\n";
-      $message .= "Atentamente,\n{$actorSignature}\nSKC SuCasa Inmobiliaria";
+      $message .= "Atentamente,\n{$actorSignature}";
       $whatsappOk = $smsQueue->enqueue($whatsappPhone, $destinatario, $message, [
         'source_module' => 'cotizaciones_mantenimiento_envio',
         'campaign_tag' => 'cotizaciones_mantenimiento_envio',
@@ -4075,7 +4075,7 @@ trait HandlesMaintenanceActions
       $message .= "Dirección: {$direction}.\n\n";
       $message .= "Puedes revisar y responder la orden desde el botón.\n\n";
       $message .= "Enlace directo: {$orderUrl}\n\n";
-      $message .= "Atentamente,\n{$actor}\nSKC SuCasa Inmobiliaria";
+      $message .= "Atentamente,\n{$actor}";
       $ok = $smsQueue->enqueue($phone, $name, $message, [
         'source_module' => 'ordenes_mantenimiento',
         'campaign_tag' => 'ordenes_mantenimiento',

@@ -445,7 +445,7 @@ final class PublicServicesLiquidatorService
       . ', inmueble #' . (string) ($context['inmueble'] ?? $context['id_inmueble'] ?? '')
       . ', periodo ' . (string) ($context['periodo'] ?? '')
       . '. Documento: ' . (string) ($document['url'] ?? '')
-      . "\n\nAtentamente,\n" . $this->signatureLine($context) . "\nSKC SuCasa Inmobiliaria";
+      . "\n\nAtentamente,\n" . $this->signatureLine($context);
   }
 
   /** @param array<string,mixed> $context */

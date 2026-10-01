@@ -300,7 +300,7 @@ final class PublicServicesLiquidatorView
               <span class="material-symbols-outlined">chat</span>
               <strong>Plantilla oficial WhatsApp</strong>
               <p>Crea en Meta una plantilla de utilidad llamada <code>scm_liquidador_servicios_reembolso_v1</code>, idioma <code>es_CO</code>, con encabezado tipo documento para adjuntar el PDF generado.</p>
-              <p class="scm-psl-template-copy">Buen día, {{1}}.<br><br>Compartimos {{2}} del contrato #{{3}}, inmueble #{{4}}, correspondiente al periodo {{5}}.<br><br>Puedes consultar el PDF adjunto. Enlace de respaldo: {{6}}<br><br>Atentamente,<br>{{7}}<br>SKC SuCasa Inmobiliaria.</p>
+              <p class="scm-psl-template-copy">Buen día, {{1}}.<br><br>Compartimos {{2}} del contrato #{{3}}, inmueble #{{4}}, correspondiente al periodo {{5}}.<br><br>Puedes consultar el PDF adjunto. Enlace de respaldo: {{6}}<br><br>Atentamente,<br>{{7}}</p>
             </article>
             <article>
               <span class="material-symbols-outlined">mail</span>

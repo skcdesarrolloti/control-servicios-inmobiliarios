@@ -6,7 +6,7 @@
   "components": [
     {
       "type": "BODY",
-      "text": "Buen día, {{1}}.\n\nTienes una orden de mantenimiento #{{2}} pendiente por aprobar del caso #{{3}} por {{4}}.\n\nCategoría: {{5}}.\nProveedor: {{6}}.\nDirección: {{7}}.\n\nPuedes revisar y responder la orden desde el botón.\n\nAtentamente,\n{{8}}\nSKC SuCasa Inmobiliaria",
+      "text": "Buen día, {{1}}.\n\nTienes una orden de mantenimiento #{{2}} pendiente por aprobar del caso #{{3}} por {{4}}.\n\nCategoría: {{5}}.\nProveedor: {{6}}.\nDirección: {{7}}.\n\nPuedes revisar y responder la orden desde el botón.\n\nAtentamente,\n{{8}}",
       "example": {
         "body_text": [
           [
@@ -21,6 +21,10 @@
           ]
         ]
       }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
     },
     {
       "type": "BUTTONS",

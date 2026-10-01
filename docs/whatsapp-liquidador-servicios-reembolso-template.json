@@ -14,7 +14,7 @@
     },
     {
       "type": "BODY",
-      "text": "Buen dia, {{1}}.\n\nCompartimos {{2}} del contrato #{{3}}, inmueble #{{4}}, correspondiente al periodo {{5}}.\n\nPuedes consultar el PDF adjunto. Enlace de respaldo: {{6}}\n\nAtentamente,\n{{7}}\nSKC SuCasa Inmobiliaria.",
+      "text": "Buen dia, {{1}}.\n\nCompartimos {{2}} del contrato #{{3}}, inmueble #{{4}}, correspondiente al periodo {{5}}.\n\nPuedes consultar el PDF adjunto. Enlace de respaldo: {{6}}\n\nAtentamente,\n{{7}}",
       "example": {
         "body_text": [
           [
@@ -28,6 +28,10 @@
           ]
         ]
       }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
     }
   ]
 }

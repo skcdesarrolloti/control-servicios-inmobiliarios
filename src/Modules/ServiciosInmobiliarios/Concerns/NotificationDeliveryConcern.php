@@ -310,7 +310,7 @@ trait NotificationDeliveryConcern
         $message .= "Generamos la comunicacion de seguimiento de reparaciones No. {$attempt} porque la cotizacion #{$quoteId} del ticket #{$logicalTicket} sigue sin respuesta despues de {$elapsedDays} dias.\n\n";
         $message .= "Puedes consultar el documento en el boton.\n\n";
         $message .= "Enlace directo: {$noticeUrl}\n\n";
-        $message .= "Atentamente,\n{$userName}\nSKC SuCasa Inmobiliaria";
+        $message .= "Atentamente,\n{$userName}";
 
         $smsQueue = new \SCM\Support\SmsQueue($this->db);
         $ok = $smsQueue->enqueue($recipientPhone, $recipientName, $message, [
