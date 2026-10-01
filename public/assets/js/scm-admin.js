@@ -2577,6 +2577,8 @@
     if (!sub || !root) return;
     var runtime = parseRuntime(root) || {};
     var body = sub.querySelector(".scm-case-submodal-body");
+    sub._scmActaOnClose = caseBtn._scmActaOnClose || null;
+    caseBtn._scmActaOnClose = null;
     var actaRun = (sub._scmActaRun || 0) + 1;
     sub._scmActaRun = actaRun;
     sub.querySelector(".scm-case-submodal-title").textContent =
@@ -2623,6 +2625,9 @@
         .addEventListener("click", function () {
           if (sub.querySelector(".scm-acta") && sub._scmActaReturnFocus)
             sub._scmActaReturnFocus.focus();
+          var onClose = sub._scmActaOnClose;
+          sub._scmActaOnClose = null;
+          if (typeof onClose === "function") onClose();
         });
     }
 
@@ -2648,7 +2653,7 @@
       data.set("ticket_pk", caseBtn.dataset.ticketPk || "");
       data.set("operation", operation);
       if (
-        ["read", "create"].includes(operation) &&
+        ["read", "create", "update", "resend", "cancel", "archive", "delete"].includes(operation) &&
         String(caseBtn.dataset.cotizacionId || "").trim() &&
         String(caseBtn.dataset.cotEstado || "")
           .trim()
@@ -3194,6 +3199,14 @@
         link.addEventListener("click", function (event) {
           event.preventDefault();
           openIframeModal(link.href, "Acta de satisfacción");
+        });
+      });
+      body.querySelectorAll("[data-acta-edit]").forEach(function (link) {
+        link.addEventListener("click", function (event) {
+          event.preventDefault();
+          var fd = new FormData();
+          fd.set("act_id", link.dataset.actaEdit);
+          request("read", fd);
         });
       });
       body.querySelectorAll("[data-acta-resend]").forEach(function (button) {

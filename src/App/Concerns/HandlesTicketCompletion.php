@@ -41,7 +41,7 @@ trait HandlesTicketCompletion
       $sourceFlow = trim((string) ($_POST['source_flow'] ?? '')) === 'approved_quote'
         ? ['flow' => 'approved_quote', 'quote_id' => trim((string) ($_POST['source_cotizacion_id'] ?? $_POST['id_cotizacion'] ?? ''))]
         : [];
-      if (($_POST['operation'] ?? '') === 'update') {
+      if ((int) ($_POST['act_id'] ?? 0) > 0 && in_array((string) ($_POST['operation'] ?? 'read'), ['read', 'update', 'resend', 'cancel', 'archive', 'delete'], true)) {
         $existingRepo = new CompletionRepository($this->db);
         $existingAct = $existingRepo->act((int) ($_POST['act_id'] ?? 0));
         if ((int) $existingAct['ticket_pk'] !== $ticketId) throw new \DomainException('El acta no pertenece al ticket seleccionado.');
@@ -288,7 +288,7 @@ trait HandlesTicketCompletion
         throw new \DomainException('Operación de acta no válida.');
       }
       $view = new CompletionView(fn(int $index, array $item): string => $this->correctiveReviewActaItem($index, $item));
-      $this->jsonOk($result + ['html' => $view->panel($service->context($ticketId, $sourceFlow), $service, 0, true, $this->canDeleteAnyTicketCompletionActs())]);
+      $this->jsonOk($result + ['html' => $view->panel($service->context($ticketId, $sourceFlow), $service, $operation === 'read' ? (int) ($_POST['act_id'] ?? 0) : 0, true, $this->canDeleteAnyTicketCompletionActs())]);
     } catch (\DomainException $error) {
       $this->jsonFail($error->getMessage());
     }

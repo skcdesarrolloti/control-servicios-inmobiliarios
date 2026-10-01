@@ -19356,7 +19356,7 @@
         if (cotizacionId) {
           return loadCotizacionCardById(cotizacionId)
             .then(function (loadedCard) {
-              return openCotizacionActaFromCard(loadedCard);
+              return openCotizacionActaFromCard(loadedCard, options);
             })
             .catch(function (err) {
               showToast("error", err.message || "No se pudo cargar la cotización para crear el acta.");
@@ -19384,6 +19384,7 @@
         caseButton.setAttribute("data-cotizacion-id", cotizacionId);
       }
       caseButton.setAttribute("data-cot-estado", "Aprobada");
+      caseButton._scmActaOnClose = options.onClose || null;
       window.scmOpenCase(caseButton);
       if (options.closeCurrentSwal && window.Swal && window.Swal.isVisible && window.Swal.isVisible()) {
         window.Swal.close();
@@ -20200,11 +20201,11 @@
                   return;
                 }
                 var quoteActaBtn = event.target && event.target.closest
-                  ? event.target.closest("[data-scm-create-cotizacion-acta]")
+                  ? event.target.closest("[data-scm-create-cotizacion-acta], [data-scm-manage-cotizacion-acta]")
                   : null;
                 if (quoteActaBtn) {
                   event.preventDefault();
-                  openCotizacionActaFromCard(quoteActaBtn, { closeCurrentSwal: true });
+                  openCotizacionActaFromCard(quoteActaBtn, { closeCurrentSwal: true, onClose: makeCaseCotizacionesReturn(button) });
                   return;
                 }
                 var actionBtn = event.target && event.target.closest
@@ -20552,7 +20553,7 @@
 
       var createCotizacionActaBtn =
         e.target && e.target.closest
-          ? e.target.closest("[data-scm-create-cotizacion-acta]")
+          ? e.target.closest("[data-scm-create-cotizacion-acta], [data-scm-manage-cotizacion-acta]")
           : null;
       if (createCotizacionActaBtn) {
         e.preventDefault();

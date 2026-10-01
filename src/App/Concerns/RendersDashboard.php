@@ -4562,46 +4562,41 @@ trait RendersDashboard
       return $empty;
     }
 
+    $legacyTable = $this->db->table('jet_cct_actas_de_satisfaccion');
+    $legacyIds = array_values(array_filter(array_map('trim', explode(',', $legacyActId)), static fn(string $id): bool => ctype_digit($id) && (int) $id > 0));
     $table = $this->db->table('scm_ticket_completion_acts');
-    if (!$this->table_exists($table)) {
-      return $legacyActId !== ''
-        ? ['url' => self::DEFAULT_ACTA_URL . rawurlencode($legacyActId), 'status' => 'legacy', 'id' => (int) $legacyActId]
-        : $empty;
+    if ($this->table_exists($table)) {
+      $conditions = [];
+      $params = [];
+      if ($cotizacionId !== '') {
+        $conditions[] = "JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.source.quote_id')) = ?";
+        $params[] = $cotizacionId;
+      }
+      if ($legacyIds !== []) {
+        $conditions[] = 'legacy_act_id IN (' . implode(',', array_fill(0, count($legacyIds), '?')) . ')';
+        array_push($params, ...$legacyIds);
+      }
+      if ($conditions !== []) {
+        $where = '(' . implode(' OR ', $conditions) . ')';
+        if ($ticketPk !== '' && ctype_digit($ticketPk)) {
+          $where .= ' AND ticket_pk = ?';
+          $params[] = (int) $ticketPk;
+        }
+        $row = $this->db->getRow("SELECT id, status FROM `{$table}` WHERE {$where} ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'signed' THEN 1 ELSE 2 END, COALESCE(signed_at, created_at) DESC, id DESC LIMIT 1", $params);
+        if (is_array($row) && (int) ($row['id'] ?? 0) > 0) {
+          return ['url' => rtrim((string) SCM_BASE_URL, '/') . '/ticket-acta.php?id=' . (int) $row['id'], 'status' => (string) $row['status'], 'id' => (int) $row['id']];
+        }
+      }
     }
-
-    $conditions = [];
-    $params = [];
-    if ($legacyActId !== '') {
-      $conditions[] = 'legacy_act_id = ?';
-      $params[] = (int) $legacyActId;
+    // Old references are not evidence that a document still exists.
+    if ($legacyIds !== [] && $this->table_exists($legacyTable)) {
+      foreach (array_reverse($legacyIds) as $legacyId) {
+        if ($this->db->getRow("SELECT _ID FROM `{$legacyTable}` WHERE _ID = ?", [(int) $legacyId])) {
+          return ['url' => self::DEFAULT_ACTA_URL . rawurlencode($legacyId), 'status' => 'legacy', 'id' => (int) $legacyId];
+        }
+      }
     }
-    if ($cotizacionId !== '') {
-      $conditions[] = "JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.source.quote_id')) = ?";
-      $params[] = $cotizacionId;
-    }
-    if ($ticketPk !== '' && ctype_digit($ticketPk)) {
-      $conditions[] = 'ticket_pk = ?';
-      $params[] = (int) $ticketPk;
-    }
-    if ($conditions === []) {
-      return $empty;
-    }
-
-    $row = $this->db->getRow(
-      "SELECT id, status FROM `{$table}` WHERE (" . implode(' OR ', $conditions) . ") ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'signed' THEN 1 ELSE 2 END, COALESCE(signed_at, created_at) DESC, id DESC LIMIT 1",
-      $params
-    );
-    if (is_array($row) && (int) ($row['id'] ?? 0) > 0) {
-      return [
-        'url' => rtrim((string) SCM_BASE_URL, '/') . '/ticket-acta.php?id=' . (int) $row['id'],
-        'status' => (string) ($row['status'] ?? ''),
-        'id' => (int) $row['id'],
-      ];
-    }
-
-    return $legacyActId !== ''
-      ? ['url' => self::DEFAULT_ACTA_URL . rawurlencode($legacyActId), 'status' => 'legacy', 'id' => (int) $legacyActId]
-      : $empty;
+    return $empty;
   }
 
   /** @param array<int,array<string,mixed>> $rows */
@@ -4813,7 +4808,8 @@ trait RendersDashboard
       . ($seguimientoReparacionesDisponible ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-repair-followup-notice data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '" data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '">Seguimiento reparaciones</button>' : '')
       . ($cotizacionAprobada && $canQuoteOrderCreate && $this->maintenance_order_has_balance($row) ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-add-cotizacion-order data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir orden</button>' : '')
       . ($cotizacionAprobada && $canQuoteOrderCreate && !$this->maintenance_order_has_balance($row) ? '<button type="button" class="scm-case-work-btn" disabled title="No hay saldo disponible en ninguna categor&iacute;a">Sin saldo para nuevas órdenes</button>' : '')
-      . ($actaInfo['url'] !== '' ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-iframe data-iframe-url="' . esc_attr($actaInfo['url']) . '" data-iframe-title="Acta de satisfacci&oacute;n">Ver acta' . ($actaInfo['status'] === 'pending' ? ' pendiente' : '') . '</button>' : '')
+      . ($actaInfo['url'] !== '' && $actaInfo['status'] !== 'legacy' && $canQuoteActaCreate ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-manage-cotizacion-acta data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Gestionar acta · ' . esc_html(['pending' => 'Sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada'][$actaInfo['status']] ?? $actaInfo['status']) . '</button>' : '')
+      . ($actaInfo['url'] !== '' && ($actaInfo['status'] === 'legacy' || !$canQuoteActaCreate) ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-iframe data-iframe-url="' . esc_attr($actaInfo['url']) . '" data-iframe-title="Acta de satisfacci&oacute;n">Ver acta' . ($actaInfo['status'] === 'pending' ? ' pendiente' : '') . '</button>' : '')
       . ($cotizacionAprobada && $canQuoteActaCreate && $actaInfo['url'] === '' ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-create-cotizacion-acta data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Crear acta de cotizaci&oacute;n</button>' : '')
       . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div>' . $orderDetailsHtml
       . '<template class="scm-cotizacion-native-source" data-scm-cotizacion-native-view>' . $nativeCotizacionHtml . '</template>'

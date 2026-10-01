@@ -191,3 +191,10 @@
   .scm-acta-evidence, .scm-acta-photo-grid figure, .scm-acta-service-item { break-inside: avoid; }
   .scm-acta thead { display: table-header-group; }
 }
+
+.scm-acta-record > .scm-acta-meta h3 { margin: 0; }
+.scm-acta-record > .scm-acta-actions { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--acta-border); }
+.scm-acta-status { padding: 5px 12px; border-radius: 999px; background: #eff6ff; color: #1e40af; font-size: 13px; }
+.scm-acta-status[data-acta-status="pending"] { background: #fff7ed; color: #9a3412; }
+.scm-acta-status[data-acta-status="signed"] { background: #ecfdf5; color: #065f46; }
+.scm-acta-status:is([data-acta-status="archived"], [data-acta-status="cancelled"]) { background: #f1f5f9; color: #475569; }

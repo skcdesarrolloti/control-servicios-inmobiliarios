@@ -56,10 +56,10 @@ final class CompletionView
       <p class="scm-acta-notice">Documenta la solución y elige el firmante. El ticket conservará el <strong>estado de ejecución seleccionado</strong> mientras el acta queda pendiente. Puedes hacer seguimiento desde <strong>Actividades administrativas → Actas de satisfacción</strong>. Solo la firma registrará el cierre; no se creará reporte administrativo nuevo desde esta acta.</p>
       <?php if ($sourceNotice !== ''): ?><p class="scm-acta-notice"><?= self::e($sourceNotice) ?></p><?php endif; ?>
       <?php if ($editAct): ?><p class="scm-acta-notice">Estás editando el acta sin firmar #<?= self::e($editAct['id']) ?>. Al guardar se invalidan los códigos anteriores y se envía una nueva invitación.</p><?php endif; ?>
-      <div class="scm-acta-meta"><span>Ticket <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Inmueble <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>
+      <div class="scm-acta-meta"><span>Ticket <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Contrato <strong><?= self::e($ticket['contrato'] ?? '—') ?></strong> · Inmueble SIMI <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>
       <?php if ($showHistory): foreach ($context['acts'] as $act): $payload = $service->payload($act); $canDeleteAct = in_array($act['status'], ['archived', 'cancelled'], true) || $canDeleteAny; ?>
         <article class="scm-acta-record">
-          <div class="scm-acta-meta"><h3><?= $act['status'] === 'pending' ? 'Acta enviada a bandeja' : 'Registro interno #' . self::e($act['id']) ?></h3><strong class="scm-acta-status"><?= self::e(['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada'][$act['status']] ?? $act['status']) ?></strong></div>
+          <div class="scm-acta-meta"><h3>Acta de satisfacción #<?= self::e($act['id']) ?></h3><strong class="scm-acta-status" data-acta-status="<?= self::e($act['status']) ?>"><?= self::e(['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada'][$act['status']] ?? $act['status']) ?></strong></div>
           <?php if ($act['status'] === 'pending'): ?><p class="scm-acta-help">También puedes consultarla y administrarla desde <strong>Actividades administrativas → Actas de satisfacción</strong>.</p><?php endif; ?>
           <p>Firmante: <strong><?= self::e($payload['signer']['name']) ?></strong> · <?= self::e(CompletionPolicy::ROLES[$payload['signer']['role']]) ?><br><?= self::e($payload['signer']['email']) ?> · <?= self::e($payload['signer']['phone']) ?></p>
           <?php
@@ -71,10 +71,10 @@ final class CompletionView
           <?php if (in_array($act['status'], ['archived', 'cancelled'], true)): ?><p>Motivo: <?= self::e($act['cancellation_reason']) ?></p><?php endif; ?>
           <div class="scm-acta-actions"><a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id'])) ?>" target="_blank" rel="noopener" data-acta-preview>Ver acta</a>
           <?php if ($act['status'] === 'signed'): ?>
-          <a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id']) . '&format=pdf') ?>" target="_blank" rel="noopener">PDF destinatario</a>
-          <a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id']) . '&format=pdf&audience=staff') ?>" target="_blank" rel="noopener">PDF interno</a>
+          <a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id']) . '&format=pdf') ?>" target="_blank" rel="noopener" data-acta-preview>PDF destinatario</a>
+          <a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id']) . '&format=pdf&audience=staff') ?>" target="_blank" rel="noopener" data-acta-preview>PDF interno</a>
           <?php endif; ?>
-          <?php if ($act['status'] === 'pending'): ?><a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->editUrl($act)) ?>">Editar acta</a><?php endif; ?>
+          <?php if ($act['status'] === 'pending'): ?><a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->editUrl($act)) ?>" data-acta-edit="<?= self::e($act['id']) ?>">Editar acta</a><?php endif; ?>
           <?php if (in_array($act['status'], ['pending', 'signed'], true)): ?>
             <button type="button" class="scm-acta-button scm-acta-secondary" data-acta-resend="<?= self::e($act['id']) ?>"><?= $act['status'] === 'signed' ? 'Reenviar copia firmada' : 'Reenviar invitación' ?></button>
           <?php endif; ?>
@@ -237,7 +237,7 @@ final class CompletionView
       $html .= '<td class="scm-date-cell">Creada ' . self::e(date('d/m/Y H:i', (int) ($act['created_at'] ?? 0))) . (!empty($act['signed_at']) ? '<br>Firmada ' . self::e(date('d/m/Y H:i', (int) $act['signed_at'])) : '') . '</td>';
       $canDelete = in_array($status, ['archived', 'cancelled'], true) || $canDeleteAny;
       $pdfButtons = $status === 'signed'
-        ? '<a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf') . '" target="_blank" rel="noopener">PDF destinatario</a><a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf&audience=staff') . '" target="_blank" rel="noopener">PDF interno</a>'
+        ? '<a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf') . '" target="_blank" rel="noopener" data-acta-preview>PDF destinatario</a><a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf&audience=staff') . '" target="_blank" rel="noopener" data-acta-preview>PDF interno</a>'
         : '';
       $html .= '<td class="scm-pending-action-cell"><button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" data-scm-open-iframe data-iframe-url="' . self::e($url) . '" data-iframe-title="Acta de satisfacción #' . self::e($act['id']) . '" data-scm-compact-iframe>Ver acta</button>' . ($status === 'pending' ? '<a class="scm-pending-action-btn scm-pending-action-btn--blue" href="' . self::e($service->editUrl($act)) . '">Editar</a>' : '') . $pdfButtons . ($status === 'pending' ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-archive="' . self::e($act['id']) . '" data-ticket-pk="' . self::e($act['ticket_pk']) . '">Archivar</button>' : '') . ($canDelete ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-delete="' . self::e($act['id']) . '">Eliminar</button>' : '') . '</td>';
       $html .= '</tr>';
