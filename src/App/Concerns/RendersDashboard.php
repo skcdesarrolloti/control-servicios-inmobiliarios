@@ -2020,6 +2020,8 @@ trait RendersDashboard
       }
     }
     $allActionKeys = [];
+    $cargoIds = array_values(array_filter(array_map(static fn(array $cargo): string => trim((string) ($cargo['id'] ?? '')), $cargos)));
+    $selectedPermissionCargo = in_array(Auth::userCargo(), $cargoIds, true) ? Auth::userCargo() : ($cargoIds[0] ?? '');
     foreach ($actionCatalog as $group) {
       foreach (array_keys((array) ($group['items'] ?? [])) as $actionKey) {
         $allActionKeys[] = (string) $actionKey;
@@ -2040,12 +2042,18 @@ trait RendersDashboard
         </div>
         <form class="scm-permissions-form" id="scm-permissions-form">
           <div class="scm-permissions-toolbar">
-            <span>Selecciona permisos por cargo</span>
+            <label class="scm-permissions-cargo-picker" for="scm-permissions-cargo">Cargo a configurar
+              <select id="scm-permissions-cargo">
+                <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; ?>
+                  <option value="<?php echo esc_attr($cargoId); ?>" <?php selected($selectedPermissionCargo, $cargoId); ?>><?php echo esc_html((string) ($cargo['name'] ?? $cargo['label'] ?? ('Cargo ' . $cargoId))); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
             <small>Los cambios se aplican al guardar.</small>
           </div>
           <div class="scm-permissions-cards">
             <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowed = $permissions[$cargoId] ?? array_keys($tabs); $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); ?>
-              <section class="scm-permission-card" data-permission-cargo="<?php echo esc_attr($cargoId); ?>">
+              <section class="scm-permission-card" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
                 <div class="scm-permission-card-head">
                   <div>
                     <h4><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?></h4>
@@ -2088,7 +2096,7 @@ trait RendersDashboard
             </div>
             <div class="scm-permission-employee-cargos-grid">
               <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); $isSelectedCargo = isset($selectedEmployeeCargoIds[$cargoId]); ?>
-                <label class="scm-permissions-check scm-funcionario-cargo-check<?php echo $isSelectedCargo ? ' is-checked' : ''; ?>">
+                <label class="scm-permissions-check scm-funcionario-cargo-check<?php echo $isSelectedCargo ? ' is-checked' : ''; ?>" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
                   <input type="checkbox" name="employee_cargo_ids[]" value="<?php echo esc_attr($cargoId); ?>" <?php checked($isSelectedCargo); ?>>
                   <span><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?><?php if ($cargoTotal !== ''): ?> · <?php echo esc_html($cargoTotal); ?><?php endif; ?></span>
                 </label>
@@ -2105,7 +2113,7 @@ trait RendersDashboard
             </div>
             <div class="scm-permission-employee-cargos-grid">
               <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); $isSelectedPopupCargo = isset($selectedAdminDuePopupCargoIds[$cargoId]); ?>
-                <label class="scm-permissions-check scm-due-popup-cargo-check<?php echo $isSelectedPopupCargo ? ' is-checked' : ''; ?>">
+                <label class="scm-permissions-check scm-due-popup-cargo-check<?php echo $isSelectedPopupCargo ? ' is-checked' : ''; ?>" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
                   <input type="checkbox" name="admin_due_popup_cargo_ids[]" value="<?php echo esc_attr($cargoId); ?>" <?php checked($isSelectedPopupCargo); ?>>
                   <span><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?><?php if ($cargoTotal !== ''): ?> · <?php echo esc_html($cargoTotal); ?><?php endif; ?></span>
                 </label>
@@ -2123,7 +2131,7 @@ trait RendersDashboard
               </div>
               <div class="scm-permissions-cards scm-permissions-action-cards">
                 <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowedActions = array_key_exists($cargoId, $actionPermissions) ? (array) $actionPermissions[$cargoId] : $allActionKeys; $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); ?>
-                  <section class="scm-permission-card scm-permission-action-card" data-permission-cargo="<?php echo esc_attr($cargoId); ?>">
+                  <section class="scm-permission-card scm-permission-action-card" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
                     <div class="scm-permission-card-head">
                       <div>
                         <h4><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?></h4>

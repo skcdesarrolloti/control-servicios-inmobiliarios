@@ -2627,8 +2627,14 @@ trait HandlesMaintenanceActions
   public function public_cotizacion_order_funcionarios(): array
   {
     $rows = \SCM\Support\FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db));
+    $permissions = $this->dashboardActionPermissionsConfig();
     $out = [];
     foreach ($rows as $row) {
+      $cargoId = trim((string) ($row['id_cargo'] ?? ''));
+      if (array_key_exists($cargoId, $permissions)) {
+        if (in_array('quote_order_respond', $permissions[$cargoId], true)) $out[] = $row;
+        continue;
+      }
       $cargo = strtolower(trim(str_replace(
         ['á', 'é', 'í', 'ó', 'ú', 'Á', 'É', 'Í', 'Ó', 'Ú'],
         ['a', 'e', 'i', 'o', 'u', 'a', 'e', 'i', 'o', 'u'],
@@ -3364,8 +3370,9 @@ trait HandlesMaintenanceActions
   {
     $cargo = Auth::userCargo();
     $permissions = $this->dashboardActionPermissionsConfig();
-    $allowed = $this->canManageDashboardPermissions()
-      || in_array('quote_order_respond', $permissions[$cargo] ?? [], true);
+    $allowed = array_key_exists($cargo, $permissions)
+      ? in_array('quote_order_respond', $permissions[$cargo], true)
+      : $this->canManageDashboardPermissions();
     return $allowed && (
       $this->canAccessDashboardTab('cotizaciones_mantenimiento')
       || $this->canAccessDashboardTab('abiertos')

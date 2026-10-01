@@ -306,6 +306,39 @@
   font-size: 20px;
 }
 
+#scm-app #scm-permissions-form [data-permission-cargo][hidden] {
+  display: none !important;
+}
+
+#scm-app #scm-permissions-form .scm-permissions-cards {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#scm-app .scm-permissions-cargo-picker {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  color: #061d49;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#scm-app .scm-permissions-cargo-picker select {
+  width: 100%;
+  max-width: 480px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #061d49;
+  font: inherit;
+}
+
+#scm-app [data-scm-respond-cotizacion-order][hidden] {
+  display: none !important;
+}
+
 #scm-app .scm-permissions-toolbar {
   display: flex;
   align-items: center;

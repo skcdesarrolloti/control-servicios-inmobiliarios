@@ -31,6 +31,15 @@ namespace SCM\Support {
       self::$jobs[] = compact('phone', 'name', 'message', 'options'); return true;
     }
   }
+  final class FuncionarioOptions {
+    public static function activeFuncionarios($db, $schema): array {
+      return [
+        ['id'=>'1', 'name'=>'Administrador', 'id_cargo'=>'11', 'cargo'=>'Gerencia'],
+        ['id'=>'2', 'name'=>'Autorizado', 'id_cargo'=>'25', 'cargo'=>'Operaciones'],
+        ['id'=>'3', 'name'=>'Sin permiso', 'id_cargo'=>'26', 'cargo'=>'Operaciones'],
+      ];
+    }
+  }
 }
 namespace SCM\Modules\AdministrativeNotifications {
   final class AdministrativeNotificationsService {
@@ -47,6 +56,8 @@ namespace {
   define('SCM_DEFAULT_PORTAL_LOGO_URL', 'https://example.com/logo.png');
   function esc_html($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); }
   function esc_attr($v): string { return esc_html($v); }
+  function selected($a, $b, $echo = true): string { $out = (string) $a === (string) $b ? 'selected' : ''; if ($echo) echo $out; return $out; }
+  function checked($v): void { if ($v) echo 'checked'; }
   function esc_url($v): string { return (string) $v; }
   function sanitize_text_field($v): string { return trim(strip_tags((string) $v)); }
   function wp_unslash($v) { return $v; }
@@ -113,6 +124,9 @@ namespace {
     public function __construct(public MemoryDb $db) {}
     public function detail(bool $pdf = false): string { return $this->render_cotizacion_order_detail($this->db->order, $this->db->quote, $pdf); }
     public function canRespond(): bool { return $this->maintenance_order_can_respond(); }
+    public function permissionsModal(): string {
+      return $this->renderDashboardPermissionsModal(['abiertos'=>'Casos'], [['id'=>'11','name'=>'Administración'],['id'=>'25','name'=>'Operaciones']], ['11'=>['abiertos'],'25'=>[]], ['11'], [], ['ordenes'=>['label'=>'Órdenes','items'=>['quote_order_respond'=>'Responder orden']]], $this->actionPermissions);
+    }
     private function verifyCsrf(): void {}
     private function canUseDashboardAction($action): bool { return true; }
     private function canAccessDashboardTab($tab): bool { return $this->tabAccess; }
@@ -154,7 +168,9 @@ namespace {
       $_POST['estado']='Aprobada';
       $_POST['order_version']=$argv[1]==='response_stale' ? 'old-version' : $db->order['cct_modified'];
       $db->raceResponse=$argv[1]==='response_race';
-      (new Handler($db))->ajax_handler_cotizacion_order_response(); exit;
+      $handler = new Handler($db);
+      if ($argv[1] === 'response_permission_denied') $handler->actionPermissions = ['11' => []];
+      $handler->ajax_handler_cotizacion_order_response(); exit;
     }
     (new Handler($db))->ajax_handler_cotizacion_order_save(); exit;
   }
@@ -166,6 +182,14 @@ namespace {
   $view = new Handler(new MemoryDb());
   $view->db->order['estado'] = 'Esperando respuesta';
   $check($view->canRespond() && str_contains($view->detail(), 'data-scm-respond-cotizacion-order'), 'administrative users can respond to pending orders');
+  $view->actionPermissions = ['11' => []];
+  $check(!$view->canRespond() && !str_contains($view->detail(), 'data-scm-respond-cotizacion-order'), 'explicit denial overrides administrative access and hides the button');
+  $view->actionPermissions['25'] = ['quote_order_respond'];
+  $check(array_column($view->public_cotizacion_order_funcionarios(), 'id') === ['2'], 'public response also excludes disabled administrative cargos and includes configured responders');
+  $permissionsHtml = $view->permissionsModal();
+  $check(str_contains($permissionsHtml, 'id="scm-permissions-cargo"') && str_contains($permissionsHtml, 'value="11" selected'), 'permission editor selects the current cargo');
+  $check(substr_count($permissionsHtml, 'data-permission-cargo="25" hidden') === 4 && str_contains($permissionsHtml, 'name="action_permissions[25][]"'), 'only selected cargo is visible while other cargo inputs remain available for saving');
+  $view->actionPermissions = [];
   $view->admin = false;
   $check(!$view->canRespond() && !str_contains($view->detail(), 'data-scm-respond-cotizacion-order'), 'cargo without explicit grant cannot respond or see the button');
   $view->actionPermissions = ['11' => ['quote_order_respond']];
@@ -197,7 +221,7 @@ namespace {
   $check($afterActa['success'] && $afterActa['order']['_ID']==='99' && $afterActa['quote']['saldo_materiales']==='500000','approved quote with remaining balance allows a new order after satisfaction act');
   $approval=$run('response_current');
   $check($approval['success'] && $approval['order']['estado']==='Aprobada','current pending version can be approved');
-  foreach (['response_stale','response_race'] as $case) {
+  foreach (['response_stale','response_race','response_permission_denied'] as $case) {
     $result=$run($case);
     $check(!$result['success'] && $result['order']['estado']==='Esperando respuesta' && $result['email']===[],$case.' cannot approve a changed order');
   }

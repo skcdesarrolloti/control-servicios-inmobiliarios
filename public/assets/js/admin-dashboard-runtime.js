@@ -9880,6 +9880,7 @@
       var closeBtn = root.querySelector("#scm-close-permissions");
       var form = root.querySelector("#scm-permissions-form");
       var msg = root.querySelector("#scm-permissions-msg");
+      var cargoPicker = root.querySelector("#scm-permissions-cargo");
       if (!openBtn || !modal || !form) {
         return;
       }
@@ -9887,8 +9888,16 @@
       function openModal() {
         modal.classList.add("open");
         modal.setAttribute("aria-hidden", "false");
+        filterPermissionCargo();
         refreshCardState(form);
       }
+      function filterPermissionCargo() {
+        if (!cargoPicker) return;
+        form.querySelectorAll("[data-permission-cargo]").forEach(function (item) {
+          item.hidden = item.getAttribute("data-permission-cargo") !== cargoPicker.value;
+        });
+      }
+      if (cargoPicker) cargoPicker.addEventListener("change", filterPermissionCargo);
       function closeModal() {
         modal.classList.remove("open");
         modal.setAttribute("aria-hidden", "true");
@@ -10051,6 +10060,10 @@
                 runtime.actionPermissions.actions = {};
                 json.data.allowed_actions.forEach(function (action) {
                   runtime.actionPermissions.actions[String(action || "")] = true;
+                });
+                root.querySelectorAll("[data-scm-respond-cotizacion-order]").forEach(function (button) {
+                  button.hidden = !runtime.actionPermissions.actions.quote_order_respond;
+                  button.disabled = !runtime.actionPermissions.actions.quote_order_respond;
                 });
               }
             }
@@ -19553,6 +19566,12 @@
 
     function openCotizacionOrderResponseModal(button, options) {
       options = options || {};
+      if (runtime.actionPermissions && runtime.actionPermissions.actions
+        && !runtime.actionPermissions.actions.quote_order_respond) {
+        showToast("error", "No tienes permiso para responder órdenes de mantenimiento.");
+        if (typeof options.onClose === "function") options.onClose();
+        return Promise.resolve(false);
+      }
       var orderId = button ? button.getAttribute("data-order-id") || "" : "";
       var orderNumber = button ? button.getAttribute("data-order-number") || orderId : orderId;
       var orderCategory = button ? button.getAttribute("data-order-category") || "mantenimiento" : "mantenimiento";
