@@ -114,15 +114,13 @@ try {
     'Estado' => $state !== '' ? $state : 'Esperando respuesta',
     'Cotización' => '#' . trim((string) ($order['id_cotizacion'] ?? '-')),
     'Caso' => '#' . trim((string) ($order['id_ticket'] ?? '-')),
-    'Inmueble' => trim((string) ($order['inmueble'] ?? $order['id_inmueble'] ?? '-')),
+    'Código inmueble web' => trim((string) ($order['id_inmueble'] ?? '-')),
     'Dirección' => trim((string) ($order['direccion'] ?? '-')),
     'Categoría' => trim((string) ($order['categoria'] ?? '-')),
-    'Valor' => $money($order['valor'] ?? 0),
     'Fecha' => $dateLabel($order['fecha'] ?? $order['cct_created'] ?? ''),
     'Proveedor' => trim((string) ($order['proveedor'] ?? '-')),
     'Correo proveedor' => trim((string) ($order['correo_proveedor'] ?? '-')),
     'Celular proveedor' => trim((string) ($order['celular_proveedor'] ?? '-')),
-    'Creador' => trim((string) ($order['creador'] ?? '-')),
   ];
 
   $detailHtml = '';
@@ -161,10 +159,15 @@ try {
     . '<article class="scm-order-public-card">'
     . '<div class="scm-order-public-status ' . $escape($statusClass) . '">' . $escape($state !== '' ? $state : 'Esperando respuesta') . '</div>'
     . '<h1>' . $escape($title) . '</h1>'
-    . '<p class="scm-order-public-subtitle">Consulta y respuesta pública segura desde enlace firmado.</p>'
+    . '<div class="scm-order-public-amount"><span>Valor de la orden</span><strong>' . $escape($money($order['valor'] ?? 0)) . '</strong></div>'
+    . '<p class="scm-order-public-subtitle">' . ($pending ? 'Revisa el detalle de la orden y registra tu respuesta al final de esta página.' : 'Consulta el detalle y el estado de la orden.') . '</p>'
+    . '<div class="scm-order-public-grid scm-order-public-identifiers">'
+    . '<div><span>Contrato</span><strong>' . $escape(trim((string) ($order['contrato'] ?? '')) ?: '-') . '</strong></div>'
+    . '<div><span>Inmueble SIMI</span><strong>' . $escape(trim((string) ($order['inmueble'] ?? '')) ?: '-') . '</strong></div></div>'
     . '<div class="scm-order-public-grid">' . $detailHtml . '</div>'
     . ($activity !== '' ? '<section class="scm-order-public-section"><h2>Actividad</h2><p>' . $escape($activity) . '</p></section>' : '')
     . ($concept !== '' ? '<section class="scm-order-public-section"><h2>Concepto</h2><p>' . $escape($concept) . '</p></section>' : '')
+    . (!empty($order['creador']) ? '<section class="scm-order-public-section"><h2>Realizado por</h2><p><strong>' . $escape($order['creador']) . '</strong></p></section>' : '')
     . '</article>' . $form;
 } catch (DomainException $error) {
   if (http_response_code() < 400) {

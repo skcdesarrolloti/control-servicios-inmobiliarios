@@ -428,6 +428,7 @@ trait RendersDashboard
         'cotizacion_save' => self::AJAX_COTIZACION_SAVE,
         'cotizacion_order_context' => self::AJAX_COTIZACION_ORDER_CONTEXT,
         'cotizacion_order_save' => self::AJAX_COTIZACION_ORDER_SAVE,
+        'cotizacion_bank_save' => self::AJAX_COTIZACION_BANK_SAVE,
         'cotizacion_order_response' => self::AJAX_COTIZACION_ORDER_RESPONSE,
         'cotizacion_pdf' => self::AJAX_COTIZACION_MANTENIMIENTO_PDF,
         'cotizacion_order_pdf' => self::AJAX_COTIZACION_ORDER_PDF,

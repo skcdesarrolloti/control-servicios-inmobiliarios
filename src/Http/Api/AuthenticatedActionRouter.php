@@ -38,6 +38,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_SAVE => 'ajax_handler_cotizacion_mantenimiento_save',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_ORDER_CONTEXT => 'ajax_handler_cotizacion_order_context',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_ORDER_SAVE => 'ajax_handler_cotizacion_order_save',
+      SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_BANK_SAVE => 'ajax_handler_cotizacion_bank_save',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_ORDER_RESPONSE => 'ajax_handler_cotizacion_order_response',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_MANTENIMIENTO_PDF => 'ajax_handler_cotizacion_mantenimiento_pdf',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_ORDER_PDF => 'ajax_handler_cotizacion_order_pdf',

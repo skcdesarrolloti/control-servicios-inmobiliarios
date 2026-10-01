@@ -261,6 +261,34 @@ body {
   color: #991b1b;
 }
 
+.scm-order-public-amount {
+  display: grid;
+  gap: 3px;
+  margin: 18px 0 12px;
+  padding: 14px 18px;
+  border-left: 5px solid #f59e0b;
+  border-radius: 12px;
+  background: #fff7ed;
+}
+
+.scm-order-public-amount span {
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scm-order-public-amount strong {
+  color: #0b1f3a;
+  font-size: clamp(30px, 5vw, 46px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.scm-order-public-grid.scm-order-public-identifiers {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
 @media (max-width: 760px) {
   .scm-order-public-head,
   .scm-order-public-actions {

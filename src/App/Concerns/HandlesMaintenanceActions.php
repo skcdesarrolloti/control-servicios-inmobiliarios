@@ -3506,6 +3506,62 @@ trait HandlesMaintenanceActions
     return $providers;
   }
 
+  public function ajax_handler_cotizacion_bank_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->maintenance_order_can_manage()) {
+      $this->jsonFail('No tienes permiso para agregar bancos desde las órdenes.');
+    }
+    try {
+      $bank = $this->maintenance_order_save_bank(
+        $this->maintenance_order_clean($_POST['banco'] ?? ''),
+        $this->maintenance_order_clean($_POST['pais'] ?? 'Colombia')
+      );
+      $banks = $this->maintenance_order_bank_options();
+    } catch (\Throwable $error) {
+      error_log('[orden_mantenimiento_banco] ' . $error->getMessage());
+      $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudo guardar el banco. Inténtalo nuevamente.');
+    }
+    $this->jsonOk(['bank' => $bank, 'banks' => $banks]);
+  }
+
+  /** @return array{id:string,value:string,label:string,pais:string,created:bool} */
+  private function maintenance_order_save_bank(string $name, string $country): array
+  {
+    $normalize = static fn(string $value): string => trim(preg_replace('/\s+/u', ' ', $value) ?? $value);
+    $name = $normalize($name);
+    $country = $normalize($country);
+    if ($name === '' || mb_strlen($name, 'UTF-8') > 160 || $country === '' || mb_strlen($country, 'UTF-8') > 80) {
+      throw new \DomainException('Completa un nombre de banco válido (máximo 160 caracteres) y su país (máximo 80).');
+    }
+    $table = $this->db->table('jet_cct_bancos');
+    if (!$this->table_exists($table)) throw new \DomainException('El catálogo de bancos no está disponible.');
+    // Serialize catalog writes so simultaneous submissions cannot create duplicates.
+    $lock = 'scm:bancos:' . sha1($table);
+    if ((int) $this->db->getVar('SELECT GET_LOCK(?, 5)', [$lock]) !== 1) {
+      throw new \DomainException('El catálogo está ocupado. Intenta guardar el banco nuevamente.');
+    }
+    try {
+      foreach ($this->db->getResults("SELECT `_ID`, `banco`, `pais`, `cct_status` FROM `{$table}` WHERE TRIM(COALESCE(`banco`, '')) <> '' ORDER BY `_ID` ASC") as $row) {
+        if (mb_strtolower($normalize((string) $row['banco']), 'UTF-8') !== mb_strtolower($name, 'UTF-8')) continue;
+        if (!in_array(strtolower(trim((string) ($row['cct_status'] ?? ''))), ['', 'publish'], true)) {
+          throw new \DomainException('Ese banco ya existe, pero no está activo en el catálogo. Solicita su revisión.');
+        }
+        return ['id' => (string) $row['_ID'], 'value' => trim((string) $row['banco']), 'label' => trim((string) $row['banco']), 'pais' => (string) ($row['pais'] ?? ''), 'created' => false];
+      }
+      $employeeId = trim((string) $this->current_employee_id());
+      if ($employeeId === '') throw new \DomainException('No se pudo identificar al funcionario que agrega el banco.');
+      $now = date('Y-m-d H:i:s');
+      if (!$this->db->insert($table, [
+        'banco' => $name, 'pais' => $country, 'cct_status' => 'publish',
+        'cct_author_id' => $employeeId, 'cct_created' => $now, 'cct_modified' => $now,
+      ])) throw new \RuntimeException('No se pudo insertar el banco.');
+      return ['id' => $this->db->lastInsertId(), 'value' => $name, 'label' => $name, 'pais' => $country, 'created' => true];
+    } finally {
+      $this->db->getVar('SELECT RELEASE_LOCK(?)', [$lock]);
+    }
+  }
+
   /** @return array<int,array<string,string>> */
   private function maintenance_order_bank_options(): array
   {
@@ -3519,8 +3575,7 @@ trait HandlesMaintenanceActions
          FROM `{$table}`
         WHERE (`cct_status` = 'publish' OR `cct_status` IS NULL OR `cct_status` = '')
           AND TRIM(COALESCE(`banco`, '')) <> ''
-        ORDER BY `banco` ASC
-        LIMIT 400"
+        ORDER BY `banco` ASC"
     );
 
     $banks = [];

@@ -150,6 +150,7 @@
     var actionCotizacionSave = actions.cotizacion_save || "";
     var actionCotizacionOrderContext = actions.cotizacion_order_context || "";
     var actionCotizacionOrderSave = actions.cotizacion_order_save || "";
+    var actionCotizacionBankSave = actions.cotizacion_bank_save || "";
     var actionCotizacionOrderResponse = actions.cotizacion_order_response || "";
     var actionCotizacionOrderPdf = actions.cotizacion_order_pdf || "";
     var actionSendCotizacion = actions.send_cotizacion || "";
@@ -18828,7 +18829,13 @@
         '<label class="scm-cotizacion-dialog-field"><span>Identificación titular <em>*</em></span><input name="identificacion_cuenta_proveedor" type="text"></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Tipo cuenta</span><select name="tipo_cuenta_proveedor">' + accountTypeOptions + "</select></label>" +
         '<label class="scm-cotizacion-dialog-field"><span>Número cuenta <em>*</em></span><input name="cuenta_proveedor" type="text"></label>' +
-        '<label class="scm-cotizacion-dialog-field"><span>Banco</span><select name="banco_proveedor">' + bankOptions + "</select></label>" +
+        '<div class="scm-cotizacion-dialog-field"><label for="scm-order-bank">Banco</label><select name="banco_proveedor" id="scm-order-bank">' + bankOptions + '</select>' +
+        '<button type="button" class="scm-cotizacion-order-view" data-scm-bank-toggle aria-expanded="false" aria-controls="scm-order-new-bank">Agregar banco</button>' +
+        '<div id="scm-order-new-bank" data-scm-new-bank hidden>' +
+        '<label>Nombre del banco<input name="new_bank_name" type="text" maxlength="160" placeholder="Nombre del banco"></label>' +
+        '<label>País<input name="new_bank_country" type="text" maxlength="80" value="Colombia"></label>' +
+        '<button type="button" class="scm-cotizacion-order-view" data-scm-bank-save>Guardar banco</button></div>' +
+        '<small data-scm-bank-status role="status" aria-live="polite"></small></div>' +
         '<label class="scm-cotizacion-dialog-field"><span>Correo pago <em>*</em></span><input name="correo_pago_proveedor" type="email"></label>' +
         "</div>" +
         "</form>"
@@ -18839,6 +18846,7 @@
       var popup = window.Swal ? window.Swal.getPopup() : null;
       var form = popup ? popup.querySelector("#scm-cotizacion-order-form") : null;
       if (!form) return;
+      var bankSaving = false;
       var providers = Array.isArray(context.providers) ? context.providers : [];
       var balances = context.cotizacion && context.cotizacion.balances ? context.cotizacion.balances : {};
       var category = cotizacionOrderField(form, "categoria");
@@ -18882,8 +18890,8 @@
             : (showEmpty && amount <= 0 ? "Ingresa un valor mayor a cero." : "");
         }
         if (confirmButton) {
-          confirmButton.disabled = isOver;
-          confirmButton.setAttribute("aria-disabled", isOver ? "true" : "false");
+          confirmButton.disabled = isOver || bankSaving;
+          confirmButton.setAttribute("aria-disabled", isOver || bankSaving ? "true" : "false");
           confirmButton.title = isOver ? "Corrige el valor para guardar la orden." : "";
         }
         return !isOver;
@@ -18918,6 +18926,60 @@
           setCotizacionOrderField(form, name, selected ? selected[name] || "" : "");
         });
       }
+      var bankToggle = form.querySelector("[data-scm-bank-toggle]");
+      var bankSection = form.querySelector("[data-scm-new-bank]");
+      var bankSave = form.querySelector("[data-scm-bank-save]");
+      var bankStatus = form.querySelector("[data-scm-bank-status]");
+      var bankSelect = cotizacionOrderField(form, "banco_proveedor");
+      if (bankToggle && bankSection) bankToggle.addEventListener("click", function () {
+        bankSection.hidden = !bankSection.hidden;
+        bankToggle.setAttribute("aria-expanded", String(!bankSection.hidden));
+        if (!bankSection.hidden) cotizacionOrderField(form, "new_bank_name").focus();
+      });
+      if (bankSave) bankSave.addEventListener("click", function () {
+        var name = String(cotizacionOrderField(form, "new_bank_name").value || "").trim();
+        var country = String(cotizacionOrderField(form, "new_bank_country").value || "").trim();
+        if (!name || !country) {
+          bankStatus.textContent = "Completa el nombre del banco y su país.";
+          return;
+        }
+        if (!actionCotizacionBankSave) {
+          bankStatus.textContent = "No está disponible la creación de bancos. Recarga el panel.";
+          return;
+        }
+        bankSaving = true;
+        bankSave.disabled = true;
+        if (confirmButton) confirmButton.disabled = true;
+        bankStatus.textContent = "Guardando banco…";
+        var bankData = new FormData();
+        bankData.append("action", actionCotizacionBankSave);
+        bankData.append("nonce", nonce);
+        bankData.append("banco", name);
+        bankData.append("pais", country);
+        fetch(ajaxUrl, { method: "POST", body: bankData, credentials: "same-origin" })
+          .then(function (response) { return response.json(); })
+          .then(function (json) {
+            if (!json || !json.success || !json.data || !json.data.bank) {
+              throw new Error(json && json.data && json.data.message || "No se pudo guardar el banco.");
+            }
+            var bank = json.data.bank;
+            context.banks = Array.isArray(json.data.banks) ? json.data.banks : [];
+            bankSelect.innerHTML = buildCotizacionOrderSelectOptions(context.banks, "Elige un banco");
+            if (!Array.from(bankSelect.options).some(function (option) { return option.value === bank.value; })) {
+              bankSelect.add(new Option(bank.label || bank.value, bank.value));
+            }
+            bankSelect.value = bank.value;
+            bankStatus.textContent = bank.created ? "Banco agregado y seleccionado." : "Ese banco ya existía; quedó seleccionado.";
+            bankSection.hidden = true;
+            bankToggle.setAttribute("aria-expanded", "false");
+          })
+          .catch(function (error) { bankStatus.textContent = error.message || "No se pudo guardar el banco."; })
+          .finally(function () {
+            bankSaving = false;
+            bankSave.disabled = false;
+            validateOrderAmount(false);
+          });
+      });
       if (category) category.addEventListener("change", updateBalance);
       if (valueField) {
         valueField.addEventListener("input", function () {

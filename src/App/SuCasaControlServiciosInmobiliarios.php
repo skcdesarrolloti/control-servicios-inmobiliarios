@@ -37,6 +37,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_COTIZACION_SAVE = 'scm_guardar_cotizacion_mantenimiento';
   const AJAX_COTIZACION_ORDER_CONTEXT = 'scm_cotizacion_order_context';
   const AJAX_COTIZACION_ORDER_SAVE = 'scm_cotizacion_order_save';
+  const AJAX_COTIZACION_BANK_SAVE = 'scm_cotizacion_bank_save';
   const AJAX_COTIZACION_ORDER_RESPONSE = 'scm_cotizacion_order_response';
   const AJAX_COTIZACION_MANTENIMIENTO_PDF = 'scm_cotizacion_mantenimiento_pdf';
   const AJAX_COTIZACION_ORDER_PDF = 'scm_cotizacion_order_pdf';
