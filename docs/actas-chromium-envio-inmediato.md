@@ -24,3 +24,15 @@ La vista pública y el PDF usan `CompletionDocument`. El diseño sigue la refere
 `php tests/ticket-completion-check.php --database --pdf-fixture` verifica el flujo con tablas temporales y transporte simulado. `php tests/ticket-completion-delivery-check.php` verifica la cola y el worker con proveedores inertes, incluido el procesamiento inmediato aislado y el reintento tras fallo. Ninguna prueba envía mensajes externos ni modifica casos reales.
 
 `php tests/ticket-completion-font-check.php` comprueba con Chromium local, sin solicitudes de fuentes externas, que el PDF incluye Noto Sans y Caveat y no usa Arial del sistema.
+
+## Reparación explícita de un PDF firmado defectuoso
+
+`bin/repair-ticket-completion-pdf.php` permite regenerar únicamente la presentación, usando el contenido y la firma guardados. Es una herramienta CLI; no expone una ruta pública. Exige ID y SHA-256 exacto del archivo defectuoso, valida los hashes/HMAC existentes y genera una copia para revisión antes de aplicar.
+
+```powershell
+php bin/repair-ticket-completion-pdf.php --id=9 --expected-sha256=SHA256_DEL_ARCHIVO --output=acta-revision.pdf
+```
+
+Después de verificar la copia, se puede ejecutar con otra ruta de salida y `--apply --reason="Corrección de fuentes"`. La tabla `scm_ticket_completion_pdf_repairs` conserva los bytes, hash y HMAC del original, la huella de la firma y del contenido, el nuevo hash, motivo, versión y fecha de reparación. El archivo disponible para descarga se actualiza con un nuevo hash/HMAC en la misma transacción. La firma, aceptación, fecha de firma, tokens, mensajes, ticket y cargos no se modifican; no se envían notificaciones. Si el respaldo falla o el registro cambió después de preparar la copia, no se aplica.
+
+`php tests/ticket-completion-pdf-repair-check.php` comprueba con tablas temporales el respaldo exacto, la conservación del contenido y firma, el rechazo de hashes/candidatos obsoletos y el rollback si no se puede guardar la auditoría.
