@@ -25,6 +25,8 @@ Si `/health` devuelve 503 y el registro muestra `Permission denied` para `chrome
 
 ## Probar localmente
 
+Los errores se registran como texto con su mensaje y traza para evitar que el visor de Hostinger los reduzca a `{}`. Además, la salida del proceso Chromium aparece en los registros de ejecución mediante la opción [dumpio de Puppeteer](https://pptr.dev/api/puppeteer.launchoptions). Si el arranque falla, copia también las líneas inmediatamente anteriores a `Chromium no inició:`: pueden contener la causa emitida por Chrome. Una vez resuelto el arranque, puedes configurar `PDF_BROWSER_DEBUG=0` para desactivar la salida adicional del navegador; los errores de la aplicación seguirán registrándose.
+
 ```powershell
 cd pdf-renderer-node
 npm ci

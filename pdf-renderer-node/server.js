@@ -4,6 +4,7 @@ const http = require('node:http');
 const { timingSafeEqual } = require('node:crypto');
 const { chmodSync, existsSync, statSync } = require('node:fs');
 const { basename, dirname, join } = require('node:path');
+const { inspect } = require('node:util');
 const Busboy = require('busboy');
 const puppeteer = require('puppeteer');
 
@@ -14,6 +15,10 @@ const maxHtmlBytes = 8 * 1024 * 1024;
 const maxActiveJobs = 2;
 let browser;
 let activeJobs = 0;
+
+function errorDetails(error) {
+  return error?.stack || error?.message || inspect(error, { depth: 4 });
+}
 
 function authorized(header) {
   if (!username || !password || typeof header !== 'string' || !header.startsWith('Basic ')) return false;
@@ -49,6 +54,7 @@ async function getBrowser() {
   browser = await puppeteer.launch({
     headless: true,
     executablePath,
+    dumpio: process.env.PDF_BROWSER_DEBUG !== '0',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   });
   return browser;
@@ -94,7 +100,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ ok: instance.connected }));
     } catch (error) {
-      console.error('Chromium no inició:', error);
+      console.error(`Chromium no inició: ${errorDetails(error)}`);
       response(res, 503, 'Chromium no disponible');
     }
     return;
@@ -123,7 +129,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': pdf.length, 'Cache-Control': 'no-store' });
     res.end(pdf);
   } catch (error) {
-    console.error('No se pudo generar el PDF:', error);
+    console.error(`No se pudo generar el PDF: ${errorDetails(error)}`);
     if (!res.headersSent) response(res, 500, 'No se pudo generar el PDF');
   } finally {
     if (page) await page.close().catch(() => {});
