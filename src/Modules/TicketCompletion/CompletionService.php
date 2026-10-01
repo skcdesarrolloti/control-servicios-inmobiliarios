@@ -10,6 +10,7 @@ use SCM\Support\StoredFileService;
 final class CompletionService
 {
   private \Closure $enqueue;
+  private \Closure $enqueueInternal;
 
   public function __construct(public readonly CompletionRepository $repo, private string $secret, private string $baseUrl, ?\Closure $enqueue = null)
   {
@@ -18,6 +19,10 @@ final class CompletionService
     }
     $this->enqueue = $enqueue ?? static function (string $to, string $subject, string $html, array $options) use ($repo): array {
       return CompletionDelivery::deliver($repo->db, $to, $subject, $html, $options);
+    };
+    // Internal recipients must not delay the public signature response with SMTP calls.
+    $this->enqueueInternal = $enqueue ?? static function (string $to, string $subject, string $html, array $options) use ($repo): int {
+      return (new \SCM\Support\EmailQueue($repo->db))->enqueue($to, $subject, $html, $options);
     };
   }
 
@@ -653,6 +658,7 @@ final class CompletionService
       $now = time();
       $context = $this->context($ticketId);
       $payload = $this->payloadFromInput($ticketId, $ticket, $context, $input, $actor, null, $now);
+      $payload['creator'] = $actor;
       $payload['items'] = $this->syncCorrectiveDamages($ticket, $payload['items'], $actor);
       $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
       $this->repo->db->insert($this->repo->table(), [
@@ -701,6 +707,8 @@ final class CompletionService
       );
       $payload['items'] = $this->syncCorrectiveDamages($ticket, $payload['items'], $actor, (array) ($oldPayload['items'] ?? []));
       $payload['updated_at'] = $now;
+      // Keep the original creator when another employee edits the pending act.
+      $payload['creator'] = $this->originalCreator($active, $oldPayload);
       $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
       $this->repo->db->update($this->repo->table(), [
         'payload_json' => $json,
@@ -944,7 +952,79 @@ final class CompletionService
       }
       return $this->repo->act($id);
     });
+    if ($act['status'] === 'signed') { $this->tryNotifySignedStaff($act); }
     return $this->notify($act, $act['status'] === 'signed', true);
+  }
+
+  private function tryNotifySignedStaff(array $act): void
+  {
+    try { $this->notifySignedStaff($act); }
+    catch (\Throwable $error) {
+      error_log('[ticket-completion] Acta #' . (int) $act['id'] . ': no se pudo registrar el aviso interno de firma: ' . $error->getMessage());
+    }
+  }
+
+  private function originalCreator(array $act, array $payload): array
+  {
+    if (is_array($payload['creator'] ?? null)) { return $payload['creator']; }
+    $actor = (array) ($payload['actor'] ?? []);
+    // Older payloads stored only the latest editor. Recover the creation audit when available.
+    $historyTable = $this->repo->db->table('jet_cct_historial_del_ticket');
+    if (!$this->repo->schema->tableExists($historyTable)) { return $actor; }
+    $history = $this->repo->db->getRow("SELECT id_empleado, nombre FROM `{$historyTable}` WHERE id_ticket = ? AND respuesta LIKE ? ORDER BY `_ID` ASC LIMIT 1", [
+      (int) $act['ticket_pk'], 'Acta de satisfacción #' . (int) $act['id'] . ' generada.%',
+    ]);
+    $employeeId = trim((string) ($history['id_empleado'] ?? ''));
+    if ($employeeId === '' || $employeeId === (string) ($actor['employee_id'] ?? '')) { return $actor; }
+    $creator = ['employee_id' => $employeeId, 'name' => (string) ($history['nombre'] ?? ''), 'email' => ''];
+    foreach (\SCM\Support\FuncionarioOptions::panelFuncionarios($this->repo->db, $this->repo->schema, 'employee', []) as $contact) {
+      if ((string) $contact['employee_id'] === $employeeId) { return $contact; }
+    }
+    return $creator;
+  }
+
+  /** Internal delivery is independent of the signer's selected invitation channels. */
+  private function notifySignedStaff(array $act): array
+  {
+    return CompletionRepository::locked($this->repo->db, (int) $act['ticket_pk'], function () use ($act): array {
+      $act = $this->repo->act((int) $act['id']);
+      if ($act['status'] !== 'signed') { return []; }
+      $payload = $this->payload($act);
+      $creator = $this->originalCreator($act, $payload);
+      $recipients = [$creator];
+      try {
+        $recipients = array_merge($recipients, \SCM\Support\InternalNotificationRecipients::contactsForAction($this->repo->db, 'acta_firmada'));
+      } catch (\Throwable $error) {
+        // A configuration failure must not prevent the creator's notification.
+        error_log('[ticket-completion] No se pudieron resolver los configurados de acta_firmada: ' . $error->getMessage());
+      }
+      $delivery = json_decode((string) ($act['delivery_json'] ?? ''), true) ?: [];
+      $results = [];
+      $subject = 'Acta #' . $act['id'] . ' firmada · Caso #' . $payload['ticket_number'];
+      $url = $this->viewUrl((int) $act['id']);
+      foreach ($recipients as $recipient) {
+        $email = strtolower(trim((string) ($recipient['email'] ?? '')));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || isset($results[$email])) { continue; }
+        if (!empty($delivery['internal_signed_receipt'][$email]['queued'])) { $results[$email] = true; continue; }
+        $name = trim((string) ($recipient['name'] ?? '')) ?: 'Funcionario';
+        $body = '<p>Hola ' . EmailTemplate::e($name) . '.</p><p>El acta #' . (int) $act['id'] . ' del caso #' . EmailTemplate::e($payload['ticket_number']) . ' fue firmada por <strong>' . EmailTemplate::e($payload['signer']['name']) . '</strong> el ' . date('d/m/Y H:i', (int) $act['signed_at']) . '. El caso quedó cerrado.</p>'
+          . '<p>Contrato: <strong>' . EmailTemplate::e($payload['contract']) . '</strong> · Inmueble SIMI: <strong>' . EmailTemplate::e($payload['property'] ?? '') . '</strong></p>'
+          . '<p><a href="' . EmailTemplate::e($url) . '">Consultar acta firmada y descargar PDF</a> (requiere iniciar sesión en el panel).</p>';
+        try {
+          $result = ($this->enqueueInternal)($email, $subject, EmailTemplate::render($subject, $body), [
+            'channel' => 'email', 'source_module' => 'ticket-completion', 'provider' => 'email_smtp',
+            'destination_name' => $name, 'priority' => 100,
+            'dedupe_key' => 'ticket-acta:' . $act['id'] . ':acta_firmada:' . $act['signed_at'] . ':email',
+            'meta' => ['event' => 'acta_firmada', 'ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id']],
+          ]);
+          $result = is_array($result) ? $result : ['queued' => $result > 0, 'sent' => false];
+        } catch (\Throwable) { $result = ['queued' => false, 'sent' => false]; }
+        $results[$email] = !empty($result['queued']);
+        $delivery['internal_signed_receipt'][$email] = $result + ['attempted_at' => time()];
+        $this->repo->db->update($this->repo->table(), ['delivery_json' => json_encode($delivery, JSON_THROW_ON_ERROR)], ['id' => (int) $act['id']]);
+      }
+      return $results;
+    });
   }
 
   private function notify(array $act, bool $receipt = false, bool $resend = false): array
@@ -1216,6 +1296,7 @@ final class CompletionService
       });
     });
     // Delivery failure cannot undo a valid signature. Staff can retry the receipt without a second charge.
+    $this->tryNotifySignedStaff($signed);
     try { $signed['receipt'] = $this->notify($signed, true); }
     catch (\Throwable) { $signed['receipt'] = ['queued' => false, 'message' => 'Acta firmada y caso cerrado; no se pudo encolar la copia. Solicita su reenvío a la inmobiliaria.']; }
     return $signed;

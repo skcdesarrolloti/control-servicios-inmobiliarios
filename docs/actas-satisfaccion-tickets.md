@@ -31,6 +31,25 @@ los siete días y no se aplica si cambió la versión del acta o sus datos de or
 Un error al generar el acta conserva el borrador; un guardado correcto lo elimina.
 El borrador no reemplaza el botón de guardar ni se comparte entre dispositivos.
 
+## Aviso interno al firmar
+
+Después de registrar la firma y el cierre, se avisa por correo al creador original
+del acta y a los funcionarios activos seleccionados en **Notificaciones internas
+→ Mantenimiento → Acta firmada** (`internal_admin_notifications.acta_firmada`).
+El creador recibe el aviso aunque no esté seleccionado ahí. Los correos repetidos
+se notifican una sola vez. La edición conserva al creador original; para registros
+anteriores se consulta el historial de creación cuando el último editor es distinto.
+
+El correo informa quién firmó, el caso, contrato e inmueble SIMI y contiene un
+enlace al acta que exige sesión y permisos del panel. Se usa la cola compartida
+con evento `acta_firmada`, deduplicación por acta/firma/destino y trazabilidad en
+`delivery_json.internal_signed_receipt`. El worker compartido procesa estos
+avisos y sus reintentos, sin demorar la respuesta de firma con envíos SMTP.
+La copia del firmante mantiene sus canales elegidos y su intento de envío inmediato.
+Una falla del aviso interno no deshace la firma ni el cierre. **Reenviar copia
+firmada** vuelve a intentar registrar los avisos internos que faltaron, sin
+duplicar los que ya quedaron encolados.
+
 Generar el acta deja `estado = En proceso` y conserva uno de los estados
 `En ejecucion por inmobiliaria/propietario/arrendatario/copropiedad`, según quién
 realizó la solución. Se guarda una copia inmutable de
@@ -326,6 +345,7 @@ Referencia de contrato de plantilla: [colección oficial de Meta](https://www.po
 php tests/ticket-completion-check.php
 php tests/ticket-completion-check.php --database
 php tests/ticket-completion-delivery-check.php
+php tests/ticket-completion-internal-notification-check.php
 ```
 
 El primer comando prueba validación y números sin base de datos. El segundo
