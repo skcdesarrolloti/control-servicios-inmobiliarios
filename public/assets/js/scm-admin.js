@@ -2707,6 +2707,9 @@
           bind();
           if (json.data.message)
             message(json.data.message, json.data.queued === false);
+          if (operation === "resend" && window.Swal) {
+            window.Swal.fire({icon: json.data.queued === false ? "warning" : "success", title: json.data.queued === false ? "Revisa el envío" : "Reenvío registrado", text: json.data.message || "Consulta el estado de envío en el acta.", confirmButtonText: "Aceptar"});
+          }
           if (operation !== "read")
             root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
           if (operation === "read") {
@@ -3188,7 +3191,9 @@
           message("Comprimiendo las fotos antes de guardar…", false);
           compressedFormData(form)
             .then(function (data) {
-              return request("create", data);
+              var operation = form.dataset.actaOperation || "create";
+              if (operation === "update") data.set("act_id", form.dataset.actaId || "");
+              return request(operation, data);
             })
             .catch(function (error) {
               photoError(error.message || "No se pudieron preparar las fotos.");
@@ -3206,14 +3211,22 @@
           event.preventDefault();
           var fd = new FormData();
           fd.set("act_id", link.dataset.actaEdit);
-          request("read", fd);
+          if (link.dataset.actaSigned === "1" && window.Swal) {
+            window.Swal.fire({icon: "warning", title: "Editar acta firmada", text: "Al guardar los cambios el acta quedará sin firmar, el caso se reabrirá y se solicitará una nueva firma. Se conservará la versión firmada anterior.", showCancelButton: true, confirmButtonText: "Continuar edición", cancelButtonText: "Cancelar"}).then(function (result) {
+              if (result.isConfirmed) request("read", fd);
+            });
+          } else request("read", fd);
         });
       });
       body.querySelectorAll("[data-acta-resend]").forEach(function (button) {
         button.addEventListener("click", function () {
           var fd = new FormData();
           fd.set("act_id", button.dataset.actaResend);
-          request("resend", fd);
+          if (window.Swal) {
+            window.Swal.fire({icon: "question", title: button.textContent.trim(), text: "Se reenviará al firmante mediante los canales registrados en el acta.", showCancelButton: true, confirmButtonText: "Reenviar", cancelButtonText: "Cancelar"}).then(function (result) {
+              if (result.isConfirmed) request("resend", fd);
+            });
+          } else if (window.confirm("¿Reenviar al firmante por los canales registrados?")) request("resend", fd);
         });
       });
       body.querySelectorAll("[data-acta-archive]").forEach(function (button) {

@@ -30,7 +30,7 @@ final class CompletionView
       if ($activeAct === null && in_array($act['status'], ['pending', 'signed'], true)) {
         $activeAct = $act;
       }
-      if ($editActId > 0 && (int) $act['id'] === $editActId && $act['status'] === 'pending') {
+      if ($editActId > 0 && (int) $act['id'] === $editActId && in_array($act['status'], ['pending', 'signed'], true)) {
         $editAct = $act;
         $editPayload = $service->payload($act);
       }
@@ -55,11 +55,11 @@ final class CompletionView
     <section class="scm-acta">
       <p class="scm-acta-notice">Documenta la solución y elige el firmante. El ticket conservará el <strong>estado de ejecución seleccionado</strong> mientras el acta queda pendiente. Puedes hacer seguimiento desde <strong>Actividades administrativas → Actas de satisfacción</strong>. Solo la firma registrará el cierre; no se creará reporte administrativo nuevo desde esta acta.</p>
       <?php if ($sourceNotice !== ''): ?><p class="scm-acta-notice"><?= self::e($sourceNotice) ?></p><?php endif; ?>
-      <?php if ($editAct): ?><p class="scm-acta-notice">Estás editando el acta sin firmar #<?= self::e($editAct['id']) ?>. Al guardar se invalidan los códigos anteriores y se envía una nueva invitación.</p><?php endif; ?>
+      <?php if ($editAct): ?><p class="scm-acta-notice">Estás editando el acta #<?= self::e($editAct['id']) ?>. Al guardar <?= $editAct['status'] === 'signed' ? 'quedará sin firmar y el caso volverá a estar en proceso. La versión firmada anterior se conservará en el historial. Se invalidan la firma, enlaces y códigos anteriores y se solicita una nueva firma.' : 'se invalidan los códigos anteriores y se envía una nueva invitación.' ?></p><?php endif; ?>
       <div class="scm-acta-meta"><span>Ticket <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Contrato <strong><?= self::e($ticket['contrato'] ?? '—') ?></strong> · Inmueble SIMI <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>
       <?php if ($showHistory): foreach ($context['acts'] as $act): $payload = $service->payload($act); $canDeleteAct = in_array($act['status'], ['archived', 'cancelled'], true) || $canDeleteAny; ?>
         <article class="scm-acta-record">
-          <div class="scm-acta-meta"><h3>Acta de satisfacción #<?= self::e($act['id']) ?></h3><strong class="scm-acta-status" data-acta-status="<?= self::e($act['status']) ?>"><?= self::e(['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada'][$act['status']] ?? $act['status']) ?></strong></div>
+          <div class="scm-acta-meta"><h3><?= $act['status'] === 'superseded' ? 'Versión firmada anterior · Registro #' : 'Acta de satisfacción #' ?><?= self::e($act['id']) ?></h3><strong class="scm-acta-status" data-acta-status="<?= self::e($act['status']) ?>"><?= self::e(['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada', 'superseded' => 'Versión firmada anterior'][$act['status']] ?? $act['status']) ?></strong></div>
           <?php if ($act['status'] === 'pending'): ?><p class="scm-acta-help">También puedes consultarla y administrarla desde <strong>Actividades administrativas → Actas de satisfacción</strong>.</p><?php endif; ?>
           <p>Firmante: <strong><?= self::e($payload['signer']['name']) ?></strong> · <?= self::e(CompletionPolicy::ROLES[$payload['signer']['role']]) ?><br><?= self::e($payload['signer']['email']) ?> · <?= self::e($payload['signer']['phone']) ?></p>
           <?php
@@ -68,20 +68,19 @@ final class CompletionView
           <?php if (trim((string) ($recordSource['quote_id'] ?? '')) !== ''): ?>
             <p>Cotización asociada: <strong>#<?= self::e($recordSource['quote_id']) ?></strong></p>
           <?php endif; ?>
-          <?php if (in_array($act['status'], ['archived', 'cancelled'], true)): ?><p>Motivo: <?= self::e($act['cancellation_reason']) ?></p><?php endif; ?>
-          <div class="scm-acta-actions"><a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id'])) ?>" target="_blank" rel="noopener" data-acta-preview>Ver acta</a>
-          <?php if ($act['status'] === 'signed'): ?>
-          <a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id']) . '&format=pdf') ?>" target="_blank" rel="noopener" data-acta-preview>PDF destinatario</a>
-          <a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id']) . '&format=pdf&audience=staff') ?>" target="_blank" rel="noopener" data-acta-preview>PDF interno</a>
+          <?php if (in_array($act['status'], ['archived', 'cancelled', 'superseded'], true)): ?><p>Motivo: <?= self::e($act['cancellation_reason']) ?></p><?php endif; ?>
+          <div class="scm-acta-actions"><?php if ($act['status'] !== 'superseded'): ?><a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id'])) ?>" data-acta-preview>Ver acta</a><?php endif; ?>
+          <?php if (in_array($act['status'], ['signed', 'superseded'], true)): ?>
+          <a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->viewUrl((int) $act['id']) . '&format=pdf' . ($act['status'] === 'superseded' ? '&audience=staff' : '')) ?>" download>Descargar PDF firmado</a>
           <?php endif; ?>
-          <?php if ($act['status'] === 'pending'): ?><a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->editUrl($act)) ?>" data-acta-edit="<?= self::e($act['id']) ?>">Editar acta</a><?php endif; ?>
+          <?php if (in_array($act['status'], ['pending', 'signed'], true) && (int) ($act['active_slot'] ?? 1) === 1): ?><a class="scm-acta-button scm-acta-secondary" href="<?= self::e($service->editUrl($act)) ?>" data-acta-edit="<?= self::e($act['id']) ?>" data-acta-signed="<?= $act['status'] === 'signed' ? '1' : '0' ?>">Editar acta</a><?php endif; ?>
           <?php if (in_array($act['status'], ['pending', 'signed'], true)): ?>
             <button type="button" class="scm-acta-button scm-acta-secondary" data-acta-resend="<?= self::e($act['id']) ?>"><?= $act['status'] === 'signed' ? 'Reenviar copia firmada' : 'Reenviar invitación' ?></button>
           <?php endif; ?>
           <?php if ($act['status'] === 'pending'): ?><button type="button" class="scm-acta-button scm-acta-danger" data-acta-archive="<?= self::e($act['id']) ?>">Archivar</button><?php endif; ?>
           <?php if ($canDeleteAct): ?><button type="button" class="scm-acta-button scm-acta-danger" data-acta-delete="<?= self::e($act['id']) ?>">Eliminar</button><?php endif; ?></div>
           <?php $delivery = json_decode((string) ($act['delivery_json'] ?? ''), true) ?: []; $event = $act['status'] === 'signed' ? 'signed_receipt' : 'signature_invitation'; ?>
-          <?php if (!in_array($act['status'], ['archived', 'cancelled'], true)): ?><ul class="scm-acta-help"><?php foreach ($payload['channels'] ?? ['email'] as $channel): ?><li><?= $channel === 'email' ? 'Correo' : 'WhatsApp' ?>: <?= !empty($delivery[$event][$channel]['sent']) ? 'enviado al proveedor' : (!empty($delivery[$event][$channel]['queued']) ? 'pendiente de reintento o confirmación; el acta permanece guardada' : 'no se pudo registrar el envío; reintenta') ?></li><?php endforeach; ?></ul><?php endif; ?>
+          <?php if (!in_array($act['status'], ['archived', 'cancelled', 'superseded'], true)): ?><ul class="scm-acta-help"><?php foreach ($payload['channels'] ?? ['email'] as $channel): ?><li><?= $channel === 'email' ? 'Correo' : 'WhatsApp' ?>: <?= !empty($delivery[$event][$channel]['sent']) ? 'enviado al proveedor' : (!empty($delivery[$event][$channel]['queued']) ? 'pendiente de reintento o confirmación; el acta permanece guardada' : 'no se pudo registrar el envío; reintenta') ?></li><?php endforeach; ?></ul><?php endif; ?>
           <?php if ($act['status'] === 'pending'): ?>
             <p class="scm-acta-help">El enlace vence el <?= self::e(date('d/m/Y', (int) $act['expires_at'])) ?>. Reenviar no cierra el ticket.</p>
             <details><summary>¿Necesitas corregir el acta o cambiar el firmante?</summary>
@@ -91,8 +90,9 @@ final class CompletionView
           <?php endif; ?>
         </article>
       <?php endforeach; endif; ?>
-      <?php if ((!$active || $editAct) && !in_array(mb_strtolower((string) $ticket['estado']), ['cerrado', 'finalizado', 'resuelto'], true)): ?>
+      <?php if ((!$active || $editAct) && ($editAct || !in_array(mb_strtolower((string) $ticket['estado']), ['cerrado', 'finalizado', 'resuelto'], true))): ?>
         <form data-acta-create data-acta-draft-user="<?= self::e(\SCM\Core\Auth::userId()) ?>" data-acta-draft-ticket="<?= self::e($ticket['_ID']) ?>" data-acta-draft-revision="<?= self::e($editAct['payload_hash'] ?? hash('sha256', json_encode([$suggestedItems, $context['contacts']], JSON_THROW_ON_ERROR))) ?>" data-acta-operation="<?= $editAct ? 'update' : 'create' ?>"<?= $editAct ? ' data-acta-id="' . self::e($editAct['id']) . '"' : '' ?>>
+          <?php if ($editAct && $editAct['status'] === 'signed'): ?><label class="scm-acta-check"><input type="checkbox" name="confirm_reopen" value="1" required><span>Confirmo que al guardar esta acta quedará sin firmar, el caso se reabrirá y se enviará una nueva solicitud de firma.</span></label><?php endif; ?>
           <input type="hidden" name="source_flow" value="<?= self::e($sourceName) ?>">
           <input type="hidden" name="source_cotizacion_id" value="<?= self::e($sourceQuoteId) ?>">
           <h3>1. <?= $editAct ? 'Editar solución y firmante' : 'Solución y firmante' ?></h3>
@@ -178,7 +178,7 @@ final class CompletionView
         <h3>Filtros</h3>
         <form method="post" autocomplete="off" id="sacta_form">
           <div class="scm-grid scm-actas-filter-grid">
-            <div class="scm-field"><label for="sacta_estado">Estado</label><select id="sacta_estado" name="sacta_estado"><option value="pending" <?= $status === 'pending' ? 'selected' : '' ?>>Actas sin firmar</option><option value="signed" <?= $status === 'signed' ? 'selected' : '' ?>>Firmadas</option><option value="archived" <?= $status === 'archived' ? 'selected' : '' ?>>Archivadas</option><option value="cancelled" <?= $status === 'cancelled' ? 'selected' : '' ?>>Anuladas</option><option value="all" <?= $status === 'all' ? 'selected' : '' ?>>Todas</option></select></div>
+            <div class="scm-field"><label for="sacta_estado">Estado</label><select id="sacta_estado" name="sacta_estado"><option value="pending" <?= $status === 'pending' ? 'selected' : '' ?>>Actas sin firmar</option><option value="signed" <?= $status === 'signed' ? 'selected' : '' ?>>Firmadas</option><option value="archived" <?= $status === 'archived' ? 'selected' : '' ?>>Archivadas</option><option value="cancelled" <?= $status === 'cancelled' ? 'selected' : '' ?>>Anuladas</option><option value="superseded" <?= $status === 'superseded' ? 'selected' : '' ?>>Versiones firmadas anteriores</option><option value="all" <?= $status === 'all' ? 'selected' : '' ?>>Todas</option></select></div>
             <div class="scm-field"><label for="sacta_caso"># caso</label><input id="sacta_caso" name="sacta_caso" type="text" value="<?= self::e($filters['caso'] ?? '') ?>" placeholder="Ticket"></div>
             <div class="scm-field"><label for="sacta_inmueble">Inmueble</label><input id="sacta_inmueble" name="sacta_inmueble" type="text" value="<?= self::e($filters['inmueble'] ?? '') ?>" placeholder="# inmueble"></div>
             <div class="scm-field"><label for="sacta_contrato">Contrato</label><input id="sacta_contrato" name="sacta_contrato" type="text" value="<?= self::e($filters['contrato'] ?? '') ?>" placeholder="# contrato"></div>
@@ -210,7 +210,7 @@ final class CompletionView
     if (!$items) {
       return '<div class="scm-table-wrap"><p class="scm-actas-empty">No hay actas para los filtros actuales.</p></div>';
     }
-    $labels = ['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada'];
+    $labels = ['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada', 'superseded' => 'Versión firmada anterior'];
     $html = '<div class="scm-table-wrap"><table class="scm-table scm-table-prev scm-actas-table"><thead><tr><th>Acta</th><th>Estado</th><th>Caso</th><th>Inmueble</th><th>Firmante</th><th>Reporte</th><th>Fechas</th><th>Acciones</th></tr></thead><tbody>';
     foreach ($items as $act) {
       $payload = (array) ($act['_payload'] ?? []);
@@ -236,10 +236,10 @@ final class CompletionView
       $html .= '<td>' . ($reportApplies ? self::money((int) ($report['total'] ?? 0)) : 'No aplica') . '<br><small>' . ($reportApplies ? (!empty($act['report_id']) ? 'Cobro #' . self::e($act['report_id']) : 'Se genera al firmar') : self::e($reportNote)) . '</small>' . (!empty($act['legacy_act_id']) ? '<br><small>CCT acta #' . self::e($act['legacy_act_id']) . '</small>' : '') . '</td>';
       $html .= '<td class="scm-date-cell">Creada ' . self::e(date('d/m/Y H:i', (int) ($act['created_at'] ?? 0))) . (!empty($act['signed_at']) ? '<br>Firmada ' . self::e(date('d/m/Y H:i', (int) $act['signed_at'])) : '') . '</td>';
       $canDelete = in_array($status, ['archived', 'cancelled'], true) || $canDeleteAny;
-      $pdfButtons = $status === 'signed'
-        ? '<a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf') . '" target="_blank" rel="noopener" data-acta-preview>PDF destinatario</a><a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf&audience=staff') . '" target="_blank" rel="noopener" data-acta-preview>PDF interno</a>'
+      $pdfButtons = in_array($status, ['signed', 'superseded'], true)
+        ? '<a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf' . ($status === 'superseded' ? '&audience=staff' : '')) . '" download>Descargar PDF firmado</a>'
         : '';
-      $html .= '<td class="scm-pending-action-cell"><button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" data-scm-open-iframe data-iframe-url="' . self::e($url) . '" data-iframe-title="Acta de satisfacción #' . self::e($act['id']) . '" data-scm-compact-iframe>Ver acta</button>' . ($status === 'pending' ? '<a class="scm-pending-action-btn scm-pending-action-btn--blue" href="' . self::e($service->editUrl($act)) . '">Editar</a>' : '') . $pdfButtons . ($status === 'pending' ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-archive="' . self::e($act['id']) . '" data-ticket-pk="' . self::e($act['ticket_pk']) . '">Archivar</button>' : '') . ($canDelete ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-delete="' . self::e($act['id']) . '">Eliminar</button>' : '') . '</td>';
+      $html .= '<td class="scm-pending-action-cell"><button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" data-scm-open-iframe data-iframe-url="' . self::e($url) . '" data-iframe-title="Acta de satisfacción #' . self::e($act['id']) . '" data-scm-compact-iframe>Ver acta</button>' . (in_array($status, ['pending', 'signed'], true) && (int) ($act['active_slot'] ?? 1) === 1 ? '<a class="scm-pending-action-btn scm-pending-action-btn--blue" href="' . self::e($service->editUrl($act)) . '">Editar</a>' : '') . $pdfButtons . ($status === 'pending' ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-archive="' . self::e($act['id']) . '" data-ticket-pk="' . self::e($act['ticket_pk']) . '">Archivar</button>' : '') . ($canDelete ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-delete="' . self::e($act['id']) . '">Eliminar</button>' : '') . '</td>';
       $html .= '</tr>';
     }
     $html .= '</tbody></table></div>';

@@ -97,8 +97,8 @@ try {
   }
   if ($editActId > 0) {
     $editAct = $repo->act($editActId);
-    if ((int) $editAct['ticket_pk'] !== $ticketPk || $editAct['status'] !== 'pending') {
-      throw new DomainException('Solo se puede editar un acta pendiente de este caso.');
+    if ((int) $editAct['ticket_pk'] !== $ticketPk || !in_array($editAct['status'], ['pending', 'signed'], true)) {
+      throw new DomainException('Solo se puede editar un acta pendiente o firmada de este caso.');
     }
   }
   $caseNumber = trim((string) ($ticket['id_ticket'] ?? '')) ?: (string) $ticketPk;

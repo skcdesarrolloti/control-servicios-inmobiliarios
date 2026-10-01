@@ -31,6 +31,8 @@ $assert($subject->lookup('570')['id'] === 4, 'pending version takes precedence o
 $pdo->exec('DELETE FROM wp_scm_ticket_completion_acts');
 $pdo->exec('INSERT INTO wp_jet_cct_actas_de_satisfaccion VALUES (264)');
 $assert($subject->lookup('570','263,264')['id'] === 264, 'legacy lists resolve an existing document only');
+$insert->execute([5,10841,0,'{"source":{"quote_id":"570"}}','superseded','2026-10-01','2026-10-01']);
+$assert($subject->lookup('570')['url'] === '', 'historical signed version cannot replace a deleted current quotation act');
 $pdo->exec('DROP TABLE wp_scm_ticket_completion_acts');
 $assert($subject->lookup('570','263')['url'] === '', 'missing native table cannot resurrect deleted legacy act');
 $assert($subject->lookup('570','264')['status'] === 'legacy', 'existing legacy act remains available');

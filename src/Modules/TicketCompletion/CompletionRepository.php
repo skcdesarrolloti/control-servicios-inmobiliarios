@@ -110,7 +110,7 @@ final class CompletionRepository
 
   public function history(int $ticketId): array
   {
-    return $this->db->getResults('SELECT * FROM `' . $this->table() . '` WHERE ticket_pk = ? ORDER BY id DESC', [$ticketId]);
+    return $this->db->getResults('SELECT * FROM `' . $this->table() . '` WHERE ticket_pk = ? ORDER BY CASE WHEN active_slot = 1 THEN 0 ELSE 1 END, id DESC', [$ticketId]);
   }
 
   public function insertLegacy(string $table, array $data): int

@@ -4577,7 +4577,7 @@ trait RendersDashboard
         array_push($params, ...$legacyIds);
       }
       if ($conditions !== []) {
-        $where = '(' . implode(' OR ', $conditions) . ')';
+        $where = '(' . implode(' OR ', $conditions) . ') AND status <> \'superseded\'';
         if ($ticketPk !== '' && ctype_digit($ticketPk)) {
           $where .= ' AND ticket_pk = ?';
           $params[] = (int) $ticketPk;

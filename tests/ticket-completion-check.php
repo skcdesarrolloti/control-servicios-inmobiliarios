@@ -318,6 +318,31 @@ $assert(is_array($approvedPropertyHistory) && str_contains((string) ($approvedPr
 $db->insert($db->table('jet_cct_cotizacion_mantenimiento'), $repo->schema->filterTableData($db->table('jet_cct_cotizacion_mantenimiento'), [
   '_ID'=>7014,'id_ticket'=>'9014','estado'=>'Aprobada','id_acta_satisfaccion'=>(string)$signed['legacy_act_id'],
 ]));
+// Correcting a signed act preserves the original signed bytes, reopens atomically,
+// and invalidates every old signing credential before a fresh signature.
+$oldSignedQuote = $repo->act((int) $approvedQuoteSigned['id']);
+$oldSignedToken = $service->token($oldSignedQuote);
+$oldSignedBytes = $service->pdf($oldSignedQuote);
+$editSignedPanel = (new View())->panel($service->context(13), $service, (int) $oldSignedQuote['id']);
+$assert(str_contains($editSignedPanel, 'data-acta-operation="update"') && str_contains($editSignedPanel, 'name="confirm_reopen"'), 'signed act opens editing form even when case is closed and requires reopening consent');
+$signedManagement = (new View())->panel($service->context(13), $service);
+$assert(substr_count($signedManagement, 'Descargar PDF firmado') === 1 && !str_contains($signedManagement, 'PDF destinatario') && !str_contains($signedManagement, 'PDF interno'), 'signed management offers one direct PDF download');
+$rejects(static fn() => $service->update((int) $oldSignedQuote['id'], 13, $deleteInput, $actor), 'editing signed act without reopening confirmation is rejected');
+$assert($repo->act((int) $oldSignedQuote['id'])['status'] === 'signed' && $repo->ticket(13)['estado'] === 'Cerrado', 'rejected edit preserves original signature and closure');
+$service->update((int) $oldSignedQuote['id'], 13, array_replace($deleteInput, ['confirm_reopen'=>'1', 'observations'=>'Corrección de acta firmada']), $actor);
+$reopened = $repo->act((int) $oldSignedQuote['id']);
+$assert($reopened['status'] === 'pending' && empty($reopened['signed_json']) && empty($reopened['signed_pdf']) && empty($reopened['legacy_act_id']), 'saving signed edit clears current signature, PDF and legacy association');
+$assert($repo->ticket(13)['estado'] === 'En proceso' && $repo->ticket(13)['estado_administrativo'] === $service->payload($reopened)['pending_admin_state'], 'signed edit reopens case in selected execution stage');
+$reopenedQuote = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID = 7013');
+$assert($reopenedQuote['estado'] === 'Aprobada' && empty($reopenedQuote['id_acta_satisfaccion']) && empty($reopenedQuote['final_trabajo']), 'signed edit removes quote completion references and preserves approval');
+$versions = array_values(array_filter($repo->history(13), static fn(array $a): bool => $a['status'] === 'superseded'));
+$assert(count($versions) === 1 && $service->pdf($versions[0], true) === $oldSignedBytes, 'exact original signed PDF remains downloadable as an authenticated historical version');
+$rejects(static fn() => $service->pdf($versions[0]), 'historical signed PDF is restricted to staff');
+$rejects(static fn() => $service->publicAct((int) $reopened['id'], $oldSignedToken), 'old signed public link no longer authorizes current act');
+$rejects(static fn() => $service->update((int) $versions[0]['id'], 13, array_replace($deleteInput,['confirm_reopen'=>'1']), $actor), 'historical version cannot be edited instead of active act');
+$requestCode($reopened);
+$approvedQuoteSigned = $service->sign((int) $reopened['id'], $service->token($reopened), $signInput($reopened), '127.0.0.1', 'QA');
+$assert($approvedQuoteSigned['status'] === 'signed' && (int) $approvedQuoteSigned['legacy_act_id'] !== (int) $oldSignedQuote['legacy_act_id'], 'corrected act can be signed again with new evidence and legacy record');
 $service->deleteRetired((int) $approvedQuoteSigned['id'], $actor, true);
 $quoteAfterActDelete = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID=7013');
 $assert(trim((string)$quoteAfterActDelete['id_acta_satisfaccion']) === '' && $quoteAfterActDelete['estado'] === 'Aprobada', 'deleting approved quote act clears its link without changing quote approval');

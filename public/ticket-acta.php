@@ -124,9 +124,9 @@ try {
     throw new DomainException('Soporte no disponible.');
   }
   if (($_GET['format'] ?? '') === 'pdf' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
-    if (!$staff && ($_GET['audience'] ?? '') === 'staff') { throw new DomainException('La copia interna requiere sesión de funcionario.'); }
-    if ($act['status'] !== 'signed') { throw new DomainException('El PDF solo se puede descargar cuando el acta esté firmada.'); }
-    $pdf = $service->pdf($act, $staff && ($_GET['audience'] ?? '') === 'staff');
+    if (!$staff && (($_GET['audience'] ?? '') === 'staff' || $act['status'] === 'superseded')) { throw new DomainException('La copia interna requiere sesión de funcionario.'); }
+    if ($act['status'] !== 'signed' && !($staff && $act['status'] === 'superseded')) { throw new DomainException('El PDF solo se puede descargar cuando el acta esté firmada.'); }
+    $pdf = $service->pdf($act, $staff && (($_GET['audience'] ?? '') === 'staff' || $act['status'] === 'superseded'));
     header('Content-Type: application/pdf');
     header('Content-Disposition: attachment; filename="acta-' . $id . '-firmada.pdf"');
     header('Content-Length: ' . strlen($pdf));

@@ -164,8 +164,8 @@ trait HandlesTicketCompletion
         }
         if ($operation === 'update') {
           $existingAct = $repo->act($actId);
-          if ((int) $existingAct['ticket_pk'] !== $ticketId || $existingAct['status'] !== 'pending') {
-            throw new \DomainException('Solo se puede editar el acta pendiente activa de este caso.');
+          if ((int) $existingAct['ticket_pk'] !== $ticketId || !in_array($existingAct['status'], ['pending', 'signed'], true)) {
+            throw new \DomainException('Solo se puede editar el acta activa, pendiente o firmada, de este caso.');
           }
           $oldPayload = $service->payload($existingAct);
           foreach ((array) ($oldPayload['items'] ?? []) as $oldItem) {

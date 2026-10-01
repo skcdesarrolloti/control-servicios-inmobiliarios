@@ -578,7 +578,7 @@ final class CompletionService
     if (!hash_equals((string) $act['payload_hash'], hash('sha256', (string) $act['payload_json']))) {
       throw new \DomainException('El contenido del acta cambió. No se puede firmar; solicita una nueva acta.');
     }
-    if (($act['status'] ?? '') === 'signed') {
+    if (in_array(($act['status'] ?? ''), ['signed', 'superseded'], true)) {
       $evidence = json_decode((string) $act['signed_json'], true, 16, JSON_THROW_ON_ERROR);
       $hmac = (string) ($evidence['evidence_hmac'] ?? '');
       unset($evidence['evidence_hmac']);
@@ -684,13 +684,17 @@ final class CompletionService
     $this->repo->requireSchema();
     $act = $this->repo->transaction($ticketId, function (array $ticket) use ($id, $ticketId, $input, $actor): array {
       $active = $this->repo->active($ticketId);
-      if (!$active || (int) $active['id'] !== $id || $active['status'] !== 'pending') {
-        throw new \DomainException('Solo se puede editar el acta pendiente activa de este caso.');
+      if (!$active || (int) $active['id'] !== $id || !in_array($active['status'], ['pending', 'signed'], true)) {
+        throw new \DomainException('Solo se puede editar el acta activa, pendiente o firmada, de este caso.');
       }
-      if (in_array(mb_strtolower(trim((string) $ticket['estado'])), ['cerrado', 'finalizado', 'resuelto'], true)) {
-        throw new \DomainException('No se puede editar un acta en un caso cerrado.');
+      $wasSigned = $active['status'] === 'signed';
+      if (!$wasSigned && in_array(mb_strtolower(trim((string) $ticket['estado'])), ['cerrado', 'finalizado', 'resuelto'], true)) {
+        throw new \DomainException('No se puede editar un acta pendiente en un caso cerrado.');
       }
       $oldPayload = $this->payload($active);
+      if ($wasSigned && (string) ($input['confirm_reopen'] ?? '') !== '1') {
+        throw new \DomainException('Confirma que el acta volverá a quedar sin firmar y el caso se reabrirá.');
+      }
       // Editing from the case must retain the approved quote that owns this act.
       $oldSource = (array) ($oldPayload['source'] ?? []);
       $input['source_flow'] = $oldSource['flow'] ?? 'ticket_solution';
@@ -711,6 +715,8 @@ final class CompletionService
       $payload['creator'] = $this->originalCreator($active, $oldPayload);
       $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
       $this->repo->db->update($this->repo->table(), [
+        'status' => 'pending', 'signed_at' => null, 'signed_json' => null, 'signed_pdf' => null,
+        'pdf_hash' => null, 'pdf_hmac' => null, 'legacy_act_id' => null, 'report_id' => null,
         'payload_json' => $json,
         'payload_hash' => hash('sha256', $json),
         'token_nonce' => bin2hex(random_bytes(32)),
@@ -719,6 +725,32 @@ final class CompletionService
         'delivery_json' => null,
         'invitation_queued_at' => null,
       ], ['id' => $id]);
+      if ($wasSigned) {
+        if (!empty($active['signed_pdf'])) $this->pdf($active);
+        // Keep the exact signed document and evidence as an internal historical version.
+        $snapshot = $active;
+        unset($snapshot['id']);
+        $snapshot['active_slot'] = null;
+        $snapshot['status'] = 'superseded';
+        $snapshot['token_nonce'] = bin2hex(random_bytes(32));
+        $snapshot['otp_json'] = null;
+        $snapshot['cancelled_at'] = $now;
+        $snapshot['cancellation_reason'] = 'Versión firmada anterior del acta #' . $id . ', sustituida al editar por ' . (string) $actor['name'] . '.';
+        $this->repo->db->insert($this->repo->table(), $snapshot);
+        $versionId = (int) $this->repo->db->lastInsertId();
+        if (!empty($snapshot['signed_pdf'])) {
+          $this->repo->db->update($this->repo->table(), ['pdf_hmac' => hash_hmac('sha256', $versionId . '|' . $snapshot['payload_hash'] . '|' . $snapshot['pdf_hash'], $this->secret)], ['id' => $versionId]);
+        }
+        $legacyId = (int) ($active['legacy_act_id'] ?? 0);
+        $this->repo->unlinkDeletedLegacyAct($legacyId);
+        if ($legacyId > 0) {
+          $legacyTable = $this->repo->db->table('jet_cct_actas_de_satisfaccion');
+          $fields = $this->repo->schema->filterTableData($legacyTable, ['cct_status' => 'draft', 'cct_modified' => date('Y-m-d H:i:s')]);
+          if ($fields) $this->repo->db->update($legacyTable, $fields, ['_ID' => $legacyId]);
+        }
+        $this->repo->updateTicket($ticketId, ['final_trabajo' => '', 'estado_acta_satisfaccion' => 'No', 'estado_acta_cotizacion_mantenimiento' => 'No']);
+        $this->repo->audit($ticketId, 'Acta firmada #' . $id . ' reabierta para corrección. Firma anterior conservada en la versión interna #' . $versionId . '; se retiró el cierre del caso y se requiere nueva firma.', $actor['name'], $actor['employee_id']);
+      }
       $this->repo->updateTicket($ticketId, ['estado' => 'En proceso', 'estado_administrativo' => $payload['pending_admin_state']]);
       $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' editada. Se invalidaron códigos anteriores y se solicitó nueva firma de ' . htmlspecialchars($payload['signer']['name'], ENT_QUOTES, 'UTF-8') . '. El caso permanece abierto en “' . $payload['pending_admin_state'] . '”.', $actor['name'], $actor['employee_id']);
       return $this->repo->act($id);
@@ -1062,7 +1094,7 @@ final class CompletionService
               'ticket_number' => $payload['ticket_number'], 'act_id' => (string) $act['id'],
               'signer_name' => $payload['signer']['name'], 'contract' => $payload['contract'],
               'property' => $payload['property'] ?? '', 'act_url' => $url,
-              'dedupe_key' => 'ticket-acta:' . $act['id'] . ':acta_firmada:' . $act['signed_at'] . ':' . $channel,
+              'dedupe_key' => 'ticket-acta:' . $act['id'] . ':acta_firmada:' . $act['signed_at'] . ':' . $channel . ':' . $act['token_nonce'],
               'meta' => ['event' => 'acta_firmada', 'ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id']],
             ]);
             $result = is_array($result) ? $result : ['queued' => $result > 0, 'sent' => false];
@@ -1173,7 +1205,7 @@ final class CompletionService
     $this->repo->transaction((int) $act['ticket_pk'], function (array $ticket) use ($id, $actor, $allowAny, &$photos): void {
       $act = $this->repo->act($id);
       $status = (string) $act['status'];
-      $allowedStatuses = $allowAny ? ['pending', 'signed', 'archived', 'cancelled'] : ['archived', 'cancelled'];
+      $allowedStatuses = $allowAny ? ['pending', 'signed', 'archived', 'cancelled', 'superseded'] : ['archived', 'cancelled'];
       if (!in_array($status, $allowedStatuses, true)) {
         throw new \DomainException($status === 'pending'
           ? 'Solo un cargo administrativo puede eliminar actas pendientes. También puedes archivarla para sacarla de pendientes sin borrarla.'
@@ -1426,13 +1458,13 @@ final class CompletionService
   public function pdf(array $act, bool $staff = false): string
   {
     $payload = $this->payload($act);
-    if ($act['status'] !== 'signed') {
+    if ($act['status'] !== 'signed' && !($staff && $act['status'] === 'superseded')) {
       throw new \DomainException('El PDF solo se puede descargar cuando el acta esté firmada.');
     }
-    if ($act['status'] === 'signed' && empty($act['signed_pdf']) && in_array((string) (json_decode($act['signed_json'], true)['consent_version'] ?? ''), ['2', '3'], true)) {
+    if (in_array($act['status'], ['signed', 'superseded'], true) && empty($act['signed_pdf']) && in_array((string) (json_decode($act['signed_json'], true)['consent_version'] ?? ''), ['2', '3'], true)) {
       throw new \DomainException('No se encuentra el PDF original firmado. Solicita revisión al administrador.');
     }
-    if ($act['status'] === 'signed' && !empty($act['signed_pdf'])) {
+    if (in_array($act['status'], ['signed', 'superseded'], true) && !empty($act['signed_pdf'])) {
       $hash = hash('sha256', $act['signed_pdf']);
       if (!hash_equals((string) $act['pdf_hash'], $hash) || !hash_equals((string) $act['pdf_hmac'], hash_hmac('sha256', $act['id'] . '|' . $act['payload_hash'] . '|' . $hash, $this->secret))) { throw new \DomainException('El PDF no coincide con su registro. Solicita revisión al administrador.'); }
       return $act['signed_pdf'];
@@ -1446,7 +1478,7 @@ final class CompletionService
     $this->repo->requireSchema();
     $clean = static fn(mixed $value): string => trim(strip_tags((string) (is_scalar($value) ? $value : '')));
     $status = strtolower($clean($input['sacta_estado'] ?? 'pending'));
-    $statusMap = ['pending' => 'pending', 'pendiente' => 'pending', 'sin_firmar' => 'pending', 'firmada' => 'signed', 'signed' => 'signed', 'archivada' => 'archived', 'archived' => 'archived', 'anulada' => 'cancelled', 'cancelled' => 'cancelled', 'todos' => 'all', 'all' => 'all'];
+    $statusMap = ['pending' => 'pending', 'pendiente' => 'pending', 'sin_firmar' => 'pending', 'firmada' => 'signed', 'signed' => 'signed', 'archivada' => 'archived', 'archived' => 'archived', 'anulada' => 'cancelled', 'cancelled' => 'cancelled', 'superseded' => 'superseded', 'todos' => 'all', 'all' => 'all'];
     $status = $statusMap[$status] ?? 'pending';
     $page = max(1, (int) ($input['sacta_page'] ?? 1));
     $perPage = min(100, max(10, (int) ($input['sacta_per_page'] ?? 30)));
