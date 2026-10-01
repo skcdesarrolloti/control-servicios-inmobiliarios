@@ -31,6 +31,7 @@ final class CompletionPdf
     $root = dirname(__DIR__, 3);
     $bytes = HtmlPdfRenderer::render($html, 'Acta de recibo a satisfacción #' . $act['id'] . ' del contrato #' . $payload['contract'], [
       'stylesheets' => [$root . '/public/assets/css/ticket-completion.css', $root . '/public/assets/css/ticket-completion-document.css'],
+      'external_fonts' => false,
       'body_class' => 'scm-acta-page scm-acta-pdf', 'wrapper_class' => 'scm-acta-print-root', 'container_class' => 'scm-acta-pdf-container', 'allow_fallback' => false,
     ]);
     if ($bytes === null) throw new \DomainException('No se pudo generar el PDF del acta con Chromium. Intenta nuevamente; la firma y el cierre solo se guardan si se completa el documento.');

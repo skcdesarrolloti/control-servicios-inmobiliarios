@@ -1,11 +1,11 @@
 # Actas de recibo a satisfacción: diseño y envío inmediato
 
-La vista pública y el PDF usan `CompletionDocument`. El diseño sigue la referencia del acta de recibo suministrada: documento blanco, logo institucional, tabla de datos, secciones numeradas y certificado de firma con pista de auditoría. La representación por nombre usa Caveat, distribuida bajo SIL OFL (licencia en `public/assets/fonts/caveat-OFL.txt`). No atribuye firmas al ejecutor ni al coordinador: el certificado muestra la firma registrada del destinatario y el cierre identifica a quien elaboró el acta.
+La vista pública y el PDF usan `CompletionDocument`. El diseño sigue la referencia del acta de recibo suministrada: documento blanco, logo institucional, tabla de datos, secciones numeradas y certificado de firma con pista de auditoría. El texto del documento usa Noto Sans y la representación por nombre usa Caveat, ambas distribuidas bajo SIL OFL (licencias en `public/assets/fonts/`). Las dos fuentes se incluyen dentro del HTML y del PDF: el Chromium alojado no necesita tener Arial instalada ni descargar fuentes para el acta. No atribuye firmas al ejecutor ni al coordinador: el certificado muestra la firma registrada del destinatario y el cierre identifica a quien elaboró el acta.
 
 ## PDF
 
 - `CompletionPdf` usa `HtmlPdfRenderer` y la configuración existente `SCM_GOTENBERG_URL`, `SCM_GOTENBERG_USERNAME` y `SCM_GOTENBERG_PASSWORD` (o Chromium local).
-- El renderer recibe las mismas hojas de estilo que la vista pública. Las fotografías se verifican contra su SHA-256 y se incluyen como imágenes embebidas; la fuente de la firma también se incluye en el HTML enviado a Chromium.
+- El renderer recibe las mismas hojas de estilo que la vista pública. Las fotografías se verifican contra su SHA-256 y se incluyen como imágenes embebidas; las fuentes del cuerpo y de la firma también se incluyen en el HTML enviado a Chromium. Esto evita letras en cuadrados en servidores sin fuentes del sistema. Este ajuste de fuentes se despliega con el panel PHP, sin cambios adicionales en la app Node.
 - Si la conversión falla, la transacción de firma/cierre se revierte. No se guarda una versión con diseño alternativo.
 - Los PDFs firmados originales se siguen validando con hash/HMAC y se devuelven sin regenerar, tanto al destinatario como al funcionario. El diseño nuevo aplica a las nuevas firmas.
 - Si se usa la app Node incluida en `pdf-renderer-node`, volver a desplegarla para aplicar el límite de HTML de 32 MiB, necesario para las fotografías embebidas de actas grandes. `PDF_MAX_HTML_MB` permite configurar entre 8 y 48 MiB. Conserva las credenciales existentes. Gotenberg debe aceptar un tamaño equivalente.
@@ -22,3 +22,5 @@ La vista pública y el PDF usan `CompletionDocument`. El diseño sigue la refere
 ## Verificación
 
 `php tests/ticket-completion-check.php --database --pdf-fixture` verifica el flujo con tablas temporales y transporte simulado. `php tests/ticket-completion-delivery-check.php` verifica la cola y el worker con proveedores inertes, incluido el procesamiento inmediato aislado y el reintento tras fallo. Ninguna prueba envía mensajes externos ni modifica casos reales.
+
+`php tests/ticket-completion-font-check.php` comprueba con Chromium local, sin solicitudes de fuentes externas, que el PDF incluye Noto Sans y Caveat y no usa Arial del sistema.

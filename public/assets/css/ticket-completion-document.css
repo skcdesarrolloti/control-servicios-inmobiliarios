@@ -1,18 +1,19 @@
 /* Receipt document inspired by the supplied acta: white paper, numbered sections,
    neutral data table and a separate electronic signature certificate. */
+@font-face { font-family:'SCM Acta Sans'; src:url('../fonts/noto-sans.ttf') format('truetype'); font-style:normal; font-weight:100 900; font-display:swap; }
 @font-face { font-family:Caveat; src:url('../fonts/caveat.ttf') format('truetype'); font-style:normal; font-weight:400 700; font-display:swap; }
-.scm-acta-receipt { box-sizing:border-box; --acta-ink:#202020; --acta-muted:#555; --acta-border:#bbb; width:100%; max-width:960px; margin:0 auto; padding:48px 64px; border:1px solid #ddd; border-radius:0; box-shadow:0 8px 30px #00000008; color:#292929; font:15px/1.65 Arial, sans-serif; }
+.scm-acta-receipt { box-sizing:border-box; --acta-ink:#202020; --acta-muted:#555; --acta-border:#bbb; width:100%; max-width:960px; margin:0 auto; padding:48px 64px; border:1px solid #ddd; border-radius:0; box-shadow:0 8px 30px #00000008; color:#292929; font:15px/1.65 'SCM Acta Sans',Arial, sans-serif; }
 .scm-acta-receipt * { box-sizing:border-box; }
 .scm-acta-receipt .scm-acta-receipt-head { display:flex; flex-direction:column; align-items:stretch; gap:0; padding-bottom:22px; border-bottom:1px solid #ccc; }
 .scm-acta-receipt .scm-acta-logo { align-self:flex-end; width:190px; min-height:76px; flex-basis:auto; margin:0 0 24px; padding:10px 14px; border-radius:3px; box-shadow:none; }
 .scm-acta-receipt .scm-acta-logo img { max-height:54px; filter:none; }
 .scm-acta-receipt .scm-acta-company { margin:0 0 8px; text-transform:uppercase; font-size:15px; }
-.scm-acta-receipt h1 { margin:0; color:#111; font:400 30px/1.4 Arial,sans-serif; }
+.scm-acta-receipt h1 { margin:0; color:#111; font:400 30px/1.4 'SCM Acta Sans',Arial,sans-serif; }
 .scm-acta-receipt .scm-acta-receipt-state { margin:12px 0 0; color:#666; font-size:12px; }
 .scm-acta-receipt .scm-acta-receipt-date { margin:26px 0 36px; color:#4b4b4b; font-size:13px; }
-.scm-acta-receipt h2 { margin:0 0 22px; color:#181818; font:bold 21px/1.35 Arial,sans-serif; }
-.scm-acta-receipt h3 { margin:0 0 16px; color:#444; font:bold 15px/1.5 Arial,sans-serif; }
-.scm-acta-receipt h4 { margin:18px 0 12px; color:#444; font:bold 13px/1.5 Arial,sans-serif; }
+.scm-acta-receipt h2 { margin:0 0 22px; color:#181818; font:bold 21px/1.35 'SCM Acta Sans',Arial,sans-serif; }
+.scm-acta-receipt h3 { margin:0 0 16px; color:#444; font:bold 15px/1.5 'SCM Acta Sans',Arial,sans-serif; }
+.scm-acta-receipt h4 { margin:18px 0 12px; color:#444; font:bold 13px/1.5 'SCM Acta Sans',Arial,sans-serif; }
 .scm-acta-receipt .scm-acta-receipt-section { margin:30px 0; }
 .scm-acta-receipt .scm-acta-receipt-data { margin:0; font-size:14px; border-collapse:collapse; table-layout:fixed; }
 .scm-acta-receipt .scm-acta-receipt-data th { width:42%; font-weight:700; }
@@ -39,7 +40,7 @@
 .scm-acta-receipt .scm-acta-certificate-head p { margin:12px 0 0; }
 .scm-acta-receipt .scm-acta-certificate-row { display:grid; grid-template-columns:1.4fr 1fr; gap:48px; align-items:center; margin:0 0 36px; }
 .scm-acta-receipt .scm-acta-typed-signature { margin:0; padding-bottom:8px; border-bottom:2px dotted #333; font:600 34px/1.3 Caveat,'Segoe Print',Georgia,serif; overflow-wrap:anywhere; }
-.scm-acta-receipt .scm-acta-signature-mark small { display:block; margin-top:6px; font:italic 10px/1.5 Arial,sans-serif; }
+.scm-acta-receipt .scm-acta-signature-mark small { display:block; margin-top:6px; font:italic 10px/1.5 'SCM Acta Sans',Arial,sans-serif; }
 .scm-acta-receipt .scm-acta-signature-contact { font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
 .scm-acta-receipt .scm-acta-signature-contact strong { color:#111; font-size:14px; }
 .scm-acta-receipt .scm-acta-signature-contact p { margin:4px 0; }
@@ -64,8 +65,8 @@
 }
 @page {
   size:letter; margin:18mm 18mm 16mm;
-  @bottom-left { content:'SKC SuCasa Inmobiliaria'; color:#888; font:9px Arial,sans-serif; }
-  @bottom-center { content:'Página ' counter(page) ' / ' counter(pages); color:#888; font:9px Arial,sans-serif; }
+  @bottom-left { content:'SKC SuCasa Inmobiliaria'; color:#888; font:9px 'SCM Acta Sans',Arial,sans-serif; }
+  @bottom-center { content:'Página ' counter(page) ' / ' counter(pages); color:#888; font:9px 'SCM Acta Sans',Arial,sans-serif; }
 }
 @media print {
   html,body.scm-acta-page { margin:0; padding:0; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }

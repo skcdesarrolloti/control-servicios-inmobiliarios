@@ -25,16 +25,21 @@ final class HtmlPdfRenderer
     $base = htmlspecialchars(rtrim((string) SCM_BASE_URL, '/') . '/', ENT_QUOTES, 'UTF-8');
     $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
     $css = implode("\n", array_map(static fn(string $path): string => (string) file_get_contents($path), $cssPaths));
-    $fontPath = dirname(__DIR__, 2) . '/public/assets/fonts/caveat.ttf';
-    if (str_contains($css, '../fonts/caveat.ttf') && is_readable($fontPath)) {
-      $css = str_replace('../fonts/caveat.ttf', 'data:font/ttf;base64,' . base64_encode((string) file_get_contents($fontPath)), $css);
+    // The hosted Chromium may have no system fonts. Send both body and signature
+    // fonts with the document rather than relying on Arial or remote font requests.
+    foreach (['noto-sans.ttf', 'caveat.ttf'] as $fontName) {
+      $reference = '../fonts/' . $fontName;
+      if (!str_contains($css, $reference)) continue;
+      $fontPath = dirname(__DIR__, 2) . '/public/assets/fonts/' . $fontName;
+      if (!is_readable($fontPath)) throw new \RuntimeException('Falta una fuente requerida para el PDF: ' . $fontName);
+      $css = str_replace($reference, 'data:font/ttf;base64,' . base64_encode((string) file_get_contents($fontPath)), $css);
     }
     $bodyClass = htmlspecialchars((string) ($options['body_class'] ?? ''), ENT_QUOTES, 'UTF-8');
     $wrapperClass = htmlspecialchars((string) ($options['wrapper_class'] ?? 'scm-cotizacion-native-print-root'), ENT_QUOTES, 'UTF-8');
     $containerClass = htmlspecialchars((string) ($options['container_class'] ?? 'scm-cotizacion-native-modal'), ENT_QUOTES, 'UTF-8');
     $content = self::inlineConfiguredLogo($content);
     $html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><base href="' . $base . '"><title>' . $safeTitle . '</title>'
-      . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">'
+      . (($options['external_fonts'] ?? true) ? '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">' : '')
       . '<style>' . $css . '</style></head><body class="' . $bodyClass . '"><main class="' . $containerClass . '"><div class="' . $wrapperClass . '">' . $content . '</div></main></body></html>';
 
     try {
