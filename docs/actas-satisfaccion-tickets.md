@@ -10,6 +10,12 @@ también su registro relacionado por `_ID`. No se acepta un correo arbitrario
 desde el formulario. Para personas jurídicas se indica el nombre del representante
 que firmará en el correo registrado.
 
+El tipo de inmueble del acta se toma primero del contrato relacionado. Si está
+vacío, se consulta la ficha del inmueble web mediante `id_inmueble_data` o el
+código web `id_inmueble`. No se usa el número SIMI como `_ID` ni el tipo antiguo
+del ticket. Esta información se copia al crear o guardar un acta pendiente;
+las actas firmadas conservan su contenido y PDF originales.
+
 Las actas y revisiones correctivas no tienen límite de **cantidad de fotos**, ni
 por detalle ni por registro. La precarga de daños conserva todas las fotos válidas.
 El navegador reduce cada
@@ -363,6 +369,7 @@ php tests/ticket-completion-check.php
 php tests/ticket-completion-check.php --database
 php tests/ticket-completion-delivery-check.php
 php tests/ticket-completion-internal-notification-check.php
+php tests/ticket-completion-property-type-check.php
 ```
 
 El primer comando prueba validación y números sin base de datos. El segundo

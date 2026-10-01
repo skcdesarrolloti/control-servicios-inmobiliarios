@@ -893,8 +893,46 @@ final class CompletionService
   /** @return array{tipo_inmueble:string,tipo_negocio:string,destinacion:string} */
   private function propertyMeta(array $ticket): array
   {
+    $contract = [];
+    $contractTable = $this->repo->db->table('jet_cct_contratos_arrendamiento');
+    if ($this->repo->schema->tableExists($contractTable)) {
+      $id = trim((string) ($ticket['id_contrato'] ?? ''));
+      if (ctype_digit($id) && (int) $id > 0) {
+        $contract = $this->repo->db->getRow("SELECT * FROM `{$contractTable}` WHERE `_ID` = ? LIMIT 1", [(int) $id]) ?: [];
+      }
+      $number = ltrim(trim((string) ($ticket['contrato'] ?? '')), '# ');
+      if (!$contract && $number !== '' && $this->repo->schema->columnExists($contractTable, 'contrato')) {
+        $contract = $this->repo->db->getRow("SELECT * FROM `{$contractTable}` WHERE `contrato` = ? LIMIT 1", [$number]) ?: [];
+      }
+    }
+    $typeKeys = ['tipo_inmueble', 'tipo_de_inmueble', 'tipo_de_inmueble_texto'];
+    $type = self::firstText($contract, $typeKeys);
+    $propertyTable = $this->repo->db->table('jet_cct_inmuebles');
+    if ($type === '' && $this->repo->schema->tableExists($propertyTable)) {
+      $property = [];
+      // Only id_inmueble_data is a CCT primary id; never treat web or SIMI codes as _ID.
+      foreach ([$contract['id_inmueble_data'] ?? '', $ticket['id_inmueble_data'] ?? ''] as $candidate) {
+        $id = trim((string) $candidate);
+        if (!ctype_digit($id) || (int) $id <= 0) { continue; }
+        $property = $this->repo->db->getRow("SELECT * FROM `{$propertyTable}` WHERE `_ID` = ? LIMIT 1", [(int) $id]) ?: [];
+        if ($property) { break; }
+      }
+      if (!$property) {
+        $codeColumns = array_values(array_filter(['codigo', 'id_ticket'], fn(string $column): bool => $this->repo->schema->columnExists($propertyTable, $column)));
+        if ($codeColumns) {
+          $where = implode(' OR ', array_map(static fn(string $column): string => "`{$column}` = ?", $codeColumns));
+          foreach ([$contract['id_inmueble'] ?? '', $ticket['id_inmueble'] ?? ''] as $candidate) {
+            $code = trim((string) $candidate);
+            if ($code === '') { continue; }
+            $property = $this->repo->db->getRow("SELECT * FROM `{$propertyTable}` WHERE {$where} LIMIT 1", array_fill(0, count($codeColumns), $code)) ?: [];
+            if ($property) { break; }
+          }
+        }
+      }
+      $type = self::firstText($property, $typeKeys);
+    }
     return [
-      'tipo_inmueble' => self::firstText($ticket, ['tipo_inmueble', 'tipo_de_inmueble', 'tipo_de_inmueble_texto']),
+      'tipo_inmueble' => $type,
       'tipo_negocio' => self::firstText($ticket, ['tipo_negocio']),
       'destinacion' => self::firstText($ticket, ['destinacion']),
     ];
