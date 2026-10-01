@@ -2,6 +2,8 @@
 
 Esta aplicación Node recibe el HTML que envía el panel PHP y devuelve el PDF con Chromium. Su ruta `POST /forms/chromium/convert/html` es compatible con la integración actual del panel. Requiere autenticación básica y HTTPS en producción.
 
+Puppeteer se comunica con Chromium mediante `pipe: true`, sin un puerto WebSocket en localhost. Esto evita el fallo `connect ECONNREFUSED 127.0.0.1:<puerto>` observado en el alojamiento aunque Chrome ya haya arrancado. El registro inicial incluye `Chromium transport: pipe` para confirmar que se desplegó esta versión.
+
 ## Crear la aplicación en Hostinger Cloud
 
 1. En hPanel, entra a **Sitios web → Añadir sitio web → Desplegar aplicación web** y elige **Node.js**. Usa un **subdominio nuevo**, por ejemplo `pdf.tudominio.com`; conserva el sitio PHP actual.

@@ -54,6 +54,8 @@ async function getBrowser() {
   browser = await puppeteer.launch({
     headless: true,
     executablePath,
+    // Avoid a localhost WebSocket: some hosted runtimes reject that connection.
+    pipe: true,
     dumpio: process.env.PDF_BROWSER_DEBUG !== '0',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   });
@@ -142,7 +144,7 @@ if (!Number.isInteger(port) || port < 1 || port > 65535 || !username || !passwor
   process.exit(1);
 }
 
-server.listen(port, '0.0.0.0', () => console.log(`SKC PDF renderer listening on ${port}`));
+server.listen(port, '0.0.0.0', () => console.log(`SKC PDF renderer listening on ${port} (Chromium transport: pipe)`));
 
 for (const signal of ['SIGTERM', 'SIGINT']) {
   process.on(signal, async () => {
