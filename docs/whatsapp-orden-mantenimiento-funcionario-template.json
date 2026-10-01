@@ -8,16 +8,18 @@
       "type": "BODY",
       "text": "Buen día, {{1}}.\n\nTienes una orden de mantenimiento #{{2}} pendiente por aprobar del caso #{{3}} por {{4}}.\n\nCategoría: {{5}}.\nProveedor: {{6}}.\nDirección: {{7}}.\n\nPuedes revisar y responder la orden desde el botón.\n\nAtentamente,\n{{8}}\nSKC SuCasa Inmobiliaria",
       "example": {
-        "body_text": [[
-          "Royner Guardo",
-          "98",
-          "10676",
-          "$ 250.000",
-          "Materiales",
-          "Homecenter",
-          "Urbanización Simón Bolívar manzana 20 lote 7",
-          "Royner Guardo"
-        ]]
+        "body_text": [
+          [
+            "Royner Guardo",
+            "98",
+            "10676",
+            "$ 250.000",
+            "Materiales",
+            "Homecenter",
+            "Urbanización Simón Bolívar manzana 20 lote 7",
+            "Funcionario de ejemplo - Coordinador de mantenimiento - Cel. 3001234567"
+          ]
+        ]
       }
     },
     {

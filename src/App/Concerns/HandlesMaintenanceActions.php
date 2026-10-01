@@ -2851,6 +2851,7 @@ trait HandlesMaintenanceActions
 
       $actor = $this->ticketCompletionActor();
       $actorName = trim((string) ($actor['name'] ?? Auth::user())) ?: 'SKC SuCasa Inmobiliaria';
+      $actorSignature = (new \SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService($this->db))->senderProfile()['signature_line'];
       $actorEmail = trim((string) ($actor['email'] ?? ''));
       $ticketRef = trim((string) ($quote['id_ticket'] ?? ''));
       $total = $this->format_cop_currency($sendTotals['total'] ?? ($quote['total'] ?? 0));
@@ -2862,7 +2863,7 @@ trait HandlesMaintenanceActions
         . '<p style="line-height:1.65;margin:0 0 14px;">Te compartimos la cotización de mantenimiento <b>#' . \SCM\Support\EmailTemplate::e((string) $cotizacionId) . '</b>' . ($ticketRef !== '' ? ' asociada al caso <b>#' . \SCM\Support\EmailTemplate::e($ticketRef) . '</b>' : '') . '.</p>'
         . '<p style="line-height:1.65;margin:0 0 14px;">Contrato: <b>#' . \SCM\Support\EmailTemplate::e($contratoRef !== '' ? $contratoRef : '-') . '</b><br>Dirección: <b>' . \SCM\Support\EmailTemplate::e($direccionRef !== '' ? $direccionRef : '-') . '</b></p>'
         . '<p style="line-height:1.65;margin:0 0 14px;">El valor total registrado es <b>' . \SCM\Support\EmailTemplate::e($total) . '</b>. Adjuntamos el PDF de la cotización y también puedes verla y responderla desde el botón seguro.</p>'
-        . '<p style="line-height:1.65;margin:0;">Cordialmente,<br><b>' . \SCM\Support\EmailTemplate::e($actorName) . '</b><br>SKC SuCasa Inmobiliaria</p>';
+        . '<p style="line-height:1.65;margin:0;">Atentamente,<br><b>' . \SCM\Support\EmailTemplate::e($actorSignature) . '</b><br>SKC SuCasa Inmobiliaria</p>';
       $html = \SCM\Support\EmailTemplate::render($subject, $content, [
         'buttons' => [
           ['url' => $quoteUrl, 'label' => 'Ver y responder cotización'],
@@ -2900,7 +2901,7 @@ trait HandlesMaintenanceActions
       $message .= "Dirección: " . ($direccionRef !== '' ? $direccionRef : '-') . ".\n\n";
       $message .= "Puedes ver el PDF adjunto y responder la cotización desde el botón.\n\n";
       $message .= "Enlace directo: {$quoteUrl}\n\n";
-      $message .= "Atentamente,\n{$actorName}\nSKC SuCasa Inmobiliaria";
+      $message .= "Atentamente,\n{$actorSignature}\nSKC SuCasa Inmobiliaria";
       $whatsappOk = $smsQueue->enqueue($whatsappPhone, $destinatario, $message, [
         'source_module' => 'cotizaciones_mantenimiento_envio',
         'campaign_tag' => 'cotizaciones_mantenimiento_envio',
@@ -2935,7 +2936,7 @@ trait HandlesMaintenanceActions
               ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($total)],
               ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($contratoRef !== '' ? $contratoRef : '-')],
               ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($direccionRef !== '' ? $direccionRef : '-')],
-              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($actorName)],
+              ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($actorSignature)],
             ],
           ],
           [
@@ -4057,7 +4058,7 @@ trait HandlesMaintenanceActions
     $total = $this->format_cop_currency($order['valor'] ?? 0);
     $provider = $this->maintenance_order_first([$order['proveedor'] ?? '', '-']);
     $direction = $this->maintenance_order_first([$order['direccion'] ?? '', $cotizacion['direccion'] ?? '', '-']);
-    $actor = $this->maintenance_order_first([$user['nombre'] ?? '', 'SKC SuCasa Inmobiliaria']);
+    $actor = (new \SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService($this->db))->senderProfile()['signature_line'];
 
     foreach ($recipients as $recipient) {
       $phone = trim((string) ($recipient['phone'] ?? ''));

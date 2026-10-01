@@ -437,6 +437,7 @@ final class RentIncreaseService
       'id_empleado' => (string) ($employee['id_empleado'] ?? Auth::employeeId() ?: Auth::userId()),
       'creador' => (string) ($employee['nombre'] ?? Auth::user()),
       'contractual' => $this->firstNonEmpty([$contractualCoordinator['nombre'] ?? '', $branch['nombre_contractual'] ?? '', $branch['nombre'] ?? '', 'Coordinador Contractual, Mantenimiento y Servicios Públicos']),
+      'cargo_contractual' => $this->firstNonEmpty([$contractualCoordinator['cargo'] ?? '', 'Coordinador Contractual, Mantenimiento y Servicios Públicos']),
       'correo_contractual' => $this->firstNonEmpty([$contractualCoordinator['correo'] ?? '', $branch['correo_contractual'] ?? '', $branch['correo'] ?? '']),
       'celular_contractual' => $this->firstNonEmpty([$contractualCoordinator['celular'] ?? '', $branch['celular_contractual'] ?? '', $branch['telefono'] ?? '']),
       'representante_legal' => $this->firstNonEmpty([$legalRepresentative['nombre'] ?? '', $branch['representante_legal'] ?? '', 'Representante legal']),
@@ -670,7 +671,10 @@ final class RentIncreaseService
   /** @param array<string,mixed> $context */
   private function signatureLine(array $context): string
   {
-    return trim((string) ($context['contractual'] ?? 'Coordinador Contractual') . ' - ' . (string) ($context['celular_contractual'] ?? ''), " \t\n\r\0\x0B-");
+    $name = trim((string) ($context['contractual'] ?? 'Coordinador Contractual'));
+    $cargo = trim((string) ($context['cargo_contractual'] ?? 'Coordinador Contractual, Mantenimiento y Servicios Públicos'));
+    $phone = trim((string) ($context['celular_contractual'] ?? ''));
+    return implode(' - ', array_filter([$name, $cargo, $phone !== '' ? 'Cel. ' . $phone : ''], static fn(string $part): bool => $part !== ''));
   }
 
   private function waText(string $text): string

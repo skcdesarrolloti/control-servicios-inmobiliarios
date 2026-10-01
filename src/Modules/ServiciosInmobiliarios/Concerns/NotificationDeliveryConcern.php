@@ -157,6 +157,7 @@ trait NotificationDeliveryConcern
   /** @param array<string,mixed> $ticket @param array<string,string> $notice @return array{email:int,whatsapp:int} */
   private function notifyPreventivaNoAccessNotice(array $ticket, string $logicalTicket, array $notice, int $attempt, string $userName): array
   {
+    $userName = (new \SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService($this->db))->senderProfile()['signature_line'];
     $emailSent = 0;
     $whatsappSent = 0;
     $tenantEmail = trim((string)($ticket['correo_arrendatario'] ?? $ticket['correo_solicitante'] ?? ''));
@@ -243,6 +244,7 @@ trait NotificationDeliveryConcern
   /** @param array<string,mixed> $ticket @param array<string,mixed> $cotizacion @param array<string,string> $notice @return array{email:int,whatsapp:int} */
   private function notifyRepairFollowupNotice(array $ticket, array $cotizacion, string $logicalTicket, array $notice, int $attempt, int $elapsedDays, string $userName): array
   {
+    $userName = (new \SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService($this->db))->senderProfile()['signature_line'];
     $emailSent = 0;
     $whatsappSent = 0;
     $quoteId = $this->firstNonEmpty([$cotizacion['_ID'] ?? '', $cotizacion['id_cotizacion_mantenimiento'] ?? '', $cotizacion['id_cotizacion'] ?? '']);

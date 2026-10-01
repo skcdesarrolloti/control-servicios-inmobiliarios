@@ -452,8 +452,9 @@ final class PublicServicesLiquidatorService
   private function signatureLine(array $context): string
   {
     $name = trim((string) ($context['realizado_por'] ?? 'Control Servicios Inmobiliarios'));
+    $cargo = trim((string) ($context['realizado_por_cargo'] ?? ''));
     $phone = trim((string) ($context['realizado_por_telefono'] ?? ''));
-    return trim($name . ($phone !== '' ? ' - ' . $phone : ''));
+    return implode(' - ', array_filter([$name, $cargo, $phone !== '' ? 'Cel. ' . $phone : ''], static fn(string $part): bool => $part !== ''));
   }
 
   /** @param array<int,array<string,string>> $recipients @return array<int,array<string,string>> */

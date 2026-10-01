@@ -7,14 +7,26 @@
       "type": "HEADER",
       "format": "DOCUMENT",
       "example": {
-        "header_handle": ["cotizacion-mantenimiento-ejemplo.pdf"]
+        "header_handle": [
+          "cotizacion-mantenimiento-ejemplo.pdf"
+        ]
       }
     },
     {
       "type": "BODY",
       "text": "Buen día, {{1}}.\n\nTe compartimos la cotización de mantenimiento #{{2}} del caso #{{3}} por {{4}}.\n\nContrato: #{{5}}.\nDirección: {{6}}.\n\nPuedes ver el PDF adjunto y responder la cotización desde el botón.\n\nAtentamente,\n{{7}}\nSKC SuCasa Inmobiliaria",
       "example": {
-        "body_text": [["María Pérez", "552", "10676", "$ 250.000", "2000", "Urbanización Simón Bolívar manzana 20 lote 7", "Royner Guardo"]]
+        "body_text": [
+          [
+            "María Pérez",
+            "552",
+            "10676",
+            "$ 250.000",
+            "2000",
+            "Urbanización Simón Bolívar manzana 20 lote 7",
+            "Funcionario de ejemplo - Coordinador de mantenimiento - Cel. 3001234567"
+          ]
+        ]
       }
     },
     {
@@ -24,7 +36,9 @@
           "type": "URL",
           "text": "Ver y responder",
           "url": "https://sucasainmobiliaria.com.co/{{1}}",
-          "example": ["control-servicios-inmobiliarios/public/cotizacion-mantenimiento.php?numero=552&expires=1789680400&sig=abc123"]
+          "example": [
+            "control-servicios-inmobiliarios/public/cotizacion-mantenimiento.php?numero=552&expires=1789680400&sig=abc123"
+          ]
         }
       ]
     }
