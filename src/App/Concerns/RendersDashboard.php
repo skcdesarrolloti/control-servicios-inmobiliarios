@@ -1727,6 +1727,7 @@ trait RendersDashboard
         </div>
       </div>
     </div>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/ticket-completion-form-state.js?v=' . SCM_VERSION); ?>" defer></script>
     <script src="<?php echo $jsUrl; ?>" defer></script>
     <script src="<?php echo $dashboardRuntimeJsUrl; ?>" defer></script>
     <script src="<?php echo $collectionManagementJsUrl; ?>" defer></script>

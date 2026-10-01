@@ -390,21 +390,13 @@ trait HandlesCorrectiveReviewActions
   /** @param array<int,array<string,string>> $items @param array<int,array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}> $storedPhotos @return array<int,array<string,string>> */
   private function correctiveReviewAttachUploadedPhotos(array $items, array &$storedPhotos): array
   {
-    $photoTotal = 0;
     foreach ($items as $index => &$item) {
       $existingPhotos = $this->correctiveReviewSplitPhotoRefs((string) ($item['registro_foto_dano'] ?? ''));
       $field = 'corrective_review_photos_' . $index;
       $names = $_FILES[$field]['name'] ?? [];
       $names = is_array($names) ? array_values(array_filter($names, static fn($name): bool => trim((string) $name) !== '')) : [];
-      if ((count($existingPhotos) + count($names)) > 10) {
-        throw new \DomainException('Cada daño admite máximo 10 fotos.');
-      }
-      $photoTotal += count($existingPhotos) + count($names);
-      if ($photoTotal > 30) {
-        throw new \DomainException('La revisión admite máximo 30 fotos en total.');
-      }
       if ($names) {
-        $photos = $this->handleImageUploadsDetailed($field, 10);
+        $photos = $this->handleImageUploadsDetailed($field, count($names));
         if (count($photos) !== count($names)) {
           throw new \DomainException('No se pudieron procesar todas las fotos. Usa imágenes JPG, PNG o WebP de máximo ' . (int) floor(SCM_UPLOAD_MAX_BYTES / 1048576) . ' MB cada una.');
         }
@@ -1040,7 +1032,7 @@ trait HandlesCorrectiveReviewActions
         <label>Registro fotográfico
           <input type="file" name="<?= $h($photoField) ?>" accept="image/jpeg,image/png,image/webp" multiple data-corrective-photos>
         </label>
-        <small><?= $acta ? 'Máximo 4 fotos del daño en el acta. Se guardarán también en la revisión correctiva.' : 'Máximo 10 fotos por daño y 30 por revisión.' ?> Se comprimen automáticamente antes de guardarlas.</small>
+        <small><?= $acta ? 'Sin límite de cantidad de fotos. Se guardarán también en la revisión correctiva.' : 'Sin límite de cantidad de fotos.' ?> Se comprimen automáticamente antes de guardarlas.</small>
         <div class="scm-acta-photo-preview" data-corrective-photo-preview>
           <?php foreach ($photos as $photoIndex => $photo): ?>
             <figure data-corrective-existing-photo>

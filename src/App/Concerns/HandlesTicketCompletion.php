@@ -71,7 +71,6 @@ trait HandlesTicketCompletion
         $items = is_array($input['items'] ?? null) ? $input['items'] : [];
         $storedPhotos = [];
         $storedBytes = 0;
-        $requestedTotal = 0;
         $actId = (int) ($_POST['act_id'] ?? 0);
         $oldPhotoNames = [];
         $allowedDamagePhotos = [];
@@ -170,19 +169,15 @@ trait HandlesTicketCompletion
           }
           $oldPayload = $service->payload($existingAct);
           foreach ((array) ($oldPayload['items'] ?? []) as $oldItem) {
-          foreach ((array) ($oldItem['damage_photos'] ?? []) as $oldDamagePhoto) {
-            if (is_array($oldDamagePhoto)) { $allowExistingDamagePhoto($oldDamagePhoto); }
-          }
+            foreach ((array) ($oldItem['damage_photos'] ?? []) as $oldDamagePhoto) {
+              if (is_array($oldDamagePhoto)) {
+                $allowExistingDamagePhoto($oldDamagePhoto);
+                $trackOldPhoto($oldDamagePhoto);
+              }
+            }
             $verifyOldPhotos((array) ($oldItem['photos'] ?? []), $allowExistingPhoto);
           }
         }
-        foreach (array_keys($items) as $index) {
-          $names = $_FILES['acta_item_photos_' . $index]['name'] ?? [];
-          $names = is_array($names) ? array_values(array_filter($names, static fn($name): bool => trim((string) $name) !== '')) : [];
-          if (count($names) > 4) { throw new \DomainException('Cada daño admite máximo 4 fotos.'); }
-          $requestedTotal += count($names);
-        }
-        if ($requestedTotal > 12) { throw new \DomainException('El acta admite máximo 12 fotos en total.'); }
         foreach ($items as $index => &$item) {
           if (!is_array($item)) { continue; }
           $keptDamagePhotos = $keptPostedPhotos($item['damage_photos'] ?? [], $allowedDamagePhotos);
@@ -199,10 +194,10 @@ trait HandlesTicketCompletion
           $damageNames = $_FILES[$damageField]['name'] ?? [];
           $damageNames = is_array($damageNames) ? array_values(array_filter($damageNames, static fn($name): bool => trim((string) $name) !== '')) : [];
           if ($damageNames) {
-            if (!is_array($item['corrective'] ?? null) || trim((string) ($item['corrective_sync_id'] ?? '')) !== '' || count($damageNames) > 4) {
+            if (!is_array($item['corrective'] ?? null) || trim((string) ($item['corrective_sync_id'] ?? '')) !== '') {
               throw new \DomainException('El registro fotográfico del daño no es válido.');
             }
-            $damageUploads = $this->handleImageUploadsDetailed($damageField, 4);
+            $damageUploads = $this->handleImageUploadsDetailed($damageField, count($damageNames));
             if (count($damageUploads) !== count($damageNames)) {
               $this->storedFiles()->deleteStoredImages(array_merge($storedPhotos, $damageUploads));
               throw new \DomainException('No se pudieron procesar las fotos del daño.');
@@ -217,9 +212,9 @@ trait HandlesTicketCompletion
               ];
               $storedBytes += (int) $photo['bytes'];
             }
-            if (count($item['damage_photos']) > 4 || $storedBytes > 8000000) {
+            if ($storedBytes > 8000000) {
               $this->storedFiles()->deleteStoredImages($storedPhotos);
-              throw new \DomainException('El acta admite máximo 4 fotos de daño por detalle y 8 MB en total.');
+              throw new \DomainException('Las fotos del acta superan 8 MB después de comprimir.');
             }
             $item['corrective']['registro_foto_dano'] = implode(',', $refs);
           }
@@ -227,7 +222,7 @@ trait HandlesTicketCompletion
           $names = $_FILES[$field]['name'] ?? [];
           $names = is_array($names) ? array_values(array_filter($names, static fn($name): bool => trim((string) $name) !== '')) : [];
           if (!$names) { continue; }
-          $photos = $this->handleImageUploadsDetailed($field, 4);
+          $photos = $this->handleImageUploadsDetailed($field, count($names));
           if (count($photos) !== count($names)) {
             $this->storedFiles()->deleteStoredImages(array_merge($storedPhotos, $photos));
             throw new \DomainException('No se pudieron procesar todas las fotos. Usa imágenes JPG, PNG o WebP de máximo ' . (int) floor(SCM_UPLOAD_MAX_BYTES / 1048576) . ' MB cada una.');
@@ -267,7 +262,7 @@ trait HandlesTicketCompletion
               }
             }
             $removedPhotos = array_map(static fn(string $name): array => ['name' => $name], array_values(array_diff($oldPhotoNames, array_keys($keptNames))));
-            if ($removedPhotos) { $this->storedFiles()->deleteStoredImages($removedPhotos); }
+            if ($removedPhotos) { $this->storedFiles()->deleteStoredImages($repo->unreferencedActPhotos($removedPhotos)); }
           }
           $result['redirect_url'] = $service->dashboardUrlForTicket($repo->ticket($ticketId), 'pending');
         }

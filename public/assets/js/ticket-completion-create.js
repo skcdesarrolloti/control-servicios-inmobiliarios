@@ -11,8 +11,6 @@
     var match = field && field.name.match(/^items\[(\d+)\]/);
     return match ? Math.max(next, Number(match[1]) + 1) : next;
   }, 0);
-  var MAX_PHOTOS_PER_DAMAGE = 4;
-  var MAX_PHOTOS_PER_ACT = 12;
   var MAX_SOURCE_PHOTO_BYTES = 25 * 1024 * 1024;
 
   function message(text, error) {
@@ -122,16 +120,6 @@
       }
     }
     var next = current.concat(additions);
-    if (next.length > MAX_PHOTOS_PER_DAMAGE) {
-      syncPhotoInput(input, current);
-      notifyError("Este daño admite máximo 4 fotos. Quita alguna antes de agregar otra.");
-      return false;
-    }
-    if (totalSelectedPhotos(input) + next.length > MAX_PHOTOS_PER_ACT) {
-      syncPhotoInput(input, current);
-      notifyError("El acta admite máximo 12 fotos en total. Quita alguna foto antes de agregar otra.");
-      return false;
-    }
     if (!syncPhotoInput(input, next)) {
       input.value = "";
       input._actaFiles = [];
@@ -201,8 +189,6 @@
   function compressedFormData() {
     var data = new FormData(form);
     var inputs = Array.from(form.querySelectorAll("[data-acta-photos], [data-acta-corrective-wrap]:not([hidden]) [data-corrective-photos]"));
-    var total = inputs.reduce(function (sum, input) { return sum + selectedPhotos(input).length; }, 0);
-    if (total > MAX_PHOTOS_PER_ACT) return Promise.reject(new Error("El acta admite máximo 12 fotos en total."));
     return Promise.all(inputs.map(function (input) {
       var name = input.name;
       data.delete(name);
@@ -392,6 +378,7 @@
   }
 
   function saveActaDraft() {
+    if (form._actaState) return form._actaState.save();
     try {
       window.localStorage.setItem(actaDraftKey(), JSON.stringify(actaDraftPayload()));
     } catch (error) {
@@ -403,6 +390,7 @@
     try {
       window.localStorage.removeItem(actaDraftKey());
     } catch (error) {}
+    if (form._actaState) return form._actaState.clear();
   }
 
   function restoreActaDraft() {
@@ -494,8 +482,9 @@
         throw new Error(json && json.data && json.data.message || "No se pudo crear el acta.");
       }
       message(json.data.message || "Acta guardada. Te llevamos a Actas de satisfacción…", json.data.queued === false);
-      clearActaDraft();
-      window.location.assign(json.data.redirect_url || root.dataset.redirectUrl || "index.php?tab=actas_satisfaccion");
+      return Promise.resolve(clearActaDraft()).then(function () {
+        window.location.assign(json.data.redirect_url || root.dataset.redirectUrl || "index.php?tab=actas_satisfaccion");
+      });
     }).catch(function (error) {
       saveActaDraft();
       notifyError(error.message || "No se pudo crear el acta. Revisa los datos e inténtalo nuevamente.");
@@ -518,7 +507,7 @@
   if (fee) fee.addEventListener("input", syncTotal);
   syncSigner(false);
   syncTotal();
-  restoreActaDraft();
+  if (!window.ScmActaFormState) restoreActaDraft();
 
   form.addEventListener("click", function (event) {
     var removePhoto = event.target.closest("[data-acta-remove-photo]");
@@ -589,6 +578,8 @@
     event.preventDefault();
     submit(false);
   });
+
+  if (window.ScmActaFormState) window.ScmActaFormState.bind(form, {compress: compressPhoto});
 
   window.setInterval(function () {
     if (document.visibilityState === "hidden" || busy) return;

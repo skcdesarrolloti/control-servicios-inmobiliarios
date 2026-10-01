@@ -10,12 +10,26 @@ también su registro relacionado por `_ID`. No se acepta un correo arbitrario
 desde el formulario. Para personas jurídicas se indica el nombre del representante
 que firmará en el correo registrado.
 
-Cada daño admite hasta **4 fotos** y el acta hasta **12**. El navegador reduce cada
+Las actas y revisiones correctivas no tienen límite de **cantidad de fotos**, ni
+por detalle ni por registro. La precarga de daños conserva todas las fotos válidas.
+El navegador reduce cada
 imagen JPG, PNG o WebP a JPEG, máximo 1600 px y calidad 78 % antes de enviarla; el
 servidor vuelve a normalizarla cuando GD está disponible y siempre rechaza una
 evidencia que no termine como JPEG de máximo 1600 px y 1,5 MB. La interfaz muestra
 vistas previas y el PDF incluye las fotografías junto al daño correspondiente. El
 conjunto comprimido no puede superar 8 MB, para mantener el PDF dentro del BLOB.
+
+Las fotos de daño y solución, nuevas o precargadas, se pueden quitar individualmente.
+Al editar se conserva cualquier archivo que otra acta o revisión correctiva siga usando.
+Quitar una foto precargada del acta no elimina la evidencia de la revisión original.
+
+En el modal y en la página de creación/edición se guarda un borrador local en
+IndexedDB, con texto, detalles, fotos comprimidas y eliminaciones pendientes.
+Se recupera al abrir el mismo caso y origen en el mismo navegador y con el mismo
+funcionario. La interfaz indica cuándo terminó de guardarse. El borrador vence a
+los siete días y no se aplica si cambió la versión del acta o sus datos de origen.
+Un error al generar el acta conserva el borrador; un guardado correcto lo elimina.
+El borrador no reemplaza el botón de guardar ni se comparte entre dispositivos.
 
 Generar el acta deja `estado = En proceso` y conserva uno de los estados
 `En ejecucion por inmobiliaria/propietario/arrendatario/copropiedad`, según quién

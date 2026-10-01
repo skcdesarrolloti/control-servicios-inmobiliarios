@@ -20,6 +20,18 @@ $pdo->exec('CREATE TABLE wp_posts (ID INTEGER PRIMARY KEY, guid TEXT, post_mime_
 $pdo->exec("INSERT INTO wp_posts VALUES (42, 'https://example.test/wp-content/uploads/dano.jpg', 'image/jpeg', 'attachment')");
 $db = new Database($pdo);
 $refs = CorrectiveReviewPhotos::refs(serialize([42, 'file.php?n=aaaaaaaaaaaaaaaaaaaaaaaa_123.jpg&s=old']));
+$editor = new class {
+  use \SCM\App\Concerns\HandlesCorrectiveReviewActions;
+  public function attachExisting(array $items): array {
+    $stored = [];
+    return $this->correctiveReviewAttachUploadedPhotos($items, $stored);
+  }
+};
+$many = array_map(static fn(int $i): string => 'https://example.test/photo-' . $i . '.jpg', range(1, 35));
+$attached = $editor->attachExisting([['registro_foto_dano' => implode(',', $many)]]);
+if (count(CorrectiveReviewPhotos::refs($attached[0]['registro_foto_dano'])) !== 35) {
+  throw new RuntimeException('La revisión limitó la cantidad de fotos existentes.');
+}
 if ($refs !== ['42', 'file.php?n=aaaaaaaaaaaaaaaaaaaaaaaa_123.jpg&s=old']) {
   throw new RuntimeException('No se recuperaron las referencias de fotos serializadas.');
 }

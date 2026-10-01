@@ -135,14 +135,13 @@ final class CompletionPolicy
       throw new \DomainException('Registra entre 1 y 30 daños con su solución.');
     }
     $items = [];
-    $photoCount = 0;
     $photoBytes = 0;
     foreach ($raw as $row) {
       if (!is_array($row)) {
         throw new \DomainException('El detalle del daño no es válido.');
       }
-      $damagePhotos = self::photoList($row['damage_photos'] ?? [], $photoCount, $photoBytes);
-      $photos = self::photoList($row['photos'] ?? [], $photoCount, $photoBytes);
+      $damagePhotos = self::photoList($row['damage_photos'] ?? [], $photoBytes);
+      $photos = self::photoList($row['photos'] ?? [], $photoBytes);
       $corrective = is_array($row['corrective'] ?? null) ? $row['corrective'] : [];
       $items[] = [
         'damage' => self::text($row['damage'] ?? '', 'daño encontrado', 3000),
@@ -157,12 +156,12 @@ final class CompletionPolicy
   }
 
   /** @return array<int,array{name:string,mime:string,width:int,height:int,bytes:int,sha256:string}> */
-  private static function photoList(mixed $rawPhotos, int &$photoCount, int &$photoBytes): array
+  private static function photoList(mixed $rawPhotos, int &$photoBytes): array
   {
     $photos = [];
     if (!is_array($rawPhotos)) { throw new \DomainException('Las evidencias fotográficas no son válidas.'); }
     foreach ($rawPhotos as $photo) {
-      if (!is_array($photo) || count($photos) >= 4 || !preg_match('/^[a-f0-9]{24}_[0-9]+\.jpg$/D', (string) ($photo['name'] ?? ''))
+      if (!is_array($photo) || !preg_match('/^[a-f0-9]{24}_[0-9]+\.jpg$/D', (string) ($photo['name'] ?? ''))
         || ($photo['mime'] ?? '') !== 'image/jpeg' || !preg_match('/^[a-f0-9]{64}$/D', (string) ($photo['sha256'] ?? ''))
         || (int) ($photo['width'] ?? 0) < 1 || (int) ($photo['width'] ?? 0) > 1600
         || (int) ($photo['height'] ?? 0) < 1 || (int) ($photo['height'] ?? 0) > 1600
@@ -174,8 +173,6 @@ final class CompletionPolicy
         'width' => (int) $photo['width'], 'height' => (int) $photo['height'], 'bytes' => (int) $photo['bytes'],
         'sha256' => (string) $photo['sha256'],
       ];
-      $photoCount++;
-      if ($photoCount > 12) { throw new \DomainException('El acta admite máximo 12 fotos en total.'); }
       $photoBytes += (int) $photo['bytes'];
       if ($photoBytes > 8000000) { throw new \DomainException('Las fotos del acta superan 8 MB después de comprimir.'); }
     }

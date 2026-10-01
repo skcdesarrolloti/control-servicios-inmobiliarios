@@ -41,6 +41,9 @@ $assert(str_contains($signingForm, 'name="signature_name"') && str_contains($sig
 $photoDescriptor = ['name' => str_repeat('a', 24) . '_123.jpg', 'mime' => 'image/jpeg', 'width' => 1200, 'height' => 900, 'bytes' => 350000, 'sha256' => str_repeat('b', 64)];
 $assert(Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [$photoDescriptor]]])[0]['photos'][0]['width'] === 1200, 'compressed photo metadata accepted');
 $assert(Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'damage_photos' => [$photoDescriptor]]])[0]['damage_photos'][0]['width'] === 1200, 'damage photo metadata is kept separate from solution evidence');
+$manyPhotos = array_fill(0, 35, array_replace($photoDescriptor, ['bytes' => 1000]));
+$unlimitedItems = Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'damage_photos' => $manyPhotos, 'photos' => $manyPhotos]]);
+$assert(count($unlimitedItems[0]['damage_photos']) === 35 && count($unlimitedItems[0]['photos']) === 35, 'act accepts more than old per-kind and total photo limits');
 $rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [array_replace($photoDescriptor, ['bytes' => 1500001])]]]), 'oversized photo evidence rejected');
 $rejects(static fn() => Policy::items([['damage' => 'Humedad', 'solution' => 'Sellado', 'photos' => [array_replace($photoDescriptor, ['name' => '../otro.jpg'])]]]), 'unsafe photo path rejected');
 $rejects(static fn() => Policy::signature(['signature_name' => 'Ana Pérez'], 'Ana Pérez'), 'opening a link never constitutes consent');
@@ -55,7 +58,7 @@ $assert(Policy::phone('120363@g.us') === '', 'group WhatsApp recipients prohibit
 $assert(Policy::executionState('inmobiliaria') === 'En ejecucion por inmobiliaria', 'executor maps to an allowed administrative execution state');
 $adminJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/scm-admin.js');
 $assert(str_contains($adminJs, 'data-acta-remove-photo') && str_contains($adminJs, 'form.addEventListener("paste"'), 'act photo UI supports individual removal and pasted clipboard images');
-$assert(str_contains($adminJs, 'MAX_PHOTOS_PER_DAMAGE = 4') && str_contains($adminJs, 'MAX_PHOTOS_PER_ACT = 12'), 'act photo UI enforces visible client limits');
+$assert(!str_contains($adminJs, 'MAX_PHOTOS_PER_DAMAGE') && !str_contains($adminJs, 'MAX_PER_DAMAGE') && !str_contains($adminJs, 'MAX_TOTAL'), 'act and corrective photo UI have no quantity caps');
 $assert(str_contains($adminJs, 'request("archive", fd)') && str_contains($adminJs, 'request("delete", fd)') && str_contains($adminJs, 'event.stopPropagation()'), 'case act popup handles archive and delete without bubbling to dashboard listeners');
 $assert(str_contains($adminJs, 'sub.dataset.scmActaDashboardUrl = json.data.redirect_url') && !str_contains($adminJs, 'window.location.assign(json.data.redirect_url)'), 'case act popup stays open after creating direct or approved quote acts');
 $inlineJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/admin-dashboard-inline.js');
@@ -89,7 +92,7 @@ $assert(str_contains($directCreatePhp, '$_GET[\'token\']') && str_contains($dire
 $assert(str_contains($authPhp, 'function loginByEmployeeId') && str_contains($authPhp, 'startSessionFromFuncionario') && !str_contains($directCreatePhp, 'pass_others_apss'), 'employee autologin starts a session without reading or transporting passwords');
 $assert(str_contains($directNoncePhp, 'App::csrf()->token') && str_contains($directCreatePhp, 'data-nonce-url') && str_contains($directCreateJs, 'refreshNonce') && str_contains($directCreateJs, '240000'), 'direct act creation page refreshes CSRF before save and keeps a visible heartbeat');
 $assert(str_contains($directCreateJs, 'dataset.actaOperation') && str_contains($directCreateJs, 'data-acta-remove-existing-photo'), 'direct act creation page can update pending acts and remove existing photos');
-$assert(str_contains($directCreateJs, 'data.set("operation", operation)') && str_contains($directCreateJs, 'redirect_url') && str_contains($directCreateJs, 'MAX_PHOTOS_PER_ACT = 12'), 'direct act creation page submits through the secure endpoint and redirects to the act dashboard');
+$assert(str_contains($directCreateJs, 'data.set("operation", operation)') && str_contains($directCreateJs, 'redirect_url') && !str_contains($directCreateJs, 'MAX_PHOTOS_PER_ACT'), 'direct act creation page submits through the secure endpoint and redirects to the act dashboard');
 
 if (!in_array('--database', $argv, true)) { echo "$checks domain checks passed. Use --database for isolated SQL integration checks.\n"; exit; }
 require dirname(__DIR__) . '/bootstrap/app.php';
@@ -147,7 +150,7 @@ $db->insert($db->table('jet_cct_cotizacion_mantenimiento'), $repo->schema->filte
 ]));
 $db->update($db->table('jet_cct_tickets'), ['id_cotizacion_mantenimiento' => '7001'], ['_ID' => 1]);
 $createPanel = (new View())->panel($service->context(1), $service);
-$assert(str_contains($createPanel, 'data-acta-photo-paste') && str_contains($createPanel, 'Máximo 4 fotos de solución por daño y 12 fotos en toda el acta'), 'act form explains solution evidence limits and exposes the clipboard paste target');
+$assert(str_contains($createPanel, 'data-acta-photo-paste') && str_contains($createPanel, 'Sin límite de cantidad de fotos.'), 'act form explains unlimited photo count and exposes the clipboard paste target');
 $assert(!str_contains($createPanel, 'Reporte administrativo de cobro') && str_contains($createPanel, 'no se creará reporte administrativo nuevo desde esta acta'), 'act form does not expose administrative charge inputs');
 $createdWithTamperedTransport = $service->create(1, array_replace($input, ['transport' => '1']), $actor);
 $tamperedPayload = $service->payload($repo->act($createdWithTamperedTransport['act_id']));

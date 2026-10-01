@@ -2677,7 +2677,7 @@
         .then(function (response) {
           return response.json();
         })
-        .then(function (json) {
+        .then(async function (json) {
           if (sub._scmActaRun !== actaRun) return;
           if (!json || !json.success || !json.data)
             throw new Error(
@@ -2693,6 +2693,10 @@
                 "Acta de satisfacción",
               );
             }
+          }
+          if (operation === "create" || operation === "update") {
+            var savedActForm = body.querySelector("[data-acta-create]");
+            if (savedActForm && savedActForm._actaState) await savedActForm._actaState.clear();
           }
           body.innerHTML = json.data.html;
           bind();
@@ -2735,8 +2739,6 @@
     }
 
     function bind() {
-      var MAX_PHOTOS_PER_DAMAGE = 4;
-      var MAX_PHOTOS_PER_ACT = 12;
       var MAX_SOURCE_PHOTO_BYTES = 25 * 1024 * 1024;
 
       function photoError(text, input) {
@@ -2849,29 +2851,6 @@
           }
         }
         var next = current.concat(additions);
-        if (next.length > MAX_PHOTOS_PER_DAMAGE) {
-          syncPhotoInput(input, current);
-          photoError(
-            "Este daño admite máximo 4 fotos. Ya tienes " +
-              current.length +
-              " y estás intentando agregar " +
-              additions.length +
-              ".",
-            input,
-          );
-          return false;
-        }
-        if (
-          totalSelectedPhotos(form, input) + next.length >
-          MAX_PHOTOS_PER_ACT
-        ) {
-          syncPhotoInput(input, current);
-          photoError(
-            "El acta admite máximo 12 fotos en total. Quita alguna foto antes de agregar otra.",
-            input,
-          );
-          return false;
-        }
         if (!syncPhotoInput(input, next)) {
           input.value = "";
           input._actaFiles = [];
@@ -2980,19 +2959,12 @@
       function compressedFormData(form) {
         var data = new FormData(form),
           inputs = Array.from(form.querySelectorAll("[data-acta-photos], [data-acta-corrective-wrap]:not([hidden]) [data-corrective-photos]"));
-        var total = inputs.reduce(function (sum, input) {
-          return sum + (input.files ? input.files.length : 0);
-        }, 0);
-        if (total > 12)
-          return Promise.reject(
-            new Error("El acta admite máximo 12 fotos en total."),
-          );
         return Promise.all(
           inputs.map(function (input) {
             var name = input.name;
             data.delete(name);
             return Promise.all(
-              Array.from(input.files || []).map(compressPhoto),
+              selectedPhotos(input).map(compressPhoto),
             ).then(function (files) {
               files.forEach(function (file) {
                 data.append(name, file, file.name);
@@ -3205,6 +3177,7 @@
           }
           addPhotos(input, files);
         });
+        if (window.ScmActaFormState) window.ScmActaFormState.bind(form, {compress: compressPhoto});
         form.addEventListener("submit", function (event) {
           event.preventDefault();
           message("Comprimiendo las fotos antes de guardar…", false);
@@ -3474,8 +3447,6 @@
     }
 
     function bind() {
-      var MAX_PER_DAMAGE = 10;
-      var MAX_TOTAL = 30;
       var MAX_SOURCE_BYTES = 25 * 1024 * 1024;
 
       if (body._scmCorrectiveClickHandler) {
@@ -3643,22 +3614,6 @@
             }
           }
           var next = current.concat(additions);
-          if (next.length > MAX_PER_DAMAGE) {
-            message("Cada daño admite máximo 10 fotos.", true);
-            scmNotify("error", "Cada daño admite máximo 10 fotos.", "Fotos");
-            syncInput(input, current);
-            return false;
-          }
-          if (totalPhotos(input) + next.length > MAX_TOTAL) {
-            message("La revisión admite máximo 30 fotos en total.", true);
-            scmNotify(
-              "error",
-              "La revisión admite máximo 30 fotos en total.",
-              "Fotos",
-            );
-            syncInput(input, current);
-            return false;
-          }
           if (!syncInput(input, next)) {
             message(
               "Tu navegador no permite administrar las fotos seleccionadas. Actualiza Chrome e inténtalo de nuevo.",
@@ -3730,13 +3685,6 @@
           var inputs = Array.from(
             form.querySelectorAll("[data-corrective-photos]"),
           );
-          var total = inputs.reduce(function (sum, input) {
-            return sum + filesOf(input).length;
-          }, form.querySelectorAll("input[name$='[existing_fotos][]']").length);
-          if (total > MAX_TOTAL)
-            return Promise.reject(
-              new Error("La revisión admite máximo 30 fotos en total."),
-            );
           return Promise.all(
             inputs.map(function (input) {
               var name = input.name;

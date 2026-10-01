@@ -278,26 +278,20 @@ final class CompletionService
         'bytes' => $bytes,
         'sha256' => $hash,
       ];
-      if (count($photos) >= 4) {
-        break;
-      }
     }
-    if (count($photos) < 4 && $attachmentIds !== []) {
-      foreach ($this->attachmentPhotoDescriptorsFromIds(array_values($attachmentIds), 4 - count($photos)) as $photo) {
+    if ($attachmentIds !== []) {
+      foreach ($this->attachmentPhotoDescriptorsFromIds(array_values($attachmentIds)) as $photo) {
         $photos[$photo['name']] = $photo;
-        if (count($photos) >= 4) {
-          break;
-        }
       }
     }
     return array_values($photos);
   }
 
   /** @param int[] $ids @return array<int,array{name:string,mime:string,width:int,height:int,bytes:int,sha256:string}> */
-  private function attachmentPhotoDescriptorsFromIds(array $ids, int $limit): array
+  private function attachmentPhotoDescriptorsFromIds(array $ids): array
   {
     $ids = array_values(array_filter(array_unique(array_map('intval', $ids)), static fn(int $id): bool => $id > 0));
-    if ($ids === [] || $limit < 1) {
+    if ($ids === []) {
       return [];
     }
     $posts = $this->repo->db->table('posts');
@@ -339,9 +333,6 @@ final class CompletionService
         'bytes' => (int) $stored['bytes'],
         'sha256' => (string) $stored['sha256'],
       ];
-      if (count($photos) >= $limit) {
-        break;
-      }
     }
     return $photos;
   }
@@ -548,7 +539,6 @@ final class CompletionService
   {
     $out = [];
     $seen = [];
-    $photoCount = 0;
     foreach ($items as $item) {
       $damage = $this->cleanSuggestionText($item['damage'] ?? '');
       if ($damage === '') {
@@ -561,11 +551,10 @@ final class CompletionService
       $seen[$key] = true;
       $photos = [];
       foreach ((array) ($item['damage_photos'] ?? []) as $photo) {
-        if (!is_array($photo) || $photoCount >= 12 || count($photos) >= 4) {
+        if (!is_array($photo)) {
           continue;
         }
         $photos[] = $photo;
-        $photoCount++;
       }
       $suggestion = ['damage' => $damage, 'solution' => ''];
       if ($photos !== []) {
@@ -762,7 +751,6 @@ final class CompletionService
         throw new \DomainException('Selecciona el área afectada del daño agregado.');
       }
       $refs = \SCM\Modules\CorrectiveReview\CorrectiveReviewPhotos::refs($raw['registro_foto_dano'] ?? '');
-      if (count($refs) > 10) { throw new \DomainException('Cada daño admite máximo 10 fotos.'); }
       $damage['registro_foto_dano'] = implode(',', $refs);
       $item['corrective'] = $damage;
       $item['damage'] = $this->correctiveDamageText($damage);
@@ -776,11 +764,6 @@ final class CompletionService
     $review = $rows[0];
     $stored = $this->decodeStoredItems($review['evaluacion_de_danos'] ?? '');
     if (count($stored) + count($pending) > 30) { throw new \DomainException('La revisión correctiva admite máximo 30 daños.'); }
-    $photoCount = 0;
-    foreach (array_merge($stored, array_values($pending)) as $damage) {
-      if (is_array($damage)) { $photoCount += count(\SCM\Modules\CorrectiveReview\CorrectiveReviewPhotos::refs($damage['registro_foto_dano'] ?? '')); }
-    }
-    if ($photoCount > 30) { throw new \DomainException('La revisión correctiva admite máximo 30 fotos en total.'); }
     foreach ($pending as $index => $damage) {
       $stored[] = $damage;
       $items[$index]['corrective_sync_id'] = bin2hex(random_bytes(16));

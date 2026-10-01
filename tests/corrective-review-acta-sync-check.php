@@ -40,12 +40,19 @@ $damage = [
   'nivel_dano' => 'Moderado',
   'tiempo_atencion' => '2 dias',
   'a_quien_corresponde' => 'Propietario',
+  'registro_foto_dano' => implode(',', array_map(static fn(int $i): string => 'https://example.test/photo-' . $i . '.jpg', range(1, 35))),
 ];
 $saved = $method->invoke($service, $ticket, [['damage' => 'Fisura nueva', 'solution' => 'Se selló', 'corrective' => $damage]], $actor);
 $stored = unserialize((string) $db->getVar('SELECT evaluacion_de_danos FROM wp_jet_cct_revision_correctiva WHERE _ID = 7'), ['allowed_classes' => false]);
 if (count($stored) !== 2 || $stored[1]['descripcion_dano'] !== 'Fisura nueva' || !preg_match('/^[a-f0-9]{32}$/', $saved[0]['corrective_sync_id'])) {
   throw new RuntimeException('El daño nuevo no quedó en la revisión.');
 }
+if (count(\SCM\Modules\CorrectiveReview\CorrectiveReviewPhotos::refs($stored[1]['registro_foto_dano'])) !== 35) {
+  throw new RuntimeException('Las fotos se limitaron al sincronizar el acta con la revisión correctiva.');
+}
+$suggestions = new ReflectionMethod($service, 'uniqueSuggestedItems');
+$suggested = $suggestions->invoke($service, [['damage' => 'Daño', 'damage_photos' => array_fill(0, 35, ['name' => 'photo.jpg'])]]);
+if (count($suggested[0]['damage_photos']) !== 35) { throw new RuntimeException('La precarga del acta truncó las fotos.'); }
 $method->invoke($service, $ticket, $saved, $actor, $saved);
 $stored = unserialize((string) $db->getVar('SELECT evaluacion_de_danos FROM wp_jet_cct_revision_correctiva WHERE _ID = 7'), ['allowed_classes' => false]);
 if (count($stored) !== 2) { throw new RuntimeException('La edición duplicó el daño en la revisión.'); }

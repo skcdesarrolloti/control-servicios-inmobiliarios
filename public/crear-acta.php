@@ -121,6 +121,7 @@ try {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="assets/css/ticket-completion.css?v=<?= $escape(SCM_VERSION) ?>">
+  <script defer src="assets/js/ticket-completion-form-state.js?v=<?= $escape(SCM_VERSION) ?>"></script>
   <script defer src="assets/js/ticket-completion-create.js?v=<?= $escape(SCM_VERSION) ?>"></script>
 </head>
 <body class="scm-acta-page scm-acta-create-body">
