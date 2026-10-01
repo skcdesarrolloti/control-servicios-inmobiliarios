@@ -48,8 +48,7 @@ try {
           (string) ($_POST['estado'] ?? ''),
           (string) ($_POST['observacion'] ?? ''),
           (string) ($_POST['motivo'] ?? ''),
-          (string) ($_POST['financiacion'] ?? ''),
-          (string) ($_POST['responder_nombre'] ?? '')
+          (string) ($_POST['financiacion'] ?? '')
         );
         $ok = (string) ($saved['ok'] ?? '0') === '1';
         if ($ok) {
@@ -96,6 +95,14 @@ session_write_close();
     .scm-public-quote-logo img{display:block;max-width:100%;max-height:48px;object-fit:contain}
     .scm-public-quote-head p{margin:0;color:#64748b;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
     .scm-public-quote-head strong{display:block;font-size:22px;color:#0b1f3a}
+    .scm-public-quote-response-guide{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 18px;padding:16px 18px;background:#fff7ed;border:1px solid #fed7aa;border-left:5px solid #ff8a00;border-radius:16px}
+    .scm-public-quote-response-guide strong{display:block;font-size:16px;color:#0b254f}
+    .scm-public-quote-response-guide p{margin:5px 0 0;font-size:13px;line-height:1.6;color:#475569}
+    .scm-public-quote-response-guide a{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;padding:12px 18px;background:#0b254f;color:#fff;border-radius:12px;font-weight:700;font-size:14px;text-decoration:none}
+    .scm-public-quote-response-guide a:focus-visible{outline:3px solid #ff8a00;outline-offset:3px}
+    #responder-cotizacion{scroll-margin-top:18px}
+    @media(max-width:720px){.scm-public-quote-response-guide{align-items:stretch;flex-direction:column}.scm-public-quote-response-guide a{align-self:flex-start}}
+    @media print{.scm-public-quote-response-guide{display:none!important}}
     .scm-public-quote-alert{margin:0 0 16px;padding:13px 16px;border-radius:14px;font-weight:700;border:1px solid}
     .scm-public-quote-alert.is-success{background:#ecfdf5;color:#047857;border-color:#a7f3d0}
     .scm-public-quote-alert.is-error{background:#fff1f2;color:#be123c;border-color:#fecdd3}
@@ -109,6 +116,7 @@ session_write_close();
     .scm-public-quote-response-form label{display:flex;flex-direction:column;gap:6px;color:#475569;font-size:12px;font-weight:800}
     .scm-public-quote-response-form label.is-wide{grid-column:1/-1}
     .scm-public-quote-response-form input,.scm-public-quote-response-form select,.scm-public-quote-response-form textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:12px;padding:11px 12px;font:500 14px Poppins,Arial,sans-serif;color:#0f172a;background:#fff}
+    .scm-public-quote-response-form input[readonly]{background:#f1f5f9;color:#475569}
     .scm-public-quote-response-form button{grid-column:1/-1;justify-self:start;border:0;border-radius:13px;background:#ff8a00;color:#fff;font:800 14px Poppins,Arial,sans-serif;padding:12px 18px;cursor:pointer}
     @media (max-width:720px){.scm-public-quote-response-form{grid-template-columns:1fr}.scm-public-quote-head{align-items:flex-start;flex-direction:column}.scm-public-quote-logo{max-width:100%;width:170px}.scm-public-quote-confirmation{align-items:flex-start;flex-direction:column}.scm-public-quote-confirmation a{width:100%;box-sizing:border-box}}
     @media print{body{background:#fff}#scm-app{max-width:none;padding:0}.scm-public-quote-head,.scm-public-quote-alert,.scm-public-quote-confirmation,.scm-public-quote-response{display:none!important}#scm-app>.scm-cotizacion-native-doc{width:800px;max-width:none;box-sizing:border-box;margin:0 auto;zoom:.9}}

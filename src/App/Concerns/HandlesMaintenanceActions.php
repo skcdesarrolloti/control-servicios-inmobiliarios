@@ -3024,7 +3024,7 @@ trait HandlesMaintenanceActions
   }
 
   /** @return array<string,string> */
-  public function public_respond_cotizacion_mantenimiento(int $cotizacionId, string $estadoRaw, string $observacionRaw, string $motivoRaw = '', string $financiacionRaw = '', string $responderNameRaw = ''): array
+  public function public_respond_cotizacion_mantenimiento(int $cotizacionId, string $estadoRaw, string $observacionRaw, string $motivoRaw = '', string $financiacionRaw = ''): array
   {
     if ($cotizacionId <= 0) {
       return ['ok' => '0', 'message' => 'Cotización inválida.'];
@@ -3042,11 +3042,6 @@ trait HandlesMaintenanceActions
       return ['ok' => '0', 'message' => 'Indica el motivo de la desaprobación.'];
     }
     $financiacion = $estado === 'Aprobada' ? trim(strip_tags($financiacionRaw)) : '';
-    $responderName = trim(strip_tags($responderNameRaw));
-    if ($responderName !== '') {
-      $observacion .= "\n\nRespondido por: " . $responderName;
-    }
-
     $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
     if (!$this->table_exists($table)) {
       return ['ok' => '0', 'message' => 'La tabla de cotizaciones no está disponible.'];
@@ -3054,6 +3049,10 @@ trait HandlesMaintenanceActions
     $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
     if (!is_array($row)) {
       return ['ok' => '0', 'message' => 'Cotización no encontrada.'];
+    }
+    $responderName = $this->cotizacion_clean_text($row['destinatario'] ?? '');
+    if ($responderName !== '') {
+      $observacion .= "\n\nRespondido por: " . $responderName;
     }
     $currentState = strtolower(trim((string) ($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
     if (!in_array($currentState, ['', 'esperando respuesta'], true)) {

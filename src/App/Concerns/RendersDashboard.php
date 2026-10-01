@@ -5075,10 +5075,14 @@ trait RendersDashboard
     $row = $rows[0] ?? $row;
     $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
     $title = 'Cotización de mantenimiento #' . $cotizacionId;
+    $responsePanel = $this->render_public_cotizacion_response_panel($row);
+    $responseGuide = str_contains($responsePanel, 'data-public-quote-response-form')
+      ? '<aside class="scm-public-quote-response-guide" aria-label="Cómo responder la cotización"><div><strong>Responde esta cotización al final de la página</strong><p>Revisa la información y, en la sección «Responder cotización», indica si la apruebas o desapruebas.</p></div><a href="#responder-cotizacion">Ir a responder</a></aside>'
+      : '';
 
     return [
       'title' => $title,
-      'content' => $this->render_native_cotizacion_mantenimiento_view($row, $orders) . $this->render_public_cotizacion_response_panel($row),
+      'content' => $responseGuide . $this->render_native_cotizacion_mantenimiento_view($row, $orders) . $responsePanel,
       'status' => 200,
     ];
   }
@@ -5095,11 +5099,11 @@ trait RendersDashboard
       return '<section class="scm-cotizacion-native-section scm-public-quote-response"><h3>Respuesta registrada</h3><p>Esta cotización ya fue respondida como <strong>' . esc_html($this->cotizacion_clean_text($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '-')) . '</strong>.</p></section>';
     }
     $destinatario = $this->cotizacion_clean_text($row['destinatario'] ?? '');
-    return '<section class="scm-cotizacion-native-section scm-public-quote-response"><h3>Responder cotización</h3>'
+    return '<section id="responder-cotizacion" tabindex="-1" class="scm-cotizacion-native-section scm-public-quote-response"><h3>Responder cotización</h3>'
       . '<p>Selecciona tu respuesta para que el equipo de SKC SuCasa Inmobiliaria pueda continuar el proceso.</p>'
       . '<form method="post" class="scm-public-quote-response-form" data-public-quote-response-form>'
       . '<input type="hidden" name="scm_public_quote_response" value="1">'
-      . '<label><span>Nombre de quien responde</span><input type="text" name="responder_nombre" value="' . esc_attr($destinatario) . '" placeholder="Nombre completo"></label>'
+      . '<label><span>Nombre de quien responde</span><input type="text" value="' . esc_attr($destinatario) . '" readonly aria-readonly="true"></label>'
       . '<label><span>Respuesta *</span><select name="estado" required data-public-quote-response-state><option value="">Selecciona</option><option value="Aprobada">Aprobar cotización</option><option value="Desaprobada">Desaprobar cotización</option></select></label>'
       . '<label data-public-quote-response-reject hidden><span>Motivo si desapruebas <em>*</em></span><select name="motivo" disabled><option value="">Selecciona motivo</option><option value="Por costo">Por costo</option><option value="Ejecución por cuenta propia">Ejecución por cuenta propia</option></select></label>'
       . '<label data-public-quote-response-approve hidden><span>Financiación si apruebas</span><select name="financiacion" disabled><option value="">No aplica / sin respuesta</option><option value="Si">Sí</option><option value="No">No</option></select></label>'
