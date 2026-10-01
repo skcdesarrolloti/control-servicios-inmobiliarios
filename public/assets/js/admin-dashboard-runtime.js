@@ -18810,7 +18810,7 @@
         '<div><span>Inmueble</span><strong>' + escHtml(cotizacion.inmueble || "-") + "</strong></div>" +
         '<div><span>Dirección</span><strong>' + escHtml(cotizacion.direccion || "-") + "</strong></div>" +
         "</div>" +
-        '<p class="scm-cotizacion-dialog-intro">Crea la orden desde la cotización aprobada. Se descuenta el saldo de la categoría elegida y se deja trazabilidad en el caso.</p>' +
+        '<p class="scm-cotizacion-dialog-intro">' + (context.orden && context.orden._ID ? 'Al guardar se ajustará el saldo y la orden volverá a esperar aprobación. Se notificará a los funcionarios configurados.' : 'Crea la orden desde la cotización aprobada. Se descuenta el saldo de la categoría elegida y se deja trazabilidad en el caso.') + '</p>' +
         '<div class="scm-cotizacion-order-balance" data-scm-order-balance>Selecciona un tipo de orden para ver el saldo disponible.</div>' +
         '<div class="scm-cotizacion-order-grid">' +
         '<label class="scm-cotizacion-dialog-field"><span>Tipo de orden <em>*</em></span><select name="categoria" id="scm-order-category"><option value="Mano de obra">Mano de obra</option><option value="Materiales">Materiales</option><option value="Maquinarias">Maquinarias</option><option value="Otros costos">Otros costos</option></select></label>' +
@@ -18930,12 +18930,24 @@
         });
       }
       if (provider) provider.addEventListener("change", fillProvider);
+      if (context.orden && context.orden._ID) {
+        Object.keys(context.orden).forEach(function (name) {
+          var field = cotizacionOrderField(form, name);
+          if (!field) return;
+          if (field.tagName === "SELECT" && context.orden[name] && !Array.from(field.options).some(function (option) { return option.value === String(context.orden[name]); })) {
+            field.add(new Option(String(context.orden[name]), String(context.orden[name])));
+          }
+          setCotizacionOrderField(form, name, context.orden[name]);
+        });
+        formatCotizacionOrderMoneyField(valueField);
+      }
       updateBalance();
     }
 
     function openCotizacionOrderFormModal(button, options) {
       options = options || {};
       var cotizacionId = button ? (button.getAttribute("data-cotizacion-id") || "") : "";
+      var orderId = button ? (button.getAttribute("data-order-id") || "") : "";
       var ticketPk = button ? (button.getAttribute("data-ticket-pk") || "") : "";
       if (!ajaxUrl || !actionCotizacionOrderContext || !actionCotizacionOrderSave || !cotizacionId || !window.Swal) {
         showToast("error", "No se pudo abrir el formulario de orden.");
@@ -18945,6 +18957,7 @@
       fd.append("action", actionCotizacionOrderContext);
       fd.append("nonce", nonce);
       fd.append("id_cotizacion", cotizacionId);
+      fd.append("id_orden", orderId);
       fd.append("ticket_pk", ticketPk);
       window.Swal.fire({
         title: "Cargando formulario de orden",
@@ -18971,12 +18984,12 @@
           var context = json.data || {};
           orderContext = context;
           return window.Swal.fire({
-            title: "Añadir orden de mantenimiento",
+            title: orderId ? "Editar orden de mantenimiento #" + orderId : "Añadir orden de mantenimiento",
             html: buildCotizacionOrderFormHtml(context),
             width: "min(900px, 96vw)",
             showCloseButton: true,
             showCancelButton: true,
-            confirmButtonText: "Guardar orden",
+            confirmButtonText: orderId ? "Guardar y solicitar aprobación" : "Guardar orden",
             cancelButtonText: "Cancelar",
             buttonsStyling: false,
             focusConfirm: false,
@@ -19008,6 +19021,8 @@
           }
           var formData = res.value;
           formData.append("id_cotizacion", cotizacionId);
+          formData.append("id_orden", orderId);
+          formData.append("order_version", orderContext ? orderContext.order_version || "" : "");
           formData.append("ticket_pk", ticketPk || (orderContext && orderContext.cotizacion ? orderContext.cotizacion.ticket_pk || "" : ""));
           return submitCotizacionAction(
             formData,
@@ -19561,6 +19576,7 @@
         var responseData = res.value || {};
         var fd = new FormData();
         fd.append("id_orden", orderId);
+        fd.append("order_version", button.getAttribute("data-order-version") || "");
         fd.append("estado", responseData.estado || "");
         fd.append("observacion", responseData.observacion || "");
         return submitCotizacionAction(
@@ -19802,6 +19818,15 @@
               event.preventDefault();
               event.stopPropagation();
               downloadCotizacionOrderPdf(pdfButton.getAttribute("data-order-id") || "", pdfButton);
+              return;
+            }
+            var editButton = event.target && event.target.closest ? event.target.closest("[data-scm-edit-cotizacion-order]") : null;
+            if (editButton) {
+              event.preventDefault();
+              openedDetail = true;
+              openCotizacionOrderFormModal(editButton, {
+                onClose: function (delayMs) { reopenCotizacionOrdersAfter(card, options, delayMs); },
+              });
               return;
             }
             var responseButton =

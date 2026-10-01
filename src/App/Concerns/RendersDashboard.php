@@ -4647,7 +4647,6 @@ trait RendersDashboard
     $ticketUrl = $ticket !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticket) : '';
     $cotUrl = $id !== '' ? self::signedMaintenanceQuotePublicUrl((int) $id) : '';
     $actaInfo = $this->cotizacion_satisfaction_act_info($id, trim((string) ($row['id_acta_satisfaccion'] ?? '')), $ticket);
-    $hasActiveActa = in_array(strtolower(trim((string) ($actaInfo['status'] ?? ''))), ['pending', 'signed', 'legacy'], true);
     $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
     $ordersHtml = empty($orders)
       ? '<div class="scm-cotizacion-orders-empty"><span aria-hidden="true">&#128203;</span><strong>Sin &oacute;rdenes registradas</strong><p>Esta cotizaci&oacute;n todav&iacute;a no tiene &oacute;rdenes de mantenimiento asociadas.</p></div>'
@@ -4672,6 +4671,7 @@ trait RendersDashboard
         . ' data-order-number="' . esc_attr($orderId !== '' ? $orderId : '-') . '"'
         . ' data-order-category="' . esc_attr($orderCategory) . '"'
         . ' data-order-provider="' . esc_attr($orderProvider) . '"'
+        . ' data-order-version="' . esc_attr((string) ($order['cct_modified'] ?? '')) . '"'
         . ' data-order-value="' . esc_attr($this->format_cop_currency($order['valor'] ?? 0)) . '"';
       $ordersHtml .= '<article class="scm-cotizacion-order-card">'
         . '<div class="scm-cotizacion-order-card-head"><div><span>Orden de mantenimiento</span><strong>#' . esc_html($orderId !== '' ? $orderId : '-') . '</strong></div><span class="scm-cotizacion-order-state">' . esc_html($orderState !== '' ? $orderState : 'Sin estado') . '</span></div>'
@@ -4680,6 +4680,8 @@ trait RendersDashboard
         . '<div class="scm-cotizacion-order-card-actions">'
         . '<button type="button" class="scm-cotizacion-order-view" data-scm-view-cotizacion-order="' . esc_attr($orderKey) . '" aria-label="Ver detalle de la orden ' . esc_attr($orderId !== '' ? '#' . $orderId : '') . '">Ver orden <span aria-hidden="true">&rarr;</span></button>'
         . ($orderId !== '' ? '<button type="button" class="scm-cotizacion-order-view" data-scm-cotizacion-order-pdf data-order-id="' . esc_attr($orderId) . '">Soporte de pago</button>' : '')
+        . ($orderId !== '' && $this->canUseDashboardAction('quote_order_create') && strtolower(trim($estado)) === 'aprobada' && in_array(strtolower($orderState), ['', 'esperando respuesta', 'aprobada', 'desaprobada'], true)
+          ? '<button type="button" class="scm-cotizacion-order-view" data-scm-edit-cotizacion-order data-order-id="' . esc_attr($orderId) . '" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Editar orden</button>' : '')
         . ($orderPending && $canRespondMaintenanceOrder ? '<button type="button" class="scm-cotizacion-order-view scm-cotizacion-order-response" data-scm-respond-cotizacion-order' . $orderResponseAttrs . '>Responder orden</button>' : '')
         . '</div>'
         . '</article>';
@@ -4799,8 +4801,8 @@ trait RendersDashboard
       . ($cotizacionSinResponder && $canQuoteApprove ? '<button type="button" class="scm-case-work-btn scm-primary-action scm-cotizacion-approve-action" data-scm-approve-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Marcar como aprobada</button>' : '')
       . ($cotizacionSinResponder && $canQuoteDelete ? '<button type="button" class="scm-case-work-btn scm-danger-action scm-cotizacion-delete-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizaci&oacute;n</button>' : '')
       . ($seguimientoReparacionesDisponible ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-repair-followup-notice data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '" data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '">Seguimiento reparaciones</button>' : '')
-      . ($cotizacionAprobada && $canQuoteOrderCreate && !$hasActiveActa ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-add-cotizacion-order data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir orden</button>' : '')
-      . ($cotizacionAprobada && $canQuoteOrderCreate && $hasActiveActa ? '<button type="button" class="scm-case-work-btn" disabled title="Esta cotizaci&oacute;n o caso ya tiene acta activa">Orden bloqueada por acta</button>' : '')
+      . ($cotizacionAprobada && $canQuoteOrderCreate && $this->maintenance_order_has_balance($row) ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-add-cotizacion-order data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">A&ntilde;adir orden</button>' : '')
+      . ($cotizacionAprobada && $canQuoteOrderCreate && !$this->maintenance_order_has_balance($row) ? '<button type="button" class="scm-case-work-btn" disabled title="No hay saldo disponible en ninguna categor&iacute;a">Sin saldo para nuevas órdenes</button>' : '')
       . ($actaInfo['url'] !== '' ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-iframe data-iframe-url="' . esc_attr($actaInfo['url']) . '" data-iframe-title="Acta de satisfacci&oacute;n">Ver acta' . ($actaInfo['status'] === 'pending' ? ' pendiente' : '') . '</button>' : '')
       . ($cotizacionAprobada && $canQuoteActaCreate && $actaInfo['url'] === '' ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-create-cotizacion-acta data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Crear acta de cotizaci&oacute;n</button>' : '')
       . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div>' . $orderDetailsHtml
@@ -4858,6 +4860,7 @@ trait RendersDashboard
         . ' data-order-number="' . esc_attr($orderId !== '' ? $orderId : '-') . '"'
         . ' data-order-category="' . esc_attr($value('categoria', '')) . '"'
         . ' data-order-provider="' . esc_attr($value('proveedor', '')) . '"'
+        . ' data-order-version="' . esc_attr((string) ($order['cct_modified'] ?? '')) . '"'
         . ' data-order-value="' . esc_attr($this->format_cop_currency($order['valor'] ?? 0)) . '">Responder orden</button>'
         ;
     }

@@ -2324,12 +2324,21 @@ trait HandlesMaintenanceActions
     if (strtolower(trim((string) ($cotizacion['estado'] ?? ''))) !== 'aprobada') {
       $this->jsonFail('Solo puedes crear ordenes cuando la cotizacion esta aprobada.');
     }
-    if ($this->maintenance_order_active_satisfaction_act($cotizacion) !== null) {
-      $this->jsonFail('Esta cotizacion o caso ya tiene un acta de satisfaccion activa. No se pueden crear ordenes nuevas.');
-    }
 
+    $orderId = (int) ($_POST['id_orden'] ?? 0);
+    try {
+      $order = $orderId > 0 ? $this->maintenance_order_editable_order($cotizacionId, $orderId) : [];
+    } catch (\DomainException $error) {
+      $this->jsonFail($error->getMessage());
+    }
+    $contextQuote = $this->maintenance_order_restore_edit_balance($cotizacion, $order);
+    if ($orderId <= 0 && !$this->maintenance_order_has_balance($contextQuote)) {
+      $this->jsonFail('La cotización no tiene saldo disponible en ninguna categoría.');
+    }
     $this->jsonOk([
-      'cotizacion' => $this->maintenance_order_context_payload($cotizacion),
+      'orden' => $order,
+      'order_version' => hash('sha256', json_encode($order, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)),
+      'cotizacion' => $this->maintenance_order_context_payload($contextQuote),
       'providers' => $this->maintenance_order_provider_options(),
       'banks' => $this->maintenance_order_bank_options(),
     ]);
@@ -2357,119 +2366,164 @@ trait HandlesMaintenanceActions
       $this->jsonFail('La tabla de cotizaciones no esta disponible.');
     }
 
-    $cotizacion = $this->maintenance_order_find_cotizacion($cotizacionId);
-    if (!is_array($cotizacion)) {
-      $this->jsonFail('Cotizacion no encontrada.');
-    }
-    if (strtolower(trim((string) ($cotizacion['estado'] ?? ''))) !== 'aprobada') {
-      $this->jsonFail('Solo puedes crear ordenes cuando la cotizacion esta aprobada.');
-    }
-    if ($this->maintenance_order_active_satisfaction_act($cotizacion) !== null) {
-      $this->jsonFail('Esta cotizacion o caso ya tiene un acta de satisfaccion activa. No se pueden crear ordenes nuevas.');
-    }
-
-    $category = $this->maintenance_order_category((string) ($_POST['categoria'] ?? ''));
-    if ($category === '') {
-      $this->jsonFail('Selecciona el tipo de orden.');
-    }
-    $concept = $this->maintenance_order_clean($_POST['concepto'] ?? '');
-    if ($concept === '') {
-      $this->jsonFail('Escribe el concepto de la orden.');
-    }
-    $activity = $this->maintenance_order_clean($_POST['actividad'] ?? '');
-    if ($activity === '') {
-      $activity = $this->maintenance_order_default_activity($category);
-    }
-    $value = $this->maintenance_order_money($_POST['valor'] ?? 0);
-    if ($value <= 0) {
-      $this->jsonFail('El valor de la orden debe ser mayor a cero.');
-    }
-
-    $balanceColumn = $this->maintenance_order_balance_column($category);
-    $currentBalance = $this->maintenance_order_money_value($cotizacion[$balanceColumn] ?? 0);
-    if ($value > ($currentBalance + 0.01)) {
-      $this->jsonFail('El valor supera el saldo disponible para ' . strtolower($category) . '. Saldo: ' . $this->format_cop_currency($currentBalance) . '.');
-    }
-
-    $providerPayload = $this->maintenance_order_provider_payload($_POST);
-    foreach (['proveedor', 'identificacion_proveedor', 'correo_proveedor', 'celular_proveedor', 'titular_proveedor', 'identificacion_cuenta_proveedor', 'cuenta_proveedor', 'correo_pago_proveedor'] as $requiredProviderField) {
-      if (trim((string) ($providerPayload[$requiredProviderField] ?? '')) === '') {
-        $this->jsonFail('Completa los datos obligatorios del proveedor.');
+    $pdo = $this->db->pdo();
+    try {
+      $pdo->beginTransaction();
+      // Serialize reservations against the same quote, including new orders.
+      $cotizacion = $this->db->getRow("SELECT * FROM `{$cotTable}` WHERE `_ID` = ? FOR UPDATE", [$cotizacionId]);
+      $editOrderId = (int) ($_POST['id_orden'] ?? 0);
+      $oldOrder = $editOrderId > 0 ? $this->maintenance_order_editable_order($cotizacionId, $editOrderId, true) : [];
+      if ($editOrderId > 0 && !hash_equals(hash('sha256', json_encode($oldOrder, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)), (string) ($_POST['order_version'] ?? ''))) {
+        throw new \DomainException('La orden cambió mientras la editabas. Abre el formulario nuevamente.');
       }
-    }
-    $providerId = $this->maintenance_order_save_provider($schema, (int) ($_POST['id_proveedor'] ?? 0), $providerPayload);
+      $balanceQuote = $this->maintenance_order_restore_edit_balance($cotizacion ?: [], $oldOrder);
+      if (!is_array($cotizacion)) {
+        throw new \DomainException('Cotizacion no encontrada.');
+      }
+      if (strtolower(trim((string) ($cotizacion['estado'] ?? ''))) !== 'aprobada') {
+        throw new \DomainException('Solo puedes crear ordenes cuando la cotizacion esta aprobada.');
+      }
 
-    $now = time();
-    $nowMysql = date('Y-m-d H:i:s', $now);
-    $userId = Auth::userId();
-    $employeeId = trim((string) (method_exists($this, 'current_employee_id') ? $this->current_employee_id() : ''));
-    if ($employeeId === '') {
-      $employeeId = (string) $userId;
-    }
-    $user = $this->maintenance_order_current_user_payload();
-    $orderItemPayload = $this->maintenance_order_item_payload($category, $concept, $providerPayload['proveedor'], $value);
+      $category = $this->maintenance_order_category((string) ($_POST['categoria'] ?? ''));
+      if ($category === '') {
+        throw new \DomainException('Selecciona el tipo de orden.');
+      }
+      $concept = $this->maintenance_order_clean($_POST['concepto'] ?? '');
+      if ($concept === '') {
+        throw new \DomainException('Escribe el concepto de la orden.');
+      }
+      $activity = $this->maintenance_order_clean($_POST['actividad'] ?? '');
+      if ($activity === '') {
+        $activity = $this->maintenance_order_default_activity($category);
+      }
+      $value = $this->maintenance_order_money($_POST['valor'] ?? 0);
+      if ($value <= 0) {
+        throw new \DomainException('El valor de la orden debe ser mayor a cero.');
+      }
 
-    $orderData = array_merge([
-      'cct_status' => 'publish',
-      'fecha' => $now,
-      'actividad' => $activity,
-      'valor' => (string) (int) round($value),
-      'categoria' => $category,
-      'estado' => 'Esperando respuesta',
-      'creador' => $user['nombre'],
-      'email_creador' => $user['email'],
-      'celular_creador' => $user['celular'],
-      'direccion' => $this->maintenance_order_first([$cotizacion['direccion'] ?? '', $_POST['direccion'] ?? '']),
-      'id_cotizacion' => (string) $cotizacionId,
-      'id_ticket' => $this->maintenance_order_first([$cotizacion['id_ticket'] ?? '', $_POST['ticket_pk'] ?? '']),
-      'id_inmueble' => $this->maintenance_order_first([$cotizacion['id_inmueble'] ?? '', $cotizacion['inmueble'] ?? '']),
-      'cct_author_id' => $employeeId,
-      'cct_created' => $nowMysql,
-      'cct_modified' => $nowMysql,
-      'coordinador' => $this->maintenance_order_first([$cotizacion['coordinador'] ?? '', $user['nombre']]),
-      'autorizador' => '',
-      'id_proveedor' => $providerId > 0 ? (string) $providerId : '',
-      'contrato' => $this->maintenance_order_first([$cotizacion['contrato'] ?? '', $cotizacion['id_contrato'] ?? '']),
-      'concepto' => $concept,
-      'id_empleado' => $employeeId,
-      'id_propietario' => trim((string) ($cotizacion['id_propietario'] ?? '')),
-      'id_autorizador' => '',
-      'id_coordinador' => trim((string) ($cotizacion['id_coordinador'] ?? '')),
-      'destinatario' => trim((string) ($cotizacion['destinatario'] ?? '')),
-      'email_destinatario' => trim((string) ($cotizacion['email_destinatario'] ?? '')),
-      'celular_destinatario' => trim((string) ($cotizacion['celular_destinatario'] ?? '')),
-      'id_contrato' => trim((string) ($cotizacion['id_contrato'] ?? '')),
-      'inmueble' => $this->maintenance_order_first([$cotizacion['inmueble'] ?? '', $cotizacion['id_inmueble'] ?? '']),
-      'sucursal' => trim((string) ($cotizacion['sucursal'] ?? '')),
-      'id_arrendatario' => trim((string) ($cotizacion['id_arrendatario'] ?? '')),
-    ], $providerPayload, $orderItemPayload);
+      $balanceColumn = $this->maintenance_order_balance_column($category);
+      $currentBalance = $this->maintenance_order_money_value($balanceQuote[$balanceColumn] ?? 0);
+      if ($value > ($currentBalance + 0.01)) {
+        throw new \DomainException('El valor supera el saldo disponible para ' . strtolower($category) . '. Saldo: ' . $this->format_cop_currency($currentBalance) . '.');
+      }
 
-    $orderData = $schema->filterTableData($ordersTable, $orderData);
-    if (empty($orderData) || !$this->db->insert($ordersTable, $orderData)) {
-      $this->jsonFail('No se pudo guardar la orden.');
-    }
-    $orderId = (int) $this->db->lastInsertId();
+      $providerPayload = $this->maintenance_order_provider_payload($_POST);
+      foreach (['proveedor', 'identificacion_proveedor', 'correo_proveedor', 'celular_proveedor', 'titular_proveedor', 'identificacion_cuenta_proveedor', 'cuenta_proveedor', 'correo_pago_proveedor'] as $requiredProviderField) {
+        if (trim((string) ($providerPayload[$requiredProviderField] ?? '')) === '') {
+          throw new \DomainException('Completa los datos obligatorios del proveedor.');
+        }
+      }
+      $providerId = $this->maintenance_order_save_provider($schema, (int) ($_POST['id_proveedor'] ?? 0), $providerPayload, $editOrderId <= 0);
 
-    $this->maintenance_order_update_cotizacion_balance($schema, $cotizacion, $category, $currentBalance, $value, $nowMysql);
-    $this->maintenance_order_update_ticket($schema, $cotizacion, $orderId, $now, $nowMysql);
-    $this->maintenance_order_insert_histories($schema, $cotizacion, $orderId, $category, $concept, $value, $user, $employeeId, $now, $nowMysql);
-    $queued = $this->maintenance_order_enqueue_created_notifications(
-      array_merge($orderData, [
-        '_ID' => (string) $orderId,
+      $now = time();
+      $nowMysql = date('Y-m-d H:i:s', max($now, (strtotime((string) ($oldOrder['cct_modified'] ?? '')) ?: 0) + ($editOrderId > 0 ? 1 : 0)));
+      $userId = Auth::userId();
+      $employeeId = trim((string) (method_exists($this, 'current_employee_id') ? $this->current_employee_id() : ''));
+      if ($employeeId === '') {
+        $employeeId = (string) $userId;
+      }
+      $user = $this->maintenance_order_current_user_payload();
+      $orderItemPayload = $this->maintenance_order_item_payload($category, $concept, $providerPayload['proveedor'], $value);
+
+      $orderData = array_merge([
+        'cct_status' => 'publish',
+        'fecha' => $now,
+        'actividad' => $activity,
+        'valor' => (string) (int) round($value),
+        'categoria' => $category,
+        'estado' => 'Esperando respuesta',
+        'creador' => $user['nombre'],
+        'email_creador' => $user['email'],
+        'celular_creador' => $user['celular'],
+        'direccion' => $this->maintenance_order_first([$cotizacion['direccion'] ?? '', $_POST['direccion'] ?? '']),
         'id_cotizacion' => (string) $cotizacionId,
         'id_ticket' => $this->maintenance_order_first([$cotizacion['id_ticket'] ?? '', $_POST['ticket_pk'] ?? '']),
-      ]),
-      $cotizacion,
-      $user,
-      $orderId
-    );
+        'id_inmueble' => $this->maintenance_order_first([$cotizacion['id_inmueble'] ?? '', $cotizacion['inmueble'] ?? '']),
+        'cct_author_id' => $employeeId,
+        'cct_created' => $nowMysql,
+        'cct_modified' => $nowMysql,
+        'coordinador' => $this->maintenance_order_first([$cotizacion['coordinador'] ?? '', $user['nombre']]),
+        'autorizador' => '',
+        'id_proveedor' => $providerId > 0 ? (string) $providerId : '',
+        'contrato' => $this->maintenance_order_first([$cotizacion['contrato'] ?? '', $cotizacion['id_contrato'] ?? '']),
+        'concepto' => $concept,
+        'id_empleado' => $employeeId,
+        'id_propietario' => trim((string) ($cotizacion['id_propietario'] ?? '')),
+        'id_autorizador' => '',
+        'id_coordinador' => trim((string) ($cotizacion['id_coordinador'] ?? '')),
+        'destinatario' => trim((string) ($cotizacion['destinatario'] ?? '')),
+        'email_destinatario' => trim((string) ($cotizacion['email_destinatario'] ?? '')),
+        'celular_destinatario' => trim((string) ($cotizacion['celular_destinatario'] ?? '')),
+        'id_contrato' => trim((string) ($cotizacion['id_contrato'] ?? '')),
+        'inmueble' => $this->maintenance_order_first([$cotizacion['inmueble'] ?? '', $cotizacion['id_inmueble'] ?? '']),
+        'sucursal' => trim((string) ($cotizacion['sucursal'] ?? '')),
+        'id_arrendatario' => trim((string) ($cotizacion['id_arrendatario'] ?? '')),
+      ], $providerPayload, $orderItemPayload);
 
-    $this->jsonOk([
-      'message' => 'Orden de mantenimiento #' . $orderId . ' creada.' . ($queued > 0 ? ' Notificaciones en cola: ' . $queued . '.' : ''),
-      'id_orden' => (string) $orderId,
-      'id_cotizacion' => (string) $cotizacionId,
-      'notifications_queued' => $queued,
-    ]);
+      $orderData = $schema->filterTableData($ordersTable, $orderData);
+      if ($editOrderId > 0) {
+        // Preserve original identity and creation time; the editor belongs in history.
+        foreach (['creador', 'email_creador', 'celular_creador', 'cct_created', 'fecha', 'cct_author_id', 'id_empleado'] as $field) unset($orderData[$field]);
+        foreach (['items_mano', 'items_materiales', 'items_otros_equi', 'items_otros_costos'] as $field) {
+          if ($schema->columnExists($ordersTable, $field) && !array_key_exists($field, $orderItemPayload)) $orderData[$field] = serialize([]);
+        }
+        $orderData = array_merge($orderData, $schema->filterTableData($ordersTable, [
+          'autorizador' => '', 'id_autorizador' => '', 'fecha_respuesta' => 0, 'observacion_respuesta' => '',
+        ]));
+        if ($this->db->update($ordersTable, $orderData, ['_ID' => $editOrderId]) < 0) throw new \RuntimeException('No se pudo actualizar la orden.');
+        $orderId = $editOrderId;
+        $balances = [];
+        foreach (['saldo_obra', 'saldo_materiales', 'saldo_maquinarias', 'saldo_otros_costo'] as $field) $balances[$field] = $balanceQuote[$field] ?? 0;
+        $balances[$balanceColumn] = (string) (int) round($currentBalance - $value);
+        $balances['cct_modified'] = $nowMysql;
+        $this->db->update($cotTable, $schema->filterTableData($cotTable, $balances), ['_ID' => $cotizacionId]);
+        $changes = [];
+        foreach (array_merge(['categoria', 'valor', 'concepto', 'actividad'], array_keys($providerPayload)) as $field) {
+          if ((string) ($oldOrder[$field] ?? '') !== (string) ($orderData[$field] ?? '')) {
+            $changes[] = $field . ': ' . (string) ($oldOrder[$field] ?? '-') . ' → ' . (string) ($orderData[$field] ?? '-');
+          }
+        }
+        $detail = 'Orden editada #' . $orderId . '. ' . implode('; ', $changes)
+          . '. Estado anterior: ' . (string) ($oldOrder['estado'] ?? '-') . '. Se solicita nueva aprobación.';
+        $this->maintenance_order_insert_response_histories($schema, array_merge($oldOrder, $orderData), 'Esperando respuesta', $detail, $user, $employeeId, $now, $nowMysql);
+        $orderData = array_merge($oldOrder, $orderData, ['_edited' => true, '_notification_revision' => bin2hex(random_bytes(8))]);
+      } else {
+        if (empty($orderData) || !$this->db->insert($ordersTable, $orderData)) throw new \RuntimeException('No se pudo guardar la orden.');
+        $orderId = (int) $this->db->lastInsertId();
+        $this->maintenance_order_update_cotizacion_balance($schema, $cotizacion, $category, $currentBalance, $value, $nowMysql);
+        $this->maintenance_order_update_ticket($schema, $cotizacion, $orderId, $now, $nowMysql);
+        $this->maintenance_order_insert_histories($schema, $cotizacion, $orderId, $category, $concept, $value, $user, $employeeId, $now, $nowMysql);
+      }
+      $pdo->commit();
+      $notificationWarning = '';
+      try {
+        $queued = $this->maintenance_order_enqueue_created_notifications(
+          array_merge($orderData, [
+            '_ID' => (string) $orderId,
+            'id_cotizacion' => (string) $cotizacionId,
+            'id_ticket' => $this->maintenance_order_first([$cotizacion['id_ticket'] ?? '', $_POST['ticket_pk'] ?? '']),
+          ]),
+          $cotizacion,
+          $user,
+          $orderId
+        );
+
+      } catch (\Throwable $error) {
+        $queued = 0;
+        $notificationWarning = ' La orden se guardó, pero no se pudieron encolar todos los avisos de aprobación.';
+        error_log('[orden_mantenimiento_notification] ' . $error->getMessage());
+      }
+      $this->jsonOk([
+        'message' => 'Orden de mantenimiento #' . $orderId . ($editOrderId > 0 ? ' actualizada y pendiente de nueva aprobación.' : ' creada.') . ($queued > 0 ? ' Notificaciones en cola: ' . $queued . '.' : '') . $notificationWarning,
+        'id_orden' => (string) $orderId,
+        'id_cotizacion' => (string) $cotizacionId,
+        'notifications_queued' => $queued,
+      ]);
+    } catch (\Throwable $error) {
+      if ($pdo->inTransaction()) $pdo->rollBack();
+      error_log('[orden_mantenimiento_save] ' . $error->getMessage());
+      $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudo guardar la orden de mantenimiento.');
+    }
   }
 
   public function ajax_handler_cotizacion_order_response(): void
@@ -2500,13 +2554,16 @@ trait HandlesMaintenanceActions
       $this->jsonFail('Orden no encontrada.');
     }
 
+    if (!hash_equals((string) ($order['cct_modified'] ?? ''), (string) ($_POST['order_version'] ?? ''))) {
+      $this->jsonFail('La orden fue modificada. Vuelve a abrirla y revisa los datos antes de aprobar.');
+    }
     $currentState = strtolower(trim((string) ($order['estado'] ?? '')));
     if ($currentState !== '' && $currentState !== 'esperando respuesta') {
       $this->jsonFail('Solo puedes responder una orden que este esperando respuesta.');
     }
 
     $now = time();
-    $nowMysql = date('Y-m-d H:i:s', $now);
+    $nowMysql = date('Y-m-d H:i:s', max($now, (strtotime((string) ($order['cct_modified'] ?? '')) ?: 0) + 1));
     $user = $this->maintenance_order_current_user_payload();
     $userId = Auth::userId();
     $employeeId = trim((string) (method_exists($this, 'current_employee_id') ? $this->current_employee_id() : ''));
@@ -2525,7 +2582,9 @@ trait HandlesMaintenanceActions
     if (empty($update)) {
       $this->jsonFail('No hay campos disponibles para actualizar la orden.');
     }
-    $this->db->update($ordersTable, $update, ['_ID' => $orderId]);
+    if (!$this->maintenance_order_apply_response($ordersTable, $order, $update)) {
+      $this->jsonFail('La orden cambió o ya fue respondida. Vuelve a abrirla.');
+    }
 
     $updatedOrder = array_merge($order, $update);
     $this->maintenance_order_insert_response_histories($schema, $updatedOrder, $estado, $observacion, $user, $employeeId, $now, $nowMysql);
@@ -2586,7 +2645,7 @@ trait HandlesMaintenanceActions
   }
 
   /** @return array{message:string,id_orden:string,estado:string,notifications_queued:int} */
-  public function public_respond_cotizacion_order(int $orderId, string $estadoRaw, string $observacionRaw, string $responderEmployeeIdRaw): array
+  public function public_respond_cotizacion_order(int $orderId, string $estadoRaw, string $observacionRaw, string $responderEmployeeIdRaw, string $orderVersion = ''): array
   {
     $estado = $this->maintenance_order_response_state($estadoRaw);
     if ($estado === '') {
@@ -2621,13 +2680,16 @@ trait HandlesMaintenanceActions
       throw new \DomainException('Orden no encontrada.');
     }
 
+    if (!hash_equals((string) ($order['cct_modified'] ?? ''), $orderVersion)) {
+      throw new \DomainException('La orden fue modificada. Vuelve a abrirla y revisa los datos antes de aprobar.');
+    }
     $currentState = strtolower(trim((string) ($order['estado'] ?? '')));
     if ($currentState !== '' && $currentState !== 'esperando respuesta') {
       throw new \DomainException('Esta orden ya fue respondida. No se puede cambiar desde el enlace público.');
     }
 
     $now = time();
-    $nowMysql = date('Y-m-d H:i:s', $now);
+    $nowMysql = date('Y-m-d H:i:s', max($now, (strtotime((string) ($order['cct_modified'] ?? '')) ?: 0) + 1));
     $observacion = $this->maintenance_order_clean($observacionRaw);
     $user = [
       'nombre' => $responderName,
@@ -2645,7 +2707,9 @@ trait HandlesMaintenanceActions
     if (empty($update)) {
       throw new \DomainException('No hay campos disponibles para actualizar la orden.');
     }
-    $this->db->update($ordersTable, $update, ['_ID' => $orderId]);
+    if (!$this->maintenance_order_apply_response($ordersTable, $order, $update)) {
+      throw new \DomainException('La orden cambió o ya fue respondida. Vuelve a abrirla.');
+    }
 
     $updatedOrder = array_merge($order, $update);
     $this->maintenance_order_insert_response_histories($schema, $updatedOrder, $estado, $observacion, $user, $employeeId, $now, $nowMysql);
@@ -3223,6 +3287,47 @@ trait HandlesMaintenanceActions
     }
   }
 
+  /** @return array<string,mixed> */
+  private function maintenance_order_editable_order(int $quoteId, int $orderId, bool $lock = false): array
+  {
+    $table = $this->db->table('jet_cct_ordenes');
+    $order = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? AND `id_cotizacion` = ?" . ($lock ? ' FOR UPDATE' : ''), [$orderId, (string) $quoteId]);
+    if (!is_array($order)) throw new \DomainException('La orden no pertenece a esta cotización.');
+    if (!in_array(strtolower(trim((string) ($order['estado'] ?? ''))), ['', 'esperando respuesta', 'aprobada', 'desaprobada'], true)
+      || in_array(strtolower(trim((string) ($order['cct_status'] ?? ''))), ['trash', 'deleted'], true)) {
+      throw new \DomainException('Esta orden no se puede editar en su estado actual.');
+    }
+    return $order;
+  }
+
+  /** Restore only the amount already reserved by the edited order. */
+  private function maintenance_order_restore_edit_balance(array $quote, array $order): array
+  {
+    if ($order === []) return $quote;
+    $category = $this->maintenance_order_category((string) ($order['categoria'] ?? ''));
+    if ($category === '') throw new \DomainException('La categoría original de la orden no es válida.');
+    $field = $this->maintenance_order_balance_column($category);
+    $quote[$field] = $this->maintenance_order_money_value($quote[$field] ?? 0) + $this->maintenance_order_money_value($order['valor'] ?? 0);
+    return $quote;
+  }
+
+  private function maintenance_order_has_balance(array $quote): bool
+  {
+    foreach (['saldo_obra', 'saldo_materiales', 'saldo_maquinarias', 'saldo_otros_costo'] as $field) {
+      if ($this->maintenance_order_money_value($quote[$field] ?? 0) > 0) return true;
+    }
+    return false;
+  }
+
+  /** Compare the pending version atomically against concurrent edits/responses. */
+  private function maintenance_order_apply_response(string $table, array $order, array $update): bool
+  {
+    $set = implode(', ', array_map(static fn(string $field): string => "`{$field}` = ?", array_keys($update)));
+    $stmt = $this->db->pdo()->prepare("UPDATE `{$table}` SET {$set} WHERE `_ID` = ? AND `estado` <=> ? AND `cct_modified` <=> ?");
+    $stmt->execute(array_merge(array_values($update), [$order['_ID'], $order['estado'] ?? null, $order['cct_modified'] ?? null]));
+    return $stmt->rowCount() === 1;
+  }
+
   private function maintenance_order_can_manage(): bool
   {
     return $this->canUseDashboardAction('quote_order_create') && (
@@ -3568,7 +3673,7 @@ trait HandlesMaintenanceActions
   }
 
   /** @param array<string,string> $providerPayload */
-  private function maintenance_order_save_provider(\SCM\Support\SchemaInspector $schema, int $providerId, array $providerPayload): int
+  private function maintenance_order_save_provider(\SCM\Support\SchemaInspector $schema, int $providerId, array $providerPayload, bool $countPurchase = true): int
   {
     $table = $this->db->table('jet_cct_proveedores');
     if (!$schema->tableExists($table)) {
@@ -3595,7 +3700,7 @@ trait HandlesMaintenanceActions
     if ($providerId > 0) {
       $currentCompras = (int) ($this->db->getVar("SELECT COALESCE(`compras`, 0) FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$providerId]) ?? 0);
       $update = array_merge($providerPayload, [
-        'compras' => (string) ($currentCompras + 1),
+        'compras' => (string) ($currentCompras + ($countPurchase ? 1 : 0)),
         'cct_modified' => $nowMysql,
       ]);
       $update = $schema->filterTableData($table, $update);
@@ -4005,8 +4110,8 @@ trait HandlesMaintenanceActions
     $category = trim((string) ($order['categoria'] ?? 'mantenimiento'));
     $ticket = $this->maintenance_order_first([$order['id_ticket'] ?? '', $cotizacion['id_ticket'] ?? '']);
     $orderUrl = $this->maintenance_order_order_url($orderId);
-    $subject = 'Orden de ' . strtolower($category) . ($ticket !== '' ? ' del caso #' . $ticket : '') . ' pendiente';
-    $html = $this->maintenance_order_email_html('Orden de mantenimiento creada', [
+    $subject = 'Orden de ' . strtolower($category) . ($ticket !== '' ? ' del caso #' . $ticket : '') . (!empty($order['_edited']) ? ' editada: nueva aprobación' : ' pendiente');
+    $html = $this->maintenance_order_email_html(!empty($order['_edited']) ? 'Orden editada: nueva aprobación' : 'Orden de mantenimiento creada', [
       'Orden' => '#' . $orderId,
       'Estado' => trim((string) ($order['estado'] ?? 'Esperando respuesta')),
       'Caso' => $ticket !== '' ? '#' . $ticket : '-',
@@ -4015,14 +4120,14 @@ trait HandlesMaintenanceActions
       'Proveedor' => trim((string) ($order['proveedor'] ?? '-')),
       'Categoria' => $category !== '' ? $category : '-',
       'Valor' => $this->format_cop_currency($order['valor'] ?? 0),
-      'Creada por' => trim((string) ($user['nombre'] ?? '-')),
+      (!empty($order['_edited']) ? 'Editada por' : 'Creada por') => trim((string) ($user['nombre'] ?? '-')),
     ], $orderId);
 
     $emailQueued = 0;
     if ($emailRecipients !== []) {
       $emailQueued = (new \SCM\Support\EmailQueue($this->db))->enqueue(array_column($emailRecipients, 'email'), $subject, $html, [
         'source_module' => 'ordenes_mantenimiento',
-        'dedupe_key' => 'orden-mantenimiento-creada:' . $orderId,
+        'dedupe_key' => 'orden-mantenimiento-creada:' . $orderId . ':' . ($order['_notification_revision'] ?? 'inicial'),
         'meta' => [
           'event' => 'orden_mantenimiento_creada',
           'id_orden' => $orderId,
@@ -4086,7 +4191,7 @@ trait HandlesMaintenanceActions
         'categoria' => $category,
         'order_url' => $orderUrl,
         'button_url_mode' => 'dynamic_suffix',
-        'dedupe_key' => 'orden-mantenimiento-creada-whatsapp:' . $orderId,
+        'dedupe_key' => 'orden-mantenimiento-creada-whatsapp:' . $orderId . ':' . ($order['_notification_revision'] ?? 'inicial'),
         'template_name' => 'scm_orden_mantenimiento_funcionario_v1',
         'template_language' => 'es_CO',
         'template_components' => [
@@ -4152,7 +4257,7 @@ trait HandlesMaintenanceActions
 
     return (new \SCM\Support\EmailQueue($this->db))->enqueue($emails, $subject, $html, [
       'source_module' => 'ordenes_mantenimiento',
-      'dedupe_key' => 'orden-mantenimiento-respuesta:' . $orderId . ':' . strtolower($estado),
+      'dedupe_key' => 'orden-mantenimiento-respuesta:' . $orderId . ':' . strtolower($estado) . ':' . (string) ($order['cct_modified'] ?? ''),
       'meta' => [
         'event' => 'respuesta_orden_mantenimiento',
         'id_orden' => $orderId,

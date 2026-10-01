@@ -76,7 +76,8 @@ try {
       $orderId,
       is_string($_POST['estado'] ?? null) ? $_POST['estado'] : '',
       is_string($_POST['observacion'] ?? null) ? $_POST['observacion'] : '',
-      is_string($_POST['id_funcionario'] ?? null) ? $_POST['id_funcionario'] : ''
+      is_string($_POST['id_funcionario'] ?? null) ? $_POST['id_funcionario'] : '',
+      is_string($_POST['order_version'] ?? null) ? $_POST['order_version'] : ''
     );
     $redirect = 'orden-publica.php?' . http_build_query([
       'numero' => $orderId,
@@ -146,6 +147,7 @@ try {
     $form = '<section class="scm-order-public-card scm-order-public-form-card"><h2>Responder orden</h2><p>Si estás conforme con esta orden, apruébala. Si no corresponde, desapruébala y deja una observación para el equipo.</p>'
       . '<form method="post">'
       . '<input type="hidden" name="_csrf_token" value="' . $escape($csrf) . '">'
+      . '<input type="hidden" name="order_version" value="' . $escape($order['cct_modified'] ?? '') . '">'
       . '<label>Funcionario que responde *<select name="id_funcionario" required>' . $funcionarioOptions . '</select></label>'
       . '<label>Respuesta *<select name="estado" required><option value="">Selecciona una respuesta</option><option value="Aprobada">Aprobar orden</option><option value="Desaprobada">Desaprobar orden</option></select></label>'
       . '<label>Observación interna<textarea name="observacion" rows="4" maxlength="1200" placeholder="Opcional, pero recomendado si desapruebas"></textarea></label>'
