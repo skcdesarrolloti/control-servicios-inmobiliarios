@@ -49,6 +49,7 @@ final class CompletionDelivery
       'signature_otp' => self::otpTemplate(),
       'signature_invitation' => self::configuredTemplate('SCM_ACTA_WHATSAPP_INVITATION_TEMPLATE', 'scm_acta_solicitud_firma_v1'),
       'signed_receipt' => self::configuredTemplate('SCM_ACTA_WHATSAPP_RECEIPT_TEMPLATE', 'scm_acta_firmada_v1'),
+      'acta_firmada' => self::configuredTemplate('SCM_ACTA_WHATSAPP_INTERNAL_SIGNED_TEMPLATE', 'scm_acta_firmada_interna_v1'),
       default => null,
     };
     if ($template === null) { return 0; }
@@ -59,7 +60,15 @@ final class CompletionDelivery
       $ticket = trim((string) ($options['ticket_number'] ?? ''));
       $url = trim((string) ($options['act_url'] ?? ''));
       if ($ticket === '' || !filter_var($url, FILTER_VALIDATE_URL) || !in_array(parse_url($url, PHP_URL_SCHEME), ['http', 'https'], true)) { return 0; }
-      $parameters = [(string) $options['destination_name'], $ticket, $url];
+      if ($event === 'acta_firmada') {
+        $actId = trim((string) ($options['act_id'] ?? ''));
+        if (!ctype_digit($actId) || (int) $actId <= 0) { return 0; }
+        $text = static fn($value): string => mb_substr(trim(preg_replace('/\s+/u', ' ', strip_tags((string) $value)) ?: '') ?: 'No registrado', 0, 600, 'UTF-8');
+        $parameters = array_map($text, [$options['destination_name'], $actId, $ticket, $options['signer_name'] ?? '', $options['contract'] ?? '', $options['property'] ?? '']);
+        $parameters[] = $url;
+      } else {
+        $parameters = [(string) $options['destination_name'], $ticket, $url];
+      }
     }
     $components = [['type' => 'body', 'parameters' => array_map(static fn(string $text): array => ['type' => 'text', 'text' => $text], $parameters)]];
     if ($otp) {

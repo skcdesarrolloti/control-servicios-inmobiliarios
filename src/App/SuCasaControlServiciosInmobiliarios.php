@@ -425,7 +425,7 @@ final class SuCasaControlServiciosInmobiliarios
           'acta_firmada' => [
             'label' => 'Acta firmada',
             'description' => 'Al firmar un acta de solución o satisfacción se avisa al creador original y a los funcionarios seleccionados aquí.',
-            'channel' => 'Email interno en cola',
+            'channel' => 'Email y WhatsApp en cola',
           ],
           'revision_correctiva_creada' => [
             'label' => 'Revisión correctiva creada',

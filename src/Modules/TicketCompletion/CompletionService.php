@@ -22,7 +22,7 @@ final class CompletionService
     };
     // Internal recipients must not delay the public signature response with SMTP calls.
     $this->enqueueInternal = $enqueue ?? static function (string $to, string $subject, string $html, array $options) use ($repo): int {
-      return (new \SCM\Support\EmailQueue($repo->db))->enqueue($to, $subject, $html, $options);
+      return CompletionDelivery::enqueue($repo->db, $to, $subject, $html, $options);
     };
   }
 
@@ -1004,24 +1004,35 @@ final class CompletionService
       $url = $this->viewUrl((int) $act['id']);
       foreach ($recipients as $recipient) {
         $email = strtolower(trim((string) ($recipient['email'] ?? '')));
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || isset($results[$email])) { continue; }
-        if (!empty($delivery['internal_signed_receipt'][$email]['queued'])) { $results[$email] = true; continue; }
         $name = trim((string) ($recipient['name'] ?? '')) ?: 'Funcionario';
         $body = '<p>Hola ' . EmailTemplate::e($name) . '.</p><p>El acta #' . (int) $act['id'] . ' del caso #' . EmailTemplate::e($payload['ticket_number']) . ' fue firmada por <strong>' . EmailTemplate::e($payload['signer']['name']) . '</strong> el ' . date('d/m/Y H:i', (int) $act['signed_at']) . '. El caso quedó cerrado.</p>'
           . '<p>Contrato: <strong>' . EmailTemplate::e($payload['contract']) . '</strong> · Inmueble SIMI: <strong>' . EmailTemplate::e($payload['property'] ?? '') . '</strong></p>'
           . '<p><a href="' . EmailTemplate::e($url) . '">Consultar acta firmada y descargar PDF</a> (requiere iniciar sesión en el panel).</p>';
-        try {
-          $result = ($this->enqueueInternal)($email, $subject, EmailTemplate::render($subject, $body), [
-            'channel' => 'email', 'source_module' => 'ticket-completion', 'provider' => 'email_smtp',
-            'destination_name' => $name, 'priority' => 100,
-            'dedupe_key' => 'ticket-acta:' . $act['id'] . ':acta_firmada:' . $act['signed_at'] . ':email',
-            'meta' => ['event' => 'acta_firmada', 'ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id']],
-          ]);
-          $result = is_array($result) ? $result : ['queued' => $result > 0, 'sent' => false];
-        } catch (\Throwable) { $result = ['queued' => false, 'sent' => false]; }
-        $results[$email] = !empty($result['queued']);
-        $delivery['internal_signed_receipt'][$email] = $result + ['attempted_at' => time()];
-        $this->repo->db->update($this->repo->table(), ['delivery_json' => json_encode($delivery, JSON_THROW_ON_ERROR)], ['id' => (int) $act['id']]);
+        $phone = CompletionPolicy::phone((string) ($recipient['phone'] ?? ''));
+        foreach (['email' => $email, 'whatsapp' => $phone] as $channel => $destination) {
+          if ($channel === 'email' ? !filter_var($destination, FILTER_VALIDATE_EMAIL) : $destination === '') { continue; }
+          // Retain existing email delivery keys when adding WhatsApp to older signed acts.
+          $key = $channel === 'email' ? $destination : 'whatsapp:' . $destination;
+          if (isset($results[$key])) { continue; }
+          if (!empty($delivery['internal_signed_receipt'][$key]['queued'])) { $results[$key] = true; continue; }
+          $text = 'El acta #' . $act['id'] . ' del caso #' . $payload['ticket_number'] . ' fue firmada por ' . $payload['signer']['name'] . '. Caso cerrado. Consultar: ' . $url;
+          try {
+            $result = ($this->enqueueInternal)($destination, $subject, EmailTemplate::render($subject, $body), [
+              'channel' => $channel, 'source_module' => 'ticket-completion',
+              'provider' => $channel === 'email' ? 'email_smtp' : 'whatsapp_official',
+              'destination_name' => $name, 'priority' => 100, 'message_text' => $text,
+              'ticket_number' => $payload['ticket_number'], 'act_id' => (string) $act['id'],
+              'signer_name' => $payload['signer']['name'], 'contract' => $payload['contract'],
+              'property' => $payload['property'] ?? '', 'act_url' => $url,
+              'dedupe_key' => 'ticket-acta:' . $act['id'] . ':acta_firmada:' . $act['signed_at'] . ':' . $channel,
+              'meta' => ['event' => 'acta_firmada', 'ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id']],
+            ]);
+            $result = is_array($result) ? $result : ['queued' => $result > 0, 'sent' => false];
+          } catch (\Throwable) { $result = ['queued' => false, 'sent' => false]; }
+          $results[$key] = !empty($result['queued']);
+          $delivery['internal_signed_receipt'][$key] = $result + ['attempted_at' => time()];
+          $this->repo->db->update($this->repo->table(), ['delivery_json' => json_encode($delivery, JSON_THROW_ON_ERROR)], ['id' => (int) $act['id']]);
+        }
       }
       return $results;
     });

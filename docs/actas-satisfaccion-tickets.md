@@ -33,14 +33,15 @@ El borrador no reemplaza el botón de guardar ni se comparte entre dispositivos.
 
 ## Aviso interno al firmar
 
-Después de registrar la firma y el cierre, se avisa por correo al creador original
+Después de registrar la firma y el cierre, se avisa por correo y WhatsApp al creador original
 del acta y a los funcionarios activos seleccionados en **Notificaciones internas
 → Mantenimiento → Acta firmada** (`internal_admin_notifications.acta_firmada`).
-El creador recibe el aviso aunque no esté seleccionado ahí. Los correos repetidos
-se notifican una sola vez. La edición conserva al creador original; para registros
+El creador recibe el aviso aunque no esté seleccionado ahí. Los correos y celulares
+repetidos se notifican una sola vez por canal. Cada contacto válido se usa de forma
+independiente: no tener correo no impide recibir WhatsApp. La edición conserva al creador original; para registros
 anteriores se consulta el historial de creación cuando el último editor es distinto.
 
-El correo informa quién firmó, el caso, contrato e inmueble SIMI y contiene un
+El aviso informa quién firmó, el caso, contrato e inmueble SIMI y contiene un
 enlace al acta que exige sesión y permisos del panel. Se usa la cola compartida
 con evento `acta_firmada`, deduplicación por acta/firma/destino y trazabilidad en
 `delivery_json.internal_signed_receipt`. El worker compartido procesa estos
@@ -49,6 +50,22 @@ La copia del firmante mantiene sus canales elegidos y su intento de envío inmed
 Una falla del aviso interno no deshace la firma ni el cierre. **Reenviar copia
 firmada** vuelve a intentar registrar los avisos internos que faltaron, sin
 duplicar los que ya quedaron encolados.
+
+WhatsApp interno requiere una plantilla aprobada por Meta, separada de la copia
+personal del firmante. Crear **`scm_acta_firmada_interna_v1`**, categoría **UTILITY**,
+idioma **es_CO**, con el cuerpo y los ejemplos de
+[`whatsapp-acta-internal-signed-template.json`](whatsapp-acta-internal-signed-template.json).
+Las siete variables son: destinatario, número de acta, número de caso, firmante,
+contrato, inmueble SIMI y URL del acta. No lleva botones dinámicos ni el nombre
+corporativo dentro del cuerpo; este se puede colocar en el pie de Meta.
+
+El nombre predeterminado funciona sin agregar variables de entorno. Si Meta
+aprueba otro nombre, configurar `SCM_ACTA_WHATSAPP_INTERNAL_SIGNED_TEMPLATE`.
+El idioma usa `SCM_ACTA_WHATSAPP_LANGUAGE` (predeterminado `es_CO`). Los celulares
+se toman del acta para su creador y de la tabla de funcionarios para los seleccionados.
+Se normalizan números colombianos a `+57`; no se aceptan destinos de grupos.
+La aprobación de la plantilla y la entrega real deben comprobarse en Meta y en
+la cola del entorno desplegado; las pruebas automatizadas usan proveedores inertes.
 
 Generar el acta deja `estado = En proceso` y conserva uno de los estados
 `En ejecucion por inmobiliaria/propietario/arrendatario/copropiedad`, según quién

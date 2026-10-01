@@ -1,0 +1,14 @@
+{
+  "name": "scm_acta_firmada_interna_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}.\n\nEl acta #{{2}} del caso #{{3}} fue firmada por {{4}}. El caso quedó cerrado.\n\nContrato: {{5}} · Inmueble SIMI: {{6}}.\n\nConsulta el acta y descarga el PDF firmado aquí: {{7}}\n\nPara consultar debes iniciar sesión en el panel.",
+      "example": {
+        "body_text": [["Royner Guardo", "9", "10841", "María Pérez", "2000", "204578", "https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/ticket-acta.php?id=9"]]
+      }
+    }
+  ]
+}
