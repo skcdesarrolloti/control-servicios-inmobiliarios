@@ -19222,7 +19222,7 @@
         .finally(function () {
           if (button) {
             button.disabled = false;
-            button.textContent = originalText || "Soporte de pago";
+            button.textContent = originalText || "Generar documento para pago";
           }
         });
     }

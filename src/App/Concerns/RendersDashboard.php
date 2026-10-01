@@ -4688,7 +4688,7 @@ trait RendersDashboard
         . '<p class="scm-cotizacion-order-activity">' . esc_html($orderActivity !== '' ? $orderActivity : 'Sin actividad registrada.') . '</p>'
         . '<div class="scm-cotizacion-order-card-actions">'
         . '<button type="button" class="scm-cotizacion-order-view" data-scm-view-cotizacion-order="' . esc_attr($orderKey) . '" aria-label="Ver detalle de la orden ' . esc_attr($orderId !== '' ? '#' . $orderId : '') . '">Ver orden <span aria-hidden="true">&rarr;</span></button>'
-        . ($orderId !== '' ? '<button type="button" class="scm-cotizacion-order-view" data-scm-cotizacion-order-pdf data-order-id="' . esc_attr($orderId) . '">Soporte de pago</button>' : '')
+        . ($orderId !== '' ? '<button type="button" class="scm-cotizacion-order-view" data-scm-cotizacion-order-pdf data-order-id="' . esc_attr($orderId) . '">Generar documento para pago</button>' : '')
         . ($orderId !== '' && $this->canUseDashboardAction('quote_order_create') && strtolower(trim($estado)) === 'aprobada' && in_array(strtolower($orderState), ['', 'esperando respuesta', 'aprobada', 'desaprobada'], true)
           ? '<button type="button" class="scm-cotizacion-order-view" data-scm-edit-cotizacion-order data-order-id="' . esc_attr($orderId) . '" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Editar orden</button>' : '')
         . ($orderPending && $canRespondMaintenanceOrder ? '<button type="button" class="scm-cotizacion-order-view scm-cotizacion-order-response" data-scm-respond-cotizacion-order' . $orderResponseAttrs . '>Responder orden</button>' : '')
@@ -4865,7 +4865,7 @@ trait RendersDashboard
     $html .= '</dl></section></div>';
     $detailActions = '';
     if (!$forPdf && $orderId !== '') {
-      $detailActions .= '<button type="button" class="scm-cotizacion-order-view" data-scm-cotizacion-order-pdf data-order-id="' . esc_attr($orderId) . '">Soporte de pago</button>';
+      $detailActions .= '<button type="button" class="scm-cotizacion-order-view" data-scm-cotizacion-order-pdf data-order-id="' . esc_attr($orderId) . '">Generar documento para pago</button>';
     }
     if (!$forPdf && $isPending && $this->maintenance_order_can_respond()) {
       $detailActions .= '<button type="button" class="scm-cotizacion-order-view scm-cotizacion-order-response" data-scm-respond-cotizacion-order'
