@@ -36,18 +36,8 @@ final class InternalNotificationRecipients
   /** @return string[] */
   public static function emailsForAction(Database $db, string $action): array
   {
-    $selectedIds = self::idsForAction($db, $action);
-    if ($selectedIds === []) {
-      return [];
-    }
-
-    $selected = array_fill_keys(array_map('strval', $selectedIds), true);
     $emails = [];
-    foreach (FuncionarioOptions::panelFuncionarios($db, new SchemaInspector($db), 'primary') as $funcionario) {
-      $id = (string) ((int) ($funcionario['id'] ?? 0));
-      if ($id === '0' || !isset($selected[$id])) {
-        continue;
-      }
+    foreach (self::contactsForAction($db, $action) as $funcionario) {
       $email = trim((string) ($funcionario['email'] ?? ''));
       if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $emails[strtolower($email)] = $email;
@@ -55,6 +45,27 @@ final class InternalNotificationRecipients
     }
 
     return array_values($emails);
+  }
+
+  /** @return array<int,array<string,string>> */
+  public static function contactsForAction(Database $db, string $action): array
+  {
+    $selectedIds = self::idsForAction($db, $action);
+    if ($selectedIds === []) {
+      return [];
+    }
+
+    $selected = array_fill_keys(array_map('strval', $selectedIds), true);
+    $contacts = [];
+    foreach (FuncionarioOptions::panelFuncionarios($db, new SchemaInspector($db), 'primary') as $funcionario) {
+      $id = (string) ((int) ($funcionario['id'] ?? 0));
+      if ($id === '0' || !isset($selected[$id])) {
+        continue;
+      }
+      $contacts[] = $funcionario;
+    }
+
+    return $contacts;
   }
 
   private static function sanitizeActionKey(string $action): string

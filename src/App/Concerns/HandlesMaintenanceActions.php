@@ -492,9 +492,9 @@ trait HandlesMaintenanceActions
         'cct_modified' => $nowSql,
         'fecha' => $mode === 'edit' ? (int) ($sourceQuote['fecha'] ?? $now) : $now,
         'se_envio' => 'No',
-        'creador' => trim((string) ($actor['name'] ?? Auth::user())),
-        'email_creador' => trim((string) ($actor['email'] ?? '')),
-        'celular_creador' => trim((string) ($actor['phone'] ?? '')),
+        'creador' => $mode === 'edit' ? trim((string) ($sourceQuote['creador'] ?? '')) : trim((string) ($actor['name'] ?? Auth::user())),
+        'email_creador' => $mode === 'edit' ? trim((string) ($sourceQuote['email_creador'] ?? '')) : trim((string) ($actor['email'] ?? '')),
+        'celular_creador' => $mode === 'edit' ? trim((string) ($sourceQuote['celular_creador'] ?? '')) : trim((string) ($actor['phone'] ?? '')),
         'coordinador' => trim((string) ($actor['name'] ?? Auth::user())),
         'email_coordinador' => trim((string) ($actor['email'] ?? '')),
         'celular_coordinador' => trim((string) ($actor['phone'] ?? '')),
@@ -2290,9 +2290,18 @@ trait HandlesMaintenanceActions
       }
     }
 
+    $ticket = $this->maintenance_quote_ticket_row_for_quote($schema, $row);
+    $notifications = $this->get_seguimiento_service()->notifyCotizacionResponse(
+      is_array($ticket) ? $ticket : [],
+      array_merge($row, $update),
+      'Aprobada',
+      (string) ($update['observacion_respuesta'] ?? $observacion)
+    );
     $this->jsonOk([
-      'message' => 'Cotizacion marcada como aprobada.' . ($ticketRowsUpdated > 0 ? ' Ticket sincronizado.' : ''),
+      'message' => 'Cotizacion marcada como aprobada.' . ($ticketRowsUpdated > 0 ? ' Ticket sincronizado.' : '') . ' Correos en cola: ' . $notifications['email'] . '. WhatsApp en cola: ' . $notifications['whatsapp'] . '.',
       'id_cotizacion' => (string) $cotizacionId,
+      'emails_sent' => (string) $notifications['email'],
+      'whatsapp_sent' => (string) $notifications['whatsapp'],
     ]);
   }
 

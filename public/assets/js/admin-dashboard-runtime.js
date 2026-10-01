@@ -20625,7 +20625,7 @@
         window.Swal.fire({
           title: "Responder cotización",
           html:
-            '<div class="scm-cotizacion-response-form"><p class="scm-cotizacion-dialog-intro">Registra la decisión recibida y la información necesaria para continuar el proceso.</p><div class="scm-cotizacion-response-grid">' +
+            '<div class="scm-cotizacion-response-form"><p class="scm-cotizacion-dialog-intro">Registra la decisión recibida. Se notificará por correo y WhatsApp al creador de la cotización y a los funcionarios configurados en Notificaciones internas → Respuesta de cotización.</p><div class="scm-cotizacion-response-grid">' +
             '<label class="scm-cotizacion-dialog-field"><span>Respuesta <em>*</em></span><select id="swal-cot-estado"><option value="">Selecciona una respuesta</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
             '<label class="scm-cotizacion-dialog-field" id="swal-cot-motivo-wrap" hidden><span>Motivo <em>*</em></span><select id="swal-cot-motivo"><option value="">Selecciona un motivo</option><option value="Por costo">Por costo</option><option value="Ejecución por cuenta propia">Ejecución por cuenta propia</option></select></label>' +
             '<label class="scm-cotizacion-dialog-field" id="swal-cot-fin-wrap" hidden><span>Financiación</span><select id="swal-cot-fin"><option value="">No aplica / sin respuesta</option><option value="Si">Sí</option><option value="No">No</option></select></label>' +
@@ -20702,8 +20702,6 @@
           fd.append("motivo", responseData.motivo || "");
           fd.append("financiacion", responseData.financiacion || "");
           fd.append("observacion", responseData.observacion || "Ninguna");
-          fd.append("notify_recipients_present", "1");
-          fd.append("notify_recipients[]", "none");
           return submitCotizacionAction(
             fd,
             actionCotizacionResponse,

@@ -438,8 +438,8 @@ final class SuCasaControlServiciosInmobiliarios
           ],
           'respuesta_cotizacion_mantenimiento' => [
             'label' => 'Respuesta de cotización',
-            'description' => 'Cuando se responde o actualiza el estado de una cotización de mantenimiento notificando a administración.',
-            'channel' => 'Email interno en cola',
+            'description' => 'Al responder una cotización se avisa al creador y a los funcionarios seleccionados aquí.',
+            'channel' => 'Email y WhatsApp en cola',
           ],
           'respuesta_orden_mantenimiento' => [
             'label' => 'Respuesta de orden de mantenimiento',

@@ -1209,17 +1209,23 @@ trait WorkflowCommandsConcern
       $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);
     }
 
-    $cotRow = $this->fetchCotizacion($cotTable, $cotIds[0]);
     $ticketHistorySaved = $writeTicketHistory
       ? $this->insertCotizacionResponseTicketHistory($ticket, $ticketPk, $cotIds, $estado, $observacion, $motivo, $financiacion, $userId, $employeeId, $userName, $nowTs, $nowMysql)
       : false;
     $propertyHistorySaved = $this->insertHistorialInmuebleCotizacion($ticket, $estado, $observacion, $motivo, $nowTs, $nowMysql);
-    $sent = $this->notifyCotizacionResponse($ticket, is_array($cotRow) ? $cotRow : [], $estado, $observacion, $notifyTargets);
+    $notifications = ['email' => 0, 'whatsapp' => 0];
+    foreach ($cotIds as $cotId) {
+      $cotRow = $this->fetchCotizacion($cotTable, $cotId);
+      $queued = $this->notifyCotizacionResponse($ticket, is_array($cotRow) ? $cotRow : [], $estado, $observacion);
+      $notifications['email'] += $queued['email'];
+      $notifications['whatsapp'] += $queued['whatsapp'];
+    }
     return [
       'ok' => '1',
-      'message' => 'Respuesta de cotizacion guardada.' . ($sent > 0 ? ' Correos programados en cola: ' . $sent . '.' : ' Sin correos programados.'),
+      'message' => 'Respuesta de cotizacion guardada. Correos en cola: ' . $notifications['email'] . '. WhatsApp en cola: ' . $notifications['whatsapp'] . '.',
       'cot_rows' => (string)$updated,
-      'emails_sent' => (string)$sent,
+      'emails_sent' => (string)$notifications['email'],
+      'whatsapp_sent' => (string)$notifications['whatsapp'],
       'hist_ticket_saved' => $ticketHistorySaved ? '1' : '0',
       'hist_inmueble_saved' => $propertyHistorySaved ? '1' : '0',
     ];

@@ -1,0 +1,25 @@
+{
+  "name": "scm_cotizacion_mantenimiento_respuesta_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Buen día, {{1}}.\n\nSe registró una respuesta a la cotización de mantenimiento #{{2}} del caso #{{3}}.\n\nRespuesta: {{4}}.\nDestinatario: {{5}}.\nContrato: {{6}} · Inmueble SIMI: {{7}}.\nDetalle: {{8}}.\n\nPuedes consultar la cotización desde el botón.\n\nSKC SuCasa Inmobiliaria",
+      "example": {
+        "body_text": [["Royner Guardo", "570", "10841", "Aprobada", "María Pérez", "2000", "204578", "Autorizo los trabajos. Financiación: No"]]
+      }
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver cotización",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": ["control-servicios-inmobiliarios/public/cotizacion-mantenimiento.php?numero=570&expires=1790000000&sig=demo"]
+        }
+      ]
+    }
+  ]
+}

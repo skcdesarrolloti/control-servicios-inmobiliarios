@@ -4162,11 +4162,7 @@
         "scm-case-submodal--workflow",
         "scm-case-submodal--quote",
       );
-      var quoteNotifyTargets = renderNotifyTargets()
-        .replace(
-          'class="scm-notify-targets"',
-          'class="scm-notify-targets scm-workflow-email-targets"',
-        );
+      var quoteNotifyTargets = '<p class="scm-seg-intro">La respuesta se notificará por correo y WhatsApp al creador de la cotización y a los funcionarios configurados en Notificaciones internas → Respuesta de cotización.</p>';
       var cotizacionMeta = caseBtn.dataset.cotizacionId
         ? [
             '<span><span class="material-symbols-outlined">receipt_long</span><b>Cotizaci&oacute;n</b> #' +

@@ -36,52 +36,97 @@ trait NotificationDeliveryConcern
     return $sent;
   }
 
-  private function notifyCotizacionResponse(array $ticket, array $cotizacion, string $estado, string $observacion, array $notifyTargets = []): int
+  /** @return array{email:int,whatsapp:int} */
+  public function notifyCotizacionResponse(array $ticket, array $cotizacion, string $estado, string $observacion): array
   {
-    if (!$this->queue instanceof EmailQueue) {
-      return 0;
-    }
-    $cotId = $this->firstNonEmpty([$cotizacion['_ID'] ?? '', $ticket['id_cotizacion_mantenimiento'] ?? '']);
-    $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
-    $cotUrl = $cotId !== '' ? \SCM\App\SuCasaControlServiciosInmobiliarios::signedMaintenanceQuotePublicUrl((int) $cotId) : '';
+    $queued = ['email' => 0, 'whatsapp' => 0];
+    $cotId = trim((string) ($cotizacion['_ID'] ?? ''));
+    if ($cotId === '' || (int) $cotId <= 0) return $queued;
+    $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '', $cotizacion['id_ticket'] ?? '']);
+    $cotUrl = \SCM\App\SuCasaControlServiciosInmobiliarios::signedMaintenanceQuotePublicUrl((int) $cotId);
     $subject = 'Nueva respuesta de cotizacion de mantenimiento #' . $cotId;
     $motivo = trim((string)($cotizacion['motivo'] ?? ''));
-    $recipients = $this->emailRecipientsForTargets($ticket, $notifyTargets, [], 'respuesta_cotizacion_mantenimiento');
-    if (!in_array('none', $this->normalizeTargets($notifyTargets), true)) {
-      foreach (
-        [
-          (string)($cotizacion['email_destinatario'] ?? ''),
-          (string)($cotizacion['email_creador'] ?? ''),
-          (string)($cotizacion['email_coordinador'] ?? ''),
-        ] as $extraEmail
-      ) {
-        $extraEmail = trim($extraEmail);
-        if ($extraEmail !== '') {
-          $recipients[] = ['email' => $extraEmail, 'name' => 'cliente', 'role' => 'cotizacion'];
+    $recipients = array_merge([[
+      'name' => trim((string) ($cotizacion['creador'] ?? '')) ?: 'Creador de la cotización',
+      'email' => trim((string) ($cotizacion['email_creador'] ?? '')),
+      'phone' => trim((string) ($cotizacion['celular_creador'] ?? '')),
+    ]], InternalNotificationRecipients::contactsForAction($this->db, 'respuesta_cotizacion_mantenimiento'));
+    $dedupe = 'cotizacion-respuesta:' . $cotId . ':' . $estado . ':' . (string) ($cotizacion['fecha_respuesta'] ?? '');
+    $meta = [
+      'event' => 'respuesta_cotizacion_mantenimiento',
+      'id_cotizacion' => $cotId,
+      'id_ticket' => $logicalTicket,
+      'estado' => $estado,
+      'fecha_respuesta' => $cotizacion['fecha_respuesta'] ?? '',
+    ];
+    $smsQueue = new \SCM\Support\SmsQueue($this->db);
+    $buttonSuffix = $this->whatsappUrlButtonSuffix($cotUrl);
+    $details = trim(wp_strip_all_tags($observacion));
+    if ($estado === 'Desaprobada' && $motivo !== '') $details .= ' Motivo: ' . $motivo . '.';
+    if ($estado === 'Aprobada' && trim((string) ($cotizacion['financiacion'] ?? '')) !== '') {
+      $details .= ' Financiación: ' . (string) $cotizacion['financiacion'] . '.';
+    }
+    $seenEmail = [];
+    $seenPhone = [];
+    $text = static fn($value): string => mb_substr(trim(preg_replace('/\s+/u', ' ', wp_strip_all_tags((string) $value)) ?: '') ?: 'No aplica', 0, 600, 'UTF-8');
+    foreach ($recipients as $recipient) {
+      $name = trim((string) ($recipient['name'] ?? '')) ?: 'Funcionario';
+      $email = strtolower(trim((string) ($recipient['email'] ?? '')));
+      if ($this->queue instanceof EmailQueue && filter_var($email, FILTER_VALIDATE_EMAIL) && !isset($seenEmail[$email])) {
+        $seenEmail[$email] = true;
+        $html = EmailTemplate::renderNamed('respuesta_cotizacion', [
+          'destinatario' => EmailTemplate::e($name),
+          'id_cotizacion' => EmailTemplate::e($cotId),
+          'id_ticket' => EmailTemplate::e($logicalTicket),
+          'estado' => EmailTemplate::e($estado),
+          'observacion' => wp_kses_post($observacion),
+          'motivo_bloque' => $estado === 'Desaprobada' && $motivo !== ''
+            ? '<p style="font-weight:500;margin:10px 0;"><b>Motivo:</b> ' . EmailTemplate::e($motivo) . '</p>'
+            : '',
+          'financiacion' => EmailTemplate::e((string)($cotizacion['financiacion'] ?? '')),
+          'botones' => EmailTemplate::buttons([['url' => $cotUrl, 'label' => 'Ver cotizacion']]),
+        ]);
+        try {
+          $queued['email'] += $this->queue->enqueue($email, $subject, $html, [
+            'source_module' => 'respuesta_cotizacion_mantenimiento',
+            'destination_name' => $name,
+            'dedupe_key' => $dedupe . ':email',
+            'meta' => $meta,
+          ]);
+        } catch (\Throwable $error) {
+          error_log('[respuesta_cotizacion_mantenimiento] Cotización #' . $cotId . ': no se pudo encolar correo: ' . $error->getMessage());
         }
+      }
+      $phone = trim((string) ($recipient['phone'] ?? ''));
+      $digits = preg_replace('/\D+/', '', $phone) ?: '';
+      if ($phone !== '' && !str_starts_with($phone, '+') && strlen($digits) <= 10) $digits = '57' . $digits;
+      $phone = '+' . $digits;
+      if (!preg_match('/^\+[1-9]\d{7,14}$/', $phone) || isset($seenPhone[$phone])) continue;
+      $seenPhone[$phone] = true;
+      $parameters = array_map(static fn($value): array => ['type' => 'text', 'text' => $text($value)], [
+        $name, $cotId, $logicalTicket, $estado, $cotizacion['destinatario'] ?? '',
+        $cotizacion['contrato'] ?? '', $cotizacion['inmueble'] ?? '', $details,
+      ]);
+      $message = 'La cotización #' . $cotId . ' del caso #' . $logicalTicket . ' fue respondida: ' . $estado . '. ' . $details;
+      if ($smsQueue->enqueue($phone, $name, $message, array_merge($meta, [
+        'source_module' => 'respuesta_cotizacion_mantenimiento',
+        'dedupe_key' => $dedupe . ':whatsapp',
+        'quote_url' => $cotUrl,
+        'button_url_mode' => 'dynamic_suffix',
+        'template_name' => 'scm_cotizacion_mantenimiento_respuesta_v1',
+        'template_language' => 'es_CO',
+        'template_components' => [
+          ['type' => 'body', 'parameters' => $parameters],
+          ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $buttonSuffix]]],
+        ],
+      ]))) {
+        $queued['whatsapp']++;
+      } else {
+        error_log('[respuesta_cotizacion_mantenimiento] Cotización #' . $cotId . ': no se pudo encolar WhatsApp: ' . $smsQueue->lastError());
       }
     }
 
-    $sent = 0;
-    foreach ($this->uniqueEmailRecipients($recipients) as $recipient) {
-      $html = EmailTemplate::renderNamed('respuesta_cotizacion', [
-        'destinatario' => EmailTemplate::e($recipient['name'] !== '' ? $recipient['name'] : 'cliente'),
-        'id_cotizacion' => EmailTemplate::e($cotId),
-        'id_ticket' => EmailTemplate::e($logicalTicket),
-        'estado' => EmailTemplate::e($estado),
-        'observacion' => wp_kses_post($observacion),
-        'motivo_bloque' => $estado === 'Desaprobada' && $motivo !== ''
-          ? '<p style="font-weight:500;margin:10px 0;"><b>Motivo:</b> ' . EmailTemplate::e($motivo) . '</p>'
-          : '',
-        'financiacion' => EmailTemplate::e((string)($cotizacion['financiacion'] ?? '')),
-        'botones' => EmailTemplate::buttons([['url' => $cotUrl, 'label' => 'Ver cotizacion']]),
-      ]);
-      $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, [
-        'cc' => [],
-      ]);
-    }
-
-    return $sent;
+    return $queued;
   }
 
   private function notifySeguimiento(array $ticket, string $observacion, string $userName, array $notifyTargets = []): int
