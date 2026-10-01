@@ -41,6 +41,14 @@ trait HandlesTicketCompletion
       $sourceFlow = trim((string) ($_POST['source_flow'] ?? '')) === 'approved_quote'
         ? ['flow' => 'approved_quote', 'quote_id' => trim((string) ($_POST['source_cotizacion_id'] ?? $_POST['id_cotizacion'] ?? ''))]
         : [];
+      if (($_POST['operation'] ?? '') === 'update') {
+        $existingRepo = new CompletionRepository($this->db);
+        $existingAct = $existingRepo->act((int) ($_POST['act_id'] ?? 0));
+        if ((int) $existingAct['ticket_pk'] !== $ticketId) throw new \DomainException('El acta no pertenece al ticket seleccionado.');
+        $existingService = new CompletionService($existingRepo, SCM_APP_SECRET, SCM_BASE_URL);
+        $existingSource = $existingService->payload($existingAct)['source'] ?? [];
+        $sourceFlow = ($existingSource['flow'] ?? '') === 'approved_quote' ? $existingSource : [];
+      }
       if (($sourceFlow['flow'] ?? '') === 'approved_quote') {
         if (!$this->canUseDashboardAction('quote_acta_create')) {
           $this->jsonFail('No tienes permiso para crear actas de cotización.');

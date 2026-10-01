@@ -36,3 +36,11 @@ php bin/repair-ticket-completion-pdf.php --id=9 --expected-sha256=SHA256_DEL_ARC
 Después de verificar la copia, se puede ejecutar con otra ruta de salida y `--apply --reason="Corrección de fuentes"`. La tabla `scm_ticket_completion_pdf_repairs` conserva los bytes, hash y HMAC del original, la huella de la firma y del contenido, el nuevo hash, motivo, versión y fecha de reparación. El archivo disponible para descarga se actualiza con un nuevo hash/HMAC en la misma transacción. La firma, aceptación, fecha de firma, tokens, mensajes, ticket y cargos no se modifican; no se envían notificaciones. Si el respaldo falla o el registro cambió después de preparar la copia, no se aplica.
 
 `php tests/ticket-completion-pdf-repair-check.php` comprueba con tablas temporales el respaldo exacto, la conservación del contenido y firma, el rechazo de hashes/candidatos obsoletos y el rollback si no se puede guardar la auditoría.
+
+## Edición y eliminación de actas
+
+- Desde el caso (Acta de solución y firma) o la gestión de cotización (Acta de cotización), el historial ofrece **Editar acta** mientras esté pendiente. También existe la acción en Actividades administrativas → Actas de satisfacción. Las firmadas no se editan.
+- La edición conserva el flujo y la cotización del acta original. El permiso se resuelve a partir de ese origen guardado, no del flujo que envía el navegador. Al guardar se invalidan enlace/códigos anteriores y se intenta reenviar la invitación.
+- La eliminación autorizada retira el registro nativo y el legacy asociado, y limpia el ID legacy exacto de tickets/cotizaciones, conservando otros IDs. Cuando no quedan actas, retira las marcas de acta/finalización relacionadas. La aprobación y las órdenes de la cotización no cambian.
+- El estado del caso se restaura solo si se elimina su acta activa y, para una firmada, el ticket todavía referencia ese soporte. Borrar una acta retirada no restablece el caso ni afecta una acta posterior. Un ID previo que ya no existe no se restaura.
+- Las fotos se eliminan solo si ninguna otra acta o revisión correctiva las referencia. Los historiales de creación, firma y eliminación permanecen como trazabilidad.

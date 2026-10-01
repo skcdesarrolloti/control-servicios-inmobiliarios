@@ -298,6 +298,10 @@ $db->insert($db->table('jet_cct_cotizacion_mantenimiento'), $repo->schema->filte
 $approvedQuoteAct = $service->create(13, array_replace($deleteInput, ['source_flow' => 'approved_quote', 'source_cotizacion_id' => '7013']), $actor);
 $approvedQuoteActRow = $repo->act((int) $approvedQuoteAct['act_id']);
 $assert(($service->payload($approvedQuoteActRow)['source']['flow'] ?? '') === 'approved_quote', 'approved quote act stores its source flow');
+$assert(str_contains($service->editUrl($approvedQuoteActRow), 'id_cotizacion=7013'), 'quote act edit link keeps the exact approved quote context');
+$service->update((int) $approvedQuoteActRow['id'], 13, array_replace($deleteInput, ['source_flow'=>'ticket_solution', 'source_cotizacion_id'=>'999']), $actor);
+$approvedQuoteActRow = $repo->act((int) $approvedQuoteActRow['id']);
+$assert($service->payload($approvedQuoteActRow)['source'] === ['flow'=>'approved_quote','quote_id'=>'7013'], 'editing an act from the case cannot detach or switch its source quote');
 $requestCode($approvedQuoteActRow);
 $approvedQuoteSigned = $service->sign((int) $approvedQuoteActRow['id'], $service->token($approvedQuoteActRow), $signInput($approvedQuoteActRow), '127.0.0.1', 'QA');
 $assert(empty($approvedQuoteSigned['report_id']) && (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_reportes_administrativos') . '`') === 0, 'approved quote act does not create a new administrative report');
@@ -307,6 +311,15 @@ $approvedTicket = $repo->ticket(13);
 $assert($approvedTicket['estado'] === 'Cerrado' && $approvedTicket['estado_administrativo'] === 'Finalizado' && ($approvedTicket['estado_cotizacion_mantenimiento'] ?? '') !== 'Desaprobada', 'approved quote act closes ticket without disapproving the approved quote');
 $approvedPropertyHistory = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_historial_del_inmueble') . '` WHERE id_ticket = ? ORDER BY _ID DESC LIMIT 1', ['9013']);
 $assert(is_array($approvedPropertyHistory) && str_contains((string) ($approvedPropertyHistory['observacion'] ?? ''), 'cotizado y aprobado') && str_contains((string) ($approvedPropertyHistory['observacion'] ?? ''), '#7013'), 'approved quote act also records property history linked to the quote');
+$db->insert($db->table('jet_cct_cotizacion_mantenimiento'), $repo->schema->filterTableData($db->table('jet_cct_cotizacion_mantenimiento'), [
+  '_ID'=>7014,'id_ticket'=>'9014','estado'=>'Aprobada','id_acta_satisfaccion'=>(string)$signed['legacy_act_id'],
+]));
+$service->deleteRetired((int) $approvedQuoteSigned['id'], $actor, true);
+$quoteAfterActDelete = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID=7013');
+$assert(trim((string)$quoteAfterActDelete['id_acta_satisfaccion']) === '' && $quoteAfterActDelete['estado'] === 'Aprobada', 'deleting approved quote act clears its link without changing quote approval');
+$assert(empty($quoteAfterActDelete['final_trabajo']) && ($quoteAfterActDelete['estado_trabajo'] ?? '') !== 'Trabajo finalizado', 'deleted quote act no longer leaves completed work markers');
+$assert(trim((string)$repo->ticket(13)['id_acta_satisfaccion']) === '' && $repo->ticket(13)['estado_acta_satisfaccion'] === 'No', 'deleting quote act also clears ticket completion linkage');
+$assert((string)$db->getVar('SELECT id_acta_satisfaccion FROM `' . $db->table('jet_cct_cotizacion_mantenimiento') . '` WHERE _ID=7014') === (string)$signed['legacy_act_id'], 'deleting an act preserves unrelated quote links');
 $seedTicket(11);
 $signedDeletable = $service->create(11, $deleteInput, $actor);
 $signedDeletableAct = $repo->act((int) $signedDeletable['act_id']);
@@ -334,6 +347,10 @@ $rejects(static fn() => $service->publicAct((int) $act2['id'], $service->token($
 $assert($repo->ticket(2)['estado_administrativo'] === 'En ejecucion por propietario' && $repo->ticket(2)['estado'] === 'En proceso', 'cancellation restores previous stage without closure');
 $replacement = $service->create(2, array_replace($input, ['signer_role' => 'arrendatario', 'signer_name' => 'Juan Prueba']), $actor);
 $assert($replacement['act_id'] !== $act2['id'], 'cancelled act remains in audit while replacement is allowed');
+$replacementTicket = $repo->ticket(2);
+$service->deleteRetired((int)$act2['id'], $actor);
+$assert($repo->ticket(2) === $replacementTicket && (int)$repo->active(2)['id'] === (int)$replacement['act_id'], 'deleting a retired act preserves the replacement act and current ticket state');
+$assert(is_file(rtrim(SCM_UPLOAD_PATH, '/\\') . '/' . $photoName), 'deleting an old act preserves photos used by its replacement or another act');
 $seedTicket(3);
 $rejects(static fn() => $service->create(3, array_replace($input, ['signer_role' => 'copropiedad']), $actor), 'missing community contact is rejected');
 $db->insert($db->table('jet_cct_copropiedades'), ['_ID' => 7, 'administrador' => 'Administrador Prueba', 'correo' => 'comunidad@example.invalid']);

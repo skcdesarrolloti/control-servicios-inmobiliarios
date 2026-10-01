@@ -617,10 +617,16 @@ final class CompletionService
 
   public function editUrl(array $act): string
   {
-    return rtrim($this->baseUrl, '/') . '/crear-acta.php?' . http_build_query([
+    $query = [
       'ticket_pk' => (int) $act['ticket_pk'],
       'act_id' => (int) $act['id'],
-    ], '', '&', PHP_QUERY_RFC3986);
+    ];
+    $source = $this->payload($act)['source'] ?? [];
+    if (($source['flow'] ?? '') === 'approved_quote' && ctype_digit((string) ($source['quote_id'] ?? ''))) {
+      $query['id_cotizacion'] = $source['quote_id'];
+      $query['source_flow'] = 'approved_quote';
+    }
+    return rtrim($this->baseUrl, '/') . '/crear-acta.php?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
   }
 
   public function token(array $act): string
@@ -690,6 +696,10 @@ final class CompletionService
         throw new \DomainException('No se puede editar un acta en un caso cerrado.');
       }
       $oldPayload = $this->payload($active);
+      // Editing from the case must retain the approved quote that owns this act.
+      $oldSource = (array) ($oldPayload['source'] ?? []);
+      $input['source_flow'] = $oldSource['flow'] ?? 'ticket_solution';
+      $input['source_cotizacion_id'] = $oldSource['quote_id'] ?? '';
       $now = time();
       $payload = $this->payloadFromInput(
         $ticketId,
@@ -1076,6 +1086,10 @@ final class CompletionService
       }
       $legacyId = (int) ($act['legacy_act_id'] ?? 0);
       $reportId = (int) ($act['report_id'] ?? 0);
+      $current = $this->repo->active((int) $ticket['_ID']);
+      $isCurrent = $current && (int) $current['id'] === $id;
+      $ticketActIds = array_filter(array_map('trim', explode(',', (string) ($ticket['id_acta_satisfaccion'] ?? ''))));
+      $restoreTicket = $isCurrent && ($status === 'pending' || ($status === 'signed' && in_array((string) $legacyId, $ticketActIds, true)));
       if ($legacyId > 0) {
         $this->repo->db->delete($this->repo->db->table('jet_cct_actas_de_satisfaccion'), ['_ID' => $legacyId]);
       }
@@ -1085,13 +1099,15 @@ final class CompletionService
       if ($this->repo->db->delete($this->repo->table(), ['id' => $id]) !== 1) {
         throw new \RuntimeException('No se pudo eliminar el acta.');
       }
-      if ($status === 'pending' || $status === 'signed') {
+      if ($restoreTicket) {
         $previousAdmin = trim((string) ($payload['previous']['estado_administrativo'] ?? ''));
+        $previousActIds = $this->repo->survivingLegacyActIds(trim((string) ($payload['previous']['id_acta_satisfaccion'] ?? '')));
         $ticketUpdate = [
           'estado' => 'En proceso',
           'estado_administrativo' => $previousAdmin,
-          'id_acta_satisfaccion' => trim((string) ($payload['previous']['id_acta_satisfaccion'] ?? '')),
-          'estado_acta_satisfaccion' => trim((string) ($payload['previous']['estado_acta_satisfaccion'] ?? 'No')) ?: 'No',
+          'id_acta_satisfaccion' => $previousActIds,
+          'estado_acta_satisfaccion' => $previousActIds !== '' ? (trim((string) ($payload['previous']['estado_acta_satisfaccion'] ?? 'No')) ?: 'No') : 'No',
+          'estado_acta_cotizacion_mantenimiento' => $previousActIds !== '' ? ($ticket['estado_acta_cotizacion_mantenimiento'] ?? 'Si') : 'No',
           'final_trabajo' => '',
         ];
         $this->repo->updateTicket((int) $ticket['_ID'], $ticketUpdate);
@@ -1099,9 +1115,10 @@ final class CompletionService
       } else {
         $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' eliminada permanentemente del tablero de actas. No cerró el ticket ni generó cobro.', $actor['name'], $actor['employee_id']);
       }
+      $this->repo->unlinkDeletedLegacyAct($legacyId);
     });
     if ($photos !== []) {
-      \SCM\Support\StoredFileService::fromRuntime()->deleteStoredImages($photos);
+      \SCM\Support\StoredFileService::fromRuntime()->deleteStoredImages($this->repo->unreferencedActPhotos($photos));
     }
   }
 

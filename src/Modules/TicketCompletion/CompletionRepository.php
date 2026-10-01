@@ -131,6 +131,55 @@ final class CompletionRepository
     $this->db->update($table, $this->schema->filterTableData($table, $data), ['_ID' => $id]);
   }
 
+  /** Keep only real legacy acts when restoring an older ticket snapshot. */
+  public function survivingLegacyActIds(string $ids): string
+  {
+    $values = $this->numericIds($ids);
+    if (!$values) return '';
+    $table = $this->db->table('jet_cct_actas_de_satisfaccion');
+    $found = $this->db->getCol('SELECT `_ID` FROM `' . $table . '` WHERE `_ID` IN (' . implode(',', array_fill(0, count($values), '?')) . ')', $values);
+    return implode(',', array_values(array_intersect($values, array_map('strval', $found))));
+  }
+
+  /** Remove this exact legacy ID, preserving links to other acts and quote approval. */
+  public function unlinkDeletedLegacyAct(int $legacyId): void
+  {
+    if ($legacyId <= 0) return;
+    foreach (['jet_cct_tickets', 'jet_cct_cotizacion_mantenimiento'] as $name) {
+      $table = $this->db->table($name);
+      if (!$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'id_acta_satisfaccion')) continue;
+      $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE FIND_IN_SET(?, REPLACE(COALESCE(`id_acta_satisfaccion`, ''), ' ', '')) > 0 FOR UPDATE", [(string) $legacyId]);
+      foreach ($rows as $row) {
+        $remaining = array_values(array_diff($this->numericIds((string) $row['id_acta_satisfaccion']), [(string) $legacyId]));
+        $update = ['id_acta_satisfaccion' => implode(',', $remaining)];
+        if (!$remaining) {
+          $update += ['estado_acta_satisfaccion' => 'No', 'estado_acta_cotizacion_mantenimiento' => 'No', 'final_trabajo' => ''];
+          if ($name === 'jet_cct_cotizacion_mantenimiento' && ($row['estado_trabajo'] ?? '') === 'Trabajo finalizado') $update['estado_trabajo'] = '';
+        }
+        $update += ['fecha_actualizacion' => time(), 'cct_modified' => date('Y-m-d H:i:s')];
+        $this->db->update($table, $this->schema->filterTableData($table, $update), ['_ID' => (int) $row['_ID']]);
+      }
+    }
+  }
+
+  /** A replacement act or corrective review can still use these same photos. */
+  public function unreferencedActPhotos(array $photos): array
+  {
+    return array_values(array_filter($photos, function (array $photo): bool {
+      $name = (string) ($photo['name'] ?? '');
+      if ($name === '' || basename($name) !== $name) return false;
+      $needle = '%' . $this->db->escapeLike($name) . '%';
+      foreach (['scm_ticket_completion_acts'=>['payload_json'], 'jet_cct_actas_de_satisfaccion'=>['registro_fotografico'], 'jet_cct_revision_correctiva'=>['evaluacion_de_danos','registro_foto_dano']] as $tableName=>$columns) {
+        $table = $this->db->table($tableName);
+        if (!$this->schema->tableExists($table)) continue;
+        foreach ($columns as $column) {
+          if ($this->schema->columnExists($table, $column) && $this->db->getVar("SELECT 1 FROM `{$table}` WHERE `{$column}` LIKE ? LIMIT 1", [$needle])) return false;
+        }
+      }
+      return true;
+    }));
+  }
+
   /**
    * La firma de esta acta confirma que la solucion se ejecuto sin aprobar la
    * cotizacion de mantenimiento. Actualiza todas las cotizaciones vinculadas
