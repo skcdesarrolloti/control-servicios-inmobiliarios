@@ -142,6 +142,35 @@ final class SharedNotificationsBridge
     return true;
   }
 
+  /** Attempt only this message now; a failed attempt remains available to the shared cron. */
+  public function dispatchNow(string $dedupeKey): array
+  {
+    if ($dedupeKey === '' || !$this->bootQueue()) return ['sent' => false, 'status' => 'unavailable'];
+    $row = $this->db->getRow("SELECT `id`, `status` FROM `{$this->queueTable()}` WHERE `project_code` = ? AND `dedupe_key` = ? LIMIT 1", [self::PROJECT_CODE, $dedupeKey]);
+    if (!$row) return ['sent' => false, 'status' => 'unavailable'];
+    $workerId = 'scm-acta-immediate:' . getmypid() . ':' . bin2hex(random_bytes(8));
+    try {
+      if ($row['status'] === 'pending') {
+        $storage = new TargetedNotificationStorage($this->storage, $this->db, (int) $row['id'], self::PROJECT_CODE);
+        $this->buildWorker($storage, $workerId)->run(1, self::PROJECT_CODE);
+      }
+    } catch (\Throwable $error) {
+      $this->lastError = $error->getMessage();
+      error_log('[acta-immediate-delivery] No se pudo completar el intento inmediato del mensaje #' . $row['id']);
+      // A provider exception must not leave our claim stranded for 15 minutes.
+      $statement = $this->db->pdo()->prepare("UPDATE `{$this->queueTable()}` SET `status` = IF(`attempts` >= `max_attempts`, 'failed', 'pending'), `locked_at` = NULL, `locked_by` = NULL,
+        `next_attempt_at` = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 MINUTE), `last_error` = 'El intento inmediato se interrumpió.', `updated_at` = UTC_TIMESTAMP()
+        WHERE `id` = ? AND `project_code` = ? AND `status` = 'processing' AND `locked_by` = ?");
+      $statement->execute([(int) $row['id'], self::PROJECT_CODE, $workerId]);
+      if ($statement->rowCount() > 0) $this->storage->insert($this->queueConfig->attemptsTable(), [
+        'notification_id' => (int) $row['id'], 'provider' => 'immediate_dispatch', 'attempt_status' => 'failed',
+        'request_payload' => '{}', 'response_payload' => '{}', 'error_message' => 'El intento inmediato se interrumpió.', 'attempted_at' => gmdate('Y-m-d H:i:s'),
+      ]);
+    }
+    $status = (string) $this->db->getVar("SELECT `status` FROM `{$this->queueTable()}` WHERE `id` = ? AND `project_code` = ?", [(int) $row['id'], self::PROJECT_CODE]);
+    return ['sent' => $status === 'sent', 'status' => $status, 'notification_id' => (int) $row['id']];
+  }
+
   private function bootWorker(): bool
   {
     if ($this->workerBooted) {
@@ -154,6 +183,12 @@ final class SharedNotificationsBridge
       return false;
     }
 
+    $this->worker = $this->buildWorker($this->storage);
+    return true;
+  }
+
+  private function buildWorker(\SharedNotifications\Contracts\StorageAdapterInterface $storage, ?string $workerId = null): \SharedNotifications\NotificationWorker
+  {
     $providersCfg = is_array($this->config['providers'] ?? null) ? $this->config['providers'] : [];
 
     $registry = new \SharedNotifications\Providers\ProviderRegistry();
@@ -185,15 +220,14 @@ final class SharedNotificationsBridge
       }
     }
 
-    $this->worker = new \SharedNotifications\NotificationWorker(
-      $this->storage,
+    return new \SharedNotifications\NotificationWorker(
+      $storage,
       $registry,
       $this->queueConfig,
-      'scm-control-servicios:' . getmypid(),
+      $workerId ?? 'scm-control-servicios:' . getmypid(),
       [],
       $providerDelays
     );
 
-    return true;
   }
 }

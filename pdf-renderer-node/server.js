@@ -11,7 +11,8 @@ const puppeteer = require('puppeteer');
 const port = Number.parseInt(process.env.PORT || '3000', 10);
 const username = process.env.PDF_SERVICE_USER || '';
 const password = process.env.PDF_SERVICE_PASSWORD || '';
-const maxHtmlBytes = 8 * 1024 * 1024;
+// Actas can contain up to 12 verified photographs embedded as data URIs.
+const maxHtmlBytes = Math.max(8, Math.min(48, Number(process.env.PDF_MAX_HTML_MB) || 32)) * 1024 * 1024;
 const maxActiveJobs = 2;
 let browser;
 let activeJobs = 0;

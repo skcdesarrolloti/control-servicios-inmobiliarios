@@ -1,93 +1,39 @@
 <?php
-
 declare(strict_types=1);
 
 namespace SCM\Modules\TicketCompletion;
 
-use SCM\Support\SimplePdf;
+use SCM\Support\HtmlPdfRenderer;
 
 final class CompletionPdf
 {
   public function render(array $act, array $payload, bool $staff = false): string
   {
-    $pdf = new SimplePdf();
-    $pdf->backgroundImage(dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg');
-    $pdf->actaDesign('Solución de daños');
-    $actor = CompletionView::actor($payload);
-    $status = $act['status'] === 'signed'
-      ? 'Firmada - Caso cerrado'
-      : ($act['status'] === 'archived' ? 'Archivada - No válida para firma' : ($act['status'] === 'cancelled' ? 'Anulada - No válida para firma' : 'Acta sin firmar - Caso abierto'));
-    $pdf->footerLabel('SKC SuCasa Inmobiliaria - NIT 900623242-4');
-    $pdf->actaHeader(
-      'Acta de satisfacción del caso #' . $payload['ticket_number'],
-      'Registro interno #' . $act['id'] . ' - Solución de daños',
-      $status
-    );
-    $pdf->sectionTitle('Datos del servicio');
-    $pdf->detailGrid([
-      ['Inmueble / contrato', $payload['property'] . ' / ' . $payload['contract']],
-      ['Dirección', $payload['address']],
-      ['Solución realizada por', CompletionPolicy::EXECUTORS[$payload['executor']]],
-      ['Fecha del acta', date('d/m/Y H:i', (int) $payload['created_at']) . ' (Colombia)'],
-      ['Firmante seleccionado', $payload['signer']['name'] . ' - ' . CompletionPolicy::ROLES[$payload['signer']['role']]],
-    ]);
-    $pdf->sectionTitle('Daños encontrados y soluciones realizadas');
-    foreach ($payload['items'] as $index => $item) {
-      $damage = $this->chunks($item['damage'], 500); $solution = $this->chunks($item['solution'], 500);
-      $pdf->serviceCard($index + 1, implode(' ', $damage), implode(' ', $solution));
-      if (!empty($item['damage_photos'])) {
-        $pdf->sectionTitle('Evidencias del daño #' . ($index + 1));
-        foreach ($item['damage_photos'] as $photoIndex => $photo) {
-          $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . basename((string) $photo['name']);
-          $hash = is_file($path) ? @hash_file('sha256', $path) : false;
-          if (!is_string($hash) || !hash_equals((string) $photo['sha256'], $hash) || !$pdf->imageEvidence($path, 'Foto ' . ($photoIndex + 1) . ' del daño #' . ($index + 1))) {
-            throw new \DomainException('Una evidencia fotográfica del daño no está disponible o cambió.');
+    // Resolve immutable evidence before remote conversion; no private upload URL is leaked.
+    foreach ($payload['items'] as &$item) {
+      foreach (['damage_photos', 'photos'] as $key) {
+        foreach ($item[$key] ?? [] as $index => $photo) {
+          $name = (string) $photo['name'];
+          if ($name !== basename($name)) throw new \DomainException('Nombre de evidencia no válido.');
+          $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . $name;
+          $bytes = is_file($path) ? file_get_contents($path) : false;
+          if (!is_string($bytes) || !hash_equals((string) $photo['sha256'], hash('sha256', $bytes))) {
+            throw new \DomainException('Una evidencia fotográfica no está disponible o cambió.');
           }
-        }
-      }
-      if (empty($item['photos'])) { continue; }
-      $pdf->sectionTitle('Evidencias de la solución #' . ($index + 1));
-      foreach ($item['photos'] as $photoIndex => $photo) {
-        $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . basename((string) $photo['name']);
-        $hash = is_file($path) ? @hash_file('sha256', $path) : false;
-        if (!is_string($hash) || !hash_equals((string) $photo['sha256'], $hash) || !$pdf->imageEvidence($path, 'Foto ' . ($photoIndex + 1) . ' de la solución #' . ($index + 1))) {
-          throw new \DomainException('Una evidencia fotográfica de la solución no está disponible o cambió.');
+          $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+          if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) throw new \DomainException('Formato de evidencia no válido.');
+          $item[$key][$index]['pdf_data_uri'] = 'data:' . $mime . ';base64,' . base64_encode($bytes);
         }
       }
     }
-    $pdf->sectionTitle('Observaciones');
-    foreach ($this->chunks($payload['observations'], 900) as $chunk) { $pdf->paragraph($chunk, 9); }
-    $pdf->sectionTitle('Trazabilidad del documento');
-    $pdf->paragraph('Identificador de contenido SHA-256: ' . $act['payload_hash'], 8);
-    if ($act['status'] === 'signed') {
-      $evidence = json_decode((string) $act['signed_json'], true, 16, JSON_THROW_ON_ERROR);
-      $pdf->pageBreak();
-      $pdf->title('Firma electrónica registrada');
-      if (!empty($evidence['strokes'])) { $pdf->drawnSignature($evidence['strokes']); }
-      $identityLine = (string) $evidence['name'] . (!empty($evidence['document']) ? ' | Documento: ' . $evidence['document'] : '');
-      $pdf->paragraph($identityLine, 10);
-      $pdf->paragraph('Firmada el ' . date('d/m/Y H:i:s', (int) $act['signed_at']) . ' (Colombia).', 9);
-      $pdf->paragraph($evidence['consent_text'], 9);
-    }
-    $pdf->signatureGroup([
-      ['label' => 'Elaborada por', 'name' => $actor['name'], 'details' => CompletionView::actorDetails($actor)],
+    unset($item);
+    $html = CompletionDocument::render($act, $payload, $staff);
+    $root = dirname(__DIR__, 3);
+    $bytes = HtmlPdfRenderer::render($html, 'Acta de recibo a satisfacción #' . $act['id'] . ' del contrato #' . $payload['contract'], [
+      'stylesheets' => [$root . '/public/assets/css/ticket-completion.css', $root . '/public/assets/css/ticket-completion-document.css'],
+      'body_class' => 'scm-acta-page scm-acta-pdf', 'wrapper_class' => 'scm-acta-print-root', 'container_class' => 'scm-acta-pdf-container', 'allow_fallback' => false,
     ]);
-    return $pdf->bytes();
-  }
-
-  private function chunks(string $text, int $limit): array
-  {
-    $out = [];
-    foreach (explode("\n", str_replace("\r", '', $text)) as $paragraph) {
-      while (mb_strlen($paragraph) > $limit) {
-        $part = mb_substr($paragraph, 0, $limit);
-        $lastSpace = mb_strrpos($part, ' ');
-        $length = $lastSpace !== false && $lastSpace > $limit / 2 ? $lastSpace : $limit;
-        $out[] = trim(mb_substr($paragraph, 0, $length));
-        $paragraph = ltrim(mb_substr($paragraph, $length));
-      }
-      $out[] = $paragraph;
-    }
-    return $out;
+    if ($bytes === null) throw new \DomainException('No se pudo generar el PDF del acta con Chromium. Intenta nuevamente; la firma y el cierre solo se guardan si se completa el documento.');
+    return $bytes;
   }
 }

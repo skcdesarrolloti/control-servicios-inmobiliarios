@@ -10,6 +10,21 @@ use SCM\Support\SmsQueue;
 
 final class CompletionDelivery
 {
+  /** Keep retries/audit in the shared queue, but attempt this exact message immediately. */
+  public static function deliver(Database $db, string $to, string $subject, string $html, array $options, ?\Closure $dispatch = null): array
+  {
+    $queued = self::enqueue($db, $to, $subject, $html, $options) > 0;
+    if (!$queued) return ['queued' => false, 'sent' => false, 'status' => 'unavailable'];
+    $destination = ($options['channel'] ?? 'email') === 'email' ? strtolower(trim($to)) : CompletionPolicy::phone($to);
+    $key = (string) $options['dedupe_key'] . ':' . $destination;
+    try {
+      $result = $dispatch ? $dispatch($key) : (new \SCM\Support\SharedNotificationsBridge($db))->dispatchNow($key);
+      return ['queued' => true, 'sent' => !empty($result['sent']), 'status' => (string) ($result['status'] ?? 'pending')];
+    } catch (\Throwable) {
+      return ['queued' => true, 'sent' => false, 'status' => 'pending'];
+    }
+  }
+
   public static function otpTemplate(): string
   {
     return self::configuredTemplate('SCM_ACTA_WHATSAPP_OTP_TEMPLATE', 'scm_acta_firma_otp_v1');

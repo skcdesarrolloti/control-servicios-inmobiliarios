@@ -16,8 +16,8 @@ final class CompletionService
     if (strlen($secret) < 32) {
       throw new \RuntimeException('No hay una clave segura para las actas.');
     }
-    $this->enqueue = $enqueue ?? static function (string $to, string $subject, string $html, array $options) use ($repo): int {
-      return CompletionDelivery::enqueue($repo->db, $to, $subject, $html, $options);
+    $this->enqueue = $enqueue ?? static function (string $to, string $subject, string $html, array $options) use ($repo): array {
+      return CompletionDelivery::deliver($repo->db, $to, $subject, $html, $options);
     };
   }
 
@@ -851,7 +851,7 @@ final class CompletionService
       'contract' => (string) ($ticket['contrato'] ?? ''), 'executor' => $executor, 'pending_admin_state' => $pendingAdminState,
       'items' => $items, 'observations' => $observations, 'created_at' => $createdAt,
       'signer' => ['role' => $role, 'name' => $signerName, 'contact_name' => $contact['name'], 'email' => $contact['email'], 'phone' => $contact['phone']],
-      'actor' => $actor,
+      'actor' => $actor, 'contacts' => $context['contacts'],
       'source' => $source,
       'property_meta' => $propertyMeta,
       'coordinator' => [
@@ -979,14 +979,17 @@ final class CompletionService
     $results = [];
     foreach ($channels as $channel) {
       if (!empty($delivery[$event][$channel]['queued'])) { $results[$channel] = true; continue; }
-      $results[$channel] = $this->send($act, $payload, $channel, $event, $generation . ':' . $act['token_nonce'], $title, $body, $description . ' ' . $linkLabel . ': ' . $target, '', $target);
-      $delivery[$event][$channel] = ['queued' => $results[$channel], 'attempted_at' => time()];
+      $result = $this->send($act, $payload, $channel, $event, $generation . ':' . $act['token_nonce'], $title, $body, $description . ' ' . $linkLabel . ': ' . $target, '', $target);
+      $results[$channel] = $result['queued'];
+      $delivery[$event][$channel] = $result + ['attempted_at' => time()];
       // Save each channel independently; a retry cannot duplicate a successful sibling channel.
       $this->repo->db->update($this->repo->table(), ['delivery_json' => json_encode($delivery, JSON_THROW_ON_ERROR)], ['id' => (int) $act['id']]);
     }
     $this->repo->db->update($this->repo->table(), ['invitation_queued_at' => time()], ['id' => (int) $act['id']]);
     $all = !in_array(false, $results, true);
-    return ['act_id' => (int) $act['id'], 'queued' => $all, 'channels' => $results, 'message' => ($receipt ? 'Acta firmada y caso cerrado. ' : 'Acta guardada; el caso sigue abierto hasta la firma. ') . ($all ? 'Mensajes en cola (no confirma entrega).' : 'No se pudieron encolar todos los canales. Revisa el detalle y reintenta.')];
+    $sent = true;
+    foreach ($channels as $channel) $sent = $sent && !empty($delivery[$event][$channel]['sent']);
+    return ['act_id' => (int) $act['id'], 'queued' => $all, 'sent' => $sent, 'channels' => $results, 'message' => ($receipt ? 'Acta firmada y caso cerrado. ' : 'Acta guardada; el caso sigue abierto hasta la firma. ') . ($sent ? 'Mensajes enviados al proveedor por los canales seleccionados.' : ($all ? 'Se intentó el envío inmediato. Quedan mensajes pendientes de reintento automático.' : 'No se pudieron registrar todos los mensajes. Revisa el detalle y reintenta.'))];
     });
   }
 
@@ -1006,27 +1009,28 @@ final class CompletionService
       if ($act['status'] !== 'pending') { throw new \DomainException('Esta acta ya no está pendiente de firma.'); }
       $payload = $this->payload($act);
       if (!isset($this->verificationChannels($payload['signer'])[$channel])) { throw new \DomainException('Canal de verificación no disponible. Usa el correo registrado o contacta a la inmobiliaria.'); }
-      return (new CompletionVerification($this->repo, $this->secret))->request($act, $channel, function (string $code, string $nonce) use ($act, $payload, $channel): bool {
+      return (new CompletionVerification($this->repo, $this->secret))->request($act, $channel, function (string $code, string $nonce) use ($act, $payload, $channel): array {
         $text = 'Tu código para firmar el acta #' . $act['id'] . ' del caso #' . $payload['ticket_number'] . ' es ' . $code . '. Vence en 10 minutos. No lo compartas. Si no lo solicitaste, ignora este mensaje.';
         return $this->send($act, $payload, $channel, 'signature_otp', $nonce, 'Código de firma del acta #' . $act['id'], '<p>' . EmailTemplate::e($text) . '</p>', $text, $code);
       });
     });
   }
 
-  private function send(array $act, array $payload, string $channel, string $event, string $key, string $subject, string $body, string $text, string $code = '', string $actUrl = ''): bool
+  private function send(array $act, array $payload, string $channel, string $event, string $key, string $subject, string $body, string $text, string $code = '', string $actUrl = ''): array
   {
     try {
-      return ($this->enqueue)($channel === 'email' ? $payload['signer']['email'] : $payload['signer']['phone'], $subject, EmailTemplate::render($subject, $body), [
+      $result = ($this->enqueue)($channel === 'email' ? $payload['signer']['email'] : $payload['signer']['phone'], $subject, EmailTemplate::render($subject, $body), [
         'channel' => $channel, 'source_module' => 'ticket-completion', 'provider' => $channel === 'email' ? 'email_smtp' : 'whatsapp_official',
         'destination_name' => $payload['signer']['name'], 'message_text' => $text, 'otp_code' => $code,
         'ticket_number' => $payload['ticket_number'], 'act_url' => $actUrl,
         'priority' => $event === 'signature_otp' ? 200 : 100,
         'dedupe_key' => 'ticket-acta:' . $act['id'] . ':' . $event . ':' . $channel . ':' . $key,
         'meta' => ['ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id'], 'event' => $event],
-      ]) > 0;
+      ]);
+      return is_array($result) ? $result : ['queued' => $result > 0, 'sent' => false, 'status' => $result > 0 ? 'pending' : 'unavailable'];
     } catch (\Throwable) {
       error_log('[ticket-completion] No se pudo encolar ' . $event . ' por ' . $channel . ' del acta #' . $act['id']);
-      return false;
+      return ['queued' => false, 'sent' => false, 'status' => 'unavailable'];
     }
   }
 
@@ -1301,7 +1305,7 @@ final class CompletionService
     if ($act['status'] === 'signed' && !empty($act['signed_pdf'])) {
       $hash = hash('sha256', $act['signed_pdf']);
       if (!hash_equals((string) $act['pdf_hash'], $hash) || !hash_equals((string) $act['pdf_hmac'], hash_hmac('sha256', $act['id'] . '|' . $act['payload_hash'] . '|' . $hash, $this->secret))) { throw new \DomainException('El PDF no coincide con su registro. Solicita revisión al administrador.'); }
-      if (!$staff) { return $act['signed_pdf']; }
+      return $act['signed_pdf'];
     }
     return (new CompletionPdf())->render($act, $payload, $staff);
   }

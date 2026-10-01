@@ -14,7 +14,7 @@ header('Cache-Control: no-store, private');
 header('Referrer-Policy: no-referrer');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
-header("Content-Security-Policy: default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' https: data:; form-action 'self'; frame-ancestors 'self'; base-uri 'none'");
+header("Content-Security-Policy: default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; font-src 'self'; img-src 'self' https: data:; form-action 'self'; frame-ancestors 'self'; base-uri 'none'");
 header('X-Robots-Tag: noindex, nofollow');
 
 $escape = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -169,7 +169,7 @@ try {
       $delivery = json_decode((string) ($repo->act($id)['delivery_json'] ?? ''), true) ?: [];
       $pendingCopy = false;
       foreach ($payload['channels'] ?? ['email'] as $channel) { $pendingCopy = $pendingCopy || empty($delivery['signed_receipt'][$channel]['queued']); }
-      $content = '<div class="scm-acta scm-acta-print"><p class="scm-acta-notice">Firma registrada. El cierre ya se guardó. ' . ($pendingCopy ? 'No se confirmó el encolado de todas las copias; puedes descargar el PDF aquí y solicitar reenvío a la inmobiliaria.' : 'Copia solicitada por los canales elegidos. En cola no significa entregada.') . '</p></div>' . $content;
+      $content = '<div class="scm-acta scm-acta-print"><p class="scm-acta-notice">Firma registrada. El cierre ya se guardó. ' . ($pendingCopy ? 'No se confirmó el encolado de todas las copias; puedes descargar el PDF aquí y solicitar reenvío a la inmobiliaria.' : 'Copia solicitada por los canales elegidos. Consulta el estado de envío con la inmobiliaria si no llega.') . '</p></div>' . $content;
     }
   }
 } catch (DomainException $error) {
@@ -193,4 +193,4 @@ if ($jsonRequest) {
 $actStatus = isset($act) && is_array($act) ? (string) ($act['status'] ?? '') : '';
 $printLocked = $actStatus !== '' && $actStatus !== 'signed';
 ?>
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acta de satisfacción · SuCasa</title><link rel="stylesheet" href="assets/css/ticket-completion.css?v=<?= $escape(SCM_VERSION) ?>"><script defer src="assets/js/ticket-completion-public.js?v=<?= $escape(SCM_VERSION) ?>"></script></head><body class="scm-acta-page<?= $printLocked ? ' scm-acta-page--print-locked' : '' ?>"><?php if ($showPrint): ?><div class="scm-acta scm-acta-print"><button type="button" class="scm-acta-button scm-acta-secondary" data-acta-print>Imprimir acta</button></div><?php endif; ?><?php if ($printLocked): ?><div class="scm-acta scm-acta-print-lock"><p>El acta solo se puede imprimir cuando esté firmada.</p></div><?php endif; ?><?= $content ?></body></html>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acta de satisfacción · SuCasa</title><link rel="stylesheet" href="assets/css/ticket-completion.css?v=<?= $escape(SCM_VERSION) ?>"><link rel="stylesheet" href="assets/css/ticket-completion-document.css?v=<?= $escape(SCM_VERSION) ?>"><script defer src="assets/js/ticket-completion-public.js?v=<?= $escape(SCM_VERSION) ?>"></script></head><body class="scm-acta-page<?= $printLocked ? ' scm-acta-page--print-locked' : '' ?>"><?php if ($showPrint): ?><div class="scm-acta scm-acta-print"><button type="button" class="scm-acta-button scm-acta-secondary" data-acta-print>Imprimir acta</button></div><?php endif; ?><?php if ($printLocked): ?><div class="scm-acta scm-acta-print-lock"><p>El acta solo se puede imprimir cuando esté firmada.</p></div><?php endif; ?><?= $content ?></body></html>

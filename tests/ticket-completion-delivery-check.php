@@ -82,4 +82,36 @@ $worker = new \SharedNotifications\NotificationWorker(new \SharedNotifications\S
 $stats = $worker->run(6);
 $assert($stats['sent'] === 6, 'worker processes all jobs using inert providers');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $attemptsTable . '` WHERE attempt_status = \'sent\'') === 6, 'delivery attempts recorded in temporary table');
+
+// Immediate dispatch must select its own ID even with higher-priority unrelated work.
+$storage = new \SharedNotifications\Storage\PdoStorageAdapter($db->pdo());
+$queue = new \SharedNotifications\NotificationQueue($storage, new \SharedNotifications\Config\QueueConfig($queueTable, $attemptsTable));
+$otherId = $queue->enqueue(['project_code'=>'another-project','source_module'=>'qa','channel'=>'email','provider'=>'email_smtp','destination'=>'other@example.invalid','priority'=>9999]);
+$siblingId = $queue->enqueue(['project_code'=>'control-servicios-inmobiliarios','source_module'=>'qa','channel'=>'email','provider'=>'email_smtp','destination'=>'sibling@example.invalid','priority'=>9999]);
+$dispatch = static function (string $key) use ($db, $queueTable, $attemptsTable, $registry, $storage): array {
+  $id = (int) $db->getVar('SELECT id FROM `' . $queueTable . '` WHERE project_code = ? AND dedupe_key = ?', ['control-servicios-inmobiliarios',$key]);
+  $target = new \SCM\Support\TargetedNotificationStorage($storage, $db, $id, 'control-servicios-inmobiliarios');
+  (new \SharedNotifications\NotificationWorker($target, $registry, new \SharedNotifications\Config\QueueConfig($queueTable,$attemptsTable), 'immediate-inert-qa'))->run(1, 'control-servicios-inmobiliarios');
+  $status = (string) $db->getVar('SELECT status FROM `' . $queueTable . '` WHERE id = ?', [$id]);
+  return ['sent'=>$status==='sent','status'=>$status];
+};
+$immediate = array_replace($base, ['dedupe_key'=>'acta-qa-immediate']);
+$result = \SCM\Modules\TicketCompletion\CompletionDelivery::deliver($db,'instant@example.invalid','QA','<p>QA</p>',$immediate,$dispatch);
+$assert($result['queued'] && $result['sent'], 'OTP delivered through targeted shared worker during the request');
+$assert($db->getVar('SELECT status FROM `' . $queueTable . '` WHERE id = ?',[$otherId])==='pending' && $db->getVar('SELECT status FROM `' . $queueTable . '` WHERE id = ?',[$siblingId])==='pending', 'immediate dispatch does not drain unrelated jobs or other projects');
+$attemptCount = (int) $db->getVar('SELECT COUNT(*) FROM `' . $attemptsTable . '`');
+\SCM\Modules\TicketCompletion\CompletionDelivery::deliver($db,'instant@example.invalid','QA','<p>QA</p>',$immediate,$dispatch);
+$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $attemptsTable . '`') === $attemptCount, 'repeat dispatch cannot send the same job twice');
+$failedRegistry = new \SharedNotifications\Providers\ProviderRegistry();
+$failedRegistry->add(new class implements \SharedNotifications\Contracts\ProviderInterface {
+  public function code(): string { return 'email_smtp'; }
+  public function send(array $notification): array { return ['ok'=>false,'http_code'=>503,'error'=>'Synthetic temporary failure']; }
+});
+$failId = $queue->enqueue(['project_code'=>'control-servicios-inmobiliarios','channel'=>'email','provider'=>'email_smtp','destination'=>'fail@example.invalid']);
+$target = new \SCM\Support\TargetedNotificationStorage($storage,$db,$failId,'control-servicios-inmobiliarios');
+$failWorker = new \SharedNotifications\NotificationWorker($target,$failedRegistry,new \SharedNotifications\Config\QueueConfig($queueTable,$attemptsTable),'immediate-failure-qa');
+$failWorker->run(1,'control-servicios-inmobiliarios');
+$failure = $db->getRow('SELECT * FROM `' . $queueTable . '` WHERE id = ?',[$failId]);
+$assert($failure['status']==='pending' && (int) $failure['attempts']===1 && $failure['next_attempt_at']!==null, 'failed immediate send remains scheduled for normal automatic retry');
+$assert($failWorker->run(1,'control-servicios-inmobiliarios')['processed']===0, 'targeted dispatch respects retry backoff');
 echo "$checks checks passed. No external messages sent; all queue/attempt rows are temporary.\n";

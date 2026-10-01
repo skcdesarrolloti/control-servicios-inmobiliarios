@@ -23,11 +23,14 @@ final class CompletionVerification
       'hash' => $this->hash($act, $nonce, $code), 'queued' => false,
     ]);
     $this->save((int) $act['id'], $state); // Persist throttling even when queueing fails.
-    $state['queued'] = (bool) $send($code, $nonce);
+    $result = $send($code, $nonce);
+    $state['queued'] = is_array($result) ? !empty($result['queued']) : (bool) $result;
+    $state['sent'] = is_array($result) && !empty($result['sent']);
     $this->save((int) $act['id'], $state);
-    return ['queued' => $state['queued'], 'message' => $state['queued']
-      ? 'Código solicitado. Revisa el contacto seleccionado. Vence en 10 minutos; usa solo el último código. En cola no significa entregado.'
-      : 'No se pudo encolar el código. El ticket sigue abierto. Espera un minuto y reintenta o elige otro canal disponible.'];
+    return ['queued' => $state['queued'], 'sent' => $state['sent'], 'message' => $state['sent']
+      ? 'Código enviado al proveedor. Revisa el contacto seleccionado. Vence en 10 minutos; usa solo el último código.'
+      : ($state['queued'] ? 'El envío inmediato no se confirmó. El código quedó pendiente de reintento automático. Si no llega, espera un minuto y solicita otro o elige otro canal.'
+      : 'No se pudo registrar ni enviar el código. El ticket sigue abierto. Espera un minuto y reintenta o elige otro canal disponible.')];
   }
 
   /** Persist failed attempts outside the signing transaction; rollback must not reset the budget. */

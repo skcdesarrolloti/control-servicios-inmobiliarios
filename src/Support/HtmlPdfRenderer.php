@@ -6,34 +6,40 @@ namespace SCM\Support;
 /** Renders the same quotation HTML/CSS used by the dashboard and public view. */
 final class HtmlPdfRenderer
 {
-  public static function render(string $content, string $title): ?string
+  public static function render(string $content, string $title, array $options = []): ?string
   {
+    $fallback = static fn(): ?string => ($options['allow_fallback'] ?? true) ? HtmlPdfFallback::render($content, $title) : null;
     $browser = self::browserPath();
     $remoteUrl = trim((string) getenv('SCM_GOTENBERG_URL'));
-    $cssPath = dirname(__DIR__, 2) . '/public/assets/css/admin/04-dashboard-pending.css';
-    $printCssPath = dirname(__DIR__, 2) . '/public/assets/css/quote-print.css';
-    if (($browser === null && $remoteUrl === '') || !is_readable($cssPath) || !is_readable($printCssPath)) {
-      return HtmlPdfFallback::render($content, $title);
+    $cssPaths = $options['stylesheets'] ?? [dirname(__DIR__, 2) . '/public/assets/css/admin/04-dashboard-pending.css', dirname(__DIR__, 2) . '/public/assets/css/quote-print.css'];
+    if (($browser === null && $remoteUrl === '') || array_filter($cssPaths, static fn(string $path): bool => !is_readable($path))) {
+      return $fallback();
     }
 
     $directory = rtrim(sys_get_temp_dir(), '/\\') . '/scm-quote-' . bin2hex(random_bytes(8));
     if (!mkdir($directory, 0700)) {
-      return HtmlPdfFallback::render($content, $title);
+      return $fallback();
     }
     $htmlPath = $directory . '/quote.html';
     $pdfPath = $directory . '/quote.pdf';
     $base = htmlspecialchars(rtrim((string) SCM_BASE_URL, '/') . '/', ENT_QUOTES, 'UTF-8');
     $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
-    $css = (string) file_get_contents($cssPath);
-    $printCss = (string) file_get_contents($printCssPath);
+    $css = implode("\n", array_map(static fn(string $path): string => (string) file_get_contents($path), $cssPaths));
+    $fontPath = dirname(__DIR__, 2) . '/public/assets/fonts/caveat.ttf';
+    if (str_contains($css, '../fonts/caveat.ttf') && is_readable($fontPath)) {
+      $css = str_replace('../fonts/caveat.ttf', 'data:font/ttf;base64,' . base64_encode((string) file_get_contents($fontPath)), $css);
+    }
+    $bodyClass = htmlspecialchars((string) ($options['body_class'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $wrapperClass = htmlspecialchars((string) ($options['wrapper_class'] ?? 'scm-cotizacion-native-print-root'), ENT_QUOTES, 'UTF-8');
+    $containerClass = htmlspecialchars((string) ($options['container_class'] ?? 'scm-cotizacion-native-modal'), ENT_QUOTES, 'UTF-8');
     $content = self::inlineConfiguredLogo($content);
     $html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><base href="' . $base . '"><title>' . $safeTitle . '</title>'
       . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">'
-      . '<style>' . $css . '</style><style>' . $printCss . '</style></head><body><main class="scm-cotizacion-native-modal"><div class="scm-cotizacion-native-print-root">' . $content . '</div></main></body></html>';
+      . '<style>' . $css . '</style></head><body class="' . $bodyClass . '"><main class="' . $containerClass . '"><div class="' . $wrapperClass . '">' . $content . '</div></main></body></html>';
 
     try {
       if (file_put_contents($htmlPath, $html, LOCK_EX) === false) {
-        return HtmlPdfFallback::render($content, $title);
+        return $fallback();
       }
       if ($remoteUrl !== '') {
         $remotePdf = self::renderWithGotenberg($htmlPath, $remoteUrl);
@@ -42,7 +48,7 @@ final class HtmlPdfRenderer
         }
       }
       if ($browser === null || !function_exists('proc_open')) {
-        return HtmlPdfFallback::render($content, $title);
+        return $fallback();
       }
       $command = [
         $browser, '--headless', '--disable-gpu', '--no-sandbox', '--no-first-run',
@@ -52,7 +58,7 @@ final class HtmlPdfRenderer
       ];
       $process = @proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
       if (!is_resource($process)) {
-        return HtmlPdfFallback::render($content, $title);
+        return $fallback();
       }
       fclose($pipes[0]);
       stream_set_blocking($pipes[1], false);
@@ -74,7 +80,7 @@ final class HtmlPdfRenderer
       fclose($pipes[2]);
       proc_close($process);
       $bytes = is_file($pdfPath) ? file_get_contents($pdfPath) : false;
-      return is_string($bytes) && str_starts_with($bytes, '%PDF-') ? $bytes : HtmlPdfFallback::render($content, $title);
+      return is_string($bytes) && str_starts_with($bytes, '%PDF-') ? $bytes : $fallback();
     } finally {
       if (is_dir($directory . '/profile')) {
         $files = new \RecursiveIteratorIterator(
@@ -131,7 +137,7 @@ final class HtmlPdfRenderer
   private static function inlineConfiguredLogo(string $content): string
   {
     return (string) preg_replace_callback(
-      '/(<div class="(?:scm-cotizacion-native-logo|scm-order-invoice-brand)"[^>]*><img src=")([^"]+)(")/',
+      '/(<(?:div|span) class="(?:scm-cotizacion-native-logo|scm-order-invoice-brand|scm-acta-logo)"[^>]*><img src=")([^"]+)(")/',
       static function (array $match): string {
         $url = html_entity_decode($match[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         if (!str_starts_with($url, 'https://')) {
