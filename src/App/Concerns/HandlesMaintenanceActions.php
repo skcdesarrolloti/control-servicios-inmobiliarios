@@ -2825,7 +2825,12 @@ trait HandlesMaintenanceActions
     }
     $quoteId = (int) ($order['id_cotizacion'] ?? 0);
     $quote = $quoteId > 0 ? $this->maintenance_order_find_cotizacion($quoteId) : null;
-    return $this->build_cotizacion_order_pdf($order, $quote)->bytes();
+    $html = $this->render_cotizacion_order_detail($order, $quote ?? [], true);
+    $bytes = \SCM\Support\HtmlPdfRenderer::render($html, 'Orden de mantenimiento #' . $orderId . ' - Soporte de pago');
+    if ($bytes === null) {
+      throw new \DomainException('No se pudo generar el PDF con el diseño de la orden. Inténtalo nuevamente o contacta a soporte.');
+    }
+    return $bytes;
   }
 
   /** @return array<int,array<string,mixed>> */
@@ -3357,7 +3362,11 @@ trait HandlesMaintenanceActions
 
   private function maintenance_order_can_respond(): bool
   {
-    return $this->canUseDashboardAction('quote_order_respond') && (
+    $cargo = Auth::userCargo();
+    $permissions = $this->dashboardActionPermissionsConfig();
+    $allowed = $this->canManageDashboardPermissions()
+      || in_array('quote_order_respond', $permissions[$cargo] ?? [], true);
+    return $allowed && (
       $this->canAccessDashboardTab('cotizaciones_mantenimiento')
       || $this->canAccessDashboardTab('abiertos')
       || $this->canAccessDashboardTab('postergados')

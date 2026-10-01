@@ -1,5 +1,33 @@
 @page { size: A4; margin: 8mm; }
 
+/* Keep the same order invoice layout when Chromium prints at A4 width. */
+.scm-cotizacion-order-detail-actions { display: none !important; }
+.scm-order-invoice { padding: 12px; }
+.scm-order-invoice-head { display: flex !important; padding: 14px 20px; }
+.scm-order-invoice-totals > div { padding: 12px 18px; }
+.scm-cotizacion-order-detail.scm-order-invoice section { padding: 12px 18px; }
+.scm-order-invoice dl > div { padding: 6px 0; }
+.scm-order-invoice-number { justify-items: end !important; text-align: right !important; }
+.scm-order-invoice-totals,
+.scm-order-invoice-columns { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.scm-order-invoice-approval dl { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.scm-order-invoice table { display: table !important; }
+.scm-order-invoice thead { display: table-header-group !important; }
+.scm-order-invoice tbody { display: table-row-group !important; }
+.scm-order-invoice tfoot { display: table-footer-group !important; }
+.scm-order-invoice tr { display: table-row !important; }
+.scm-order-invoice tr > th,
+.scm-order-invoice tr > td { display: table-cell !important; padding: 6px 9px !important; }
+.scm-order-invoice tr > td::before { display: none !important; }
+.scm-order-invoice-head,
+.scm-order-invoice-totals,
+.scm-order-invoice-reference,
+.scm-order-invoice-concept,
+.scm-order-invoice-columns > section,
+.scm-order-invoice-approval,
+.scm-order-invoice tr { break-inside: avoid; page-break-inside: avoid; }
+.scm-order-invoice h3 { break-after: avoid; page-break-after: avoid; }
+
 html,
 body {
   margin: 0;

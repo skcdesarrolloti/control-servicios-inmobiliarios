@@ -131,7 +131,7 @@ final class HtmlPdfRenderer
   private static function inlineConfiguredLogo(string $content): string
   {
     return (string) preg_replace_callback(
-      '/(<div class="scm-cotizacion-native-logo"[^>]*><img src=")([^"]+)(")/',
+      '/(<div class="(?:scm-cotizacion-native-logo|scm-order-invoice-brand)"[^>]*><img src=")([^"]+)(")/',
       static function (array $match): string {
         $url = html_entity_decode($match[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         if (!str_starts_with($url, 'https://')) {

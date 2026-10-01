@@ -7,6 +7,7 @@ namespace SCM\Core {
   final class Auth {
     public static function userId(): int { return 7; }
     public static function user(): string { return 'Editor'; }
+    public static function userCargo(): string { return '11'; }
   }
 }
 namespace SCM\Support {
@@ -41,7 +42,11 @@ namespace {
   define('SCM_BASE_URL', 'https://example.com');
   define('SCM_APP_SECRET', 'isolated-test-secret');
   require dirname(__DIR__) . '/src/App/Concerns/HandlesMaintenanceActions.php';
+  require dirname(__DIR__) . '/src/App/Concerns/RendersDashboard.php';
+  require dirname(__DIR__) . '/src/Support/MaintenanceOrderInvoice.php';
+  define('SCM_DEFAULT_PORTAL_LOGO_URL', 'https://example.com/logo.png');
   function esc_html($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); }
+  function esc_attr($v): string { return esc_html($v); }
   function esc_url($v): string { return (string) $v; }
   function sanitize_text_field($v): string { return trim(strip_tags((string) $v)); }
   function wp_unslash($v) { return $v; }
@@ -101,10 +106,18 @@ namespace {
   }
   final class Handler {
     use \SCM\App\Concerns\HandlesMaintenanceActions;
+    use \SCM\App\Concerns\RendersDashboard;
+    public bool $admin = true;
+    public bool $tabAccess = true;
+    public array $actionPermissions = [];
     public function __construct(public MemoryDb $db) {}
+    public function detail(bool $pdf = false): string { return $this->render_cotizacion_order_detail($this->db->order, $this->db->quote, $pdf); }
+    public function canRespond(): bool { return $this->maintenance_order_can_respond(); }
     private function verifyCsrf(): void {}
     private function canUseDashboardAction($action): bool { return true; }
-    private function canAccessDashboardTab($tab): bool { return true; }
+    private function canAccessDashboardTab($tab): bool { return $this->tabAccess; }
+    private function canManageDashboardPermissions(): bool { return $this->admin; }
+    private function dashboardActionPermissionsConfig(): array { return $this->actionPermissions; }
     private function table_exists($table): bool { return true; }
     private function current_employee_id(): string { return '77'; }
     private function format_cop_currency($v): string { return '$'.number_format((float) $v,0,',','.'); }
@@ -150,6 +163,20 @@ namespace {
     return json_decode((string) shell_exec($cmd),true,512,JSON_THROW_ON_ERROR);
   };
   $check=static function(bool $ok,string $label): void { if (!$ok) throw new \RuntimeException($label); echo 'OK '.$label.PHP_EOL; };
+  $view = new Handler(new MemoryDb());
+  $view->db->order['estado'] = 'Esperando respuesta';
+  $check($view->canRespond() && str_contains($view->detail(), 'data-scm-respond-cotizacion-order'), 'administrative users can respond to pending orders');
+  $view->admin = false;
+  $check(!$view->canRespond() && !str_contains($view->detail(), 'data-scm-respond-cotizacion-order'), 'cargo without explicit grant cannot respond or see the button');
+  $view->actionPermissions = ['11' => ['quote_order_respond']];
+  $check($view->canRespond() && str_contains($view->detail(), 'data-scm-respond-cotizacion-order'), 'configured responder permission enables the pending order button');
+  $view->tabAccess = false;
+  $check(!$view->canRespond() && !str_contains($view->detail(), 'data-scm-respond-cotizacion-order'), 'response permission also requires access to the case module');
+  $view->tabAccess = true;
+  $view->db->order['estado'] = 'Aprobada';
+  $check(!str_contains($view->detail(), 'data-scm-respond-cotizacion-order'), 'responded orders do not display response action');
+  $view->db->order['estado'] = 'Esperando respuesta';
+  $check(!str_contains($view->detail(true), 'data-scm-respond-cotizacion-order') && !str_contains($view->detail(true), 'data-scm-cotizacion-order-pdf'), 'PDF uses the same detail without interactive buttons');
   $decrease=$run('decrease');
   $check($decrease['success'] && $decrease['quote']['saldo_materiales']==='800000','decrease returns the difference to quote balance');
   $check($decrease['order']['_ID']==='98' && $decrease['order']['creador']==='Creador original' && $decrease['order']['id_empleado']==='25','edit preserves number and creator identity');

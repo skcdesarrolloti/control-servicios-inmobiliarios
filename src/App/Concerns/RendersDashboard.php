@@ -4654,7 +4654,7 @@ trait RendersDashboard
       : '<div class="scm-cotizacion-orders-summary"><span>Cotizaci&oacute;n #' . esc_html($id !== '' ? $id : '-') . '</span><strong>' . esc_html((string) count($orders)) . ' ' . (count($orders) === 1 ? 'orden registrada' : '&oacute;rdenes registradas') . '</strong></div><div class="scm-cotizacion-orders-list">';
     $orderDetailsHtml = '';
     $ordersHistoryHtml = empty($orders) ? '<p class="scm-case-history-empty">Sin &oacute;rdenes registradas para esta cotizaci&oacute;n.</p>' : '';
-    $canRespondMaintenanceOrder = $this->canUseDashboardAction('quote_order_respond');
+    $canRespondMaintenanceOrder = $this->maintenance_order_can_respond();
     foreach ($orders as $orderIndex => $order) {
       $orderId = trim((string) ($order['_ID'] ?? ''));
       $orderKey = $orderId !== '' ? $orderId : 'item-' . (string) $orderIndex;
@@ -4812,7 +4812,7 @@ trait RendersDashboard
   }
 
   /** @param array<string,mixed> $order @param array<string,mixed> $quote */
-  private function render_cotizacion_order_detail(array $order, array $quote): string
+  private function render_cotizacion_order_detail(array $order, array $quote, bool $forPdf = false): string
   {
     $value = static fn(string $key, string $fallback = '-'): string => trim((string) ($order[$key] ?? '')) !== '' ? trim((string) $order[$key]) : $fallback;
     $dateTs = (int) ($order['fecha'] ?? 0);
@@ -4833,7 +4833,7 @@ trait RendersDashboard
     $html = '<div class="scm-cotizacion-order-detail scm-order-invoice">';
     $html .= '<header class="scm-order-invoice-head"><div class="scm-order-invoice-brand"><img src="' . esc_attr($logo) . '" alt="SKC SuCasa Inmobiliaria"><span>SKC SuCasa Inmobiliaria</span></div><div class="scm-order-invoice-number"><span>Orden de mantenimiento</span><strong>#' . esc_html($orderId !== '' ? $orderId : '-') . '</strong><em>' . esc_html($state) . '</em></div></header>';
     $html .= '<div class="scm-order-invoice-totals"><div class="is-primary"><span>Valor de esta orden</span><strong>' . esc_html($money($order['valor'] ?? 0)) . '</strong><small>' . esc_html($value('categoria')) . '</small></div><div><span>Valor total de la cotización</span><strong>' . esc_html($money($quoteTotal)) . '</strong><small>Cotización #' . esc_html($value('id_cotizacion')) . '</small></div></div>';
-    $html .= '<div class="scm-order-invoice-reference"><span>Fecha: <strong>' . esc_html($date) . '</strong></span><span>Ticket: <strong>#' . esc_html($value('id_ticket')) . '</strong></span><span>Contrato: <strong>#' . esc_html($value('contrato', $value('id_contrato'))) . '</strong></span><span>Inmueble: <strong>' . esc_html($value('inmueble', $value('id_inmueble'))) . '</strong></span></div>';
+    $html .= '<div class="scm-order-invoice-reference"><span>Fecha: <strong>' . esc_html($date) . '</strong></span><span>Caso: <strong>#' . esc_html($value('id_ticket')) . '</strong></span><span class="scm-order-invoice-contract">Contrato: <strong>#' . esc_html($value('contrato', $value('id_contrato'))) . '</strong> · Inmueble SIMI: <strong>' . esc_html($value('inmueble')) . '</strong></span><span>Código inmueble web: <strong>' . esc_html($value('id_inmueble')) . '</strong></span></div>';
     $html .= '<section class="scm-order-invoice-lines"><h3>Desglose por tipo de concepto</h3><div class="scm-order-invoice-table-wrap"><table><thead><tr><th scope="col">Tipo</th><th scope="col">En la cotización</th><th scope="col">En esta orden</th></tr></thead><tbody>';
     foreach (\SCM\Support\MaintenanceOrderInvoice::rows($order, $quote) as $line) {
       $html .= '<tr' . ($line['current'] ? ' class="is-current"' : '') . '><th scope="row">' . esc_html($line['label']) . '</th><td>' . esc_html($money($line['quote'])) . '</td><td>' . esc_html($money($line['order'])) . '</td></tr>';
@@ -4849,13 +4849,17 @@ trait RendersDashboard
     $html .= $pair('Número de cuenta', $value('cuenta_proveedor')) . $pair('Correo para pago', $value('correo_pago_proveedor'));
     $html .= '</dl></section></div>';
     $html .= '<section class="scm-order-invoice-approval"><h3>Creación y aprobación</h3><dl>';
-    $html .= $pair('Creada por', $value('creador')) . $pair($approvalLabel, $approvedBy) . $pair('Coordinación', $value('coordinador'));
+    $creatorRole = $value('cargo_creador', 'Creador de la orden');
+    $creatorPhone = $value('celular_creador', '');
+    $html .= '<div><dt>Creada por</dt><dd>' . esc_html($value('creador')) . '<small>' . esc_html($creatorRole) . '</small>'
+      . ($creatorPhone !== '' ? '<small>Celular: ' . esc_html($creatorPhone) . '</small>' : '') . '</dd></div>';
+    $html .= $pair($approvalLabel, $approvedBy) . $pair('Coordinación', $value('coordinador'));
     $html .= '</dl></section></div>';
     $detailActions = '';
-    if ($orderId !== '') {
+    if (!$forPdf && $orderId !== '') {
       $detailActions .= '<button type="button" class="scm-cotizacion-order-view" data-scm-cotizacion-order-pdf data-order-id="' . esc_attr($orderId) . '">Soporte de pago</button>';
     }
-    if ($isPending) {
+    if (!$forPdf && $isPending && $this->maintenance_order_can_respond()) {
       $detailActions .= '<button type="button" class="scm-cotizacion-order-view scm-cotizacion-order-response" data-scm-respond-cotizacion-order'
         . ' data-order-id="' . esc_attr($orderId) . '"'
         . ' data-order-number="' . esc_attr($orderId !== '' ? $orderId : '-') . '"'

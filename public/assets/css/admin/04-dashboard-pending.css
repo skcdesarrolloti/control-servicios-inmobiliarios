@@ -11343,6 +11343,12 @@
   align-items: center;
 }
 
+.scm-cotizacion-order-detail-actions {
+  margin-top: 18px;
+  padding: 16px 20px;
+  border-top: 1px solid #d7e4f3;
+}
+
 .scm-cotizacion-order-view {
   display: inline-flex;
   align-items: center;
@@ -11628,6 +11634,7 @@
 .scm-order-invoice-approval dl { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .scm-order-invoice-approval dl > div { display: block; border: 0; }
 .scm-order-invoice-approval dd { margin-top: 4px; }
+.scm-order-invoice-approval dd small { display: block; margin-top: 4px; color: #607694; font-size: 11px; font-weight: 500; }
 
 @media (max-width: 700px) {
   .scm-order-invoice-head,
