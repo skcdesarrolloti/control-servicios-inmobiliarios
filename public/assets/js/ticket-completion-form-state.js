@@ -59,7 +59,7 @@
       return {revision:revision, savedAt:Date.now(), fields:collectFields(form,false), items:Array.from(form.querySelectorAll('[data-acta-item]')).map(function(item) {
         if(!item.dataset.actaDraftItem||identities.has(item.dataset.actaDraftItem))item.dataset.actaDraftItem='new-'+Date.now()+'-'+Math.random();
         identities.add(item.dataset.actaDraftItem);
-        return {key:item.dataset.actaDraftItem,values:collectFields(item,true),kept:Array.from(item.querySelectorAll('[data-acta-existing-photo] input[name$="[name]"]')).map(function(i){return i.value;}),photos:inputs(item).map(function(input){return {kind:kind(input),files:files(input)};})};
+        return {key:item.dataset.actaDraftItem,values:collectFields(item,true),kept:Array.from(item.querySelectorAll('[data-acta-existing-photo] input[name$="[name]"]')).map(function(i){return i.value;}),correctiveKept:Array.from(item.querySelectorAll('[data-corrective-existing-photo] input')).map(function(i){return i.value;}),photos:inputs(item).map(function(input){return {kind:kind(input),files:files(input)};})};
       })};
     }
     function save() {
@@ -99,6 +99,7 @@
         }
         item.dataset.actaDraftItem=saved.key;
         item.querySelectorAll('[data-acta-existing-photo]').forEach(function(f){var n=f.querySelector('input[name$="[name]"]');if(!n||!saved.kept.includes(n.value))f.remove();});
+        if(Array.isArray(saved.correctiveKept))item.querySelectorAll('[data-corrective-existing-photo]').forEach(function(f){var ref=f.querySelector('input');if(!ref||!saved.correctiveKept.includes(ref.value))f.remove();});
         restoreFields(item,saved.values,true);
         (saved.photos||[]).forEach(function(group){var input=item.querySelector(group.kind==='damage'?'[data-corrective-photos]':'[data-acta-photos]');if(input){setFiles(input,group.files.map(function(f){return new File([f.blob],f.name,{type:f.blob.type,lastModified:f.lastModified});}));preview(input);}});
         restored.push(item);
@@ -121,9 +122,14 @@
       if(incoming.length)add(button.closest('[data-acta-item]').querySelector('[data-acta-photos]'),incoming);else message('No se encontró una imagen en el portapapeles.');
     },true);
     form.addEventListener('click',function(event){
-      var button=event.target.closest('[data-acta-unselect],[data-acta-remove-existing-photo]');if(!button)return;
+      var button=event.target.closest('[data-acta-unselect],[data-acta-remove-existing-photo],[data-corrective-remove-existing-photo]');if(!button)return;
       event.preventDefault();event.stopImmediatePropagation();
-      if(button.hasAttribute('data-acta-remove-existing-photo'))button.closest('[data-acta-existing-photo]').remove();
+      if(button.hasAttribute('data-acta-remove-existing-photo')||button.hasAttribute('data-corrective-remove-existing-photo')){
+        var figure=button.closest('[data-acta-existing-photo],[data-corrective-existing-photo]'), item=button.closest('[data-acta-item]'), field=figure.querySelector('input[name$="[name]"],input[name$="[existing_fotos][]"]'), name='';
+        if(field){try{name=new URL(field.value,location.href).searchParams.get('n')||field.value;}catch(e){name=field.value;}}
+        item.querySelectorAll('[data-acta-damage-photo],[data-corrective-existing-photo]').forEach(function(other){var ref=other.querySelector('input[name$="[name]"],input[name$="[existing_fotos][]"]');if(!ref)return;var otherName;try{otherName=new URL(ref.value,location.href).searchParams.get('n')||ref.value;}catch(e){otherName=ref.value;}if(name&&name===otherName)other.remove();});
+        figure.remove();
+      }
       else {var input=button.closest('[data-acta-item]').querySelector(button.dataset.actaPhotoKind==='damage'?'[data-corrective-photos]':'[data-acta-photos]'), list=files(input);list.splice(Number(button.dataset.actaUnselect),1);setFiles(input,list);preview(input);}
       schedule();
     },true);

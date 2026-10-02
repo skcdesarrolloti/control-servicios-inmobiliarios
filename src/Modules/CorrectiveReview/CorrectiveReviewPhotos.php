@@ -63,6 +63,8 @@ final class CorrectiveReviewPhotos
     if (preg_match('/^[a-f0-9]{24}_[0-9]+\.jpg$/D', $name) && (str_contains($ref, 'file.php?') || $ref === $name)) {
       $files = StoredFileService::fromRuntime();
       if ($files->pathFor($name) !== null) { return $files->urlFor($name); }
+      // A retained database reference does not mean the file still exists.
+      return '';
     }
     if (preg_match('#^https?://#i', $ref)) { return $ref; }
     if (str_starts_with($ref, 'file.php?')) { return rtrim((string) SCM_BASE_URL, '/') . '/' . $ref; }

@@ -48,5 +48,8 @@ if (!str_starts_with($url, SCM_BASE_URL . '/file.php?n=' . $name . '&s=') || str
   throw new RuntimeException('No se renovó la firma de la foto guardada.');
 }
 unlink($directory . '/' . $name);
+if (CorrectiveReviewPhotos::url($db, $refs[1]) !== '') {
+  throw new RuntimeException('Un archivo eliminado produjo un enlace de imagen roto.');
+}
 rmdir($directory);
 echo "Corrective review photo checks passed.\n";

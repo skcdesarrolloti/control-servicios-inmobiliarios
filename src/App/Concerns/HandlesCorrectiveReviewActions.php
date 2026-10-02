@@ -1037,7 +1037,7 @@ trait HandlesCorrectiveReviewActions
           <?php foreach ($photos as $photoIndex => $photo): ?>
             <figure data-corrective-existing-photo>
               <?php $photoUrl = \SCM\Modules\CorrectiveReview\CorrectiveReviewPhotos::url($this->db, $photo); ?>
-              <?php if ($photoUrl !== ''): ?><img src="<?= $h($photoUrl) ?>" alt="Foto guardada <?= $h((string) ($photoIndex + 1)) ?>"><?php else: ?><span>Foto no disponible</span><?php endif; ?>
+              <?php if ($photoUrl !== ''): ?><img src="<?= $h($photoUrl) ?>" alt="Foto guardada <?= $h((string) ($photoIndex + 1)) ?>"><?php else: ?><span>Foto no disponible. El archivo guardado no se encontró; vuelve a adjuntarlo.</span><?php endif; ?>
               <figcaption>Foto guardada</figcaption>
               <input type="hidden" name="<?= $h($fieldBase) ?>[existing_fotos][]" value="<?= $h($photo) ?>">
               <button type="button" class="scm-acta-photo-remove" data-corrective-remove-existing-photo aria-label="Quitar foto guardada">×</button>
