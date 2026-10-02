@@ -224,8 +224,8 @@ final class AdministrativeNotificationsService
         'email_template' => 'scm_email_arrendatario_fecha_pago_v1',
         'parameter_mode' => 'collection_due_date',
       ],
-      'scm_factura_disponible_v1' => [
-        'name' => 'scm_factura_disponible_v1',
+      'scm_factura_disponible_v2' => [
+        'name' => 'scm_factura_disponible_v2',
         'label' => 'Factura disponible',
         'language' => 'es_CO',
         'description' => 'Aviso para arrendatarios cuando tienen una nueva factura disponible.',
@@ -237,6 +237,7 @@ final class AdministrativeNotificationsService
         'header_type' => 'image',
         'header_media_key' => 'whatsapp_factura_disponible_header_url',
         'header_media_env' => 'SCM_WHATSAPP_FACTURA_DISPONIBLE_IMAGE_URL',
+        'header_media_url' => \home_url('assets/img/whatsapp-factura-disponible.jpg'),
         'header_required' => true,
       ],
       'scm_mes_generado_pago_v1' => [
@@ -4811,8 +4812,8 @@ final class AdministrativeNotificationsService
   {
     $templateName = trim($templateName);
     $templateAliases = [
-      'nueva_factura' => 'scm_factura_disponible_v1',
-      'scm_factura_disponible_v2' => 'scm_factura_disponible_v1',
+      'nueva_factura' => 'scm_factura_disponible_v2',
+      'scm_factura_disponible_v1' => 'scm_factura_disponible_v2',
       'cupones' => 'scm_arrendatario_fecha_pago_v1',
       'scm_cupon_disponible_v1' => 'scm_arrendatario_fecha_pago_v1',
       'scm_cupon_disponible_v2' => 'scm_arrendatario_fecha_pago_v1',
