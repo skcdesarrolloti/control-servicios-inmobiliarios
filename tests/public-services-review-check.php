@@ -121,7 +121,7 @@ try {
   $workspace = new \SCM\Modules\Pending\PublicServicesWorkspace($db);
   $viewData = $workspace->review($result['review_id']);
   $reviewHtml = \SCM\Modules\Pending\PublicServicesDocument::review($viewData['review'],$viewData['context'],$viewData['services'],$viewData['documents'],'');
-  $assert(str_contains($reviewHtml,'Funcionario autenticado QA') && !str_contains($reviewHtml,'Sucursal') && str_contains($reviewHtml,'data-services-preview'), 'native public document closes with real actor hides branch and previews original PDF inline');
+  $assert(str_contains($reviewHtml,'Funcionario autenticado QA') && !str_contains($reviewHtml,'Sucursal') && !str_contains($reviewHtml,'Propietario QA') && !str_contains($reviewHtml,'<th scope="row">Propietario</th>') && str_contains($reviewHtml,'Arrendatario QA') && str_contains($reviewHtml,'data-services-preview'), 'native public document hides owner and branch while preserving tenant, actor and inline act previews');
   $assert(str_contains($workspace->history(['contrato'=>'2000']),'Copiar enlace público') && str_contains($workspace->templates('critico'),'cuarenta y ocho (48)'), 'history offers signed links and critical template contains supplied 90-day letter');
   $templates = new \SCM\Modules\Pending\PublicServicesActTemplates($db);
   $actHtml = \SCM\Modules\Pending\PublicServicesDocument::act($viewData['context'],$viewData['services']['energia'],$viewData['context']['templates']['al_dia']);

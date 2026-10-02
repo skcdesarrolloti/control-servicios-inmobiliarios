@@ -29,7 +29,7 @@ Los cambios afectan las próximas actas. Cada revisión nueva conserva una insta
 
 Revisiones realizadas incluye filtros por contrato, inmueble SIMI, propietario, arrendatario y fechas; pagina de 30 en 30 y permite consultar cada revisión, previsualizar sus actas y copiar un enlace público.
 
-La vista pública muestra datos contractuales, fechas de revisión y corte por servicio cuando existen, resultados y valores. Omite sucursal y cierra con Realizado por. Las actas se abren dentro de la página. Imprimir oculta acciones, reduce tablas y mantiene juntas las tarjetas y firmas. Sin sesión requiere `expires` y una firma HMAC ligada a la revisión. Los enlaces nuevos duran 180 días. Las URLs externas antiguas enviadas previamente no cambian automáticamente.
+La vista pública muestra datos contractuales, fechas de revisión y corte por servicio cuando existen, resultados y valores. Omite el nombre del propietario (incluida la impresión) y sucursal, y cierra con Realizado por. Las actas se abren dentro de la página. Imprimir oculta acciones, reduce tablas y mantiene juntas las tarjetas y firmas. Sin sesión requiere `expires` y una firma HMAC ligada a la revisión. Los enlaces nuevos duran 180 días. Las URLs externas antiguas enviadas previamente no cambian automáticamente.
 
 ## Notificaciones
 

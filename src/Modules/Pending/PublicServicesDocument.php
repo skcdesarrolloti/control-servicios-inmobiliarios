@@ -89,7 +89,7 @@ final class PublicServicesDocument
       . '<p class="scm-acta-receipt-date">Fecha de revisión: ' . date('d/m/Y H:i', (int) $context['fecha']) . ' (Colombia)</p>'
       . '<section class="scm-acta-receipt-section"><h2>1. Datos de la revisión</h2>' . self::table([
         'Contrato / Inmueble SIMI' => '#' . ($context['contrato'] ?? '') . ' · ' . ($context['inmueble'] ?? ''),
-        'Dirección' => $context['direccion'] ?? '', 'Propietario' => $context['propietario'] ?? '', 'Arrendatario' => $context['arrendatario'] ?? '',
+        'Dirección' => $context['direccion'] ?? '', 'Arrendatario' => $context['arrendatario'] ?? '',
         'Tipo de revisión' => $review['tipo'] ?? 'Durante la ocupación',
         'Inicio del contrato' => !empty($review['inicio_contrato']) ? date('d/m/Y', PublicServicesWorkspace::timestamp($review['inicio_contrato'])) : '',
         'Fin del contrato' => !empty($review['fin_contrato']) ? date('d/m/Y', PublicServicesWorkspace::timestamp($review['fin_contrato'])) : '',
