@@ -1,0 +1,59 @@
+/* Shared by native public review, template preview and Chromium actas. */
+body.scm-services-page{margin:0;background:#f1f5f9;color:#202020;font-family:'SCM Acta Sans',Arial,sans-serif}
+.scm-services-public-root{max-width:960px;margin:24px auto;padding:0 14px 30px}
+.scm-services-document{background:#fff;overflow-wrap:anywhere}
+.scm-services-document .scm-acta-receipt-data{width:100%}
+.scm-services-document .scm-acta-logo{background:#10264a;display:flex;align-items:center;justify-content:center}
+.scm-services-document .scm-acta-logo img{width:100%;max-width:170px;object-fit:contain}
+.scm-services-document h1{font-size:25px;line-height:1.35}
+.scm-services-act h1{font-size:28px;font-weight:700;line-height:1.3}
+.scm-services-document h2{font-size:18px;margin-bottom:14px}
+.scm-services-result-grid{display:grid;gap:22px}
+.scm-services-result{break-inside:avoid;page-break-inside:avoid}
+.scm-services-result h3{margin-bottom:8px}
+.scm-services-signatures{display:grid;grid-template-columns:1fr 1fr;gap:22px;break-inside:avoid;page-break-inside:avoid}
+.scm-services-signatures span,.scm-services-signatures strong{display:block}
+.scm-services-signatures span{font-size:11px;margin-bottom:5px}
+.scm-services-signatures strong{font-size:14px;color:#202020}
+.scm-services-company{grid-column:1/-1}
+.scm-services-letter p{margin:0 0 14px;line-height:1.6}
+.scm-services-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.scm-services-button{display:inline-flex;padding:10px 16px;border:1px solid #cbd5e1;background:#10264a;color:#fff;border-radius:8px;text-decoration:none;font:600 13px Arial,sans-serif;cursor:pointer;margin-top:12px}
+.scm-services-button:focus-visible{outline:3px solid #f97316;outline-offset:3px}
+.scm-services-preview-dialog{width:min(1080px,95vw);max-width:95vw;height:90vh;padding:14px;border:1px solid #cbd5e1;border-radius:12px;box-sizing:border-box}
+.scm-services-preview-dialog::backdrop{background:#0f172ab3}
+.scm-services-preview-dialog header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.scm-services-preview-dialog iframe{width:100%;height:calc(100% - 50px);border:0}
+.scm-services-letterhead{display:none}
+.scm-services-letterhead-top,.scm-services-letterhead-bottom{width:100%;break-inside:avoid;page-break-inside:avoid}
+.scm-services-letterhead-top{margin-bottom:5mm}
+.scm-services-letterhead-bottom{margin-top:8mm}
+.scm-services-letterhead-top img,.scm-services-letterhead-bottom img{display:block;width:100%;height:auto;max-width:none}
+.scm-services-letterhead-top img{width:70%}
+@media(max-width:600px){.scm-services-public-root{padding:0 8px}.scm-services-signatures{grid-template-columns:1fr}.scm-services-document h1{font-size:21px}}
+@page{size:letter;margin:20mm 18mm 22mm}
+@media print{
+  html,body.scm-services-page{margin:0;padding:0;background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .scm-services-public-root{margin:0;padding:0;max-width:none}
+  .scm-services-document{border:0;box-shadow:none;padding:0;font-size:11px;line-height:1.5;max-width:none}
+  .scm-services-document h1{font-size:19px}.scm-services-document h2{font-size:14px}
+  .scm-services-act h1{font-size:22px;font-weight:700;line-height:1.3}
+  .scm-services-document .scm-acta-receipt-section{margin:16px 0}
+  .scm-services-document .scm-acta-receipt-data{font-size:10px}
+  .scm-services-document .scm-acta-receipt-data th,.scm-services-document .scm-acta-receipt-data td{padding:4px 7px}
+  .scm-services-document .scm-acta-receipt-date{margin:14px 0}
+  .scm-services-document .scm-acta-logo{width:130px;min-height:46px;margin:0 0 10px}
+  .scm-services-actions,.scm-services-button,.scm-services-preview-dialog{display:none!important}
+  .scm-services-signatures{grid-template-columns:1fr 1fr;gap:18px;margin-top:18px;padding-top:12px}
+  .scm-services-signatures strong{font-size:12px}
+  .scm-services-letter p{margin-bottom:10px}
+  .scm-services-pdf .scm-acta-logo{display:none}
+  .scm-services-pdf .scm-acta-receipt-head{padding-top:0}
+  .scm-services-pdf .scm-acta-receipt-head{padding-bottom:12px}
+  .scm-services-pdf .scm-acta-receipt-section{margin:12px 0}
+  .scm-services-pdf .scm-acta-receipt-date{margin:10px 0}
+  .scm-services-pdf .scm-acta-receipt-footer{margin-top:18px;padding-top:12px}
+  .scm-services-pdf .scm-services-letterhead-bottom{margin-top:3mm}
+  .scm-services-document tr,.scm-services-document h1,.scm-services-document .scm-acta-receipt-head{break-inside:avoid;page-break-inside:avoid}
+  .scm-services-document h2,.scm-services-document h3{break-after:avoid;page-break-after:avoid}
+}

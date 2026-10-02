@@ -16,7 +16,15 @@ $check = static function (bool $ok, string $message) use (&$failures): void {
 foreach (['pdo_mysql', 'mbstring', 'iconv', 'fileinfo'] as $extension) {
   $check(extension_loaded($extension), 'Extensión ' . $extension);
 }
-$check(is_readable(SCM_ROOT . '/resources/assets/membrete-sucasa.jpg'), 'Membrete institucional legible');
+foreach (['membrete-sucasa.jpg', 'membrete-sucasa-header.jpg', 'membrete-sucasa-footer.jpg'] as $asset) {
+  $check(is_readable(SCM_ROOT . '/resources/assets/' . $asset), 'Membrete institucional legible: ' . $asset);
+}
+$nativeStorage = new \SCM\Modules\Pending\PublicServicesReviewStorage($db);
+try { $nativeStorage->requireSchema(); $check(true, 'Esquema de revisiones nativas e idempotencia disponible'); }
+catch (Throwable $error) { $check(false, $error->getMessage()); }
+$pdfReflection = new ReflectionClass(\SCM\Support\HtmlPdfRenderer::class);
+$browserAvailable = $pdfReflection->getMethod('browserPath')->invoke(null) !== null;
+$check($browserAvailable || trim((string)getenv('SCM_GOTENBERG_URL')) !== '', 'Chromium o servicio PDF configurado para el diseño de actas');
 $check(is_dir(SCM_UPLOAD_PATH) && is_writable(SCM_UPLOAD_PATH), 'storage/uploads existe y permite escritura al usuario CLI (verificar también usuario PHP web)');
 $check(str_starts_with(SCM_BASE_URL, 'https://'), 'BASE_URL usa HTTPS para los enlaces firmados');
 $required = [

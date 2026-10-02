@@ -1,0 +1,60 @@
+const { chromium } = require('playwright');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const fs = require('node:fs');
+
+// Use the no-DB CLI-server harness. All saves are synthetic and send no messages.
+(async () => {
+  const base = process.env.SCM_SERVICES_QA_URL || 'http://127.0.0.1:9015';
+  const browser = await chromium.launch({ headless: true, executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' });
+  const errors = [];
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1050 } });
+    page.on('pageerror', error => errors.push(error.message));
+    await page.route('**/tests/assets/css/**', route => route.fulfill({ path: path.join(__dirname, '../public/assets/css', path.basename(new URL(route.request().url()).pathname)), contentType: 'text/css' }));
+    await page.route('**/tests/assets/fonts/**', route => route.fulfill({ path: path.join(__dirname, '../public/assets/fonts', path.basename(new URL(route.request().url()).pathname)) }));
+    await page.goto(base + '/tests/public-services-review-ui.php');
+    await page.locator('[data-services-tab="templates"]').click();
+    await page.locator('[data-services-template-form]').waitFor();
+    assert(await page.locator('[data-services-section="pending"]').isHidden());
+    await page.locator('[data-services-template-type]').selectOption('critico');
+    await page.waitForFunction(() => document.querySelector('[name="body"]').value.includes('cuarenta y ocho (48)'));
+    assert((await page.locator('[name="title"]').inputValue()).includes('90 días'));
+    await page.locator('[name="title"]').fill('Requerimiento actualizado {{servicio}}');
+    await page.locator('[name="body"]').focus();
+    await page.locator('[data-services-variable="{{valor}}"]' ).click();
+    assert((await page.locator('[name="body"]').inputValue()).includes('{{valor}}'));
+    await page.locator('[data-services-template-preview]').click();
+    await page.locator('[data-services-template-dialog][open]').waitFor();
+    const frame = page.frameLocator('[data-services-template-dialog] iframe');
+    await frame.locator('h1').waitFor();
+    assert((await frame.locator('h1').innerText()).includes('Energía eléctrica'));
+    assert((await frame.locator('body').innerText()).includes('$350.000 COP'));
+    await page.locator('[data-services-template-dialog] button').click();
+    let declined = false;
+    page.once('dialog', async dialog => { declined = true; await dialog.dismiss(); });
+    await page.locator('[data-services-tab="history"]').click();
+    assert(declined && await page.locator('[data-services-section="templates"]').isVisible());
+    await page.locator('[data-services-template-form] button[type="submit"]').click();
+    await page.waitForFunction(() => document.querySelector('#qa-result').textContent.includes('plantilla guardada'));
+    assert.equal(await page.locator('[name="title"]').inputValue(), 'Requerimiento actualizado {{servicio}}');
+    const qaDir = path.join(__dirname, '../tmp/services-qa');
+    fs.mkdirSync(qaDir, { recursive: true });
+    await page.screenshot({ path: path.join(qaDir, 'editor-desktop.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2));
+    await page.screenshot({ path: path.join(qaDir, 'editor-mobile.png'), fullPage: true });
+    await page.locator('[data-services-tab="history"]').click();
+    await page.locator('[data-services-history-form]').waitFor();
+    assert(await page.locator('[data-services-copy-url]').isVisible());
+    await page.locator('[data-services-history-form] input').fill('149');
+    await page.locator('[data-services-history-form] button').click();
+    await page.locator('[data-services-history-page]').click();
+    await page.locator('[data-services-tab="pending"]').click();
+    await page.locator('[data-scm-open-public-services-review]').click();
+    await page.locator('[data-public-services-review-form]').waitFor();
+    await page.locator('[data-public-services-review-close]').first().click();
+    assert.equal(errors.length, 0, errors.join('\n'));
+    console.log('PASS: subpestañas, editor crítico de 90 días, variables, vista previa, protección de borrador, guardado, historial, filtros, paginación, revisión modal y móvil sin desbordamiento. No DB writes or messages.');
+  } finally { await browser.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });

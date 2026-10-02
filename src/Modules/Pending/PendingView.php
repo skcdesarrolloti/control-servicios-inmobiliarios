@@ -97,8 +97,8 @@ final class PendingView
       <!-- Header -->
       <div class="scm-pending-header scm-pending-header--brand">
         <div>
-          <h2>Servicios Publicos &mdash; Pendientes</h2>
-          <p>Contratos <strong>estado = Entregado</strong> con siguiente revision calculada desde la ultima revision y el mes configurado</p>
+          <h2>Servicios Públicos</h2>
+          <p>Contratos entregados · Revisión trimestral desde la fecha real · Actas e historial</p>
         </div>
         <div>
           <div class="scm-pending-count" id="rsp-kpi-count"><?php echo esc_html((string) $count); ?></div>
@@ -106,6 +106,8 @@ final class PendingView
         </div>
       </div>
 
+      <?php echo \SCM\Modules\Pending\PublicServicesWorkspace::tabs(); ?>
+      <section data-services-section="pending">
       <!-- Filtros -->
       <div class="scm-filter-card">
         <h3>Filtros</h3>
@@ -158,6 +160,9 @@ final class PendingView
       <div id="rsp_table">
         <?php echo $this->renderServiciosPublicosTable($items, $configurationItems); ?>
       </div>
+      </section>
+      <section data-services-section="templates" hidden><div data-services-workspace-content="templates"></div></section>
+      <section data-services-section="history" hidden><div data-services-workspace-content="history"></div></section>
 
     </div>
 <?php
@@ -695,17 +700,15 @@ final class PendingView
     $contractId = (string) ($contract['_ID'] ?? '');
     $contractCode = (string) ($contract['contrato'] ?? $contractId);
     $reviewDate = (string) ($context['review_date'] ?? date('Y-m-d'));
-    $currentMonth = (int) ($contract['mes_revision_servicios'] ?? 0);
-    if ($currentMonth < 1 || $currentMonth > 12) {
-      $currentMonth = (int) date('n');
-    }
-    $nextMonth = (($currentMonth + 3 - 1) % 12) + 1;
+    $nextReview = \SCM\Modules\Pending\PublicServicesSchedule::next(time());
+    $nextMonth = (int) date('n', $nextReview);
 
     ob_start();
 ?>
     <form class="scm-public-services-review-form" data-public-services-review-form autocomplete="off" novalidate>
       <input type="hidden" name="contract_id" value="<?php echo esc_attr($contractId); ?>">
       <input type="hidden" name="configuration_present" value="1">
+      <input type="hidden" name="request_token" value="<?php echo esc_attr((string) ($context['request_token'] ?? '')); ?>">
       <div class="scm-public-services-review-summary">
         <div><span>Contrato</span><strong>#<?php echo esc_html($contractCode !== '' ? $contractCode : '-'); ?></strong></div>
         <div><span>Inmueble SIMI</span><strong>#<?php echo esc_html((string) ($contract['inmueble'] ?? '-')); ?></strong></div>
@@ -760,7 +763,7 @@ final class PendingView
                   <option value="Al dia">Al día</option>
                   <option value="30 dias">30 días</option>
                   <option value="60 dias">60 días</option>
-                  <option value="Estado critico">Estado crítico</option>
+                  <option value="Estado critico">Estado crítico / superior a 90 días</option>
                 </select>
               </label>
               <label class="scm-seg-field" data-public-service-review-only>

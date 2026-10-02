@@ -48,11 +48,54 @@ trait PublicServicesReviewConcern
       'employee' => $employee,
       'branch' => $branch,
       'review_date' => date('Y-m-d'),
+      'request_token' => \SCM\Modules\Pending\PublicServicesReviewStorage::formToken($contract, Auth::userId()),
     ];
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
   public function createServiciosPublicosReview(int $contractId, array $input): array
+  {
+    $db = $this->repo->getDb();
+    $pdo = $db->pdo();
+    if ($pdo->inTransaction()) return ['ok' => false, 'message' => 'Ya existe una operación en curso. Intenta nuevamente.'];
+    $result = [];
+    try {
+      $storage = new \SCM\Modules\Pending\PublicServicesReviewStorage($db);
+      $storage->requireSchema();
+      $pdo->beginTransaction();
+      $contract = $this->repo->getPublicServicesContract($contractId, true);
+      if (!$contract) throw new \DomainException('Contrato no encontrado.');
+      $token = (string) ($input['request_token'] ?? '');
+      \SCM\Modules\Pending\PublicServicesReviewStorage::validateToken($token, $contract, Auth::userId(), false);
+      $requestKey = hash('sha256', $token);
+      $existing = $storage->byRequest($requestKey);
+      if ($existing) {
+        $snapshot = json_decode($existing['snapshot_json'], true, 32, JSON_THROW_ON_ERROR);
+        $pdo->commit();
+        return $snapshot['result'] + ['replayed' => true];
+      }
+      \SCM\Modules\Pending\PublicServicesReviewStorage::validateToken($token, $contract, Auth::userId());
+      if (strtolower(trim((string) ($contract['estado'] ?? ''))) !== 'entregado') throw new \DomainException('Este contrato ya no está entregado. Recarga el listado.');
+      $result = $this->createLockedServiciosPublicosReview($contractId, $input);
+      if (empty($result['ok'])) throw new \DomainException((string) ($result['message'] ?? 'No fue posible guardar la revisión.'));
+      $publicResult = $result;
+      unset($publicResult['_context'], $publicResult['_services'], $publicResult['_documents'], $publicResult['_contract'], $publicResult['_employee']);
+      $storage->insert($requestKey, $contractId, $result['review_id'], ['context' => $result['_context'], 'services' => $result['_services'], 'result' => $publicResult]);
+      $pdo->commit();
+    } catch (\Throwable $error) {
+      if ($pdo->inTransaction()) $pdo->rollBack();
+      $this->removeGeneratedReviewDocuments($result['_documents'] ?? []);
+      return ['ok' => false, 'message' => $error->getMessage()];
+    }
+    $queued = $this->queuePublicServicesReviewEmails($result['review_id'], $result['_contract'], $result['_employee'], $result['_documents'], $result['_services']);
+    unset($result['_context'], $result['_services'], $result['_documents'], $result['_contract'], $result['_employee']);
+    $result['notifications_queued'] = $queued;
+    $result['message'] = 'Revisión agregada con éxito. Se generaron ' . count($result['documents']) . ' actas y se encolaron ' . $queued . ' correos.';
+    return $result;
+  }
+
+  /** Called only while holding the contract row lock in the outer transaction. */
+  private function createLockedServiciosPublicosReview(int $contractId, array $input): array
   {
     $context = $this->buildServiciosPublicosReviewContext($contractId);
     if (empty($context['ok'])) {
@@ -104,12 +147,7 @@ trait PublicServicesReviewConcern
     $nowTs = time();
     $nowMysql = date('Y-m-d H:i:s', $nowTs);
     $reviewCount = max(0, (int) ($contract['revisiones_servicios'] ?? 0)) + 1;
-    $baseMonth = (int) ($contract['mes_revision_servicios'] ?? 0);
-    if ($baseMonth < 1 || $baseMonth > 12) {
-      $baseMonth = (int) date('n', $nowTs);
-    }
-    // Equivalente nativo del hook crear-mes-revision-servicios.
-    $nextReviewMonth = (($baseMonth + 3 - 1) % 12) + 1;
+    $nextReviewMonth = (int) date('n', \SCM\Modules\Pending\PublicServicesSchedule::next($nowTs));
     $employee = (array) ($context['employee'] ?? []);
     $branch = (array) ($context['branch'] ?? []);
     $employeeId = (string) $employee['id_empleado'];
@@ -129,12 +167,10 @@ trait PublicServicesReviewConcern
       'realizado_por_telefono' => $this->cleanReviewText((string) (($employee['telefono'] ?? '') ?: ($employee['celular'] ?? ''))),
       'representante_legal' => (string) ($branch['representante_legal'] ?? ''),
       'celular_legal' => (string) ($branch['celular_legal'] ?? ''),
+      'templates' => (new \SCM\Modules\Pending\PublicServicesActTemplates($this->repo->getDb()))->all(),
     ];
 
     $documents = [];
-    if ($this->repo->getDb()->pdo()->inTransaction()) {
-      return ['ok' => false, 'message' => 'Ya existe una operación en curso. Intenta nuevamente.'];
-    }
     try {
       $documents = (new PublicServicesReviewPdfGenerator())->generate($pdfContext, $services);
       if (count($documents) !== count($services)) {
@@ -183,6 +219,7 @@ trait PublicServicesReviewConcern
         'tipo' => 'Durante la ocupacion',
       ];
       $contractPayload = $configuration['payload'] + [
+        'cct_author_id' => $employeeId,
         'id_empleado' => $employeeId,
         'realizado_por' => $employeeName,
         'revisiones_servicios' => (string) $reviewCount,
@@ -251,6 +288,8 @@ trait PublicServicesReviewConcern
         'fecha' => $nowTs,
         'tipo_reporte' => 'Contractual',
         'observacion' => 'Se ha realizado revisión de servicios públicos en su inmueble. Servicios configurados: ' . $configuration['summary'] . '.',
+        'id_revision_servicios_publicos' => (string) $reviewId,
+        'id_revision_sp' => (string) $reviewId,
         'funcionario' => $employeeName,
       ]);
       if (!$historyInserted) {
@@ -269,18 +308,19 @@ trait PublicServicesReviewConcern
       return ['ok' => false, 'message' => 'No se pudo registrar la revisión: ' . $exception->getMessage()];
     }
 
-    $queued = $this->queuePublicServicesReviewEmails($reviewId, $contract, $employee, $documents, $services);
     return [
       'ok' => true,
-      'message' => 'Revisión agregada con éxito. Se generaron ' . count($documents) . ' actas y se encolaron ' . $queued . ' correos.',
+      'message' => 'Revisión registrada. Las actas ya fueron generadas.',
       'review_id' => $reviewId,
       'documents' => array_values(array_map(static fn(array $document): array => [
         'title' => $document['title'],
         'url' => $document['url'],
       ], $documents)),
-      'notifications_queued' => $queued,
+      'notifications_queued' => 0,
       'ultima_revision_servicios' => $nowTs,
       'mes_revision_servicios' => $nextReviewMonth,
+      '_context' => $pdfContext, '_services' => $services, '_documents' => $documents,
+      '_contract' => $contract, '_employee' => $employee,
     ];
   }
 
@@ -314,6 +354,7 @@ trait PublicServicesReviewConcern
       $now = date('Y-m-d H:i:s');
       $changedFields = array_keys($changes);
       $changes['cct_modified'] = $now;
+      $changes['cct_author_id'] = (string) $employee['id_empleado'];
       if ($this->repo->updateContratoArrendamiento($contractId, $changes) <= 0) {
         throw new \RuntimeException('No fue posible actualizar los servicios del contrato.');
       }
@@ -515,7 +556,7 @@ trait PublicServicesReviewConcern
     $contractCode = trim((string) ($contract['contrato'] ?? '')) ?: (string) ($contract['_ID'] ?? '');
     $property = trim((string) ($contract['inmueble'] ?? $contract['id_inmueble'] ?? ''));
     $subject = 'Revisión de servicios públicos del contrato #' . $contractCode;
-    $reviewUrl = 'https://sucasainmobiliaria.com.co/revision-de-servicios-publicos/?numero=' . rawurlencode((string) $reviewId);
+    $reviewUrl = \SCM\Modules\Pending\PublicServicesDocument::url($reviewId);
     array_unshift($buttons, ['url' => $reviewUrl, 'label' => 'Ver revisión completa']);
     $replyTo = trim((string) ($employee['correo'] ?? ''));
     $queue = new EmailQueue($this->repo->getDb());

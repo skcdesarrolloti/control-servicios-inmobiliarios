@@ -30,8 +30,8 @@ final class HistoryLinkMap
       'id_revision_correctiva' => ['label' => 'Ver revision correctiva', 'base' => $correctiveReviewUrl],
       'id_revision_entrega' => ['label' => 'Ver revision de entrega', 'base' => 'https://sucasainmobiliaria.com.co/revision-de-entrega/?numero='],
       'id_revision_recibo' => ['label' => 'Ver revision de recibo', 'base' => 'https://sucasainmobiliaria.com.co/revision-de-recibo/?numero='],
-      'id_revision_sp' => ['label' => 'Ver revision de servicios publicos', 'base' => 'https://sucasainmobiliaria.com.co/revision-de-servicios-publicos/?numero='],
-      'id_revision_servicios_publicos' => ['label' => 'Ver revision de servicios publicos', 'base' => 'https://sucasainmobiliaria.com.co/revision-de-servicios-publicos/?numero='],
+      'id_revision_sp' => ['label' => 'Ver revision de servicios publicos', 'base' => $baseUrl . 'revision-servicios-publicos.php?numero='],
+      'id_revision_servicios_publicos' => ['label' => 'Ver revision de servicios publicos', 'base' => $baseUrl . 'revision-servicios-publicos.php?numero='],
 
       // Inmueble / inventario
       'id_inmueble' => ['label' => 'Ver inmueble en web', 'base' => 'https://sucasainmobiliaria.com.co/inmuebles/inmueble-'],

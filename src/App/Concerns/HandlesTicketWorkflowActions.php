@@ -3243,6 +3243,23 @@ trait HandlesTicketWorkflowActions
     }
 
     $operation = sanitize_key((string) ($_POST['operation'] ?? 'load'));
+    if (in_array($operation, ['templates', 'history', 'save_template', 'preview_template'], true)) {
+      try {
+        $workspace = new \SCM\Modules\Pending\PublicServicesWorkspace($this->db);
+        $type = sanitize_key((string) ($_POST['type'] ?? 'al_dia'));
+        if ($operation === 'history') $this->jsonOk(['html' => $workspace->history($_POST)]);
+        if ($operation === 'templates') $this->jsonOk(['html' => $workspace->templates($type)]);
+        $templateInput = ['title' => wp_unslash((string) ($_POST['title'] ?? '')), 'body' => wp_unslash((string) ($_POST['body'] ?? '')), 'version' => (string) ($_POST['version'] ?? '')];
+        if ($operation === 'preview_template') {
+          $template = \SCM\Modules\Pending\PublicServicesActTemplates::validate($type, $templateInput);
+          $this->jsonOk(['html' => \SCM\Modules\Pending\PublicServicesWorkspace::preview($template, $type)]);
+        }
+        $employee = (new \SCM\Modules\Pending\PendingRepository($this->db))->getFuncionarioByUserId(\SCM\Core\Auth::userId());
+        if (!$employee || empty($employee['id_empleado'])) $this->jsonFail('No se pudo identificar al funcionario autenticado.');
+        (new \SCM\Modules\Pending\PublicServicesActTemplates($this->db))->save($type, $templateInput, (int) $employee['id_empleado'], $employee['nombre']);
+        $this->jsonOk(['html' => $workspace->templates($type), 'message' => 'Plantilla guardada. Se aplicará a las próximas actas.']);
+      } catch (\Throwable $error) { $this->jsonFail($error->getMessage()); }
+    }
     $contractId = (int) ($_POST['contract_id'] ?? $_POST['id_contrato'] ?? 0);
     if ($contractId <= 0) {
       $this->jsonFail('ID de contrato inválido.');
@@ -3266,6 +3283,7 @@ trait HandlesTicketWorkflowActions
 
     $input = [];
     $input['configuration_present'] = (string) ($_POST['configuration_present'] ?? '');
+    $input['request_token'] = (string) ($_POST['request_token'] ?? '');
     $configuredRaw = is_array($_POST['servicios_configurados'] ?? null) ? $_POST['servicios_configurados'] : [];
     $input['servicios_configurados'] = array_map(static fn($value): string => is_scalar($value) ? sanitize_key(wp_unslash((string) $value)) : '', $configuredRaw);
     $servicesRaw = is_array($_POST['servicios'] ?? null) ? $_POST['servicios'] : [];

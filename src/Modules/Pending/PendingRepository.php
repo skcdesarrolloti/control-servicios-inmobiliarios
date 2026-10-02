@@ -192,10 +192,10 @@ final class PendingRepository
    * Exact primary-key lookup for writes; contract codes are not interchangeable with _ID.
    * @return array<string,mixed>|null
    */
-  public function getPublicServicesContract(int $id): ?array
+  public function getPublicServicesContract(int $id, bool $lock = false): ?array
   {
     $table = $this->db->table('jet_cct_contratos_arrendamiento');
-    return $id > 0 ? $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$id]) : null;
+    return $id > 0 ? $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1" . ($lock ? ' FOR UPDATE' : ''), [$id]) : null;
   }
 
   /** @param array<string,mixed> $data */

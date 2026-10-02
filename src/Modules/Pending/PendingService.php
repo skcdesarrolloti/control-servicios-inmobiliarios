@@ -28,7 +28,7 @@ final class PendingService
       return ['ok' => false, 'message' => 'ID de contrato invalido.'];
     }
 
-    $row = $this->repo->getContratoArrendamientoById((string) $contractId);
+    $row = $this->repo->getPublicServicesContract($contractId);
     if (!is_array($row)) {
       return ['ok' => false, 'message' => 'Contrato no encontrado.'];
     }
@@ -38,12 +38,35 @@ final class PendingService
       return ['ok' => false, 'message' => 'La fecha de recibo es obligatoria.'];
     }
 
-    $this->repo->updateContratoArrendamiento($contractId, [
-      'estado' => 'Recibido',
-      'tipo' => 'Ex',
-      'fecha_recibo' => $fechaTs,
-      'cct_modified' => date('Y-m-d H:i:s'),
-    ]);
+    $employee = $this->repo->getFuncionarioByUserId(Auth::userId());
+    if (!$employee || empty($employee['id_empleado'])) return ['ok' => false, 'message' => 'No se pudo identificar al funcionario autenticado.'];
+    $pdo = $this->repo->getDb()->pdo();
+    if ($pdo->inTransaction()) return ['ok' => false, 'message' => 'Ya existe una operación en curso.'];
+    try {
+      $pdo->beginTransaction();
+      $row = $this->repo->getPublicServicesContract($contractId, true);
+      if (!$row) throw new \DomainException('Contrato no encontrado.');
+      if (strtolower(trim((string) ($row['estado'] ?? ''))) === 'recibido') {
+        $pdo->commit();
+        return ['ok' => true, 'message' => 'El contrato ya estaba recibido; no se modificó nuevamente.', 'estado' => 'Recibido', 'tipo' => $row['tipo'] ?? 'Ex', 'fecha_recibo' => $row['fecha_recibo'] ?? 0];
+      }
+      $now = date('Y-m-d H:i:s');
+      if ($this->repo->updateContratoArrendamiento($contractId, [
+        'estado' => 'Recibido', 'tipo' => 'Ex', 'fecha_recibo' => $fechaTs, 'cct_modified' => $now,
+        'cct_author_id' => (string) $employee['id_empleado'], 'id_empleado' => (string) $employee['id_empleado'], 'realizado_por' => $employee['nombre'],
+      ]) !== 1) throw new \RuntimeException('No fue posible actualizar el contrato.');
+      if (!$this->repo->insertHistorialInmueble([
+        'cct_status' => 'publish', 'cct_author_id' => (string) $employee['id_empleado'], 'cct_created' => $now, 'cct_modified' => $now,
+        'id_empleado' => (string) $employee['id_empleado'], 'funcionario' => $employee['nombre'], 'id_inmueble' => $row['id_inmueble'] ?? '',
+        'fecha' => time(), 'tipo_reporte' => 'Contractual',
+        'observacion' => 'Contrato #' . ($row['contrato'] ?? $contractId) . ' marcado como recibido. Estado anterior: ' . ($row['estado'] ?? '')
+          . '; tipo anterior: ' . ($row['tipo'] ?? '') . '; fecha de recibo anterior: ' . ($row['fecha_recibo'] ?? '') . '; nueva fecha de recibo: ' . $this->formatContractReceivedDate($fechaTs) . '.',
+      ])) throw new \RuntimeException('No fue posible guardar la trazabilidad del recibo.');
+      $pdo->commit();
+    } catch (\Throwable $error) {
+      if ($pdo->inTransaction()) $pdo->rollBack();
+      return ['ok' => false, 'message' => $error->getMessage()];
+    }
 
     return [
       'ok' => true,
@@ -102,13 +125,13 @@ final class PendingService
     $tz = new \DateTimeZone('America/Bogota');
     foreach (['Y-m-d', 'd/m/Y', 'Y-m-d H:i:s'] as $format) {
       $dt = \DateTimeImmutable::createFromFormat($format, $value, $tz);
-      if ($dt instanceof \DateTimeImmutable) {
+      $errors = \DateTimeImmutable::getLastErrors();
+      if ($dt instanceof \DateTimeImmutable && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))) {
         return $dt->setTime(0, 0)->getTimestamp();
       }
     }
 
-    $ts = strtotime($value);
-    return $ts === false ? 0 : (int) $ts;
+    return 0;
   }
 
   private function formatContractReceivedDate(int $timestamp): string

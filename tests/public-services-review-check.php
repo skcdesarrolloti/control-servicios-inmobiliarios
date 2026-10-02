@@ -8,12 +8,14 @@ require dirname(__DIR__) . '/bootstrap/app.php';
 set_exception_handler(static function (Throwable $e): void { fwrite(STDERR, $e->getMessage() . "\n"); exit(1); });
 
 $db = \SCM\Core\App::db();
+// Validate permanent schemas before TEMPORARY shadows hide engine metadata in MySQL.
+(new \SCM\Modules\Pending\PublicServicesReviewStorage($db))->requireSchema();
 $package = (string) (getenv('SHARED_NOTIFICATIONS_PATH') ?: dirname(__DIR__, 2) . '/shared-notifications');
 require_once $package . '/autoload.php';
 $queueConfig = require $package . '/config.php';
 $queueTable = (string) ($queueConfig['queue']['queue_table'] ?? 'skc_notification_queue');
 $attemptsTable = (string) ($queueConfig['queue']['attempts_table'] ?? 'skc_notification_attempts');
-$tables = array_map([$db, 'table'], ['jet_cct_contratos_arrendamiento', 'jet_cct_funcionarios', 'jet_cct_cargos', 'jet_cct_sucursales', 'jet_cct_revisiones_servicios', 'jet_cct_historial_del_inmueble', 'jet_cct_confi_sistema', 'posts', 'postmeta']);
+$tables = array_map([$db, 'table'], ['jet_cct_contratos_arrendamiento', 'jet_cct_funcionarios', 'jet_cct_cargos', 'jet_cct_sucursales', 'jet_cct_revisiones_servicios', 'jet_cct_historial_del_inmueble', 'jet_cct_confi_sistema', 'posts', 'postmeta', 'scm_public_services_reviews']);
 $tables[] = $queueTable;
 $tables[] = $attemptsTable;
 foreach ($tables as $table) {
@@ -58,7 +60,7 @@ $assert(str_contains($html, '94001') && !str_contains($html, 'Gloria QA') && !st
 $listing = $controller->buildServiciosPublicosPayload([]);
 $assert($listing['count'] === 0 && count($listing['configuration_items']) === 2, 'unconfigured and explicitly empty services are separate from pending KPI');
 $assert(str_contains($view->renderServiciosPublicosTable($listing['items'], $listing['configuration_items']), 'Configurar servicios'), 'unconfigured contracts remain editable');
-$input = ['configuration_present' => '1', 'servicios_configurados' => ['energia', 'agua'], 'nic' => 'NIC-QA', 'medidor_luz' => 'METER-QA', 'poliza' => 'POLIZA-QA', 'medidor_agua' => 'WATER-METER', 'id_empleado' => '70001', 'realizado_por' => 'FORGED'];
+$input = ['request_token' => $context['request_token'], 'configuration_present' => '1', 'servicios_configurados' => ['energia', 'agua'], 'nic' => 'NIC-QA', 'medidor_luz' => 'METER-QA', 'poliza' => 'POLIZA-QA', 'medidor_agua' => 'WATER-METER', 'id_empleado' => '70001', 'realizado_por' => 'FORGED'];
 $saved = $service->saveServiciosPublicosConfiguration(90001, $input);
 $assert(!empty($saved['ok']), 'configuration-only saves account and meter corrections');
 $contract = $repo->getPublicServicesContract(90001);
@@ -86,19 +88,21 @@ $db->pdo()->rollBack();
 $generatedPaths = [];
 try {
   $result = $service->createServiciosPublicosReview(90001, $reviewInput);
+  if (empty($result['ok'])) fwrite(STDERR, (string)($result['message']??'Review failed') . "\n");
   foreach ($result['documents'] ?? [] as $document) {
     parse_str((string) parse_url($document['url'], PHP_URL_QUERY), $query);
     $path = \SCM\Support\StoredFileService::fromRuntime()->pathFor((string) ($query['n'] ?? ''));
     if ($path !== null) { $generatedPaths[] = $path; }
   }
   $assert(!empty($result['ok']) && count($generatedPaths) === 1, 'review generates only the selected service PDF');
-  $pdfBytes = (string) file_get_contents($generatedPaths[0]);
-  $assert(str_contains($pdfBytes, 'Coordinador QA') && str_contains($pdfBytes, 'Cel. 3001234567'), 'review PDF includes reviewer cargo and phone');
+  $pdfText = (new \Smalot\PdfParser\Parser())->parseFile($generatedPaths[0])->getText();
+  $assert(str_contains($pdfText, 'Coordinador QA') && str_contains($pdfText, '3001234567'), 'review PDF includes reviewer cargo and phone');
   $review = $db->getRow("SELECT * FROM `{$reviewTable}` WHERE `_ID` = ?", [$result['review_id']]);
   $assert($review['id_empleado'] === '94001' && $review['realizado_por'] === 'Funcionario autenticado QA' && (string) $review['cct_author_id'] === '94001', 'review stores correct employee identity and CCT author');
   $assert($review['resultado_tiempo_agua'] === '' && $review['acta_felicitaciones_agua'] === '', 'unreviewed configured service gets no fake result or PDF');
   $contract = $repo->getPublicServicesContract(90001);
-  $assert((int) $contract['mes_revision_servicios'] === 2 && (int) $contract['revisiones_servicios'] === 5 && (int) $contract['ultima_revision_servicios'] > 1700000000, 'review applies November-to-February formula and updates count/date');
+  $expectedDue = \SCM\Modules\Pending\PublicServicesSchedule::next((int) $contract['ultima_revision_servicios']);
+  $assert((int) $contract['mes_revision_servicios'] === (int) date('n', $expectedDue) && (int) $contract['revisiones_servicios'] === 5 && (int) $contract['ultima_revision_servicios'] > 1700000000, 'review schedules three months from actual date despite stale configured November');
   $assert($contract['id_empleado'] === '94001' && $contract['realizado_por'] === 'Funcionario autenticado QA', 'contract stores authenticated employee');
   $rows = $db->getResults("SELECT * FROM `{$queueTable}` ORDER BY id");
   $assert(count($rows) === 3 && count(array_filter($rows, static fn(array $r): bool => $r['status'] === 'pending')) === 3, 'emails enqueue owner, tenant and configured internal recipient only');
@@ -106,6 +110,31 @@ try {
   $assert(in_array('admin-config@example.invalid', $queuedDestinations, true) && !in_array('gcorrearivera@gmail.com', $queuedDestinations, true), 'internal review email uses configuration instead of fixed legacy addresses');
   $payload = json_decode($rows[0]['payload_json'], true);
   $assert($payload['reply_to'] === 'actor@example.invalid' && $payload['attachments'][0]['path'] === $generatedPaths[0], 'reply-to and attachment belong to correct actor/review');
+  $assert(str_contains($rows[0]['message_html'], 'revision-servicios-publicos.php?numero=') && str_contains($rows[0]['message_html'], 'expires='), 'email uses native expiring public review URL');
+  $replay = $service->createServiciosPublicosReview(90001, $reviewInput);
+  $assert(!empty($replay['ok']) && !empty($replay['replayed']) && $replay['review_id'] === $result['review_id'] && (int)$db->getVar("SELECT COUNT(*) FROM `{$reviewTable}`") === 1 && (int)$db->getVar("SELECT COUNT(*) FROM `{$queueTable}`") === 3, 'same request replays original review without duplicate PDFs rows counts or emails');
+  $staleInput = $reviewInput;
+  $staleInput['request_token'] = \SCM\Modules\Pending\PublicServicesReviewStorage::formToken($base, 70001);
+  $assert(empty($service->createServiciosPublicosReview(90001, $staleInput)['ok']), 'second form with old review version is rejected after contract row lock');
+  $tamperedInput = $reviewInput; $tamperedInput['request_token'] .= 'tampered';
+  $assert(empty($service->createServiciosPublicosReview(90001, $tamperedInput)['ok']), 'tampered request token cannot write or replay a review');
+  $workspace = new \SCM\Modules\Pending\PublicServicesWorkspace($db);
+  $viewData = $workspace->review($result['review_id']);
+  $reviewHtml = \SCM\Modules\Pending\PublicServicesDocument::review($viewData['review'],$viewData['context'],$viewData['services'],$viewData['documents'],'');
+  $assert(str_contains($reviewHtml,'Funcionario autenticado QA') && !str_contains($reviewHtml,'Sucursal') && str_contains($reviewHtml,'data-services-preview'), 'native public document closes with real actor hides branch and previews original PDF inline');
+  $assert(str_contains($workspace->history(['contrato'=>'2000']),'Copiar enlace público') && str_contains($workspace->templates('critico'),'cuarenta y ocho (48)'), 'history offers signed links and critical template contains supplied 90-day letter');
+  $templates = new \SCM\Modules\Pending\PublicServicesActTemplates($db);
+  $actHtml = \SCM\Modules\Pending\PublicServicesDocument::act($viewData['context'],$viewData['services']['energia'],$viewData['context']['templates']['al_dia']);
+  $assert(!str_contains($actHtml,'class="scm-acta-company"') && str_contains($actHtml,'scm-services-act') && str_contains($actHtml,'SKC SuCasa Inmobiliaria · NIT'), 'act header omits repeated company name and prioritizes title while keeping footer identity');
+  $beforeTemplate = $templates->all()['al_dia'];
+  $templates->save('al_dia',['title'=>'Texto nuevo {{servicio}}','body'=>'Contenido nuevo para {{arrendatario}}.','version'=>$beforeTemplate['version']],94001,'Funcionario autenticado QA');
+  $assert($templates->all()['al_dia']['title']==='Texto nuevo {{servicio}}' && $workspace->review($result['review_id'])['context']['templates']['al_dia']['title']===$beforeTemplate['title'], 'editor persists changes with actor while existing review snapshot keeps issued wording');
+  try { $templates->save('al_dia',['title'=>'Conflicto','body'=>'No sobrescribir','version'=>$beforeTemplate['version']],94001,'QA'); $assert(false,'stale template version'); } catch (\DomainException $error) { $assert(true,'stale template version cannot overwrite newer content'); }
+  try { \SCM\Modules\Pending\PublicServicesActTemplates::validate('critico',['title'=>'Prueba','body'=>'{{variable_invalida}}']); $assert(false,'unknown placeholder'); } catch (\DomainException $error) { $assert(true,'editor rejects unsupported variables'); }
+  $expiry = time()+600;
+  $signature = \SCM\Modules\Pending\PublicServicesDocument::signature($result['review_id'],$expiry);
+  $assert(\SCM\Modules\Pending\PublicServicesDocument::valid($result['review_id'],$expiry,$signature) && !\SCM\Modules\Pending\PublicServicesDocument::valid($result['review_id']+1,$expiry,$signature) && !\SCM\Modules\Pending\PublicServicesDocument::valid($result['review_id'],time()-1,$signature), 'public signature binds review ID and expiration');
+  $assert(date('Y-m-d', \SCM\Modules\Pending\PublicServicesSchedule::next(strtotime('2026-11-30 12:00:00'))) === '2027-02-28' && date('Y-m-d', \SCM\Modules\Pending\PublicServicesSchedule::next(strtotime('2026-01-31 12:00:00'))) === '2026-04-30', 'quarterly schedule clamps end of month and crosses year');
   $registry = new \SharedNotifications\Providers\ProviderRegistry();
   $registry->add(new class implements \SharedNotifications\Contracts\ProviderInterface {
     public function code(): string { return 'email_smtp'; }
@@ -117,6 +146,13 @@ try {
   $saved = $service->saveServiciosPublicosConfiguration(90001, ['configuration_present' => '1', 'servicios_configurados' => []]);
   $context = $service->buildServiciosPublicosReviewContext(90001);
   $assert(!empty($saved['ok']) && !$context['has_services'] && $context['services']['energia']['account'] === 'NIC-QA', 'removing all services excludes pending but preserves historical identifiers');
+  $received = $service->markContratoRecibido(90001,'2026-10-02');
+  $receivedRow = $repo->getPublicServicesContract(90001);
+  $receivedHistory = $db->getRow("SELECT * FROM `{$historyTable}` ORDER BY _ID DESC LIMIT 1");
+  $assert(!empty($received['ok']) && $receivedRow['estado']==='Recibido' && $receivedRow['tipo']==='Ex' && (string)$receivedRow['cct_author_id']==='94001' && str_contains($receivedHistory['observacion'],'Estado anterior: Entregado') && (string)$receivedHistory['id_empleado']==='94001', 'received action writes contract and before-after audit under authenticated employee');
+  $historyCount=(int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`");
+  $assert(!empty($service->markContratoRecibido(90001,'2026-10-03')['ok']) && (int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`")===$historyCount && $repo->getPublicServicesContract(90001)['fecha_recibo']===$receivedRow['fecha_recibo'], 'received retry preserves original date and avoids duplicate history');
+  $assert(empty($service->markContratoRecibido(90002,'2026-02-30')['ok']) && empty($service->markContratoRecibido(99999,'2026-10-02')['ok']), 'invalid receipt dates and missing exact contract PK fail closed');
   echo "$checks checks passed. Permanent rows unchanged; no external messages sent.\n";
 } finally {
   foreach ($generatedPaths as $path) { if (is_file($path)) { unlink($path); } }

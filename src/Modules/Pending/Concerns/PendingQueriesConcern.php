@@ -178,10 +178,8 @@ trait PendingQueriesConcern
       $ultTs = $this->parseTs($row['ultima_revision_servicios'] ?? null);
       $mesRevisionServicios = (int) ($row['mes_revision_servicios'] ?? 0);
 
-      if ($ultTs > 0 && $mesRevisionServicios >= 1 && $mesRevisionServicios <= 12) {
-        $dueTs = $this->replaceMonthPreservingDate($ultTs, $mesRevisionServicios, true);
-      } elseif ($ultTs > 0) {
-        $dueTs = $ultTs;
+      if ($ultTs > 0) {
+        $dueTs = \SCM\Modules\Pending\PublicServicesSchedule::next($ultTs);
       } else {
         $baseTs = $this->firstPositiveTs([
           $row['fecha_entrega'] ?? null,
@@ -196,9 +194,7 @@ trait PendingQueriesConcern
         }
       }
 
-      $dueMonth = ($mesRevisionServicios >= 1 && $mesRevisionServicios <= 12)
-        ? $mesRevisionServicios
-        : ($dueTs > 0 ? (int) date('n', $dueTs) : 0);
+      $dueMonth = $dueTs > 0 ? (int) date('n', $dueTs) : 0;
 
       if ($fMes > 0 && $fMes !== $dueMonth) {
         continue;

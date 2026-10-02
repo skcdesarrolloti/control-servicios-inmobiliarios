@@ -10646,6 +10646,142 @@
       }
     }
 
+    function servicesWorkspaceRequest(operation, fields) {
+      var fd = fields || new FormData();
+      fd.set("action", actionRevisionServiciosPublicos);
+      fd.set("nonce", nonce);
+      fd.set("operation", operation);
+      return fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success) throw new Error((json && json.data && json.data.message) || "No fue posible cargar servicios públicos.");
+          return json.data || {};
+        });
+    }
+
+    function loadServicesWorkspace(section, fields) {
+      var target = root.querySelector('[data-services-workspace-content="' + section + '"]');
+      if (!target) return Promise.resolve();
+      var request = (target._request || 0) + 1;
+      target._request = request;
+      target.setAttribute("aria-busy", "true");
+      if (!target.innerHTML) target.innerHTML = '<p role="status">Cargando...</p>';
+      return servicesWorkspaceRequest(section, fields).then(function (data) {
+        if (target._request === request) target.innerHTML = data.html || "";
+      }).catch(function (error) {
+        showToast("error", error.message);
+        if (target._request === request && !target.querySelector("form")) target.innerHTML = '<p role="alert">' + escHtml(error.message) + '</p><button type="button" class="scm-btn-secondary" data-services-tab="' + section + '">Reintentar</button>';
+      }).finally(function () { if (target._request === request) target.removeAttribute("aria-busy"); });
+    }
+
+    function servicesTemplateCanLeave() {
+      var form = root.querySelector("[data-services-template-form]");
+      if (!form) return true;
+      if (form.getAttribute("aria-busy") === "true") { showToast("info", "Espera a que termine de guardarse la plantilla."); return false; }
+      if (form.dataset.dirty !== "1") return true;
+      if (!window.confirm("Hay cambios sin guardar en la plantilla. ¿Deseas descartarlos?")) return false;
+      form.dataset.dirty = "0";
+      return true;
+    }
+
+    root.addEventListener("input", function (event) {
+      var form = event.target.closest("[data-services-template-form]");
+      if (form && !event.target.matches("[data-services-template-type]")) form.dataset.dirty = "1";
+    });
+    root.addEventListener("change", function (event) {
+      if (!event.target.matches("[data-services-template-type]")) return;
+      var form = event.target.closest("form");
+      if (!servicesTemplateCanLeave()) {
+        event.target.value = event.target.dataset.loadedType || "al_dia";
+        return;
+      }
+      var fd = new FormData(); fd.set("type", event.target.value);
+      loadServicesWorkspace("templates", fd).then(function () {
+        var current = root.querySelector("[data-services-template-form]");
+        if (current) current.querySelector('[name="type"]').dataset.loadedType = current.querySelector('[name="type"]').value;
+      });
+    });
+    root.addEventListener("click", function (event) {
+      var tab = event.target.closest("[data-services-tab]");
+      if (tab) {
+        event.preventDefault();
+        if (!servicesTemplateCanLeave()) return;
+        var section = tab.dataset.servicesTab;
+        var panel = root.querySelector("#scm-panel-servicios-publicos-pendientes");
+        if (!panel) return;
+        panel.querySelectorAll("[data-services-section]").forEach(function (item) { item.hidden = item.dataset.servicesSection !== section; });
+        panel.querySelectorAll("[data-services-tab]").forEach(function (button) { button.setAttribute("aria-pressed", button.dataset.servicesTab === section ? "true" : "false"); });
+        if (section !== "pending") loadServicesWorkspace(section);
+        return;
+      }
+      var variable = event.target.closest("[data-services-variable]");
+      if (variable) {
+        var textarea = variable.closest("form").querySelector('[name="body"]');
+        textarea.setRangeText(variable.dataset.servicesVariable, textarea.selectionStart, textarea.selectionEnd, "end");
+        textarea.focus(); textarea.closest("form").dataset.dirty = "1";
+        return;
+      }
+      var copy = event.target.closest("[data-services-copy-url]");
+      if (copy) {
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(copy.dataset.servicesCopyUrl).then(function () { showToast("success", "Enlace público copiado. Vence en 180 días."); }).catch(function () { window.prompt("Copia el enlace público:", copy.dataset.servicesCopyUrl); });
+        else window.prompt("Copia el enlace público:", copy.dataset.servicesCopyUrl);
+        return;
+      }
+      var clear = event.target.closest("[data-services-history-clear]");
+      var page = event.target.closest("[data-services-history-page]");
+      if (clear || page) {
+        var historyForm = root.querySelector("[data-services-history-form]");
+        var historyFd = clear ? new FormData() : new FormData(historyForm);
+        if (page) historyFd.set("page", page.dataset.servicesHistoryPage);
+        loadServicesWorkspace("history", historyFd);
+        return;
+      }
+      var preview = event.target.closest("[data-services-template-preview]");
+      if (preview) {
+        var previewForm = preview.closest("form");
+        if (!previewForm.reportValidity()) return;
+        preview.disabled = true;
+        servicesWorkspaceRequest("preview_template", new FormData(previewForm)).then(function (data) {
+          var dialog = root.querySelector("[data-services-template-dialog]");
+          if (!dialog) {
+            dialog = document.createElement("dialog");
+            dialog.className = "scm-services-template-dialog";
+            dialog.setAttribute("data-services-template-dialog", "");
+            dialog.innerHTML = '<header><strong>Vista previa con datos de ejemplo</strong><button type="button" class="scm-btn-secondary">Cerrar</button></header><iframe title="Vista previa de la plantilla"></iframe>';
+            dialog.querySelector("button").addEventListener("click", function () { dialog.close(); });
+            root.appendChild(dialog);
+          }
+          var styleBase = new URL(".", new URL(ajaxUrl, window.location.href));
+          var styles = ["ticket-completion-document.css", "public-services-document.css"].map(function (file) { return '<link rel="stylesheet" href="' + escHtml(new URL("assets/css/" + file, styleBase).href) + '">'; }).join("");
+          dialog.querySelector("iframe").srcdoc = '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;self&#39;; img-src https: data:; font-src &#39;self&#39;">' + styles + '</head><body class="scm-services-page"><main class="scm-services-public-root">' + data.html + '</main></body></html>';
+          dialog.showModal();
+        }).catch(function (error) { showToast("error", error.message); }).finally(function () { preview.disabled = false; });
+      }
+    });
+    root.addEventListener("submit", function (event) {
+      var form = event.target;
+      if (form.matches("[data-services-history-form]")) { event.preventDefault(); loadServicesWorkspace("history", new FormData(form)); return; }
+      if (!form.matches("[data-services-template-form]")) return;
+      event.preventDefault();
+      if (form.getAttribute("aria-busy") === "true" || !form.reportValidity()) return;
+      form.setAttribute("aria-busy", "true");
+      form.querySelector('[type="submit"]').disabled = true;
+      servicesWorkspaceRequest("save_template", new FormData(form)).then(function (data) {
+        root.querySelector('[data-services-workspace-content="templates"]').innerHTML = data.html;
+        showToast("success", data.message);
+      }).catch(function (error) {
+        form.querySelector("[data-services-template-status]").textContent = error.message;
+        showToast("error", error.message);
+      }).finally(function () { form.removeAttribute("aria-busy"); form.querySelector('[type="submit"]').disabled = false; });
+    });
+    document.addEventListener("click", function (event) {
+      var act = event.target.closest("[data-services-act-preview]");
+      if (!act) return;
+      event.preventDefault();
+      if (window.Swal) window.Swal.close();
+      openIframeModal(act.dataset.servicesActPreview, act.textContent || "Acta de servicios públicos");
+    });
+
     function ensurePublicServicesReviewModal() {
       var modal = root.querySelector("#scm-public-services-review-modal");
       if (modal) return modal;
@@ -10840,7 +10976,7 @@
     function publicServicesReviewDocumentsHtml(documents) {
       if (!Array.isArray(documents) || !documents.length) return "";
       return '<div class="scm-public-services-review-links">' + documents.map(function (document) {
-        return '<a href="' + escHtml(document.url || "#") + '" target="_blank" rel="noopener noreferrer">' + escHtml(document.title || "Ver acta") + "</a>";
+        return '<button type="button" class="scm-pending-action-btn" data-services-act-preview="' + escHtml(document.url || "#") + '">' + escHtml(document.title || "Ver acta") + "</button>";
       }).join("") + "</div>";
     }
 
@@ -12018,7 +12154,7 @@
       if (window.Swal && typeof window.Swal.fire === "function") {
         window.Swal.fire({
           title: "Contrato recibido",
-          text: code ? "Contrato " + code : "Selecciona la fecha de recibo.",
+          text: (code ? "Contrato " + code + ". " : "") + "Se marcará como Recibido / Ex y saldrá de los pendientes. La fecha y el funcionario quedarán en el historial.",
           input: "date",
           inputLabel: "Fecha de recibo",
           inputValue: bogotaTodayDate(),
