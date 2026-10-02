@@ -65,6 +65,8 @@
                     var rspPanel = document.getElementById('scm-panel-servicios-publicos-pendientes');
                     var rspFilterCount = rspPanel && rspPanel.querySelector('[data-services-filter-count]');
                     if (rspFilterCount && d.count != null) rspFilterCount.textContent = d.count + ' contratos encontrados';
+                    var rspTabCount = rspPanel && rspPanel.querySelector('[data-services-tab-count]');
+                    if (rspTabCount && d.count != null) rspTabCount.textContent = d.count;
                     if (rspPanel) rspPanel.querySelectorAll('[data-services-quick]').forEach(function(button) { button.setAttribute('aria-pressed','false'); });
                   }
                   if (prefix === 'sacta_') {

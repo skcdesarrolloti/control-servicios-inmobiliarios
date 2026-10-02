@@ -11897,6 +11897,8 @@
           if (prefix === 'rsp_') {
             var filterCount = panel.querySelector('[data-services-filter-count]');
             if (filterCount && data.count != null) filterCount.textContent = data.count + ' contratos encontrados';
+            var tabCount = panel.querySelector('[data-services-tab-count]');
+            if (tabCount && data.count != null) tabCount.textContent = data.count;
             panel.querySelectorAll('[data-services-quick]').forEach(function (button) { button.setAttribute('aria-pressed', 'false'); });
           }
           panel.setAttribute("data-scm-loaded", "1");

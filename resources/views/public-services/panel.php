@@ -9,7 +9,7 @@ $months = [1=>'Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto',
     <div class="!sp-flex !sp-items-center !sp-gap-3"><span class="!sp-p-2.5 !sp-bg-amber-50 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-amber-200"><?= UI::icon('document','!sp-w-6 !sp-h-6') ?></span><div><h2 class="!sp-m-0 !sp-text-xl !sp-font-bold !sp-text-service-navy" data-services-title>Servicios Públicos — Pendientes</h2><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">Contratos entregados · Revisión trimestral desde la fecha real · Actas e historial</p></div></div>
     <div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2"><button type="button" class="<?= UI::SECONDARY ?> [&[hidden]]:!sp-hidden" data-services-export="pending" data-services-header-pending title="Exportar el resultado filtrado a CSV compatible con Excel"><?= UI::icon('download') ?>Exportar Excel</button><button type="button" class="<?= UI::NAVY ?> [&[hidden]]:!sp-hidden" data-services-refresh data-services-header-pending><?= UI::icon('refresh') ?>Sincronizar revisiones</button><div class="!sp-text-right !sp-border-y-0 !sp-border-r-0 !sp-border-l !sp-border-solid !sp-border-slate-200 !sp-pl-4"><strong id="rsp-kpi-count" class="!sp-text-xl"><?= $e($count) ?></strong><p class="!sp-m-0 !sp-text-[9px] !sp-uppercase !sp-text-service-muted">Contratos pendientes</p></div></div>
   </header>
-  <?= PublicServicesWorkspace::tabs() ?>
+  <?= PublicServicesWorkspace::tabs($count) ?>
   <section data-services-section="pending" class="!sp-space-y-5">
     <div id="rsp_kpis" class="!sp-grid !sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-4"><?= $view->renderServiciosPublicosKpis($count,$corte,$items,$configurationItems) ?></div>
     <div class="<?= UI::CARD ?> !sp-p-5">

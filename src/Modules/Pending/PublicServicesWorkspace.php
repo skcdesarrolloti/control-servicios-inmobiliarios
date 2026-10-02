@@ -9,11 +9,14 @@ final class PublicServicesWorkspace
 {
   public function __construct(private Database $db) {}
 
-  public static function tabs(): string
+  public static function tabs(?int $count = null): string
   {
-    $html = '<nav class="!sp-flex !sp-flex-wrap !sp-gap-1 !sp-p-1 !sp-bg-slate-100/70 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-w-fit !sp-max-w-full" aria-label="Servicios públicos">';
-    foreach (['pending'=>'Pendientes','templates'=>'Plantillas de actas','history'=>'Revisiones realizadas'] as $key=>$label) {
-      $html .= '<button type="button" class="!sp-px-4 !sp-py-2.5 !sp-rounded !sp-bg-transparent !sp-border-0 !sp-text-service-navy !sp-font-sans !sp-text-xs !sp-cursor-pointer aria-pressed:!sp-bg-service-navy aria-pressed:!sp-text-white focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow" data-services-tab="' . $key . '" aria-pressed="' . ($key==='pending'?'true':'false') . '">' . $label . '</button>';
+    $html = '<nav class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-1 !sp-p-1 !sp-bg-slate-100 !sp-rounded-lg !sp-border-0 !sp-w-fit !sp-max-w-full" aria-label="Servicios públicos">';
+    foreach (['pending'=>['Pendientes','clock'],'history'=>['Revisiones realizadas','refresh'],'templates'=>['Plantillas de actas','document']] as $key=>$tab) {
+      $html .= '<button type="button" class="sp-group !sp-inline-flex !sp-items-center !sp-justify-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-rounded-md !sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-font-sans !sp-text-[10px] !sp-font-medium !sp-cursor-pointer aria-pressed:!sp-bg-service-navy aria-pressed:!sp-text-white aria-pressed:!sp-font-semibold focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow" data-services-tab="' . $key . '" aria-pressed="' . ($key==='pending'?'true':'false') . '">'
+        . PublicServicesUi::icon($tab[1], '!sp-w-3 !sp-h-3 group-aria-pressed:!sp-text-service-yellow') . '<span>' . $tab[0] . '</span>';
+      if ($key==='pending' && $count!==null) $html .= '<span class="!sp-rounded-full !sp-bg-slate-200 !sp-text-service-navy !sp-text-[8px] !sp-font-semibold !sp-px-1.5 !sp-py-0.5 group-aria-pressed:!sp-bg-white/20 group-aria-pressed:!sp-text-white" data-services-tab-count>' . max(0,$count) . '</span>';
+      $html .= '<span class="!sp-hidden group-aria-pressed:!sp-block !sp-w-1 !sp-h-1 !sp-rounded-full !sp-bg-service-yellow" aria-hidden="true"></span></button>';
     }
     return $html . '</nav>';
   }
