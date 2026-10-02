@@ -129,7 +129,6 @@ final class CompletionView
           <label>Observaciones finales *<textarea name="observations" required maxlength="6000" rows="3" placeholder="Describe verificaciones, alcance de la solución y observaciones para el firmante."><?= self::e($formObservations) ?></textarea></label>
           <input type="hidden" name="service_fee" value="0" data-acta-fee>
           <input type="hidden" name="transport" value="0" data-acta-transport>
-          <p class="scm-acta-notice">El reporte administrativo de cobro se gestiona desde la cotización de mantenimiento cuando aplique, no desde esta acta.</p>
           <label class="scm-acta-check"><input type="checkbox" name="confirm" value="1" required><span>Revisé los daños, las soluciones y el firmante. Entiendo que al firmar se cerrará el caso sin crear un reporte administrativo nuevo.</span></label>
           <button type="submit" class="scm-acta-button"><?= $editAct ? 'Guardar cambios y reenviar firma' : 'Generar acta y solicitar firma' ?></button>
         </form>

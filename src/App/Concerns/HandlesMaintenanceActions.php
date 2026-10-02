@@ -1858,12 +1858,13 @@ trait HandlesMaintenanceActions
     $config = [];
     $configTable = $this->db->table('jet_cct_confi_sistema');
     if ($schema->tableExists($configTable)) {
-      foreach ($this->db->getResults("SELECT `funcion`, `valor` FROM `{$configTable}` WHERE `funcion` IN ('salario','dias_trabajo','porcentaje_smlmv_co_pre','porcentaje_smlmv') ORDER BY `_ID`") as $row) {
+      foreach ($this->db->getResults("SELECT `funcion`, `valor` FROM `{$configTable}` WHERE `funcion` IN ('salario','dias_trabajo','porcentaje_smlmv_co_pre','porcentaje_smlmv','valor_transporte') ORDER BY `_ID`") as $row) {
         $config[(string) ($row['funcion'] ?? '')] = $row['valor'] ?? '';
       }
     }
     $fee = (float) (\SCM\Modules\TicketCompletion\CompletionPolicy::fee($config) ?? 0);
     $value = $fee > 0 ? $fee : 0.0;
+    $transport = \SCM\Modules\TicketCompletion\CompletionPolicy::transportMaximum($config) ?? 0;
     $actorName = trim((string) ($actor['name'] ?? Auth::user()));
     $description = 'Cobro administrativo por cotización de mantenimiento #' . $quoteId . ' asociada a ' . $reportCategory . '.';
     $payload = [
@@ -1878,8 +1879,8 @@ trait HandlesMaintenanceActions
       'fue_pagado' => 'No',
       'categoria' => $reportCategory,
       'descripcion' => $description,
-      'valor' => (string) (int) round($value),
-      'transporte' => '0',
+      'valor' => (string) ((int) round($value) + $transport),
+      'transporte' => (string) $transport,
       'valor_mantenimiento' => (string) (int) round($value),
       'valor_otro' => '0',
       'sucursal' => trim((string) ($quoteData['sucursal'] ?? $ticket['sucursal'] ?? '')),
