@@ -20,6 +20,16 @@ final class PublicServicesDocument
 
   public static function e(mixed $value): string { return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
+  /** Limited editor formatting; escape all source HTML before adding safe tags. */
+  public static function paragraph(string $value): string
+  {
+    $escaped = self::e($value);
+    $escaped = preg_replace('/\*\*([^\n]+?)\*\*/u', '<strong>$1</strong>', $escaped) ?? $escaped;
+    $escaped = preg_replace('/__([^\n]+?)__/u', '<u>$1</u>', $escaped) ?? $escaped;
+    $escaped = preg_replace('/(?<!\*)\*([^*\n]+?)\*(?!\*)/u', '<em>$1</em>', $escaped) ?? $escaped;
+    return nl2br($escaped);
+  }
+
   public static function status(string $value): string
   {
     return match($value) {'Al dia'=>'Al día','30 dias'=>'30 días','60 dias'=>'60 días','Estado critico'=>'Crítico / superior a 90 días',default=>$value};
@@ -69,7 +79,7 @@ final class PublicServicesDocument
         'Medidor' => $service['meter'], 'Resultado' => self::status($service['status']),
         'Valor reportado' => '$' . number_format((int) $service['amount'], 0, ',', '.') . ' COP',
       ]) . '</section><section class="scm-acta-receipt-section scm-services-letter"><h2>2. Comunicación</h2>';
-    foreach (preg_split('/\n\s*\n/', $body) ?: [] as $paragraph) $html .= '<p>' . nl2br(self::e($paragraph)) . '</p>';
+    foreach (preg_split('/\n\s*\n/', $body) ?: [] as $paragraph) $html .= '<p>' . self::paragraph($paragraph) . '</p>';
     return $html . '</section>' . self::footer($context, true) . $letterheadFooter . '</article>';
   }
 

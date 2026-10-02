@@ -592,6 +592,7 @@ foreach ($rawNavItems as $k => $item) {
   $tailwindCssVer = (defined('SCM_VERSION') ? SCM_VERSION : '2.0.0') . '-' . (file_exists($tailwindCssPath) ? (string) filemtime($tailwindCssPath) : '0');
   ?>
   <link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/tailwind-admin.css?v=' . $tailwindCssVer, ENT_QUOTES, 'UTF-8'); ?>">
+  <link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/tailwind-services.css?v=' . SCM_VERSION, ENT_QUOTES, 'UTF-8'); ?>">
 
   <style>
     @font-face {

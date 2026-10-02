@@ -126,6 +126,8 @@ try {
   $templates = new \SCM\Modules\Pending\PublicServicesActTemplates($db);
   $actHtml = \SCM\Modules\Pending\PublicServicesDocument::act($viewData['context'],$viewData['services']['energia'],$viewData['context']['templates']['al_dia']);
   $assert(!str_contains($actHtml,'class="scm-acta-company"') && str_contains($actHtml,'scm-services-act') && str_contains($actHtml,'SKC SuCasa Inmobiliaria · NIT'), 'act header omits repeated company name and prioritizes title while keeping footer identity');
+  $formatted = \SCM\Modules\Pending\PublicServicesDocument::paragraph('**Pago** *oportuno* __verificado__ <img src=x onerror=alert(1)>');
+  $assert(str_contains($formatted,'<strong>Pago</strong>') && str_contains($formatted,'<em>oportuno</em>') && str_contains($formatted,'<u>verificado</u>') && !str_contains($formatted,'<img'), 'editor formatting supports bold italic underline while escaping source HTML');
   $beforeTemplate = $templates->all()['al_dia'];
   $templates->save('al_dia',['title'=>'Texto nuevo {{servicio}}','body'=>'Contenido nuevo para {{arrendatario}}.','version'=>$beforeTemplate['version']],94001,'Funcionario autenticado QA');
   $assert($templates->all()['al_dia']['title']==='Texto nuevo {{servicio}}' && $workspace->review($result['review_id'])['context']['templates']['al_dia']['title']===$beforeTemplate['title'], 'editor persists changes with actor while existing review snapshot keeps issued wording');

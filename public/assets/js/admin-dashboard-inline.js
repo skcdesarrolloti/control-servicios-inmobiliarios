@@ -1,7 +1,7 @@
 (function() {
           function setInlineListLoading(scope, isLoading, label) {
             if (!scope) return;
-            var wrap = scope.querySelector('.scm-public-pqr-cards-wrap, .scm-cards-wrap, .scm-table-wrap, .table-responsive');
+            var wrap = scope.querySelector('.scm-public-pqr-cards-wrap, .scm-cards-wrap, .scm-table-wrap, .table-responsive, [data-services-list="pending"]');
             if (!wrap) return;
             var loader = wrap.querySelector('.scm-list-loader');
             if (!loader) {
@@ -62,6 +62,10 @@
                   if (prefix === 'rsp_') {
                     var rspHeaderCount = document.getElementById('rsp-kpi-count');
                     if (rspHeaderCount && typeof d.count === 'string') rspHeaderCount.textContent = d.count;
+                    var rspPanel = document.getElementById('scm-panel-servicios-publicos-pendientes');
+                    var rspFilterCount = rspPanel && rspPanel.querySelector('[data-services-filter-count]');
+                    if (rspFilterCount && d.count != null) rspFilterCount.textContent = d.count + ' contratos encontrados';
+                    if (rspPanel) rspPanel.querySelectorAll('[data-services-quick]').forEach(function(button) { button.setAttribute('aria-pressed','false'); });
                   }
                   if (prefix === 'sacta_') {
                     var actaHeaderCount = document.getElementById('sacta-kpi-count');

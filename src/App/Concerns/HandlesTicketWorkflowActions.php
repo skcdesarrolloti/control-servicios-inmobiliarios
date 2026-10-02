@@ -1631,7 +1631,7 @@ trait HandlesTicketWorkflowActions
     $controller = $this->get_pending_controller();
     $payload = $controller->buildServiciosPublicosPayload($_POST);
     $view = new \SCM\Modules\Pending\PendingView();
-    $kpis = $view->renderServiciosPublicosKpis((int)($payload['count'] ?? 0), (string)($payload['corte'] ?? ''));
+    $kpis = $view->renderServiciosPublicosKpis((int)($payload['count'] ?? 0), (string)($payload['corte'] ?? ''), (array)($payload['items'] ?? []), (array)($payload['configuration_items'] ?? []));
     $table = $view->renderServiciosPublicosTable((array)($payload['items'] ?? []), (array) ($payload['configuration_items'] ?? []));
     $this->jsonOk([
       'kpis_html' => $kpis,

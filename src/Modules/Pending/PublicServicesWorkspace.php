@@ -11,7 +11,11 @@ final class PublicServicesWorkspace
 
   public static function tabs(): string
   {
-    return '<nav class="scm-services-tabs" aria-label="Servicios públicos"><button type="button" data-services-tab="pending" aria-pressed="true">Pendientes</button><button type="button" data-services-tab="templates" aria-pressed="false">Plantillas de actas</button><button type="button" data-services-tab="history" aria-pressed="false">Revisiones realizadas</button></nav>';
+    $html = '<nav class="!sp-flex !sp-flex-wrap !sp-gap-1 !sp-p-1 !sp-bg-slate-100/70 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-w-fit !sp-max-w-full" aria-label="Servicios públicos">';
+    foreach (['pending'=>'Pendientes','templates'=>'Plantillas de actas','history'=>'Revisiones realizadas'] as $key=>$label) {
+      $html .= '<button type="button" class="!sp-px-4 !sp-py-2.5 !sp-rounded !sp-bg-transparent !sp-border-0 !sp-text-service-navy !sp-font-sans !sp-text-xs !sp-cursor-pointer aria-pressed:!sp-bg-service-navy aria-pressed:!sp-text-white focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow" data-services-tab="' . $key . '" aria-pressed="' . ($key==='pending'?'true':'false') . '">' . $label . '</button>';
+    }
+    return $html . '</nav>';
   }
 
   public function templates(string $type = 'al_dia'): string
@@ -23,15 +27,7 @@ final class PublicServicesWorkspace
 
   public static function templateEditor(string $type, array $template): string
   {
-    $e = [PublicServicesDocument::class, 'e'];
-    $html = '<div class="scm-filter-card scm-services-editor"><h3>Contenido de las actas</h3><p>Los cambios se aplican a las próximas revisiones. Las actas ya emitidas conservan su contenido y PDF original.</p><form data-services-template-form>'
-      . '<input type="hidden" name="version" value="' . $e($template['version']) . '"><label>Tipo de acta<select name="type" data-services-template-type data-loaded-type="' . $e($type) . '">';
-    foreach (PublicServicesActTemplates::TYPES as $key => $label) $html .= '<option value="' . $key . '"' . ($key === $type ? ' selected' : '') . '>' . $e($label) . '</option>';
-    $html .= '</select></label><label>Título<input name="title" maxlength="240" required value="' . $e($template['title']) . '"></label><label>Contenido<textarea name="body" rows="20" maxlength="20000" required>' . $e($template['body']) . '</textarea></label><p>Variables disponibles: selecciona una para insertarla en el contenido.</p><div class="scm-services-variables">';
-    foreach (PublicServicesActTemplates::VARIABLES as $variable) $html .= '<button type="button" data-services-variable="{{' . $variable . '}}">{{' . $variable . '}}</button>';
-    $html .= '</div><div class="scm-actions"><button type="button" class="scm-btn-secondary" data-services-template-preview>Vista previa</button><button type="submit" class="scm-btn-primary">Guardar plantilla</button></div><p data-services-template-status role="status" aria-live="polite"></p></form>';
-    if (!empty($template['updated_at'])) $html .= '<small>Última actualización: ' . date('d/m/Y H:i', (int) $template['updated_at']) . ' · ' . $e($template['updated_name'] ?? '') . '</small>';
-    return $html . '</div>';
+    return PublicServicesUi::render('editor', compact('type','template'));
   }
 
   public function history(array $input): string
@@ -53,19 +49,14 @@ final class PublicServicesWorkspace
     $total = (int) $this->db->getVar('SELECT COUNT(*) FROM `' . $table . '` WHERE ' . $sqlWhere, $args);
     $pages = max(1, (int) ceil($total / 30));
     $page = min($pages, max(1, (int) ($input['page'] ?? 1)));
-    $rows = $this->db->getResults('SELECT * FROM `' . $table . '` WHERE ' . $sqlWhere . ' ORDER BY fecha DESC, _ID DESC LIMIT 30 OFFSET ' . (($page - 1) * 30), $args);
-    $html = '<div class="scm-filter-card"><h3>Revisiones realizadas</h3><form data-services-history-form><div class="scm-services-history-filters">';
-    foreach (['contrato'=>'Contrato','inmueble'=>'Inmueble SIMI','arrendatario'=>'Arrendatario','propietario'=>'Propietario','from'=>'Desde','to'=>'Hasta'] as $key=>$label) $html .= '<label>' . $label . '<input name="' . $key . '" type="' . (in_array($key,['from','to'],true)?'date':'text') . '" value="' . $e($input[$key] ?? '') . '"></label>';
-    $html .= '</div><div class="scm-actions"><button type="submit" class="scm-btn-primary">Filtrar</button><button type="button" class="scm-btn-secondary" data-services-history-clear>Limpiar</button></div></form></div><p>' . $total . ' revisiones · Página ' . $page . ' de ' . $pages . '</p><div class="scm-table-wrap"><table class="scm-table scm-table-prev"><thead><tr><th>Revisión</th><th>Fecha</th><th>Contrato / Inmueble</th><th>Dirección / Arrendatario</th><th>Realizado por</th><th>Acciones</th></tr></thead><tbody>';
-    foreach ($rows as $row) {
-      $url = PublicServicesDocument::url((int) $row['_ID']);
-      $html .= '<tr><td>#' . $e($row['_ID']) . '</td><td>' . date('d/m/Y', self::timestamp($row['fecha'] ?? '')) . '</td><td>#' . $e($row['contrato'] ?? '') . '<br>SIMI ' . $e($row['inmueble'] ?? '') . '</td><td>' . $e($row['direccion'] ?? '') . '<br>' . $e($row['arrendatario'] ?? '') . '</td><td>' . $e($row['realizado_por'] ?? '') . '</td><td><div class="scm-services-history-actions"><button type="button" class="scm-pending-action-btn" data-scm-open-iframe data-iframe-url="' . $e($url) . '" data-iframe-title="Revisión de servicios públicos">Ver revisión y actas</button><button type="button" class="scm-pending-action-btn" data-services-copy-url="' . $e($url) . '">Copiar enlace público</button>';
-      foreach (self::documents($row) as $document) $html .= '<button type="button" class="scm-pending-action-btn" data-scm-open-iframe data-iframe-url="' . $e($document['url']) . '" data-iframe-title="' . $e($document['title']) . '">' . $e($document['title']) . '</button>';
-      $html .= '</div></td></tr>';
-    }
-    if (!$rows) $html .= '<tr><td colspan="6">No hay revisiones con estos filtros.</td></tr>';
-    $html .= '</tbody></table></div><div class="scm-actions"><button type="button" class="scm-btn-secondary" data-services-history-page="' . ($page-1) . '"' . ($page<=1?' disabled':'') . '>Anterior</button><button type="button" class="scm-btn-secondary" data-services-history-page="' . ($page+1) . '"' . ($page>=$pages?' disabled':'') . '>Siguiente</button></div>';
-    return $html;
+    $order = ($input['order'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $rows = $this->db->getResults('SELECT * FROM `' . $table . '` WHERE ' . $sqlWhere . ' ORDER BY fecha ' . $order . ', _ID ' . $order . ' LIMIT 30 OFFSET ' . (($page - 1) * 30), $args);
+    return self::historyList($rows, $input, $total, $page, $pages);
+  }
+
+  public static function historyList(array $rows, array $input, int $total, int $page, int $pages): string
+  {
+    return PublicServicesUi::render('history', compact('rows','input','total','page','pages'));
   }
 
   public function review(int $id): array

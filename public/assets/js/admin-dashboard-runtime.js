@@ -10684,6 +10684,75 @@
       return true;
     }
 
+    function paintServicesPage(list) {
+      if (!list) return;
+      var rows = Array.from(list.querySelectorAll('[data-services-contract-row]'));
+      var select = list.querySelector('[data-services-page-size]');
+      var quick = list.dataset.quick || '';
+      var now = new Date(); var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      var week = new Date(today); week.setDate(week.getDate() + 7);
+      var next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      var afterNext = new Date(now.getFullYear(), now.getMonth() + 2, 1);
+      var matches = rows.filter(function (row) {
+        var due = Number(row.dataset.servicesDue) * 1000;
+        if (!due) return !quick;
+        return !quick || (quick === 'overdue' && due < today.getTime()) || (quick === 'week' && due >= today.getTime() && due < week.getTime()) || (quick === 'next' && due >= next.getTime() && due < afterNext.getTime());
+      });
+      var size = !select || select.value === 'all' ? Math.max(1, matches.length) : Number(select.value);
+      var pages = Math.max(1, Math.ceil(matches.length / size));
+      var page = Math.min(pages, Math.max(1, Number(list.dataset.page || 1))); list.dataset.page = page;
+      rows.forEach(function (row) { row.hidden = true; });
+      matches.slice((page - 1) * size, page * size).forEach(function (row) { row.hidden = false; });
+      var summary = list.querySelector('[data-services-page-summary]');
+      var summaryText = 'Mostrando ' + (matches.length ? (page - 1) * size + 1 : 0) + ' a ' + Math.min(page * size, matches.length) + ' de ' + matches.length + ' contratos pendientes';
+      if (summary && summary.textContent !== summaryText) summary.textContent = summaryText;
+      var number = list.querySelector('[data-services-page-number]'); var pageText = page + ' / ' + pages; if (number && number.textContent !== pageText) number.textContent = pageText;
+      list.querySelectorAll('[data-services-page-step]').forEach(function (button) { button.disabled = Number(button.dataset.servicesPageStep) < 0 ? page <= 1 : page >= pages; });
+      list._exportRows = matches;
+    }
+
+    function servicesExportTable(table, rows, filename) {
+      if (!table) return;
+      var lines = [Array.from(table.querySelectorAll('thead th')).slice(0, -1).map(function (cell) { return cell.innerText; })];
+      rows.forEach(function (row) { lines.push(Array.from(row.cells).slice(0, -1).map(function (cell) { return cell.textContent.replace(/\s+/g, ' ').trim(); })); });
+      var csv = '\ufeff' + lines.map(function (line) { return line.map(function (value) { return '"' + (/^[=+@-]/.test(value) ? "'" : '') + value.replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
+      var url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      var link = document.createElement('a'); link.href = url; link.download = filename + '.csv'; link.click(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }
+
+    root.addEventListener('click', function (event) {
+      var control = event.target.closest('[data-services-page-step], [data-services-quick], [data-services-refresh], [data-services-export], [data-services-show-variables]');
+      if (!control) return;
+      event.preventDefault();
+      var panel = root.querySelector('#scm-panel-servicios-publicos-pendientes');
+      var list = panel && panel.querySelector('[data-services-list="pending"]');
+      if (control.hasAttribute('data-services-page-step') && list) { list.dataset.page = Number(list.dataset.page || 1) + Number(control.dataset.servicesPageStep); paintServicesPage(list); }
+      if (control.hasAttribute('data-services-quick') && list) {
+        list.dataset.quick = list.dataset.quick === control.dataset.servicesQuick ? '' : control.dataset.servicesQuick; list.dataset.page = 1;
+        panel.querySelectorAll('[data-services-quick]').forEach(function (button) { button.setAttribute('aria-pressed', button.dataset.servicesQuick === list.dataset.quick ? 'true' : 'false'); });
+        paintServicesPage(list);
+      }
+      if (control.hasAttribute('data-services-refresh')) {
+        control.disabled = true;
+        reloadPendingPanel(panel, 'rsp_', actionServiciosPublicosPendientes, 'rsp_table', 'rsp_kpis').finally(function () { control.disabled = false; });
+      }
+      if (control.hasAttribute('data-services-show-variables')) { var variables = control.closest('form').querySelector('[data-services-variables]'); variables.scrollIntoView({ block: 'nearest' }); variables.querySelector('button').focus(); }
+      if (control.dataset.servicesExport === 'pending' && list) { paintServicesPage(list); servicesExportTable(list.querySelector('table'), list._exportRows || [], 'servicios-publicos-pendientes'); }
+      if (control.dataset.servicesExport === 'history') {
+        var history = root.querySelector('[data-services-history-table]'); servicesExportTable(history, history ? Array.from(history.tBodies[0].rows).filter(function (row) { return row.cells.length > 1; }) : [], 'revisiones-servicios-publicos-pagina-actual');
+      }
+    });
+    root.addEventListener('change', function (event) {
+      if (event.target.matches('[data-services-page-size]')) { var list = event.target.closest('[data-services-list]'); list.dataset.page = 1; paintServicesPage(list); }
+      if (event.target.matches('[data-services-history-order]')) { var form = root.querySelector('[data-services-history-form]'); var fd = new FormData(form); fd.set('order', event.target.value); loadServicesWorkspace('history', fd); }
+    });
+    var servicesTableObserver = new MutationObserver(function (changes) {
+      if (!changes.some(function (change) { return change.addedNodes.length; })) return;
+      root.querySelectorAll('[data-services-list="pending"]').forEach(paintServicesPage);
+    });
+    servicesTableObserver.observe(root, { childList: true, subtree: true });
+    root.querySelectorAll('[data-services-list="pending"]').forEach(paintServicesPage);
+
     root.addEventListener("input", function (event) {
       var form = event.target.closest("[data-services-template-form]");
       if (form && !event.target.matches("[data-services-template-type]")) form.dataset.dirty = "1";
@@ -10709,9 +10778,22 @@
         var section = tab.dataset.servicesTab;
         var panel = root.querySelector("#scm-panel-servicios-publicos-pendientes");
         if (!panel) return;
+        var title = panel.querySelector('[data-services-title]');
+        if (title) title.textContent = section === 'pending' ? 'Servicios Públicos — Pendientes' : 'Servicios Públicos';
+        panel.querySelectorAll('[data-services-header-pending]').forEach(function (button) { button.hidden = section !== 'pending'; });
         panel.querySelectorAll("[data-services-section]").forEach(function (item) { item.hidden = item.dataset.servicesSection !== section; });
         panel.querySelectorAll("[data-services-tab]").forEach(function (button) { button.setAttribute("aria-pressed", button.dataset.servicesTab === section ? "true" : "false"); });
         if (section !== "pending") loadServicesWorkspace(section);
+        return;
+      }
+      var formatButton = event.target.closest('[data-services-template-format]');
+      if (formatButton) {
+        var editor = formatButton.closest('form').querySelector('[name="body"]');
+        var marker = { bold: '**', italic: '*', underline: '__' }[formatButton.dataset.servicesTemplateFormat];
+        var start = editor.selectionStart, end = editor.selectionEnd;
+        if (start === end) { editor.focus(); showToast('info', 'Selecciona el texto al que deseas aplicar formato.'); return; }
+        editor.setRangeText(marker + editor.value.slice(start, end) + marker, start, end, 'select');
+        editor.focus(); editor.closest('form').dataset.dirty = '1';
         return;
       }
       var variable = event.target.closest("[data-services-variable]");
@@ -10787,13 +10869,13 @@
       if (modal) return modal;
       modal = document.createElement("div");
       modal.id = "scm-public-services-review-modal";
-      modal.className = "scm-public-services-review-modal";
+      modal.className = "scm-public-services-review-modal !sp-font-sans";
       modal.setAttribute("aria-hidden", "true");
       modal.innerHTML =
-        '<div class="scm-public-services-review-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-public-services-review-title">' +
-        '<header class="scm-public-services-review-head"><div><span>Servicios públicos</span><h4 id="scm-public-services-review-title">Agregar revisión</h4><p data-public-services-review-meta>Cargando información del contrato...</p></div>' +
-        '<button type="button" class="scm-public-services-review-close" data-public-services-review-close aria-label="Cerrar">&times;</button></header>' +
-        '<div class="scm-public-services-review-body" data-public-services-review-body><div class="scm-public-services-review-loading" role="status"><i aria-hidden="true"></i><strong>Cargando formulario...</strong></div></div>' +
+        '<div class="scm-public-services-review-dialog !sp-w-full !sp-max-w-[1024px] !sp-rounded-2xl !sp-bg-white !sp-overflow-hidden !sp-border-0 !sp-shadow-2xl !sp-font-sans" role="dialog" aria-modal="true" aria-labelledby="scm-public-services-review-title">' +
+        '<header class="!sp-bg-service-navy !sp-text-white !sp-p-5 sm:!sp-p-6 !sp-flex !sp-items-start !sp-justify-between !sp-gap-3"><div><span class="!sp-inline-flex !sp-bg-service-yellow/20 !sp-text-service-yellow !sp-rounded-full !sp-px-3 !sp-py-1 !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide">Servicios públicos · SKC SuCasa Inmobiliaria</span><div class="!sp-flex !sp-flex-wrap !sp-gap-3 !sp-items-center !sp-mt-2"><h4 class="!sp-m-0 !sp-text-2xl !sp-font-bold !sp-text-white" id="scm-public-services-review-title">Agregar revisión</h4><span class="!sp-rounded-full !sp-bg-white/10 !sp-text-service-yellow !sp-px-2 !sp-py-1 !sp-text-[10px]" data-public-services-review-meta>Cargando contrato...</span></div><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-blue-100">Auditoría periódica de suministros domiciliarios, legalización de lecturas y estados de cuenta.</p></div>' +
+        '<button type="button" class="!sp-w-9 !sp-h-9 !sp-shrink-0 !sp-rounded-lg !sp-border-0 !sp-bg-white/10 !sp-text-white !sp-text-xl !sp-cursor-pointer hover:!sp-bg-white/20 focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow" data-public-services-review-close aria-label="Cerrar">&times;</button></header>' +
+        '<div class="scm-public-services-review-body !sp-p-0" data-public-services-review-body><div class="scm-public-services-review-loading" role="status"><i aria-hidden="true"></i><strong>Cargando formulario...</strong></div></div>' +
         "</div>";
       root.appendChild(modal);
       modal.addEventListener("click", function (event) {
@@ -10876,6 +10958,8 @@
       var enabled = !!(toggle && toggle.checked);
       var reviewToggle = card.querySelector('input[name="servicios[]"]');
       var reviewEnabled = enabled && reviewToggle.checked;
+      var fields = card.querySelector('.scm-public-service-fields');
+      if (fields) { fields.classList.toggle('!sp-hidden', !enabled); fields.classList.toggle('!sp-grid', enabled); }
       card.classList.toggle("is-selected", enabled);
       card.classList.toggle("is-reviewing", reviewEnabled);
       if (toggle) toggle.setAttribute("aria-expanded", enabled ? "true" : "false");
@@ -11809,6 +11893,11 @@
             : null;
           if (headerCount && typeof data.count === "string") {
             headerCount.textContent = data.count;
+          }
+          if (prefix === 'rsp_') {
+            var filterCount = panel.querySelector('[data-services-filter-count]');
+            if (filterCount && data.count != null) filterCount.textContent = data.count + ' contratos encontrados';
+            panel.querySelectorAll('[data-services-quick]').forEach(function (button) { button.setAttribute('aria-pressed', 'false'); });
           }
           panel.setAttribute("data-scm-loaded", "1");
           return true;

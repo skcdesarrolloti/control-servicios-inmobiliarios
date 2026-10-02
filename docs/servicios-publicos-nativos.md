@@ -23,7 +23,7 @@ Marcar Contrato recibido guarda estado Recibido, tipo Ex, fecha y funcionario re
 
 Las cuatro plantillas son Al día, Mora 30 días, Mora 60 días y Crítico/superior a 90 días. La última incorpora el contenido suministrado en `CARTA MORA A 90 DIAS (1).docx`, con fecha, destinatario, inmueble, servicio, referencia y valor dinámicos. El representante legal se resuelve desde la sucursal; el nombre corporativo visible es SKC SuCasa Inmobiliaria.
 
-El editor permite cambiar título y contenido, insertar variables y ver una muestra antes de guardar. Es texto plano: no ejecuta HTML ni JavaScript. Guarda autor, fecha y versiones anteriores en la configuración del sistema. Rechaza guardar sobre una versión que otra persona haya cambiado.
+El editor permite cambiar título y contenido, insertar variables y ver una muestra antes de guardar. Los botones B/I/U aplican formato al texto seleccionado con `**negrita**`, `*cursiva*` y `__subrayado__`; la vista previa y las actas interpretan únicamente esas marcas y escapan todo HTML de origen. Guarda autor, fecha y versiones anteriores en la configuración del sistema. Rechaza guardar sobre una versión que otra persona haya cambiado.
 
 Los cambios afectan las próximas actas. Cada revisión nueva conserva una instantánea de su contexto, servicios y plantillas; los PDFs emitidos y las revisiones anteriores no se regeneran por editar una plantilla.
 
@@ -36,6 +36,14 @@ La vista pública muestra datos contractuales, fechas de revisión y corte por s
 Los correos continúan en shared-notifications. Los destinatarios son propietario, arrendatario y funcionarios activos seleccionados en Notificaciones internas / acta_servicios_publicos. No se introducen destinatarios fijos ni envíos directos. Encolar se realiza después de confirmar la transacción.
 
 ## Verificación
+
+La interfaz usa Tailwind 3.4.17 compilado localmente, sin CDN ni preflight adicional. Sus utilidades `!sp-` están acotadas al panel para prevalecer sobre reglas antiguas sin alterar otros módulos. Para recompilar:
+
+```powershell
+npx --yes tailwindcss@3.4.17 -c tailwind.services.config.js -i resources/css/tailwind-services.css -o public/assets/css/tailwind-services.css --minify
+```
+
+Pendientes conserva filtros de servidor y añade paginación local, tamaño de página y filtros rápidos sobre el resultado cargado. Sincronizar recarga el listado y sus indicadores. Las exportaciones descargan CSV UTF-8 compatible con Excel: todos los pendientes del resultado actual, o la página actual del historial (indicado en el nombre del archivo y la ayuda del botón). Se neutralizan fórmulas en campos aportados por usuarios.
 
 ```powershell
 php tests/public-services-review-check.php
