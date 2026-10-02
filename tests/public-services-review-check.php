@@ -190,11 +190,15 @@ try {
   $adjustContext=$service->buildServiciosPublicosReviewContext(91001);
   $adjustInput=['request_token'=>$adjustContext['request_token'],'last_review_date'=>'2026-07-02','adjustment_reason'=>'Reorganización administrativa del atraso','id_empleado'=>'70001'];
   $_SESSION['scm_user_cargo']='11';
-  $assert(empty($adjustContext['can_adjust_schedule']) && !str_contains($view->renderServiciosPublicosReviewForm($adjustContext),'data-services-adjust-save') && empty($service->adjustServiciosPublicosReviewDate(91001,$adjustInput)['ok']), 'non-admin cannot see or call date adjustment even with forged session cargo');
+  $nonAdminList=$service->buildServiciosPublicos(['contrato'=>'B91001']);
+  $assert(!str_contains($view->renderServiciosPublicosTable($nonAdminList['items']),'data-services-adjust-save') && empty($adjustContext['can_adjust_schedule']) && !str_contains($view->renderServiciosPublicosReviewForm($adjustContext),'data-services-adjust-save') && empty($service->adjustServiciosPublicosReviewDate(91001,$adjustInput)['ok']), 'non-admin cannot see or call date adjustment even with forged session cargo');
   $db->update($employeeTable,['id_cargo'=>'11'],['_ID'=>70001]);
   $adjustContext=$service->buildServiciosPublicosReviewContext(91001);
   $adjustInput['request_token']=$adjustContext['request_token'];
-  $assert(!empty($adjustContext['can_adjust_schedule']) && str_contains($view->renderServiciosPublicosReviewForm($adjustContext),'data-services-adjust-save'), 'active database admin receives date editor');
+  $adminList=$service->buildServiciosPublicos(['contrato'=>'B91001']);
+  $assert(!str_contains($view->renderServiciosPublicosReviewForm($adjustContext),'data-services-adjust-save') && str_contains($view->renderServiciosPublicosTable($adminList['items']),'data-services-adjust-save'), 'admin date editor is in table Actions and absent from review popup');
+  \SCM\Modules\Pending\PublicServicesReviewStorage::validateToken($adminList['items'][0]['adjustment_token'],$repo->getPublicServicesContract(91001),70001);
+  $assert(!empty($adminList['items'][0]['can_adjust_schedule']), 'table token carries actual last date and review count');
   $assert(empty($service->adjustServiciosPublicosReviewDate(91001,array_replace($adjustInput,['last_review_date'=>'2026-02-30']))['ok']) && empty($service->adjustServiciosPublicosReviewDate(91001,array_replace($adjustInput,['last_review_date'=>date('Y-m-d',time()+86400)]))['ok']) && empty($service->adjustServiciosPublicosReviewDate(91001,array_replace($adjustInput,['adjustment_reason'=>'']))['ok']), 'admin date adjustment rejects impossible dates, future dates and missing reasons');
   $assert(empty($service->adjustServiciosPublicosReviewDate(91001,array_replace($adjustInput,['request_token'=>'forged']))['ok']), 'date adjustment requires signed token');
   $adjusted=$service->adjustServiciosPublicosReviewDate(91001,$adjustInput);

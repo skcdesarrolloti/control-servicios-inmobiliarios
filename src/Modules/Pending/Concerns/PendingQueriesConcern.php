@@ -216,6 +216,16 @@ trait PendingQueriesConcern
     });
 
     $months = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    $employee = $this->repo->getFuncionarioByUserId(\SCM\Core\Auth::userId());
+    if ($employee && $this->publicServicesScheduleAdmin($employee)) {
+      $decorate = static function (array $item): array {
+        $item['can_adjust_schedule'] = true;
+        $item['adjustment_token'] = \SCM\Modules\Pending\PublicServicesReviewStorage::formToken($item['row'], \SCM\Core\Auth::userId());
+        return $item;
+      };
+      $items = array_map($decorate, $items);
+      $configurationItems = array_map($decorate, $configurationItems);
+    }
     $corte = (string) $year . ($fMes > 0 ? (' — ' . ($months[$fMes] ?? (string) $fMes)) : '');
 
     return [

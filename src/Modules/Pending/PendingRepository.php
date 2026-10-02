@@ -449,6 +449,7 @@ final class PendingRepository
       'tuvo_preventiva',
       'ultima_revision_servicios',
       'mes_revision_servicios',
+      'revisiones_servicios',
       'servicios_publicos',
       'luz',
       'agua',

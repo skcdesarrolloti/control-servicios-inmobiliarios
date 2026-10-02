@@ -10879,12 +10879,6 @@
         "</div>";
       root.appendChild(modal);
       modal.addEventListener("click", function (event) {
-        var adjustButton = event.target && event.target.closest ? event.target.closest("[data-services-adjust-save]") : null;
-        if (adjustButton) {
-          event.preventDefault();
-          adjustPublicServicesDate(adjustButton);
-          return;
-        }
         var closeButton = event.target && event.target.closest
           ? event.target.closest("[data-public-services-review-close]")
           : null;
@@ -10896,9 +10890,6 @@
       modal.addEventListener("change", function (event) {
         var form = modal.querySelector("[data-public-services-review-form]");
         if (form) form.dataset.dirty = "1";
-        if (event.target && event.target.matches && event.target.matches('[data-services-adjust-date]')) {
-          previewPublicServicesDate(event.target.closest('[data-public-services-date-adjustment]'));
-        }
         var serviceToggle = event.target && event.target.matches
           ? event.target.matches('input[name="servicios[]"], input[name="servicios_configurados[]"]')
             ? event.target
@@ -11073,6 +11064,12 @@
       }).join("") + "</div>";
     }
 
+    root.addEventListener('change', function (event) {
+      if (event.target && event.target.matches && event.target.matches('[data-services-adjust-date]')) {
+        previewPublicServicesDate(event.target.closest('[data-public-services-date-adjustment]'));
+      }
+    });
+
     function previewPublicServicesDate(section) {
       var input = section.querySelector('[data-services-adjust-date]');
       var preview = section.querySelector('[data-services-adjust-preview]');
@@ -11085,10 +11082,9 @@
       preview.textContent = 'Próxima revisión: ' + String(next.getUTCDate()).padStart(2, '0') + '/' + String(next.getUTCMonth() + 1).padStart(2, '0') + '/' + next.getUTCFullYear();
     }
 
-    function adjustPublicServicesDate(button) {
+    async function adjustPublicServicesDate(button) {
       var section = button.closest('[data-public-services-date-adjustment]');
-      var form = button.closest('[data-public-services-review-form]');
-      if (!section || !form || button.disabled) return;
+      if (!section || button.disabled) return;
       var dateInput = section.querySelector('[data-services-adjust-date]');
       var reasonInput = section.querySelector('[data-services-adjust-reason]');
       var errorBox = section.querySelector('[data-services-adjust-error]');
@@ -11098,12 +11094,19 @@
         errorBox.hidden = false;
         return;
       }
+      previewPublicServicesDate(section);
+      var message = 'Contrato #' + section.dataset.contractCode + '\nÚltima revisión: ' + dateInput.value + '\n' + section.querySelector('[data-services-adjust-preview]').textContent + '\nMotivo: ' + reasonInput.value.trim() + '\n¿Confirmas el ajuste de programación?';
+      button.disabled = true;
+      var confirmed = window.Swal && typeof window.Swal.fire === 'function'
+        ? (await window.Swal.fire({ title: 'Confirmar ajuste de fecha', text: message, icon: 'question', showCancelButton: true, confirmButtonText: 'Sí, guardar ajuste', cancelButtonText: 'Cancelar' })).isConfirmed
+        : window.confirm(message);
+      if (!confirmed) { button.disabled = false; return; }
       var fd = new FormData();
       fd.append('action', actionRevisionServiciosPublicos);
       fd.append('nonce', nonce);
       fd.append('operation', 'adjust_date');
-      fd.append('contract_id', form.querySelector('[name="contract_id"]').value);
-      fd.append('request_token', form.querySelector('[name="request_token"]').value);
+      fd.append('contract_id', section.dataset.contractId);
+      fd.append('request_token', section.dataset.requestToken);
       fd.append('last_review_date', dateInput.value);
       fd.append('adjustment_reason', reasonInput.value.trim());
       button.disabled = true;
@@ -11111,7 +11114,7 @@
         .then(function (response) { return response.json(); })
         .then(function (json) {
           if (!json || !json.success) throw new Error((json && json.data && json.data.message) || 'No se pudo ajustar la fecha.');
-          form.querySelector('[name="request_token"]').value = json.data.request_token;
+          section.dataset.requestToken = json.data.request_token;
           previewPublicServicesDate(section);
           showToast('success', json.data.message);
           return reloadPendingPanel(root.querySelector('#scm-panel-servicios-publicos-pendientes'), 'rsp_', actionServiciosPublicosPendientes, 'rsp_table', 'rsp_kpis');
@@ -15990,6 +15993,9 @@
         });
         return;
       }
+
+      var servicesDateButton = e.target && e.target.closest ? e.target.closest('[data-services-adjust-save]') : null;
+      if (servicesDateButton) { e.preventDefault(); adjustPublicServicesDate(servicesDateButton); return; }
 
       var publicServicesReviewBtn =
         e.target && e.target.closest

@@ -22,6 +22,8 @@ $context['can_adjust_schedule'] = true;
 $context['contract']['ultima_revision_servicios'] = strtotime('2026-01-31');
 $items = [];
 for ($i=0;$i<24;$i++) $items[]=['row'=>['_ID'=>90001+$i,'contrato'=>2000+$i,'inmueble'=>10156+$i,'estado'=>'Entregado','direccion'=>'Crespo 2da Avenida No. 67–190 Local 102, Edificio Crespo 270','propietario'=>'MYRIAM ABEITA NASSAR','arrendatario'=>'COMERCIALIZADORA DE SERVICIOS DE BOLÍVAR S.A.S.','inicio_contrato'=>strtotime('2024-07-29'),'fin_contrato'=>strtotime('2027-07-28'),'fecha_entrega'=>strtotime('2024-07-29')],'ultima'=>strtotime('2026-07-01'),'due'=>strtotime('2026-10-01')+$i*86400];
+foreach ($items as &$qaItem) { $qaItem['can_adjust_schedule']=true; $qaItem['adjustment_token']='qa-table-token'; $qaItem['ultima']=strtotime('2026-01-31'); }
+unset($qaItem);
 $configurationItems=[array_replace($items[0],['needs_service_configuration'=>true,'due'=>0])];
 $historyRows=[['_ID'=>123,'fecha'=>time(),'contrato'=>149,'inmueble'=>10156,'direccion'=>'Altos de Plan Parejo 2 Mz 42 Lt 02','arrendatario'=>'JORGE IVAN ZABALETA RINCON','realizado_por'=>'Funcionario autenticado QA','acta_felicitaciones_luz'=>'https://example.invalid/acta.pdf']];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
