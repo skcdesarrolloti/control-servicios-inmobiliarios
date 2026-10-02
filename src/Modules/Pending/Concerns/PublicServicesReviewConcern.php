@@ -45,11 +45,70 @@ trait PublicServicesReviewConcern
       'contract' => $contract,
       'services' => $formServices,
       'has_services' => !empty($available),
+      'can_adjust_schedule' => $this->publicServicesScheduleAdmin($employee),
       'employee' => $employee,
       'branch' => $branch,
       'review_date' => date('Y-m-d'),
       'request_token' => \SCM\Modules\Pending\PublicServicesReviewStorage::formToken($contract, Auth::userId()),
     ];
+  }
+
+  /** Same administrator cargos used by dashboard permission management, checked from the DB. */
+  private function publicServicesScheduleAdmin(array $employee): bool
+  {
+    return !empty($employee['id_empleado']) && in_array((string) ($employee['id_cargo'] ?? ''), ['11', '12', '13', '14'], true);
+  }
+
+  /** Administrative scheduling adjustment; historical reviews and issued PDFs remain intact. */
+  public function adjustServiciosPublicosReviewDate(int $contractId, array $input): array
+  {
+    $employee = $this->repo->getFuncionarioByUserId(Auth::userId());
+    if (!$employee || !$this->publicServicesScheduleAdmin($employee)) {
+      return ['ok' => false, 'message' => 'Solo los administradores pueden ajustar la fecha de última revisión.'];
+    }
+    $value = trim((string) ($input['last_review_date'] ?? ''));
+    $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value, new \DateTimeZone('America/Bogota'));
+    $reason = $this->cleanReviewText((string) ($input['adjustment_reason'] ?? ''));
+    if (!$date || $date->format('Y-m-d') !== $value || $date->getTimestamp() <= 0 || $value > date('Y-m-d')) {
+      return ['ok' => false, 'message' => 'Indica una fecha válida de última revisión, hasta el día de hoy.'];
+    }
+    if (mb_strlen($reason) < 5 || mb_strlen($reason) > 1000) {
+      return ['ok' => false, 'message' => 'Escribe un motivo de ajuste entre 5 y 1000 caracteres.'];
+    }
+    $pdo = $this->repo->getDb()->pdo();
+    if ($pdo->inTransaction()) { return ['ok' => false, 'message' => 'No se puede ajustar dentro de otra operación.']; }
+    try {
+      (new \SCM\Modules\Pending\PublicServicesReviewStorage($this->repo->getDb()))->requireSchema();
+      $pdo->beginTransaction();
+      $contract = $this->repo->getPublicServicesContract($contractId, true);
+      if (!$contract || strtolower(trim((string) ($contract['estado'] ?? ''))) !== 'entregado') {
+        throw new \DomainException('Solo se pueden ajustar contratos entregados.');
+      }
+      $token = (string) ($input['request_token'] ?? '');
+      \SCM\Modules\Pending\PublicServicesReviewStorage::validateToken($token, $contract, Auth::userId(), false);
+      $oldTs = \SCM\Modules\Pending\PublicServicesDateRecovery::timestamp($contract['ultima_revision_servicios'] ?? null);
+      $timestamp = $oldTs > 0 && date('Y-m-d', $oldTs) === $value ? $oldTs : $date->getTimestamp();
+      $next = \SCM\Modules\Pending\PublicServicesSchedule::next($timestamp);
+      $month = (int) date('n', $next);
+      if ($timestamp !== $oldTs || $month !== (int) ($contract['mes_revision_servicios'] ?? 0)) {
+        \SCM\Modules\Pending\PublicServicesReviewStorage::validateToken($token, $contract, Auth::userId());
+        $now = date('Y-m-d H:i:s');
+        $payload = ['ultima_revision_servicios' => $timestamp, 'mes_revision_servicios' => $month, 'cct_modified' => $now, 'cct_author_id' => $employee['id_empleado']];
+        if ($this->repo->updateContratoArrendamiento($contractId, $payload) !== 1) { throw new \RuntimeException('No fue posible guardar el ajuste.'); }
+        $audit = ['contract_pk' => $contractId, 'previous' => ['ultima_revision_servicios' => $contract['ultima_revision_servicios'] ?? null, 'mes_revision_servicios' => $contract['mes_revision_servicios'] ?? null], 'adjusted' => ['ultima_revision_servicios' => $timestamp, 'mes_revision_servicios' => $month], 'next_review' => $next];
+        if (!$this->repo->insertHistorialInmueble([
+          'cct_status' => 'publish', 'cct_author_id' => $employee['id_empleado'], 'id_empleado' => $employee['id_empleado'], 'funcionario' => $employee['nombre'],
+          'cct_created' => $now, 'cct_modified' => $now, 'fecha' => time(), 'id_inmueble' => (string) $contract['id_inmueble'], 'tipo_reporte' => 'Contractual',
+          'observacion' => 'Ajuste administrativo de programación de servicios públicos del contrato #' . $contract['contrato'] . '. Motivo: ' . $reason . '. Este ajuste no acredita una nueva revisión realizada. Auditoría: ' . json_encode($audit, JSON_UNESCAPED_UNICODE),
+        ])) { throw new \RuntimeException('No se pudo registrar el historial del ajuste.'); }
+        $contract = array_replace($contract, $payload);
+      }
+      $pdo->commit();
+      return ['ok' => true, 'message' => 'Fecha ajustada. Próxima revisión: ' . date('d/m/Y', $next) . '.', 'ultima_revision_servicios' => $timestamp, 'mes_revision_servicios' => $month, 'next_review_date' => date('Y-m-d', $next), 'request_token' => \SCM\Modules\Pending\PublicServicesReviewStorage::formToken($contract, Auth::userId())];
+    } catch (\Throwable $error) {
+      if ($pdo->inTransaction()) { $pdo->rollBack(); }
+      return ['ok' => false, 'message' => $error->getMessage()];
+    }
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */

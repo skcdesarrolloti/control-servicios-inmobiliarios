@@ -10879,6 +10879,12 @@
         "</div>";
       root.appendChild(modal);
       modal.addEventListener("click", function (event) {
+        var adjustButton = event.target && event.target.closest ? event.target.closest("[data-services-adjust-save]") : null;
+        if (adjustButton) {
+          event.preventDefault();
+          adjustPublicServicesDate(adjustButton);
+          return;
+        }
         var closeButton = event.target && event.target.closest
           ? event.target.closest("[data-public-services-review-close]")
           : null;
@@ -10890,6 +10896,9 @@
       modal.addEventListener("change", function (event) {
         var form = modal.querySelector("[data-public-services-review-form]");
         if (form) form.dataset.dirty = "1";
+        if (event.target && event.target.matches && event.target.matches('[data-services-adjust-date]')) {
+          previewPublicServicesDate(event.target.closest('[data-public-services-date-adjustment]'));
+        }
         var serviceToggle = event.target && event.target.matches
           ? event.target.matches('input[name="servicios[]"], input[name="servicios_configurados[]"]')
             ? event.target
@@ -11062,6 +11071,53 @@
       return '<div class="scm-public-services-review-links">' + documents.map(function (document) {
         return '<button type="button" class="scm-pending-action-btn" data-services-act-preview="' + escHtml(document.url || "#") + '">' + escHtml(document.title || "Ver acta") + "</button>";
       }).join("") + "</div>";
+    }
+
+    function previewPublicServicesDate(section) {
+      var input = section.querySelector('[data-services-adjust-date]');
+      var preview = section.querySelector('[data-services-adjust-preview]');
+      var value = input.value;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) { preview.textContent = ''; return; }
+      var parts = value.split('-').map(Number);
+      var next = new Date(Date.UTC(parts[0], parts[1] - 1 + 3, 1));
+      var lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+      next.setUTCDate(Math.min(parts[2], lastDay));
+      preview.textContent = 'Próxima revisión: ' + String(next.getUTCDate()).padStart(2, '0') + '/' + String(next.getUTCMonth() + 1).padStart(2, '0') + '/' + next.getUTCFullYear();
+    }
+
+    function adjustPublicServicesDate(button) {
+      var section = button.closest('[data-public-services-date-adjustment]');
+      var form = button.closest('[data-public-services-review-form]');
+      if (!section || !form || button.disabled) return;
+      var dateInput = section.querySelector('[data-services-adjust-date]');
+      var reasonInput = section.querySelector('[data-services-adjust-reason]');
+      var errorBox = section.querySelector('[data-services-adjust-error]');
+      errorBox.hidden = true;
+      if (!dateInput.value || !dateInput.checkValidity() || reasonInput.value.trim().length < 5) {
+        errorBox.textContent = 'Indica una fecha válida hasta hoy y un motivo de al menos 5 caracteres.';
+        errorBox.hidden = false;
+        return;
+      }
+      var fd = new FormData();
+      fd.append('action', actionRevisionServiciosPublicos);
+      fd.append('nonce', nonce);
+      fd.append('operation', 'adjust_date');
+      fd.append('contract_id', form.querySelector('[name="contract_id"]').value);
+      fd.append('request_token', form.querySelector('[name="request_token"]').value);
+      fd.append('last_review_date', dateInput.value);
+      fd.append('adjustment_reason', reasonInput.value.trim());
+      button.disabled = true;
+      fetch(ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success) throw new Error((json && json.data && json.data.message) || 'No se pudo ajustar la fecha.');
+          form.querySelector('[name="request_token"]').value = json.data.request_token;
+          previewPublicServicesDate(section);
+          showToast('success', json.data.message);
+          return reloadPendingPanel(root.querySelector('#scm-panel-servicios-publicos-pendientes'), 'rsp_', actionServiciosPublicosPendientes, 'rsp_table', 'rsp_kpis');
+        })
+        .catch(function (error) { errorBox.textContent = error.message; errorBox.hidden = false; })
+        .finally(function () { button.disabled = false; });
     }
 
     function submitPublicServicesReviewForm(form) {

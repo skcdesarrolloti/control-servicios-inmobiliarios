@@ -18,6 +18,8 @@ foreach ($definitions as $key => $definition) {
 }
 $context = ['contract' => ['_ID' => 90001, 'contrato' => 2000, 'inmueble' => 204578, 'direccion' => 'Dirección sintética de prueba', 'arrendatario' => 'Arrendatario QA', 'mes_revision_servicios' => 11], 'services' => $services, 'employee' => ['nombre' => 'Funcionario autenticado QA', 'id_empleado' => '94001'], 'has_services' => true, 'review_date' => date('Y-m-d')];
 $view = new \SCM\Modules\Pending\PendingView();
+$context['can_adjust_schedule'] = true;
+$context['contract']['ultima_revision_servicios'] = strtotime('2026-01-31');
 $items = [];
 for ($i=0;$i<24;$i++) $items[]=['row'=>['_ID'=>90001+$i,'contrato'=>2000+$i,'inmueble'=>10156+$i,'estado'=>'Entregado','direccion'=>'Crespo 2da Avenida No. 67–190 Local 102, Edificio Crespo 270','propietario'=>'MYRIAM ABEITA NASSAR','arrendatario'=>'COMERCIALIZADORA DE SERVICIOS DE BOLÍVAR S.A.S.','inicio_contrato'=>strtotime('2024-07-29'),'fin_contrato'=>strtotime('2027-07-28'),'fecha_entrega'=>strtotime('2024-07-29')],'ultima'=>strtotime('2026-07-01'),'due'=>strtotime('2026-10-01')+$i*86400];
 $configurationItems=[array_replace($items[0],['needs_service_configuration'=>true,'due'=>0])];
@@ -36,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $data = $operation === 'load'
     ? ['form_html' => (new \SCM\Modules\Pending\PendingView())->renderServiciosPublicosReviewForm($context)]
     : ['message' => 'QA sin escritura: ' . $operation . '; configurados=' . implode(',', (array) ($_POST['servicios_configurados'] ?? [])) . '; revisados=' . implode(',', (array) ($_POST['servicios'] ?? [])), 'documents' => []];
+  if ($operation === 'adjust_date') { $data['request_token']='qa-refreshed-date-token'; }
   echo json_encode(['success' => true, 'data' => $data]);
   exit;
 }

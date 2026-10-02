@@ -187,6 +187,28 @@ try {
   $historiesAfter=(int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`");
   $assert(!$recovery->repair(91001,94001) && !$recovery->repair(91002,94001) && (int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`")===$historiesAfter, 'repair is idempotent and leaves undocumented contracts unchanged');
   $assert((int)$db->getVar("SELECT COUNT(*) FROM `{$queueTable}`")===$queuesBefore && (int)$db->getVar("SELECT COUNT(*) FROM `{$reviewTable}`")===$reviewsBefore, 'date recovery creates no reviews, acts or notifications');
+  $adjustContext=$service->buildServiciosPublicosReviewContext(91001);
+  $adjustInput=['request_token'=>$adjustContext['request_token'],'last_review_date'=>'2026-07-02','adjustment_reason'=>'Reorganización administrativa del atraso','id_empleado'=>'70001'];
+  $_SESSION['scm_user_cargo']='11';
+  $assert(empty($adjustContext['can_adjust_schedule']) && !str_contains($view->renderServiciosPublicosReviewForm($adjustContext),'data-services-adjust-save') && empty($service->adjustServiciosPublicosReviewDate(91001,$adjustInput)['ok']), 'non-admin cannot see or call date adjustment even with forged session cargo');
+  $db->update($employeeTable,['id_cargo'=>'11'],['_ID'=>70001]);
+  $adjustContext=$service->buildServiciosPublicosReviewContext(91001);
+  $adjustInput['request_token']=$adjustContext['request_token'];
+  $assert(!empty($adjustContext['can_adjust_schedule']) && str_contains($view->renderServiciosPublicosReviewForm($adjustContext),'data-services-adjust-save'), 'active database admin receives date editor');
+  $assert(empty($service->adjustServiciosPublicosReviewDate(91001,array_replace($adjustInput,['last_review_date'=>'2026-02-30']))['ok']) && empty($service->adjustServiciosPublicosReviewDate(91001,array_replace($adjustInput,['last_review_date'=>date('Y-m-d',time()+86400)]))['ok']) && empty($service->adjustServiciosPublicosReviewDate(91001,array_replace($adjustInput,['adjustment_reason'=>'']))['ok']), 'admin date adjustment rejects impossible dates, future dates and missing reasons');
+  $assert(empty($service->adjustServiciosPublicosReviewDate(91001,array_replace($adjustInput,['request_token'=>'forged']))['ok']), 'date adjustment requires signed token');
+  $adjusted=$service->adjustServiciosPublicosReviewDate(91001,$adjustInput);
+  $adjustedContract=$repo->getPublicServicesContract(91001);
+  $adjustHistory=$db->getRow("SELECT * FROM `{$historyTable}` ORDER BY `_ID` DESC LIMIT 1");
+  $assert(!empty($adjusted['ok']) && $adjusted['next_review_date']==='2026-10-02' && (int)$adjustedContract['mes_revision_servicios']===10 && (int)$adjustedContract['cct_author_id']===94001 && (int)$adjustedContract['revisiones_servicios']===4, 'admin adjustment recalculates next date/month under actual actor without changing review counts');
+  $assert((int)$adjustHistory['id_empleado']===94001 && str_contains($adjustHistory['observacion'],$adjustInput['adjustment_reason']) && str_contains($adjustHistory['observacion'],'previous') && str_contains($adjustHistory['observacion'],'no acredita una nueva revisión'), 'administrative adjustment audit preserves before/after and reason without claiming performed review');
+  $adjustedListing=$service->buildServiciosPublicos(['contrato'=>'B91001','mes'=>12]);
+  $assert(count($adjustedListing['items'])===0 && count($service->buildServiciosPublicos(['contrato'=>'B91001','mes'=>10])['items'])===1, 'date adjustment removes contract from old month and moves it to target month');
+  $adjustHistories=(int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`");
+  $assert(!empty($service->adjustServiciosPublicosReviewDate(91001,$adjustInput)['ok']) && (int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`")===$adjustHistories && empty($service->adjustServiciosPublicosReviewDate(91001,array_replace($adjustInput,['last_review_date'=>'2026-08-02']))['ok']), 'adjustment retry is idempotent while stale forms cannot overwrite a different date');
+  $assert((int)$db->getVar("SELECT COUNT(*) FROM `{$queueTable}`")===$queuesBefore && (int)$db->getVar("SELECT COUNT(*) FROM `{$reviewTable}`")===$reviewsBefore, 'admin date adjustment creates no reviews, acts or notifications');
+  $db->update($employeeTable,['activo'=>'No'],['_ID'=>70001]);
+  $assert(empty($service->adjustServiciosPublicosReviewDate(91001,array_replace($adjustInput,['request_token'=>$adjusted['request_token']]))['ok']), 'inactive admin cannot adjust dates');
   echo "$checks checks passed. Permanent rows unchanged; no external messages sent.\n";
 } finally {
   foreach ($generatedPaths as $path) { if (is_file($path)) { unlink($path); } }

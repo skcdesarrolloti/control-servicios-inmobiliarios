@@ -3277,6 +3277,17 @@ trait HandlesTicketWorkflowActions
       ]);
     }
 
+    if ($operation === 'adjust_date') {
+      $result = $controller->adjustServiciosPublicosReviewDate($contractId, [
+        'request_token' => (string) ($_POST['request_token'] ?? ''),
+        'last_review_date' => sanitize_text_field(wp_unslash((string) ($_POST['last_review_date'] ?? ''))),
+        'adjustment_reason' => sanitize_textarea_field(wp_unslash((string) ($_POST['adjustment_reason'] ?? ''))),
+      ]);
+      if (empty($result['ok'])) { $this->jsonFail((string) ($result['message'] ?? 'No fue posible ajustar la fecha.')); }
+      unset($result['ok']);
+      $this->jsonOk($result);
+    }
+
     if (!in_array($operation, ['submit', 'configure'], true)) {
       $this->jsonFail('Operación no válida.');
     }
