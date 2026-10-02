@@ -1587,7 +1587,11 @@
         return fetch(calendarApiUrl + encodeURIComponent(action), options).then(function (r) {
           return r.text().then(function (body) {
             try {
-              return JSON.parse(body);
+              var json = JSON.parse(body);
+              if (json && !json.success && json.data && json.data.error_detail) {
+                json.message = (json.message || "Error del calendario.") + " Detalle: " + json.data.error_detail + (json.data.error_id ? " (Referencia: " + json.data.error_id + ")" : "");
+              }
+              return json;
             } catch (err) {
               var responseError = new Error("No se pudo confirmar la respuesta del calendario (HTTP " + r.status + "). Revisa si el elemento ya aparece en el calendario antes de volver a guardarlo.");
               responseError.calendarResponseInvalid = true;
@@ -2965,7 +2969,10 @@
           if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el " + itemLabel + ".");
           showToast("success", json.message || (itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1) + " creado."));
           if (googleRequested && json.data && (json.data.google_pendiente || (json.data.item && !json.data.item.google_event_id))) {
-            showToast("error", "Se guardó en el panel, pero quedó pendiente en Google Calendar. " + (json.data.google_error || ""), "Google Calendar pendiente");
+            showToast("error", "Se guardó en el panel, pero quedó pendiente en Google Calendar. " + (json.data.google_error || "") + (json.data.google_error_detail ? " Detalle: " + json.data.google_error_detail : ""), "Google Calendar pendiente");
+          }
+          if (tipoItem === "recordatorio" && json.data && json.data.aviso_programado === false) {
+            showToast("warning", "El recordatorio se guardó, pero no se pudo programar el aviso. " + (json.data.aviso_error || ""), "Aviso pendiente");
           }
           closeWeekQuickPopover();
           return loadEvents();
@@ -3584,10 +3591,15 @@
         }
         return calendarApi("listar_items_calendario", Object.assign({}, filters, { tipos_item: ["evento", "tarea", "recordatorio"] }))
           .then(function (json) {
-            if (!json || !json.success) throw new Error((json && json.message) || "No se pudieron cargar items.");
+            if (!json || !json.success) {
+              var loadError = new Error((json && json.message) || "No se pudieron cargar items.");
+              loadError.calendarBackendError = !!(json && json.data && json.data.error_code);
+              throw loadError;
+            }
             return extractRows(json.data || json);
           })
-          .catch(function () {
+          .catch(function (err) {
+            if (err.calendarBackendError) throw err;
             return loadLegacyEvents();
           })
           .then(function (rows) {
@@ -4690,7 +4702,7 @@
           }
           showToast("success", result.value.message || "Cambios guardados.");
           var data = result.value.data || {};
-          if (data.google_pendiente) showToast("error", "El cambio se guardo aqui, pero no se pudo actualizar en Google Calendar. " + ((data.item && data.item.google_error) || ""), "Google Calendar pendiente");
+          if (data.google_pendiente) showToast("error", "El cambio se guardo aqui, pero no se pudo actualizar en Google Calendar. " + ((data.item && data.item.google_error) || "") + (data.item && data.item.google_error_detail ? " Detalle: " + data.item.google_error_detail : ""), "Google Calendar pendiente");
           if (isReminder && data.aviso_programado === false) showToast("error", "El recordatorio se guardo, pero no se pudo programar el aviso por WhatsApp.", "Aviso pendiente");
           loadEvents();
         });
@@ -6194,7 +6206,7 @@
           if (!result.isConfirmed || !result.value) return;
           showToast("success", result.value.message || "Evento creado.");
           if (result.value._scmGoogleRequested && result.value.data && (result.value.data.google_pendiente || result.value.data.google_pendientes > 0 || (Array.isArray(result.value.data) && result.value.data.some(function (item) { return item && !item.google_event_id; })))) {
-            showToast("error", "Se guardó en el panel, pero uno o más elementos quedaron pendientes en Google Calendar. " + (result.value.data.google_error || ""), "Google Calendar pendiente");
+            showToast("error", "Se guardó en el panel, pero uno o más elementos quedaron pendientes en Google Calendar. " + (result.value.data.google_error || "") + (result.value.data.google_error_detail ? " Detalle: " + result.value.data.google_error_detail : ""), "Google Calendar pendiente");
           }
           if (Array.isArray(result.value._scmCitaNotificationAppointments) && result.value._scmCitaNotificationAppointments.length) {
             notifyCalendarAppointment(root, result.value._scmCitaNotificationAppointments)
