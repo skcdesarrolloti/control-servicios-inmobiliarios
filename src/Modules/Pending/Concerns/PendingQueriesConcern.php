@@ -158,6 +158,7 @@ trait PendingQueriesConcern
   {
     $funcionarios = $this->repo->getFuncionarios();
     $rows = $this->repo->getContratosEntregados($filters);
+    $recoveredDates = (new \SCM\Modules\Pending\PublicServicesDateRecovery($this->repo->getDb()))->evidence($rows);
 
     $nowTs = time();
     $year = (int) date('Y', $nowTs);
@@ -176,6 +177,9 @@ trait PendingQueriesConcern
       }
 
       $ultTs = $this->parseTs($row['ultima_revision_servicios'] ?? null);
+      if ($ultTs <= 0 && isset($recoveredDates[(int) ($row['_ID'] ?? 0)])) {
+        $ultTs = $recoveredDates[(int) $row['_ID']]['timestamp'];
+      }
       $mesRevisionServicios = (int) ($row['mes_revision_servicios'] ?? 0);
 
       if ($ultTs > 0) {
@@ -186,12 +190,7 @@ trait PendingQueriesConcern
           $row['inicio_contrato'] ?? null,
           $row['fecha'] ?? null,
         ]);
-        if ($mesRevisionServicios >= 1 && $mesRevisionServicios <= 12) {
-          $referenceTs = $baseTs > 0 ? $baseTs : $nowTs;
-          $dueTs = $this->replaceMonthPreservingDate($referenceTs, $mesRevisionServicios, false, $year);
-        } else {
-          $dueTs = $baseTs > 0 ? $baseTs : $nowTs;
-        }
+        $dueTs = \SCM\Modules\Pending\PublicServicesSchedule::initial($baseTs > 0 ? $baseTs : $nowTs, $mesRevisionServicios);
       }
 
       $dueMonth = $dueTs > 0 ? (int) date('n', $dueTs) : 0;

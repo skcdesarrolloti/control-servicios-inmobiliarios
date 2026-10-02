@@ -155,6 +155,38 @@ try {
   $historyCount=(int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`");
   $assert(!empty($service->markContratoRecibido(90001,'2026-10-03')['ok']) && (int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`")===$historyCount && $repo->getPublicServicesContract(90001)['fecha_recibo']===$receivedRow['fecha_recibo'], 'received retry preserves original date and avoids duplicate history');
   $assert(empty($service->markContratoRecibido(90002,'2026-02-30')['ok']) && empty($service->markContratoRecibido(99999,'2026-10-02')['ok']), 'invalid receipt dates and missing exact contract PK fail closed');
+  $schedule = \SCM\Modules\Pending\PublicServicesSchedule::class;
+  $assert(date('Y-m-d', $schedule::initial(strtotime('2026-10-02'), 1)) === '2027-01-02', 'missing-date January schedule cannot precede October delivery');
+  $assert(date('Y-m-d', $schedule::initial(strtotime('2024-10-31'), 2)) === '2025-02-28', 'legacy overdue schedule retains original year and clamps day');
+  $assert(date('Y-m-d', $schedule::initial(strtotime('2026-10-02'), 10)) === '2026-10-02' && $schedule::initial(strtotime('2026-10-02'), 0) === strtotime('2026-10-02'), 'without historical evidence same-month and unset schedules remain due at delivery');
+  $recovery = new \SCM\Modules\Pending\PublicServicesDateRecovery($db);
+  $historicalDate = strtotime('2026-09-25 15:43:38');
+  foreach ([91001,91002,91003,91004,91005] as $pk) {
+    $db->insert($contractTable, array_replace($base, ['_ID'=>$pk,'contrato'=>'B'.$pk,'id_inmueble'=>'80101','ultima_revision_servicios'=>null,'fecha_entrega'=>strtotime('2026-10-02'),'mes_revision_servicios'=>'1','luz'=>'NIC','servicios_publicos'=>serialize(['Energia'])]));
+  }
+  $legacyReview = ['id_contrato'=>'91001','id_inmueble'=>'80101','contrato'=>'Contrato sin entregar','cct_status'=>'publish','fecha'=>$historicalDate,'tipo'=>'Antes de la ocupacion'];
+  $db->insert($reviewTable, $legacyReview + ['_ID'=>92001]);
+  $db->insert($reviewTable, array_replace($legacyReview, ['_ID'=>92002,'fecha'=>strtotime('2026-08-25')]));
+  $db->insert($reviewTable, array_replace($legacyReview, ['_ID'=>92003,'id_contrato'=>'91002','id_inmueble'=>'WRONG']));
+  $db->insert($reviewTable, array_replace($legacyReview, ['_ID'=>92004,'id_contrato'=>'91003','contrato'=>'OTHER-CONTRACT']));
+  $db->insert($reviewTable, array_replace($legacyReview, ['_ID'=>92005,'id_contrato'=>'91004','fecha'=>time()+86400]));
+  $db->insert($reviewTable, array_replace($legacyReview, ['_ID'=>92006,'id_contrato'=>'91005','fecha'=>null,'fecha_revision_luz'=>$historicalDate]));
+  $candidates = $recovery->evidence($repo->getContratosEntregados([]));
+  $assert(count($candidates)===2 && $candidates[91001]['review_id']===92001 && $candidates[91005]['timestamp']===$historicalDate, 'recovery finds latest exact pre-occupation evidence and actual service date fallback');
+  $assert(!isset($candidates[91002]) && !isset($candidates[91003]) && !isset($candidates[91004]), 'recovery rejects other properties, contradictory codes and future reviews');
+  $beforeRecovery = $controller->buildServiciosPublicosPayload(['rsp_contrato'=>'B91001','rsp_mes'=>12]);
+  $assert($beforeRecovery['count']===1 && date('Y-m-d',$beforeRecovery['items'][0]['due'])==='2026-12-25' && $repo->getPublicServicesContract(91001)['ultima_revision_servicios']===null, 'listing uses recovered evidence without mutating database and filters recovered due month');
+  $queuesBefore=(int)$db->getVar("SELECT COUNT(*) FROM `{$queueTable}`");
+  $reviewsBefore=(int)$db->getVar("SELECT COUNT(*) FROM `{$reviewTable}`");
+  try { $recovery->repair(91001,70003); $assert(false,'invalid repair actor'); } catch (\RuntimeException $e) { $assert($repo->getPublicServicesContract(91001)['ultima_revision_servicios']===null,'repair rejects an ID without a real active employee'); }
+  $assert($recovery->repair(91001,94001), 'audited historical date repair succeeds');
+  $repaired=$repo->getPublicServicesContract(91001);
+  $repairHistory=$db->getRow("SELECT * FROM `{$historyTable}` ORDER BY `_ID` DESC LIMIT 1");
+  $assert((int)$repaired['ultima_revision_servicios']===$historicalDate && (int)$repaired['mes_revision_servicios']===12 && (int)$repaired['revisiones_servicios']===4 && (int)$repaired['cct_author_id']===94001, 'repair updates actual date and next month while retaining original review count');
+  $assert((int)$repairHistory['id_empleado']===94001 && str_contains($repairHistory['observacion'],'92001') && str_contains($repairHistory['observacion'],'previous'), 'repair audit retains original fields and evidence under real employee identity');
+  $historiesAfter=(int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`");
+  $assert(!$recovery->repair(91001,94001) && !$recovery->repair(91002,94001) && (int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`")===$historiesAfter, 'repair is idempotent and leaves undocumented contracts unchanged');
+  $assert((int)$db->getVar("SELECT COUNT(*) FROM `{$queueTable}`")===$queuesBefore && (int)$db->getVar("SELECT COUNT(*) FROM `{$reviewTable}`")===$reviewsBefore, 'date recovery creates no reviews, acts or notifications');
   echo "$checks checks passed. Permanent rows unchanged; no external messages sent.\n";
 } finally {
   foreach ($generatedPaths as $path) { if (is_file($path)) { unlink($path); } }

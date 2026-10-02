@@ -53,3 +53,13 @@ php tests/public-services-liquidator-check.php
 La prueba de revisiones usa sombras TEMPORARY de las tablas, incluido el almacenamiento nativo, y un proveedor inerte: no cambia datos permanentes ni envía mensajes.
 
 Para probar la interfaz con Playwright, sirve la raíz del repositorio con PHP CLI-server en `127.0.0.1:9015` y ejecuta `node tests/public-services-workspace-check.cjs` con Playwright disponible. El harness `tests/public-services-review-ui.php` no conecta a base de datos y simula guardados. Verifica subpestañas, edición de la plantilla crítica, variables, vista previa, borradores, filtros y diseño móvil.
+
+## Recuperación de fechas históricas (3.3.343)
+
+Los contratos entregados sin `ultima_revision_servicios` pueden recuperar la fecha real desde las revisiones CCT existentes, incluidas las realizadas antes de la ocupación. Se exige coincidencia exacta de `id_contrato` con el `_ID` del contrato y de `id_inmueble`; se rechazan códigos contradictorios, fechas futuras y registros sin fecha real. Se toma la revisión válida más reciente, usando `fecha` o, cuando está vacía, las fechas explícitas de revisión de sus servicios. No se usa la fecha de creación como prueba de revisión.
+
+El listado utiliza esa evidencia sin escribir en la base de datos, de modo que también cubre nuevas entregas provenientes del flujo externo. La próxima revisión se calcula tres meses después de la revisión real. Si no existe evidencia, el mes heredado se sitúa en su primera ocurrencia desde la entrega; no se fuerza al año actual ni se desplazan vencimientos antiguos. La fecha de entrega nunca se registra como una revisión realizada.
+
+`php bin/repair-public-services-dates.php` muestra un diagnóstico sin cambios. `--contract=787` limita por `_ID` CCT. Para persistir: `php bin/repair-public-services-dates.php --apply --employee=1`, usando el `id_empleado` real de un funcionario activo. Cada reparación bloquea el contrato, vuelve a validar su fecha vacía y la evidencia, actualiza fecha/mes y conserva los valores anteriores y el ID de revisión fuente en el historial del inmueble, en una transacción. Es idempotente; no crea revisiones, actas ni notificaciones y no incrementa contadores. Los contratos sin respaldo se mantienen sin fecha para su verificación.
+
+Ejecución del 2 de octubre de 2026: de 131 contratos entregados sin fecha, se recuperaron 87 con evidencia y quedaron 44 sin respaldo inequívoco. El contrato #852 (CCT 787) recuperó el 25/09/2026 desde la revisión 890, realizada antes de la ocupación; próxima revisión 25/12/2026 y `mes_revision_servicios=12`.
