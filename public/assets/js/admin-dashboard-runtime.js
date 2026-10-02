@@ -17955,6 +17955,7 @@
       var ticket = context && context.ticket ? context.ticket : {};
       var quote = context && context.cotizacion ? context.cotizacion : {};
       return "scm:maintenance_quote_draft:" + [
+        window.ScmPanelDrafts.user(),
         context && context.mode ? context.mode : "create",
         ticket.id || ticket.numero || ticket.ticket_pk || "ticket",
         quote.id || "new",
@@ -18003,6 +18004,7 @@
         fields: fields,
         materialSupportProvider: (form.querySelector("[data-material-support-provider]") || {}).value || "",
         generatedMaterialOffers: maintenanceQuoteGeneratedMaterialOffers(form),
+        photos:Array.from(form.querySelectorAll('input[type="file"]')).map(function(input){return {name:input.name,files:window.ScmPanelDrafts.pack(Array.from(input.files||[]))};}),
         repeaters: {
           mano: collectQuoteRows(form, "mano"),
           materiales: collectQuoteRows(form, "materiales"),
@@ -18013,19 +18015,9 @@
       };
     }
 
-    function saveMaintenanceQuoteDraft(form, draftKey, context) {
-      if (!form || !draftKey || !window.localStorage) return;
-      try {
-        window.localStorage.setItem(draftKey, JSON.stringify(maintenanceQuoteDraftPayload(form, context || {})));
-      } catch (err) {
-        if (window.console && console.warn) console.warn("[cotizacion] No se pudo guardar el borrador local.", err);
-      }
-    }
-
-    function clearMaintenanceQuoteDraft(draftKey) {
-      if (!draftKey || !window.localStorage) return;
-      try { window.localStorage.removeItem(draftKey); } catch (err) {}
-    }
+    var maintenanceQuoteDraftStates=new Map();
+    function saveMaintenanceQuoteDraft(form,draftKey,context){var state=maintenanceQuoteDraftStates.get(draftKey);return state?state.save():Promise.resolve();}
+    function clearMaintenanceQuoteDraft(draftKey){var state=maintenanceQuoteDraftStates.get(draftKey);return state?state.clear():Promise.resolve();}
 
     function showMaintenanceQuoteDraftRestoredHint(form) {
       if (!form) return;
@@ -18059,14 +18051,7 @@
       if (nextRows) section.innerHTML = nextRows.innerHTML;
     }
 
-    function restoreMaintenanceQuoteDraft(form, context, draftKey) {
-      if (!form || !draftKey || !window.localStorage) return false;
-      var payload = null;
-      try {
-        payload = JSON.parse(window.localStorage.getItem(draftKey) || "null");
-      } catch (err) {
-        payload = null;
-      }
+    function restoreMaintenanceQuoteDraft(form, context, draftKey, payload) {
       if (!payload || !payload.repeaters) return false;
       replaceMaintenanceQuoteRepeaterRows(form, "mano", payload.repeaters.mano, context.unit_options);
       replaceMaintenanceQuoteRepeaterRows(form, "materiales", payload.repeaters.materiales, context.unit_options);
@@ -18077,6 +18062,7 @@
         var field = form.querySelector('[name="' + name + '"]');
         if (field && field.type !== "file") field.value = payload.fields[name] == null ? "" : String(payload.fields[name]);
       });
+      (payload.photos||[]).forEach(function(group){var input=Array.from(form.querySelectorAll('input[type="file"]')).find(function(field){return field.name===group.name;});if(input){var transfer=new DataTransfer();window.ScmPanelDrafts.unpack(group.files).forEach(function(file){transfer.items.add(file);});input.files=transfer.files;}});
       var provider = form.querySelector("[data-material-support-provider]");
       if (provider) provider.value = payload.materialSupportProvider || "";
       setMaintenanceQuoteGeneratedMaterialOffers(form, payload.generatedMaterialOffers || []);
@@ -18089,23 +18075,14 @@
       return true;
     }
 
-    function wireMaintenanceQuoteDraft(form, context, draftKey) {
-      if (!form || !draftKey) return;
-      var timer = null;
-      function schedule() {
-        window.clearTimeout(timer);
-        timer = window.setTimeout(function () {
-          saveMaintenanceQuoteDraft(form, draftKey, context || {});
-        }, 350);
-      }
-      form.addEventListener("input", schedule);
-      form.addEventListener("change", schedule);
-      form.addEventListener("click", function (event) {
-        if (event.target && event.target.closest && event.target.closest("[data-generate-material-offer], [data-remove-generated-material-offer], [data-remove-material-row-index], [data-quote-add-row], [data-quote-remove-row]")) {
-          schedule();
-        }
+    function wireMaintenanceQuoteDraft(form,context,draftKey){
+      if(!form||!draftKey)return;
+      var state=window.ScmPanelDrafts.bind(form,draftKey,{
+        revision:JSON.stringify(context.cotizacion||{}),
+        snapshot:function(){return maintenanceQuoteDraftPayload(form,context);},
+        restore:function(payload){restoreMaintenanceQuoteDraft(form,context,draftKey,payload);}
       });
-      restoreMaintenanceQuoteDraft(form, context || {}, draftKey);
+      form._scmQuoteDraft=state;maintenanceQuoteDraftStates.set(draftKey,state);
     }
 
     function quotePerturbationLevel(percent) {
@@ -18548,9 +18525,6 @@
               return false;
             }
             var draftKey = maintenanceQuoteDraftKey(context || {});
-            if (mode === "create" && button.hasAttribute("data-scm-clear-cotizacion-create-draft")) {
-              clearMaintenanceQuoteDraft(draftKey);
-            }
             return window.Swal.fire({
             title: context.mode === "edit" ? "Editar cotización de mantenimiento" : (context.mode === "note" ? "Añadir nota de cotización" : "Añadir cotización de mantenimiento"),
             html: buildMaintenanceQuoteFormHtml(context),
@@ -18585,6 +18559,7 @@
                 window.Swal.showValidationMessage("Formulario no disponible.");
                 return false;
               }
+              return form._scmQuoteDraft.ready.then(function(){
               syncMaintenanceQuotePerturbation(form, context || {});
               if (maintenanceQuoteMaterialSupportRows(form).length && !generateMaterialOfferFromSupport(form, true)) {
                 return false;
@@ -18610,8 +18585,8 @@
                   saveMaintenanceQuoteDraft(form, draftKey, context || {});
                   return false;
                 }
-                clearMaintenanceQuoteDraft(draftKey);
-                return true;
+                return clearMaintenanceQuoteDraft(draftKey).then(function(){return true;});
+              });
               });
             },
           }).then(function (result) {

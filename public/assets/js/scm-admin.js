@@ -3824,6 +3824,7 @@
           return [
             "scm",
             "revision-correctiva-draft",
+            window.ScmPanelDrafts.user(),
             caseBtn.dataset.ticketPk || "ticket",
             form.hasAttribute("data-corrective-review-edit")
               ? "edit"
@@ -3855,39 +3856,16 @@
             };
           });
         }
-        function correctiveDraftHasContent(entries) {
-          return Array.isArray(entries) && entries.some(function (entry) {
-            return String(entry.value || "").trim() !== "";
-          });
-        }
-        function saveCorrectiveDraft() {
-          try {
-            var draftItems = Array.from(
-              form.querySelectorAll("[data-corrective-item]"),
-            ).map(correctiveDraftFields);
-            while (draftItems.length > 1 && !correctiveDraftHasContent(draftItems[draftItems.length - 1]))
-              draftItems.pop();
-            window.localStorage.setItem(
-              correctiveDraftKey(),
-              JSON.stringify({
-                version: 1,
-                reviewVersion: form.dataset.correctiveReviewVersion || "",
-                savedAt: Date.now(),
-                items: draftItems,
-              }),
-            );
-          } catch (error) {
-            if (window.console && console.warn)
-              console.warn(
-                "[correctiva] No se pudo guardar el borrador local.",
-                error,
-              );
-          }
-        }
-        function clearCorrectiveDraft() {
-          try {
-            window.localStorage.removeItem(correctiveDraftKey());
-          } catch (error) {}
+        var originalCorrectivePhotos=new Map();
+        form.querySelectorAll('[data-corrective-existing-photo]').forEach(function(photo){var field=photo.querySelector('input');if(field)originalCorrectivePhotos.set(field.value,photo.cloneNode(true));});
+        var correctiveDraftState;
+        function saveCorrectiveDraft() { return correctiveDraftState ? correctiveDraftState.save() : Promise.resolve(); }
+        function clearCorrectiveDraft() { window.clearTimeout(correctiveDraftTimer); return correctiveDraftState.clear(); }
+        function correctiveDraftPayload() {
+          return {items:Array.from(form.querySelectorAll('[data-corrective-item]')).map(function(item){
+            var input=item.querySelector('[data-corrective-photos]');
+            return {fields:correctiveDraftFields(item), photos:window.ScmPanelDrafts.pack(filesOf(input)), kept:Array.from(item.querySelectorAll('[data-corrective-existing-photo] input')).map(function(field){return field.value;})};
+          })};
         }
         function setCorrectiveDraftField(field, entry) {
           if (!field || !entry) return;
@@ -3897,34 +3875,7 @@
             field.value = entry.value == null ? "" : String(entry.value);
           }
         }
-        function restoreCorrectiveDraft() {
-          var raw = null;
-          try {
-            raw = window.localStorage.getItem(correctiveDraftKey());
-          } catch (error) {
-            raw = null;
-          }
-          if (!raw) return;
-          var payload = null;
-          try {
-            payload = JSON.parse(raw);
-          } catch (error) {
-            clearCorrectiveDraft();
-            return;
-          }
-          if (
-            !payload ||
-            !Array.isArray(payload.items) ||
-            !payload.items.length
-          )
-            return;
-          if (form.hasAttribute("data-corrective-review-edit") &&
-            payload.reviewVersion !== form.dataset.correctiveReviewVersion) {
-            clearCorrectiveDraft();
-            return;
-          }
-          while (payload.items.length > 1 && !correctiveDraftHasContent(payload.items[payload.items.length - 1]))
-            payload.items.pop();
+        function restoreCorrectiveDraft(payload) {
           var list = form.querySelector("[data-corrective-review-items]");
           if (list) {
             while (
@@ -3940,17 +3891,22 @@
           }
           Array.from(form.querySelectorAll("[data-corrective-item]")).forEach(
             function (item, itemIndex) {
-              var entries = payload.items[itemIndex] || [];
+              var saved = payload.items[itemIndex] || {};
+              var entries = saved.fields || [];
               correctiveDraftFieldElements(item).forEach(
                 function (field, fieldIndex) {
                   setCorrectiveDraftField(field, entries[fieldIndex]);
                 },
               );
+              item.querySelectorAll('[data-corrective-existing-photo]').forEach(function(photo){photo.remove();});
+              (saved.kept||[]).forEach(function(ref){var original=originalCorrectivePhotos.get(ref);if(original){var photo=original.cloneNode(true);photo.querySelector('input').name='items['+itemIndex+'][existing_fotos][]';item.querySelector('[data-corrective-photo-preview]').appendChild(photo);}});
+              var input=item.querySelector('[data-corrective-photos]');
+              syncInput(input,window.ScmPanelDrafts.unpack(saved.photos));preview(input);
               syncCorrectiveAreaFields(item);
             },
           );
           message(
-            "Restauré un borrador local de la revisión correctiva. Las fotos solo se conservan si no recargaste la página.",
+            "Restauré el borrador de este caso, incluidas las fotos de la revisión correctiva.",
             false,
           );
         }
@@ -4023,7 +3979,9 @@
         form
           .querySelectorAll("[data-corrective-item]")
           .forEach(syncCorrectiveAreaFields);
-        restoreCorrectiveDraft();
+        correctiveDraftState=window.ScmPanelDrafts.bind(form,correctiveDraftKey(),{
+          revision:form.dataset.correctiveReviewVersion||'',snapshot:correctiveDraftPayload,restore:restoreCorrectiveDraft
+        });
         form.addEventListener("submit", function (event) {
           event.preventDefault();
           saveCorrectiveDraft();

@@ -154,4 +154,33 @@
     observer.observe(document.body,{childList:true,subtree:true});
   }
   window.ScmActaFormState={bind:bind,count:count,preview:preview};
+  // IndexedDB keeps binary photos alongside the form data without localStorage's small quota.
+  window.ScmPanelDrafts={
+    user:function(){return (document.querySelector('[data-scm-draft-user]')||{}).dataset?.scmDraftUser||'';},
+    pack:function(list){return list.map(function(file){return {blob:file,name:file.name,lastModified:file.lastModified};});},
+    unpack:function(list){return (list||[]).map(function(file){return new File([file.blob],file.name,{type:file.blob.type,lastModified:file.lastModified});});},
+    bind:function(form,key,options){
+      var loading=true,changed=false,cleared=false,timer,chain=Promise.resolve();
+      var hint=document.createElement('p');hint.setAttribute('role','status');form.prepend(hint);
+      function save(){
+        if(loading||cleared)return chain;
+        var payload=options.snapshot();payload.savedAt=Date.now();payload.revision=options.revision||'';
+        hint.textContent='Guardando borrador y fotos en este navegador…';
+        chain=chain.catch(function(){}).then(function(){if(!cleared)return storage('put',key,payload);}).then(function(){if(!cleared)hint.textContent='Borrador del caso guardado en este navegador, incluidas las fotos.';}).catch(function(){hint.textContent='No se pudo guardar el borrador. Conserva abierto el formulario para no perder lo escrito ni las fotos.';});
+        return chain;
+      }
+      function schedule(){if(loading){changed=true;return;}clearTimeout(timer);timer=setTimeout(save,250);}
+      var ready=storage('get',key).then(function(payload){
+        if(!payload||changed)return;
+        if(payload.revision!==(options.revision||'')||Date.now()-payload.savedAt>7*86400000){hint.textContent='El borrador anterior venció o los datos guardados cambiaron. Se cargó la versión actual.';return;}
+        options.restore(payload);hint.textContent='Borrador del caso recuperado, incluidas las fotos.';
+      }).catch(function(){hint.textContent='No se pudo recuperar el borrador local.';}).finally(function(){loading=false;if(changed)schedule();});
+      form.addEventListener('input',schedule);form.addEventListener('change',schedule);
+      form.addEventListener('click',function(){queueMicrotask(function(){if(!loading)schedule();});});
+      form.addEventListener('submit',function(e){if(loading){e.preventDefault();e.stopImmediatePropagation();hint.textContent='Espera a recuperar el borrador.';}},true);
+      window.addEventListener('pagehide',function(){if(form.isConnected)save();});document.addEventListener('visibilitychange',function(){if(document.hidden&&form.isConnected)save();});
+      var observer=new MutationObserver(function(){if(!form.isConnected){clearTimeout(timer);save();observer.disconnect();}});observer.observe(document.body,{childList:true,subtree:true});
+      return {save:save,ready:ready,clear:function(){cleared=true;clearTimeout(timer);return chain.then(function(){return storage('delete',key);}).catch(function(){hint.textContent='El registro se guardó, pero no se pudo borrar el borrador local.';});}};
+    }
+  };
 })();
