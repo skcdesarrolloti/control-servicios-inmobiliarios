@@ -15659,6 +15659,8 @@
         e.target && e.target.closest ? e.target.closest("a[href]") : null;
       if (
         extLink &&
+        !e.defaultPrevented &&
+        !extLink.hasAttribute("download") &&
         extLink.closest(".scm-case-modal") &&
         extLink.getAttribute("target") !== "_blank" &&
         /^https?:\/\//i.test(extLink.getAttribute("href") || "")

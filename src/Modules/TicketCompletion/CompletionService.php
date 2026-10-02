@@ -96,7 +96,7 @@ final class CompletionService
     $items = [];
     foreach ($rows as $row) {
       $stored = $this->decodeStoredItems($row['evaluacion_de_danos'] ?? null);
-      foreach ($stored as $item) {
+      foreach ($stored as $itemIndex => $item) {
         if (!is_array($item)) {
           continue;
         }
@@ -104,6 +104,8 @@ final class CompletionService
         if ($damage !== '') {
           $items[] = [
             'damage' => $damage,
+            'corrective' => $item,
+            'corrective_sync_id' => (string) ($item['_scm_acta_sync_id'] ?? md5((string) $row['_ID'] . ':' . $itemIndex . ':' . $damage)),
             'solution' => '',
             'damage_photos' => $this->actaPhotoDescriptorsFromRefs($this->storedImageRefsFromValue($item['registro_foto_dano'] ?? '')),
           ];
@@ -562,6 +564,10 @@ final class CompletionService
         $photos[] = $photo;
       }
       $suggestion = ['damage' => $damage, 'solution' => ''];
+      if (!empty($item['corrective'])) {
+        $suggestion['corrective'] = $item['corrective'];
+        $suggestion['corrective_sync_id'] = (string) ($item['corrective_sync_id'] ?? '');
+      }
       if ($photos !== []) {
         $suggestion['damage_photos'] = $photos;
       }
@@ -763,19 +769,15 @@ final class CompletionService
   private function syncCorrectiveDamages(array $ticket, array $items, array $actor, array $previousItems = []): array
   {
     $known = [];
-    foreach ($previousItems as $oldItem) {
+    foreach (array_merge($this->suggestedItemsFromCorrectiveReview((string) ($ticket['id_revision_correctiva'] ?? '')), $previousItems) as $oldItem) {
       $id = (string) ($oldItem['corrective_sync_id'] ?? '');
       if (preg_match('/^[a-f0-9]{32}$/D', $id)) { $known[$id] = $oldItem; }
     }
     $pending = [];
     foreach ($items as $index => &$item) {
       $id = (string) ($item['corrective_sync_id'] ?? '');
-      if ($id !== '' && isset($known[$id])) {
-        $item['corrective'] = $known[$id]['corrective'] ?? [];
-        $item['damage'] = $this->correctiveDamageText($item['corrective']);
-        continue;
-      }
-      $item['corrective_sync_id'] = '';
+      if ($id !== '' && !isset($known[$id])) throw new \DomainException('El daño cambió en la revisión correctiva. Recarga el acta antes de guardar.');
+      if ($id !== '' && empty($item['corrective'])) { $item['corrective'] = $known[$id]['corrective'] ?? []; }
       if (!is_array($item['corrective'] ?? null) || $item['corrective'] === []) { continue; }
       $raw = $item['corrective'];
       $required = ['indice', 'descripcion_dano', 'consecuencia', 'nivel_dano', 'tiempo_atencion'];
@@ -790,7 +792,9 @@ final class CompletionService
       if (!array_filter([$damage['area_afectada_1'], $damage['area_afectada_2'], $damage['area_afectada_3'], $damage['area_afectada_4']])) {
         throw new \DomainException('Selecciona el área afectada del daño agregado.');
       }
+      $damage['area_afectada'] = implode(', ', array_filter([$damage['area_afectada_1'], $damage['area_afectada_2'], $damage['area_afectada_3'], $damage['area_afectada_4']]));
       $refs = \SCM\Modules\CorrectiveReview\CorrectiveReviewPhotos::refs($raw['registro_foto_dano'] ?? '');
+      if ($id !== '') $refs = array_values(array_unique(array_merge(\SCM\Modules\CorrectiveReview\CorrectiveReviewPhotos::refs($known[$id]['corrective']['registro_foto_dano'] ?? ''), $refs)));
       $damage['registro_foto_dano'] = implode(',', $refs);
       $item['corrective'] = $damage;
       $item['damage'] = $this->correctiveDamageText($damage);
@@ -800,31 +804,63 @@ final class CompletionService
     unset($item);
     if ($pending === []) { return $items; }
     $rows = $this->linkedRowsByIds('jet_cct_revision_correctiva', (string) ($ticket['id_revision_correctiva'] ?? ''));
-    if ($rows === []) { throw new \DomainException('Este caso no tiene revisión correctiva. Guarda primero la revisión antes de agregar daños desde el acta.'); }
-    $review = $rows[0];
-    $stored = $this->decodeStoredItems($review['evaluacion_de_danos'] ?? '');
-    if (count($stored) + count($pending) > 30) { throw new \DomainException('La revisión correctiva admite máximo 30 daños.'); }
+    if ($rows === []) throw new \DomainException('Este caso no tiene revisión correctiva. Guarda primero la revisión antes de agregar daños desde el acta.');
+    $storedByReview = [];
+    foreach ($rows as $review) $storedByReview[(string) $review['_ID']] = $this->decodeStoredItems($review['evaluacion_de_danos'] ?? '');
+    $changed = [];
+    $used = [];
     foreach ($pending as $index => $damage) {
-      $stored[] = $damage;
-      $items[$index]['corrective_sync_id'] = bin2hex(random_bytes(16));
-    }
-    $areas = [];
-    foreach ($stored as $damage) {
-      foreach (['area_afectada_1', 'area_afectada_2', 'area_afectada_3', 'area_afectada_4'] as $key) {
-        $area = trim((string) ($damage[$key] ?? ''));
-        if ($area !== '') { $areas[$area] = $area; }
+      $syncId = (string) ($items[$index]['corrective_sync_id'] ?? '');
+      if ($syncId !== '') {
+        $previous = $known[$syncId];
+        $matches = [];
+        foreach ($storedByReview as $reviewId => $stored) {
+          foreach ($stored as $offset => $storedDamage) {
+            if (!is_array($storedDamage)) continue;
+            $storedId = (string) ($storedDamage['_scm_acta_sync_id'] ?? md5($reviewId . ':' . $offset . ':' . $this->correctiveDamageText($storedDamage)));
+            if ($storedId === $syncId && $this->correctiveDamageText($storedDamage) !== $this->correctiveDamageText((array) ($previous['corrective'] ?? []))) {
+              throw new \DomainException('El daño fue editado en la revisión correctiva. Recarga el acta para conservar esos cambios.');
+            }
+            if ($storedId === $syncId || ($this->correctiveDamageText($storedDamage) === $this->correctiveDamageText((array) ($previous['corrective'] ?? [])))) $matches[] = [$reviewId, $offset];
+          }
+        }
+        if (count($matches) !== 1) throw new \DomainException('No se pudo identificar el daño original o fue modificado. Recarga la revisión antes de guardar.');
+        [$reviewId, $offset] = $matches[0];
+        if (isset($used[$reviewId . ':' . $offset])) throw new \DomainException('El mismo daño está repetido en el acta.');
+        $used[$reviewId . ':' . $offset] = true;
+        $damage['registro_foto_dano'] = implode(',', array_values(array_unique(array_merge(
+          \SCM\Modules\CorrectiveReview\CorrectiveReviewPhotos::refs($storedByReview[$reviewId][$offset]['registro_foto_dano'] ?? ''),
+          \SCM\Modules\CorrectiveReview\CorrectiveReviewPhotos::refs($damage['registro_foto_dano'])
+        ))));
+        $items[$index]['corrective']['registro_foto_dano'] = $damage['registro_foto_dano'];
+        $storedByReview[$reviewId][$offset] = array_replace($storedByReview[$reviewId][$offset], $damage, ['_scm_acta_sync_id' => $syncId]);
+      } else {
+        $reviewId = (string) $rows[0]['_ID'];
+        if (count($storedByReview[$reviewId]) >= 30) throw new \DomainException('La revisión correctiva admite máximo 30 daños.');
+        $syncId = bin2hex(random_bytes(16));
+        $storedByReview[$reviewId][] = $damage + ['_scm_acta_sync_id' => $syncId];
+        $items[$index]['corrective_sync_id'] = $syncId;
       }
+      $changed[$reviewId] = true;
     }
-    $table = $this->repo->db->table('jet_cct_revision_correctiva');
-    $update = $this->repo->schema->filterTableData($table, [
-      'evaluacion_de_danos' => serialize($stored),
-      'area_afectada' => implode(', ', $areas),
-      'cct_modified' => date('Y-m-d H:i:s'),
-      'cct_author_id' => (string) ($actor['employee_id'] ?? ''),
-      'id_empleado' => (string) ($actor['employee_id'] ?? ''),
-    ]);
-    $this->repo->db->update($table, $update, ['_ID' => (int) $review['_ID']]);
-    $this->repo->audit((int) $ticket['_ID'], 'Se agregaron ' . count($pending) . ' daños a la revisión correctiva #' . $review['_ID'] . ' desde el acta de satisfacción.', (string) ($actor['name'] ?? ''), (string) ($actor['employee_id'] ?? ''));
+    foreach (array_keys($changed) as $reviewId) {
+      $stored = $storedByReview[$reviewId];
+      $areas = [];
+      foreach ($stored as $damage) foreach (['area_afectada_1', 'area_afectada_2', 'area_afectada_3', 'area_afectada_4'] as $key) {
+        $area = trim((string) ($damage[$key] ?? ''));
+        if ($area !== '') $areas[$area] = $area;
+      }
+      $table = $this->repo->db->table('jet_cct_revision_correctiva');
+      $update = $this->repo->schema->filterTableData($table, [
+        'evaluacion_de_danos' => serialize($stored),
+        'area_afectada' => implode(', ', $areas),
+        'cct_modified' => date('Y-m-d H:i:s'),
+        'cct_author_id' => (string) ($actor['employee_id'] ?? ''),
+        'id_empleado' => (string) ($actor['employee_id'] ?? ''),
+      ]);
+      $this->repo->db->update($table, $update, ['_ID' => (int) $reviewId]);
+      $this->repo->audit((int) $ticket['_ID'], 'Daños de la revisión correctiva #' . $reviewId . ' actualizados desde el acta de satisfacción, conservando los demás daños.', (string) ($actor['name'] ?? ''), (string) ($actor['employee_id'] ?? ''));
+    }
     return $items;
   }
 

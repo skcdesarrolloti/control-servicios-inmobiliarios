@@ -3185,6 +3185,7 @@
           }
           addPhotos(input, files);
         });
+        form.querySelectorAll("[data-acta-item]").forEach(function (item) { syncActaCorrectiveArea(item); syncActaDamageSummary(item); });
         if (window.ScmActaFormState) window.ScmActaFormState.bind(form, {compress: compressPhoto});
         form.addEventListener("submit", function (event) {
           event.preventDefault();

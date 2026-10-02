@@ -194,7 +194,7 @@ trait HandlesTicketCompletion
           $damageNames = $_FILES[$damageField]['name'] ?? [];
           $damageNames = is_array($damageNames) ? array_values(array_filter($damageNames, static fn($name): bool => trim((string) $name) !== '')) : [];
           if ($damageNames) {
-            if (!is_array($item['corrective'] ?? null) || trim((string) ($item['corrective_sync_id'] ?? '')) !== '') {
+            if (!is_array($item['corrective'] ?? null)) {
               throw new \DomainException('El registro fotográfico del daño no es válido.');
             }
             $damageUploads = $this->handleImageUploadsDetailed($damageField, count($damageNames));

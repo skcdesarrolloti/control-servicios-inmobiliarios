@@ -44,6 +44,16 @@ final class CompletionView
     $selectedChannel = count($selectedChannels) > 1 ? 'both' : (string) ($selectedChannels[0] ?? 'email');
     $suggestedItems = is_array($context['suggested_items'] ?? null) ? $context['suggested_items'] : [];
     $formItems = is_array($formPayload['items'] ?? null) && $formPayload['items'] ? $formPayload['items'] : ($suggestedItems ?: [[]]);
+    // Enrich older acts whose payload stored only the damage summary.
+    foreach ($formItems as &$formItem) {
+      if (!empty($formItem['corrective'])) continue;
+      $matches = array_values(array_filter($suggestedItems, static fn(array $suggestion): bool => (string) ($suggestion['damage'] ?? '') === (string) ($formItem['damage'] ?? '') && !empty($suggestion['corrective'])));
+      if (count($matches) === 1) {
+        $formItem['corrective'] = $matches[0]['corrective'];
+        $formItem['corrective_sync_id'] = $matches[0]['corrective_sync_id'];
+      }
+    }
+    unset($formItem);
     $formObservations = (string) ($formPayload['observations'] ?? '');
     $sourceFlow = is_array($formPayload['source'] ?? null) ? $formPayload['source'] : (is_array($context['source_flow'] ?? null) ? $context['source_flow'] : []);
     $sourceName = (string) ($sourceFlow['flow'] ?? 'ticket_solution');
@@ -130,7 +140,7 @@ final class CompletionView
     $hasCorrective = is_array($values['corrective'] ?? null) && $values['corrective'] !== [];
     $syncId = trim((string) ($values['corrective_sync_id'] ?? ''));
     $correctiveHtml = $this->correctiveItem !== null ? ($this->correctiveItem)($index, $hasCorrective ? $values['corrective'] : []) : '';
-    $correctiveBlock = $correctiveHtml === '' ? '' : '<div data-acta-corrective-wrap' . ($hasCorrective ? '' : ' hidden') . '><fieldset data-acta-corrective-fields' . ($hasCorrective && $syncId === '' ? '' : ' disabled') . '><legend>Detalle para la revisión correctiva</legend>' . $correctiveHtml . '</fieldset></div>';
+    $correctiveBlock = $correctiveHtml === '' ? '' : '<div data-acta-corrective-wrap' . ($hasCorrective ? '' : ' hidden') . '><fieldset data-acta-corrective-fields' . ($hasCorrective ? '' : ' disabled') . '><legend>Detalle para la revisión correctiva</legend>' . $correctiveHtml . '</fieldset></div>';
     $syncField = $syncId !== '' ? '<input type="hidden" name="items[' . $index . '][corrective_sync_id]" value="' . self::e($syncId) . '">' : '';
     $helpId = 'acta-photo-help-' . $index;
     $damagePhotosHtml = '';
