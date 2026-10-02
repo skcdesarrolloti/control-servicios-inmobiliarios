@@ -44,16 +44,23 @@ final class CompletionView
     $selectedChannel = count($selectedChannels) > 1 ? 'both' : (string) ($selectedChannels[0] ?? 'email');
     $suggestedItems = is_array($context['suggested_items'] ?? null) ? $context['suggested_items'] : [];
     $formItems = is_array($formPayload['items'] ?? null) && $formPayload['items'] ? $formPayload['items'] : ($suggestedItems ?: [[]]);
+    $normalizeDamage = static fn(string $text): string => trim(preg_replace('/[ \t\x{00A0}]+/u', ' ', str_replace(["\r\n", "\r"], "\n", html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8'))) ?? '');
     // Enrich older acts whose payload stored only the damage summary.
     foreach ($formItems as &$formItem) {
       if (!empty($formItem['corrective'])) continue;
-      $matches = array_values(array_filter($suggestedItems, static fn(array $suggestion): bool => (string) ($suggestion['damage'] ?? '') === (string) ($formItem['damage'] ?? '') && !empty($suggestion['corrective'])));
+      $matches = array_values(array_filter($suggestedItems, static fn(array $suggestion): bool => $normalizeDamage((string) ($suggestion['damage'] ?? '')) === $normalizeDamage((string) ($formItem['damage'] ?? '')) && !empty($suggestion['corrective'])));
       if (count($matches) === 1) {
         $formItem['corrective'] = $matches[0]['corrective'];
         $formItem['corrective_sync_id'] = $matches[0]['corrective_sync_id'];
+        if (empty($formItem['damage_photos'])) $formItem['damage_photos'] = $matches[0]['damage_photos'] ?? [];
       }
     }
     unset($formItem);
+    $draftRevision = $editAct['payload_hash'] ?? hash('sha256', json_encode([$suggestedItems, $context['contacts']], JSON_THROW_ON_ERROR));
+    if ($editAct && $formItems !== ($formPayload['items'] ?? [])) {
+      // An older draft must not hide newly recovered corrective fields or photos.
+      $draftRevision = hash('sha256', json_encode([$draftRevision, $formItems], JSON_THROW_ON_ERROR));
+    }
     $formObservations = (string) ($formPayload['observations'] ?? '');
     $sourceFlow = is_array($formPayload['source'] ?? null) ? $formPayload['source'] : (is_array($context['source_flow'] ?? null) ? $context['source_flow'] : []);
     $sourceName = (string) ($sourceFlow['flow'] ?? 'ticket_solution');
@@ -101,7 +108,7 @@ final class CompletionView
         </article>
       <?php endforeach; endif; ?>
       <?php if ((!$active || $editAct) && ($editAct || !in_array(mb_strtolower((string) $ticket['estado']), ['cerrado', 'finalizado', 'resuelto'], true))): ?>
-        <form data-acta-create data-acta-draft-user="<?= self::e(\SCM\Core\Auth::userId()) ?>" data-acta-draft-ticket="<?= self::e($ticket['_ID']) ?>" data-acta-draft-revision="<?= self::e($editAct['payload_hash'] ?? hash('sha256', json_encode([$suggestedItems, $context['contacts']], JSON_THROW_ON_ERROR))) ?>" data-acta-operation="<?= $editAct ? 'update' : 'create' ?>"<?= $editAct ? ' data-acta-id="' . self::e($editAct['id']) . '"' : '' ?>>
+        <form data-acta-create data-acta-draft-user="<?= self::e(\SCM\Core\Auth::userId()) ?>" data-acta-draft-ticket="<?= self::e($ticket['_ID']) ?>" data-acta-draft-revision="<?= self::e($draftRevision) ?>" data-acta-operation="<?= $editAct ? 'update' : 'create' ?>"<?= $editAct ? ' data-acta-id="' . self::e($editAct['id']) . '"' : '' ?>>
           <?php if ($editAct && $editAct['status'] === 'signed'): ?><label class="scm-acta-check"><input type="checkbox" name="confirm_reopen" value="1" required><span>Confirmo que al guardar esta acta quedará sin firmar, el caso se reabrirá y se enviará una nueva solicitud de firma.</span></label><?php endif; ?>
           <input type="hidden" name="source_flow" value="<?= self::e($sourceName) ?>">
           <input type="hidden" name="source_cotizacion_id" value="<?= self::e($sourceQuoteId) ?>">

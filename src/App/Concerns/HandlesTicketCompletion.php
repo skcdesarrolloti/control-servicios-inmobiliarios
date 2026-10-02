@@ -156,7 +156,7 @@ trait HandlesTicketCompletion
             $trackOldPhoto($oldPhoto);
           }
         };
-        if ($operation === 'create') {
+        if (in_array($operation, ['create', 'update'], true)) {
           foreach ((array) ($service->context($ticketId, $sourceFlow)['suggested_items'] ?? []) as $suggestedItem) {
             $verifySuggestedPhotos((array) ($suggestedItem['damage_photos'] ?? []), $allowExistingDamagePhoto);
             $verifySuggestedPhotos((array) ($suggestedItem['photos'] ?? []), $allowLegacySuggestedPhoto);
