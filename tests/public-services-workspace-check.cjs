@@ -90,7 +90,7 @@ const fs = require('node:fs');
     await page.locator('[data-services-export="history"]').click();
     assert((await historyDownloadWait).suggestedFilename().includes('pagina-actual'));
     await page.locator('[data-services-tab="pending"]').click();
-    await page.locator('[data-scm-open-public-services-review]').first().click();
+    await page.locator('[data-services-list="pending"] [data-scm-open-public-services-review]').first().click();
     await page.locator('[data-public-services-review-form]').waitFor();
     const form = page.locator('[data-public-services-review-form]');
     assert(await form.locator('[data-public-service-card="agua"] .scm-public-service-fields').isHidden());
