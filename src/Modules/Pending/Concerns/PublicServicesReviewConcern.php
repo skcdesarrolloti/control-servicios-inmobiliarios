@@ -90,12 +90,12 @@ trait PublicServicesReviewConcern
       $timestamp = $oldTs > 0 && date('Y-m-d', $oldTs) === $value ? $oldTs : $date->getTimestamp();
       $next = \SCM\Modules\Pending\PublicServicesSchedule::next($timestamp);
       $month = (int) date('n', $next);
-      if ($timestamp !== $oldTs || $month !== (int) ($contract['mes_revision_servicios'] ?? 0)) {
+      if ($timestamp !== $oldTs || $month !== (int) ($contract['mes_revision_servicios'] ?? 0) || (int) ($contract['proxima_revision_servicios'] ?? 0) > 0) {
         \SCM\Modules\Pending\PublicServicesReviewStorage::validateToken($token, $contract, Auth::userId());
         $now = date('Y-m-d H:i:s');
-        $payload = ['ultima_revision_servicios' => $timestamp, 'mes_revision_servicios' => $month, 'cct_modified' => $now, 'cct_author_id' => $employee['id_empleado']];
+        $payload = ['ultima_revision_servicios' => $timestamp, 'mes_revision_servicios' => $month, 'proxima_revision_servicios' => null, 'cct_modified' => $now, 'cct_author_id' => $employee['id_empleado']];
         if ($this->repo->updateContratoArrendamiento($contractId, $payload) !== 1) { throw new \RuntimeException('No fue posible guardar el ajuste.'); }
-        $audit = ['contract_pk' => $contractId, 'previous' => ['ultima_revision_servicios' => $contract['ultima_revision_servicios'] ?? null, 'mes_revision_servicios' => $contract['mes_revision_servicios'] ?? null], 'adjusted' => ['ultima_revision_servicios' => $timestamp, 'mes_revision_servicios' => $month], 'next_review' => $next];
+        $audit = ['contract_pk' => $contractId, 'previous' => ['ultima_revision_servicios' => $contract['ultima_revision_servicios'] ?? null, 'mes_revision_servicios' => $contract['mes_revision_servicios'] ?? null, 'proxima_revision_servicios' => $contract['proxima_revision_servicios'] ?? null], 'adjusted' => ['ultima_revision_servicios' => $timestamp, 'mes_revision_servicios' => $month, 'proxima_revision_servicios' => null], 'next_review' => $next];
         if (!$this->repo->insertHistorialInmueble([
           'cct_status' => 'publish', 'cct_author_id' => $employee['id_empleado'], 'id_empleado' => $employee['id_empleado'], 'funcionario' => $employee['nombre'],
           'cct_created' => $now, 'cct_modified' => $now, 'fecha' => time(), 'id_inmueble' => (string) $contract['id_inmueble'], 'tipo_reporte' => 'Contractual',
@@ -108,6 +108,71 @@ trait PublicServicesReviewConcern
     } catch (\Throwable $error) {
       if ($pdo->inTransaction()) { $pdo->rollBack(); }
       return ['ok' => false, 'message' => $error->getMessage()];
+    }
+  }
+
+  /** Atomic multi-contract scheduling, preserving actual review dates. */
+  public function scheduleServiciosPublicosMonth(array $input): array
+  {
+    $employee = $this->repo->getFuncionarioByUserId(Auth::userId());
+    if (!$employee || !$this->publicServicesScheduleAdmin($employee)) {
+      return ['ok'=>false, 'message'=>'Solo los administradores pueden reprogramar revisiones.'];
+    }
+    $monthValue = trim((string) ($input['target_month'] ?? ''));
+    $target = \DateTimeImmutable::createFromFormat('!Y-m', $monthValue, new \DateTimeZone('America/Bogota'));
+    $reason = $this->cleanReviewText((string) ($input['reason'] ?? ''));
+    $selection = $input['contracts'] ?? [];
+    if (!$target || $target->format('Y-m') !== $monthValue || $monthValue < date('Y-m') || (int)$target->format('Y') > 9999) {
+      return ['ok'=>false, 'message'=>'Escoge el mes actual o uno futuro, indicando el año.'];
+    }
+    if (!is_array($selection) || !$selection || count($selection) > 500 || mb_strlen($reason) < 5 || mb_strlen($reason) > 1000) {
+      return ['ok'=>false, 'message'=>'Selecciona entre 1 y 500 contratos y escribe un motivo entre 5 y 1000 caracteres.'];
+    }
+    $selected = [];
+    foreach ($selection as $entry) {
+      if (!is_array($entry) || !ctype_digit((string)($entry['id'] ?? '')) || (int)$entry['id'] <= 0 || isset($selected[(int)$entry['id']])) {
+        return ['ok'=>false, 'message'=>'La selección de contratos no es válida.'];
+      }
+      $selected[(int)$entry['id']] = (string)($entry['token'] ?? '');
+    }
+    ksort($selected, SORT_NUMERIC); // Stable lock order prevents deadlocks across overlapping batches.
+    $db = $this->repo->getDb(); $pdo = $db->pdo();
+    if ($pdo->inTransaction()) { return ['ok'=>false,'message'=>'Ya hay otra operación en curso.']; }
+    try {
+      (new \SCM\Modules\Pending\PublicServicesReviewStorage($db))->requireSchema();
+      $pdo->beginTransaction(); $changed = 0; $updates=[]; $histories=[]; $now=date('Y-m-d H:i:s');
+      $locked = $this->repo->lockPublicServicesContracts(array_keys($selected));
+      $recovered = (new \SCM\Modules\Pending\PublicServicesDateRecovery($db))->evidence(array_values($locked));
+      foreach ($selected as $pk => $token) {
+        $contract = $locked[$pk] ?? null;
+        if (!$contract || strtolower(trim((string)$contract['estado'])) !== 'entregado') { throw new \DomainException('El contrato seleccionado ya no está entregado. Recarga el listado.'); }
+        \SCM\Modules\Pending\PublicServicesReviewStorage::validateToken($token, $contract, Auth::userId(), false);
+        $actual = $this->parseTs($contract['ultima_revision_servicios'] ?? null);
+        if ($actual <= 0) { $actual = $recovered[$pk]['timestamp'] ?? 0; }
+        $oldDue = $this->parseTs($contract['proxima_revision_servicios'] ?? null);
+        if ($oldDue <= 0) {
+          $base = $this->firstPositiveTs([$contract['fecha_entrega'] ?? null, $contract['inicio_contrato'] ?? null, $contract['fecha'] ?? null]);
+          $oldDue = $actual > 0 ? \SCM\Modules\Pending\PublicServicesSchedule::next($actual) : \SCM\Modules\Pending\PublicServicesSchedule::initial($base ?: time(), (int)($contract['mes_revision_servicios'] ?? 0));
+        }
+        $day = (int)date('j', $oldDue);
+        $due = $target->setDate((int)$target->format('Y'), (int)$target->format('n'), min($day, (int)$target->format('t')))->getTimestamp();
+        if ((int)($contract['proxima_revision_servicios'] ?? 0) === $due && (int)$contract['mes_revision_servicios'] === (int)$target->format('n')) { continue; }
+        \SCM\Modules\Pending\PublicServicesReviewStorage::validateToken($token, $contract, Auth::userId());
+        $updates[$pk]=$due;
+        $audit = ['contract_pk'=>$pk,'previous_due'=>$oldDue,'previous_override'=>$contract['proxima_revision_servicios'] ?? null,'previous_month'=>$contract['mes_revision_servicios'] ?? null,'next_due'=>$due,'last_review_preserved'=>$contract['ultima_revision_servicios'] ?? null];
+        $histories[]=[
+          'cct_status'=>'publish','cct_author_id'=>$employee['id_empleado'],'id_empleado'=>$employee['id_empleado'],'funcionario'=>$employee['nombre'],
+          'cct_created'=>$now,'cct_modified'=>$now,'fecha'=>time(),'id_inmueble'=>(string)$contract['id_inmueble'],'tipo_reporte'=>'Contractual',
+          'observacion'=>'Reprogramación administrativa de servicios públicos del contrato #'.$contract['contrato'].' para '.date('d/m/Y',$due).'. Motivo: '.$reason.'. Se conserva la fecha real de última revisión. Auditoría: '.json_encode($audit,JSON_UNESCAPED_UNICODE),
+        ];
+        $changed++;
+      }
+      if ($updates) { $this->repo->updatePublicServicesSchedules($updates, (int)$target->format('n'), (string)$employee['id_empleado'], $now, $histories); }
+      $pdo->commit();
+      return ['ok'=>true,'updated'=>$changed,'selected'=>count($selected),'message'=>'Programación guardada para '.count($selected).' contratos en '.$monthValue.'. Cambios realizados: '.$changed.'.'];
+    } catch (\Throwable $error) {
+      if ($pdo->inTransaction()) { $pdo->rollBack(); }
+      return ['ok'=>false,'message'=>$error->getMessage().' No se guardó ningún cambio del grupo.'];
     }
   }
 
@@ -284,6 +349,7 @@ trait PublicServicesReviewConcern
         'revisiones_servicios' => (string) $reviewCount,
         'tuvo_revision' => 'Si',
         'ultima_revision_servicios' => $nowTs,
+        'proxima_revision_servicios' => null,
         'mes_revision_servicios' => (string) $nextReviewMonth,
         'cct_modified' => $nowMysql,
       ];

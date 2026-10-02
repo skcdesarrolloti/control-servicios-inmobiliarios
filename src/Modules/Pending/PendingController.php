@@ -82,6 +82,11 @@ final class PendingController
     return $this->service->adjustServiciosPublicosReviewDate($contractId, $input);
   }
 
+  public function scheduleServiciosPublicosMonth(array $input): array
+  {
+    return $this->service->scheduleServiciosPublicosMonth($input);
+  }
+
   public function renderReportesAdministrativosTab(): string
   {
     $payload = $this->buildReportesAdministrativosPayload($_GET);

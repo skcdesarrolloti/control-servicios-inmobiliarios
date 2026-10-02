@@ -3260,6 +3260,16 @@ trait HandlesTicketWorkflowActions
         $this->jsonOk(['html' => $workspace->templates($type), 'message' => 'Plantilla guardada. Se aplicará a las próximas actas.']);
       } catch (\Throwable $error) { $this->jsonFail($error->getMessage()); }
     }
+    if ($operation === 'schedule_month') {
+      $selection = json_decode(wp_unslash((string) ($_POST['contracts_json'] ?? '')), true);
+      $result = $this->get_pending_controller()->scheduleServiciosPublicosMonth([
+        'contracts' => is_array($selection) ? $selection : [],
+        'target_month' => sanitize_text_field(wp_unslash((string) ($_POST['target_month'] ?? ''))),
+        'reason' => sanitize_textarea_field(wp_unslash((string) ($_POST['reason'] ?? ''))),
+      ]);
+      if (empty($result['ok'])) { $this->jsonFail((string) $result['message']); }
+      unset($result['ok']); $this->jsonOk($result);
+    }
     $contractId = (int) ($_POST['contract_id'] ?? $_POST['id_contrato'] ?? 0);
     if ($contractId <= 0) {
       $this->jsonFail('ID de contrato inválido.');

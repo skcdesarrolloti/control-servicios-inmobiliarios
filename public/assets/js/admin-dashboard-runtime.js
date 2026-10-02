@@ -10684,6 +10684,69 @@
       return true;
     }
 
+    function servicesSelection(list) {
+      return Array.from(list.querySelectorAll('[data-services-select-contract]:checked'));
+    }
+    function paintServicesSelection(list) {
+      var count = list.querySelector('[data-services-selected-count]');
+      var selected = servicesSelection(list).length;
+      if (count && count.textContent !== String(selected)) count.textContent = String(selected);
+      var pageCheck = list.querySelector('[data-services-select-page]');
+      var visible = Array.from(list.querySelectorAll('[data-services-contract-row]')).filter(function (row) { return !row.hidden; }).map(function (row) { return row.querySelector('[data-services-select-contract]'); }).filter(Boolean);
+      if (pageCheck) { pageCheck.checked = visible.length > 0 && visible.every(function (input) { return input.checked; }); pageCheck.indeterminate = visible.some(function (input) { return input.checked; }) && !pageCheck.checked; }
+    }
+    root.addEventListener('change', function (event) {
+      var input = event.target;
+      if (!input.matches('[data-services-select-page], [data-services-select-contract]')) return;
+      var list = input.closest('[data-services-list]');
+      if (input.matches('[data-services-select-page]')) list.querySelectorAll('[data-services-contract-row]').forEach(function (row) { var check = row.querySelector('[data-services-select-contract]'); if (!row.hidden && check) check.checked = input.checked; });
+      paintServicesSelection(list);
+    });
+    root.addEventListener('click', function (event) {
+      var control = event.target.closest('[data-services-schedule-one], [data-services-select-all-results], [data-services-select-clear], [data-services-schedule-save]');
+      if (!control) return;
+      event.preventDefault();
+      var list = control.closest('[data-services-list]');
+      var panel = list.querySelector('[data-services-bulk-panel]');
+      if (control.matches('[data-services-schedule-save]')) { saveServicesMonth(list, control); return; }
+      if (control.matches('[data-services-schedule-one]')) {
+        list.querySelectorAll('[data-services-select-contract]').forEach(function (input) { input.checked = false; });
+        control.closest('[data-services-contract-row]').querySelector('[data-services-select-contract]').checked = true;
+        panel.open = true; panel.scrollIntoView({block:'nearest'}); panel.querySelector('[data-services-target-month]').focus();
+      } else {
+        list.querySelectorAll('[data-services-contract-row]').forEach(function (row) {
+          var check = row.querySelector('[data-services-select-contract]');
+          if (check) check.checked = control.matches('[data-services-select-all-results]') && row.dataset.servicesMatches !== '0';
+        });
+      }
+      paintServicesSelection(list);
+    });
+    async function saveServicesMonth(list, button) {
+      if (button.disabled) return;
+      var panel = list.querySelector('[data-services-bulk-panel]');
+      var selected = servicesSelection(list);
+      var month = panel.querySelector('[data-services-target-month]');
+      var reason = panel.querySelector('[data-services-schedule-reason]').value.trim();
+      var errorBox = panel.querySelector('[data-services-schedule-error]'); errorBox.hidden = true;
+      if (!selected.length || selected.length > 500 || !month.value || !month.checkValidity() || reason.length < 5) {
+        errorBox.hidden = false; errorBox.textContent = 'Selecciona entre 1 y 500 contratos, un mes actual o futuro y un motivo de al menos 5 caracteres.'; return;
+      }
+      var contracts = selected.map(function (input) { return {id:input.dataset.contractId, token:input.dataset.requestToken}; });
+      var destination = month.value.split('-').reverse().join('/');
+      var message = 'Se programarán ' + contracts.length + ' contratos para ' + destination + '.\nContratos: ' + selected.slice(0,20).map(function (input) { return '#'+input.dataset.contractCode; }).join(', ') + (selected.length>20 ? '…' : '') + '\nMotivo: ' + reason + '\nLa fecha real de última revisión se conserva. ¿Confirmas?';
+      button.disabled = true;
+      try {
+        var confirmed = window.Swal && typeof window.Swal.fire === 'function' ? (await window.Swal.fire({title:'Confirmar reprogramación',text:message,icon:'question',showCancelButton:true,confirmButtonText:'Sí, programar',cancelButtonText:'Cancelar'})).isConfirmed : window.confirm(message);
+        if (!confirmed) return;
+        var fd = new FormData(); fd.append('action', actionRevisionServiciosPublicos); fd.append('nonce', nonce); fd.append('operation','schedule_month'); fd.append('contracts_json',JSON.stringify(contracts)); fd.append('target_month',month.value); fd.append('reason',reason);
+        var response = await fetch(ajaxUrl,{method:'POST',body:fd,credentials:'same-origin'}); var json = await response.json();
+        if (!json || !json.success) throw new Error((json && json.data && json.data.message) || 'No se pudo guardar la programación.');
+        showToast('success',json.data.message);
+        await reloadPendingPanel(root.querySelector('#scm-panel-servicios-publicos-pendientes'),'rsp_',actionServiciosPublicosPendientes,'rsp_table','rsp_kpis');
+      } catch (error) { errorBox.textContent = error.message; errorBox.hidden = false; }
+      finally { button.disabled = false; }
+    }
+
     function paintServicesPage(list) {
       if (!list) return;
       var rows = Array.from(list.querySelectorAll('[data-services-contract-row]'));
@@ -10701,8 +10764,9 @@
       var size = !select || select.value === 'all' ? Math.max(1, matches.length) : Number(select.value);
       var pages = Math.max(1, Math.ceil(matches.length / size));
       var page = Math.min(pages, Math.max(1, Number(list.dataset.page || 1))); list.dataset.page = page;
-      rows.forEach(function (row) { row.hidden = true; });
+      rows.forEach(function (row) { row.hidden = true; row.dataset.servicesMatches = matches.includes(row) ? '1' : '0'; });
       matches.slice((page - 1) * size, page * size).forEach(function (row) { row.hidden = false; });
+      paintServicesSelection(list);
       var summary = list.querySelector('[data-services-page-summary]');
       var summaryText = 'Mostrando ' + (matches.length ? (page - 1) * size + 1 : 0) + ' a ' + Math.min(page * size, matches.length) + ' de ' + matches.length + ' contratos pendientes';
       if (summary && summary.textContent !== summaryText) summary.textContent = summaryText;

@@ -193,6 +193,8 @@ trait PendingQueriesConcern
         $dueTs = \SCM\Modules\Pending\PublicServicesSchedule::initial($baseTs > 0 ? $baseTs : $nowTs, $mesRevisionServicios);
       }
 
+      $manualDue = $this->parseTs($row['proxima_revision_servicios'] ?? null);
+      if ($manualDue > 0) { $dueTs = $manualDue; }
       $dueMonth = $dueTs > 0 ? (int) date('n', $dueTs) : 0;
 
       if ($fMes > 0 && $fMes !== $dueMonth) {

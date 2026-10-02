@@ -198,6 +198,38 @@ final class PendingRepository
     return $id > 0 ? $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1" . ($lock ? ' FOR UPDATE' : ''), [$id]) : null;
   }
 
+  /** All selected rows are locked once, in primary-key order. */
+  public function lockPublicServicesContracts(array $ids): array
+  {
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    $marks = implode(',', array_fill(0, count($ids), '?'));
+    $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE `_ID` IN ({$marks}) ORDER BY `_ID` FOR UPDATE", $ids);
+    return array_column($rows, null, '_ID');
+  }
+
+  /** Batch writes stay inside the caller's transaction; histories use the CCT's actual columns. */
+  public function updatePublicServicesSchedules(array $dates, int $month, string $employeeId, string $now, array $histories): void
+  {
+    if (!$dates || !$this->db->pdo()->inTransaction()) { throw new \RuntimeException('La programación requiere una transacción.'); }
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    $cases = []; $args = [];
+    foreach ($dates as $pk => $timestamp) { $cases[] = 'WHEN ? THEN ?'; $args[] = $pk; $args[] = $timestamp; }
+    $marks = implode(',', array_fill(0, count($dates), '?'));
+    $sql = "UPDATE `{$table}` SET `proxima_revision_servicios` = CASE `_ID` " . implode(' ', $cases) . " END, `mes_revision_servicios` = ?, `cct_author_id` = ?, `cct_modified` = ? WHERE `_ID` IN ({$marks})";
+    $statement = $this->db->pdo()->prepare($sql);
+    $statement->execute(array_merge($args, [$month, $employeeId, $now], array_keys($dates)));
+    if ($statement->rowCount() !== count($dates)) { throw new \RuntimeException('No se guardó toda la programación.'); }
+    $historyTable = $this->db->table('jet_cct_historial_del_inmueble');
+    $filtered = array_map(fn(array $row): array => $this->schema()->filterTableData($historyTable, $row), $histories);
+    $columns = array_keys($filtered[0]);
+    if (!$columns || count($filtered) !== count($dates)) { throw new \RuntimeException('Falta el historial de la programación.'); }
+    $rowMarks = '(' . implode(',', array_fill(0, count($columns), '?')) . ')';
+    $values = [];
+    foreach ($filtered as $row) { foreach ($columns as $column) { $values[] = $row[$column]; } }
+    $statement = $this->db->pdo()->prepare('INSERT INTO `' . $historyTable . '` (`' . implode('`,`', $columns) . '`) VALUES ' . implode(',', array_fill(0, count($filtered), $rowMarks)));
+    $statement->execute($values);
+  }
+
   /** @param array<string,mixed> $data */
   public function updateContratoArrendamiento(int $id, array $data): int
   {
@@ -450,6 +482,7 @@ final class PendingRepository
       'ultima_revision_servicios',
       'mes_revision_servicios',
       'revisiones_servicios',
+      'proxima_revision_servicios',
       'servicios_publicos',
       'luz',
       'agua',

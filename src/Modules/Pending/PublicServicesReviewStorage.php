@@ -35,6 +35,9 @@ final class PublicServicesReviewStorage
     if (array_diff(['request_key','contract_pk','review_id','snapshot_json','created_at'], $schema->getTableColumns($this->table()))) {
       throw new \DomainException('Prepara el módulo ejecutando bin/migrate-public-services.php.');
     }
+    if (!$schema->columnExists($this->db->table('jet_cct_contratos_arrendamiento'), 'proxima_revision_servicios')) {
+      throw new \DomainException('Prepara la programación ejecutando bin/migrate-public-services.php.');
+    }
     $tables = [$this->table(), $this->db->table('jet_cct_contratos_arrendamiento'), $this->db->table('jet_cct_revisiones_servicios'), $this->db->table('jet_cct_historial_del_inmueble')];
     $engines = $this->db->getCol('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (' . implode(',', array_fill(0,count($tables),'?')) . ')', $tables);
     if (count($engines) !== count($tables) || array_filter($engines, static fn($engine): bool => strcasecmp((string)$engine,'InnoDB') !== 0)) throw new \DomainException('Las tablas de revisiones, contratos e historial deben usar InnoDB para guardar la operación completa.');
@@ -63,20 +66,20 @@ final class PublicServicesReviewStorage
 
   public static function formToken(array $contract, int $actor): string
   {
-    $body = implode('|', [(int) $contract['_ID'], $actor, (int) ($contract['ultima_revision_servicios'] ?? 0), (int) ($contract['revisiones_servicios'] ?? 0), time() + 86400, bin2hex(random_bytes(16))]);
+    $body = implode('|', [(int) $contract['_ID'], $actor, (int) ($contract['ultima_revision_servicios'] ?? 0), (int) ($contract['revisiones_servicios'] ?? 0), time() + 86400, bin2hex(random_bytes(16)), (int) ($contract['proxima_revision_servicios'] ?? 0)]);
     return $body . '|' . hash_hmac('sha256', 'services-form|' . $body, (string) SCM_APP_SECRET);
   }
 
   public static function validateToken(string $token, array $contract, int $actor, bool $checkVersion = true): void
   {
     $parts = explode('|', $token);
-    if (count($parts) !== 7) throw new \DomainException('Recarga el formulario de revisión.');
-    $body = implode('|', array_slice($parts, 0, 6));
-    if (!hash_equals(hash_hmac('sha256', 'services-form|' . $body, (string) SCM_APP_SECRET), $parts[6]) || (int) $parts[0] !== (int) $contract['_ID'] || (int) $parts[1] !== $actor || (int) $parts[4] <= time()) {
+    if (!in_array(count($parts), [7, 8], true)) throw new \DomainException('Recarga el formulario de revisión.');
+    $body = implode('|', array_slice($parts, 0, -1));
+    if (!hash_equals(hash_hmac('sha256', 'services-form|' . $body, (string) SCM_APP_SECRET), $parts[count($parts)-1]) || (int) $parts[0] !== (int) $contract['_ID'] || (int) $parts[1] !== $actor || (int) $parts[4] <= time()) {
       throw new \DomainException('El formulario venció o no corresponde a este contrato y funcionario. Recárgalo.');
     }
-    if ($checkVersion && ((int) $parts[2] !== (int) ($contract['ultima_revision_servicios'] ?? 0) || (int) $parts[3] !== (int) ($contract['revisiones_servicios'] ?? 0))) {
-      throw new \DomainException('Ya se registró otra revisión de este contrato. Recarga el listado antes de continuar.');
+    if ($checkVersion && ((int) $parts[2] !== (int) ($contract['ultima_revision_servicios'] ?? 0) || (int) $parts[3] !== (int) ($contract['revisiones_servicios'] ?? 0) || (count($parts) === 8 ? (int) $parts[6] : 0) !== (int) ($contract['proxima_revision_servicios'] ?? 0))) {
+      throw new \DomainException('La revisión o programación de este contrato cambió. Recarga el listado antes de continuar.');
     }
   }
 }

@@ -81,7 +81,7 @@ final class PublicServicesDateRecovery
       }
       $evidence = $this->evidence([$contract])[$contractPk] ?? null;
       if (!$evidence) { $pdo->rollBack(); return false; }
-      $month = (int) date('n', PublicServicesSchedule::next($evidence['timestamp']));
+      $month = (int) date('n', (int)($contract['proxima_revision_servicios'] ?? 0) > 0 ? (int)$contract['proxima_revision_servicios'] : PublicServicesSchedule::next($evidence['timestamp']));
       $now = date('Y-m-d H:i:s');
       $payload = ['ultima_revision_servicios' => $evidence['timestamp'], 'mes_revision_servicios' => $month, 'cct_modified' => $now, 'cct_author_id' => $employeeId];
       if ($repo->updateContratoArrendamiento($contractPk, $payload) !== 1) { throw new \RuntimeException('No se actualizó el contrato.'); }

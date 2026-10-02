@@ -213,6 +213,36 @@ try {
   $assert((int)$db->getVar("SELECT COUNT(*) FROM `{$queueTable}`")===$queuesBefore && (int)$db->getVar("SELECT COUNT(*) FROM `{$reviewTable}`")===$reviewsBefore, 'admin date adjustment creates no reviews, acts or notifications');
   $db->update($employeeTable,['activo'=>'No'],['_ID'=>70001]);
   $assert(empty($service->adjustServiciosPublicosReviewDate(91001,array_replace($adjustInput,['request_token'=>$adjusted['request_token']]))['ok']), 'inactive admin cannot adjust dates');
+  $db->update($employeeTable,['activo'=>'Si'],['_ID'=>70001]);
+  $batchRows=[];
+  foreach ([91001,91005] as $pk) { $batchRows[]=['id'=>(string)$pk,'token'=>\SCM\Modules\Pending\PublicServicesReviewStorage::formToken($repo->getPublicServicesContract($pk),70001)]; }
+  $batchInput=['contracts'=>$batchRows,'target_month'=>'2027-02','reason'=>'Redistribución de revisiones para el próximo año'];
+  $priorBatch=[$repo->getPublicServicesContract(91001),$repo->getPublicServicesContract(91005)];
+  $assert(empty($service->scheduleServiciosPublicosMonth(array_replace($batchInput,['target_month'=>'2027-13']))['ok']) && empty($service->scheduleServiciosPublicosMonth(array_replace($batchInput,['target_month'=>'2025-01']))['ok']), 'month scheduling validates destination year/month and rejects past months');
+  $badBatch=$batchRows; $badBatch[1]['token']='forged';
+  $histBeforeBatch=(int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`");
+  $assert(empty($service->scheduleServiciosPublicosMonth(array_replace($batchInput,['contracts'=>$badBatch]))['ok']) && empty($repo->getPublicServicesContract(91001)['proxima_revision_servicios']) && (int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`")===$histBeforeBatch, 'invalid second token rolls back entire batch and its first history');
+  $batchSaved=$service->scheduleServiciosPublicosMonth($batchInput);
+  $batchFirst=$repo->getPublicServicesContract(91001);$batchSecond=$repo->getPublicServicesContract(91005);
+  $assert(!empty($batchSaved['ok']) && $batchSaved['updated']===2 && date('Y-m-d',(int)$batchFirst['proxima_revision_servicios'])==='2027-02-02' && date('Y-m-d',(int)$batchSecond['proxima_revision_servicios'])==='2027-02-25', 'bulk scheduling preserves each due day in explicit next-year destination');
+  $assert($batchFirst['ultima_revision_servicios']===$priorBatch[0]['ultima_revision_servicios'] && $batchSecond['ultima_revision_servicios']===$priorBatch[1]['ultima_revision_servicios'] && $batchFirst['revisiones_servicios']===$priorBatch[0]['revisiones_servicios'] && (int)$batchFirst['mes_revision_servicios']===2, 'bulk month scheduling preserves actual review dates and counters and updates configured month');
+  $assert($service->scheduleServiciosPublicosMonth($batchInput)['updated']===0 && (int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`")===$histBeforeBatch+2, 'batch retry does not duplicate audit');
+  $batchListing=$service->buildServiciosPublicos(['contrato'=>'B91001','mes'=>2]);
+  $assert(count($batchListing['items'])===1 && date('Y-m-d',$batchListing['items'][0]['due'])==='2027-02-02' && count($service->buildServiciosPublicos(['contrato'=>'B91001','mes'=>10])['items'])===0, 'listing and month filter honor explicit override with full year');
+  $assert(empty($service->scheduleServiciosPublicosMonth(array_replace($batchInput,['target_month'=>'2027-03']))['ok']), 'stale batch cannot overwrite newer manual scheduling');
+  $db->insert($contractTable,array_replace($base,['_ID'=>91006,'contrato'=>'B91006','id_inmueble'=>'80101','ultima_revision_servicios'=>strtotime('2026-10-31'),'mes_revision_servicios'=>'1','servicios_publicos'=>serialize(['Energia'])]));
+  $clampInput=['contracts'=>[['id'=>'91006','token'=>\SCM\Modules\Pending\PublicServicesReviewStorage::formToken($repo->getPublicServicesContract(91006),70001)]],'target_month'=>'2027-02','reason'=>'Ajuste del cierre de mes'];
+  $assert(!empty($service->scheduleServiciosPublicosMonth($clampInput)['ok']) && date('Y-m-d',(int)$repo->getPublicServicesContract(91006)['proxima_revision_servicios'])==='2027-02-28', 'destination month clamps day 31 to February end');
+  $assert((int)$db->getVar("SELECT COUNT(*) FROM `{$queueTable}`")===$queuesBefore && (int)$db->getVar("SELECT COUNT(*) FROM `{$reviewTable}`")===$reviewsBefore, 'bulk scheduling generates no reviews, acts or notifications');
+  $newAdjustment=$adjustInput; $newAdjustment['request_token']=\SCM\Modules\Pending\PublicServicesReviewStorage::formToken($batchFirst,70001);
+  $assert(!empty($service->adjustServiciosPublicosReviewDate(91001,$newAdjustment)['ok']) && empty($repo->getPublicServicesContract(91001)['proxima_revision_servicios']), 'adjusting actual review date clears manual scheduling override');
+  $nativeContext=$service->buildServiciosPublicosReviewContext(91006);
+  $nativeInput=['request_token'=>$nativeContext['request_token'],'configuration_present'=>'1','servicios_configurados'=>['energia'],'servicios'=>['energia'],'nic'=>'NIC-QA','medidor_luz'=>'METER-QA','resultado_tiempo_luz'=>'Al dia','resultado_valores_luz'=>'0'];
+  $nativeReview=$service->createServiciosPublicosReview(91006,$nativeInput);
+  foreach ((array)($nativeReview['documents']??[]) as $doc) { parse_str((string)parse_url($doc['url'],PHP_URL_QUERY),$qaQuery); $qaPath=\SCM\Support\StoredFileService::fromRuntime()->pathFor((string)($qaQuery['n']??'')); if($qaPath!==null)$generatedPaths[]=$qaPath; }
+  $assert(!empty($nativeReview['ok']) && empty($repo->getPublicServicesContract(91006)['proxima_revision_servicios']), 'actual new review clears override and resumes quarterly schedule');
+  $db->update($employeeTable,['id_cargo'=>'3'],['_ID'=>70001]);
+  $assert(empty($service->scheduleServiciosPublicosMonth($batchInput)['ok']), 'non-admin cannot invoke bulk scheduling');
   echo "$checks checks passed. Permanent rows unchanged; no external messages sent.\n";
 } finally {
   foreach ($generatedPaths as $path) { if (is_file($path)) { unlink($path); } }
