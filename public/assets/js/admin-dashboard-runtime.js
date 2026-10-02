@@ -19342,6 +19342,19 @@
         showToast("error", "No se encontró la cotización para crear el acta.");
         return Promise.resolve();
       }
+      // SweetAlert cards and cached cards are outside the app. The case editor
+      // resolves its runtime from the trigger's ancestors, so keep a local copy.
+      var proxy = null;
+      if (!root.contains(card)) {
+        if (root._scmQuoteActaProxy) root._scmQuoteActaProxy.remove();
+        proxy = document.createElement("div");
+        proxy.hidden = true;
+        proxy.setAttribute("data-scm-quote-acta-proxy", "");
+        card = card.cloneNode(true);
+        proxy.appendChild(card);
+        root.appendChild(proxy);
+        root._scmQuoteActaProxy = proxy;
+      }
       var sourceTemplate = card.querySelector(".scm-cotizacion-linked-ticket-source");
       var holder = card.querySelector(".scm-cotizacion-linked-ticket-dom");
       if (!holder && sourceTemplate) {
@@ -19354,6 +19367,7 @@
       }
       var caseButton = (holder ? holder.querySelector(".scm-btn-case") : null) || card.querySelector(".scm-btn-case");
       if (!caseButton || typeof window.scmOpenCase !== "function") {
+        if (proxy) proxy.remove();
         showToast("error", "No se pudo abrir el caso ligado para crear el acta.");
         return Promise.resolve();
       }
@@ -19361,21 +19375,29 @@
         caseButton.setAttribute("data-cotizacion-id", cotizacionId);
       }
       caseButton.setAttribute("data-cot-estado", "Aprobada");
-      caseButton._scmActaOnClose = options.onClose || null;
+      caseButton._scmActaOnClose = function () {
+        if (proxy) proxy.remove();
+        if (typeof options.onClose === "function") options.onClose();
+      };
       window.scmOpenCase(caseButton);
       if (options.closeCurrentSwal && window.Swal && window.Swal.isVisible && window.Swal.isVisible()) {
         window.Swal.close();
       }
-      window.setTimeout(function () {
+      var caseModal = root.querySelector("#scm-case-modal.open");
+      if (!caseModal || caseModal._scmCurrentCaseButton !== caseButton) {
+        if (proxy) proxy.remove();
+        showToast("error", "No se pudo abrir el caso de esta cotización. Inténtalo de nuevo.");
+        return Promise.resolve();
+      }
         var actionBtn =
-          document.querySelector("#scm-app #scm-case-modal.open [data-scm-cotizacion-acta-button]") ||
-          document.querySelector("#scm-app #scm-case-modal.open [data-scm-open-ticket-acta]");
+          caseModal.querySelector("[data-scm-cotizacion-acta-button]") ||
+          caseModal.querySelector("[data-scm-open-ticket-acta]");
         if (actionBtn) {
           actionBtn.click();
         } else {
+          if (proxy) proxy.remove();
           showToast("error", "El acta no está disponible para esta cotización.");
         }
-      }, 120);
       return Promise.resolve();
     }
 
@@ -20182,6 +20204,7 @@
                   : null;
                 if (quoteActaBtn) {
                   event.preventDefault();
+                  event.stopPropagation();
                   openCotizacionActaFromCard(quoteActaBtn, { closeCurrentSwal: true, onClose: makeCaseCotizacionesReturn(button) });
                   return;
                 }
