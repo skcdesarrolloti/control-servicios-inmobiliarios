@@ -20,7 +20,7 @@ const editor = source.slice(source.indexOf('  function openTicketCompletionEdito
    window.edit='<section class="scm-acta"><p data-acta-message></p><form data-acta-create data-acta-operation="update" data-acta-id="11"><select data-acta-signer><option selected>Propietario</option></select><input data-acta-signer-name><input data-acta-signer-email><input data-acta-signer-phone><input data-acta-fee value="0"><input data-acta-transport value="0"><div data-acta-items><fieldset data-acta-item><input name="items[0][corrective_sync_id]" value="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"><div data-acta-corrective-wrap><fieldset data-acta-corrective-fields><select data-corrective-indice name="items[0][corrective][indice]"><option selected>Elementos estructurales</option></select><div data-corrective-area-group data-corrective-area-for="area_afectada_1"><input data-corrective-area-field name="items[0][corrective][area_afectada_1]" value="Muros"></div><div data-corrective-area-group data-corrective-area-for="area_afectada_2"><input data-corrective-area-field name="items[0][corrective][area_afectada_2]" value="Vigas"></div><input name="items[0][corrective][descripcion_dano]" value="Fisura"><input name="items[0][corrective][consecuencia]" value="Filtración"><input name="items[0][corrective][nivel_dano]" value="Moderado"><input name="items[0][corrective][tiempo_atencion]" value="2 días"></fieldset></div><textarea name="items[0][damage]"></textarea><textarea name="items[0][solution]">Sellado</textarea></fieldset></div><button type="button" data-acta-add-item>Agregar</button><input type="checkbox" name="confirm_reopen" value="1" checked><button type="submit">Guardar</button></form></section>';
    window.fetch=async (_url,options)=>{
     const data=Object.fromEntries(options.body.entries()); requests.push(data);
-    return {json:async()=>({success:true,data:{html:data.operation==='read'&&data.act_id?edit:record,queued:true,message:data.operation==='resend'?'Reenvío registrado':''}})};
+    return {json:async()=>({success:true,data:{html:data.operation==='read'&&data.act_id?edit:record,queued:true,sent:true,message:data.operation==='resend'?'Reenvío registrado':''}})};
    };
   });
   await page.addScriptTag({content:editor+'\nopenTicketCompletionEditor(document.querySelector("#modal"),document.querySelector("#case"));'});
@@ -33,7 +33,7 @@ const editor = source.slice(source.indexOf('  function openTicketCompletionEdito
   await page.locator('[data-acta-resend]').click();
   await page.waitForFunction(()=>requests.some(r=>r.operation==='resend'));
   assert.equal(await page.evaluate(()=>requests.find(r=>r.operation==='resend').act_id),'11');
-  assert(await page.evaluate(()=>dialogs.some(d=>d.title==='Reenvío registrado')),'resend result uses SweetAlert');
+  assert(await page.evaluate(()=>dialogs.some(d=>d.title==='Acta reenviada al firmante' && d.icon==='success' && !d.text.includes('proveedor'))),'successful resend uses clear SweetAlert feedback');
   await page.locator('[data-acta-edit]').click();
   await page.locator('[data-acta-create]').waitFor();
   assert(await page.evaluate(()=>dialogs.some(d=>d.title==='Editar acta firmada')),'signed edit explains reopening in SweetAlert');

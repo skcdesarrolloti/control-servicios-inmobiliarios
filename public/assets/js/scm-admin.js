@@ -2705,10 +2705,17 @@
           }
           body.innerHTML = json.data.html;
           bind();
-          if (json.data.message)
+          if (json.data.message && (operation !== "resend" || !window.Swal))
             message(json.data.message, json.data.queued === false);
           if (operation === "resend" && window.Swal) {
-            window.Swal.fire({icon: json.data.queued === false ? "warning" : "success", title: json.data.queued === false ? "Revisa el envío" : "Reenvío registrado", text: json.data.message || "Consulta el estado de envío en el acta.", confirmButtonText: "Aceptar"});
+            window.Swal.fire({
+              icon: json.data.queued === false ? "warning" : "success",
+              title: json.data.queued === false ? "No se pudo completar el reenvío" : (json.data.sent === true ? "Acta reenviada al firmante" : "Reenvío solicitado al firmante"),
+              text: json.data.queued === false
+                ? "Revisa el estado de los canales del acta y vuelve a intentar el envío pendiente."
+                : (json.data.sent === true ? "El acta se envió por los canales seleccionados." : "La solicitud quedó registrada. Los envíos pendientes se reintentarán automáticamente."),
+              confirmButtonText: "Aceptar",
+            });
           }
           if (operation !== "read")
             root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
