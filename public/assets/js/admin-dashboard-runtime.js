@@ -2263,7 +2263,7 @@
       }
 
       function activeCalendarStatuses() {
-        if (!layerFilterForm) return ["pending", "completed"];
+        if (!layerFilterForm) return ["pending"];
         return Array.prototype.slice.call(layerFilterForm.querySelectorAll('input[name="item_status"]:checked'))
           .map(function (input) { return String(input.value || "").trim(); })
           .filter(Boolean);

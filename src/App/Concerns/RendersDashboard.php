@@ -2706,10 +2706,10 @@ trait RendersDashboard
     if (!$presetTypes) {
       $presetTypes = $allowedTypes;
     }
-    $presetStatuses = is_array($options['preset_statuses'] ?? null) ? $options['preset_statuses'] : ['pending', 'completed'];
+    $presetStatuses = is_array($options['preset_statuses'] ?? null) ? $options['preset_statuses'] : ['pending'];
     $presetStatuses = array_values(array_intersect(['pending', 'completed'], array_map(static fn($status) => trim((string) $status), $presetStatuses)));
     if (!$presetStatuses) {
-      $presetStatuses = ['pending', 'completed'];
+      $presetStatuses = ['pending'];
     }
     $typeChecked = static fn(string $type): string => in_array($type, $presetTypes, true) ? 'checked' : '';
     $statusChecked = static fn(string $status): string => in_array($status, $presetStatuses, true) ? 'checked' : '';
