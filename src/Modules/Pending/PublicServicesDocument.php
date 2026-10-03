@@ -78,6 +78,7 @@ final class PublicServicesDocument
         'Servicio / Referencia' => ($service['display_label'] ?? $service['label']) . ' · ' . $service['account'],
         'Medidor' => $service['meter'], 'Resultado' => self::status($service['status']),
         'Valor reportado' => '$' . number_format((int) $service['amount'], 0, ',', '.') . ' COP',
+        ...($service['status']==='Estado critico' && !empty($context['fecha_limite_pago']) ? ['Plazo máximo de pago'=>'72 horas desde el registro','Fecha límite de pago'=>date('d/m/Y H:i',(int)$context['fecha_limite_pago']).' (Colombia)'] : []),
       ]) . '</section><section class="scm-acta-receipt-section scm-services-letter"><h2>2. Comunicación</h2>';
     foreach (preg_split('/\n\s*\n/', $body) ?: [] as $paragraph) $html .= '<p>' . self::paragraph($paragraph) . '</p>';
     return $html . '</section>' . self::footer($context, true) . $letterheadFooter . '</article>';
@@ -87,6 +88,7 @@ final class PublicServicesDocument
   {
     $html = '<article class="scm-acta-receipt scm-services-document">' . self::header('Revisión de servicios públicos #' . $review['_ID'])
       . '<p class="scm-acta-receipt-date">Fecha de revisión: ' . date('d/m/Y H:i', (int) $context['fecha']) . ' (Colombia)</p>'
+      . (!empty($context['fecha_limite_pago']) && array_filter($services, static fn($s)=>($s['status']??'')==='Estado critico') ? '<section class="scm-services-deadline"><strong>Requerimiento crítico · pago máximo en 72 horas</strong><p>Fecha límite: ' . date('d/m/Y H:i',(int)$context['fecha_limite_pago']) . ' (Colombia).</p><a class="scm-services-button" href="' . self::e(PublicServicesCritical::url((int)$review['_ID'],(int)$context['fecha']+180*86400)) . '">Realicé el pago</a></section>' : '')
       . '<section class="scm-acta-receipt-section"><h2>1. Datos de la revisión</h2>' . self::table([
         'Contrato / Inmueble SIMI' => '#' . ($context['contrato'] ?? '') . ' · ' . ($context['inmueble'] ?? ''),
         'Dirección' => $context['direccion'] ?? '', 'Arrendatario' => $context['arrendatario'] ?? '',

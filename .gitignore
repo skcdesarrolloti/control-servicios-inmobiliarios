@@ -15,3 +15,6 @@
 /outputs/
 /tmp/
 /.vscode/mcp.json
+
+/storage/public-services-payments/*
+!/storage/public-services-payments/.htaccess

@@ -1919,13 +1919,14 @@ trait RendersDashboard
     $settings = $this->internalNotificationSettingsConfig();
     $catalog = $this->internalNotificationActionCatalog();
     $funcionarios = $this->internalNotificationFuncionarioOptions();
-    $buildOptions = function (array $selectedIds) use ($funcionarios): string {
+    $allActiveFuncionarios = $this->internalNotificationFuncionarioOptions(true);
+    $buildOptions = function (array $selectedIds, bool $allActive = false) use ($funcionarios, $allActiveFuncionarios): string {
       $selected = [];
       foreach ($selectedIds as $selectedId) {
         $selected[(string) ((int) $selectedId)] = true;
       }
       $html = '';
-      foreach ($funcionarios as $funcionario) {
+      foreach ($allActive ? $allActiveFuncionarios : $funcionarios as $funcionario) {
         $id = trim((string) ($funcionario['id'] ?? ''));
         if ($id === '') {
           continue;
@@ -1952,12 +1953,12 @@ trait RendersDashboard
         $groupsHtml .= '<span>' . esc_html((string) ($item['channel'] ?? 'Email interno')) . '</span>';
         $groupsHtml .= '</div>';
         $groupsHtml .= '<p>' . esc_html((string) ($item['description'] ?? '')) . '</p>';
-        $groupsHtml .= '<select name="settings[' . esc_attr($action) . '][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $buildOptions($selectedIds) . '</select>';
+        $groupsHtml .= '<select name="settings[' . esc_attr($action) . '][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $buildOptions($selectedIds, in_array($action, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario'], true)) . '</select>';
         $groupsHtml .= '</div>';
       }
       $groupsHtml .= '</section>';
     }
-    if ($funcionarios === []) {
+    if ($funcionarios === [] && $allActiveFuncionarios === []) {
       $groupsHtml = '<p class="scm-pqr-config-empty">No hay funcionarios activos disponibles para configurar.</p>';
     }
 
@@ -2839,6 +2840,7 @@ trait RendersDashboard
             </div>
           </div>
           <form class="scm-calendar-due-type-filter" data-scm-calendar-due-type-filter autocomplete="off">
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--no-prorroga-contrato"><input type="checkbox" name="due_type" value="servicios_publicos_critico" checked><span class="material-symbols-outlined" aria-hidden="true">warning</span><strong>Servicios críticos · 72 horas</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-sin-enviar"><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><strong>Preventivas sin enviar</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--ticket-preventiva-sin-cita"><input type="checkbox" name="due_type" value="ticket_preventiva_sin_cita" checked><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><strong>Tickets sin cita preventiva</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-cita-sin-realizar"><input type="checkbox" name="due_type" value="preventiva_cita_sin_realizar" checked><span class="material-symbols-outlined" aria-hidden="true">pending_actions</span><strong>Preventivas con cita sin realizar</strong></label>

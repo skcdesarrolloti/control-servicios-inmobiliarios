@@ -25,7 +25,10 @@ final class PublicServicesWorkspace
   {
     if (!isset(PublicServicesActTemplates::TYPES[$type])) $type = 'al_dia';
     $template = (new PublicServicesActTemplates($this->db))->all()[$type];
-    return self::templateEditor($type, $template);
+    $html = self::templateEditor($type, $template);
+    $employee = (new PendingRepository($this->db))->getFuncionarioByUserId(\SCM\Core\Auth::userId());
+    if (PublicServicesCritical::admin($employee ?? [])) $html .= (new PublicServicesCritical($this->db))->configHtml();
+    return $html;
   }
 
   public static function templateEditor(string $type, array $template): string
@@ -54,12 +57,14 @@ final class PublicServicesWorkspace
     $page = min($pages, max(1, (int) ($input['page'] ?? 1)));
     $order = ($input['order'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
     $rows = $this->db->getResults('SELECT * FROM `' . $table . '` WHERE ' . $sqlWhere . ' ORDER BY fecha ' . $order . ', _ID ' . $order . ' LIMIT 30 OFFSET ' . (($page - 1) * 30), $args);
-    return self::historyList($rows, $input, $total, $page, $pages);
+    $critical = new PublicServicesCritical($this->db);
+    $criticalReviewIds = $critical->available() ? array_fill_keys($this->db->getCol('SELECT review_id FROM `' . $critical->table() . '`'), true) : [];
+    return self::historyList($rows, $input, $total, $page, $pages, $criticalReviewIds);
   }
 
-  public static function historyList(array $rows, array $input, int $total, int $page, int $pages): string
+  public static function historyList(array $rows, array $input, int $total, int $page, int $pages, array $criticalReviewIds = []): string
   {
-    return PublicServicesUi::render('history', compact('rows','input','total','page','pages'));
+    return PublicServicesUi::render('history', compact('rows','input','total','page','pages','criticalReviewIds'));
   }
 
   public function review(int $id): array

@@ -29,6 +29,8 @@ if (!$lockFp || !flock($lockFp, LOCK_EX | LOCK_NB)) {
 }
 
 try {
+  // Domain effects first; all message deliveries still use shared-notifications.
+  (new \SCM\Modules\Pending\PublicServicesCritical($scmDb))->run(30);
   $bridge = new \SCM\Support\SharedNotificationsBridge($scmDb);
   if (!$bridge->isAvailable()) {
     throw new \RuntimeException($bridge->lastError() !== '' ? $bridge->lastError() : 'No se pudo iniciar shared-notifications.');

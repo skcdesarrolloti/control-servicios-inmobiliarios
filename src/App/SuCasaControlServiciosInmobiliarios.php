@@ -372,6 +372,9 @@ final class SuCasaControlServiciosInmobiliarios
       'servicios_publicos' => [
         'label' => 'Servicios públicos',
         'items' => [
+          'servicios_publicos_critico' => ['label'=>'Revisión crítica · 72 horas','description'=>'Acta crítica y detalles; también se informa al creador y al arrendatario.','channel'=>'WhatsApp oficial y email en cola'],
+          'servicios_publicos_pago_reportado' => ['label'=>'Comprobante de pago recibido','description'=>'Respuesta del arrendatario pendiente de verificación; también se avisa a responsables del requerimiento y creador.','channel'=>'WhatsApp oficial y email en cola'],
+          'servicios_publicos_critico_calendario' => ['label'=>'Agenda de revisiones críticas','description'=>'Personas que reciben el recordatorio de 72 horas y la sincronización con su Google Calendar.','channel'=>'Recordatorio y Google Calendar'],
           'acta_servicios_publicos' => [
             'label' => 'Acta de servicios públicos',
             'description' => 'Cuando se genera una revisión nativa de servicios públicos y sus actas.',
@@ -506,6 +509,7 @@ final class SuCasaControlServiciosInmobiliarios
         $validFuncionarioIds[$id] = true;
       }
     }
+    $allActiveIds = array_fill_keys(array_column($this->internalNotificationFuncionarioOptions(true), 'id'), true);
 
     $out = [];
     foreach ($raw as $action => $ids) {
@@ -516,7 +520,8 @@ final class SuCasaControlServiciosInmobiliarios
       $selected = [];
       foreach ((array) $ids as $id) {
         $idKey = trim((string) ((int) $id));
-        if ($idKey !== '' && $idKey !== '0' && isset($validFuncionarioIds[$idKey])) {
+        $allowed = in_array($actionKey, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario'], true) ? $allActiveIds : $validFuncionarioIds;
+        if ($idKey !== '' && $idKey !== '0' && isset($allowed[$idKey])) {
           $selected[$idKey] = $idKey;
         }
       }
@@ -527,13 +532,14 @@ final class SuCasaControlServiciosInmobiliarios
   }
 
   /** @return array<int,array{id:string,label:string,name:string,email:string,phone:string,cargo:string}> */
-  private function internalNotificationFuncionarioOptions(): array
+  private function internalNotificationFuncionarioOptions(bool $allActive = false): array
   {
     $out = [];
     $rows = \SCM\Support\FuncionarioOptions::panelFuncionarios(
       $this->db,
       new \SCM\Support\SchemaInspector($this->db),
-      'primary'
+      'primary',
+      $allActive ? [] : null
     );
     foreach ($rows as $row) {
       $id = (string) ((int) ($row['id'] ?? 0));

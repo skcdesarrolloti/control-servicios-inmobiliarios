@@ -26,16 +26,29 @@ foreach ($items as &$qaItem) { $qaItem['can_adjust_schedule']=true; $qaItem['adj
 unset($qaItem);
 $configurationItems=[array_replace($items[0],['needs_service_configuration'=>true,'due'=>0])];
 $historyRows=[['_ID'=>123,'fecha'=>time(),'contrato'=>149,'inmueble'=>10156,'direccion'=>'Altos de Plan Parejo 2 Mz 42 Lt 02','arrendatario'=>'JORGE IVAN ZABALETA RINCON','realizado_por'=>'Funcionario autenticado QA','acta_felicitaciones_luz'=>'https://example.invalid/acta.pdf']];
+
+$criticalConfig=['whatsapp_template'=>'','response_template'=>'','language'=>'es_CO','whatsapp_enabled'=>false,'button_base'=>'https://example.invalid/'];
+$criticalContacts=[['id'=>'11','name'=>'Funcionario QA','employee_id'=>'94011','cargo'=>'Director QA']];
+$criticalConfigHtml=static fn()=>\SCM\Modules\Pending\PublicServicesUi::render('critical-config',['config'=>$criticalConfig,'contacts'=>$criticalContacts,'events'=>[]]);
+$criticalDetailHtml=static function($verified=false)use($criticalContacts){
+  return \SCM\Modules\Pending\PublicServicesUi::render('critical-detail',[
+    'case'=>['review_id'=>123,'created_at'=>time(),'deadline_at'=>time()+72*3600,'status'=>$verified?'verified':'reported'],
+    'payload'=>['contract'=>['contrato'=>149,'direccion'=>'Dirección QA','arrendatario'=>'Arrendatario QA'],'employee'=>['nombre'=>'Funcionario QA']],
+    'payments'=>[['id'=>99,'created_at'=>time(),'note'=>'Comprobante sintético QA']], 'audit'=>[], 'jobs'=>[], 'canVerify'=>true
+  ]);
+};
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   header('Content-Type: application/json');
   $operation = (string) ($_POST['operation'] ?? '');
+  if (in_array($operation,['critical_detail','critical_verify','critical_config'],true)) { echo json_encode(['success'=>true,'data'=>['html'=>$operation==='critical_config'?$criticalConfigHtml():$criticalDetailHtml($operation==='critical_verify'),'message'=>'QA sin escritura: '.$operation]]); exit; }
   $type = (string) ($_POST['type'] ?? 'al_dia');
   if (in_array(($_POST['action']??''),['qa-pending','scm_servicios_publicos_pendientes'],true)) { echo json_encode(['success'=>true,'data'=>['table_html'=>$view->renderServiciosPublicosTable($items,$configurationItems),'kpis_html'=>$view->renderServiciosPublicosKpis(count($items),'2026',$items,$configurationItems),'count'=>(string)count($items)]]);exit; }
   if (in_array($operation,['templates','save_template','preview_template','history'],true)) {
-    if ($operation==='history') $html=\SCM\Modules\Pending\PublicServicesWorkspace::historyList($historyRows,$_POST,89,max(1,(int)($_POST['page']??1)),3);
+    if ($operation==='history') $html=\SCM\Modules\Pending\PublicServicesWorkspace::historyList($historyRows,$_POST,89,max(1,(int)($_POST['page']??1)),3,[123=>true]);
     elseif ($operation==='preview_template') $html=\SCM\Modules\Pending\PublicServicesWorkspace::preview(['title'=>$_POST['title'],'body'=>$_POST['body']],$type);
     else $html=$templateHtml($type,$operation==='save_template'?['title'=>$_POST['title'],'body'=>$_POST['body']]:null);
-    echo json_encode(['success'=>true,'data'=>['html'=>$html,'message'=>'QA sin escritura: plantilla guardada']]);exit;
+    echo json_encode(['success'=>true,'data'=>['html'=>$html.($operation==='templates'?$criticalConfigHtml():''),'message'=>'QA sin escritura: plantilla guardada']]);exit;
   }
   $data = $operation === 'load'
     ? ['form_html' => (new \SCM\Modules\Pending\PendingView())->renderServiciosPublicosReviewForm($context)]

@@ -518,7 +518,8 @@
       if (type === "preventiva_pendiente") return "Preventivas pendientes";
       if (type === "ticket_preventiva_sin_cita") return "Tickets sin cita preventiva";
       if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
-      if (type === "servicios_publicos_pendientes") return "Servicios públicos pendientes";
+      if (type === "servicios_publicos_critico") return "Servicios críticos · 72 horas";
+        if (type === "servicios_publicos_pendientes") return "Servicios públicos pendientes";
       if (type === "terminacion_contrato_pendiente") return "Terminación de contrato";
       if (type === "no_prorroga_contrato_pendiente") return "No prórroga de contrato";
       if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
@@ -880,7 +881,7 @@
           '<strong>' + escHtml(formatDuePopupDate(row.fecha_vencimiento || "-")) + "</strong>" +
           '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
           '<em>' + escHtml(row.estado || "Pendiente") + (Number(row.dias_vencido || 0) > 0 ? " • " + escHtml(String(row.dias_vencido)) + " día(s)" : "") + "</em>" +
-          (isCreateTicket ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-create-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Crear ticket</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-services data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" disabled>Sin caso</button>'))) +
+          (caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Seguimiento · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-create-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Crear ticket</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-services data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" disabled>Sin caso</button>'))) +
           '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div>" +
           "</div>";
       }).join("");
@@ -2502,7 +2503,7 @@
           (Number(row.dias_vencido || 0) > 0 ? '<span>' + escHtml(String(row.dias_vencido)) + " dia(s) vencido</span>" : "") +
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
-          (isCreateTicket ? '<button type="button" class="scm-case-work-btn" data-scm-open-admin-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Crear ticket</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>'))) +
+          (caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Seguimiento · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn" data-scm-open-admin-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Crear ticket</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>'))) +
           '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div></div></article>";
       }
 
@@ -3386,6 +3387,7 @@
         if (type === "preventiva_pendiente") return "Preventivas pendientes";
         if (type === "ticket_preventiva_sin_cita") return "Tickets sin cita preventiva";
         if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
+        if (type === "servicios_publicos_critico") return "Servicios críticos · 72 horas";
         if (type === "servicios_publicos_pendientes") return "Servicios públicos pendientes";
         if (type === "terminacion_contrato_pendiente") return "Terminación de contrato";
         if (type === "no_prorroga_contrato_pendiente") return "No prórroga de contrato";
@@ -10673,6 +10675,60 @@
           return json.data || {};
         });
     }
+
+    function servicesCriticalDialog() {
+      var dialog = root.querySelector('[data-services-critical-dialog]');
+      if (!dialog) {
+        dialog = document.createElement('dialog'); dialog.className = 'scm-services-critical-dialog';
+        dialog.setAttribute('data-services-critical-dialog', '');
+        dialog.innerHTML = '<button type="button" class="scm-btn-secondary" data-critical-close>Cerrar</button><div data-critical-content></div>';
+        root.appendChild(dialog);
+        dialog.addEventListener('close', function () { if (dialog._trigger) dialog._trigger.focus(); });
+      }
+      return dialog;
+    }
+    root.addEventListener('click', function (event) {
+      var open = event.target.closest('[data-services-critical-open]');
+      var preview = event.target.closest('[data-critical-preview]');
+      if (preview) { var frame = servicesCriticalDialog().querySelector('[data-critical-preview-frame]'); frame.src = preview.dataset.criticalPreview; frame.hidden = false; frame.scrollIntoView({block:'nearest'}); return; }
+      if (event.target.closest('[data-critical-close]')) { servicesCriticalDialog().close(); return; }
+      if (!open) return;
+      var fd = new FormData(); fd.set('review_id', open.dataset.servicesCriticalOpen);
+      open.disabled = true;
+      servicesWorkspaceRequest('critical_detail', fd).then(function (data) {
+        var dialog = servicesCriticalDialog(); dialog._trigger = open;
+        dialog.querySelector('[data-critical-content]').innerHTML = data.html;
+        if (!dialog.open) dialog.showModal();
+      }).catch(function (error) { showToast('error', error.message); }).finally(function () { open.disabled = false; });
+    });
+    root.addEventListener('submit', function (event) {
+      var form = event.target;
+      var config = form.matches('[data-services-critical-config-form]');
+      var verify = form.matches('[data-services-critical-verify-form]');
+      if (!config && !verify) return;
+      event.preventDefault();
+      var submittedFields = new FormData(form);
+      var send = function () {
+        var button = form.querySelector('[type="submit"]'); button.disabled = true;
+        servicesWorkspaceRequest(config ? 'critical_config' : 'critical_verify', submittedFields).then(function (data) {
+          if (config) { form.closest('[data-services-critical-config]').outerHTML = data.html; }
+          else { servicesCriticalDialog().querySelector('[data-critical-content]').innerHTML = data.html; }
+          showToast('success', data.message);
+          if (verify) { dashboardDuePopupPromise = null; refreshDashboardDueNavBadge(); }
+        }).catch(function (error) { showToast('error', error.message); }).finally(function () { button.disabled = false; });
+      };
+      if (verify) {
+        if (form.querySelector('[data-critical-confirm]')) return;
+        var box = document.createElement('aside'); box.setAttribute('data-critical-confirm',''); box.setAttribute('role','alert');
+        box.className = '!sp-bg-amber-50 !sp-p-4 !sp-rounded !sp-text-xs';
+        box.innerHTML = '<p>Confirma que revisaste el PDF. Confirmar el pago cierra el vencimiento; rechazar conserva el plazo original.</p><button type="button" class="scm-btn-primary" data-critical-confirm-yes>Confirmar resultado</button> <button type="button" class="scm-btn-secondary" data-critical-confirm-no>Cancelar</button>';
+        form.appendChild(box);
+        box.querySelector('[data-critical-confirm-yes]').addEventListener('click', function () { box.remove(); send(); });
+        box.querySelector('[data-critical-confirm-no]').addEventListener('click', function () { box.remove(); });
+        box.querySelector('[data-critical-confirm-yes]').focus();
+      }
+      else send();
+    });
 
     function loadServicesWorkspace(section, fields) {
       var target = root.querySelector('[data-services-workspace-content="' + section + '"]');

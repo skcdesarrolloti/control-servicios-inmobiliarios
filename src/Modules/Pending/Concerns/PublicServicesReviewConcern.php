@@ -205,6 +205,7 @@ trait PublicServicesReviewConcern
       $publicResult = $result;
       unset($publicResult['_context'], $publicResult['_services'], $publicResult['_documents'], $publicResult['_contract'], $publicResult['_employee']);
       $storage->insert($requestKey, $contractId, $result['review_id'], ['context' => $result['_context'], 'services' => $result['_services'], 'result' => $publicResult]);
+      (new \SCM\Modules\Pending\PublicServicesCritical($db))->record($result);
       $pdo->commit();
     } catch (\Throwable $error) {
       if ($pdo->inTransaction()) $pdo->rollBack();
@@ -212,9 +213,16 @@ trait PublicServicesReviewConcern
       return ['ok' => false, 'message' => $error->getMessage()];
     }
     $queued = $this->queuePublicServicesReviewEmails($result['review_id'], $result['_contract'], $result['_employee'], $result['_documents'], $result['_services']);
+    $critical = new \SCM\Modules\Pending\PublicServicesCritical($db);
+    if ($critical->case((int)$result['review_id'])) {
+      try { $critical->plan((int)$result['review_id']); $critical->run(30,null,true,(int)$result['review_id']); }
+      catch (\Throwable $e) { error_log('[services-critical-plan] ' . $e->getMessage()); }
+      $result['critical_deadline_at'] = (int)$result['_context']['fecha'] + 72 * 3600;
+    }
     unset($result['_context'], $result['_services'], $result['_documents'], $result['_contract'], $result['_employee']);
     $result['notifications_queued'] = $queued;
     $result['message'] = 'Revisión agregada con éxito. Se generaron ' . count($result['documents']) . ' actas y se encolaron ' . $queued . ' correos.';
+    if (!empty($result['critical_deadline_at'])) $result['message'] .= ' Seguimiento crítico creado: pago máximo en 72 horas, hasta ' . date('d/m/Y H:i', $result['critical_deadline_at']) . ' (Colombia). Los avisos y recordatorios se procesarán por cola.';
     return $result;
   }
 
@@ -279,6 +287,7 @@ trait PublicServicesReviewConcern
 
     $pdfContext = [
       'fecha' => $nowTs,
+      'fecha_limite_pago' => $nowTs + 72 * 3600,
       'ciudad' => 'Cartagena de Indias',
       'contrato' => (string) ($contract['contrato'] ?? $contractId),
       'id_inmueble' => (string) ($contract['id_inmueble'] ?? ''),

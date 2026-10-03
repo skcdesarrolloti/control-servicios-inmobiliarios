@@ -10,4 +10,7 @@ if (!(new \SCM\Support\SchemaInspector($db))->columnExists($contracts, 'proxima_
 }
 \SCM\Core\App::db()->pdo()->exec($storage->schemaSql());
 $storage->requireSchema();
+$critical = new \SCM\Modules\Pending\PublicServicesCritical($db);
+foreach ($critical->schema() as $sql) $db->pdo()->exec($sql);
+$critical->requireSchema();
 echo "Esquema de revisiones nativas preparado. Se conservan contratos y revisiones históricas.\n";

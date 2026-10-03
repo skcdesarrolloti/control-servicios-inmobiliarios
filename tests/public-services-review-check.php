@@ -10,12 +10,14 @@ set_exception_handler(static function (Throwable $e): void { fwrite(STDERR, $e->
 $db = \SCM\Core\App::db();
 // Validate permanent schemas before TEMPORARY shadows hide engine metadata in MySQL.
 (new \SCM\Modules\Pending\PublicServicesReviewStorage($db))->requireSchema();
+(new \SCM\Modules\Pending\PublicServicesCritical($db))->requireSchema();
 $package = (string) (getenv('SHARED_NOTIFICATIONS_PATH') ?: dirname(__DIR__, 2) . '/shared-notifications');
 require_once $package . '/autoload.php';
 $queueConfig = require $package . '/config.php';
 $queueTable = (string) ($queueConfig['queue']['queue_table'] ?? 'skc_notification_queue');
 $attemptsTable = (string) ($queueConfig['queue']['attempts_table'] ?? 'skc_notification_attempts');
 $tables = array_map([$db, 'table'], ['jet_cct_contratos_arrendamiento', 'jet_cct_funcionarios', 'jet_cct_cargos', 'jet_cct_sucursales', 'jet_cct_revisiones_servicios', 'jet_cct_historial_del_inmueble', 'jet_cct_confi_sistema', 'posts', 'postmeta', 'scm_public_services_reviews']);
+foreach (['cases','payments','audit','jobs'] as $suffix) $tables[] = $db->table('scm_services_critical_' . $suffix);
 $tables[] = $queueTable;
 $tables[] = $attemptsTable;
 foreach ($tables as $table) {
@@ -122,7 +124,7 @@ try {
   $viewData = $workspace->review($result['review_id']);
   $reviewHtml = \SCM\Modules\Pending\PublicServicesDocument::review($viewData['review'],$viewData['context'],$viewData['services'],$viewData['documents'],'');
   $assert(str_contains($reviewHtml,'Funcionario autenticado QA') && !str_contains($reviewHtml,'Sucursal') && !str_contains($reviewHtml,'Propietario QA') && !str_contains($reviewHtml,'<th scope="row">Propietario</th>') && str_contains($reviewHtml,'Arrendatario QA') && str_contains($reviewHtml,'data-services-preview'), 'native public document hides owner and branch while preserving tenant, actor and inline act previews');
-  $assert(str_contains($workspace->history(['contrato'=>'2000']),'Copiar enlace público') && str_contains($workspace->templates('critico'),'cuarenta y ocho (48)'), 'history offers signed links and critical template contains supplied 90-day letter');
+  $assert(str_contains($workspace->history(['contrato'=>'2000']),'Copiar enlace público') && str_contains($workspace->templates('critico'),'setenta y dos (72)'), 'history offers signed links and critical template contains supplied 90-day letter');
   $templates = new \SCM\Modules\Pending\PublicServicesActTemplates($db);
   $actHtml = \SCM\Modules\Pending\PublicServicesDocument::act($viewData['context'],$viewData['services']['energia'],$viewData['context']['templates']['al_dia']);
   $assert(!str_contains($actHtml,'class="scm-acta-company"') && str_contains($actHtml,'scm-services-act') && str_contains($actHtml,'SKC SuCasa Inmobiliaria · NIT'), 'act header omits repeated company name and prioritizes title while keeping footer identity');
@@ -243,6 +245,95 @@ try {
   $assert(!empty($nativeReview['ok']) && empty($repo->getPublicServicesContract(91006)['proxima_revision_servicios']), 'actual new review clears override and resumes quarterly schedule');
   $db->update($employeeTable,['id_cargo'=>'3'],['_ID'=>70001]);
   $assert(empty($service->scheduleServiciosPublicosMonth($batchInput)['ok']), 'non-admin cannot invoke bulk scheduling');
+
+  $db->insert($cargoTable,['_ID'=>11,'nombre_cargo'=>'Director QA']);
+  $critical = new \SCM\Modules\Pending\PublicServicesCritical($db);
+  $db->update($employeeTable,['id_cargo'=>'11'],['_ID'=>70001]);
+  $db->update($employeeTable,['celular'=>'3007654321'],['_ID'=>70004]);
+  $actor=$repo->getFuncionarioByUserId(70001);
+  $critical->saveConfig([
+    'whatsapp_template'=>'qa_critical_document','response_template'=>'qa_payment_document','language'=>'es_CO',
+    'servicios_publicos_critico'=>['70004'], 'servicios_publicos_pago_reportado'=>[], 'servicios_publicos_critico_calendario'=>['70004']
+  ],$actor);
+  $db->update($contractTable,['celular_arrendatario'=>'3008889999'],['_ID'=>91006]);
+  $criticalContext=$service->buildServiciosPublicosReviewContext(91006);
+  $criticalInput=array_replace($nativeInput,['request_token'=>$criticalContext['request_token'],'resultado_tiempo_luz'=>'Estado critico','resultado_valores_luz'=>'350000']);
+  $criticalResult=$service->createServiciosPublicosReview(91006,$criticalInput);
+  $assert(!empty($criticalResult['ok']),'critical review commits native review and durable payment follow-up: '.($criticalResult['message']??''));
+  foreach ($criticalResult['documents'] as $doc) { parse_str((string)parse_url($doc['url'],PHP_URL_QUERY),$q);$path=\SCM\Support\StoredFileService::fromRuntime()->pathFor((string)$q['n']);if($path)$generatedPaths[]=$path; }
+  $id=(int)$criticalResult['review_id'];$case=$critical->case($id);
+  $assert((int)$case['deadline_at']-(int)$case['created_at']===72*3600,'critical deadline is exactly 72 hours including time of day');
+  $criticalData=$workspace->review($id);
+  $assert(str_contains(\SCM\Modules\Pending\PublicServicesDocument::review($criticalData['review'],$criticalData['context'],$criticalData['services'],$criticalData['documents'],''),'Realicé el pago'),'public review displays deadline and signed payment action');
+  $assert(str_contains($workspace->history([]),'data-services-critical-open'),'history offers native critical follow-up actions');
+  $assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE kind=? AND review_id=?',['whatsapp',$id])===3,'critical WhatsApp jobs target tenant creator and configured employee');
+  $calendarJob=json_decode($db->getVar('SELECT payload_json FROM `'.$critical->table('jobs').'` WHERE kind=?',['calendar']),true);
+  $assert($calendarJob['id_empleado']==='94004'&&$calendarJob['creado_por']==='94001'&&$calendarJob['sincronizar_google']===true,'calendar targets selected real employee identities and requests Google synchronization');
+  $count=(int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'`');$critical->plan($id);
+  $assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'`')===$count,'critical planning is idempotent');
+  $critical->run(30,static fn($kind,$p)=>['id'=>100,'google_event_id'=>'qa-google-only']);
+  $assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE kind=? AND status=?',['whatsapp','pending'])===3,'unapproved WhatsApp remains durable pending without falling back to direct messages');
+  $assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE kind=? AND status=?',['email','done'])===3,'critical emails enqueue through shared-notifications even while WhatsApp awaits configuration');
+  $critical->saveConfig([
+    'whatsapp_template'=>'qa_critical_document','response_template'=>'qa_payment_document','language'=>'es_CO','whatsapp_enabled'=>'1',
+    'servicios_publicos_critico'=>['70004'], 'servicios_publicos_pago_reportado'=>[], 'servicios_publicos_critico_calendario'=>['70004']
+  ],$actor);
+  $critical->run(30,static fn($kind,$p)=>['id'=>100,'google_event_id'=>'qa-google-only']);
+  $wa=$db->getResults('SELECT * FROM `'.$queueTable.'` WHERE source_module=? AND channel=?',['public-services-critical','whatsapp']);
+  $assert(count($wa)===3&&count(array_unique(array_column($wa,'destination')))===3,'approved critical WhatsApp enqueues once per unique intended destination');
+  $wp=json_decode($wa[0]['payload_json'],true);
+  $assert($wp['components'][0]['parameters'][0]['type']==='document'&&$wp['components'][2]['sub_type']==='url'&&str_contains($wp['components'][2]['parameters'][0]['text'],'pago-servicios-publicos.php?revision='),'WhatsApp includes act PDF and dynamic signed payment URL button');
+  $queueCount=(int)$db->getVar('SELECT COUNT(*) FROM `'.$queueTable.'`');$critical->run(30,static fn()=>[]);
+  $assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$queueTable.'`')===$queueCount,'critical retry does not duplicate shared queue notifications');
+  $exp=time()+3600;$sig=\SCM\Modules\Pending\PublicServicesCritical::signature($id,$exp);
+  $assert(\SCM\Modules\Pending\PublicServicesCritical::valid($id,$exp,$sig)&&!\SCM\Modules\Pending\PublicServicesCritical::valid($id+1,$exp,$sig)&&!\SCM\Modules\Pending\PublicServicesCritical::valid($id,time()-1,$sig),'payment capability rejects enumeration expiry and mismatched signatures');
+  parse_str(parse_url(\SCM\Modules\Pending\PublicServicesCritical::evidenceUrl(1,$exp),PHP_URL_QUERY),$eq);
+  $assert(\SCM\Modules\Pending\PublicServicesCritical::validEvidence(1,$exp,$eq['sig'])&&!\SCM\Modules\Pending\PublicServicesCritical::valid(1,$exp,$eq['sig']),'payment evidence signatures have a separate scope');
+  $goodPdf=end($generatedPaths);\SCM\Modules\Pending\PublicServicesCritical::validatePdf($goodPdf);
+  $bad=tempnam(sys_get_temp_dir(),'scmqa');file_put_contents($bad,'<?php not a pdf');$failed=false;try{\SCM\Modules\Pending\PublicServicesCritical::validatePdf($bad);}catch(DomainException){$failed=true;}unlink($bad);
+  $assert($failed,'PDF evidence validation rejects non-PDF contents');
+  $failed=false;try{$critical->report($id,['tmp_name'=>$goodPdf,'error'=>UPLOAD_ERR_OK],'forged local file',str_repeat('a',64));}catch(DomainException){$failed=true;}
+  $assert($failed,'upload cannot substitute an arbitrary local filesystem path');
+  $failed=false;try{$critical->verify($id,'verified','Pago confirmado QA',$actor);}catch(DomainException){$failed=true;}
+  $assert($failed&&$critical->case($id)['status']==='pending','cannot close critical deadline before a payment report');
+  $db->update($critical->table(),['status'=>'reported'],['review_id'=>$id]);
+  $critical->verify($id,'pending','Soporte incompleto QA',$actor);
+  $assert($critical->case($id)['status']==='pending'&&(int)$critical->case($id)['deadline_at']===(int)$case['deadline_at'],'rejecting evidence retains original deadline');
+  $db->update($critical->table(),['status'=>'reported'],['review_id'=>$id]);$critical->verify($id,'verified','Soporte comprobado QA',$actor);
+  $assert($critical->case($id)['status']==='verified'&&(int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE kind=?',['calendar_close'])===1,'verified payment closes due follow-up and schedules calendar cancellation');
+  $assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('audit').'` WHERE actor=? AND action=?',['94001','payment_verified'])===1,'verification audit records real employee identity and reason');
+  if(!is_dir(dirname(__DIR__).'/tmp/services-qa'))mkdir(dirname(__DIR__).'/tmp/services-qa',0777,true);
+  copy($goodPdf,dirname(__DIR__).'/tmp/services-qa/critical-72h.pdf');
+
+
+  $calendarReview=$id+900000;
+  $db->insert($critical->table(),['review_id'=>$calendarReview,'contract_id'=>91006,'created_at'=>time(),'deadline_at'=>time()+72*3600,'planned'=>1,'payload_json'=>$case['payload_json']]);
+  $calendarJob['meta']['review_id']=$calendarReview;
+  $calendarJob['external_ref']='qa-retry-calendar';
+  $db->insert($critical->table('jobs'),['review_id'=>$calendarReview,'kind'=>'calendar','dedupe_key'=>'qa-retry-calendar','payload_json'=>json_encode($calendarJob),'available_at'=>0]);
+  $calls=[];$remote=null;
+  $calendarCritical=new \SCM\Modules\Pending\PublicServicesCritical($db,static function($action,$payload)use(&$calls,&$remote){
+    $calls[]=$action;
+    if($action==='listar_items_calendario')return ['success'=>true,'data'=>$remote?[$remote]:[]];
+    if($action==='crear_recordatorio'){$remote=$payload+['id'=>98765,'google_pendiente'=>true];return ['success'=>true,'data'=>$remote];}
+    if($action==='actualizar_recordatorio'){$remote['google_event_id']='qa-google-recovered';return ['success'=>true,'data'=>['item'=>$remote,'google_pendiente'=>false]];}
+    if($action==='actualizar_recordatorio_estado')return ['success'=>true,'data'=>$remote+['estado'=>'cancelado']];
+    throw new RuntimeException('Unexpected calendar operation');
+  });
+  $first=$calendarCritical->run(30,null,false,$calendarReview);
+  $assert($first['failed']===1&&(int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE review_id=? AND status=?',[$calendarReview,'pending'])===1,'Google pending remains an audited retry instead of false success');
+  $db->update($critical->table('jobs'),['available_at'=>0],['review_id'=>$calendarReview]);
+  $second=$calendarCritical->run(30,null,false,$calendarReview);
+  $assert($second['processed']===1&&count(array_filter($calls,static fn($c)=>$c==='crear_recordatorio'))===1&&in_array('actualizar_recordatorio',$calls,true),'calendar retry recovers existing external reference without duplicate reminders');
+  $db->update($critical->table(),['status'=>'reported'],['review_id'=>$calendarReview]);
+  $calendarCritical->verify($calendarReview,'verified','Verificado después de Google QA',$actor);
+  $calendarCritical->run(30,null,false,$calendarReview);
+  $assert(in_array('actualizar_recordatorio_estado',$calls,true),'verified payment cancels existing reminder through calendar API');
+  $failed=false;try{$critical->verify($id,'verified','Motivo suficiente QA',array_replace($actor,['id_cargo'=>'3']));}catch(DomainException){$failed=true;}
+  $assert($failed,'non-admin cannot directly verify payments');
+  $failed=false;try{$critical->saveConfig([],array_replace($actor,['id_cargo'=>'3']));}catch(DomainException){$failed=true;}
+  $assert($failed,'non-admin cannot change critical notification settings');
+
   echo "$checks checks passed. Permanent rows unchanged; no external messages sent.\n";
 } finally {
   foreach ($generatedPaths as $path) { if (is_file($path)) { unlink($path); } }

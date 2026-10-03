@@ -16,7 +16,7 @@ body.scm-services-page{margin:0;background:#f1f5f9;color:#202020;font-family:'SC
 .scm-services-signatures span{font-size:11px;margin-bottom:5px}
 .scm-services-signatures strong{font-size:14px;color:#202020}
 .scm-services-company{grid-column:1/-1}
-.scm-services-letter p{margin:0 0 14px;line-height:1.6}
+.scm-services-letter p{margin:0 0 14px;line-height:1.6;break-inside:avoid;page-break-inside:avoid}
 .scm-services-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
 .scm-services-button{display:inline-flex;padding:10px 16px;border:1px solid #cbd5e1;background:#10264a;color:#fff;border-radius:8px;text-decoration:none;font:600 13px Arial,sans-serif;cursor:pointer;margin-top:12px}
 .scm-services-button:focus-visible{outline:3px solid #f97316;outline-offset:3px}
@@ -57,3 +57,8 @@ body.scm-services-page{margin:0;background:#f1f5f9;color:#202020;font-family:'SC
   .scm-services-document tr,.scm-services-document h1,.scm-services-document .scm-acta-receipt-head{break-inside:avoid;page-break-inside:avoid}
   .scm-services-document h2,.scm-services-document h3{break-after:avoid;page-break-after:avoid}
 }
+
+.scm-services-deadline{border:1px solid #f8cf4a;background:#fffbeb;border-radius:8px;padding:16px;margin:16px 0;break-inside:avoid;page-break-inside:avoid}
+.scm-services-payment form{display:grid;gap:12px}.scm-services-payment input,.scm-services-payment textarea{max-width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font:inherit}.scm-services-payment iframe{width:100%;height:360px;border:1px solid #cbd5e1}
+.scm-services-critical-dialog{width:min(900px,92vw);max-height:90vh;overflow:auto;border:1px solid #cbd5e1;border-radius:12px;padding:24px}.scm-services-critical-dialog::backdrop{background:#061d4980}.scm-services-critical-dialog [data-critical-close]{float:right}.scm-critical-evidence-preview{width:100%;height:480px;border:1px solid #cbd5e1}
+@media print{.scm-services-payment{display:none!important}.scm-services-deadline{padding:8px;margin:8px 0;font-size:10px}.scm-services-critical-dialog{display:none!important}}
