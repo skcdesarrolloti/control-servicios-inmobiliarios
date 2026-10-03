@@ -2256,7 +2256,7 @@
       }
 
       function activeCalendarTypes() {
-        if (!layerFilterForm) return ["evento", "tarea", "recordatorio"];
+        if (!layerFilterForm) return ["evento", "recordatorio"];
         return Array.prototype.slice.call(layerFilterForm.querySelectorAll('input[name="item_type"]:checked'))
           .map(function (input) { return String(input.value || "").trim(); })
           .filter(Boolean);
@@ -2911,6 +2911,7 @@
         var title = String(fd.get("titulo") || "").trim();
         var categoryId = String(fd.get("id_categoria") || "").trim();
         var kind = String(fd.get("kind") || "event").trim();
+        if (["event", "reminder"].indexOf(kind) === -1) kind = "event";
         var location = String(fd.get("ubicacion") || "").trim();
         var tipoItem = kind === "task" ? "tarea" : (kind === "reminder" ? "recordatorio" : "evento");
         var itemLabel = tipoItem === "tarea" ? "tarea" : (tipoItem === "recordatorio" ? "recordatorio" : "evento");
@@ -3009,7 +3010,6 @@
           '<label class="scm-calendar-week-quick-title"><span class="sr-only">Titulo</span><input name="titulo" placeholder="A&ntilde;ade un t&iacute;tulo" required data-week-quick-title-input></label>' +
           '<div class="scm-calendar-week-quick-tabs" aria-label="Tipo">' +
           '<button type="button" class="active" data-week-quick-kind="event">Evento</button>' +
-          '<button type="button" data-week-quick-kind="task">Tarea</button>' +
           '<button type="button" data-week-quick-kind="reminder">Recordatorio</button>' +
           '</div>' +
           '<div class="scm-calendar-week-quick-row"><span class="material-symbols-outlined">schedule</span><div><strong>' + escHtml(dateLabel) + '</strong><em>' + escHtml(timeLabel) + '</em></div></div>' +
@@ -3589,7 +3589,7 @@
             return json.data || [];
           });
         }
-        return calendarApi("listar_items_calendario", Object.assign({}, filters, { tipos_item: ["evento", "tarea", "recordatorio"] }))
+        return calendarApi("listar_items_calendario", Object.assign({}, filters, { tipos_item: ["evento", "recordatorio"] }))
           .then(function (json) {
             if (!json || !json.success) {
               var loadError = new Error((json && json.message) || "No se pudieron cargar items.");
@@ -5271,7 +5271,7 @@
         var defaultStartValue = String(defaults.start || "").slice(0, 5);
         var defaultEndValue = String(defaults.end || "").slice(0, 5);
         var defaultKind = String(defaults.kind || "event").trim();
-        if (["event", "task", "reminder"].indexOf(defaultKind) === -1) defaultKind = "event";
+        if (["event", "reminder"].indexOf(defaultKind) === -1) defaultKind = "event";
         var defaultTitleValue = String(defaults.title || "").trim();
         var defaultKindConfig = defaultKind === "reminder"
           ? {

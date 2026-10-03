@@ -2700,7 +2700,7 @@ trait RendersDashboard
     $showReportAction = !array_key_exists('show_report_action', $options) || (bool) $options['show_report_action'];
     $showKpis = !array_key_exists('show_kpis', $options) || (bool) $options['show_kpis'];
     $showEmployeeFilter = !array_key_exists('show_employee_filter', $options) || (bool) $options['show_employee_filter'];
-    $allowedTypes = ['evento', 'tarea', 'recordatorio'];
+    $allowedTypes = ['evento', 'recordatorio'];
     $presetTypes = is_array($options['preset_types'] ?? null) ? $options['preset_types'] : $allowedTypes;
     $presetTypes = array_values(array_intersect($allowedTypes, array_map(static fn($type) => trim((string) $type), $presetTypes)));
     if (!$presetTypes) {
@@ -2753,7 +2753,6 @@ trait RendersDashboard
           <?php if ($showCreateActions): ?>
             <?php if ($mode === 'personal'): ?>
               <button type="button" class="scm-case-work-btn scm-calendar-reminder-action" data-scm-calendar-open-create data-calendar-mode="single" data-calendar-kind="reminder"><span class="material-symbols-outlined" aria-hidden="true">notifications_active</span><span>Recordatorio</span></button>
-              <button type="button" class="scm-case-work-btn scm-calendar-task-action" data-scm-calendar-open-create data-calendar-mode="single" data-calendar-kind="task"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><span>Tarea</span></button>
             <?php endif; ?>
             <button type="button" class="scm-case-work-btn scm-calendar-multiple-action" data-scm-calendar-open-create data-calendar-mode="multiple"><span class="material-symbols-outlined" aria-hidden="true">inventory_2</span><span>Evento m&uacute;ltiple</span></button>
             <button type="button" class="scm-btn-primary btn btn-primary scm-calendar-create-action" data-scm-calendar-open-create data-calendar-mode="single"><span class="material-symbols-outlined" aria-hidden="true">add</span><span>Crear evento</span></button>
@@ -2803,11 +2802,6 @@ trait RendersDashboard
                 <input type="checkbox" name="item_type" value="evento" <?php echo $typeChecked('evento'); ?>>
                 <span class="material-symbols-outlined" aria-hidden="true">event</span>
                 <strong>Eventos</strong>
-              </label>
-              <label class="scm-calendar-layer-chip scm-calendar-layer-chip--task">
-                <input type="checkbox" name="item_type" value="tarea" <?php echo $typeChecked('tarea'); ?>>
-                <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
-                <strong>Tareas</strong>
               </label>
               <label class="scm-calendar-layer-chip scm-calendar-layer-chip--reminder">
                 <input type="checkbox" name="item_type" value="recordatorio" <?php echo $typeChecked('recordatorio'); ?>>
