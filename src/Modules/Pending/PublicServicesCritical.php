@@ -174,10 +174,11 @@ final class PublicServicesCritical
         $body='Revisión crítica #'.$id.' · Contrato #'.$contract['contrato'].' · '.$contract['direccion']."\n".$details."\nPlazo máximo: 72 horas. Pagar antes de ".$deadline."\nRealizado por: ".$p['employee']['nombre'];
         $this->notifyJobs($case,$r,$body,$link,$p['documents'],false);
       }
-      $connected = $this->connectedCalendarContacts();
+      $selectedCalendarContacts = $this->contacts(self::CALENDAR_EVENT);
+      $connected = $selectedCalendarContacts ? $this->connectedCalendarContacts() : [];
       $googleIds = array_fill_keys(array_column($connected,'employee_id'), true);
       $calendarRecipients = [];
-      foreach (array_merge($this->contacts(self::CALENDAR_EVENT), $connected) as $r) $calendarRecipients[(string)$r['employee_id']] = $r;
+      foreach ($selectedCalendarContacts as $r) $calendarRecipients[(string)$r['employee_id']] = $r;
       foreach ($calendarRecipients as $r) {
         $ref='services-critical:'.$id.':employee:'.$r['employee_id'];
         $this->job($id,'calendar',$ref,['tipo_item'=>'recordatorio','titulo'=>'Pago servicios críticos · contrato #'.$contract['contrato'],'descripcion'=>$details.' · Pago máximo en 72 horas. '.PublicServicesDocument::url($id),'recordatorio_at'=>date('Y-m-d H:i:s',(int)$case['deadline_at']),'id_empleado'=>(string)$r['employee_id'],'creado_por'=>(string)$p['employee']['id_empleado'],'origen_app'=>'control-servicios-inmobiliarios','external_ref'=>$ref,'recordatorio_canal'=>'email','sincronizar_google'=>isset($googleIds[(string)$r['employee_id']]),'meta'=>['review_id'=>$id,'deadline_at'=>(int)$case['deadline_at'],'payment_pending'=>true]]);
@@ -316,6 +317,7 @@ final class PublicServicesCritical
   }
   private function calendar(string $kind,array $p): array
   {
+    if($kind==='calendar' && !in_array((string)$p['id_empleado'], array_column($this->contacts(self::CALENDAR_EVENT),'employee_id'), true)) return ['cancelled'=>true,'reason'=>'Funcionario no configurado para el calendario crítico.'];
     if($kind==='calendar_close' && (int)$this->db->getVar('SELECT COUNT(*) FROM `'.$this->table('jobs').'` WHERE review_id=? AND kind=\'calendar\' AND status=\'processing\'',[(int)$p['meta']['review_id']])>0)throw new \RuntimeException('Esperando confirmar la creación del recordatorio antes de cerrarlo.');
     if($kind==='calendar'&&$this->case((int)$p['meta']['review_id'])['status']==='verified')return ['cancelled'=>true];
     $rows=$this->calendarRequest('listar_items_calendario',['tipo_item'=>'recordatorio','id_empleado'=>$p['id_empleado'],'origen_app'=>$p['origen_app'],'external_ref'=>$p['external_ref'],'limite'=>100]);

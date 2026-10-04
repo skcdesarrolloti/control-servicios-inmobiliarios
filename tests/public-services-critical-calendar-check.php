@@ -28,11 +28,11 @@ $db->insert($critical->table(),['review_id'=>123,'contract_id'=>99,'created_at'=
 $critical->plan(123);
 $jobs=$db->getResults('SELECT payload_json FROM `'.$critical->table('jobs').'` WHERE kind=\'calendar\' ORDER BY id');
 $byEmployee=[]; foreach($jobs as $job){$p=json_decode($job['payload_json'],true);$byEmployee[$p['id_empleado']]=$p;}
-$assert(count($byEmployee)===3 && isset($byEmployee['94004']),'automatically adds connected employees outside configured reminder list');
-$assert($byEmployee['94001']['sincronizar_google'] && $byEmployee['94004']['sincronizar_google'] && !$byEmployee['94002']['sincronizar_google'],'Google only for connected accounts; configured unconnected employee gets internal reminder');
-$assert($byEmployee['94004']['recordatorio_at']===date('Y-m-d H:i:s',$now+72*3600),'calendar event uses exact 72-hour deadline');
+$assert(count($byEmployee)===2 && !isset($byEmployee['94004']),'connected employees outside configured calendar list receive no reminder or Google event');
+$assert($byEmployee['94001']['sincronizar_google'] && !$byEmployee['94002']['sincronizar_google'],'selected connected employee gets Google; selected unconnected employee gets internal reminder');
+$assert($byEmployee['94001']['recordatorio_at']===date('Y-m-d H:i:s',$now+72*3600),'calendar event uses exact 72-hour deadline');
 $critical->plan(123);
-$assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE kind=\'calendar\'')===3,'replanning does not duplicate reminders or Google events');
+$assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE kind=\'calendar\'')===2,'replanning does not duplicate reminders or Google events');
 $calls=[]; $remote=null;
 $transport=new \SCM\Modules\Pending\PublicServicesCritical($db,static function($action,$p)use(&$calls,&$remote){
   $calls[]=$action;
@@ -42,8 +42,11 @@ $transport=new \SCM\Modules\Pending\PublicServicesCritical($db,static function($
   throw new RuntimeException('Unexpected action');
 });
 $method=(new ReflectionClass($transport))->getMethod('calendar');
-try{$method->invoke($transport,'calendar',$byEmployee['94004']);$assert(false,'Google pending must retry');}catch(RuntimeException $e){$assert(str_contains($e->getMessage(),'Google Calendar pendiente'),'does not report success before Google event is confirmed');}
-$result=$method->invoke($transport,'calendar',$byEmployee['94004']);
+$unselected=$byEmployee['94001'];$unselected['id_empleado']='94004';
+$result=$method->invoke($transport,'calendar',$unselected);
+$assert(!empty($result['cancelled']) && !$calls,'legacy queued job for unselected connected employee is skipped without calling calendar API');
+try{$method->invoke($transport,'calendar',$byEmployee['94001']);$assert(false,'Google pending must retry');}catch(RuntimeException $e){$assert(str_contains($e->getMessage(),'Google Calendar pendiente'),'does not report success before Google event is confirmed');}
+$result=$method->invoke($transport,'calendar',$byEmployee['94001']);
 $assert($result['google_event_id']==='qa-google-event' && count(array_filter($calls,static fn($a)=>$a==='crear_recordatorio'))===1,'retry reuses external reference and nested API result without duplicate');
 $remote=null;
 $result=$method->invoke($transport,'calendar',$byEmployee['94002']);
@@ -56,5 +59,9 @@ $db->update($critical->table(),['status'=>'verified'],['review_id'=>123]);
 $assert(str_contains($workspace->critical([]),'No hay seguimientos') && str_contains($workspace->critical(['status'=>'verified']),'NIC-QA'),'verified cases leave default list and remain searchable');
 $db->update($critical->table(),['status'=>'reported'],['review_id'=>123]);
 $critical->verify(123,'verified','Pago comprobado en prueba',['id_empleado'=>'94001','id_cargo'=>'11','nombre'=>'Administrador QA']);
-$assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE kind=\'calendar_close\'')===3,'verification schedules closure for every connected or configured recipient');
+$assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE kind=\'calendar_close\'')===2,'verification schedules closure only for configured recipients');
+(new \SCM\Core\Settings($db))->set('internal_admin_notifications',[]);
+$db->insert($critical->table(),['review_id'=>124,'contract_id'=>99,'created_at'=>$now,'deadline_at'=>$now+72*3600,'payload_json'=>json_encode($payload)]);
+$critical->plan(124);
+$assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE review_id=124 AND kind=\'calendar\'')===0,'empty calendar selection creates no reminders despite connected accounts');
 echo 'Critical calendar and listing checks passed; no real messages or Google calls.'.PHP_EOL;
