@@ -150,7 +150,7 @@ Cuando Meta haya aprobado **las dos plantillas**:
 1. Abre **Servicios públicos → Plantillas de actas → Seguimiento crítico** con una cuenta administradora.
 2. Guarda los nombres exactos aprobados: `scm_servicios_critico_72h` y `scm_servicios_pago_reportado`, o los nombres definitivos si los cambiaste en Meta.
 3. Ingresa el código de idioma exacto que aprobó Meta. Por ejemplo, `es` para español genérico; no conserves `es_CO` solo porque aparezca como valor inicial del formulario.
-4. Selecciona los funcionarios de los tres grupos que se explican abajo.
+4. Selecciona los funcionarios de los dos grupos que se explican abajo.
 5. Marca **Activar WhatsApp: las dos plantillas ya están aprobadas en Meta** y guarda.
 6. Comprueba con una revisión de prueba que se reciben el PDF, los datos correctos y el botón que abre la página correspondiente.
 
@@ -160,15 +160,14 @@ Los trabajos de WhatsApp que hayan quedado pendientes por falta de configuració
 
 ### Paso 1. Configurar quién recibe cada cosa
 
-En **Servicios públicos → Plantillas de actas → Seguimiento crítico** configura estas listas, disponibles también en **Notificaciones internas**:
+En **Servicios públicos → Plantillas de actas → Seguimiento crítico** configura estas dos listas, disponibles también en **Notificaciones internas**:
 
 | Grupo | Para qué sirve |
 | --- | --- |
-| Avisos de revisión crítica (`servicios_publicos_critico`) | Funcionarios que reciben el requerimiento y después el aviso del comprobante. El creador se incluye en el flujo y el arrendatario recibe el requerimiento. |
+| Avisos de revisión crítica (`servicios_publicos_critico`) | Funcionarios que reciben el requerimiento, el recordatorio del vencimiento y después el aviso del comprobante. Los seleccionados con Google conectado reciben también el evento en Google. El creador y el arrendatario reciben el requerimiento, pero eso no los incorpora a la agenda. |
 | Reportes de pago (`servicios_publicos_pago_reportado`) | Funcionarios adicionales que deben recibir el comprobante y los detalles de la respuesta por WhatsApp y correo. |
-| Calendario (`servicios_publicos_critico_calendario`) | Únicos destinatarios del recordatorio del vencimiento. Si el seleccionado tiene Google conectado, también recibe el evento en Google Calendar. |
 
-La selección para calendario es independiente de las listas de avisos. Desde la versión 3.3.350 se consulta la tabla `calendario_google_accounts` únicamente para decidir si los funcionarios seleccionados pueden sincronizar con Google. Tener Google conectado no agrega destinatarios. Los seleccionados sin conexión reciben el recordatorio interno. Una lista de calendario vacía no agenda vencimientos. La sincronización debe estar habilitada en el servidor.
+La agenda utiliza la misma lista Revisión crítica · 72 horas (`servicios_publicos_critico`) de Notificaciones internas. Desde la versión 3.3.351 se consulta la tabla `calendario_google_accounts` únicamente para decidir si esos funcionarios seleccionados pueden sincronizar con Google. Tener Google conectado no agrega destinatarios. Los seleccionados sin conexión reciben el recordatorio interno. Una lista de aviso crítico vacía no agenda vencimientos. La sincronización debe estar habilitada en el servidor.
 
 ### Paso 2. Registrar la revisión crítica
 
@@ -194,7 +193,7 @@ Los mensajes pasan por la cola compartida de notificaciones, con trazabilidad y 
 
 El seguimiento aparece en el **calendario de vencimientos** y en su **popup**, según los permisos y la configuración del panel.
 
-A los funcionarios activos seleccionados en la lista de calendario se les crea un recordatorio con la hora exacta del vencimiento. Solo si el seleccionado tiene Google conectado se solicita también su evento en **Google Calendar**. Si Google falla, se reintenta sobre el recordatorio existente; no se considera sincronizado solo por haber creado el recordatorio interno.
+A los funcionarios activos configurados en Notificaciones internas → Revisión crítica · 72 horas se les crea un recordatorio con la hora exacta del vencimiento. Solo si el seleccionado tiene Google conectado se solicita también su evento en **Google Calendar**. Si Google falla, se reintenta sobre el recordatorio existente; no se considera sincronizado solo por haber creado el recordatorio interno.
 
 ### Paso 6. Recibir la evidencia del arrendatario
 

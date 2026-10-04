@@ -19,7 +19,7 @@ $employeeTable=$db->table('jet_cct_funcionarios');
 foreach([1=>'Si',2=>'Si',3=>'No',4=>'Si',5=>'Si'] as $id=>$active) $db->insert($employeeTable,['_ID'=>70000+$id,'id_empleado'=>(string)(94000+$id),'nombre'=>'Funcionario QA '.$id,'activo'=>$active,'id_cargo'=>'99']);
 foreach([1,3,4] as $id) $db->insert('calendario_google_accounts',['id_empleado'=>(string)(94000+$id),'google_email'=>'qa'.$id.'@example.invalid','refresh_token_enc'=>'synthetic-refresh']);
 $db->insert('calendario_google_accounts',['id_empleado'=>'94005','google_email'=>'expired@example.invalid','access_token_enc'=>'synthetic-expired','expires_at'=>'2000-01-01 00:00:00']);
-(new \SCM\Core\Settings($db))->set('internal_admin_notifications',[\SCM\Modules\Pending\PublicServicesCritical::CALENDAR_EVENT=>[70001,70002]]);
+(new \SCM\Core\Settings($db))->set('internal_admin_notifications',[\SCM\Modules\Pending\PublicServicesCritical::EVENT=>[70001,70002],\SCM\Modules\Pending\PublicServicesCritical::CALENDAR_EVENT=>[70004]]);
 $ids=array_column($critical->connectedCalendarContacts(),'employee_id');sort($ids);
 $assert($ids===['94001','94004'],'connected active employees from every cargo; inactive and expired unrenewable accounts excluded');
 $payload=['contract'=>['contrato'=>'2000','direccion'=>'Dirección QA','arrendatario'=>'QA'],'employee'=>['id_empleado'=>'94001','nombre'=>'Creador QA'],'services'=>['energia'=>['label'=>'Energía','account'=>'NIC-QA','amount'=>350000]],'documents'=>[]];
@@ -28,7 +28,7 @@ $db->insert($critical->table(),['review_id'=>123,'contract_id'=>99,'created_at'=
 $critical->plan(123);
 $jobs=$db->getResults('SELECT payload_json FROM `'.$critical->table('jobs').'` WHERE kind=\'calendar\' ORDER BY id');
 $byEmployee=[]; foreach($jobs as $job){$p=json_decode($job['payload_json'],true);$byEmployee[$p['id_empleado']]=$p;}
-$assert(count($byEmployee)===2 && !isset($byEmployee['94004']),'connected employees outside configured calendar list receive no reminder or Google event');
+$assert(count($byEmployee)===2 && !isset($byEmployee['94004']),'only critical notification recipients get calendar jobs; connected employee in legacy calendar list is excluded');
 $assert($byEmployee['94001']['sincronizar_google'] && !$byEmployee['94002']['sincronizar_google'],'selected connected employee gets Google; selected unconnected employee gets internal reminder');
 $assert($byEmployee['94001']['recordatorio_at']===date('Y-m-d H:i:s',$now+72*3600),'calendar event uses exact 72-hour deadline');
 $critical->plan(123);
@@ -63,5 +63,5 @@ $assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WH
 (new \SCM\Core\Settings($db))->set('internal_admin_notifications',[]);
 $db->insert($critical->table(),['review_id'=>124,'contract_id'=>99,'created_at'=>$now,'deadline_at'=>$now+72*3600,'payload_json'=>json_encode($payload)]);
 $critical->plan(124);
-$assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE review_id=124 AND kind=\'calendar\'')===0,'empty calendar selection creates no reminders despite connected accounts');
+$assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE review_id=124 AND kind=\'calendar\'')===0,'empty critical notification selection creates no reminders despite connected accounts');
 echo 'Critical calendar and listing checks passed; no real messages or Google calls.'.PHP_EOL;

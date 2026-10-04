@@ -372,9 +372,8 @@ final class SuCasaControlServiciosInmobiliarios
       'servicios_publicos' => [
         'label' => 'Servicios públicos',
         'items' => [
-          'servicios_publicos_critico' => ['label'=>'Revisión crítica · 72 horas','description'=>'Acta crítica y detalles; también se informa al creador y al arrendatario.','channel'=>'WhatsApp oficial y email en cola'],
+          'servicios_publicos_critico' => ['label'=>'Revisión crítica · 72 horas','description'=>'Acta crítica, detalles y recordatorio del vencimiento; se agenda en Google si el seleccionado tiene cuenta conectada. También se informa al creador y al arrendatario.','channel'=>'WhatsApp oficial, email en cola y calendario'],
           'servicios_publicos_pago_reportado' => ['label'=>'Comprobante de pago recibido','description'=>'Respuesta del arrendatario pendiente de verificación; también se avisa a responsables del requerimiento y creador.','channel'=>'WhatsApp oficial y email en cola'],
-          'servicios_publicos_critico_calendario' => ['label'=>'Agenda de revisiones críticas','description'=>'Personas que reciben el recordatorio de 72 horas y la sincronización con su Google Calendar.','channel'=>'Recordatorio y Google Calendar'],
           'acta_servicios_publicos' => [
             'label' => 'Acta de servicios públicos',
             'description' => 'Cuando se genera una revisión nativa de servicios públicos y sus actas.',
