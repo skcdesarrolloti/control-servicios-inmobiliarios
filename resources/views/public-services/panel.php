@@ -28,4 +28,5 @@ $months = [1=>'Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto',
   </section>
   <section data-services-section="templates" hidden><div data-services-workspace-content="templates"></div></section>
   <section data-services-section="history" hidden><div data-services-workspace-content="history"></div></section>
+  <section data-services-section="critical" hidden><div data-services-workspace-content="critical"></div></section>
 </div>

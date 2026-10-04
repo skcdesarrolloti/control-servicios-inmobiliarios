@@ -10714,7 +10714,11 @@
           if (config) { form.closest('[data-services-critical-config]').outerHTML = data.html; }
           else { servicesCriticalDialog().querySelector('[data-critical-content]').innerHTML = data.html; }
           showToast('success', data.message);
-          if (verify) { dashboardDuePopupPromise = null; refreshDashboardDueNavBadge(); }
+          if (verify) {
+            dashboardDuePopupPromise = null; refreshDashboardDueNavBadge();
+            var listForm = root.querySelector('[data-services-critical-list-form]');
+            if (listForm) loadServicesWorkspace('critical', new FormData(listForm));
+          }
         }).catch(function (error) { showToast('error', error.message); }).finally(function () { button.disabled = false; });
       };
       if (verify) {
@@ -10945,6 +10949,16 @@
         return;
       }
       var clear = event.target.closest("[data-services-history-clear]");
+      var criticalClear = event.target.closest('[data-services-critical-list-clear]');
+      var criticalRefresh = event.target.closest('[data-services-critical-list-refresh]');
+      var criticalPage = event.target.closest('[data-services-critical-list-page]');
+      if (criticalClear || criticalRefresh || criticalPage) {
+        var criticalForm = root.querySelector('[data-services-critical-list-form]');
+        var criticalFd = criticalClear ? new FormData() : new FormData(criticalForm);
+        if (criticalPage) criticalFd.set('page', criticalPage.dataset.servicesCriticalListPage);
+        loadServicesWorkspace('critical', criticalFd);
+        return;
+      }
       var page = event.target.closest("[data-services-history-page]");
       if (clear || page) {
         var historyForm = root.querySelector("[data-services-history-form]");
@@ -10978,6 +10992,10 @@
     root.addEventListener("submit", function (event) {
       var form = event.target;
       if (form.matches("[data-services-history-form]")) { event.preventDefault(); loadServicesWorkspace("history", new FormData(form)); return; }
+      if (form.matches('[data-services-critical-list-form]')) {
+        event.preventDefault(); var criticalFd = new FormData(form); criticalFd.set('page', '1');
+        loadServicesWorkspace('critical', criticalFd); return;
+      }
       if (!form.matches("[data-services-template-form]")) return;
       event.preventDefault();
       if (form.getAttribute("aria-busy") === "true" || !form.reportValidity()) return;

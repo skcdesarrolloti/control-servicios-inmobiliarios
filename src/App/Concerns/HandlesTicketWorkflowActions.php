@@ -3275,11 +3275,12 @@ trait HandlesTicketWorkflowActions
         $this->jsonOk(['html'=>$critical->detailHtml((int)$_POST['review_id']),'message'=>'Verificación guardada con trazabilidad.']);
       } catch (\Throwable $e) { $this->jsonFail($e->getMessage()); }
     }
-    if (in_array($operation, ['templates', 'history', 'save_template', 'preview_template'], true)) {
+    if (in_array($operation, ['templates', 'history', 'critical', 'save_template', 'preview_template'], true)) {
       try {
         $workspace = new \SCM\Modules\Pending\PublicServicesWorkspace($this->db);
         $type = sanitize_key((string) ($_POST['type'] ?? 'al_dia'));
         if ($operation === 'history') $this->jsonOk(['html' => $workspace->history($_POST)]);
+        if ($operation === 'critical') $this->jsonOk(['html' => $workspace->critical($_POST)]);
         if ($operation === 'templates') $this->jsonOk(['html' => $workspace->templates($type)]);
         $templateInput = ['title' => wp_unslash((string) ($_POST['title'] ?? '')), 'body' => wp_unslash((string) ($_POST['body'] ?? '')), 'version' => (string) ($_POST['version'] ?? '')];
         if ($operation === 'preview_template') {

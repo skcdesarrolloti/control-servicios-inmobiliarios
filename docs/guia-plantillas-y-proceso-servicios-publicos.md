@@ -166,9 +166,9 @@ En **Servicios públicos → Plantillas de actas → Seguimiento crítico** conf
 | --- | --- |
 | Avisos de revisión crítica (`servicios_publicos_critico`) | Funcionarios que reciben el requerimiento y después el aviso del comprobante. El creador se incluye en el flujo y el arrendatario recibe el requerimiento. |
 | Reportes de pago (`servicios_publicos_pago_reportado`) | Funcionarios adicionales que deben recibir el comprobante y los detalles de la respuesta por WhatsApp y correo. |
-| Calendario (`servicios_publicos_critico_calendario`) | Personas a quienes se les crea el recordatorio del vencimiento y se les solicita sincronización con Google Calendar. |
+| Calendario (`servicios_publicos_critico_calendario`) | Destinatarios adicionales del recordatorio interno del vencimiento. Las cuentas Google conectadas de funcionarios activos se incluyen automáticamente. |
 
-La selección para calendario es independiente de las listas de avisos. Cada persona seleccionada para Google Calendar necesita su cuenta Google conectada y la sincronización habilitada en el servidor.
+La selección para calendario es independiente de las listas de avisos. Desde la versión 3.3.349 se consulta la tabla `calendario_google_accounts` y se incluyen automáticamente los funcionarios activos con conexión Google. Los seleccionados sin conexión reciben el recordatorio interno. La sincronización debe estar habilitada en el servidor.
 
 ### Paso 2. Registrar la revisión crítica
 
@@ -194,7 +194,7 @@ Los mensajes pasan por la cola compartida de notificaciones, con trazabilidad y 
 
 El seguimiento aparece en el **calendario de vencimientos** y en su **popup**, según los permisos y la configuración del panel.
 
-A las personas seleccionadas para calendario se les crea un recordatorio con la hora exacta del vencimiento. La integración solicita su sincronización con **Google Calendar**. Si la cuenta no está conectada o la sincronización falla, ese resultado queda pendiente o registrado para revisión; no se considera sincronizado solo por haber creado el recordatorio interno.
+A los funcionarios activos con cuenta Google conectada se les crea automáticamente un recordatorio con la hora exacta del vencimiento y se solicita su evento en **Google Calendar**. La selección de calendario añade recordatorios internos para otros funcionarios. Si Google falla, se reintenta sobre el recordatorio existente; no se considera sincronizado solo por haber creado el recordatorio interno.
 
 ### Paso 6. Recibir la evidencia del arrendatario
 
@@ -210,7 +210,7 @@ El WhatsApp adjunta el comprobante y ofrece **Ver revisión**. Recibir un PDF no
 
 ### Paso 8. Verificar y cerrar o rechazar
 
-Un administrador abre **Revisiones realizadas → Seguimiento · 72 horas**, consulta el soporte dentro del popup y decide con motivo y confirmación:
+Un administrador abre **Servicios públicos en estado crítico → Abrir seguimiento**, consulta el soporte dentro del popup y decide con motivo y confirmación:
 
 - **Confirmar:** cierra el seguimiento del vencimiento y solicita cancelar el recordatorio asociado.
 - **Rechazar:** devuelve el caso a pendiente y conserva la fecha límite original; no concede otras 72 horas.

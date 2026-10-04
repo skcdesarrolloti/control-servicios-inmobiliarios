@@ -12,7 +12,7 @@ final class PublicServicesWorkspace
   public static function tabs(?int $count = null): string
   {
     $html = '<nav class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-1 !sp-p-1 !sp-bg-slate-100 !sp-rounded-lg !sp-border-0 !sp-w-fit !sp-max-w-full" aria-label="Servicios públicos">';
-    foreach (['pending'=>['Pendientes','clock'],'history'=>['Revisiones realizadas','refresh'],'templates'=>['Plantillas de actas','document']] as $key=>$tab) {
+    foreach (['pending'=>['Pendientes','clock'],'history'=>['Revisiones realizadas','refresh'],'critical'=>['Servicios públicos en estado crítico','alert'],'templates'=>['Plantillas de actas','document']] as $key=>$tab) {
       $html .= '<button type="button" class="sp-group !sp-inline-flex !sp-items-center !sp-justify-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-rounded-md !sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-font-sans !sp-text-[10px] !sp-font-medium !sp-cursor-pointer aria-pressed:!sp-bg-service-navy aria-pressed:!sp-text-white aria-pressed:!sp-font-semibold focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow" data-services-tab="' . $key . '" aria-pressed="' . ($key==='pending'?'true':'false') . '">'
         . PublicServicesUi::icon($tab[1], '!sp-w-3 !sp-h-3 group-aria-pressed:!sp-text-service-yellow') . '<span>' . $tab[0] . '</span>';
       if ($key==='pending' && $count!==null) $html .= '<span class="!sp-rounded-full !sp-bg-slate-200 !sp-text-service-navy !sp-text-[8px] !sp-font-semibold !sp-px-1.5 !sp-py-0.5 group-aria-pressed:!sp-bg-white/20 group-aria-pressed:!sp-text-white" data-services-tab-count>' . max(0,$count) . '</span>';
@@ -65,6 +65,39 @@ final class PublicServicesWorkspace
   public static function historyList(array $rows, array $input, int $total, int $page, int $pages, array $criticalReviewIds = []): string
   {
     return PublicServicesUi::render('history', compact('rows','input','total','page','pages','criticalReviewIds'));
+  }
+
+  public function critical(array $input): string
+  {
+    $critical = new PublicServicesCritical($this->db);
+    $stats = ['pending'=>0,'reported'=>0,'overdue'=>0,'verified'=>0];
+    if (!$critical->available()) return self::criticalList([], $input, 0, 1, 1, $stats);
+    $table = $critical->table();
+    $now = time();
+    $counts = $this->db->getRow('SELECT SUM(status=\'pending\') pending, SUM(status=\'reported\') reported, SUM(status<>\'verified\' AND deadline_at<?) overdue, SUM(status=\'verified\') verified FROM `'.$table.'`', [$now]);
+    foreach ($stats as $key=>$_) $stats[$key] = (int)($counts[$key]??0);
+    $where = []; $args = [];
+    $status = (string)($input['status']??'open');
+    if (!in_array($status, ['open','pending','reported','verified','overdue','all'], true)) $status = 'open';
+    $input['status'] = $status;
+    if ($status==='open') $where[] = 'c.status<>\'verified\'';
+    elseif ($status==='overdue') { $where[] = 'c.status<>\'verified\' AND c.deadline_at<?'; $args[] = $now; }
+    elseif ($status!=='all') { $where[] = 'c.status=?'; $args[] = $status; }
+    foreach (['contrato','inmueble','arrendatario'] as $field) {
+      $term = trim((string)($input[$field]??''));
+      if ($term!=='') { $where[] = 'r.`'.$field.'` LIKE ?'; $args[] = '%'.$this->db->escapeLike($term).'%'; }
+    }
+    $join = ' FROM `'.$table.'` c LEFT JOIN `'.$this->db->table('jet_cct_revisiones_servicios').'` r ON r._ID=c.review_id WHERE '.($where?implode(' AND ', $where):'1=1');
+    $total = (int)$this->db->getVar('SELECT COUNT(*)'.$join, $args);
+    $pages = max(1, (int)ceil($total/30));
+    $page = min($pages, max(1, (int)($input['page']??1)));
+    $rows = $this->db->getResults('SELECT c.*'.$join.' ORDER BY c.deadline_at ASC, c.review_id ASC LIMIT 30 OFFSET '.(($page-1)*30), $args);
+    return self::criticalList($rows, $input, $total, $page, $pages, $stats);
+  }
+
+  public static function criticalList(array $rows, array $input, int $total, int $page, int $pages, array $stats): string
+  {
+    return PublicServicesUi::render('critical-list', compact('rows','input','total','page','pages','stats'));
   }
 
   public function review(int $id): array
