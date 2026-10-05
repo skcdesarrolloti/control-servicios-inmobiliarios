@@ -160,10 +160,10 @@ final class ContractRenewalService
   }
 
   /** Cancel old scheduled notices before the shared worker delivers them. */
-  public function reconcileCycles(): void
+  public function reconcileCycles(?int $contractId = null): void
   {
     $contracts = $this->db->table('jet_cct_contratos_arrendamiento');
-    $rows = $this->db->getResults("SELECT contract_id FROM `{$this->table()}` WHERE no_exit = 1");
+    $rows = $this->db->getResults("SELECT contract_id FROM `{$this->table()}` WHERE no_exit = 1" . ($contractId !== null ? " AND contract_id = ?" : ""), $contractId !== null ? [$contractId] : []);
     foreach ($rows as $item) {
       $pdo = $this->db->pdo();
       try {

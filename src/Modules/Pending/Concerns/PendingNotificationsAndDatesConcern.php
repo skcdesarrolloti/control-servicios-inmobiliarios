@@ -106,15 +106,15 @@ trait PendingNotificationsAndDatesConcern
       $extraContent = $content;
       if (!empty($pdfButtons)) {
         $extraContent .= '<div style="margin:16px 0;padding:14px 16px;border:1px solid #fde2bd;background:#fff8ef;border-radius:10px;">';
-        $extraContent .= '<p style="margin:0 0 6px;color:#061d49;font-weight:700;">Ofrecimiento de revision preventiva</p>';
-        $extraContent .= '<p style="margin:0;color:#475569;">Consulta el ofrecimiento correspondiente desde el boton de acceso. No se adjunta archivo fisico al correo.</p>';
+        $extraContent .= '<p style="margin:0 0 6px;color:#061d49;font-weight:700;">' . (isset($generatedPdfs['acta_desocupacion']) ? 'Notificación previa para entrega del inmueble' : 'Ofrecimiento de revisión preventiva') . '</p>';
+        $extraContent .= '<p style="margin:0;color:#475569;">Consulta el documento correspondiente desde el botón de acceso.</p>';
         $extraContent .= '</div>';
       }
       $html = EmailTemplate::render($subject, $extraContent, [
         'ticket_url' => $ticketUrl,
         'buttons' => $pdfButtons,
       ]);
-      $queue->enqueue((string) $job['email'], $subject, $html, [
+      $queuedCount = $queue->enqueue((string) $job['email'], $subject, $html, [
         'source' => 'scm_ticket_administrativo_nativo',
         'dedupe_key' => 'ticket_admin_created_' . $ticketId,
         'meta' => [
@@ -122,6 +122,7 @@ trait PendingNotificationsAndDatesConcern
           'targets' => array_values(array_unique((array) ($job['targets'] ?? []))),
         ],
       ]);
+      if (!empty($ticketPayload['require_receipt_letter']) && $queuedCount < 1) throw new \RuntimeException('No se pudo encolar la carta para todos los destinatarios.');
     }
     return count($jobs);
   }

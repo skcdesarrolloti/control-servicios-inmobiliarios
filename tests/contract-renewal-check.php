@@ -11,11 +11,13 @@ namespace SharedNotifications\Storage {
 namespace SharedNotifications {
   class NotificationQueue {
     public static int $constructions = 0;
+    public static bool $failEnqueue = false;
     public function __construct(private $storage, $config) {
       if ($storage->pdo->inTransaction()) throw new \RuntimeException('Queue initialization must not execute DDL inside a business transaction');
       self::$constructions++;
     }
     public function enqueue(array $job): int {
+      if (self::$failEnqueue) throw new \RuntimeException('Synthetic queue failure');
       $stmt = $this->storage->pdo->prepare('INSERT INTO test_jobs(dedupe_key,status,payload) VALUES (?, ?, ?)');
       $stmt->execute([$job['dedupe_key'], 'pending', json_encode($job)]);
       return (int) $this->storage->pdo->lastInsertId();
@@ -106,6 +108,7 @@ final class RealTicketCreationProbe {
   use \SCM\Modules\Pending\Concerns\AdministrativeTicketCreationConcern;
   use \SCM\Modules\Pending\Concerns\PendingNotificationsAndDatesConcern;
   public object $repo;
+  public bool $letterAvailable = false;
   public function __construct(\SCM\Core\Database $db) {
     $this->repo = new class($db) {
       public function __construct(private $db) {}
@@ -115,13 +118,13 @@ final class RealTicketCreationProbe {
     };
   }
   private function ticketCreatorProfile($schema): array { return ['name'=>'Creator test','cargo'=>'Test','phone'=>'','email'=>'']; }
-  private function generateTicketPdfs($mode,$tema,$id,$payload): array { return ['pdfs'=>[], 'warnings'=>[]]; }
+  private function generateTicketPdfs($mode,$tema,$id,$payload): array { return ['pdfs'=> $this->letterAvailable ? ['acta_desocupacion'=>['url'=>'https://example.invalid/signed-letter.pdf','title'=>'Carta previa de entrega']] : [], 'warnings'=>[]]; }
 }
 function check(bool $ok,string $message): void { if (!$ok) throw new RuntimeException($message); }
 function callEndpoint(callable $fn): RenewalResult { try { $fn(); } catch (RenewalResult $result) { return $result; } throw new RuntimeException('Missing endpoint response'); }
 
 $pdo = new RenewalTestPdo(); $db = new \SCM\Core\Database($pdo); $probe = new RenewalProbe($db);
-$pdo->exec('CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY,contrato TEXT,inmueble TEXT,id_inmueble TEXT,id_inmueble_data TEXT,fin_contrato TEXT,estado TEXT,valor_canon TEXT,id_empleado TEXT,cct_author_id TEXT,cct_modified TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY,contrato TEXT,inmueble TEXT,id_inmueble TEXT,id_inmueble_data TEXT,fin_contrato TEXT,estado TEXT,valor_canon TEXT,correo_arrendatario TEXT,id_empleado TEXT,cct_author_id TEXT,cct_modified TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_tickets(_ID INTEGER PRIMARY KEY,id_ticket TEXT,id_contrato TEXT,tema_ayuda TEXT,fecha_terminacion_contrato TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_inmuebles(_ID INTEGER PRIMARY KEY,codigo TEXT,id_funcionario TEXT,propietario TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_funcionarios(_ID INTEGER PRIMARY KEY,id_empleado TEXT,nombre TEXT,correo TEXT,celular TEXT,id_cargo TEXT,activo TEXT)');
@@ -132,9 +135,9 @@ $pdo->exec('CREATE TABLE wp_jet_cct_historial_del_inmueble(_ID INTEGER PRIMARY K
 $pdo->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN cct_author_id TEXT');
 $pdo->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN id_empleado TEXT');
 $db->insert('wp_jet_cct_funcionarios', ['_ID'=>13,'id_empleado'=>'EMP-13','nombre'=>'Assigned test','correo'=>'test@example.invalid','id_cargo'=>'13','activo'=>'Si']);
-$db->insert('wp_jet_cct_confi_sistema', ['_ID'=>1,'funcion'=>'control_servicios_config','valor'=>json_encode(['internal_admin_notifications'=>['contrato_no_salida'=>[13],'retencion_contrato_ticket'=>[13]]])]);
+$db->insert('wp_jet_cct_confi_sistema', ['_ID'=>1,'funcion'=>'control_servicios_config','valor'=>json_encode(['internal_admin_notifications'=>['contrato_no_salida'=>[13],'retencion_contrato_ticket'=>[13],'contrato_recibo_automatico'=>[13]]])]);
 $end = strtotime('today +15 days');
-foreach ([193=>'900',800=>'193',801=>'901'] as $id=>$code) $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>$id,'contrato'=>$code,'inmueble'=>(string)$id,'id_inmueble'=>(string)$id,'fin_contrato'=>(string)$end,'estado'=>'Entregado','valor_canon'=>'1.000.000','id_empleado'=>'EMP-13']);
+foreach ([193=>'900',800=>'193',801=>'901',802=>'902'] as $id=>$code) $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>$id,'contrato'=>$code,'inmueble'=>(string)$id,'id_inmueble'=>(string)$id,'fin_contrato'=>(string)$end,'estado'=>'Entregado','valor_canon'=>'1.000.000','correo_arrendatario'=>'tenant@example.invalid','id_empleado'=>'EMP-13']);
 $db->insert('wp_jet_cct_inmuebles', ['_ID'=>1,'codigo'=>'193','id_funcionario'=>'PROPERTY-EMP','propietario'=>'Owner test']);
 $service = new \SCM\Modules\Contracts\ContractRenewalService($db);
 $temp = sys_get_temp_dir() . '/scm-renewal-test-' . bin2hex(random_bytes(6)); mkdir($temp);
@@ -175,9 +178,25 @@ try {
   $pdo->beginTransaction(); $service->save($probe->pk('193'),$end,100,false,'7,0','','EMP-900');$pdo->commit();
   check($probe->createRetention($probe->pk('193'))['ok']==='0','100 percent must block retention in backend');
   $pdo->beginTransaction();$service->save($probe->pk('800'),$end,null,true,'7,0','No exit','EMP-900');$pdo->commit();
+  check($probe->processAutomaticContractReceipts()['enabled']===false,'New automation must start disabled');
+  check(\SCM\Modules\Contracts\ContractReceiptSettings::read($db)['contract_id']===525,'Default scope must be exactly 525');
+  try { \SCM\Modules\Contracts\ContractReceiptSettings::validate($db,['enabled'=>true,'contract_id'=>0,'employee_id'=>'EMP-13']); throw new RuntimeException('Unrestricted scope accepted'); } catch (InvalidArgumentException $expected) {}
+  $settings=json_decode($db->getVar('SELECT valor FROM wp_jet_cct_confi_sistema WHERE _ID=1'),true);
+  $settings['contract_receipt_automation']=['enabled'=>true,'contract_id'=>193,'employee_id'=>'EMP-13','coordinator_id'=>''];
+  $db->update('wp_jet_cct_confi_sistema',['valor'=>json_encode($settings)],['_ID'=>1]);
+  check($probe->processAutomaticContractReceipts()['created']===0,'100 percent scope must suppress receipt');
+  $settings['contract_receipt_automation']['contract_id']=800;
+  $db->update('wp_jet_cct_confi_sistema',['valor'=>json_encode($settings)],['_ID'=>1]);
+  check($probe->processAutomaticContractReceipts()['created']===0,'No exit scope must suppress receipt');
+  $settings['contract_receipt_automation']['contract_id']=801;
+  $db->update('wp_jet_cct_confi_sistema',['valor'=>json_encode($settings)],['_ID'=>1]);
+  $before=(int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets');
+  check(count($probe->processAutomaticContractReceipts(true)['candidates'])===1,'Dry run must inspect only configured contract');
+  check((int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets')===$before,'Dry run must never create a ticket');
   $stats=$probe->processAutomaticContractReceipts();
   check($stats['created']===1,'Only nonrenewed exiting contract gets receipt: '.json_encode($stats));
   check($probe->processAutomaticContractReceipts()['created']===0,'Repeated automation must not duplicate receipt');
+  check((int)$db->getVar("SELECT COUNT(*) FROM wp_jet_cct_tickets WHERE id_contrato='802'")===0,'Eligible contract outside configured scope must never get a receipt');
   check($db->getVar("SELECT id_contrato FROM wp_jet_cct_tickets WHERE tema_ayuda='Recibo de inmuebles'")==='801','Receipt must belong to correct contract');
   // Entire import rolls back if any previous value changed.
   $changes=[];foreach ([193,800] as $id) $changes[]=['contract_id'=>(string)$id,'new_fin_contrato'=>(string)($end+86400),'old_fin_contrato'=>(string)$end,'contract_code'=>$probe->pk((string)$id)['contrato'],'property_code'=>(string)$id];
@@ -200,6 +219,22 @@ try {
   check($db->getVar('SELECT cct_author_id FROM wp_jet_cct_historial_del_inmueble WHERE id_ticket=?',[$result['ticket_id']])==='EMP-900','Property audit must record creator, not assignee');
   check($db->getVar('SELECT cct_author_id FROM wp_jet_cct_historial_del_ticket WHERE id_ticket=?',[$result['ticket_id']])==='EMP-900','Ticket audit must record creator');
   check($db->getVar('SELECT id_empleado FROM wp_jet_cct_tickets WHERE _ID=?',[$result['ticket_id']])==='EMP-13','Ticket responsibility must remain the selected employee');
+  $letterProbe = new RealTicketCreationProbe($db);
+  $letterInput = ['contract_pk'=>'801','id_empleado'=>'EMP-13','tema_ayuda'=>'Recibo de inmuebles','departamento'=>'Servicio al arrendatario','prioridad'=>'Prioridad urgente','asunto'=>'Aviso previo','descripcion'=>'Prueba sin envío','solicitante_tipo'=>'arrendatario','internal_notification_action'=>'contrato_recibo_automatico','require_receipt_letter'=>true];
+  $before = (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets');
+  $pdo->beginTransaction(); $failed = $letterProbe->createAdministrativeTicket($letterInput,[],[],['empleado','solicitante','admin']); $pdo->rollBack();
+  check($failed['ok']==='0' && (int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets')===$before,'Missing letter must prevent automatic ticket');
+  $letterProbe->letterAvailable = true;
+  \SharedNotifications\NotificationQueue::$failEnqueue=true;
+  $pdo->beginTransaction();
+  try { $letterProbe->createAdministrativeTicket($letterInput,[],[],['empleado','solicitante','admin']); throw new RuntimeException('Failed queue silently accepted'); }
+  catch (RuntimeException $exception) { check(str_contains($exception->getMessage(),'encolar'),'Queue failure must propagate to business rollback'); }
+  finally { $pdo->rollBack(); \SharedNotifications\NotificationQueue::$failEnqueue=false; }
+  check((int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets')===$before,'Failed delivery enqueue must roll back ticket');
+  $pdo->beginTransaction(); $letterResult=$letterProbe->createAdministrativeTicket($letterInput,[],[],['empleado','solicitante','admin']); $pdo->commit();
+  check($letterResult['ok']==='1' && (int)$letterResult['emails_queued']===2,'Tenant and configured internal employee must receive the letter, deduplicating recipient');
+  $letterJob=json_decode($db->getVar("SELECT payload FROM test_jobs WHERE payload LIKE '%signed-letter.pdf%' LIMIT 1"),true);
+  check(($letterJob['meta']['documents'][0]['url'] ?? '')==='https://example.invalid/signed-letter.pdf','Queued letter must retain signed PDF link');
   check(\SharedNotifications\NotificationQueue::$constructions===1,'All transactions must reuse the prewarmed queue');
   $probe->writable=false;
   check(!callEndpoint(fn()=>$probe->ajax_handler_contracts_ending_import_apply())->ok,'Read-only users cannot import');

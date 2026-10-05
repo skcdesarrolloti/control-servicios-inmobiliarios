@@ -1965,6 +1965,13 @@ trait RendersDashboard
       return $html;
     };
 
+    $receiptConfig = \SCM\Modules\Contracts\ContractReceiptSettings::read($this->db);
+    $receiptEmployees = \SCM\Support\FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db), 'employee', true);
+    $receiptOptions = static function (string $selected) use ($receiptEmployees): string {
+      $html = '<option value="">Selecciona un funcionario</option>';
+      foreach ($receiptEmployees as $person) $html .= '<option value="' . esc_attr((string) $person['id']) . '"' . ((string) $person['id'] === $selected ? ' selected' : '') . '>' . esc_html((string) ($person['name'] ?? $person['id'])) . '</option>';
+      return $html;
+    };
     $groupsHtml = '';
     foreach ($catalog as $groupKey => $group) {
       $groupsHtml .= '<section class="scm-internal-notif-group" data-internal-notif-group="' . esc_attr((string) $groupKey) . '">';
@@ -1981,7 +1988,7 @@ trait RendersDashboard
         $groupsHtml .= '<span>' . esc_html((string) ($item['channel'] ?? 'Email interno')) . '</span>';
         $groupsHtml .= '</div>';
         $groupsHtml .= '<p>' . esc_html((string) ($item['description'] ?? '')) . '</p>';
-        $groupsHtml .= '<select name="settings[' . esc_attr($action) . '][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $buildOptions($selectedIds, in_array($action, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario'], true)) . '</select>';
+        $groupsHtml .= '<select name="settings[' . esc_attr($action) . '][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $buildOptions($selectedIds, in_array($action, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_no_salida'], true)) . '</select>';
         $groupsHtml .= '</div>';
       }
       $groupsHtml .= '</section>';
@@ -2002,6 +2009,15 @@ trait RendersDashboard
         </div>
         <form id="scm-internal-notifications-form" class="scm-internal-notifications-form" autocomplete="off">
           <div class="scm-config-info-strip"><strong>Acciones y destinatarios internos:</strong> Selecciona uno o varios funcionarios por acci&oacute;n. Si una acci&oacute;n queda vac&iacute;a, no se env&iacute;an avisos internos para esa actividad.</div>
+          <section class="scm-pqr-settings-section" data-receipt-automation>
+            <h4>Recibos automáticos de contratos · cron</h4>
+            <p>Genera el ticket y la carta de aviso previo 15 días antes de la fecha fin. Solo procesa el _ID indicado. La carta se envía al arrendatario, al responsable y a los destinatarios del evento Ticket automático de recibo · 15 días.</p>
+            <label><input type="checkbox" name="receipt_enabled" <?php echo !empty($receiptConfig['enabled']) ? 'checked' : ''; ?>> Activar recibos automáticos</label>
+            <label>Contrato: _ID interno (no número contractual)<input class="input input-bordered" type="number" min="1" max="999999999" required name="receipt_contract_id" value="<?php echo (int) $receiptConfig['contract_id']; ?>"></label>
+            <label>Funcionario al que se asignan los tickets<select class="select select-bordered scm-select" name="receipt_employee_id"><?php echo $receiptOptions((string) $receiptConfig['employee_id']); ?></select></label>
+            <label>Coordinador que aparece en la carta (opcional)<select class="select select-bordered scm-select" name="receipt_coordinator_id"><?php echo $receiptOptions((string) $receiptConfig['coordinator_id']); ?></select></label>
+            <p>El registro fotográfico del contrato se incluye como enlace. Las fotos almacenadas en la aplicación se insertan en el PDF. El responsable configurado aquí prevalece sobre la recomendación del inmueble.</p>
+          </section>
           <section class="scm-pqr-settings-section">
             <h4>Acciones y destinatarios internos</h4>
             <p>Selecciona uno o varios funcionarios por acci&oacute;n. Si una acci&oacute;n queda vac&iacute;a, no se env&iacute;an avisos internos para esa actividad.</p>

@@ -10397,6 +10397,13 @@
         fd.append("action", actionInternalNotificationsSave);
         fd.append("nonce", nonce);
         fd.append("settings", JSON.stringify(collectSettings()));
+        var receiptScope = form.querySelector('[data-receipt-automation]');
+        if (receiptScope) fd.append('receipt_automation', JSON.stringify({
+          enabled: receiptScope.querySelector('[name="receipt_enabled"]').checked,
+          contract_id: receiptScope.querySelector('[name="receipt_contract_id"]').value,
+          employee_id: receiptScope.querySelector('[name="receipt_employee_id"]').value,
+          coordinator_id: receiptScope.querySelector('[name="receipt_coordinator_id"]').value
+        }));
         fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
           .then(function (r) {
             return r.json();
@@ -15407,7 +15414,7 @@
             } else if (contractsEndingView === 'no-exit') {
               details = '<div class="scm-contract-renewal-values"><span><b>' + (Number(renewal.no_exit) ? 'No salida reportada' : 'Sin reporte de no salida') + '</b></span>' + (renewal.note ? '<span>' + escHtml(renewal.note) + '</span>' : '') + '<span>Recordatorios: ' + escHtml(renewal.reminder_days || '30,7,0') + ' días antes</span></div>';
             } else if (contractsEndingView === 'receipt') {
-              details = '<div class="scm-contract-renewal-values"><span>Programado: <b>' + escHtml(row.receipt_due_label || '-') + '</b></span><span>' + (Number(row.probability) === 100 ? 'Omitido: renovación al 100 %' : Number(renewal.no_exit) ? 'Omitido: no salida reportada' : row.receipt_ticket_id ? 'Ticket creado' : (renewal.receipt_employee_id || row.receipt_default_employee_id) ? 'Pendiente de ejecución automática' : 'Requiere asignar responsable') + '</span></div>';
+              details = '<div class="scm-contract-renewal-values"><span>Programado: <b>' + escHtml(row.receipt_due_label || '-') + '</b></span><span>' + (Number(row.probability) === 100 ? 'Omitido: renovación al 100 %' : Number(renewal.no_exit) ? 'Omitido: no salida reportada' : row.receipt_ticket_id ? 'Ticket creado' : row.receipt_in_scope === false ? 'Fuera del contrato configurado para el cron' : row.receipt_automation_enabled === false ? 'Cron desactivado en Configuración' : row.receipt_default_employee_id ? 'Pendiente de ejecución automática' : 'Requiere configurar responsable') + '</span></div>';
               ticketButton = row.receipt_ticket_id ? '<button type="button" class="scm-case-work-btn" data-contracts-ending-case="receipt" data-contract-pk="' + escHtml(row.contract_pk) + '">Ver recibo #' + escHtml(row.receipt_ticket_id) + '</button>' : '';
             }
             var configure = canWrite ? '<button type="button" class="scm-case-work-btn" data-contracts-ending-configure data-contract-pk="' + escHtml(row.contract_pk) + '">' + (contractsEndingView === 'no-exit' ? 'Registrar / editar reporte' : 'Editar gestión') + '</button>' : '';
@@ -15640,8 +15647,8 @@
           '<small>Separados por coma; 0 significa el día de terminación, a las 9:00 a. m. Los destinatarios se configuran en Notificaciones internas → No salida del inmueble.</small>' +
           (Number(state.no_exit) ? '<label class="scm-contract-renewal-check"><input type="checkbox" name="confirm_retire">Confirmo retirar el reporte y cancelar sus recordatorios si desmarco No salida.</label>' : '') +
           '<label>Reporte / observaciones<textarea name="note" rows="3" maxlength="4000">' + escHtml(state.note || '') + '</textarea></label>' +
-          '<label>Responsable del recibo automático<select name="receipt_employee_id"><option value="">Usar recomendación del inmueble / contrato</option>' + employeeOptions + '</select></label>' +
-          '<small>Recibo programado para ' + escHtml(row.receipt_due_label || '-') + '. Si no hay un responsable activo, quedará pendiente de asignación.</small></form>',
+          '<input type="hidden" name="receipt_employee_id" value="' + escHtml(state.receipt_employee_id || '') + '"><p>El responsable de los tickets automáticos se selecciona en Configuración → Notificaciones → Recibos automáticos.</p>' +
+          '<small>Recibo programado para ' + escHtml(row.receipt_due_label || '-') + '. Solo se ejecuta para el contrato indicado y con el cron activado en Configuración.</small></form>',
         showCancelButton: true, confirmButtonText: 'Guardar gestión', cancelButtonText: 'Cancelar', showLoaderOnConfirm: true,
         allowOutsideClick: function() { return !Swal.isLoading(); },
         preConfirm: function() {

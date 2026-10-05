@@ -102,10 +102,20 @@ trait AdministrativeTicketCreationConcern
     $contractualName = $this->firstNonEmpty([$sucursal['nombre_contractual'] ?? '', $sucursal['nombre'] ?? '']);
     $contractualPhone = $this->firstNonEmpty([$sucursal['celular_contractual'] ?? '', $sucursal['telefono'] ?? '']);
     $contractualEmail = $this->firstNonEmpty([$sucursal['correo_contractual'] ?? '', $sucursal['correo'] ?? '']);
+    $coordinatorId = trim((string) ($input['contractual_employee_id'] ?? ''));
+    if ($coordinatorId !== '') {
+      $coordinator = $this->repo->getFuncionarioById($coordinatorId) ?: [];
+      $contractualName = $this->firstNonEmpty([$coordinator['nombre'] ?? '', $coordinator['nombre_empleado'] ?? '']);
+      $contractualPhone = $this->firstNonEmpty([$coordinator['celular'] ?? '', $coordinator['celular_empleado'] ?? '', $coordinator['telefono'] ?? '']);
+      $contractualEmail = $this->firstNonEmpty([$coordinator['correo'] ?? '', $coordinator['correo_empleado'] ?? '']);
+    } elseif (!empty($input['require_receipt_letter'])) {
+      $contractualName = ''; $contractualPhone = ''; $contractualEmail = '';
+    }
     $ciudad = $this->firstNonEmpty([$sucursal['ciudad'] ?? '', $contract['ciudad'] ?? '', 'Cartagena de Indias']);
     $creatorProfile = $this->ticketCreatorProfile($schema);
 
     $ticketPayload = [
+      'require_receipt_letter' => !empty($input['require_receipt_letter']),
       'internal_notification_action' => trim((string) ($input['internal_notification_action'] ?? '')),
       'cct_status' => 'publish',
       'cct_author_id' => $creatorEmployeeId !== '' ? $creatorEmployeeId : 0,
@@ -184,6 +194,18 @@ trait AdministrativeTicketCreationConcern
       $ticketPayload['archivos'] = serialize(array_values($documentos));
     }
 
+    // PDF-only context: decode existing CCT evidence without instantiating serialized objects.
+    $photoUrls = $imagenes;
+    foreach (['imagenes', 'imagen', 'registro_fotografico'] as $photoKey) {
+      $raw = $contract[$photoKey] ?? '';
+      $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
+      if (!is_array($decoded) && is_string($raw) && preg_match('/^a:\\d+:/', $raw)) $decoded = @unserialize($raw, ['allowed_classes' => false]);
+      if (is_array($decoded)) {
+        array_walk_recursive($decoded, static function ($value) use (&$photoUrls) { if (is_string($value)) $photoUrls[] = $value; });
+      } elseif (is_string($raw) && $raw !== '') $photoUrls[] = $raw;
+    }
+    $ticketPayload['receipt_photo_urls'] = array_values(array_unique(array_filter($photoUrls, 'is_string')));
+
     $insertPayload = $schema->filterTableData($ticketsTable, $ticketPayload);
     if (empty($insertPayload)) {
       return ['ok' => '0', 'message' => 'No se pudo preparar la informacion del ticket.'];
@@ -215,6 +237,7 @@ trait AdministrativeTicketCreationConcern
         : $this->generateTicketPdfs($mode, $tema, $ticketId, $ticketPayload);
       $generatedPdfs = $generated['pdfs'];
       $warnings = array_merge($warnings, $generated['warnings']);
+      if (!empty($input['require_receipt_letter']) && empty($generatedPdfs['acta_desocupacion'])) throw new \RuntimeException('No se pudo generar la carta de aviso previo.');
       if (!empty($generatedPdfs)) {
         $this->applyGeneratedPdfsToPayload($ticketPayload, $documentos, $generatedPdfs);
         $updatePayload = $schema->filterTableData($ticketsTable, $this->ticketGeneratedPdfData($ticketPayload));
@@ -230,7 +253,7 @@ trait AdministrativeTicketCreationConcern
         do_action('guardar-revision-preventiva', $ticketId, $ticketPayload, $contract);
       }
 
-      if ($startedTransaction && $pdo->inTransaction()) {
+      if ($startedTransaction && $pdo->inTransaction() && empty($input['require_receipt_letter'])) {
         $pdo->commit();
       }
     } catch (\Throwable $e) {
@@ -243,10 +266,16 @@ trait AdministrativeTicketCreationConcern
     try {
       $queued = $this->queueCreationEmails($ticketId, $ticketPayload, $notifyRecipients, $mode, $generatedPdfs);
     } catch (\Throwable $exception) {
+      if (!empty($input['require_receipt_letter'])) {
+        if ($startedTransaction && $pdo->inTransaction()) $pdo->rollBack();
+        foreach ($generatedPdfs as $pdf) if (!empty($pdf['path']) && is_file($pdf['path'])) @unlink($pdf['path']);
+        throw $exception;
+      }
       $queued = 0;
       $warnings[] = 'Ticket guardado; no se pudieron encolar los avisos.';
       error_log('[ticket_creation_notifications] ' . $exception->getMessage());
     }
+    if ($startedTransaction && $pdo->inTransaction()) $pdo->commit();
     $message = 'Ticket #' . $ticketId . ' creado correctamente.';
     if (!empty($warnings)) {
       $message .= ' ' . implode(' ', $warnings);

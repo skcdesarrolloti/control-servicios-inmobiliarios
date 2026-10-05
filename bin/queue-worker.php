@@ -29,6 +29,10 @@ if (!$lockFp || !flock($lockFp, LOCK_EX | LOCK_NB)) {
 }
 
 try {
+  // Preserve cancellation of obsolete reminders independently of receipt activation.
+  $renewal = new \SCM\Modules\Contracts\ContractRenewalService($scmDb);
+  $renewal->ensureSchema();
+  $renewal->reconcileCycles();
   // Domain effects first; all message deliveries still use shared-notifications.
   try {
     $receipts = (new \SCM\App\SuCasaControlServiciosInmobiliarios($scmDb))->processAutomaticContractReceipts();

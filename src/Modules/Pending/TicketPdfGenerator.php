@@ -35,7 +35,7 @@ final class TicketPdfGenerator
       $out['acta_desocupacion'] = $this->save(
         $this->buildActaDesocupacion($ticket),
         'acta_desocupacion_' . $ticketId,
-        'Acta de desocupacion',
+        'Notificación previa para entrega del inmueble',
         'acta_desocupacion'
       );
     }
@@ -229,27 +229,45 @@ final class TicketPdfGenerator
     $pdf = new SimplePdf();
     $pdf->backgroundImage($this->letterheadPath());
     $pdf->actaDesign('Gestión contractual');
-    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Acta de desocupación');
-    $pdf->title('Acta de desocupacion');
-    $pdf->line($this->value($ticket, 'ciudad', 'Cartagena de Indias') . ', ' . date('d-m-Y'));
-    $pdf->line('Apreciado(a) ' . $this->value($ticket, 'arrendatario', 'arrendatario'));
+    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Aviso previo de entrega');
+    $pdf->title('Notificación previa para entrega del inmueble');
+    $pdf->line($this->value($ticket, 'ciudad', 'Cartagena de Indias') . ', ' . date('d/m/Y'));
+    $pdf->line('Señor(a): ' . $this->value($ticket, 'arrendatario', 'Arrendatario'));
+    $pdf->line('Inmueble: ' . $this->value($ticket, 'direccion', $this->value($ticket, 'inmueble', '-')));
+    $pdf->line('Contrato: ' . $this->value($ticket, 'contrato', '-'));
     $pdf->spacer(8);
-    $pdf->heading('Notificación');
-    $pdf->paragraph('Por medio de la presente le notificamos que su contrato #' . $this->value($ticket, 'contrato', '-') . ' de arrendamiento esta proximo a culminar, es por ello por lo que, con anticipacion, le invitamos a realizar las reparaciones que se encuentren pendientes en el inmueble; lo anterior, toda vez que tal como lo estipula el contrato de arrendamiento en su CLAUSULA DECIMA NOVENA, la cual establece:');
-    $pdf->paragraph('"DECIMA NOVENA: RECIBO Y ESTADO. El arrendatario declara que ha recibido el inmueble objeto de este contrato en buen estado, conforme al inventario que hace parte de este, y que en el mismo estado lo restituira al arrendador a la terminacion del arrendamiento, o cuando este haya de cesar por alguna de las causales previstas, salvo el deterioro proveniente del tiempo y del uso legitimo."');
-    $pdf->paragraph('Asi mismo, destacamos que para recibir el bien inmueble, usted debera estar a paz y salvo de canon de arrendamiento, administracion (si aplica), y servicios publicos con su respectivo deposito.');
-    $pdf->paragraph('Nota: En caso de que el inmueble tenga reparaciones pendientes, o presente deudas de canon de arrendamiento, administracion y/o servicios publicos, los valores adeudados seguiran contando hasta el dia en que se reciba formalmente el inmueble y el mismo se encuentre totalmente a paz y salvo.');
-    $pdf->heading('Anexos');
+    $pdf->paragraph('Teniendo en cuenta que su contrato de arrendamiento se encuentra próximo a finalizar, nos permitimos recordarle que la fecha prevista para la entrega y restitución del inmueble es el día ' . $this->dateLabel($this->value($ticket, 'fecha_terminacion_contrato', '')) . '.');
+    $pdf->paragraph('Con el propósito de efectuar la entrega de manera oportuna y evitar inconvenientes posteriores, agradecemos realizar con suficiente anticipación las reparaciones que sean de su responsabilidad y verificar que se encuentren atendidas las obligaciones correspondientes a canon de arrendamiento, servicios públicos, administración —cuando aplique— y demás conceptos asociados a su ocupación.');
+    $pdf->paragraph('El inmueble deberá ser entregado desocupado, junto con sus llaves y demás elementos recibidos, en las condiciones establecidas en el contrato de arrendamiento, teniendo en cuenta el deterioro normal derivado del uso legítimo y del transcurso del tiempo, así como con los certificados de mantenimientos de equipos entregados, cuando corresponda.');
+    $pdf->heading('Importante');
+    $pdf->paragraph('En caso de que, por circunstancias atribuibles al arrendatario, la entrega formal y efectiva del inmueble se realice en una fecha posterior a la pactada, continuarán causándose los valores correspondientes a canon de arrendamiento hasta la fecha en que el inmueble sea efectivamente recibido.');
+    $pdf->paragraph('Cuando dicha entrega se extienda a un nuevo período de facturación, se generará inicialmente el cobro del canon mensual completo vigente; una vez se produzca la entrega formal del inmueble, se realizará la liquidación correspondiente a los días efectivamente causados y se reintegrará o abonará a su favor el valor correspondiente a los días posteriores a la entrega que no hayan sido consumidos.');
+    $pdf->paragraph('Por lo anterior, recomendamos atender previamente cualquier reparación, obligación o novedad que pueda retrasar el proceso de entrega. Agradecemos coordinar oportunamente con nuestro equipo la revisión y recepción del inmueble.');
+    $pdf->heading('Registro fotográfico');
     $registro = $this->value($ticket, 'registro_fotografico', '');
-    if ($registro !== '') {
-      $pdf->linkText('Registro fotografico', $registro);
+    if (filter_var($registro, FILTER_VALIDATE_URL) && in_array(strtolower((string) parse_url($registro, PHP_URL_SCHEME)), ['https', 'http'], true)) {
+      $pdf->linkText('Consultar registro fotográfico del inmueble', $registro);
     }
+    $inserted = 0;
+    $files = StoredFileService::fromRuntime();
+    foreach (array_unique((array) ($ticket['receipt_photo_urls'] ?? [])) as $url) {
+      $query = []; parse_str((string) parse_url((string) $url, PHP_URL_QUERY), $query);
+      $name = (string) ($query['n'] ?? $query['file'] ?? $query['name'] ?? basename((string) parse_url((string) $url, PHP_URL_PATH)));
+      $path = $files->pathFor($name);
+      if ($path === null || filesize($path) > 10 * 1024 * 1024) continue;
+      $info = @getimagesize($path);
+      if (!$info || (int) $info[0] * (int) $info[1] > 16000000) continue;
+      if ($pdf->image($path, 440, 240)) { $inserted++; $pdf->spacer(8); }
+      if ($inserted >= 20) break;
+    }
+    if ($registro === '' && $inserted === 0) $pdf->paragraph('No hay registro fotográfico disponible en el contrato.');
+    $pdf->paragraph('Cordialmente, SKC SuCasa Inmobiliaria.');
     $contractual = $this->contactParts($ticket, 'contractual');
     $checker = $this->contactParts($ticket, 'empleado');
-    $pdf->signatureGroup([
-      ['label' => 'Coordinación contractual', 'name' => $contractual['name'], 'details' => $contractual['details']],
-      ['label' => 'Verificador de inmuebles', 'name' => $checker['name'], 'details' => $checker['details']],
-    ]);
+    $signatures = [];
+    if (trim((string) ($ticket['nombre_contractual'] ?? '')) !== '') $signatures[] = ['label' => 'Coordinación contractual', 'name' => $contractual['name'], 'details' => $contractual['details']];
+    $signatures[] = ['label' => 'Realizado por', 'name' => $checker['name'], 'details' => $checker['details']];
+    $pdf->signatureGroup($signatures);
     return $pdf;
   }
 

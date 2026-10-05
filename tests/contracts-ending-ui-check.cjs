@@ -62,11 +62,11 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
     await popup.locator('.swal2-confirm').click();
     assert.match(await popup.locator('.swal2-validation-message').innerText(), /Describe/);
     await popup.locator('[name="note"]').fill('El arrendatario confirmó que permanecerá.');
-    await popup.locator('[name="receipt_employee_id"]').selectOption('EMP-13');
+    assert.equal(await popup.locator('[name="receipt_employee_id"]').getAttribute('type'), 'hidden');
     await popup.locator('.swal2-confirm').click();
     await popup.waitFor({state:'hidden'});
     const saved=await page.evaluate(()=>sent.find(item=>item.action==='save').payload);
-    assert.equal(saved.probability,'95'); assert.equal(saved.no_exit,'1'); assert.equal(saved.end_ts,'1792472400'); assert.equal(saved.revision,'2');assert.equal(saved.receipt_employee_id,'EMP-13');
+    assert.equal(saved.probability,'95'); assert.equal(saved.no_exit,'1'); assert.equal(saved.end_ts,'1792472400'); assert.equal(saved.revision,'2');assert.equal(saved.receipt_employee_id,'');
     await page.locator('[data-contracts-ending-view="no-exit"]').click();
     await page.locator('[data-contracts-only-no-exit]').check();
     assert.equal(await page.locator('.scm-contracts-ending-row').count(),1);

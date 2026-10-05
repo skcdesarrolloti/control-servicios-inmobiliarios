@@ -411,7 +411,26 @@ trait HandlesTicketWorkflowActions
     } else {
       $settings = $incomingSettings;
     }
-    \SCM\Core\App::settings()->set('internal_admin_notifications', $settings, Auth::userId());
+    $automation = null;
+    if (array_key_exists('receipt_automation', $_POST)) {
+      try {
+        $automation = json_decode((string) $_POST['receipt_automation'], true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($automation)) throw new \InvalidArgumentException('Configuración de recibos inválida.');
+        $automation = \SCM\Modules\Contracts\ContractReceiptSettings::validate($this->db, $automation);
+        if ($automation['enabled'] && empty($settings['contrato_recibo_automatico'])) throw new \InvalidArgumentException('Selecciona destinatarios internos para Ticket automático de recibo · 15 días.');
+      } catch (\Throwable $exception) { $this->jsonFail($exception->getMessage()); return; }
+    }
+    $pdo = $this->db->pdo();
+    $pdo->beginTransaction();
+    try {
+      if ($automation !== null) \SCM\Core\App::settings()->set(\SCM\Modules\Contracts\ContractReceiptSettings::KEY, $automation, (int) Auth::employeeId());
+      \SCM\Core\App::settings()->set('internal_admin_notifications', $settings, (int) Auth::employeeId());
+      $pdo->commit();
+    } catch (\Throwable $exception) {
+      if ($pdo->inTransaction()) $pdo->rollBack();
+      \SCM\Core\App::settings()->refresh();
+      $this->jsonFail('No se pudo guardar la configuración.'); return;
+    }
     \SCM\Core\App::settings()->refresh();
 
     $totalRecipients = 0;
@@ -4645,19 +4664,40 @@ trait HandlesTicketWorkflowActions
   }
 
   /** CLI domain automation; never called by rendering a panel. */
-  public function processAutomaticContractReceipts(): array
+  public function processAutomaticContractReceipts(bool $dryRun = false): array
   {
+    $config = \SCM\Modules\Contracts\ContractReceiptSettings::read($this->db);
+    $stats = ['created' => 0, 'skipped' => 0, 'errors' => [], 'dry_run' => $dryRun, 'enabled' => (bool) $config['enabled'], 'contract_id' => (int) $config['contract_id'], 'candidates' => []];
+    if (!$config['enabled']) return $stats;
+    if ((int) $config['contract_id'] <= 0) throw new \RuntimeException('Configura un contrato específico para el cron.');
     $service = new ContractRenewalService($this->db);
-    $service->ensureSchema();
     $table = $this->db->table('jet_cct_contratos_arrendamiento');
     $receiptTable = $this->db->table('scm_contract_receipts');
-    $stats = ['created' => 0, 'skipped' => 0, 'errors' => []];
     $from = strtotime('today');
     $to = strtotime('today +15 days 23:59:59');
-    $service->reconcileCycles();
+    if (!$dryRun) {
+      $service->ensureSchema();
+      $service->reconcileCycles((int) $config['contract_id']);
+    }
     $dateSql = "CASE WHEN TRIM(`fin_contrato`) REGEXP '^[0-9]+$' THEN CASE WHEN CAST(`fin_contrato` AS UNSIGNED) > 9999999999 THEN FLOOR(CAST(`fin_contrato` AS UNSIGNED) / 1000) ELSE CAST(`fin_contrato` AS UNSIGNED) END ELSE UNIX_TIMESTAMP(`fin_contrato`) END";
-    $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE {$dateSql} BETWEEN ? AND ? AND LOWER(TRIM(`estado`)) IN ('entregado','por recibir')", [$from, $to]);
-    $active = array_map('strval', array_column(FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db), 'employee', true), 'id'));
+    $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE `_ID` = ? AND {$dateSql} BETWEEN ? AND ? AND LOWER(TRIM(`estado`)) IN ('entregado','por recibir')", [(int) $config['contract_id'], $from, $to]);
+    if ($dryRun) {
+      $schema = new \SCM\Support\SchemaInspector($this->db);
+      foreach ($rows as $row) {
+        $endTs = $this->contractTerminationTimestamp($row['fin_contrato']);
+        $state = $schema->tableExists($service->table()) ? $service->get((int) $row['_ID'], $endTs) : [];
+        $reason = !empty($state['no_exit']) ? 'No salida reportada' : ((isset($state['probability']) && (float) $state['probability'] >= 100) ? 'Renovación al 100 %' : ($this->contractEndingReceiptTicketId($row) !== '' ? 'Ticket existente' : 'Dentro del plazo; validar responsable y destinatarios'));
+        $stats['candidates'][] = ['contract_id' => (int) $row['_ID'], 'end_date' => date('Y-m-d', $endTs), 'employee_id' => $config['employee_id'], 'reason' => $reason];
+      }
+      if (!$rows) {
+        $contract = $this->db->getRow("SELECT `_ID`, `fin_contrato`, `estado` FROM `{$table}` WHERE `_ID` = ?", [(int) $config['contract_id']]);
+        if ($contract) $stats['next_receipt_date'] = date('Y-m-d', strtotime('-15 days', $this->contractTerminationTimestamp($contract['fin_contrato'])));
+        $stats['message'] = 'El contrato configurado no está dentro del plazo o su estado no permite recibo.';
+      }
+      return $stats;
+    }
+    $receiptEmployees = FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db), 'employee', true);
+    $active = array_map('strval', array_column($receiptEmployees, 'id'));
     foreach ($rows as $row) {
       $pdo = $this->db->pdo();
       try {
@@ -4673,18 +4713,23 @@ trait HandlesTicketWorkflowActions
         if ($existing !== '' || $this->db->getRow("SELECT ticket_id FROM `{$receiptTable}` WHERE contract_id = ? AND end_ts = ?", [$id, $endTs])) {
           $pdo->rollBack(); $stats['skipped']++; continue;
         }
-        $employee = (string) ($state['receipt_employee_id'] ?? '');
-        if ($employee === '') $employee = $this->contractRetentionDefaultEmployeeId($row, $active);
-        if ($employee === '' || !in_array($employee, $active, true)) throw new \RuntimeException('Selecciona un responsable activo en Recibo automático.');
+        $employee = (string) $config['employee_id'];
+        if ($employee === '' || !in_array($employee, $active, true)) throw new \RuntimeException('Selecciona un responsable activo en Configuración → Notificaciones → Recibos automáticos.');
+        if ($config['coordinator_id'] !== '' && !in_array((string) $config['coordinator_id'], $active, true)) throw new \RuntimeException('El coordinador configurado ya no está activo.');
+        $assigned = array_values(array_filter($receiptEmployees, static fn(array $person): bool => (string) $person['id'] === $employee));
+        if (!filter_var((string) ($assigned[0]['email'] ?? ''), FILTER_VALIDATE_EMAIL)) throw new \RuntimeException('El funcionario asignado necesita un correo válido.');
+        if (!filter_var(trim((string) ($row['correo_arrendatario'] ?? '')), FILTER_VALIDATE_EMAIL)) throw new \RuntimeException('El arrendatario necesita un correo válido para recibir la carta.');
+        if (!\SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, 'contrato_recibo_automatico')) throw new \RuntimeException('Configura destinatarios internos para el recibo automático.');
         $result = $this->get_pending_controller()->createAdministrativeTicket([
           'ticket_mode' => 'administrativo', 'contract_pk' => (string) $id, 'id_empleado' => $employee,
           'solicitante_tipo' => 'arrendatario', 'prioridad' => 'Prioridad urgente', 'departamento' => 'Servicio al arrendatario',
           'tema_ayuda' => 'Recibo de inmuebles', 'asunto' => 'Recibo automático de contrato #' . (string) ($row['contrato'] ?? $id),
           'descripcion' => 'Ticket automático para coordinar el recibo 15 días antes de la terminación del contrato. Fecha fin: ' . date('d/m/Y', $endTs),
           'internal_notification_action' => 'contrato_recibo_automatico',
-          'skip_receipt_acta' => true,
+          'require_receipt_letter' => true, 'contractual_employee_id' => (string) $config['coordinator_id'],
         ], [], [], ['empleado', 'solicitante', 'admin']);
         if (($result['ok'] ?? '0') !== '1') throw new \RuntimeException((string) ($result['message'] ?? 'Error al crear recibo.'));
+        if (!empty($result['warnings'])) throw new \RuntimeException(implode(' ', $result['warnings']));
         $this->db->insert($receiptTable, ['contract_id' => $id, 'end_ts' => $endTs, 'ticket_id' => (int) $result['ticket_id'], 'created_at' => time()]);
         $service->audit($id, 'receipt_created', 'Sistema', ['ticket_id' => $result['ticket_id'], 'end_ts' => $endTs]);
         $pdo->commit(); $stats['created']++;
@@ -4779,6 +4824,7 @@ trait HandlesTicketWorkflowActions
     $existingTicket = $this->contractEndingRetentionTicketId($row);
 
     $renewal = (new ContractRenewalService($this->db))->get((int) $contractPk, $endTs);
+    $receiptConfig = \SCM\Modules\Contracts\ContractReceiptSettings::read($this->db);
     $canon = ContractRenewalService::canon($row['valor_canon'] ?? '');
     $probability = isset($renewal['probability']) ? (float) $renewal['probability'] : null;
     return [
@@ -4787,7 +4833,9 @@ trait HandlesTicketWorkflowActions
       'end_ts' => $endTs,
       'receipt_ticket_id' => $this->contractEndingReceiptTicketId($row),
       'receipt_due_label' => date('d/m/Y', strtotime('-15 days', $endTs)),
-      'receipt_default_employee_id' => $this->contractRetentionDefaultEmployeeId($row, array_map('strval', array_column($this->contractReceiptFuncionarios(), 'id'))),
+      'receipt_automation_enabled' => !empty($receiptConfig['enabled']),
+      'receipt_in_scope' => (int) $receiptConfig['contract_id'] === (int) $contractPk,
+      'receipt_default_employee_id' => (string) $receiptConfig['employee_id'],
       'probability' => $probability,
       'canon' => $canon,
       'weighted_value' => $canon !== null && $probability !== null ? round($canon * $probability / 100, 2) : null,
