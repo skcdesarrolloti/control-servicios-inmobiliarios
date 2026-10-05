@@ -127,6 +127,7 @@ trait RendersDashboard
     $cartasAumentoHtml = '';
     $dashboardPermissionTabs = $this->dashboardPermissionTabs();
     $tabMap = [
+      'ini' => 'scm-panel-inicio',
       'inicio' => 'scm-panel-inicio',
       'home' => 'scm-panel-inicio',
       'resumen' => 'scm-panel-inicio',

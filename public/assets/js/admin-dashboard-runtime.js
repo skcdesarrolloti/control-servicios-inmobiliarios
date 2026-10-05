@@ -263,14 +263,11 @@
     function shouldAutoShowDashboardDuePopup(source) {
       try {
         var params = new URL(window.location.href).searchParams;
-        var tab = String(params.get("tab") || params.get("scm_tab") || "").trim().toLowerCase();
+        var tab = String(params.get("tab") || "").trim().toLowerCase();
         var subtab = String(params.get("subtab") || params.get("scm_subtab") || "").trim();
-        if (source === "home-manual") return isDashboardHomePanelActive();
-        if (tab === "inicio" && subtab === "") return true;
-        return (source === "home-tab" || source === "case-return") && isDashboardHomePanelActive() && subtab === "";
+        return tab === "ini" && subtab === "" && isDashboardHomePanelActive();
       } catch (_duePopupUrlError) {
-        if (source === "home-manual") return isDashboardHomePanelActive();
-        return (source === "home-tab" || source === "case-return") && isDashboardHomePanelActive();
+        return false;
       }
     }
 
@@ -1032,9 +1029,10 @@
       if (!window.Swal || !ajaxUrl || !actionAdminDueCalendar) {
         return Promise.resolve();
       }
-      dashboardDuePopupShown[source] = true;
       return loadDashboardDuePopupRows()
         .then(function (payload) {
+          if (!shouldAutoShowDashboardDuePopup(source) || dashboardDuePopupShown[source]) return;
+          dashboardDuePopupShown[source] = true;
           payload = payload || {};
           var rows = Array.isArray(payload.rows) ? payload.rows : [];
           var summaryGroups = Array.isArray(payload.summaryGroups) ? payload.summaryGroups : [];
@@ -21731,6 +21729,14 @@
         var parentPanel = tab.closest("[data-calendar-sections]");
         if (!target || !parentPanel) {
           return;
+        }
+        if (parentPanel.closest("#scm-panel-inicio")) {
+          var homeSectionUrl = new URL(window.location.href);
+          homeSectionUrl.searchParams.set("tab", "ini");
+          homeSectionUrl.searchParams.set("subtab", target.replace(/^scm-home-calendar-section-/, ""));
+          homeSectionUrl.searchParams.delete("scm_tab");
+          homeSectionUrl.searchParams.delete("scm_subtab");
+          window.history.replaceState({}, "", homeSectionUrl.toString());
         }
         parentPanel.querySelectorAll(".scm-calendar-section-tab").forEach(function (item) {
           item.classList.toggle("active", item === tab);

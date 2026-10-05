@@ -360,6 +360,18 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
 
             if (nativeTabBtn) {
               e.preventDefault();
+              // Guardar el destino antes de activar el panel y sus alertas.
+              if (window.history && window.history.pushState) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', panelTarget === 'scm-panel-inicio' ? 'ini' : selectedTabKey);
+                url.searchParams.delete('subtab');
+                url.searchParams.delete('scm_subtab');
+                if (panelTarget === 'scm-panel-inicio') {
+                  url.searchParams.delete('scm_tab');
+                  if (subtabTarget && selectedTabKey !== 'inicio') url.searchParams.set('subtab', subtabTarget);
+                }
+                window.history.pushState({}, '', url.toString());
+              }
               nativeTabBtn.click();
               window.scrollTo({ top: 0, behavior: 'instant' });
               if (panelTarget === 'scm-panel-inicio' && selectedTabKey === 'inicio') {
@@ -390,6 +402,11 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
                 setTimeout(function () {
                   const subtabBtn = document.querySelector('[data-calendar-section-target="scm-home-calendar-section-' + subtabTarget + '"]');
                   if (subtabBtn) subtabBtn.click();
+                  if (panelTarget === 'scm-panel-inicio' && selectedTabKey === 'inicio') {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('subtab');
+                    window.history.replaceState({}, '', url.toString());
+                  }
                 }, 120);
               }
 
@@ -435,13 +452,6 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
               }
               this.setAttribute('aria-current', 'page');
 
-              // Actualizar la URL de forma limpia
-              if (window.history && window.history.pushState) {
-                const url = new URL(window.location.href);
-                const tabKey = this.getAttribute('data-tab-key') || '';
-                url.searchParams.set('tab', tabKey);
-                window.history.pushState({}, '', url.toString());
-              }
             }
           }
         });
