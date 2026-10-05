@@ -898,14 +898,13 @@ trait HandlesTicketWorkflowActions
     $creator = $this->calendarCitaCreatorContact();
     $creatorName = trim((string) ($creator['name'] ?? '')) ?: (Auth::user() ?: 'Funcionario de SKC SuCasa Inmobiliaria');
     $creatorDetails = $this->contractTerminationCreatorSignatureDetails($creator);
-    $creatorSignature = $this->contractTerminationCreatorSignatureText($creatorName, $creatorDetails);
     $requestTs = $this->adminDueFirstTimestamp($ticket, ['solicitud_fecha', 'fecha', 'solicitud_created', 'cct_created']);
     $requestDate = $requestTs > 0 ? date('Y-m-d', $requestTs) : '';
     if ($endDate === '') {
       $finContratoTs = $this->contractTerminationTimestamp($ticket['fin_contrato'] ?? '');
       $endDate = $finContratoTs > 0 ? date('Y-m-d', $finContratoTs) : '';
     }
-    $responseText = $this->contractTerminationResponseText($ticket, $term, $requestDate, $endDate, $creatorSignature);
+    $responseText = $this->contractTerminationResponseText($ticket, $term, $requestDate, $endDate);
 
     try {
       $acta = $this->generateContractTerminationActa($ticket, $term, $responseText, $requestDate, $endDate, $creatorName, $creatorDetails);
@@ -1015,14 +1014,13 @@ trait HandlesTicketWorkflowActions
     $creator = $this->calendarCitaCreatorContact();
     $creatorName = trim((string) ($creator['name'] ?? '')) ?: (Auth::user() ?: 'Funcionario de SKC SuCasa Inmobiliaria');
     $creatorDetails = $this->contractTerminationCreatorSignatureDetails($creator);
-    $creatorSignature = $this->contractTerminationCreatorSignatureText($creatorName, $creatorDetails);
     $requestTs = $this->adminDueFirstTimestamp($ticket, ['fecha', 'cct_created']);
     $requestDate = $requestTs > 0 ? date('Y-m-d', $requestTs) : '';
     if ($endDate === '') {
       $finContratoTs = $this->contractTerminationTimestamp($ticket['fin_contrato'] ?? '');
       $endDate = $finContratoTs > 0 ? date('Y-m-d', $finContratoTs) : '';
     }
-    $responseText = $this->contractNonRenewalResponseText($ticket, $term, $requestDate, $endDate, $creatorSignature);
+    $responseText = $this->contractNonRenewalResponseText($ticket, $term, $requestDate, $endDate);
     $retentionTicket = [];
     if ($createRetentionTicket) {
       if ($retentionEmployeeId === '') {
@@ -4988,18 +4986,6 @@ trait HandlesTicketWorkflowActions
     return implode(' | ', array_values(array_unique($parts)));
   }
 
-  private function contractTerminationCreatorSignatureText(string $creatorName, string $creatorDetails): string
-  {
-    $lines = [$creatorName];
-    foreach (explode('|', $creatorDetails) as $part) {
-      $part = trim($part);
-      if ($part !== '' && !in_array($part, $lines, true)) {
-        $lines[] = $part;
-      }
-    }
-    return implode("\n", $lines);
-  }
-
   private function contractTerminationCreatorSignatureInline(string $creatorName, string $creatorDetails): string
   {
     $parts = [$creatorName];
@@ -5014,7 +5000,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $ticket */
-  private function contractTerminationResponseText(array $ticket, string $term, string $requestDate, string $endDate, string $creatorSignature): string
+  private function contractTerminationResponseText(array $ticket, string $term, string $requestDate, string $endDate): string
   {
     $recipient = $this->contractTerminationFirstText([$ticket], ['solicitante', 'arrendatario', 'propietario']) ?: 'cliente';
     $address = $this->contractTerminationFirstText([$ticket], ['direccion']) ?: 'el inmueble relacionado';
@@ -5024,7 +5010,7 @@ trait HandlesTicketWorkflowActions
 
     if ($term === 'dentro') {
       $text = "Cartagena de Indias D.T. y C., " . date('d/m/Y') . "\n\n";
-      $text .= "Señor(a): {$recipient}\nCiudad\n\n";
+      $text .= "Señor(a): {$recipient}\n\n";
       $text .= "SKC SuCasa Inmobiliaria, en calidad de administradora del inmueble ubicado en {$address}, da respuesta a su solicitud de terminación del contrato de arrendamiento #{$contract}. ";
       $text .= "De acuerdo con la comunicación recibida el {$requestLabel}, la solicitud fue presentada dentro del término establecido, con no menos de tres (3) meses de antelación cuando aplique.\n\n";
       $text .= "En consecuencia, el contrato finalizará el día {$endLabel}, fecha en la cual deberá realizarse la entrega material del inmueble.\n\n";
@@ -5032,13 +5018,12 @@ trait HandlesTicketWorkflowActions
       $text .= "Le recordamos que el inmueble debe entregarse en las mismas condiciones en que fue recibido, conforme al inventario que hace parte del contrato de arrendamiento.";
     } else {
       $text = "Cartagena de Indias D.T. y C., " . date('d/m/Y') . "\n\n";
-      $text .= "Señor(a): {$recipient}\nCiudad\n\n";
+      $text .= "Señor(a): {$recipient}\n\n";
       $text .= "Cordial saludo.\n\n";
       $text .= "SKC SuCasa Inmobiliaria, en calidad de administradora del inmueble ubicado en {$address}, da respuesta a la comunicación recibida el {$requestLabel}, mediante la cual manifiesta su intención de dar por terminado el contrato de arrendamiento #{$contract}.\n\n";
       $text .= "La solicitud se encuentra fuera de término frente a las condiciones del contrato. Por lo anterior, la terminación anticipada no es viable en los términos planteados y podrá generar a su cargo la sanción contractual equivalente al valor de tres (3) cánones de arrendamiento vigentes, o la continuidad hasta la fecha estipulada contractualmente.\n\n";
       $text .= "Sin perjuicio de lo anterior, se dará traslado al área comercial para intentar, sin compromiso de nuestra parte, conseguir un posible nuevo arrendatario que permita estudiar una cesión del contrato. En caso de lograrse, se informará oportunamente.";
     }
-    $text .= "\n\nAtentamente,\n{$creatorSignature}";
     return $text;
   }
 
@@ -5074,7 +5059,7 @@ trait HandlesTicketWorkflowActions
       }
     }
     $pdf->signatureGroup([
-      ['label' => 'Realizado por', 'name' => $creatorName, 'details' => $creatorDetails !== '' ? $creatorDetails : 'SKC SuCasa Inmobiliaria'],
+      ['label' => 'Atentamente', 'name' => $creatorName, 'details' => $creatorDetails !== '' ? $creatorDetails : 'SKC SuCasa Inmobiliaria'],
     ]);
     $pdf->save($path);
 
@@ -5086,7 +5071,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $ticket */
-  private function contractNonRenewalResponseText(array $ticket, string $term, string $requestDate, string $endDate, string $creatorSignature): string
+  private function contractNonRenewalResponseText(array $ticket, string $term, string $requestDate, string $endDate): string
   {
     $recipient = $this->contractTerminationFirstText([$ticket], ['solicitante', 'arrendatario', 'propietario']) ?: 'cliente';
     $address = $this->contractTerminationFirstText([$ticket], ['direccion']) ?: 'el inmueble relacionado';
@@ -5095,7 +5080,7 @@ trait HandlesTicketWorkflowActions
     $endLabel = $this->contractTerminationHumanDate($endDate);
 
     $text = "Cartagena de Indias D.T. y C., " . date('d/m/Y') . "\n\n";
-    $text .= "Señor(a): {$recipient}\nCiudad\n\n";
+    $text .= "Señor(a): {$recipient}\n\n";
     $text .= "SKC SuCasa Inmobiliaria, en calidad de administradora del inmueble ubicado en {$address}, da respuesta a la solicitud relacionada con la no prórroga del contrato de arrendamiento #{$contract}. ";
     if ($term === 'dentro') {
       $text .= "De acuerdo con la comunicación recibida el {$requestLabel}, la solicitud fue presentada dentro del término establecido para informar la no prórroga del contrato.\n\n";
@@ -5104,7 +5089,6 @@ trait HandlesTicketWorkflowActions
       $text .= "La comunicación recibida el {$requestLabel} se encuentra fuera del término previsto para informar la no prórroga del contrato.\n\n";
       $text .= "Por lo anterior, la solicitud no produce los efectos esperados en los términos planteados y el contrato podrá entenderse prorrogado o sujeto a las consecuencias contractuales y legales aplicables, sin perjuicio de las validaciones adicionales que realice el área encargada.";
     }
-    $text .= "\n\nAtentamente,\n{$creatorSignature}";
     return $text;
   }
 
@@ -5140,7 +5124,7 @@ trait HandlesTicketWorkflowActions
       }
     }
     $pdf->signatureGroup([
-      ['label' => 'Realizado por', 'name' => $creatorName, 'details' => $creatorDetails !== '' ? $creatorDetails : 'SKC SuCasa Inmobiliaria'],
+      ['label' => 'Atentamente', 'name' => $creatorName, 'details' => $creatorDetails !== '' ? $creatorDetails : 'SKC SuCasa Inmobiliaria'],
     ]);
     $pdf->save($path);
 
