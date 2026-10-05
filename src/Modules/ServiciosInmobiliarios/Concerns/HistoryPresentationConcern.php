@@ -496,7 +496,7 @@ trait HistoryPresentationConcern
       $parts[] = 'Codigo inmueble Web: ' . $propertyWeb;
     }
     if ($propertySimi !== '') {
-      $parts[] = 'ID Inmueble: ' . $propertySimi;
+      $parts[] = 'Inmueble SIMI: ' . $propertySimi;
     }
     return $parts !== [] ? implode(' · ', $parts) : 'Control inmobiliario';
   }
