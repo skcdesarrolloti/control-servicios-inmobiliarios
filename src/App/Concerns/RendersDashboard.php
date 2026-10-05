@@ -905,23 +905,6 @@ trait RendersDashboard
             </div>
             <?php endforeach; ?>
           </section>
-            </div>
-            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-non-renewal' ? ' active' : ''; ?>" id="scm-home-calendar-section-contract-non-renewal" data-calendar-section-panel>
-              <section class="scm-contract-termination-panel" data-scm-contract-non-renewal-panel aria-live="polite">
-                <div class="scm-contract-termination-head">
-                  <div>
-                    <span class="scm-calendar-action-kicker">Contratos</span>
-                    <h3>Solicitudes de no pr&oacute;rroga de contrato</h3>
-                    <p>Responde si la solicitud est&aacute; dentro o fuera de t&eacute;rmino, elige destinatarios y cierra el ticket con acta.</p>
-                  </div>
-                  <button type="button" class="scm-case-work-btn" data-scm-contract-non-renewal-refresh>Actualizar</button>
-                </div>
-                <div class="scm-contract-termination-status" data-scm-contract-non-renewal-status>Cargando solicitudes pendientes...</div>
-                <div class="scm-contract-termination-summary" data-scm-contract-non-renewal-summary></div>
-                <div class="scm-contract-termination-list" data-scm-contract-non-renewal-list></div>
-              </section>
-            </div>
-          </section>
         <?php endif; ?>
       </section>
 
