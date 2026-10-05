@@ -126,3 +126,29 @@
 .swal2-popup.scm-calendar-create-swal .swal2-actions {
   gap: 10px !important;
 }
+
+/* Contract renewal workspace */
+.scm-contracts-ending-subtabs{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.scm-contracts-ending-subtabs button{border:1px solid #d9e3f0;border-radius:10px;padding:10px 14px;background:#fff;color:#08234b;font:inherit;font-size:13px;cursor:pointer}
+.scm-contracts-ending-subtabs button[aria-selected="true"]{background:#08234b;color:#fff;border-color:#08234b}
+.scm-contracts-ending-subtabs button:focus-visible,.scm-contract-renewal-form input:focus-visible,.scm-contract-renewal-form select:focus-visible{outline:3px solid #ff7814;outline-offset:2px}
+.scm-contracts-ending-view-help{font-size:13px;color:#516780;line-height:1.6}
+.scm-contracts-ending-actions{flex-wrap:wrap;gap:8px;max-width:360px}
+.scm-contract-renewal-values{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:10px;font-size:12px;color:#334a65}
+.scm-contract-renewal-ok{display:inline-block;border-radius:8px;background:#e7f7ef;color:#155a3b;padding:8px 12px;font-size:12px}
+.scm-contract-renewal-form{display:grid;gap:14px;text-align:left;color:#08234b;font-size:14px}
+.scm-contract-renewal-form label{display:grid;gap:6px;font-weight:600}
+.scm-contract-renewal-form input:not([type="checkbox"]),.scm-contract-renewal-form textarea,.scm-contract-renewal-form select{width:100%;border:1px solid #c6d4e5;border-radius:8px;padding:10px;color:#08234b;font:inherit;box-sizing:border-box;background:#fff}
+.scm-contract-renewal-form small{font-size:12px;color:#516780;line-height:1.5}
+.scm-contract-renewal-check{display:flex!important;align-items:center;gap:10px!important;font-size:13px;margin:12px 0}
+.scm-contract-renewal-check input{width:18px;height:18px;flex-shrink:0}
+.scm-contract-history-entry{text-align:left;padding:14px;border-bottom:1px solid #d9e3f0;font-size:13px}
+.scm-contract-history-entry small{display:block;margin-top:5px;color:#516780}
+@media(max-width:700px){.scm-contracts-ending-row{flex-wrap:wrap}.scm-contracts-ending-main{min-width:0;overflow-wrap:anywhere}.scm-contracts-ending-actions{max-width:none;width:100%}.scm-contracts-ending-subtabs button{flex:1 1 140px}.scm-contract-renewal-values{flex-direction:column}}
+
+#scm-app .scm-contracts-ending-panel .scm-case-work-btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;border:1px solid #dbe6f2;padding:10px 14px;font-size:12px;line-height:1.4;cursor:pointer}
+
+#scm-app .scm-contracts-ending-panel{background:#fff;color:#0b1f3a;border-color:#dbe6f2}
+#scm-app .scm-contracts-ending-panel h3,#scm-app .scm-contracts-ending-panel .scm-contract-termination-summary strong{color:#0b1f3a}
+#scm-app .scm-contracts-ending-panel .scm-contract-termination-summary>div{background:#fff;border-color:#dbe6f2}
+#scm-app .scm-contracts-ending-panel .scm-contract-termination-status{background:#fff;color:#516780;border-color:#dbe6f2}

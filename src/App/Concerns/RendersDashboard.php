@@ -518,6 +518,9 @@ trait RendersDashboard
         'contracts_ending_create_retention' => self::AJAX_CONTRACTS_ENDING_CREATE_RETENTION,
         'contracts_ending_import_preview' => self::AJAX_CONTRACTS_ENDING_IMPORT_PREVIEW,
         'contracts_ending_import_apply' => self::AJAX_CONTRACTS_ENDING_IMPORT_APPLY,
+        'contracts_ending_renewal_save' => self::AJAX_CONTRACTS_ENDING_RENEWAL_SAVE,
+        'contracts_ending_history' => self::AJAX_CONTRACTS_ENDING_HISTORY,
+        'contracts_ending_case' => self::AJAX_CONTRACTS_ENDING_CASE,
         'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
@@ -885,6 +888,13 @@ trait RendersDashboard
                   <button type="submit" class="scm-case-work-btn scm-primary-action">Previsualizar actualizaci&oacute;n</button>
                   <small>Se cruzan No. Contrato + No. Inmueble y solo se aplica despu&eacute;s de confirmar los cambios.</small>
                 </form>
+                <div class="scm-contracts-ending-subtabs" role="tablist" aria-label="Gestión de contratos por terminar">
+                  <button type="button" role="tab" aria-selected="true" data-contracts-ending-view="ending">Por terminar</button>
+                  <button type="button" role="tab" aria-selected="false" data-contracts-ending-view="renewal">Probabilidad y valor</button>
+                  <button type="button" role="tab" aria-selected="false" data-contracts-ending-view="no-exit">No salida del inmueble</button>
+                  <button type="button" role="tab" aria-selected="false" data-contracts-ending-view="receipt">Recibo automático</button>
+                </div>
+                <p class="scm-contracts-ending-view-help" data-contracts-ending-help></p>
                 <div class="scm-contract-termination-status" data-scm-contracts-ending-status>Cargando contratos por terminar...</div>
                 <div class="scm-contract-termination-summary" data-scm-contracts-ending-summary></div>
                 <div class="scm-contracts-ending-list" data-scm-contracts-ending-list></div>

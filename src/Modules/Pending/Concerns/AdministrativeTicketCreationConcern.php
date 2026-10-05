@@ -22,7 +22,9 @@ trait AdministrativeTicketCreationConcern
     }
 
     $contractRef = trim((string) ($input['contract_pk'] ?? $input['id_contrato'] ?? ''));
-    $contract = $this->repo->getContratoArrendamientoById($contractRef);
+    $contract = isset($input['contract_pk']) && ctype_digit($contractRef)
+      ? $db->getRow("SELECT * FROM `{$db->table('jet_cct_contratos_arrendamiento')}` WHERE `_ID` = ? LIMIT 1", [(int) $contractRef])
+      : $this->repo->getContratoArrendamientoById($contractRef);
     if (!is_array($contract)) {
       return ['ok' => '0', 'message' => 'Contrato no encontrado.'];
     }
@@ -63,7 +65,9 @@ trait AdministrativeTicketCreationConcern
     $nowTs = time();
     $nowMysql = date('Y-m-d H:i:s', $nowTs);
     $userId = Auth::userId();
-    $creatorEmployeeId = Auth::employeeId() ?: (string) $userId;
+    $creatorEmployeeId = Auth::employeeId();
+    if ($userId > 0 && $creatorEmployeeId === '') return ['ok' => '0', 'message' => 'No se pudo identificar el id_empleado del funcionario creador.'];
+    if ($creatorEmployeeId === '') $creatorEmployeeId = '0';
     $userName = Auth::user();
     if ($userName === '') {
       $userName = $userId > 0 ? ('Usuario #' . $userId) : 'Sistema';
@@ -102,8 +106,9 @@ trait AdministrativeTicketCreationConcern
     $creatorProfile = $this->ticketCreatorProfile($schema);
 
     $ticketPayload = [
+      'internal_notification_action' => trim((string) ($input['internal_notification_action'] ?? '')),
       'cct_status' => 'publish',
-      'cct_author_id' => $creatorEmployeeId,
+      'cct_author_id' => $creatorEmployeeId !== '' ? $creatorEmployeeId : 0,
       'cct_created' => $nowMysql,
       'cct_modified' => $nowMysql,
       'estado' => 'Nuevo',
@@ -205,7 +210,9 @@ trait AdministrativeTicketCreationConcern
         $db->update($ticketsTable, ['id_ticket' => (string) $ticketId], ['_ID' => $ticketId]);
       }
 
-      $generated = $this->generateTicketPdfs($mode, $tema, $ticketId, $ticketPayload);
+      $generated = !empty($input['skip_receipt_acta']) && $tema === 'Recibo de inmuebles'
+        ? ['pdfs' => [], 'warnings' => []]
+        : $this->generateTicketPdfs($mode, $tema, $ticketId, $ticketPayload);
       $generatedPdfs = $generated['pdfs'];
       $warnings = array_merge($warnings, $generated['warnings']);
       if (!empty($generatedPdfs)) {
@@ -216,7 +223,8 @@ trait AdministrativeTicketCreationConcern
         }
       }
 
-      $this->insertPropertyHistory($schema, $ticketId, $ticketPayload, $userName, $idEmpleado, $nowTs, $nowMysql, $mode);
+      $this->insertTicketHistory($schema, $ticketId, $ticketPayload, $imagenes, $documentos, $userName, $creatorEmployeeId, $nowTs, $nowMysql);
+      $this->insertPropertyHistory($schema, $ticketId, $ticketPayload, $userName, $creatorEmployeeId, $nowTs, $nowMysql, $mode);
       $this->updateContractAfterTicket($schema, $contract, $ticketId, $ticketPayload);
       if ($mode === 'preventiva' && function_exists('do_action')) {
         do_action('guardar-revision-preventiva', $ticketId, $ticketPayload, $contract);
@@ -232,7 +240,13 @@ trait AdministrativeTicketCreationConcern
       return ['ok' => '0', 'message' => 'No se pudo crear el ticket: ' . $e->getMessage()];
     }
 
-    $queued = $this->queueCreationEmails($ticketId, $ticketPayload, $notifyRecipients, $mode, $generatedPdfs);
+    try {
+      $queued = $this->queueCreationEmails($ticketId, $ticketPayload, $notifyRecipients, $mode, $generatedPdfs);
+    } catch (\Throwable $exception) {
+      $queued = 0;
+      $warnings[] = 'Ticket guardado; no se pudieron encolar los avisos.';
+      error_log('[ticket_creation_notifications] ' . $exception->getMessage());
+    }
     $message = 'Ticket #' . $ticketId . ' creado correctamente.';
     if (!empty($warnings)) {
       $message .= ' ' . implode(' ', $warnings);

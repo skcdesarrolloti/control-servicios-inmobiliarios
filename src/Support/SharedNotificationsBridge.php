@@ -7,6 +7,8 @@ use SCM\Core\Database;
 final class SharedNotificationsBridge
 {
   private const PROJECT_CODE = 'control-servicios-inmobiliarios';
+  /** Queue construction runs DDL; reuse it on the same PDO after prewarming outside transactions. */
+  private static ?\WeakMap $connectionQueues = null;
 
   private Database $db;
   private string $packageRoot;
@@ -137,7 +139,19 @@ final class SharedNotificationsBridge
     );
 
     $this->storage = new \SharedNotifications\Storage\PdoStorageAdapter($this->db->pdo());
-    $this->queue = new \SharedNotifications\NotificationQueue($this->storage, $this->queueConfig);
+    self::$connectionQueues ??= new \WeakMap();
+    $pdo = $this->db->pdo();
+    $key = $this->queueConfig->queueTable() . '|' . (string) ($queueCfg['attempts_table'] ?? 'skc_notification_attempts');
+    $queues = self::$connectionQueues[$pdo] ?? [];
+    if (!isset($queues[$key])) {
+      if ($pdo->inTransaction()) {
+        $this->lastError = 'Inicializa shared-notifications antes de comenzar la transacción.';
+        return false;
+      }
+      $queues[$key] = new \SharedNotifications\NotificationQueue($this->storage, $this->queueConfig);
+      self::$connectionQueues[$pdo] = $queues;
+    }
+    $this->queue = $queues[$key];
 
     return true;
   }

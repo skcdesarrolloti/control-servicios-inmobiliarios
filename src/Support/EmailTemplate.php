@@ -34,7 +34,7 @@ final class EmailTemplate
       . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f8fafc;">'
       . '<tr><td align="center" style="padding:28px 12px;">'
       . '<table role="presentation" width="700" cellpadding="0" cellspacing="0" border="0" style="max-width:700px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 14px 30px rgba(15,23,42,.08);">'
-      . '<tr><td style="padding:0;"><img src="' . self::e($bannerUrl) . '" alt="Su Casa Inmobiliaria" style="display:block;width:100%;height:auto;border:0;"></td></tr>'
+      . '<tr><td style="padding:0;"><img src="' . self::e($bannerUrl) . '" alt="SKC SuCasa Inmobiliaria" style="display:block;width:100%;height:auto;border:0;"></td></tr>'
       . '<tr><td style="background:#f59120;height:8px;font-size:0;line-height:0;">&nbsp;</td></tr>'
       . '<tr><td style="padding:36px 34px;text-align:left;color:#334155;">'
       . '<h3 style="color:#061d49;font-size:22px;margin:0 0 22px;text-align:center;">' . self::e($title) . '</h3>'
@@ -43,7 +43,7 @@ final class EmailTemplate
       . '</td></tr>'
       . '<tr><td style="background:#0f172a;text-align:center;font-size:14px;padding:22px 20px;color:#cbd5e1;">'
       . '<p style="margin:0 0 6px;color:#ffffff;font-weight:700;">Una empresa para lograr sus sue&ntilde;os.</p>'
-      . '<p style="margin:0;color:#94a3b8;">&copy; ' . date('Y') . ' Su Casa Inmobiliaria</p>'
+      . '<p style="margin:0;color:#94a3b8;">&copy; ' . date('Y') . ' SKC SuCasa Inmobiliaria</p>'
       . '</td></tr>'
       . '</table></td></tr></table></body></html>';
   }
@@ -54,7 +54,7 @@ final class EmailTemplate
     $resources = defined('SCM_RESOURCES_PATH') ? SCM_RESOURCES_PATH : dirname(__DIR__, 2) . '/resources';
     $path = $resources . '/emails/' . preg_replace('/[^a-zA-Z0-9_-]/', '', $name) . '.php';
     if (!is_readable($path)) {
-      return self::render((string)($vars['titulo'] ?? 'SUCASA INMOBILIARIA'), (string)($vars['contenido'] ?? ''), $vars);
+      return self::render((string)($vars['titulo'] ?? 'SKC SuCasa Inmobiliaria'), (string)($vars['contenido'] ?? ''), $vars);
     }
 
     $html = (string)file_get_contents($path);

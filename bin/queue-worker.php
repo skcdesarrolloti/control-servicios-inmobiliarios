@@ -30,6 +30,12 @@ if (!$lockFp || !flock($lockFp, LOCK_EX | LOCK_NB)) {
 
 try {
   // Domain effects first; all message deliveries still use shared-notifications.
+  try {
+    $receipts = (new \SCM\App\SuCasaControlServiciosInmobiliarios($scmDb))->processAutomaticContractReceipts();
+    if ($receipts['errors']) error_log('[contract_receipts] ' . json_encode($receipts, JSON_UNESCAPED_UNICODE));
+  } catch (\Throwable $exception) {
+    error_log('[contract_receipts] ' . $exception->getMessage());
+  }
   (new \SCM\Modules\Pending\PublicServicesCritical($scmDb))->run(30);
   $bridge = new \SCM\Support\SharedNotificationsBridge($scmDb);
   if (!$bridge->isAvailable()) {

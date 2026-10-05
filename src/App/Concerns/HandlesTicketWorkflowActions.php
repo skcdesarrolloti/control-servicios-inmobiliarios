@@ -9,9 +9,12 @@ use SCM\Core\Settings;
 use SCM\Support\FuncionarioOptions;
 use SCM\Support\LegacyXlsReader;
 use Shuchkin\SimpleXLSX;
+use SCM\Modules\Contracts\ContractRenewalService;
 
 trait HandlesTicketWorkflowActions
 {
+  private ?array $contractRetentionEmployeesCache = null;
+  private ?array $contractReceiptEmployeesCache = null;
   public function ajax_handler_session_heartbeat(): void
   {
     $this->verifyCsrf();
@@ -1087,6 +1090,7 @@ trait HandlesTicketWorkflowActions
     $year = max(2000, min(2100, (int) ($_POST['year'] ?? date('Y'))));
     $month = max(1, min(12, (int) ($_POST['month'] ?? date('n'))));
     try {
+      (new ContractRenewalService($this->db))->ensureSchema();
       $items = $this->contractsEndingMonthItems($year, $month);
     } catch (\Throwable $exception) {
       error_log('[contracts_ending_months] ' . $exception->getMessage());
@@ -1127,6 +1131,8 @@ trait HandlesTicketWorkflowActions
       'year' => $year,
       'month' => $month,
       'generated_at' => date('d/m/Y H:i'),
+      'can_write' => $this->canWriteContractRenewal(),
+      'receipt_funcionarios' => $this->contractReceiptFuncionarios(),
     ]);
   }
 
@@ -1200,79 +1206,51 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_contracts_ending_import_apply(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessContractsEndingPanel() || (!$this->canAccessDashboardTab('contratos_arrendamiento') && !$this->canUseDashboardAction('case_respond'))) {
-      $this->jsonFail('No tienes permiso para actualizar fechas de contratos.');
+    if (!$this->canWriteContractRenewal()) $this->jsonFail('No tienes permiso para actualizar fechas de contratos.');
+    $changes = json_decode(wp_unslash((string) ($_POST['changes'] ?? '')), true);
+    $token = trim((string) ($_POST['token'] ?? ''));
+    $expires = (int) ($_POST['expires'] ?? 0);
+    if (!is_array($changes) || !$changes || count($changes) > 5000) $this->jsonFail('No hay un lote válido para aplicar.');
+    if ($expires < time() || !hash_equals($this->contractsEndingImportToken($changes, $expires), $token)) {
+      $this->jsonFail('La previsualización venció o no es válida. Vuelve a subir el archivo.');
     }
-
-    $changesJson = trim(wp_unslash((string) ($_POST['changes'] ?? '')));
-    $token = trim(sanitize_text_field(wp_unslash((string) ($_POST['token'] ?? ''))));
-    $changes = json_decode($changesJson, true);
-    if (!is_array($changes) || $changes === []) {
-      $this->jsonFail('No hay cambios para aplicar.');
-    }
-    if (!hash_equals($this->contractsEndingImportToken($changes), $token)) {
-      $this->jsonFail('La previsualización ya no es válida. Vuelve a subir el archivo y revisa los cambios.');
-    }
-
+    $service = new ContractRenewalService($this->db);
+    $service->ensureSchema();
     $table = $this->db->table('jet_cct_contratos_arrendamiento');
-    if (!$this->table_exists($table) || !$this->column_exists($table, 'fin_contrato')) {
-      $this->jsonFail('La tabla de contratos no está disponible.');
-    }
-
+    $pdo = $this->db->pdo();
     $updated = 0;
-    $skipped = 0;
-    $applied = [];
-    $now = date('Y-m-d H:i:s');
-    $employeeId = Auth::employeeId();
-    foreach ($changes as $change) {
-      if (!is_array($change)) {
-        $skipped++;
-        continue;
-      }
-      $contractId = (int) ($change['contract_id'] ?? 0);
-      $newTs = (int) ($change['new_fin_contrato'] ?? 0);
-      if ($contractId <= 0 || $newTs <= 0) {
-        $skipped++;
-        continue;
-      }
-      $current = $this->db->getRow("SELECT `_ID`, `fin_contrato`, `contrato`, `inmueble`, `id_inmueble` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$contractId]);
-      if (!is_array($current) || $current === []) {
-        $skipped++;
-        continue;
-      }
-      $currentTs = $this->contractTerminationTimestamp($current['fin_contrato'] ?? '');
-      if ($currentTs === $newTs) {
-        $skipped++;
-        continue;
-      }
-      $payload = ['fin_contrato' => (string) $newTs];
-      if ($this->column_exists($table, 'cct_modified')) {
-        $payload['cct_modified'] = $now;
-      }
-      if ($employeeId !== '' && $this->column_exists($table, 'cct_author_id')) {
-        $payload['cct_author_id'] = $employeeId;
-      }
-      $rows = $this->db->update($table, $payload, ['_ID' => $contractId]);
-      if ($rows >= 0) {
+    $seen = [];
+    try {
+      $pdo->beginTransaction();
+      foreach ($changes as $change) {
+        $id = (int) ($change['contract_id'] ?? 0);
+        $newTs = (int) ($change['new_fin_contrato'] ?? 0);
+        if ($id <= 0 || $newTs <= 0 || isset($seen[$id])) throw new \RuntimeException('El lote contiene contratos repetidos o inválidos.');
+        $seen[$id] = true;
+        $current = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? FOR UPDATE", [$id]);
+        if (!$current || (string) ($current['fin_contrato'] ?? '') !== (string) ($change['old_fin_contrato'] ?? '')
+          || (string) ($current['contrato'] ?? '') !== (string) ($change['contract_code'] ?? '')
+          || (string) ($current['inmueble'] ?? '') !== (string) ($change['property_code'] ?? '')) {
+          throw new \RuntimeException('El contrato #' . $id . ' cambió desde la previsualización. No se aplicó el lote; vuelve a revisarlo.');
+        }
+        $payload = ['fin_contrato' => (string) $newTs];
+        if ($this->column_exists($table, 'cct_modified')) $payload['cct_modified'] = date('Y-m-d H:i:s');
+        if (Auth::employeeId() !== '' && $this->column_exists($table, 'cct_author_id')) $payload['cct_author_id'] = Auth::employeeId();
+        if ($this->db->update($table, $payload, ['_ID' => $id]) !== 1) throw new \RuntimeException('No se pudo actualizar el contrato #' . $id . '.');
+        $service->audit($id, 'end_date_imported', Auth::employeeId(), ['before' => $current['fin_contrato'] ?? '', 'after' => $newTs]);
+        $oldState = $service->get($id, $this->contractTerminationTimestamp($current['fin_contrato'] ?? ''));
+        if ($oldState) {
+          // A new end date starts a new renewal cycle; cancel reminders from the old cycle.
+          $service->save($current, $newTs, null, false, (string) $oldState['reminder_days'], '', Auth::employeeId());
+        }
         $updated++;
-        $applied[] = [
-          'contract_id' => (string) $contractId,
-          'contrato' => trim((string) ($current['contrato'] ?? '')),
-          'inmueble' => trim((string) ($current['inmueble'] ?? $current['id_inmueble'] ?? '')),
-          'old_fin_label' => $currentTs > 0 ? date('d/m/Y', $currentTs) : '',
-          'new_fin_label' => date('d/m/Y', $newTs),
-        ];
-      } else {
-        $skipped++;
       }
+      $pdo->commit();
+    } catch (\Throwable $exception) {
+      if ($pdo->inTransaction()) $pdo->rollBack();
+      $this->jsonFail($exception->getMessage());
     }
-
-    $this->jsonOk([
-      'message' => 'Fechas de fin actualizadas: ' . $updated . '.',
-      'updated' => $updated,
-      'skipped' => $skipped,
-      'applied' => $applied,
-    ]);
+    $this->jsonOk(['message' => 'Fechas de fin actualizadas: ' . $updated . '.', 'updated' => $updated, 'skipped' => 0]);
   }
 
   /** @param array<string,mixed> $file @return array<string,mixed> */
@@ -1308,7 +1286,7 @@ trait HandlesTicketWorkflowActions
     }
 
     $importRows = [];
-    for ($i = 1, $max = min(count($rows), 5001); $i < $max; $i++) {
+    for ($i = 1, $max = count($rows); $i < $max; $i++) {
       $row = $rows[$i];
       $contract = $this->contractsEndingImportCleanText($row[$contractIndex] ?? '');
       $property = $this->contractsEndingImportCleanText($row[$propertyIndex] ?? '');
@@ -1336,6 +1314,11 @@ trait HandlesTicketWorkflowActions
     $changes = [];
     $previewRows = [];
     $stats = ['total' => count($importRows), 'changes' => 0, 'unchanged' => 0, 'unmatched' => 0, 'ambiguous' => 0, 'invalid' => 0];
+    $duplicateKeys = [];
+    foreach ($importRows as $row) {
+      $pair = $row['contract'] . '|' . $row['property'];
+      $duplicateKeys[$pair] = ($duplicateKeys[$pair] ?? 0) + 1;
+    }
     foreach ($importRows as $row) {
       $key = $row['line'];
       $candidates = $matches[$key] ?? [];
@@ -1343,7 +1326,11 @@ trait HandlesTicketWorkflowActions
       $note = '';
       $contractDb = [];
       $currentTs = 0;
-      if ((int) $row['new_ts'] <= 0) {
+      if ($row['contract'] === '' || $row['property'] === '' || $duplicateKeys[$row['contract'] . '|' . $row['property']] > 1) {
+        $status = 'invalid';
+        $note = 'Contrato e inmueble son obligatorios y la pareja no puede repetirse.';
+        $stats['invalid']++;
+      } elseif ((int) $row['new_ts'] <= 0) {
         $status = 'invalid';
         $note = 'Fecha fin inválida.';
         $stats['invalid']++;
@@ -1367,6 +1354,9 @@ trait HandlesTicketWorkflowActions
           $changes[] = [
             'contract_id' => (string) ($contractDb['_ID'] ?? ''),
             'new_fin_contrato' => (string) $row['new_ts'],
+            'old_fin_contrato' => (string) ($contractDb['fin_contrato'] ?? ''),
+            'contract_code' => (string) ($contractDb['contrato'] ?? ''),
+            'property_code' => (string) ($contractDb['inmueble'] ?? ''),
           ];
         }
       }
@@ -1386,11 +1376,24 @@ trait HandlesTicketWorkflowActions
       ];
     }
 
+    $targetCounts = array_count_values(array_column($changes, 'contract_id'));
+    foreach ($previewRows as &$previewRow) {
+      if ($previewRow['status'] === 'change' && ($targetCounts[$previewRow['contract_id']] ?? 0) > 1) {
+        $previewRow['status'] = 'ambiguous';
+        $previewRow['note'] = 'Más de una fila pretende actualizar el mismo contrato. Revisa los identificadores.';
+        $stats['changes']--;
+        $stats['ambiguous']++;
+      }
+    }
+    unset($previewRow);
+    $changes = array_values(array_filter($changes, static fn(array $change): bool => ($targetCounts[$change['contract_id']] ?? 0) === 1));
+    $expires = time() + 1800;
     return [
       'stats' => $stats,
       'rows' => $previewRows,
       'changes' => $changes,
-      'token' => $this->contractsEndingImportToken($changes),
+      'token' => $this->contractsEndingImportToken($changes, $expires),
+      'expires' => $expires,
       'filename' => $name,
       'generated_at' => date('d/m/Y H:i'),
     ];
@@ -1405,7 +1408,8 @@ trait HandlesTicketWorkflowActions
       if (!$book->success()) {
         throw new \RuntimeException('No se pudo leer el archivo XLS: ' . (string) $book->error());
       }
-      $rowsEx = $book->rowsEx(0, 5001);
+      $rowsEx = $book->rowsEx(0, 5002);
+      if (count($rowsEx) > 5001) throw new \RuntimeException('El archivo supera 5.000 filas. Divide el archivo para revisar todas.');
       return array_map(function (array $row): array {
         return array_map(static fn($cell) => is_array($cell) ? ($cell['raw'] ?? $cell['value'] ?? '') : $cell, array_values($row));
       }, $rowsEx);
@@ -1414,7 +1418,9 @@ trait HandlesTicketWorkflowActions
     if (!$book instanceof SimpleXLSX) {
       throw new \RuntimeException('No se pudo leer el archivo XLSX: ' . (string) SimpleXLSX::parseError());
     }
-    return array_map(static fn(array $row): array => array_values($row), $book->rows(0, 5001));
+    $rows = $book->rows(0, 5002);
+    if (count($rows) > 5001) throw new \RuntimeException('El archivo supera 5.000 filas. Divide el archivo para revisar todas.');
+    return array_map(static fn(array $row): array => array_values($row), $rows);
   }
 
   /** @param array<int,array<string,mixed>> $importRows @return array<int,array<int,array<string,mixed>>> */
@@ -1439,13 +1445,13 @@ trait HandlesTicketWorkflowActions
       return [];
     }
 
-    $contractColumns = array_values(array_filter(['contrato', 'id_contrato', 'id_contrato_arrendamiento', '_ID'], fn($column): bool => $this->column_exists($table, $column)));
+    $contractColumns = array_values(array_filter(['contrato'], fn($column): bool => $this->column_exists($table, $column)));
     if ($contractColumns === []) {
       return [];
     }
     $contractSet = array_fill_keys($contracts, true);
     $orderSql = $this->column_exists($table, '_ID') ? " ORDER BY CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC" : '';
-    $dbRows = $this->db->getResults("SELECT " . implode(', ', $select) . " FROM `{$table}`{$orderSql} LIMIT 50000");
+    $dbRows = $this->db->getResults("SELECT " . implode(', ', $select) . " FROM `{$table}` WHERE TRIM(LEADING '0' FROM TRIM(`contrato`)) IN (" . implode(',', array_fill(0, count($contracts), '?')) . "){$orderSql}", $contracts);
     $rowsByContract = [];
     foreach ($dbRows as $dbRow) {
       foreach ($contractColumns as $column) {
@@ -1469,7 +1475,7 @@ trait HandlesTicketWorkflowActions
           continue;
         }
         $seenRows[$seenKey] = true;
-        if ($rowProperty !== '' && !$this->contractsEndingImportRowMatches($dbRow, ['inmueble', 'id_inmueble', 'codigo_inmueble_web'], $rowProperty)) {
+        if ($rowProperty === '' || !$this->contractsEndingImportRowMatches($dbRow, ['inmueble', 'id_inmueble', 'codigo_inmueble_web'], $rowProperty)) {
           continue;
         }
         $matches[$line][] = $dbRow;
@@ -1493,22 +1499,11 @@ trait HandlesTicketWorkflowActions
     return false;
   }
 
-  private function contractsEndingImportToken(array $changes): string
+  private function contractsEndingImportToken(array $changes, int $expires = 0): string
   {
-    $canonical = [];
-    foreach ($changes as $change) {
-      if (!is_array($change)) {
-        continue;
-      }
-      $contractId = trim((string) ($change['contract_id'] ?? ''));
-      $newTs = trim((string) ($change['new_fin_contrato'] ?? ''));
-      if ($contractId !== '' && $newTs !== '') {
-        $canonical[] = ['contract_id' => $contractId, 'new_fin_contrato' => $newTs];
-      }
-    }
-    usort($canonical, static fn(array $a, array $b): int => strcmp($a['contract_id'], $b['contract_id']) ?: strcmp($a['new_fin_contrato'], $b['new_fin_contrato']));
-    $secret = defined('SCM_APP_SECRET') ? (string) SCM_APP_SECRET : 'scm-contracts-ending-import';
-    return hash_hmac('sha256', json_encode($canonical, JSON_UNESCAPED_UNICODE), $secret);
+    if (!defined('SCM_APP_SECRET') || (string) SCM_APP_SECRET === '') throw new \RuntimeException('Falta configurar el secreto de la aplicación.');
+    // Sign the ordered batch, its previous values, expiration and current actor.
+    return hash_hmac('sha256', json_encode([$changes, $expires, Auth::employeeId(), Auth::userId()], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), (string) SCM_APP_SECRET);
   }
 
   /** @param array<int,string> $headers @param array<int,string> $aliases */
@@ -1560,9 +1555,11 @@ trait HandlesTicketWorkflowActions
     }
     $text = $this->contractsEndingImportCleanText($value);
     if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $text, $m) === 1) {
+      if (!checkdate((int) $m[2], (int) $m[1], (int) $m[3])) return 0;
       return (int) strtotime(sprintf('%04d-%02d-%02d 00:00:00', (int) $m[3], (int) $m[2], (int) $m[1]));
     }
-    if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})/', $text, $m) === 1) {
+    if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T]\d{2}:\d{2}:\d{2})?$/', $text, $m) === 1) {
+      if (!checkdate((int) $m[2], (int) $m[3], (int) $m[1])) return 0;
       return (int) strtotime(sprintf('%04d-%02d-%02d 00:00:00', (int) $m[1], (int) $m[2], (int) $m[3]));
     }
     return 0;
@@ -4095,6 +4092,9 @@ trait HandlesTicketWorkflowActions
     if (!$this->table_exists($table)) {
       return [];
     }
+    foreach ($rows as $context) {
+      if (array_key_exists('fin_contrato', $context) && isset($context['_ID'])) return $this->contractEndingContractByPk((string) $context['_ID']);
+    }
     $contractRefs = $this->contractTerminationUniqueRefs($rows, ['contrato', 'id_contrato', 'id_contrato_arrendamiento']);
     $propertyRefs = $this->contractTerminationUniqueRefs($rows, ['id_inmueble', 'inmueble']);
     if ($contractRefs === [] && $propertyRefs === []) {
@@ -4339,8 +4339,9 @@ trait HandlesTicketWorkflowActions
   /** @return array<int,array<string,mixed>> */
   private function contractRetentionEligibleFuncionarios(): array
   {
+    if ($this->contractRetentionEmployeesCache !== null) return $this->contractRetentionEmployeesCache;
     $funcionarios = FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db), 'employee', true);
-    return array_values(array_filter($funcionarios, static function (array $funcionario): bool {
+    return $this->contractRetentionEmployeesCache = array_values(array_filter($funcionarios, static function (array $funcionario): bool {
       $cargo = mb_strtolower(trim((string) ($funcionario['cargo'] ?? '')), 'UTF-8');
       $cargoId = trim((string) ($funcionario['id_cargo'] ?? ''));
       return $cargo === 'consultor de arriendo' || $cargoId === '13';
@@ -4440,6 +4441,13 @@ trait HandlesTicketWorkflowActions
       $help[] = ['label' => 'Funcionario relacionado', 'value' => $employee];
     }
 
+    $property = $this->contractRetentionProperty($contract ?: $ticket);
+    if ($property) {
+      if (trim((string) ($property['propietario'] ?? '')) !== '') $help[] = ['label' => 'Propietario del inmueble', 'value' => (string) $property['propietario']];
+      $propertyEmployee = $this->contractRetentionEmployeeFromRows([$property], ['id_funcionario']);
+      if ($propertyEmployee !== '') $help[] = ['label' => 'Responsable del inmueble', 'value' => $propertyEmployee];
+      $help[] = ['label' => 'Recomendación', 'value' => 'Se prioriza el responsable activo del inmueble cuando su cargo permite gestionar retención.'];
+    }
     $suggested = $this->contractRetentionEmployeeDisplayName($defaultEmployeeId, 'id_empleado');
     if ($suggested !== '') {
       $help[] = ['label' => 'Sugerido para asignar', 'value' => $suggested];
@@ -4471,7 +4479,7 @@ trait HandlesTicketWorkflowActions
         if ($value === '' || $value === '-') {
           continue;
         }
-        $mode = $column === 'cct_author_id' ? 'internal' : 'id_empleado';
+        $mode = 'id_empleado';
         $name = $this->contractRetentionEmployeeDisplayName($value, $mode);
         if ($name !== '') {
           return $name;
@@ -4509,6 +4517,21 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $ticket @param string[] $validEmployeeIds */
+  private function contractRetentionProperty(array $contract): array
+  {
+    $table = $this->db->table('jet_cct_inmuebles');
+    if (!$this->table_exists($table)) return [];
+    $internal = trim((string) ($contract['id_inmueble_data'] ?? ''));
+    if ($internal !== '' && ctype_digit($internal)) {
+      $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [(int) $internal]);
+      if ($row) return $row;
+    }
+    $code = trim((string) ($contract['inmueble'] ?? $contract['id_inmueble'] ?? ''));
+    if ($code === '' || !$this->column_exists($table, 'codigo')) return [];
+    $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE TRIM(`codigo`) = ? LIMIT 2", [$code]);
+    return count($rows) === 1 ? $rows[0] : [];
+  }
+
   private function contractRetentionDefaultEmployeeId(array $ticket, array $validEmployeeIds): string
   {
     $valid = array_fill_keys(array_map('strval', $validEmployeeIds), true);
@@ -4518,9 +4541,11 @@ trait HandlesTicketWorkflowActions
       'id_captador', 'captador_id', 'funcionario_creador', 'id_funcionario_creador', 'cct_author_id',
     ];
 
-    foreach ([$contract, $ticket] as $row) {
+    $property = $this->contractRetentionProperty($contract ?: $ticket);
+    foreach ([$property, $contract, $ticket] as $row) {
       foreach ($columns as $column) {
-        $employeeId = $this->contractRetentionNormalizeEmployeeId((string) ($row[$column] ?? ''), $valid);
+        $value = trim((string) ($row[$column] ?? ''));
+        $employeeId = $column === 'cct_author_id' ? (isset($valid[$value]) ? $value : '') : $this->contractRetentionNormalizeEmployeeId($value, $valid);
         if ($employeeId !== '') {
           return $employeeId;
         }
@@ -4550,6 +4575,135 @@ trait HandlesTicketWorkflowActions
     return '';
   }
 
+  private function canWriteContractRenewal(): bool
+  {
+    return $this->canAccessContractsEndingPanel() && ($this->canAccessDashboardTab('contratos_arrendamiento') || $this->canUseDashboardAction('case_respond'));
+  }
+
+  private function contractReceiptFuncionarios(): array
+  {
+    return $this->contractReceiptEmployeesCache ??= FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db), 'employee', true);
+  }
+
+  public function ajax_handler_contracts_ending_renewal_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canWriteContractRenewal()) $this->jsonFail('No tienes permiso para editar la gestión contractual.');
+    $service = new ContractRenewalService($this->db);
+    $service->ensureSchema();
+    $pdo = $this->db->pdo();
+    try {
+      $probability = ContractRenewalService::probability(trim((string) ($_POST['probability'] ?? '')));
+      $days = trim((string) ($_POST['reminder_days'] ?? '30,7,0'));
+      $note = trim(sanitize_textarea_field(wp_unslash((string) ($_POST['note'] ?? ''))));
+      $noExit = (string) ($_POST['no_exit'] ?? '0') === '1';
+      if ($noExit && $note === '') throw new \RuntimeException('Describe el reporte o la evidencia de no salida.');
+      $employee = trim((string) ($_POST['receipt_employee_id'] ?? ''));
+      $active = array_column(FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db), 'employee', true), 'id');
+      if ($employee !== '' && !in_array($employee, array_map('strval', $active), true)) throw new \RuntimeException('El responsable del recibo debe estar activo.');
+      $pdo->beginTransaction();
+      $table = $this->db->table('jet_cct_contratos_arrendamiento');
+      $contract = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? FOR UPDATE", [(int) ($_POST['contract_pk'] ?? 0)]);
+      if (!$contract) throw new \RuntimeException('Contrato no encontrado.');
+      $endTs = $this->contractTerminationTimestamp($contract['fin_contrato'] ?? '');
+      if ($endTs <= 0) throw new \RuntimeException('El contrato no tiene una fecha fin válida.');
+      if ($noExit && !in_array(mb_strtolower(trim((string) ($contract['estado'] ?? ''))), ['entregado','por recibir'], true)) throw new \RuntimeException('No se pueden programar recordatorios para un contrato recibido o desistido.');
+      $old = $service->get((int) $contract['_ID'], $endTs);
+      if ($endTs !== (int) ($_POST['end_ts'] ?? 0) || (int) ($old['revision'] ?? 0) !== (int) ($_POST['revision'] ?? 0)) throw new \RuntimeException('El contrato cambió. Actualiza el listado antes de guardar.');
+      if (!empty($old['no_exit']) && !$noExit && (string) ($_POST['confirm_retire'] ?? '') !== '1') throw new \RuntimeException('Confirma el retiro del reporte de no salida y la cancelación de sus recordatorios.');
+      if (mb_strlen($note) > 4000) throw new \RuntimeException('Las observaciones no pueden superar 4.000 caracteres.');
+      $result = $service->save($contract, $endTs, $probability, $noExit, $days, $note, Auth::employeeId(), $employee);
+      $pdo->commit();
+    } catch (\Throwable $exception) {
+      if ($pdo->inTransaction()) $pdo->rollBack();
+      $this->jsonFail($exception->getMessage());
+    }
+    $this->jsonOk($result + ['message' => 'Gestión guardada. Recordatorios en cola: ' . $result['reminders_queued'] . '.']);
+  }
+
+  public function ajax_handler_contracts_ending_history(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessContractsEndingPanel()) $this->jsonFail('No tienes permiso para ver el historial.');
+    $service = new ContractRenewalService($this->db);
+    $service->ensureSchema();
+    $this->jsonOk(['items' => $service->history((int) ($_POST['contract_pk'] ?? 0))]);
+  }
+
+  public function ajax_handler_contracts_ending_case(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessContractsEndingPanel()) $this->jsonFail('No tienes permiso para abrir el caso.');
+    $contract = $this->contractEndingContractByPk((string) ($_POST['contract_pk'] ?? ''));
+    if (!$contract) $this->jsonFail('Contrato no encontrado.');
+    $id = (string) ($_POST['kind'] ?? '') === 'receipt' ? $this->contractEndingReceiptTicketId($contract) : $this->contractEndingRetentionTicketId($contract);
+    if ($id === '') $this->jsonFail('No hay un ticket asociado a este ciclo del contrato.');
+    $table = $this->db->table('jet_cct_tickets');
+    $ticket = $this->db->getRow("SELECT * FROM `{$table}` WHERE `id_contrato` = ? AND `id_ticket` = ? LIMIT 1", [(string) $contract['_ID'], $id]);
+    if (!$ticket) $this->jsonFail('No se encontró el ticket asociado.');
+    $this->jsonOk(['case' => $this->adminDueNativeTicketCasePayload((int) $ticket['_ID'], $this->adminDueStatusBucket($ticket))]);
+  }
+
+  /** CLI domain automation; never called by rendering a panel. */
+  public function processAutomaticContractReceipts(): array
+  {
+    $service = new ContractRenewalService($this->db);
+    $service->ensureSchema();
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    $receiptTable = $this->db->table('scm_contract_receipts');
+    $stats = ['created' => 0, 'skipped' => 0, 'errors' => []];
+    $from = strtotime('today');
+    $to = strtotime('today +15 days 23:59:59');
+    $service->reconcileCycles();
+    $dateSql = "CASE WHEN TRIM(`fin_contrato`) REGEXP '^[0-9]+$' THEN CASE WHEN CAST(`fin_contrato` AS UNSIGNED) > 9999999999 THEN FLOOR(CAST(`fin_contrato` AS UNSIGNED) / 1000) ELSE CAST(`fin_contrato` AS UNSIGNED) END ELSE UNIX_TIMESTAMP(`fin_contrato`) END";
+    $rows = $this->db->getResults("SELECT * FROM `{$table}` WHERE {$dateSql} BETWEEN ? AND ? AND LOWER(TRIM(`estado`)) IN ('entregado','por recibir')", [$from, $to]);
+    $active = array_map('strval', array_column(FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db), 'employee', true), 'id'));
+    foreach ($rows as $row) {
+      $pdo = $this->db->pdo();
+      try {
+        $pdo->beginTransaction();
+        $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? FOR UPDATE", [(int) $row['_ID']]);
+        $endTs = $this->contractTerminationTimestamp($row['fin_contrato'] ?? '');
+        $id = (int) $row['_ID'];
+        $state = $service->get($id, $endTs);
+        if (!in_array(mb_strtolower(trim((string) ($row['estado'] ?? ''))), ['entregado','por recibir'], true) || $endTs < $from || $endTs > $to || (isset($state['probability']) && (float) $state['probability'] >= 100) || !empty($state['no_exit'])) {
+          $pdo->rollBack(); $stats['skipped']++; continue;
+        }
+        $existing = $this->contractEndingReceiptTicketId($row);
+        if ($existing !== '' || $this->db->getRow("SELECT ticket_id FROM `{$receiptTable}` WHERE contract_id = ? AND end_ts = ?", [$id, $endTs])) {
+          $pdo->rollBack(); $stats['skipped']++; continue;
+        }
+        $employee = (string) ($state['receipt_employee_id'] ?? '');
+        if ($employee === '') $employee = $this->contractRetentionDefaultEmployeeId($row, $active);
+        if ($employee === '' || !in_array($employee, $active, true)) throw new \RuntimeException('Selecciona un responsable activo en Recibo automático.');
+        $result = $this->get_pending_controller()->createAdministrativeTicket([
+          'ticket_mode' => 'administrativo', 'contract_pk' => (string) $id, 'id_empleado' => $employee,
+          'solicitante_tipo' => 'arrendatario', 'prioridad' => 'Prioridad urgente', 'departamento' => 'Servicio al arrendatario',
+          'tema_ayuda' => 'Recibo de inmuebles', 'asunto' => 'Recibo automático de contrato #' . (string) ($row['contrato'] ?? $id),
+          'descripcion' => 'Ticket automático para coordinar el recibo 15 días antes de la terminación del contrato. Fecha fin: ' . date('d/m/Y', $endTs),
+          'internal_notification_action' => 'contrato_recibo_automatico',
+          'skip_receipt_acta' => true,
+        ], [], [], ['empleado', 'solicitante', 'admin']);
+        if (($result['ok'] ?? '0') !== '1') throw new \RuntimeException((string) ($result['message'] ?? 'Error al crear recibo.'));
+        $this->db->insert($receiptTable, ['contract_id' => $id, 'end_ts' => $endTs, 'ticket_id' => (int) $result['ticket_id'], 'created_at' => time()]);
+        $service->audit($id, 'receipt_created', 'Sistema', ['ticket_id' => $result['ticket_id'], 'end_ts' => $endTs]);
+        $pdo->commit(); $stats['created']++;
+      } catch (\Throwable $exception) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $stats['errors'][] = ['contract_id' => $row['_ID'] ?? '', 'message' => $exception->getMessage()];
+      }
+    }
+    return $stats;
+  }
+
+  private function contractEndingReceiptTicketId(array $contract): string
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->column_exists($table, 'fecha_terminacion_contrato')) return '';
+    $row = $this->db->getRow("SELECT `_ID`, `id_ticket` FROM `{$table}` WHERE `id_contrato` = ? AND LOWER(TRIM(`tema_ayuda`)) IN ('recibo de inmuebles','recibo de inmueble') AND `fecha_terminacion_contrato` = ? ORDER BY `_ID` DESC LIMIT 1", [(string) $contract['_ID'], (string) ($contract['fin_contrato'] ?? '')]);
+    return $row ? (string) ($row['id_ticket'] ?: $row['_ID']) : '';
+  }
+
   private function canAccessContractsEndingPanel(): bool
   {
     return $this->canAccessDashboardTab('contratos_arrendamiento')
@@ -4567,8 +4721,8 @@ trait HandlesTicketWorkflowActions
     $fromTs = strtotime(sprintf('%04d-%02d-01 00:00:00', $year, $month)) ?: strtotime(date('Y-m-01 00:00:00'));
     $toTs = strtotime(date('Y-m-t 23:59:59', $fromTs)) ?: $fromTs;
     $columns = [
-      '_ID', 'contrato', 'id_contrato', 'id_contrato_arrendamiento', 'inmueble', 'id_inmueble',
-      'codigo_inmueble_web', 'direccion', 'barrio', 'ciudad', 'propietario', 'arrendatario',
+      '_ID', 'estado', 'contrato', 'id_contrato', 'id_contrato_arrendamiento', 'inmueble', 'id_inmueble',
+      'codigo_inmueble_web', 'id_inmueble_data', 'direccion', 'barrio', 'ciudad', 'propietario', 'arrendatario',
       'correo_propietario', 'correo_arrendatario', 'celular_propietario', 'celular_arrendatario',
       'id_propietario', 'id_arrendatario', 'inicio_contrato', 'fin_contrato', 'valor_canon',
       'valor_administracion', 'id_empleado', 'id_funcionario', 'id_asesor', 'id_comercial',
@@ -4584,9 +4738,10 @@ trait HandlesTicketWorkflowActions
       $select[] = '`_ID`';
     }
 
+    $dateSql = "CASE WHEN TRIM(`fin_contrato`) REGEXP '^[0-9]+$' THEN CASE WHEN CAST(`fin_contrato` AS UNSIGNED) > 9999999999 THEN FLOOR(CAST(`fin_contrato` AS UNSIGNED) / 1000) ELSE CAST(`fin_contrato` AS UNSIGNED) END ELSE UNIX_TIMESTAMP(`fin_contrato`) END";
+    $activeSql = $this->column_exists($table, 'estado') ? " AND LOWER(TRIM(`estado`)) IN ('entregado','por recibir')" : '';
     $rows = $this->db->getResults(
-      "SELECT " . implode(', ', $select) . " FROM `{$table}` WHERE CAST(COALESCE(`fin_contrato`, 0) AS UNSIGNED) BETWEEN ? AND ? ORDER BY CAST(COALESCE(`fin_contrato`, 0) AS UNSIGNED) ASC, CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC LIMIT 500",
-      [$fromTs, $toTs]
+      "SELECT " . implode(', ', $select) . " FROM `{$table}` WHERE {$dateSql} BETWEEN ? AND ?{$activeSql} ORDER BY {$dateSql} ASC, `_ID` DESC", [$fromTs, $toTs]
     );
     if (!is_array($rows)) {
       return [];
@@ -4623,7 +4778,19 @@ trait HandlesTicketWorkflowActions
     $tenant = $this->contractTerminationFirstText([$row], ['arrendatario']);
     $existingTicket = $this->contractEndingRetentionTicketId($row);
 
+    $renewal = (new ContractRenewalService($this->db))->get((int) $contractPk, $endTs);
+    $canon = ContractRenewalService::canon($row['valor_canon'] ?? '');
+    $probability = isset($renewal['probability']) ? (float) $renewal['probability'] : null;
     return [
+      'renewal' => $renewal,
+      'estado_contrato' => (string) ($row['estado'] ?? ''),
+      'end_ts' => $endTs,
+      'receipt_ticket_id' => $this->contractEndingReceiptTicketId($row),
+      'receipt_due_label' => date('d/m/Y', strtotime('-15 days', $endTs)),
+      'receipt_default_employee_id' => $this->contractRetentionDefaultEmployeeId($row, array_map('strval', array_column($this->contractReceiptFuncionarios(), 'id'))),
+      'probability' => $probability,
+      'canon' => $canon,
+      'weighted_value' => $canon !== null && $probability !== null ? round($canon * $probability / 100, 2) : null,
       'contract_pk' => $contractPk,
       'contrato' => $contractCode,
       'inmueble' => $property,
@@ -4666,22 +4833,15 @@ trait HandlesTicketWorkflowActions
     if (!$this->table_exists($ticketsTable) || !$this->column_exists($ticketsTable, 'id_contrato')) {
       return '';
     }
-    $contractRefs = array_values(array_unique(array_filter([
-      trim((string) ($contract['_ID'] ?? '')),
-      trim((string) ($contract['id_contrato'] ?? '')),
-      trim((string) ($contract['id_contrato_arrendamiento'] ?? '')),
-      trim((string) ($contract['contrato'] ?? '')),
-    ], static fn(string $value): bool => $value !== '')));
-    if ($contractRefs === []) {
-      return '';
-    }
+    $contractRefs = [trim((string) ($contract['_ID'] ?? ''))];
+    if ($contractRefs[0] === '') return '';
     $topicSql = $this->column_exists($ticketsTable, 'tema_ayuda')
       ? " AND LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) IN ('retencion de contrato', 'retención de contrato')"
       : '';
     $select = $this->column_exists($ticketsTable, 'id_ticket') ? '`_ID`, `id_ticket`' : '`_ID`';
     $rows = $this->db->getResults(
-      "SELECT {$select} FROM `{$ticketsTable}` WHERE TRIM(COALESCE(`id_contrato`, '')) IN (" . implode(', ', array_fill(0, count($contractRefs), '?')) . "){$topicSql} ORDER BY CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC LIMIT 1",
-      $contractRefs
+      "SELECT {$select} FROM `{$ticketsTable}` WHERE TRIM(COALESCE(`id_contrato`, '')) IN (" . implode(', ', array_fill(0, count($contractRefs), '?')) . "){$topicSql}" . ($this->column_exists($ticketsTable, 'fecha_terminacion_contrato') ? " AND TRIM(COALESCE(`fecha_terminacion_contrato`, '')) = ?" : '') . " ORDER BY CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC LIMIT 1" . ($this->db->pdo()->inTransaction() ? " FOR UPDATE" : ""),
+      $this->column_exists($ticketsTable, 'fecha_terminacion_contrato') ? array_merge($contractRefs, [(string) ($contract['fin_contrato'] ?? '')]) : $contractRefs
     );
     if (!is_array($rows) || $rows === [] || !is_array($rows[0])) {
       return '';
@@ -4695,17 +4855,42 @@ trait HandlesTicketWorkflowActions
     if ($contractPk === '') {
       return [];
     }
-    $contract = $this->contractTerminationContractByContext([
-      '_ID' => $contractPk,
-      'id_contrato' => $contractPk,
-      'id_contrato_arrendamiento' => $contractPk,
-      'contrato' => $contractPk,
-    ]);
-    return is_array($contract) ? $contract : [];
+    if (!ctype_digit($contractPk)) return [];
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    return $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [(int) $contractPk]) ?? [];
   }
 
   /** @param array<string,mixed> $ticket @return array<string,mixed> */
   private function createContractRetentionTicketFromContractRequest(array $ticket, string $term, string $employeeId, string $responseText, string $actaUrl = '', string $actaTitle = '', string $sourceLabel = 'no prórroga'): array
+  {
+    $service = new ContractRenewalService($this->db);
+    $service->ensureSchema();
+    $contract = array_key_exists('fin_contrato', $ticket) && isset($ticket['_ID']) ? $this->contractEndingContractByPk((string) $ticket['_ID']) : $this->contractTerminationContractByContext($ticket);
+    $id = (int) ($contract['_ID'] ?? 0);
+    if (!$id) return ['ok' => '0', 'message' => 'No se encontró el contrato.'];
+    $pdo = $this->db->pdo();
+    $owns = !$pdo->inTransaction();
+    try {
+      if ($owns) $pdo->beginTransaction();
+      $table = $this->db->table('jet_cct_contratos_arrendamiento');
+      $locked = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? FOR UPDATE", [$id]);
+      if (!$locked) throw new \RuntimeException('El contrato ya no existe.');
+      if (isset($locked['estado']) && !in_array(mb_strtolower(trim((string) $locked['estado'])), ['entregado', 'por recibir'], true)) throw new \RuntimeException('Solo se genera retención para contratos entregados o por recibir.');
+      $state = $service->get($id, $this->contractTerminationTimestamp($locked['fin_contrato'] ?? ''));
+      if (isset($state['probability']) && (float) $state['probability'] >= 100) throw new \RuntimeException('Renovación al 100 %: no se genera retención.');
+      if ($this->contractEndingRetentionTicketId($locked) !== '') throw new \RuntimeException('Este contrato ya tiene ticket de retención. Actualiza el listado para abrir el caso.');
+      $result = $this->createContractRetentionTicketUnlocked($ticket, $term, $employeeId, $responseText, $actaUrl, $actaTitle, $sourceLabel, $locked);
+      if (($result['ok'] ?? '0') !== '1') throw new \RuntimeException((string) ($result['message'] ?? 'No se pudo crear la retención.'));
+      $service->audit($id, 'retention_created', Auth::employeeId(), ['ticket_id' => $result['ticket_id'], 'end_ts' => $locked['fin_contrato'] ?? '']);
+      if ($owns) $pdo->commit();
+      return $result;
+    } catch (\Throwable $exception) {
+      if ($owns && $pdo->inTransaction()) $pdo->rollBack();
+      return ['ok' => '0', 'message' => $exception->getMessage()];
+    }
+  }
+
+  private function createContractRetentionTicketUnlocked(array $ticket, string $term, string $employeeId, string $responseText, string $actaUrl = '', string $actaTitle = '', string $sourceLabel = 'no prórroga', array $resolvedContract = []): array
   {
     $employeeId = trim($employeeId);
     if ($employeeId === '') {
@@ -4722,7 +4907,7 @@ trait HandlesTicketWorkflowActions
       return ['ok' => '0', 'message' => 'El responsable debe tener activo = Si y ser consultor de arriendo o tener el cargo 13.'];
     }
 
-    $contract = $this->contractTerminationContractByContext($ticket);
+    $contract = $resolvedContract ?: $this->contractTerminationContractByContext($ticket);
     $contractPk = $this->contractTerminationFirstText([$contract, $ticket], ['_ID', 'id_contrato', 'contrato']);
     if ($contractPk === '') {
       return ['ok' => '0', 'message' => 'No se encontró el contrato para crear el ticket de retención.'];

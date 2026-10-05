@@ -117,6 +117,9 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACTS_ENDING_CREATE_RETENTION = 'scm_contratos_por_terminar_retencion';
   const AJAX_CONTRACTS_ENDING_IMPORT_PREVIEW = 'scm_contratos_por_terminar_import_preview';
   const AJAX_CONTRACTS_ENDING_IMPORT_APPLY = 'scm_contratos_por_terminar_import_apply';
+  const AJAX_CONTRACTS_ENDING_RENEWAL_SAVE = 'scm_contratos_renovacion_guardar';
+  const AJAX_CONTRACTS_ENDING_HISTORY = 'scm_contratos_renovacion_historial';
+  const AJAX_CONTRACTS_ENDING_CASE = 'scm_contratos_caso';
   const AJAX_DASHBOARD_METRICS = 'scm_dashboard_metricas';
   const AJAX_DASHBOARD_FILTER_OPTIONS = 'scm_dashboard_filter_options';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';
@@ -402,6 +405,16 @@ final class SuCasaControlServiciosInmobiliarios
           'retencion_contrato_ticket' => [
             'label' => 'Ticket comercial de retención de contrato',
             'description' => 'Cuando una no prórroga crea un ticket comercial para gestionar la retención o búsqueda del inmueble.',
+            'channel' => 'Email interno en cola',
+          ],
+          'contrato_no_salida' => [
+            'label' => 'No salida del inmueble',
+            'description' => 'Recordatorios programados cuando se reporta que el arrendatario no realizará la salida.',
+            'channel' => 'Email interno en cola',
+          ],
+          'contrato_recibo_automatico' => [
+            'label' => 'Ticket automático de recibo · 15 días',
+            'description' => 'Avisos internos al crear el recibo antes de la fecha fin del contrato.',
             'channel' => 'Email interno en cola',
           ],
         ],
