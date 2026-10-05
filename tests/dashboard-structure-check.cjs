@@ -37,7 +37,10 @@ echo $html;
     for (const kind of ['termination','non-renewal']) {
       assert.equal(await page.locator('[data-scm-contract-'+kind+'-panel]').count(),1,'exactly one '+kind+' panel');
       assert(await page.locator('[data-scm-contract-'+kind+'-panel]').evaluate(el=>!!el.closest('#scm-app')));
+      assert(await page.locator('[data-scm-contract-'+kind+'-panel]').evaluate(el=>!!el.closest('#scm-panel-actividades-contractuales')), 'contractual sections belong to their own main panel');
     }
+    assert.equal(await page.locator('#scm-panel-inicio .scm-calendar-section-tab').count(),4,'Inicio has only its four operational views');
+    assert.equal(await page.locator('#scm-panel-actividades-contractuales .scm-calendar-section-tab').count(),3,'Contract activities has its three views');
     const modalIds=['scm-ticket-topic-settings-modal','scm-pqr-settings-modal','scm-internal-notifications-modal','scm-permissions-modal'];
     for(const id of modalIds) {
       const modal=page.locator('#'+id);

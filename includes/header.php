@@ -235,8 +235,15 @@ if (empty($current_page) || $current_page === 'tickets') {
   $tabParam = mb_strtolower(trim((string)($_GET['scm_tab'] ?? ($_GET['tab'] ?? ''))), 'UTF-8');
   $subtabParam = mb_strtolower(trim((string)($_GET['scm_subtab'] ?? ($_GET['subtab'] ?? ''))), 'UTF-8');
   if ($tabParam === 'ini') $tabParam = 'inicio';
+  if ($tabParam === 'actividades_contractuales') {
+    $tabParam = 'inicio';
+    if ($subtabParam === '') $subtabParam = 'contracts-ending';
+  }
 
-  if (in_array($tabParam, ['abiertos', 'scm-panel-abiertos'], true)) {
+  $sectionTabPages = ['mine' => 'mine', 'team' => 'team', 'due' => 'due', 'property_history' => 'property_history', 'contracts_ending' => 'contracts_ending', 'contract_termination' => 'contract_termination', 'contract_non_renewal' => 'contract_non_renewal'];
+  if (isset($sectionTabPages[$tabParam])) {
+    $current_page = $sectionTabPages[$tabParam];
+  } elseif (in_array($tabParam, ['abiertos', 'scm-panel-abiertos'], true)) {
     $current_page = 'abiertos';
   } elseif (in_array($tabParam, ['mis_tickets', 'mis-tickets', 'scm-panel-mis-tickets'], true)) {
     $current_page = 'mis_tickets';
@@ -309,10 +316,11 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 };
 
 // Orden solicitado:
-// 1. Inicio (Dropdown: Mi Calendario, Calendario Equipo, Vencimientos, Historial Inmueble, Contratos por terminar, Solicitudes Terminación)
+// 1. Inicio (Dropdown: Resumen, Mi Calendario, Calendario Equipo, Vencimientos, Historial Inmueble)
 // 2. Gestión de Casos & Tickets (Dropdown: Tickets Abiertos, Mis Tickets, Tickets Postergados, Tickets Cerrados)
 // 3. Actividades Administrativas (Dropdown: Notificaciones, Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
-// 4. Métricas y Dashboard
+// 4. Actividades contractuales (Dropdown: Contratos por terminar, Terminación, No prórroga)
+// 5. Métricas y Dashboard
 $rawNavItems = [
   'inicio' => [
     'type' => 'dropdown',
@@ -334,7 +342,7 @@ $rawNavItems = [
         'label' => 'Mi calendario',
         'panel_id' => 'scm-panel-inicio',
         'subtab' => 'mine',
-        'url' => $baseUrl . '/index.php?tab=ini&subtab=mine',
+        'url' => $baseUrl . '/index.php?tab=mine',
         'icon' => 'calendar_today',
         'perms' => ['calendario_actividades', 'abiertos'],
       ],
@@ -343,7 +351,7 @@ $rawNavItems = [
         'label' => 'Calendario equipo',
         'panel_id' => 'scm-panel-inicio',
         'subtab' => 'team',
-        'url' => $baseUrl . '/index.php?tab=ini&subtab=team',
+        'url' => $baseUrl . '/index.php?tab=team',
         'icon' => 'groups',
         'perms' => ['calendario_actividades', 'abiertos'],
       ],
@@ -352,7 +360,7 @@ $rawNavItems = [
         'label' => 'Vencimientos',
         'panel_id' => 'scm-panel-inicio',
         'subtab' => 'due',
-        'url' => $baseUrl . '/index.php?tab=ini&subtab=due',
+        'url' => $baseUrl . '/index.php?tab=due',
         'icon' => 'calendar_month',
         'perms' => ['calendario_actividades', 'reportes_administrativos_pendientes', 'abiertos'],
       ],
@@ -361,35 +369,8 @@ $rawNavItems = [
         'label' => 'Historial inmueble',
         'panel_id' => 'scm-panel-inicio',
         'subtab' => 'property-history',
-        'url' => $baseUrl . '/index.php?tab=ini&subtab=property-history',
+        'url' => $baseUrl . '/index.php?tab=property_history',
         'icon' => 'history',
-        'perms' => ['calendario_actividades', 'abiertos'],
-      ],
-      'contracts_ending' => [
-        'key' => 'contracts_ending',
-        'label' => 'Contratos por terminar',
-        'panel_id' => 'scm-panel-inicio',
-        'subtab' => 'contracts-ending',
-        'url' => $baseUrl . '/index.php?tab=ini&subtab=contracts-ending',
-        'icon' => 'event_upcoming',
-        'perms' => ['calendario_actividades', 'abiertos'],
-      ],
-      'contract_termination' => [
-        'key' => 'contract_termination',
-        'label' => 'Solicitudes de terminación de contrato',
-        'panel_id' => 'scm-panel-inicio',
-        'subtab' => 'contract-termination',
-        'url' => $baseUrl . '/index.php?tab=ini&subtab=contract-termination',
-        'icon' => 'assignment_late',
-        'perms' => ['calendario_actividades', 'abiertos'],
-      ],
-      'contract_non_renewal' => [
-        'key' => 'contract_non_renewal',
-        'label' => 'Solicitudes de no prórroga de contrato',
-        'panel_id' => 'scm-panel-inicio',
-        'subtab' => 'contract-non-renewal',
-        'url' => $baseUrl . '/index.php?tab=ini&subtab=contract-non-renewal',
-        'icon' => 'event_busy',
         'perms' => ['calendario_actividades', 'abiertos'],
       ],
     ],
@@ -539,6 +520,41 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=cartas_aumento',
         'icon' => 'mail',
         'perms' => ['cartas_aumento'],
+      ],
+    ],
+  ],
+  'contractuales' => [
+    'type' => 'dropdown',
+    'key' => 'contractuales',
+    'label' => 'Actividades contractuales',
+    'icon' => 'contract',
+    'children' => [
+      'contracts_ending' => [
+        'key' => 'contracts_ending',
+        'label' => 'Contratos por terminar',
+        'panel_id' => 'scm-panel-actividades-contractuales',
+        'subtab' => 'contracts-ending',
+        'url' => $baseUrl . '/index.php?tab=contracts_ending',
+        'icon' => 'event_upcoming',
+        'perms' => ['calendario_actividades', 'abiertos'],
+      ],
+      'contract_termination' => [
+        'key' => 'contract_termination',
+        'label' => 'Solicitudes de terminación de contrato',
+        'panel_id' => 'scm-panel-actividades-contractuales',
+        'subtab' => 'contract-termination',
+        'url' => $baseUrl . '/index.php?tab=contract_termination',
+        'icon' => 'assignment_late',
+        'perms' => ['calendario_actividades', 'abiertos'],
+      ],
+      'contract_non_renewal' => [
+        'key' => 'contract_non_renewal',
+        'label' => 'Solicitudes de no prórroga de contrato',
+        'panel_id' => 'scm-panel-actividades-contractuales',
+        'subtab' => 'contract-non-renewal',
+        'url' => $baseUrl . '/index.php?tab=contract_non_renewal',
+        'icon' => 'event_busy',
+        'perms' => ['calendario_actividades', 'abiertos'],
       ],
     ],
   ],

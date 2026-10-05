@@ -783,7 +783,7 @@
 
     function openContractTerminationTab() {
       dashboardDuePopupShown.administrative = true;
-      var homeTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-inicio"]');
+      var homeTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-actividades-contractuales"]');
       if (homeTab) {
         homeTab.click();
         homeTab.focus({ preventScroll: true });
@@ -799,7 +799,7 @@
 
     function openContractNonRenewalTab() {
       dashboardDuePopupShown.administrative = true;
-      var homeTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-inicio"]');
+      var homeTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-actividades-contractuales"]');
       if (homeTab) {
         homeTab.click();
         homeTab.focus({ preventScroll: true });
@@ -14569,9 +14569,6 @@
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-mine"><span class="material-symbols-outlined">calendar_month</span><strong>Mi calendario</strong><i>Agenda</i></button>' +
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-team"><span class="material-symbols-outlined">groups</span><strong>Calendario equipo</strong><i>Equipo</i></button>' +
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-property-history"><span class="material-symbols-outlined">home</span><strong>Historial inmueble</strong><i>Consulta</i></button>' +
-              '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-contracts-ending"><span class="material-symbols-outlined">event_upcoming</span><strong>Contratos por terminar</strong><i>Retención</i></button>' +
-              '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-contract-termination"><span class="material-symbols-outlined">description</span><strong>Terminaciones</strong><i>Contratos</i></button>' +
-              '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-contract-non-renewal"><span class="material-symbols-outlined">event_busy</span><strong>No prórroga</strong><i>Contratos</i></button>' +
             '</div></section>' +
           '</div>';
       }
@@ -21558,6 +21555,13 @@
       if (activePanel.id === "scm-panel-inicio") {
         return loadDashboardHome();
       }
+      if (activePanel.id === "scm-panel-actividades-contractuales") {
+        var contractSection = activePanel.querySelector(".scm-calendar-section-panel.active");
+        if (!contractSection) return Promise.resolve();
+        if (contractSection.id === "scm-home-calendar-section-contract-termination") return loadContractTerminationRequests(false);
+        if (contractSection.id === "scm-home-calendar-section-contract-non-renewal") return loadContractNonRenewalRequests(false);
+        return loadContractsEnding(false);
+      }
       if (
         activePanel.id !== "scm-panel-metricas" &&
         !dashboardFilterOptionsLoaded &&
@@ -21730,10 +21734,11 @@
         if (!target || !parentPanel) {
           return;
         }
-        if (parentPanel.closest("#scm-panel-inicio")) {
+        var contractParent = parentPanel.closest("#scm-panel-actividades-contractuales");
+        if (parentPanel.closest("#scm-panel-inicio") || contractParent) {
           var homeSectionUrl = new URL(window.location.href);
-          homeSectionUrl.searchParams.set("tab", "ini");
-          homeSectionUrl.searchParams.set("subtab", target.replace(/^scm-home-calendar-section-/, ""));
+          homeSectionUrl.searchParams.set("tab", target.replace(/^scm-home-calendar-section-/, "").replace(/-/g, "_"));
+          homeSectionUrl.searchParams.delete("subtab");
           homeSectionUrl.searchParams.delete("scm_tab");
           homeSectionUrl.searchParams.delete("scm_subtab");
           window.history.replaceState({}, "", homeSectionUrl.toString());
@@ -21792,6 +21797,27 @@
 
     root.querySelectorAll(".scm-tab[data-tab]").forEach(function (tab) {
       tab.addEventListener("click", function () {
+        if ((tab.getAttribute("data-tab") || "") === "scm-panel-inicio") {
+          var homeUrl = new URL(window.location.href);
+          if (["ini", "mine", "team", "due", "property_history"].indexOf(homeUrl.searchParams.get("tab")) === -1) {
+            homeUrl.searchParams.set("tab", "ini");
+            homeUrl.searchParams.delete("subtab");
+            homeUrl.searchParams.delete("scm_tab");
+            homeUrl.searchParams.delete("scm_subtab");
+            window.history.replaceState({}, "", homeUrl.toString());
+          }
+        }
+        if ((tab.getAttribute("data-tab") || "") === "scm-panel-actividades-contractuales") {
+          var contractUrl = new URL(window.location.href);
+          if (["contracts_ending", "contract_termination", "contract_non_renewal"].indexOf(contractUrl.searchParams.get("tab")) === -1) {
+            var selectedContractSection = root.querySelector("#scm-panel-actividades-contractuales .scm-calendar-section-panel.active");
+            contractUrl.searchParams.set("tab", selectedContractSection ? selectedContractSection.id.replace(/^scm-home-calendar-section-/, "").replace(/-/g, "_") : "contracts_ending");
+            contractUrl.searchParams.delete("subtab");
+            contractUrl.searchParams.delete("scm_tab");
+            contractUrl.searchParams.delete("scm_subtab");
+            window.history.replaceState({}, "", contractUrl.toString());
+          }
+        }
         window.setTimeout(function () {
           loadActiveLazyPanelWithFeedback();
           if ((tab.getAttribute("data-tab") || "") === "scm-panel-inicio") {
@@ -21905,6 +21931,9 @@
         : null;
       if (sectionTab) {
         event.preventDefault();
+        var sectionParent = sectionTab.closest(".scm-tab-panel");
+        var sectionMainTab = sectionParent ? root.querySelector('.scm-main-tabs .scm-tab[data-tab="' + sectionParent.id + '"]') : null;
+        if (sectionMainTab && !sectionParent.classList.contains("active")) sectionMainTab.click();
         sectionTab.click();
         sectionTab.focus({ preventScroll: true });
         return;

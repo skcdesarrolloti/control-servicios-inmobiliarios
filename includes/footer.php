@@ -363,12 +363,11 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
               // Guardar el destino antes de activar el panel y sus alertas.
               if (window.history && window.history.pushState) {
                 const url = new URL(window.location.href);
-                url.searchParams.set('tab', panelTarget === 'scm-panel-inicio' ? 'ini' : selectedTabKey);
+                url.searchParams.set('tab', selectedTabKey === 'inicio' ? 'ini' : selectedTabKey);
                 url.searchParams.delete('subtab');
                 url.searchParams.delete('scm_subtab');
-                if (panelTarget === 'scm-panel-inicio') {
+                if (panelTarget === 'scm-panel-inicio' || panelTarget === 'scm-panel-actividades-contractuales') {
                   url.searchParams.delete('scm_tab');
-                  if (subtabTarget && selectedTabKey !== 'inicio') url.searchParams.set('subtab', subtabTarget);
                 }
                 window.history.pushState({}, '', url.toString());
               }
@@ -405,6 +404,7 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
                   if (panelTarget === 'scm-panel-inicio' && selectedTabKey === 'inicio') {
                     const url = new URL(window.location.href);
                     url.searchParams.delete('subtab');
+                    url.searchParams.set('tab', 'ini');
                     window.history.replaceState({}, '', url.toString());
                   }
                 }, 120);

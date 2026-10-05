@@ -219,6 +219,17 @@ trait RendersDashboard
       'scm-panel-cartas-aumento' => 'scm-panel-cartas-aumento',
     ];
     $initialTab = $tabMap[$tabKey] ?? '';
+    $contractSections = ['contracts-ending', 'contract-termination', 'contract-non-renewal'];
+    $contractLegacyRoutes = [
+      'contracts_ending' => 'contracts-ending', 'contracts-ending' => 'contracts-ending', 'contratos_por_terminar' => 'contracts-ending',
+      'contract_termination' => 'contract-termination', 'contract-termination' => 'contract-termination', 'contrato_terminacion' => 'contract-termination', 'solicitudes_terminacion' => 'contract-termination', 'terminacion_contrato' => 'contract-termination',
+      'contract_non_renewal' => 'contract-non-renewal', 'contract-non-renewal' => 'contract-non-renewal', 'contrato_no_prorroga' => 'contract-non-renewal', 'solicitudes_no_prorroga' => 'contract-non-renewal', 'no_prorroga_contrato' => 'contract-non-renewal',
+    ];
+    $requestedContractSection = str_replace('_', '-', trim((string) ($_GET['subtab'] ?? $_GET['scm_subtab'] ?? '')));
+    $activeContractSection = 'scm-home-calendar-section-' . ($contractLegacyRoutes[$tabKey] ?? (in_array($requestedContractSection, $contractSections, true) ? $requestedContractSection : 'contracts-ending'));
+    if ($tabKey === 'actividades_contractuales' || isset($contractLegacyRoutes[$tabKey]) || ($initialTab === 'scm-panel-inicio' && in_array($requestedContractSection, $contractSections, true))) {
+      $initialTab = 'scm-panel-actividades-contractuales';
+    }
     $administrativeActivityTabs = [
       'notificaciones' => [
         'panel' => 'scm-panel-admin-notificaciones',
@@ -317,6 +328,7 @@ trait RendersDashboard
       'scm-panel-cerrados' => 'cerrados',
       'scm-panel-mis-tickets' => 'mis_tickets',
       'scm-panel-actividades-administrativas' => 'actividades_administrativas',
+      'scm-panel-actividades-contractuales' => 'calendario_actividades',
       'scm-panel-contratos-arrendamiento' => 'contratos_arrendamiento',
       'scm-panel-metricas' => 'metricas',
     ];
@@ -751,7 +763,7 @@ trait RendersDashboard
             $tabLabel = 'Actividades administrativas';
           } else {
             if (!in_array($permissionKey, $dashboardAllowedTabs, true)) continue;
-            $tabLabel = (string)($dashboardPermissionTabs[$permissionKey] ?? $permissionKey);
+            $tabLabel = $panelId === 'scm-panel-actividades-contractuales' ? 'Actividades contractuales' : (string)($dashboardPermissionTabs[$permissionKey] ?? $permissionKey);
           }
           ?>
           <button class="scm-tab<?php echo $initialTab === $panelId ? ' active' : ''; ?>" data-tab="<?php echo esc_attr($panelId); ?>" data-permission-tab="<?php echo esc_attr($permissionKey); ?>" type="button"><?php echo esc_html($tabLabel); ?></button>
@@ -762,18 +774,12 @@ trait RendersDashboard
         <?php
         $subtabReq = mb_strtolower(trim((string)($_GET['subtab'] ?? '')), 'UTF-8');
         $activeHomeSection = 'scm-home-calendar-section-mine';
-        if ($subtabReq === 'due' || $tabKey === 'vencimientos' || $tabKey === 'vencimiento') {
+        if ($subtabReq === 'due' || in_array($tabKey, ['due', 'vencimientos', 'vencimiento'], true)) {
           $activeHomeSection = 'scm-home-calendar-section-due';
-        } elseif ($subtabReq === 'property-history' || $subtabReq === 'property_history' || $tabKey === 'historial' || $tabKey === 'historial_inmueble') {
+        } elseif ($subtabReq === 'property-history' || $subtabReq === 'property_history' || in_array($tabKey, ['property_history', 'property-history', 'historial', 'historial_inmueble'], true)) {
           $activeHomeSection = 'scm-home-calendar-section-property-history';
-        } elseif ($subtabReq === 'team' || $tabKey === 'calendario_equipo') {
+        } elseif ($subtabReq === 'team' || in_array($tabKey, ['team', 'calendario_equipo'], true)) {
           $activeHomeSection = 'scm-home-calendar-section-team';
-        } elseif ($subtabReq === 'contract-termination' || $subtabReq === 'contract_termination' || in_array($tabKey, ['contract_termination', 'contrato_terminacion', 'solicitudes_terminacion'], true)) {
-          $activeHomeSection = 'scm-home-calendar-section-contract-termination';
-        } elseif ($subtabReq === 'contract-non-renewal' || $subtabReq === 'contract_non_renewal' || in_array($tabKey, ['contract_non_renewal', 'contrato_no_prorroga', 'solicitudes_no_prorroga'], true)) {
-          $activeHomeSection = 'scm-home-calendar-section-contract-non-renewal';
-        } elseif ($subtabReq === 'contracts-ending' || $subtabReq === 'contracts_ending' || in_array($tabKey, ['contracts_ending', 'contratos_por_terminar'], true)) {
-          $activeHomeSection = 'scm-home-calendar-section-contracts-ending';
         } elseif ($subtabReq === 'mine' || $tabKey === 'mi_calendario') {
           $activeHomeSection = 'scm-home-calendar-section-mine';
         }
@@ -785,9 +791,6 @@ trait RendersDashboard
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-team' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-team"><span class="material-symbols-outlined" aria-hidden="true">groups</span><span>Calendario equipo</span></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-due' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-due"><span class="material-symbols-outlined" aria-hidden="true">schedule</span><span>Vencimientos</span><em data-scm-calendar-due-nav-count hidden>0</em></button>
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-property-history' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-property-history"><span class="material-symbols-outlined" aria-hidden="true">home</span><span>Historial inmueble</span></button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-contracts-ending' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contracts-ending"><span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span><span>Contratos por terminar</span></button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-termination' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contract-termination"><span class="material-symbols-outlined" aria-hidden="true">description</span><span>Solicitudes de terminaci&oacute;n de contrato</span></button>
-              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-non-renewal' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contract-non-renewal"><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><span>No pr&oacute;rroga de contrato</span></button>
             </div>
             <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-mine' ? ' active' : ''; ?>" id="scm-home-calendar-section-mine" data-calendar-section-panel>
               <?php echo $this->render_calendario_actividades_panel($config, [
@@ -847,7 +850,20 @@ trait RendersDashboard
                 <div class="scm-property-history-results" data-scm-property-history-results></div>
               </section>
             </div>
-            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-contracts-ending' ? ' active' : ''; ?>" id="scm-home-calendar-section-contracts-ending" data-calendar-section-panel>
+
+          </section>
+        <?php endif; ?>
+      </section>
+
+      <?php if ($canAccessAdministrativeCalendar): ?>
+      <section class="scm-tab-panel<?php echo $initialTab === 'scm-panel-actividades-contractuales' ? ' active' : ''; ?>" id="scm-panel-actividades-contractuales" data-permission-tab="calendario_actividades" aria-label="Actividades contractuales">
+        <section class="scm-home-calendar" data-calendar-sections>
+          <div class="scm-calendar-section-tabs" role="tablist" aria-label="Actividades contractuales">
+              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeContractSection === 'scm-home-calendar-section-contracts-ending' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contracts-ending"><span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span><span>Contratos por terminar</span></button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeContractSection === 'scm-home-calendar-section-contract-termination' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contract-termination"><span class="material-symbols-outlined" aria-hidden="true">description</span><span>Solicitudes de terminaci&oacute;n de contrato</span></button>
+              <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeContractSection === 'scm-home-calendar-section-contract-non-renewal' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contract-non-renewal"><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><span>No pr&oacute;rroga de contrato</span></button>
+          </div>
+            <div class="scm-calendar-section-panel<?php echo $activeContractSection === 'scm-home-calendar-section-contracts-ending' ? ' active' : ''; ?>" id="scm-home-calendar-section-contracts-ending" data-calendar-section-panel>
               <section class="scm-contract-termination-panel scm-contracts-ending-panel" data-scm-contracts-ending-panel aria-live="polite">
                 <div class="scm-contract-termination-head">
                   <div>
@@ -875,7 +891,7 @@ trait RendersDashboard
               </section>
             </div>
             <?php foreach (['termination' => ['section' => 'contract-termination', 'title' => 'Solicitudes de terminación de contrato'], 'non-renewal' => ['section' => 'contract-non-renewal', 'title' => 'Solicitudes de no prórroga de contrato']] as $requestKind => $requestView): ?>
-            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-' . $requestView['section'] ? ' active' : ''; ?>" id="scm-home-calendar-section-<?php echo $requestView['section']; ?>" data-calendar-section-panel>
+            <div class="scm-calendar-section-panel<?php echo $activeContractSection === 'scm-home-calendar-section-' . $requestView['section'] ? ' active' : ''; ?>" id="scm-home-calendar-section-<?php echo $requestView['section']; ?>" data-calendar-section-panel>
               <section class="scm-contract-workspace" data-scm-contract-<?php echo $requestKind; ?>-panel aria-label="<?php echo esc_attr($requestView['title']); ?>">
                 <div class="scm-contract-heading">
                   <div class="space-y-2">
@@ -905,9 +921,9 @@ trait RendersDashboard
               </section>
             </div>
             <?php endforeach; ?>
-          </section>
-        <?php endif; ?>
+        </section>
       </section>
+      <?php endif; ?>
 
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-abiertos' ? ' active' : ''; ?>" id="scm-panel-abiertos" data-permission-tab="abiertos">
         <div class="scm-status-bucket scm-open-bucket" data-open-bucket="abiertos">
