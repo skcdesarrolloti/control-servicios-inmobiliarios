@@ -78,7 +78,7 @@ final class FuncionarioOptions
    *   id_cargo:string
    * }>
    */
-  public static function panelFuncionarios(Database $db, ?SchemaInspector $schema = null, string $idMode = 'employee', ?array $cargoIds = null): array
+  public static function panelFuncionarios(Database $db, ?SchemaInspector $schema = null, string $idMode = 'employee', ?array $cargoIds = null, bool $requireActivoSi = false): array
   {
     $schema = $schema ?: new SchemaInspector($db);
     $table = $db->table('jet_cct_funcionarios');
@@ -109,7 +109,12 @@ final class FuncionarioOptions
     if ($employeeColumn !== '') {
       $where[] = "TRIM(COALESCE(f.`{$employeeColumn}`, '')) <> ''";
     }
-    if ($activeColumn !== '') {
+    if ($requireActivoSi) {
+      if (!$schema->columnExists($table, 'activo')) {
+        return [];
+      }
+      $where[] = "LOWER(TRIM(COALESCE(f.`activo`, ''))) = 'si'";
+    } elseif ($activeColumn !== '') {
       if ($activeColumn === 'cct_status') {
         $where[] = "LOWER(TRIM(COALESCE(f.`{$activeColumn}`, 'publish'))) IN ('publish', 'published', 'si', 'sí', '1', 'true', 'activo', 'active')";
       } else {
@@ -195,8 +200,8 @@ final class FuncionarioOptions
    *   id_cargo:string
    * }>
    */
-  public static function activeFuncionarios(Database $db, ?SchemaInspector $schema = null, string $idMode = 'employee'): array
+  public static function activeFuncionarios(Database $db, ?SchemaInspector $schema = null, string $idMode = 'employee', bool $requireActivoSi = false): array
   {
-    return self::panelFuncionarios($db, $schema, $idMode, []);
+    return self::panelFuncionarios($db, $schema, $idMode, [], $requireActivoSi);
   }
 }

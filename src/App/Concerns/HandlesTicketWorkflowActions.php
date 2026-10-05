@@ -4338,12 +4338,22 @@ trait HandlesTicketWorkflowActions
     ];
   }
 
+  /** @return array<int,array<string,mixed>> */
+  private function contractRetentionEligibleFuncionarios(): array
+  {
+    $funcionarios = FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db), 'employee', true);
+    return array_values(array_filter($funcionarios, static function (array $funcionario): bool {
+      $cargo = mb_strtolower(trim((string) ($funcionario['cargo'] ?? '')), 'UTF-8');
+      $cargoId = trim((string) ($funcionario['id_cargo'] ?? ''));
+      return $cargo === 'consultor de arriendo' || $cargoId === '13';
+    }));
+  }
+
   /** @param array<string,mixed> $ticket @return array<string,mixed> */
   private function contractRetentionTicketUiData(array $ticket): array
   {
     try {
-      $schema = new \SCM\Support\SchemaInspector($this->db);
-      $funcionarios = FuncionarioOptions::activeFuncionarios($this->db, $schema);
+      $funcionarios = $this->contractRetentionEligibleFuncionarios();
     } catch (\Throwable $exception) {
       error_log('[contract_retention_ticket_ui] funcionarios: ' . $exception->getMessage());
       return [
@@ -4357,9 +4367,6 @@ trait HandlesTicketWorkflowActions
     $options = [];
     foreach ($funcionarios as $funcionario) {
       $cargo = trim((string) ($funcionario['cargo'] ?? ''));
-      if (mb_strtolower($cargo, 'UTF-8') !== 'consultor de arriendo') {
-        continue;
-      }
       $id = trim((string) ($funcionario['id'] ?? ''));
       if ($id === '') {
         continue;
@@ -4707,15 +4714,14 @@ trait HandlesTicketWorkflowActions
       return ['ok' => '0', 'message' => 'Selecciona el funcionario responsable del ticket de retención.'];
     }
     $activeIds = [];
-    foreach (FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db)) as $funcionario) {
+    foreach ($this->contractRetentionEligibleFuncionarios() as $funcionario) {
       $id = trim((string) ($funcionario['id'] ?? ''));
-      $cargo = mb_strtolower(trim((string) ($funcionario['cargo'] ?? '')), 'UTF-8');
-      if ($id !== '' && $cargo === 'consultor de arriendo') {
+      if ($id !== '') {
         $activeIds[$id] = true;
       }
     }
     if (!isset($activeIds[$employeeId])) {
-      return ['ok' => '0', 'message' => 'El funcionario responsable debe ser un consultor de arriendo activo.'];
+      return ['ok' => '0', 'message' => 'El responsable debe tener activo = Si y ser consultor de arriendo o tener el cargo 13.'];
     }
 
     $contract = $this->contractTerminationContractByContext($ticket);
