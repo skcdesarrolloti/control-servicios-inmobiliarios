@@ -14854,90 +14854,123 @@
 
     function contractTerminationRecipientChecks(row) {
       var recipients = Array.isArray(row && row.recipients) ? row.recipients : [];
-      if (!recipients.length) {
-        return '<div class="scm-contract-termination-checks">' +
-          '<label><input type="checkbox" name="notify_recipients[]" value="none" checked> No notificar</label>' +
-        "</div>";
-      }
-      return '<div class="scm-contract-termination-checks">' + recipients.map(function (recipient) {
+      return '<div class="scm-contract-notifications">' + recipients.map(function (recipient) {
         recipient = recipient || {};
-        var available = recipient.available === true || recipient.available === "1";
-        var detail = [recipient.name, recipient.email, recipient.phone].filter(Boolean).join(" · ");
-        return '<label class="' + (available ? "" : "is-disabled") + '">' +
-          '<input type="checkbox" name="notify_recipients[]" value="' + escHtml(recipient.value || "") + '"' + (available ? " checked" : " disabled") + "> " +
-          '<span>' + escHtml(recipient.label || "Destinatario") + '</span>' +
-          (detail ? '<small>' + escHtml(detail) + "</small>" : "") +
-        "</label>";
-      }).join("") +
-      '<label><input type="checkbox" name="notify_recipients[]" value="none"> No notificar</label>' +
-      "</div>";
+        var available = recipient.available === true || recipient.available === '1';
+        return '<label class="' + (available ? '' : 'is-disabled') + '"><input type="checkbox" name="notify_recipients[]" value="' + escHtml(recipient.value || '') + '"' + (available ? ' checked' : ' disabled') + '><span class="min-w-0"><span class="scm-recipient-label">' + escHtml(recipient.label || 'Destinatario') + '</span><strong class="text-xs">' + escHtml(recipient.name || '') + '</strong><small>' + escHtml([recipient.email,recipient.phone].filter(Boolean).join(' · ')) + '</small></span></label>';
+      }).join('') + '<label><input type="checkbox" name="notify_recipients[]" value="none"' + (!recipients.length ? ' checked' : '') + '><span><strong class="text-xs">No notificar a ninguna parte</strong><small>Solo registrar la respuesta y cerrar</small></span></label></div>';
     }
 
     function contractTerminationTermBadge(row, compact) {
       row = row || {};
-      var status = row.term_status || "unknown";
-      var label = row.term_label || "Sin cálculo de término";
-      var hint = row.term_hint || "";
-      var dates = [];
-      if (row.fin_contrato_label) dates.push("Fin: " + row.fin_contrato_label);
-      if (row.fecha_limite_label) dates.push("Límite: " + row.fecha_limite_label);
-      return '<div class="scm-contract-termination-term is-' + escHtml(status) + (compact ? " is-compact" : "") + '">' +
-        '<strong>' + escHtml(label) + "</strong>" +
-        (hint ? '<span>' + escHtml(hint) + "</span>" : "") +
-        (dates.length ? '<small>' + escHtml(dates.join(" · ")) + "</small>" : "") +
-      "</div>";
+      var status = ['dentro','fuera'].indexOf(row.term_status) !== -1 ? row.term_status : 'unknown';
+      return '<div class="scm-contract-term is-' + status + (compact ? ' is-compact' : '') + '"><div class="flex items-center gap-2 font-bold mb-2">' + contractUiIcon(status === 'dentro' ? 'check' : 'clock') + escHtml(row.term_label || 'Sin cálculo de término') + '</div>' + (row.term_hint ? '<p class="!m-0 text-xs leading-relaxed">' + escHtml(row.term_hint) + '</p>' : '') + '<div class="flex flex-wrap justify-between gap-2 mt-3 rounded-md bg-white/70 px-2 py-1.5 text-[10px]"><span>Fin: <strong>' + escHtml(row.fin_contrato_label || '-') + '</strong></span><span>Límite: <strong>' + escHtml(row.fecha_limite_label || '-') + '</strong></span></div></div>';
+    }
+
+    function contractUiIcon(name) {
+      var paths = {
+        refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 8a7 7 0 0 1 12-3l2 2M4 17l2 2a7 7 0 0 0 12-3"/>',
+        clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        ticket: '<path d="M4 5h16v5a2 2 0 0 0 0 4v5H4v-5a2 2 0 0 0 0-4Z"/><path d="M13 8v8"/>',
+        person: '<circle cx="12" cy="7" r="3"/><path d="M5 20v-2a7 7 0 0 1 14 0v2Z"/>',
+        check: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+        eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+        reply: '<path d="m9 5-6 6 6 6M3 11h10a7 7 0 0 1 7 7"/>',
+        document: '<path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v5h4M9 12h6M9 16h6"/>',
+        filter: '<path d="M3 6h18M6 12h12M10 18h4"/>',
+        download: '<path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4"/>',
+        location: '<path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 0 1 14 0Z"/><circle cx="12" cy="10" r="2"/>'
+      };
+      return '<svg class="scm-contract-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (paths[name] || paths.document) + '</svg>';
+    }
+
+    function contractFilteredRows(panel) {
+      var rows = Array.isArray(panel.scmContractData && panel.scmContractData.items) ? panel.scmContractData.items : [];
+      var search = panel.querySelector('[data-contract-search]');
+      var term = panel.querySelector('[data-contract-term-filter]');
+      var query = String(search && search.value || '').trim().toLocaleLowerCase('es');
+      return rows.filter(function (row) {
+        var text = [row.id_ticket, row.titulo, row.asunto, row.contrato, row.inmueble, row.direccion, row.solicitante].join(' ').toLocaleLowerCase('es');
+        var termStatus = ['dentro', 'fuera'].indexOf(row.term_status) !== -1 ? row.term_status : 'unknown';
+        return (!query || text.indexOf(query) !== -1) && (!term || !term.value || termStatus === term.value);
+      });
+    }
+
+    function contractRequestCard(row, kind) {
+      row = row || {};
+      var caseData = row.case || {};
+      var sourceHtml = String(caseData.case_source_html || '').trim();
+      var meta = [row.contrato && row.contrato !== '-' ? 'Contrato #' + row.contrato : '', row.inmueble && row.inmueble !== '-' ? 'Inmueble ' + row.inmueble : ''].filter(Boolean);
+      var prefix = 'data-scm-contract-' + kind;
+      var dueType = kind === 'termination' ? 'terminacion_contrato_pendiente' : 'no_prorroga_contrato_pendiente';
+      return '<article class="scm-contract-card scm-ticket-card">' +
+        '<div class="scm-contract-card-body"><div class="flex flex-col gap-3 min-w-0 flex-1">' +
+        '<div class="flex flex-wrap items-center gap-3 text-xs"><span class="scm-contract-tag font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Ticket') + '</span><span class="inline-flex items-center gap-1.5">' + contractUiIcon('clock') + 'Creado: ' + escHtml(row.creado || '-') + '</span><span class="rounded-md bg-amber-50 px-2 py-1 text-amber-900">Esperando respuesta</span></div>' +
+        '<h4 class="!m-0 !text-base sm:!text-lg !font-bold !text-[#001944]">' + escHtml(row.asunto || (kind === 'termination' ? 'Solicitud de terminación de contrato' : 'Solicitud de no prórroga de contrato')) + '</h4>' +
+        '<div class="flex flex-wrap items-center gap-2 text-xs"><span>' + escHtml(meta.join(' · ') || 'Sin datos de inmueble') + '</span>' + (row.direccion && row.direccion !== '-' ? '<span class="inline-flex items-start gap-1">' + contractUiIcon('location') + escHtml(row.direccion) + '</span>' : '') + '</div>' +
+        '<div class="flex flex-wrap items-center gap-2"><span class="scm-contract-tag font-semibold">' + contractUiIcon('person') + escHtml(row.solicitante || '-') + '</span><span class="scm-contract-tag">Caso: ' + escHtml(row.estado || '-') + ' / ' + escHtml(row.estado_administrativo || '-') + '</span></div>' +
+        '</div>' + contractTerminationTermBadge(row, true) + '</div>' +
+        '<div class="scm-contract-card-footer"><span class="inline-flex items-center gap-2 text-xs">' + contractUiIcon('document') + 'Solicitud: ' + escHtml(row.estado_solicitud || 'Pendiente') + '</span><div class="flex flex-wrap gap-3">' +
+        (sourceHtml ? '<button type="button" class="scm-contract-button" ' + prefix + '-open-case data-scm-due-case-loaded="1" data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + '>' + contractUiIcon('eye') + 'Ver caso</button>' : '<button type="button" class="scm-contract-button" disabled>Sin caso</button>') +
+        '<button type="button" class="scm-contract-button scm-contract-button-primary" ' + prefix + '-respond data-solicitud-id="' + escHtml(row.solicitud_id || '') + '" data-ticket-pk="' + escHtml(row.ticket_pk || '') + '">' + contractUiIcon('reply') + 'Responder</button></div></div>' +
+        '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + '</div></article>';
+    }
+
+    function renderContractRequestList(panel, kind) {
+      var rows = contractFilteredRows(panel);
+      var list = panel.querySelector('[data-scm-contract-' + kind + '-list]');
+      if (list) list.innerHTML = rows.length ? rows.map(function (row) { return contractRequestCard(row, kind); }).join('') : contractTerminationEmpty('No hay solicitudes para mostrar con estos criterios.');
+      var count = panel.querySelector('[data-contract-count]');
+      if (count) count.textContent = rows.length + (rows.length === 1 ? ' registro' : ' registros');
+    }
+
+    function renderContractRequests(data, kind) {
+      var panel = root.querySelector('[data-scm-contract-' + kind + '-panel]');
+      if (!panel) return;
+      panel.scmContractData = data || {};
+      var rows = Array.isArray(data && data.items) ? data.items : [];
+      var status = panel.querySelector('[data-scm-contract-' + kind + '-status]');
+      if (status) {
+        status.classList.remove('is-error');
+        status.innerHTML = '<span class="inline-flex items-center gap-2">' + contractUiIcon('clock') + 'Actualizado ' + escHtml(data && data.generated_at || '') + '</span><span class="flex flex-wrap gap-4"><span>' + rows.filter(function (row) { return row.term_status === 'dentro'; }).length + ' En término</span><span>' + rows.filter(function (row) { return row.term_status === 'fuera'; }).length + ' Fuera de término</span><span>' + rows.filter(function (row) { return row.term_status !== 'dentro' && row.term_status !== 'fuera'; }).length + ' Sin cálculo</span></span>';
+      }
+      var summary = panel.querySelector('[data-scm-contract-' + kind + '-summary]');
+      if (summary) summary.innerHTML = '<div class="scm-contract-metric"><div class="space-y-1"><span class="text-[10px] font-bold uppercase tracking-wider">Pendientes</span><div class="flex items-center gap-2"><strong class="text-3xl font-bold">' + formatDashboardCount(data && data.count != null ? data.count : rows.length) + '</strong><span class="rounded-md bg-emerald-50 px-2 py-1 text-[10px] text-emerald-800">Revisión prioritaria</span></div><p class="!m-0 text-xs">Solicitudes pendientes de respuesta</p></div><span class="rounded-xl bg-[#e9edff] p-3">' + contractUiIcon('document') + '</span></div><div class="scm-contract-metric"><div class="space-y-2"><span class="text-[10px] font-bold uppercase tracking-wider">Acción requerida</span><strong class="block text-2xl font-bold">Responder y cerrar</strong><p class="!m-0 text-xs">Clasificación y generación del acta de respuesta</p></div><span class="rounded-xl bg-[#e9edff] p-3">' + contractUiIcon('reply') + '</span></div>';
+      renderContractRequestList(panel, kind);
+      panel.setAttribute('data-scm-loaded', '1');
+      if (!panel.scmContractControlsBound) {
+        panel.scmContractControlsBound = true;
+        panel.querySelector('[data-contract-filter-toggle]').addEventListener('click', function (event) {
+          var filters = panel.querySelector('[data-contract-filters]');
+          filters.hidden = !filters.hidden;
+          event.currentTarget.setAttribute('aria-expanded', String(!filters.hidden));
+          if (!filters.hidden) panel.querySelector('[data-contract-search]').focus();
+        });
+        panel.querySelector('[data-contract-search]').addEventListener('input', function () { renderContractRequestList(panel, kind); });
+        panel.querySelector('[data-contract-term-filter]').addEventListener('change', function () { renderContractRequestList(panel, kind); });
+        panel.querySelector('[data-contract-export]').addEventListener('click', function () {
+          var exportRows = contractFilteredRows(panel);
+          var cells = [['Ticket', 'Creado', 'Contrato', 'Inmueble', 'Dirección', 'Solicitante', 'Clasificación', 'Fin contrato', 'Límite']].concat(exportRows.map(function (row) { return [row.id_ticket || row.titulo, row.creado, row.contrato, row.inmueble, row.direccion, row.solicitante, row.term_label, row.fin_contrato_label, row.fecha_limite_label]; }));
+          var csv = '\ufeff' + cells.map(function (row) { return row.map(function (cell) { var value = String(cell == null ? '' : cell); if (/^[=+\-@\t\r]/.test(value)) value = "'" + value; return '"' + value.replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
+          var url = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8;' }));
+          var link = document.createElement('a'); link.href = url; link.download = 'solicitudes-' + kind + '.csv'; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        });
+      }
+    }
+
+    function contractResponseFormHtml(row, kind) {
+      var meta = [row.contrato ? 'Contrato #' + row.contrato : '', row.inmueble ? 'Inmueble ' + row.inmueble : '', row.direccion || ''].filter(Boolean).join(' · ');
+      return '<form class="scm-contract-response-form" data-scm-contract-' + kind + '-form>' +
+        '<div class="rounded-xl bg-[#f2f3ff] p-4 space-y-2"><div class="flex flex-wrap items-center gap-2"><span class="scm-contract-tag !bg-[#dae2ff] font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Ticket') + '</span><strong>' + escHtml(row.asunto || 'Solicitud contractual') + '</strong></div><p class="!m-0 text-xs">' + escHtml(meta) + '</p></div>' +
+        contractTerminationTermBadge(row, false) +
+        '<div class="grid grid-cols-1 md:grid-cols-3 gap-4"><label class="scm-contract-field"><span>Clasificación <b class="text-red-700">*</b></span><select name="termino" required><option value="" selected disabled>Selecciona clasificación</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label><label class="scm-contract-field"><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || '') + '" readonly aria-readonly="true"></label><label class="scm-contract-field"><span>' + (kind === 'termination' ? 'Fecha terminación / entrega' : 'Fecha fin de contrato') + '</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || '') + '"></label></div>' +
+        contractRetentionTicketBlockHtml(row) + '<section><div class="flex items-center justify-between gap-3 mb-3"><strong class="text-[10px] uppercase tracking-wider">Notificar a</strong><span class="text-[10px]">Destinatarios configurados</span></div>' + contractTerminationRecipientChecks(row) + '</section></form>';
     }
 
     function renderContractTermination(data) {
-      var panel = root.querySelector("[data-scm-contract-termination-panel]");
-      if (!panel) return;
-      var status = panel.querySelector("[data-scm-contract-termination-status]");
-      var summary = panel.querySelector("[data-scm-contract-termination-summary]");
-      var list = panel.querySelector("[data-scm-contract-termination-list]");
-      var rows = Array.isArray(data && data.items) ? data.items : [];
       contractTerminationRowsByPk = {};
-      rows.forEach(function (row) {
-        if (row && row.solicitud_id) contractTerminationRowsByPk[String(row.solicitud_id)] = row;
-      });
-      if (status) {
-        status.classList.remove("is-error");
-        status.textContent = "Actualizado " + String((data && data.generated_at) || "") + ".";
-      }
-      if (summary) {
-        summary.innerHTML =
-          '<div><span>Pendientes</span><strong>' + formatDashboardCount(data && data.count || rows.length) + "</strong></div>" +
-          '<div><span>Acción</span><strong>Responder y cerrar</strong></div>';
-      }
-      if (!list) return;
-      if (!rows.length) {
-        list.innerHTML = contractTerminationEmpty("No hay solicitudes de terminación pendientes.");
-        return;
-      }
-      list.innerHTML = rows.map(function (row) {
-        row = row || {};
-        var caseData = row.case || {};
-        var sourceHtml = String(caseData.case_source_html || "").trim();
-        var canOpenCase = sourceHtml !== "";
-        var meta = [
-          row.contrato && row.contrato !== "-" ? "Contrato #" + row.contrato : "",
-          row.inmueble && row.inmueble !== "-" ? "Inmueble " + row.inmueble : "",
-          row.direccion && row.direccion !== "-" ? row.direccion : "",
-        ].filter(Boolean);
-        return '<article class="scm-contract-termination-row scm-ticket-card">' +
-          '<div class="scm-contract-termination-date"><span>Creado</span><strong>' + escHtml(row.creado || "-") + "</strong></div>" +
-          '<div class="scm-contract-termination-main">' +
-            '<strong>' + escHtml(row.titulo || "Ticket") + " · " + escHtml(row.asunto || "Solicitud de terminación") + "</strong>" +
-            '<span>' + escHtml(meta.join(" · ") || "Sin datos de inmueble") + "</span>" +
-            '<small>' + escHtml(row.solicitante || "-") + " · Solicitud: " + escHtml(row.estado_solicitud || "-") + " · Caso: " + escHtml(row.estado || "-") + " / " + escHtml(row.estado_administrativo || "-") + "</small>" +
-            contractTerminationTermBadge(row, true) +
-          "</div>" +
-          '<div class="scm-contract-termination-actions">' +
-            (canOpenCase ? '<button type="button" class="scm-case-work-btn" data-scm-contract-termination-open-case data-scm-due-case-loaded="1" data-due-type="terminacion_contrato_pendiente"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso</button>') +
-            '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-contract-termination-respond data-solicitud-id="' + escHtml(row.solicitud_id || "") + '" data-ticket-pk="' + escHtml(row.ticket_pk || "") + '">Responder</button>' +
-          '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div>" +
-        "</article>";
-      }).join("");
-      panel.setAttribute("data-scm-loaded", "1");
+      (Array.isArray(data && data.items) ? data.items : []).forEach(function (row) { if (row && row.solicitud_id) contractTerminationRowsByPk[String(row.solicitud_id)] = row; });
+      renderContractRequests(data, 'termination');
     }
 
     function loadContractTerminationRequests(force) {
@@ -14975,7 +15008,7 @@
         func = func || {};
         var id = String(func.id || "");
         if (!id) return "";
-        var label = String(func.name || func.label || id);
+        var label = String(func.name || func.label || id) + (func.cargo ? " (" + func.cargo + ")" : "");
         return '<option value="' + escHtml(id) + '"' + (id === defaultRetentionEmployee ? " selected" : "") + '>' + escHtml(label) + "</option>";
       }).join("");
       if (!retentionOptions) {
@@ -14993,7 +15026,7 @@
         var label = String(item.label || "").trim();
         var value = String(item.value || "").trim();
         if (!label || !value) return "";
-        return '<div class="scm-retention-ticket-context-item"><span>' + escHtml(label) + '</span><strong>' + escHtml(value) + "</strong></div>";
+        return '<div class="scm-retention-ticket-context-item' + (label === "Sugerido para asignar" ? " is-suggested" : "") + '"><span>' + escHtml(label === "Contrato de" ? "Partes del contrato" : label) + '</span><strong>' + escHtml(value) + "</strong></div>";
       }).join("");
 
       return '<section class="scm-retention-ticket-card' + (!retention.enabled ? " is-disabled" : "") + '">' +
@@ -15006,7 +15039,7 @@
           '<span><strong>Crear ticket y enviar segundo mensaje</strong><small>Si lo desmarcas, solo se responde y se cierra esta solicitud.</small></span>' +
         "</label>" +
         (helpHtml ? '<div class="scm-retention-ticket-context">' + helpHtml + "</div>" : "") +
-        '<label class="scm-retention-ticket-field"><span>Asignar a consultor de arriendo</span><select name="retencion_id_empleado" ' + (!retention.enabled ? "disabled" : "") + '><option value="">Selecciona responsable</option>' + retentionOptions + '</select></label>' +
+        '<label class="scm-retention-ticket-field scm-contract-field"><span>Asignar a consultor de arriendo</span><select name="retencion_id_empleado" ' + (!retention.enabled ? "disabled" : "") + '><option value="">Selecciona responsable</option>' + retentionOptions + '</select></label>' +
       "</section>";
     }
 
@@ -15030,32 +15063,21 @@
         showToast("warning", "No se encontró la solicitud seleccionada.");
         return;
       }
-      var html = '<form class="scm-contract-termination-form" data-scm-contract-termination-form>' +
-        '<div class="scm-contract-termination-case">' +
-          '<strong>' + escHtml(row.titulo || "Ticket") + '</strong><span>' + escHtml(row.asunto || "Solicitud de terminación") + "</span>" +
-          '<small>' + escHtml([row.contrato ? "Contrato #" + row.contrato : "", row.inmueble ? "Inmueble " + row.inmueble : "", row.direccion || ""].filter(Boolean).join(" · ")) + "</small>" +
-        "</div>" +
-        contractTerminationTermBadge(row, false) +
-        '<div class="scm-contract-termination-form-grid">' +
-          '<label><span>Clasificación</span><select name="termino" required><option value="" selected disabled>Selecciona clasificación</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label>' +
-          '<label><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || "") + '" readonly aria-readonly="true"></label>' +
-          '<label><span>Fecha terminación / entrega</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || "") + '"></label>' +
-        "</div>" +
-        contractRetentionTicketBlockHtml(row) +
-        '<div><span class="scm-contract-termination-label">Notificar a</span>' + contractTerminationRecipientChecks(row) + "</div>" +
-      "</form>";
+      var html = contractResponseFormHtml(row, 'termination');
       window.Swal.fire({
-        title: "Responder terminación",
+        title: '<span class="block text-[10px] uppercase tracking-wider mb-1 font-medium">Gestión contractual · SKC SuCasa Inmobiliaria</span>Responder terminación',
         html: html,
-        width: "min(860px, 94vw)",
+        width: "min(800px, 94vw)",
+        showCloseButton: true,
+        closeButtonAriaLabel: "Cerrar respuesta",
         showCancelButton: true,
         confirmButtonText: "Responder y cerrar",
         cancelButtonText: "Cancelar",
         buttonsStyling: false,
         customClass: {
-          popup: "scm-calendar-swal-popup scm-contract-termination-swal",
-          confirmButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--primary",
-          cancelButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary",
+          popup: "scm-contract-response-swal",
+          confirmButton: "scm-contract-button scm-contract-button-primary",
+          cancelButton: "scm-contract-button",
         },
         didOpen: function () {
           var popup = window.Swal.getPopup();
@@ -15130,55 +15152,9 @@
     }
 
     function renderContractNonRenewal(data) {
-      var panel = root.querySelector("[data-scm-contract-non-renewal-panel]");
-      if (!panel) return;
-      var status = panel.querySelector("[data-scm-contract-non-renewal-status]");
-      var summary = panel.querySelector("[data-scm-contract-non-renewal-summary]");
-      var list = panel.querySelector("[data-scm-contract-non-renewal-list]");
-      var rows = Array.isArray(data && data.items) ? data.items : [];
       contractNonRenewalRowsByPk = {};
-      rows.forEach(function (row) {
-        if (row && row.solicitud_id) contractNonRenewalRowsByPk[String(row.solicitud_id)] = row;
-      });
-      if (status) {
-        status.classList.remove("is-error");
-        status.textContent = "Actualizado " + String((data && data.generated_at) || "") + ".";
-      }
-      if (summary) {
-        summary.innerHTML =
-          '<div><span>Pendientes</span><strong>' + formatDashboardCount(data && data.count || rows.length) + "</strong></div>" +
-          '<div><span>Acción</span><strong>Responder y cerrar</strong></div>';
-      }
-      if (!list) return;
-      if (!rows.length) {
-        list.innerHTML = contractTerminationEmpty("No hay solicitudes de no prórroga pendientes.");
-        return;
-      }
-      list.innerHTML = rows.map(function (row) {
-        row = row || {};
-        var caseData = row.case || {};
-        var sourceHtml = String(caseData.case_source_html || "").trim();
-        var canOpenCase = sourceHtml !== "";
-        var meta = [
-          row.contrato && row.contrato !== "-" ? "Contrato #" + row.contrato : "",
-          row.inmueble && row.inmueble !== "-" ? "Inmueble " + row.inmueble : "",
-          row.direccion && row.direccion !== "-" ? row.direccion : "",
-        ].filter(Boolean);
-        return '<article class="scm-contract-termination-row scm-ticket-card">' +
-          '<div class="scm-contract-termination-date"><span>Creado</span><strong>' + escHtml(row.creado || "-") + "</strong></div>" +
-          '<div class="scm-contract-termination-main">' +
-            '<strong>' + escHtml(row.titulo || "Ticket") + " · " + escHtml(row.asunto || "Solicitud de no prórroga") + "</strong>" +
-            '<span>' + escHtml(meta.join(" · ") || "Sin datos de inmueble") + "</span>" +
-            '<small>' + escHtml(row.solicitante || "-") + " · Solicitud: " + escHtml(row.estado_solicitud || "-") + " · Caso: " + escHtml(row.estado || "-") + " / " + escHtml(row.estado_administrativo || "-") + "</small>" +
-            contractTerminationTermBadge(row, true) +
-          "</div>" +
-          '<div class="scm-contract-termination-actions">' +
-            (canOpenCase ? '<button type="button" class="scm-case-work-btn" data-scm-contract-non-renewal-open-case data-scm-due-case-loaded="1" data-due-type="no_prorroga_contrato_pendiente"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso</button>') +
-            '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-contract-non-renewal-respond data-solicitud-id="' + escHtml(row.solicitud_id || "") + '" data-ticket-pk="' + escHtml(row.ticket_pk || "") + '">Responder</button>' +
-          '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div>" +
-        "</article>";
-      }).join("");
-      panel.setAttribute("data-scm-loaded", "1");
+      (Array.isArray(data && data.items) ? data.items : []).forEach(function (row) { if (row && row.solicitud_id) contractNonRenewalRowsByPk[String(row.solicitud_id)] = row; });
+      renderContractRequests(data, 'non-renewal');
     }
 
     function loadContractNonRenewalRequests(force) {
@@ -15213,32 +15189,21 @@
         showToast("warning", "No se encontró la solicitud seleccionada.");
         return;
       }
-      var html = '<form class="scm-contract-termination-form" data-scm-contract-non-renewal-form>' +
-        '<div class="scm-contract-termination-case">' +
-          '<strong>' + escHtml(row.titulo || "Ticket") + '</strong><span>' + escHtml(row.asunto || "Solicitud de no prórroga") + "</span>" +
-          '<small>' + escHtml([row.contrato ? "Contrato #" + row.contrato : "", row.inmueble ? "Inmueble " + row.inmueble : "", row.direccion || ""].filter(Boolean).join(" · ")) + "</small>" +
-        "</div>" +
-        contractTerminationTermBadge(row, false) +
-        '<div class="scm-contract-termination-form-grid">' +
-          '<label><span>Clasificación</span><select name="termino" required><option value="" selected disabled>Selecciona clasificación</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label>' +
-          '<label><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || "") + '" readonly aria-readonly="true"></label>' +
-          '<label><span>Fecha fin de contrato</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || "") + '"></label>' +
-        "</div>" +
-        contractRetentionTicketBlockHtml(row) +
-        '<div><span class="scm-contract-termination-label">Notificar a</span>' + contractTerminationRecipientChecks(row) + "</div>" +
-      "</form>";
+      var html = contractResponseFormHtml(row, 'non-renewal');
       window.Swal.fire({
-        title: "Responder no prórroga",
+        title: '<span class="block text-[10px] uppercase tracking-wider mb-1 font-medium">Gestión contractual · SKC SuCasa Inmobiliaria</span>Responder no prórroga',
         html: html,
-        width: "min(860px, 94vw)",
+        width: "min(800px, 94vw)",
+        showCloseButton: true,
+        closeButtonAriaLabel: "Cerrar respuesta",
         showCancelButton: true,
         confirmButtonText: "Responder y cerrar",
         cancelButtonText: "Cancelar",
         buttonsStyling: false,
         customClass: {
-          popup: "scm-calendar-swal-popup scm-contract-termination-swal",
-          confirmButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--primary",
-          cancelButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary",
+          popup: "scm-contract-response-swal",
+          confirmButton: "scm-contract-button scm-contract-button-primary",
+          cancelButton: "scm-contract-button",
         },
         didOpen: function () {
           var popup = window.Swal.getPopup();

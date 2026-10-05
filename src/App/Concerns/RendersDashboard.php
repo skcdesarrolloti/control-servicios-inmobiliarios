@@ -873,20 +873,38 @@ trait RendersDashboard
                 <div class="scm-contracts-ending-list" data-scm-contracts-ending-list></div>
               </section>
             </div>
-            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-termination' ? ' active' : ''; ?>" id="scm-home-calendar-section-contract-termination" data-calendar-section-panel>
-              <section class="scm-contract-termination-panel" data-scm-contract-termination-panel aria-live="polite">
-                <div class="scm-contract-termination-head">
-                  <div>
-                    <span class="scm-calendar-action-kicker">Contratos</span>
-                    <h3>Solicitudes de terminaci&oacute;n de contrato</h3>
-                    <p>Responde si la solicitud est&aacute; dentro o fuera de t&eacute;rmino, elige destinatarios y cierra el ticket con acta.</p>
+            <?php foreach (['termination' => ['section' => 'contract-termination', 'title' => 'Solicitudes de terminación de contrato'], 'non-renewal' => ['section' => 'contract-non-renewal', 'title' => 'Solicitudes de no prórroga de contrato']] as $requestKind => $requestView): ?>
+            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-' . $requestView['section'] ? ' active' : ''; ?>" id="scm-home-calendar-section-<?php echo $requestView['section']; ?>" data-calendar-section-panel>
+              <section class="scm-contract-workspace" data-scm-contract-<?php echo $requestKind; ?>-panel aria-label="<?php echo esc_attr($requestView['title']); ?>">
+                <div class="scm-contract-heading">
+                  <div class="space-y-2">
+                    <div class="flex flex-wrap items-center gap-2"><span class="scm-contract-kicker">Contratos</span><span class="inline-flex items-center gap-1.5 text-xs"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>Gestión de arrendamiento</span></div>
+                    <h3><?php echo esc_html($requestView['title']); ?></h3>
+                    <p>Responde si la solicitud está dentro o fuera de término, elige destinatarios y cierra el ticket con acta.</p>
                   </div>
-                  <button type="button" class="scm-case-work-btn" data-scm-contract-termination-refresh>Actualizar</button>
+                  <button type="button" class="scm-contract-button shrink-0" data-scm-contract-<?php echo $requestKind; ?>-refresh><svg class="scm-contract-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 7v5h-5M4 17v-5h5M6 8a7 7 0 0 1 12-3l2 2M4 17l2 2a7 7 0 0 0 12-3"/></svg>Actualizar</button>
                 </div>
-                <div class="scm-contract-termination-status" data-scm-contract-termination-status>Cargando solicitudes pendientes...</div>
-                <div class="scm-contract-termination-summary" data-scm-contract-termination-summary></div>
-                <div class="scm-contract-termination-list" data-scm-contract-termination-list></div>
+                <div class="scm-contract-status" data-scm-contract-<?php echo $requestKind; ?>-status role="status">Cargando solicitudes pendientes...</div>
+                <div class="scm-contract-metrics" data-scm-contract-<?php echo $requestKind; ?>-summary></div>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div class="flex items-center gap-2"><span class="text-[10px] font-bold uppercase tracking-wider">Listado de casos</span><span class="scm-contract-tag" data-contract-count>0 registros</span></div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" class="scm-contract-button" data-contract-filter-toggle aria-expanded="false" aria-controls="scm-contract-filters-<?php echo $requestKind; ?>"><svg class="scm-contract-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M6 12h12M10 18h4"/></svg>Filtrar</button>
+                    <button type="button" class="scm-contract-button" data-contract-export><svg class="scm-contract-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4"/></svg>Exportar</button>
+                  </div>
+                </div>
+                <div id="scm-contract-filters-<?php echo $requestKind; ?>" data-contract-filters hidden>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-xl bg-white p-4">
+                    <label class="grid gap-2 text-xs font-semibold">Buscar caso<input type="search" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" data-contract-search placeholder="Ticket, contrato, inmueble o solicitante"></label>
+                    <label class="grid gap-2 text-xs font-semibold">Término<select class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" data-contract-term-filter><option value="">Todos</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option><option value="unknown">Sin cálculo de término</option></select></label>
+                  </div>
+                </div>
+                <div class="flex flex-col gap-5" data-scm-contract-<?php echo $requestKind; ?>-list></div>
+                <div class="rounded-xl bg-[#f2f3ff] p-4 text-xs leading-relaxed"><strong class="block mb-1">Respuesta contractual</strong>Al responder se generará el acta y se cerrará la solicitud. La creación del ticket comercial de retención es opcional.</div>
               </section>
+            </div>
+            <?php endforeach; ?>
+          </section>
             </div>
             <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-contract-non-renewal' ? ' active' : ''; ?>" id="scm-home-calendar-section-contract-non-renewal" data-calendar-section-panel>
               <section class="scm-contract-termination-panel" data-scm-contract-non-renewal-panel aria-live="polite">
