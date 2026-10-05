@@ -13,16 +13,12 @@ trait CaseEnrichmentConcern
     }
 
     $ticketKeys = [];
-    $contractIds = [];
     $propertyIds = [];
     $ownerIds = [];
     $tenantIds = [];
     foreach ($rows as $row) {
       foreach ($this->resolveTicketLookupKeys($row) as $key) {
         $ticketKeys[$key] = true;
-      }
-      foreach ($this->splitIds($this->firstExistingValue($row, ['id_contrato', 'contrato'])) as $id) {
-        $contractIds[$id] = true;
       }
       foreach ($this->splitIds($this->firstExistingValue($row, ['id_inmueble'])) as $id) {
         $propertyIds[$id] = true;
@@ -47,10 +43,11 @@ trait CaseEnrichmentConcern
       array_keys($ticketKeys),
       ['_ID', 'cct_status', 'id_ticket', 'id_empleado', 'fecha', 'nombre', 'observacion', 'cct_author_id', 'cct_created', 'cct_modified']
     );
-    $contractById = $this->fetchSingleRowsByIdCandidates(
-      $this->db->table('jet_cct_contratos_arrendamiento'),
-      ['_ID', 'contrato'],
-      array_keys($contractIds)
+    $contractById = \SCM\Support\CaseContractLookup::load(
+      $rows,
+      fn(string $column, array $ids): array => $this->fetchSingleRowsByIdCandidates(
+        $this->db->table('jet_cct_contratos_arrendamiento'), [$column], $ids
+      )
     );
     foreach ($contractById as $contract) {
       foreach ($this->splitIds($this->firstExistingValue($contract, ['id_propietario'])) as $id) {
@@ -108,11 +105,7 @@ trait CaseEnrichmentConcern
       $row['_scm_seguimientos_ticket'] = $this->uniqueCaseActivityRows($row['_scm_seguimientos_ticket']);
       $row['_scm_notas_ticket'] = $this->uniqueCaseActivityRows($row['_scm_notas_ticket']);
 
-      $contractRaw = $this->firstExistingValue($row, ['id_contrato', 'contrato']);
-      $contractId = $this->first_id_value($contractRaw);
-      if ($contractId !== '' && isset($contractById[$contractId])) {
-        $row['_scm_contrato_data'] = $contractById[$contractId];
-      }
+      $row['_scm_contrato_data'] = \SCM\Support\CaseContractLookup::resolve($row, $contractById);
 
       $propertyRaw = $this->firstExistingValue($row, ['id_inmueble']);
       $propertyId = $this->first_id_value($propertyRaw);

@@ -646,7 +646,6 @@ final class PendingRepository
     }
 
     $ticketKeys = [];
-    $contractIds = [];
     $propertyIds = [];
     $ownerIds = [];
     $tenantIds = [];
@@ -656,13 +655,6 @@ final class PendingRepository
         if ($key !== '') {
           $ticketKeys[$key] = true;
         }
-      }
-      $contractId = trim((string) ($row['id_contrato'] ?? ''));
-      if ($contractId === '') {
-        $contractId = trim((string) ($row['contrato'] ?? ''));
-      }
-      if ($contractId !== '') {
-        $contractIds[$contractId] = true;
       }
       foreach ([$row['id_propietario'] ?? ''] as $id) {
         $id = trim((string) $id);
@@ -702,10 +694,11 @@ final class PendingRepository
       array_keys($ticketKeys),
       ['_ID', 'cct_status', 'id_ticket', 'id_empleado', 'fecha', 'nombre', 'observacion', 'cct_author_id', 'cct_created', 'cct_modified']
     );
-    $contractById = $this->fetchPendingSingleRows(
-      $this->db->table('jet_cct_contratos_arrendamiento'),
-      ['_ID', 'contrato', 'id_contrato'],
-      array_keys($contractIds)
+    $contractById = \SCM\Support\CaseContractLookup::load(
+      $rows,
+      fn(string $column, array $ids): array => $this->fetchPendingSingleRows(
+        $this->db->table('jet_cct_contratos_arrendamiento'), [$column], $ids
+      )
     );
 
     foreach ($contractById as $contract) {
@@ -797,13 +790,7 @@ final class PendingRepository
         }
       }
 
-      $contractId = trim((string) ($row['id_contrato'] ?? ''));
-      if ($contractId === '') {
-        $contractId = trim((string) ($row['contrato'] ?? ''));
-      }
-      if ($contractId !== '' && isset($contractById[$contractId])) {
-        $row['_scm_contrato_data'] = $contractById[$contractId];
-      }
+      $row['_scm_contrato_data'] = \SCM\Support\CaseContractLookup::resolve($row, $contractById);
 
       $ownerId = trim((string) ($row['id_propietario'] ?? ''));
       if ($ownerId === '' && !empty($row['_scm_contrato_data']) && is_array($row['_scm_contrato_data'])) {

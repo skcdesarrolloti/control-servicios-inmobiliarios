@@ -22,16 +22,12 @@ trait GenericEnrichmentConcern
     }
 
     $ticketKeys = [];
-    $contractIds = [];
     $propertyIds = [];
     $ownerIds = [];
     $tenantIds = [];
     foreach ($rows as $row) {
       foreach ($this->resolve_ticket_lookup_keys($row) as $key) {
         $ticketKeys[$key] = true;
-      }
-      foreach ($this->split_id_values($this->first_existing_value($row, ['id_contrato', 'contrato'])) as $id) {
-        $contractIds[$id] = true;
       }
       foreach ($this->split_id_values($this->first_existing_value($row, ['id_inmueble'])) as $id) {
         $propertyIds[$id] = true;
@@ -56,10 +52,11 @@ trait GenericEnrichmentConcern
       array_keys($ticketKeys),
       ['_ID', 'cct_status', 'id_ticket', 'id_empleado', 'fecha', 'nombre', 'observacion', 'cct_author_id', 'cct_created', 'cct_modified']
     );
-    $contractById = $this->fetch_single_rows_by_id_candidates(
-      $this->db->table('jet_cct_contratos_arrendamiento'),
-      ['_ID', 'contrato'],
-      array_keys($contractIds)
+    $contractById = \SCM\Support\CaseContractLookup::load(
+      $rows,
+      fn(string $column, array $ids): array => $this->fetch_single_rows_by_id_candidates(
+        $this->db->table('jet_cct_contratos_arrendamiento'), [$column], $ids
+      )
     );
     foreach ($contractById as $contract) {
       foreach ($this->split_id_values($this->first_existing_value($contract, ['id_propietario'])) as $id) {
@@ -117,10 +114,7 @@ trait GenericEnrichmentConcern
       $row['_scm_seguimientos_ticket'] = $this->uniqueGenericActivityRows($row['_scm_seguimientos_ticket']);
       $row['_scm_notas_ticket'] = $this->uniqueGenericActivityRows($row['_scm_notas_ticket']);
 
-      $contractId = $this->first_id_value($this->first_existing_value($row, ['id_contrato', 'contrato']));
-      if ($contractId !== '' && isset($contractById[$contractId])) {
-        $row['_scm_contrato_data'] = $contractById[$contractId];
-      }
+      $row['_scm_contrato_data'] = \SCM\Support\CaseContractLookup::resolve($row, $contractById);
 
       $propertyId = $this->first_id_value($this->first_existing_value($row, ['id_inmueble']));
       if ($propertyId === '' && !empty($row['_scm_contrato_data']) && is_array($row['_scm_contrato_data'])) {

@@ -1596,7 +1596,7 @@
     if (subTitle) {
       subTitle.textContent = title || "Detalle";
     }
-    var caseBtn = modal.querySelector(".scm-btn-case");
+    var caseBtn = modal._scmCurrentCaseButton || modal.querySelector(".scm-btn-case");
     setCaseSubmodalMeta(sub, caseBtn);
     if (subBody) {
       subBody.innerHTML = "";
