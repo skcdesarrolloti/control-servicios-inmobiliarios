@@ -46,6 +46,7 @@ final class RenewalTestPdo extends PDO {
     $this->sqliteCreateFunction('FLOOR', fn($value) => floor((float) $value));
   }
   public function prepare(string $query, array $options = []): PDOStatement|false {
+    if (str_contains($query, 'f.id_empleado = e.actor')) throw new PDOException('Illegal mix of collations between actor and CCT employee');
     // MySQL numeric dates acquire a coercible collation when converted to text.
     // Reject the old expression so SQLite cannot conceal this production failure.
     if (str_contains($query, "TRIM(COALESCE(`fecha_terminacion_contrato`, '')) = ?")) throw new PDOException('Illegal mix of collations on numeric termination date');
@@ -179,6 +180,8 @@ try {
   $pdo->beginTransaction(); $service->save($probe->pk('193'),$end,80,false,'7,0','Withdrawn','EMP-900'); $pdo->commit();
   check((int)$db->getVar("SELECT COUNT(*) FROM test_jobs WHERE status='pending'")===0,'Withdrawal cancels pending reminders');
   check(count($service->history(193))===3,'Audit saves with the real actor');
+  $db->insert('wp_jet_cct_funcionarios', ['_ID'=>900,'id_empleado'=>'EMP-900','nombre'=>'Real author','correo'=>'author@example.invalid','activo'=>'Si']);
+  check($service->history(193)[0]['actor_name']==='Real author','History must resolve real author without joining tables with different collations');
   $pdo->beginTransaction(); $service->save($probe->pk('193'),$end,100,false,'7,0','','EMP-900');$pdo->commit();
   check($probe->createRetention($probe->pk('193'))['ok']==='0','100 percent must block retention in backend');
   $pdo->beginTransaction();$service->save($probe->pk('800'),$end,null,true,'7,0','No exit','EMP-900');$pdo->commit();

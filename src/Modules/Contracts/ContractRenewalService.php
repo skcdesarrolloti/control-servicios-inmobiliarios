@@ -153,10 +153,18 @@ final class ContractRenewalService
 
   public function history(int $id): array
   {
-    $employees = $this->db->table('jet_cct_funcionarios');
-    return $this->db->getResults("SELECT action,actor,details_json,created_at,
-      COALESCE((SELECT nombre FROM `{$employees}` f WHERE f.id_empleado = e.actor LIMIT 1),e.actor) AS actor_name
-      FROM `{$this->eventsTable()}` e WHERE contract_id = ? ORDER BY id DESC LIMIT 30", [$id]);
+    $rows = $this->db->getResults("SELECT action,actor,details_json,created_at FROM `{$this->eventsTable()}` WHERE contract_id = ? ORDER BY id DESC LIMIT 30", [$id]);
+    $actors = array_values(array_unique(array_filter(array_map(static fn(array $row): string => trim((string) $row['actor']), $rows))));
+    $names = [];
+    // Resolve authors separately: CCT and business tables can have different collations.
+    if ($actors) {
+      $employees = $this->db->table('jet_cct_funcionarios');
+      $people = $this->db->getResults("SELECT id_empleado,nombre FROM `{$employees}` WHERE id_empleado IN (" . implode(',', array_fill(0, count($actors), '?')) . ")", $actors);
+      foreach ($people as $person) $names[(string) $person['id_empleado']] = (string) $person['nombre'];
+    }
+    foreach ($rows as &$row) $row['actor_name'] = $names[(string) $row['actor']] ?? (string) $row['actor'];
+    unset($row);
+    return $rows;
   }
 
   /** Cancel old scheduled notices before the shared worker delivers them. */

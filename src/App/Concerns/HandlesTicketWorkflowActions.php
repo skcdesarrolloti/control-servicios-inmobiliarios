@@ -1143,7 +1143,9 @@ trait HandlesTicketWorkflowActions
       $groups[$itemKey]['items'][] = $item;
     }
 
+    $receiptConfig = \SCM\Modules\Contracts\ContractReceiptSettings::read($this->db);
     $this->jsonOk([
+      'receipt_automation' => ['enabled' => (bool) $receiptConfig['enabled'], 'contract_id' => (int) $receiptConfig['contract_id']],
       'items' => $items,
       'groups' => array_values($groups),
       'count' => count($items),
