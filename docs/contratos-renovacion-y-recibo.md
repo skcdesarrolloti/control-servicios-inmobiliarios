@@ -1,11 +1,11 @@
 # Contratos por terminar · renovación y recibo
 
-Versión 3.3.359. El panel consulta contratos `Entregado` o `Por recibir` por mes de fecha fin. No cambia el estado administrativo de tickets existentes.
+Versión 3.3.360. El panel consulta contratos `Entregado` o `Por recibir` por mes de fecha fin. No cambia el estado administrativo de tickets existentes.
 
 ## Subpestañas
 
 - **Por terminar:** gestión comercial y acceso al popup interno del ticket de retención del ciclo actual.
-- **Probabilidad y valor:** tabla específica de canon, probabilidad y valor ponderado; sin botones de creación de retención. Registro manual de 0 a 100 %, o sin dato. Valor ponderado mensual = `valor_canon × probabilidad / 100`. Sin probabilidad o canon no se inventa un valor. Al 100 % el servidor impide una nueva retención y omite el recibo automático; los tickets existentes siguen siendo consultables.
+- **Probabilidad y valor:** informe de consulta de canon, probabilidad y valor ponderado; los cambios se registran desde Por terminar. Registro manual de 0 a 100 %, o sin dato. Valor ponderado mensual = `valor_canon × probabilidad / 100`. Sin probabilidad o canon no se inventa un valor. Al 100 % el servidor impide una nueva retención y omite el recibo automático; los tickets existentes siguen siendo consultables.
 - **No salida del inmueble:** reporte con observación obligatoria, filtro de reportados activo inicialmente (puede desmarcarse para registrar nuevos reportes) y días de aviso configurables. Predeterminado: 30, 7 y 0 días antes de fecha fin, a las 09:00 en la zona horaria de la aplicación. Si todos los plazos pasaron, se programa un aviso inmediato. Retirar el reporte exige confirmación y cancela avisos pendientes. Editar solo la probabilidad o el responsable conserva la programación existente.
 - **Recibo automático:** fecha de creación 15 días antes de fecha fin, responsable global seleccionado en Configuración → Notificaciones → Recibos automáticos y acceso al caso creado. Si una ejecución se perdió, recupera los contratos aún vigentes dentro de esos 15 días. No crea recibos de contratos ya vencidos, recibidos, desistidos, con renovación al 100 % o no salida reportada. La vista solo lista el contrato configurado cuando su fecha fin corresponde al mes consultado; si no corresponde, muestra un mensaje y el _ID configurado. Solo procesa el contrato `_ID` configurado (inicialmente 525); requiere activación explícita y un funcionario activo con correo válido. La recomendación del inmueble sigue disponible para retención, pero no cambia el responsable global del cron.
 
@@ -101,3 +101,5 @@ El historial contractual es la auditoría de cambios de valoración, no salida, 
 **Editar descripción** permite corregir el texto mostrado y exige motivo; mantiene autor, fecha, tipo y datos originales del movimiento. **Anular movimiento** exige motivo y confirmación y lo oculta de la consulta normal. Administradores autorizados pueden marcar **Mostrar anulados y correcciones** para revisar la trazabilidad. No hay eliminación definitiva; cada corrección conserva el contenido anterior, autor de la corrección, fecha y motivo. Un control de revisión evita sobreescribir una modificación concurrente.
 
 Editar/anular historial no reinicia probabilidad, no retira reportes de no salida, no cancela sus avisos y no elimina tickets. Esas acciones se realizan desde sus flujos correspondientes. No se realiza limpieza automática de registros de pruebas.
+
+En **Por terminar**, cada contrato muestra su porcentaje actual (o Sin registrar), el estado de no salida y botones independientes para agregar/editar probabilidad y reportar/editar no salida. Cada formulario conserva los datos del otro proceso. No salida y Recibo automático siguen siendo listados.

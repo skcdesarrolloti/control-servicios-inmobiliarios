@@ -15403,8 +15403,8 @@
         if (contractsEndingView === 'receipt') items = items.filter(function(row) { return row.receipt_in_scope === true; });
         if (contractsEndingView === 'renewal') {
           var moneyLabel = function(value) { return value == null ? 'Sin dato' : new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(Number(value)); };
-          return '<section class="scm-contracts-ending-month"><h4>Probabilidad y valor · ' + escHtml(group.label || '') + '</h4><div class="scm-contract-renewal-table-wrap"><table class="scm-contract-renewal-table"><thead><tr><th>Contrato / inmueble</th><th>Probabilidad de renovación</th><th>Canon mensual</th><th>Valor ponderado mensual</th><th>Gestión</th></tr></thead><tbody>' + items.map(function(row) {
-            return '<tr><td><b>Contrato #' + escHtml(row.contrato || row.contract_pk) + '</b><small>' + escHtml(row.arrendatario || '') + '</small><small>' + escHtml(row.inmueble || '') + ' · ' + escHtml(row.direccion || '') + '</small></td><td>' + (row.probability == null ? 'Sin registrar' : escHtml(row.probability) + ' %') + (Number(row.probability) === 100 ? '<small>Sin nueva acción</small>' : '') + '</td><td>' + escHtml(moneyLabel(row.canon)) + '</td><td><b>' + escHtml(moneyLabel(row.weighted_value)) + '</b></td><td>' + (data.can_write ? '<button type="button" class="scm-case-work-btn" data-contracts-ending-configure data-contract-pk="' + escHtml(row.contract_pk) + '">Registrar probabilidad</button>' : '') + '<button type="button" class="scm-case-work-btn" data-contracts-ending-history data-contract-pk="' + escHtml(row.contract_pk) + '">Historial</button></td></tr>';
+          return '<section class="scm-contracts-ending-month"><h4>Probabilidad y valor · ' + escHtml(group.label || '') + '</h4><div class="scm-contract-renewal-table-wrap"><table class="scm-contract-renewal-table"><thead><tr><th>Contrato / inmueble</th><th>Probabilidad de renovación</th><th>Canon mensual</th><th>Valor ponderado mensual</th><th>Historial</th></tr></thead><tbody>' + items.map(function(row) {
+            return '<tr><td><b>Contrato #' + escHtml(row.contrato || row.contract_pk) + '</b><small>' + escHtml(row.arrendatario || '') + '</small><small>' + escHtml(row.inmueble || '') + ' · ' + escHtml(row.direccion || '') + '</small></td><td>' + (row.probability == null ? 'Sin registrar' : escHtml(row.probability) + ' %') + (Number(row.probability) === 100 ? '<small>Sin nueva acción</small>' : '') + '</td><td>' + escHtml(moneyLabel(row.canon)) + '</td><td><b>' + escHtml(moneyLabel(row.weighted_value)) + '</b></td><td><button type="button" class="scm-case-work-btn" data-contracts-ending-history data-contract-pk="' + escHtml(row.contract_pk) + '">Historial</button></td></tr>';
           }).join('') + '</tbody></table></div></section>';
         }
         return '<section class="scm-contracts-ending-month">' +
@@ -15424,9 +15424,8 @@
                   ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-contracts-ending-create data-contract-pk="' + escHtml(row.contract_pk) + '">Crear retención</button>'
                   : '<span>' + (canWrite ? 'Sin responsable disponible para retención' : 'Consulta') + '</span>';
             var details = '';
-            var money = function(value) { return value == null ? 'Sin dato' : new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(Number(value)); };
-            if (contractsEndingView === 'renewal') {
-              details = '<div class="scm-contract-renewal-values"><span>Probabilidad: <b>' + (row.probability == null ? 'Sin registrar' : escHtml(row.probability) + ' %') + '</b></span><span>Canon mensual: <b>' + escHtml(money(row.canon)) + '</b></span><span>Valor ponderado mensual: <b>' + escHtml(money(row.weighted_value)) + '</b></span></div>';
+            if (contractsEndingView === 'ending') {
+              details = '<div class="scm-contract-renewal-values"><span>Probabilidad de renovación: <b>' + (row.probability == null ? 'Sin registrar' : escHtml(row.probability) + ' %') + '</b></span><span>' + (Number(renewal.no_exit) ? 'No salida reportada' : 'Sin reporte de no salida') + '</span></div>';
             } else if (contractsEndingView === 'no-exit') {
               details = '<div class="scm-contract-renewal-values"><span><b>' + (Number(renewal.no_exit) ? 'No salida reportada' : 'Sin reporte de no salida') + '</b></span>' + (renewal.note ? '<span>' + escHtml(renewal.note) + '</span>' : '') + '<span>Recordatorios: ' + escHtml(renewal.reminder_days || '30,7,0') + ' días antes</span></div>';
             } else if (contractsEndingView === 'receipt') {
@@ -15434,7 +15433,9 @@
               ticketButton = row.receipt_ticket_id ? '<button type="button" class="scm-case-work-btn" data-contracts-ending-case="receipt" data-contract-pk="' + escHtml(row.contract_pk) + '">Ver recibo #' + escHtml(row.receipt_ticket_id) + '</button>' : '';
             }
             if (contractsEndingView === 'no-exit') ticketButton = '';
-            var configure = canWrite && contractsEndingView === 'no-exit' ? '<button type="button" class="scm-case-work-btn" data-contracts-ending-configure data-contract-pk="' + escHtml(row.contract_pk) + '">' + (contractsEndingView === 'no-exit' ? 'Registrar / editar reporte' : 'Editar gestión') + '</button>' : '';
+            var configure = '';
+            if (canWrite && contractsEndingView === 'ending') configure = '<button type="button" class="scm-case-work-btn" data-contracts-ending-configure="probability" data-contract-pk="' + escHtml(row.contract_pk) + '">' + (row.probability == null ? 'Agregar probabilidad' : 'Editar probabilidad') + '</button><button type="button" class="scm-case-work-btn" data-contracts-ending-configure="no-exit" data-contract-pk="' + escHtml(row.contract_pk) + '">' + (Number(renewal.no_exit) ? 'Editar no salida' : 'Reportar no salida') + '</button>';
+            if (canWrite && contractsEndingView === 'no-exit') configure = '<button type="button" class="scm-case-work-btn" data-contracts-ending-configure="no-exit" data-contract-pk="' + escHtml(row.contract_pk) + '">Registrar / editar reporte</button>';
             var history = '<button type="button" class="scm-case-work-btn" data-contracts-ending-history data-contract-pk="' + escHtml(row.contract_pk) + '">Historial</button>';
             var daysLeft = Number(row.days_left || 0);
             var daysLabel = daysLeft < 0 ? Math.abs(daysLeft) + " días vencido" : daysLeft + " días restantes";
@@ -15646,38 +15647,36 @@
       });
     }
 
-    function openContractsEndingManagement(contractPk) {
+    function openContractsEndingManagement(contractPk, mode) {
       var row = contractsEndingRowsByPk[String(contractPk)];
       if (!row || !window.Swal || !contractsEndingData.can_write) return;
       var state = row.renewal || {};
-      var employeeOptions = (contractsEndingData.receipt_funcionarios || row.receipt_funcionarios || []).map(function(employee) {
-        return '<option value="' + escHtml(employee.id) + '"' + (String(employee.id) === String(state.receipt_employee_id || '') ? ' selected' : '') + '>' + escHtml(employee.name || employee.label) + '</option>';
-      }).join('');
+      var probabilityMode = mode === 'probability';
       Swal.fire({
-        title: 'Gestión del contrato #' + row.contrato,
+        title: (probabilityMode ? 'Probabilidad de renovación · Contrato #' : 'No salida del inmueble · Contrato #') + row.contrato,
         customClass: {popup:'scm-contract-management-swal'},
         html: '<form data-contract-renewal-form class="scm-contract-renewal-form">' +
-          '<label>Probabilidad de renovación (%)<input name="probability" type="number" min="0" max="100" step="0.01" placeholder="Sin registrar" value="' + escHtml(row.probability == null ? '' : row.probability) + '"></label>' +
-          '<small>Al 100 % se omiten nuevas retenciones y el recibo automático. El valor ponderado usa el canon mensual.</small>' +
-          '<label class="scm-contract-renewal-check"><input type="checkbox" name="no_exit" ' + (Number(state.no_exit) ? 'checked' : '') + '>El arrendatario no realizará la salida del inmueble</label>' +
+          (probabilityMode ? '<label>Probabilidad de renovación (%)<input name="probability" type="number" min="0" max="100" step="0.01" placeholder="Sin registrar" value="' + escHtml(row.probability == null ? '' : row.probability) + '"></label>' +
+          '<small>Al 100 % se omiten nuevas retenciones y el recibo automático. El valor ponderado usa el canon mensual.</small>' : '') +
+          (!probabilityMode ?
+          '<label class="scm-contract-renewal-check"><input type="checkbox" name="no_exit" ' + (Number(state.no_exit) || mode === 'no-exit' ? 'checked' : '') + '>El arrendatario no realizará la salida del inmueble</label>' +
           '<label>Recordatorios: días antes de la fecha fin<input name="reminder_days" value="' + escHtml(state.reminder_days || '30,7,0') + '"></label>' +
           '<small>Separados por coma; 0 significa el día de terminación, a las 9:00 a. m. Los destinatarios se configuran en Notificaciones internas → No salida del inmueble.</small>' +
           (Number(state.no_exit) ? '<label class="scm-contract-renewal-check"><input type="checkbox" name="confirm_retire">Confirmo retirar el reporte y cancelar sus recordatorios si desmarco No salida.</label>' : '') +
-          '<label>Reporte / observaciones<textarea name="note" rows="3" maxlength="4000">' + escHtml(state.note || '') + '</textarea></label>' +
-          '<input type="hidden" name="receipt_employee_id" value="' + escHtml(state.receipt_employee_id || '') + '"><p>El responsable de los tickets automáticos se selecciona en Configuración → Notificaciones → Recibos automáticos.</p>' +
-          '<small>Recibo programado para ' + escHtml(row.receipt_due_label || '-') + '. Solo se ejecuta para el contrato indicado y con el cron activado en Configuración.</small></form>',
-        showCancelButton: true, confirmButtonText: 'Guardar gestión', cancelButtonText: 'Cancelar', showLoaderOnConfirm: true,
+          '<label>Reporte / observaciones<textarea name="note" rows="3" maxlength="4000">' + escHtml(state.note || '') + '</textarea></label>' : '') +
+          '</form>',
+        showCancelButton: true, confirmButtonText: probabilityMode ? 'Guardar probabilidad' : 'Guardar reporte', cancelButtonText: 'Cancelar', showLoaderOnConfirm: true,
         allowOutsideClick: function() { return !Swal.isLoading(); },
         preConfirm: function() {
           var form = Swal.getPopup().querySelector('[data-contract-renewal-form]');
-          var noExit = form.elements.no_exit.checked;
-          if (noExit && !form.elements.note.value.trim()) { Swal.showValidationMessage('Describe el reporte de no salida.'); return false; }
-          if (Number(state.no_exit) && !noExit && !form.elements.confirm_retire.checked) { Swal.showValidationMessage('Confirma el retiro del reporte y la cancelación de sus recordatorios pendientes.'); return false; }
+          var noExit = probabilityMode ? !!Number(state.no_exit) : form.elements.no_exit.checked;
+          if (!probabilityMode && noExit && !form.elements.note.value.trim()) { Swal.showValidationMessage('Describe el reporte de no salida.'); return false; }
+          if (!probabilityMode && Number(state.no_exit) && !noExit && !form.elements.confirm_retire.checked) { Swal.showValidationMessage('Confirma el retiro del reporte y la cancelación de sus recordatorios pendientes.'); return false; }
           return dashboardFormAction(actions.contracts_ending_renewal_save, function(fd) {
             fd.append('contract_pk', row.contract_pk); fd.append('end_ts', String(row.end_ts)); fd.append('revision', String(state.revision || 0));
-            fd.append('probability', form.elements.probability.value); fd.append('no_exit', noExit ? '1' : '0');
-            fd.append('reminder_days', form.elements.reminder_days.value); fd.append('note', form.elements.note.value);
-            fd.append('receipt_employee_id', form.elements.receipt_employee_id.value);
+            fd.append('probability', probabilityMode ? form.elements.probability.value : row.probability == null ? '' : String(row.probability)); fd.append('no_exit', noExit ? '1' : '0');
+            fd.append('reminder_days', probabilityMode ? state.reminder_days || '30,7,0' : form.elements.reminder_days.value); fd.append('note', probabilityMode ? state.note || '' : form.elements.note.value);
+            fd.append('receipt_employee_id', state.receipt_employee_id || '');
             fd.append('confirm_retire', form.elements.confirm_retire && form.elements.confirm_retire.checked ? '1' : '0');
           }).catch(function(error) { Swal.showValidationMessage(error.message || 'No se pudo guardar.'); return false; });
         }
@@ -15733,7 +15732,7 @@
       var tab = event.target.closest('[data-contracts-ending-view]');
       if (tab) { contractsEndingView = tab.getAttribute('data-contracts-ending-view'); if (contractsEndingData) renderContractsEnding(contractsEndingData); return; }
       var configure = event.target.closest('[data-contracts-ending-configure]');
-      if (configure) { openContractsEndingManagement(configure.getAttribute('data-contract-pk')); return; }
+      if (configure) { openContractsEndingManagement(configure.getAttribute('data-contract-pk'), configure.getAttribute('data-contracts-ending-configure')); return; }
       var history = event.target.closest('[data-contracts-ending-history]');
       if (history) {
         history.disabled = true;
