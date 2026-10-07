@@ -15352,6 +15352,18 @@
       if (name === 'person') return '<svg class="scm-ending-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="7" r="3"/><path d="M5 21v-3a7 7 0 0 1 14 0v3"/></svg>';
       if (name === 'location') return '<svg class="scm-ending-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2"/></svg>';
       var paths = {info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',document:'<path d="M7 3h7l4 4v14H7zM14 3v5h4M10 12h5m-5 4h5"/>',bell:'<path d="M6 17h12l-2-3V9a4 4 0 0 0-8 0v5zm4 3h4"/>',clipboard:'<rect x="5" y="5" width="14" height="16" rx="2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/>',calendar:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 10h16m-12 4 8 5m0-5-8 5"/>',settings:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/>',list:'<path d="M8 6h12M8 12h12M8 18h12M3 6h1m-1 6h1m-1 6h1"/>',check:'<path d="m5 12 4 4L19 6"/>',plus:'<path d="M12 4v16M4 12h16"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>'};
+      Object.assign(paths, {
+        house:'<path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/>',
+        building:'<path d="M4 21V3h10v18M14 9h6v12M2 21h20M8 7h2m-2 4h2m-2 4h2m6-2h1m-1 4h1"/>',
+        key:'<circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-6-6 3-3m0 6 3-3"/>',
+        money:'<rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 12h.01M18 12h.01"/>',
+        city:'<path d="M3 21V9h6V3h7v10h5v8M1 21h22M6 12v1m0 3v1m6-11h1m-1 4h1m-1 4h1m-1 4h1m5-2v2"/>',
+        neighborhood:'<path d="m2 11 5-4 5 4m-8-2v10h6V9m3 2 5-4 5 4m-8-2v10h6V9M7 19v-5m11 5v-5"/>',
+        layers:'<path d="m12 3 10 5-10 5L2 8Zm-10 9 10 5 10-5M2 16l10 5 10-5"/>',
+        bed:'<path d="M3 18V7m18 11V9a2 2 0 0 0-2-2h-7v8M3 15h18M3 18v3m18-3v3"/><rect x="5" y="8" width="5" height="5" rx="1"/>',
+        bath:'<path d="M3 12h18v3a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Zm2 0V5a2 2 0 0 1 4 0m-2 0h4M6 19v2m12-2v2"/>',
+        area:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m7 17 10-10M7 13v4h4m2-10h4v4"/>'
+      });
       return '<svg class="scm-ending-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (paths[name] || paths.document) + '</svg>';
     }
 
@@ -15611,8 +15623,8 @@
       var row = contractsEndingRowsByPk[String(contractPk)];
       if (!row || !window.Swal) return;
       var property = row.property_details || {};
-      var fields = [['Contrato', '#' + row.contrato],['Inmueble',row.inmueble],['Dirección',row.direccion],['Tipo',property.tipo_inmueble],['Destinación',property.destinacion],['Canon mensual',row.canon == null ? '' : '$ ' + Number(row.canon).toLocaleString('es-CO')],['Ciudad',property.ciudad],['Barrio',property.barrio],['Estrato',property.estrato],['Habitaciones',property.habitaciones],['Baños',property.banos],['Área construida (m²)',property.area_construida]];
-      Swal.fire({title:'Ficha del inmueble',width:'min(720px,94vw)',html:'<div class="scm-ending-context-grid">' + fields.map(function(field) { return contractsEndingContextCard(field[0],'document','<p>' + escHtml(field[1] || 'Sin registrar') + '</p>'); }).join('') + '</div>',confirmButtonText:'Cerrar',buttonsStyling:false,customClass:contractsEndingDialogClasses('property')});
+      var fields = [['Contrato', '#' + row.contrato,'document'],['Inmueble',row.inmueble,'house'],['Dirección',row.direccion,'location'],['Tipo',property.tipo_inmueble,'building'],['Destinación',property.destinacion,'key'],['Canon mensual',row.canon == null ? '' : '$ ' + Number(row.canon).toLocaleString('es-CO'),'money'],['Ciudad',property.ciudad,'city'],['Barrio',property.barrio,'neighborhood'],['Estrato',property.estrato,'layers'],['Habitaciones',property.habitaciones,'bed'],['Baños',property.banos,'bath'],['Área construida (m²)',property.area_construida,'area']];
+      Swal.fire({title:'Ficha del inmueble',width:'min(720px,94vw)',html:'<div class="scm-ending-context-grid">' + fields.map(function(field) { return contractsEndingContextCard(field[0],field[2],'<p>' + escHtml(field[1] || 'Sin registrar') + '</p>'); }).join('') + '</div>',confirmButtonText:'Cerrar',buttonsStyling:false,customClass:contractsEndingDialogClasses('property')});
     }
 
     function openContractsEndingRetention(contractPk) {
