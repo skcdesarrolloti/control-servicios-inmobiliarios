@@ -520,6 +520,7 @@ trait RendersDashboard
         'contracts_ending_import_apply' => self::AJAX_CONTRACTS_ENDING_IMPORT_APPLY,
         'contracts_ending_renewal_save' => self::AJAX_CONTRACTS_ENDING_RENEWAL_SAVE,
         'contracts_ending_history' => self::AJAX_CONTRACTS_ENDING_HISTORY,
+        'contracts_ending_history_manage' => self::AJAX_CONTRACTS_ENDING_HISTORY_MANAGE,
         'contracts_ending_case' => self::AJAX_CONTRACTS_ENDING_CASE,
         'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,

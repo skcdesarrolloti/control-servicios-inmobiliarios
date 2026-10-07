@@ -119,6 +119,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACTS_ENDING_IMPORT_APPLY = 'scm_contratos_por_terminar_import_apply';
   const AJAX_CONTRACTS_ENDING_RENEWAL_SAVE = 'scm_contratos_renovacion_guardar';
   const AJAX_CONTRACTS_ENDING_HISTORY = 'scm_contratos_renovacion_historial';
+  const AJAX_CONTRACTS_ENDING_HISTORY_MANAGE = 'scm_contratos_historial_gestionar';
   const AJAX_CONTRACTS_ENDING_CASE = 'scm_contratos_caso';
   const AJAX_DASHBOARD_METRICS = 'scm_dashboard_metricas';
   const AJAX_DASHBOARD_FILTER_OPTIONS = 'scm_dashboard_filter_options';
@@ -618,6 +619,7 @@ final class SuCasaControlServiciosInmobiliarios
           'case_note' => 'Agregar nota',
           'case_postpone' => 'Postergar ticket',
           'case_respond' => 'Responder ticket',
+          'contract_history_manage' => 'Editar y anular historial contractual',
           'case_transfer' => 'Trasladar caso',
           'case_activate' => 'Activar ticket',
           'case_close' => 'Cerrar ticket',
@@ -662,7 +664,11 @@ final class SuCasaControlServiciosInmobiliarios
   private function dashboardActionPermissionsConfig(): array
   {
     $raw = \SCM\Core\App::settings()->get('dashboard_action_permissions', []);
-    return $this->sanitizeDashboardActionPermissions(is_array($raw) ? $raw : []);
+    $permissions = $this->sanitizeDashboardActionPermissions(is_array($raw) ? $raw : []);
+    if (!\SCM\Core\App::settings()->get('contract_history_permissions_configured', false)) {
+      $permissions['11'] = array_values(array_unique(array_merge($permissions['11'] ?? $this->dashboardActionPermissionKeys(), ['contract_history_manage'])));
+    }
+    return $permissions;
   }
 
   /** @param array<mixed> $raw @return array<string,array<int,string>> */
@@ -836,7 +842,7 @@ final class SuCasaControlServiciosInmobiliarios
     $permissions = $this->dashboardActionPermissionsConfig();
     $allActions = $this->dashboardActionPermissionKeys();
     if ($cargo === '' || !array_key_exists($cargo, $permissions)) {
-      return $allActions;
+      return array_values(array_filter($allActions, static fn(string $action): bool => $action !== 'contract_history_manage'));
     }
     return !empty($permissions[$cargo]) ? $permissions[$cargo] : [];
   }

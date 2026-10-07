@@ -1,6 +1,6 @@
 # Contratos por terminar · renovación y recibo
 
-Versión 3.3.358. El panel consulta contratos `Entregado` o `Por recibir` por mes de fecha fin. No cambia el estado administrativo de tickets existentes.
+Versión 3.3.359. El panel consulta contratos `Entregado` o `Por recibir` por mes de fecha fin. No cambia el estado administrativo de tickets existentes.
 
 ## Subpestañas
 
@@ -89,3 +89,15 @@ php tests/cct-author-employee-check.php
 Las pruebas nuevas usan SQLite en memoria, un adaptador de sintaxis MySQL y una cola transaccional simulada. Cubren fechas, cruces, firma, importación atómica, recomendación, valoración, recordatorios, cancelación, destinatarios internos específicos, autoría y recibos idempotentes. La prueba visual usa Playwright/Edge con solicitudes sintéticas; no envía mensajes ni crea tickets reales. No sustituye la validación del cron y la entrega de correos en el servidor desplegado.
 
 El historial resuelve los nombres de los autores mediante una consulta separada por `id_empleado`; evita comparar directamente columnas con collations distintas entre las tablas CCT y las tablas de auditoría. Las cuatro vistas muestran acciones y resúmenes propios; la importación Excel solo se ofrece en Por terminar.
+
+## Descripciones de retención e historial editable
+
+Las retenciones creadas desde Por terminar, Terminación y No prórroga guardan un resumen HTML con objetivo comercial, caso de origen, contrato, arrendatario, inmueble, dirección y fecha fin. La respuesta contractual completa se conserva en el caso de origen y el PDF enlazado/archivado; no se copia en la descripción comercial. El ticket 10864 se corrigió con este formato conservando su texto anterior en el historial del ticket, sin cambiar estado ni enviar avisos.
+
+Para revisar una descripción antigua generada por este flujo, `php bin/repair-retention-description.php --ticket=ID`. La opción `--apply` realiza la corrección de ese único ticket y guarda la descripción anterior en su historial. Las descripciones personalizadas se rechazan; no hay reparación masiva ni llamadas a transporte.
+
+El historial contractual es la auditoría de cambios de valoración, no salida, fecha fin y tickets creados. Su nueva gestión se configura en **Permisos → Acciones del caso → Editar y anular historial contractual**. Inicialmente corresponde a **Gerencia Administrativa (cargo 11)**; otros cargos requieren autorización explícita en la matriz. Al guardar la matriz, revocar ese permiso también revoca el acceso en el servidor.
+
+**Editar descripción** permite corregir el texto mostrado y exige motivo; mantiene autor, fecha, tipo y datos originales del movimiento. **Anular movimiento** exige motivo y confirmación y lo oculta de la consulta normal. Administradores autorizados pueden marcar **Mostrar anulados y correcciones** para revisar la trazabilidad. No hay eliminación definitiva; cada corrección conserva el contenido anterior, autor de la corrección, fecha y motivo. Un control de revisión evita sobreescribir una modificación concurrente.
+
+Editar/anular historial no reinicia probabilidad, no retira reportes de no salida, no cancela sus avisos y no elimina tickets. Esas acciones se realizan desde sus flujos correspondientes. No se realiza limpieza automática de registros de pruebas.

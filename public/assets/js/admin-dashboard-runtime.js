@@ -15684,6 +15684,49 @@
       }).then(function(result) { if (result.isConfirmed && result.value) { showToast('success', result.value.message); loadContractsEnding(true); } });
     }
 
+    function contractHistoryText(item) {
+      var details = {}; try { details = JSON.parse(item.details_json); } catch (_) {}
+      if (details.manual_text) return String(details.manual_text);
+      if (item.action === 'reminders_cancelled') return details.reason || 'Se cancelaron recordatorios pendientes por un cambio del contrato.';
+      if (item.action === 'history_edited' || item.action === 'history_voided') return 'Movimiento #' + details.entry_id + '. Motivo: ' + (details.reason || '');
+      var before = details.before || {}, after = details.after || {};
+      return item.action === 'renewal_saved' ? 'Probabilidad: ' + (before.probability == null ? 'Sin registrar' : before.probability + ' %') + ' → ' + (after.probability == null ? 'Sin registrar' : after.probability + ' %') + '. No salida: ' + (Number(after.no_exit) ? 'Sí' : 'No') + '. ' + (after.note || '') : item.action === 'end_date_imported' ? 'Fecha anterior: ' + new Date(Number(details.before) * 1000).toLocaleDateString('es-CO') + '. Nueva: ' + new Date(Number(details.after) * 1000).toLocaleDateString('es-CO') : 'Ticket #' + (details.ticket_id || '');
+    }
+
+    function openContractHistory(contractPk, includeVoided) {
+      return dashboardAction(actions.contracts_ending_history, {contract_pk:contractPk, include_voided:includeVoided ? '1' : ''}).then(function(data) {
+        var names = {renewal_saved:'Gestión de renovación actualizada',end_date_imported:'Fecha fin actualizada desde Excel',retention_created:'Retención creada',receipt_created:'Recibo automático creado',reminders_cancelled:'Recordatorios cancelados automáticamente',history_edited:'Descripción del historial corregida',history_voided:'Movimiento anulado'};
+        var items = data.items || [];
+        var html = '<p>Registro de cambios y tickets del contrato, con fecha y funcionario. Editar o anular un movimiento no modifica la gestión del contrato ni elimina sus tickets.</p>';
+        if (data.can_manage) html += '<label><input type="checkbox" data-history-include-voided ' + (includeVoided ? 'checked' : '') + '>Mostrar anulados y correcciones</label>';
+        html += items.map(function(item,index) {
+          var editable = data.can_manage && !item.voided && item.action !== 'history_edited' && item.action !== 'history_voided';
+          return '<article class="scm-contract-history-entry"><b>' + (item.voided ? 'Anulado · ' : '') + escHtml(names[item.action] || item.action) + '</b><small>' + escHtml(new Date(Number(item.created_at)*1000).toLocaleString('es-CO')) + ' · Funcionario ' + escHtml(item.actor_name || item.actor || 'Sistema') + '</small><p>' + escHtml(contractHistoryText(item)) + '</p>' + (editable ? '<button type="button" class="scm-case-work-btn" data-history-edit="' + index + '">Editar descripción</button><button type="button" class="scm-case-work-btn" data-history-void="' + index + '">Anular movimiento</button>' : '') + '</article>';
+        }).join('');
+        if (!items.length) html += '<p>No hay movimientos registrados.</p>';
+        Swal.fire({title:'Historial contractual · últimos 30 movimientos',width:'min(900px,96vw)',html:html,confirmButtonText:'Cerrar',didOpen:function() {
+          var popup = Swal.getPopup();
+          var toggle = popup.querySelector('[data-history-include-voided]');
+          if (toggle) toggle.addEventListener('change', function() { openContractHistory(contractPk, toggle.checked); });
+          popup.addEventListener('click', function(event) {
+            var button = event.target.closest('[data-history-edit],[data-history-void]');
+            if (!button) return;
+            var operation = button.hasAttribute('data-history-void') ? 'void' : 'edit';
+            var item = items[Number(button.getAttribute(operation === 'void' ? 'data-history-void' : 'data-history-edit'))];
+            Swal.fire({title:operation === 'void' ? 'Anular movimiento del historial' : 'Editar descripción del historial',html:'<form data-history-correction class="scm-contract-renewal-form">' + (operation === 'edit' ? '<label>Descripción corregida<textarea name="text" rows="5" maxlength="4000">' + escHtml(contractHistoryText(item)) + '</textarea></label>' : '<p>Este movimiento se ocultará de la consulta normal. La corrección quedará registrada. No se eliminan tickets ni se reinicia la probabilidad o los recordatorios.</p><label><input type="checkbox" name="confirm">Confirmo anular este movimiento</label>') + '<label>Motivo<textarea name="reason" rows="2" maxlength="2000"></textarea></label></form>',showCancelButton:true,confirmButtonText:operation === 'void' ? 'Confirmar anulación' : 'Guardar corrección',cancelButtonText:'Volver',showLoaderOnConfirm:true,allowOutsideClick:function(){return !Swal.isLoading();},preConfirm:function() {
+              var form = Swal.getPopup().querySelector('[data-history-correction]');
+              if (!form.elements.reason.value.trim()) { Swal.showValidationMessage('Indica el motivo.'); return false; }
+              if (operation === 'void' && !form.elements.confirm.checked) { Swal.showValidationMessage('Confirma la anulación.'); return false; }
+              if (operation === 'edit' && !form.elements.text.value.trim()) { Swal.showValidationMessage('Escribe la descripción corregida.'); return false; }
+              return dashboardFormAction(actions.contracts_ending_history_manage, function(fd) {
+                fd.append('contract_pk',contractPk);fd.append('entry_id',item.id);fd.append('revision',item.revision);fd.append('operation',operation);fd.append('reason',form.elements.reason.value.trim());fd.append('text',operation === 'edit' ? form.elements.text.value.trim() : '');fd.append('confirm',operation === 'void' && form.elements.confirm.checked ? '1' : '0');
+              }).catch(function(error) { Swal.showValidationMessage(error.message || 'No se pudo corregir el historial.');return false; });
+            }}).then(function(result) { if (result.isConfirmed) showToast('success','Historial actualizado.'); openContractHistory(contractPk,includeVoided); });
+          });
+        }});
+      }).catch(function(error) { showToast('error',error.message,'No se pudo cargar el historial'); });
+    }
+
     root.addEventListener('click', function(event) {
       var onlyNoExit = event.target.closest('[data-contracts-only-no-exit]');
       if (onlyNoExit) { contractsEndingOnlyNoExit = onlyNoExit.checked; if (contractsEndingData) renderContractsEnding(contractsEndingData); return; }
@@ -15694,15 +15737,7 @@
       var history = event.target.closest('[data-contracts-ending-history]');
       if (history) {
         history.disabled = true;
-        dashboardAction(actions.contracts_ending_history, {contract_pk: history.getAttribute('data-contract-pk')}).then(function(data) {
-          var names = {renewal_saved:'Gestión de renovación actualizada',end_date_imported:'Fecha fin actualizada desde Excel',retention_created:'Retención creada',receipt_created:'Recibo automático creado',reminders_cancelled:'Recordatorios cancelados automáticamente'};
-          Swal.fire({title:'Historial contractual · últimos 30 movimientos',width:'min(900px,96vw)',html:(data.items || []).map(function(item) {
-            var details = {}; try { details = JSON.parse(item.details_json); } catch (_) {}
-            var before = details.before || {}; var after = details.after || {};
-            var text = item.action === 'renewal_saved' ? 'Probabilidad: ' + (before.probability == null ? 'Sin registrar' : before.probability + ' %') + ' → ' + (after.probability == null ? 'Sin registrar' : after.probability + ' %') + '. No salida: ' + (Number(after.no_exit) ? 'Sí' : 'No') + '. ' + (after.note || '') : item.action === 'end_date_imported' ? 'Fecha anterior: ' + new Date(Number(details.before) * 1000).toLocaleDateString('es-CO') + '. Nueva: ' + new Date(Number(details.after) * 1000).toLocaleDateString('es-CO') : 'Ticket #' + (details.ticket_id || '');
-            return '<article class="scm-contract-history-entry"><b>' + escHtml(names[item.action] || item.action) + '</b><small>' + escHtml(new Date(Number(item.created_at)*1000).toLocaleString('es-CO')) + ' · Funcionario ' + escHtml(item.actor_name || item.actor || 'Sistema') + '</small><p>' + escHtml(text) + '</p></article>';
-          }).join('') || 'No hay movimientos registrados.',confirmButtonText:'Cerrar'});
-        }).catch(function(error) { showToast('error',error.message,'No se pudo cargar el historial'); }).finally(function() { history.disabled = false; });
+        openContractHistory(history.getAttribute('data-contract-pk'), false).finally(function() { history.disabled = false; });
         return;
       }
       var caseButton = event.target.closest('[data-contracts-ending-case]');

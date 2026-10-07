@@ -362,6 +362,7 @@ trait HandlesTicketWorkflowActions
 
     \SCM\Core\App::settings()->set('dashboard_tab_permissions', $permissions, Auth::userId());
     \SCM\Core\App::settings()->set('dashboard_action_permissions', $actionPermissions, Auth::userId());
+    if (array_key_exists('action_permissions', $_POST)) \SCM\Core\App::settings()->set('contract_history_permissions_configured', true, (int) Auth::employeeId());
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('admin_due_popup_cargo_ids', $adminDuePopupCargoIds, Auth::userId());
     \SCM\Core\App::settings()->refresh();
@@ -4648,7 +4649,21 @@ trait HandlesTicketWorkflowActions
     if (!$this->canAccessContractsEndingPanel()) $this->jsonFail('No tienes permiso para ver el historial.');
     $service = new ContractRenewalService($this->db);
     $service->ensureSchema();
-    $this->jsonOk(['items' => $service->history((int) ($_POST['contract_pk'] ?? 0))]);
+    $canManage = $this->canUseDashboardAction('contract_history_manage');
+    $this->jsonOk(['can_manage' => $canManage, 'items' => $service->history((int) ($_POST['contract_pk'] ?? 0), $canManage && !empty($_POST['include_voided']))]);
+  }
+
+  public function ajax_handler_contracts_ending_history_manage(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessContractsEndingPanel() || !$this->canUseDashboardAction('contract_history_manage')) $this->jsonFail('No tienes permiso para editar el historial contractual.');
+    if (Auth::employeeId() === '') $this->jsonFail('No se pudo identificar al funcionario.');
+    $operation = (string) ($_POST['operation'] ?? '');
+    if ($operation === 'void' && (string) ($_POST['confirm'] ?? '') !== '1') $this->jsonFail('Confirma la anulación del movimiento.');
+    try {
+      (new ContractRenewalService($this->db))->manageHistory((int) ($_POST['contract_pk'] ?? 0), (int) ($_POST['entry_id'] ?? 0), $operation, (string) ($_POST['text'] ?? ''), (string) ($_POST['reason'] ?? ''), (string) ($_POST['revision'] ?? ''), Auth::employeeId());
+    } catch (\Throwable $exception) { $this->jsonFail($exception->getMessage()); }
+    $this->jsonOk(['message' => 'Historial actualizado. Los datos del contrato y sus tickets conservan su gestión actual.']);
   }
 
   public function ajax_handler_contracts_ending_case(): void
@@ -4968,25 +4983,18 @@ trait HandlesTicketWorkflowActions
     $address = $this->contractTerminationFirstText([$contract, $ticket], ['direccion']);
     $status = $term === 'dentro' ? 'dentro de término' : ($term === 'fuera' ? 'fuera de término' : '');
     $sourceLabel = trim($sourceLabel) !== '' ? trim($sourceLabel) : 'solicitud contractual';
-    if ($logicalTicket !== '-' && $term !== '') {
-      $description = "Se crea ticket comercial de retención de contrato a partir de la {$sourceLabel} respondida en el ticket #{$logicalTicket}.\n\n";
-    } else {
-      $description = "Se crea ticket comercial de retención de contrato desde el control de {$sourceLabel}.\n\n";
-    }
-    $description .= "Objetivo: gestionar retención del contrato o iniciar búsqueda comercial para el inmueble asociado.\n";
-    if ($status !== '') {
-      $description .= "Clasificación de la solicitud: {$status}.\n";
-    }
-    if ($contractCode !== '') {
-      $description .= "Contrato: {$contractCode}.\n";
-    }
-    if ($property !== '') {
-      $description .= "Inmueble: {$property}.\n";
-    }
-    if ($address !== '') {
-      $description .= "Dirección: {$address}.\n";
-    }
-    $description .= "\nRespuesta emitida:\n" . trim(strip_tags($responseText));
+    $description = \SCM\Modules\Contracts\ContractRetentionDescription::build([
+      'source' => $sourceLabel,
+      'source_ticket' => $term !== '' && $logicalTicket !== '-' ? $logicalTicket : '',
+      'status' => $status,
+      'contract' => $contractCode,
+      'property' => $property,
+      'address' => $address,
+      'tenant' => $this->contractTerminationFirstText([$contract, $ticket], ['arrendatario']),
+      'end_date' => ($endTs = $this->contractTerminationTimestamp($contract['fin_contrato'] ?? '')) > 0 ? date('d/m/Y', $endTs) : '',
+      'document_url' => $actaUrl,
+      'document_title' => $actaTitle,
+    ]);
 
     $input = [
       'ticket_mode' => 'administrativo',

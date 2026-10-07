@@ -245,6 +245,33 @@ try {
   check(\SharedNotifications\NotificationQueue::$constructions===1,'All transactions must reuse the prewarmed queue');
   $probe->writable=false;
   check(!callEndpoint(fn()=>$probe->ajax_handler_contracts_ending_import_apply())->ok,'Read-only users cannot import');
+  $service->audit(802,'retention_created','EMP-900',['ticket_id'=>44]);
+  $entry=$service->history(802)[0];
+  $contractBefore=$probe->pk('802');
+  $service->manageHistory(802,(int)$entry['id'],'edit','Nota de prueba corregida','Corregir prueba',$entry['revision'],'EMP-13');
+  $edited=$service->history(802)[0];
+  check(json_decode($edited['details_json'],true)['manual_text']==='Nota de prueba corregida','History editor must change visible description');
+  check($edited['actor']==='EMP-900','History corrections must preserve original author');
+  try { $service->manageHistory(802,(int)$entry['id'],'edit','Overwritten','Stale test',$entry['revision'],'EMP-13'); throw new RuntimeException('Stale history accepted'); } catch (RuntimeException $expected) { check(str_contains($expected->getMessage(),'cambió'),'Stale history correction must be rejected'); }
+  try { $service->manageHistory(193,(int)$entry['id'],'void','','Wrong contract',$edited['revision'],'EMP-13'); throw new RuntimeException('Cross-contract edit accepted'); } catch (RuntimeException $expected) { check(str_contains($expected->getMessage(),'modificar'),'Cross-contract edit rejected'); }
+  $service->manageHistory(802,(int)$edited['id'],'void','','Anular prueba',$edited['revision'],'EMP-13');
+  check(count($service->history(802))===0 && count($service->history(802,true))===3,'Voided entries hidden normally; all correction evidence retained');
+  check($probe->pk('802')===$contractBefore,'History editing and voiding must not alter contract state');
+  $probe->writable=false; $_POST=['contract_pk'=>802,'entry_id'=>$entry['id'],'operation'=>'void','confirm'=>'1'];
+  check(!callEndpoint(fn()=>$probe->ajax_handler_contracts_ending_history_manage())->ok,'History management requires server permission');
+  $rawSettings=$db->getVar('SELECT valor FROM wp_jet_cct_confi_sistema WHERE _ID=1');
+  $appSettings=new \SCM\Core\Settings($db,true);
+  (new ReflectionProperty(\SCM\Core\App::class,'settings'))->setValue(null,$appSettings);
+  $app=new \SCM\App\SuCasaControlServiciosInmobiliarios($db);
+  $permission=new ReflectionMethod($app,'canUseDashboardAction');
+  $_SESSION['scm_user_cargo']='11';check($permission->invoke($app,'contract_history_manage'),'Administrative cargo gets history management initially');
+  $_SESSION['scm_user_cargo']='13';check(!$permission->invoke($app,'contract_history_manage'),'Other cargos must not inherit history management');
+  $configured=json_decode($rawSettings,true);$configured['contract_history_permissions_configured']=true;$configured['dashboard_action_permissions']=['11'=>[],'13'=>['contract_history_manage']];
+  $db->update('wp_jet_cct_confi_sistema',['valor'=>json_encode($configured)],['_ID'=>1]);$appSettings->refresh();
+  check($permission->invoke($app,'contract_history_manage'),'Explicit configurable history permission respected');
+  $_SESSION['scm_user_cargo']='11';check(!$permission->invoke($app,'contract_history_manage'),'Removing history permission must revoke it');
+  $db->update('wp_jet_cct_confi_sistema',['valor'=>$rawSettings],['_ID'=>1]);$appSettings->refresh();
+  unset($_SESSION['scm_user_cargo']);
   echo "PASS: exact contract, dates, matching, signatures, probabilities, responsibility, reminder scheduling/cancellation, history, atomic imports and idempotent automatic receipts. No messages sent.\n";
 } finally {
   putenv('SHARED_NOTIFICATIONS_PATH'); unlink($temp.'/autoload.php');unlink($temp.'/config.php');rmdir($temp);

@@ -151,9 +151,9 @@ final class ContractRenewalService
     return ['reminders_queued' => $keepSchedule ? 0 : count($jobs), 'revision' => $revision];
   }
 
-  public function history(int $id): array
+  public function history(int $id, bool $includeCorrections = false): array
   {
-    $rows = $this->db->getResults("SELECT action,actor,details_json,created_at FROM `{$this->eventsTable()}` WHERE contract_id = ? ORDER BY id DESC LIMIT 30", [$id]);
+    $rows = $this->db->getResults("SELECT id,action,actor,details_json,created_at FROM `{$this->eventsTable()}` WHERE contract_id = ? ORDER BY id DESC LIMIT 30", [$id]);
     $actors = array_values(array_unique(array_filter(array_map(static fn(array $row): string => trim((string) $row['actor']), $rows))));
     $names = [];
     // Resolve authors separately: CCT and business tables can have different collations.
@@ -162,9 +162,41 @@ final class ContractRenewalService
       $people = $this->db->getResults("SELECT id_empleado,nombre FROM `{$employees}` WHERE id_empleado IN (" . implode(',', array_fill(0, count($actors), '?')) . ")", $actors);
       foreach ($people as $person) $names[(string) $person['id_empleado']] = (string) $person['nombre'];
     }
-    foreach ($rows as &$row) $row['actor_name'] = $names[(string) $row['actor']] ?? (string) $row['actor'];
+    foreach ($rows as &$row) {
+      $row['actor_name'] = $names[(string) $row['actor']] ?? (string) $row['actor'];
+      $row['revision'] = hash('sha256', (string) $row['details_json']);
+      $details = json_decode((string) $row['details_json'], true) ?: [];
+      $row['voided'] = !empty($details['voided']);
+    }
     unset($row);
-    return $rows;
+    return $includeCorrections ? $rows : array_values(array_filter($rows, static fn(array $row): bool => !$row['voided'] && !in_array($row['action'], ['history_edited', 'history_voided'], true)));
+
+  }
+
+  public function manageHistory(int $contractId, int $entryId, string $operation, string $text, string $reason, string $revision, string $actor): void
+  {
+    if (!in_array($operation, ['edit', 'void'], true)) throw new \InvalidArgumentException('Acción de historial inválida.');
+    $reason = trim($reason); $text = trim($text);
+    if ($reason === '' || mb_strlen($reason) > 2000) throw new \InvalidArgumentException('Indica el motivo de la corrección (máximo 2000 caracteres).');
+    if ($operation === 'edit' && ($text === '' || mb_strlen($text) > 4000)) throw new \InvalidArgumentException('Indica la descripción corregida (máximo 4000 caracteres).');
+    $pdo = $this->db->pdo();
+    $pdo->beginTransaction();
+    try {
+      $row = $this->db->getRow("SELECT * FROM `{$this->eventsTable()}` WHERE id = ? AND contract_id = ? FOR UPDATE", [$entryId, $contractId]);
+      if (!$row || in_array($row['action'], ['history_edited', 'history_voided'], true)) throw new \RuntimeException('No se puede modificar ese movimiento.');
+      if (!hash_equals(hash('sha256', (string) $row['details_json']), $revision)) throw new \RuntimeException('El movimiento cambió. Actualiza el historial e intenta de nuevo.');
+      $details = json_decode((string) $row['details_json'], true, 512, JSON_THROW_ON_ERROR);
+      if (!empty($details['voided'])) throw new \RuntimeException('El movimiento ya está anulado.');
+      $before = $details;
+      if ($operation === 'edit') $details['manual_text'] = $text;
+      else $details['voided'] = true;
+      $details['correction_reason'] = $reason;
+      $details['corrected_by'] = $actor;
+      $details['corrected_at'] = time();
+      $this->db->update($this->eventsTable(), ['details_json' => json_encode($details, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)], ['id' => $entryId]);
+      $this->audit($contractId, $operation === 'edit' ? 'history_edited' : 'history_voided', $actor, ['entry_id' => $entryId, 'reason' => $reason, 'before' => $before, 'after' => $details]);
+      $pdo->commit();
+    } catch (\Throwable $exception) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $exception; }
   }
 
   /** Cancel old scheduled notices before the shared worker delivers them. */
