@@ -1,6 +1,6 @@
 # Contratos por terminar · renovación y recibo
 
-Versión 3.3.363. El panel consulta contratos `Entregado` o `Por recibir` por mes de fecha fin. No cambia el estado administrativo de tickets existentes.
+Versión 3.3.365. El panel consulta contratos `Entregado` o `Por recibir` por mes de fecha fin. No cambia el estado administrativo de tickets existentes.
 
 ## Subpestañas
 
@@ -122,3 +122,13 @@ El listado aprovecha todo el ancho disponible del panel. Por terminar presenta t
 Los popups de retención, probabilidad, no salida e historial siguen las nuevas referencias. Retención presenta contrato, partes, inmueble, funcionario relacionado y sugerencia real de responsable; Aplicar sugerencia selecciona ese funcionario, sin crear el ticket. No se muestran nombres, carga o porcentajes de efectividad ficticios. Probabilidad incorpora accesos a 25, 50, 75 y 100 %, además de validar el rango. No salida conserva observaciones obligatorias y confirmación para retirar reportes. Historial conserva permisos, corrección con motivo y confirmación de anulación, e incorpora un estado vacío con icono y barra de color.
 
 Las clases de cada popup se declaran explícitamente para conservar sus estilos en la compilación Tailwind. La verificación de navegador cubre escritorio, móvil, ancho disponible, sugerencia de responsable, porcentajes rápidos, validación, preservación de datos, permisos y estilos compilados. Las pruebas usan datos simulados y no crean tickets ni envían notificaciones reales.
+
+## Uso de no salida y ejemplo de fechas (3.3.365)
+
+Reportar no salida registra que el arrendatario permanecerá en el inmueble y requiere describir lo informado o acordado. No renueva el contrato, no cambia su fecha fin y no establece por sí mismo probabilidad del 100 %. Se programan correos internos para los destinatarios del evento No salida del inmueble seleccionados al guardar; cambiar los destinatarios exige volver a guardar el reporte para actualizar esa programación. Cada fecha genera un mensaje por correo único, y la cifra Recordatorios en cola cuenta mensajes, no fechas. Se envían cuando el worker procesa la cola a partir del horario programado.
+
+Para un contrato con fecha fin 09/01/2027, `30,7,0` representa 10/12/2026, 02/01/2027 y 09/01/2027 a las 09:00. Solo se programan fechas pendientes; si todas pasaron, se programa un mensaje inmediato por destinatario. Con no salida reportada, el cron omite crear su recibo automático. Si el arrendatario confirma que saldrá, retirar el reporte exige confirmación y cancela avisos pendientes; el cron puede crear el recibo si aún está en plazo y cumple las demás condiciones. No elimina tickets ya creados ni revoca mensajes enviados.
+
+Sin no salida y con probabilidad inferior al 100 % (o sin registrar), la creación de recibo está prevista para el 25/12/2026. Si el cron no corrió ese día, puede recuperarlo hasta el día de terminación, mientras el contrato siga en estado permitido. La creación ocurre en la primera ejecución elegible del cron; no usa el horario de las 09:00 de los recordatorios. Deben estar configurados activación, contrato interno específico, responsable activo, destinatarios internos, correos válidos y el worker compartido.
+
+La revisión corrigió la omisión de `destinacion_inmueble` en la consulta mensual, para mostrar la destinación contractual vigente en la ficha. Las pruebas también verifican conservación del reporte vigente y cancelación de avisos cuando otro flujo cambia la fecha fin o el inmueble ya fue recibido. La entrega real y la ejecución del cron en Hostinger requieren revisión en ese servidor; las pruebas locales no certifican el transporte.

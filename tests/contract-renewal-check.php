@@ -128,7 +128,7 @@ function check(bool $ok,string $message): void { if (!$ok) throw new RuntimeExce
 function callEndpoint(callable $fn): RenewalResult { try { $fn(); } catch (RenewalResult $result) { return $result; } throw new RuntimeException('Missing endpoint response'); }
 
 $pdo = new RenewalTestPdo(); $db = new \SCM\Core\Database($pdo); $probe = new RenewalProbe($db);
-$pdo->exec('CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY,contrato TEXT,inmueble TEXT,id_inmueble TEXT,id_inmueble_data TEXT,fin_contrato TEXT,estado TEXT,valor_canon TEXT,correo_arrendatario TEXT,id_empleado TEXT,cct_author_id TEXT,cct_modified TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY,contrato TEXT,inmueble TEXT,id_inmueble TEXT,id_inmueble_data TEXT,fin_contrato TEXT,estado TEXT,valor_canon TEXT,destinacion_inmueble TEXT,correo_arrendatario TEXT,id_empleado TEXT,cct_author_id TEXT,cct_modified TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_tickets(_ID INTEGER PRIMARY KEY,id_ticket TEXT,id_contrato TEXT,tema_ayuda TEXT,fecha_terminacion_contrato INTEGER)');
 $pdo->exec('CREATE TABLE wp_jet_cct_inmuebles(_ID INTEGER PRIMARY KEY,codigo TEXT,id_funcionario TEXT,propietario TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_funcionarios(_ID INTEGER PRIMARY KEY,id_empleado TEXT,nombre TEXT,correo TEXT,celular TEXT,id_cargo TEXT,activo TEXT)');
@@ -150,6 +150,10 @@ putenv('SHARED_NOTIFICATIONS_PATH='.$temp);
 $service->ensureSchema();
 try {
   check(count($probe->month((int)date('Y',$end),(int)date('n',$end)))===4,'Month list must load with numeric ticket dates and mixed database collations');
+  $db->update('wp_jet_cct_contratos_arrendamiento',['destinacion_inmueble'=>'Vivienda contractual'],['_ID'=>193]);
+  $monthRows=$probe->month((int)date('Y',$end),(int)date('n',$end));
+  $listedContract=array_values(array_filter($monthRows,static fn(array $row):bool=>(string)$row['contract_pk']==='193'))[0];
+  check($listedContract['property_details']['destinacion']==='Vivienda contractual','Property modal must receive the contract use from the month query');
   check($probe->pk('193')['contrato']==='900','Exact PK must beat another contract number');
   foreach (['31/02/2026','00/10/2026','2026-02-31','2026-10-01junk'] as $date) check($probe->parse($date)===0,'Invalid date accepted: '.$date);
   check(date('Y-m-d',$probe->parse('29/02/2028'))==='2028-02-29','Leap day rejected');
@@ -272,6 +276,20 @@ try {
   $_SESSION['scm_user_cargo']='11';check(!$permission->invoke($app,'contract_history_manage'),'Removing history permission must revoke it');
   $db->update('wp_jet_cct_confi_sistema',['valor'=>$rawSettings],['_ID'=>1]);$appSettings->refresh();
   unset($_SESSION['scm_user_cargo']);
+  // Changes outside the Excel flow must cancel obsolete notices before delivery.
+  $pdo->beginTransaction();$service->save($probe->pk('802'),$end,null,true,'7,0','Permanencia de prueba','EMP-900');$pdo->commit();
+  $scheduledJobs=json_decode($service->get(802,$end)['jobs_json'],true);
+  $service->reconcileCycles(802);
+  check($service->get(802,$end)['no_exit']==1,'Unchanged active contract keeps its no-exit report');
+  $db->update('wp_jet_cct_contratos_arrendamiento',['fin_contrato'=>(string)($end+86400)],['_ID'=>802]);
+  $service->reconcileCycles(802);
+  foreach($scheduledJobs as $key) check($db->getVar('SELECT status FROM test_jobs WHERE dedupe_key=?',[$key])==='cancelled','External date change must cancel old-cycle notices');
+  check($service->get(802,$end)['no_exit']==0,'External date change retires the old report');
+  $pdo->beginTransaction();$service->save($probe->pk('802'),$end+86400,null,true,'7,0','Nueva permanencia de prueba','EMP-900');$pdo->commit();
+  $scheduledJobs=json_decode($service->get(802,$end+86400)['jobs_json'],true);
+  $db->update('wp_jet_cct_contratos_arrendamiento',['estado'=>'Recibido'],['_ID'=>802]);
+  $service->reconcileCycles(802);
+  foreach($scheduledJobs as $key) check($db->getVar('SELECT status FROM test_jobs WHERE dedupe_key=?',[$key])==='cancelled','Received contract must cancel pending no-exit notices');
   echo "PASS: exact contract, dates, matching, signatures, probabilities, responsibility, reminder scheduling/cancellation, history, atomic imports and idempotent automatic receipts. No messages sent.\n";
 } finally {
   putenv('SHARED_NOTIFICATIONS_PATH'); unlink($temp.'/autoload.php');unlink($temp.'/config.php');rmdir($temp);

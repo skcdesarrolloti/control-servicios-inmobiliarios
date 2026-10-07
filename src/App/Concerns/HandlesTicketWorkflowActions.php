@@ -4786,7 +4786,7 @@ trait HandlesTicketWorkflowActions
       '_ID', 'estado', 'contrato', 'id_contrato', 'id_contrato_arrendamiento', 'inmueble', 'id_inmueble',
       'codigo_inmueble_web', 'id_inmueble_data', 'direccion', 'barrio', 'ciudad', 'propietario', 'arrendatario',
       'correo_propietario', 'correo_arrendatario', 'celular_propietario', 'celular_arrendatario',
-      'id_propietario', 'id_arrendatario', 'inicio_contrato', 'fin_contrato', 'valor_canon',
+      'id_propietario', 'id_arrendatario', 'inicio_contrato', 'fin_contrato', 'valor_canon', 'destinacion_inmueble',
       'valor_administracion', 'id_empleado', 'id_funcionario', 'id_asesor', 'id_comercial',
       'id_captador', 'funcionario_creador', 'id_funcionario_creador', 'cct_author_id',
     ];
