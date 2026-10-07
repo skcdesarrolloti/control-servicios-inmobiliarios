@@ -15291,7 +15291,7 @@
         func = func || {};
         var id = String(func.id || "");
         if (!id) return "";
-        var label = String(func.name || func.label || id);
+        var label = String(func.name || func.label || id) + (func.cargo ? ' · ' + func.cargo : '');
         return '<option value="' + escHtml(id) + '"' + (id === defaultEmployee ? " selected" : "") + '>' + escHtml(label) + "</option>";
       }).join("");
       return options || '<option value="">No hay consultores de arriendo activos disponibles</option>';
@@ -15349,6 +15349,8 @@
     }
 
     function contractsEndingIcon(name) {
+      if (name === 'person') return '<svg class="scm-ending-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="7" r="3"/><path d="M5 21v-3a7 7 0 0 1 14 0v3"/></svg>';
+      if (name === 'location') return '<svg class="scm-ending-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2"/></svg>';
       var paths = {info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',document:'<path d="M7 3h7l4 4v14H7zM14 3v5h4M10 12h5m-5 4h5"/>',bell:'<path d="M6 17h12l-2-3V9a4 4 0 0 0-8 0v5zm4 3h4"/>',clipboard:'<rect x="5" y="5" width="14" height="16" rx="2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/>',calendar:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 10h16m-12 4 8 5m0-5-8 5"/>',settings:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/>',list:'<path d="M8 6h12M8 12h12M8 18h12M3 6h1m-1 6h1m-1 6h1"/>',check:'<path d="m5 12 4 4L19 6"/>',plus:'<path d="M12 4v16M4 12h16"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>'};
       return '<svg class="scm-ending-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (paths[name] || paths.document) + '</svg>';
     }
@@ -15446,7 +15448,9 @@
           if (canWrite && contractsEndingView === 'ending') configure = '<button type="button" class="scm-ending-button" data-contracts-ending-configure="probability" data-contract-pk="' + escHtml(row.contract_pk) + '">' + (row.probability == null ? 'Agregar probabilidad' : 'Editar probabilidad') + '</button><button type="button" class="scm-ending-button" data-contracts-ending-configure="no-exit" data-contract-pk="' + escHtml(row.contract_pk) + '">' + (Number(renewal.no_exit) ? 'Editar no salida' : 'Reportar no salida') + '</button>';
           if (canWrite && contractsEndingView === 'no-exit') configure = '<button type="button" class="scm-ending-button" data-contracts-ending-configure="no-exit" data-contract-pk="' + escHtml(row.contract_pk) + '">Registrar / editar reporte</button>';
           var daysLeft = Number(row.days_left || 0), daysLabel = daysLeft < 0 ? Math.abs(daysLeft) + ' días vencido' : daysLeft + ' días restantes';
-          return '<article class="scm-contracts-ending-row"><div class="scm-contracts-ending-date"><span>Fin</span><strong>' + escHtml(row.fin_contrato_label || '-') + '</strong><small class="' + (daysLeft < 0 ? 'is-expired' : '') + '">' + escHtml(daysLabel) + '</small></div><div class="scm-contracts-ending-main"><strong>Contrato #' + escHtml(row.contrato || row.contract_pk || '-') + '</strong><p>' + (row.arrendatario ? '<b>Arrendatario:</b> ' + escHtml(row.arrendatario) : '') + (row.arrendatario && row.propietario ? ' <span class="scm-ending-party-dot">•</span> ' : '') + (row.propietario ? '<b>Propietario:</b> ' + escHtml(row.propietario) : '') + '</p><small>' + escHtml([row.inmueble ? 'Inmueble ' + row.inmueble : '', row.direccion || ''].filter(Boolean).join(' · ')) + '</small>' + details + '</div><div class="scm-contracts-ending-actions">' + ticketButton + configure + historyButton(row.contract_pk) + '</div></article>';
+          var propertyType = (row.property_details || {}).tipo_inmueble;
+          var ficha = '<button type="button" class="scm-ending-button scm-ending-ficha" data-ending-property="' + escHtml(row.contract_pk) + '">' + contractsEndingIcon('document') + 'Ver ficha</button>';
+          return '<article class="scm-contracts-ending-row"><div class="scm-contracts-ending-date"><span>Fin: ' + escHtml(row.fin_contrato_label || '-') + '</span><small class="' + (daysLeft < 0 ? 'is-expired' : daysLeft <= 15 ? 'is-soon' : '') + '">' + contractsEndingIcon('clock') + escHtml(daysLabel) + '</small></div><div class="scm-contracts-ending-main"><div class="scm-ending-contract-title"><strong>Contrato #' + escHtml(row.contrato || row.contract_pk || '-') + '</strong>' + (propertyType ? '<span class="scm-ending-type">' + escHtml(propertyType) + '</span>' : '') + '</div>' + (row.arrendatario ? '<p>' + contractsEndingIcon('person') + '<span><b>Arrendatario:</b> ' + escHtml(row.arrendatario) + '</span></p>' : '') + (row.propietario ? '<p>' + contractsEndingIcon('person') + '<span><b>Propietario:</b> ' + escHtml(row.propietario) + '</span></p>' : '') + '<small class="scm-ending-address">' + contractsEndingIcon('location') + '<span>' + escHtml([row.inmueble ? 'Inmueble ' + row.inmueble : '', row.direccion || ''].filter(Boolean).join(' · ')) + '</span></small>' + details + '</div><div class="scm-contracts-ending-actions"><div class="scm-ending-row-primary">' + ficha + ticketButton + '</div><div class="scm-ending-row-secondary">' + configure + historyButton(row.contract_pk) + '</div></div></article>';
         }).join('') : empty) + '</div></section>';
       }).join('');
       if (contractsEndingView === 'no-exit') list.insertAdjacentHTML('afterbegin', '<label class="scm-ending-filter"><input type="checkbox" data-contracts-only-no-exit ' + (contractsEndingOnlyNoExit ? 'checked' : '') + '>Mostrar solo reportes de no salida</label>');
@@ -15594,6 +15598,23 @@
       });
     }
 
+    function contractsEndingDialogClasses(kind) {
+      var kinds = {retention:'scm-ending-retention-swal',probability:'scm-ending-probability-swal','no-exit':'scm-ending-no-exit-swal',history:'scm-ending-history-swal',correction:'scm-ending-correction-swal',property:'scm-ending-property-swal'};
+      return {popup:'scm-ending-dialog-swal ' + (kinds[kind] || ''), confirmButton:'scm-ending-dialog-button scm-ending-dialog-primary',cancelButton:'scm-ending-dialog-button',closeButton:'scm-ending-dialog-close'};
+    }
+
+    function contractsEndingContextCard(label, icon, body) {
+      return '<section class="scm-ending-context-card"><div class="scm-ending-context-label"><span>' + escHtml(label) + '</span>' + contractsEndingIcon(icon) + '</div>' + body + '</section>';
+    }
+
+    function openContractsEndingProperty(contractPk) {
+      var row = contractsEndingRowsByPk[String(contractPk)];
+      if (!row || !window.Swal) return;
+      var property = row.property_details || {};
+      var fields = [['Contrato', '#' + row.contrato],['Inmueble',row.inmueble],['Dirección',row.direccion],['Tipo',property.tipo_inmueble],['Destinación',property.destinacion],['Canon mensual',row.canon == null ? '' : '$ ' + Number(row.canon).toLocaleString('es-CO')],['Ciudad',property.ciudad],['Barrio',property.barrio],['Estrato',property.estrato],['Habitaciones',property.habitaciones],['Baños',property.banos],['Área construida (m²)',property.area_construida]];
+      Swal.fire({title:'Ficha del inmueble',width:'min(720px,94vw)',html:'<div class="scm-ending-context-grid">' + fields.map(function(field) { return contractsEndingContextCard(field[0],'document','<p>' + escHtml(field[1] || 'Sin registrar') + '</p>'); }).join('') + '</div>',confirmButtonText:'Cerrar',buttonsStyling:false,customClass:contractsEndingDialogClasses('property')});
+    }
+
     function openContractsEndingRetention(contractPk) {
       var row = contractsEndingRowsByPk[String(contractPk || "")];
       if (!row || !window.Swal || typeof window.Swal.fire !== "function") {
@@ -15601,26 +15622,37 @@
         return;
       }
       var retention = row.retention_ticket || {};
-      var helpHtml = contractsEndingHelpHtml(row);
-      var html = '<form class="scm-contract-termination-form" data-scm-contracts-ending-retention-form>' +
-        '<section class="scm-retention-ticket-card' + (!retention.enabled ? " is-disabled" : "") + '">' +
-          '<div class="scm-retention-ticket-head"><div><span class="scm-retention-ticket-eyebrow">Ticket comercial</span><strong>Retención de contrato</strong></div><span class="scm-retention-ticket-pill">Contratos por terminar</span></div>' +
-          (helpHtml ? '<div class="scm-retention-ticket-context">' + helpHtml + "</div>" : "") +
-          '<label class="scm-retention-ticket-field"><span>Asignar a consultor de arriendo</span><select name="retencion_id_empleado" ' + (!retention.enabled ? "disabled" : "") + '><option value="">Selecciona responsable</option>' + contractsEndingEmployeeOptions(row) + '</select></label>' +
-        "</section>" +
-      "</form>";
+      var property = row.property_details || {};
+      var help = Array.isArray(retention.assignment_help) ? retention.assignment_help : [];
+      function helpValue(label) { var item = help.find(function(item) { return item.label === label; }); return item ? item.value : ''; }
+      var suggested = (retention.funcionarios || []).find(function(employee) { return String(employee.id) === String(retention.default_employee_id); });
+      var days = Number(row.days_left || 0);
+      var html = '<form class="scm-ending-dialog-form" data-scm-contracts-ending-retention-form>' +
+        '<div class="scm-ending-retention-heading"><div><span class="scm-ending-context-label">Ticket comercial</span><strong>Retención de contrato</strong></div><span class="scm-ending-retention-pill">Contratos por terminar</span></div>' +
+        '<div class="scm-ending-context-grid">' +
+          contractsEndingContextCard('Contrato','document','<div class="scm-ending-contract-number">#' + escHtml(row.contrato) + (property.destinacion ? '<span>' + escHtml(property.destinacion) + '</span>' : '') + '</div><p class="scm-ending-expiration">' + contractsEndingIcon('clock') + escHtml(days < 0 ? 'Vencido hace ' + Math.abs(days) + ' días' : 'Vencimiento en ' + days + ' días') + '</p>') +
+          contractsEndingContextCard('Partes del contrato','person','<p><span>Arrendatario:</span> <b>' + escHtml(row.arrendatario || 'Sin registrar') + '</b></p><p><span>Propietario:</span> <b>' + escHtml(row.propietario || 'Sin registrar') + '</b></p>') +
+          contractsEndingContextCard('Inmueble','location','<p class="scm-ending-property-code">Inmueble ID: ' + escHtml(row.inmueble || 'Sin registrar') + '</p><p>' + escHtml(row.direccion || 'Sin dirección registrada') + '</p><small>' + escHtml([property.tipo_inmueble,property.ciudad,property.estrato ? 'Estrato ' + property.estrato : ''].filter(Boolean).join(' · ')) + '</small>') +
+          contractsEndingContextCard('Funcionario relacionado','person','<p><b>' + escHtml(helpValue('Responsable del inmueble') || helpValue('Funcionario relacionado') || 'Sin funcionario registrado') + '</b></p><small>Responsable registrado en el inmueble o contrato</small>') +
+        '</div>' + (suggested ? '<section class="scm-ending-suggestion"><div class="scm-ending-avatar">' + escHtml(String(suggested.name || suggested.label || '').split(/\s+/).slice(0,2).map(function(word) { return word.charAt(0); }).join('')) + '</div><div><span class="scm-ending-context-label">Sugerido para asignar</span><b>' + escHtml(suggested.name || suggested.label || suggested.id) + '</b><small>' + escHtml(helpValue('Recomendación') || 'Responsable sugerido según los datos registrados y su disponibilidad para gestionar retención.') + '</small></div><button type="button" class="scm-ending-dialog-button scm-ending-apply-suggestion" data-ending-apply-suggestion>' + contractsEndingIcon('check') + 'Aplicar sugerencia</button></section>' : '') +
+        '<label><span>Asignar a consultor de arriendo <small>obligatorio</small></span><select name="retencion_id_empleado" ' + (!retention.enabled ? 'disabled' : '') + '><option value="">Selecciona responsable</option>' + contractsEndingEmployeeOptions(row) + '</select></label>' +
+        '<div class="scm-ending-dialog-notice">' + contractsEndingIcon('info') + '<p>El consultor asignado gestionará la retención del cliente y buscará inmuebles similares que se ajusten a sus necesidades.</p></div></form>';
       window.Swal.fire({
         title: "Crear ticket de retención",
         html: html,
         width: "min(760px, 94vw)",
+        showCloseButton: true,
+        closeButtonAriaLabel: 'Cerrar creación de ticket',
         showCancelButton: true,
-        confirmButtonText: "Crear ticket",
+        confirmButtonText: contractsEndingIcon('check') + "Crear ticket",
         cancelButtonText: "Cancelar",
         buttonsStyling: false,
-        customClass: {
-          popup: "scm-calendar-swal-popup scm-contract-termination-swal",
-          confirmButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--primary",
-          cancelButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary",
+        customClass: contractsEndingDialogClasses('retention'),
+        didOpen: function(popup) {
+          var title = popup.querySelector('.swal2-title');
+          title.insertAdjacentHTML('beforeend','<small>Gestión preventiva de renovación y fidelización de contratos</small>');
+          var apply = popup.querySelector('[data-ending-apply-suggestion]');
+          if (apply) apply.addEventListener('click',function() { var select = popup.querySelector('[name="retencion_id_empleado"]'); select.value = String(suggested.id); select.focus(); });
         },
         preConfirm: function () {
           var popup = window.Swal.getPopup();
@@ -15652,23 +15684,30 @@
       var state = row.renewal || {};
       var probabilityMode = mode === 'probability';
       Swal.fire({
-        title: (probabilityMode ? 'Probabilidad de renovación · Contrato #' : 'No salida del inmueble · Contrato #') + row.contrato,
-        customClass: {popup:'scm-contract-management-swal'},
-        html: '<form data-contract-renewal-form class="scm-contract-renewal-form">' +
-          (probabilityMode ? '<label>Probabilidad de renovación (%)<input name="probability" type="number" min="0" max="100" step="0.01" placeholder="Sin registrar" value="' + escHtml(row.probability == null ? '' : row.probability) + '"></label>' +
-          '<small>Al 100 % se omiten nuevas retenciones y el recibo automático. El valor ponderado usa el canon mensual.</small>' : '') +
+        title: (probabilityMode ? 'Probabilidad de renovación' : 'No salida del inmueble') + ' <span class="scm-ending-dialog-dot">·</span><span class="scm-ending-dialog-contract">Contrato #' + escHtml(row.contrato) + '</span>',
+        customClass: contractsEndingDialogClasses(probabilityMode ? 'probability' : 'no-exit'),
+        width:'min(512px,94vw)', buttonsStyling:false,
+        didOpen: function(popup) {
+          if (probabilityMode) popup.querySelector('.swal2-title').insertAdjacentHTML('beforebegin','<span class="scm-ending-dialog-kicker">Gestión de Cartera</span>');
+          else popup.querySelector('.swal2-title').insertAdjacentHTML('afterend','<p class="scm-ending-dialog-subtitle">Gestión de permanencia y registro de excepciones</p>');
+          popup.querySelectorAll('[data-ending-probability-preset]').forEach(function(button) { button.addEventListener('click',function() { var input = popup.querySelector('[name="probability"]'); input.value = button.getAttribute('data-ending-probability-preset'); input.focus(); }); });
+        },
+        html: '<form data-contract-renewal-form class="scm-ending-dialog-form">' +
+          (probabilityMode ? '<label>Probabilidad de renovación (%)<div class="scm-ending-probability-input"><input name="probability" type="number" min="0" max="100" step="0.01" placeholder="Sin registrar" value="' + escHtml(row.probability == null ? '' : row.probability) + '"><span>%</span></div></label>' +
+          '<div class="scm-ending-probability-presets"><span>Sugeridos:</span>' + [25,50,75,100].map(function(value) { return '<button type="button" data-ending-probability-preset="' + value + '">' + value + '%</button>'; }).join('') + '</div><div class="scm-ending-dialog-notice">' + contractsEndingIcon('info') + '<p>Al 100 % se omiten nuevas retenciones y el recibo automático. El valor ponderado usa el canon mensual.</p></div>' : '') +
           (!probabilityMode ?
-          '<label class="scm-contract-renewal-check"><input type="checkbox" name="no_exit" ' + (Number(state.no_exit) || mode === 'no-exit' ? 'checked' : '') + '>El arrendatario no realizará la salida del inmueble</label>' +
+          '<label class="scm-ending-dialog-check"><input type="checkbox" name="no_exit" ' + (Number(state.no_exit) || mode === 'no-exit' ? 'checked' : '') + '><span>El arrendatario no realizará la salida del inmueble</span></label>' +
           '<label>Recordatorios: días antes de la fecha fin<input name="reminder_days" value="' + escHtml(state.reminder_days || '30,7,0') + '"></label>' +
           '<small>Separados por coma; 0 significa el día de terminación, a las 9:00 a. m. Los destinatarios se configuran en Notificaciones internas → No salida del inmueble.</small>' +
-          (Number(state.no_exit) ? '<label class="scm-contract-renewal-check"><input type="checkbox" name="confirm_retire">Confirmo retirar el reporte y cancelar sus recordatorios si desmarco No salida.</label>' : '') +
-          '<label>Reporte / observaciones<textarea name="note" rows="3" maxlength="4000">' + escHtml(state.note || '') + '</textarea></label>' : '') +
+          (Number(state.no_exit) ? '<label class="scm-ending-dialog-check"><input type="checkbox" name="confirm_retire"><span>Confirmo retirar el reporte y cancelar sus recordatorios si desmarco No salida.</span></label>' : '') +
+          '<label>Reporte / observaciones<textarea name="note" rows="3" maxlength="4000" placeholder="Añade detalles, motivos o acuerdos pertinentes sobre la permanencia…">' + escHtml(state.note || '') + '</textarea></label>' : '') +
           '</form>',
         showCancelButton: true, confirmButtonText: probabilityMode ? 'Guardar probabilidad' : 'Guardar reporte', cancelButtonText: 'Cancelar', showLoaderOnConfirm: true,
         allowOutsideClick: function() { return !Swal.isLoading(); },
         preConfirm: function() {
           var form = Swal.getPopup().querySelector('[data-contract-renewal-form]');
           var noExit = probabilityMode ? !!Number(state.no_exit) : form.elements.no_exit.checked;
+          if (probabilityMode && !form.elements.probability.checkValidity()) { Swal.showValidationMessage('Registra una probabilidad entre 0 y 100 %.'); return false; }
           if (!probabilityMode && noExit && !form.elements.note.value.trim()) { Swal.showValidationMessage('Describe el reporte de no salida.'); return false; }
           if (!probabilityMode && Number(state.no_exit) && !noExit && !form.elements.confirm_retire.checked) { Swal.showValidationMessage('Confirma el retiro del reporte y la cancelación de sus recordatorios pendientes.'); return false; }
           return dashboardFormAction(actions.contracts_ending_renewal_save, function(fd) {
@@ -15696,14 +15735,14 @@
         var names = {renewal_saved:'Gestión de renovación actualizada',end_date_imported:'Fecha fin actualizada desde Excel',retention_created:'Retención creada',receipt_created:'Recibo automático creado',reminders_cancelled:'Recordatorios cancelados automáticamente',history_edited:'Descripción del historial corregida',history_voided:'Movimiento anulado'};
         var items = data.items || [];
         if (receiptsOnly) items = items.filter(function(item) { return item.action === 'receipt_created'; });
-        var html = '<p>Registro de cambios y tickets del contrato, con fecha y funcionario. Editar o anular un movimiento no modifica la gestión del contrato ni elimina sus tickets.</p>';
-        if (data.can_manage) html += '<label><input type="checkbox" data-history-include-voided ' + (includeVoided ? 'checked' : '') + '>Mostrar anulados y correcciones</label>';
+        var html = '<p class="scm-ending-history-intro">Registro de cambios y tickets del contrato, con fecha y funcionario. Editar o anular un movimiento no modifica la gestión del contrato ni elimina sus tickets.</p>';
+        if (data.can_manage) html += '<label class="scm-ending-history-filter"><input type="checkbox" data-history-include-voided ' + (includeVoided ? 'checked' : '') + '>Mostrar anulados y correcciones</label>';
         html += items.map(function(item,index) {
           var editable = data.can_manage && !item.voided && item.action !== 'history_edited' && item.action !== 'history_voided';
-          return '<article class="scm-contract-history-entry"><b>' + (item.voided ? 'Anulado · ' : '') + escHtml(names[item.action] || item.action) + '</b><small>' + escHtml(new Date(Number(item.created_at)*1000).toLocaleString('es-CO')) + ' · Funcionario ' + escHtml(item.actor_name || item.actor || 'Sistema') + '</small><p>' + escHtml(contractHistoryText(item)) + '</p>' + (editable ? '<button type="button" class="scm-case-work-btn" data-history-edit="' + index + '">Editar descripción</button><button type="button" class="scm-case-work-btn" data-history-void="' + index + '">Anular movimiento</button>' : '') + '</article>';
+          return '<article class="scm-contract-history-entry"><b>' + (item.voided ? 'Anulado · ' : '') + escHtml(names[item.action] || item.action) + '</b><small>' + escHtml(new Date(Number(item.created_at)*1000).toLocaleString('es-CO')) + ' · Funcionario ' + escHtml(item.actor_name || item.actor || 'Sistema') + '</small><p>' + escHtml(contractHistoryText(item)) + '</p>' + (editable ? '<div class="scm-ending-history-actions"><button type="button" class="scm-ending-dialog-button" data-history-edit="' + index + '">Editar descripción</button><button type="button" class="scm-ending-dialog-button" data-history-void="' + index + '">Anular movimiento</button></div>' : '') + '</article>';
         }).join('');
-        if (!items.length) html += '<p>No hay movimientos registrados.</p>';
-        Swal.fire({title:receiptsOnly ? 'Historial de recibos · últimos movimientos' : 'Historial contractual · últimos 30 movimientos',width:'min(900px,96vw)',html:html,confirmButtonText:'Cerrar',didOpen:function() {
+        if (!items.length) html += '<section class="scm-ending-history-empty"><div>' + contractsEndingIcon('clock') + '</div><b>No hay movimientos registrados.</b><small>Las acciones y actualizaciones futuras aparecerán en este registro.</small></section>';
+        Swal.fire({title:receiptsOnly ? 'Historial de recibos <span class="scm-ending-dialog-dot">·</span> <span class="scm-ending-history-title-detail">últimos movimientos</span>' : 'Historial contractual <span class="scm-ending-dialog-dot">·</span> <span class="scm-ending-history-title-detail">últimos 30 movimientos</span>',width:'min(576px,94vw)',html:html,confirmButtonText:'Cerrar',buttonsStyling:false,customClass:contractsEndingDialogClasses('history'),didOpen:function() {
           var popup = Swal.getPopup();
           var toggle = popup.querySelector('[data-history-include-voided]');
           if (toggle) toggle.addEventListener('change', function() { openContractHistory(contractPk, toggle.checked, receiptsOnly); });
@@ -15712,7 +15751,7 @@
             if (!button) return;
             var operation = button.hasAttribute('data-history-void') ? 'void' : 'edit';
             var item = items[Number(button.getAttribute(operation === 'void' ? 'data-history-void' : 'data-history-edit'))];
-            Swal.fire({title:operation === 'void' ? 'Anular movimiento del historial' : 'Editar descripción del historial',html:'<form data-history-correction class="scm-contract-renewal-form">' + (operation === 'edit' ? '<label>Descripción corregida<textarea name="text" rows="5" maxlength="4000">' + escHtml(contractHistoryText(item)) + '</textarea></label>' : '<p>Este movimiento se ocultará de la consulta normal. La corrección quedará registrada. No se eliminan tickets ni se reinicia la probabilidad o los recordatorios.</p><label><input type="checkbox" name="confirm">Confirmo anular este movimiento</label>') + '<label>Motivo<textarea name="reason" rows="2" maxlength="2000"></textarea></label></form>',showCancelButton:true,confirmButtonText:operation === 'void' ? 'Confirmar anulación' : 'Guardar corrección',cancelButtonText:'Volver',showLoaderOnConfirm:true,allowOutsideClick:function(){return !Swal.isLoading();},preConfirm:function() {
+            Swal.fire({title:operation === 'void' ? 'Anular movimiento del historial' : 'Editar descripción del historial',width:'min(576px,94vw)',buttonsStyling:false,customClass:contractsEndingDialogClasses('correction'),html:'<form data-history-correction class="scm-ending-dialog-form">' + (operation === 'edit' ? '<label>Descripción corregida<textarea name="text" rows="5" maxlength="4000">' + escHtml(contractHistoryText(item)) + '</textarea></label>' : '<p>Este movimiento se ocultará de la consulta normal. La corrección quedará registrada. No se eliminan tickets ni se reinicia la probabilidad o los recordatorios.</p><label class="scm-ending-dialog-check"><input type="checkbox" name="confirm"><span>Confirmo anular este movimiento</span></label>') + '<label>Motivo<textarea name="reason" rows="2" maxlength="2000"></textarea></label></form>',showCancelButton:true,confirmButtonText:operation === 'void' ? 'Confirmar anulación' : 'Guardar corrección',cancelButtonText:'Volver',showLoaderOnConfirm:true,allowOutsideClick:function(){return !Swal.isLoading();},preConfirm:function() {
               var form = Swal.getPopup().querySelector('[data-history-correction]');
               if (!form.elements.reason.value.trim()) { Swal.showValidationMessage('Indica el motivo.'); return false; }
               if (operation === 'void' && !form.elements.confirm.checked) { Swal.showValidationMessage('Confirma la anulación.'); return false; }
@@ -15756,6 +15795,8 @@
       if (onlyNoExit) { contractsEndingOnlyNoExit = onlyNoExit.checked; if (contractsEndingData) renderContractsEnding(contractsEndingData); return; }
       var tab = event.target.closest('[data-contracts-ending-view]');
       if (tab) { contractsEndingView = tab.getAttribute('data-contracts-ending-view'); if (contractsEndingData) renderContractsEnding(contractsEndingData); return; }
+      var propertyButton = event.target.closest('[data-ending-property]');
+      if (propertyButton) { openContractsEndingProperty(propertyButton.getAttribute('data-ending-property')); return; }
       var configure = event.target.closest('[data-contracts-ending-configure]');
       if (configure) { openContractsEndingManagement(configure.getAttribute('data-contract-pk'), configure.getAttribute('data-contracts-ending-configure')); return; }
       var history = event.target.closest('[data-contracts-ending-history]');

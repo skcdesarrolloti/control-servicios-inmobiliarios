@@ -70,7 +70,7 @@
 }
 /* User-supplied contract ending layouts, compiled with the local Tailwind build. */
 @layer components {
-  #scm-app .scm-ending-workspace.scm-contracts-ending-panel { @apply mx-auto flex w-full max-w-7xl flex-col gap-6 bg-[#f4f6f9] p-4 text-[#061d49] sm:p-6; border:0; border-radius:0; font-family:Poppins,sans-serif; font-size:14px; }
+  #scm-app .scm-ending-workspace.scm-contracts-ending-panel { @apply mx-auto flex w-full max-w-none flex-col gap-6 bg-[#f4f6f9] p-4 text-[#061d49] sm:p-6; border:0; border-radius:0; font-family:Poppins,sans-serif; font-size:14px; }
   #scm-app .scm-ending-workspace[data-ending-view="renewal"] { @apply bg-white; }
   #scm-app .scm-ending-workspace[data-ending-view="no-exit"], #scm-app .scm-ending-workspace[data-ending-view="receipt"] { @apply bg-slate-50; }
   #scm-app .scm-ending-workspace .scm-ending-intro { @apply rounded-xl border border-slate-200 bg-white p-6 shadow-sm; }
@@ -203,7 +203,7 @@
   #scm-app .scm-ending-workspace :is(button,input,select):focus-visible { outline:2px solid #1e3c76; outline-offset:3px; }
   @media(min-width:1200px) {
     #scm-app .scm-ending-workspace .scm-contracts-ending-row { grid-template-columns:120px minmax(0,1fr) auto; }
-    #scm-app .scm-ending-workspace .scm-contracts-ending-actions { @apply col-span-1 flex-nowrap justify-end; }
+    #scm-app .scm-ending-workspace .scm-contracts-ending-actions { @apply col-span-1 justify-end; }
     #scm-app .scm-ending-workspace .scm-contracts-ending-actions .scm-ending-button { max-width:140px; }
   }
   @media(max-width:640px) {
@@ -214,6 +214,133 @@
     #scm-app .scm-ending-workspace .scm-contracts-ending-date { @apply justify-self-start; }
     #scm-app .scm-ending-workspace .scm-contracts-ending-actions { @apply col-span-1 grid w-full grid-cols-2; }
     #scm-app .scm-ending-workspace .scm-ending-button { min-height:44px; }
+  }
+}
+
+/* Contract cards and internal dialogs follow the supplied Poppins/navy/yellow references. */
+@layer components {
+  #scm-app .scm-ending-workspace[data-ending-view="ending"] { @apply bg-[#faf8ff]; }
+  #scm-app .scm-ending-workspace[data-ending-view="ending"] .scm-contracts-ending-month { @apply overflow-visible border-0 bg-transparent shadow-none; }
+  #scm-app .scm-ending-workspace[data-ending-view="ending"] .scm-contracts-ending-month-head { @apply border-0 bg-transparent px-0 pt-0; }
+  #scm-app .scm-ending-workspace[data-ending-view="ending"] .scm-contracts-ending-rows { @apply gap-3 p-0; }
+  #scm-app .scm-ending-workspace[data-ending-view="ending"] .scm-contracts-ending-row { @apply rounded-2xl border border-white p-5 shadow-sm; }
+  #scm-app .scm-ending-workspace .scm-ending-contract-title { @apply flex flex-wrap items-center gap-2 text-sm font-bold; }
+  #scm-app .scm-ending-workspace .scm-ending-type { @apply rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#1e3c76]; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-main p,
+  #scm-app .scm-ending-workspace .scm-ending-address { @apply flex items-start gap-2; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-main .scm-ending-icon { @apply mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1e3c76]; }
+  #scm-app .scm-ending-workspace .scm-ending-address .scm-ending-icon { @apply text-amber-600; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date { @apply self-center border-0 bg-slate-100 px-2.5 py-3; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date:has(.is-expired) { @apply bg-rose-50; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date:has(.is-soon) { @apply bg-amber-50; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date span { @apply text-[10px] font-semibold normal-case text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date small { @apply flex items-center justify-center gap-1 border-0 bg-indigo-100 text-[#1e3c76]; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date small.is-expired { @apply bg-red-700 text-white; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date small.is-soon { @apply bg-amber-200 text-amber-900; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date .scm-ending-icon { @apply h-3 w-3 shrink-0; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-actions { @apply flex flex-col items-stretch gap-2; }
+  #scm-app .scm-ending-workspace .scm-ending-row-primary,
+  #scm-app .scm-ending-workspace .scm-ending-row-secondary { @apply flex flex-wrap items-center justify-end gap-2; }
+  #scm-app .scm-ending-workspace .scm-ending-ficha { @apply border-transparent bg-indigo-50; }
+  #scm-app .scm-ending-workspace .scm-ending-row-secondary .scm-ending-button { @apply min-h-[36px] px-3 py-1.5 text-[11px]; }
+  @media(min-width:1200px) { #scm-app .scm-ending-workspace .scm-contracts-ending-actions { max-width:440px; } }
+  @media(max-width:640px) {
+    #scm-app .scm-ending-workspace .scm-contracts-ending-actions { @apply flex; }
+    #scm-app .scm-ending-workspace .scm-ending-row-primary,
+    #scm-app .scm-ending-workspace .scm-ending-row-secondary { @apply grid grid-cols-2; }
+    #scm-app .scm-ending-workspace .scm-contracts-ending-actions .scm-ending-button { @apply min-h-[44px]; max-width:none; }
+  }
+
+  .swal2-popup.scm-ending-dialog-swal { @apply overflow-hidden rounded-2xl border border-slate-100 bg-white p-0 text-[#061d49] shadow-2xl; font-family:Poppins,sans-serif; }
+  .swal2-popup.scm-ending-dialog-swal .swal2-title { @apply m-0 px-8 pt-8 text-xl font-bold leading-snug tracking-tight text-[#061d49]; }
+  .swal2-popup.scm-ending-dialog-swal .swal2-html-container { @apply m-0 overflow-x-hidden px-8 py-6 text-left text-xs leading-relaxed text-[#061d49]; max-height:65vh; }
+  .swal2-popup.scm-ending-dialog-swal .swal2-actions { @apply m-0 flex w-full flex-row-reverse justify-start gap-3 px-8 pb-8; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-button { @apply m-0 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-[#061d49] shadow-sm transition-colors hover:bg-slate-50; cursor:pointer; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-primary { @apply border-[#f8cf4a] bg-[#f8cf4a] font-semibold hover:bg-[#eac444]; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-icon { @apply h-4 w-4 shrink-0; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-dot { @apply text-[#f8cf4a]; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-contract { @apply text-[#1e3c76]; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-form { @apply grid gap-5; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-form label { @apply m-0 grid gap-2 text-xs font-semibold; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-form label > span { @apply flex items-center justify-between gap-2; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-form :is(input:not([type="checkbox"]),select,textarea) { @apply m-0 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal leading-relaxed text-[#061d49] shadow-sm; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-form :is(input,textarea)::placeholder { @apply text-slate-400; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-form small { @apply text-[11px] font-normal leading-relaxed text-slate-500; }
+  .swal2-popup.scm-ending-dialog-swal input[type="checkbox"] { @apply h-4 w-4 shrink-0 rounded border-slate-300; accent-color:#1e3c76; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-form .scm-ending-dialog-check { @apply flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/50 p-3.5; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-check input { @apply mt-0.5; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-notice { @apply flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-100 p-4 text-xs text-slate-600; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-notice p { @apply m-0; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-notice svg { @apply mt-0.5 text-[#1e3c76]; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-kicker { @apply mx-8 mt-8 justify-self-start rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold text-[#1e3c76]; }
+  .swal2-popup.scm-ending-probability-swal { @apply rounded-3xl; }
+  .swal2-popup.scm-ending-probability-swal .swal2-title { @apply pt-3 text-left; }
+  .swal2-popup.scm-ending-probability-swal .scm-ending-dialog-contract { @apply block; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-probability-input { @apply relative; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-probability-input input { @apply bg-slate-50 pr-10; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-probability-input > span { @apply absolute right-4 top-3 text-sm font-semibold; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-probability-input input { appearance:textfield; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-probability-input input::-webkit-inner-spin-button,
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-probability-input input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-probability-presets { @apply -mt-2 flex flex-wrap items-center gap-2 text-[10px] text-slate-500; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-probability-presets button { @apply flex min-h-[32px] min-w-[36px] items-center justify-center rounded bg-slate-100 px-2 py-1 text-xs text-slate-600 hover:bg-indigo-100; }
+  .swal2-popup.scm-ending-no-exit-swal::before { @apply absolute left-1/2 top-6 h-1 w-12 -translate-x-1/2 rounded bg-[#f8cf4a]; content:""; }
+  .swal2-popup.scm-ending-no-exit-swal .swal2-title { @apply pt-14; }
+  .swal2-popup.scm-ending-no-exit-swal .scm-ending-dialog-contract { @apply block; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-dialog-subtitle { @apply mb-0 mt-2 px-8 text-center text-xs text-slate-500; }
+  .swal2-popup.scm-ending-no-exit-swal .swal2-actions { @apply border-t border-slate-100 pt-5; }
+  .swal2-popup.scm-ending-history-swal::before { @apply absolute inset-x-0 top-0 h-2; background:linear-gradient(90deg,#f8cf4a,#1e3c76,#061d49); content:""; }
+  .swal2-popup.scm-ending-history-swal .swal2-html-container { @apply pt-3; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-history-title-detail { @apply font-medium text-slate-700; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-history-intro { @apply m-0 mb-6 text-center text-sm leading-relaxed text-slate-500; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-history-filter { @apply mb-4 flex items-center gap-2 text-xs text-slate-600; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-history-empty { @apply flex flex-col items-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-5 py-8 text-center; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-history-empty > div { @apply mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-history-empty svg { @apply h-7 w-7; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-history-empty b { @apply text-sm font-semibold text-slate-700; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-history-empty small { @apply text-xs text-slate-500; }
+  .swal2-popup.scm-ending-history-swal .swal2-actions { @apply justify-center; }
+  .swal2-popup.scm-ending-history-swal .swal2-confirm { min-width:140px; }
+  .swal2-popup.scm-ending-dialog-swal .scm-contract-history-entry { @apply mb-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-left; overflow-wrap:anywhere; }
+  .swal2-popup.scm-ending-dialog-swal .scm-contract-history-entry > small { @apply mt-1 block text-[11px] text-slate-500; }
+  .swal2-popup.scm-ending-dialog-swal .scm-contract-history-entry p { @apply my-3 text-xs leading-relaxed text-slate-600; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-history-actions { @apply flex flex-wrap gap-2; }
+  .swal2-popup.scm-ending-retention-swal .swal2-title { @apply bg-[#061d49] px-7 py-5 text-left text-xl text-white; }
+  .swal2-popup.scm-ending-retention-swal .swal2-title small { @apply mt-1 block text-[11px] font-normal tracking-normal text-blue-200; }
+  .swal2-popup.scm-ending-retention-swal .scm-ending-dialog-close { @apply absolute right-5 top-5 m-0 rounded-full bg-white/10 text-white; width:32px; height:32px; font-size:24px; }
+  .swal2-popup.scm-ending-retention-swal .swal2-html-container { @apply px-7; }
+  .swal2-popup.scm-ending-retention-swal .swal2-actions { @apply bg-[#fafaff] px-7 py-4; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-retention-heading { @apply flex flex-wrap items-center justify-between gap-3 border-b border-indigo-50 pb-3; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-retention-heading strong { @apply mt-1 block text-xl font-bold; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-context-label { @apply flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-wide text-[#1e3c76]; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-retention-pill { @apply rounded-full bg-amber-100 px-3 py-1 text-[10px] font-semibold uppercase text-amber-800; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-context-grid { @apply grid grid-cols-2 gap-3; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-context-card { @apply min-w-0 rounded-xl bg-[#f6f6ff] p-4; overflow-wrap:anywhere; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-context-card p { @apply mb-0 mt-2 text-xs; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-context-card p span { @apply text-[10px]; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-context-card b { @apply font-semibold; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-context-card small { @apply mt-2 block text-[10px] leading-relaxed text-slate-500; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-contract-number { @apply mt-2 flex flex-wrap items-center gap-2 text-3xl font-bold; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-contract-number span { @apply rounded bg-indigo-100 px-2 py-0.5 text-[10px] font-normal; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-expiration { @apply flex items-center gap-2; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-property-code { @apply text-amber-700; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-suggestion { @apply flex items-center gap-3 rounded-xl bg-gradient-to-r from-amber-50 to-indigo-50 p-4; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-avatar { @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#061d49] font-semibold text-[#f8cf4a]; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-suggestion > div:nth-child(2) { @apply min-w-0 flex-1; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-suggestion b { @apply mt-1 block text-sm; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-suggestion small { @apply mt-1 block text-[10px]; }
+  .swal2-popup.scm-ending-dialog-swal .scm-ending-apply-suggestion { @apply border-0 bg-indigo-100 px-3 text-[10px]; }
+  .swal2-popup.scm-ending-retention-swal .scm-ending-dialog-form select { @apply border-0 bg-[#f4f3ff] text-xs; }
+  .swal2-popup.scm-ending-retention-swal .scm-ending-dialog-notice { @apply border-0 bg-[#f4f3ff]; }
+  .swal2-popup.scm-ending-dialog-swal :is(button,input,select,textarea):focus-visible { outline:2px solid #1e3c76; outline-offset:2px; }
+  @media(max-width:640px) {
+    .swal2-popup.scm-ending-dialog-swal .swal2-title { @apply px-5 text-lg; }
+    .swal2-popup.scm-ending-dialog-swal .swal2-html-container { @apply px-5; }
+    .swal2-popup.scm-ending-dialog-swal .swal2-actions { @apply flex-wrap px-5; }
+    .swal2-popup.scm-ending-dialog-swal .scm-ending-context-grid { @apply grid-cols-1; }
+    .swal2-popup.scm-ending-dialog-swal .scm-ending-suggestion { @apply flex-wrap; }
+    .swal2-popup.scm-ending-dialog-swal .scm-ending-apply-suggestion { @apply w-full; }
+    .swal2-popup.scm-ending-retention-swal .swal2-title { @apply pr-14; }
   }
 }
 

@@ -1,6 +1,6 @@
 # Contratos por terminar · renovación y recibo
 
-Versión 3.3.362. El panel consulta contratos `Entregado` o `Por recibir` por mes de fecha fin. No cambia el estado administrativo de tickets existentes.
+Versión 3.3.363. El panel consulta contratos `Entregado` o `Por recibir` por mes de fecha fin. No cambia el estado administrativo de tickets existentes.
 
 ## Subpestañas
 
@@ -114,3 +114,11 @@ Las cuatro subpestañas y la previsualización Excel siguen los HTML de referenc
 Configurar / Habilitar abre el popup existente de Notificaciones internas cuando el usuario dispone de ese permiso; la activación se guarda desde esa configuración. Crear reporte manual muestra los contratos del periodo para escoger el reporte, sin modificar datos automáticamente. Ver histórico de recibos filtra movimientos de recibo del historial consultado. El popup Excel conserva paginación, token de confirmación y aplicación solo de cambios válidos; cerrar o No aplicar no modifica fechas.
 
 Compilación: `npx --yes tailwindcss@3.4.17 -c tailwind.config.js -i resources/css/tailwind-admin.css -o public/assets/css/tailwind-admin.css --minify`. No se utiliza Tailwind CDN en producción.
+
+## Tarjetas y popups (3.3.363)
+
+El listado aprovecha todo el ancho disponible del panel. Por terminar presenta tarjetas individuales blancas sobre fondo lavanda, con fecha y vencimiento, tipo de inmueble, arrendatario y propietario en líneas separadas. Se mantienen probabilidad, no salida, historial y acceso al caso existente; la renovación al 100 % conserva la omisión de nuevas acciones. Ver ficha muestra los datos del inmueble en un popup dentro del panel, sin abrir otra pestaña; la destinación y el canon corresponden al contrato vigente.
+
+Los popups de retención, probabilidad, no salida e historial siguen las nuevas referencias. Retención presenta contrato, partes, inmueble, funcionario relacionado y sugerencia real de responsable; Aplicar sugerencia selecciona ese funcionario, sin crear el ticket. No se muestran nombres, carga o porcentajes de efectividad ficticios. Probabilidad incorpora accesos a 25, 50, 75 y 100 %, además de validar el rango. No salida conserva observaciones obligatorias y confirmación para retirar reportes. Historial conserva permisos, corrección con motivo y confirmación de anulación, e incorpora un estado vacío con icono y barra de color.
+
+Las clases de cada popup se declaran explícitamente para conservar sus estilos en la compilación Tailwind. La verificación de navegador cubre escritorio, móvil, ancho disponible, sugerencia de responsable, porcentajes rápidos, validación, preservación de datos, permisos y estilos compilados. Las pruebas usan datos simulados y no crean tickets ni envían notificaciones reales.

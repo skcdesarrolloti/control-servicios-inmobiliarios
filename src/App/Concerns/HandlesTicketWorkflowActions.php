@@ -4844,7 +4844,15 @@ trait HandlesTicketWorkflowActions
     $receiptConfig = \SCM\Modules\Contracts\ContractReceiptSettings::read($this->db);
     $canon = ContractRenewalService::canon($row['valor_canon'] ?? '');
     $probability = isset($renewal['probability']) ? (float) $renewal['probability'] : null;
+    $propertyRow = $this->contractRetentionProperty($row);
+    $propertyDetails = [];
+    foreach (['tipo_inmueble', 'destinacion', 'barrio', 'ciudad', 'estrato', 'habitaciones', 'banos', 'area_construida'] as $field) {
+      $propertyDetails[$field] = is_scalar($propertyRow[$field] ?? null) ? trim((string) $propertyRow[$field]) : '';
+    }
+    $contractUse = trim((string) ($row['destinacion_inmueble'] ?? ''));
+    if ($contractUse !== '') $propertyDetails['destinacion'] = $contractUse;
     return [
+      'property_details' => $propertyDetails,
       'renewal' => $renewal,
       'estado_contrato' => (string) ($row['estado'] ?? ''),
       'end_ts' => $endTs,
