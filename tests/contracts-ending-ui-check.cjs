@@ -30,7 +30,7 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
       var sent = [], opened = [], messages = [], pendingLists = null;
       function escHtml(value) { var el = document.createElement('div'); el.textContent = String(value == null ? '' : value); return el.innerHTML.replace(/"/g,'&quot;'); }
       function formatDashboardCount(n) { return String(n); }
-      function showToast(kind,text) { messages.push({kind,text}); }
+      function showToast(kind,text,title) { messages.push({kind,text,title}); }
       function dashboardAction(action,payload) {
         sent.push({action,payload});
         if (action === 'case') return Promise.resolve({case:{ticket_pk:'77',ticket:'77',case_source_html:'<p>Detalle del caso #77</p>'}});
@@ -92,6 +92,8 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
     await page.waitForFunction(()=>document.querySelector('[data-scm-contracts-ending-status]').textContent.includes('NEW'));
     await page.evaluate(()=>pendingLists[0](Object.assign({},fixture,{generated_at:'OLD'})));
     assert.match(await page.locator('[data-scm-contracts-ending-status]').innerText(), /NEW/);
+    await page.evaluate(async()=>{dashboardAction=()=>Promise.reject(new Error('Consulta no disponible'));await loadContractsEnding(true);});
+    assert.equal(await page.evaluate(()=>messages[messages.length-1].title),'No se pudo cargar el listado');
     assert.deepEqual(errors,[]);
     console.log('PASS: four subtabs, weighted amounts, 100% suppression, existing-case popup, saves and retirement validation, escaping, all Excel preview pages, request ordering and mobile layout. QA: '+qaDir);
   } finally { await browser.close(); }

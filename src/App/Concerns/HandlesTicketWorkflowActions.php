@@ -4888,7 +4888,7 @@ trait HandlesTicketWorkflowActions
       : '';
     $select = $this->column_exists($ticketsTable, 'id_ticket') ? '`_ID`, `id_ticket`' : '`_ID`';
     $rows = $this->db->getResults(
-      "SELECT {$select} FROM `{$ticketsTable}` WHERE TRIM(COALESCE(`id_contrato`, '')) IN (" . implode(', ', array_fill(0, count($contractRefs), '?')) . "){$topicSql}" . ($this->column_exists($ticketsTable, 'fecha_terminacion_contrato') ? " AND TRIM(COALESCE(`fecha_terminacion_contrato`, '')) = ?" : '') . " ORDER BY CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC LIMIT 1" . ($this->db->pdo()->inTransaction() ? " FOR UPDATE" : ""),
+      "SELECT {$select} FROM `{$ticketsTable}` WHERE TRIM(COALESCE(`id_contrato`, '')) IN (" . implode(', ', array_fill(0, count($contractRefs), '?')) . "){$topicSql}" . ($this->column_exists($ticketsTable, 'fecha_terminacion_contrato') ? " AND `fecha_terminacion_contrato` = ?" : '') . " ORDER BY CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC LIMIT 1" . ($this->db->pdo()->inTransaction() ? " FOR UPDATE" : ""),
       $this->column_exists($ticketsTable, 'fecha_terminacion_contrato') ? array_merge($contractRefs, [(string) ($contract['fin_contrato'] ?? '')]) : $contractRefs
     );
     if (!is_array($rows) || $rows === [] || !is_array($rows[0])) {

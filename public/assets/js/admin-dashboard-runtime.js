@@ -15467,7 +15467,7 @@
           status.classList.add("is-error");
           status.textContent = error && error.message ? error.message : "No se pudieron cargar los contratos por terminar.";
         }
-        showToast("error", error && error.message ? error.message : "No se pudieron cargar los contratos por terminar.");
+        showToast("error", error && error.message ? error.message : "No se pudieron cargar los contratos por terminar.", "No se pudo cargar el listado");
       });
     }
 

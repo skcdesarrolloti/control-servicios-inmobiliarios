@@ -46,6 +46,9 @@ final class RenewalTestPdo extends PDO {
     $this->sqliteCreateFunction('FLOOR', fn($value) => floor((float) $value));
   }
   public function prepare(string $query, array $options = []): PDOStatement|false {
+    // MySQL numeric dates acquire a coercible collation when converted to text.
+    // Reject the old expression so SQLite cannot conceal this production failure.
+    if (str_contains($query, "TRIM(COALESCE(`fecha_terminacion_contrato`, '')) = ?")) throw new PDOException('Illegal mix of collations on numeric termination date');
     $query = str_replace(' FOR UPDATE', '', $query);
     $query = str_replace(' BETWEEN ? AND ?', ' BETWEEN CAST(? AS INTEGER) AND CAST(? AS INTEGER)', $query);
     if (str_contains($query, 'information_schema.TABLES')) $query = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1";
@@ -125,7 +128,7 @@ function callEndpoint(callable $fn): RenewalResult { try { $fn(); } catch (Renew
 
 $pdo = new RenewalTestPdo(); $db = new \SCM\Core\Database($pdo); $probe = new RenewalProbe($db);
 $pdo->exec('CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY,contrato TEXT,inmueble TEXT,id_inmueble TEXT,id_inmueble_data TEXT,fin_contrato TEXT,estado TEXT,valor_canon TEXT,correo_arrendatario TEXT,id_empleado TEXT,cct_author_id TEXT,cct_modified TEXT)');
-$pdo->exec('CREATE TABLE wp_jet_cct_tickets(_ID INTEGER PRIMARY KEY,id_ticket TEXT,id_contrato TEXT,tema_ayuda TEXT,fecha_terminacion_contrato TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_tickets(_ID INTEGER PRIMARY KEY,id_ticket TEXT,id_contrato TEXT,tema_ayuda TEXT,fecha_terminacion_contrato INTEGER)');
 $pdo->exec('CREATE TABLE wp_jet_cct_inmuebles(_ID INTEGER PRIMARY KEY,codigo TEXT,id_funcionario TEXT,propietario TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_funcionarios(_ID INTEGER PRIMARY KEY,id_empleado TEXT,nombre TEXT,correo TEXT,celular TEXT,id_cargo TEXT,activo TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema(_ID INTEGER PRIMARY KEY,funcion TEXT,valor TEXT)');
@@ -145,6 +148,7 @@ file_put_contents($temp.'/autoload.php', '<?php'); file_put_contents($temp.'/con
 putenv('SHARED_NOTIFICATIONS_PATH='.$temp);
 $service->ensureSchema();
 try {
+  check(count($probe->month((int)date('Y',$end),(int)date('n',$end)))===4,'Month list must load with numeric ticket dates and mixed database collations');
   check($probe->pk('193')['contrato']==='900','Exact PK must beat another contract number');
   foreach (['31/02/2026','00/10/2026','2026-02-31','2026-10-01junk'] as $date) check($probe->parse($date)===0,'Invalid date accepted: '.$date);
   check(date('Y-m-d',$probe->parse('29/02/2028'))==='2028-02-29','Leap day rejected');
