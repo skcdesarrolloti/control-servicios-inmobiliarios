@@ -1,6 +1,6 @@
 # Contratos por terminar · renovación y recibo
 
-Versión 3.3.360. El panel consulta contratos `Entregado` o `Por recibir` por mes de fecha fin. No cambia el estado administrativo de tickets existentes.
+Versión 3.3.361. El panel consulta contratos `Entregado` o `Por recibir` por mes de fecha fin. No cambia el estado administrativo de tickets existentes.
 
 ## Subpestañas
 
@@ -103,3 +103,5 @@ El historial contractual es la auditoría de cambios de valoración, no salida, 
 Editar/anular historial no reinicia probabilidad, no retira reportes de no salida, no cancela sus avisos y no elimina tickets. Esas acciones se realizan desde sus flujos correspondientes. No se realiza limpieza automática de registros de pruebas.
 
 En **Por terminar**, cada contrato muestra su porcentaje actual (o Sin registrar), el estado de no salida y botones independientes para agregar/editar probabilidad y reportar/editar no salida. Cada formulario conserva los datos del otro proceso. No salida y Recibo automático siguen siendo listados.
+
+Los nuevos tickets de retención de los tres flujos solicitan conservar al cliente en SKC SuCasa Inmobiliaria y ofrecer inmuebles similares según sus necesidades y presupuesto. La descripción incluye tipo, destinación, canon mensual del contrato, habitaciones, baños, área construida y barrio. Se consulta la ficha del inmueble asociada al contrato; los datos faltantes se muestran como Sin registrar, sin sustituir el canon vigente por el precio publicado del inmueble.

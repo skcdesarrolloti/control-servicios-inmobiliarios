@@ -4983,7 +4983,9 @@ trait HandlesTicketWorkflowActions
     $address = $this->contractTerminationFirstText([$contract, $ticket], ['direccion']);
     $status = $term === 'dentro' ? 'dentro de término' : ($term === 'fuera' ? 'fuera de término' : '');
     $sourceLabel = trim($sourceLabel) !== '' ? trim($sourceLabel) : 'solicitud contractual';
-    $description = \SCM\Modules\Contracts\ContractRetentionDescription::build([
+    $propertyRow = $this->contractRetentionProperty($contract);
+    $description = \SCM\Modules\Contracts\ContractRetentionDescription::build(array_merge(
+      \SCM\Modules\Contracts\ContractRetentionDescription::propertyContext($contract, $propertyRow, $ticket), [
       'source' => $sourceLabel,
       'source_ticket' => $term !== '' && $logicalTicket !== '-' ? $logicalTicket : '',
       'status' => $status,
@@ -4994,7 +4996,7 @@ trait HandlesTicketWorkflowActions
       'end_date' => ($endTs = $this->contractTerminationTimestamp($contract['fin_contrato'] ?? '')) > 0 ? date('d/m/Y', $endTs) : '',
       'document_url' => $actaUrl,
       'document_title' => $actaTitle,
-    ]);
+    ]));
 
     $input = [
       'ticket_mode' => 'administrativo',
